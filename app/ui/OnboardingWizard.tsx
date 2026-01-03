@@ -1,7 +1,7 @@
 // app/ui/OnboardingWizard.tsx
 "use client";
 
-import React, { useEffect, useMemo, useState } from "react";
+import React, { useEffect, useMemo, useRef, useState } from "react";
 import { CREWS, TURTLES } from "./constants";
 
 type NamegenResponse = {
@@ -18,7 +18,7 @@ type NamegenResponse = {
 type CityPrediction = { description: string; place_id: string };
 
 type WizardState = {
-  step: 1 | 2 | 3 | 4 | 5;
+  step: 1 | 2 | 3 | 4 | 5; // keep 5 for backward-compat saved state, but we won't use it
   sessionId: string;
 
   topping: string;
@@ -34,16 +34,38 @@ type WizardState = {
 
   city: string;
 
-  // ✅ multi-select turtles
+  // ✅ multi-select turtles (stores TURTLES[*].id)
   turtles: string[];
 
   crews: string[];
 
   seenNames: string[];
 
+  // ✅ Discord linking (Phase 3)
+  discordId?: string;
+  discordJoined?: boolean;
+
   submitting: boolean;
   error?: string;
   success?: boolean;
+};
+
+type CrewOption = {
+  id: string;
+  label: string; // Crew name
+  turtles?: string[] | string; // from sheet: comma-delimited turtle names
+  role?: string;
+  channel?: string;
+  event?: string;
+  emoji?: string;
+  sheet?: string;
+  callTime?: string;
+  callLength?: string;
+  tasks?: { label: string; url?: string }[];
+};
+
+type CrewMappingsResponse = {
+  crews: CrewOption[];
 };
 
 function uuidLike() {
@@ -52,6 +74,25 @@ function uuidLike() {
 
 // bump key to avoid old saved state shape conflicts (turtle -> turtles)
 const LS_KEY = "mob_pizza_onboarding_v3";
+const PENDING_CLAIM_KEY = "mob_pizza_onboarding_pending_claim_v1";
+
+function norm(s: unknown) {
+  return String(s ?? "")
+    .trim()
+    .replace(/\s+/g, " ");
+}
+function normKey(s: unknown) {
+  return norm(s).toLowerCase();
+}
+function splitTurtlesCell(v: unknown): string[] {
+  if (Array.isArray(v)) return v.map(norm).filter(Boolean);
+  const s = norm(v);
+  if (!s) return [];
+  return s
+    .split(/[,/|]+/)
+    .map((x) => norm(x))
+    .filter(Boolean);
+}
 
 export default function OnboardingWizard() {
   const [s, setS] = useState<WizardState>(() => ({
@@ -64,8 +105,86 @@ export default function OnboardingWizard() {
     turtles: [],
     crews: [],
     seenNames: [],
+    discordId: undefined,
+    discordJoined: false,
     submitting: false,
   }));
+
+  // ✅ dynamic crews from Crew Mappings sheet (fallback to constants)
+  const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
+    (CREWS ?? []).map((c: any) => ({
+      id: String(c.id),
+      label: String(c.label ?? c.id),
+      turtles: [],
+    }))
+  );
+  const [crewsLoading, setCrewsLoading] = useState(false);
+
+  // ✅ Pick up Discord callback params (/?discordId=...&discordJoined=1&sessionId=...)
+  useEffect(() => {
+    try {
+      const url = new URL(window.location.href);
+      const discordId = url.searchParams.get("discordId");
+      const joined = url.searchParams.get("discordJoined");
+      const returnedSessionId = url.searchParams.get("sessionId");
+
+      if (discordId) {
+        setS((p) => ({
+          ...p,
+          discordId,
+          discordJoined: joined === "1" || joined === "true",
+          sessionId: returnedSessionId || p.sessionId,
+        }));
+
+        // clean URL
+        url.searchParams.delete("discordId");
+        url.searchParams.delete("discordJoined");
+        url.searchParams.delete("sessionId");
+        window.history.replaceState({}, "", url.toString());
+      }
+    } catch { }
+  }, []);
+
+  // ✅ Fetch crew mappings
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setCrewsLoading(true);
+        const res = await fetch("/api/crew-mappings", { cache: "no-store" });
+        const data = (await res.json()) as CrewMappingsResponse | any;
+        if (!res.ok) throw new Error(data?.error || "Failed to load crews");
+
+        const crews: CrewOption[] = Array.isArray(data?.crews) ? data.crews : [];
+        const cleaned = crews
+          .map((c) => ({
+            ...c,
+            id: String((c as any)?.id ?? ""),
+            label: norm((c as any)?.label ?? ""),
+            turtles: splitTurtlesCell((c as any)?.turtles),
+            emoji: norm((c as any)?.emoji) || undefined,
+            role: norm((c as any)?.role) || undefined,
+            channel: norm((c as any)?.channel) || undefined,
+            event: norm((c as any)?.event) || undefined,
+            sheet: norm((c as any)?.sheet) || undefined,
+            callTime: norm((c as any)?.callTime) || undefined,
+            callLength: norm((c as any)?.callLength) || undefined,
+            tasks: Array.isArray((c as any)?.tasks) ? (c as any).tasks : [],
+          }))
+          .filter((c) => c.id && c.label);
+
+        if (!alive) return;
+        if (cleaned.length) setCrewOptions(cleaned);
+      } catch {
+        // keep fallback crews
+      } finally {
+        if (alive) setCrewsLoading(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
 
   // Load draft from localStorage (with migration for old "turtle" string)
   useEffect(() => {
@@ -77,20 +196,24 @@ export default function OnboardingWizard() {
         const migratedTurtles: string[] = Array.isArray(parsed?.turtles)
           ? parsed.turtles
           : parsed?.turtle
-          ? [String(parsed.turtle)]
-          : [];
+            ? [String(parsed.turtle)]
+            : [];
 
         setS((prev) => ({
           ...prev,
           ...parsed,
+          // if a saved state is on step 5, bring them to step 4 (combined)
+          step: parsed?.step === 5 ? 4 : (parsed?.step ?? prev.step),
           turtles: migratedTurtles,
           submitting: false,
           error: undefined,
           success: false,
           seenNames: Array.isArray(parsed?.seenNames) ? parsed.seenNames : [],
+          discordId: typeof parsed?.discordId === "string" ? parsed.discordId : prev.discordId,
+          discordJoined: typeof parsed?.discordJoined === "boolean" ? parsed.discordJoined : prev.discordJoined,
         }));
       }
-    } catch {}
+    } catch { }
   }, []);
 
   // Persist draft
@@ -100,7 +223,7 @@ export default function OnboardingWizard() {
         LS_KEY,
         JSON.stringify({ ...s, submitting: false, error: undefined, success: false })
       );
-    } catch {}
+    } catch { }
   }, [
     s.step,
     s.topping,
@@ -113,6 +236,8 @@ export default function OnboardingWizard() {
     s.crews,
     s.sessionId,
     s.seenNames,
+    s.discordId,
+    s.discordJoined,
   ]);
 
   const canGenerate = s.topping.trim().length > 0 && s.mafiaMovieTitle.trim().length > 0;
@@ -207,13 +332,22 @@ export default function OnboardingWizard() {
           turtles: s.turtles,
 
           crews: s.crews,
+
+          // ✅ Discord (include in payload so backend can embed in RawJSON)
+          discordId: s.discordId || "",
+          discordJoined: !!s.discordJoined,
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data?.error || "Submit failed");
 
-      setS((p) => ({ ...p, submitting: false, success: true, error: undefined, step: 5 }));
+      // clear the pending claim flag if it existed
+      try {
+        localStorage.removeItem(PENDING_CLAIM_KEY);
+      } catch { }
+
+      setS((p) => ({ ...p, submitting: false, success: true, error: undefined, step: 4 }));
     } catch (e: any) {
       setS((p) => ({
         ...p,
@@ -224,6 +358,39 @@ export default function OnboardingWizard() {
     }
   }
 
+  function connectDiscord() {
+    window.location.href = `/api/discord/login?state=${encodeURIComponent(s.sessionId)}`;
+  }
+
+  async function claimRoles() {
+    // If we don't have a discordId yet, start OAuth and auto-finish when we come back.
+    if (!s.discordId) {
+      try {
+        localStorage.setItem(PENDING_CLAIM_KEY, "1");
+      } catch { }
+      connectDiscord();
+      return;
+    }
+
+    // Already linked, just save/claim now.
+    submitAll();
+  }
+
+  // If user just returned from Discord and they intended to claim roles, auto-submit.
+  useEffect(() => {
+    if (!s.discordId) return;
+
+    let pending = false;
+    try {
+      pending = localStorage.getItem(PENDING_CLAIM_KEY) === "1";
+    } catch { }
+
+    if (pending && !s.submitting && !s.success) {
+      submitAll();
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [s.discordId]);
+
   const stepTitle = useMemo(() => {
     switch (s.step) {
       case 1:
@@ -231,30 +398,80 @@ export default function OnboardingWizard() {
       case 2:
         return "2) Your city";
       case 3:
-        return "3) Choose Ninja Turtles";
+        return "3) What kind of team member are you?";
       case 4:
-        return "4) Choose PizzaDAO crews";
       case 5:
-        return "Done";
+        return "4) Choose Crews:";
     }
   }, [s.step]);
 
+  // ✅ Map turtle ids -> labels so we can match sheet values like "Leonardo"
+  const turtleIdToLabel = useMemo(() => {
+    const m: Record<string, string> = {};
+    for (const t of TURTLES as any[]) {
+      if (!t) continue;
+      const id = String(t.id ?? "").trim();
+      const label = String(t.label ?? "").trim();
+      if (id) m[id] = label || id;
+    }
+    return m;
+  }, []);
+
+  // ✅ RECOMMENDATION:
+  // Crew is “Recommended” if ANY selected turtle matches ANY turtle in that crew row's "Turtles" column.
+  // Now returns a Map<CrewID, MatchedTurtleID[]> so we can show WHY it's recommended.
+  const recommendedCrewReasons = useMemo(() => {
+    const map = new Map<string, string[]>();
+    if (!s.turtles.length) return map;
+
+    // Build a quick lookup for selected turtles: id -> id (normalized)
+    // We want to preserve the ORIGINAL selected ID (s.turtles elements) to display their images later.
+    const selectedTurtles = s.turtles; // these are IDs like "Leonardo"
+
+    for (const c of crewOptions) {
+      const crewIdStr = String(c.id);
+      const crewTurtlesNormalized = new Set(
+        splitTurtlesCell((c as any)?.turtles).map(normKey)
+      );
+
+      const matches: string[] = [];
+
+      for (const tId of selectedTurtles) {
+        // We match if the turtle ID itself or its label matches one of the crew's turtle entries
+        const tIdKey = normKey(tId);
+        const tLabelKey = normKey(turtleIdToLabel[tId]);
+
+        if (crewTurtlesNormalized.has(tIdKey) || crewTurtlesNormalized.has(tLabelKey)) {
+          matches.push(tId);
+        }
+      }
+
+      if (matches.length > 0) {
+        map.set(crewIdStr, matches);
+      }
+    }
+    return map;
+  }, [s.turtles, crewOptions, turtleIdToLabel]);
+
   return (
     <div style={card()}>
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          gap: 12,
-          alignItems: "baseline",
-        }}
-      >
-        <h2 style={{ margin: 0 }}>{stepTitle}</h2>
+      {/* Consolidated Selection Summary */}
+      {(s.mafiaName || s.city || s.turtles.length > 0) && (
+        <div style={{ opacity: 0.9, fontSize: 16, borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: 8, marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>
+          {s.mafiaName && <span>Name: <b>{s.mafiaName}</b></span>}
+          {s.city && <span> • City: <b>{s.city}</b></span>}
+          {s.turtles.length > 0 && <span> • Roles: <b>{s.turtles.join(", ")}</b></span>}
+        </div>
+      )}
+
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
+        <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>
         <button
           onClick={() => {
             try {
               localStorage.removeItem(LS_KEY);
-            } catch {}
+              localStorage.removeItem(PENDING_CLAIM_KEY);
+            } catch { }
             setS({
               step: 1,
               sessionId: uuidLike(),
@@ -265,6 +482,8 @@ export default function OnboardingWizard() {
               turtles: [],
               crews: [],
               seenNames: [],
+              discordId: undefined,
+              discordJoined: false,
               submitting: false,
             });
           }}
@@ -275,7 +494,7 @@ export default function OnboardingWizard() {
       </div>
 
       {s.error && <div style={alert("error")}>{s.error}</div>}
-      {s.success && <div style={alert("success")}>Saved to Google Sheet ✅</div>}
+
 
       {s.step === 1 && (
         <div style={{ display: "grid", gap: 12 }}>
@@ -333,8 +552,7 @@ export default function OnboardingWizard() {
 
             {s.resolvedMovieTitle && (
               <span style={{ opacity: 0.75 }}>
-                Matched: <b>{s.resolvedMovieTitle}</b>{" "}
-                {s.releaseDate ? `(${s.releaseDate.slice(0, 4)})` : ""}
+                Matched: <b>{s.resolvedMovieTitle}</b> {s.releaseDate ? `(${s.releaseDate.slice(0, 4)})` : ""}
               </span>
             )}
           </div>
@@ -362,15 +580,10 @@ export default function OnboardingWizard() {
 
       {s.step === 2 && (
         <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ opacity: 0.85 }}>
-            Chosen name: <b>{s.mafiaName}</b>
-          </div>
+
 
           <Field label="City">
-            <CityAutocomplete
-              value={s.city}
-              onChange={(v) => setS((p) => ({ ...p, city: v }))}
-            />
+            <CityAutocomplete value={s.city} onChange={(v) => setS((p) => ({ ...p, city: v }))} />
           </Field>
 
           <div style={{ display: "flex", gap: 10 }}>
@@ -390,36 +603,24 @@ export default function OnboardingWizard() {
 
       {s.step === 3 && (
         <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ opacity: 0.85 }}>
-            Name: <b>{s.mafiaName}</b> • City: <b>{s.city}</b>
-          </div>
+
 
           <div style={{ opacity: 0.75, fontSize: 13 }}>Pick one or more:</div>
 
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
             {TURTLES.map((t) => {
-              const selected = s.turtles.includes(t);
+              const selected = s.turtles.includes(t.id);
               return (
-                <button key={t} onClick={() => toggleTurtle(t)} style={tile(selected)}>
-                  <div
-                    style={{
-                      display: "flex",
-                      justifyContent: "space-between",
-                      alignItems: "baseline",
-                      gap: 10,
-                    }}
-                  >
-                    <div style={{ fontWeight: 800 }}>{t}</div>
-                    <div style={{ opacity: 0.75, fontSize: 12 }}>{selected ? "Selected" : ""}</div>
-                  </div>
-                  <div style={{ opacity: 0.7, fontSize: 13 }}>
-                    {t === "Leonardo"
-                      ? "Leader energy"
-                      : t === "Michelangelo"
-                      ? "Party energy"
-                      : t === "Donatello"
-                      ? "Builder energy"
-                      : "Chaos energy"}
+                <button key={t.id} onClick={() => toggleTurtle(t.id)} style={tile(selected)}>
+                  <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+                    <img src={t.image} alt={t.label} style={{ width: 40, height: 40, objectFit: "contain" }} />
+
+                    <div style={{ flex: 1 }}>
+                      <div style={{ fontWeight: 800 }}>{t.label}</div>
+                      <div style={{ opacity: 0.7, fontSize: 13 }}>{t.role}</div>
+                    </div>
+
+                    {selected && <div style={{ fontSize: 12, opacity: 0.7 }}>Selected</div>}
                   </div>
                 </button>
               );
@@ -445,85 +646,201 @@ export default function OnboardingWizard() {
         </div>
       )}
 
-      {s.step === 4 && (
+      {(s.step === 4 || s.step === 5) && (
         <div style={{ display: "grid", gap: 12 }}>
-          <div style={{ opacity: 0.85 }}>
-            Name: <b>{s.mafiaName}</b> • City: <b>{s.city}</b> • Turtles:{" "}
-            <b>{s.turtles.length ? s.turtles.join(", ") : "(none)"}</b>
-          </div>
 
-          <div style={{ fontWeight: 700 }}>Choose crews:</div>
+
+          {crewsLoading && (
+            <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
+              <div style={{ opacity: 0.65, fontSize: 13 }}>Loading crews…</div>
+            </div>
+          )}
+
           <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-            {CREWS.map((c) => {
-              const checked = s.crews.includes(c.id);
+            {crewOptions.map((c) => {
+              const idStr = String(c.id);
+              const checked = s.crews.includes(idStr);
+              const recommended = recommendedCrewReasons.get(idStr);
+
               return (
-                <label key={c.id} style={crewRow(checked)}>
+                <label key={idStr} style={crewRow(checked)}>
                   <input
                     type="checkbox"
                     checked={checked}
-                    onChange={() => toggleCrew(c.id)}
+                    onChange={() => toggleCrew(idStr)}
                     style={{ transform: "scale(1.1)" }}
                   />
-                  <span style={{ fontWeight: 600 }}>{c.label}</span>
+
+                  <div style={{ display: "grid", gap: 4 }}>
+                    <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                      <span style={{ fontWeight: 700 }}>
+                        {c.emoji ? `${c.emoji} ` : ""}
+                        {c.label}
+                      </span>
+
+                      {recommended && recommended.length > 0 && (
+                        <div
+                          style={{
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                            padding: "2px 8px",
+                            borderRadius: 999,
+                            border: "1px solid rgba(0,0,0,0.18)",
+                            background: "rgba(0,0,0,0.04)",
+                          }}
+                        >
+                          <div style={{ display: "flex", alignItems: "center" }}>
+                            {recommended.map((tId, idx) => {
+                              const img = TURTLES.find((t) => t.id === tId)?.image;
+                              if (!img) return null;
+                              return (
+                                <img
+                                  key={tId}
+                                  src={img}
+                                  alt={tId}
+                                  style={{
+                                    width: 16.8,
+                                    height: 16.8,
+                                    marginLeft: idx === 0 ? 0 : -4,
+                                    objectFit: "contain",
+                                    flexShrink: 0,
+                                  }}
+                                />
+                              );
+                            })}
+                          </div>
+                          <span style={{ fontSize: 12, fontWeight: 750 }}>Recommended</span>
+                        </div>
+                      )}
+                    </div>
+
+                    {(c.callTime || c.callLength) && (
+                      <div style={{ opacity: 0.7, fontSize: 13 }}>
+                        {c.callTime ? c.callTime : ""}
+                        {c.callTime && c.callLength ? " • " : ""}
+                        {c.callLength ? c.callLength : ""}
+                      </div>
+                    )}
+
+                    {c.tasks && c.tasks.length > 0 && (
+                      <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
+                        <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: 0.5 }}>Current Tasks</div>
+                        {c.tasks.map((t, idx) => (
+                          <div key={idx} style={{ fontSize: 12, opacity: 0.85, display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
+                            <span style={{ flexShrink: 0 }}>•</span>
+                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                              {t.url ? (
+                                <a
+                                  href={t.url}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  onClick={(e) => e.stopPropagation()}
+                                  style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
+                                >
+                                  {t.label}
+                                </a>
+                              ) : (
+                                <span>{t.label}</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+
+                    {c.sheet && (
+                      <a
+                        href={c.sheet}
+                        target="_blank"
+                        rel="noreferrer"
+                        onClick={(e) => e.stopPropagation()}
+                        style={{
+                          fontSize: 13,
+                          fontWeight: 650,
+                          opacity: 0.85,
+                          textDecoration: "none",
+                        }}
+                        title={c.sheet}
+                      >
+                        Open crew sheet ↗
+                      </a>
+                    )}
+                  </div>
                 </label>
               );
             })}
           </div>
 
-          <div style={{ display: "flex", gap: 10 }}>
-            <button onClick={() => setS((p) => ({ ...p, step: 3 }))} style={btn("secondary")}>
-              Back
-            </button>
-            <button onClick={submitAll} disabled={s.submitting} style={btn("primary", s.submitting)}>
-              {s.submitting ? "Saving…" : "Save to Google Sheet"}
-            </button>
+          {/* ✅ Combined final action */}
+          <div style={{ display: "grid", gap: 6 }}>
+            <div style={{ display: "flex", gap: 10 }}>
+              <button onClick={() => setS((p) => ({ ...p, step: 3 }))} style={btn("secondary")}>
+                Back
+              </button>
+              <button onClick={claimRoles} disabled={s.submitting} style={btn("primary", s.submitting)}>
+                {s.submitting ? "Claiming…" : "Claim Discord Roles"}
+              </button>
+            </div>
+
+
           </div>
 
-          <div style={{ opacity: 0.7, fontSize: 13 }}>(Crews are optional; you can submit with none selected.)</div>
-        </div>
-      )}
+          {s.success && (
+            <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
+              <div style={alert("success")}>
+                Done ✅ You’re officially <b>{s.mafiaName}</b>.
+              </div>
 
-      {s.step === 5 && (
-        <div style={{ display: "grid", gap: 12 }}>
-          <div style={alert("success")}>
-            Saved ✅ You’re officially <b>{s.mafiaName}</b>.
-          </div>
-          <div style={{ lineHeight: 1.6 }}>
-            <div>
-              <b>City:</b> {s.city}
+              <div style={{ lineHeight: 1.6 }}>
+                <div>
+                  <b>City:</b> {s.city}
+                </div>
+                <div>
+                  <b>Turtles:</b> {s.turtles.length ? s.turtles.join(", ") : "(none)"}
+                </div>
+                <div>
+                  <b>Crews:</b> {s.crews.length ? s.crews.join(", ") : "(none)"}
+                </div>
+                <div>
+                  <b>Movie:</b> {s.resolvedMovieTitle ?? s.mafiaMovieTitle}
+                </div>
+                {s.discordId && (
+                  <div>
+                    <b>Discord:</b> {s.discordJoined ? "Joined ✅" : "Linked ✅"} •{" "}
+                    <span style={{ fontFamily: "monospace" }}>{s.discordId}</span>
+                  </div>
+                )}
+              </div>
+
+
             </div>
-            <div>
-              <b>Turtles:</b> {s.turtles.length ? s.turtles.join(", ") : "(none)"}
-            </div>
-            <div>
-              <b>Crews:</b> {s.crews.length ? s.crews.join(", ") : "(none)"}
-            </div>
-            <div>
-              <b>Movie:</b> {s.resolvedMovieTitle ?? s.mafiaMovieTitle}
-            </div>
-          </div>
-          <button onClick={() => setS((p) => ({ ...p, step: 1 }))} style={btn("secondary")}>
-            Start over
-          </button>
+          )}
         </div>
       )}
     </div>
   );
 }
 
-function CityAutocomplete({
-  value,
-  onChange,
-}: {
-  value: string;
-  onChange: (v: string) => void;
-}) {
+function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<CityPrediction[]>([]);
   const [loading, setLoading] = useState(false);
 
+  // ✅ If the user picked an item, we don't want the effect to re-open for that exact value.
+  const suppressForValueRef = useRef<string>(value);
+
   useEffect(() => {
     const q = value.trim();
+
+    // If this value was just selected from the dropdown, suppress fetching + reopening.
+    if (q && q === suppressForValueRef.current) {
+      setOpen(false);
+      setItems([]);
+      setLoading(false);
+      return;
+    }
+
     if (q.length < 2) {
       setItems([]);
       setOpen(false);
@@ -555,18 +872,22 @@ function CityAutocomplete({
     <div style={{ position: "relative" }}>
       <input
         value={value}
-        onChange={(e) => onChange(e.target.value)}
-        onFocus={() => value.trim().length >= 2 && setOpen(true)}
+        onChange={(e) => {
+          // user is typing again; allow future autocompletes
+          suppressForValueRef.current = "";
+          onChange(e.target.value);
+        }}
+        onFocus={() => value.trim().length >= 2 && items.length > 0 && setOpen(true)}
         onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        placeholder="Brooklyn, NY"
+        placeholder="New York, NY"
         style={input()}
         autoComplete="off"
       />
+
       {loading && (
-        <div style={{ position: "absolute", right: 10, top: 10, opacity: 0.6, fontSize: 12 }}>
-          …
-        </div>
+        <div style={{ position: "absolute", right: 10, top: 10, opacity: 0.6, fontSize: 12 }}>…</div>
       )}
+
       {open && items.length > 0 && (
         <div
           style={{
@@ -589,10 +910,11 @@ function CityAutocomplete({
               type="button"
               onMouseDown={(e) => e.preventDefault()} // keeps focus
               onClick={() => {
+                suppressForValueRef.current = it.description; // ✅ prevent re-open on this selection
                 onChange(it.description);
                 setOpen(false);
-            }}
-
+                setItems([]); // ✅ nothing to show even if focused
+              }}
               style={{
                 width: "100%",
                 textAlign: "left",

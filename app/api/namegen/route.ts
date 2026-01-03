@@ -156,6 +156,65 @@ function cacheSet(key: string, value: any) {
 }
 
 /**
+ * In-flight dedupe:
+ * Prevents users from firing multiple OpenAI calls by repeatedly clicking
+ * Generate/Regenerate while an identical request is already running.
+ */
+const inflight = new Map<string, Promise<any>>();
+
+/**
+ * Local RPM gate (best-effort):
+ * If you're on a tiny RPM limit (like 3 RPM), fail fast with Retry-After
+ * instead of calling OpenAI and getting a raw 429.
+ *
+ * NOTE: This is per-process. In serverless with multiple instances, it's not
+ * a global limiter, but it helps a lot in dev/single-instance deployments.
+ */
+const rpmWindow: number[] = [];
+const RPM_LIMIT = 3;
+const WINDOW_MS = 60_000;
+
+function checkLocalRpmOrThrow() {
+  const now = Date.now();
+  while (rpmWindow.length && now - rpmWindow[0] > WINDOW_MS) rpmWindow.shift();
+  if (rpmWindow.length >= RPM_LIMIT) {
+    const retryMs = WINDOW_MS - (now - rpmWindow[0]);
+    const retryAfter = Math.max(1, Math.ceil(retryMs / 1000));
+    const e: any = new Error("Local RPM limit hit");
+    e.status = 429;
+    e.retryAfter = retryAfter;
+    throw e;
+  }
+  rpmWindow.push(now);
+}
+
+function isRateLimitError(err: any) {
+  const status = err?.status ?? err?.response?.status;
+  const msg = String(err?.message ?? "").toLowerCase();
+  return status === 429 || msg.includes("rate limit") || msg.includes("429");
+}
+
+/**
+ * Minimal retry/backoff for OpenAI 429s.
+ */
+async function callOpenAIWithBackoff<T>(fn: () => Promise<T>, tries = 3) {
+  let lastErr: any;
+  for (let i = 0; i < tries; i++) {
+    try {
+      return await fn();
+    } catch (e: any) {
+      lastErr = e;
+      if (!isRateLimitError(e) || i === tries - 1) throw e;
+
+      // exponential backoff + jitter
+      const delay = Math.min(3000, 300 * 2 ** i) + Math.floor(Math.random() * 250);
+      await new Promise((r) => setTimeout(r, delay));
+    }
+  }
+  throw lastErr;
+}
+
+/**
  * RULE MODEL:
  * - Name is exactly TWO PARTS (two chunks):
  *   1) topping phrase (can be multiword, e.g. "Green Pepper")
@@ -354,7 +413,21 @@ export async function POST(req: Request) {
 
         const contains = titleLower.includes(inputTitle.toLowerCase());
 
+        // Light nostalgia, but don't reward ancient years over popularity.
         const year = r.release_date ? Number(r.release_date.slice(0, 4)) : 9999;
+
+        // Soft preference for ~1970–2005 "mafia era" (doesn't hard-ban others)
+        const eraBonus =
+          year >= 1970 && year <= 2005 ? 250 : 0;
+
+        // Small penalty for *very* old titles unless they are massively voted
+        const ancientPenalty =
+          year < 1955 ? -800 : 0;
+
+        // If the user typed a year (e.g. "Scarface 1983"), respect it
+        const inputHasYear = /\b(19|20)\d{2}\b/.test(inputTitle);
+        const yearMatchBonus =
+          inputHasYear && inputTitle.includes(String(year)) ? 2500 : 0;
 
         const overview = (r.overview ?? "").toLowerCase();
         const mafiaHit =
@@ -375,6 +448,7 @@ export async function POST(req: Request) {
         const voteScore = Math.log10(votes + 1) * 250; // ~0..1000-ish
         const popScore = pop * 8;
 
+
         const score =
           (exact ? 8000 : 0) +
           (exactLoose ? 6000 : 0) +
@@ -382,7 +456,9 @@ export async function POST(req: Request) {
           (mafiaHit ? 700 : 0) +
           popScore +
           voteScore +
-          Math.max(0, 2600 - year) +
+          eraBonus +
+          ancientPenalty +
+          yearMatchBonus +
           (credible ? 0 : -10_000);
 
         return { ...r, _score: score };
@@ -399,8 +475,8 @@ export async function POST(req: Request) {
     const releaseDate = best.release_date ?? "";
 
     // Cache only for non-force calls (Generate). Regenerate uses force:true so it always changes.
-    // Bump cache version so old "Al Pacino" lastname-phrase cache won't hit.
-    const cacheKey = `v7|${movieId}|${toppingPhrase}|${style}`;
+    // Bump cache version so old behavior won't hit.
+    const cacheKey = `v9|${movieId}|${toppingPhrase}|${style}`;
     if (!force) {
       const cached = cacheGet(cacheKey);
       if (cached) return NextResponse.json({ ...cached, cached: true });
@@ -437,8 +513,15 @@ export async function POST(req: Request) {
 
     const { rerank } = buildFilterAndReranker(toppingPhrase, topCast, style);
 
-    // We’ll retry a few times if the model outputs repeats or invalid combos.
-    const maxAttempts = 3;
+    // ✅ In-flight dedupe key collapses repeated clicks while the first is running.
+    // Include exclude list (normalized) so "Regenerate (no repeats)" stays correct.
+    const excludeKey = Array.from(excludeSet).sort().join("|");
+    const inflightKey = `${cacheKey}|${force ? "force" : "gen"}|ex=${excludeKey}`;
+
+    if (inflight.has(inflightKey)) {
+      const payload = await inflight.get(inflightKey)!;
+      return NextResponse.json({ ...payload, deduped: true });
+    }
 
     const system = `
 You are a comedy name-writer with excellent taste for mafia-movie nicknames.
@@ -460,16 +543,16 @@ Hard rules (MUST follow):
 
 Return JSON:
 {
-  "candidatePool": ["..."],  // 50 items
+  "candidatePool": ["..."],  // 120 items
   "suggestions": ["...", "...", "..."] // best 3 in order
 }
 `;
 
-    let finalSuggestions: string[] = [];
-    let finalPool: string[] = [];
-    let lastRaw: any = null;
+    // ✅ Only ONE OpenAI call per request (prevents single-click consuming multiple RPM).
+    const job = (async () => {
+      // Best-effort local throttle so we fail fast with a friendly Retry-After.
+      checkLocalRpmOrThrow();
 
-    for (let attempt = 1; attempt <= maxAttempts; attempt++) {
       const promptObj = {
         toppingPhrase,
         movie: {
@@ -482,29 +565,27 @@ Return JSON:
         cast: topCast,
         excludeNames: Array.from(excludeSet).slice(0, 200),
         instruction:
-          "Generate 50 candidates, then pick the best 3. Use EXACT forms only. Do NOT output anything in excludeNames (case-insensitive).",
-        attempt,
+          "Generate 120 candidates, then pick the best 3. Use EXACT forms only. Do NOT output anything in excludeNames (case-insensitive).",
       };
 
-      const resp = await openai.responses.create({
-        model: "gpt-4o-mini",
-        input: [
-          { role: "system", content: system },
-          { role: "user", content: JSON.stringify(promptObj) },
-        ],
-        text: { format: { type: "json_object" } },
-        max_output_tokens: 1000,
-      });
+      const resp = await callOpenAIWithBackoff(() =>
+        openai.responses.create({
+          model: "gpt-4o-mini",
+          input: [
+            { role: "system", content: system },
+            { role: "user", content: JSON.stringify(promptObj) },
+          ],
+          text: { format: { type: "json_object" } },
+          max_output_tokens: 1800,
+        })
+      );
 
       let parsed: any;
       try {
         parsed = JSON.parse(resp.output_text);
       } catch {
-        lastRaw = resp.output_text;
-        continue;
+        throw new Error("Model returned invalid JSON.");
       }
-
-      lastRaw = parsed;
 
       const rawPool: string[] = Array.isArray(parsed?.candidatePool) ? parsed.candidatePool : [];
       const rawSuggestions: string[] = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
@@ -516,49 +597,55 @@ Return JSON:
       // Remove excluded names (previous batches)
       const fresh = reranked.filter((n) => !excludeSet.has(n.trim().toLowerCase()));
 
-      const suggestions = fresh.slice(0, 3);
-      const pool = fresh.slice(0, 50);
+      const finalSuggestions = fresh.slice(0, 3);
+      const finalPool = fresh.slice(0, 120);
 
-      if (suggestions.length >= 3) {
-        finalSuggestions = suggestions;
-        finalPool = pool;
-        break;
+      if (finalSuggestions.length < 3) {
+        throw new Error(
+          "Could not generate 3 new (non-repeating) names under the rules. Try a different topping/movie or loosen constraints."
+        );
       }
-    }
 
-    if (finalSuggestions.length < 3) {
-      return NextResponse.json(
-        {
-          error:
-            "Could not generate 3 new (non-repeating) names under the rules. Try a different topping/movie or loosen constraints.",
-          raw: lastRaw,
+      const payload = {
+        cached: false,
+        topping: toppingPhrase,
+        mafiaMovieTitle,
+        resolvedMovieTitle: best.title,
+        tmdbMovieId: movieId,
+        releaseDate,
+        style,
+        suggestions: finalSuggestions,
+        candidatePool: finalPool,
+      };
+
+      if (!force) cacheSet(cacheKey, payload);
+
+      return payload;
+    })();
+
+    inflight.set(inflightKey, job);
+
+    try {
+      const payload = await job;
+
+      return new NextResponse(JSON.stringify(payload), {
+        headers: {
+          "Content-Type": "application/json",
+          "Cache-Control": force ? "no-store" : "s-maxage=86400, stale-while-revalidate=604800",
         },
-        { status: 502 }
+      });
+    } finally {
+      inflight.delete(inflightKey);
+    }
+  } catch (err: any) {
+    if (err?.status === 429 || isRateLimitError(err)) {
+      const retryAfter = Number(err?.retryAfter ?? 20);
+      return NextResponse.json(
+        { error: `Rate limited by OpenAI. Please try again in ~${retryAfter}s.` },
+        { status: 429, headers: { "Retry-After": String(retryAfter) } }
       );
     }
 
-    const payload = {
-      cached: false,
-      topping: toppingPhrase,
-      mafiaMovieTitle,
-      resolvedMovieTitle: best.title,
-      tmdbMovieId: movieId,
-      releaseDate,
-      style,
-      suggestions: finalSuggestions,
-      candidatePool: finalPool,
-    };
-
-    if (!force) cacheSet(cacheKey, payload);
-
-    return new NextResponse(JSON.stringify(payload), {
-      headers: {
-        "Content-Type": "application/json",
-        // Regenerate should always be fresh
-        "Cache-Control": force ? "no-store" : "s-maxage=86400, stale-while-revalidate=604800",
-      },
-    });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
+    return NextResponse.json({ error: String(err?.message ?? "Unknown error") }, { status: 500 });
   }
 }
