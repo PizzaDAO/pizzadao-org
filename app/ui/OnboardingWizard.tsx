@@ -2,6 +2,7 @@
 "use client";
 
 import React, { useEffect, useMemo, useRef, useState } from "react";
+import { useRouter } from "next/navigation";
 import { CREWS, TURTLES } from "./constants";
 
 type NamegenResponse = {
@@ -18,7 +19,7 @@ type NamegenResponse = {
 type CityPrediction = { description: string; place_id: string };
 
 type WizardState = {
-  step: 1 | 2 | 3 | 4 | 5; // keep 5 for backward-compat saved state, but we won't use it
+  step: 0 | 1 | 2 | 3 | 4 | 5;
   sessionId: string;
 
   topping: string;
@@ -45,6 +46,7 @@ type WizardState = {
   discordId?: string;
   discordJoined?: boolean;
 
+  memberId?: string;
   submitting: boolean;
   error?: string;
   success?: boolean;
@@ -95,8 +97,9 @@ function splitTurtlesCell(v: unknown): string[] {
 }
 
 export default function OnboardingWizard() {
+  const router = useRouter();
   const [s, setS] = useState<WizardState>(() => ({
-    step: 1,
+    step: 0,
     sessionId: uuidLike(),
     topping: "",
     mafiaMovieTitle: "",
@@ -107,8 +110,11 @@ export default function OnboardingWizard() {
     seenNames: [],
     discordId: undefined,
     discordJoined: false,
+    memberId: "",
     submitting: false,
   }));
+
+  const [lookupLoading, setLookupLoading] = useState(false);
 
   // ✅ dynamic crews from Crew Mappings sheet (fallback to constants)
   const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -141,9 +147,28 @@ export default function OnboardingWizard() {
         url.searchParams.delete("discordJoined");
         url.searchParams.delete("sessionId");
         window.history.replaceState({}, "", url.toString());
+
+        // ✅ Check if member exists and redirect to dashboard if so
+        (async () => {
+          try {
+            setLookupLoading(true);
+            const res = await fetch(`/api/member-lookup/${discordId}`);
+            if (res.ok) {
+              const data = await res.json();
+              if (data.found && (data.memberId || data.data?.ID)) {
+                router.push(`/dashboard/${data.memberId || data.data.ID}`);
+                return; // don't clear lookupLoading so they don't see the splash
+              }
+            }
+          } catch (e) {
+            console.error("Lookup failed", e);
+          } finally {
+            setLookupLoading(false);
+          }
+        })();
       }
     } catch { }
-  }, []);
+  }, [router]);
 
   // ✅ Fetch crew mappings
   useEffect(() => {
@@ -238,6 +263,7 @@ export default function OnboardingWizard() {
     s.seenNames,
     s.discordId,
     s.discordJoined,
+    s.memberId,
   ]);
 
   const canGenerate = s.topping.trim().length > 0 && s.mafiaMovieTitle.trim().length > 0;
@@ -332,6 +358,7 @@ export default function OnboardingWizard() {
           turtles: s.turtles,
 
           crews: s.crews,
+          memberId: s.memberId,
 
           // ✅ Discord (include in payload so backend can embed in RawJSON)
           discordId: s.discordId || "",
@@ -347,7 +374,12 @@ export default function OnboardingWizard() {
         localStorage.removeItem(PENDING_CLAIM_KEY);
       } catch { }
 
-      setS((p) => ({ ...p, submitting: false, success: true, error: undefined, step: 4 }));
+      setS((p) => ({ ...p, submitting: false, success: true, error: undefined }));
+
+      // delay slightly so they see the success state before redirect
+      setTimeout(() => {
+        router.push(`/dashboard/${s.memberId || s.discordId || s.sessionId}`);
+      }, 1500);
     } catch (e: any) {
       setS((p) => ({
         ...p,
@@ -393,6 +425,8 @@ export default function OnboardingWizard() {
 
   const stepTitle = useMemo(() => {
     switch (s.step) {
+      case 0:
+        return "Welcome to PizzaDAO";
       case 1:
         return "1) Pick your mafia name";
       case 2:
@@ -400,8 +434,9 @@ export default function OnboardingWizard() {
       case 3:
         return "3) What kind of team member are you?";
       case 4:
+        return "4) Pick your Member ID";
       case 5:
-        return "4) Choose Crews:";
+        return "5) Choose Crews:";
     }
   }, [s.step]);
 
@@ -495,7 +530,42 @@ export default function OnboardingWizard() {
 
       {s.error && <div style={alert("error")}>{s.error}</div>}
 
+      {lookupLoading && (
+        <div style={{ textAlign: "center", padding: "40px 0" }}>
+          <div className="spinner" style={{
+            width: 40,
+            height: 40,
+            border: "3px solid rgba(0,0,0,0.1)",
+            borderTop: "3px solid #ff4d4d",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+            margin: "0 auto 20px"
+          }} />
+          <p style={{ fontSize: 18, opacity: 0.8 }}>Verifying member status...</p>
+        </div>
+      )}
 
+      {!lookupLoading && s.step === 0 && (
+        <div style={{ display: "grid", gap: 20, textAlign: "center", padding: "20px 0" }}>
+          <div style={{ fontSize: 18, lineHeight: 1.5, opacity: 0.9 }}>
+            Join the world's largest pizza co-op. <br />
+          </div>
+          <div style={{ display: "grid", gap: 12 }}>
+            <button
+              onClick={() => setS((p) => ({ ...p, step: 1 }))}
+              style={{ ...btn("primary"), padding: "16px 20px", fontSize: 18 }}
+            >
+              Join PizzaDAO
+            </button>
+            <button
+              onClick={connectDiscord}
+              style={{ ...btn("secondary"), padding: "16px 20px", fontSize: 18 }}
+            >
+              Already in our Discord? Login
+            </button>
+          </div>
+        </div>
+      )}
       {s.step === 1 && (
         <div style={{ display: "grid", gap: 12 }}>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
@@ -575,6 +645,12 @@ export default function OnboardingWizard() {
               </div>
             </div>
           )}
+
+          <div style={{ marginTop: 12 }}>
+            <button onClick={() => setS((p) => ({ ...p, step: 0 }))} style={btn("secondary")}>
+              Back
+            </button>
+          </div>
         </div>
       )}
 
@@ -646,8 +722,18 @@ export default function OnboardingWizard() {
         </div>
       )}
 
-      {(s.step === 4 || s.step === 5) && (
+      {s.step === 4 && (
+        <MemberIdPicker
+          value={s.memberId || ""}
+          onChange={(v) => setS((p) => ({ ...p, memberId: v }))}
+          onNext={() => setS((p) => ({ ...p, step: 5 }))}
+          onBack={() => setS((p) => ({ ...p, step: 3 }))}
+        />
+      )}
+
+      {s.step === 5 && (
         <div style={{ display: "grid", gap: 12 }}>
+
 
 
           {crewsLoading && (
@@ -775,7 +861,7 @@ export default function OnboardingWizard() {
           {/* ✅ Combined final action */}
           <div style={{ display: "grid", gap: 6 }}>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setS((p) => ({ ...p, step: 3 }))} style={btn("secondary")}>
+              <button onClick={() => setS((p) => ({ ...p, step: 4 }))} style={btn("secondary")}>
                 Back
               </button>
               <button onClick={claimRoles} disabled={s.submitting} style={btn("primary", s.submitting)}>
@@ -800,7 +886,18 @@ export default function OnboardingWizard() {
                   <b>Turtles:</b> {s.turtles.length ? s.turtles.join(", ") : "(none)"}
                 </div>
                 <div>
-                  <b>Crews:</b> {s.crews.length ? s.crews.join(", ") : "(none)"}
+                  <b>Crews:</b>{" "}
+                  {s.crews.length
+                    ? s.crews
+                      .map((id) => {
+                        const label = crewOptions.find((c) => c.id === id)?.label || id;
+                        return label
+                          .split(" ")
+                          .map((w) => w.charAt(0).toUpperCase() + w.slice(1).toLowerCase())
+                          .join(" ");
+                      })
+                      .join(", ")
+                    : "(none)"}
                 </div>
                 <div>
                   <b>Movie:</b> {s.resolvedMovieTitle ?? s.mafiaMovieTitle}
@@ -818,6 +915,163 @@ export default function OnboardingWizard() {
           )}
         </div>
       )}
+    </div>
+  );
+}
+
+function MemberIdPicker({
+  value,
+  onChange,
+  onNext,
+  onBack,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onNext: () => void;
+  onBack: () => void;
+}) {
+  const [suggestions, setSuggestions] = useState<number[]>([]);
+  const [checking, setChecking] = useState(false);
+  const [availability, setAvailability] = useState<{ id: string; status: "available" | "taken" | "invalid" | null }>({
+    id: "",
+    status: null,
+  });
+  const [loadingSuggestions, setLoadingSuggestions] = useState(false);
+
+  useEffect(() => {
+    let alive = true;
+    (async () => {
+      try {
+        setLoadingSuggestions(true);
+        const res = await fetch("/api/member-id");
+        const data = await res.json();
+        if (alive && data.suggestions) {
+          setSuggestions(data.suggestions);
+        }
+      } catch {
+        // ignore
+      } finally {
+        if (alive) setLoadingSuggestions(false);
+      }
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  async function checkAvailability(id: string) {
+    if (!id.trim()) return;
+    setChecking(true);
+    try {
+      const res = await fetch(`/api/member-id?check=${id}`);
+      const data = await res.json();
+      if (data.error) {
+        setAvailability({ id, status: "invalid" });
+      } else {
+        setAvailability({ id, status: data.available ? "available" : "taken" });
+      }
+    } catch {
+      setAvailability({ id, status: "invalid" });
+    } finally {
+      setChecking(false);
+    }
+  }
+
+  return (
+    <div style={{ display: "grid", gap: 16 }}>
+      {loadingSuggestions ? (
+        <div style={{ opacity: 0.6 }}>Loading suggestions...</div>
+      ) : (
+        <div style={{ display: "grid", gap: 10 }}>
+          <div style={{ opacity: 0.7, fontSize: 13 }}>Next available IDs:</div>
+          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+            {suggestions.map((id) => (
+              <button
+                key={id}
+                onClick={() => onChange(String(id))}
+                style={{
+                  ...btn(value === String(id) ? "primary" : "secondary"),
+                  padding: "8px 16px",
+                }}
+              >
+                {id}
+              </button>
+            ))}
+          </div>
+        </div>
+      )}
+
+      <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
+        <Field label="Or check a specific number:">
+          <div style={{ display: "flex", gap: 10 }}>
+            <input
+              type="number"
+              value={availability.id}
+              onChange={(e) => setAvailability({ id: e.target.value, status: null })}
+              placeholder="Enter ID"
+              style={input()}
+            />
+            <button
+              onClick={() => checkAvailability(availability.id)}
+              disabled={checking || !availability.id}
+              style={btn("secondary", checking || !availability.id)}
+            >
+              {checking ? "Checking..." : "Check"}
+            </button>
+          </div>
+        </Field>
+
+        {availability.status && (
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 14,
+              fontWeight: 600,
+              color:
+                availability.status === "available"
+                  ? "green"
+                  : availability.status === "taken"
+                    ? "red"
+                    : "orange",
+            }}
+          >
+            {availability.status === "available" && (
+              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                <span>ID {availability.id} is available!</span>
+                <button
+                  onClick={() => onChange(availability.id)}
+                  style={{
+                    backgroundColor: "black",
+                    color: "white",
+                    border: "none",
+                    padding: "4px 8px",
+                    borderRadius: 4,
+                    fontSize: 12,
+                    cursor: "pointer",
+                  }}
+                >
+                  Pick this
+                </button>
+              </div>
+            )}
+            {availability.status === "taken" && `ID ${availability.id} is already taken.`}
+            {availability.status === "invalid" && "Invalid ID."}
+          </div>
+        )}
+      </div>
+
+      <div style={{ marginTop: 8 }}>
+        Selected Member ID: <b>{value || "(none)"}</b>
+      </div>
+
+      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+        <button onClick={onBack} style={btn("secondary")}>
+          Back
+        </button>
+        <button onClick={onNext} disabled={!value} style={btn("primary", !value)}>
+          Next
+        </button>
+      </div>
     </div>
   );
 }
@@ -933,7 +1187,7 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
   );
 }
 
-function Field({ label, children }: { label: string; children: any }) {
+function Field({ label, children }: { label: string; children: React.ReactNode }) {
   return (
     <label style={{ display: "grid", gap: 6 }}>
       <span style={{ fontWeight: 650 }}>{label}</span>

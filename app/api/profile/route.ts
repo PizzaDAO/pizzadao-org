@@ -160,6 +160,7 @@ export async function POST(req: Request) {
       turtles: turtlesArr,
 
       crews: crewsArr,
+      memberId: clampStr(body.memberId ?? "", 20),
 
       discordId: clampStr(body.discordId ?? "", 64),
       discordJoined: clampBool(body.discordJoined),
@@ -178,6 +179,7 @@ export async function POST(req: Request) {
         turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
         turtles: turtlesArr,
         crews: crewsArr,
+        memberId: clampStr(body.memberId ?? "", 20),
         discordId: clampStr(body.discordId ?? "", 64),
         discordJoined: clampBool(body.discordJoined),
       },
