@@ -159,7 +159,12 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
 
     if (taskIdx === -1) return [];
 
-    const activeTasks: { label: string; url?: string }[] = [];
+    // Find priority column using the same findCol helper from header detection
+    const headerRow = rows[headerRowIdx]?.c || [];
+    const priorityIdx = headerRow.findIndex((c: any) => String(c?.v || "").toLowerCase().includes("priority"));
+
+    // Collect all tasks with stage "now" or "doing" along with their priority
+    const tasksWithMeta: { label: string; url?: string; priority: string }[] = [];
     for (let i = headerRowIdx + 1; i < rows.length; i++) {
       const r = rows[i]?.c || [];
       const stage = stageIdx !== -1 ? String(r[stageIdx]?.v || "").trim().toLowerCase() : "";
@@ -167,12 +172,27 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       const taskCell = r[taskIdx];
       const taskLabel = String(taskCell?.v || "").trim();
       const taskUrl = taskCell?.l || undefined; // GViz 'l' property contains the hyperlink
+      const priority = priorityIdx !== -1 ? String(r[priorityIdx]?.v || "").trim().toLowerCase() : "";
 
       if (taskLabel && (stage === "now" || stage === "doing")) {
-        activeTasks.push({ label: taskLabel, url: taskUrl });
+        tasksWithMeta.push({ label: taskLabel, url: taskUrl, priority });
       }
-      if (activeTasks.length >= 3) break;
     }
+
+    // Helper to get priority rank
+    const getPriorityRank = (p: string) => {
+      if (p.includes("top")) return 1;
+      if (p.includes("high")) return 2;
+      if (p.includes("mid")) return 3;
+      if (p.includes("low")) return 4;
+      return 999;
+    };
+
+    // Sort by priority
+    tasksWithMeta.sort((a, b) => getPriorityRank(a.priority) - getPriorityRank(b.priority));
+
+    // Take top 3 and return without priority field
+    const activeTasks = tasksWithMeta.slice(0, 3).map(t => ({ label: t.label, url: t.url }));
 
     return activeTasks;
   } catch (e) {
