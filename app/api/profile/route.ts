@@ -215,9 +215,12 @@ export async function POST(req: Request) {
       parsed = JSON.parse(text);
     } catch { }
 
-    if (!sheetRes.ok || parsed?.ok === false) {
+    if (!sheetRes.ok || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
       return NextResponse.json(
-        { error: "Failed to save profile", details: parsed ?? text },
+        {
+          error: "Failed to save profile",
+          details: parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text
+        },
         { status: 502 }
       );
     }

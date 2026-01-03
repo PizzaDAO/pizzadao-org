@@ -19,7 +19,7 @@ type NamegenResponse = {
 type CityPrediction = { description: string; place_id: string };
 
 type WizardState = {
-  step: 0 | 1 | 2 | 3 | 4 | 5;
+  step: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   sessionId: string;
 
   topping: string;
@@ -47,9 +47,18 @@ type WizardState = {
   discordJoined?: boolean;
 
   memberId?: string;
+  isUpdate?: boolean;
+  lookupLoading?: boolean;
   submitting: boolean;
   error?: string;
+  errorDetails?: string;
   success?: boolean;
+  existingData?: {
+    mafiaName?: string;
+    city?: string;
+    turtles: string[];
+    crews: string[];
+  };
 };
 
 type CrewOption = {
@@ -111,10 +120,13 @@ export default function OnboardingWizard() {
     discordId: undefined,
     discordJoined: false,
     memberId: "",
+    isUpdate: false,
+    lookupLoading: false,
     submitting: false,
+    errorDetails: undefined,
+    existingData: undefined,
   }));
 
-  const [lookupLoading, setLookupLoading] = useState(false);
 
   // ✅ dynamic crews from Crew Mappings sheet (fallback to constants)
   const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -151,19 +163,44 @@ export default function OnboardingWizard() {
         // ✅ Check if member exists and redirect to dashboard if so
         (async () => {
           try {
-            setLookupLoading(true);
+            setS(p => ({ ...p, lookupLoading: true }));
             const res = await fetch(`/api/member-lookup/${discordId}`);
             if (res.ok) {
               const data = await res.json();
-              if (data.found && (data.memberId || data.data?.ID)) {
-                router.push(`/dashboard/${data.memberId || data.data.ID}`);
-                return; // don't clear lookupLoading so they don't see the splash
+              if (data.found && data.data) {
+                const sheetData = data.data;
+                const parseList = (val: any) => {
+                  if (Array.isArray(val)) return val.map(String);
+                  if (typeof val === "string") return val.split(/[,|]+/).map(s => s.trim()).filter(Boolean);
+                  return [];
+                };
+
+                const isAutoLogin = !localStorage.getItem(PENDING_CLAIM_KEY);
+                if (isAutoLogin) {
+                  router.push(`/dashboard/${data.memberId || discordId}`);
+                  return;
+                }
+
+                setS(p => ({
+                  ...p,
+                  isUpdate: true,
+                  lookupLoading: false,
+                  existingData: {
+                    mafiaName: sheetData["Name"] || "",
+                    city: sheetData["City"] || "",
+                    turtles: parseList(sheetData["Turtles"]),
+                    crews: parseList(sheetData["Crews"]),
+                  },
+                  memberId: data.memberId || sheetData["ID"] || p.memberId,
+                  step: 6
+                }));
+                return;
               }
             }
+            setS(p => ({ ...p, lookupLoading: false }));
           } catch (e) {
             console.error("Lookup failed", e);
-          } finally {
-            setLookupLoading(false);
+            setS(p => ({ ...p, lookupLoading: false }));
           }
         })();
       }
@@ -367,14 +404,17 @@ export default function OnboardingWizard() {
       });
 
       const data = await res.json();
-      if (!res.ok) throw new Error(data?.error || "Submit failed");
+      if (!res.ok) {
+        setS(p => ({ ...p, errorDetails: data?.details ? JSON.stringify(data.details, null, 2) : undefined }));
+        throw new Error(data?.error || "Submit failed");
+      }
 
       // clear the pending claim flag if it existed
       try {
         localStorage.removeItem(PENDING_CLAIM_KEY);
       } catch { }
 
-      setS((p) => ({ ...p, submitting: false, success: true, error: undefined }));
+      setS((p) => ({ ...p, submitting: false, success: true, error: undefined, errorDetails: undefined }));
 
       // delay slightly so they see the success state before redirect
       setTimeout(() => {
@@ -417,11 +457,11 @@ export default function OnboardingWizard() {
       pending = localStorage.getItem(PENDING_CLAIM_KEY) === "1";
     } catch { }
 
-    if (pending && !s.submitting && !s.success) {
+    if (pending && !s.submitting && !s.success && !s.lookupLoading && !s.isUpdate) {
       submitAll();
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [s.discordId]);
+  }, [s.discordId, s.lookupLoading, s.isUpdate]);
 
   const stepTitle = useMemo(() => {
     switch (s.step) {
@@ -434,9 +474,11 @@ export default function OnboardingWizard() {
       case 3:
         return "3) What kind of team member are you?";
       case 4:
-        return "4) Pick your Member ID";
+        return s.isUpdate ? "Review your Member ID" : "4) Pick your Member ID";
       case 5:
-        return "5) Choose Crews:";
+        return s.isUpdate ? "Update your Crews" : "5) Choose Crews:";
+      case 6:
+        return "6) Review Profile Updates";
     }
   }, [s.step]);
 
@@ -490,6 +532,11 @@ export default function OnboardingWizard() {
 
   return (
     <div style={card()}>
+      {s.isUpdate && (
+        <div style={{ ...alert("success"), marginBottom: 16, background: "rgba(0,0,0,0.05)", border: "2px solid black" }}>
+          👋 <b>Existing Profile Found!</b> We've pre-filled your info. You can update anything below.
+        </div>
+      )}
       {/* Consolidated Selection Summary */}
       {(s.mafiaName || s.city || s.turtles.length > 0) && (
         <div style={{ opacity: 0.9, fontSize: 16, borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: 8, marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -528,9 +575,18 @@ export default function OnboardingWizard() {
         </button>
       </div>
 
-      {s.error && <div style={alert("error")}>{s.error}</div>}
+      {s.error && (
+        <div style={alert("error")}>
+          <div style={{ fontWeight: 800 }}>{s.error}</div>
+          {s.errorDetails && (
+            <div style={{ marginTop: 8, fontSize: 13, opacity: 0.8, whiteSpace: "pre-wrap", fontFamily: "monospace", background: "rgba(0,0,0,0.05)", padding: 8, borderRadius: 8 }}>
+              {s.errorDetails}
+            </div>
+          )}
+        </div>
+      )}
 
-      {lookupLoading && (
+      {s.lookupLoading && (
         <div style={{ textAlign: "center", padding: "40px 0" }}>
           <div className="spinner" style={{
             width: 40,
@@ -545,7 +601,7 @@ export default function OnboardingWizard() {
         </div>
       )}
 
-      {!lookupLoading && s.step === 0 && (
+      {!s.lookupLoading && s.step === 0 && (
         <div style={{ display: "grid", gap: 20, textAlign: "center", padding: "20px 0" }}>
           <div style={{ fontSize: 18, lineHeight: 1.5, opacity: 0.9 }}>
             Join the world's largest pizza co-op. <br />
@@ -667,11 +723,11 @@ export default function OnboardingWizard() {
               Back
             </button>
             <button
-              onClick={() => setS((p) => ({ ...p, step: 3 }))}
+              onClick={() => setS((p) => ({ ...p, step: p.isUpdate ? 5 : 3 }))}
               disabled={s.city.trim().length === 0}
               style={btn("primary", s.city.trim().length === 0)}
             >
-              Next
+              {s.isUpdate ? "Next (Skip ID Selection)" : "Next"}
             </button>
           </div>
         </div>
@@ -858,14 +914,15 @@ export default function OnboardingWizard() {
             })}
           </div>
 
+
           {/* ✅ Combined final action */}
           <div style={{ display: "grid", gap: 6 }}>
             <div style={{ display: "flex", gap: 10 }}>
               <button onClick={() => setS((p) => ({ ...p, step: 4 }))} style={btn("secondary")}>
                 Back
               </button>
-              <button onClick={claimRoles} disabled={s.submitting} style={btn("primary", s.submitting)}>
-                {s.submitting ? "Claiming…" : "Claim Discord Roles"}
+              <button onClick={s.isUpdate ? () => setS(p => ({ ...p, step: 6 })) : claimRoles} disabled={s.submitting} style={btn("primary", s.submitting)}>
+                {s.submitting ? (s.isUpdate ? "Updating…" : "Claiming…") : (s.isUpdate ? "Update Profile" : "Claim Discord Roles")}
               </button>
             </div>
 
@@ -913,6 +970,63 @@ export default function OnboardingWizard() {
 
             </div>
           )}
+        </div>
+      )}
+
+      {s.step === 6 && (
+        <div style={{ display: "grid", gap: 16 }}>
+          <div style={{ ...alert("info"), background: "rgba(0,0,0,0.03)", border: "1px solid black" }}>
+            👋 <b>Existing Profile Found!</b> We found an account linked to your Discord. Would you like to update it with the new info you just entered?
+          </div>
+
+          <div style={{ display: "grid", gap: 0, border: "1px solid rgba(0,0,0,0.1)", borderRadius: 10, overflow: "hidden" }}>
+            {/* Header */}
+            <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr", gap: 10, background: "rgba(0,0,0,0.06)", padding: "12px 16px", fontWeight: 750, fontSize: 13, textTransform: "uppercase", letterSpacing: 0.6 }}>
+              <div>Field</div>
+              <div>Existing (In Sheet)</div>
+              <div>New (Entered)</div>
+            </div>
+
+            {[
+              { label: "Name", new: s.mafiaName, old: s.existingData?.mafiaName },
+              { label: "City", new: s.city, old: s.existingData?.city },
+              { label: "Roles", new: s.turtles.join(", "), old: (s.existingData?.turtles ?? []).join(", ") },
+              {
+                label: "Crews",
+                new: (s.crews ?? []).map(id => crewOptions.find(c => c.id === id)?.label || id).join(", "),
+                old: (s.existingData?.crews ?? []).join(", ")
+              },
+            ].map((row, i) => {
+              const hasChange = String(row.new || "").trim().toLowerCase() !== String(row.old || "").trim().toLowerCase();
+              return (
+                <div key={i} style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr", gap: 10, padding: "12px 16px", background: i % 2 === 1 ? "rgba(0,0,0,0.01)" : "white", borderTop: "1px solid rgba(0,0,0,0.05)" }}>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "rgba(0,0,0,0.5)" }}>{row.label}</div>
+                  <div style={{ opacity: 0.6, fontSize: 14 }}>{row.old || "—"}</div>
+                  <div style={{ fontWeight: hasChange ? 750 : 400, color: hasChange ? "#000" : "#777", fontSize: 14 }}>
+                    {row.new || "—"}
+                    {hasChange && <span style={{ marginLeft: 6, color: "#10b981", fontSize: 16 }} title="Modified">●</span>}
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+
+          <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
+            <button
+              onClick={() => submitAll()}
+              disabled={s.submitting}
+              style={btn("primary", s.submitting)}
+            >
+              {s.submitting ? "Updating Profile..." : "Yes, Update My Profile"}
+            </button>
+            <button
+              onClick={() => router.push(`/dashboard/${s.memberId || s.discordId || s.sessionId}`)}
+              disabled={s.submitting}
+              style={{ ...btn("secondary"), flex: 1 }}
+            >
+              No, Keep Existing & Go to Dashboard
+            </button>
+          </div>
         </div>
       )}
     </div>
@@ -1270,12 +1384,17 @@ function crewRow(checked: boolean): React.CSSProperties {
   };
 }
 
-function alert(kind: "error" | "success"): React.CSSProperties {
+function alert(kind: "error" | "success" | "info"): React.CSSProperties {
   return {
     padding: "10px 12px",
     borderRadius: 12,
     border: "1px solid rgba(0,0,0,0.12)",
-    background: kind === "error" ? "rgba(255,0,0,0.06)" : "rgba(0,200,0,0.08)",
+    background:
+      kind === "error"
+        ? "rgba(255,0,0,0.06)"
+        : kind === "success"
+          ? "rgba(0,200,0,0.08)"
+          : "rgba(0,0,255,0.05)",
     fontWeight: 650,
   };
 }

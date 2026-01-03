@@ -107,7 +107,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const idValue = data["ID"] || data["Crew ID"] || id;
     const crews = data["Crews"] || "None";
     const discord = data["DiscordID"] || data["Discord"] || "Not linked";
-    const status = data["Frequency"] || data["Status"] || "No status";
+    const status = data["Status"] || data["Frequency"] || "No status";
     const orgs = data["Affiliation"] || data["Orgs"] || "None";
     const skills = data["Specialties"] || data["Skills"] || "None";
     const telegram = data["Telegram"] || "Not linked";

@@ -41,13 +41,19 @@ export async function GET(request: Request) {
 
         // --- Header Row Hunter ---
         let headerRowIdx = -1;
-        for (let ri = 0; ri < Math.min(rows.length, 50); ri++) {
+        let headerRowVals: string[] = [];
+
+        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
             const rowCells = rows[ri]?.c || [];
             const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
+
             const hasName = rowVals.includes("name");
-            const hasCity = rowVals.includes("city");
-            if (hasName && hasCity) {
+            const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
+            const hasCity = rowVals.includes("city") || rowVals.includes("crews");
+
+            if (hasName && (hasStatus || hasCity)) {
                 headerRowIdx = ri;
+                headerRowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
                 break;
             }
         }
@@ -55,9 +61,21 @@ export async function GET(request: Request) {
         const claimedIds = new Set<number>();
 
         if (headerRowIdx !== -1) {
+            // Find ID column index
+            let idColIdx = -1;
+            const normalizedHeaders = headerRowVals.map(h => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
+            const idAliases = ["id", "crewid", "memberid"];
+            for (let i = 0; i < normalizedHeaders.length; i++) {
+                if (idAliases.includes(normalizedHeaders[i])) {
+                    idColIdx = i;
+                    break;
+                }
+            }
+            if (idColIdx === -1) idColIdx = 0;
+
             // Found the header row, data starts immediately after
             for (let i = headerRowIdx + 1; i < rows.length; i++) {
-                const idVal = rows[i]?.c?.[0]?.v;
+                const idVal = rows[i]?.c?.[idColIdx]?.v ?? rows[i]?.c?.[idColIdx]?.f;
                 if (typeof idVal === "number") {
                     claimedIds.add(idVal);
                 } else if (typeof idVal === "string" && idVal.trim()) {
@@ -68,7 +86,7 @@ export async function GET(request: Request) {
         } else {
             // Extreme fallback: just use column A and try to find numbers
             for (let i = 0; i < rows.length; i++) {
-                const idVal = rows[i]?.c?.[0]?.v;
+                const idVal = rows[i]?.c?.[0]?.v ?? rows[i]?.c?.[0]?.f;
                 if (typeof idVal === "number") {
                     claimedIds.add(idVal);
                 } else if (typeof idVal === "string" && idVal.trim()) {

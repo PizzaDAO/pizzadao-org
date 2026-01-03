@@ -43,70 +43,72 @@ export async function GET(
 
         // --- Header Row Hunter ---
         let headerRowIdx = -1;
-        for (let ri = 0; ri < Math.min(rows.length, 50); ri++) {
+        let headerRowVals: string[] = [];
+
+        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
             const rowCells = rows[ri]?.c || [];
             const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
 
-            // Look for a row that contains "Name" AND ("City" OR "Crews")
             const hasName = rowVals.includes("name");
-            const hasCity = rowVals.includes("city");
-            const hasCrews = rowVals.includes("crews");
+            const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
+            const hasCity = rowVals.includes("city") || rowVals.includes("crews");
 
-            if (hasName && (hasCity || hasCrews)) {
+            if (hasName && (hasStatus || hasCity)) {
                 headerRowIdx = ri;
+                headerRowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
                 break;
             }
         }
 
         if (headerRowIdx === -1) {
-            throw new Error(`Could not find a header row containing 'Name' and 'City'/'Crews' after scanning 50 rows. Please ensure you are looking at the correct tab.`);
+            throw new Error(`Could not find header row (Name + Status/City). Checked 100 rows.`);
         }
 
-        const headerRow = rows[headerRowIdx]?.c || [];
+        // Find standard column indices in the detected header row
         let idColIdx = -1;
         let discordColIdx = -1;
+        const normalizedHeaders = headerRowVals.map(h => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
 
-        headerRow.forEach((cell: any, ci: number) => {
-            const val = String(cell?.v || cell?.f || "").trim().toLowerCase();
-            // Fallback for Column A if it's null in GViz but contains ID in the actual sheet
-            if (ci === 0 && (!val || val === "null")) {
-                // We'll peek at the next row's cell 0. If it's a number, this is likely the ID column.
-                const nextRowVal = rows[headerRowIdx + 1]?.c?.[0]?.v;
-                if (typeof nextRowVal === "number" || (nextRowVal && !isNaN(Number(nextRowVal)))) {
-                    idColIdx = ci;
-                }
-            }
-            if (val === "id" || val === "crew id" || val.includes("# id")) idColIdx = ci;
-            if (val === "discordid" || val === "discord id" || val === "discord") discordColIdx = ci;
+        normalizedHeaders.forEach((h, ci) => {
+            if (h === "id" || h === "crewid" || h === "memberid") idColIdx = ci;
+            if (h === "discordid" || h === "discord" || h === "discorduser") discordColIdx = ci;
         });
 
-        if (idColIdx === -1) idColIdx = 0; // fallback to first column
+        if (idColIdx === -1) idColIdx = 0; // fallback to A
         if (discordColIdx === -1) {
-            throw new Error(`Could not find Discord column in the header row detected at index ${headerRowIdx}. Found headers: ${headerRow.map((c: any) => c?.v || "null").join(", ")}`);
+            throw new Error(`Could not find Discord column (DiscordID, Discord). Found: ${headerRowVals.join(", ")}`);
         }
 
         const dataStartIdx = headerRowIdx + 1;
         const userRow = rows.slice(dataStartIdx).find((r: any) => {
-            const cellVal = r?.c?.[discordColIdx]?.v;
+            const cellVal = r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f;
             if (cellVal === null || cellVal === undefined) return false;
             return String(cellVal).trim() === discordId;
         });
 
         if (!userRow) {
-            return NextResponse.json({ error: "Member not found" }, { status: 404 });
+            const sampleDiscordIds = rows.slice(dataStartIdx, dataStartIdx + 5).map((r: any) => r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f).filter(Boolean);
+            return NextResponse.json({
+                error: `Member not found for Discord ID '${discordId}'. Found in sheet: ${sampleDiscordIds.join(", ")}. Column ${discordColIdx} ('${headerRowVals[discordColIdx]}')`,
+                status: 404
+            }, { status: 404 });
         }
 
-        // Map columns to keys using the header row values
+        // Map data using human-readable keys from the header row
         const data: any = {};
-        cols.forEach((_col: any, idx: number) => {
-            const headVal = headerRow[idx]?.v;
-            const key = headVal ? String(headVal).trim() : `field_${idx}`;
-
-            const val = userRow.c?.[idx]?.v;
-            data[key] = val;
+        headerRowVals.forEach((rawKey, idx) => {
+            if (!rawKey) return;
+            const val = userRow.c?.[idx]?.v ?? userRow.c?.[idx]?.f;
+            data[rawKey] = val;
         });
 
-        const memberId = userRow.c?.[idColIdx]?.v;
+        // Add standardized aliases for UI convenience
+        data["Status"] = data["Status"] || data["Frequency"];
+        data["Orgs"] = data["Orgs"] || data["Affiliation"];
+        data["Skills"] = data["Skills"] || data["Specialties"];
+        data["DiscordID"] = data["DiscordID"] || data["Discord"];
+
+        const memberId = userRow.c?.[idColIdx]?.v ?? userRow.c?.[idColIdx]?.f;
 
         return NextResponse.json({ found: true, memberId, data });
     } catch (err: any) {

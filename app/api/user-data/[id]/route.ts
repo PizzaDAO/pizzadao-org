@@ -45,47 +45,44 @@ export async function GET(
 
         // --- Header Row Hunter ---
         let headerRowIdx = -1;
-        for (let ri = 0; ri < Math.min(rows.length, 50); ri++) {
+        let headerRowVals: string[] = [];
+
+        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
             const rowCells = rows[ri]?.c || [];
             const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
 
-            // Look for a row that contains "Name" AND ("City" OR "Crews")
             const hasName = rowVals.includes("name");
-            const hasCity = rowVals.includes("city");
-            const hasCrews = rowVals.includes("crews");
+            const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
+            const hasCity = rowVals.includes("city") || rowVals.includes("crews");
 
-            if (hasName && (hasCity || hasCrews)) {
+            if (hasName && (hasStatus || hasCity)) {
                 headerRowIdx = ri;
+                headerRowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
                 break;
             }
         }
 
         if (headerRowIdx === -1) {
-            throw new Error(`Could not find a header row containing 'Name' and 'City'/'Crews' after scanning 50 rows. Please ensure you are looking at the correct tab.`);
+            throw new Error(`Could not find header row (Name + Status/City). Checked 100 rows.`);
         }
 
-        const headerRow = rows[headerRowIdx]?.c || [];
+        // Find ID column index in the detected header row
         let idColIdx = -1;
+        const normalizedHeaders = headerRowVals.map(h => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
 
-        headerRow.forEach((cell: any, ci: number) => {
-            const val = String(cell?.v || cell?.f || "").trim().toLowerCase();
-            // Fallback for Column A if it's null in GViz but contains ID in the actual sheet
-            if (ci === 0 && (!val || val === "null")) {
-                const nextRowVal = rows[headerRowIdx + 1]?.c?.[0]?.v;
-                if (typeof nextRowVal === "number" || (nextRowVal && !isNaN(Number(nextRowVal)))) {
-                    idColIdx = ci;
-                }
+        // Look for ID
+        const idAliases = ["id", "crewid", "memberid"];
+        for (let i = 0; i < normalizedHeaders.length; i++) {
+            if (idAliases.includes(normalizedHeaders[i])) {
+                idColIdx = i;
+                break;
             }
-            if (val === "id" || val === "crew id" || val.includes("# id")) idColIdx = ci;
-        });
-
-        if (idColIdx === -1) idColIdx = 0; // fallback
-        const dataStartIdx = headerRowIdx + 1;
-
-        // Extreme fallback
-        if (idColIdx === -1) idColIdx = 0;
+        }
+        if (idColIdx === -1) idColIdx = 0; // fallback to A
 
         const targetId = parseInt(id, 10);
+        const dataStartIdx = headerRowIdx + 1;
+
         const userRow = rows.slice(dataStartIdx).find((r: any) => {
             const val = r?.c?.[idColIdx]?.v;
             if (typeof val === "number") return val === targetId;
@@ -94,18 +91,26 @@ export async function GET(
         });
 
         if (!userRow) {
-            return NextResponse.json({ error: "User not found" }, { status: 404 });
+            const sampleIds = rows.slice(dataStartIdx, dataStartIdx + 10).map((r: any) => r?.c?.[idColIdx]?.v ?? r?.c?.[idColIdx]?.f).filter(Boolean);
+            return NextResponse.json({
+                error: `User ID ${id} not found. Sheet IDs: ${sampleIds.join(", ")}. Column index ${idColIdx} ('${headerRowVals[idColIdx]}')`,
+                status: 404
+            }, { status: 404 });
         }
 
-        // Map columns to keys using the header row values
+        // Map data using human-readable keys from the header row
         const data: any = {};
-        cols.forEach((_col: any, idx: number) => {
-            const headVal = headerRow[idx]?.v;
-            const key = headVal ? String(headVal).trim() : `field_${idx}`;
-
-            const val = userRow.c?.[idx]?.v;
-            data[key] = val;
+        headerRowVals.forEach((rawKey, idx) => {
+            if (!rawKey) return;
+            const val = userRow.c?.[idx]?.v ?? userRow.c?.[idx]?.f;
+            data[rawKey] = val;
         });
+
+        // Add standardized aliases for UI convenience
+        data["Status"] = data["Status"] || data["Frequency"];
+        data["Orgs"] = data["Orgs"] || data["Affiliation"];
+        data["Skills"] = data["Skills"] || data["Specialties"];
+        data["DiscordID"] = data["DiscordID"] || data["Discord"];
 
         return NextResponse.json(data);
     } catch (err: any) {
