@@ -421,9 +421,22 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
 
                     <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)", textAlign: "center" }}>
-                        <Link href="/" style={btn("secondary")}>
-                            Back Home
-                        </Link>
+                        <button
+                            onClick={() => {
+                                try {
+                                    localStorage.removeItem("mob_pizza_onboarding_v3");
+                                    localStorage.removeItem("mob_pizza_onboarding_pending_claim_v1");
+                                } catch { }
+                                window.location.href = "/";
+                            }}
+                            style={{
+                                ...btn("secondary"),
+                                fontFamily: "inherit",
+                                fontSize: 16
+                            }}
+                        >
+                            Logout
+                        </button>
                     </div>
                 </div>
 
