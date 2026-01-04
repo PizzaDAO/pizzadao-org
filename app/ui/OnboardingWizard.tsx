@@ -567,21 +567,21 @@ export default function OnboardingWizard() {
   const stepTitle = useMemo(() => {
     switch (s.step) {
       case 0:
-        return "Welcome to PizzaDAO";
+        return ""; // Logo shown instead
       case 1:
-        return "1) Pick your mafia name";
+        return "Pick your mafia name";
       case 2:
-        return "2) Your city";
+        return "Your city";
       case 3:
-        return "3) What kind of team member are you?";
+        return "What kind of team member are you?";
       case 4:
-        return s.isUpdate ? "Review your Member ID" : "4) Pick your Member ID";
+        return s.isUpdate ? "Review your Member ID" : "Pick your Member ID";
       case 5:
-        return s.isUpdate ? "Update your Crews" : "5) Choose Crews:";
+        return s.isUpdate ? "Update your Crews" : "Choose Crews:";
       case 6:
-        return "6) Review Profile Updates";
+        return "Review Profile Updates";
     }
-  }, [s.step]);
+  }, [s.step, s.isUpdate]);
 
   // ✅ Map turtle ids -> labels so we can match sheet values like "Leonardo"
   const turtleIdToLabel = useMemo(() => {
@@ -820,34 +820,38 @@ export default function OnboardingWizard() {
 
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
-          <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>
+          {s.step > 0 && (
+            <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>
+          )}
           {/* Removed duplicate small Keep button - green button in Step 1 handles this */}
         </div>
-        <button
-          onClick={() => {
-            try {
-              localStorage.removeItem(LS_KEY);
-              localStorage.removeItem(PENDING_CLAIM_KEY);
-            } catch { }
-            setS({
-              step: 1,
-              sessionId: uuidLike(),
-              topping: "",
-              mafiaMovieTitle: "",
-              style: "balanced",
-              city: "",
-              turtles: [],
-              crews: [],
-              seenNames: [],
-              discordId: undefined,
-              discordJoined: false,
-              submitting: false,
-            });
-          }}
-          style={btn("secondary")}
-        >
-          Reset
-        </button>
+        {s.step > 0 && (
+          <button
+            onClick={() => {
+              try {
+                localStorage.removeItem(LS_KEY);
+                localStorage.removeItem(PENDING_CLAIM_KEY);
+              } catch { }
+              setS({
+                step: 1,
+                sessionId: uuidLike(),
+                topping: "",
+                mafiaMovieTitle: "",
+                style: "balanced",
+                city: "",
+                turtles: [],
+                crews: [],
+                seenNames: [],
+                discordId: undefined,
+                discordJoined: false,
+                submitting: false,
+              });
+            }}
+            style={btn("secondary")}
+          >
+            Reset
+          </button>
+        )}
       </div>
 
       {s.error && (
@@ -878,6 +882,13 @@ export default function OnboardingWizard() {
 
       {!s.lookupLoading && s.step === 0 && (
         <div style={{ display: "grid", gap: 20, textAlign: "center", padding: "20px 0" }}>
+          <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+            <img
+              src="https://i.imgur.com/lRq8iK7.png"
+              alt="PizzaDAO"
+              style={{ height: 60, width: "auto" }}
+            />
+          </div>
           <div style={{ fontSize: 18, lineHeight: 1.5, opacity: 0.9 }}>
             Join the world's largest pizza co-op. <br />
           </div>

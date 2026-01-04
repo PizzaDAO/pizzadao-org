@@ -49,6 +49,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
 
     // New state for rich crew data
     const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -111,10 +112,24 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 // keep fallback crews
             }
         })();
+
+        // Fetch personalized tasks
+        (async () => {
+            try {
+                const res = await fetch(`/api/my-tasks/${id}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json.tasksByCrew) setMyTasks(json.tasksByCrew);
+                }
+            } catch (e) {
+                console.error("Failed to fetch personalized tasks", e);
+            }
+        })();
+
         return () => {
             alive = false;
         };
-    }, []);
+    }, [id]);
 
     if (loading) {
         return (
@@ -210,8 +225,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                 {/* Main Card */}
                 <div style={card()}>
-                    <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
-                        <h2 style={{ margin: 0, fontSize: 24 }}>Profile Details</h2>
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 10 }}>
                         <Link href={`/?edit=1&memberId=${idValue}`} style={{
                             ...btn("primary"),
                             fontSize: 14,
@@ -267,88 +281,142 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     </div>
 
                     {/* Crews Section - MATCHING STEP 5 UI */}
-                    {userCrews.length > 0 && (
-                        <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)" }}>
-                            <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>Your Crews</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
-                                {userCrews.map((cName) => {
-                                    // Find rich crew definition
-                                    const c = crewOptions.find(opt => opt.id.toLowerCase() === cName.toLowerCase() || opt.label.toLowerCase() === cName.toLowerCase());
+                    {(() => {
+                        // Normalize userCrews to IDs where possible
+                        const userCrewIds = userCrews.map(name => {
+                            const found = crewOptions.find(opt => opt.label.toLowerCase() === name.toLowerCase() || opt.id.toLowerCase() === name.toLowerCase());
+                            return found ? found.id : name;
+                        });
 
-                                    // If not found, use a basic fallback
-                                    const label = c?.label || cName;
-                                    const emoji = c?.emoji || "🍕";
+                        // Combine with IDs from myTasks
+                        const taskCrewIds = Object.keys(myTasks);
+                        const allDisplayIds = Array.from(new Set([...userCrewIds, ...taskCrewIds]));
 
-                                    return (
-                                        <div key={cName} style={crewCard()}>
-                                            <div style={{ display: "grid", gap: 4 }}>
-                                                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                                                    <span style={{ fontWeight: 700 }}>
-                                                        {emoji ? `${emoji} ` : ""}
-                                                        {label}
-                                                    </span>
-                                                </div>
+                        if (allDisplayIds.length === 0) return null;
 
-                                                {(c?.callTime || c?.callLength) && (
-                                                    <div style={{ opacity: 0.7, fontSize: 13 }}>
-                                                        {c.callTime ? c.callTime : ""}
-                                                        {c.callTime && c.callLength ? " • " : ""}
-                                                        {c.callLength ? c.callLength : ""}
+                        return (
+                            <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)" }}>
+                                <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>Your Crews</h3>
+                                <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+                                    {allDisplayIds.map((cid) => {
+                                        // Find rich crew definition
+                                        const c = crewOptions.find(opt => opt.id.toLowerCase() === cid.toLowerCase() || opt.label.toLowerCase() === cid.toLowerCase());
+
+                                        // If not found, use a basic fallback
+                                        const label = c?.label || cid;
+                                        const emoji = c?.emoji || "🍕";
+
+                                        return (
+                                            <div key={cid} style={crewCard()}>
+                                                <div style={{ display: "grid", gap: 4 }}>
+                                                    <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
+                                                        <span style={{ fontWeight: 700 }}>
+                                                            {emoji ? `${emoji} ` : ""}
+                                                            {label}
+                                                        </span>
                                                     </div>
-                                                )}
 
-                                                {c?.tasks && c.tasks.length > 0 && (
-                                                    <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
-                                                        <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: 0.5 }}>Top Tasks</div>
-                                                        {c.tasks.map((t, idx) => (
-                                                            <div key={idx} style={{ fontSize: 12, opacity: 0.85, display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
-                                                                <span style={{ flexShrink: 0 }}>•</span>
-                                                                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                                    {t.url ? (
-                                                                        <a
-                                                                            href={t.url}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
-                                                                        >
-                                                                            {t.label}
-                                                                        </a>
-                                                                    ) : (
-                                                                        <span>{t.label}</span>
-                                                                    )}
+                                                    {(c?.callTime || c?.callLength) && (
+                                                        <div style={{ opacity: 0.7, fontSize: 13 }}>
+                                                            {c.callTime ? c.callTime : ""}
+                                                            {c.callTime && c.callLength ? " • " : ""}
+                                                            {c.callLength ? c.callLength : ""}
+                                                        </div>
+                                                    )}
+
+                                                    {(() => {
+                                                        const personalTasks = myTasks[c?.id || ""] || myTasks[cid] || [];
+                                                        const topTasks = c?.tasks || [];
+                                                        const hasPersonal = personalTasks && personalTasks.length > 0;
+
+                                                        // Merge: Personal first, then Top Tasks to fill up to 3
+                                                        let displayTasks = [...personalTasks];
+                                                        if (displayTasks.length < 3) {
+                                                            const remaining = 3 - displayTasks.length;
+                                                            // Filter out top tasks that are already in personal tasks (by label)
+                                                            const personalLabels = new Set(displayTasks.map(t => t.label.toLowerCase()));
+                                                            const additional = topTasks
+                                                                .filter(t => !personalLabels.has(t.label.toLowerCase()))
+                                                                .slice(0, remaining);
+                                                            displayTasks = [...displayTasks, ...additional];
+                                                        }
+
+                                                        if (displayTasks.length === 0) return null;
+
+                                                        return (
+                                                            <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
+                                                                <div style={{
+                                                                    fontSize: 11,
+                                                                    fontWeight: 700,
+                                                                    opacity: 0.8,
+                                                                    textTransform: "uppercase",
+                                                                    letterSpacing: 0.5,
+                                                                    color: hasPersonal ? "#ff4d4d" : "rgba(0,0,0,0.6)"
+                                                                }}>
+                                                                    {hasPersonal ? "Your Tasks" : "Top Tasks"}
                                                                 </div>
+                                                                {displayTasks.map((t, idx) => {
+                                                                    const isPersonal = personalTasks?.some(pt => pt.label === t.label);
+                                                                    return (
+                                                                        <div key={idx} style={{
+                                                                            fontSize: 12,
+                                                                            opacity: isPersonal ? 1 : 0.7,
+                                                                            fontWeight: isPersonal ? 600 : 400,
+                                                                            display: "flex",
+                                                                            alignItems: "baseline",
+                                                                            gap: 4,
+                                                                            minWidth: 0
+                                                                        }}>
+                                                                            <span style={{ flexShrink: 0, color: isPersonal ? "#ff4d4d" : "inherit" }}>•</span>
+                                                                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                                                {t.url ? (
+                                                                                    <a
+                                                                                        href={t.url}
+                                                                                        target="_blank"
+                                                                                        rel="noreferrer"
+                                                                                        onClick={(e) => e.stopPropagation()}
+                                                                                        style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
+                                                                                    >
+                                                                                        {t.label}
+                                                                                    </a>
+                                                                                ) : (
+                                                                                    <span>{t.label}</span>
+                                                                                )}
+                                                                            </div>
+                                                                        </div>
+                                                                    );
+                                                                })}
                                                             </div>
-                                                        ))}
-                                                    </div>
-                                                )}
+                                                        );
+                                                    })()}
 
-                                                {c?.sheet && (
-                                                    <a
-                                                        href={c.sheet}
-                                                        target="_blank"
-                                                        rel="noreferrer"
-                                                        onClick={(e) => e.stopPropagation()}
-                                                        style={{
-                                                            fontSize: 13,
-                                                            fontWeight: 650,
-                                                            opacity: 0.85,
-                                                            textDecoration: "none",
-                                                            marginTop: 6,
-                                                            display: "inline-block"
-                                                        }}
-                                                        title={c.sheet}
-                                                    >
-                                                        Open crew sheet ↗
-                                                    </a>
-                                                )}
+                                                    {c?.sheet && (
+                                                        <a
+                                                            href={c.sheet}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            onClick={(e) => e.stopPropagation()}
+                                                            style={{
+                                                                fontSize: 13,
+                                                                fontWeight: 650,
+                                                                opacity: 0.85,
+                                                                textDecoration: "none",
+                                                                marginTop: 6,
+                                                                display: "inline-block"
+                                                            }}
+                                                            title={c.sheet}
+                                                        >
+                                                            Open crew sheet ↗
+                                                        </a>
+                                                    )}
+                                                </div>
                                             </div>
-                                        </div>
-                                    );
-                                })}
+                                        );
+                                    })}
+                                </div>
                             </div>
-                        </div>
-                    )}
+                        );
+                    })()}
 
 
 
