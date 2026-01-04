@@ -886,7 +886,7 @@ export default function OnboardingWizard() {
             <img
               src="https://i.imgur.com/lRq8iK7.png"
               alt="PizzaDAO"
-              style={{ height: 60, width: "auto" }}
+              style={{ height: 60, width: "auto", maxWidth: "100%", objectFit: "contain" }}
             />
           </div>
           <div style={{ fontSize: 18, lineHeight: 1.5, opacity: 0.9 }}>
