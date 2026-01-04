@@ -22,6 +22,7 @@ function gvizUrl(sheetId: string, tabName?: string) {
     url.searchParams.set("tqx", "out:json");
     if (tabName) url.searchParams.set("sheet", tabName);
     url.searchParams.set("headers", "0");
+    url.searchParams.set("_now", String(Date.now())); // Cache Buster
     return url.toString();
 }
 
@@ -110,7 +111,7 @@ export async function GET(
         data["Status"] = data["Status"] || data["Frequency"];
         data["Orgs"] = data["Orgs"] || data["Affiliation"];
         data["Skills"] = data["Skills"] || data["Specialties"];
-        data["DiscordID"] = data["DiscordID"] || data["Discord"];
+        data["DiscordID"] = data["DiscordID"] || data["Discord"] || data["DiscordId"] || data["discordid"];
 
         return NextResponse.json(data);
     } catch (err: any) {

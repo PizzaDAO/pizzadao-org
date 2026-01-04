@@ -186,16 +186,13 @@ export async function POST(req: Request) {
     };
 
     // Basic validation
-    if (!payload.mafiaName || !payload.topping || !payload.mafiaMovieTitle || !payload.city || !payload.turtle) {
+    // Relaxed: Only require Name. Other fields might be empty during updates or partial edits.
+    if (!payload.mafiaName) {
       return NextResponse.json(
         {
           error: "Missing required fields.",
           missing: {
             mafiaName: !payload.mafiaName,
-            topping: !payload.topping,
-            mafiaMovieTitle: !payload.mafiaMovieTitle,
-            city: !payload.city,
-            turtle: !payload.turtle,
           },
         },
         { status: 400 }

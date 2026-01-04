@@ -150,16 +150,33 @@ function upsertToCrew_(ss, raw, nowIso) {
 
     const name = String(raw.mafiaName ?? raw.name ?? "").trim();
     crewSheet.getRange(targetRow, colID).setValue(memberId);
-    if (mapping.Name) crewSheet.getRange(targetRow, mapping.Name).setValue(name);
+    // Only write Name if explicitly provided
+    if (mapping.Name && (raw.mafiaName !== undefined || raw.name !== undefined)) {
+      crewSheet.getRange(targetRow, mapping.Name).setValue(name);
+    }
     if (mapping.Status) {
        const cur = String(crewSheet.getRange(targetRow, mapping.Status).getValue()).trim();
        if (!cur || action === "inserted") crewSheet.getRange(targetRow, mapping.Status).setValue(DEFAULT_STATUS_ON_INSERT);
     }
-    if (mapping.City) crewSheet.getRange(targetRow, mapping.City).setValue(String(raw.city ?? ""));
-    if (mapping.Crews) crewSheet.getRange(targetRow, mapping.Crews).setValue(Array.isArray(raw.crews) ? raw.crews.join(", ") : String(raw.crews || ""));
-    if (mapping.Turtles) crewSheet.getRange(targetRow, mapping.Turtles).setValue(Array.isArray(raw.turtles) ? raw.turtles.join(", ") : String(raw.turtle || ""));
-    if (mapping.DiscordId) crewSheet.getRange(targetRow, mapping.DiscordId).setValue(String(raw.discordId || ""));
-    if (mapping.DiscordJoined) crewSheet.getRange(targetRow, mapping.DiscordJoined).setValue(raw.discordJoined ? "TRUE" : "FALSE");
+    // Only write City if explicitly provided
+    if (mapping.City && raw.city !== undefined) {
+      crewSheet.getRange(targetRow, mapping.City).setValue(String(raw.city ?? ""));
+    }
+    // Only write Crews if explicitly provided
+    if (mapping.Crews && raw.crews !== undefined) {
+      crewSheet.getRange(targetRow, mapping.Crews).setValue(Array.isArray(raw.crews) ? raw.crews.join(", ") : String(raw.crews || ""));
+    }
+    // Only write Turtles if explicitly provided
+    if (mapping.Turtles && (raw.turtles !== undefined || raw.turtle !== undefined)) {
+      crewSheet.getRange(targetRow, mapping.Turtles).setValue(Array.isArray(raw.turtles) ? raw.turtles.join(", ") : String(raw.turtle || ""));
+    }
+    // Always write DiscordId and DiscordJoined if provided
+    if (mapping.DiscordId && raw.discordId !== undefined) {
+      crewSheet.getRange(targetRow, mapping.DiscordId).setValue(String(raw.discordId || ""));
+    }
+    if (mapping.DiscordJoined && raw.discordJoined !== undefined) {
+      crewSheet.getRange(targetRow, mapping.DiscordJoined).setValue(raw.discordJoined ? "TRUE" : "FALSE");
+    }
 
     if (mapping.Notes) {
       const curNotes = String(crewSheet.getRange(targetRow, mapping.Notes).getValue()).trim();

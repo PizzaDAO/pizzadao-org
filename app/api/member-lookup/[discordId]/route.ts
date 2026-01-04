@@ -33,6 +33,9 @@ export async function GET(
         const { discordId } = await params;
         if (!discordId) return NextResponse.json({ error: "Missing Discord ID" }, { status: 400 });
 
+        const searchParams = new URL(request.url).searchParams;
+        const searchName = (searchParams.get("searchName") || "").trim().toLowerCase();
+
         const url = gvizUrl(SHEET_ID, TAB_NAME);
         const res = await fetch(url, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch sheet");
@@ -67,11 +70,14 @@ export async function GET(
         // Find standard column indices in the detected header row
         let idColIdx = -1;
         let discordColIdx = -1;
+        const nameColIndices: number[] = []; // Store ALL name columns
+
         const normalizedHeaders = headerRowVals.map(h => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
 
         normalizedHeaders.forEach((h, ci) => {
             if (h === "id" || h === "crewid" || h === "memberid") idColIdx = ci;
             if (h === "discordid" || h === "discord" || h === "discorduser") discordColIdx = ci;
+            if (h === "name" || h === "mafianame" || h === "realname") nameColIndices.push(ci);
         });
 
         if (idColIdx === -1) idColIdx = 0; // fallback to A
@@ -79,17 +85,42 @@ export async function GET(
             throw new Error(`Could not find Discord column (DiscordID, Discord). Found: ${headerRowVals.join(", ")}`);
         }
 
+        console.log(`[Lookup] ID Col: ${idColIdx}, Discord Col: ${discordColIdx}, Name Cols: ${nameColIndices}, Headers: ${normalizedHeaders.join(",")}`);
+
         const dataStartIdx = headerRowIdx + 1;
-        const userRow = rows.slice(dataStartIdx).find((r: any) => {
+
+        // 1. Search by Discord ID
+        let userRow = rows.slice(dataStartIdx).find((r: any) => {
             const cellVal = r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f;
             if (cellVal === null || cellVal === undefined) return false;
             return String(cellVal).trim() === discordId;
         });
 
+        let foundMethod = "discord_id";
+
+        // 2. Fallback: Search by Name (if provided and Discord ID not found)
+        if (!userRow && searchName && nameColIndices.length > 0) {
+            console.log(`[Lookup] Searching for name: '${searchName}'`);
+            userRow = rows.slice(dataStartIdx).find((r: any) => {
+                const discordVal = String(r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f ?? "").trim();
+
+                // Must have EMPTY Discord ID
+                const isEmptyDiscord = !discordVal || discordVal === "null" || discordVal === "undefined";
+                if (!isEmptyDiscord) return false;
+
+                // Check ANY name column
+                return nameColIndices.some(idx => {
+                    const val = String(r?.c?.[idx]?.v ?? r?.c?.[idx]?.f ?? "").trim().toLowerCase();
+                    return val === searchName;
+                });
+            });
+            if (userRow) foundMethod = "name_match";
+        }
+
         if (!userRow) {
             const sampleDiscordIds = rows.slice(dataStartIdx, dataStartIdx + 5).map((r: any) => r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f).filter(Boolean);
             return NextResponse.json({
-                error: `Member not found for Discord ID '${discordId}'. Found in sheet: ${sampleDiscordIds.join(", ")}. Column ${discordColIdx} ('${headerRowVals[discordColIdx]}')`,
+                error: `Member not found for Discord ID '${discordId}' (or name '${searchName}'). Found in sheet: ${sampleDiscordIds.join(", ")}.`,
                 status: 404
             }, { status: 404 });
         }
@@ -110,7 +141,7 @@ export async function GET(
 
         const memberId = userRow.c?.[idColIdx]?.v ?? userRow.c?.[idColIdx]?.f;
 
-        return NextResponse.json({ found: true, memberId, data });
+        return NextResponse.json({ found: true, memberId, data, method: foundMethod });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
     }

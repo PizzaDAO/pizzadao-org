@@ -43,8 +43,10 @@ type WizardState = {
   seenNames: string[];
 
   // ✅ Discord linking (Phase 3)
+  // ✅ Discord linking (Phase 3)
   discordId?: string;
   discordJoined?: boolean;
+  discordNick?: string;
 
   memberId?: string;
   isUpdate?: boolean;
@@ -59,6 +61,14 @@ type WizardState = {
     turtles: string[];
     crews: string[];
   };
+};
+
+type ClaimState = {
+  active: boolean;
+  step: "ask" | "input-id" | "input-pass" | "processing";
+  memberId: string;
+  error: string | null;
+  foundName: string | null;
 };
 
 type CrewOption = {
@@ -136,6 +146,14 @@ export default function OnboardingWizard() {
       turtles: [],
     }))
   );
+
+  const [claimState, setClaimState] = useState<ClaimState>({
+    active: false,
+    step: "ask",
+    memberId: "",
+    error: null,
+    foundName: null,
+  });
   const [crewsLoading, setCrewsLoading] = useState(false);
 
   // ✅ Pick up Discord callback params (/?discordId=...&discordJoined=1&sessionId=...)
@@ -145,12 +163,14 @@ export default function OnboardingWizard() {
       const discordId = url.searchParams.get("discordId");
       const joined = url.searchParams.get("discordJoined");
       const returnedSessionId = url.searchParams.get("sessionId");
+      const discordNick = url.searchParams.get("discordNick");
 
       if (discordId) {
         setS((p) => ({
           ...p,
           discordId,
           discordJoined: joined === "1" || joined === "true",
+          discordNick: discordNick || undefined,
           sessionId: returnedSessionId || p.sessionId,
         }));
 
@@ -158,15 +178,44 @@ export default function OnboardingWizard() {
         url.searchParams.delete("discordId");
         url.searchParams.delete("discordJoined");
         url.searchParams.delete("sessionId");
+        url.searchParams.delete("discordNick");
         window.history.replaceState({}, "", url.toString());
 
         // ✅ Check if member exists and redirect to dashboard if so
         (async () => {
           try {
             setS(p => ({ ...p, lookupLoading: true }));
-            const res = await fetch(`/api/member-lookup/${discordId}`);
+            // Pass nickname for fallback search
+            const searchParam = discordNick ? `?searchName=${encodeURIComponent(discordNick)}` : "";
+            const res = await fetch(`/api/member-lookup/${discordId}${searchParam}`);
             if (res.ok) {
               const data = await res.json();
+
+              // ✅ Handle Name Match Auto-Claim FIRST - must write discordId to sheet
+              if (data.found && data.method === "name_match" && data.memberId) {
+                console.log("[AutoClaim] Found by nickname, claiming member:", data.memberId);
+                try {
+                  const claimRes = await fetch("/api/claim-member", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({
+                      memberId: data.memberId,
+                      discordId: discordId,
+                      password: "moltobenny"
+                    }),
+                  });
+                  if (claimRes.ok) {
+                    router.push(`/dashboard/${data.memberId}`);
+                    return;
+                  }
+                  console.error("Auto-claim failed", await claimRes.text());
+                } catch (err) {
+                  console.error("Auto-claim error", err);
+                }
+                // If auto-claim fails, fall through to manual flow
+              }
+
+              // ✅ Handle regular Discord ID match (already linked)
               if (data.found && data.data) {
                 const sheetData = data.data;
                 const parseList = (val: any) => {
@@ -197,10 +246,62 @@ export default function OnboardingWizard() {
                 return;
               }
             }
+            // Not found -> Trigger Claim Flow
             setS(p => ({ ...p, lookupLoading: false }));
+            setClaimState(p => ({ ...p, active: true, step: "ask" }));
           } catch (e) {
             console.error("Lookup failed", e);
             setS(p => ({ ...p, lookupLoading: false }));
+          }
+        })();
+        return;
+      }
+
+      // ✅ Edit Profile Flow
+      const isEdit = url.searchParams.get("edit") === "1";
+      const memberId = url.searchParams.get("memberId");
+
+      if (isEdit && memberId) {
+        // Clear query params
+        url.searchParams.delete("edit");
+        url.searchParams.delete("memberId");
+        window.history.replaceState({}, "", url.toString());
+
+        (async () => {
+          try {
+            setS(p => ({ ...p, lookupLoading: true }));
+            const res = await fetch(`/api/user-data/${memberId}`);
+            if (!res.ok) throw new Error("Failed to load user data");
+            const data = await res.json();
+
+            const parseList = (val: any) => {
+              if (Array.isArray(val)) return val.map(String);
+              if (typeof val === "string") return val.split(/[,|]+/).map(s => s.trim()).filter(Boolean);
+              return [];
+            };
+
+            const existing = {
+              mafiaName: data["Name"] || data["Mafia Name"] || "",
+              city: data["City"] || "",
+              turtles: parseList(data["Turtles"] || data["Roles"] || []),
+              crews: parseList(data["Crews"] || []),
+            };
+
+            setS(p => ({
+              ...p,
+              memberId,
+              isUpdate: true,
+              lookupLoading: false,
+              mafiaName: existing.mafiaName,
+              city: existing.city,
+              crews: existing.crews,
+              turtles: existing.turtles,
+              existingData: existing,
+              step: 1 // Start at Step 1 for edit flow
+            }));
+          } catch (e) {
+            console.error("Edit profile fetch failed", e);
+            setS(p => ({ ...p, lookupLoading: false })); // Unblock if failed
           }
         })();
       }
@@ -530,6 +631,179 @@ export default function OnboardingWizard() {
     return map;
   }, [s.turtles, crewOptions, turtleIdToLabel]);
 
+  // --- Claim Flow Handlers ---
+
+  async function checkMemberId() {
+    if (!claimState.memberId.trim()) {
+      setClaimState(p => ({ ...p, error: "Please enter an ID" }));
+      return;
+    }
+    setClaimState(p => ({ ...p, step: "processing", error: null }));
+    try {
+      const res = await fetch(`/api/user-data/${claimState.memberId}`);
+      if (res.ok) {
+        const data = await res.json();
+        const name = data["Name"] || data["Mafia Name"] || "Unknown";
+        setClaimState(p => ({ ...p, step: "input-pass", foundName: name }));
+      } else {
+        setClaimState(p => ({ ...p, step: "input-id", error: "ID not found in our records." }));
+      }
+    } catch {
+      setClaimState(p => ({ ...p, step: "input-id", error: "Failed to check ID." }));
+    }
+  }
+
+  async function submitClaim(password: string) {
+    setClaimState(p => ({ ...p, step: "processing", error: null }));
+    try {
+      const res = await fetch("/api/claim-member", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          memberId: claimState.memberId,
+          discordId: s.discordId,
+          password
+        }),
+      });
+      const json = await res.json();
+      if (res.ok) {
+        // Success! Redirect to dashboard
+        router.push(`/dashboard/${claimState.memberId}`);
+      } else {
+        setClaimState(p => ({ ...p, step: "input-pass", error: json.error || "Claim failed" }));
+      }
+    } catch {
+      setClaimState(p => ({ ...p, step: "input-pass", error: "Network error" }));
+    }
+  }
+
+  // ---
+
+  // --- Render Claim Flow ---
+  if (claimState.active) {
+    return (
+      <div style={{
+        minHeight: "100vh",
+        display: "flex",
+        alignItems: "center",
+        justifyContent: "center",
+        background: "#fafafa",
+        padding: 20,
+      }}>
+        <div style={card()}>
+          {claimState.step === "ask" && (
+            <>
+              <h2 style={{ fontSize: 24, marginBottom: 16 }}>Welcome, Pizza Chef! 🍕</h2>
+              <p style={{ marginBottom: 24, lineHeight: 1.5 }}>
+                We authenticated your Discord, but we couldn't automatically find your Profile.
+                <br /><br />
+                <strong>Do you already have a PizzaDAO Member ID?</strong>
+              </p>
+              <div style={{ display: "flex", gap: 12 }}>
+                <button
+                  onClick={() => setClaimState(p => ({ ...p, step: "input-id" }))}
+                  style={btn("primary")}
+                >
+                  Yes, I have an ID
+                </button>
+                <button
+                  onClick={() => {
+                    setClaimState(p => ({ ...p, active: false }));
+                    if (s.discordNick) {
+                      setS(p => ({ ...p, mafiaName: p.discordNick }));
+                    }
+                  }} // Proceed to new registration
+                  style={btn("secondary")}
+                >
+                  No, I'm new
+                </button>
+              </div>
+            </>
+          )}
+
+          {claimState.step === "input-id" && (
+            <>
+              <h2 style={{ fontSize: 20, marginBottom: 16 }}>Find Your Profile</h2>
+              <p style={{ marginBottom: 16, fontSize: 14, opacity: 0.8 }}>
+                Please enter your numeric Member ID.
+              </p>
+              <input
+                type="text"
+                placeholder="e.g. 60"
+                value={claimState.memberId}
+                onChange={(e) => setClaimState(p => ({ ...p, memberId: e.target.value }))}
+                style={{
+                  padding: "10px 12px",
+                  borderRadius: 8,
+                  border: "1px solid #ccc",
+                  fontSize: 16,
+                  width: "100%",
+                  marginBottom: 16
+                }}
+              />
+              {claimState.error && <div style={{ color: "red", fontSize: 14, marginBottom: 16 }}>{claimState.error}</div>}
+              <div style={{ display: "flex", gap: 12 }}>
+                <button onClick={checkMemberId} style={btn("primary")}>
+                  Search ID
+                </button>
+                <button
+                  onClick={() => setClaimState(p => ({ ...p, step: "ask", error: null }))}
+                  style={btn("secondary")}
+                >
+                  Back
+                </button>
+              </div>
+            </>
+          )}
+
+          {claimState.step === "input-pass" && (
+            <>
+              <h2 style={{ fontSize: 20, marginBottom: 16 }}>Claim Profile: {claimState.foundName}</h2>
+              <p style={{ marginBottom: 16, fontSize: 14, opacity: 0.8 }}>
+                To verify this is you, please enter the claim password.
+              </p>
+              <form onSubmit={(e) => { e.preventDefault(); const fd = new FormData(e.currentTarget); submitClaim(String(fd.get("password"))); }}>
+                <input
+                  name="password"
+                  type="password"
+                  placeholder="Password"
+                  autoFocus
+                  style={{
+                    padding: "10px 12px",
+                    borderRadius: 8,
+                    border: "1px solid #ccc",
+                    fontSize: 16,
+                    width: "100%",
+                    marginBottom: 16
+                  }}
+                />
+                {claimState.error && <div style={{ color: "red", fontSize: 14, marginBottom: 16 }}>{claimState.error}</div>}
+                <div style={{ display: "flex", gap: 12 }}>
+                  <button type="submit" style={btn("primary")}>
+                    Claim Profile
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setClaimState(p => ({ ...p, step: "input-id", error: null }))}
+                    style={btn("secondary")}
+                  >
+                    Back
+                  </button>
+                </div>
+              </form>
+            </>
+          )}
+
+          {claimState.step === "processing" && (
+            <div style={{ textAlign: "center", padding: 20 }}>
+              Checking...
+            </div>
+          )}
+        </div>
+      </div>
+    );
+  }
+
   return (
     <div style={card()}>
       {s.isUpdate && (
@@ -546,8 +820,18 @@ export default function OnboardingWizard() {
         </div>
       )}
 
-      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "baseline" }}>
-        <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>
+      <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
+        <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
+          <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>
+          {s.step === 1 && s.isUpdate && s.existingData?.mafiaName && (
+            <button
+              onClick={() => pickName(s.existingData!.mafiaName!)}
+              style={{ ...btn("primary"), padding: "4px 12px", fontSize: 13 }}
+            >
+              Keep <b>{s.existingData.mafiaName}</b>
+            </button>
+          )}
+        </div>
         <button
           onClick={() => {
             try {
@@ -672,7 +956,7 @@ export default function OnboardingWizard() {
                 style={btn("secondary", !canGenerate || s.submitting)}
                 title="Regenerate (won’t repeat anything you’ve already seen)"
               >
-                {s.submitting ? "Regenerating…" : "Regenerate (no repeats)"}
+                {s.submitting ? "Regenerating…" : "Regenerate"}
               </button>
             )}
 
@@ -723,11 +1007,11 @@ export default function OnboardingWizard() {
               Back
             </button>
             <button
-              onClick={() => setS((p) => ({ ...p, step: p.isUpdate ? 5 : 3 }))}
+              onClick={() => setS((p) => ({ ...p, step: 3 }))}
               disabled={s.city.trim().length === 0}
               style={btn("primary", s.city.trim().length === 0)}
             >
-              {s.isUpdate ? "Next (Skip ID Selection)" : "Next"}
+              Next
             </button>
           </div>
         </div>
@@ -768,11 +1052,11 @@ export default function OnboardingWizard() {
               Back
             </button>
             <button
-              onClick={() => setS((p) => ({ ...p, step: 4 }))}
+              onClick={() => setS((p) => ({ ...p, step: p.isUpdate ? 5 : 4 }))}
               disabled={s.turtles.length === 0}
               style={btn("primary", s.turtles.length === 0)}
             >
-              Next
+              {s.isUpdate ? "Next" : "Next"}
             </button>
           </div>
         </div>
@@ -867,7 +1151,7 @@ export default function OnboardingWizard() {
 
                     {c.tasks && c.tasks.length > 0 && (
                       <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
-                        <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: 0.5 }}>Current Tasks</div>
+                        <div style={{ fontSize: 11, fontWeight: 700, opacity: 0.6, textTransform: "uppercase", letterSpacing: 0.5 }}>Top Tasks</div>
                         {c.tasks.map((t, idx) => (
                           <div key={idx} style={{ fontSize: 12, opacity: 0.85, display: "flex", alignItems: "baseline", gap: 4, minWidth: 0 }}>
                             <span style={{ flexShrink: 0 }}>•</span>
@@ -918,7 +1202,7 @@ export default function OnboardingWizard() {
           {/* ✅ Combined final action */}
           <div style={{ display: "grid", gap: 6 }}>
             <div style={{ display: "flex", gap: 10 }}>
-              <button onClick={() => setS((p) => ({ ...p, step: 4 }))} style={btn("secondary")}>
+              <button onClick={() => setS((p) => ({ ...p, step: p.isUpdate ? 3 : 4 }))} style={btn("secondary")}>
                 Back
               </button>
               <button onClick={s.isUpdate ? () => setS(p => ({ ...p, step: 6 })) : claimRoles} disabled={s.submitting} style={btn("primary", s.submitting)}>
@@ -975,16 +1259,13 @@ export default function OnboardingWizard() {
 
       {s.step === 6 && (
         <div style={{ display: "grid", gap: 16 }}>
-          <div style={{ ...alert("info"), background: "rgba(0,0,0,0.03)", border: "1px solid black" }}>
-            👋 <b>Existing Profile Found!</b> We found an account linked to your Discord. Would you like to update it with the new info you just entered?
-          </div>
 
           <div style={{ display: "grid", gap: 0, border: "1px solid rgba(0,0,0,0.1)", borderRadius: 10, overflow: "hidden" }}>
             {/* Header */}
             <div style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr", gap: 10, background: "rgba(0,0,0,0.06)", padding: "12px 16px", fontWeight: 750, fontSize: 13, textTransform: "uppercase", letterSpacing: 0.6 }}>
               <div>Field</div>
-              <div>Existing (In Sheet)</div>
               <div>New (Entered)</div>
+              <div>Existing (In Sheet)</div>
             </div>
 
             {[
@@ -1001,11 +1282,11 @@ export default function OnboardingWizard() {
               return (
                 <div key={i} style={{ display: "grid", gridTemplateColumns: "100px 1fr 1fr", gap: 10, padding: "12px 16px", background: i % 2 === 1 ? "rgba(0,0,0,0.01)" : "white", borderTop: "1px solid rgba(0,0,0,0.05)" }}>
                   <div style={{ fontWeight: 600, fontSize: 14, color: "rgba(0,0,0,0.5)" }}>{row.label}</div>
-                  <div style={{ opacity: 0.6, fontSize: 14 }}>{row.old || "—"}</div>
                   <div style={{ fontWeight: hasChange ? 750 : 400, color: hasChange ? "#000" : "#777", fontSize: 14 }}>
                     {row.new || "—"}
                     {hasChange && <span style={{ marginLeft: 6, color: "#10b981", fontSize: 16 }} title="Modified">●</span>}
                   </div>
+                  <div style={{ opacity: 0.6, fontSize: 14 }}>{row.old || "—"}</div>
                 </div>
               );
             })}
@@ -1015,7 +1296,7 @@ export default function OnboardingWizard() {
             <button
               onClick={() => submitAll()}
               disabled={s.submitting}
-              style={btn("primary", s.submitting)}
+              style={{ ...btn("primary", s.submitting), flex: 1 }}
             >
               {s.submitting ? "Updating Profile..." : "Yes, Update My Profile"}
             </button>
@@ -1024,7 +1305,7 @@ export default function OnboardingWizard() {
               disabled={s.submitting}
               style={{ ...btn("secondary"), flex: 1 }}
             >
-              No, Keep Existing & Go to Dashboard
+              Don't Update
             </button>
           </div>
         </div>

@@ -53,7 +53,7 @@ async function addUserToGuild(discordUserId: string, userAccessToken: string) {
   let data: any = null;
   try {
     data = JSON.parse(text);
-  } catch {}
+  } catch { }
 
   // Defensive: if Discord says "already a member", treat as joined.
   // (Some endpoints use code 30007; keeping this tolerant.)
@@ -69,6 +69,25 @@ async function addUserToGuild(discordUserId: string, userAccessToken: string) {
   throw new Error(`guilds.join failed (${r.status}): ${text}`);
 }
 
+
+interface GuildMember {
+  nick?: string;
+  user?: {
+    global_name?: string;
+    username: string;
+  };
+}
+
+async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
+  const guildId = process.env.DISCORD_GUILD_ID!;
+  const botToken = process.env.DISCORD_BOT_TOKEN!;
+  const r = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+    headers: { Authorization: `Bot ${botToken}` },
+  });
+  if (!r.ok) return null;
+  return await r.json();
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -81,14 +100,19 @@ export async function GET(req: Request) {
     const me = await fetchDiscordMe(token.access_token);
 
     const joinResult = await addUserToGuild(me.id, token.access_token);
+    const guildMember = await fetchGuildMember(me.id);
+
+    const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
 
     const back = new URL("/", url.origin);
     back.searchParams.set("discordId", me.id);
     if (state) back.searchParams.set("sessionId", state);
     back.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
+    if (nick) back.searchParams.set("discordNick", nick);
 
     return NextResponse.redirect(back.toString());
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Discord callback failed" }, { status: 500 });
   }
 }
+
