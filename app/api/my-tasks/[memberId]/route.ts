@@ -110,7 +110,7 @@ async function fetchMyTasksForCrew(sheetUrl: string, memberId: string): Promise<
                         if (!r || r.length === 0) continue;
 
                         // If we see another "Tasks" in the first few columns, this table is done
-                        const firstFew = r.slice(0, 3).map(c => String(c?.v || "").trim().toLowerCase());
+                        const firstFew = r.slice(0, 3).map((c: any) => String(c?.v || "").trim().toLowerCase());
                         if (firstFew.includes("tasks")) break;
 
                         const taskCell = r[tIdx];
