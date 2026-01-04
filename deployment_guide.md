@@ -23,6 +23,7 @@ If you haven't already, push your local code to a GitHub repository.
    - `DISCORD_BOT_TOKEN`: Your Discord Bot Token.
    - `NEXT_PUBLIC_BASE_URL`: Your live Vercel URL (e.g., `https://onboarding.vercel.app`).
 4. Click **Deploy**.
+5. **Automatic Updates**: By connecting your GitHub repository, Vercel will automatically redeploy your site whenever you push changes to the `main` branch. No manual action is needed!
 
 ## 3. Update Discord Redirect URI
 Once you have your live URL (e.g., `pizza-onboarding.vercel.app`), you **must** update your Discord Application settings:
