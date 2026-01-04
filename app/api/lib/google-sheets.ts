@@ -5,9 +5,15 @@ import path from "path";
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
 
 // Check for env var credentials first (preferred for production)
-const credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
-    : undefined;
+let credentials;
+try {
+    credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
+        ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
+        : undefined;
+} catch (error) {
+    console.error("Error parsing GOOGLE_SERVICE_ACCOUNT_JSON environment variable");
+    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON. Please ensure it is the full object starting with '{' and ending with '}'.");
+}
 
 const auth = new google.auth.GoogleAuth({
     credentials,
