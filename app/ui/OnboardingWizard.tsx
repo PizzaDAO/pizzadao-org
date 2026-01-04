@@ -710,7 +710,9 @@ export default function OnboardingWizard() {
                   onClick={() => {
                     setClaimState(p => ({ ...p, active: false }));
                     if (s.discordNick) {
-                      setS(p => ({ ...p, mafiaName: p.discordNick }));
+                      setS(p => ({ ...p, mafiaName: p.discordNick, step: 1 }));
+                    } else {
+                      setS(p => ({ ...p, step: 1 }));
                     }
                   }} // Proceed to new registration
                   style={btn("secondary")}
@@ -806,11 +808,7 @@ export default function OnboardingWizard() {
 
   return (
     <div style={card()}>
-      {s.isUpdate && (
-        <div style={{ ...alert("success"), marginBottom: 16, background: "rgba(0,0,0,0.05)", border: "2px solid black" }}>
-          👋 <b>Existing Profile Found!</b> We've pre-filled your info. You can update anything below.
-        </div>
-      )}
+      {/* Removed 'Existing Profile Found' message - not needed for updates */}
       {/* Consolidated Selection Summary */}
       {(s.mafiaName || s.city || s.turtles.length > 0) && (
         <div style={{ opacity: 0.9, fontSize: 16, borderBottom: "1px solid rgba(0,0,0,0.06)", paddingBottom: 8, marginBottom: 12, display: "flex", flexWrap: "wrap", gap: 10 }}>
@@ -823,14 +821,7 @@ export default function OnboardingWizard() {
       <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
         <div style={{ display: "flex", gap: 12, alignItems: "center", flexWrap: "wrap" }}>
           <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>
-          {s.step === 1 && s.isUpdate && s.existingData?.mafiaName && (
-            <button
-              onClick={() => pickName(s.existingData!.mafiaName!)}
-              style={{ ...btn("primary"), padding: "4px 12px", fontSize: 13 }}
-            >
-              Keep <b>{s.existingData.mafiaName}</b>
-            </button>
-          )}
+          {/* Removed duplicate small Keep button - green button in Step 1 handles this */}
         </div>
         <button
           onClick={() => {
@@ -908,6 +899,32 @@ export default function OnboardingWizard() {
       )}
       {s.step === 1 && (
         <div style={{ display: "grid", gap: 12 }}>
+          {/* Keep Discord Nickname option - show when name matches nickname */}
+          {s.discordNick && (s.mafiaName === s.discordNick || !s.mafiaName) && (
+            <div style={{
+              padding: 16,
+              background: "rgba(76, 175, 80, 0.1)",
+              borderRadius: 12,
+              border: "2px solid rgba(76, 175, 80, 0.3)",
+              textAlign: "center"
+            }}>
+              <div style={{ marginBottom: 8, fontSize: 14, opacity: 0.8 }}>
+                Want to use your Discord nickname?
+              </div>
+              <button
+                onClick={() => {
+                  setS(p => ({ ...p, mafiaName: p.discordNick, step: 2 }));
+                }}
+                style={{ ...btn("primary"), background: "#4CAF50" }}
+              >
+                Keep "{s.discordNick || s.mafiaName}" and continue
+              </button>
+            </div>
+          )}
+
+          <div style={{ textAlign: "center", opacity: 0.6, fontSize: 13 }}>
+            {s.discordNick && (s.mafiaName === s.discordNick || !s.mafiaName) && "— or generate a new name instead —"}
+          </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Favorite pizza topping">
               <input
