@@ -1598,6 +1598,7 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
                 padding: "10px 12px",
                 border: "none",
                 background: "white",
+                color: "#000000",
                 cursor: "pointer",
               }}
             >
@@ -1628,6 +1629,7 @@ function card(): React.CSSProperties {
     background: "white",
     display: "grid",
     gap: 14,
+    color: "#000000",
   };
 }
 
@@ -1640,6 +1642,9 @@ function input(): React.CSSProperties {
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
+    background: "#ffffff",
+    color: "#000000",
+    appearance: "none", // helps with iOS styling
   };
 }
 
@@ -1653,7 +1658,7 @@ function btn(kind: "primary" | "secondary", disabled?: boolean): React.CSSProper
     opacity: disabled ? 0.6 : 1,
   };
   if (kind === "primary") return { ...base, background: "black", color: "white", borderColor: "black" };
-  return { ...base, background: "white" };
+  return { ...base, background: "white", color: "#000000" };
 }
 
 function choiceBtn(): React.CSSProperties {
@@ -1662,6 +1667,7 @@ function choiceBtn(): React.CSSProperties {
     borderRadius: 12,
     border: "1px solid rgba(0,0,0,0.18)",
     background: "white",
+    color: "#000000",
     textAlign: "left",
     cursor: "pointer",
     fontWeight: 800,
@@ -1675,6 +1681,7 @@ function tile(selected: boolean): React.CSSProperties {
     borderRadius: 12,
     border: selected ? "2px solid black" : "1px solid rgba(0,0,0,0.18)",
     background: selected ? "rgba(0,0,0,0.04)" : "white",
+    color: "#000000",
     textAlign: "left",
     cursor: "pointer",
   };
@@ -1689,6 +1696,7 @@ function crewRow(checked: boolean): React.CSSProperties {
     borderRadius: 12,
     border: checked ? "2px solid black" : "1px solid rgba(0,0,0,0.18)",
     background: checked ? "rgba(0,0,0,0.04)" : "white",
+    color: "#000000",
     cursor: "pointer",
   };
 }
