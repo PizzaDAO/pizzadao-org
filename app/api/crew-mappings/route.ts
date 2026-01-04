@@ -1,5 +1,5 @@
-// app/api/crew-mappings/route.ts
 import { NextResponse } from "next/server";
+import { getTaskLinks } from "../lib/google-sheets";
 
 export const runtime = "nodejs";
 
@@ -85,20 +85,114 @@ function extractSheetId(url: string) {
   return match ? match[1] : null;
 }
 
+function extractUrlFromText(text: string): string | undefined {
+  // 1. Try parentheses: (https://...)
+  const parenMatch = text.match(/\((https?:\/\/[^\s\)]+)\)/);
+  if (parenMatch) return parenMatch[1];
+  // 2. Try raw URL: https://...
+  const rawMatch = text.match(/https?:\/\/[^\s\)]+/);
+  if (rawMatch) return rawMatch[0];
+  // 3. Try common domains: rsv.pizza, rarepizzas.com
+  const domainMatch = text.match(/([a-zA-Z0-9-]+\.(?:com|pizza|xyz|org|net|io|me))/i);
+  if (domainMatch) return `https://${domainMatch[1]}`;
+  return undefined;
+}
+
+// Fetch task links from published HTML (pubhtml) - copied from my-tasks
+async function fetchTaskLinksFromHTML(sheetId: string): Promise<Record<string, string>> {
+  const linkMap: Record<string, string> = {};
+  try {
+    const pubhtmlUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/pubhtml`;
+    const res = await fetch(pubhtmlUrl, {
+      headers: { "User-Agent": "Mozilla/5.0" },
+      cache: "no-store"
+    });
+
+    if (!res.ok) {
+      console.log(`[fetchTaskLinksFromHTML] Sheet not published or inaccessible (${res.status})`);
+      return linkMap;
+    }
+
+    const html = await res.text();
+    const $ = cheerio.load(html);
+
+    // Find all tables and look for Tasks table
+    $('table').each((_, table) => {
+      const $table = $(table);
+      let tasksHeaderRow: any = null;
+      let taskColIdx = -1;
+
+      // Find the "Tasks" anchor
+      $table.find('tr').each((rowIdx, tr) => {
+        const $tr = $(tr);
+        const cells = $tr.find('td, th');
+        cells.each((cellIdx, cell) => {
+          const text = $(cell).text().trim().toLowerCase();
+          if (text === 'tasks' || text === 'task') {
+            tasksHeaderRow = $tr;
+            return false; // break
+          }
+        });
+        if (tasksHeaderRow) return false; // break outer
+      });
+
+      if (!tasksHeaderRow) return; // continue to next table
+
+      // Find header row (should be 1-2 rows after anchor)
+      const headerRowIdx = $table.find('tr').index(tasksHeaderRow);
+      for (let offset = 1; offset <= 3; offset++) {
+        const $headerRow = $table.find('tr').eq(headerRowIdx + offset);
+        const headerCells = $headerRow.find('td, th');
+        headerCells.each((idx, cell) => {
+          const text = $(cell).text().trim().toLowerCase();
+          if (text === 'task') {
+            taskColIdx = idx;
+            return false; // break
+          }
+        });
+        if (taskColIdx !== -1) break;
+      }
+
+      if (taskColIdx === -1) return; // No task column found
+
+      // Extract links from task cells
+      $table.find('tr').each((_, tr) => {
+        const $tr = $(tr);
+        const cells = $tr.find('td, th');
+        const taskCell = cells.eq(taskColIdx);
+        const $link = taskCell.find('a');
+
+        if ($link.length > 0) {
+          const label = taskCell.text().trim();
+          const href = $link.attr('href');
+          if (label && href) {
+            linkMap[label] = href;
+          }
+        }
+      });
+    });
+
+    console.log(`[fetchTaskLinksFromHTML] Extracted ${Object.keys(linkMap).length} links from HTML`);
+  } catch (e) {
+    console.error('[fetchTaskLinksFromHTML] Error:', e);
+  }
+  return linkMap;
+}
+
 async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: string }[]> {
   const id = extractSheetId(sheetUrl);
   if (!id) return [];
 
   try {
     const url = gvizUrl(id); // default tab
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 600 } });
+    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 300 } });
     if (!res.ok) return [];
     const text = await res.text();
     const gviz = parseGvizJson(text);
     const rows = gviz?.table?.rows || [];
     const cols = gviz?.table?.cols || [];
 
-    // Find the cell containing "Tasks"
+    // Find the cell containing "Tasks" or "Task"
     let tasksRowIdx = -1;
     let tasksColIdx = -1;
 
@@ -106,8 +200,7 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       const rowCells = rows[ri]?.c || [];
       for (let ci = 0; ci < rowCells.length; ci++) {
         const val = String(rowCells[ci]?.v || "").trim().toLowerCase();
-        // Look for the cell that contains exactly "tasks"
-        if (val === "tasks") {
+        if (val === "tasks" || val === "task") {
           tasksRowIdx = ri;
           tasksColIdx = ci;
           break;
@@ -116,26 +209,18 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       if (tasksRowIdx !== -1) break;
     }
 
-    console.log(`[fetchCrewTasks] ${sheetUrl} - Tasks header found at: row ${tasksRowIdx}, col ${tasksColIdx} ("${String(rows[tasksRowIdx]?.c?.[tasksColIdx]?.v || "")}")`);
+    if (tasksRowIdx === -1) return [];
 
-    if (tasksRowIdx === -1) {
-      console.log(`[fetchCrewTasks] ${sheetUrl} - ERROR: No "Tasks" cell found in the first 100 rows.`);
-      return [];
-    }
-
-    // The table is below the "Tasks" cell.
-    // We'll search the next 3 rows for headers (Task, Stage)
     let headerRowIdx = -1;
     let stageIdx = -1;
     let taskIdx = -1;
 
-    for (let i = 1; i <= 3; i++) {
+    for (let i = 0; i <= 3; i++) {
       const ri = tasksRowIdx + i;
       if (ri >= rows.length) break;
       const row = rows[ri]?.c || [];
-
       const findCol = (name: string) =>
-        row.findIndex((c: any) => String(c?.v || "").toLowerCase().includes(name.toLowerCase()));
+        row.findIndex((c: any) => String(c?.v || "").toLowerCase().trim() === name.toLowerCase());
 
       const sIdx = findCol("stage");
       const tIdx = findCol("task");
@@ -148,38 +233,33 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       }
     }
 
-    if (headerRowIdx === -1) {
-      console.log(`[fetchCrewTasks] ${sheetUrl} - ERROR: Could not find headers (Task/Stage) near the "Tasks" cell.`);
-      return [];
-    }
+    if (headerRowIdx === -1) return [];
 
-    const headerLabels = (rows[headerRowIdx]?.c || []).map((h: any) => String(h?.v || "").trim());
-    console.log(`[fetchCrewTasks] ${sheetUrl} - Found headers at row ${headerRowIdx}:`, headerLabels);
-    console.log(`[fetchCrewTasks] ${sheetUrl} - Found stageIdx: ${stageIdx}, taskIdx: ${taskIdx}`);
-
-    if (taskIdx === -1) return [];
-
-    // Find priority column using the same findCol helper from header detection
     const headerRow = rows[headerRowIdx]?.c || [];
     const priorityIdx = headerRow.findIndex((c: any) => String(c?.v || "").toLowerCase().includes("priority"));
 
-    // Collect all tasks with stage "now" or "doing" along with their priority
+    // Fetch links from Google Sheets API
+    const htmlLinkMap = await getTaskLinks(id);
+
     const tasksWithMeta: { label: string; url?: string; priority: string }[] = [];
     for (let i = headerRowIdx + 1; i < rows.length; i++) {
       const r = rows[i]?.c || [];
       const stage = stageIdx !== -1 ? String(r[stageIdx]?.v || "").trim().toLowerCase() : "";
+      const isActive = stage === "now" || stage === "doing" || stage === "in progress" || stage === "todo" || stage.includes("progress");
 
       const taskCell = r[taskIdx];
-      const taskLabel = String(taskCell?.v || "").trim();
-      const taskUrl = taskCell?.l || undefined; // GViz 'l' property contains the hyperlink
+      const rawLabel = String(taskCell?.v || "").trim();
+      // Priority: 1. HTML link map  2. GViz link  3. Text extraction
+      const taskUrl = htmlLinkMap[rawLabel] || taskCell?.l || extractUrlFromText(rawLabel);
+      // Clean label if it has the URL in it
+      const taskLabel = rawLabel.replace(/\s*\(https?:\/\/[^\s\)]+\)\s*/g, " ").trim();
       const priority = priorityIdx !== -1 ? String(r[priorityIdx]?.v || "").trim().toLowerCase() : "";
 
-      if (taskLabel && (stage === "now" || stage === "doing")) {
+      if (taskLabel && isActive) {
         tasksWithMeta.push({ label: taskLabel, url: taskUrl, priority });
       }
     }
 
-    // Helper to get priority rank
     const getPriorityRank = (p: string) => {
       if (p.includes("top")) return 1;
       if (p.includes("high")) return 2;
@@ -188,13 +268,8 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       return 999;
     };
 
-    // Sort by priority
     tasksWithMeta.sort((a, b) => getPriorityRank(a.priority) - getPriorityRank(b.priority));
-
-    // Take top 3 and return without priority field
-    const activeTasks = tasksWithMeta.slice(0, 3).map(t => ({ label: t.label, url: t.url }));
-
-    return activeTasks;
+    return tasksWithMeta.slice(0, 3).map(t => ({ label: t.label, url: t.url }));
   } catch (e) {
     console.error("fetchCrewTasks error:", e);
     return [];
@@ -203,7 +278,7 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
 
 export async function GET() {
   try {
-    const cacheKey = `crew-mappings:public-gviz:v3:${SHEET_ID}:${TAB_NAME}`;
+    const cacheKey = `crew-mappings:public-gviz:v5:${SHEET_ID}:${TAB_NAME}`;
     const cached = cacheGet(cacheKey);
     if (cached) return NextResponse.json({ ...cached, cached: true });
 

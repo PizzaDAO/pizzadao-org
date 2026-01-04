@@ -51,12 +51,12 @@ export default function RootLayout({
             position: fixed;
             bottom: 16px;
             right: 16px;
-            opacity: 0.4;
+            opacity: 1;
             transition: opacity 0.2s;
             z-index: 1000;
           }
           .github-link:hover {
-            opacity: 1;
+            color: red;
           }
         `}</style>
       </body>

@@ -50,6 +50,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
     const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
+    const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
 
     // New state for rich crew data
     const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -120,6 +121,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 if (res.ok) {
                     const json = await res.json();
                     if (json.tasksByCrew) setMyTasks(json.tasksByCrew);
+                    if (json.doneCountsByCrew) setDoneCounts(json.doneCountsByCrew);
                 }
             } catch (e) {
                 console.error("Failed to fetch personalized tasks", e);
@@ -325,7 +327,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                     )}
 
                                                     {(() => {
-                                                        const personalTasks = myTasks[c?.id || ""] || myTasks[cid] || [];
+                                                        const currentCid = String(c?.id || cid).toLowerCase();
+                                                        const doneCount = doneCounts[currentCid] || 0;
+                                                        const personalTasks = myTasks[currentCid] || [];
                                                         const topTasks = c?.tasks || [];
                                                         const hasPersonal = personalTasks && personalTasks.length > 0;
 
@@ -340,52 +344,68 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                                 .slice(0, remaining);
                                                             displayTasks = [...displayTasks, ...additional];
                                                         }
-
-                                                        if (displayTasks.length === 0) return null;
+                                                        if (displayTasks.length === 0 && doneCount === 0) return null;
 
                                                         return (
                                                             <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
-                                                                <div style={{
-                                                                    fontSize: 11,
-                                                                    fontWeight: 700,
-                                                                    opacity: 0.8,
-                                                                    textTransform: "uppercase",
-                                                                    letterSpacing: 0.5,
-                                                                    color: hasPersonal ? "#ff4d4d" : "rgba(0,0,0,0.6)"
-                                                                }}>
-                                                                    {hasPersonal ? "Your Tasks" : "Top Tasks"}
-                                                                </div>
-                                                                {displayTasks.map((t, idx) => {
-                                                                    const isPersonal = personalTasks?.some(pt => pt.label === t.label);
-                                                                    return (
-                                                                        <div key={idx} style={{
-                                                                            fontSize: 12,
-                                                                            opacity: isPersonal ? 1 : 0.7,
-                                                                            fontWeight: isPersonal ? 600 : 400,
-                                                                            display: "flex",
-                                                                            alignItems: "baseline",
-                                                                            gap: 4,
-                                                                            minWidth: 0
+                                                                {doneCount > 0 && (
+                                                                    <div style={{
+                                                                        fontSize: 11,
+                                                                        fontWeight: 700,
+                                                                        opacity: 0.8,
+                                                                        textTransform: "uppercase",
+                                                                        letterSpacing: 0.5,
+                                                                        color: "#10b981",
+                                                                        marginBottom: 2
+                                                                    }}>
+                                                                        Closed: {doneCount}
+                                                                    </div>
+                                                                )}
+                                                                {displayTasks.length > 0 && (
+                                                                    <>
+                                                                        <div style={{
+                                                                            fontSize: 11,
+                                                                            fontWeight: 700,
+                                                                            opacity: 0.8,
+                                                                            textTransform: "uppercase",
+                                                                            letterSpacing: 0.5,
+                                                                            color: hasPersonal ? "#ff4d4d" : "rgba(0,0,0,0.6)"
                                                                         }}>
-                                                                            <span style={{ flexShrink: 0, color: isPersonal ? "#ff4d4d" : "inherit" }}>•</span>
-                                                                            <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                                                {t.url ? (
-                                                                                    <a
-                                                                                        href={t.url}
-                                                                                        target="_blank"
-                                                                                        rel="noreferrer"
-                                                                                        onClick={(e) => e.stopPropagation()}
-                                                                                        style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
-                                                                                    >
-                                                                                        {t.label}
-                                                                                    </a>
-                                                                                ) : (
-                                                                                    <span>{t.label}</span>
-                                                                                )}
-                                                                            </div>
+                                                                            {hasPersonal ? "Your Tasks" : "Top Tasks"}
                                                                         </div>
-                                                                    );
-                                                                })}
+                                                                        {displayTasks.map((t, idx) => {
+                                                                            const isPersonal = personalTasks?.some(pt => pt.label === t.label);
+                                                                            return (
+                                                                                <div key={idx} style={{
+                                                                                    fontSize: 12,
+                                                                                    opacity: isPersonal ? 1 : 0.7,
+                                                                                    fontWeight: isPersonal ? 600 : 400,
+                                                                                    display: "flex",
+                                                                                    alignItems: "baseline",
+                                                                                    gap: 4,
+                                                                                    minWidth: 0
+                                                                                }}>
+                                                                                    <span style={{ flexShrink: 0, color: isPersonal ? "#ff4d4d" : "inherit" }}>•</span>
+                                                                                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                                                                                        {t.url ? (
+                                                                                            <a
+                                                                                                href={t.url}
+                                                                                                target="_blank"
+                                                                                                rel="noreferrer"
+                                                                                                onClick={(e) => e.stopPropagation()}
+                                                                                                style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
+                                                                                            >
+                                                                                                {t.label}
+                                                                                            </a>
+                                                                                        ) : (
+                                                                                            <span>{t.label}</span>
+                                                                                        )}
+                                                                                    </div>
+                                                                                </div>
+                                                                            );
+                                                                        })}
+                                                                    </>
+                                                                )}
                                                             </div>
                                                         );
                                                     })()}
