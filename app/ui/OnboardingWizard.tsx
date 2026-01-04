@@ -586,7 +586,7 @@ export default function OnboardingWizard() {
   // ✅ Map turtle ids -> labels so we can match sheet values like "Leonardo"
   const turtleIdToLabel = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const t of TURTLES as any[]) {
+    for (const t of TURTLES as unknown as any[]) {
       if (!t) continue;
       const id = String(t.id ?? "").trim();
       const label = String(t.label ?? "").trim();
