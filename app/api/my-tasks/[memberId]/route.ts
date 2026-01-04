@@ -39,7 +39,10 @@ function extractUrlFromText(text: string): string | undefined {
 }
 
 // Fetch task links from published HTML (pubhtml)
-async function fetchTaskLinksFromHTML(sheetId: string): Promise<Record<string, string>> {
+// Legacy function removed
+async function fetchTaskLinksFromHTML(sheetId: string) { return {}; }
+/*
+async function fetchTaskLinksFromHTML_LEGACY(sheetId: string): Promise<Record<string, string>> {
     const linkMap: Record<string, string> = {};
     try {
         const pubhtmlUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/pubhtml`;
@@ -119,6 +122,7 @@ async function fetchTaskLinksFromHTML(sheetId: string): Promise<Record<string, s
     }
     return linkMap;
 }
+*/
 
 // Google GViz wraps JSON inside a JS function call (copied from crew-mappings/route.ts)
 function parseGvizJson(text: string) {
