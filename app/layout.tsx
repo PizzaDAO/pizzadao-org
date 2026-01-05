@@ -32,7 +32,7 @@ export default function RootLayout({
         <div className="fixed bottom-4 right-4 flex items-center gap-3">
           {/* Google Sheets Link */}
           <a
-            href="https://docs.google.com/spreadsheets/d/1J3-Usmmfd2B_av_BVvC9m70cRdpLvmGv5Wm2d6m_Y_w/edit?gid=0#gid=0"
+            href="https://docs.google.com/spreadsheets/d/1bRTR85CDHbTAsTG6sVi1jv6H-WjLyf-yvOerLCqeY2Q/edit?gid=0#gid=0"
             target="_blank"
             rel="noopener noreferrer"
             className="google-sheets-link"
