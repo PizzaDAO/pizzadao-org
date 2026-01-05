@@ -1,6 +1,7 @@
 name: Post issues to Discord
 
 on:
+  workflow_dispatch:
   issues:
     types: [opened, reopened, closed]
   issue_comment:
@@ -10,14 +11,45 @@ jobs:
   notify:
     runs-on: ubuntu-latest
     steps:
-      - name: Send to Discord
+      - name: Send to Discord (debug)
+        shell: bash
         env:
           DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
         run: |
-          python - << 'PY'
-          import json, os, urllib.request
+          set -euo pipefail
 
-          event_path = os.environ["GITHUB_EVENT_PATH"]
+          if [ -z "${DISCORD_WEBHOOK_URL:-}" ]; then
+            echo "❌ DISCORD_WEBHOOK_URL secret is missing/empty."
+            exit 1
+          fi
+
+          python - << 'PY'
+          import json, os, sys
+          import urllib.request, urllib.error
+          from urllib.parse import urlparse
+
+          webhook = os.environ.get("DISCORD_WEBHOOK_URL", "").strip()
+
+          # Basic sanity check: correct Discord webhook URL shape
+          p = urlparse(webhook)
+          if p.scheme not in ("http", "https") or "discord" not in (p.netloc or ""):
+            print("❌ Webhook URL does not look like a Discord URL.")
+            print("   Expected: https://discord.com/api/webhooks/<id>/<token>")
+            print("   Got:", webhook[:80] + ("..." if len(webhook) > 80 else ""))
+            sys.exit(1)
+
+          parts = [x for x in (p.path or "").split("/") if x]
+          # expected path: /api/webhooks/<id>/<token>
+          if len(parts) < 4 or parts[-3] != "webhooks":
+            print("❌ Webhook URL path does not match /api/webhooks/<id>/<token>.")
+            print("   Got path:", p.path)
+            sys.exit(1)
+
+          event_path = os.environ.get("GITHUB_EVENT_PATH")
+          if not event_path or not os.path.exists(event_path):
+            print("❌ GITHUB_EVENT_PATH missing or file not found:", event_path)
+            sys.exit(1)
+
           with open(event_path, "r", encoding="utf-8") as f:
             payload = json.load(f)
 
@@ -30,7 +62,11 @@ jobs:
 
           if event_name == "issues":
             action = payload.get("action")
-            issue = payload.get("issue", {})
+            issue = payload.get("issue") or {}
+            if not issue:
+              print("❌ No issue object in payload. Top keys:", sorted(payload.keys()))
+              sys.exit(1)
+
             title = issue.get("title", "(no title)")
             url = issue.get("html_url", "")
             number = issue.get("number")
@@ -47,9 +83,12 @@ jobs:
             }]
 
           elif event_name == "issue_comment":
-            action = payload.get("action")
-            issue = payload.get("issue", {})
-            comment = payload.get("comment", {})
+            issue = payload.get("issue") or {}
+            comment = payload.get("comment") or {}
+            if not issue or not comment:
+              print("❌ Missing issue/comment in payload. Top keys:", sorted(payload.keys()))
+              sys.exit(1)
+
             title = issue.get("title", "(no title)")
             url = comment.get("html_url") or issue.get("html_url", "")
             number = issue.get("number")
@@ -66,12 +105,31 @@ jobs:
           else:
             content = f"**[{repo}]** Event: {event_name}"
 
-          data = json.dumps({"content": content, "embeds": embeds}).encode("utf-8")
+          # Disable mentions to avoid any webhook mention restrictions
+          payload_out = {
+            "content": content,
+            "embeds": embeds,
+            "allowed_mentions": {"parse": []},
+          }
+
+          data = json.dumps(payload_out).encode("utf-8")
           req = urllib.request.Request(
-            os.environ["DISCORD_WEBHOOK_URL"],
+            webhook,
             data=data,
-            headers={"Content-Type": "application/json"},
+            headers={
+              "Content-Type": "application/json",
+              "User-Agent": "GitHubActions-DiscordWebhook",
+            },
             method="POST",
           )
-          urllib.request.urlopen(req).read()
+
+          try:
+            with urllib.request.urlopen(req) as resp:
+              print("✅ Discord status:", resp.status)
+              print(resp.read().decode("utf-8", errors="ignore"))
+          except urllib.error.HTTPError as e:
+            body = e.read().decode("utf-8", errors="ignore")
+            print(f"❌ Discord HTTPError: {e.code} {e.reason}")
+            print("❌ Discord body:", body)
+            raise
           PY
