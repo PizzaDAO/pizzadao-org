@@ -39,9 +39,9 @@ export default function RootLayout({
             title="View Google Sheets"
           >
             <img
-              src="https://cdn.simpleicons.org/googlesheets/ffffff"
+              src="https://cdn.simpleicons.org/googlesheets/000000"
               alt="Google Sheets"
-              className="w-8 h-8 filter invert"
+              className="w-8 h-8 filter"
             />
           </a>
 
@@ -70,10 +70,6 @@ export default function RootLayout({
             opacity: 1;
             transition: opacity 0.2s;
             z-index: 1000;
-          }
-          .google-sheets-link:hover,
-          .github-link:hover {
-            color: red;
           }
         `}</style>
       </body>

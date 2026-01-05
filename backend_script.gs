@@ -152,7 +152,20 @@ function upsertToCrew_(ss, raw, nowIso) {
     crewSheet.getRange(targetRow, colID).setValue(memberId);
     // Only write Name if explicitly provided
     if (mapping.Name && (raw.mafiaName !== undefined || raw.name !== undefined)) {
-      crewSheet.getRange(targetRow, mapping.Name).setValue(name);
+      const nameCell = crewSheet.getRange(targetRow, mapping.Name);
+      const existingRichText = nameCell.getRichTextValue();
+      const existingUrl = existingRichText ? existingRichText.getLinkUrl() : null;
+      
+      if (existingUrl) {
+         // Preserve the existing link with the new text
+         const newRichText = SpreadsheetApp.newRichTextValue()
+           .setText(name)
+           .setLinkUrl(existingUrl)
+           .build();
+         nameCell.setRichTextValue(newRichText);
+      } else {
+         nameCell.setValue(name);
+      }
     }
     if (mapping.Status) {
        const cur = String(crewSheet.getRange(targetRow, mapping.Status).getValue()).trim();

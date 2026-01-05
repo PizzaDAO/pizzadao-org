@@ -338,7 +338,7 @@ async function fetchMyTasksForCrew(sheetUrl: string, memberId: string): Promise<
                         if (isMatch && isActive && taskLabel) {
                             debugLog.push(`MATCH found at ri=${j}: ${taskLabel} (stage=${stageVal}, searchCol=${lIdx}, foundId=${v || pv || nv})`);
                             // Priority: 1. HTML link map  2. GViz link  3. Text extraction
-                            const taskUrl = htmlLinkMap[taskLabel] || taskCell?.l || extractUrlFromText(taskLabel);
+                            const taskUrl = htmlLinkMap[taskLabel.trim()] || taskCell?.l || extractUrlFromText(taskLabel);
                             let cleanLabel = taskLabel;
                             if (taskUrl) {
                                 // Extract the core domain/path to match in text
