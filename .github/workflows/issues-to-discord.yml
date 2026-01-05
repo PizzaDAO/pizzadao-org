@@ -1,0 +1,77 @@
+name: Post issues to Discord
+
+on:
+  issues:
+    types: [opened, reopened, closed]
+  issue_comment:
+    types: [created]
+
+jobs:
+  notify:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Send to Discord
+        env:
+          DISCORD_WEBHOOK_URL: ${{ secrets.DISCORD_WEBHOOK_URL }}
+        run: |
+          python - << 'PY'
+          import json, os, urllib.request
+
+          event_path = os.environ["GITHUB_EVENT_PATH"]
+          with open(event_path, "r", encoding="utf-8") as f:
+            payload = json.load(f)
+
+          event_name = os.environ.get("GITHUB_EVENT_NAME", "")
+          repo = os.environ.get("GITHUB_REPOSITORY", "")
+          actor = os.environ.get("GITHUB_ACTOR", "")
+
+          content = ""
+          embeds = []
+
+          if event_name == "issues":
+            action = payload.get("action")
+            issue = payload.get("issue", {})
+            title = issue.get("title", "(no title)")
+            url = issue.get("html_url", "")
+            number = issue.get("number")
+            state = issue.get("state")
+
+            content = f"**[{repo}]** Issue #{number} {action} by **{actor}**"
+            embeds = [{
+              "title": title,
+              "url": url,
+              "fields": [
+                {"name": "State", "value": str(state), "inline": True},
+                {"name": "Action", "value": str(action), "inline": True},
+              ],
+            }]
+
+          elif event_name == "issue_comment":
+            action = payload.get("action")
+            issue = payload.get("issue", {})
+            comment = payload.get("comment", {})
+            title = issue.get("title", "(no title)")
+            url = comment.get("html_url") or issue.get("html_url", "")
+            number = issue.get("number")
+            body = (comment.get("body") or "").strip()
+            snippet = body[:300] + ("…" if len(body) > 300 else "")
+
+            content = f"**[{repo}]** New comment on Issue #{number} by **{actor}**"
+            embeds = [{
+              "title": title,
+              "url": url,
+              "description": snippet or "(no text)",
+            }]
+
+          else:
+            content = f"**[{repo}]** Event: {event_name}"
+
+          data = json.dumps({"content": content, "embeds": embeds}).encode("utf-8")
+          req = urllib.request.Request(
+            os.environ["DISCORD_WEBHOOK_URL"],
+            data=data,
+            headers={"Content-Type": "application/json"},
+            method="POST",
+          )
+          urllib.request.urlopen(req).read()
+          PY
