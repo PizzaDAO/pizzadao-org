@@ -124,6 +124,28 @@ async function fetchCrewRoleIds(req: Request, selectedCrewIds: string[]): Promis
 }
 
 // --- main handler ---
+export async function writeToSheet(payload: any) {
+  const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
+  if (!url) throw new Error("Missing Sheets webapp env vars");
+
+  const sheetRes = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+  });
+
+  const text = await sheetRes.text();
+  let parsed: any = null;
+  try {
+    parsed = JSON.parse(text);
+  } catch { }
+
+  if (!sheetRes.ok || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
+    throw new Error(JSON.stringify(parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text));
+  }
+  return parsed;
+}
+
 export async function POST(req: Request) {
   try {
     const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
@@ -186,7 +208,6 @@ export async function POST(req: Request) {
     };
 
     // Basic validation
-    // Relaxed: Only require Name. Other fields might be empty during updates or partial edits.
     if (!payload.mafiaName) {
       return NextResponse.json(
         {
@@ -200,23 +221,14 @@ export async function POST(req: Request) {
     }
 
     // 1) Write to Sheets
-    const sheetRes = await fetch(url, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
-    });
-
-    const text = await sheetRes.text();
-    let parsed: any = null;
+    let parsed;
     try {
-      parsed = JSON.parse(text);
-    } catch { }
-
-    if (!sheetRes.ok || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
+      parsed = await writeToSheet(payload);
+    } catch (e: any) {
       return NextResponse.json(
         {
           error: "Failed to save profile",
-          details: parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text
+          details: e.message
         },
         { status: 502 }
       );

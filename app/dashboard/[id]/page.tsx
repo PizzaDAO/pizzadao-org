@@ -247,36 +247,67 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         <StatItem label="Discord" value={discord} />
                         <StatItem label="Telegram" value={telegram} />
 
-                        {/* Roles moved here - Images only */}
-                        <div>
-                            <h3 style={{
-                                fontSize: 12,
-                                textTransform: "uppercase",
-                                letterSpacing: "1px",
-                                opacity: 0.5,
-                                marginTop: 0,
-                                marginBottom: 6,
-                                fontWeight: 700
-                            }}>
-                                Roles
-                            </h3>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
-                                {turtleList.length > 0 ? (
-                                    turtleList.map((tName: string) => {
-                                        const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
-                                        if (!tDef) return null; // Skip unknown or text-only if we only want images
+                        {/* Roles moved here - Images + Sync Button */}
+                        <div style={{ gridColumn: "1 / -1" }}>
+                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                                <div>
+                                    <h3 style={{
+                                        fontSize: 12,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "1px",
+                                        opacity: 0.5,
+                                        marginTop: 0,
+                                        marginBottom: 6,
+                                        fontWeight: 700
+                                    }}>
+                                        Roles
+                                    </h3>
+                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                                        {turtleList.length > 0 ? (
+                                            turtleList.map((tName: string) => {
+                                                const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
+                                                if (!tDef) return null;
+                                                return (
+                                                    <img
+                                                        key={tDef.id}
+                                                        src={tDef.image}
+                                                        alt={tDef.label}
+                                                        title={tDef.label}
+                                                        style={{ width: 40, height: 40, objectFit: "contain" }}
+                                                    />
+                                                );
+                                            })
+                                        ) : (
+                                            <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
+                                        )}
+                                    </div>
+
+                                    {/* Other Roles List */}
+                                    {(() => {
+                                        const otherRoles = turtleList.filter((tName: string) => {
+                                            return !TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
+                                        });
+
+                                        if (otherRoles.length === 0) return null;
                                         return (
-                                            <img
-                                                key={tDef.id}
-                                                src={tDef.image}
-                                                alt={tDef.label}
-                                                title={tDef.label}
-                                                style={{ width: 40, height: 40, objectFit: "contain" }}
-                                            />
+                                            <div style={{ marginTop: 8, fontSize: 14, opacity: 0.8 }}>
+                                                <strong>Other Roles:</strong> {otherRoles.join(", ")}
+                                            </div>
                                         );
-                                    })
-                                ) : (
-                                    <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
+                                    })()}
+                                </div>
+
+                                {/* Sync Button */}
+                                {discord && discord !== "Not linked" && (
+                                    <SyncRolesButton
+                                        memberId={idValue}
+                                        discordId={discord}
+                                        name={name}
+                                        onSync={(newTurtles, others) => {
+                                            // Ideally we force a reload, but for now we can just reload the page
+                                            window.location.reload();
+                                        }}
+                                    />
                                 )}
                             </div>
                         </div>
@@ -547,3 +578,52 @@ function crewCard(): React.CSSProperties {
         background: "white",
     };
 }
+
+const SyncRolesButton = ({ memberId, discordId, name, onSync }: { memberId: string, discordId: string, name: string, onSync: (turtles: string[], others: string[]) => void }) => {
+    const [loading, setLoading] = useState(false);
+    const [msg, setMsg] = useState("");
+
+    const handleSync = async () => {
+        setLoading(true);
+        setMsg("Syncing...");
+        try {
+            const res = await fetch("/api/discord/sync-to-sheet", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ memberId, discordId, mafiaName: name })
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Sync failed");
+
+            setMsg("Done!");
+            setTimeout(() => setMsg(""), 2000);
+            onSync(data.turtles, data.otherRoles);
+        } catch (e: any) {
+            console.error(e);
+            setMsg("Error!");
+            setTimeout(() => setMsg(""), 2000);
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    return (
+        <button
+            onClick={handleSync}
+            disabled={loading}
+            style={{
+                background: "transparent",
+                border: "1px solid #ccc",
+                borderRadius: 4,
+                padding: "4px 8px",
+                fontSize: 12,
+                cursor: loading ? "wait" : "pointer",
+                display: "flex",
+                alignItems: "center",
+                gap: 4
+            }}
+        >
+            {loading ? "🔄" : "🔁"} {msg || "Sync Roles"}
+        </button>
+    );
+};

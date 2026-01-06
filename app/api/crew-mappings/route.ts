@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getTaskLinks } from "../lib/google-sheets";
+import promiseLimit from "promise-limit";
 
 export const runtime = "nodejs";
 
@@ -416,12 +417,15 @@ content-type=${contentType} url=${url} preview=${JSON.stringify(preview)}`
     const crews = Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
 
     // Parallel fetch tasks for crews that have a sheet
+    // Limit concurrency to avoid 429s (sheets quota is ~60/min but heavier calls are lower)
+    const limit = promiseLimit(3);
+
     await Promise.all(
-      crews.map(async (c) => {
+      crews.map((c) => limit(async () => {
         if (c.sheet) {
           c.tasks = await fetchCrewTasks(c.sheet);
         }
-      })
+      }))
     );
 
     const payload = { crews };

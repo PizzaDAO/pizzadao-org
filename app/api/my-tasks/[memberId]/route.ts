@@ -155,7 +155,11 @@ async function fetchMyTasksForCrew(sheetUrl: string, memberId: string): Promise<
 
         // Fetch links from Google Sheets API
         const sheetId = extractSheetId(sheetUrl);
-        const htmlLinkMap = sheetId ? await getTaskLinks(sheetId) : {};
+        let htmlLinkMap: Record<string, string> = {};
+        try {
+            htmlLinkMap = sheetId ? await getTaskLinks(sheetId) : {};
+        } catch (e) { console.error("Link fetch failed, proceeding without links", e); }
+
         debugLog.push(`Sheets API link map contains ${Object.keys(htmlLinkMap).length} entries`);
 
 

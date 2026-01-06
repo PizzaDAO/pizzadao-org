@@ -59,3 +59,8 @@ export const TURTLE_ROLE_IDS: Record<string, string> = {
   DONATELLO: "815277900492046356",
   APRIL: "815976204900499537",
 };
+
+export const ROLE_ID_TO_TURTLE: Record<string, string> = Object.entries(TURTLE_ROLE_IDS).reduce((acc, [key, value]) => {
+  acc[value] = key.charAt(0) + key.slice(1).toLowerCase(); // "LEONARDO" -> "Leonardo"
+  return acc;
+}, {} as Record<string, string>);
