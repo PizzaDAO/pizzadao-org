@@ -1,10 +1,20 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)",
-      "Bash(npm show:*)",
-      "Bash(test:*)",
+      "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx prisma:*)",
+      "Bash(openssl genpkey:*)",
+      "Bash(openssl rsa:*)",
+      "Bash(git add:*)",
+      "Bash(git stash:*)",
+      "Bash(git merge:*)",
+      "Bash(git commit:*)",
+      "Bash(echo \"-----BEGIN PRIVATE KEY-----\nMIIEvQIBADANBgkqhkiG9w0BAQEFAASCBKcwggSjAgEAAoIBAQCnEgCOfOFawUrN\nbInyVuYBgSDeVm+90F4JfVLv7XCEWP9pFuxUj3KZ2ZP37fvUJ6qaP/FVy7BZtmoh\nIuPq5VgLXIW/9VYQEWGAnTEagTU2355+wl+uRkoNK87GBR/1WiIQSev1SUCd+QYQ\nLAVv8CgGxDodtak1oUlR0lei7ulU6HqD6vWEVd0j5kf09wftI94iUGz5Fj9SYC2F\nF1wB9jVzQgAZI+aVlLwuVtWDQPf446lo2cMPO04ZBt3rwROhIJbiw+4sWWBEmDMv\nxXsLHuUE7HnYiwL6b1IkhCxg0pGLyX2HZ7GXwmA7hZi5Dklz2b96KuxzOwcY4erL\nUHBhs6b3AgMBAAECggEACRp3A0yUrvBHVigq4BSSFdTmaJcHIa2f4h59DWu/rMZ4\nrE4+dGEYmn97i4/hH+9FYYBIcydVJZ5F7CZNivgSMxRIiWwh02BPEsX97fbKYoIO\nzdNjiUh1MoCHlMyksCbIImEUxVnHdpQiG3F6nl3UoIHCtOm4HZ77MsUmV09zUVf+\n+irj/4MXx6uTZAR+dI9jOm5S+SRFyx1wyvxR3AuPEAZnCuihwAkbkgqBjgDtU2wC\n4WCnTecoZklb0qfRbWjanvvku9MBbfE9GgTtc60osISImSFQuaOpxJHNDLVxxSMr\nc+w1yxJ1bqy533RGWmg1/4T6ajBBblr9TEX8UZeoUQKBgQDazt7OWToWADV6wC6R\nff/ielupUlXrWU1YJwfQuqPLjVGsduNEU7/1h31POvYDUUFr01z/6HXECjIYoLW6\nNyLIwBmPz6z5rrX8xWmQX1CDEvKmp0mBWw5PXDpxWV2M6tG4UdFHbhtTKI1Iv3Bc\nkG/2kksXNkUv6O1FSDwdt4jGvwKBgQDDd9W6vxE3/ofKlTZmKC4bNkpCgb4J5A1R\n7oFTMSPhSiBIEdLCeBwQDNtq3F3t9neQbZcYRxHwCflAmLV126tccut7aoctGE8a\nuaUBWmVVItn8pwvkxWryRv4gXDqzb4HM35XcjrclFIkn42IB6nhO+5clOwxgyR/B\nmFm/KOolyQKBgG1lTGQinDXvuM08VIwNUOfsgPNw5OAb792I9hFXnxjf+NufPRUm\nQi0Bppb8RY93CpxcOnz/vhFbf5xsjS8i7dMsqBsMm9Dhlr9f+91gqiI+UO8daFSy\nL79hvx54rZsMs/nRfi6WUDcNaUXb4NOGq1O95KkgSwsfC7G94cCByHKFAoGBAKCi\ngJCBqMLdd/ax/QyjBJD0Yr6ZJPW35oJogPs/LP9eDX1suEl8r4M5LbB5/O8sV0Hn\n7f3Tmhgr+hxt4uJCbmcBQiggeYpDqe6KleGwygnXJFGPbiTJYIROd1Vcthj0EDWv\noNaqqjPc1oJjSQ3OBKTT+XhtOFTptCFC9K42D4aRAoGAAchslARrEir1pdlQfr6r\nNlgl8K1d4ZTaHra8SlAQiHlEpDA6y90zwpsB5bijGbVsnzn/XShmkl58k+dJwQDg\n07zwDv/qj7VRfbY4o4x3Fv+vfjJDllbxFChgLyRI3IsSDC2EOOLuN/2cbsh7E/Vy\nP+q/qcLDE0AFBRJ0CzhN1XQ=\n-----END PRIVATE KEY-----\")",
       "Bash(taskkill:*)"
     ]
   }

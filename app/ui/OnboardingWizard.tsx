@@ -910,8 +910,31 @@ export default function OnboardingWizard() {
       )}
       {s.step === 1 && (
         <div style={{ display: "grid", gap: 12 }}>
-          {/* Keep Discord Nickname option - show when name matches nickname */}
-          {s.discordNick && (s.mafiaName === s.discordNick || !s.mafiaName) && (
+          {/* Keep existing mafia name option - show in edit mode when existingData has a name */}
+          {s.isUpdate && s.existingData?.mafiaName && (
+            <div style={{
+              padding: 16,
+              background: "rgba(76, 175, 80, 0.1)",
+              borderRadius: 12,
+              border: "2px solid rgba(76, 175, 80, 0.3)",
+              textAlign: "center"
+            }}>
+              <div style={{ marginBottom: 8, fontSize: 14, opacity: 0.8 }}>
+                Keep your current mafia name?
+              </div>
+              <button
+                onClick={() => {
+                  setS(p => ({ ...p, mafiaName: p.existingData?.mafiaName, step: 2 }));
+                }}
+                style={{ ...btn("primary"), background: "#4CAF50" }}
+              >
+                Keep "{s.existingData.mafiaName}" and continue
+              </button>
+            </div>
+          )}
+
+          {/* Keep Discord Nickname option - show for new users when name matches nickname */}
+          {!s.isUpdate && s.discordNick && (s.mafiaName === s.discordNick || !s.mafiaName) && (
             <div style={{
               padding: 16,
               background: "rgba(76, 175, 80, 0.1)",
@@ -934,7 +957,9 @@ export default function OnboardingWizard() {
           )}
 
           <div style={{ textAlign: "center", opacity: 0.6, fontSize: 13 }}>
-            {s.discordNick && (s.mafiaName === s.discordNick || !s.mafiaName) && "— or generate a new name instead —"}
+            {(s.isUpdate && s.existingData?.mafiaName) || (!s.isUpdate && s.discordNick && (s.mafiaName === s.discordNick || !s.mafiaName))
+              ? "— or generate a new name instead —"
+              : null}
           </div>
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             <Field label="Favorite pizza topping">
