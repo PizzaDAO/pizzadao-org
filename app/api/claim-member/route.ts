@@ -1,5 +1,7 @@
-
+// app/api/claim-member/route.ts
 import { NextResponse } from "next/server";
+import { getSession } from "@/app/lib/session";
+import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 
 export const runtime = "nodejs";
 
@@ -33,7 +35,6 @@ async function fetchMemberData(id: string) {
     const text = await res.text();
     const gviz = parseGvizJson(text);
     const rows = gviz?.table?.rows || [];
-    const cols = gviz?.table?.cols || [];
 
     // --- Header Row Hunter ---
     let headerRowIdx = -1;
@@ -59,7 +60,7 @@ async function fetchMemberData(id: string) {
 
     // Find ID column index
     let idColIdx = -1;
-    const normalizedHeaders = headerRowVals.map(h => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
+    const normalizedHeaders = headerRowVals.map((h) => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
     const idAliases = ["id", "crewid", "memberid"];
     for (let i = 0; i < normalizedHeaders.length; i++) {
         if (idAliases.includes(normalizedHeaders[i])) {
@@ -68,6 +69,16 @@ async function fetchMemberData(id: string) {
         }
     }
     if (idColIdx === -1) idColIdx = 0;
+
+    // Also find Discord ID column index (best-effort)
+    let discordColIdx = -1;
+    const discordAliases = ["discordid", "discord", "discorduserid", "discorduserid"];
+    for (let i = 0; i < normalizedHeaders.length; i++) {
+        if (discordAliases.includes(normalizedHeaders[i])) {
+            discordColIdx = i;
+            break;
+        }
+    }
 
     const targetId = parseInt(id, 10);
     const dataStartIdx = headerRowIdx + 1;
@@ -87,36 +98,86 @@ async function fetchMemberData(id: string) {
         const val = userRow.c?.[idx]?.v ?? userRow.c?.[idx]?.f;
         data[rawKey] = val;
     });
+
+    // Add a normalized discordId hint for checks
+    const existingDiscord =
+        discordColIdx >= 0 ? String(userRow.c?.[discordColIdx]?.v ?? userRow.c?.[discordColIdx]?.f ?? "").trim() : "";
+    (data as any).__existingDiscordId = existingDiscord;
+
     return data;
 }
 
 export async function POST(req: Request) {
     try {
-        const body = await req.json();
-        const { memberId, discordId, password } = body;
+        const session = await getSession();
+        const sessionDiscordId = session?.discordId ? String(session.discordId).trim() : "";
 
-        // 1. Password check
-        if (password !== "moltobenny") {
+        if (!sessionDiscordId) {
+            return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+        }
+
+        const body = await req.json();
+        const { memberId, password } = body;
+
+        // 1) Password check using environment variable
+        const claimPassword = process.env.CLAIM_PASSWORD;
+        if (!claimPassword) {
+            return NextResponse.json({ error: "Claim password not configured" }, { status: 500 });
+        }
+        if (password !== claimPassword) {
             return NextResponse.json({ error: "Incorrect password" }, { status: 403 });
         }
 
-        if (!memberId || !discordId) {
-            return NextResponse.json({ error: "Missing memberId or discordId" }, { status: 400 });
+        if (!memberId) {
+            return NextResponse.json({ error: "Missing memberId" }, { status: 400 });
         }
 
-        // 2. Fetch existing data (Crucial to preserve Name)
-        const existingData = await fetchMemberData(memberId);
+        // 2) Fetch existing data (to ensure row exists and to prevent claiming someone else's row)
+        const existingData = await fetchMemberData(String(memberId));
         if (!existingData) {
             return NextResponse.json({ error: `Member ID ${memberId} not found` }, { status: 404 });
         }
 
-        const existingName = existingData["Name"] || existingData["Mafia Name"];
-        if (!existingName) {
-            // This is weird if we found the row, but maybe name is blank?
-            // If name is blank in sheet, sending blank is fine.
+        // Get member name for better error messages
+        const memberName = String(
+            (existingData as any)["Name"] ||
+            (existingData as any)["Mafia Name"] ||
+            (existingData as any)["name"] ||
+            ""
+        ).trim();
+
+        const alreadyClaimedDiscord = String((existingData as any).__existingDiscordId || "").trim();
+        if (alreadyClaimedDiscord && alreadyClaimedDiscord !== sessionDiscordId) {
+            return NextResponse.json(
+                {
+                    error: memberName
+                        ? `Member ID ${memberId} belongs to "${memberName}" and is already claimed by another Discord account.`
+                        : `Member ID ${memberId} is already claimed by another Discord account.`,
+                    memberName,
+                },
+                { status: 409 }
+            );
         }
 
-        // 3. Update via Google Sheets Web App
+        // If already claimed by same user, treat as success (idempotent)
+        if (alreadyClaimedDiscord === sessionDiscordId) {
+            return NextResponse.json({ ok: true, alreadyClaimed: true });
+        }
+
+        // 3) Fetch Discord turtle roles and merge with existing sheet turtles
+        const existingTurtles = parseTurtlesFromSheet(
+            (existingData as any)["Turtles"] || (existingData as any)["Roles"] || ""
+        );
+        const discordTurtles = await getDiscordTurtleRoles(sessionDiscordId);
+        const mergedTurtles = mergeTurtles(existingTurtles, discordTurtles);
+
+        console.log("[claim-member] Turtle sync:", {
+            existing: existingTurtles,
+            discord: discordTurtles,
+            merged: mergedTurtles,
+        });
+
+        // 4) Update via Google Sheets Web App
         const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
         const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
         if (!url || !secret) {
@@ -125,14 +186,14 @@ export async function POST(req: Request) {
 
         const payload = {
             secret,
-            // Only send what's needed for claim - backend now skips undefined fields
             raw: {
                 source: "onboarding_claim",
                 memberId: String(memberId),
-                discordId: String(discordId),
+                discordId: sessionDiscordId,
                 discordJoined: true,
-                // Do NOT send mafiaName, city, crews, turtles - they will remain unchanged
-            }
+                // Include merged turtles (existing + Discord roles)
+                turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
+            },
         };
 
         const sheetRes = await fetch(url, {
@@ -148,15 +209,17 @@ export async function POST(req: Request) {
         } catch { }
 
         if (!sheetRes.ok || parsed?.ok === false) {
-            return NextResponse.json({
-                error: "Failed to update sheet",
-                details: parsed?.error ?? text
-            }, { status: 502 });
+            return NextResponse.json(
+                {
+                    error: "Failed to update sheet",
+                    details: parsed?.error ?? text,
+                },
+                { status: 502 }
+            );
         }
 
         return NextResponse.json({ ok: true });
-
     } catch (e: any) {
-        return NextResponse.json({ error: e.message || "Unknown error" }, { status: 500 });
+        return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
     }
 }

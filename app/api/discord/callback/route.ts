@@ -1,5 +1,6 @@
 // app/api/discord/callback/route.ts
 import { NextResponse } from "next/server";
+import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 
@@ -88,6 +89,21 @@ async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
   return await r.json();
 }
 
+// Check if user already has a member ID in the sheet (via member-lookup)
+async function checkExistingMember(discordId: string, origin: string): Promise<{ memberId?: string; name?: string } | null> {
+  try {
+    const res = await fetch(`${origin}/api/member-lookup/${discordId}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.memberId) {
+      return { memberId: data.memberId, name: data.name };
+    }
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -104,15 +120,37 @@ export async function GET(req: Request) {
 
     const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
 
-    const back = new URL("/", url.origin);
-    back.searchParams.set("discordId", me.id);
-    if (state) back.searchParams.set("sessionId", state);
-    back.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
-    if (nick) back.searchParams.set("discordNick", nick);
+    // Create session token
+    const sessionToken = createSessionToken({
+      discordId: me.id,
+      username: me.username,
+      nick: nick,
+      createdAt: Date.now(),
+    });
 
-    return NextResponse.redirect(back.toString());
+    // Check if user already has a member record
+    const existingMember = await checkExistingMember(me.id, url.origin);
+
+    // Build redirect URL
+    let redirectUrl: URL;
+    if (existingMember?.memberId) {
+      // Existing member - go directly to dashboard
+      redirectUrl = new URL(`/dashboard/${existingMember.memberId}`, url.origin);
+    } else {
+      // New user - go to home page with params
+      redirectUrl = new URL("/", url.origin);
+      redirectUrl.searchParams.set("discordId", me.id);
+      if (state) redirectUrl.searchParams.set("sessionId", state);
+      redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
+      if (nick) redirectUrl.searchParams.set("discordNick", nick);
+    }
+
+    // Create response and set session cookie
+    const res = NextResponse.redirect(redirectUrl.toString());
+    res.cookies.set(COOKIE_NAME, sessionToken, getSessionCookieOptions());
+
+    return res;
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Discord callback failed" }, { status: 500 });
   }
 }
-
