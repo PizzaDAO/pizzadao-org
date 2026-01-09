@@ -6,11 +6,14 @@ import { importPublicKey, verify, fromBase64, hashToken } from '@/utils/blindRsa
 // No authentication required - the valid signature IS the authentication
 export async function POST(req: Request) {
   const body = await req.json()
-  const { token, signature, pollId, optionId } = body
+  const { token, preparedMessage, signature, pollId, optionId } = body
 
   // Validate input
   if (!token || typeof token !== 'string') {
     return NextResponse.json({ error: 'Token is required' }, { status: 400 })
+  }
+  if (!preparedMessage || typeof preparedMessage !== 'string') {
+    return NextResponse.json({ error: 'Prepared message is required' }, { status: 400 })
   }
   if (!signature || typeof signature !== 'string') {
     return NextResponse.json({ error: 'Signature is required' }, { status: 400 })
@@ -51,14 +54,28 @@ export async function POST(req: Request) {
   try {
     const publicKey = await importPublicKey(publicKeyPem)
     const signatureBytes = fromBase64(signature)
-    const tokenBytes = new TextEncoder().encode(token)
+    const preparedBytes = fromBase64(preparedMessage)
 
-    const isValid = await verify(publicKey, signatureBytes, tokenBytes)
+    console.log('[vote/anonymous] Verifying signature...')
+    console.log('[vote/anonymous] Token:', token)
+    console.log('[vote/anonymous] Signature length:', signatureBytes.length)
+    console.log('[vote/anonymous] Prepared message length:', preparedBytes.length)
+
+    // Verify signature against prepared message using Web Crypto directly
+    // (SHA-384 = 48 byte salt for RSA-PSS)
+    const isValid = await crypto.subtle.verify(
+      { name: 'RSA-PSS', saltLength: 48 },
+      publicKey,
+      signatureBytes,
+      preparedBytes
+    )
+    console.log('[vote/anonymous] Verification result:', isValid)
+
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
   } catch (e: unknown) {
-    console.error('Verification error:', e)
+    console.error('[vote/anonymous] Verification error:', e)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 

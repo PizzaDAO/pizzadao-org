@@ -263,7 +263,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                 {/* Main Card */}
                 <div style={card()}>
-                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <Link href="/admin/polls" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Voting
+                        </Link>
                         <Link href={`/?edit=1&memberId=${idValue}`} style={{
                             ...btn("primary"),
                             fontSize: 14,
@@ -477,25 +484,36 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                         );
                                                     })()}
 
-                                                    {c?.sheet && (
-                                                        <a
-                                                            href={c.sheet}
-                                                            target="_blank"
-                                                            rel="noreferrer"
-                                                            onClick={(e) => e.stopPropagation()}
+                                                    <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
+                                                        <Link
+                                                            href={`/crew/${c?.id || cid}`}
                                                             style={{
                                                                 fontSize: 13,
                                                                 fontWeight: 650,
-                                                                opacity: 0.85,
+                                                                color: "#ff4d4d",
                                                                 textDecoration: "none",
-                                                                marginTop: 6,
-                                                                display: "inline-block"
                                                             }}
-                                                            title={c.sheet}
                                                         >
-                                                            Open crew sheet ↗
-                                                        </a>
-                                                    )}
+                                                            View crew page →
+                                                        </Link>
+                                                        {c?.sheet && (
+                                                            <a
+                                                                href={c.sheet}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                onClick={(e) => e.stopPropagation()}
+                                                                style={{
+                                                                    fontSize: 13,
+                                                                    fontWeight: 650,
+                                                                    opacity: 0.7,
+                                                                    textDecoration: "none",
+                                                                }}
+                                                                title={c.sheet}
+                                                            >
+                                                                Open sheet ↗
+                                                            </a>
+                                                        )}
+                                                    </div>
                                                 </div>
                                             </div>
                                         );

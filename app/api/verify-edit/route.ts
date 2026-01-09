@@ -36,7 +36,8 @@ export async function GET(req: Request) {
     }
 
     try {
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(TAB_NAME)}&tqx=out:json`;
+        // headers=0 ensures the header row is included in the response
+        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(TAB_NAME)}&tqx=out:json&headers=0`;
         const res = await fetch(gvizUrl, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch sheet");
 
@@ -44,15 +45,16 @@ export async function GET(req: Request) {
         const gviz = parseGvizJson(text);
         const rows = gviz?.table?.rows || [];
 
-        // Find header row
+        // Find header row (same logic as member-lookup)
         let headerRowIdx = -1;
         let headerVals: string[] = [];
         for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
             const rowCells = rows[ri]?.c || [];
             const rowValsLower = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
-            const hasId = rowValsLower.includes("id") || rowValsLower.includes("member id");
             const hasName = rowValsLower.includes("name");
-            if (hasId && hasName) {
+            const hasStatus = rowValsLower.includes("status") || rowValsLower.includes("frequency");
+            const hasCity = rowValsLower.includes("city") || rowValsLower.includes("crews");
+            if (hasName && (hasStatus || hasCity)) {
                 headerRowIdx = ri;
                 headerVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
                 break;
@@ -66,12 +68,10 @@ export async function GET(req: Request) {
         const headerMap = new Map<string, number>();
         headerVals.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
 
-        const idxId = headerMap.get("id") ?? headerMap.get("member id");
+        // Find ID column, fallback to column 0 if not found (matches member-lookup behavior)
+        let idxId = headerMap.get("id") ?? headerMap.get("member id") ?? headerMap.get("memberid");
+        if (idxId == null) idxId = 0; // fallback to column A
         const idxDiscord = headerMap.get("discordid") ?? headerMap.get("discord id") ?? headerMap.get("discord");
-
-        if (idxId == null) {
-            return NextResponse.json({ error: "ID column not found" }, { status: 500 });
-        }
 
         // Find the row with matching memberId
         for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {

@@ -27,36 +27,14 @@ type UserStatus = {
   hasClaimedToken: boolean
 }
 
-type VotingToken = {
-  token: string
-  signature: string
-}
-
-const STORAGE_KEY_PREFIX = 'pizzadao_vote_token_'
-
 export default function AnonymousVote({ pollId }: { pollId: string }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [poll, setPoll] = useState<PollData | null>(null)
   const [userStatus, setUserStatus] = useState<UserStatus | null>(null)
-  const [votingToken, setVotingToken] = useState<VotingToken | null>(null)
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
-  const [submitting, setSubmitting] = useState(false)
   const [hasVoted, setHasVoted] = useState(false)
   const [claimingToken, setClaimingToken] = useState(false)
-
-  // Load saved token from localStorage
-  useEffect(() => {
-    const saved = localStorage.getItem(`${STORAGE_KEY_PREFIX}${pollId}`)
-    if (saved) {
-      try {
-        const parsed = JSON.parse(saved)
-        setVotingToken(parsed)
-      } catch {
-        // Invalid saved data, ignore
-      }
-    }
-  }, [pollId])
 
   // Fetch poll status
   useEffect(() => {
@@ -84,8 +62,8 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
     fetchStatus()
   }, [pollId])
 
-  // Claim voting token (blind signature flow)
-  const claimToken = useCallback(async () => {
+  // Combined: Claim token and submit vote in one step
+  const voteAnonymously = useCallback(async (optionId: string) => {
     if (!poll || !userStatus?.isEligible) return
     setClaimingToken(true)
     setError(null)
@@ -127,43 +105,22 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
       const blindSigBytes = fromBase64(blindSignature)
       const finalSignature = await finalize(publicKey, preparedMsg, blindSigBytes, blindInverse)
 
-      // Store the token
-      const token: VotingToken = {
-        token: tokenMessage,
-        signature: toBase64(finalSignature),
-      }
-      setVotingToken(token)
-      localStorage.setItem(`${STORAGE_KEY_PREFIX}${pollId}`, JSON.stringify(token))
-
-      // Update user status
-      setUserStatus(prev => prev ? { ...prev, hasClaimedToken: true } : null)
-    } catch (e: any) {
-      setError(e.message)
-    } finally {
-      setClaimingToken(false)
-    }
-  }, [poll, pollId, userStatus?.isEligible])
-
-  // Submit vote
-  const submitVote = async () => {
-    if (!votingToken || !selectedOption) return
-    setSubmitting(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/vote/anonymous', {
+      // Now immediately submit the vote
+      // Include preparedMsg for verification (contains PSS salt, needed for verify)
+      const voteRes = await fetch('/api/vote/anonymous', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
-          token: votingToken.token,
-          signature: votingToken.signature,
+          token: tokenMessage,
+          preparedMessage: toBase64(preparedMsg),
+          signature: toBase64(finalSignature),
           pollId,
-          optionId: selectedOption,
+          optionId,
         }),
       })
 
-      if (!res.ok) {
-        const data = await res.json()
+      if (!voteRes.ok) {
+        const data = await voteRes.json()
         if (data.error === 'You have already voted') {
           setHasVoted(true)
           return
@@ -172,14 +129,12 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
       }
 
       setHasVoted(true)
-      // Clear stored token after successful vote
-      localStorage.removeItem(`${STORAGE_KEY_PREFIX}${pollId}`)
     } catch (e: any) {
       setError(e.message)
     } finally {
-      setSubmitting(false)
+      setClaimingToken(false)
     }
-  }
+  }, [poll, pollId, userStatus?.isEligible])
 
   if (loading) {
     return (
@@ -277,8 +232,8 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
         </div>
       )}
 
-      {/* User is eligible but hasn't claimed token yet */}
-      {!hasVoted && userStatus?.isEligible && !votingToken && (
+      {/* User is eligible - single step voting */}
+      {!hasVoted && userStatus?.isEligible && (
         <div>
           <div className="space-y-2 mb-6">
             {poll.options.map(opt => (
@@ -300,51 +255,15 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
           </div>
 
           <button
-            onClick={claimToken}
+            onClick={() => selectedOption && voteAnonymously(selectedOption)}
             disabled={!selectedOption || claimingToken}
             className="w-full bg-blue-600 text-white py-3 rounded-lg font-medium hover:bg-blue-700 disabled:opacity-50 disabled:cursor-not-allowed"
           >
-            {claimingToken ? 'Preparing anonymous ballot...' : 'Vote Anonymously'}
+            {claimingToken ? 'Submitting vote...' : 'Vote'}
           </button>
 
           <p className="text-xs text-gray-500 mt-3 text-center">
-            Your identity will be protected by blind signature cryptography
-          </p>
-        </div>
-      )}
-
-      {/* User has token, ready to vote */}
-      {!hasVoted && userStatus?.isEligible && votingToken && (
-        <div>
-          <div className="space-y-2 mb-6">
-            {poll.options.map(opt => (
-              <label
-                key={opt.id}
-                className="flex items-center p-3 border rounded cursor-pointer hover:bg-gray-50"
-              >
-                <input
-                  type="radio"
-                  name="vote"
-                  value={opt.id}
-                  checked={selectedOption === opt.id}
-                  onChange={() => setSelectedOption(opt.id)}
-                  className="mr-3"
-                />
-                <span>{opt.label}</span>
-              </label>
-            ))}
-          </div>
-
-          <button
-            onClick={submitVote}
-            disabled={!selectedOption || submitting}
-            className="w-full bg-green-600 text-white py-3 rounded-lg font-medium hover:bg-green-700 disabled:opacity-50 disabled:cursor-not-allowed"
-          >
-            {submitting ? 'Submitting...' : 'Submit Vote'}
-          </button>
-
-          <p className="text-xs text-gray-500 mt-3 text-center">
-            Your anonymous ballot is ready. No one can link your vote to your identity.
+            Your identity is protected by blind signature cryptography
           </p>
         </div>
       )}

@@ -12,7 +12,10 @@
       "Bash(openssl rsa:*)",
       "Bash(git add:*)",
       "Bash(git stash:*)",
-      "Bash(git merge:*)"
+      "Bash(git merge:*)",
+      "WebSearch",
+      "WebFetch(domain:docs.google.com)",
+      "Bash(python3:*)"
     ]
   }
 }

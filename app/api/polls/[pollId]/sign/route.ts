@@ -66,7 +66,10 @@ export async function POST(req: Request, { params }: Params) {
   try {
     const privateKey = await importPrivateKey(privateKeyPem)
     const blindedBytes = fromBase64(blindedMessage)
+    console.log('[sign] Blinded message length:', blindedBytes.length)
+
     const blindSig = await blindSign(privateKey, blindedBytes)
+    console.log('[sign] Blind signature length:', blindSig.length)
 
     // Ensure user exists in our database
     await prisma.user.upsert({
