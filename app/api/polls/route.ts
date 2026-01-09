@@ -19,7 +19,7 @@ export async function GET() {
   })
 
   // Only include results for closed polls
-  const sanitizedPolls = polls.map(poll => ({
+  const sanitizedPolls = polls.map((poll: typeof polls[number]) => ({
     ...poll,
     results: poll.status === 'CLOSED' ? poll.results : [],
   }))
