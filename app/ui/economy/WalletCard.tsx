@@ -13,6 +13,41 @@ type Balance = {
   };
 };
 
+function card(): React.CSSProperties {
+  return {
+    border: "1px solid rgba(0,0,0,0.12)",
+    borderRadius: 14,
+    padding: 20,
+    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+    background: "white",
+  };
+}
+
+function input(): React.CSSProperties {
+  return {
+    flex: 1,
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.18)",
+    fontSize: 14,
+    outline: "none",
+  };
+}
+
+function btn(kind: "primary" | "secondary", disabled?: boolean): React.CSSProperties {
+  const base: React.CSSProperties = {
+    padding: "10px 14px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.18)",
+    fontWeight: 650,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.5 : 1,
+    fontSize: 14,
+  };
+  if (kind === "primary") return { ...base, background: "black", color: "white", borderColor: "black" };
+  return { ...base, background: "white", color: "black" };
+}
+
 export function WalletCard() {
   const [balance, setBalance] = useState<Balance | null>(null);
   const [loading, setLoading] = useState(true);
@@ -80,72 +115,69 @@ export function WalletCard() {
 
   if (loading) {
     return (
-      <div className="p-6 bg-gray-800 rounded-lg animate-pulse">
-        <div className="h-6 bg-gray-700 rounded w-1/3 mb-4"></div>
-        <div className="h-10 bg-gray-700 rounded w-1/2"></div>
-      </div>
+      <div style={{ ...card(), height: 180, background: "rgba(0,0,0,0.04)" }} />
     );
   }
 
   if (error && !balance) {
     return (
-      <div className="p-6 bg-red-900/20 border border-red-500 rounded-lg">
-        <p className="text-red-400">{error}</p>
+      <div style={{ ...card(), background: "rgba(255,0,0,0.05)", borderColor: "rgba(255,0,0,0.3)" }}>
+        <p style={{ color: "#c00" }}>{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="p-6 bg-gray-800 rounded-lg">
-      <h2 className="text-xl font-bold mb-4">Your Wallet</h2>
+    <div style={card()}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>Your Wallet</h2>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-900/20 border border-red-500 rounded text-red-400 text-sm">
+        <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
           {error}
         </div>
       )}
 
-      <div className="grid grid-cols-3 gap-4 mb-6">
-        <div className="text-center p-4 bg-gray-700 rounded">
-          <p className="text-sm text-gray-400">Wallet</p>
-          <p className="text-2xl font-bold text-green-400">
+      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, marginBottom: 16 }}>
+        <div style={{ textAlign: "center", padding: 12, background: "#fafafa", borderRadius: 10 }}>
+          <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Wallet</p>
+          <p style={{ fontSize: 20, fontWeight: 700, margin: "4px 0 0", color: "#16a34a" }}>
             {balance?.formatted.wallet}
           </p>
         </div>
-        <div className="text-center p-4 bg-gray-700 rounded">
-          <p className="text-sm text-gray-400">Bank</p>
-          <p className="text-2xl font-bold text-blue-400">
+        <div style={{ textAlign: "center", padding: 12, background: "#fafafa", borderRadius: 10 }}>
+          <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Bank</p>
+          <p style={{ fontSize: 20, fontWeight: 700, margin: "4px 0 0", color: "#2563eb" }}>
             {balance?.formatted.bank}
           </p>
         </div>
-        <div className="text-center p-4 bg-gray-700 rounded">
-          <p className="text-sm text-gray-400">Total</p>
-          <p className="text-2xl font-bold text-yellow-400">
+        <div style={{ textAlign: "center", padding: 12, background: "#fafafa", borderRadius: 10 }}>
+          <p style={{ fontSize: 12, opacity: 0.6, margin: 0 }}>Total</p>
+          <p style={{ fontSize: 20, fontWeight: 700, margin: "4px 0 0", color: "#ca8a04" }}>
             {balance?.formatted.total}
           </p>
         </div>
       </div>
 
-      <div className="flex gap-2">
+      <div style={{ display: "flex", gap: 8 }}>
         <input
           type="number"
           placeholder="Amount"
           value={amount}
           onChange={(e) => setAmount(e.target.value)}
-          className="flex-1 px-4 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+          style={input()}
           disabled={actionLoading}
         />
         <button
           onClick={handleDeposit}
           disabled={actionLoading || !amount}
-          className="px-4 py-2 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-medium transition"
+          style={btn("secondary", actionLoading || !amount)}
         >
           Deposit
         </button>
         <button
           onClick={handleWithdraw}
           disabled={actionLoading || !amount}
-          className="px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-medium transition"
+          style={btn("secondary", actionLoading || !amount)}
         >
           Withdraw
         </button>

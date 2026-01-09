@@ -17,6 +17,16 @@ type ActiveJobData = {
   type: string | null;
 };
 
+function card(): React.CSSProperties {
+  return {
+    border: "1px solid rgba(0,0,0,0.12)",
+    borderRadius: 14,
+    padding: 20,
+    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+    background: "white",
+  };
+}
+
 export function JobBoard() {
   const [jobs, setJobs] = useState<Job[]>([]);
   const [activeJob, setActiveJob] = useState<ActiveJobData | null>(null);
@@ -43,11 +53,11 @@ export function JobBoard() {
 
   if (loading) {
     return (
-      <div className="space-y-4">
-        <div className="h-32 bg-gray-700 rounded-lg animate-pulse"></div>
-        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+      <div style={{ display: "grid", gap: 16 }}>
+        <div style={{ height: 100, background: "rgba(0,0,0,0.04)", borderRadius: 14 }} />
+        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
           {[...Array(4)].map((_, i) => (
-            <div key={i} className="h-24 bg-gray-700 rounded-lg animate-pulse"></div>
+            <div key={i} style={{ height: 100, background: "rgba(0,0,0,0.04)", borderRadius: 14 }} />
           ))}
         </div>
       </div>
@@ -56,27 +66,27 @@ export function JobBoard() {
 
   if (error) {
     return (
-      <div className="p-6 bg-red-900/20 border border-red-500 rounded-lg">
-        <p className="text-red-400">{error}</p>
+      <div style={{ ...card(), background: "rgba(255,0,0,0.05)", borderColor: "rgba(255,0,0,0.3)" }}>
+        <p style={{ color: "#c00" }}>{error}</p>
       </div>
     );
   }
 
   return (
-    <div className="space-y-6">
+    <div style={{ display: "grid", gap: 20 }}>
       {activeJob && (
         <ActiveJob job={activeJob} onQuit={fetchJobs} />
       )}
 
       <div>
-        <h2 className="text-xl font-bold mb-4">Available Jobs</h2>
+        <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>Available Jobs</h2>
 
         {jobs.length === 0 ? (
-          <div className="p-6 bg-gray-800 rounded-lg text-center">
-            <p className="text-gray-400">No jobs available at the moment</p>
+          <div style={{ ...card(), textAlign: "center" }}>
+            <p style={{ opacity: 0.5 }}>No jobs available at the moment</p>
           </div>
         ) : (
-          <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
             {jobs.map((job) => (
               <JobCard
                 key={job.id}

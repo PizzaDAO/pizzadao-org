@@ -11,6 +11,20 @@ type ActiveJobProps = {
   onQuit?: () => void;
 };
 
+function btn(kind: "primary" | "danger", disabled?: boolean): React.CSSProperties {
+  const base: React.CSSProperties = {
+    padding: "10px 16px",
+    borderRadius: 8,
+    border: "none",
+    fontWeight: 650,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.5 : 1,
+    fontSize: 14,
+  };
+  if (kind === "danger") return { ...base, background: "#dc2626", color: "white" };
+  return { ...base, background: "black", color: "white" };
+}
+
 export function ActiveJob({ job, onQuit }: ActiveJobProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -40,31 +54,43 @@ export function ActiveJob({ job, onQuit }: ActiveJobProps) {
   };
 
   return (
-    <div className="p-6 bg-gradient-to-r from-green-900/30 to-blue-900/30 border border-green-500/50 rounded-lg">
-      <div className="flex justify-between items-start mb-3">
-        <h2 className="text-xl font-bold text-green-400">Your Active Job</h2>
-        <span className="text-xs font-medium px-2 py-1 bg-green-600/20 text-green-400 rounded">
+    <div style={{
+      padding: 20,
+      background: "linear-gradient(135deg, rgba(22,163,74,0.08) 0%, rgba(37,99,235,0.08) 100%)",
+      border: "1px solid rgba(22,163,74,0.3)",
+      borderRadius: 14,
+    }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 12 }}>
+        <h2 style={{ fontSize: 18, fontWeight: 700, color: "#16a34a", margin: 0 }}>Your Active Job</h2>
+        <span style={{
+          fontSize: 11,
+          fontWeight: 600,
+          padding: "4px 8px",
+          background: "rgba(22,163,74,0.15)",
+          color: "#16a34a",
+          borderRadius: 6,
+        }}>
           {job.type || "General"}
         </span>
       </div>
 
-      <p className="text-lg mb-4">{job.description}</p>
+      <p style={{ fontSize: 16, marginBottom: 16 }}>{job.description}</p>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-900/20 border border-red-500 rounded text-red-400 text-sm">
+        <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
           {error}
         </div>
       )}
 
-      <div className="flex gap-3">
+      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
         <button
           onClick={handleQuit}
           disabled={loading}
-          className="px-4 py-2 bg-red-600 hover:bg-red-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-medium transition"
+          style={btn("danger", loading)}
         >
           {loading ? "Quitting..." : "Quit Job"}
         </button>
-        <p className="text-sm text-gray-400 self-center">
+        <p style={{ fontSize: 13, opacity: 0.6, margin: 0 }}>
           Complete this job and submit proof to an admin to receive your reward!
         </p>
       </div>

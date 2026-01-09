@@ -6,6 +6,42 @@ type TransferFormProps = {
   onSuccess?: () => void;
 };
 
+function card(): React.CSSProperties {
+  return {
+    border: "1px solid rgba(0,0,0,0.12)",
+    borderRadius: 14,
+    padding: 20,
+    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+    background: "white",
+  };
+}
+
+function input(): React.CSSProperties {
+  return {
+    width: "100%",
+    padding: "10px 12px",
+    borderRadius: 10,
+    border: "1px solid rgba(0,0,0,0.18)",
+    fontSize: 14,
+    outline: "none",
+    boxSizing: "border-box",
+  };
+}
+
+function btn(disabled?: boolean): React.CSSProperties {
+  return {
+    width: "100%",
+    padding: "12px 16px",
+    borderRadius: 10,
+    border: "none",
+    fontWeight: 650,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.5 : 1,
+    background: "black",
+    color: "white",
+  };
+}
+
 export function TransferForm({ onSuccess }: TransferFormProps) {
   const [toUserId, setToUserId] = useState("");
   const [amount, setAmount] = useState("");
@@ -46,24 +82,24 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
   };
 
   return (
-    <div className="p-6 bg-gray-800 rounded-lg">
-      <h2 className="text-xl font-bold mb-4">Send $PEP</h2>
+    <div style={card()}>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>Send $PEP</h2>
 
       {error && (
-        <div className="mb-4 p-3 bg-red-900/20 border border-red-500 rounded text-red-400 text-sm">
+        <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-4 p-3 bg-green-900/20 border border-green-500 rounded text-green-400 text-sm">
+        <div style={{ marginBottom: 16, padding: 12, background: "rgba(0,200,0,0.08)", borderRadius: 8, color: "#16a34a", fontSize: 14 }}>
           {success}
         </div>
       )}
 
-      <form onSubmit={handleTransfer} className="space-y-4">
+      <form onSubmit={handleTransfer} style={{ display: "grid", gap: 16 }}>
         <div>
-          <label className="block text-sm text-gray-400 mb-1">
+          <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
             Recipient Discord ID
           </label>
           <input
@@ -71,19 +107,19 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
             placeholder="Enter Discord user ID"
             value={toUserId}
             onChange={(e) => setToUserId(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+            style={input()}
             disabled={loading}
           />
         </div>
 
         <div>
-          <label className="block text-sm text-gray-400 mb-1">Amount</label>
+          <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>Amount</label>
           <input
             type="number"
             placeholder="Amount to send"
             value={amount}
             onChange={(e) => setAmount(e.target.value)}
-            className="w-full px-4 py-2 bg-gray-700 rounded border border-gray-600 focus:border-blue-500 focus:outline-none"
+            style={input()}
             disabled={loading}
             min="1"
           />
@@ -92,7 +128,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         <button
           type="submit"
           disabled={loading || !toUserId || !amount}
-          className="w-full px-4 py-3 bg-purple-600 hover:bg-purple-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-medium transition"
+          style={btn(loading || !toUserId || !amount)}
         >
           {loading ? "Sending..." : "Send $PEP"}
         </button>

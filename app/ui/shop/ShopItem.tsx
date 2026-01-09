@@ -17,6 +17,43 @@ type ShopItemProps = {
   onPurchase?: () => void;
 };
 
+function card(): React.CSSProperties {
+  return {
+    border: "1px solid rgba(0,0,0,0.12)",
+    borderRadius: 14,
+    padding: 16,
+    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+    background: "white",
+  };
+}
+
+function input(): React.CSSProperties {
+  return {
+    width: 50,
+    padding: "6px 8px",
+    borderRadius: 8,
+    border: "1px solid rgba(0,0,0,0.18)",
+    fontSize: 14,
+    textAlign: "center" as const,
+    outline: "none",
+  };
+}
+
+function btn(disabled?: boolean): React.CSSProperties {
+  return {
+    flex: 1,
+    padding: "8px 12px",
+    borderRadius: 8,
+    border: "none",
+    fontWeight: 650,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.5 : 1,
+    background: "black",
+    color: "white",
+    fontSize: 13,
+  };
+}
+
 export function ShopItem({ item, onPurchase }: ShopItemProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -51,50 +88,46 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
   };
 
   return (
-    <div className="p-4 bg-gray-800 rounded-lg border border-gray-700 hover:border-gray-600 transition">
-      <div className="flex justify-between items-start mb-2">
-        <h3 className="font-bold text-lg">{item.name}</h3>
-        <span className="text-green-400 font-bold">{item.priceFormatted}</span>
+    <div style={card()}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+        <h3 style={{ fontWeight: 700, fontSize: 16, margin: 0 }}>{item.name}</h3>
+        <span style={{ fontWeight: 700, color: "#16a34a" }}>{item.priceFormatted}</span>
       </div>
 
       {item.description && (
-        <p className="text-gray-400 text-sm mb-3">{item.description}</p>
+        <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 12, marginTop: 0 }}>{item.description}</p>
       )}
 
-      <div className="flex items-center justify-between text-sm text-gray-500 mb-3">
-        <span>
-          {item.quantity === -1
-            ? "Unlimited stock"
-            : `${item.quantity} in stock`}
-        </span>
+      <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 12 }}>
+        {item.quantity === -1 ? "Unlimited stock" : `${item.quantity} in stock`}
       </div>
 
       {error && (
-        <div className="mb-3 p-2 bg-red-900/20 border border-red-500 rounded text-red-400 text-xs">
+        <div style={{ marginBottom: 12, padding: 8, background: "rgba(255,0,0,0.05)", borderRadius: 6, color: "#c00", fontSize: 12 }}>
           {error}
         </div>
       )}
 
       {success && (
-        <div className="mb-3 p-2 bg-green-900/20 border border-green-500 rounded text-green-400 text-xs">
+        <div style={{ marginBottom: 12, padding: 8, background: "rgba(0,200,0,0.08)", borderRadius: 6, color: "#16a34a", fontSize: 12 }}>
           Purchase successful!
         </div>
       )}
 
-      <div className="flex gap-2">
+      <div style={{ display: "flex", gap: 8 }}>
         <input
           type="number"
           value={quantity}
           onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
           min="1"
           max={item.quantity === -1 ? 999 : item.quantity}
-          className="w-16 px-2 py-1 bg-gray-700 rounded border border-gray-600 text-center"
+          style={input()}
           disabled={loading || !item.inStock}
         />
         <button
           onClick={handleBuy}
           disabled={loading || !item.inStock}
-          className="flex-1 px-4 py-2 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 disabled:cursor-not-allowed rounded font-medium transition"
+          style={btn(loading || !item.inStock)}
         >
           {loading ? "Buying..." : item.inStock ? "Buy" : "Out of Stock"}
         </button>

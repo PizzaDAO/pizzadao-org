@@ -17,6 +17,16 @@ type ShopGridProps = {
   onPurchase?: () => void;
 };
 
+function card(): React.CSSProperties {
+  return {
+    border: "1px solid rgba(0,0,0,0.12)",
+    borderRadius: 14,
+    padding: 20,
+    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+    background: "white",
+  };
+}
+
 export function ShopGrid({ onPurchase }: ShopGridProps) {
   const [items, setItems] = useState<Item[]>([]);
   const [loading, setLoading] = useState(true);
@@ -46,9 +56,9 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
 
   if (loading) {
     return (
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {[...Array(6)].map((_, i) => (
-          <div key={i} className="h-40 bg-gray-700 rounded-lg animate-pulse"></div>
+      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+        {[...Array(4)].map((_, i) => (
+          <div key={i} style={{ height: 120, background: "rgba(0,0,0,0.04)", borderRadius: 14 }} />
         ))}
       </div>
     );
@@ -56,22 +66,22 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
 
   if (error) {
     return (
-      <div className="p-6 bg-red-900/20 border border-red-500 rounded-lg">
-        <p className="text-red-400">{error}</p>
+      <div style={{ ...card(), background: "rgba(255,0,0,0.05)", borderColor: "rgba(255,0,0,0.3)" }}>
+        <p style={{ color: "#c00" }}>{error}</p>
       </div>
     );
   }
 
   if (items.length === 0) {
     return (
-      <div className="p-6 bg-gray-800 rounded-lg text-center">
-        <p className="text-gray-400">No items available in the shop</p>
+      <div style={{ ...card(), textAlign: "center" }}>
+        <p style={{ opacity: 0.5 }}>No items available in the shop</p>
       </div>
     );
   }
 
   return (
-    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
       {items.map((item) => (
         <ShopItem key={item.id} item={item} onPurchase={handlePurchase} />
       ))}
