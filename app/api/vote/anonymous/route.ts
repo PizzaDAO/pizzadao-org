@@ -63,11 +63,12 @@ export async function POST(req: Request) {
 
     // Verify signature against prepared message using Web Crypto directly
     // (SHA-384 = 48 byte salt for RSA-PSS)
+    // Create new Uint8Array views to satisfy TypeScript's strict BufferSource type
     const isValid = await crypto.subtle.verify(
       { name: 'RSA-PSS', saltLength: 48 },
       publicKey,
-      signatureBytes,
-      preparedBytes
+      new Uint8Array(signatureBytes),
+      new Uint8Array(preparedBytes)
     )
     console.log('[vote/anonymous] Verification result:', isValid)
 
