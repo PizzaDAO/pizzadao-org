@@ -15,7 +15,25 @@
       "Bash(git merge:*)",
       "WebSearch",
       "WebFetch(domain:docs.google.com)",
-      "Bash(python3:*)"
+      "Bash(python3:*)",
+      "Bash(git push:*)",
+      "Bash(git commit:*)",
+      "Bash(git restore:*)",
+      "Bash(npx prisma db push:*)",
+      "Bash(npx dotenv:*)",
+      "Bash(npx prisma db pull:*)",
+      "Bash(npx prisma generate:*)",
+      "Bash(npx vercel env add:*)",
+      "Bash(npx vercel login)",
+      "Bash(npx vercel link)",
+      "Bash(npx vercel link --yes)",
+      "Bash(npx vercel env:*)",
+      "Bash(npx vercel:*)",
+      "Bash(echo:*)",
+      "Bash(printf:*)",
+      "Bash(git worktree:*)",
+      "Bash(git branch:*)",
+      "Bash(npm uninstall:*)"
     ]
   }
 }

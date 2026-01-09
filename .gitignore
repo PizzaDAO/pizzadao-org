@@ -42,3 +42,4 @@ service-account.json
 next-env.d.ts
 
 /app/generated/prisma
+.env*.local
