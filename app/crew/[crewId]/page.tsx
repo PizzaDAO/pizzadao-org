@@ -259,8 +259,13 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                   </div>
                   <div style={{ marginTop: 8, fontWeight: 500 }}>
                     {task.url ? (
-                      <a href={task.url} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
-                        {task.task} ↗
+                      <a
+                        href={task.url}
+                        target="_blank"
+                        rel="noreferrer"
+                        style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                      >
+                        {task.task}
                       </a>
                     ) : (
                       task.task

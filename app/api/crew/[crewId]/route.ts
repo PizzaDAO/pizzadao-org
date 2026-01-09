@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { getTaskLinks } from '@/app/api/lib/google-sheets'
 
 type Params = { params: Promise<{ crewId: string }> }
 
@@ -27,6 +28,34 @@ function parseGvizJson(text: string) {
 // Get cell value
 function cellVal(cell: any): string {
   return norm(cell?.v ?? cell?.f ?? '')
+}
+
+// Extract URL from cell (checks GViz link property, hyperlink, or text content)
+function extractUrl(cell: any): string | null {
+  if (!cell) return null
+
+  // Check for GViz link property (how GViz returns hyperlinks)
+  if (cell.l) return cell.l
+
+  // Check for explicit hyperlink in cell properties
+  if (cell.hyperlink) return cell.hyperlink
+
+  // Check formatted value for URL patterns
+  const text = String(cell?.f ?? cell?.v ?? '')
+
+  // Try to extract URL from HYPERLINK formula pattern
+  const hyperlinkMatch = text.match(/HYPERLINK\s*\(\s*"([^"]+)"/i)
+  if (hyperlinkMatch) return hyperlinkMatch[1]
+
+  // Try to extract URL in parentheses: (https://...)
+  const parenMatch = text.match(/\((https?:\/\/[^\s\)]+)\)/)
+  if (parenMatch) return parenMatch[1]
+
+  // Try to extract raw URL from text
+  const urlMatch = text.match(/https?:\/\/[^\s"<>\)]+/)
+  if (urlMatch) return urlMatch[0]
+
+  return null
 }
 
 // Detect section by checking if row contains specific headers
@@ -122,25 +151,31 @@ function parseGoals(rows: any[], headerIdx: number, headers: string[]) {
 }
 
 // Parse tasks section
-function parseTasks(rows: any[], headerIdx: number, headers: string[]) {
+function parseTasks(rows: any[], headerIdx: number, headers: string[], htmlLinkMap: Record<string, string> = {}) {
   const headerMap = new Map<string, number>()
   headers.forEach((h, i) => headerMap.set(h.toLowerCase(), i))
 
   const tasks: any[] = []
+  const taskIdx = headerMap.get('task') ?? -1
 
   for (let ri = headerIdx + 1; ri < rows.length; ri++) {
     const cells = rows[ri]?.c || []
-    const task = cellVal(cells[headerMap.get('task') ?? -1])
+    const taskCell = cells[taskIdx]
+    const task = cellVal(taskCell)
     if (!task) continue
 
     // Check if we hit another section header
     const rowVals = cells.map(cellVal)
     if (detectSection(rowVals)) break
 
+    // Priority: 1. HTML link map (Ctrl+K links)  2. GViz/text extraction
+    const url = htmlLinkMap[task] || extractUrl(taskCell)
+
     tasks.push({
       priority: cellVal(cells[headerMap.get('priority') ?? -1]),
       stage: cellVal(cells[headerMap.get('stage') ?? -1]),
       task,
+      url,
       dueDate: cellVal(cells[headerMap.get('due') ?? headerMap.get('due date') ?? headerMap.get('duedate') ?? -1]),
       lead: cellVal(cells[headerMap.get('lead') ?? headerMap.get('owner') ?? headerMap.get('assigned') ?? -1]),
       notes: cellVal(cells[headerMap.get('notes') ?? -1]),
@@ -248,9 +283,12 @@ export async function GET(req: Request, { params }: Params) {
       })
     }
 
-    // Fetch spreadsheet data via GViz API
+    // Fetch spreadsheet data via GViz API and HTML links in parallel
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
-    const sheetRes = await fetch(gvizUrl, { cache: 'no-store' })
+    const [sheetRes, htmlLinkMap] = await Promise.all([
+      fetch(gvizUrl, { cache: 'no-store' }),
+      getTaskLinks(sheetId),
+    ])
     if (!sheetRes.ok) {
       throw new Error('Failed to fetch crew spreadsheet')
     }
@@ -276,7 +314,7 @@ export async function GET(req: Request, { params }: Params) {
       } else if (section === 'goals') {
         goals = parseGoals(rows, ri, rowVals)
       } else if (section === 'tasks') {
-        tasks = parseTasks(rows, ri, rowVals)
+        tasks = parseTasks(rows, ri, rowVals, htmlLinkMap)
       } else if (section === 'agenda') {
         agenda = parseAgenda(rows, ri, rowVals)
       }
