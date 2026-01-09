@@ -6,68 +6,111 @@ datasource db {
   provider = "postgresql"
 }
 
-// Stores Discord users who have authenticated
 model User {
-  id        String   @id // Discord User ID
-  roles     String[] // Discord role IDs
-  createdAt DateTime @default(now())
-  updatedAt DateTime @updatedAt
-
+  id                String             @id
+  roles             String[]
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  Economy           Economy?
   pendingSignatures PendingSignature[]
 }
 
-// Poll definition
 model Poll {
-  id              String   @id @default(cuid())
-  question        String
-  options         Json     // Array of { id: string, label: string }
-  requiredRoleId  String   // Discord role ID required to vote
-  status          PollStatus @default(DRAFT)
-  createdBy       String   // Discord ID of creator
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  batchSignedAt   DateTime? // When tokens were generated
-
-  results           PollResult[]
+  id                String             @id @default(cuid())
+  question          String
+  options           Json
+  requiredRoleId    String
+  status            PollStatus         @default(DRAFT)
+  createdBy         String
+  createdAt         DateTime           @default(now())
+  updatedAt         DateTime           @updatedAt
+  batchSignedAt     DateTime?
   pendingSignatures PendingSignature[]
+  results           PollResult[]
 }
 
-enum PollStatus {
-  DRAFT      // Created but not open
-  OPEN       // Accepting votes
-  CLOSED     // Voting ended, results visible
-}
-
-// Bridge table: stores signed tokens for eligible users
-// This links identity to token temporarily, but the token itself
-// is blinded so the server never sees the final voting credential
 model PendingSignature {
   id         String @id @default(cuid())
   userId     String
   pollId     String
-  blindedSig String // Base64 encoded blind signature
+  blindedSig String
+  poll       Poll   @relation(fields: [pollId], references: [id])
+  user       User   @relation(fields: [userId], references: [id])
 
-  user User @relation(fields: [userId], references: [id])
-  poll Poll @relation(fields: [pollId], references: [id])
-
-  @@unique([userId, pollId]) // One token per user per poll
+  @@unique([userId, pollId])
 }
 
-// Anonymous vote tally - no link to user identity
 model PollResult {
   pollId   String
   optionId String
   tally    Int    @default(0)
-
-  poll Poll @relation(fields: [pollId], references: [id])
+  poll     Poll   @relation(fields: [pollId], references: [id])
 
   @@id([pollId, optionId])
 }
 
-// Tracks consumed tokens to prevent double voting
-// Only stores hash of token, not the token itself
 model ConsumedToken {
-  tokenHash String   @id
-  pollId    String
+  tokenHash  String   @id
+  pollId     String
   consumedAt DateTime @default(now())
+}
+
+model Economy {
+  id        String   @id
+  wallet    Int      @default(0)
+  bank      Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime
+  User      User     @relation(fields: [id], references: [id])
+}
+
+model Inventory {
+  userId   String
+  itemId   Int
+  quantity Int      @default(1)
+  ShopItem ShopItem @relation(fields: [itemId], references: [id])
+
+  @@id([userId, itemId])
+}
+
+model Job {
+  id            Int             @id @default(autoincrement())
+  description   String
+  type          String?
+  sheetRow      Int?
+  isActive      Boolean         @default(true)
+  createdAt     DateTime        @default(now())
+  JobAssignment JobAssignment[]
+}
+
+model JobAssignment {
+  id         Int      @id @default(autoincrement())
+  jobId      Int
+  userId     String
+  assignedAt DateTime @default(now())
+  Job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId])
+}
+
+model JobCycle {
+  id           Int @id @default(1)
+  currentIndex Int @default(0)
+}
+
+model ShopItem {
+  id          Int         @id @default(autoincrement())
+  name        String      @unique
+  description String?
+  price       Int
+  quantity    Int         @default(-1)
+  isAvailable Boolean     @default(true)
+  createdAt   DateTime    @default(now())
+  Inventory   Inventory[]
+}
+
+enum PollStatus {
+  DRAFT
+  OPEN
+  CLOSED
 }
