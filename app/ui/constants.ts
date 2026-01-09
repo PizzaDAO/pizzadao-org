@@ -64,3 +64,8 @@ export const ROLE_ID_TO_TURTLE: Record<string, string> = Object.entries(TURTLE_R
   acc[value] = key.charAt(0) + key.slice(1).toLowerCase(); // "LEONARDO" -> "Leonardo"
   return acc;
 }, {} as Record<string, string>);
+
+// Admin roles that can create and manage polls
+export const ADMIN_ROLE_IDS = [
+  TURTLE_ROLE_IDS.LEONARDO, // Leader role
+] as const;

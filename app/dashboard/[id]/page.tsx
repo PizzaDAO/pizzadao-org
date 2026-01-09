@@ -3,6 +3,7 @@
 
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { Inter, Outfit } from "next/font/google"; // Keep fonts if needed, or use defaults
 import { TURTLES, CREWS } from "../../ui/constants";
 
@@ -46,9 +47,11 @@ function splitTurtlesCell(v: unknown): string[] {
 
 export default function Dashboard({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
+    const router = useRouter();
     const [data, setData] = useState<any>(null);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [authError, setAuthError] = useState<string | null>(null);
     const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
     const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
 
@@ -61,23 +64,33 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         }))
     );
 
+    // Verify auth on mount - API handles ownership check
     useEffect(() => {
-        async function fetchData() {
+        async function verifyAuth() {
             try {
-                const res = await fetch(`/api/user-data/${id}`);
-                if (!res.ok) {
-                    const errData = await res.json();
+                // Fetch user data - API requires auth and verifies ownership
+                const dataRes = await fetch(`/api/user-data/${id}`);
+                if (!dataRes.ok) {
+                    const errData = await dataRes.json();
+                    if (dataRes.status === 401) {
+                        setAuthError("Please log in to view your dashboard");
+                        return;
+                    }
+                    if (dataRes.status === 403) {
+                        setAuthError("You don't have permission to view this dashboard");
+                        return;
+                    }
                     throw new Error(errData.error || "Failed to load dashboard");
                 }
-                const json = await res.json();
-                setData(json);
+                const userData = await dataRes.json();
+                setData(userData);
             } catch (e: any) {
                 setError(e.message);
             } finally {
                 setLoading(false);
             }
         }
-        fetchData();
+        verifyAuth();
     }, [id]);
 
     // Fetch crew mappings to get tasks, call times etc.
@@ -158,6 +171,29 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     <style jsx>{`
             @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
           `}</style>
+                </div>
+            </div>
+        );
+    }
+
+    if (authError) {
+        return (
+            <div style={{
+                minHeight: "100vh",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                background: "#fafafa",
+                color: "#000",
+                fontFamily: inter.style.fontFamily,
+                padding: 20
+            }}>
+                <div style={card()}>
+                    <h1 style={{ fontSize: 24, marginBottom: 16 }}>Access Denied</h1>
+                    <p style={{ opacity: 0.7, marginBottom: 32 }}>{authError}</p>
+                    <Link href="/" style={btn("primary")}>
+                        Back to Home
+                    </Link>
                 </div>
             </div>
         );
@@ -473,12 +509,18 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)", textAlign: "center" }}>
                         <button
-                            onClick={() => {
+                            onClick={async () => {
                                 try {
+                                    // Clear localStorage
                                     localStorage.removeItem("mob_pizza_onboarding_v3");
                                     localStorage.removeItem("mob_pizza_onboarding_pending_claim_v1");
                                 } catch { }
-                                window.location.href = "/";
+                                try {
+                                    // Clear session cookie via API
+                                    await fetch("/api/logout", { method: "POST" });
+                                } catch { }
+                                // Redirect to home
+                                router.push("/");
                             }}
                             style={{
                                 ...btn("secondary"),

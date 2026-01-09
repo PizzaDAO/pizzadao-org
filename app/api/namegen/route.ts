@@ -22,6 +22,12 @@ type TMDBCreditsCast = {
   order?: number;
 };
 
+type TMDBCreditsCrew = {
+  name: string;
+  job?: string;
+  department?: string;
+};
+
 function titleCase(s: string) {
   return s
     .trim()
@@ -482,9 +488,13 @@ export async function POST(req: Request) {
       if (cached) return NextResponse.json({ ...cached, cached: true });
     }
 
-    // TMDB credits
+    // TMDB credits (cast + crew)
     const credits = await tmdbFetch(`movie/${movieId}/credits`, { language: "en-US" });
     const cast: TMDBCreditsCast[] = Array.isArray(credits?.cast) ? credits.cast : [];
+    const crew: TMDBCreditsCrew[] = Array.isArray(credits?.crew) ? credits.crew : [];
+
+    // Extract directors from crew
+    const directors = crew.filter((c) => c.job === "Director");
 
     const topCast = cast
       .slice()
@@ -511,7 +521,29 @@ export async function POST(req: Request) {
         };
       });
 
-    const { rerank } = buildFilterAndReranker(toppingPhrase, topCast, style);
+    // Add directors to the cast list (with high priority - order 0)
+    // For directors, preserve middle names as part of last name (e.g., "Ford Coppola" not just "Coppola")
+    const directorEntries = directors.map((d) => {
+      const parts = splitWords(d.name);
+      const directorFirstPhrase = parts.length > 0 ? normalizeNamePreserveCase(parts[0]) : "";
+      // Everything after first name becomes the "last name phrase" (e.g., "Ford Coppola")
+      const directorLastPhrase = parts.length > 1
+        ? normalizeNamePreserveCase(parts.slice(1).join(" "))
+        : "";
+
+      return {
+        actorFirstPhrase: directorFirstPhrase,
+        actorLastPhrase: directorLastPhrase,
+        characterFirstPhrase: "", // Directors don't have character names
+        characterLastPhrase: "",
+        castOrder: 0, // Give directors highest priority
+      };
+    });
+
+    // Combine directors + cast (directors first for priority)
+    const allCast = [...directorEntries, ...topCast];
+
+    const { rerank } = buildFilterAndReranker(toppingPhrase, allCast, style);
 
     // ✅ In-flight dedupe key collapses repeated clicks while the first is running.
     // Include exclude list (normalized) so "Regenerate (no repeats)" stays correct.
@@ -531,15 +563,16 @@ Hard rules (MUST follow):
 - Output ONLY valid JSON.
 - Each name MUST be EXACTLY TWO PARTS (two chunks), not necessarily two single words.
 - ONE PART MUST be the topping phrase EXACTLY (case-insensitive), e.g. "Green Pepper".
-- The OTHER PART MUST be a cast-name phrase from the provided list.
+- The OTHER PART MUST be a name phrase from the provided list (actors, characters, OR directors).
 - Valid forms ONLY:
   1) "<TOPPING_PHRASE> <LASTNAME_PHRASE>"
   2) "<FIRSTNAME_PHRASE> <TOPPING_PHRASE>"
 - Do NOT output "<TOPPING_PHRASE> <FIRSTNAME_PHRASE>"
 - Do NOT output "<LASTNAME_PHRASE> <TOPPING_PHRASE>"
-- Lastname phrases may contain spaces (e.g. "De Niro", "Van Zandt")
-- Preserve capitalization as provided in the cast phrases (e.g. "LaBeouf", not "Labeouf").
+- Lastname phrases may contain spaces (e.g. "De Niro", "Van Zandt", "Coppola")
+- Preserve capitalization as provided in the cast/director phrases (e.g. "LaBeouf", not "Labeouf").
 - IMPORTANT: For "Al Pacino", the lastname is "Pacino" (NOT "Al Pacino"). Same idea for other first+last pairs.
+- Director names are especially good choices as they're iconic (e.g. "Pepperoni Scorsese", "Francis Pepperoni")
 
 Return JSON:
 {
@@ -562,10 +595,11 @@ Return JSON:
           tmdbMovieId: movieId,
         },
         style,
+        directors: directorEntries, // Directors first for emphasis
         cast: topCast,
         excludeNames: Array.from(excludeSet).slice(0, 200),
         instruction:
-          "Generate 120 candidates, then pick the best 3. Use EXACT forms only. Do NOT output anything in excludeNames (case-insensitive).",
+          "Generate 120 candidates, then pick the best 3. Use EXACT forms only. Director names are great choices! Do NOT output anything in excludeNames (case-insensitive).",
       };
 
       const resp = await callOpenAIWithBackoff(() =>

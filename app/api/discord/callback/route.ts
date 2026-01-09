@@ -1,5 +1,6 @@
 // app/api/discord/callback/route.ts
 import { NextResponse } from "next/server";
+import { signSession, COOKIE_NAME, getSessionCookieOptions } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 
@@ -45,37 +46,27 @@ async function addUserToGuild(discordUserId: string, userAccessToken: string) {
     body: JSON.stringify({ access_token: userAccessToken }),
   });
 
-  // Success cases
   if (r.status === 201 || r.status === 204) return { joined: true };
 
-  // Try to interpret body (Discord often returns JSON error payloads)
   const text = await r.text();
   let data: any = null;
   try {
     data = JSON.parse(text);
   } catch { }
 
-  // Defensive: if Discord says "already a member", treat as joined.
-  // (Some endpoints use code 30007; keeping this tolerant.)
   const msg = String(data?.message ?? text ?? "");
   const code = data?.code;
   const looksAlreadyMember =
-    code === 30007 ||
-    /already.*member/i.test(msg) ||
-    /member.*exists/i.test(msg);
+    code === 30007 || /already.*member/i.test(msg) || /member.*exists/i.test(msg);
 
   if (looksAlreadyMember) return { joined: true };
 
   throw new Error(`guilds.join failed (${r.status}): ${text}`);
 }
 
-
 interface GuildMember {
   nick?: string;
-  user?: {
-    global_name?: string;
-    username: string;
-  };
+  user?: { global_name?: string; username: string };
 }
 
 async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
@@ -104,15 +95,54 @@ export async function GET(req: Request) {
 
     const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
 
-    const back = new URL("/", url.origin);
-    back.searchParams.set("discordId", me.id);
-    if (state) back.searchParams.set("sessionId", state);
-    back.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
-    if (nick) back.searchParams.set("discordNick", nick);
+    // ✅ Set signed session cookie (works on localhost + prod)
+    const ttlSeconds = 60 * 60 * 24 * 14; // 14 days
+    const signed = signSession(
+      { discordId: me.id, username: me.username, nick },
+      ttlSeconds
+    );
 
-    return NextResponse.redirect(back.toString());
+    // ✅ Check if member already exists - redirect directly to dashboard
+    let redirectUrl: URL;
+    try {
+      const lookupUrl = new URL(`/api/member-lookup/${me.id}`, url.origin);
+      if (nick) lookupUrl.searchParams.set("searchName", nick);
+      const lookupRes = await fetch(lookupUrl.toString());
+
+      if (lookupRes.ok) {
+        const data = await lookupRes.json();
+        if (data.found && data.memberId) {
+          // Member exists - redirect directly to dashboard
+          redirectUrl = new URL(`/dashboard/${data.memberId}`, url.origin);
+        } else {
+          // Not found - go to home page for onboarding
+          redirectUrl = new URL("/", url.origin);
+          redirectUrl.searchParams.set("discordId", me.id);
+          if (state) redirectUrl.searchParams.set("sessionId", state);
+          redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
+          if (nick) redirectUrl.searchParams.set("discordNick", nick);
+        }
+      } else {
+        // Lookup failed - go to home page
+        redirectUrl = new URL("/", url.origin);
+        redirectUrl.searchParams.set("discordId", me.id);
+        if (state) redirectUrl.searchParams.set("sessionId", state);
+        redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
+        if (nick) redirectUrl.searchParams.set("discordNick", nick);
+      }
+    } catch {
+      // Error - fall back to home page
+      redirectUrl = new URL("/", url.origin);
+      redirectUrl.searchParams.set("discordId", me.id);
+      if (state) redirectUrl.searchParams.set("sessionId", state);
+      redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
+      if (nick) redirectUrl.searchParams.set("discordNick", nick);
+    }
+
+    const res = NextResponse.redirect(redirectUrl.toString());
+    res.cookies.set(COOKIE_NAME, signed, getSessionCookieOptions(ttlSeconds));
+    return res;
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Discord callback failed" }, { status: 500 });
   }
 }
-

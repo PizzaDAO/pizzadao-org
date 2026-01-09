@@ -141,7 +141,10 @@ export async function GET(
 
         const memberId = userRow.c?.[idColIdx]?.v ?? userRow.c?.[idColIdx]?.f;
 
-        return NextResponse.json({ found: true, memberId, data, method: foundMethod });
+        // Get member name for auto-claim verification
+        const memberName = data["Name"] || data["Mafia Name"] || "";
+
+        return NextResponse.json({ found: true, memberId, memberName, data, method: foundMethod });
     } catch (err: any) {
         return NextResponse.json({ error: err.message }, { status: 500 });
     }

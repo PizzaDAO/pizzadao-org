@@ -1,5 +1,6 @@
 // app/api/user-data/[id]/route.ts
 import { NextResponse } from "next/server";
+import { getSession } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 
@@ -33,6 +34,12 @@ export async function GET(
     try {
         const { id } = await params;
         if (!id) return NextResponse.json({ error: "Missing ID" }, { status: 400 });
+
+        // Require authentication
+        const session = await getSession();
+        if (!session?.discordId) {
+            return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
+        }
 
         const url = gvizUrl(SHEET_ID, TAB_NAME);
         const res = await fetch(url, { cache: "no-store" });
@@ -112,6 +119,12 @@ export async function GET(
         data["Orgs"] = data["Orgs"] || data["Affiliation"];
         data["Skills"] = data["Skills"] || data["Specialties"];
         data["DiscordID"] = data["DiscordID"] || data["Discord"] || data["DiscordId"] || data["discordid"];
+
+        // Verify ownership: user can only view their own data
+        const memberDiscordId = String(data["DiscordID"] || "").trim();
+        if (memberDiscordId && memberDiscordId !== session.discordId) {
+            return NextResponse.json({ error: "Forbidden: You can only view your own data" }, { status: 403 });
+        }
 
         return NextResponse.json(data);
     } catch (err: any) {
