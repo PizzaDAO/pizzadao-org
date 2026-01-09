@@ -227,7 +227,17 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                 {/* Main Card */}
                 <div style={card()}>
-                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                        <Link href="/pep" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6
+                        }}>
+                            $PEP Economy
+                        </Link>
                         <Link href={`/?edit=1&memberId=${idValue}`} style={{
                             ...btn("primary"),
                             fontSize: 14,
