@@ -71,11 +71,16 @@ export async function getSession(): Promise<Session | null> {
 
 /**
  * Cookie options for setting the session
+ * Pass the request to properly detect HTTPS in production environments
  */
-export function getSessionCookieOptions() {
+export function getSessionCookieOptions(req?: Request) {
+    // Detect secure context from NODE_ENV or x-forwarded-proto header
+    const isSecure = process.env.NODE_ENV === "production" ||
+        req?.headers.get("x-forwarded-proto") === "https";
+
     return {
         httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
+        secure: isSecure,
         sameSite: "lax" as const,
         path: "/",
         maxAge: 60 * 60 * 24 * 30, // 30 days
