@@ -1,6 +1,6 @@
 // app/api/discord/callback/route.ts
 import { NextResponse } from "next/server";
-import { signSession, COOKIE_NAME, getSessionCookieOptions } from "@/app/lib/session";
+import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 
@@ -46,27 +46,37 @@ async function addUserToGuild(discordUserId: string, userAccessToken: string) {
     body: JSON.stringify({ access_token: userAccessToken }),
   });
 
+  // Success cases
   if (r.status === 201 || r.status === 204) return { joined: true };
 
+  // Try to interpret body (Discord often returns JSON error payloads)
   const text = await r.text();
   let data: any = null;
   try {
     data = JSON.parse(text);
   } catch { }
 
+  // Defensive: if Discord says "already a member", treat as joined.
+  // (Some endpoints use code 30007; keeping this tolerant.)
   const msg = String(data?.message ?? text ?? "");
   const code = data?.code;
   const looksAlreadyMember =
-    code === 30007 || /already.*member/i.test(msg) || /member.*exists/i.test(msg);
+    code === 30007 ||
+    /already.*member/i.test(msg) ||
+    /member.*exists/i.test(msg);
 
   if (looksAlreadyMember) return { joined: true };
 
   throw new Error(`guilds.join failed (${r.status}): ${text}`);
 }
 
+
 interface GuildMember {
   nick?: string;
-  user?: { global_name?: string; username: string };
+  user?: {
+    global_name?: string;
+    username: string;
+  };
 }
 
 async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
@@ -77,6 +87,21 @@ async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
   });
   if (!r.ok) return null;
   return await r.json();
+}
+
+// Check if user already has a member ID in the sheet (via member-lookup)
+async function checkExistingMember(discordId: string, origin: string): Promise<{ memberId?: string; name?: string } | null> {
+  try {
+    const res = await fetch(`${origin}/api/member-lookup/${discordId}`, { cache: "no-store" });
+    if (!res.ok) return null;
+    const data = await res.json();
+    if (data?.memberId) {
+      return { memberId: data.memberId, name: data.name };
+    }
+    return null;
+  } catch {
+    return null;
+  }
 }
 
 export async function GET(req: Request) {
@@ -95,43 +120,24 @@ export async function GET(req: Request) {
 
     const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
 
-    // ✅ Set signed session cookie (works on localhost + prod)
-    const ttlSeconds = 60 * 60 * 24 * 14; // 14 days
-    const signed = signSession(
-      { discordId: me.id, username: me.username, nick },
-      ttlSeconds
-    );
+    // Create session token
+    const sessionToken = createSessionToken({
+      discordId: me.id,
+      username: me.username,
+      nick: nick,
+      createdAt: Date.now(),
+    });
 
-    // ✅ Check if member already exists - redirect directly to dashboard
+    // Check if user already has a member record
+    const existingMember = await checkExistingMember(me.id, url.origin);
+
+    // Build redirect URL
     let redirectUrl: URL;
-    try {
-      const lookupUrl = new URL(`/api/member-lookup/${me.id}`, url.origin);
-      if (nick) lookupUrl.searchParams.set("searchName", nick);
-      const lookupRes = await fetch(lookupUrl.toString());
-
-      if (lookupRes.ok) {
-        const data = await lookupRes.json();
-        if (data.found && data.memberId) {
-          // Member exists - redirect directly to dashboard
-          redirectUrl = new URL(`/dashboard/${data.memberId}`, url.origin);
-        } else {
-          // Not found - go to home page for onboarding
-          redirectUrl = new URL("/", url.origin);
-          redirectUrl.searchParams.set("discordId", me.id);
-          if (state) redirectUrl.searchParams.set("sessionId", state);
-          redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
-          if (nick) redirectUrl.searchParams.set("discordNick", nick);
-        }
-      } else {
-        // Lookup failed - go to home page
-        redirectUrl = new URL("/", url.origin);
-        redirectUrl.searchParams.set("discordId", me.id);
-        if (state) redirectUrl.searchParams.set("sessionId", state);
-        redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
-        if (nick) redirectUrl.searchParams.set("discordNick", nick);
-      }
-    } catch {
-      // Error - fall back to home page
+    if (existingMember?.memberId) {
+      // Existing member - go directly to dashboard
+      redirectUrl = new URL(`/dashboard/${existingMember.memberId}`, url.origin);
+    } else {
+      // New user - go to home page with params
       redirectUrl = new URL("/", url.origin);
       redirectUrl.searchParams.set("discordId", me.id);
       if (state) redirectUrl.searchParams.set("sessionId", state);
@@ -139,8 +145,10 @@ export async function GET(req: Request) {
       if (nick) redirectUrl.searchParams.set("discordNick", nick);
     }
 
+    // Create response and set session cookie
     const res = NextResponse.redirect(redirectUrl.toString());
-    res.cookies.set(COOKIE_NAME, signed, getSessionCookieOptions(ttlSeconds));
+    res.cookies.set(COOKIE_NAME, sessionToken, getSessionCookieOptions());
+
     return res;
   } catch (e: any) {
     return NextResponse.json({ error: e?.message || "Discord callback failed" }, { status: 500 });

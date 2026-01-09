@@ -1,13 +1,10 @@
 // app/api/me/route.ts
+// Returns the current session info for the authenticated user
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 
-/**
- * Returns the current user's session info.
- * Used by frontend to check auth state and get discordId.
- */
 export async function GET() {
     const session = await getSession();
 

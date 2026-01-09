@@ -1,93 +1,67 @@
 // app/lib/session.ts
-import crypto from "crypto";
-import type { CookieSerializeOptions } from "cookie";
+// Secure session handling with signed cookies
 import { cookies } from "next/headers";
+import { createHmac } from "crypto";
 
-type Session = {
+const COOKIE_NAME = "pizzadao_session";
+const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-in-production";
+
+export interface Session {
     discordId: string;
     username?: string;
     nick?: string;
-    iat: number; // issued-at epoch seconds
-    exp: number; // expiry epoch seconds
-};
-
-export const COOKIE_NAME = "pizzadao_session";
+    createdAt: number;
+}
 
 /**
- * Base64URL helpers (Node 18+)
+ * Sign a payload with HMAC-SHA256
  */
-function b64urlEncode(buf: Buffer) {
-    return buf
-        .toString("base64")
-        .replace(/=/g, "")
-        .replace(/\+/g, "-")
-        .replace(/\//g, "_");
-}
-function b64urlDecode(s: string) {
-    s = s.replace(/-/g, "+").replace(/_/g, "/");
-    const pad = s.length % 4;
-    if (pad) s += "=".repeat(4 - pad);
-    return Buffer.from(s, "base64");
+function sign(payload: string): string {
+    const hmac = createHmac("sha256", SESSION_SECRET);
+    hmac.update(payload);
+    return hmac.digest("base64url");
 }
 
-function hmac(secret: string, data: string) {
-    return crypto.createHmac("sha256", secret).update(data).digest();
+/**
+ * Create a signed session token
+ */
+export function createSessionToken(session: Session): string {
+    const payload = Buffer.from(JSON.stringify(session)).toString("base64url");
+    const signature = sign(payload);
+    return `${payload}.${signature}`;
 }
 
-export function signSession(
-    session: Omit<Session, "iat" | "exp">,
-    ttlSeconds = 60 * 60 * 24 * 14
-) {
-    const secret = process.env.SESSION_SECRET;
-    if (!secret) throw new Error("Missing SESSION_SECRET");
-
-    const now = Math.floor(Date.now() / 1000);
-    const payload: Session = {
-        ...session,
-        iat: now,
-        exp: now + ttlSeconds,
-    };
-
-    const payloadB64 = b64urlEncode(Buffer.from(JSON.stringify(payload), "utf8"));
-    const sig = b64urlEncode(hmac(secret, payloadB64));
-    return `${payloadB64}.${sig}`;
-}
-
-export function verifySession(token: string | undefined | null): Session | null {
+/**
+ * Verify and decode a session token
+ */
+export function verifySession(token: string | undefined): Session | null {
     if (!token) return null;
-    const secret = process.env.SESSION_SECRET;
-    if (!secret) return null;
 
     const parts = token.split(".");
     if (parts.length !== 2) return null;
 
-    const [payloadB64, sigB64] = parts;
+    const [payload, signature] = parts;
+    const expectedSignature = sign(payload);
 
-    // Verify signature
-    const expected = b64urlEncode(hmac(secret, payloadB64));
-    const a = Buffer.from(expected, "utf8");
-    const b = Buffer.from(sigB64, "utf8");
-    if (a.length !== b.length) return null;
-    if (!crypto.timingSafeEqual(a, b)) return null;
+    // Constant-time comparison to prevent timing attacks
+    if (signature.length !== expectedSignature.length) return null;
+    let mismatch = 0;
+    for (let i = 0; i < signature.length; i++) {
+        mismatch |= signature.charCodeAt(i) ^ expectedSignature.charCodeAt(i);
+    }
+    if (mismatch !== 0) return null;
 
-    // Parse + expiry
-    let payload: Session;
     try {
-        payload = JSON.parse(b64urlDecode(payloadB64).toString("utf8"));
+        const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf-8"));
+        if (!decoded.discordId) return null;
+        return decoded as Session;
     } catch {
         return null;
     }
-
-    const now = Math.floor(Date.now() / 1000);
-    if (!payload?.discordId) return null;
-    if (typeof payload.exp !== "number" || payload.exp < now) return null;
-
-    return payload;
 }
 
 /**
- * Read session from the httpOnly cookie in App Router handlers.
- * Note: In Next.js 15+, cookies() is async.
+ * Get the current session from cookies (async for Next.js 15+)
  */
 export async function getSession(): Promise<Session | null> {
     const cookieStore = await cookies();
@@ -96,18 +70,16 @@ export async function getSession(): Promise<Session | null> {
 }
 
 /**
- * Cookie settings that work on localhost AND production.
- * - On localhost (http): secure=false, sameSite=lax
- * - On prod (https): secure=true, sameSite=lax
+ * Cookie options for setting the session
  */
-export function getSessionCookieOptions(maxAgeSeconds: number): CookieSerializeOptions {
-    const isProd = process.env.NODE_ENV === "production";
-
+export function getSessionCookieOptions() {
     return {
         httpOnly: true,
-        secure: isProd, // IMPORTANT: must be false on http://localhost
-        sameSite: "lax", // IMPORTANT: works with OAuth redirects
+        secure: process.env.NODE_ENV === "production",
+        sameSite: "lax" as const,
         path: "/",
-        maxAge: maxAgeSeconds,
+        maxAge: 60 * 60 * 24 * 30, // 30 days
     };
 }
+
+export { COOKIE_NAME };

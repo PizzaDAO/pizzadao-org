@@ -305,7 +305,7 @@ export async function POST(req: Request) {
       crews: crewsArr,
       memberId,
 
-      // ✅ Identity comes from cookie session, never from client body
+      // Identity comes from cookie session, never from client body
       discordId: clampStr(session.discordId, 64),
       discordJoined: clampBool(body.discordJoined),
 
@@ -343,7 +343,7 @@ export async function POST(req: Request) {
     }
 
     /**
-     * ✅ Authorization: if updating a specific memberId, enforce ownership
+     * Authorization: if updating a specific memberId, enforce ownership
      * Only the Discord user recorded on that row may edit it.
      */
     if (payload.memberId) {
