@@ -51,8 +51,8 @@ export default function AdminPollsPage() {
       setIsAdmin(true)
       const data = await res.json()
       setPolls(data)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e: unknown) {
+      setError(e instanceof Error ? e.message : 'An error occurred')
     } finally {
       setLoading(false)
     }
@@ -86,8 +86,8 @@ export default function AdminPollsPage() {
       setShowForm(false)
       setQuestion('')
       setOptions(['', ''])
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'An error occurred')
     } finally {
       setCreating(false)
     }
@@ -108,8 +108,8 @@ export default function AdminPollsPage() {
 
       const updated = await res.json()
       setPolls(polls.map(p => (p.id === pollId ? { ...p, ...updated } : p)))
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'An error occurred')
     }
   }
 
@@ -123,8 +123,8 @@ export default function AdminPollsPage() {
         throw new Error(data.error || 'Failed to delete poll')
       }
       setPolls(polls.filter(p => p.id !== pollId))
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert(e instanceof Error ? e.message : 'An error occurred')
     }
   }
 

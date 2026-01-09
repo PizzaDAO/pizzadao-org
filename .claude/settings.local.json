@@ -1,14 +1,18 @@
 {
   "permissions": {
     "allow": [
-      "Bash(dir:*)",
-      "Bash(npm show:*)",
-      "Bash(test:*)",
+      "Bash(npx tsc:*)",
       "Bash(npm run build:*)",
-      "Bash(taskkill:*)",
+      "Bash(npm install:*)",
+      "Bash(npm run dev:*)",
+      "Bash(curl:*)",
+      "Bash(git checkout:*)",
+      "Bash(npx prisma:*)",
+      "Bash(openssl genpkey:*)",
+      "Bash(openssl rsa:*)",
       "Bash(git add:*)",
       "Bash(git stash:*)",
-      "Bash(git commit:*)"
+      "Bash(git merge:*)"
     ]
   }
 }

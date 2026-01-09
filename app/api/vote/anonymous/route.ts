@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Verification error:', e)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }

@@ -1,16 +1,50 @@
 import { RSABSSA } from '@cloudflare/blindrsa-ts'
 
-// Use SHA-384 with PSS padding, randomized for extra security
-const suite = RSABSSA.SHA384.PSS.Randomized()
+// Get suite instance
+function getSuite() {
+  return RSABSSA.SHA384.PSS.Randomized()
+}
+
+// Convert PEM to ArrayBuffer
+function pemToArrayBuffer(pem: string, type: 'public' | 'private'): ArrayBuffer {
+  const header = type === 'public' ? '-----BEGIN PUBLIC KEY-----' : '-----BEGIN PRIVATE KEY-----'
+  const footer = type === 'public' ? '-----END PUBLIC KEY-----' : '-----END PRIVATE KEY-----'
+
+  const pemContents = pem
+    .replace(header, '')
+    .replace(footer, '')
+    .replace(/\s/g, '')
+
+  const binaryString = atob(pemContents)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+  return bytes.buffer
+}
 
 // Server-side: Import private key for signing
-export async function importPrivateKey(pemKey: string) {
-  return suite.importKey(pemKey, 'private')
+export async function importPrivateKey(pemKey: string): Promise<CryptoKey> {
+  const keyData = pemToArrayBuffer(pemKey, 'private')
+  return crypto.subtle.importKey(
+    'pkcs8',
+    keyData,
+    { name: 'RSA-PSS', hash: 'SHA-384' },
+    true,
+    ['sign']
+  )
 }
 
 // Server-side: Import public key for verification
-export async function importPublicKey(pemKey: string) {
-  return suite.importKey(pemKey, 'public')
+export async function importPublicKey(pemKey: string): Promise<CryptoKey> {
+  const keyData = pemToArrayBuffer(pemKey, 'public')
+  return crypto.subtle.importKey(
+    'spki',
+    keyData,
+    { name: 'RSA-PSS', hash: 'SHA-384' },
+    true,
+    ['verify']
+  )
 }
 
 // Server-side: Sign a blinded message
@@ -18,6 +52,7 @@ export async function blindSign(
   privateKey: CryptoKey,
   blindedMessage: Uint8Array
 ): Promise<Uint8Array> {
+  const suite = getSuite()
   return suite.blindSign(privateKey, blindedMessage)
 }
 
@@ -27,36 +62,12 @@ export async function verify(
   signature: Uint8Array,
   message: Uint8Array
 ): Promise<boolean> {
+  const suite = getSuite()
   try {
-    await suite.verify(publicKey, signature, message)
-    return true
+    return await suite.verify(publicKey, signature, message)
   } catch {
     return false
   }
-}
-
-// Client-side: Prepare a message for blinding
-export async function prepareMessage(message: string): Promise<Uint8Array> {
-  return suite.prepare(new TextEncoder().encode(message))
-}
-
-// Client-side: Blind a prepared message
-export async function blind(
-  publicKey: CryptoKey,
-  preparedMessage: Uint8Array
-): Promise<{ blindedMessage: Uint8Array; blindInverse: Uint8Array }> {
-  const [blindedMessage, blindInverse] = await suite.blind(publicKey, preparedMessage)
-  return { blindedMessage, blindInverse }
-}
-
-// Client-side: Finalize (unblind) a signature
-export async function finalize(
-  publicKey: CryptoKey,
-  preparedMessage: Uint8Array,
-  blindedSignature: Uint8Array,
-  blindInverse: Uint8Array
-): Promise<Uint8Array> {
-  return suite.finalize(publicKey, preparedMessage, blindedSignature, blindInverse)
 }
 
 // Utility: Convert Uint8Array to base64 string

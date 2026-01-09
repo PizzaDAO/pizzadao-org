@@ -2,16 +2,41 @@
 
 import { RSABSSA } from '@cloudflare/blindrsa-ts'
 
-// Use SHA-384 with PSS padding, randomized for extra security
-const suite = RSABSSA.SHA384.PSS.Randomized()
+// Get suite instance
+function getSuite() {
+  return RSABSSA.SHA384.PSS.Randomized()
+}
+
+// Convert PEM to ArrayBuffer (browser-compatible)
+function pemToArrayBuffer(pem: string): ArrayBuffer {
+  const pemContents = pem
+    .replace(/-----BEGIN PUBLIC KEY-----/, '')
+    .replace(/-----END PUBLIC KEY-----/, '')
+    .replace(/\s/g, '')
+
+  const binaryString = atob(pemContents)
+  const bytes = new Uint8Array(binaryString.length)
+  for (let i = 0; i < binaryString.length; i++) {
+    bytes[i] = binaryString.charCodeAt(i)
+  }
+  return bytes.buffer
+}
 
 // Import public key for blinding operations
-export async function importPublicKey(pemKey: string) {
-  return suite.importKey(pemKey, 'public')
+export async function importPublicKey(pemKey: string): Promise<CryptoKey> {
+  const keyData = pemToArrayBuffer(pemKey)
+  return crypto.subtle.importKey(
+    'spki',
+    keyData,
+    { name: 'RSA-PSS', hash: 'SHA-384' },
+    true,
+    ['verify']
+  )
 }
 
 // Prepare a message for blinding
-export async function prepareMessage(message: string): Promise<Uint8Array> {
+export function prepareMessage(message: string): Uint8Array {
+  const suite = getSuite()
   return suite.prepare(new TextEncoder().encode(message))
 }
 
@@ -20,8 +45,12 @@ export async function blind(
   publicKey: CryptoKey,
   preparedMessage: Uint8Array
 ): Promise<{ blindedMessage: Uint8Array; blindInverse: Uint8Array }> {
-  const [blindedMessage, blindInverse] = await suite.blind(publicKey, preparedMessage)
-  return { blindedMessage, blindInverse }
+  const suite = getSuite()
+  const result = await suite.blind(publicKey, preparedMessage)
+  return {
+    blindedMessage: result.blindedMsg,
+    blindInverse: result.inv,
+  }
 }
 
 // Finalize (unblind) a signature to get the final valid signature
@@ -31,6 +60,7 @@ export async function finalize(
   blindedSignature: Uint8Array,
   blindInverse: Uint8Array
 ): Promise<Uint8Array> {
+  const suite = getSuite()
   return suite.finalize(publicKey, preparedMessage, blindedSignature, blindInverse)
 }
 

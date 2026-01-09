@@ -88,7 +88,7 @@ export async function POST(req: Request, { params }: Params) {
     return NextResponse.json({
       blindSignature: toBase64(blindSig),
     })
-  } catch (e: any) {
+  } catch (e: unknown) {
     console.error('Signing error:', e)
     return NextResponse.json(
       { error: 'Failed to sign token' },
