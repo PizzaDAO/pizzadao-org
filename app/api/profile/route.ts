@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
+import { sendWelcomeMessage } from "@/app/lib/discord-webhook";
 
 export const runtime = "nodejs";
 
@@ -200,6 +201,7 @@ export async function writeToSheet(payload: any) {
   const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   if (!url) throw new Error("Missing Sheets webapp env vars");
 
+  console.log("[writeToSheet] Calling:", url);
   const sheetRes = await fetch(url, {
     method: "POST",
     headers: { "Content-Type": "application/json" },
@@ -207,12 +209,14 @@ export async function writeToSheet(payload: any) {
   });
 
   const text = await sheetRes.text();
+  console.log("[writeToSheet] Response status:", sheetRes.status, "text length:", text.length);
   let parsed: any = null;
   try {
     parsed = JSON.parse(text);
   } catch { }
 
   if (!sheetRes.ok || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
+    console.error("[writeToSheet] Error:", parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text);
     throw new Error(JSON.stringify(parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text));
   }
   return parsed;
@@ -258,11 +262,20 @@ export async function POST(req: Request) {
     }
 
     const session = await getSession();
+    console.log("[profile] Session check:", { hasSession: !!session, discordId: session?.discordId });
     if (!session?.discordId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await req.json();
+    console.log("[profile] Received body:", {
+      mafiaName: body.mafiaName,
+      city: body.city,
+      topping: body.topping,
+      crews: body.crews,
+      turtles: body.turtles,
+      memberId: body.memberId,
+    });
 
     // Get submitted turtles from form
     const submittedTurtles = Array.isArray(body.turtles)
@@ -333,6 +346,7 @@ export async function POST(req: Request) {
 
     // Basic validation (create + update should both require a name)
     if (!payload.mafiaName) {
+      console.log("[profile] Validation failed: missing mafiaName");
       return NextResponse.json(
         {
           error: "Missing required fields.",
@@ -347,42 +361,50 @@ export async function POST(req: Request) {
     /**
      * Authorization: if updating a specific memberId, enforce ownership
      * Only the Discord user recorded on that row may edit it.
+     *
+     * For NEW signups: memberId is provided but row doesn't exist yet - this is allowed
+     * For UPDATES: memberId exists in sheet - verify the discordId matches
      */
+    let isNewSignup = true; // Track if this is a new signup (for welcome message)
     if (payload.memberId) {
       const row = await fetchMemberRowById(payload.memberId);
-      if (!row) {
-        return NextResponse.json({ error: `Member ID ${payload.memberId} not found` }, { status: 404 });
-      }
 
-      const sheetDiscord = String(row.discordId || "").trim();
-      if (!sheetDiscord) {
-        return NextResponse.json(
-          { error: "Member is not claimed yet. Use the claim flow first." },
-          { status: 403 }
-        );
-      }
+      if (row) {
+        // Row exists - this is an UPDATE, verify ownership
+        isNewSignup = false;
+        const sheetDiscord = String(row.discordId || "").trim();
+        if (!sheetDiscord) {
+          return NextResponse.json(
+            { error: "Member is not claimed yet. Use the claim flow first." },
+            { status: 403 }
+          );
+        }
 
-      if (sheetDiscord !== payload.discordId) {
-        return NextResponse.json({ error: "Forbidden: cannot edit another member" }, { status: 403 });
-      }
+        if (sheetDiscord !== payload.discordId) {
+          return NextResponse.json({ error: "Forbidden: cannot edit another member" }, { status: 403 });
+        }
 
-      // Optional safety: prevent blank-overwrite updates
-      // (Adjust if you want to allow clearing fields explicitly)
-      const hasAnyUpdateField =
-        Boolean(payload.city) || payload.turtles.length > 0 || payload.crews.length > 0 || Boolean(payload.topping);
-      if (!hasAnyUpdateField) {
-        return NextResponse.json(
-          { error: "No update fields provided." },
-          { status: 400 }
-        );
+        // Optional safety: prevent blank-overwrite updates
+        const hasAnyUpdateField =
+          Boolean(payload.city) || payload.turtles.length > 0 || payload.crews.length > 0 || Boolean(payload.topping);
+        if (!hasAnyUpdateField) {
+          return NextResponse.json(
+            { error: "No update fields provided." },
+            { status: 400 }
+          );
+        }
       }
+      // If row doesn't exist, it's a NEW signup with a chosen memberId - allow it to proceed
     }
 
     // 1) Write to Sheets
     let parsed: any;
     try {
+      console.log("[profile] Writing to sheet with payload keys:", Object.keys(payload));
       parsed = await writeToSheet(payload);
+      console.log("[profile] Sheet write result:", parsed);
     } catch (e: any) {
+      console.error("[profile] Sheet write failed:", e?.message ?? String(e));
       return NextResponse.json(
         {
           error: "Failed to save profile",
@@ -441,7 +463,22 @@ export async function POST(req: Request) {
       }
     }
 
-    return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed });
+    // 3) Send welcome message to Discord for NEW signups (not updates)
+    let welcomeResult: any = null;
+    if (isNewSignup && payload.discordId) {
+      welcomeResult = await sendWelcomeMessage({
+        discordId: payload.discordId,
+        memberId: payload.memberId,
+        mafiaName: payload.mafiaName,
+        city: payload.city,
+        topping: payload.topping,
+        mafiaMovie: payload.resolvedMovieTitle || payload.mafiaMovieTitle,
+        turtles: payload.turtles,
+        crews: payload.crews,
+      });
+    }
+
+    return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult });
   } catch (err: any) {
     return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
   }
