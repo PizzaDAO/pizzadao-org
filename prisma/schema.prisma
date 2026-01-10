@@ -114,3 +114,85 @@ enum PollStatus {
   OPEN
   CLOSED
 }
+
+// ============================================
+// ANONYMOUS VOTING (Semaphore)
+// ============================================
+
+// Semaphore group for anonymous voting
+model SemaphoreGroup {
+  id              String                  @id @default(cuid())
+  name            String
+  discordRoleId   String
+  discordRoleName String
+  category        VotingCategory          @default(ALL)
+  merkleRoot      String                  // Current Merkle tree root
+  memberCount     Int                     @default(0)
+  createdAt       DateTime                @default(now())
+  updatedAt       DateTime                @updatedAt
+  members         SemaphoreGroupMember[]
+  polls           AnonPoll[]
+
+  @@unique([discordRoleId, category])
+}
+
+// Group member (stores identity commitments)
+model SemaphoreGroupMember {
+  id         String         @id @default(cuid())
+  groupId    String
+  commitment String         // The identity commitment (public)
+  index      Int            // Position in Merkle tree
+  createdAt  DateTime       @default(now())
+  group      SemaphoreGroup @relation(fields: [groupId], references: [id], onDelete: Cascade)
+
+  @@unique([groupId, commitment])
+  @@index([groupId, index])
+}
+
+// Anonymous poll using Semaphore proofs
+model AnonPoll {
+  id          String                @id @default(cuid())
+  question    String
+  description String?
+  options     Json                  // Array of option strings
+  groupId     String                // Which Semaphore group can vote
+  category    VotingCategory        @default(ALL)
+  status      PollStatus            @default(DRAFT)
+  createdBy   String                // Admin who created it
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+  closesAt    DateTime?
+  group       SemaphoreGroup        @relation(fields: [groupId], references: [id])
+  nullifiers  AnonVoteNullifier[]
+  results     AnonPollResult[]
+}
+
+// Nullifiers to prevent double voting
+model AnonVoteNullifier {
+  id          String   @id @default(cuid())
+  pollId      String
+  nullifier   String   // The nullifier hash from the proof
+  optionIndex Int      // Which option was voted for
+  createdAt   DateTime @default(now())
+  poll        AnonPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@unique([pollId, nullifier])
+}
+
+// Vote tallies per option
+model AnonPollResult {
+  pollId      String
+  optionIndex Int
+  count       Int      @default(0)
+  poll        AnonPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+
+  @@id([pollId, optionIndex])
+}
+
+enum VotingCategory {
+  TREASURY
+  TECHNICAL
+  SOCIAL
+  GOVERNANCE
+  ALL
+}

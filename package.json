@@ -3,8 +3,9 @@
   "version": "0.1.0",
   "private": true,
   "scripts": {
-    "dev": "next dev",
-    "build": "prisma generate && next build",
+    "dev": "next dev --turbo",
+    "dev:webpack": "next dev --webpack",
+    "build": "prisma generate && next build --webpack",
     "start": "next start",
     "lint": "eslint",
     "postinstall": "prisma generate"
@@ -16,6 +17,10 @@
     "@prisma/client": "^7.2.0",
     "@privy-io/node": "^0.7.0",
     "@privy-io/react-auth": "^3.10.1",
+    "@semaphore-protocol/core": "^4.14.0",
+    "@semaphore-protocol/group": "^4.14.0",
+    "@semaphore-protocol/identity": "^4.14.0",
+    "@semaphore-protocol/proof": "^4.14.0",
     "@vercel/postgres": "^0.10.0",
     "cheerio": "^1.1.2",
     "googleapis": "^169.0.0",
