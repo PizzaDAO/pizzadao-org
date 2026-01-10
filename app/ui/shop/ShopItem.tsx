@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { PepAmount } from "../economy/PepIcon";
 
 type Item = {
   id: number;
@@ -91,7 +92,7 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
     <div style={card()}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
         <h3 style={{ fontWeight: 700, fontSize: 16, margin: 0 }}>{item.name}</h3>
-        <span style={{ fontWeight: 700, color: "#16a34a" }}>{item.priceFormatted}</span>
+        <span style={{ fontWeight: 700, color: "#16a34a" }}><PepAmount amount={item.price} size={14} /></span>
       </div>
 
       {item.description && (

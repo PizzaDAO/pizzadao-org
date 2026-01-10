@@ -11,10 +11,8 @@ export async function GET() {
       leaderboard: leaderboard.map((entry, index) => ({
         rank: index + 1,
         userId: entry.userId,
-        wallet: entry.wallet,
-        bank: entry.bank,
-        total: entry.total,
-        formatted: formatCurrency(entry.total)
+        balance: entry.balance,
+        formatted: formatCurrency(entry.balance)
       }))
     })
   } catch (error) {

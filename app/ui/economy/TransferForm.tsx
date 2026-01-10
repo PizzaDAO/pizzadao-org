@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
+import { PepIcon } from "./PepIcon";
 
 type TransferFormProps = {
   onSuccess?: () => void;
@@ -83,7 +84,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
 
   return (
     <div style={card()}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>Send $PEP</h2>
+      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0, display: "flex", alignItems: "center", gap: 6 }}>Send <PepIcon size={18} /></h2>
 
       {error && (
         <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
@@ -130,7 +131,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
           disabled={loading || !toUserId || !amount}
           style={btn(loading || !toUserId || !amount)}
         >
-          {loading ? "Sending..." : "Send $PEP"}
+          {loading ? "Sending..." : <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Send <PepIcon size={14} /></span>}
         </button>
       </form>
     </div>

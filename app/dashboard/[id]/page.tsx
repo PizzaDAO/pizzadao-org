@@ -5,6 +5,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { Inter, Outfit } from "next/font/google"; // Keep fonts if needed, or use defaults
 import { TURTLES, CREWS } from "../../ui/constants";
+import { PepIcon, PepAmount } from "../../ui/economy";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -51,6 +52,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const [error, setError] = useState<string | null>(null);
     const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
     const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
+    const [pepBalance, setPepBalance] = useState<number | null>(null);
 
     // New state for rich crew data
     const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -125,6 +127,19 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 }
             } catch (e) {
                 console.error("Failed to fetch personalized tasks", e);
+            }
+        })();
+
+        // Fetch $PEP balance
+        (async () => {
+            try {
+                const res = await fetch("/api/economy/balance");
+                if (res.ok) {
+                    const json = await res.json();
+                    setPepBalance(json.balance);
+                }
+            } catch (e) {
+                console.error("Failed to fetch $PEP balance", e);
             }
         })();
 
@@ -236,7 +251,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             alignItems: "center",
                             gap: 6
                         }}>
-                            $PEP Economy
+                            <PepIcon size={16} /> Economy
                         </Link>
                         <Link href={`/?edit=1&memberId=${idValue}`} style={{
                             ...btn("primary"),
@@ -250,6 +265,30 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                         <StatItem label="Name" value={name} />
+                        <div>
+                            <h3 style={{
+                                fontSize: 12,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                                opacity: 0.5,
+                                marginTop: 0,
+                                marginBottom: 6,
+                                fontWeight: 700,
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 4
+                            }}>
+                                <PepIcon size={12} /> Balance
+                            </h3>
+                            <p style={{
+                                fontSize: 24,
+                                fontWeight: 700,
+                                margin: 0,
+                                color: "#16a34a"
+                            }}>
+                                {pepBalance !== null ? <PepAmount amount={pepBalance} size={20} /> : "—"}
+                            </p>
+                        </div>
                         <StatItem label="City" value={city} />
                         <StatItem label="Status" value={status} />
                         <StatItem label="Orgs" value={orgs} />
@@ -510,7 +549,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     );
 }
 
-function StatItem({ label, value }: { label: string, value: string }) {
+function StatItem({ label, value, highlight }: { label: string, value: string, highlight?: boolean }) {
     return (
         <div>
             <h3 style={{
@@ -525,9 +564,9 @@ function StatItem({ label, value }: { label: string, value: string }) {
                 {label}
             </h3>
             <p style={{
-                fontSize: 18,
-                fontWeight: 500,
-                color: "#111",
+                fontSize: highlight ? 24 : 18,
+                fontWeight: highlight ? 700 : 500,
+                color: highlight ? "#16a34a" : "#111",
                 margin: 0,
                 wordBreak: "break-word"
             }}>

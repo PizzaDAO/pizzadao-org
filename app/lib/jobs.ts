@@ -3,8 +3,105 @@ import { updateWallet } from './economy'
 
 const JOB_REWARD_AMOUNT = parseInt(process.env.JOB_REWARD_AMOUNT || '50', 10)
 const JOBS_SHEET_ID = process.env.JOBS_SHEET_ID
+const DAILY_JOBS_COUNT = 3
 
 export { JOB_REWARD_AMOUNT }
+
+/**
+ * Get the start of the current UTC day
+ */
+function getDayStart(): Date {
+  const now = new Date()
+  return new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()))
+}
+
+/**
+ * Get the start of the next UTC day (reset time)
+ */
+export function getNextResetTime(): Date {
+  const dayStart = getDayStart()
+  return new Date(dayStart.getTime() + 24 * 60 * 60 * 1000)
+}
+
+/**
+ * Check if user has completed a specific job today
+ */
+export async function hasCompletedJobToday(userId: string, jobId: number): Promise<boolean> {
+  const dayStart = getDayStart()
+  const assignment = await prisma.jobAssignment.findFirst({
+    where: {
+      userId,
+      jobId,
+      assignedAt: { gte: dayStart }
+    }
+  })
+  return !!assignment
+}
+
+/**
+ * Get all job IDs the user has completed today
+ */
+export async function getCompletedJobsToday(userId: string): Promise<number[]> {
+  const dayStart = getDayStart()
+  const assignments = await prisma.jobAssignment.findMany({
+    where: {
+      userId,
+      assignedAt: { gte: dayStart }
+    },
+    select: { jobId: true }
+  })
+  return assignments.map(a => a.jobId)
+}
+
+/**
+ * Seeded random number generator for consistent daily selection
+ */
+function seededRandom(seed: number): () => number {
+  return function() {
+    seed = (seed * 1103515245 + 12345) & 0x7fffffff
+    return seed / 0x7fffffff
+  }
+}
+
+/**
+ * Shuffle array with seeded random
+ */
+function shuffleWithSeed<T>(array: T[], seed: number): T[] {
+  const result = [...array]
+  const random = seededRandom(seed)
+  for (let i = result.length - 1; i > 0; i--) {
+    const j = Math.floor(random() * (i + 1))
+    ;[result[i], result[j]] = [result[j], result[i]]
+  }
+  return result
+}
+
+/**
+ * Get daily random jobs (3 jobs, reset every 24 hours UTC)
+ */
+export async function getDailyJobs() {
+  const allJobs = await getJobs()
+
+  if (allJobs.length <= DAILY_JOBS_COUNT) {
+    return {
+      jobs: allJobs,
+      resetAt: getNextResetTime()
+    }
+  }
+
+  // Use day timestamp as seed for consistent selection
+  const dayStart = getDayStart()
+  const seed = dayStart.getTime()
+
+  // Shuffle and take first 3
+  const shuffled = shuffleWithSeed(allJobs, seed)
+  const dailyJobs = shuffled.slice(0, DAILY_JOBS_COUNT)
+
+  return {
+    jobs: dailyJobs,
+    resetAt: getNextResetTime()
+  }
+}
 
 /**
  * Get all jobs with their assignments
@@ -237,6 +334,69 @@ function parseCSVLine(line: string): string[] {
   result.push(current.trim())
 
   return result
+}
+
+/**
+ * Sync jobs from data array (from Google Apps Script webhook)
+ */
+export async function syncJobsFromData(jobs: Array<{ type: string; description: string; sheetRow?: number }>) {
+  if (jobs.length === 0) {
+    return { synced: 0, added: 0, updated: 0 }
+  }
+
+  // Get current jobs
+  const currentJobs = await prisma.job.findMany()
+  const currentByDescription = new Map(currentJobs.map(j => [j.description, j]))
+
+  let added = 0
+  let updated = 0
+  const seenDescriptions = new Set<string>()
+
+  // Add or update jobs
+  for (const job of jobs) {
+    const description = job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())
+    seenDescriptions.add(description)
+
+    const existing = currentByDescription.get(description)
+    if (existing) {
+      // Update if type changed or was inactive
+      if (existing.type !== job.type || !existing.isActive) {
+        await prisma.job.update({
+          where: { id: existing.id },
+          data: { type: job.type, sheetRow: job.sheetRow, isActive: true }
+        })
+        updated++
+      }
+    } else {
+      // Add new job
+      await prisma.job.create({
+        data: {
+          description,
+          type: job.type || 'General',
+          sheetRow: job.sheetRow,
+          isActive: true
+        }
+      })
+      added++
+    }
+  }
+
+  // Deactivate jobs no longer in sheet (only if no assignments)
+  let deactivated = 0
+  for (const job of currentJobs) {
+    if (job.isActive && !seenDescriptions.has(job.description)) {
+      const hasAssignments = await prisma.jobAssignment.count({ where: { jobId: job.id } })
+      if (hasAssignments === 0) {
+        await prisma.job.update({
+          where: { id: job.id },
+          data: { isActive: false }
+        })
+        deactivated++
+      }
+    }
+  }
+
+  return { synced: jobs.length, added, updated, deactivated }
 }
 
 /**

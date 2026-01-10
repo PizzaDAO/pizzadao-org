@@ -63,7 +63,7 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
 
   // Use transaction for atomicity
   await prisma.$transaction(async (tx) => {
-    // Deduct from wallet
+    // Deduct from balance
     await tx.economy.update({
       where: { id: userId },
       data: { wallet: { decrement: totalCost } }
@@ -155,6 +155,92 @@ export async function removeFromInventory(userId: string, itemId: number, quanti
   }
 
   return { success: true }
+}
+
+// ===== Sync from Google Sheets =====
+
+interface ShopItemData {
+  name: string
+  description?: string
+  price: number
+  quantity?: number
+  image?: string
+}
+
+/**
+ * Sync shop items from data array (from Google Apps Script webhook)
+ */
+export async function syncShopItemsFromData(items: ShopItemData[]) {
+  if (items.length === 0) {
+    return { synced: 0, added: 0, updated: 0, deactivated: 0 }
+  }
+
+  // Get current items
+  const currentItems = await prisma.shopItem.findMany()
+  const currentByName = new Map(currentItems.map(i => [i.name, i]))
+
+  let added = 0
+  let updated = 0
+  const seenNames = new Set<string>()
+
+  // Add or update items
+  for (const item of items) {
+    if (!item.name || item.price === undefined) continue
+
+    seenNames.add(item.name)
+    const existing = currentByName.get(item.name)
+
+    if (existing) {
+      // Update if any field changed or was unavailable
+      const needsUpdate =
+        existing.description !== (item.description || null) ||
+        existing.price !== item.price ||
+        existing.quantity !== (item.quantity ?? -1) ||
+        existing.image !== (item.image || null) ||
+        !existing.isAvailable
+
+      if (needsUpdate) {
+        await prisma.shopItem.update({
+          where: { id: existing.id },
+          data: {
+            description: item.description || null,
+            price: item.price,
+            quantity: item.quantity ?? -1,
+            image: item.image || null,
+            isAvailable: true
+          }
+        })
+        updated++
+      }
+    } else {
+      // Add new item
+      await prisma.shopItem.create({
+        data: {
+          name: item.name,
+          description: item.description || null,
+          price: item.price,
+          quantity: item.quantity ?? -1,
+          image: item.image || null,
+          isAvailable: true
+        }
+      })
+      added++
+    }
+  }
+
+  // Deactivate items no longer in sheet
+  let deactivated = 0
+  for (const item of currentItems) {
+    if (item.isAvailable && !seenNames.has(item.name)) {
+      await prisma.shopItem.update({
+        where: { id: item.id },
+        data: { isAvailable: false }
+      })
+      deactivated++
+    }
+  }
+
+  return { synced: items.length, added, updated, deactivated }
 }
 
 // ===== Admin Functions =====

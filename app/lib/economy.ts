@@ -18,8 +18,15 @@ export async function getOrCreateEconomy(userId: string) {
   })
 
   if (!economy) {
+    // Ensure User record exists first (required by foreign key)
+    await prisma.user.upsert({
+      where: { id: userId },
+      create: { id: userId, roles: [] },
+      update: {}
+    })
+
     economy = await prisma.economy.create({
-      data: { id: userId, wallet: 0, bank: 0 }
+      data: { id: userId, wallet: 0 }
     })
   }
 
@@ -27,25 +34,21 @@ export async function getOrCreateEconomy(userId: string) {
 }
 
 /**
- * Get user's balance (wallet + bank)
+ * Get user's balance
  */
 export async function getBalance(userId: string) {
   const economy = await getOrCreateEconomy(userId)
-  return {
-    wallet: economy.wallet,
-    bank: economy.bank,
-    total: economy.wallet + economy.bank
-  }
+  return { balance: economy.wallet }
 }
 
 /**
- * Add or subtract from user's wallet
+ * Add or subtract from user's balance
  */
-export async function updateWallet(userId: string, amount: number) {
+export async function updateBalance(userId: string, amount: number) {
   const economy = await getOrCreateEconomy(userId)
 
   if (economy.wallet + amount < 0) {
-    throw new Error('Insufficient funds in wallet')
+    throw new Error('Insufficient funds')
   }
 
   return prisma.economy.update({
@@ -53,6 +56,9 @@ export async function updateWallet(userId: string, amount: number) {
     data: { wallet: economy.wallet + amount }
   })
 }
+
+// Alias for backward compatibility
+export const updateWallet = updateBalance
 
 /**
  * Transfer currency between users
@@ -70,7 +76,7 @@ export async function transfer(fromId: string, toId: string, amount: number) {
   await getOrCreateEconomy(toId) // Ensure recipient exists
 
   if (fromEconomy.wallet < amount) {
-    throw new Error('Insufficient funds in wallet')
+    throw new Error('Insufficient funds')
   }
 
   // Use transaction to ensure atomicity
@@ -89,81 +95,24 @@ export async function transfer(fromId: string, toId: string, amount: number) {
 }
 
 /**
- * Deposit from wallet to bank
- */
-export async function deposit(userId: string, amount: number) {
-  if (amount <= 0) {
-    throw new Error('Amount must be positive')
-  }
-
-  const economy = await getOrCreateEconomy(userId)
-
-  if (economy.wallet < amount) {
-    throw new Error('Insufficient funds in wallet')
-  }
-
-  return prisma.economy.update({
-    where: { id: userId },
-    data: {
-      wallet: { decrement: amount },
-      bank: { increment: amount }
-    }
-  })
-}
-
-/**
- * Withdraw from bank to wallet
- */
-export async function withdraw(userId: string, amount: number) {
-  if (amount <= 0) {
-    throw new Error('Amount must be positive')
-  }
-
-  const economy = await getOrCreateEconomy(userId)
-
-  if (economy.bank < amount) {
-    throw new Error('Insufficient funds in bank')
-  }
-
-  return prisma.economy.update({
-    where: { id: userId },
-    data: {
-      bank: { decrement: amount },
-      wallet: { increment: amount }
-    }
-  })
-}
-
-/**
- * Get leaderboard (top users by total balance)
+ * Get leaderboard (top users by balance)
  */
 export async function getLeaderboard(limit = 10) {
   const economies = await prisma.economy.findMany({
-    orderBy: [
-      { wallet: 'desc' },
-      { bank: 'desc' }
-    ],
-    take: limit * 2 // Fetch more to sort properly
+    orderBy: { wallet: 'desc' },
+    take: limit
   })
 
-  // Sort by total and take top N
-  return economies
-    .map(e => ({
-      userId: e.id,
-      wallet: e.wallet,
-      bank: e.bank,
-      total: e.wallet + e.bank
-    }))
-    .sort((a, b) => b.total - a.total)
-    .slice(0, limit)
+  return economies.map(e => ({
+    userId: e.id,
+    balance: e.wallet
+  }))
 }
 
 /**
  * Check if user is onboarded (has completed profile)
- * This checks if user exists in Google Sheets via member lookup
  */
 export async function isOnboarded(userId: string): Promise<boolean> {
-  // Check if user has a User record (authenticated via Discord)
   const user = await prisma.user.findUnique({
     where: { id: userId }
   })

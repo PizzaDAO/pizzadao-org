@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { withdraw, requireOnboarded, formatCurrency, getBalance } from '@/app/lib/economy'
+import { claimBounty } from '@/app/lib/bounties'
+import { requireOnboarded } from '@/app/lib/economy'
 
 export const runtime = 'nodejs'
 
@@ -15,20 +16,22 @@ export async function POST(request: NextRequest) {
     await requireOnboarded(session.discordId)
 
     const body = await request.json()
-    const { amount } = body
+    const { bountyId } = body
 
-    if (!amount || typeof amount !== 'number' || amount <= 0) {
-      return NextResponse.json({ error: 'Valid positive amount required' }, { status: 400 })
+    if (!bountyId || typeof bountyId !== 'number') {
+      return NextResponse.json({ error: 'Bounty ID required' }, { status: 400 })
     }
 
-    await withdraw(session.discordId, Math.floor(amount))
-    const balance = await getBalance(session.discordId)
+    const bounty = await claimBounty(session.discordId, bountyId)
 
     return NextResponse.json({
       success: true,
-      message: `Withdrew ${formatCurrency(amount)} from bank`,
-      wallet: balance.wallet,
-      bank: balance.bank
+      bounty: {
+        id: bounty.id,
+        description: bounty.description,
+        reward: bounty.reward,
+        status: bounty.status
+      }
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

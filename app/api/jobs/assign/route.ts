@@ -1,7 +1,8 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { assignJob, assignRandomJob } from '@/app/lib/jobs'
-import { requireOnboarded } from '@/app/lib/economy'
+import { getJob, JOB_REWARD_AMOUNT, hasCompletedJobToday } from '@/app/lib/jobs'
+import { requireOnboarded, updateBalance, formatCurrency } from '@/app/lib/economy'
+import { prisma } from '@/app/lib/db'
 
 export const runtime = 'nodejs'
 
@@ -18,21 +19,40 @@ export async function POST(request: NextRequest) {
     const body = await request.json()
     const { jobId } = body
 
-    let job
-    if (jobId && typeof jobId === 'number') {
-      // Assign specific job
-      job = await assignJob(session.discordId, jobId)
-    } else {
-      // Assign random job (round-robin)
-      job = await assignRandomJob(session.discordId)
+    if (!jobId || typeof jobId !== 'number') {
+      return NextResponse.json({ error: 'Job ID required' }, { status: 400 })
     }
+
+    // Get the job
+    const job = await getJob(jobId)
+    if (!job || !job.isActive) {
+      return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+
+    // Check if already completed today
+    const alreadyCompleted = await hasCompletedJobToday(session.discordId, jobId)
+    if (alreadyCompleted) {
+      return NextResponse.json({ error: 'You have already completed this job today' }, { status: 400 })
+    }
+
+    // Record the job completion
+    await prisma.jobAssignment.create({
+      data: {
+        jobId,
+        userId: session.discordId
+      }
+    })
+
+    // Award the $PEP immediately
+    await updateBalance(session.discordId, JOB_REWARD_AMOUNT)
 
     return NextResponse.json({
       success: true,
-      message: `Assigned to job: ${job.description}`,
+      message: `You earned ${formatCurrency(JOB_REWARD_AMOUNT)}!`,
+      reward: JOB_REWARD_AMOUNT,
       job: {
         id: job.id,
-        description: job.description,
+        description: job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString()),
         type: job.type
       }
     })

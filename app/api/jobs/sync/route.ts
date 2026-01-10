@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { syncJobsFromSheet, fullRefreshJobs } from '@/app/lib/jobs'
+import { syncJobsFromSheet, fullRefreshJobs, syncJobsFromData } from '@/app/lib/jobs'
 
 const JOB_SYNC_SECRET = process.env.JOB_SYNC_SECRET
 
@@ -10,7 +10,8 @@ export async function POST(request: NextRequest) {
     // Verify authorization if secret is configured
     if (JOB_SYNC_SECRET) {
       const authHeader = request.headers.get('authorization')
-      const token = authHeader?.replace('Bearer ', '')
+      const syncSecretHeader = request.headers.get('x-sync-secret')
+      const token = syncSecretHeader || authHeader?.replace('Bearer ', '')
 
       if (token !== JOB_SYNC_SECRET) {
         console.warn('Unauthorized job sync attempt')
@@ -18,10 +19,22 @@ export async function POST(request: NextRequest) {
       }
     }
 
-    // Check for refresh flag
+    // Parse request body
     const body = await request.json().catch(() => ({}))
-    const fullRefresh = body.refresh === true
 
+    // Check if jobs data was sent directly (from Google Apps Script)
+    if (body.jobs && Array.isArray(body.jobs)) {
+      console.log(`Job sync triggered with ${body.jobs.length} jobs from request body`)
+      const result = await syncJobsFromData(body.jobs)
+      return NextResponse.json({
+        success: true,
+        message: 'Jobs synced successfully',
+        ...result
+      })
+    }
+
+    // Otherwise, fetch from Google Sheets
+    const fullRefresh = body.refresh === true
     console.log(`Job sync triggered via webhook (refresh: ${fullRefresh})`)
 
     const result = fullRefresh
