@@ -3,6 +3,7 @@
 import { usePrivy } from '@privy-io/react-auth'
 import { LoginButton } from './components/LoginButton'
 import { UserInfo } from './components/UserInfo'
+import { PollsList } from './components/PollsList'
 
 export default function GovernanceContent() {
   const { ready, authenticated } = usePrivy()
@@ -24,7 +25,7 @@ export default function GovernanceContent() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
         {/* Polls section */}
         <div className="lg:col-span-2 space-y-6">
-          <h2 className="text-xl font-semibold">Active Polls</h2>
+          <h2 className="text-xl font-semibold">Polls</h2>
 
           {!ready ? (
             <div className="animate-pulse space-y-4">
@@ -39,40 +40,7 @@ export default function GovernanceContent() {
               <LoginButton />
             </div>
           ) : (
-            <div className="space-y-4">
-              {/* Placeholder for polls */}
-              <div className="p-6 bg-gray-900 rounded-xl border border-gray-800">
-                <div className="flex items-center justify-between mb-4">
-                  <span className="px-2 py-1 bg-green-900 text-green-400 text-xs rounded-full">
-                    Active
-                  </span>
-                  <span className="text-sm text-gray-400">
-                    Closes in 3 days
-                  </span>
-                </div>
-                <h3 className="text-lg font-semibold mb-2">
-                  Example Poll: Should we fund the pizza hackathon?
-                </h3>
-                <p className="text-gray-400 text-sm mb-4">
-                  This is a placeholder poll. Real polls will be created once the full system is implemented.
-                </p>
-                <div className="space-y-2">
-                  <button className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
-                    Yes, full amount ($5,000)
-                  </button>
-                  <button className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
-                    Yes, partial ($2,500)
-                  </button>
-                  <button className="w-full p-3 bg-gray-800 hover:bg-gray-700 rounded-lg text-left transition-colors">
-                    No, save for later
-                  </button>
-                </div>
-              </div>
-
-              <div className="p-6 bg-gray-900 rounded-xl border border-gray-800 text-center text-gray-500">
-                More polls will appear here once created
-              </div>
-            </div>
+            <PollsList />
           )}
         </div>
 
@@ -112,8 +80,8 @@ export default function GovernanceContent() {
                 <span>Phase 1: Privy Integration</span>
               </div>
               <div className="flex items-center gap-2">
-                <span className="w-2 h-2 bg-gray-600 rounded-full"></span>
-                <span className="text-gray-500">Phase 2: Semaphore (Anonymous)</span>
+                <span className="w-2 h-2 bg-green-400 rounded-full"></span>
+                <span>Phase 2: Semaphore (Anonymous)</span>
               </div>
               <div className="flex items-center gap-2">
                 <span className="w-2 h-2 bg-gray-600 rounded-full"></span>

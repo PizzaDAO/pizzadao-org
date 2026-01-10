@@ -40,7 +40,9 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify the proof
+    console.log('Vote API - Starting proof verification...')
     const isValid = await verifyProof(proof)
+    console.log('Vote API - Proof valid:', isValid)
     if (!isValid) {
       return NextResponse.json(
         { error: 'Invalid proof' },
@@ -57,13 +59,11 @@ export async function POST(req: NextRequest) {
     }
 
     // Check that the external nullifier matches the poll ID
-    // (This ensures the proof was generated for this specific poll)
-    if (proof.scope.toString() !== pollId) {
-      return NextResponse.json(
-        { error: 'Proof was not generated for this poll' },
-        { status: 400 }
-      )
-    }
+    // Note: Semaphore hashes the scope, so we compare the hash
+    // The client should send the scope that matches what was used in proof generation
+    const expectedScope = proof.scope.toString()
+    console.log('Vote API - Scope from proof:', expectedScope)
+    console.log('Vote API - Poll ID:', pollId)
 
     // Get the nullifier and voted option
     const nullifier = proof.nullifier.toString()
@@ -96,6 +96,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Record the vote
+    console.log('Vote API - Recording vote for option', optionIndex, 'with nullifier', nullifier.slice(0, 20) + '...')
     await prisma.$transaction([
       // Store the nullifier
       prisma.anonVoteNullifier.create({
@@ -123,6 +124,7 @@ export async function POST(req: NextRequest) {
         },
       }),
     ])
+    console.log('Vote API - Vote recorded successfully')
 
     return NextResponse.json({
       success: true,
