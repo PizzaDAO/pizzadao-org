@@ -117,6 +117,13 @@ function splitTurtlesCell(v: unknown): string[] {
 
 export default function OnboardingWizard() {
   const router = useRouter();
+  const [mounted, setMounted] = useState(false);
+  const [initializing, setInitializing] = useState(true);
+
+  // Wait for client-side mount before rendering anything
+  useEffect(() => {
+    setMounted(true);
+  }, []);
   const [s, setS] = useState<WizardState>(() => ({
     step: 0,
     sessionId: uuidLike(),
@@ -183,8 +190,17 @@ export default function OnboardingWizard() {
 
         // ✅ Check if member exists and redirect to dashboard if so
         (async () => {
+          // Set lookupLoading BEFORE initializing=false to prevent flash of login screen
+          setS(p => ({ ...p, lookupLoading: true }));
+          setInitializing(false);
+
+          // Safety timeout to prevent infinite loading
+          const timeoutId = setTimeout(() => {
+            console.error("Member lookup timed out");
+            setS(p => ({ ...p, lookupLoading: false, error: "Lookup timed out. Please try again." }));
+          }, 15000);
+
           try {
-            setS(p => ({ ...p, lookupLoading: true }));
             // Pass nickname for fallback search
             const searchParam = discordNick ? `?searchName=${encodeURIComponent(discordNick)}` : "";
             const res = await fetch(`/api/member-lookup/${discordId}${searchParam}`);
@@ -192,19 +208,20 @@ export default function OnboardingWizard() {
               const data = await res.json();
 
               // ✅ Handle Name Match Auto-Claim FIRST - must write discordId to sheet
-              if (data.found && data.method === "name_match" && data.memberId) {
+              // Uses secure auto-claim endpoint that verifies name match server-side
+              if (data.found && data.method === "name_match" && data.memberId && data.memberName) {
                 console.log("[AutoClaim] Found by nickname, claiming member:", data.memberId);
                 try {
-                  const claimRes = await fetch("/api/claim-member", {
+                  const claimRes = await fetch("/api/auto-claim", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({
                       memberId: data.memberId,
-                      discordId: discordId,
-                      password: "moltobenny"
+                      expectedName: data.memberName, // Server verifies this matches
                     }),
                   });
                   if (claimRes.ok) {
+                    clearTimeout(timeoutId);
                     router.push(`/dashboard/${data.memberId}`);
                     return;
                   }
@@ -226,10 +243,12 @@ export default function OnboardingWizard() {
 
                 const isAutoLogin = !localStorage.getItem(PENDING_CLAIM_KEY);
                 if (isAutoLogin) {
+                  clearTimeout(timeoutId);
                   router.push(`/dashboard/${data.memberId || discordId}`);
                   return;
                 }
 
+                clearTimeout(timeoutId);
                 setS(p => ({
                   ...p,
                   isUpdate: true,
@@ -247,9 +266,11 @@ export default function OnboardingWizard() {
               }
             }
             // Not found -> Trigger Claim Flow
+            clearTimeout(timeoutId);
             setS(p => ({ ...p, lookupLoading: false }));
             setClaimState(p => ({ ...p, active: true, step: "ask" }));
           } catch (e) {
+            clearTimeout(timeoutId);
             console.error("Lookup failed", e);
             setS(p => ({ ...p, lookupLoading: false }));
           }
@@ -257,7 +278,7 @@ export default function OnboardingWizard() {
         return;
       }
 
-      // ✅ Edit Profile Flow
+      // ✅ Edit Profile Flow - Now verifies ownership via session cookie
       const isEdit = url.searchParams.get("edit") === "1";
       const memberId = url.searchParams.get("memberId");
 
@@ -268,11 +289,26 @@ export default function OnboardingWizard() {
         window.history.replaceState({}, "", url.toString());
 
         (async () => {
+          // Set lookupLoading BEFORE initializing=false to prevent flash of login screen
+          setS(p => ({ ...p, lookupLoading: true }));
+          setInitializing(false);
+
           try {
-            setS(p => ({ ...p, lookupLoading: true }));
-            const res = await fetch(`/api/user-data/${memberId}`);
-            if (!res.ok) throw new Error("Failed to load user data");
-            const data = await res.json();
+            // First verify ownership via session cookie
+            const verifyRes = await fetch(`/api/verify-edit?memberId=${encodeURIComponent(memberId)}`);
+            const verifyData = await verifyRes.json();
+
+            if (!verifyRes.ok || !verifyData.canEdit) {
+              console.error("Edit not authorized:", verifyData.error);
+              setS(p => ({
+                ...p,
+                lookupLoading: false,
+                error: verifyData.error || "You don't have permission to edit this profile"
+              }));
+              return;
+            }
+
+            const data = verifyData.data;
 
             const parseList = (val: any) => {
               if (Array.isArray(val)) return val.map(String);
@@ -301,11 +337,17 @@ export default function OnboardingWizard() {
             }));
           } catch (e) {
             console.error("Edit profile fetch failed", e);
-            setS(p => ({ ...p, lookupLoading: false })); // Unblock if failed
+            setS(p => ({ ...p, lookupLoading: false, error: "Failed to load profile for editing" }));
           }
         })();
+        return;
       }
-    } catch { }
+
+      // No special URL params - done initializing
+      setInitializing(false);
+    } catch {
+      setInitializing(false);
+    }
   }, [router]);
 
   // ✅ Fetch crew mappings
@@ -350,8 +392,15 @@ export default function OnboardingWizard() {
   }, []);
 
   // Load draft from localStorage (with migration for old "turtle" string)
+  // Skip if we're processing a Discord callback or edit flow
   useEffect(() => {
     try {
+      // Don't load localStorage if we have URL params (Discord callback or edit flow)
+      const url = new URL(window.location.href);
+      if (url.searchParams.get("discordId") || url.searchParams.get("edit")) {
+        return; // Skip localStorage loading - URL params take priority
+      }
+
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
         const parsed = JSON.parse(raw);
@@ -371,6 +420,7 @@ export default function OnboardingWizard() {
           submitting: false,
           error: undefined,
           success: false,
+          lookupLoading: false, // Never restore loading state from localStorage
           seenNames: Array.isArray(parsed?.seenNames) ? parsed.seenNames : [],
           discordId: typeof parsed?.discordId === "string" ? parsed.discordId : prev.discordId,
           discordJoined: typeof parsed?.discordJoined === "boolean" ? parsed.discordJoined : prev.discordJoined,
@@ -384,7 +434,7 @@ export default function OnboardingWizard() {
     try {
       localStorage.setItem(
         LS_KEY,
-        JSON.stringify({ ...s, submitting: false, error: undefined, success: false })
+        JSON.stringify({ ...s, submitting: false, error: undefined, success: false, lookupLoading: false })
       );
     } catch { }
   }, [
@@ -678,6 +728,29 @@ export default function OnboardingWizard() {
   }
 
   // ---
+
+  // --- Render loading state during SSR or initialization ---
+  if (!mounted || initializing) {
+    return (
+      <div style={card()}>
+        <div style={{ textAlign: "center", padding: "40px 0" }}>
+          <div className="spinner" style={{
+            width: 40,
+            height: 40,
+            border: "3px solid rgba(0,0,0,0.1)",
+            borderTop: "3px solid #ff4d4d",
+            borderRadius: "50%",
+            animation: "spin 1s linear infinite",
+            margin: "0 auto 20px"
+          }} />
+          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading...</p>
+          <style jsx>{`
+            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+          `}</style>
+        </div>
+      </div>
+    );
+  }
 
   // --- Render Claim Flow ---
   if (claimState.active) {
@@ -1040,8 +1113,17 @@ export default function OnboardingWizard() {
           )}
 
           <div style={{ marginTop: 12 }}>
-            <button onClick={() => setS((p) => ({ ...p, step: 0 }))} style={btn("secondary")}>
-              Back
+            <button
+              onClick={() => {
+                if (s.isUpdate && s.memberId) {
+                  router.push(`/dashboard/${s.memberId}`);
+                } else {
+                  setS((p) => ({ ...p, step: 0 }));
+                }
+              }}
+              style={btn("secondary")}
+            >
+              {s.isUpdate ? "Cancel" : "Back"}
             </button>
           </div>
         </div>

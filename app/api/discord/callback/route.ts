@@ -147,7 +147,7 @@ export async function GET(req: Request) {
 
     // Create response and set session cookie
     const res = NextResponse.redirect(redirectUrl.toString());
-    res.cookies.set(COOKIE_NAME, sessionToken, getSessionCookieOptions());
+    res.cookies.set(COOKIE_NAME, sessionToken, getSessionCookieOptions(req));
 
     return res;
   } catch (e: any) {

@@ -38,9 +38,10 @@ async function fetchMemberRowById(memberId: string) {
     return JSON.parse(cleaned.slice(start, end + 1));
   }
 
+  // headers=0 ensures the header row is included in the response
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
     TAB_NAME
-  )}&tqx=out:json`;
+  )}&tqx=out:json&headers=0`;
 
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error("Failed to fetch sheet");
@@ -48,15 +49,16 @@ async function fetchMemberRowById(memberId: string) {
   const gviz = parseGvizJson(text);
   const rows = gviz?.table?.rows || [];
 
-  // header hunter
+  // header hunter (same logic as member-lookup)
   let headerRowIdx = -1;
   let headerVals: string[] = [];
   for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
     const rowCells = rows[ri]?.c || [];
     const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
-    const hasId = rowVals.includes("id") || rowVals.includes("member id") || rowVals.includes("memberid");
-    const hasName = rowVals.includes("name") || rowVals.includes("mafia name");
-    if (hasId && hasName) {
+    const hasName = rowVals.includes("name");
+    const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
+    const hasCity = rowVals.includes("city") || rowVals.includes("crews");
+    if (hasName && (hasStatus || hasCity)) {
       headerRowIdx = ri;
       headerVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
       break;
@@ -67,7 +69,9 @@ async function fetchMemberRowById(memberId: string) {
   const headerMap = new Map<string, number>();
   headerVals.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
 
-  const idxId = headerMap.get("id") ?? headerMap.get("member id") ?? headerMap.get("memberid");
+  // Find ID column, fallback to column 0 if not found (matches member-lookup behavior)
+  let idxId = headerMap.get("id") ?? headerMap.get("member id") ?? headerMap.get("memberid");
+  if (idxId == null) idxId = 0; // fallback to column A
 
   // DiscordID column variants
   const idxDiscord =
@@ -75,8 +79,6 @@ async function fetchMemberRowById(memberId: string) {
     headerMap.get("discord id") ??
     headerMap.get("discord") ??
     headerMap.get("discord user id");
-
-  if (idxId == null) throw new Error("ID column not found");
 
   for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
     const cells = rows[ri]?.c || [];

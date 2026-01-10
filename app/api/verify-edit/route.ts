@@ -22,9 +22,7 @@ function parseGvizJson(text: string) {
  * Returns the member data if authorized.
  */
 export async function GET(req: Request) {
-    console.log("[verify-edit] Starting request...");
     const session = await getSession();
-    console.log("[verify-edit] Session:", session?.discordId ? `Found: ${session.discordId}` : "Not found");
 
     if (!session?.discordId) {
         return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
@@ -38,6 +36,7 @@ export async function GET(req: Request) {
     }
 
     try {
+        // headers=0 ensures the header row is included in the response
         const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(TAB_NAME)}&tqx=out:json&headers=0`;
         const res = await fetch(gvizUrl, { cache: "no-store" });
         if (!res.ok) throw new Error("Failed to fetch sheet");
@@ -62,9 +61,7 @@ export async function GET(req: Request) {
             }
         }
 
-        console.log("[verify-edit] Header row search complete. Found at:", headerRowIdx);
         if (headerRowIdx === -1) {
-            console.log("[verify-edit] First 3 rows:", JSON.stringify(rows.slice(0, 3).map((r: any) => r?.c?.map((c: any) => c?.v || c?.f))));
             return NextResponse.json({ error: "Header row not found" }, { status: 500 });
         }
 
@@ -74,7 +71,6 @@ export async function GET(req: Request) {
         // Find ID column, fallback to column 0 if not found (matches member-lookup behavior)
         let idxId = headerMap.get("id") ?? headerMap.get("member id") ?? headerMap.get("memberid");
         if (idxId == null) idxId = 0; // fallback to column A
-
         const idxDiscord = headerMap.get("discordid") ?? headerMap.get("discord id") ?? headerMap.get("discord");
 
         // Find the row with matching memberId
@@ -121,7 +117,6 @@ export async function GET(req: Request) {
         return NextResponse.json({ error: "Member not found" }, { status: 404 });
     } catch (e: unknown) {
         const msg = e instanceof Error ? e.message : "Failed to verify";
-        console.error("[verify-edit] Error:", e);
         return NextResponse.json({ error: msg }, { status: 500 });
     }
 }
