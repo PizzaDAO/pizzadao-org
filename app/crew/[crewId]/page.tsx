@@ -1,10 +1,19 @@
 'use client'
 
-import { use, useEffect, useState } from 'react'
+import { use, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
 
 const inter = Inter({ subsets: ['latin'] })
+
+// Loading stages to show progress
+const LOADING_STAGES = [
+  'Connecting to server...',
+  'Loading crew info...',
+  'Fetching roster...',
+  'Loading tasks...',
+  'Almost ready...',
+]
 
 type CrewData = {
   crew: {
@@ -12,6 +21,7 @@ type CrewData = {
     label: string
     emoji?: string
     callTime?: string
+    callTimeUrl?: string
     callLength?: string
     channel?: string
     role?: string
@@ -60,6 +70,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   const [data, setData] = useState<CrewData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
+  const [loadingStage, setLoadingStage] = useState(0)
+  const [elapsedTime, setElapsedTime] = useState(0)
 
   useEffect(() => {
     async function fetchCrew() {
@@ -79,6 +91,28 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
     }
     fetchCrew()
   }, [crewId])
+
+  // Animate loading stages and track elapsed time
+  useEffect(() => {
+    if (!loading) return
+
+    const startTime = Date.now()
+
+    // Update elapsed time every 100ms
+    const timerInterval = setInterval(() => {
+      setElapsedTime(Math.floor((Date.now() - startTime) / 100) / 10)
+    }, 100)
+
+    // Cycle through loading stages
+    const stageInterval = setInterval(() => {
+      setLoadingStage(prev => (prev + 1) % LOADING_STAGES.length)
+    }, 1200)
+
+    return () => {
+      clearInterval(timerInterval)
+      clearInterval(stageInterval)
+    }
+  }, [loading])
 
   if (loading) {
     return (
@@ -100,7 +134,12 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
             animation: 'spin 1s linear infinite',
             margin: '0 auto 20px',
           }} />
-          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading crew data...</p>
+          <p style={{ fontSize: 18, opacity: 0.8, marginBottom: 8 }}>
+            {LOADING_STAGES[loadingStage]}
+          </p>
+          <p style={{ fontSize: 13, opacity: 0.5 }}>
+            {elapsedTime.toFixed(1)}s
+          </p>
           <style jsx>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
       </div>
@@ -138,20 +177,41 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
       padding: '40px 20px',
     }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
+        {/* Home Button */}
+        <div>
+          <Link href="/" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 14px',
+            background: 'white',
+            border: '1px solid rgba(0,0,0,0.15)',
+            borderRadius: 8,
+            color: '#000',
+            textDecoration: 'none',
+            fontSize: 14,
+            fontWeight: 600,
+          }}>
+            ← Home
+          </Link>
+        </div>
+
         {/* Header */}
         <header style={{ textAlign: 'center', marginBottom: 20 }}>
           <div style={{ fontSize: 48, marginBottom: 8 }}>{crew.emoji || '🍕'}</div>
           <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>{crew.label}</h1>
-          {crew.role && <p style={{ fontSize: 16, opacity: 0.7, marginTop: 8 }}>{crew.role}</p>}
           <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
             {crew.callTime && (
-              <span style={badge()}>🕐 {crew.callTime}</span>
+              crew.callTimeUrl ? (
+                <a href={crew.callTimeUrl} target="_blank" rel="noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
+                  🕐 {crew.callTime}
+                </a>
+              ) : (
+                <span style={badge()}>🕐 {crew.callTime}</span>
+              )
             )}
             {crew.callLength && (
               <span style={badge()}>⏱ {crew.callLength}</span>
-            )}
-            {crew.channel && (
-              <span style={badge()}>#{crew.channel}</span>
             )}
             {crew.sheet && (
               <a href={crew.sheet} target="_blank" rel="noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
@@ -160,15 +220,6 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
             )}
           </div>
         </header>
-
-        {/* Call Info */}
-        {callInfo?.time && (
-          <div style={card()}>
-            <h2 style={sectionTitle()}>Meeting Info</h2>
-            <p style={{ margin: 0 }}><strong>Time:</strong> {callInfo.time}</p>
-            {callInfo.song && <p style={{ margin: '8px 0 0' }}><strong>Crew Song:</strong> {callInfo.song}</p>}
-          </div>
-        )}
 
         {/* Agenda */}
         {agenda.length > 0 && (
@@ -206,7 +257,14 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <div key={i} style={memberCard()}>
                   <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 16 }}>{member.name}</div>
+                      <Link
+                        href={`/profile/${member.id}`}
+                        style={{ fontWeight: 700, fontSize: 16, color: 'inherit', textDecoration: 'none' }}
+                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                      >
+                        {member.name}
+                      </Link>
                       {member.city && <div style={{ fontSize: 13, opacity: 0.7 }}>{member.city}</div>}
                     </div>
                     {member.status && (
