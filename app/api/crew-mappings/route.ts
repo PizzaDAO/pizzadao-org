@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
-import { getTaskLinks } from "../lib/google-sheets";
+import { getTaskLinks, getColumnHyperlinks } from "../lib/google-sheets";
+import { getFileModifiedTime } from "../lib/google-drive";
 import promiseLimit from "promise-limit";
 
 export const runtime = "nodejs";
@@ -7,21 +8,48 @@ export const runtime = "nodejs";
 const SHEET_ID = "19itGq86BRQTVehKhtRFKwK8gZqjsUQ_bG5cuVmem9HU";
 const TAB_NAME = "Crew Mappings";
 
-// Cache (best-effort, per-instance)
-const memCache = new Map<string, { at: number; value: any }>();
-const TTL_MS = 1000 * 60 * 10; // 10 minutes
+// Smart cache with modification time tracking
+interface CacheEntry {
+  at: number;
+  modifiedTime: string;
+  value: any;
+}
+const memCache = new Map<string, CacheEntry>();
+const MAX_CACHE_AGE = 1000 * 60 * 5; // 5 minutes max age before forced refresh
 
-function cacheGet(key: string) {
+async function smartCacheGet(key: string, sheetId: string): Promise<any | null> {
   const hit = memCache.get(key);
   if (!hit) return null;
-  if (Date.now() - hit.at > TTL_MS) {
+
+  const age = Date.now() - hit.at;
+
+  // If very fresh (< 30s), skip mod time check
+  if (age < 30 * 1000) {
+    return hit.value;
+  }
+
+  // If too old, force refresh
+  if (age > MAX_CACHE_AGE) {
     memCache.delete(key);
     return null;
   }
-  return hit.value;
+
+  // Check modification time
+  const currentModTime = await getFileModifiedTime(sheetId);
+  if (currentModTime && currentModTime === hit.modifiedTime) {
+    // File unchanged, refresh timestamp
+    hit.at = Date.now();
+    return hit.value;
+  }
+
+  // File changed or couldn't check
+  memCache.delete(key);
+  return null;
 }
-function cacheSet(key: string, value: any) {
-  memCache.set(key, { at: Date.now(), value });
+
+async function smartCacheSet(key: string, sheetId: string, value: any) {
+  const modifiedTime = await getFileModifiedTime(sheetId) || "";
+  memCache.set(key, { at: Date.now(), modifiedTime, value });
 }
 
 function normalizeSpaces(s: unknown) {
@@ -53,6 +81,7 @@ type CrewOption = {
   emoji?: string;
   sheet?: string;
   callTime?: string;
+  callTimeUrl?: string; // Calendar event link
   callLength?: string;
   tasks?: { label: string; url?: string }[];
 };
@@ -281,15 +310,27 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
   }
 }
 
-export async function GET() {
+export async function GET(req: Request) {
   try {
-    const cacheKey = `crew-mappings:public-gviz:v5:${SHEET_ID}:${TAB_NAME}`;
-    const cached = cacheGet(cacheKey);
-    if (cached) return NextResponse.json({ ...cached, cached: true });
+    // Check for ?fresh=1 to skip cache
+    const url = new URL(req.url);
+    const forceRefresh = url.searchParams.get('fresh') === '1';
 
-    const url = gvizUrl(SHEET_ID, TAB_NAME);
+    const cacheKey = `crew-mappings:smart:v6:${SHEET_ID}:${TAB_NAME}`;
 
-    const res = await fetch(url, {
+    if (!forceRefresh) {
+      const cached = await smartCacheGet(cacheKey, SHEET_ID);
+      if (cached) {
+        console.log('[crew-mappings] Cache hit');
+        return NextResponse.json({ ...cached, cached: true });
+      }
+    }
+
+    console.log('[crew-mappings] Cache miss, fetching fresh data');
+
+    const gvizEndpoint = gvizUrl(SHEET_ID, TAB_NAME);
+
+    const res = await fetch(gvizEndpoint, {
       headers: {
         "User-Agent": "Mozilla/5.0",
         Accept: "text/plain,*/*",
@@ -304,7 +345,7 @@ export async function GET() {
     if (!res.ok) {
       const preview = raw.slice(0, 240);
       throw new Error(
-        `Failed to fetch sheet via GViz. status=${res.status} content-type=${contentType} url=${url} preview=${JSON.stringify(
+        `Failed to fetch sheet via GViz. status=${res.status} content-type=${contentType} url=${gvizEndpoint} preview=${JSON.stringify(
           preview
         )}`
       );
@@ -314,7 +355,7 @@ export async function GET() {
       const preview = raw.slice(0, 260);
       throw new Error(
         `GViz returned HTML (not JSON). This usually means the sheet/tab isn't accessible via GViz.
-content-type=${contentType} url=${url} preview=${JSON.stringify(preview)}`
+content-type=${contentType} url=${gvizEndpoint} preview=${JSON.stringify(preview)}`
       );
     }
 
@@ -416,6 +457,14 @@ content-type=${contentType} url=${url} preview=${JSON.stringify(preview)}`
 
     const crews = Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
 
+    // Fetch calendar event links from Call Time column
+    const callTimeLinks = await getColumnHyperlinks(SHEET_ID, TAB_NAME, "Crew", "Call Time");
+    for (const c of crews) {
+      if (callTimeLinks[c.label]) {
+        c.callTimeUrl = callTimeLinks[c.label];
+      }
+    }
+
     // Parallel fetch tasks for crews that have a sheet
     // Limit concurrency to avoid 429s (sheets quota is ~60/min but heavier calls are lower)
     const limit = promiseLimit(3);
@@ -429,7 +478,7 @@ content-type=${contentType} url=${url} preview=${JSON.stringify(preview)}`
     );
 
     const payload = { crews };
-    cacheSet(cacheKey, payload);
+    await smartCacheSet(cacheKey, SHEET_ID, payload);
 
     return NextResponse.json({ ...payload, cached: false });
   } catch (err: any) {

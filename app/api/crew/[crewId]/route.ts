@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getTaskLinks } from '@/app/api/lib/google-sheets'
+import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
 
 type Params = { params: Promise<{ crewId: string }> }
 
@@ -249,6 +250,7 @@ export async function GET(req: Request, { params }: Params) {
           label: crew.label,
           emoji: crew.emoji,
           callTime: crew.callTime,
+          callTimeUrl: crew.callTimeUrl,
           callLength: crew.callLength,
           channel: crew.channel,
           role: crew.role,
@@ -270,6 +272,7 @@ export async function GET(req: Request, { params }: Params) {
           label: crew.label,
           emoji: crew.emoji,
           callTime: crew.callTime,
+          callTimeUrl: crew.callTimeUrl,
           callLength: crew.callLength,
           channel: crew.channel,
           role: crew.role,
@@ -283,65 +286,90 @@ export async function GET(req: Request, { params }: Params) {
       })
     }
 
-    // Fetch spreadsheet data via GViz API and HTML links in parallel
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
-    const [sheetRes, htmlLinkMap] = await Promise.all([
-      fetch(gvizUrl, { cache: 'no-store' }),
-      getTaskLinks(sheetId),
-    ])
-    if (!sheetRes.ok) {
-      throw new Error('Failed to fetch crew spreadsheet')
+    // Check for ?fresh=1 to skip cache
+    const url = new URL(req.url)
+    const forceRefresh = url.searchParams.get('fresh') === '1'
+
+    // Try to get cached data first (unless force refresh)
+    type CrewSheetData = { roster: any[]; goals: any[]; tasks: any[]; agenda: any[]; callInfo: any }
+    let sheetData: CrewSheetData | null = null
+
+    if (!forceRefresh) {
+      sheetData = await getCachedSheetData<CrewSheetData>(crew.sheet)
+      if (sheetData) {
+        console.log(`[crew] Cache hit for ${crewId}`)
+      }
     }
 
-    const text = await sheetRes.text()
-    const gviz = parseGvizJson(text)
-    const rows = gviz?.table?.rows || []
+    // If no cached data, fetch fresh
+    if (!sheetData) {
+      console.log(`[crew] Cache miss for ${crewId}, fetching fresh data`)
 
-    // Parse sections by detecting header rows
-    let roster: any[] = []
-    let goals: any[] = []
-    let tasks: any[] = []
-    let agenda: any[] = []
-    let callInfo: any = null
-
-    for (let ri = 0; ri < rows.length; ri++) {
-      const cells = rows[ri]?.c || []
-      const rowVals = cells.map(cellVal)
-      const section = detectSection(rowVals)
-
-      if (section === 'roster') {
-        roster = parseRoster(rows, ri, rowVals)
-      } else if (section === 'goals') {
-        goals = parseGoals(rows, ri, rowVals)
-      } else if (section === 'tasks') {
-        tasks = parseTasks(rows, ri, rowVals, htmlLinkMap)
-      } else if (section === 'agenda') {
-        agenda = parseAgenda(rows, ri, rowVals)
+      // Fetch spreadsheet data via GViz API and HTML links in parallel
+      const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
+      const [sheetRes, htmlLinkMap] = await Promise.all([
+        fetch(gvizUrl, { cache: 'no-store' }),
+        getTaskLinks(sheetId),
+      ])
+      if (!sheetRes.ok) {
+        throw new Error('Failed to fetch crew spreadsheet')
       }
 
-      // Look for call time in early rows
-      if (ri < 10 && !callInfo) {
-        const firstCell = rowVals[0]?.toLowerCase() || ''
-        if (firstCell.includes('call time') || firstCell.includes('meeting time')) {
-          callInfo = {
-            time: rowVals[1] || '',
-            song: '',
-            announcements: '',
+      const text = await sheetRes.text()
+      const gviz = parseGvizJson(text)
+      const rows = gviz?.table?.rows || []
+
+      // Parse sections by detecting header rows
+      let roster: any[] = []
+      let goals: any[] = []
+      let tasks: any[] = []
+      let agenda: any[] = []
+      let callInfo: any = null
+
+      for (let ri = 0; ri < rows.length; ri++) {
+        const cells = rows[ri]?.c || []
+        const rowVals = cells.map(cellVal)
+        const section = detectSection(rowVals)
+
+        if (section === 'roster') {
+          roster = parseRoster(rows, ri, rowVals)
+        } else if (section === 'goals') {
+          goals = parseGoals(rows, ri, rowVals)
+        } else if (section === 'tasks') {
+          tasks = parseTasks(rows, ri, rowVals, htmlLinkMap)
+        } else if (section === 'agenda') {
+          agenda = parseAgenda(rows, ri, rowVals)
+        }
+
+        // Look for call time in early rows
+        if (ri < 10 && !callInfo) {
+          const firstCell = rowVals[0]?.toLowerCase() || ''
+          if (firstCell.includes('call time') || firstCell.includes('meeting time')) {
+            callInfo = {
+              time: rowVals[1] || '',
+              song: '',
+              announcements: '',
+            }
           }
         }
       }
-    }
 
-    // Use tasks from crew-mappings if sheet parsing didn't find any
-    if (tasks.length === 0 && crew.tasks?.length > 0) {
-      tasks = crew.tasks.map((t: any) => ({
-        task: t.label,
-        url: t.url,
-        priority: '',
-        stage: 'now',
-        lead: '',
-        notes: '',
-      }))
+      // Use tasks from crew-mappings if sheet parsing didn't find any
+      if (tasks.length === 0 && crew.tasks?.length > 0) {
+        tasks = crew.tasks.map((t: any) => ({
+          task: t.label,
+          url: t.url,
+          priority: '',
+          stage: 'now',
+          lead: '',
+          notes: '',
+        }))
+      }
+
+      sheetData = { roster, goals, tasks, agenda, callInfo }
+
+      // Cache the parsed data
+      await setCachedSheetData(crew.sheet, sheetData)
     }
 
     return NextResponse.json({
@@ -350,16 +378,13 @@ export async function GET(req: Request, { params }: Params) {
         label: crew.label,
         emoji: crew.emoji,
         callTime: crew.callTime,
+        callTimeUrl: crew.callTimeUrl,
         callLength: crew.callLength,
         channel: crew.channel,
         role: crew.role,
         sheet: crew.sheet,
       },
-      roster,
-      goals,
-      tasks,
-      agenda,
-      callInfo,
+      ...sheetData,
     })
   } catch (e: unknown) {
     console.error('[crew] Error:', e)
