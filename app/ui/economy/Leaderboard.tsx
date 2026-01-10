@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { PepAmount } from "./PepIcon";
+import { UserLink } from "../UserLink";
 
 type LeaderboardEntry = {
   rank: number;
@@ -114,9 +115,7 @@ export function Leaderboard() {
                 <span style={{ fontWeight: 700, width: 32 }}>
                   {getRankEmoji(entry.rank)}
                 </span>
-                <span style={{ fontFamily: "monospace", fontSize: 13, opacity: 0.7 }}>
-                  {entry.userId.slice(0, 8)}...
-                </span>
+                <UserLink discordId={entry.userId} style={{ fontSize: 13 }} />
               </div>
               <span style={{ fontWeight: 700, color: "#16a34a" }}>
                 <PepAmount amount={entry.balance} size={14} />
