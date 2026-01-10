@@ -108,7 +108,7 @@ export async function sendWelcomeMessage(opts: {
 
         const { discordId, memberId, city, topping, mafiaMovie, turtles, crews } = opts;
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://onboarding.pizzadao.xyz";
-        const profileUrl = `${baseUrl}/dashboard/${memberId}`;
+        const profileUrl = `${baseUrl}/profile/${memberId}`;
 
         // Build the welcome message
         const lines: string[] = [];
