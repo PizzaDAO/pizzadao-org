@@ -1,4 +1,4 @@
-import OnboardingWizard from "./ui/OnboardingWizard";
+import { OnboardingWizard } from "./ui/onboarding";
 
 export default function Page() {
   return (
