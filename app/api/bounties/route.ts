@@ -14,6 +14,7 @@ export async function GET() {
       bounties: bounties.map(b => ({
         id: b.id,
         description: b.description,
+        link: b.link,
         reward: b.reward,
         createdBy: b.createdBy,
         claimedBy: b.claimedBy,
@@ -39,7 +40,7 @@ export async function POST(request: NextRequest) {
     await requireOnboarded(session.discordId)
 
     const body = await request.json()
-    const { description, reward } = body
+    const { description, reward, link } = body
 
     if (!description || typeof description !== 'string') {
       return NextResponse.json({ error: 'Description required' }, { status: 400 })
@@ -49,13 +50,14 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid reward amount required' }, { status: 400 })
     }
 
-    const bounty = await createBounty(session.discordId, description, reward)
+    const bounty = await createBounty(session.discordId, description, reward, link)
 
     return NextResponse.json({
       success: true,
       bounty: {
         id: bounty.id,
         description: bounty.description,
+        link: bounty.link,
         reward: bounty.reward,
         status: bounty.status,
         createdAt: bounty.createdAt.toISOString()

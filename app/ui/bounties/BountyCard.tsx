@@ -7,6 +7,7 @@ import { UserLink } from "../UserLink";
 type Bounty = {
   id: number;
   description: string;
+  link: string | null;
   reward: number;
   createdBy: string;
   claimedBy: string | null;
@@ -157,6 +158,29 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
           )}
         </div>
         <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4 }}>{bounty.description}</p>
+        {bounty.link && (
+          <a
+            href={bounty.link}
+            target="_blank"
+            rel="noopener noreferrer"
+            style={{
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 4,
+              marginTop: 6,
+              fontSize: 12,
+              color: "#2563eb",
+              textDecoration: "none",
+            }}
+          >
+            <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+              <polyline points="15 3 21 3 21 9" />
+              <line x1="10" y1="14" x2="21" y2="3" />
+            </svg>
+            View details
+          </a>
+        )}
         <div style={{ marginTop: 6, fontSize: 11, opacity: 0.6 }}>
           Posted by <UserLink discordId={bounty.createdBy} />
         </div>

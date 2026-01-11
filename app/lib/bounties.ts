@@ -4,7 +4,7 @@ import { getOrCreateEconomy, updateBalance } from './economy'
 /**
  * Create a bounty with escrowed reward
  */
-export async function createBounty(creatorId: string, description: string, reward: number) {
+export async function createBounty(creatorId: string, description: string, reward: number, link?: string) {
   if (reward <= 0) {
     throw new Error('Reward must be positive')
   }
@@ -26,6 +26,7 @@ export async function createBounty(creatorId: string, description: string, rewar
   const bounty = await prisma.bounty.create({
     data: {
       description: description.trim(),
+      link: link?.trim() || null,
       reward,
       createdBy: creatorId,
       status: 'OPEN'

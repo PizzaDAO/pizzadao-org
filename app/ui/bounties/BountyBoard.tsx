@@ -7,6 +7,7 @@ import { PepIcon, PepAmount } from "../economy/PepIcon";
 type Bounty = {
   id: number;
   description: string;
+  link: string | null;
   reward: number;
   createdBy: string;
   claimedBy: string | null;
@@ -61,6 +62,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
   const [formDescription, setFormDescription] = useState("");
+  const [formLink, setFormLink] = useState("");
   const [formReward, setFormReward] = useState("");
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
@@ -95,6 +97,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           description: formDescription.trim(),
+          link: formLink.trim() || undefined,
           reward: Number(formReward),
         }),
       });
@@ -103,6 +106,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
 
       // Reset form and refresh
       setFormDescription("");
+      setFormLink("");
       setFormReward("");
       setShowForm(false);
       fetchBounties();
@@ -174,6 +178,19 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                   onChange={(e) => setFormDescription(e.target.value)}
                   placeholder="Describe the bounty..."
                   style={{ ...input(), minHeight: 80, resize: "vertical" }}
+                  disabled={formLoading}
+                />
+              </div>
+              <div>
+                <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                  Link (optional)
+                </label>
+                <input
+                  type="url"
+                  value={formLink}
+                  onChange={(e) => setFormLink(e.target.value)}
+                  placeholder="https://..."
+                  style={input()}
                   disabled={formLoading}
                 />
               </div>

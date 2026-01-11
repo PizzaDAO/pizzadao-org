@@ -83,6 +83,7 @@ model JobCycle {
 model Bounty {
   id          Int          @id @default(autoincrement())
   description String
+  link        String?      // Optional link for more details
   reward      Int          // Escrowed amount
   createdBy   String       // Discord ID of poster
   claimedBy   String?      // Discord ID of claimer
