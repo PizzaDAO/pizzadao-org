@@ -109,6 +109,7 @@ function parseRoster(rows: any[], headerIdx: number, headers: string[]) {
       city: cellVal(cells[headerMap.get('city') ?? -1]),
       org: cellVal(cells[headerMap.get('org') ?? headerMap.get('organization') ?? headerMap.get('orgs') ?? -1]),
       skills: cellVal(cells[headerMap.get('skills') ?? headerMap.get('specialties') ?? -1]),
+      turtles: cellVal(cells[headerMap.get('turtles') ?? headerMap.get('turtle') ?? headerMap.get('roles') ?? -1]),
       telegram: cellVal(cells[headerMap.get('telegram') ?? -1]),
       attendance: cellVal(cells[headerMap.get('attendance') ?? headerMap.get('att') ?? -1]),
       notes: cellVal(cells[headerMap.get('notes') ?? -1]),

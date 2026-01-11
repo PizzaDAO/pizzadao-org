@@ -34,6 +34,7 @@ type CrewData = {
     city: string
     org: string
     skills: string
+    turtles: string
     telegram: string
     attendance: string
     notes: string
@@ -249,43 +250,112 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
         )}
 
         {/* Crew Roster */}
-        {roster.length > 0 && (
-          <div style={card()}>
-            <h2 style={sectionTitle()}>Crew Roster ({roster.length} members)</h2>
-            <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-              {roster.map((member, i) => (
-                <div key={i} style={memberCard()}>
-                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                    <div>
-                      <Link
-                        href={`/profile/${member.id}`}
-                        style={{ fontWeight: 700, fontSize: 16, color: 'inherit', textDecoration: 'none' }}
-                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
-                      >
-                        {member.name}
-                      </Link>
-                      {member.city && <div style={{ fontSize: 13, opacity: 0.7 }}>{member.city}</div>}
-                    </div>
-                    {member.status && (
-                      <span style={statusBadge(member.status)}>{member.status}</span>
-                    )}
-                  </div>
-                  {member.skills && (
-                    <div style={{ marginTop: 8, fontSize: 12, opacity: 0.8 }}>
-                      <strong>Skills:</strong> {member.skills}
-                    </div>
-                  )}
-                  {member.org && (
-                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                      {member.org}
-                    </div>
-                  )}
+        {(() => {
+          // Filter out "6. Iced" members
+          const visibleRoster = roster.filter(m => !m.status?.toLowerCase().includes('iced'))
+
+          // Split into Active and Bench
+          const activeStatuses = ['0. lead', '1. capo', '2. hot', '3. warm']
+          const benchStatuses = ['4. cool', '5. cold']
+
+          const isActive = (status: string) => activeStatuses.some(s => status?.toLowerCase().includes(s.split('. ')[1]))
+          const isBench = (status: string) => benchStatuses.some(s => status?.toLowerCase().includes(s.split('. ')[1]))
+
+          const activeMembers = visibleRoster.filter(m => isActive(m.status))
+          const benchMembers = visibleRoster.filter(m => isBench(m.status))
+          const otherMembers = visibleRoster.filter(m => !isActive(m.status) && !isBench(m.status))
+
+          const renderMemberCard = (member: typeof roster[0], i: number) => (
+            <div key={i} style={memberCard()}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+                <div>
+                  <Link
+                    href={`/profile/${member.id}`}
+                    style={{ fontWeight: 700, fontSize: 16, color: 'inherit', textDecoration: 'none' }}
+                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
+                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                  >
+                    {member.name}
+                  </Link>
+                  {member.city && <div style={{ fontSize: 13, opacity: 0.7 }}>{member.city}</div>}
                 </div>
-              ))}
+                {member.status && (
+                  <span style={statusBadge(member.status)}>{member.status}</span>
+                )}
+              </div>
+              {member.turtles && (
+                <div style={{ marginTop: 8, fontSize: 12 }}>
+                  {member.turtles.split(',').map((t, j) => (
+                    <span key={j} style={{
+                      display: 'inline-block',
+                      background: '#e8f5e9',
+                      color: '#2e7d32',
+                      padding: '2px 8px',
+                      borderRadius: 12,
+                      marginRight: 4,
+                      marginBottom: 4,
+                      fontSize: 11,
+                      fontWeight: 500
+                    }}>
+                      {t.trim()}
+                    </span>
+                  ))}
+                </div>
+              )}
+              {member.skills && (
+                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
+                  <strong>Skills:</strong> {member.skills}
+                </div>
+              )}
+              {member.org && (
+                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
+                  {member.org}
+                </div>
+              )}
             </div>
-          </div>
-        )}
+          )
+
+          if (visibleRoster.length === 0) return null
+
+          return (
+            <div style={card()}>
+              <h2 style={sectionTitle()}>Crew Roster ({visibleRoster.length} members)</h2>
+
+              {activeMembers.length > 0 && (
+                <>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#2e7d32', marginBottom: 12, marginTop: 0 }}>
+                    Active ({activeMembers.length})
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                    {activeMembers.map(renderMemberCard)}
+                  </div>
+                </>
+              )}
+
+              {benchMembers.length > 0 && (
+                <>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#5c6bc0', marginBottom: 12, marginTop: 0 }}>
+                    Bench ({benchMembers.length})
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                    {benchMembers.map(renderMemberCard)}
+                  </div>
+                </>
+              )}
+
+              {otherMembers.length > 0 && (
+                <>
+                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#757575', marginBottom: 12, marginTop: 0 }}>
+                    Other ({otherMembers.length})
+                  </h3>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                    {otherMembers.map(renderMemberCard)}
+                  </div>
+                </>
+              )}
+            </div>
+          )
+        })()}
 
         {/* Goals */}
         {goals.length > 0 && (
