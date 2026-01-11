@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Inter, Outfit } from "next/font/google"; // Keep fonts if needed, or use defaults
 import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
+import { PepIcon, PepAmount } from "../../ui/economy";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -60,6 +61,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const [editingSkills, setEditingSkills] = useState(false);
     const [skillsInput, setSkillsInput] = useState("");
     const [skillsSaving, setSkillsSaving] = useState(false);
+    const [pepBalance, setPepBalance] = useState<number | null>(null);
+    const [showSendModal, setShowSendModal] = useState(false);
 
     // New state for rich crew data
     const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -160,6 +163,19 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 }
             } catch (e) {
                 console.error("Failed to fetch personalized tasks", e);
+            }
+        })();
+
+        // Fetch $PEP balance
+        (async () => {
+            try {
+                const res = await fetch("/api/economy/balance");
+                if (res.ok) {
+                    const json = await res.json();
+                    setPepBalance(json.balance);
+                }
+            } catch (e) {
+                console.error("Failed to fetch $PEP balance", e);
             }
         })();
 
@@ -293,15 +309,16 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             All Crews
                         </Link>
-{/* Voting button hidden for now
-                        <Link href="/admin/polls" style={{
+                        <Link href="/pep" style={{
                             ...btn("secondary"),
                             fontSize: 14,
-                            textDecoration: "none"
+                            textDecoration: "none",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6
                         }}>
-                            Voting
+                            <PepIcon size={16} /> Economy
                         </Link>
-*/}
                         <Link href={`/?edit=1&memberId=${idValue}`} style={{
                             ...btn("primary"),
                             fontSize: 14,
@@ -360,6 +377,43 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             >
                                 {name}
                             </Link>
+                        </div>
+                        <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+                                {/* Wallet Icon */}
+                                <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
+                                    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
+                                    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
+                                    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
+                                </svg>
+                                <span style={{
+                                    fontSize: 24,
+                                    fontWeight: 700,
+                                    color: "#16a34a"
+                                }}>
+                                    {pepBalance !== null ? <PepAmount amount={pepBalance} size={20} /> : "—"}
+                                </span>
+                                {/* Send Button */}
+                                <button
+                                    onClick={() => setShowSendModal(true)}
+                                    style={{
+                                        background: "none",
+                                        border: "none",
+                                        cursor: "pointer",
+                                        padding: 4,
+                                        display: "flex",
+                                        alignItems: "center",
+                                        justifyContent: "center",
+                                        opacity: 0.6,
+                                    }}
+                                    title="Send PEP"
+                                >
+                                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                        <path d="M22 2L11 13" />
+                                        <path d="M22 2L15 22L11 13L2 9L22 2Z" />
+                                    </svg>
+                                </button>
+                            </div>
                         </div>
                         <StatItem label="City" value={city} />
                         <StatItem label="Status" value={status} />
@@ -745,11 +799,26 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     PizzaDAO
                 </div>
             </div>
+
+            {/* Send Modal */}
+            {showSendModal && (
+                <SendPepModal
+                    onClose={() => setShowSendModal(false)}
+                    onSuccess={() => {
+                        setShowSendModal(false);
+                        // Refresh balance
+                        fetch("/api/economy/balance")
+                            .then(res => res.json())
+                            .then(json => setPepBalance(json.balance))
+                            .catch(() => {});
+                    }}
+                />
+            )}
         </div>
     );
 }
 
-function StatItem({ label, value }: { label: string, value: string }) {
+function StatItem({ label, value, highlight }: { label: string, value: string, highlight?: boolean }) {
     return (
         <div>
             <h3 style={{
@@ -764,9 +833,9 @@ function StatItem({ label, value }: { label: string, value: string }) {
                 {label}
             </h3>
             <p style={{
-                fontSize: 18,
-                fontWeight: 500,
-                color: "#111",
+                fontSize: highlight ? 24 : 18,
+                fontWeight: highlight ? 700 : 500,
+                color: highlight ? "#16a34a" : "#111",
                 margin: 0,
                 wordBreak: "break-word"
             }}>
@@ -826,6 +895,117 @@ function crewCard(): React.CSSProperties {
         border: "1px solid rgba(0,0,0,0.12)",
         background: "white",
     };
+}
+
+function SendPepModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
+    const [memberId, setMemberId] = useState("");
+    const [amount, setAmount] = useState("");
+    const [loading, setLoading] = useState(false);
+    const [error, setError] = useState<string | null>(null);
+
+    const handleSend = async (e: React.FormEvent) => {
+        e.preventDefault();
+        if (!memberId || !amount) return;
+
+        setLoading(true);
+        setError(null);
+
+        try {
+            const res = await fetch("/api/economy/transfer", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ toUserId: memberId, amount: Number(amount) }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error);
+            onSuccess();
+        } catch (err) {
+            setError(err instanceof Error ? err.message : "Failed to send");
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const inputStyle: React.CSSProperties = {
+        width: "100%",
+        padding: "10px 12px",
+        borderRadius: 10,
+        border: "1px solid rgba(0,0,0,0.18)",
+        fontSize: 14,
+        outline: "none",
+        boxSizing: "border-box" as const,
+    };
+
+    return (
+        <div style={{
+            position: "fixed",
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: "rgba(0,0,0,0.5)",
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "center",
+            zIndex: 1000,
+        }} onClick={onClose}>
+            <div style={{ ...card(), maxWidth: 400, width: "90%" }} onClick={e => e.stopPropagation()}>
+                <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                    Send <PepIcon size={18} />
+                </h2>
+
+                {error && (
+                    <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
+                        {error}
+                    </div>
+                )}
+
+                <form onSubmit={handleSend} style={{ display: "grid", gap: 16 }}>
+                    <div>
+                        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                            Recipient Member ID
+                        </label>
+                        <input
+                            type="text"
+                            placeholder="Enter member ID"
+                            value={memberId}
+                            onChange={(e) => setMemberId(e.target.value)}
+                            style={inputStyle}
+                            disabled={loading}
+                        />
+                    </div>
+
+                    <div>
+                        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                            Amount
+                        </label>
+                        <input
+                            type="number"
+                            placeholder="Amount"
+                            value={amount}
+                            onChange={(e) => setAmount(e.target.value)}
+                            style={inputStyle}
+                            disabled={loading}
+                            min="1"
+                        />
+                    </div>
+
+                    <div style={{ display: "flex", gap: 10 }}>
+                        <button type="button" onClick={onClose} style={{ ...btn("secondary"), flex: 1, fontFamily: "inherit" }}>
+                            Cancel
+                        </button>
+                        <button
+                            type="submit"
+                            disabled={loading || !memberId || !amount}
+                            style={{ ...btn("primary"), flex: 1, fontFamily: "inherit", opacity: loading || !memberId || !amount ? 0.5 : 1 }}
+                        >
+                            {loading ? "Sending..." : "Send"}
+                        </button>
+                    </div>
+                </form>
+            </div>
+        </div>
+    );
 }
 
 const SyncRolesButton = ({ memberId, discordId, name, onSync }: { memberId: string, discordId: string, name: string, onSync: (turtles: string[], others: string[]) => void }) => {

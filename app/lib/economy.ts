@@ -1,0 +1,130 @@
+import { prisma } from './db'
+
+const PEP_SYMBOL = process.env.PEP_SYMBOL || '$PEP'
+const PEP_NAME = process.env.PEP_NAME || 'PEP'
+
+export { PEP_SYMBOL, PEP_NAME }
+
+export function formatCurrency(amount: number): string {
+  return `${PEP_SYMBOL}${amount.toLocaleString()}`
+}
+
+/**
+ * Get or create economy record for a user
+ */
+export async function getOrCreateEconomy(userId: string) {
+  let economy = await prisma.economy.findUnique({
+    where: { id: userId }
+  })
+
+  if (!economy) {
+    // Ensure User record exists first (required by foreign key)
+    await prisma.user.upsert({
+      where: { id: userId },
+      create: { id: userId, roles: [] },
+      update: {}
+    })
+
+    economy = await prisma.economy.create({
+      data: { id: userId, wallet: 0 }
+    })
+  }
+
+  return economy
+}
+
+/**
+ * Get user's balance
+ */
+export async function getBalance(userId: string) {
+  const economy = await getOrCreateEconomy(userId)
+  return { balance: economy.wallet }
+}
+
+/**
+ * Add or subtract from user's balance
+ */
+export async function updateBalance(userId: string, amount: number) {
+  const economy = await getOrCreateEconomy(userId)
+
+  if (economy.wallet + amount < 0) {
+    throw new Error('Insufficient funds')
+  }
+
+  return prisma.economy.update({
+    where: { id: userId },
+    data: { wallet: economy.wallet + amount }
+  })
+}
+
+// Alias for backward compatibility
+export const updateWallet = updateBalance
+
+/**
+ * Transfer currency between users
+ */
+export async function transfer(fromId: string, toId: string, amount: number) {
+  if (amount <= 0) {
+    throw new Error('Amount must be positive')
+  }
+
+  if (fromId === toId) {
+    throw new Error('Cannot transfer to yourself')
+  }
+
+  const fromEconomy = await getOrCreateEconomy(fromId)
+  await getOrCreateEconomy(toId) // Ensure recipient exists
+
+  if (fromEconomy.wallet < amount) {
+    throw new Error('Insufficient funds')
+  }
+
+  // Use transaction to ensure atomicity
+  await prisma.$transaction([
+    prisma.economy.update({
+      where: { id: fromId },
+      data: { wallet: { decrement: amount } }
+    }),
+    prisma.economy.update({
+      where: { id: toId },
+      data: { wallet: { increment: amount } }
+    })
+  ])
+
+  return { success: true, amount }
+}
+
+/**
+ * Get leaderboard (top users by balance)
+ */
+export async function getLeaderboard(limit = 10) {
+  const economies = await prisma.economy.findMany({
+    orderBy: { wallet: 'desc' },
+    take: limit
+  })
+
+  return economies.map(e => ({
+    userId: e.id,
+    balance: e.wallet
+  }))
+}
+
+/**
+ * Check if user is onboarded (has completed profile)
+ */
+export async function isOnboarded(userId: string): Promise<boolean> {
+  const user = await prisma.user.findUnique({
+    where: { id: userId }
+  })
+  return !!user
+}
+
+/**
+ * Require user to be onboarded before economy access
+ */
+export async function requireOnboarded(userId: string) {
+  const onboarded = await isOnboarded(userId)
+  if (!onboarded) {
+    throw new Error('You must complete onboarding before using the economy')
+  }
+}

@@ -6,111 +6,150 @@ datasource db {
   provider = "postgresql"
 }
 
+// Stores Discord users who have authenticated
 model User {
-  id                String             @id
-  roles             String[]
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  Economy           Economy?
-  pendingSignatures PendingSignature[]
-}
-
-model Poll {
-  id                String             @id @default(cuid())
-  question          String
-  options           Json
-  requiredRoleId    String
-  status            PollStatus         @default(DRAFT)
-  createdBy         String
-  createdAt         DateTime           @default(now())
-  updatedAt         DateTime           @updatedAt
-  batchSignedAt     DateTime?
-  pendingSignatures PendingSignature[]
-  results           PollResult[]
-}
-
-model PendingSignature {
-  id         String @id @default(cuid())
-  userId     String
-  pollId     String
-  blindedSig String
-  poll       Poll   @relation(fields: [pollId], references: [id])
-  user       User   @relation(fields: [userId], references: [id])
-
-  @@unique([userId, pollId])
-}
-
-model PollResult {
-  pollId   String
-  optionId String
-  tally    Int    @default(0)
-  poll     Poll   @relation(fields: [pollId], references: [id])
-
-  @@id([pollId, optionId])
-}
-
-model ConsumedToken {
-  tokenHash  String   @id
-  pollId     String
-  consumedAt DateTime @default(now())
-}
-
-model Economy {
-  id        String   @id
-  wallet    Int      @default(0)
-  bank      Int      @default(0)
+  id        String   @id // Discord User ID
+  roles     String[] // Discord role IDs
   createdAt DateTime @default(now())
-  updatedAt DateTime
-  User      User     @relation(fields: [id], references: [id])
+  updatedAt DateTime @updatedAt
+
+  pendingSignatures PendingSignature[]
+  economy           Economy?
 }
 
-model Inventory {
-  userId   String
-  itemId   Int
-  quantity Int      @default(1)
-  ShopItem ShopItem @relation(fields: [itemId], references: [id])
+// ===== $PEP ECONOMY SYSTEM =====
 
-  @@id([userId, itemId])
+// User's $PEP balance - linked to User model
+model Economy {
+  id        String   @id // Discord User ID
+  wallet    Int      @default(0)
+  user      User     @relation(fields: [id], references: [id])
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
 }
 
-model Job {
-  id            Int             @id @default(autoincrement())
-  description   String
-  type          String?
-  sheetRow      Int?
-  isActive      Boolean         @default(true)
-  createdAt     DateTime        @default(now())
-  JobAssignment JobAssignment[]
-}
-
-model JobAssignment {
-  id         Int      @id @default(autoincrement())
-  jobId      Int
-  userId     String
-  assignedAt DateTime @default(now())
-  Job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
-
-  @@unique([jobId, userId])
-}
-
-model JobCycle {
-  id           Int @id @default(1)
-  currentIndex Int @default(0)
-}
-
+// Shop items available for purchase
 model ShopItem {
   id          Int         @id @default(autoincrement())
   name        String      @unique
   description String?
   price       Int
-  quantity    Int         @default(-1)
+  quantity    Int         @default(-1) // -1 = unlimited
+  image       String?     // URL to item image
   isAvailable Boolean     @default(true)
   createdAt   DateTime    @default(now())
-  Inventory   Inventory[]
+  inventory   Inventory[]
+}
+
+// User's inventory of purchased items
+model Inventory {
+  userId   String
+  itemId   Int
+  quantity Int      @default(1)
+  item     ShopItem @relation(fields: [itemId], references: [id])
+
+  @@id([userId, itemId])
+}
+
+// Jobs synced from Google Sheets
+model Job {
+  id          Int             @id @default(autoincrement())
+  description String
+  type        String?         // Category from spreadsheet
+  sheetRow    Int?            // Row index for sync tracking
+  isActive    Boolean         @default(true)
+  createdAt   DateTime        @default(now())
+  assignments JobAssignment[]
+}
+
+// Job assignments - who is working on what
+model JobAssignment {
+  id         Int      @id @default(autoincrement())
+  jobId      Int
+  userId     String
+  assignedAt DateTime @default(now())
+  job        Job      @relation(fields: [jobId], references: [id], onDelete: Cascade)
+
+  @@unique([jobId, userId])
+}
+
+// Round-robin job cycle tracking
+model JobCycle {
+  id           Int @id @default(1)
+  currentIndex Int @default(0)
+}
+
+// User-created bounties with escrowed rewards
+model Bounty {
+  id          Int          @id @default(autoincrement())
+  description String
+  reward      Int          // Escrowed amount
+  createdBy   String       // Discord ID of poster
+  claimedBy   String?      // Discord ID of claimer
+  status      BountyStatus @default(OPEN)
+  createdAt   DateTime     @default(now())
+  updatedAt   DateTime     @updatedAt
+}
+
+enum BountyStatus {
+  OPEN       // Available to claim
+  CLAIMED    // Someone is working on it
+  COMPLETED  // Work done, reward paid
+  CANCELLED  // Poster cancelled, refunded
+}
+
+// Poll definition
+model Poll {
+  id              String   @id @default(cuid())
+  question        String
+  options         Json     // Array of { id: string, label: string }
+  requiredRoleId  String   // Discord role ID required to vote
+  status          PollStatus @default(DRAFT)
+  createdBy       String   // Discord ID of creator
+  createdAt       DateTime @default(now())
+  updatedAt       DateTime @updatedAt
+  batchSignedAt   DateTime? // When tokens were generated
+
+  results           PollResult[]
+  pendingSignatures PendingSignature[]
 }
 
 enum PollStatus {
-  DRAFT
-  OPEN
-  CLOSED
+  DRAFT      // Created but not open
+  OPEN       // Accepting votes
+  CLOSED     // Voting ended, results visible
+}
+
+// Bridge table: stores signed tokens for eligible users
+// This links identity to token temporarily, but the token itself
+// is blinded so the server never sees the final voting credential
+model PendingSignature {
+  id         String @id @default(cuid())
+  userId     String
+  pollId     String
+  blindedSig String // Base64 encoded blind signature
+
+  user User @relation(fields: [userId], references: [id])
+  poll Poll @relation(fields: [pollId], references: [id])
+
+  @@unique([userId, pollId]) // One token per user per poll
+}
+
+// Anonymous vote tally - no link to user identity
+model PollResult {
+  pollId   String
+  optionId String
+  tally    Int    @default(0)
+
+  poll Poll @relation(fields: [pollId], references: [id])
+
+  @@id([pollId, optionId])
+}
+
+// Tracks consumed tokens to prevent double voting
+// Only stores hash of token, not the token itself
+model ConsumedToken {
+  tokenHash String   @id
+  pollId    String
+  consumedAt DateTime @default(now())
 }
