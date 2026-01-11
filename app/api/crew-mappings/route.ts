@@ -1,56 +1,12 @@
 import { NextResponse } from "next/server";
 import { getTaskLinks, getColumnHyperlinks } from "../lib/google-sheets";
-import { getFileModifiedTime } from "../lib/google-drive";
+import { cacheGet, cacheSet, cacheDel, CACHE_TTL } from "../lib/cache";
 import promiseLimit from "promise-limit";
 
 export const runtime = "nodejs";
 
 const SHEET_ID = "19itGq86BRQTVehKhtRFKwK8gZqjsUQ_bG5cuVmem9HU";
 const TAB_NAME = "Crew Mappings";
-
-// Smart cache with modification time tracking
-interface CacheEntry {
-  at: number;
-  modifiedTime: string;
-  value: any;
-}
-const memCache = new Map<string, CacheEntry>();
-const MAX_CACHE_AGE = 1000 * 60 * 5; // 5 minutes max age before forced refresh
-
-async function smartCacheGet(key: string, sheetId: string): Promise<any | null> {
-  const hit = memCache.get(key);
-  if (!hit) return null;
-
-  const age = Date.now() - hit.at;
-
-  // If very fresh (< 30s), skip mod time check
-  if (age < 30 * 1000) {
-    return hit.value;
-  }
-
-  // If too old, force refresh
-  if (age > MAX_CACHE_AGE) {
-    memCache.delete(key);
-    return null;
-  }
-
-  // Check modification time
-  const currentModTime = await getFileModifiedTime(sheetId);
-  if (currentModTime && currentModTime === hit.modifiedTime) {
-    // File unchanged, refresh timestamp
-    hit.at = Date.now();
-    return hit.value;
-  }
-
-  // File changed or couldn't check
-  memCache.delete(key);
-  return null;
-}
-
-async function smartCacheSet(key: string, sheetId: string, value: any) {
-  const modifiedTime = await getFileModifiedTime(sheetId) || "";
-  memCache.set(key, { at: Date.now(), modifiedTime, value });
-}
 
 function normalizeSpaces(s: unknown) {
   return String(s ?? "").trim().replace(/\s+/g, " ");
@@ -316,10 +272,10 @@ export async function GET(req: Request) {
     const url = new URL(req.url);
     const forceRefresh = url.searchParams.get('fresh') === '1';
 
-    const cacheKey = `crew-mappings:smart:v6:${SHEET_ID}:${TAB_NAME}`;
+    const cacheKey = `crew-mappings:v7:${SHEET_ID}`;
 
     if (!forceRefresh) {
-      const cached = await smartCacheGet(cacheKey, SHEET_ID);
+      const cached = await cacheGet<{ crews: any[] }>(cacheKey);
       if (cached) {
         console.log('[crew-mappings] Cache hit');
         return NextResponse.json({ ...cached, cached: true });
@@ -478,7 +434,7 @@ content-type=${contentType} url=${gvizEndpoint} preview=${JSON.stringify(preview
     );
 
     const payload = { crews };
-    await smartCacheSet(cacheKey, SHEET_ID, payload);
+    await cacheSet(cacheKey, payload, CACHE_TTL.CREW_MAPPINGS);
 
     return NextResponse.json({ ...payload, cached: false });
   } catch (err: any) {

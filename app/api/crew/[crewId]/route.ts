@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getTaskLinks } from '@/app/api/lib/google-sheets'
+import { getTaskLinks, getMemberTurtlesMap } from '@/app/api/lib/google-sheets'
 import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
 
 type Params = { params: Promise<{ crewId: string }> }
@@ -365,6 +365,18 @@ export async function GET(req: Request, { params }: Params) {
           lead: '',
           notes: '',
         }))
+      }
+
+      // Enrich roster with turtle data from main members database
+      const turtlesMap = await getMemberTurtlesMap()
+      for (const member of roster) {
+        if (!member.turtles && member.name) {
+          const normalizedName = member.name.toLowerCase().replace(/\s+/g, ' ')
+          const turtles = turtlesMap.get(normalizedName)
+          if (turtles) {
+            member.turtles = turtles
+          }
+        }
       }
 
       sheetData = { roster, goals, tasks, agenda, callInfo }

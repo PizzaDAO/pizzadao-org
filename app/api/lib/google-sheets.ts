@@ -1,5 +1,6 @@
 import { google } from "googleapis";
 import path from "path";
+import { cacheGet, cacheSet, CACHE_TTL } from "./cache";
 
 // Initialize Google Sheets API client
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
@@ -23,16 +24,14 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: "v4", auth });
 
-// Basic in-memory cache to prevent redundant API calls
-const CACHE = new Map<string, { time: number, data: Record<string, string> }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
 // Extract rich text hyperlinks from a specific sheet
 export async function getTaskLinks(sheetId: string): Promise<Record<string, string>> {
-    // Check cache first
-    const cached = CACHE.get(sheetId);
-    if (cached && (Date.now() - cached.time < CACHE_TTL)) {
-        return cached.data;
+    // Check persistent cache first
+    const cacheKey = `task-links:${sheetId}`;
+    const cached = await cacheGet<Record<string, string>>(cacheKey);
+    if (cached) {
+        console.log(`[getTaskLinks] Cache hit for ${sheetId}`);
+        return cached;
     }
 
     const linkMap: Record<string, string> = {};
@@ -110,8 +109,8 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
                     }
                 }
 
-                // SUCCESS
-                CACHE.set(sheetId, { time: Date.now(), data: linkMap });
+                // SUCCESS - cache with 30 min TTL
+                await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
                 console.log(`[getTaskLinks] Extracted ${Object.keys(linkMap).length} links via Sheets API for ${sheetId}`);
                 break;
 
@@ -140,6 +139,216 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
     } catch (error) {
         // Fallback or log
         console.error("[getTaskLinks] Exhausted retries:", error);
+    }
+    return linkMap;
+}
+
+// Member turtles cache TTL
+const MEMBER_TURTLES_CACHE_TTL = 60 * 10; // 10 minutes in seconds
+
+// Main members database sheet
+const MEMBERS_SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
+const MEMBERS_TAB_NAME = "Crew";
+
+// Core TMNT turtle roles to display on crew cards
+const CORE_TURTLE_ROLES = new Set([
+    "leonardo",
+    "donatello",
+    "michelangelo",
+    "raphael",
+    "april",
+    "splinter",
+    "foot clan",
+]);
+
+/**
+ * Filter a comma-separated turtles string to only include core TMNT roles
+ */
+function filterCoreTurtles(turtlesStr: string): string {
+    if (!turtlesStr) return "";
+    const turtles = turtlesStr.split(",").map(t => t.trim()).filter(Boolean);
+    const filtered = turtles.filter(t => CORE_TURTLE_ROLES.has(t.toLowerCase()));
+    return filtered.join(", ");
+}
+
+/**
+ * Fetch member name → turtles mapping from the main members database
+ * Uses GViz for public read access (doesn't require service account permissions on this sheet)
+ */
+export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
+    // Check persistent cache
+    const cacheKey = "member-turtles-map";
+    const cached = await cacheGet<Record<string, string>>(cacheKey);
+    if (cached) {
+        console.log("[getMemberTurtlesMap] Cache hit");
+        return new Map(Object.entries(cached));
+    }
+
+    const turtlesMap = new Map<string, string>();
+
+    try {
+        const url = `https://docs.google.com/spreadsheets/d/${MEMBERS_SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(MEMBERS_TAB_NAME)}&tqx=out:json&headers=0`;
+        const res = await fetch(url, { cache: "no-store" });
+        if (!res.ok) throw new Error("Failed to fetch members sheet");
+
+        const text = await res.text();
+        const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
+        const start = cleaned.indexOf("{");
+        const end = cleaned.lastIndexOf("}");
+        if (start === -1 || end === -1 || end <= start) throw new Error("GViz parse error");
+
+        const gviz = JSON.parse(cleaned.slice(start, end + 1));
+        const rows = gviz?.table?.rows || [];
+
+        // Find header row
+        let headerRowIdx = -1;
+        let headerRowVals: string[] = [];
+
+        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
+            const rowCells = rows[ri]?.c || [];
+            const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
+            if (rowVals.includes("name") && (rowVals.includes("turtles") || rowVals.includes("turtle"))) {
+                headerRowIdx = ri;
+                headerRowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
+                break;
+            }
+        }
+
+        if (headerRowIdx === -1) {
+            console.warn("[getMemberTurtlesMap] Could not find header row with Name and Turtles columns");
+            return turtlesMap;
+        }
+
+        // Find column indices
+        const nameIdx = headerRowVals.indexOf("name");
+        const turtlesIdx = headerRowVals.includes("turtles")
+            ? headerRowVals.indexOf("turtles")
+            : headerRowVals.indexOf("turtle");
+
+        if (nameIdx === -1 || turtlesIdx === -1) {
+            console.warn("[getMemberTurtlesMap] Missing Name or Turtles column");
+            return turtlesMap;
+        }
+
+        // Extract name → turtles mapping (filtered to core TMNT roles only)
+        for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
+            const cells = rows[ri]?.c || [];
+            const name = String(cells[nameIdx]?.v ?? cells[nameIdx]?.f ?? "").trim();
+            const turtlesRaw = String(cells[turtlesIdx]?.v ?? cells[turtlesIdx]?.f ?? "").trim();
+            const turtles = filterCoreTurtles(turtlesRaw);
+
+            if (name && turtles) {
+                // Normalize name for matching (lowercase, remove extra spaces)
+                const normalizedName = name.toLowerCase().replace(/\s+/g, " ");
+                turtlesMap.set(normalizedName, turtles);
+            }
+        }
+
+        console.log(`[getMemberTurtlesMap] Loaded ${turtlesMap.size} member turtle mappings`);
+        // Cache as plain object (Maps don't serialize to JSON well)
+        await cacheSet(cacheKey, Object.fromEntries(turtlesMap), MEMBER_TURTLES_CACHE_TTL);
+    } catch (error) {
+        console.error("[getMemberTurtlesMap] Error:", error);
+    }
+
+    return turtlesMap;
+}
+
+/**
+ * Extract hyperlinks from a specific column, keyed by another column's value
+ * Handles: Ctrl+K links, rich text links, and HYPERLINK formulas
+ * @param sheetId - The spreadsheet ID
+ * @param tabName - The tab/sheet name
+ * @param keyColumn - Column name to use as the key (e.g., "Crew")
+ * @param linkColumn - Column name containing the hyperlinks (e.g., "Call Time")
+ * @returns Map of key value -> hyperlink URL
+ */
+export async function getColumnHyperlinks(
+    sheetId: string,
+    tabName: string,
+    keyColumn: string,
+    linkColumn: string
+): Promise<Record<string, string>> {
+    const cacheKey = `col-links:${sheetId}:${tabName}:${keyColumn}:${linkColumn}`;
+    const cached = await cacheGet<Record<string, string>>(cacheKey);
+    if (cached) {
+        console.log(`[getColumnHyperlinks] Cache hit for ${tabName}:${linkColumn}`);
+        return cached;
+    }
+
+    const linkMap: Record<string, string> = {};
+    try {
+        const res = await sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            ranges: [`'${tabName}'`],
+            includeGridData: true,
+            // Include textFormatRuns for rich text links
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
+        });
+
+        const sheetData = res.data.sheets?.[0];
+        if (!sheetData?.data) return linkMap;
+
+        for (const grid of sheetData.data) {
+            const rows = grid.rowData;
+            if (!rows || rows.length === 0) continue;
+
+            // Find header row and column indices
+            const headerRow = rows[0]?.values || [];
+            let keyColIdx = -1;
+            let linkColIdx = -1;
+
+            for (let c = 0; c < headerRow.length; c++) {
+                const val = (headerRow[c]?.userEnteredValue?.stringValue ||
+                    headerRow[c]?.formattedValue || "").toLowerCase().trim();
+                if (val.includes(keyColumn.toLowerCase())) keyColIdx = c;
+                if (val.includes(linkColumn.toLowerCase())) linkColIdx = c;
+            }
+
+            if (keyColIdx === -1 || linkColIdx === -1) continue;
+
+            // Extract hyperlinks from data rows
+            for (let r = 1; r < rows.length; r++) {
+                const cells = rows[r]?.values || [];
+                const keyCell = cells[keyColIdx];
+                const linkCell = cells[linkColIdx];
+
+                const keyValue = keyCell?.userEnteredValue?.stringValue ||
+                    keyCell?.formattedValue || "";
+
+                // Try multiple ways to get the hyperlink:
+                // 1. Direct hyperlink property (Ctrl+K links)
+                let hyperlink = linkCell?.hyperlink;
+
+                // 2. Rich text links (textFormatRuns with link.uri)
+                if (!hyperlink && linkCell?.textFormatRuns) {
+                    for (const run of linkCell.textFormatRuns) {
+                        if (run?.format?.link?.uri) {
+                            hyperlink = run.format.link.uri;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. HYPERLINK formula in userEnteredValue
+                if (!hyperlink && linkCell?.userEnteredValue?.formulaValue) {
+                    const formula = linkCell.userEnteredValue.formulaValue;
+                    const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                    if (match) {
+                        hyperlink = match[1];
+                    }
+                }
+
+                if (keyValue && hyperlink) {
+                    linkMap[keyValue.trim()] = hyperlink;
+                }
+            }
+        }
+
+        await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
+        console.log(`[getColumnHyperlinks] Extracted ${Object.keys(linkMap).length} links from ${tabName}:${linkColumn}`);
+    } catch (error) {
+        console.error("[getColumnHyperlinks] Error:", error);
     }
     return linkMap;
 }

@@ -3,6 +3,7 @@
 import { use, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
+import { TURTLES } from '@/app/ui/constants'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -66,6 +67,13 @@ type CrewData = {
   } | null
 }
 
+type UserData = {
+  memberId: string
+  name: string
+  crews: string[]
+  discordId?: string
+}
+
 export default function CrewPage({ params }: { params: Promise<{ crewId: string }> }) {
   const { crewId } = use(params)
   const [data, setData] = useState<CrewData | null>(null)
@@ -73,7 +81,11 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   const [error, setError] = useState<string | null>(null)
   const [loadingStage, setLoadingStage] = useState(0)
   const [elapsedTime, setElapsedTime] = useState(0)
+  const [user, setUser] = useState<UserData | null>(null)
+  const [joining, setJoining] = useState(false)
+  const [leaving, setLeaving] = useState(false)
 
+  // Fetch crew data
   useEffect(() => {
     async function fetchCrew() {
       try {
@@ -92,6 +104,86 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
     }
     fetchCrew()
   }, [crewId])
+
+  // Fetch user data
+  useEffect(() => {
+    async function fetchUser() {
+      try {
+        const meRes = await fetch('/api/me')
+        if (!meRes.ok) return
+
+        const meData = await meRes.json()
+        if (!meData.authenticated || !meData.discordId) return
+
+        // Look up memberId from discordId
+        const lookupRes = await fetch(`/api/member-lookup/${meData.discordId}`)
+        if (!lookupRes.ok) return
+
+        const lookupData = await lookupRes.json()
+        if (!lookupData.memberId) return
+
+        const profileRes = await fetch(`/api/profile/${lookupData.memberId}`)
+        if (profileRes.ok) {
+          const profileData = await profileRes.json()
+          const userCrews = profileData.Crews
+            ? profileData.Crews.split(',').map((c: string) => c.trim().toLowerCase()).filter(Boolean)
+            : []
+          setUser({
+            memberId: lookupData.memberId,
+            name: lookupData.memberName || profileData.Name,
+            crews: userCrews,
+            discordId: meData.discordId,
+          })
+        }
+      } catch (e) {
+        console.error('Failed to fetch user', e)
+      }
+    }
+    fetchUser()
+  }, [])
+
+  const isInCrew = user?.crews.some(c => c.toLowerCase() === crewId.toLowerCase()) ?? false
+
+  const handleJoinCrew = async () => {
+    if (!user) {
+      alert('Please log in to join this crew')
+      return
+    }
+    setJoining(true)
+    try {
+      const res = await fetch('/api/join-crew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crewId, action: 'join' }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to join crew')
+      setUser(prev => prev ? { ...prev, crews: [...prev.crews, crewId.toLowerCase()] } : null)
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setJoining(false)
+    }
+  }
+
+  const handleLeaveCrew = async () => {
+    if (!user) return
+    setLeaving(true)
+    try {
+      const res = await fetch('/api/join-crew', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ crewId, action: 'leave' }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to leave crew')
+      setUser(prev => prev ? { ...prev, crews: prev.crews.filter(c => c.toLowerCase() !== crewId.toLowerCase()) } : null)
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setLeaving(false)
+    }
+  }
 
   // Animate loading stages and track elapsed time
   useEffect(() => {
@@ -178,8 +270,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
       padding: '40px 20px',
     }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
-        {/* Home Button */}
-        <div>
+        {/* Navigation */}
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link href="/" style={{
             display: 'inline-flex',
             alignItems: 'center',
@@ -195,6 +287,38 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           }}>
             ← Home
           </Link>
+          <Link href="/crews" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '8px 14px',
+            background: 'white',
+            border: '1px solid rgba(0,0,0,0.15)',
+            borderRadius: 8,
+            color: '#000',
+            textDecoration: 'none',
+            fontSize: 14,
+            fontWeight: 600,
+          }}>
+            All Crews
+          </Link>
+          {user && (
+            <Link href={`/dashboard/${user.memberId}`} style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: 'white',
+              border: '1px solid rgba(0,0,0,0.15)',
+              borderRadius: 8,
+              color: '#000',
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 600,
+            }}>
+              My Dashboard
+            </Link>
+          )}
         </div>
 
         {/* Header */}
@@ -218,6 +342,65 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               <a href={crew.sheet} target="_blank" rel="noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
                 📊 Open Sheet
               </a>
+            )}
+          </div>
+
+          {/* Join/Leave Crew Button */}
+          <div style={{ marginTop: 20 }}>
+            {user ? (
+              isInCrew ? (
+                <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
+                  <span style={{
+                    background: '#e8f5e9',
+                    color: '#2e7d32',
+                    padding: '8px 16px',
+                    borderRadius: 20,
+                    fontSize: 14,
+                    fontWeight: 600,
+                  }}>
+                    You're a member of this crew
+                  </span>
+                  <button
+                    onClick={handleLeaveCrew}
+                    disabled={leaving}
+                    style={{
+                      padding: '8px 16px',
+                      borderRadius: 10,
+                      border: '1px solid #d32f2f',
+                      background: 'white',
+                      color: '#d32f2f',
+                      fontSize: 14,
+                      fontWeight: 600,
+                      cursor: leaving ? 'wait' : 'pointer',
+                      opacity: leaving ? 0.6 : 1,
+                    }}
+                  >
+                    {leaving ? 'Leaving...' : 'Leave Crew'}
+                  </button>
+                </div>
+              ) : (
+                <button
+                  onClick={handleJoinCrew}
+                  disabled={joining}
+                  style={{
+                    padding: '12px 24px',
+                    borderRadius: 10,
+                    border: 'none',
+                    background: 'black',
+                    color: 'white',
+                    fontSize: 16,
+                    fontWeight: 600,
+                    cursor: joining ? 'wait' : 'pointer',
+                    opacity: joining ? 0.6 : 1,
+                  }}
+                >
+                  {joining ? 'Joining...' : 'Join This Crew'}
+                </button>
+              )
+            ) : (
+              <p style={{ fontSize: 14, opacity: 0.6 }}>
+                <Link href="/" style={{ color: '#ff4d4d' }}>Log in</Link> to join this crew
+              </p>
             )}
           </div>
         </header>
@@ -284,22 +467,23 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 )}
               </div>
               {member.turtles && (
-                <div style={{ marginTop: 8, fontSize: 12 }}>
-                  {member.turtles.split(',').map((t, j) => (
-                    <span key={j} style={{
-                      display: 'inline-block',
-                      background: '#e8f5e9',
-                      color: '#2e7d32',
-                      padding: '2px 8px',
-                      borderRadius: 12,
-                      marginRight: 4,
-                      marginBottom: 4,
-                      fontSize: 11,
-                      fontWeight: 500
-                    }}>
-                      {t.trim()}
-                    </span>
-                  ))}
+                <div style={{ marginTop: 8, display: 'flex', flexWrap: 'wrap', gap: 4 }}>
+                  {member.turtles.split(',').map((tName, j) => {
+                    const tDef = TURTLES.find(t =>
+                      t.id.toLowerCase() === tName.trim().toLowerCase() ||
+                      t.label.toLowerCase() === tName.trim().toLowerCase()
+                    )
+                    if (!tDef) return null
+                    return (
+                      <img
+                        key={j}
+                        src={tDef.image}
+                        alt={tDef.label}
+                        title={tDef.label}
+                        style={{ width: 28, height: 28, objectFit: 'contain' }}
+                      />
+                    )
+                  })}
                 </div>
               )}
               {member.skills && (
@@ -308,8 +492,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 </div>
               )}
               {member.org && (
-                <div style={{ fontSize: 12, opacity: 0.7, marginTop: 4 }}>
-                  {member.org}
+                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
+                  <strong>Orgs:</strong> {member.org}
                 </div>
               )}
             </div>

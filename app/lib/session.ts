@@ -66,7 +66,15 @@ export function verifySession(token: string | undefined): Session | null {
 export async function getSession(): Promise<Session | null> {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value;
-    return verifySession(token);
+    const session = verifySession(token);
+    console.log("[getSession] Cookie check:", {
+        cookieName: COOKIE_NAME,
+        hasToken: !!token,
+        tokenLength: token?.length,
+        hasSession: !!session,
+        discordId: session?.discordId
+    });
+    return session;
 }
 
 /**

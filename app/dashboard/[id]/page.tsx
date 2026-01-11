@@ -5,6 +5,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Inter, Outfit } from "next/font/google"; // Keep fonts if needed, or use defaults
+import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -21,6 +22,7 @@ type CrewOption = {
     emoji?: string;
     sheet?: string;
     callTime?: string;
+    callTimeUrl?: string;
     callLength?: string;
     tasks?: { label: string; url?: string }[];
 };
@@ -54,6 +56,10 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const [authError, setAuthError] = useState<string | null>(null);
     const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
     const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
+    const [pfpUrl, setPfpUrl] = useState<string | null>(null);
+    const [editingSkills, setEditingSkills] = useState(false);
+    const [skillsInput, setSkillsInput] = useState("");
+    const [skillsSaving, setSkillsSaving] = useState(false);
 
     // New state for rich crew data
     const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -93,6 +99,21 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         verifyAuth();
     }, [id]);
 
+    // Fetch profile picture
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`/api/pfp/${id}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json.url) setPfpUrl(json.url);
+                }
+            } catch (e) {
+                console.error("Failed to fetch profile picture", e);
+            }
+        })();
+    }, [id]);
+
     // Fetch crew mappings to get tasks, call times etc.
     useEffect(() => {
         let alive = true;
@@ -115,6 +136,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         event: norm((c as any)?.event) || undefined,
                         sheet: norm((c as any)?.sheet) || undefined,
                         callTime: norm((c as any)?.callTime) || undefined,
+                        callTimeUrl: norm((c as any)?.callTimeUrl) || undefined,
                         callLength: norm((c as any)?.callLength) || undefined,
                         tasks: Array.isArray((c as any)?.tasks) ? (c as any).tasks : [],
                     }))
@@ -263,7 +285,15 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                 {/* Main Card */}
                 <div style={card()}>
-                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 10 }}>
+                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                        <Link href="/crews" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            All Crews
+                        </Link>
+{/* Voting button hidden for now
                         <Link href="/admin/polls" style={{
                             ...btn("secondary"),
                             fontSize: 14,
@@ -271,6 +301,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             Voting
                         </Link>
+*/}
                         <Link href={`/?edit=1&memberId=${idValue}`} style={{
                             ...btn("primary"),
                             fontSize: 14,
@@ -280,13 +311,165 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         </Link>
                     </div>
 
+                    {/* Profile Picture */}
+                    {pfpUrl && (
+                        <div style={{ textAlign: "center", marginBottom: 16 }}>
+                            <img
+                                src={pfpUrl}
+                                alt={`${name}'s profile`}
+                                style={{
+                                    width: 150,
+                                    height: 150,
+                                    borderRadius: "50%",
+                                    objectFit: "cover",
+                                    objectPosition: "top",
+                                    border: "4px solid #fafafa",
+                                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
+                                    imageRendering: "crisp-edges"
+                                }}
+                                onError={(e) => {
+                                    (e.target as HTMLImageElement).style.display = "none";
+                                }}
+                            />
+                        </div>
+                    )}
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                        <StatItem label="Name" value={name} />
+                        <div>
+                            <h3 style={{
+                                fontSize: 12,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                                opacity: 0.5,
+                                marginTop: 0,
+                                marginBottom: 6,
+                                fontWeight: 700
+                            }}>
+                                Name
+                            </h3>
+                            <Link
+                                href={`/profile/${idValue}`}
+                                style={{
+                                    fontSize: 18,
+                                    fontWeight: 500,
+                                    color: "#111",
+                                    textDecoration: "none"
+                                }}
+                                onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
+                                onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                            >
+                                {name}
+                            </Link>
+                        </div>
                         <StatItem label="City" value={city} />
                         <StatItem label="Status" value={status} />
                         <StatItem label="Orgs" value={orgs} />
-                        <StatItem label="Skills" value={skills} />
+                        {/* Skills with edit button */}
+                        <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                                <h3 style={{
+                                    fontSize: 12,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "1px",
+                                    opacity: 0.5,
+                                    margin: 0,
+                                    fontWeight: 700
+                                }}>
+                                    Skills
+                                </h3>
+                                {!editingSkills && (
+                                    <button
+                                        onClick={() => {
+                                            setSkillsInput(skills === "None" ? "" : skills);
+                                            setEditingSkills(true);
+                                        }}
+                                        style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            opacity: 0.4,
+                                            padding: 0,
+                                            display: "flex",
+                                            alignItems: "center"
+                                        }}
+                                        title="Edit skills"
+                                    >
+                                        <Pencil size={12} />
+                                    </button>
+                                )}
+                            </div>
+                            {editingSkills ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                    <textarea
+                                        value={skillsInput}
+                                        onChange={(e) => setSkillsInput(e.target.value)}
+                                        placeholder="Enter your skills (comma separated)"
+                                        style={{
+                                            padding: 8,
+                                            borderRadius: 6,
+                                            border: "1px solid rgba(0,0,0,0.2)",
+                                            fontSize: 14,
+                                            fontFamily: "inherit",
+                                            resize: "vertical",
+                                            minHeight: 60
+                                        }}
+                                    />
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                        <button
+                                            onClick={async () => {
+                                                setSkillsSaving(true);
+                                                try {
+                                                    const res = await fetch("/api/update-skills", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ memberId: idValue, skills: skillsInput })
+                                                    });
+                                                    if (res.ok) {
+                                                        setData({ ...data, Specialties: skillsInput, Skills: skillsInput });
+                                                        setEditingSkills(false);
+                                                    } else {
+                                                        const err = await res.json();
+                                                        alert(err.error || "Failed to save");
+                                                    }
+                                                } catch (e) {
+                                                    alert("Failed to save skills");
+                                                } finally {
+                                                    setSkillsSaving(false);
+                                                }
+                                            }}
+                                            disabled={skillsSaving}
+                                            style={{
+                                                ...btn("primary"),
+                                                fontSize: 12,
+                                                padding: "6px 12px"
+                                            }}
+                                        >
+                                            {skillsSaving ? "Saving..." : "Save"}
+                                        </button>
+                                        <button
+                                            onClick={() => setEditingSkills(false)}
+                                            style={{
+                                                ...btn("secondary"),
+                                                fontSize: 12,
+                                                padding: "6px 12px"
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p style={{
+                                    fontSize: 18,
+                                    fontWeight: 500,
+                                    color: "#111",
+                                    margin: 0,
+                                    wordBreak: "break-word"
+                                }}>
+                                    {skills}
+                                </p>
+                            )}
+                        </div>
                         <StatItem label="Discord" value={discord} />
                         <StatItem label="Telegram" value={telegram} />
 
@@ -394,7 +577,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                                                     {(c?.callTime || c?.callLength) && (
                                                         <div style={{ opacity: 0.7, fontSize: 13 }}>
-                                                            {c.callTime ? c.callTime : ""}
+                                                            {c.callTime ? (
+                                                                c.callTimeUrl ? (
+                                                                    <a href={c.callTimeUrl} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>
+                                                                        {c.callTime}
+                                                                    </a>
+                                                                ) : c.callTime
+                                                            ) : ""}
                                                             {c.callTime && c.callLength ? " • " : ""}
                                                             {c.callLength ? c.callLength : ""}
                                                         </div>

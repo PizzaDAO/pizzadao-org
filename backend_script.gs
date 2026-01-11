@@ -174,6 +174,7 @@ function upsertToCrew_(ss, raw, nowIso) {
       City: getCol_(headerMap, "City"),
       Crews: getCol_(headerMap, "Crews"),
       Turtles: getCol_(headerMap, "Turtles"),
+      Skills: getCol_(headerMap, "Skills"),
       DiscordId: getCol_(headerMap, "DiscordId"),
       DiscordJoined: getCol_(headerMap, "DiscordJoined"),
       Notes: getCol_(headerMap, "Notes"),
@@ -220,6 +221,11 @@ function upsertToCrew_(ss, raw, nowIso) {
       crewSheet
         .getRange(targetRow, mapping.Turtles)
         .setValue(Array.isArray(raw.turtles) ? raw.turtles.join(", ") : String(raw.turtle || ""));
+    }
+
+    // Only write Skills if explicitly provided
+    if (mapping.Skills && raw.skills !== undefined) {
+      crewSheet.getRange(targetRow, mapping.Skills).setValue(String(raw.skills || ""));
     }
 
     // Always write DiscordId and DiscordJoined if provided
