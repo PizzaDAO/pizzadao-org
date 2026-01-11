@@ -13,8 +13,11 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Join PizzaDAO",
-  description: "The world's largest pizza co-op.",
+  title: "PizzaDAO Governance",
+  description: "Anonymous voting for PizzaDAO decisions.",
+  icons: {
+    icon: '/icon',
+  },
 };
 
 export default function RootLayout({

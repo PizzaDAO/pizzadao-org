@@ -6,8 +6,11 @@ import { verifyProof, type SemaphoreProof } from '@semaphore-protocol/core'
  * POST /api/governance/vote
  *
  * Cast an anonymous vote with a Semaphore proof.
+ * Verifies the ZK proof cryptographically (~10ms) before counting.
  */
 export async function POST(req: NextRequest) {
+  const log = (msg: string) => console.log(`[Vote API] ${msg}`)
+
   try {
     const body = await req.json()
     const { pollId, proof } = body as { pollId: string; proof: SemaphoreProof }
@@ -39,31 +42,15 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Verify the proof
-    console.log('Vote API - Starting proof verification...')
-    const isValid = await verifyProof(proof)
-    console.log('Vote API - Proof valid:', isValid)
-    if (!isValid) {
-      return NextResponse.json(
-        { error: 'Invalid proof' },
-        { status: 400 }
-      )
-    }
-
-    // Check that the proof uses the correct group root
+    // Quick validation (without full proof verification)
+    // Check merkle root matches
     if (proof.merkleTreeRoot.toString() !== poll.group.merkleRoot) {
+      log('Merkle root mismatch')
       return NextResponse.json(
-        { error: 'Proof uses incorrect group' },
+        { error: 'Proof uses incorrect group - you may not be in this voting group' },
         { status: 400 }
       )
     }
-
-    // Check that the external nullifier matches the poll ID
-    // Note: Semaphore hashes the scope, so we compare the hash
-    // The client should send the scope that matches what was used in proof generation
-    const expectedScope = proof.scope.toString()
-    console.log('Vote API - Scope from proof:', expectedScope)
-    console.log('Vote API - Poll ID:', pollId)
 
     // Get the nullifier and voted option
     const nullifier = proof.nullifier.toString()
@@ -81,61 +68,123 @@ export async function POST(req: NextRequest) {
     // Check if nullifier has been used (double vote prevention)
     const existingVote = await prisma.anonVoteNullifier.findUnique({
       where: {
-        pollId_nullifier: {
-          pollId,
-          nullifier,
-        },
+        pollId_nullifier: { pollId, nullifier },
       },
     })
 
     if (existingVote) {
+      // Return the existing vote status
       return NextResponse.json(
-        { error: 'You have already voted on this poll' },
+        {
+          error: 'You have already voted on this poll',
+          status: existingVote.status,
+        },
         { status: 400 }
       )
     }
 
-    // Record the vote
-    console.log('Vote API - Recording vote for option', optionIndex, 'with nullifier', nullifier.slice(0, 20) + '...')
-    await prisma.$transaction([
-      // Store the nullifier
+    // Verify the ZK proof cryptographically
+    log(`Verifying proof for poll ${pollId.slice(0, 8)}...`)
+    const verifyStart = Date.now()
+
+    let isValid: boolean
+    try {
+      isValid = await verifyProof(proof)
+    } catch (verifyError) {
+      log(`Proof verification error: ${verifyError}`)
+      return NextResponse.json(
+        { error: 'Failed to verify proof' },
+        { status: 500 }
+      )
+    }
+
+    const verifyTime = Date.now() - verifyStart
+    log(`Proof verification took ${verifyTime}ms - valid: ${isValid}`)
+
+    if (!isValid) {
+      return NextResponse.json(
+        { error: 'Invalid proof - verification failed' },
+        { status: 400 }
+      )
+    }
+
+    // Save verified vote and increment count in a single transaction
+    log(`Saving and counting vote...`)
+
+    const [vote] = await prisma.$transaction([
       prisma.anonVoteNullifier.create({
         data: {
           pollId,
           nullifier,
           optionIndex,
+          status: 'VERIFIED',
+          verifiedAt: new Date(),
+          proofData: proof as object,
         },
       }),
-      // Update the vote count
       prisma.anonPollResult.upsert({
-        where: {
-          pollId_optionIndex: {
-            pollId,
-            optionIndex,
-          },
-        },
-        create: {
-          pollId,
-          optionIndex,
-          count: 1,
-        },
-        update: {
-          count: { increment: 1 },
-        },
+        where: { pollId_optionIndex: { pollId, optionIndex } },
+        create: { pollId, optionIndex, count: 1 },
+        update: { count: { increment: 1 } },
       }),
     ])
-    console.log('Vote API - Vote recorded successfully')
+
+    log(`Vote ${vote.id.slice(0, 8)} VERIFIED and counted!`)
 
     return NextResponse.json({
       success: true,
-      message: 'Vote recorded',
+      message: 'Vote verified and counted!',
+      voteId: vote.id,
+      status: 'VERIFIED',
     })
 
   } catch (error) {
-    console.error('Failed to record vote:', error)
+    console.error('[Vote API] ERROR:', error)
     return NextResponse.json(
-      { error: 'Failed to record vote' },
+      { error: 'Failed to submit vote' },
       { status: 500 }
     )
   }
+}
+
+/**
+ * GET /api/governance/vote?nullifier=xxx&pollId=xxx
+ *
+ * Check vote status by nullifier
+ */
+export async function GET(req: NextRequest) {
+  const { searchParams } = new URL(req.url)
+  const nullifier = searchParams.get('nullifier')
+  const pollId = searchParams.get('pollId')
+
+  if (!nullifier || !pollId) {
+    return NextResponse.json(
+      { error: 'Missing nullifier or pollId' },
+      { status: 400 }
+    )
+  }
+
+  const vote = await prisma.anonVoteNullifier.findUnique({
+    where: {
+      pollId_nullifier: { pollId, nullifier },
+    },
+    select: {
+      status: true,
+      optionIndex: true,
+      createdAt: true,
+      verifiedAt: true,
+    },
+  })
+
+  if (!vote) {
+    return NextResponse.json({ voted: false })
+  }
+
+  return NextResponse.json({
+    voted: true,
+    status: vote.status,
+    optionIndex: vote.optionIndex,
+    createdAt: vote.createdAt,
+    verifiedAt: vote.verifiedAt,
+  })
 }

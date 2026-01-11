@@ -1,7 +1,8 @@
 'use client'
 
-import { useState } from 'react'
+import { useState, useEffect, useCallback } from 'react'
 import { Group } from '@semaphore-protocol/core'
+import { usePrivy } from '@privy-io/react-auth'
 import { useSemaphore } from '../hooks/useSemaphore'
 
 interface Poll {
@@ -19,7 +20,6 @@ interface Poll {
   }
   results?: { optionIndex: number; count: number }[]
   voteCount?: number
-  hasVoted?: boolean
 }
 
 interface PollCardProps {
@@ -27,16 +27,143 @@ interface PollCardProps {
   onVoted?: () => void
 }
 
+type VoteStatus = 'none' | 'PENDING' | 'VERIFIED' | 'REJECTED'
+
+// Store vote info in localStorage
+function getStoredVote(pollId: string): { nullifier: string; status: VoteStatus; optionIndex: number } | null {
+  if (typeof window === 'undefined') return null
+  const stored = localStorage.getItem(`vote_${pollId}`)
+  if (stored) {
+    try {
+      return JSON.parse(stored)
+    } catch {
+      return null
+    }
+  }
+  return null
+}
+
+function storeVote(pollId: string, nullifier: string, status: VoteStatus, optionIndex: number) {
+  if (typeof window === 'undefined') return
+  localStorage.setItem(`vote_${pollId}`, JSON.stringify({ nullifier, status, optionIndex }))
+}
+
 export function PollCard({ poll, onVoted }: PollCardProps) {
-  const { identity, commitment, generateIdentity, isGeneratingIdentity, vote, isVoting } = useSemaphore()
+  const { user } = usePrivy()
+  const discordAccount = user?.linkedAccounts?.find(a => a.type === 'discord_oauth')
+  const discordId = discordAccount?.subject
+
+  const { identity, commitment, vote, isVoting } = useSemaphore(discordId)
   const [selectedOption, setSelectedOption] = useState<number | null>(null)
   const [error, setError] = useState<string | null>(null)
-  const [success, setSuccess] = useState(false)
-  const [isJoiningGroup, setIsJoiningGroup] = useState(false)
-  const [hasJoinedGroup, setHasJoinedGroup] = useState(false)
+  const [isInGroup, setIsInGroup] = useState<boolean | null>(null)
+  const [isCheckingGroup, setIsCheckingGroup] = useState(true)
+  const [isSyncing, setIsSyncing] = useState(false)
+  const [isSubmitting, setIsSubmitting] = useState(false)
+  const [votePhase, setVotePhase] = useState<'idle' | 'proof' | 'submit'>('idle')
+
+  // Vote status tracking
+  const [voteStatus, setVoteStatus] = useState<VoteStatus>('none')
+  const [votedOption, setVotedOption] = useState<number | null>(null)
+  const [storedNullifier, setStoredNullifier] = useState<string | null>(null)
 
   const isOpen = poll.status === 'OPEN'
   const isClosed = poll.status === 'CLOSED'
+  const hasVoted = voteStatus !== 'none'
+
+  // Load stored vote on mount
+  useEffect(() => {
+    const stored = getStoredVote(poll.id)
+    if (stored) {
+      setVoteStatus(stored.status)
+      setVotedOption(stored.optionIndex)
+      setStoredNullifier(stored.nullifier)
+    }
+  }, [poll.id])
+
+  // Poll for vote status updates (if pending)
+  useEffect(() => {
+    if (voteStatus !== 'PENDING' || !storedNullifier) return
+
+    const checkStatus = async () => {
+      try {
+        const res = await fetch(`/api/governance/vote?pollId=${poll.id}&nullifier=${storedNullifier}`)
+        if (res.ok) {
+          const data = await res.json()
+          if (data.voted && data.status !== 'PENDING') {
+            setVoteStatus(data.status)
+            storeVote(poll.id, storedNullifier, data.status, votedOption!)
+          }
+        }
+      } catch {
+        // Ignore polling errors
+      }
+    }
+
+    // Check immediately and then every 10 seconds
+    checkStatus()
+    const interval = setInterval(checkStatus, 10000)
+    return () => clearInterval(interval)
+  }, [voteStatus, storedNullifier, poll.id, votedOption])
+
+  // Check if user is in the group, and sync if not
+  useEffect(() => {
+    if (!commitment || !poll.group || !discordId) {
+      setIsCheckingGroup(false)
+      return
+    }
+
+    async function checkAndSyncMembership() {
+      try {
+        // First check current membership
+        const res = await fetch(`/api/governance/groups/${poll.group!.id}`)
+        if (!res.ok) throw new Error('Failed to fetch group')
+        const groupData = await res.json()
+        const isMember = groupData.members.some(
+          (m: { commitment: string }) => m.commitment === commitment
+        )
+
+        if (isMember) {
+          setIsInGroup(true)
+          setIsCheckingGroup(false)
+          return
+        }
+
+        // Not a member yet - try to sync
+        setIsSyncing(true)
+        setIsCheckingGroup(false)
+
+        const syncRes = await fetch('/api/governance/sync-me', {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ discordId }),
+        })
+
+        if (syncRes.ok) {
+          // Re-check membership after sync
+          const res2 = await fetch(`/api/governance/groups/${poll.group!.id}`)
+          if (res2.ok) {
+            const groupData2 = await res2.json()
+            const isMemberNow = groupData2.members.some(
+              (m: { commitment: string }) => m.commitment === commitment
+            )
+            setIsInGroup(isMemberNow)
+          } else {
+            setIsInGroup(false)
+          }
+        } else {
+          setIsInGroup(false)
+        }
+      } catch {
+        setIsInGroup(false)
+      } finally {
+        setIsCheckingGroup(false)
+        setIsSyncing(false)
+      }
+    }
+
+    checkAndSyncMembership()
+  }, [commitment, poll.group, discordId])
 
   // Format time remaining
   const getTimeRemaining = () => {
@@ -54,46 +181,13 @@ export function PollCard({ poll, onVoted }: PollCardProps) {
     return `${hours}h remaining`
   }
 
-  // Join the Semaphore group
-  const handleJoinGroup = async () => {
-    if (!commitment || !poll.group) return
-
-    setIsJoiningGroup(true)
-    setError(null)
-
-    try {
-      const res = await fetch('/api/governance/groups/join', {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          groupId: poll.group.id,
-          commitment: commitment.toString(),
-          discordId: 'user', // TODO: Get from session
-        }),
-      })
-
-      if (!res.ok) {
-        const data = await res.json()
-        if (data.error === 'Already a member of this group') {
-          setHasJoinedGroup(true)
-          return
-        }
-        throw new Error(data.error || 'Failed to join group')
-      }
-
-      setHasJoinedGroup(true)
-    } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to join group')
-    } finally {
-      setIsJoiningGroup(false)
-    }
-  }
-
   // Cast vote
-  const handleVote = async () => {
+  const handleVote = useCallback(async () => {
     if (selectedOption === null || !identity || !poll.group) return
 
     setError(null)
+    setVotePhase('proof')
+    setIsSubmitting(true)
 
     try {
       // Fetch group members to reconstruct the group
@@ -108,9 +202,11 @@ export function PollCard({ poll, onVoted }: PollCardProps) {
       }
 
       // Generate proof and vote
-      const { proof } = await vote(semaphoreGroup, poll.id, selectedOption)
+      const { proof, nullifier } = await vote(semaphoreGroup, poll.id, selectedOption)
 
-      // Submit vote to API
+      // Now submitting to API
+      setVotePhase('submit')
+
       const voteRes = await fetch('/api/governance/vote', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
@@ -127,17 +223,26 @@ export function PollCard({ poll, onVoted }: PollCardProps) {
         }),
       })
 
+      const responseData = await voteRes.json()
+
       if (!voteRes.ok) {
-        const data = await voteRes.json()
-        throw new Error(data.error || 'Failed to submit vote')
+        throw new Error(responseData.error || responseData.message || 'Failed to submit vote')
       }
 
-      setSuccess(true)
+      // Vote submitted! Use status from server response
+      const status = responseData.status as VoteStatus || 'PENDING'
+      storeVote(poll.id, nullifier, status, selectedOption)
+      setStoredNullifier(nullifier)
+      setVoteStatus(status)
+      setVotedOption(selectedOption)
       onVoted?.()
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Failed to vote')
+    } finally {
+      setIsSubmitting(false)
+      setVotePhase('idle')
     }
-  }
+  }, [selectedOption, identity, poll.group, poll.id, vote, onVoted])
 
   // Calculate result percentages
   const getResultPercentage = (optionIndex: number) => {
@@ -146,17 +251,52 @@ export function PollCard({ poll, onVoted }: PollCardProps) {
     return result ? Math.round((result.count / poll.voteCount) * 100) : 0
   }
 
+  // Get total votes from results
+  const getTotalVotes = () => {
+    if (!poll.results) return 0
+    return poll.results.reduce((sum, r) => sum + r.count, 0)
+  }
+
+  // Render vote status pill
+  const renderVoteStatusPill = () => {
+    if (voteStatus === 'PENDING') {
+      return (
+        <span className="px-2 py-1 text-xs rounded-full bg-yellow-900 text-yellow-400 flex items-center gap-1">
+          <span className="animate-pulse">●</span> Vote Pending
+        </span>
+      )
+    }
+    if (voteStatus === 'VERIFIED') {
+      return (
+        <span className="px-2 py-1 text-xs rounded-full bg-green-900 text-green-400">
+          ✓ Voted
+        </span>
+      )
+    }
+    if (voteStatus === 'REJECTED') {
+      return (
+        <span className="px-2 py-1 text-xs rounded-full bg-red-900 text-red-400">
+          ✗ Vote Failed
+        </span>
+      )
+    }
+    return null
+  }
+
   return (
     <div className="p-6 bg-gray-900 rounded-xl border border-gray-800">
-      {/* Status badge */}
+      {/* Status badges */}
       <div className="flex items-center justify-between mb-4">
-        <span className={`px-2 py-1 text-xs rounded-full ${
-          isOpen ? 'bg-green-900 text-green-400' :
-          isClosed ? 'bg-gray-700 text-gray-400' :
-          'bg-yellow-900 text-yellow-400'
-        }`}>
-          {poll.status}
-        </span>
+        <div className="flex items-center gap-2">
+          <span className={`px-2 py-1 text-xs rounded-full ${
+            isOpen ? 'bg-green-900 text-green-400' :
+            isClosed ? 'bg-gray-700 text-gray-400' :
+            'bg-yellow-900 text-yellow-400'
+          }`}>
+            {poll.status}
+          </span>
+          {renderVoteStatusPill()}
+        </div>
         {poll.closesAt && (
           <span className="text-sm text-gray-400">{getTimeRemaining()}</span>
         )}
@@ -193,19 +333,33 @@ export function PollCard({ poll, onVoted }: PollCardProps) {
                   />
                 </div>
               </div>
-            ) : isOpen && !success ? (
+            ) : isOpen && !hasVoted ? (
               // Voting buttons for open polls
               <button
                 onClick={() => setSelectedOption(index)}
-                disabled={!identity || isVoting}
+                disabled={!identity || !isInGroup || isVoting || isCheckingGroup || isSubmitting}
                 className={`w-full p-3 rounded-lg text-left transition-colors ${
                   selectedOption === index
                     ? 'bg-blue-600 text-white'
                     : 'bg-gray-800 hover:bg-gray-700'
-                } ${!identity ? 'opacity-50 cursor-not-allowed' : ''}`}
+                } ${(!identity || !isInGroup || isCheckingGroup) ? 'opacity-50 cursor-not-allowed' : ''}`}
               >
                 {option}
               </button>
+            ) : hasVoted ? (
+              // Show which option was voted for
+              <div className={`p-3 rounded-lg ${
+                votedOption === index
+                  ? 'bg-blue-900/50 border border-blue-700'
+                  : 'bg-gray-800'
+              }`}>
+                <div className="flex items-center justify-between">
+                  <span>{option}</span>
+                  {votedOption === index && (
+                    <span className="text-blue-400 text-sm">Your vote</span>
+                  )}
+                </div>
+              </div>
             ) : (
               // Static display
               <div className="p-3 bg-gray-800 rounded-lg">{option}</div>
@@ -215,46 +369,49 @@ export function PollCard({ poll, onVoted }: PollCardProps) {
       </div>
 
       {/* Vote count for closed polls */}
-      {isClosed && poll.voteCount !== undefined && (
+      {isClosed && (
         <p className="text-sm text-gray-400 mt-4">
-          Total votes: {poll.voteCount}
+          Total votes: {getTotalVotes()}
         </p>
       )}
 
       {/* Voting flow */}
-      {isOpen && !success && (
+      {isOpen && !hasVoted && (
         <div className="mt-4 space-y-3">
           {error && (
             <p className="text-red-400 text-sm">{error}</p>
           )}
 
-          {!identity ? (
-            // Step 1: Generate identity
-            <button
-              onClick={generateIdentity}
-              disabled={isGeneratingIdentity}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg transition-colors"
-            >
-              {isGeneratingIdentity ? 'Generating Identity...' : 'Generate Voting Identity'}
-            </button>
-          ) : !hasJoinedGroup ? (
-            // Step 2: Join group
-            <button
-              onClick={handleJoinGroup}
-              disabled={isJoiningGroup}
-              className="w-full py-2 px-4 bg-blue-600 hover:bg-blue-700 disabled:bg-gray-600 rounded-lg transition-colors"
-            >
-              {isJoiningGroup ? 'Joining Group...' : 'Join Voting Group'}
-            </button>
+          {isCheckingGroup || isSyncing ? (
+            <div className="text-center text-gray-400 text-sm flex items-center justify-center gap-2">
+              <span className="animate-spin">⏳</span>
+              {isSyncing ? 'Syncing your eligibility...' : 'Checking eligibility...'}
+            </div>
+          ) : !isInGroup ? (
+            <div className="p-3 bg-yellow-900/30 border border-yellow-700 rounded-lg text-center">
+              <p className="text-yellow-400 text-sm">
+                You&apos;re not in this voting group. You may not have the required Discord role.
+              </p>
+            </div>
           ) : selectedOption !== null ? (
-            // Step 3: Cast vote
-            <button
-              onClick={handleVote}
-              disabled={isVoting}
-              className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded-lg transition-colors"
-            >
-              {isVoting ? 'Casting Vote...' : 'Cast Anonymous Vote'}
-            </button>
+            <div className="space-y-2">
+              <button
+                onClick={handleVote}
+                disabled={isSubmitting}
+                className="w-full py-2 px-4 bg-green-600 hover:bg-green-700 disabled:bg-gray-600 rounded-lg transition-colors"
+              >
+                {votePhase === 'proof' ? 'Generating ZK proof...' :
+                 votePhase === 'submit' ? 'Submitting vote...' :
+                 'Cast Anonymous Vote'}
+              </button>
+              {isSubmitting && (
+                <p className="text-xs text-gray-400 text-center">
+                  {votePhase === 'proof'
+                    ? 'Creating cryptographic proof of your vote...'
+                    : 'Submitting your vote...'}
+                </p>
+              )}
+            </div>
           ) : (
             <p className="text-gray-400 text-sm text-center">
               Select an option to vote
@@ -263,20 +420,39 @@ export function PollCard({ poll, onVoted }: PollCardProps) {
         </div>
       )}
 
-      {/* Success message */}
-      {success && (
-        <div className="mt-4 p-3 bg-green-900/50 border border-green-700 rounded-lg text-center">
-          <p className="text-green-400">Vote cast anonymously!</p>
-          <p className="text-xs text-gray-400 mt-1">
-            Your vote is recorded. No one can see how you voted.
-          </p>
-        </div>
-      )}
-
-      {/* Already voted indicator */}
-      {poll.hasVoted && !success && (
-        <div className="mt-4 p-3 bg-blue-900/50 border border-blue-700 rounded-lg text-center">
-          <p className="text-blue-400">You have voted</p>
+      {/* Vote submitted message */}
+      {hasVoted && isOpen && (
+        <div className={`mt-4 p-3 rounded-lg text-center ${
+          voteStatus === 'PENDING'
+            ? 'bg-yellow-900/30 border border-yellow-700'
+            : voteStatus === 'VERIFIED'
+            ? 'bg-green-900/50 border border-green-700'
+            : 'bg-red-900/30 border border-red-700'
+        }`}>
+          {voteStatus === 'PENDING' && (
+            <>
+              <p className="text-yellow-400">Vote submitted!</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Your vote is being verified. This happens in the background - you can close this page.
+              </p>
+            </>
+          )}
+          {voteStatus === 'VERIFIED' && (
+            <>
+              <p className="text-green-400">Vote verified and counted!</p>
+              <p className="text-xs text-gray-400 mt-1">
+                Your anonymous vote has been recorded.
+              </p>
+            </>
+          )}
+          {voteStatus === 'REJECTED' && (
+            <>
+              <p className="text-red-400">Vote verification failed</p>
+              <p className="text-xs text-gray-400 mt-1">
+                There was an issue with your vote. Please try again.
+              </p>
+            </>
+          )}
         </div>
       )}
     </div>

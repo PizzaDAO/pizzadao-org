@@ -169,14 +169,23 @@ model AnonPoll {
 
 // Nullifiers to prevent double voting
 model AnonVoteNullifier {
-  id          String   @id @default(cuid())
+  id          String     @id @default(cuid())
   pollId      String
-  nullifier   String   // The nullifier hash from the proof
-  optionIndex Int      // Which option was voted for
-  createdAt   DateTime @default(now())
-  poll        AnonPoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  nullifier   String     // The nullifier hash from the proof
+  optionIndex Int        // Which option was voted for
+  status      VoteStatus @default(PENDING) // pending until proof verified
+  proofData   Json?      // Store proof for background verification
+  createdAt   DateTime   @default(now())
+  verifiedAt  DateTime?  // When proof was verified
+  poll        AnonPoll   @relation(fields: [pollId], references: [id], onDelete: Cascade)
 
   @@unique([pollId, nullifier])
+}
+
+enum VoteStatus {
+  PENDING   // Submitted, awaiting verification
+  VERIFIED  // Proof verified, vote counts
+  REJECTED  // Proof invalid, vote discarded
 }
 
 // Vote tallies per option
@@ -195,4 +204,12 @@ enum VotingCategory {
   SOCIAL
   GOVERNANCE
   ALL
+}
+
+// User identity for anonymous voting (links Discord to Semaphore commitment)
+model UserIdentity {
+  id          String   @id @default(cuid())
+  discordId   String   @unique
+  commitment  String   @unique
+  createdAt   DateTime @default(now())
 }

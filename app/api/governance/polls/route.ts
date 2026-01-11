@@ -1,5 +1,37 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { prisma } from '@/lib/prisma'
+import { prisma } from '@/app/lib/db'
+import { syncGroupMembers } from '@/app/lib/batch-sync'
+
+// Default voting group - Pockets Checked role holders
+const DEFAULT_GROUP = {
+  discordRoleId: '926922069600501830',
+  discordRoleName: 'pockets checked',
+  name: 'Pockets Checked Voters',
+}
+
+/**
+ * Ensure the default voting group exists
+ */
+async function ensureDefaultGroup() {
+  let group = await prisma.semaphoreGroup.findFirst({
+    where: { discordRoleId: DEFAULT_GROUP.discordRoleId },
+  })
+
+  if (!group) {
+    group = await prisma.semaphoreGroup.create({
+      data: {
+        name: DEFAULT_GROUP.name,
+        discordRoleId: DEFAULT_GROUP.discordRoleId,
+        discordRoleName: DEFAULT_GROUP.discordRoleName,
+        category: 'ALL',
+        merkleRoot: '0',
+        memberCount: 0,
+      },
+    })
+  }
+
+  return group
+}
 
 /**
  * GET /api/governance/polls
@@ -72,9 +104,9 @@ export async function GET(req: NextRequest) {
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json()
-    const { question, description, options, groupId, category, closesAt, createdBy } = body
+    const { question, description, options, category, closesAt, createdBy } = body
 
-    if (!question || !options || !groupId || !createdBy) {
+    if (!question || !options || !createdBy) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
@@ -88,16 +120,21 @@ export async function POST(req: NextRequest) {
       )
     }
 
-    // Verify group exists
-    const group = await prisma.semaphoreGroup.findUnique({
-      where: { id: groupId },
-    })
+    // Get or create the default group (leonardo role)
+    const group = await ensureDefaultGroup()
 
-    if (!group) {
-      return NextResponse.json(
-        { error: 'Group not found' },
-        { status: 404 }
-      )
+    // Determine initial status
+    const initialStatus = body.status === 'OPEN' ? 'OPEN' : 'DRAFT'
+
+    // If creating as OPEN, try to sync group (but don't fail if sync fails)
+    let syncResult = null
+    if (initialStatus === 'OPEN') {
+      try {
+        syncResult = await syncGroupMembers(group.id)
+      } catch (syncError) {
+        console.warn('Group sync failed, poll will still be created:', syncError)
+        // Poll will still be created - users can sync when they visit
+      }
     }
 
     // Create poll
@@ -106,11 +143,11 @@ export async function POST(req: NextRequest) {
         question,
         description,
         options,
-        groupId,
+        groupId: group.id,
         category: category || 'ALL',
         closesAt: closesAt ? new Date(closesAt) : null,
         createdBy,
-        status: 'DRAFT',
+        status: initialStatus,
       },
       include: {
         group: {
@@ -118,6 +155,7 @@ export async function POST(req: NextRequest) {
             id: true,
             name: true,
             discordRoleName: true,
+            memberCount: true,
           },
         },
       },
@@ -132,7 +170,10 @@ export async function POST(req: NextRequest) {
       })),
     })
 
-    return NextResponse.json(poll, { status: 201 })
+    return NextResponse.json({
+      ...poll,
+      sync: syncResult,
+    }, { status: 201 })
 
   } catch (error) {
     console.error('Failed to create poll:', error)
