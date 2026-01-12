@@ -6,6 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
 import { TURTLES, CREWS } from "../../ui/constants";
+import { NFTCollection } from "../../ui/nft";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -303,6 +304,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             })()}
                         </div>
                     </div>
+
+                    {/* NFT Collection Section */}
+                    <NFTCollection memberId={idValue} />
 
                     {/* Crews Section */}
                     {userCrews.length > 0 && (

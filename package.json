@@ -14,6 +14,8 @@
     "@neondatabase/serverless": "^1.0.2",
     "@prisma/adapter-neon": "^7.2.0",
     "@prisma/client": "^7.2.0",
+    "@rainbow-me/rainbowkit": "^2.2.10",
+    "@tanstack/react-query": "^5.90.16",
     "@vercel/kv": "^3.0.0",
     "@vercel/postgres": "^0.10.0",
     "cheerio": "^1.1.2",
@@ -25,7 +27,9 @@
     "prisma": "^7.2.0",
     "promise-limit": "^2.7.0",
     "react": "19.2.3",
-    "react-dom": "19.2.3"
+    "react-dom": "19.2.3",
+    "viem": "^2.44.1",
+    "wagmi": "^2.19.5"
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
