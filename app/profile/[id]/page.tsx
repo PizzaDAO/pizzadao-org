@@ -305,8 +305,8 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         </div>
                     </div>
 
-                    {/* NFT Collection Section */}
-                    <NFTCollection memberId={idValue} />
+                    {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
+                    <NFTCollection memberId={idValue} showConnectPrompt={false} />
 
                     {/* Crews Section */}
                     {userCrews.length > 0 && (

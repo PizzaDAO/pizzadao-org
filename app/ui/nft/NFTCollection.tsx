@@ -9,6 +9,7 @@ import { useAccount } from "wagmi";
 type NFTCollectionProps = {
   memberId: string;
   maxPerCollection?: number;
+  showConnectPrompt?: boolean;
 };
 
 type GroupedNFT = {
@@ -21,7 +22,7 @@ type GroupedNFT = {
   overflow: number;
 };
 
-export function NFTCollection({ memberId, maxPerCollection = 3 }: NFTCollectionProps) {
+export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPrompt = true }: NFTCollectionProps) {
   const [data, setData] = useState<NFTCollectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -119,8 +120,11 @@ export function NFTCollection({ memberId, maxPerCollection = 3 }: NFTCollectionP
     borderTop: "1px solid rgba(0,0,0,0.1)",
   };
 
-  // Show connect wallet prompt if no wallet is saved
+  // Show connect wallet prompt if no wallet is saved (only if showConnectPrompt is true)
   if (!loading && data?.noWallet && !walletSaved) {
+    if (!showConnectPrompt) {
+      return null; // Hide completely on profile page if no wallet
+    }
     return (
       <div style={sectionStyle}>
         <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>

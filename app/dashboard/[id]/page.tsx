@@ -8,6 +8,7 @@ import { Inter, Outfit } from "next/font/google"; // Keep fonts if needed, or us
 import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
 import { PepIcon, PepAmount } from "../../ui/economy";
+import { NFTCollection } from "../../ui/nft";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -593,6 +594,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         </div>
                     </div>
 
+                    {/* NFT Collection Section - shows connect prompt if no wallet */}
+                    <NFTCollection memberId={idValue} showConnectPrompt={true} />
+
                     {/* Crews Section - MATCHING STEP 5 UI */}
                     {(() => {
                         // Normalize userCrews to IDs where possible
@@ -765,8 +769,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             </div>
                         );
                     })()}
-
-
 
                     <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)", textAlign: "center" }}>
                         <button

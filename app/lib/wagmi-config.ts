@@ -1,5 +1,5 @@
 import { getDefaultConfig } from "@rainbow-me/rainbowkit";
-import { mainnet, base, polygon, optimism, zora } from "wagmi/chains";
+import { mainnet, base, polygon, optimism, zora } from "viem/chains";
 
 export const config = getDefaultConfig({
   appName: "PizzaDAO",
