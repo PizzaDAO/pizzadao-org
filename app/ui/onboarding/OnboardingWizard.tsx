@@ -181,7 +181,10 @@ export function OnboardingWizard() {
         const claimRes = await fetch("/api/auto-claim", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ memberId: lookup.memberId, discordId }),
+          body: JSON.stringify({
+            memberId: lookup.memberId,
+            expectedName: lookup.memberName || discordNick,
+          }),
         });
         if (claimRes.ok) {
           router.push(`/dashboard/${lookup.memberId}`);
