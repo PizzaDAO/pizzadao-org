@@ -67,14 +67,14 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ memberId, walletAddress: address }),
           });
-          console.log("[NFTCollection] Wallet save response:", res.status);
+          const resData = await res.json();
+          console.log("[NFTCollection] Wallet save response:", res.status, resData);
           if (res.ok) {
             setWalletSaved(true);
             // Refetch NFTs with the new wallet
             await fetchNFTs();
           } else {
-            const errData = await res.json();
-            console.error("[NFTCollection] Wallet save failed:", errData);
+            console.error("[NFTCollection] Wallet save failed:", resData);
           }
         } catch (e) {
           console.error("Failed to save wallet", e);

@@ -125,7 +125,11 @@ export async function POST(request: NextRequest) {
     // Update the wallet cell (row is 1-indexed in Sheets API)
     const cellRange = `${TAB_NAME}!${colToLetter(walletColIdx)}${memberRowIdx + 1}`;
 
-    await sheets.spreadsheets.values.update({
+    console.log(`[wallet] Writing to cell ${cellRange} for member ${memberId}`);
+    console.log(`[wallet] Header row: ${headerRowIdx}, wallet col: ${walletColIdx}, member row: ${memberRowIdx}`);
+    console.log(`[wallet] Headers found:`, headerRowVals);
+
+    const updateResult = await sheets.spreadsheets.values.update({
       spreadsheetId: SHEET_ID,
       range: cellRange,
       valueInputOption: "RAW",
@@ -134,12 +138,20 @@ export async function POST(request: NextRequest) {
       },
     });
 
+    console.log(`[wallet] Update result:`, JSON.stringify(updateResult.data));
     console.log(`[wallet] Updated wallet for member ${memberId} to ${walletAddress}`);
 
     return NextResponse.json({
       success: true,
       message: "Wallet address saved",
       walletAddress,
+      debug: {
+        cellRange,
+        headerRow: headerRowIdx,
+        walletCol: walletColIdx,
+        memberRow: memberRowIdx,
+        updateResult: updateResult.data,
+      }
     });
   } catch (error) {
     console.error("[wallet] Error saving wallet:", error);
