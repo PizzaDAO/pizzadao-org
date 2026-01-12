@@ -17,7 +17,9 @@ export function GovernanceProviders({ children }: Props) {
           accentColor: '#6366f1',
         },
         embeddedWallets: {
-          createOnLogin: 'users-without-wallets',
+          ethereum: {
+            createOnLogin: 'users-without-wallets',
+          },
         },
         loginMethods: ['discord'],
       }}

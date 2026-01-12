@@ -23,11 +23,11 @@ export default function GovernanceContent() {
   const discordUsername = discordAccount?.username
   const isAdmin = discordId && ADMIN_IDS.includes(discordId)
 
-  const { hasStoredIdentity, isGeneratingIdentity, identityError, generateIdentity, isWaitingForWallet } = useSemaphore(discordId)
+  const { hasIdentity, isGeneratingIdentity, identityError, generateIdentity } = useSemaphore(discordId)
 
   // Auto-sync user when they have identity
   useEffect(() => {
-    if (authenticated && hasStoredIdentity && discordId && !isSyncing) {
+    if (authenticated && hasIdentity && discordId && !isSyncing) {
       setIsSyncing(true)
       fetch('/api/governance/sync-me', {
         method: 'POST',
@@ -35,7 +35,7 @@ export default function GovernanceContent() {
         body: JSON.stringify({ discordId }),
       }).finally(() => setIsSyncing(false))
     }
-  }, [authenticated, hasStoredIdentity, discordId])
+  }, [authenticated, hasIdentity, discordId])
 
   // Handle logout
   const handleLogout = async () => {
@@ -124,7 +124,7 @@ export default function GovernanceContent() {
         <div className="lg:col-span-2 space-y-6">
           <div className="flex items-center justify-between">
             <h2 className="text-xl font-semibold">Polls</h2>
-            {isAdmin && hasStoredIdentity && (
+            {isAdmin && hasIdentity && (
               <button
                 onClick={() => setShowCreatePoll(!showCreatePoll)}
                 className="px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors"
@@ -251,19 +251,7 @@ export default function GovernanceContent() {
                 Try Again
               </button>
             </div>
-          ) : isWaitingForWallet ? (
-            <div className="p-8 bg-gray-900 rounded-xl border border-gray-800 text-center">
-              <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
-              <p className="text-gray-400">Setting up your secure wallet...</p>
-              <p className="text-gray-500 text-sm mt-2">This may take a moment for new users</p>
-              <button
-                onClick={generateIdentity}
-                className="mt-4 px-4 py-2 bg-blue-600 hover:bg-blue-700 rounded-lg text-sm transition-colors"
-              >
-                Continue Setup
-              </button>
-            </div>
-          ) : !hasStoredIdentity ? (
+          ) : !hasIdentity ? (
             <div className="p-8 bg-gray-900 rounded-xl border border-gray-800 text-center">
               <div className="animate-spin w-8 h-8 border-2 border-blue-500 border-t-transparent rounded-full mx-auto mb-4" />
               <p className="text-gray-400">Preparing voting system...</p>
@@ -288,7 +276,7 @@ export default function GovernanceContent() {
               <p className="text-gray-400 text-sm">
                 Logged in as <span className="text-white">{discordUsername || 'User'}</span>
               </p>
-              {hasStoredIdentity && (
+              {hasIdentity && (
                 <p className="text-green-400 text-sm mt-2">
                   Voting identity active
                 </p>
