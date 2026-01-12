@@ -135,14 +135,19 @@ export async function POST(req: Request) {
                     return NextResponse.json({ error: "Missing Sheets env vars" }, { status: 500 });
                 }
 
+                // Match the profile route's payload structure - fields at top level AND in raw
                 const payload = {
                     secret,
+                    source: "onboarding_auto_claim",
+                    memberId: String(memberId),
+                    discordId: sessionDiscordId,
+                    discordJoined: true,
+                    turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
                     raw: {
                         source: "onboarding_auto_claim",
                         memberId: String(memberId),
                         discordId: sessionDiscordId,
                         discordJoined: true,
-                        // Include merged turtles
                         turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
                     },
                 };
@@ -164,6 +169,30 @@ export async function POST(req: Request) {
                         error: "Failed to update sheet",
                         details: parsed?.error ?? sheetText,
                     }, { status: 502 });
+                }
+
+                // Create voting identity for the user (fire-and-forget, don't block on failure)
+                try {
+                    const governanceUrl = process.env.GOVERNANCE_API_URL || 'http://localhost:3003';
+                    fetch(`${governanceUrl}/api/governance/create-identity`, {
+                        method: 'POST',
+                        headers: { 'Content-Type': 'application/json' },
+                        body: JSON.stringify({
+                            discordId: sessionDiscordId,
+                            secret,
+                        }),
+                    }).then(res => {
+                        if (res.ok) {
+                            console.log(`[auto-claim] Created voting identity for ${sessionDiscordId}`);
+                        } else {
+                            console.warn(`[auto-claim] Failed to create voting identity for ${sessionDiscordId}`);
+                        }
+                    }).catch(err => {
+                        console.warn(`[auto-claim] Error creating voting identity:`, err.message);
+                    });
+                } catch (err) {
+                    // Don't fail the claim if identity creation fails
+                    console.warn('[auto-claim] Error initiating identity creation:', err);
                 }
 
                 return NextResponse.json({ ok: true });

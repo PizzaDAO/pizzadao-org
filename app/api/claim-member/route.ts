@@ -184,14 +184,19 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing Sheets env vars" }, { status: 500 });
         }
 
+        // Match the profile route's payload structure - fields at top level AND in raw
         const payload = {
             secret,
+            source: "onboarding_claim",
+            memberId: String(memberId),
+            discordId: sessionDiscordId,
+            discordJoined: true,
+            turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
             raw: {
                 source: "onboarding_claim",
                 memberId: String(memberId),
                 discordId: sessionDiscordId,
                 discordJoined: true,
-                // Include merged turtles (existing + Discord roles)
                 turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
             },
         };
@@ -216,6 +221,30 @@ export async function POST(req: Request) {
                 },
                 { status: 502 }
             );
+        }
+
+        // Create voting identity for the user (fire-and-forget, don't block on failure)
+        try {
+            const governanceUrl = process.env.GOVERNANCE_API_URL || 'http://localhost:3003';
+            fetch(`${governanceUrl}/api/governance/create-identity`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({
+                    discordId: sessionDiscordId,
+                    secret,
+                }),
+            }).then(res => {
+                if (res.ok) {
+                    console.log(`[claim-member] Created voting identity for ${sessionDiscordId}`);
+                } else {
+                    console.warn(`[claim-member] Failed to create voting identity for ${sessionDiscordId}`);
+                }
+            }).catch(err => {
+                console.warn(`[claim-member] Error creating voting identity:`, err.message);
+            });
+        } catch (err) {
+            // Don't fail the claim if identity creation fails
+            console.warn('[claim-member] Error initiating identity creation:', err);
         }
 
         return NextResponse.json({ ok: true });
