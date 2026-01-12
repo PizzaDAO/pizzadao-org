@@ -50,7 +50,16 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   // When user connects wallet and we have no wallet saved, save it
   useEffect(() => {
     async function saveWallet() {
+      console.log("[NFTCollection] saveWallet check:", {
+        isConnected,
+        address,
+        noWallet: data?.noWallet,
+        walletSaved,
+        saving,
+        memberId,
+      });
       if (isConnected && address && data?.noWallet && !walletSaved && !saving) {
+        console.log("[NFTCollection] Saving wallet for member", memberId);
         setSaving(true);
         try {
           const res = await fetch("/api/wallet", {
@@ -58,10 +67,14 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ memberId, walletAddress: address }),
           });
+          console.log("[NFTCollection] Wallet save response:", res.status);
           if (res.ok) {
             setWalletSaved(true);
             // Refetch NFTs with the new wallet
             await fetchNFTs();
+          } else {
+            const errData = await res.json();
+            console.error("[NFTCollection] Wallet save failed:", errData);
           }
         } catch (e) {
           console.error("Failed to save wallet", e);
