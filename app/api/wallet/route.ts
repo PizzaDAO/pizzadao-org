@@ -57,7 +57,7 @@ export async function POST(request: NextRequest) {
     const gviz = parseGvizJson(text);
     const rows = gviz?.table?.rows || [];
 
-    // Find header row
+    // Find header row - use same logic as member-lookup (name + status/city)
     let headerRowIdx = -1;
     let headerRowVals: string[] = [];
 
@@ -66,7 +66,11 @@ export async function POST(request: NextRequest) {
       const rowVals = rowCells.map((c: { v?: unknown; f?: unknown }) =>
         String(c?.v || c?.f || "").trim().toLowerCase()
       );
-      if (rowVals.includes("name") && (rowVals.includes("wallet") || rowVals.includes("address"))) {
+      const hasName = rowVals.includes("name");
+      const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
+      const hasCity = rowVals.includes("city") || rowVals.includes("crews");
+
+      if (hasName && (hasStatus || hasCity)) {
         headerRowIdx = ri;
         headerRowVals = rowCells.map((c: { v?: unknown; f?: unknown }) =>
           String(c?.v || c?.f || "").trim().toLowerCase()
