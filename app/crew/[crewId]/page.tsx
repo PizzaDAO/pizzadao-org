@@ -58,6 +58,7 @@ type CrewData = {
     time: string
     lead: string
     step: string
+    stepUrl?: string
     action: string
     notes: string
   }>
@@ -104,6 +105,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
     other: false,
     agenda: false,
     goals: false,
+    myTasks: false, // My Tasks expanded by default
     topTasks: false,
     otherTasks: true, // Other Tasks collapsed by default
     manuals: false,
@@ -545,7 +547,20 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                   <tr key={i}>
                     <td style={td()}>{item.time}</td>
                     <td style={td()}>{item.lead}</td>
-                    <td style={td()}>{item.step}</td>
+                    <td style={td()}>
+                      {item.stepUrl ? (
+                        <a
+                          href={item.stepUrl}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                        >
+                          {item.step}
+                        </a>
+                      ) : (
+                        item.step
+                      )}
+                    </td>
                     <td style={td()}>{item.action}</td>
                   </tr>
                 ))}
@@ -704,9 +719,14 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
             return lower.includes('0.') || lower.includes('top') || lower.includes('1.') || lower.includes('high')
           }
           const isLater = (t: typeof tasks[0]) => t.stage?.toLowerCase().includes('later')
-          const topTasks = tasks.filter(t => isTopPriority(t.priority) && !isLater(t))
-          const laterTasks = tasks.filter(t => isLater(t) && !isTopPriority(t.priority))
-          const otherTasks = tasks.filter(t => !isTopPriority(t.priority) && !isLater(t))
+          const isMyTask = (t: typeof tasks[0]) => user && t.leadId === user.memberId
+
+          // My tasks (user is the lead) - shown at top
+          const myTasks = tasks.filter(t => isMyTask(t))
+          // Other task categories exclude my tasks
+          const topTasks = tasks.filter(t => isTopPriority(t.priority) && !isLater(t) && !isMyTask(t))
+          const laterTasks = tasks.filter(t => isLater(t) && !isTopPriority(t.priority) && !isMyTask(t))
+          const otherTasks = tasks.filter(t => !isTopPriority(t.priority) && !isLater(t) && !isMyTask(t))
 
           const renderTaskCard = (task: typeof tasks[0], i: number) => {
             const needsLead = !task.lead || task.lead === '#N/A' || task.lead.trim() === ''
@@ -806,6 +826,22 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           return (
             <div style={card()}>
               <h2 style={sectionTitle()}>Tasks ({tasks.length})</h2>
+
+              {myTasks.length > 0 && (
+                <>
+                  <h3
+                    onClick={() => toggleSection('myTasks')}
+                    style={collapsibleHeader('#2e7d32')}
+                  >
+                    <span>{collapsedSections.myTasks ? '▶' : '▼'} My Tasks ({myTasks.length})</span>
+                  </h3>
+                  {!collapsedSections.myTasks && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                      {myTasks.map(renderTaskCard)}
+                    </div>
+                  )}
+                </>
+              )}
 
               {topTasks.length > 0 && (
                 <>

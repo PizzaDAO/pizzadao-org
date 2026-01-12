@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getTaskLinks, getMemberTurtlesMap } from '@/app/api/lib/google-sheets'
+import { getTaskLinks, getAgendaStepLinks, getMemberTurtlesMap } from '@/app/api/lib/google-sheets'
 import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
 
 type Params = { params: Promise<{ crewId: string }> }
@@ -189,15 +189,17 @@ function parseTasks(rows: any[], headerIdx: number, headers: string[], htmlLinkM
 }
 
 // Parse agenda section
-function parseAgenda(rows: any[], headerIdx: number, headers: string[]) {
+function parseAgenda(rows: any[], headerIdx: number, headers: string[], htmlLinkMap: Record<string, string> = {}) {
   const headerMap = new Map<string, number>()
   headers.forEach((h, i) => headerMap.set(h.toLowerCase(), i))
 
   const agenda: any[] = []
+  const stepIdx = headerMap.get('step') ?? -1
 
   for (let ri = headerIdx + 1; ri < rows.length; ri++) {
     const cells = rows[ri]?.c || []
-    const step = cellVal(cells[headerMap.get('step') ?? -1])
+    const stepCell = cells[stepIdx]
+    const step = cellVal(stepCell)
     const action = cellVal(cells[headerMap.get('action') ?? -1])
     if (!step && !action) continue
 
@@ -205,10 +207,14 @@ function parseAgenda(rows: any[], headerIdx: number, headers: string[]) {
     const rowVals = cells.map(cellVal)
     if (detectSection(rowVals)) break
 
+    // Extract URL from step cell (check HTML link map first, then GViz extraction)
+    const stepUrl = htmlLinkMap[step] || extractUrl(stepCell)
+
     agenda.push({
       time: cellVal(cells[headerMap.get('time') ?? -1]),
       lead: cellVal(cells[headerMap.get('lead') ?? -1]),
       step,
+      stepUrl,
       action,
       notes: cellVal(cells[headerMap.get('notes') ?? -1]),
     })
@@ -309,9 +315,10 @@ export async function GET(req: Request, { params }: Params) {
 
       // Fetch spreadsheet data via GViz API and HTML links in parallel
       const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
-      const [sheetRes, htmlLinkMap] = await Promise.all([
+      const [sheetRes, htmlLinkMap, agendaLinkMap] = await Promise.all([
         fetch(gvizUrl, { cache: 'no-store' }),
         getTaskLinks(sheetId),
+        getAgendaStepLinks(sheetId),
       ])
       if (!sheetRes.ok) {
         throw new Error('Failed to fetch crew spreadsheet')
@@ -340,7 +347,7 @@ export async function GET(req: Request, { params }: Params) {
         } else if (section === 'tasks') {
           tasks = parseTasks(rows, ri, rowVals, htmlLinkMap)
         } else if (section === 'agenda') {
-          agenda = parseAgenda(rows, ri, rowVals)
+          agenda = parseAgenda(rows, ri, rowVals, agendaLinkMap)
         }
 
         // Look for call time in early rows

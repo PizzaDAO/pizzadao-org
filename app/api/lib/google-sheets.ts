@@ -144,6 +144,93 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
 }
 
 /**
+ * Extract hyperlinks from the Step column in the agenda section
+ * Returns a map of step text -> hyperlink URL
+ */
+export async function getAgendaStepLinks(sheetId: string): Promise<Record<string, string>> {
+    const cacheKey = `agenda-links:${sheetId}`;
+    const cached = await cacheGet<Record<string, string>>(cacheKey);
+    if (cached) {
+        console.log(`[getAgendaStepLinks] Cache hit for ${sheetId}`);
+        return cached;
+    }
+
+    const linkMap: Record<string, string> = {};
+    try {
+        const res = await sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            includeGridData: true,
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink))))",
+        });
+
+        const sheetData = res.data.sheets?.[0];
+        if (!sheetData?.data) return linkMap;
+
+        for (const grid of sheetData.data) {
+            const rows = grid.rowData;
+            if (!rows) continue;
+
+            // Find the "Agenda" section
+            let agendaHeaderRowIdx = -1;
+            let stepColIdx = -1;
+
+            for (let r = 0; r < rows.length; r++) {
+                const cells = rows[r].values || [];
+                for (let c = 0; c < cells.length; c++) {
+                    const val = (cells[c]?.userEnteredValue?.stringValue ||
+                        cells[c]?.formattedValue || "").toLowerCase().trim();
+                    if (val === "agenda" || val === "meeting agenda") {
+                        agendaHeaderRowIdx = r;
+                        break;
+                    }
+                }
+                if (agendaHeaderRowIdx !== -1) break;
+            }
+
+            if (agendaHeaderRowIdx === -1) continue;
+
+            // Find "Step" column header (1-3 rows after anchor)
+            for (let offset = 0; offset <= 3; offset++) {
+                const r = agendaHeaderRowIdx + offset;
+                if (r >= rows.length) break;
+                const cells = rows[r].values || [];
+                for (let c = 0; c < cells.length; c++) {
+                    const val = (cells[c]?.userEnteredValue?.stringValue ||
+                        cells[c]?.formattedValue || "").toLowerCase().trim();
+                    if (val === "step") {
+                        stepColIdx = c;
+                        agendaHeaderRowIdx = r; // Update to actual header row
+                        break;
+                    }
+                }
+                if (stepColIdx !== -1) break;
+            }
+
+            if (stepColIdx === -1) continue;
+
+            // Extract links from the Step column
+            for (let r = agendaHeaderRowIdx + 1; r < rows.length; r++) {
+                const cell = rows[r].values?.[stepColIdx];
+                if (!cell) continue;
+
+                const hyperlink = cell.hyperlink;
+                const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+
+                if (label && hyperlink) {
+                    linkMap[label.trim()] = hyperlink;
+                }
+            }
+        }
+
+        await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
+        console.log(`[getAgendaStepLinks] Extracted ${Object.keys(linkMap).length} links for ${sheetId}`);
+    } catch (error) {
+        console.error("[getAgendaStepLinks] Error:", error);
+    }
+    return linkMap;
+}
+
+/**
  * Extract hyperlinks from the Manual column in the manuals spreadsheet
  * Returns a map of manual title -> hyperlink URL
  */
