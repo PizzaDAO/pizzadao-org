@@ -180,6 +180,7 @@ function parseTasks(rows: any[], headerIdx: number, headers: string[], htmlLinkM
       url,
       dueDate: cellVal(cells[headerMap.get('due') ?? headerMap.get('due date') ?? headerMap.get('duedate') ?? -1]),
       lead: cellVal(cells[headerMap.get('lead') ?? headerMap.get('owner') ?? headerMap.get('assigned') ?? -1]),
+      leadId: cellVal(cells[headerMap.get('lead id') ?? -1]),
       notes: cellVal(cells[headerMap.get('notes') ?? -1]),
     })
   }

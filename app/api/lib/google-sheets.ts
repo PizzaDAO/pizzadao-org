@@ -143,6 +143,94 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
     return linkMap;
 }
 
+/**
+ * Extract hyperlinks from the Manual column in the manuals spreadsheet
+ * Returns a map of manual title -> hyperlink URL
+ */
+export async function getManualLinks(sheetId: string): Promise<Record<string, string>> {
+    const cacheKey = `manual-links:${sheetId}`;
+    const cached = await cacheGet<Record<string, string>>(cacheKey);
+    if (cached) {
+        console.log(`[getManualLinks] Cache hit for ${sheetId}`);
+        return cached;
+    }
+
+    const linkMap: Record<string, string> = {};
+    try {
+        const res = await sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            includeGridData: true,
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
+        });
+
+        const sheetData = res.data.sheets?.[0];
+        if (!sheetData?.data) return linkMap;
+
+        for (const grid of sheetData.data) {
+            const rows = grid.rowData;
+            if (!rows || rows.length === 0) continue;
+
+            // Find the "Manual" column (should be first column, index 0)
+            const headerRow = rows[0]?.values || [];
+            let manualColIdx = -1;
+
+            for (let c = 0; c < headerRow.length; c++) {
+                const val = (headerRow[c]?.userEnteredValue?.stringValue ||
+                    headerRow[c]?.formattedValue || "").toLowerCase().trim();
+                if (val === "manual" || val === "manuals") {
+                    manualColIdx = c;
+                    break;
+                }
+            }
+
+            // Default to first column if no header found
+            if (manualColIdx === -1) manualColIdx = 0;
+
+            // Extract links from the Manual column (start from row 1 to skip header)
+            for (let r = 1; r < rows.length; r++) {
+                const cell = rows[r]?.values?.[manualColIdx];
+                if (!cell) continue;
+
+                const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+                if (!label) continue;
+
+                // Try multiple ways to get the hyperlink:
+                // 1. Direct hyperlink property (Ctrl+K links)
+                let hyperlink = cell.hyperlink;
+
+                // 2. Rich text links (textFormatRuns with link.uri)
+                if (!hyperlink && cell.textFormatRuns) {
+                    for (const run of cell.textFormatRuns) {
+                        if (run?.format?.link?.uri) {
+                            hyperlink = run.format.link.uri;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. HYPERLINK formula in userEnteredValue
+                if (!hyperlink && cell.userEnteredValue?.formulaValue) {
+                    const formula = cell.userEnteredValue.formulaValue;
+                    const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                    if (match) {
+                        hyperlink = match[1];
+                    }
+                }
+
+                if (label && hyperlink) {
+                    linkMap[label.trim()] = hyperlink;
+                }
+            }
+        }
+
+        await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
+        console.log(`[getManualLinks] Extracted ${Object.keys(linkMap).length} links for ${sheetId}`);
+    } catch (error) {
+        console.error("[getManualLinks] Error:", error);
+    }
+    return linkMap;
+}
+
 // Member turtles cache TTL
 const MEMBER_TURTLES_CACHE_TTL = 60 * 10; // 10 minutes in seconds
 

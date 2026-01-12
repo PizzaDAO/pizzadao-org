@@ -50,6 +50,7 @@ type CrewData = {
     task: string
     dueDate?: string
     lead?: string
+    leadId?: string
     notes?: string
     url?: string
   }>
@@ -74,6 +75,17 @@ type UserData = {
   discordId?: string
 }
 
+type Manual = {
+  title: string
+  url: string | null
+  crew: string
+  status: string
+  authorId: string
+  author: string
+  lastUpdated: string
+  notes: string
+}
+
 export default function CrewPage({ params }: { params: Promise<{ crewId: string }> }) {
   const { crewId } = use(params)
   const [data, setData] = useState<CrewData | null>(null)
@@ -84,6 +96,24 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   const [user, setUser] = useState<UserData | null>(null)
   const [joining, setJoining] = useState(false)
   const [leaving, setLeaving] = useState(false)
+  const [manuals, setManuals] = useState<Manual[]>([])
+
+  // Collapsed section state
+  const [collapsedSections, setCollapsedSections] = useState<Record<string, boolean>>({
+    bench: true, // Bench collapsed by default
+    other: false,
+    agenda: false,
+    goals: false,
+    topTasks: false,
+    otherTasks: true, // Other Tasks collapsed by default
+    manuals: false,
+  })
+  const [showLaterTasks, setShowLaterTasks] = useState(false)
+  const [claimingTask, setClaimingTask] = useState<string | null>(null)
+
+  const toggleSection = (section: string) => {
+    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }))
+  }
 
   // Fetch crew data
   useEffect(() => {
@@ -142,6 +172,22 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
     fetchUser()
   }, [])
 
+  // Fetch manuals for this crew
+  useEffect(() => {
+    async function fetchManuals() {
+      try {
+        const res = await fetch(`/api/manuals?crew=${encodeURIComponent(crewId)}`)
+        if (res.ok) {
+          const data = await res.json()
+          setManuals(data.manuals || [])
+        }
+      } catch (e) {
+        console.error('Failed to fetch manuals', e)
+      }
+    }
+    fetchManuals()
+  }, [crewId])
+
   const isInCrew = user?.crews.some(c => c.toLowerCase() === crewId.toLowerCase()) ?? false
 
   const handleJoinCrew = async () => {
@@ -182,6 +228,82 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
       alert(e.message)
     } finally {
       setLeaving(false)
+    }
+  }
+
+  const handleClaimTask = async (taskName: string) => {
+    if (!user) {
+      alert('Please log in to claim this task')
+      return
+    }
+    if (!data?.crew.sheet) {
+      alert('No sheet configured for this crew')
+      return
+    }
+    setClaimingTask(taskName)
+    try {
+      const res = await fetch('/api/claim-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetUrl: data.crew.sheet,
+          taskName,
+          memberId: user.memberId,
+          action: 'claim',
+        }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to claim task')
+      // Update local state to reflect the claim
+      setData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t =>
+            t.task === taskName ? { ...t, lead: user.name, leadId: user.memberId } : t
+          ),
+        }
+      })
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setClaimingTask(null)
+    }
+  }
+
+  const handleGiveUpTask = async (taskName: string) => {
+    if (!user) return
+    if (!data?.crew.sheet) {
+      alert('No sheet configured for this crew')
+      return
+    }
+    setClaimingTask(taskName)
+    try {
+      const res = await fetch('/api/claim-task', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          sheetUrl: data.crew.sheet,
+          taskName,
+          action: 'giveup',
+        }),
+      })
+      const result = await res.json()
+      if (!res.ok) throw new Error(result.error || 'Failed to give up task')
+      // Update local state to reflect giving up
+      setData(prev => {
+        if (!prev) return prev
+        return {
+          ...prev,
+          tasks: prev.tasks.map(t =>
+            t.task === taskName ? { ...t, lead: '', leadId: '' } : t
+          ),
+        }
+      })
+    } catch (e: any) {
+      alert(e.message)
+    } finally {
+      setClaimingTask(null)
     }
   }
 
@@ -518,23 +640,33 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
 
               {benchMembers.length > 0 && (
                 <>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#5c6bc0', marginBottom: 12, marginTop: 0 }}>
-                    Bench ({benchMembers.length})
+                  <h3
+                    onClick={() => toggleSection('bench')}
+                    style={collapsibleHeader('#5c6bc0')}
+                  >
+                    <span>{collapsedSections.bench ? '▶' : '▼'} Bench ({benchMembers.length})</span>
                   </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
-                    {benchMembers.map(renderMemberCard)}
-                  </div>
+                  {!collapsedSections.bench && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                      {benchMembers.map(renderMemberCard)}
+                    </div>
+                  )}
                 </>
               )}
 
               {otherMembers.length > 0 && (
                 <>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#757575', marginBottom: 12, marginTop: 0 }}>
-                    Other ({otherMembers.length})
+                  <h3
+                    onClick={() => toggleSection('other')}
+                    style={collapsibleHeader('#757575')}
+                  >
+                    <span>{collapsedSections.other ? '▶' : '▼'} Other ({otherMembers.length})</span>
                   </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-                    {otherMembers.map(renderMemberCard)}
-                  </div>
+                  {!collapsedSections.other && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                      {otherMembers.map(renderMemberCard)}
+                    </div>
+                  )}
                 </>
               )}
             </div>
@@ -544,58 +676,228 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
         {/* Goals */}
         {goals.length > 0 && (
           <div style={card()}>
-            <h2 style={sectionTitle()}>Goals</h2>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {goals.map((goal, i) => (
-                <div key={i} style={goalCard(goal.priority)}>
-                  {goal.priority && (
-                    <span style={priorityBadge(goal.priority)}>{goal.priority}</span>
-                  )}
-                  <span style={{ fontWeight: 500 }}>{goal.description}</span>
-                </div>
-              ))}
-            </div>
+            <h2
+              onClick={() => toggleSection('goals')}
+              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+            >
+              {collapsedSections.goals ? '▶' : '▼'} Goals ({goals.length})
+            </h2>
+            {!collapsedSections.goals && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                {goals.map((goal, i) => (
+                  <div key={i} style={itemCard(goal.priority)}>
+                    {goal.priority && (
+                      <span style={priorityBadge(goal.priority)}>{goal.priority}</span>
+                    )}
+                    <div style={{ fontWeight: 500, marginTop: goal.priority ? 8 : 0 }}>{goal.description}</div>
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
         {/* Tasks */}
-        {tasks.length > 0 && (
-          <div style={card()}>
-            <h2 style={sectionTitle()}>Tasks</h2>
-            <div style={{ display: 'grid', gap: 10 }}>
-              {tasks.map((task, i) => (
-                <div key={i} style={taskCard(task.stage)}>
-                  <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
-                    {task.priority && <span style={priorityBadge(task.priority)}>{task.priority}</span>}
-                    {task.stage && <span style={stageBadge(task.stage)}>{task.stage}</span>}
-                  </div>
-                  <div style={{ marginTop: 8, fontWeight: 500 }}>
-                    {task.url ? (
-                      <a
-                        href={task.url}
-                        target="_blank"
-                        rel="noreferrer"
-                        style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
-                      >
-                        {task.task}
-                      </a>
-                    ) : (
-                      task.task
-                    )}
-                  </div>
-                  {(task.lead || task.dueDate) && (
-                    <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-                      {task.lead && <span>Lead: {task.lead}</span>}
-                      {task.lead && task.dueDate && <span> • </span>}
-                      {task.dueDate && <span>Due: {task.dueDate}</span>}
-                    </div>
-                  )}
-                  {task.notes && (
-                    <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{task.notes}</div>
+        {tasks.length > 0 && (() => {
+          const isTopPriority = (p: string) => {
+            const lower = p?.toLowerCase() || ''
+            return lower.includes('0.') || lower.includes('top') || lower.includes('1.') || lower.includes('high')
+          }
+          const isLater = (t: typeof tasks[0]) => t.stage?.toLowerCase().includes('later')
+          const topTasks = tasks.filter(t => isTopPriority(t.priority) && !isLater(t))
+          const laterTasks = tasks.filter(t => isLater(t) && !isTopPriority(t.priority))
+          const otherTasks = tasks.filter(t => !isTopPriority(t.priority) && !isLater(t))
+
+          const renderTaskCard = (task: typeof tasks[0], i: number) => {
+            const needsLead = !task.lead || task.lead === '#N/A' || task.lead.trim() === ''
+            const isClaiming = claimingTask === task.task
+
+            return (
+              <div key={i} style={{
+                ...itemCard(),
+                ...(needsLead ? {
+                  background: '#fff8e1',
+                  borderColor: '#ffb300',
+                  borderWidth: '2px',
+                } : {}),
+              }}>
+                <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
+                  {task.priority && <span style={priorityBadge(task.priority)}>{task.priority}</span>}
+                  {task.stage && <span style={stageBadge(task.stage)}>{task.stage}</span>}
+                  {needsLead && <span style={{
+                    display: 'inline-block',
+                    padding: '3px 8px',
+                    borderRadius: 6,
+                    fontSize: 10,
+                    fontWeight: 700,
+                    background: 'rgba(255,179,0,0.2)',
+                    color: '#ff8f00',
+                    textTransform: 'uppercase',
+                  }}>Needs Lead</span>}
+                </div>
+                <div style={{ marginTop: 8, fontWeight: 500 }}>
+                  {task.url ? (
+                    <a
+                      href={task.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                    >
+                      {task.task}
+                    </a>
+                  ) : (
+                    task.task
                   )}
                 </div>
-              ))}
+                {(task.lead && task.lead !== '#N/A') || task.dueDate ? (
+                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+                    {task.lead && task.lead !== '#N/A' && <span>Lead: {task.lead}</span>}
+                    {task.lead && task.lead !== '#N/A' && task.dueDate && <span> • </span>}
+                    {task.dueDate && <span>Due: {task.dueDate}</span>}
+                  </div>
+                ) : null}
+                {task.notes && (
+                  <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{task.notes}</div>
+                )}
+                {needsLead && user && (
+                  <button
+                    onClick={() => handleClaimTask(task.task)}
+                    disabled={isClaiming}
+                    style={{
+                      marginTop: 10,
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      border: 'none',
+                      background: '#ff8f00',
+                      color: 'white',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: isClaiming ? 'wait' : 'pointer',
+                      opacity: isClaiming ? 0.6 : 1,
+                    }}
+                  >
+                    {isClaiming ? 'Claiming...' : 'Claim Task'}
+                  </button>
+                )}
+                {!needsLead && user && task.leadId === user.memberId && (
+                  <button
+                    onClick={() => handleGiveUpTask(task.task)}
+                    disabled={isClaiming}
+                    style={{
+                      marginTop: 10,
+                      padding: '6px 12px',
+                      borderRadius: 6,
+                      border: '1px solid #d32f2f',
+                      background: 'white',
+                      color: '#d32f2f',
+                      fontSize: 12,
+                      fontWeight: 600,
+                      cursor: isClaiming ? 'wait' : 'pointer',
+                      opacity: isClaiming ? 0.6 : 1,
+                    }}
+                  >
+                    {isClaiming ? 'Giving up...' : 'Give Up'}
+                  </button>
+                )}
+              </div>
+            )
+          }
+
+          return (
+            <div style={card()}>
+              <h2 style={sectionTitle()}>Tasks ({tasks.length})</h2>
+
+              {topTasks.length > 0 && (
+                <>
+                  <h3
+                    onClick={() => toggleSection('topTasks')}
+                    style={collapsibleHeader('#d32f2f')}
+                  >
+                    <span>{collapsedSections.topTasks ? '▶' : '▼'} Top Tasks ({topTasks.length})</span>
+                  </h3>
+                  {!collapsedSections.topTasks && (
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                      {topTasks.map(renderTaskCard)}
+                    </div>
+                  )}
+                </>
+              )}
+
+              {(otherTasks.length > 0 || laterTasks.length > 0) && (
+                <>
+                  <h3
+                    onClick={() => toggleSection('otherTasks')}
+                    style={collapsibleHeader('#757575')}
+                  >
+                    <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({otherTasks.length + (showLaterTasks ? laterTasks.length : 0)})</span>
+                  </h3>
+                  {!collapsedSections.otherTasks && (
+                    <>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                        {otherTasks.map(renderTaskCard)}
+                        {showLaterTasks && laterTasks.map(renderTaskCard)}
+                      </div>
+                      {laterTasks.length > 0 && (
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, fontSize: 13, opacity: 0.7, cursor: 'pointer' }}>
+                          <input
+                            type="checkbox"
+                            checked={showLaterTasks}
+                            onChange={(e) => setShowLaterTasks(e.target.checked)}
+                            style={{ cursor: 'pointer' }}
+                          />
+                          Show "Later" tasks ({laterTasks.length})
+                        </label>
+                      )}
+                    </>
+                  )}
+                </>
+              )}
             </div>
+          )
+        })()}
+
+        {/* Manuals */}
+        {manuals.length > 0 && (
+          <div style={card()}>
+            <h2
+              onClick={() => toggleSection('manuals')}
+              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+            >
+              {collapsedSections.manuals ? '▶' : '▼'} Manuals ({manuals.length})
+            </h2>
+            {!collapsedSections.manuals && (
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                {manuals.map((manual, i) => (
+                  <div key={i} style={itemCard(manual.status)}>
+                    {manual.status && <span style={manualStatusBadge(manual.status)}>{manual.status}</span>}
+                    <div style={{ fontWeight: 600, fontSize: 15, marginTop: manual.status ? 8 : 0 }}>
+                      {manual.url ? (
+                        <a
+                          href={manual.url}
+                          target="_blank"
+                          rel="noreferrer"
+                          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                        >
+                          {manual.title}
+                        </a>
+                      ) : (
+                        manual.title
+                      )}
+                    </div>
+                    {(manual.author || manual.lastUpdated) && (
+                      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+                        {manual.author && manual.author !== '#N/A' && <span>By {manual.author}</span>}
+                        {manual.author && manual.author !== '#N/A' && manual.lastUpdated && <span> • </span>}
+                        {manual.lastUpdated && <span>Updated: {manual.lastUpdated}</span>}
+                      </div>
+                    )}
+                    {manual.notes && (
+                      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{manual.notes}</div>
+                    )}
+                  </div>
+                ))}
+              </div>
+            )}
           </div>
         )}
 
@@ -681,6 +983,43 @@ function memberCard(): React.CSSProperties {
     padding: 14,
     borderRadius: 10,
     border: '1px solid rgba(0,0,0,0.1)',
+    background: '#fafafa',
+  }
+}
+
+function collapsibleHeader(color: string): React.CSSProperties {
+  return {
+    fontSize: 14,
+    fontWeight: 600,
+    color: color,
+    marginBottom: 12,
+    marginTop: 0,
+    cursor: 'pointer',
+    userSelect: 'none',
+  }
+}
+
+function itemCard(priority?: string): React.CSSProperties {
+  const lower = priority?.toLowerCase() || ''
+  let borderColor = 'rgba(0,0,0,0.1)'
+
+  if (lower.includes('top') || lower.includes('high') || lower.includes('0.') || lower.includes('1.')) {
+    borderColor = '#ff4d4d'
+  } else if (lower.includes('mid') || lower.includes('2.')) {
+    borderColor = '#ffa726'
+  } else if (lower.includes('complete')) {
+    borderColor = '#4caf50'
+  } else if (lower.includes('draft')) {
+    borderColor = '#ff9800'
+  } else if (lower.includes('needed')) {
+    borderColor = '#f44336'
+  }
+
+  return {
+    padding: 14,
+    borderRadius: 10,
+    border: '1px solid rgba(0,0,0,0.1)',
+    borderLeft: `4px solid ${borderColor}`,
     background: '#fafafa',
   }
 }
@@ -784,6 +1123,58 @@ function stageBadge(stage: string): React.CSSProperties {
     bg = 'rgba(76,175,80,0.15)'
     color = '#2e7d32'
   } else if (lower.includes('todo') || lower.includes('next')) {
+    bg = 'rgba(156,39,176,0.15)'
+    color = '#7b1fa2'
+  }
+
+  return {
+    display: 'inline-block',
+    padding: '3px 8px',
+    borderRadius: 6,
+    fontSize: 10,
+    fontWeight: 700,
+    background: bg,
+    color: color,
+    textTransform: 'uppercase',
+  }
+}
+
+function manualCard(status: string): React.CSSProperties {
+  const lower = status?.toLowerCase() || ''
+  let borderColor = 'rgba(0,0,0,0.1)'
+
+  if (lower.includes('complete')) {
+    borderColor = '#4caf50'
+  } else if (lower.includes('draft')) {
+    borderColor = '#ff9800'
+  } else if (lower.includes('needed')) {
+    borderColor = '#f44336'
+  }
+
+  return {
+    padding: 14,
+    borderRadius: 10,
+    border: '1px solid rgba(0,0,0,0.1)',
+    borderLeft: `4px solid ${borderColor}`,
+    background: 'white',
+  }
+}
+
+function manualStatusBadge(status: string): React.CSSProperties {
+  const lower = status?.toLowerCase() || ''
+  let bg = 'rgba(0,0,0,0.08)'
+  let color = '#666'
+
+  if (lower.includes('complete')) {
+    bg = 'rgba(76,175,80,0.15)'
+    color = '#2e7d32'
+  } else if (lower.includes('draft')) {
+    bg = 'rgba(255,152,0,0.15)'
+    color = '#ef6c00'
+  } else if (lower.includes('needed')) {
+    bg = 'rgba(244,67,54,0.15)'
+    color = '#d32f2f'
+  } else if (lower.includes('backlog')) {
     bg = 'rgba(156,39,176,0.15)'
     color = '#7b1fa2'
   }

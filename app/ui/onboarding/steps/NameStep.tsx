@@ -178,16 +178,30 @@ export function NameStep({
         </div>
       )}
 
-      {suggestions && (
+      {(suggestions || submitting) && (
         <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ fontWeight: 600 }}>Pick one:</div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10 }}>
-            {suggestions.map((name) => (
-              <button key={name} onClick={() => onPickName(name)} style={choiceBtn()}>
+          <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+            Pick one:
+            {submitting && (
+              <span style={{
+                display: "inline-block",
+                width: 16,
+                height: 16,
+                border: "2px solid rgba(0,0,0,0.1)",
+                borderTop: "2px solid #ff4d4d",
+                borderRadius: "50%",
+                animation: "spin 1s linear infinite",
+              }} />
+            )}
+          </div>
+          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, opacity: submitting ? 0.5 : 1 }}>
+            {suggestions?.map((name) => (
+              <button key={name} onClick={() => onPickName(name)} disabled={submitting} style={choiceBtn()}>
                 {name}
               </button>
             ))}
           </div>
+          <style>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
       )}
 

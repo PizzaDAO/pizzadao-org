@@ -70,6 +70,10 @@ export function OnboardingWizard() {
   const [error, setError] = useState<string | undefined>();
   const [errorDetails, setErrorDetails] = useState<string | undefined>();
 
+  // --- Name generation state ---
+  const [generatingNames, setGeneratingNames] = useState(false);
+  const [lastGenParams, setLastGenParams] = useState<{ topping: string; movie: string; style: string } | null>(null);
+
   // --- Persist data to localStorage ---
   useEffect(() => {
     if (typeof window === "undefined") return;
@@ -270,8 +274,17 @@ export function OnboardingWizard() {
 
   // --- Generate names ---
   async function generateNames(force = false) {
-    setFlow({ type: "submitting" });
+    setGeneratingNames(true);
     setError(undefined);
+
+    // Check if user clicked generate with same params - treat as regenerate
+    const currentParams = { topping: data.topping, movie: data.mafiaMovieTitle, style: data.style };
+    const sameParams = lastGenParams &&
+      lastGenParams.topping === currentParams.topping &&
+      lastGenParams.movie === currentParams.movie &&
+      lastGenParams.style === currentParams.style;
+
+    const shouldForce = force || (sameParams && data.suggestions && data.suggestions.length > 0);
 
     try {
       const res = await fetch("/api/namegen", {
@@ -281,8 +294,8 @@ export function OnboardingWizard() {
           topping: data.topping,
           movieTitle: data.mafiaMovieTitle,
           style: data.style,
-          force,
-          exclude: force ? data.seenNames : [],
+          force: shouldForce,
+          exclude: shouldForce ? data.seenNames : [],
         }),
       });
 
@@ -298,10 +311,11 @@ export function OnboardingWizard() {
         seenNames: mergeSeen(p.seenNames, result.suggestions ?? []),
       }));
 
-      setFlow({ type: "wizard", step: 1, isUpdate: flow.type === "wizard" && flow.isUpdate });
+      setLastGenParams(currentParams);
     } catch (e: any) {
       setError(e?.message || "Failed to generate names");
-      setFlow({ type: "wizard", step: 1, isUpdate: flow.type === "wizard" && flow.isUpdate });
+    } finally {
+      setGeneratingNames(false);
     }
   }
 
@@ -548,7 +562,7 @@ export function OnboardingWizard() {
             isUpdate={flow.isUpdate}
             existingName={data.existingData?.mafiaName}
             discordNick={data.discordNick}
-            submitting={false}
+            submitting={generatingNames}
             onChange={(updates) => setData((p) => ({ ...p, ...updates }))}
             onGenerate={generateNames}
             onPickName={(name) => {

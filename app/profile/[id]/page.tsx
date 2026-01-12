@@ -355,7 +355,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                                 </div>
                                             )}
 
-                                            {/* Assigned tasks */}
+                                            {/* Claimed tasks */}
                                             {tasks.length > 0 && (
                                                 <div style={{ marginTop: 8 }}>
                                                     <div style={{
@@ -366,7 +366,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                                         color: "#ff4d4d",
                                                         marginBottom: 4
                                                     }}>
-                                                        Assigned Tasks
+                                                        Claimed Tasks
                                                     </div>
                                                     {tasks.slice(0, 3).map((t, idx) => (
                                                         <div key={idx} style={{
