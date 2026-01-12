@@ -81,13 +81,13 @@ export async function POST(request: NextRequest) {
 
     // Find ID and Wallet column indices
     let idColIdx = headerRowVals.findIndex((h) =>
-      ["id", "crewid", "memberid"].includes(h.replace(/[#\s\-_]/g, ""))
+      ["id", "crewid", "memberid"].includes(h.toLowerCase().replace(/[#\s\-_]/g, ""))
     );
     if (idColIdx === -1) idColIdx = 0;
 
-    let walletColIdx = headerRowVals.findIndex((h) => h === "wallet");
+    let walletColIdx = headerRowVals.findIndex((h) => h.toLowerCase() === "wallet");
     if (walletColIdx === -1) {
-      walletColIdx = headerRowVals.findIndex((h) => h === "address" || h.includes("wallet"));
+      walletColIdx = headerRowVals.findIndex((h) => h.toLowerCase() === "address" || h.toLowerCase().includes("wallet"));
     }
 
     if (walletColIdx === -1) {
@@ -97,6 +97,9 @@ export async function POST(request: NextRequest) {
     // Find the member's row
     const targetId = parseInt(memberId, 10);
     let memberRowIdx = -1;
+    let foundId: any = null;
+
+    console.log(`[wallet] Looking for member ID ${targetId} in column ${idColIdx}`);
 
     for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
       const cells = rows[ri]?.c || [];
@@ -104,6 +107,8 @@ export async function POST(request: NextRequest) {
       const rowId = typeof val === "number" ? val : parseInt(String(val), 10);
       if (rowId === targetId) {
         memberRowIdx = ri;
+        foundId = val;
+        console.log(`[wallet] Found member ${targetId} at row ${ri}, ID value in cell: ${val}`);
         break;
       }
     }
@@ -148,8 +153,11 @@ export async function POST(request: NextRequest) {
       debug: {
         cellRange,
         headerRow: headerRowIdx,
+        idCol: idColIdx,
         walletCol: walletColIdx,
         memberRow: memberRowIdx,
+        foundIdValue: foundId,
+        headers: headerRowVals.slice(0, 15), // First 15 headers for debug
         updateResult: updateResult.data,
       }
     });
