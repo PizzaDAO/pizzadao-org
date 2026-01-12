@@ -35,7 +35,7 @@ async function getWalletForMember(memberId: string): Promise<string | null> {
   const gviz = parseGvizJson(text);
   const rows = gviz?.table?.rows || [];
 
-  // Find header row
+  // Find header row - use same logic as member-lookup (name + status/city)
   let headerRowIdx = -1;
   let headerRowVals: string[] = [];
 
@@ -44,8 +44,11 @@ async function getWalletForMember(memberId: string): Promise<string | null> {
     const rowVals = rowCells.map((c: { v?: unknown; f?: unknown }) =>
       String(c?.v || c?.f || "").trim().toLowerCase()
     );
-    // Look for a row with name and wallet columns
-    if (rowVals.includes("name") && (rowVals.includes("wallet") || rowVals.includes("address"))) {
+    const hasName = rowVals.includes("name");
+    const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
+    const hasCity = rowVals.includes("city") || rowVals.includes("crews");
+
+    if (hasName && (hasStatus || hasCity)) {
       headerRowIdx = ri;
       headerRowVals = rowCells.map((c: { v?: unknown; f?: unknown }) =>
         String(c?.v || c?.f || "").trim().toLowerCase()
