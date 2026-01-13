@@ -103,7 +103,9 @@
       "Bash(code:*)",
       "Bash(git show:*)",
       "WebFetch(domain:cdn.discordapp.com)",
-      "Bash(node scripts/add-logging.js:*)"
+      "Bash(node scripts/add-logging.js:*)",
+      "Bash(git rm:*)",
+      "Bash(git ls-files:*)"
     ]
   }
 }

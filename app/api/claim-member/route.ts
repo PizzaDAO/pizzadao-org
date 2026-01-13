@@ -26,7 +26,7 @@ async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): P
     }
 
     // Follow redirects with GET (Apps Script redirect pattern)
-    let currentUrl = res.headers.get("location");
+    let currentUrl: string | null = res.headers.get("location");
     if (!currentUrl) {
         console.error("[claim-member] Redirect without location header");
         return { status: res.status, text: "Redirect without location" };
@@ -34,7 +34,7 @@ async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): P
 
     for (let i = 0; i < maxRedirects; i++) {
         console.log("[claim-member] Following redirect to:", currentUrl.substring(0, 80) + "...");
-        const redirectRes = await fetch(currentUrl, {
+        const redirectRes: Response = await fetch(currentUrl, {
             method: "GET",
             redirect: "manual",
         });

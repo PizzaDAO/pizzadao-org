@@ -23,13 +23,13 @@ async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): P
     }
 
     // Follow redirects with GET (Apps Script redirect pattern)
-    let currentUrl = res.headers.get("location");
+    let currentUrl: string | null = res.headers.get("location");
     if (!currentUrl) {
         return { status: res.status, text: "Redirect without location" };
     }
 
     for (let i = 0; i < maxRedirects; i++) {
-        const redirectRes = await fetch(currentUrl, {
+        const redirectRes: Response = await fetch(currentUrl, {
             method: "GET",
             redirect: "manual",
         });

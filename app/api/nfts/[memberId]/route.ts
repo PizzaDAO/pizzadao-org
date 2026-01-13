@@ -122,7 +122,12 @@ export async function GET(
     // Fetch NFTs from Alchemy
     const nftData = await fetchPizzaDAONFTs(walletAddress);
 
-    return NextResponse.json(nftData);
+    // Ensure walletAddress and noWallet are always included
+    return NextResponse.json({
+      ...nftData,
+      walletAddress,
+      noWallet: false,
+    });
   } catch (error) {
     console.error("[nfts] Error:", error);
     return NextResponse.json(
