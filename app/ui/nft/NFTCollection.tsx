@@ -1,6 +1,7 @@
 "use client";
 
 import React, { useState, useEffect, useMemo, useCallback } from "react";
+import Link from "next/link";
 import { NFTCard } from "./NFTCard";
 import { NFTCollectionResponse, NFTDisplayItem } from "@/app/lib/nft-types";
 import { ConnectButton } from "@rainbow-me/rainbowkit";
@@ -140,9 +141,11 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
     }
     return (
       <div style={sectionStyle}>
-        <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
-          NFT Collection
-        </h3>
+        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
+          <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
+            NFT Collection
+          </h3>
+        </Link>
         <div
           style={{
             display: "flex",
@@ -169,9 +172,11 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   if (!loading && data?.walletAddress && data.totalCount === 0) {
     return (
       <div style={sectionStyle}>
-        <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
-          NFT Collection
-        </h3>
+        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
+          <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
+            NFT Collection
+          </h3>
+        </Link>
         <div
           style={{
             display: "flex",
@@ -211,9 +216,11 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   if (loading) {
     return (
       <div style={sectionStyle}>
-        <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
-          NFT Collection
-        </h3>
+        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
+          <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
+            NFT Collection
+          </h3>
+        </Link>
         <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
           {[1, 2, 3].map((i) => (
             <div
@@ -251,14 +258,16 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
           gap: 8,
         }}
       >
-        <h3 style={{ fontSize: 18, margin: 0, fontWeight: 600 }}>
-          NFT Collection
-          <span
-            style={{ fontSize: 14, fontWeight: 400, opacity: 0.6, marginLeft: 8 }}
-          >
-            ({data!.totalCount})
-          </span>
-        </h3>
+        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
+          <h3 style={{ fontSize: 18, margin: 0, fontWeight: 600 }}>
+            NFT Collection
+            <span
+              style={{ fontSize: 14, fontWeight: 400, opacity: 0.6, marginLeft: 8 }}
+            >
+              ({data!.totalCount})
+            </span>
+          </h3>
+        </Link>
         {data?.walletAddress && (
           <a
             href={`https://opensea.io/${data.walletAddress}`}
