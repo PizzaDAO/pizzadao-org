@@ -129,11 +129,8 @@ async function syncDiscordMember(opts: {
 
   const currentRoles: string[] = Array.isArray(member.json?.roles) ? member.json.roles : [];
 
-  // 2) Replace only turtle roles, keep all other roles
-  const ALL_TURTLE_ROLE_IDS = new Set(Object.values(TURTLE_ROLE_IDS).map(String));
-  const kept = currentRoles.filter((r) => !ALL_TURTLE_ROLE_IDS.has(String(r)));
-
-  const nextRoles = Array.from(new Set([...kept, ...turtleRoleIds, ...crewRoleIds].map(String)));
+  // 2) Add-only: keep all existing roles and add new turtle/crew roles
+  const nextRoles = Array.from(new Set([...currentRoles, ...turtleRoleIds, ...crewRoleIds].map(String)));
 
   // 3) PATCH member: nick + roles
   const body: any = { roles: nextRoles };
