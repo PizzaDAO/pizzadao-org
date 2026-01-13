@@ -165,9 +165,49 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
     );
   }
 
-  // Don't render if has wallet but no NFTs
+  // Show prompt to get NFTs if wallet connected but no NFTs found
   if (!loading && data?.walletAddress && data.totalCount === 0) {
-    return null;
+    return (
+      <div style={sectionStyle}>
+        <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
+          NFT Collection
+        </h3>
+        <div
+          style={{
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "center",
+            justifyContent: "center",
+            padding: "32px 16px",
+            borderRadius: 12,
+            border: "1px dashed rgba(0,0,0,0.2)",
+            background: "#fafafa",
+            gap: 16,
+          }}
+        >
+          <p style={{ margin: 0, fontSize: 14, opacity: 0.7, textAlign: "center" }}>
+            No PizzaDAO NFTs found in this wallet
+          </p>
+          <a
+            href="https://opensea.io/collection/pizzadao"
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: "inline-block",
+              padding: "10px 20px",
+              borderRadius: 10,
+              background: "black",
+              color: "white",
+              fontWeight: 600,
+              fontSize: 14,
+              textDecoration: "none",
+            }}
+          >
+            Get a PizzaDAO NFT
+          </a>
+        </div>
+      </div>
+    );
   }
 
   if (loading) {

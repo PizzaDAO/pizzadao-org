@@ -199,30 +199,48 @@ async function fetchCrewRoleIds(req: Request, selectedCrewIds: string[]): Promis
 /**
  * Fetch with redirect handling for Apps Script.
  * Apps Script returns 302 redirects that need to be followed manually for POST requests.
+ * The redirect URL should be fetched with GET to retrieve the response.
  */
 async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
-  let currentUrl = url;
+  // First request is POST with the payload
+  const res = await fetch(url, {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify(payload),
+    redirect: "manual",
+  });
+
+  // If not a redirect, return directly
+  if (res.status !== 302 && res.status !== 301) {
+    const text = await res.text();
+    return { status: res.status, text };
+  }
+
+  // Follow redirects with GET (Apps Script redirect pattern)
+  let currentUrl = res.headers.get("location");
+  if (!currentUrl) {
+    console.error("[writeToSheet] Redirect without location header");
+    return { status: res.status, text: "Redirect without location" };
+  }
+
   for (let i = 0; i < maxRedirects; i++) {
-    const res = await fetch(currentUrl, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify(payload),
+    console.log("[writeToSheet] Following redirect to:", currentUrl.substring(0, 80) + "...");
+    const redirectRes = await fetch(currentUrl, {
+      method: "GET",
       redirect: "manual",
     });
 
-    if (res.status === 302 || res.status === 301) {
-      const location = res.headers.get("location");
+    if (redirectRes.status === 302 || redirectRes.status === 301) {
+      const location = redirectRes.headers.get("location");
       if (!location) {
-        console.error("[writeToSheet] Redirect without location header");
-        return { status: res.status, text: "Redirect without location" };
+        return { status: redirectRes.status, text: "Redirect without location" };
       }
-      console.log("[writeToSheet] Following redirect to:", location.substring(0, 80) + "...");
       currentUrl = location;
       continue;
     }
 
-    const text = await res.text();
-    return { status: res.status, text };
+    const text = await redirectRes.text();
+    return { status: redirectRes.status, text };
   }
   return { status: 500, text: "Too many redirects" };
 }

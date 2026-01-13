@@ -88,7 +88,22 @@
       "Bash(tasklist:*)",
       "WebFetch(domain:onboarding-black-tau.vercel.app)",
       "Bash(vercel --version:*)",
-      "Bash(git fetch:*)"
+      "Bash(git fetch:*)",
+      "Bash(PRISMA_USER_CONSENT_FOR_DANGEROUS_AI_ACTION=\"yes do that\" npx prisma db push:*)",
+      "Bash(ls:*)",
+      "WebFetch(domain:zora.co)",
+      "WebFetch(domain:api.zora.co)",
+      "Bash(jq:*)",
+      "Bash(vercel env:*)",
+      "Bash(npm run lint)",
+      "Bash(npm info:*)",
+      "Bash(npx ts-node:*)",
+      "WebFetch(domain:doc-0k-0k-sheets.googleusercontent.com)",
+      "Bash(git merge-base:*)",
+      "Bash(code:*)",
+      "Bash(git show:*)",
+      "WebFetch(domain:cdn.discordapp.com)",
+      "Bash(node scripts/add-logging.js:*)"
     ]
   }
 }

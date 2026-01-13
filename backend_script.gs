@@ -1,7 +1,8 @@
-// Google Apps Script (Web App) — V11 (Append + Auto-Sort + Safe Claim Mode)
+// Google Apps Script (Web App) — V12 (Append + Auto-Sort + Safe Claim Mode + Wallet)
 // - Prevents blanking ID when memberId is missing
 // - Adds strict "claim mode": if raw.source === "onboarding_claim", MUST match by memberId (no discord fallback)
 // - Prevents inserting rows without memberId (especially important for claim mode)
+// - Adds Wallet column support for storing user wallet addresses
 
 const ONBOARDING_LOG_SHEET = "Onboarding";
 const DEFAULT_STATUS_ON_INSERT = "Active";
@@ -178,6 +179,7 @@ function upsertToCrew_(ss, raw, nowIso) {
       DiscordId: getCol_(headerMap, "DiscordId"),
       DiscordJoined: getCol_(headerMap, "DiscordJoined"),
       Notes: getCol_(headerMap, "Notes"),
+      Wallet: getCol_(headerMap, "Wallet"),
     };
 
     const name = String(raw.mafiaName ?? raw.name ?? "").trim();
@@ -234,6 +236,11 @@ function upsertToCrew_(ss, raw, nowIso) {
     }
     if (mapping.DiscordJoined && raw.discordJoined !== undefined) {
       crewSheet.getRange(targetRow, mapping.DiscordJoined).setValue(raw.discordJoined ? "TRUE" : "FALSE");
+    }
+
+    // Write Wallet if provided
+    if (mapping.Wallet && raw.wallet !== undefined) {
+      crewSheet.getRange(targetRow, mapping.Wallet).setValue(String(raw.wallet || ""));
     }
 
     if (mapping.Notes) {
