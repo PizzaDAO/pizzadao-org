@@ -189,9 +189,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             No PizzaDAO NFTs found in this wallet
           </p>
           <a
-            href="https://opensea.io/collection/pizzadao"
-            target="_blank"
-            rel="noreferrer"
+            href="/nfts"
             style={{
               display: "inline-block",
               padding: "10px 20px",
@@ -203,7 +201,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
               textDecoration: "none",
             }}
           >
-            Get a PizzaDAO NFT
+            Browse PizzaDAO NFTs
           </a>
         </div>
       </div>

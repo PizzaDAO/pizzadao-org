@@ -59,6 +59,7 @@ export async function getNFTContracts(): Promise<NFTContract[]> {
     const contractIdx = headers.findIndex((h: string) => h === "contract");
     const nameIdx = headers.findIndex((h: string) => h === "name");
     const orderIdx = headers.findIndex((h: string) => h === "order");
+    const detailsIdx = headers.findIndex((h: string) => h === "details");
 
     if (chainIdx === -1 || contractIdx === -1) {
       console.error("[nft-config] Missing required columns (chain, contract)");
@@ -74,6 +75,7 @@ export async function getNFTContracts(): Promise<NFTContract[]> {
       const name = nameIdx !== -1 ? String(cells[nameIdx]?.v || "").trim() : "";
       const orderVal = orderIdx !== -1 ? cells[orderIdx]?.v : undefined;
       const order = typeof orderVal === "number" ? orderVal : parseInt(String(orderVal), 10);
+      const description = detailsIdx !== -1 ? String(cells[detailsIdx]?.v || "").trim() : "";
 
       // Validate contract address format
       if (chain && address && address.startsWith("0x") && address.length === 42) {
@@ -82,6 +84,7 @@ export async function getNFTContracts(): Promise<NFTContract[]> {
           address,
           name: name || "Unknown Collection",
           order: !isNaN(order) ? order : undefined,
+          description: description || undefined,
         });
       }
     }

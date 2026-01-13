@@ -5,6 +5,7 @@ export interface NFTContract {
   name: string;
   chain: string;
   order?: number;
+  description?: string;
 }
 
 export interface AlchemyNFT {
