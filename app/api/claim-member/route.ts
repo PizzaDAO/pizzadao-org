@@ -201,6 +201,12 @@ export async function POST(req: Request) {
             },
         };
 
+        console.log("[claim-member] Sending to Apps Script:", {
+            memberId: payload.memberId,
+            discordId: payload.discordId,
+            source: payload.source,
+        });
+
         const sheetRes = await fetch(url, {
             method: "POST",
             headers: { "Content-Type": "application/json" },
@@ -213,15 +219,24 @@ export async function POST(req: Request) {
             parsed = JSON.parse(text);
         } catch { }
 
+        console.log("[claim-member] Apps Script response:", {
+            httpStatus: sheetRes.status,
+            ok: parsed?.ok,
+            crewSync: parsed?.crewSync,
+        });
+
         if (!sheetRes.ok || parsed?.ok === false) {
+            console.error("[claim-member] Apps Script error:", parsed?.crewSync?.error ?? parsed?.error ?? text);
             return NextResponse.json(
                 {
                     error: "Failed to update sheet",
-                    details: parsed?.error ?? text,
+                    details: parsed?.crewSync?.error ?? parsed?.error ?? text,
                 },
                 { status: 502 }
             );
         }
+
+        console.log("[claim-member] Successfully claimed member", memberId, "with discordId", sessionDiscordId);
 
         // Create voting identity for the user (fire-and-forget, don't block on failure)
         try {
