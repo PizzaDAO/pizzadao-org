@@ -130,7 +130,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
               borderRadius: 8,
               fontSize: 13
             }}>
-              <span style={{ opacity: 0.6 }}>New jobs in:</span>
+              <span style={{ color: "#666" }}>New jobs in:</span>
               <span style={{ fontWeight: 700, fontFamily: "monospace", color: "#2563eb" }}>
                 {countdown}
               </span>
@@ -153,7 +153,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
                 background: "#f5f5f5",
                 cursor: "pointer",
                 fontSize: 12,
-                opacity: 0.6,
+                color: "#666",
               }}
               title="Reset today's jobs"
             >
@@ -164,7 +164,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
 
         {jobs.length === 0 ? (
           <div style={{ ...card(), textAlign: "center" }}>
-            <p style={{ opacity: 0.5 }}>No jobs available at the moment</p>
+            <p style={{ color: "#666" }}>No jobs available at the moment</p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>

@@ -136,7 +136,7 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
 
         <form onSubmit={handleSend} style={{ display: "grid", gap: 16 }}>
           <div>
-            <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+            <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
               Recipient Member ID
             </label>
             <input
@@ -150,7 +150,7 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+            <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
               Amount {maxQuantity && `(max: ${maxQuantity})`}
             </label>
             <input
@@ -195,11 +195,11 @@ function SendIcon({ size = 16, onClick }: { size?: number; onClick: () => void }
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        opacity: 0.6,
-        transition: "opacity 0.2s",
+        color: "#666",
+        transition: "color 0.2s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.opacity = "1")}
-      onMouseLeave={(e) => (e.currentTarget.style.opacity = "0.6")}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "#000")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "#666")}
       title="Send"
     >
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -280,7 +280,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
     <div style={card()}>
       <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, marginBottom: 16 }}>Your Inventory</h2>
       {items.length === 0 ? (
-        <p style={{ opacity: 0.5, textAlign: "center", padding: "16px 0", margin: 0 }}>No items yet</p>
+        <p style={{ color: "#666", textAlign: "center", padding: "16px 0", margin: 0 }}>No items yet</p>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {items.map((inv) => (
@@ -301,7 +301,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
                 )}
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{inv.item.name}</div>
-                  <div style={{ fontSize: 12, opacity: 0.5 }}>x{inv.quantity}</div>
+                  <div style={{ fontSize: 12, color: "#666" }}>x{inv.quantity}</div>
                 </div>
               </div>
               <SendIcon size={16} onClick={() => onSendItem(inv)} />
@@ -315,6 +315,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
 
 export default function PepDashboard() {
   const [session, setSession] = useState<SessionData | null>(null);
+  const [memberName, setMemberName] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [walletKey, setWalletKey] = useState(0);
   const [sendModal, setSendModal] = useState<{
@@ -330,6 +331,21 @@ export default function PepDashboard() {
         const res = await fetch("/api/me");
         const data = await res.json();
         setSession(data);
+
+        // Fetch member name if authenticated
+        if (data.authenticated && data.discordId) {
+          try {
+            const memberRes = await fetch(`/api/member-lookup/${data.discordId}`);
+            if (memberRes.ok) {
+              const memberData = await memberRes.json();
+              if (memberData.memberName) {
+                setMemberName(memberData.memberName);
+              }
+            }
+          } catch {
+            // Ignore - fallback to username
+          }
+        }
       } catch {
         setSession({ authenticated: false });
       } finally {
@@ -358,7 +374,7 @@ export default function PepDashboard() {
       <div style={{ minHeight: "100vh", background: "#fafafa", padding: "40px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ ...card(), maxWidth: 400, textAlign: "center" }}>
           <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}><PepIcon size={28} /> Economy</h1>
-          <p style={{ opacity: 0.6, marginBottom: 24 }}>
+          <p style={{ color: "#666", marginBottom: 24 }}>
             Please log in with Discord to access the economy features.
           </p>
           <Link href="/api/discord/login" style={btn("primary")}>
@@ -373,12 +389,19 @@ export default function PepDashboard() {
     <div style={{ minHeight: "100vh", background: "#fafafa", padding: "40px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <header style={{ marginBottom: 24 }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-            <PepIcon size={28} /> Economy
-          </h1>
-          <p style={{ opacity: 0.6, margin: 0 }}>
-            Welcome, {session.username || session.discordId}
-          </p>
+          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
+            <div>
+              <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
+                <PepIcon size={28} /> Economy
+              </h1>
+              <p style={{ color: "#666", margin: 0 }}>
+                Welcome, {memberName || session.username || session.discordId}
+              </p>
+            </div>
+            <Link href="/" style={{ ...btn("secondary"), fontSize: 14, textDecoration: "none" }}>
+              ← Home
+            </Link>
+          </div>
         </header>
 
         {/* Two column layout - Jobs left, everything else right */}

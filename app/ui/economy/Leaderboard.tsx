@@ -95,7 +95,7 @@ export function Leaderboard() {
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>Leaderboard</h2>
 
       {entries.length === 0 ? (
-        <p style={{ opacity: 0.5, textAlign: "center", padding: "32px 0" }}>No entries yet</p>
+        <p style={{ color: "#666", textAlign: "center", padding: "32px 0" }}>No entries yet</p>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {entries.map((entry) => (

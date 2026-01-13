@@ -170,7 +170,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
           <div style={{ ...card(), marginBottom: 16 }}>
             <form onSubmit={handleCreateBounty} style={{ display: "grid", gap: 12 }}>
               <div>
-                <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
                   What do you need done?
                 </label>
                 <textarea
@@ -182,7 +182,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
                   Link (optional)
                 </label>
                 <input
@@ -195,7 +195,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
                   Reward amount (will be escrowed)
                 </label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -229,7 +229,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
 
         {bounties.length === 0 ? (
           <div style={{ ...card(), textAlign: "center" }}>
-            <p style={{ opacity: 0.5, margin: 0 }}>No bounties posted yet</p>
+            <p style={{ color: "#666", margin: 0 }}>No bounties posted yet</p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
