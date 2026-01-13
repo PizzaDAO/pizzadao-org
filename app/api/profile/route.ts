@@ -196,26 +196,52 @@ async function fetchCrewRoleIds(req: Request, selectedCrewIds: string[]): Promis
   return Array.from(new Set(roleIds));
 }
 
+/**
+ * Fetch with redirect handling for Apps Script.
+ * Apps Script returns 302 redirects that need to be followed manually for POST requests.
+ */
+async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
+  let currentUrl = url;
+  for (let i = 0; i < maxRedirects; i++) {
+    const res = await fetch(currentUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      redirect: "manual",
+    });
+
+    if (res.status === 302 || res.status === 301) {
+      const location = res.headers.get("location");
+      if (!location) {
+        console.error("[writeToSheet] Redirect without location header");
+        return { status: res.status, text: "Redirect without location" };
+      }
+      console.log("[writeToSheet] Following redirect to:", location.substring(0, 80) + "...");
+      currentUrl = location;
+      continue;
+    }
+
+    const text = await res.text();
+    return { status: res.status, text };
+  }
+  return { status: 500, text: "Too many redirects" };
+}
+
 // --- main handler ---
 export async function writeToSheet(payload: any) {
   const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   if (!url) throw new Error("Missing Sheets webapp env vars");
 
   console.log("[writeToSheet] Calling:", url);
-  const sheetRes = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-  });
+  const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
 
-  const text = await sheetRes.text();
-  console.log("[writeToSheet] Response status:", sheetRes.status, "text length:", text.length);
+  console.log("[writeToSheet] Response status:", sheetStatus, "text length:", text.length);
   let parsed: any = null;
   try {
     parsed = JSON.parse(text);
   } catch { }
 
-  if (!sheetRes.ok || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
+  if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
     console.error("[writeToSheet] Error:", parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text);
     throw new Error(JSON.stringify(parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text));
   }

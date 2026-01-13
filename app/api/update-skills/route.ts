@@ -3,6 +3,34 @@ import { getSession } from "@/app/lib/session";
 
 export const runtime = "nodejs";
 
+/**
+ * Fetch with redirect handling for Apps Script.
+ */
+async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
+    let currentUrl = url;
+    for (let i = 0; i < maxRedirects; i++) {
+        const res = await fetch(currentUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            redirect: "manual",
+        });
+
+        if (res.status === 302 || res.status === 301) {
+            const location = res.headers.get("location");
+            if (!location) {
+                return { status: res.status, text: "Redirect without location" };
+            }
+            currentUrl = location;
+            continue;
+        }
+
+        const text = await res.text();
+        return { status: res.status, text };
+    }
+    return { status: 500, text: "Too many redirects" };
+}
+
 // Fetch member row to verify ownership
 async function fetchMemberRowById(memberId: string) {
     const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
@@ -102,19 +130,14 @@ export async function POST(req: Request) {
             skills: String(skills || "").trim().slice(0, 500),
         };
 
-        const sheetRes = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
+        const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
 
-        const text = await sheetRes.text();
         let parsed: any = null;
         try {
             parsed = JSON.parse(text);
         } catch { }
 
-        if (!sheetRes.ok || parsed?.ok === false) {
+        if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
             return NextResponse.json({ error: "Failed to update skills", details: parsed }, { status: 502 });
         }
 

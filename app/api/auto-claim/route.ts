@@ -7,6 +7,37 @@ import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/ap
 
 export const runtime = "nodejs";
 
+/**
+ * Fetch with redirect handling for Apps Script.
+ * Apps Script returns 302 redirects that need to be followed manually for POST requests.
+ */
+async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
+    let currentUrl = url;
+    for (let i = 0; i < maxRedirects; i++) {
+        const res = await fetch(currentUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            redirect: "manual",
+        });
+
+        if (res.status === 302 || res.status === 301) {
+            const location = res.headers.get("location");
+            if (!location) {
+                console.error("[auto-claim] Redirect without location header");
+                return { status: res.status, text: "Redirect without location" };
+            }
+            console.log("[auto-claim] Following redirect to:", location.substring(0, 80) + "...");
+            currentUrl = location;
+            continue;
+        }
+
+        const text = await res.text();
+        return { status: res.status, text };
+    }
+    return { status: 500, text: "Too many redirects" };
+}
+
 const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
 const TAB_NAME = "Crew";
 
@@ -158,25 +189,20 @@ export async function POST(req: Request) {
                     source: payload.source,
                 });
 
-                const sheetRes = await fetch(url, {
-                    method: "POST",
-                    headers: { "Content-Type": "application/json" },
-                    body: JSON.stringify(payload),
-                });
+                const { status: sheetStatus, text: sheetText } = await fetchWithRedirect(url, payload);
 
-                const sheetText = await sheetRes.text();
                 let parsed: any = null;
                 try {
                     parsed = JSON.parse(sheetText);
                 } catch { }
 
                 console.log("[auto-claim] Apps Script response:", {
-                    httpStatus: sheetRes.status,
+                    httpStatus: sheetStatus,
                     ok: parsed?.ok,
                     crewSync: parsed?.crewSync,
                 });
 
-                if (!sheetRes.ok || parsed?.ok === false) {
+                if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
                     console.error("[auto-claim] Apps Script error:", parsed?.crewSync?.error ?? parsed?.error ?? sheetText);
                     return NextResponse.json({
                         error: "Failed to update sheet",

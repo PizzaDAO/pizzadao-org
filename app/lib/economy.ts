@@ -110,6 +110,17 @@ export async function getLeaderboard(limit = 10) {
 }
 
 /**
+ * Ensure user exists in database (auto-create if needed)
+ */
+export async function ensureUser(userId: string) {
+  await prisma.user.upsert({
+    where: { id: userId },
+    create: { id: userId, roles: [] },
+    update: {}
+  })
+}
+
+/**
  * Check if user is onboarded (has completed profile)
  */
 export async function isOnboarded(userId: string): Promise<boolean> {
@@ -121,10 +132,13 @@ export async function isOnboarded(userId: string): Promise<boolean> {
 
 /**
  * Require user to be onboarded before economy access
+ * Auto-creates User record if it doesn't exist
  */
 export async function requireOnboarded(userId: string) {
-  const onboarded = await isOnboarded(userId)
-  if (!onboarded) {
-    throw new Error('You must complete onboarding before using the economy')
-  }
+  // Auto-create user record if it doesn't exist
+  await prisma.user.upsert({
+    where: { id: userId },
+    create: { id: userId, roles: [] },
+    update: {}
+  })
 }

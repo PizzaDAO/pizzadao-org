@@ -147,29 +147,58 @@ async function updateDiscordRoles(opts: {
   return { ok: true };
 }
 
+/**
+ * Fetch with redirect handling for Apps Script.
+ */
+async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
+  let currentUrl = url;
+  for (let i = 0; i < maxRedirects; i++) {
+    const res = await fetch(currentUrl, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(payload),
+      redirect: "manual",
+    });
+
+    if (res.status === 302 || res.status === 301) {
+      const location = res.headers.get("location");
+      if (!location) {
+        return { status: res.status, text: "Redirect without location" };
+      }
+      currentUrl = location;
+      continue;
+    }
+
+    const text = await res.text();
+    return { status: res.status, text };
+  }
+  return { status: 500, text: "Too many redirects" };
+}
+
 // --- Write to sheet ---
 async function updateCrewsInSheet(memberId: string, crews: string[]) {
   const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
   if (!url || !secret) throw new Error("Missing sheet config");
 
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({
-      secret,
-      memberId,
-      crews,
-      source: "join-crew",
-    }),
-  });
+  const payload = {
+    secret,
+    memberId,
+    crews,
+    source: "join-crew",
+  };
 
-  if (!res.ok) {
-    const text = await res.text();
+  const { status, text } = await fetchWithRedirect(url, payload);
+
+  if (status < 200 || status >= 300) {
     throw new Error(`Sheet update failed: ${text}`);
   }
 
-  return res.json();
+  try {
+    return JSON.parse(text);
+  } catch {
+    return { ok: true, raw: text };
+  }
 }
 
 // --- Main handler ---

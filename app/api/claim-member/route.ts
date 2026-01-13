@@ -5,6 +5,37 @@ import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/ap
 
 export const runtime = "nodejs";
 
+/**
+ * Fetch with redirect handling for Apps Script.
+ * Apps Script returns 302 redirects that need to be followed manually for POST requests.
+ */
+async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
+    let currentUrl = url;
+    for (let i = 0; i < maxRedirects; i++) {
+        const res = await fetch(currentUrl, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify(payload),
+            redirect: "manual",
+        });
+
+        if (res.status === 302 || res.status === 301) {
+            const location = res.headers.get("location");
+            if (!location) {
+                console.error("[claim-member] Redirect without location header");
+                return { status: res.status, text: "Redirect without location" };
+            }
+            console.log("[claim-member] Following redirect to:", location.substring(0, 80) + "...");
+            currentUrl = location;
+            continue;
+        }
+
+        const text = await res.text();
+        return { status: res.status, text };
+    }
+    return { status: 500, text: "Too many redirects" };
+}
+
 const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
 const TAB_NAME = "Crew";
 
@@ -207,25 +238,20 @@ export async function POST(req: Request) {
             source: payload.source,
         });
 
-        const sheetRes = await fetch(url, {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify(payload),
-        });
+        const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
 
-        const text = await sheetRes.text();
         let parsed: any = null;
         try {
             parsed = JSON.parse(text);
         } catch { }
 
         console.log("[claim-member] Apps Script response:", {
-            httpStatus: sheetRes.status,
+            httpStatus: sheetStatus,
             ok: parsed?.ok,
             crewSync: parsed?.crewSync,
         });
 
-        if (!sheetRes.ok || parsed?.ok === false) {
+        if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
             console.error("[claim-member] Apps Script error:", parsed?.crewSync?.error ?? parsed?.error ?? text);
             return NextResponse.json(
                 {
