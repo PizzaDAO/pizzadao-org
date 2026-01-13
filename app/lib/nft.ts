@@ -8,7 +8,7 @@ import { cacheGetOrSet, CACHE_TTL } from "../api/lib/cache";
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 
 /**
- * Fetch NFTs from Alchemy for a specific wallet and contract
+ * Fetch NFTs from Alchemy for a specific wallet and contract (with pagination)
  */
 async function fetchNFTsForContract(
   walletAddress: string,
@@ -25,24 +25,42 @@ async function fetchNFTsForContract(
     return [];
   }
 
-  const url = `${baseUrl}/${ALCHEMY_API_KEY}/getNFTsForOwner?owner=${walletAddress}&contractAddresses[]=${contract.address}&withMetadata=true`;
+  const allNfts: AlchemyNFT[] = [];
+  let pageKey: string | undefined;
+  const maxPages = 10; // Safety limit to prevent infinite loops
 
   try {
-    const res = await fetch(url, {
-      cache: "no-store",
-      headers: { Accept: "application/json" },
-    });
+    for (let page = 0; page < maxPages; page++) {
+      let url = `${baseUrl}/${ALCHEMY_API_KEY}/getNFTsForOwner?owner=${walletAddress}&contractAddresses[]=${contract.address}&withMetadata=true`;
+      if (pageKey) {
+        url += `&pageKey=${pageKey}`;
+      }
 
-    if (!res.ok) {
-      console.error(`[nft] Alchemy API error for ${contract.chain}:`, res.status);
-      return [];
+      const res = await fetch(url, {
+        cache: "no-store",
+        headers: { Accept: "application/json" },
+      });
+
+      if (!res.ok) {
+        console.error(`[nft] Alchemy API error for ${contract.chain}:`, res.status);
+        break;
+      }
+
+      const data = await res.json();
+      const nfts = data.ownedNfts || [];
+      allNfts.push(...nfts);
+
+      // Check if there are more pages
+      if (!data.pageKey) {
+        break;
+      }
+      pageKey = data.pageKey;
     }
 
-    const data = await res.json();
-    return data.ownedNfts || [];
+    return allNfts;
   } catch (error) {
     console.error(`[nft] Fetch error for ${contract.chain}:`, error);
-    return [];
+    return allNfts; // Return whatever we got so far
   }
 }
 
