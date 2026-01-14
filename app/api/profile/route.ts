@@ -2,7 +2,7 @@
 import { NextResponse } from "next/server";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { getSession } from "@/app/lib/session";
-import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
+import { parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { sendWelcomeMessage } from "@/app/lib/discord-webhook";
 import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
@@ -263,13 +263,11 @@ export async function POST(req: Request) {
     const body = await req.json();
 
     // Get submitted turtles from form
+    // Only save turtles that the user explicitly selected - don't auto-add Discord roles
     const submittedTurtles = Array.isArray(body.turtles)
       ? body.turtles.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
       : [];
-
-    // Fetch Discord turtle roles and merge with submitted (adds any Discord roles not already submitted)
-    const discordTurtles = await getDiscordTurtleRoles(session.discordId);
-    const turtlesArr = mergeTurtles(submittedTurtles, discordTurtles);
+    const turtlesArr = submittedTurtles;
 
     const crewsArr = Array.isArray(body.crews)
       ? body.crews.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
