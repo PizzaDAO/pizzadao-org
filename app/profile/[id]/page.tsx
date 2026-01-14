@@ -7,6 +7,7 @@ import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
 import { TURTLES, CREWS } from "../../ui/constants";
 import { NFTCollection } from "../../ui/nft";
+import { POAPCollection } from "../../ui/poap";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -305,6 +306,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                     {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
                     <NFTCollection memberId={idValue} showConnectPrompt={false} />
+
+                    {/* POAP Collection Section - only shows if wallet exists and has POAPs */}
+                    <POAPCollection memberId={idValue} />
 
                     {/* Crews Section */}
                     {userCrews.length > 0 && (
