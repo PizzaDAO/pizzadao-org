@@ -1,6 +1,7 @@
 // PizzaDAO NFT Collection Configuration
 // Contract addresses are loaded from Google Sheets for easy management
 
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NFTContract } from "./nft-types";
 
 const NFT_CONTRACTS_SHEET_ID = "1I9Sjj5kNQOushVbYGSnG668tMOAz0SJ3L8StaCG5r0I";
@@ -18,15 +19,6 @@ export const ALCHEMY_CHAIN_URLS: Record<string, string> = {
 let contractsCache: { contracts: NFTContract[]; fetchedAt: number } | null = null;
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function parseGvizJson(text: string) {
-  const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("GViz: Unexpected response");
-  }
-  return JSON.parse(cleaned.slice(start, end + 1));
-}
 
 /**
  * Fetch NFT contract addresses from the Google Sheet

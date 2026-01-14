@@ -1,6 +1,8 @@
 // app/api/auto-claim/route.ts
 // Handles auto-claiming when Discord nickname matches a member name
 // No password required since we verify via session + name match
+import { parseGvizJson } from "@/app/lib/gviz-parser";
+import { fetchWithRedirect, findColumnIndex } from "@/app/lib/sheet-utils";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
@@ -12,60 +14,10 @@ export const runtime = "nodejs";
  * Apps Script returns 302 redirects that need to be followed manually for POST requests.
  * The redirect URL should be fetched with GET to retrieve the response.
  */
-async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
-    // First request is POST with the payload
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        redirect: "manual",
-    });
-
-    // If not a redirect, return directly
-    if (res.status !== 302 && res.status !== 301) {
-        const text = await res.text();
-        return { status: res.status, text };
-    }
-
-    // Follow redirects with GET (Apps Script redirect pattern)
-    let currentUrl: string | null = res.headers.get("location");
-    if (!currentUrl) {
-        return { status: res.status, text: "Redirect without location" };
-    }
-
-    for (let i = 0; i < maxRedirects; i++) {
-        const redirectRes: Response = await fetch(currentUrl, {
-            method: "GET",
-            redirect: "manual",
-        });
-
-        if (redirectRes.status === 302 || redirectRes.status === 301) {
-            const location = redirectRes.headers.get("location");
-            if (!location) {
-                return { status: redirectRes.status, text: "Redirect without location" };
-            }
-            currentUrl = location;
-            continue;
-        }
-
-        const text = await redirectRes.text();
-        return { status: redirectRes.status, text };
-    }
-    return { status: 500, text: "Too many redirects" };
-}
 
 const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
 const TAB_NAME = "Crew";
 
-function parseGvizJson(text: string) {
-    const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) {
-        throw new Error("GViz: Unexpected response");
-    }
-    return JSON.parse(cleaned.slice(start, end + 1));
-}
 
 /**
  * Auto-claim a member ID when the Discord nickname matches the member name.
@@ -115,13 +67,10 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Header row not found" }, { status: 500 });
         }
 
-        const headerMap = new Map<string, number>();
-        headerVals.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
-
-        const idxId = headerMap.get("id") ?? headerMap.get("member id") ?? headerMap.get("memberid") ?? 0;
-        const idxName = headerMap.get("name") ?? headerMap.get("mafia name");
-        const idxDiscord = headerMap.get("discordid") ?? headerMap.get("discord id") ?? headerMap.get("discord");
-        const idxTurtles = headerMap.get("turtles") ?? headerMap.get("roles");
+        const idxId = findColumnIndex(headerVals, ["id", "member id", "memberid"], 0) ?? 0;
+        const idxName = findColumnIndex(headerVals, ["name", "mafia name"]);
+        const idxDiscord = findColumnIndex(headerVals, ["discordid", "discord id", "discord"]);
+        const idxTurtles = findColumnIndex(headerVals, ["turtles", "roles"]);
 
         if (idxName == null) {
             return NextResponse.json({ error: "Name column not found" }, { status: 500 });

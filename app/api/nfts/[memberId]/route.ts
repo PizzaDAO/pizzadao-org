@@ -1,3 +1,4 @@
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextRequest, NextResponse } from "next/server";
 import { fetchPizzaDAONFTs } from "@/app/lib/nft";
 
@@ -10,15 +11,6 @@ const TAB_NAME = "Crew";
 const WALLET_CACHE = new Map<string, { time: number; wallet: string | null }>();
 const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
-function parseGvizJson(text: string) {
-  const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("GViz: Unexpected response");
-  }
-  return JSON.parse(cleaned.slice(start, end + 1));
-}
 
 async function getWalletForMember(memberId: string): Promise<string | null> {
   // Check cache

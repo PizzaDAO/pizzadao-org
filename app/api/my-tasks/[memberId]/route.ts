@@ -1,3 +1,4 @@
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getTaskLinks } from "../../lib/google-sheets";
 
@@ -122,14 +123,6 @@ async function fetchTaskLinksFromHTML_LEGACY(sheetId: string): Promise<Record<st
 */
 
 // Google GViz wraps JSON inside a JS function call (copied from crew-mappings/route.ts)
-function parseGvizJson(text: string) {
-    const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) return null;
-    const json = cleaned.slice(start, end + 1);
-    return JSON.parse(json);
-}
 
 async function fetchMyTasksForCrew(sheetUrl: string, memberId: string): Promise<CrewTaskData> {
     const id = extractSheetId(sheetUrl);

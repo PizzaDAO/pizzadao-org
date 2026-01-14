@@ -1,4 +1,6 @@
 // app/api/claim-member/route.ts
+import { parseGvizJson } from "@/app/lib/gviz-parser";
+import { fetchWithRedirect, findColumnIndex } from "@/app/lib/sheet-utils";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
@@ -10,62 +12,11 @@ export const runtime = "nodejs";
  * Apps Script returns 302 redirects that need to be followed manually for POST requests.
  * The redirect URL should be fetched with GET to retrieve the response.
  */
-async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
-    // First request is POST with the payload
-    const res = await fetch(url, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-        redirect: "manual",
-    });
-
-    // If not a redirect, return directly
-    if (res.status !== 302 && res.status !== 301) {
-        const text = await res.text();
-        return { status: res.status, text };
-    }
-
-    // Follow redirects with GET (Apps Script redirect pattern)
-    let currentUrl: string | null = res.headers.get("location");
-    if (!currentUrl) {
-        return { status: res.status, text: "Redirect without location" };
-    }
-
-    for (let i = 0; i < maxRedirects; i++) {
-        const redirectRes: Response = await fetch(currentUrl, {
-            method: "GET",
-            redirect: "manual",
-        });
-
-        if (redirectRes.status === 302 || redirectRes.status === 301) {
-            const location = redirectRes.headers.get("location");
-            if (!location) {
-                return { status: redirectRes.status, text: "Redirect without location" };
-            }
-            currentUrl = location;
-            continue;
-        }
-
-        const text = await redirectRes.text();
-        return { status: redirectRes.status, text };
-    }
-    return { status: 500, text: "Too many redirects" };
-}
 
 const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
 const TAB_NAME = "Crew";
 
 // --- Helpers copied from user-data route ---
-function parseGvizJson(text: string) {
-    const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) {
-        throw new Error("GViz: Unexpected response");
-    }
-    const json = cleaned.slice(start, end + 1);
-    return JSON.parse(json);
-}
 
 function gvizUrl(sheetId: string, tabName?: string) {
     const url = new URL(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`);
@@ -106,26 +57,8 @@ async function fetchMemberData(id: string) {
     }
 
     // Find ID column index
-    let idColIdx = -1;
-    const normalizedHeaders = headerRowVals.map((h) => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
-    const idAliases = ["id", "crewid", "memberid"];
-    for (let i = 0; i < normalizedHeaders.length; i++) {
-        if (idAliases.includes(normalizedHeaders[i])) {
-            idColIdx = i;
-            break;
-        }
-    }
-    if (idColIdx === -1) idColIdx = 0;
-
-    // Also find Discord ID column index (best-effort)
-    let discordColIdx = -1;
-    const discordAliases = ["discordid", "discord", "discorduserid", "discorduserid"];
-    for (let i = 0; i < normalizedHeaders.length; i++) {
-        if (discordAliases.includes(normalizedHeaders[i])) {
-            discordColIdx = i;
-            break;
-        }
-    }
+    const idColIdx = findColumnIndex(headerRowVals, ["id", "crewid", "memberid"], 0) ?? 0;
+    const discordColIdx = findColumnIndex(headerRowVals, ["discordid", "discord", "discorduserid"]);
 
     const targetId = parseInt(id, 10);
     const dataStartIdx = headerRowIdx + 1;
@@ -148,7 +81,7 @@ async function fetchMemberData(id: string) {
 
     // Add a normalized discordId hint for checks
     const existingDiscord =
-        discordColIdx >= 0 ? String(userRow.c?.[discordColIdx]?.v ?? userRow.c?.[discordColIdx]?.f ?? "").trim() : "";
+        discordColIdx != null ? String(userRow.c?.[discordColIdx]?.v ?? userRow.c?.[discordColIdx]?.f ?? "").trim() : "";
     (data as any).__existingDiscordId = existingDiscord;
 
     return data;

@@ -1,3 +1,4 @@
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from 'next/server'
 import { getManualLinks } from '@/app/api/lib/google-sheets'
 
@@ -9,15 +10,6 @@ function norm(s: unknown): string {
 }
 
 // Parse GViz JSON response
-function parseGvizJson(text: string) {
-  const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, '').trim()
-  const start = cleaned.indexOf('{')
-  const end = cleaned.lastIndexOf('}')
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error('GViz: Unexpected response')
-  }
-  return JSON.parse(cleaned.slice(start, end + 1))
-}
 
 // Get cell value
 function cellVal(cell: any): string {

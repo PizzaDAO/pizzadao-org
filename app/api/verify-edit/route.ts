@@ -1,4 +1,5 @@
 // app/api/verify-edit/route.ts
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 
@@ -7,15 +8,6 @@ export const runtime = "nodejs";
 const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
 const TAB_NAME = "Crew";
 
-function parseGvizJson(text: string) {
-    const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) {
-        throw new Error("GViz: Unexpected response");
-    }
-    return JSON.parse(cleaned.slice(start, end + 1));
-}
 
 /**
  * Verifies that the current session owns a specific member ID.

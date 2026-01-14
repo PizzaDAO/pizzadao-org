@@ -1,4 +1,5 @@
 // app/api/user-data/[id]/route.ts
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 
@@ -7,16 +8,6 @@ export const runtime = "nodejs";
 const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
 const TAB_NAME = "Crew";
 
-function parseGvizJson(text: string) {
-    const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) {
-        throw new Error("GViz: Unexpected response");
-    }
-    const json = cleaned.slice(start, end + 1);
-    return JSON.parse(json);
-}
 
 function gvizUrl(sheetId: string, tabName?: string) {
     const url = new URL(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`);

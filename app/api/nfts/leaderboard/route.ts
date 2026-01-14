@@ -1,4 +1,5 @@
 // NFT Leaderboard API - Aggregates NFT holdings by collection across all members
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getNFTContracts, ALCHEMY_CHAIN_URLS } from "@/app/lib/nft-config";
 import { NFTContract } from "@/app/lib/nft-types";
@@ -46,15 +47,6 @@ interface LeaderboardResponse {
   error?: string;
 }
 
-function parseGvizJson(text: string) {
-  const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    throw new Error("GViz: Unexpected response");
-  }
-  return JSON.parse(cleaned.slice(start, end + 1));
-}
 
 /**
  * Fetch all members with valid wallet addresses

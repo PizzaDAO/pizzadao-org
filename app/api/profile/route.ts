@@ -4,6 +4,8 @@ import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { sendWelcomeMessage } from "@/app/lib/discord-webhook";
+import { parseGvizJson } from "@/app/lib/gviz-parser";
+import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 
 export const runtime = "nodejs";
 
@@ -30,14 +32,6 @@ function extractRoleIdFromMention(s: unknown): string | null {
 async function fetchMemberRowById(memberId: string) {
   const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
   const TAB_NAME = "Crew";
-
-  function parseGvizJson(text: string) {
-    const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-    const start = cleaned.indexOf("{");
-    const end = cleaned.lastIndexOf("}");
-    if (start === -1 || end === -1 || end <= start) throw new Error("GViz: Unexpected response");
-    return JSON.parse(cleaned.slice(start, end + 1));
-  }
 
   // headers=0 ensures the header row is included in the response
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
@@ -198,47 +192,6 @@ async function fetchCrewRoleIds(req: Request, selectedCrewIds: string[]): Promis
  * Apps Script returns 302 redirects that need to be followed manually for POST requests.
  * The redirect URL should be fetched with GET to retrieve the response.
  */
-async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): Promise<{ status: number; text: string }> {
-  // First request is POST with the payload
-  const res = await fetch(url, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(payload),
-    redirect: "manual",
-  });
-
-  // If not a redirect, return directly
-  if (res.status !== 302 && res.status !== 301) {
-    const text = await res.text();
-    return { status: res.status, text };
-  }
-
-  // Follow redirects with GET (Apps Script redirect pattern)
-  let currentUrl: string | null = res.headers.get("location");
-  if (!currentUrl) {
-    return { status: res.status, text: "Redirect without location" };
-  }
-
-  for (let i = 0; i < maxRedirects; i++) {
-    const redirectRes: Response = await fetch(currentUrl, {
-      method: "GET",
-      redirect: "manual",
-    });
-
-    if (redirectRes.status === 302 || redirectRes.status === 301) {
-      const location = redirectRes.headers.get("location");
-      if (!location) {
-        return { status: redirectRes.status, text: "Redirect without location" };
-      }
-      currentUrl = location;
-      continue;
-    }
-
-    const text = await redirectRes.text();
-    return { status: redirectRes.status, text };
-  }
-  return { status: 500, text: "Too many redirects" };
-}
 
 // --- main handler ---
 export async function writeToSheet(payload: any) {

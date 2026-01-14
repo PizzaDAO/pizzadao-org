@@ -1,3 +1,4 @@
+import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getTaskLinks, getColumnHyperlinks } from "../lib/google-sheets";
 import { cacheGet, cacheSet, cacheDel, CACHE_TTL } from "../lib/cache";
@@ -43,20 +44,6 @@ type CrewOption = {
 };
 
 // Google GViz wraps JSON inside a JS function call
-function parseGvizJson(text: string) {
-  // It can start with: /*O_o*/\ngoogle.visualization.Query.setResponse({...});
-  const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-
-  const start = cleaned.indexOf("{");
-  const end = cleaned.lastIndexOf("}");
-  if (start === -1 || end === -1 || end <= start) {
-    const preview = cleaned.slice(0, 220);
-    throw new Error(`GViz: Unexpected response (no JSON object). Preview: ${JSON.stringify(preview)}`);
-  }
-
-  const json = cleaned.slice(start, end + 1);
-  return JSON.parse(json);
-}
 
 function gvizUrl(sheetId: string, tabName?: string) {
   const url = new URL(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`);
