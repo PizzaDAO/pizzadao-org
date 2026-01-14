@@ -11,7 +11,6 @@ try {
         ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
         : undefined;
 } catch (error) {
-    console.error("Error parsing GOOGLE_SERVICE_ACCOUNT_JSON environment variable");
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON.");
 }
 
@@ -61,9 +60,7 @@ async function listFolderFiles(folderId: string): Promise<Map<string, string>> {
         } while (pageToken);
 
         FILE_CACHE.set(folderId, { time: Date.now(), files: fileMap });
-        console.log(`[listFolderFiles] Cached ${fileMap.size} files from folder ${folderId}`);
     } catch (error) {
-        console.error("[listFolderFiles] Error:", error);
     }
 
     return fileMap;
@@ -131,7 +128,6 @@ export async function getFileModifiedTime(fileId: string): Promise<string | null
         }
         return modifiedTime;
     } catch (error: any) {
-        console.error(`[getFileModifiedTime] Error for ${fileId}:`, error?.message || error);
         return null;
     }
 }

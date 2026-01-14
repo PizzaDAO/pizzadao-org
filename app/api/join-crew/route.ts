@@ -296,7 +296,6 @@ export async function POST(req: Request) {
       discord: discordResult,
     });
   } catch (err: any) {
-    console.error("[join-crew] Error:", err);
     return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
   }
 }

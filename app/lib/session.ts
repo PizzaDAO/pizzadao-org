@@ -4,7 +4,11 @@ import { cookies } from "next/headers";
 import { createHmac } from "crypto";
 
 const COOKIE_NAME = "pizzadao_session";
-const SESSION_SECRET = process.env.SESSION_SECRET || "dev-secret-change-in-production";
+
+if (!process.env.SESSION_SECRET) {
+    throw new Error("SESSION_SECRET environment variable is required but not set");
+}
+const SESSION_SECRET = process.env.SESSION_SECRET;
 
 export interface Session {
     discordId: string;
@@ -67,13 +71,6 @@ export async function getSession(): Promise<Session | null> {
     const cookieStore = await cookies();
     const token = cookieStore.get(COOKIE_NAME)?.value;
     const session = verifySession(token);
-    console.log("[getSession] Cookie check:", {
-        cookieName: COOKIE_NAME,
-        hasToken: !!token,
-        tokenLength: token?.length,
-        hasSession: !!session,
-        discordId: session?.discordId
-    });
     return session;
 }
 

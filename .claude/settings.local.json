@@ -105,7 +105,10 @@
       "WebFetch(domain:cdn.discordapp.com)",
       "Bash(node scripts/add-logging.js:*)",
       "Bash(git rm:*)",
-      "Bash(git ls-files:*)"
+      "Bash(git ls-files:*)",
+      "Bash(wc:*)",
+      "Bash(vercel login)",
+      "Bash(vercel redeploy)"
     ]
   }
 }

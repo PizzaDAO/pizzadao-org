@@ -86,7 +86,6 @@ export async function GET(req: Request) {
 
     return NextResponse.json({ manuals })
   } catch (e: unknown) {
-    console.error('[manuals] Error:', e)
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to load manuals' },
       { status: 500 }

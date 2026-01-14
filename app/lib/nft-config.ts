@@ -42,7 +42,6 @@ export async function getNFTContracts(): Promise<NFTContract[]> {
     const res = await fetch(url, { cache: "no-store" });
 
     if (!res.ok) {
-      console.error("[nft-config] Failed to fetch contracts sheet:", res.status);
       return contractsCache?.contracts || [];
     }
 
@@ -62,7 +61,6 @@ export async function getNFTContracts(): Promise<NFTContract[]> {
     const detailsIdx = headers.findIndex((h: string) => h === "details");
 
     if (chainIdx === -1 || contractIdx === -1) {
-      console.error("[nft-config] Missing required columns (chain, contract)");
       return contractsCache?.contracts || [];
     }
 
@@ -91,11 +89,9 @@ export async function getNFTContracts(): Promise<NFTContract[]> {
 
     // Update cache
     contractsCache = { contracts, fetchedAt: Date.now() };
-    console.log(`[nft-config] Loaded ${contracts.length} NFT contracts`);
 
     return contracts;
   } catch (error) {
-    console.error("[nft-config] Error fetching contracts:", error);
     return contractsCache?.contracts || [];
   }
 }

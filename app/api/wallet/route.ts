@@ -21,7 +21,6 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
     }
 
-    console.log(`[wallet] Saving wallet ${walletAddress} for member ${memberId}`);
 
     // Use the same writeToSheet approach as profile/auto-claim routes
     // The Apps Script correctly finds rows by ID (not GViz indices which skip hidden rows)
@@ -38,7 +37,6 @@ export async function POST(request: NextRequest) {
     };
 
     const result = await writeToSheet(payload);
-    console.log(`[wallet] Sheet write result:`, result);
 
     return NextResponse.json({
       success: true,
@@ -46,7 +44,6 @@ export async function POST(request: NextRequest) {
       walletAddress,
     });
   } catch (error) {
-    console.error("[wallet] Error saving wallet:", error);
     return NextResponse.json(
       { error: "Failed to save wallet address" },
       { status: 500 }

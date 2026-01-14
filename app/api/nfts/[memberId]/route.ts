@@ -58,7 +58,6 @@ async function getWalletForMember(memberId: string): Promise<string | null> {
   }
 
   if (headerRowIdx === -1) {
-    console.log("[nfts] Could not find header row with wallet column");
     WALLET_CACHE.set(memberId, { time: Date.now(), wallet: null });
     return null;
   }
@@ -76,7 +75,6 @@ async function getWalletForMember(memberId: string): Promise<string | null> {
   }
 
   if (walletColIdx === -1) {
-    console.log("[nfts] Missing Wallet column");
     WALLET_CACHE.set(memberId, { time: Date.now(), wallet: null });
     return null;
   }
@@ -129,7 +127,6 @@ export async function GET(
       noWallet: false,
     });
   } catch (error) {
-    console.error("[nfts] Error:", error);
     return NextResponse.json(
       {
         error: "Failed to fetch NFTs",

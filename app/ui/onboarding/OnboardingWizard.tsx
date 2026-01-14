@@ -234,7 +234,6 @@ export function OnboardingWizard() {
         error: null,
       });
     } catch (e) {
-      console.error("Lookup failed", e);
       setFlow({ type: "wizard", step: 0, isUpdate: false });
     }
   }

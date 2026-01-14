@@ -72,7 +72,6 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                     if (json.url) setPfpUrl(json.url);
                 }
             } catch (e) {
-                console.error("Failed to fetch profile picture", e);
             }
         })();
     }, [id]);
@@ -109,7 +108,6 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                     if (json.doneCountsByCrew) setDoneCounts(json.doneCountsByCrew);
                 }
             } catch (e) {
-                console.error("Failed to fetch tasks", e);
             }
         })();
     }, [id]);

@@ -113,7 +113,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     if (json.url) setPfpUrl(json.url);
                 }
             } catch (e) {
-                console.error("Failed to fetch profile picture", e);
             }
         })();
     }, [id]);
@@ -163,7 +162,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     if (json.doneCountsByCrew) setDoneCounts(json.doneCountsByCrew);
                 }
             } catch (e) {
-                console.error("Failed to fetch personalized tasks", e);
             }
         })();
 
@@ -176,7 +174,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     setPepBalance(json.balance);
                 }
             } catch (e) {
-                console.error("Failed to fetch $PEP balance", e);
             }
         })();
 
@@ -1030,7 +1027,6 @@ const SyncRolesButton = ({ memberId, discordId, name, onSync }: { memberId: stri
             setTimeout(() => setMsg(""), 2000);
             onSync(data.turtles, data.otherRoles);
         } catch (e: any) {
-            console.error(e);
             setMsg("Error!");
             setTimeout(() => setMsg(""), 2000);
         } finally {

@@ -125,7 +125,6 @@ export async function GET(
 
         return NextResponse.json(data);
     } catch (error: any) {
-        console.error("[profile] Error:", error);
         return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
     }
 }

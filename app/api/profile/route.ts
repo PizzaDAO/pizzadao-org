@@ -216,12 +216,10 @@ async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): P
   // Follow redirects with GET (Apps Script redirect pattern)
   let currentUrl: string | null = res.headers.get("location");
   if (!currentUrl) {
-    console.error("[writeToSheet] Redirect without location header");
     return { status: res.status, text: "Redirect without location" };
   }
 
   for (let i = 0; i < maxRedirects; i++) {
-    console.log("[writeToSheet] Following redirect to:", currentUrl.substring(0, 80) + "...");
     const redirectRes: Response = await fetch(currentUrl, {
       method: "GET",
       redirect: "manual",
@@ -247,17 +245,14 @@ export async function writeToSheet(payload: any) {
   const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   if (!url) throw new Error("Missing Sheets webapp env vars");
 
-  console.log("[writeToSheet] Calling:", url);
   const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
 
-  console.log("[writeToSheet] Response status:", sheetStatus, "text length:", text.length);
   let parsed: any = null;
   try {
     parsed = JSON.parse(text);
   } catch { }
 
   if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
-    console.error("[writeToSheet] Error:", parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text);
     throw new Error(JSON.stringify(parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text));
   }
   return parsed;
@@ -306,20 +301,11 @@ export async function POST(req: Request) {
     }
 
     const session = await getSession();
-    console.log("[profile] Session check:", { hasSession: !!session, discordId: session?.discordId });
     if (!session?.discordId) {
       return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
     }
 
     const body = await req.json();
-    console.log("[profile] Received body:", {
-      mafiaName: body.mafiaName,
-      city: body.city,
-      topping: body.topping,
-      crews: body.crews,
-      turtles: body.turtles,
-      memberId: body.memberId,
-    });
 
     // Get submitted turtles from form
     const submittedTurtles = Array.isArray(body.turtles)
@@ -329,12 +315,6 @@ export async function POST(req: Request) {
     // Fetch Discord turtle roles and merge with submitted (adds any Discord roles not already submitted)
     const discordTurtles = await getDiscordTurtleRoles(session.discordId);
     const turtlesArr = mergeTurtles(submittedTurtles, discordTurtles);
-
-    console.log("[profile] Turtle sync:", {
-      submitted: submittedTurtles,
-      discord: discordTurtles,
-      merged: turtlesArr,
-    });
 
     const crewsArr = Array.isArray(body.crews)
       ? body.crews.map((x: any) => clampStr(x, 40)).filter(Boolean)
@@ -390,7 +370,6 @@ export async function POST(req: Request) {
 
     // Basic validation (create + update should both require a name)
     if (!payload.mafiaName) {
-      console.log("[profile] Validation failed: missing mafiaName");
       return NextResponse.json(
         {
           error: "Missing required fields.",
@@ -444,11 +423,8 @@ export async function POST(req: Request) {
     // 1) Write to Sheets
     let parsed: any;
     try {
-      console.log("[profile] Writing to sheet with payload keys:", Object.keys(payload));
       parsed = await writeToSheet(payload);
-      console.log("[profile] Sheet write result:", parsed);
     } catch (e: any) {
-      console.error("[profile] Sheet write failed:", e?.message ?? String(e));
       return NextResponse.json(
         {
           error: "Failed to save profile",

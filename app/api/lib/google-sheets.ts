@@ -12,7 +12,6 @@ try {
         ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
         : undefined;
 } catch (error) {
-    console.error("Error parsing GOOGLE_SERVICE_ACCOUNT_JSON environment variable");
     throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON. Please ensure it is the full object starting with '{' and ending with '}'.");
 }
 
@@ -30,7 +29,6 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
     const cacheKey = `task-links:${sheetId}`;
     const cached = await cacheGet<Record<string, string>>(cacheKey);
     if (cached) {
-        console.log(`[getTaskLinks] Cache hit for ${sheetId}`);
         return cached;
     }
 
@@ -111,7 +109,6 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
 
                 // SUCCESS - cache with 30 min TTL
                 await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
-                console.log(`[getTaskLinks] Extracted ${Object.keys(linkMap).length} links via Sheets API for ${sheetId}`);
                 break;
 
             } catch (err: any) {
@@ -127,7 +124,6 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
                 if (isRetryable) {
                     // Add jitter
                     const jitter = Math.random() * 500;
-                    console.warn(`[getTaskLinks] API Error (${code} - ${err.message}). Retrying in ${delay + jitter}ms...`);
                     await new Promise(res => setTimeout(res, delay + jitter));
                     retries--;
                     delay *= 2;
@@ -138,7 +134,6 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
         }
     } catch (error) {
         // Fallback or log
-        console.error("[getTaskLinks] Exhausted retries:", error);
     }
     return linkMap;
 }
@@ -151,7 +146,6 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
     const cacheKey = `agenda-links:${sheetId}`;
     const cached = await cacheGet<Record<string, string>>(cacheKey);
     if (cached) {
-        console.log(`[getAgendaStepLinks] Cache hit for ${sheetId}`);
         return cached;
     }
 
@@ -223,9 +217,7 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
-        console.log(`[getAgendaStepLinks] Extracted ${Object.keys(linkMap).length} links for ${sheetId}`);
     } catch (error) {
-        console.error("[getAgendaStepLinks] Error:", error);
     }
     return linkMap;
 }
@@ -238,7 +230,6 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
     const cacheKey = `manual-links:${sheetId}`;
     const cached = await cacheGet<Record<string, string>>(cacheKey);
     if (cached) {
-        console.log(`[getManualLinks] Cache hit for ${sheetId}`);
         return cached;
     }
 
@@ -311,9 +302,7 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
-        console.log(`[getManualLinks] Extracted ${Object.keys(linkMap).length} links for ${sheetId}`);
     } catch (error) {
-        console.error("[getManualLinks] Error:", error);
     }
     return linkMap;
 }
@@ -355,7 +344,6 @@ export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
     const cacheKey = "member-turtles-map";
     const cached = await cacheGet<Record<string, string>>(cacheKey);
     if (cached) {
-        console.log("[getMemberTurtlesMap] Cache hit");
         return new Map(Object.entries(cached));
     }
 
@@ -390,7 +378,6 @@ export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
         }
 
         if (headerRowIdx === -1) {
-            console.warn("[getMemberTurtlesMap] Could not find header row with Name and Turtles columns");
             return turtlesMap;
         }
 
@@ -401,7 +388,6 @@ export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
             : headerRowVals.indexOf("turtle");
 
         if (nameIdx === -1 || turtlesIdx === -1) {
-            console.warn("[getMemberTurtlesMap] Missing Name or Turtles column");
             return turtlesMap;
         }
 
@@ -419,11 +405,9 @@ export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
             }
         }
 
-        console.log(`[getMemberTurtlesMap] Loaded ${turtlesMap.size} member turtle mappings`);
         // Cache as plain object (Maps don't serialize to JSON well)
         await cacheSet(cacheKey, Object.fromEntries(turtlesMap), MEMBER_TURTLES_CACHE_TTL);
     } catch (error) {
-        console.error("[getMemberTurtlesMap] Error:", error);
     }
 
     return turtlesMap;
@@ -447,7 +431,6 @@ export async function getColumnHyperlinks(
     const cacheKey = `col-links:${sheetId}:${tabName}:${keyColumn}:${linkColumn}`;
     const cached = await cacheGet<Record<string, string>>(cacheKey);
     if (cached) {
-        console.log(`[getColumnHyperlinks] Cache hit for ${tabName}:${linkColumn}`);
         return cached;
     }
 
@@ -521,9 +504,7 @@ export async function getColumnHyperlinks(
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
-        console.log(`[getColumnHyperlinks] Extracted ${Object.keys(linkMap).length} links from ${tabName}:${linkColumn}`);
     } catch (error) {
-        console.error("[getColumnHyperlinks] Error:", error);
     }
     return linkMap;
 }

@@ -98,7 +98,6 @@ async function fetchTaskLinksFromHTML_LEGACY(sheetId: string): Promise<Record<st
     });
 
     if (!res.ok) {
-      console.log(`[fetchTaskLinksFromHTML] Sheet not published or inaccessible (${res.status})`);
       return linkMap;
     }
 
@@ -161,9 +160,7 @@ async function fetchTaskLinksFromHTML_LEGACY(sheetId: string): Promise<Record<st
       });
     });
 
-    console.log(`[fetchTaskLinksFromHTML] Extracted ${Object.keys(linkMap).length} links from HTML`);
   } catch (e) {
-    console.error('[fetchTaskLinksFromHTML] Error:', e);
   }
   return linkMap;
 }
@@ -261,7 +258,6 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
     tasksWithMeta.sort((a, b) => getPriorityRank(a.priority) - getPriorityRank(b.priority));
     return tasksWithMeta.slice(0, 3).map(t => ({ label: t.label, url: t.url }));
   } catch (e) {
-    console.error("fetchCrewTasks error:", e);
     return [];
   }
 }
@@ -277,12 +273,10 @@ export async function GET(req: Request) {
     if (!forceRefresh) {
       const cached = await cacheGet<{ crews: any[] }>(cacheKey);
       if (cached) {
-        console.log('[crew-mappings] Cache hit');
         return NextResponse.json({ ...cached, cached: true });
       }
     }
 
-    console.log('[crew-mappings] Cache miss, fetching fresh data');
 
     const gvizEndpoint = gvizUrl(SHEET_ID, TAB_NAME);
 

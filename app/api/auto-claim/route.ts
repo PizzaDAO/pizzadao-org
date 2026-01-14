@@ -30,12 +30,10 @@ async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): P
     // Follow redirects with GET (Apps Script redirect pattern)
     let currentUrl: string | null = res.headers.get("location");
     if (!currentUrl) {
-        console.error("[auto-claim] Redirect without location header");
         return { status: res.status, text: "Redirect without location" };
     }
 
     for (let i = 0; i < maxRedirects; i++) {
-        console.log("[auto-claim] Following redirect to:", currentUrl.substring(0, 80) + "...");
         const redirectRes: Response = await fetch(currentUrl, {
             method: "GET",
             redirect: "manual",
@@ -171,12 +169,6 @@ export async function POST(req: Request) {
                 const discordTurtles = await getDiscordTurtleRoles(sessionDiscordId);
                 const mergedTurtles = mergeTurtles(existingTurtles, discordTurtles);
 
-                console.log("[auto-claim] Turtle sync:", {
-                    existing: existingTurtles,
-                    discord: discordTurtles,
-                    merged: mergedTurtles,
-                });
-
                 // Proceed with claim via Google Sheets Web App
                 const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
                 const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
@@ -201,12 +193,6 @@ export async function POST(req: Request) {
                     },
                 };
 
-                console.log("[auto-claim] Sending to Apps Script:", {
-                    memberId: payload.memberId,
-                    discordId: payload.discordId,
-                    source: payload.source,
-                });
-
                 const { status: sheetStatus, text: sheetText } = await fetchWithRedirect(url, payload);
 
                 let parsed: any = null;
@@ -214,21 +200,13 @@ export async function POST(req: Request) {
                     parsed = JSON.parse(sheetText);
                 } catch { }
 
-                console.log("[auto-claim] Apps Script response:", {
-                    httpStatus: sheetStatus,
-                    ok: parsed?.ok,
-                    crewSync: parsed?.crewSync,
-                });
-
                 if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
-                    console.error("[auto-claim] Apps Script error:", parsed?.crewSync?.error ?? parsed?.error ?? sheetText);
                     return NextResponse.json({
                         error: "Failed to update sheet",
                         details: parsed?.crewSync?.error ?? parsed?.error ?? sheetText,
                     }, { status: 502 });
                 }
 
-                console.log("[auto-claim] Successfully claimed member", memberId, "with discordId", sessionDiscordId);
 
                 // Create voting identity for the user (fire-and-forget, don't block on failure)
                 try {
@@ -242,16 +220,12 @@ export async function POST(req: Request) {
                         }),
                     }).then(res => {
                         if (res.ok) {
-                            console.log(`[auto-claim] Created voting identity for ${sessionDiscordId}`);
                         } else {
-                            console.warn(`[auto-claim] Failed to create voting identity for ${sessionDiscordId}`);
                         }
                     }).catch(err => {
-                        console.warn(`[auto-claim] Error creating voting identity:`, err.message);
                     });
                 } catch (err) {
                     // Don't fail the claim if identity creation fails
-                    console.warn('[auto-claim] Error initiating identity creation:', err);
                 }
 
                 return NextResponse.json({ ok: true });

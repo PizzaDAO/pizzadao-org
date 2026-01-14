@@ -14,7 +14,6 @@ export async function POST(request: NextRequest) {
       const token = syncSecretHeader || authHeader?.replace('Bearer ', '')
 
       if (token !== JOB_SYNC_SECRET) {
-        console.warn('Unauthorized job sync attempt')
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
     }
@@ -24,7 +23,6 @@ export async function POST(request: NextRequest) {
 
     // Check if jobs data was sent directly (from Google Apps Script)
     if (body.jobs && Array.isArray(body.jobs)) {
-      console.log(`Job sync triggered with ${body.jobs.length} jobs from request body`)
       const result = await syncJobsFromData(body.jobs)
       return NextResponse.json({
         success: true,
@@ -35,7 +33,6 @@ export async function POST(request: NextRequest) {
 
     // Otherwise, fetch from Google Sheets
     const fullRefresh = body.refresh === true
-    console.log(`Job sync triggered via webhook (refresh: ${fullRefresh})`)
 
     const result = fullRefresh
       ? await fullRefreshJobs()
@@ -47,7 +44,6 @@ export async function POST(request: NextRequest) {
       ...result
     })
   } catch (error) {
-    console.error('Error in job sync webhook:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

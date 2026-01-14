@@ -63,7 +63,6 @@ export default function NFTsPage() {
       // Fetch fresh data
       await fetchData();
     } catch (err) {
-      console.error("Refresh error:", err);
     } finally {
       setRefreshing(false);
     }
@@ -114,11 +113,8 @@ export default function NFTsPage() {
                 color: "#111",
               }}
             >
-              NFT Collections
+              PizzaDAO NFTs
             </h1>
-            <p style={{ margin: 0, fontSize: 14, color: "#666" }}>
-              PizzaDAO member holder leaderboards
-            </p>
           </div>
 
           <div style={{ textAlign: "right" }}>

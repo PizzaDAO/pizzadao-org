@@ -168,7 +168,6 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           })
         }
       } catch (e) {
-        console.error('Failed to fetch user', e)
       }
     }
     fetchUser()
@@ -184,7 +183,6 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           setManuals(data.manuals || [])
         }
       } catch (e) {
-        console.error('Failed to fetch manuals', e)
       }
     }
     fetchManuals()

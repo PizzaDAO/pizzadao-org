@@ -56,10 +56,6 @@ export async function POST(req: Request) {
     const signatureBytes = fromBase64(signature)
     const preparedBytes = fromBase64(preparedMessage)
 
-    console.log('[vote/anonymous] Verifying signature...')
-    console.log('[vote/anonymous] Token:', token)
-    console.log('[vote/anonymous] Signature length:', signatureBytes.length)
-    console.log('[vote/anonymous] Prepared message length:', preparedBytes.length)
 
     // Verify signature against prepared message using Web Crypto directly
     // (SHA-384 = 48 byte salt for RSA-PSS)
@@ -70,13 +66,11 @@ export async function POST(req: Request) {
       new Uint8Array(signatureBytes),
       new Uint8Array(preparedBytes)
     )
-    console.log('[vote/anonymous] Verification result:', isValid)
 
     if (!isValid) {
       return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
     }
   } catch (e: unknown) {
-    console.error('[vote/anonymous] Verification error:', e)
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 

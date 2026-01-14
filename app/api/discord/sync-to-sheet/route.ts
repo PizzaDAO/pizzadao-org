@@ -65,7 +65,6 @@ export async function POST(req: Request) {
                 rolesData.forEach((r: any) => guildRolesMap.set(r.id, r.name));
             }
         } catch (e) {
-            console.error("Failed to fetch guild roles", e);
         }
 
         discordRoleIds.forEach(rId => {
@@ -100,8 +99,6 @@ export async function POST(req: Request) {
             ...otherRoleNames
         ]));
 
-        console.log("[Sync] Final Roles to Write:", finalRoles);
-        console.log("[Sync] (Breakdown: Existing=", existingTurtles, "DiscordTurtles=", discordTurtles, "Other=", otherRoleNames, ")");
 
         // 5. Write back to Sheet
         // We need to construct a payload compatible with writeToSheet
@@ -126,9 +123,7 @@ export async function POST(req: Request) {
             // `turtles` IS in payload, so it will be updated.
         };
 
-        console.log("[Sync] Sending payload to Sheets:", JSON.stringify(payload));
         const writeRes = await writeToSheet(payload);
-        console.log("[Sync] Write result:", writeRes);
 
         return NextResponse.json({
             ok: true,
@@ -138,7 +133,6 @@ export async function POST(req: Request) {
         });
 
     } catch (error: any) {
-        console.error("Sync error:", error);
         return NextResponse.json({ error: error.message }, { status: 500 });
     }
 }

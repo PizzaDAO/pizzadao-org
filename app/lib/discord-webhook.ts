@@ -13,7 +13,6 @@ try {
         ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
         : undefined;
 } catch (error) {
-    console.error("[discord-webhook] Error parsing GOOGLE_SERVICE_ACCOUNT_JSON");
 }
 
 const auth = credentials
@@ -45,7 +44,6 @@ async function getCrewLabels(): Promise<Map<string, string>> {
         const CREW_MAPPINGS_SHEET_ID = "1bSLN2mL1K-qr3nLiURVjhm31Zxn0J3ta1Pq0txlXsPI";
 
         if (!sheets) {
-            console.warn("[discord-webhook] Sheets API not available for crew labels");
             return labelMap;
         }
 
@@ -77,10 +75,8 @@ async function getCrewLabels(): Promise<Map<string, string>> {
             }
         }
 
-        console.log(`[discord-webhook] Loaded ${labelMap.size} crew labels`);
         crewLabelCache = { time: Date.now(), data: labelMap };
     } catch (error: any) {
-        console.error("[discord-webhook] Error fetching crew labels:", error?.message);
     }
 
     return labelMap;
@@ -108,7 +104,6 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
     }
 
     if (!sheets) {
-        console.error("[discord-webhook] Google Sheets API not initialized - missing GOOGLE_SERVICE_ACCOUNT_JSON");
         return null;
     }
 
@@ -120,7 +115,6 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
 
         const rows = res.data.values || [];
         if (rows.length === 0) {
-            console.error("[discord-webhook] Webhook sheet is empty");
             return null;
         }
 
@@ -132,7 +126,6 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
         let webhookColIdx = headers.findIndex((h: string) => h === "webhook" || h === "webhook url" || h === "webhookurl");
 
         if (channelColIdx === -1 || webhookColIdx === -1) {
-            console.error("[discord-webhook] Could not find Channel/Crew or Webhook columns. Headers:", headers);
             return null;
         }
 
@@ -144,16 +137,13 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
                 const webhook = String(row[webhookColIdx] || "").trim();
                 if (webhook) {
                     webhookCache.set(cacheKey, { url: webhook, time: Date.now() });
-                    console.log(`[discord-webhook] Found webhook for "${channelName}"`);
                     return webhook;
                 }
             }
         }
 
-        console.log(`[discord-webhook] No webhook found for channel "${channelName}"`);
         return null;
     } catch (error: any) {
-        console.error("[discord-webhook] Error fetching webhook URL:", error?.message || error);
         return null;
     }
 }
@@ -223,13 +213,11 @@ export async function sendWelcomeMessage(opts: {
 
         if (!res.ok) {
             const text = await res.text();
-            console.error("[discord-webhook] Failed to send welcome message:", res.status, text);
             return { ok: false, error: `Discord webhook failed: ${res.status}` };
         }
 
         return { ok: true };
     } catch (error: any) {
-        console.error("[discord-webhook] Error sending welcome message:", error);
         return { ok: false, error: error?.message || "Unknown error" };
     }
 }

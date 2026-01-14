@@ -15,13 +15,11 @@ async function fetchNFTsForContract(
   contract: NFTContract
 ): Promise<AlchemyNFT[]> {
   if (!ALCHEMY_API_KEY) {
-    console.error("[nft] ALCHEMY_API_KEY not configured");
     return [];
   }
 
   const baseUrl = ALCHEMY_CHAIN_URLS[contract.chain];
   if (!baseUrl) {
-    console.error(`[nft] Unknown chain: ${contract.chain}`);
     return [];
   }
 
@@ -42,7 +40,6 @@ async function fetchNFTsForContract(
       });
 
       if (!res.ok) {
-        console.error(`[nft] Alchemy API error for ${contract.chain}:`, res.status);
         break;
       }
 
@@ -59,7 +56,6 @@ async function fetchNFTsForContract(
 
     return allNfts;
   } catch (error) {
-    console.error(`[nft] Fetch error for ${contract.chain}:`, error);
     return allNfts; // Return whatever we got so far
   }
 }

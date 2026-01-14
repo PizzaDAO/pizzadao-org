@@ -44,7 +44,6 @@ export async function GET(
         // No image found
         return NextResponse.json({ url: null });
     } catch (error) {
-        console.error("[pfp] Error:", error);
         return NextResponse.json({ error: "Failed to get profile picture" }, { status: 500 });
     }
 }

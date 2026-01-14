@@ -80,7 +80,6 @@ export async function setCachedSheetData<T>(
     const modTime = modifiedTime || await getFileModifiedTime(fileId);
     if (!modTime) {
         // Can't get mod time, still cache but with shorter effective TTL
-        console.warn(`[sheet-cache] Could not get mod time for ${fileId}, caching anyway`);
     }
 
     SHEET_CACHE.set(fileId, {

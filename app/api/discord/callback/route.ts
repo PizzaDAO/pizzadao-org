@@ -148,12 +148,6 @@ export async function GET(req: Request) {
     // Create response and set session cookie
     const res = NextResponse.redirect(redirectUrl.toString());
     const cookieOpts = getSessionCookieOptions(req);
-    console.log("[callback] Setting session cookie:", {
-      cookieName: COOKIE_NAME,
-      tokenLength: sessionToken.length,
-      cookieOpts,
-      redirectTo: redirectUrl.toString()
-    });
     res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
 
     return res;

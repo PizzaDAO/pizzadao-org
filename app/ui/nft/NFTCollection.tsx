@@ -37,7 +37,6 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
       const json = await res.json();
       setData(json);
     } catch (e) {
-      console.error("Failed to fetch NFTs", e);
       setData({ nfts: [], totalCount: 0, walletAddress: null, error: "Failed to load" });
     } finally {
       setLoading(false);
@@ -51,16 +50,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   // When user connects wallet and we have no wallet saved, save it
   useEffect(() => {
     async function saveWallet() {
-      console.log("[NFTCollection] saveWallet check:", {
-        isConnected,
-        address,
-        noWallet: data?.noWallet,
-        walletSaved,
-        saving,
-        memberId,
-      });
       if (isConnected && address && data?.noWallet && !walletSaved && !saving) {
-        console.log("[NFTCollection] Saving wallet for member", memberId);
         setSaving(true);
         try {
           const res = await fetch("/api/wallet", {
@@ -69,16 +59,13 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             body: JSON.stringify({ memberId, walletAddress: address }),
           });
           const resData = await res.json();
-          console.log("[NFTCollection] Wallet save response:", res.status, resData);
           if (res.ok) {
             setWalletSaved(true);
             // Refetch NFTs with the new wallet
             await fetchNFTs();
           } else {
-            console.error("[NFTCollection] Wallet save failed:", resData);
           }
         } catch (e) {
-          console.error("Failed to save wallet", e);
         } finally {
           setSaving(false);
         }

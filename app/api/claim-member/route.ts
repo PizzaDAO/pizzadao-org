@@ -28,12 +28,10 @@ async function fetchWithRedirect(url: string, payload: any, maxRedirects = 3): P
     // Follow redirects with GET (Apps Script redirect pattern)
     let currentUrl: string | null = res.headers.get("location");
     if (!currentUrl) {
-        console.error("[claim-member] Redirect without location header");
         return { status: res.status, text: "Redirect without location" };
     }
 
     for (let i = 0; i < maxRedirects; i++) {
-        console.log("[claim-member] Following redirect to:", currentUrl.substring(0, 80) + "...");
         const redirectRes: Response = await fetch(currentUrl, {
             method: "GET",
             redirect: "manual",
@@ -220,12 +218,6 @@ export async function POST(req: Request) {
         const discordTurtles = await getDiscordTurtleRoles(sessionDiscordId);
         const mergedTurtles = mergeTurtles(existingTurtles, discordTurtles);
 
-        console.log("[claim-member] Turtle sync:", {
-            existing: existingTurtles,
-            discord: discordTurtles,
-            merged: mergedTurtles,
-        });
-
         // 4) Update via Google Sheets Web App
         const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
         const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
@@ -250,12 +242,6 @@ export async function POST(req: Request) {
             },
         };
 
-        console.log("[claim-member] Sending to Apps Script:", {
-            memberId: payload.memberId,
-            discordId: payload.discordId,
-            source: payload.source,
-        });
-
         const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
 
         let parsed: any = null;
@@ -263,14 +249,7 @@ export async function POST(req: Request) {
             parsed = JSON.parse(text);
         } catch { }
 
-        console.log("[claim-member] Apps Script response:", {
-            httpStatus: sheetStatus,
-            ok: parsed?.ok,
-            crewSync: parsed?.crewSync,
-        });
-
         if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
-            console.error("[claim-member] Apps Script error:", parsed?.crewSync?.error ?? parsed?.error ?? text);
             return NextResponse.json(
                 {
                     error: "Failed to update sheet",
@@ -280,7 +259,6 @@ export async function POST(req: Request) {
             );
         }
 
-        console.log("[claim-member] Successfully claimed member", memberId, "with discordId", sessionDiscordId);
 
         // Create voting identity for the user (fire-and-forget, don't block on failure)
         try {
@@ -294,16 +272,12 @@ export async function POST(req: Request) {
                 }),
             }).then(res => {
                 if (res.ok) {
-                    console.log(`[claim-member] Created voting identity for ${sessionDiscordId}`);
                 } else {
-                    console.warn(`[claim-member] Failed to create voting identity for ${sessionDiscordId}`);
                 }
             }).catch(err => {
-                console.warn(`[claim-member] Error creating voting identity:`, err.message);
             });
         } catch (err) {
             // Don't fail the claim if identity creation fails
-            console.warn('[claim-member] Error initiating identity creation:', err);
         }
 
         return NextResponse.json({ ok: true });

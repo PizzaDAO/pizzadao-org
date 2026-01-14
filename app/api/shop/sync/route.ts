@@ -14,7 +14,6 @@ export async function POST(request: NextRequest) {
       const token = syncSecretHeader || authHeader?.replace('Bearer ', '')
 
       if (token !== SHOP_SYNC_SECRET) {
-        console.warn('Unauthorized shop sync attempt')
         return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
       }
     }
@@ -24,7 +23,6 @@ export async function POST(request: NextRequest) {
 
     // Check if items data was sent directly (from Google Apps Script)
     if (body.items && Array.isArray(body.items)) {
-      console.log(`Shop sync triggered with ${body.items.length} items from request body`)
       const result = await syncShopItemsFromData(body.items)
       return NextResponse.json({
         success: true,
@@ -37,7 +35,6 @@ export async function POST(request: NextRequest) {
       error: 'No items data provided. Send { items: [...] } in request body.'
     }, { status: 400 })
   } catch (error) {
-    console.error('Error in shop sync webhook:', error)
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })
   }

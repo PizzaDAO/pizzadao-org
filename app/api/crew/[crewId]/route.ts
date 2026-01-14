@@ -305,13 +305,11 @@ export async function GET(req: Request, { params }: Params) {
     if (!forceRefresh) {
       sheetData = await getCachedSheetData<CrewSheetData>(crew.sheet)
       if (sheetData) {
-        console.log(`[crew] Cache hit for ${crewId}`)
       }
     }
 
     // If no cached data, fetch fresh
     if (!sheetData) {
-      console.log(`[crew] Cache miss for ${crewId}, fetching fresh data`)
 
       // Fetch spreadsheet data via GViz API and HTML links in parallel
       const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
@@ -408,7 +406,6 @@ export async function GET(req: Request, { params }: Params) {
       ...sheetData,
     })
   } catch (e: unknown) {
-    console.error('[crew] Error:', e)
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to load crew data' },
       { status: 500 }

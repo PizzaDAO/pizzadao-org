@@ -85,7 +85,6 @@ export async function GET(
             throw new Error(`Could not find Discord column (DiscordID, Discord). Found: ${headerRowVals.join(", ")}`);
         }
 
-        console.log(`[Lookup] ID Col: ${idColIdx}, Discord Col: ${discordColIdx}, Name Cols: ${nameColIndices}, Headers: ${normalizedHeaders.join(",")}`);
 
         const dataStartIdx = headerRowIdx + 1;
 
@@ -100,7 +99,6 @@ export async function GET(
 
         // 2. Fallback: Search by Name (if provided and Discord ID not found)
         if (!userRow && searchName && nameColIndices.length > 0) {
-            console.log(`[Lookup] Searching for name: '${searchName}'`);
             userRow = rows.slice(dataStartIdx).find((r: any) => {
                 const discordVal = String(r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f ?? "").trim();
 

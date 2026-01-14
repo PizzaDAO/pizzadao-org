@@ -13,7 +13,6 @@ export async function fetchDiscordMemberRoles(discordId: string): Promise<string
     const guildId = process.env.DISCORD_GUILD_ID;
 
     if (!botToken || !guildId) {
-        console.warn("[discord-roles] Missing DISCORD_BOT_TOKEN or DISCORD_GUILD_ID");
         return [];
     }
 
@@ -26,14 +25,12 @@ export async function fetchDiscordMemberRoles(discordId: string): Promise<string
         });
 
         if (!res.ok) {
-            console.warn(`[discord-roles] Failed to fetch member ${discordId}: ${res.status}`);
             return [];
         }
 
         const member = await res.json();
         return member.roles || [];
     } catch (e) {
-        console.error("[discord-roles] Error fetching member roles:", e);
         return [];
     }
 }

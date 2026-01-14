@@ -161,7 +161,6 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ ok: true, skills: payload.skills });
     } catch (err: any) {
-        console.error("[update-skills] Error:", err);
         return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
     }
 }

@@ -52,7 +52,6 @@ async function fetchTaskLinksFromHTML_LEGACY(sheetId: string): Promise<Record<st
         });
 
         if (!res.ok) {
-            console.log(`[fetchTaskLinksFromHTML] Sheet not published or inaccessible (${res.status})`);
             return linkMap;
         }
 
@@ -116,9 +115,7 @@ async function fetchTaskLinksFromHTML_LEGACY(sheetId: string): Promise<Record<st
             });
         });
 
-        console.log(`[fetchTaskLinksFromHTML] Extracted ${Object.keys(linkMap).length} links from HTML`);
     } catch (e) {
-        console.error('[fetchTaskLinksFromHTML] Error:', e);
     }
     return linkMap;
 }
@@ -158,7 +155,7 @@ async function fetchMyTasksForCrew(sheetUrl: string, memberId: string): Promise<
         let htmlLinkMap: Record<string, string> = {};
         try {
             htmlLinkMap = sheetId ? await getTaskLinks(sheetId) : {};
-        } catch (e) { console.error("Link fetch failed, proceeding without links", e); }
+        } catch (e) { }
 
         debugLog.push(`Sheets API link map contains ${Object.keys(htmlLinkMap).length} entries`);
 
@@ -372,7 +369,6 @@ async function fetchMyTasksForCrew(sheetUrl: string, memberId: string): Promise<
 
         return { active: myTasks, doneCount, log: debugLog };
     } catch (e) {
-        console.error("fetchMyTasksForCrew error:", e);
         return { active: [], doneCount: 0, log: [String(e)] };
     }
 }

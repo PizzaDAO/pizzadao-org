@@ -106,7 +106,6 @@ async function fetchMembersWithWallets(): Promise<MemberInfo[]> {
   const idxTurtles = headerVals.findIndex((h) => h === "turtles" || h === "roles");
 
   if (idxWallet === -1) {
-    console.log("[leaderboard] Wallet column not found");
     return [];
   }
 
@@ -135,7 +134,6 @@ async function fetchMembersWithWallets(): Promise<MemberInfo[]> {
     }
   }
 
-  console.log(`[leaderboard] Found ${members.length} members with wallets`);
   return members;
 }
 
@@ -214,7 +212,6 @@ async function aggregateLeaderboard(): Promise<LeaderboardResponse> {
     }
     processed++;
     if (processed % 10 === 0) {
-      console.log(`[leaderboard] Processed ${processed}/${members.length} members`);
     }
   }
 
@@ -282,7 +279,6 @@ export async function GET() {
     }
 
     // Aggregate fresh data
-    console.log("[leaderboard] Cache miss, aggregating fresh data...");
     const data = await aggregateLeaderboard();
 
     // Cache the result
@@ -290,7 +286,6 @@ export async function GET() {
 
     return NextResponse.json(data);
   } catch (error) {
-    console.error("[leaderboard] Error:", error);
     return NextResponse.json(
       {
         collections: [],

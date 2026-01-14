@@ -31,7 +31,6 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
     }
     return entry.value as T;
   } catch (error) {
-    console.error(`[cache] Error getting key ${key}:`, error);
     return null;
   }
 }
@@ -51,7 +50,6 @@ export async function cacheSet<T>(key: string, value: T, ttlSeconds: number = DE
       });
     }
   } catch (error) {
-    console.error(`[cache] Error setting key ${key}:`, error);
   }
 }
 
@@ -66,7 +64,6 @@ export async function cacheDel(key: string): Promise<void> {
       memoryCache.delete(key);
     }
   } catch (error) {
-    console.error(`[cache] Error deleting key ${key}:`, error);
   }
 }
 
@@ -80,11 +77,9 @@ export async function cacheGetOrSet<T>(
 ): Promise<T> {
   const cached = await cacheGet<T>(key);
   if (cached !== null) {
-    console.log(`[cache] HIT: ${key}`);
     return cached;
   }
 
-  console.log(`[cache] MISS: ${key}`);
   const value = await fetchFn();
   await cacheSet(key, value, ttlSeconds);
   return value;

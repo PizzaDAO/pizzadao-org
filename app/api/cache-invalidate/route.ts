@@ -77,7 +77,6 @@ export async function POST(req: Request) {
       }
     }
 
-    console.log(`[cache-invalidate] Deleted ${deletedKeys.length} keys:`, deletedKeys);
 
     return NextResponse.json({
       success: true,
@@ -85,7 +84,6 @@ export async function POST(req: Request) {
       keys: deletedKeys
     });
   } catch (err: any) {
-    console.error("[cache-invalidate] Error:", err);
     return NextResponse.json({ error: String(err?.message ?? "Unknown error") }, { status: 500 });
   }
 }
