@@ -9,6 +9,7 @@ import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
 import { PepIcon, PepAmount } from "../../ui/economy";
 import { NFTCollection } from "../../ui/nft";
+import { POAPCollection } from "../../ui/poap";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -593,6 +594,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     {/* NFT Collection Section - shows connect prompt if no wallet */}
                     <NFTCollection memberId={idValue} showConnectPrompt={true} />
+
+                    {/* POAP Collection Section - only shows if wallet exists and has POAPs */}
+                    <POAPCollection memberId={idValue} />
 
                     {/* Crews Section - MATCHING STEP 5 UI */}
                     {(() => {
