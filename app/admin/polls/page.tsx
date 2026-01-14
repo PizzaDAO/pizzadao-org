@@ -52,7 +52,7 @@ export default function AdminPollsPage() {
       const data = await res.json()
       setPolls(data)
     } catch (e: unknown) {
-      setError(e instanceof Error ? e.message : 'An error occurred')
+      setError(e instanceof Error ? (e as any)?.message : 'An error occurred')
     } finally {
       setLoading(false)
     }
@@ -87,7 +87,7 @@ export default function AdminPollsPage() {
       setQuestion('')
       setOptions(['', ''])
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'An error occurred')
+      alert(e instanceof Error ? (e as any)?.message : 'An error occurred')
     } finally {
       setCreating(false)
     }
@@ -109,7 +109,7 @@ export default function AdminPollsPage() {
       const updated = await res.json()
       setPolls(polls.map(p => (p.id === pollId ? { ...p, ...updated } : p)))
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'An error occurred')
+      alert(e instanceof Error ? (e as any)?.message : 'An error occurred')
     }
   }
 
@@ -124,7 +124,7 @@ export default function AdminPollsPage() {
       }
       setPolls(polls.filter(p => p.id !== pollId))
     } catch (e: unknown) {
-      alert(e instanceof Error ? e.message : 'An error occurred')
+      alert(e instanceof Error ? (e as any)?.message : 'An error occurred')
     }
   }
 

@@ -94,8 +94,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 }
                 const userData = await dataRes.json();
                 setData(userData);
-            } catch (e: any) {
-                setError(e.message);
+            } catch (e: unknown) {
+                setError((e as any)?.message);
             } finally {
                 setLoading(false);
             }
@@ -1026,7 +1026,7 @@ const SyncRolesButton = ({ memberId, discordId, name, onSync }: { memberId: stri
             setMsg("Done!");
             setTimeout(() => setMsg(""), 2000);
             onSync(data.turtles, data.otherRoles);
-        } catch (e: any) {
+        } catch (e: unknown) {
             setMsg("Error!");
             setTimeout(() => setMsg(""), 2000);
         } finally {

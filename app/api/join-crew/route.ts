@@ -234,8 +234,8 @@ export async function POST(req: Request) {
             removeRoleIds: action === "leave" ? [roleId] : [],
           });
           discordResult = { ok: true, roleId };
-        } catch (e: any) {
-          discordResult = { ok: false, error: e.message };
+        } catch (e: unknown) {
+          discordResult = { ok: false, error: (e as any)?.message };
         }
       } else {
         discordResult = { ok: true, note: "No Discord role for this crew" };

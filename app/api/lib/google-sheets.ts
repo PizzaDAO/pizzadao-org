@@ -1,6 +1,7 @@
 import { google } from "googleapis";
 import path from "path";
 import { cacheGet, cacheSet, CACHE_TTL } from "./cache";
+import { GvizCell } from "@/app/lib/types/gviz";
 
 // Initialize Google Sheets API client
 const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
@@ -111,15 +112,15 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
                 await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
                 break;
 
-            } catch (err: any) {
-                const code = err.code || err.response?.status;
+            } catch (err: unknown) {
+                const code = (err as any).code || (err as any).response?.status;
                 // Google Sheets API sometimes returns 400 for quota issues if the quota is "user rate limit exceeded"? No, usually 429.
                 // But let's be safe and check message too.
                 const isRetryable =
                     code === 429 ||
                     code === 500 ||
                     code === 503 ||
-                    (err.message && err.message.includes('Quota exceeded'));
+                    ((err as any).message && (err as any).message.includes('Quota exceeded'));
 
                 if (isRetryable) {
                     // Add jitter
@@ -132,7 +133,7 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
                 }
             }
         }
-    } catch (error) {
+    } catch (error: unknown) {
         // Fallback or log
     }
     return linkMap;
@@ -217,7 +218,7 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
-    } catch (error) {
+    } catch (error: unknown) {
     }
     return linkMap;
 }
@@ -302,7 +303,7 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
-    } catch (error) {
+    } catch (error: unknown) {
     }
     return linkMap;
 }
@@ -369,10 +370,10 @@ export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
 
         for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
             const rowCells = rows[ri]?.c || [];
-            const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
+            const rowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
             if (rowVals.includes("name") && (rowVals.includes("turtles") || rowVals.includes("turtle"))) {
                 headerRowIdx = ri;
-                headerRowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
+                headerRowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
                 break;
             }
         }
@@ -407,7 +408,7 @@ export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
 
         // Cache as plain object (Maps don't serialize to JSON well)
         await cacheSet(cacheKey, Object.fromEntries(turtlesMap), MEMBER_TURTLES_CACHE_TTL);
-    } catch (error) {
+    } catch (error: unknown) {
     }
 
     return turtlesMap;
@@ -504,7 +505,7 @@ export async function getColumnHyperlinks(
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
-    } catch (error) {
+    } catch (error: unknown) {
     }
     return linkMap;
 }

@@ -108,7 +108,7 @@ export async function GET(req: Request) {
 
         return NextResponse.json({ error: "Member not found" }, { status: 404 });
     } catch (e: unknown) {
-        const msg = e instanceof Error ? e.message : "Failed to verify";
+        const msg = e instanceof Error ? (e as any)?.message : "Failed to verify";
         return NextResponse.json({ error: msg }, { status: 500 });
     }
 }

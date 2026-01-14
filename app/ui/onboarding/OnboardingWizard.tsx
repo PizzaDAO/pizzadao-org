@@ -314,8 +314,8 @@ export function OnboardingWizard() {
       }));
 
       setLastGenParams(currentParams);
-    } catch (e: any) {
-      setError(e?.message || "Failed to generate names");
+    } catch (e: unknown) {
+      setError((e as any)?.message || "Failed to generate names");
     } finally {
       setGeneratingNames(false);
     }
@@ -367,9 +367,9 @@ export function OnboardingWizard() {
       } else {
         setFlow({ type: "success", redirectTo: "/" });
       }
-    } catch (e: any) {
-      setError(e?.message || "Failed to save");
-      setErrorDetails(e?.details);
+    } catch (e: unknown) {
+      setError((e as any)?.message || "Failed to save");
+      setErrorDetails((e as any)?.details);
       setFlow({
         type: "wizard",
         step: flow.type === "wizard" ? flow.step : 5,

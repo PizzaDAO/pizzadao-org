@@ -128,8 +128,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
         }
         const json = await res.json()
         setData(json)
-      } catch (e: any) {
-        setError(e.message)
+      } catch (e: unknown) {
+        setError((e as any)?.message)
       } finally {
         setLoading(false)
       }
@@ -205,8 +205,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed to join crew')
       setUser(prev => prev ? { ...prev, crews: [...prev.crews, crewId.toLowerCase()] } : null)
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert((e as any)?.message)
     } finally {
       setJoining(false)
     }
@@ -224,8 +224,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
       const result = await res.json()
       if (!res.ok) throw new Error(result.error || 'Failed to leave crew')
       setUser(prev => prev ? { ...prev, crews: prev.crews.filter(c => c.toLowerCase() !== crewId.toLowerCase()) } : null)
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert((e as any)?.message)
     } finally {
       setLeaving(false)
     }
@@ -264,8 +264,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           ),
         }
       })
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert((e as any)?.message)
     } finally {
       setClaimingTask(null)
     }
@@ -300,8 +300,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           ),
         }
       })
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert((e as any)?.message)
     } finally {
       setClaimingTask(null)
     }

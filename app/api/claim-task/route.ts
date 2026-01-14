@@ -174,7 +174,7 @@ export async function POST(req: Request) {
     return NextResponse.json({ success: true, action })
   } catch (e: unknown) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to claim task' },
+      { error: e instanceof Error ? (e as any)?.message : 'Failed to claim task' },
       { status: 500 }
     )
   }

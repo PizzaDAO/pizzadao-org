@@ -53,8 +53,8 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
         const data = await res.json()
         setPoll(data.poll)
         setUserStatus(data.user)
-      } catch (e: any) {
-        setError(e.message)
+      } catch (e: unknown) {
+        setError((e as any)?.message || 'An error occurred')
       } finally {
         setLoading(false)
       }
@@ -129,8 +129,8 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
       }
 
       setHasVoted(true)
-    } catch (e: any) {
-      setError(e.message)
+    } catch (e: unknown) {
+      setError((e as any)?.message || 'An error occurred')
     } finally {
       setClaimingToken(false)
     }

@@ -604,7 +604,7 @@ export default function OnboardingWizard() {
         releaseDate: data.releaseDate,
         seenNames: mergeSeen(p.seenNames, data.suggestions ?? []),
       }));
-    } catch (e: any) {
+    } catch (e: unknown) {
       setS((p) => ({ ...p, submitting: false, error: e?.message || "Failed", success: false }));
     }
   }
@@ -686,7 +686,7 @@ export default function OnboardingWizard() {
       setTimeout(() => {
         router.push(`/dashboard/${s.memberId || s.discordId || s.sessionId}`);
       }, 1500);
-    } catch (e: any) {
+    } catch (e: unknown) {
       setS((p) => ({
         ...p,
         submitting: false,

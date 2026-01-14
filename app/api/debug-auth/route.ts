@@ -27,8 +27,8 @@ export async function GET() {
                 // Check if it contains actual newlines
                 authStatus.privateKeyHasNewlines = creds.private_key.includes('\n');
             }
-        } catch (e: any) {
-            authStatus.error = e.message;
+        } catch (e: unknown) {
+            authStatus.error = (e as any)?.message || String(e);
         }
     }
 

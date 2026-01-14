@@ -182,7 +182,7 @@ export async function POST(req: Request) {
         }
 
         return NextResponse.json({ error: `Member ID ${memberId} not found` }, { status: 404 });
-    } catch (e: any) {
-        return NextResponse.json({ error: e?.message || "Unknown error" }, { status: 500 });
+    } catch (e: unknown) {
+        return NextResponse.json({ error: (e as any)?.message || "Unknown error" }, { status: 500 });
     }
 }

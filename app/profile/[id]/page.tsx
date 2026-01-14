@@ -53,8 +53,8 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                 }
                 const profileData = await res.json();
                 setData(profileData);
-            } catch (e: any) {
-                setError(e.message);
+            } catch (e: unknown) {
+                setError((e as any)?.message);
             } finally {
                 setLoading(false);
             }

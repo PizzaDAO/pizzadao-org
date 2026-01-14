@@ -74,7 +74,7 @@ export async function POST(req: Request) {
     }
 
     return Response.json({ ok: true, added: Array.from(selectedRoleIds) });
-  } catch (e: any) {
-    return Response.json({ error: e?.message || "Failed to sync roles" }, { status: 500 });
+  } catch (e: unknown) {
+    return Response.json({ error: (e as any)?.message || "Failed to sync roles" }, { status: 500 });
   }
 }

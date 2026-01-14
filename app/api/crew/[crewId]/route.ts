@@ -399,7 +399,7 @@ export async function GET(req: Request, { params }: Params) {
     })
   } catch (e: unknown) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to load crew data' },
+      { error: e instanceof Error ? (e as any)?.message : 'Failed to load crew data' },
       { status: 500 }
     )
   }

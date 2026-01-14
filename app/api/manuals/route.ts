@@ -79,7 +79,7 @@ export async function GET(req: Request) {
     return NextResponse.json({ manuals })
   } catch (e: unknown) {
     return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to load manuals' },
+      { error: e instanceof Error ? (e as any)?.message : 'Failed to load manuals' },
       { status: 500 }
     )
   }

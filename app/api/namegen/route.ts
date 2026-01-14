@@ -208,7 +208,7 @@ async function callOpenAIWithBackoff<T>(fn: () => Promise<T>, tries = 3) {
   for (let i = 0; i < tries; i++) {
     try {
       return await fn();
-    } catch (e: any) {
+    } catch (e: unknown) {
       lastErr = e;
       if (!isRateLimitError(e) || i === tries - 1) throw e;
 

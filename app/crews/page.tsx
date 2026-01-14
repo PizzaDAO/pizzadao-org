@@ -64,8 +64,8 @@ export default function AllCrewsPage() {
             }
           }
         }
-      } catch (e: any) {
-        setError(e.message)
+      } catch (e: unknown) {
+        setError((e as any)?.message)
       } finally {
         setLoading(false)
       }
@@ -96,8 +96,8 @@ export default function AllCrewsPage() {
         crews: [...prev.crews, crewId.toLowerCase()]
       } : null)
 
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert((e as any)?.message)
     } finally {
       setJoining(null)
     }
@@ -123,8 +123,8 @@ export default function AllCrewsPage() {
         crews: prev.crews.filter(c => c.toLowerCase() !== crewId.toLowerCase())
       } : null)
 
-    } catch (e: any) {
-      alert(e.message)
+    } catch (e: unknown) {
+      alert((e as any)?.message)
     } finally {
       setLeaving(null)
     }

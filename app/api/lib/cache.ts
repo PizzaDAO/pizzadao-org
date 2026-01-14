@@ -6,7 +6,7 @@ const TASK_LINKS_TTL = 60 * 30; // 30 minutes for task links (less volatile)
 const CREW_MAPPINGS_TTL = 60 * 5; // 5 minutes for crew mappings
 
 // In-memory fallback for local development (when KV is not configured)
-const memoryCache = new Map<string, { value: any; expiresAt: number }>();
+const memoryCache = new Map<string, { value: unknown; expiresAt: number }>();
 
 // Check if Vercel KV is configured
 function isKVConfigured(): boolean {

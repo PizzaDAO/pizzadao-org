@@ -151,7 +151,7 @@ export async function GET(req: Request) {
     res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
 
     return res;
-  } catch (e: any) {
-    return NextResponse.json({ error: e?.message || "Discord callback failed" }, { status: 500 });
+  } catch (e: unknown) {
+    return NextResponse.json({ error: (e as any)?.message || "Discord callback failed" }, { status: 500 });
   }
 }

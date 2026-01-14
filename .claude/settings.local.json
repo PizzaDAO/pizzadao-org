@@ -108,7 +108,8 @@
       "Bash(git ls-files:*)",
       "Bash(wc:*)",
       "Bash(vercel login)",
-      "Bash(vercel redeploy)"
+      "Bash(vercel redeploy)",
+      "Bash(vercel --prod --yes:*)"
     ]
   }
 }

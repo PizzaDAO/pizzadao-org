@@ -6,6 +6,7 @@ import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/ap
 import { sendWelcomeMessage } from "@/app/lib/discord-webhook";
 import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { GvizCell } from "@/app/lib/types/gviz";
 
 export const runtime = "nodejs";
 
@@ -49,13 +50,13 @@ async function fetchMemberRowById(memberId: string) {
   let headerVals: string[] = [];
   for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
     const rowCells = rows[ri]?.c || [];
-    const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
+    const rowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
     const hasName = rowVals.includes("name");
     const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
     const hasCity = rowVals.includes("city") || rowVals.includes("crews");
     if (hasName && (hasStatus || hasCity)) {
       headerRowIdx = ri;
-      headerVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
+      headerVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim());
       break;
     }
   }
@@ -92,7 +93,7 @@ async function discordFetch(path: string, init: RequestInit) {
   const base = "https://discord.com/api/v10";
   const res = await fetch(base + path, init);
   const text = await res.text();
-  let json: any = null;
+  let json: unknown = null;
   try {
     json = JSON.parse(text);
   } catch { }
@@ -117,17 +118,17 @@ async function syncDiscordMember(opts: {
 
   if (!member.res.ok) {
     throw new Error(
-      `Discord GET member failed (${member.res.status}): ${member.json?.message ?? member.text}`
+      `Discord GET member failed (${member.res.status}): ${(member.json as any)?.message ?? member.text}`
     );
   }
 
-  const currentRoles: string[] = Array.isArray(member.json?.roles) ? member.json.roles : [];
+  const currentRoles: string[] = Array.isArray((member.json as any)?.roles) ? (member.json as any).roles : [];
 
   // 2) Add-only: keep all existing roles and add new turtle/crew roles
   const nextRoles = Array.from(new Set([...currentRoles, ...turtleRoleIds, ...crewRoleIds].map(String)));
 
   // 3) PATCH member: nick + roles
-  const body: any = { roles: nextRoles };
+  const body: { roles: string[]; nick?: string } = { roles: nextRoles };
   if (nickname) body.nick = nickname.slice(0, 32); // Discord nickname limit
 
   const patch = await discordFetch(`/guilds/${guildId}/members/${userId}`, {
@@ -140,7 +141,7 @@ async function syncDiscordMember(opts: {
   });
 
   if (!patch.res.ok) {
-    const msg = patch.json?.message ?? patch.text;
+    const msg = (patch.json as any)?.message ?? patch.text;
     if (patch.res.status === 403) {
       throw new Error(
         `Discord PATCH member failed (403): Missing Permissions. ` +
@@ -169,10 +170,10 @@ async function fetchCrewRoleIds(req: Request, selectedCrewIds: string[]): Promis
 
   const base = getBaseUrl(req);
   const res = await fetch(`${base}/api/crew-mappings`, { cache: "no-store" });
-  const data = (await res.json()) as CrewMappingsResponse | any;
-  if (!res.ok) throw new Error(data?.error || "Failed to load crew mappings (server)");
+  const data = (await res.json()) as unknown;
+  if (!res.ok) throw new Error((data as any)?.error || "Failed to load crew mappings (server)");
 
-  const crews: CrewOption[] = Array.isArray(data?.crews) ? data.crews : [];
+  const crews: CrewOption[] = Array.isArray((data as any)?.crews) ? (data as any).crews : [];
   const byId = new Map<string, CrewOption>();
   for (const c of crews) {
     if (c?.id) byId.set(String(c.id), c);
@@ -194,19 +195,19 @@ async function fetchCrewRoleIds(req: Request, selectedCrewIds: string[]): Promis
  */
 
 // --- main handler ---
-export async function writeToSheet(payload: any) {
+export async function writeToSheet(payload: unknown) {
   const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   if (!url) throw new Error("Missing Sheets webapp env vars");
 
   const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
 
-  let parsed: any = null;
+  let parsed: unknown = null;
   try {
     parsed = JSON.parse(text);
   } catch { }
 
-  if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false || (parsed?.crewSync && parsed.crewSync.ok === false)) {
-    throw new Error(JSON.stringify(parsed?.crewSync?.error ?? parsed?.details ?? parsed ?? text));
+  if (sheetStatus < 200 || sheetStatus >= 300 || (parsed as any)?.ok === false || ((parsed as any)?.crewSync && (parsed as any).crewSync.ok === false)) {
+    throw new Error(JSON.stringify((parsed as any)?.crewSync?.error ?? (parsed as any)?.details ?? parsed ?? text));
   }
   return parsed;
 }
@@ -233,13 +234,14 @@ function resolveTurtleRoleId(turtleName: string): string | null {
   // Handle "Foot Clan" -> "FOOT_CLAN" (spaces to underscores, uppercase)
   const upperUnderscore = raw.toUpperCase().replace(/\s+/g, "_");
 
+  const turtleRoleIdsRecord = TURTLE_ROLE_IDS as Record<string, unknown>;
   const candidates = [
     TURTLE_ROLE_IDS[upper as keyof typeof TURTLE_ROLE_IDS],
-    (TURTLE_ROLE_IDS as any)[upperUnderscore], // "FOOT_CLAN"
-    (TURTLE_ROLE_IDS as any)[lower],
-    (TURTLE_ROLE_IDS as any)[title],
-    (TURTLE_ROLE_IDS as any)[`${normalizeTurtleKey(raw)}_role_id`],
-    (TURTLE_ROLE_IDS as any)[`${upper}_ROLE_ID`],
+    turtleRoleIdsRecord[upperUnderscore], // "FOOT_CLAN"
+    turtleRoleIdsRecord[lower],
+    turtleRoleIdsRecord[title],
+    turtleRoleIdsRecord[`${normalizeTurtleKey(raw)}_role_id`],
+    turtleRoleIdsRecord[`${upper}_ROLE_ID`],
   ].filter(Boolean);
 
   return candidates.length ? String(candidates[0]) : null;
@@ -262,7 +264,7 @@ export async function POST(req: Request) {
 
     // Get submitted turtles from form
     const submittedTurtles = Array.isArray(body.turtles)
-      ? body.turtles.map((x: any) => clampStr(x, 40)).filter(Boolean)
+      ? body.turtles.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
       : [];
 
     // Fetch Discord turtle roles and merge with submitted (adds any Discord roles not already submitted)
@@ -270,7 +272,7 @@ export async function POST(req: Request) {
     const turtlesArr = mergeTurtles(submittedTurtles, discordTurtles);
 
     const crewsArr = Array.isArray(body.crews)
-      ? body.crews.map((x: any) => clampStr(x, 40)).filter(Boolean)
+      ? body.crews.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
       : [];
 
     const memberId = clampStr(body.memberId ?? "", 20);
@@ -374,21 +376,21 @@ export async function POST(req: Request) {
     }
 
     // 1) Write to Sheets
-    let parsed: any;
+    let parsed: unknown;
     try {
       parsed = await writeToSheet(payload);
-    } catch (e: any) {
+    } catch (e: unknown) {
       return NextResponse.json(
         {
           error: "Failed to save profile",
-          details: e?.message ?? String(e),
+          details: (e as any)?.message ?? String(e),
         },
         { status: 502 }
       );
     }
 
     // 2) Sync Discord
-    let discordResult: any = null;
+    let discordResult: unknown = null;
 
     if (payload.discordId) {
       const guildId = process.env.DISCORD_GUILD_ID;
@@ -398,16 +400,16 @@ export async function POST(req: Request) {
       } else {
         // Turtle role IDs (payload.turtles are like "Leonardo", "Raphael", ...)
         const turtleRoleIds = payload.turtles
-          .map((t: any) => resolveTurtleRoleId(String(t)))
+          .map((t: unknown) => resolveTurtleRoleId(String(t)))
           .filter(Boolean) as string[];
 
         // Crew role IDs from crew mappings table (column "role")
         let crewRoleIds: string[] = [];
         try {
           crewRoleIds = await fetchCrewRoleIds(req, payload.crews);
-        } catch (e: any) {
+        } catch (e: unknown) {
           crewRoleIds = [];
-          discordResult = { ok: false, error: `Crew role lookup failed: ${e?.message ?? "unknown"}` };
+          discordResult = { ok: false, error: `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}` };
         }
 
         try {
@@ -425,10 +427,10 @@ export async function POST(req: Request) {
             turtleRoleIds,
             crewRoleIds,
           };
-        } catch (e: any) {
+        } catch (e: unknown) {
           discordResult = {
             ok: false,
-            error: e?.message ?? "Discord sync failed",
+            error: (e as any)?.message ?? "Discord sync failed",
             turtleRoleIds,
             crewRoleIds,
           };
@@ -437,7 +439,7 @@ export async function POST(req: Request) {
     }
 
     // 3) Send welcome message to Discord for NEW signups (not updates)
-    let welcomeResult: any = null;
+    let welcomeResult: unknown = null;
     if (isNewSignup && payload.discordId) {
       welcomeResult = await sendWelcomeMessage({
         discordId: payload.discordId,
@@ -452,7 +454,7 @@ export async function POST(req: Request) {
     }
 
     return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult });
-  } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
+  } catch (err: unknown) {
+    return NextResponse.json({ error: (err as any)?.message ?? "Unknown error" }, { status: 500 });
   }
 }
