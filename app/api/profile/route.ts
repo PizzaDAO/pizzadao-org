@@ -9,6 +9,9 @@ import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { GvizCell } from "@/app/lib/types/gviz";
 import { withErrorHandling } from "@/app/lib/errors/error-response";
 import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
+import { fetchMemberById } from "@/app/lib/sheets/member-repository";
+import { syncDiscordMember } from "@/app/lib/services/discord-api";
+import { validateProfilePayload } from "@/app/lib/profile/validation";
 
 export const runtime = "nodejs";
 
@@ -26,135 +29,6 @@ function extractRoleIdFromMention(s: unknown): string | null {
   // matches <@&123> or just 123
   const m = str.match(/^<@&(\d+)>$/) || str.match(/^(\d+)$/);
   return m ? m[1] : null;
-}
-
-/**
- * Minimal GViz reader to find the DiscordID for a given memberId.
- * Used to enforce "only the owner can update their profile".
- */
-async function fetchMemberRowById(memberId: string) {
-  const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-  const TAB_NAME = "Crew";
-
-  // headers=0 ensures the header row is included in the response
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-    TAB_NAME
-  )}&tqx=out:json&headers=0`;
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch sheet");
-  const text = await res.text();
-  const gviz = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
-
-  // header hunter (same logic as member-lookup)
-  let headerRowIdx = -1;
-  let headerVals: string[] = [];
-  for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-    const rowCells = rows[ri]?.c || [];
-    const rowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
-    const hasName = rowVals.includes("name");
-    const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
-    const hasCity = rowVals.includes("city") || rowVals.includes("crews");
-    if (hasName && (hasStatus || hasCity)) {
-      headerRowIdx = ri;
-      headerVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim());
-      break;
-    }
-  }
-  if (headerRowIdx === -1) throw new Error("Header row not found");
-
-  const headerMap = new Map<string, number>();
-  headerVals.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
-
-  // Find ID column, fallback to column 0 if not found (matches member-lookup behavior)
-  let idxId = headerMap.get("id") ?? headerMap.get("member id") ?? headerMap.get("memberid");
-  if (idxId == null) idxId = 0; // fallback to column A
-
-  // DiscordID column variants
-  const idxDiscord =
-    headerMap.get("discordid") ??
-    headerMap.get("discord id") ??
-    headerMap.get("discord") ??
-    headerMap.get("discord user id");
-
-  for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || [];
-    const idVal = String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim();
-    if (idVal && idVal === memberId) {
-      const discordVal =
-        idxDiscord != null ? String(cells[idxDiscord]?.v ?? cells[idxDiscord]?.f ?? "").trim() : "";
-      return { discordId: discordVal };
-    }
-  }
-
-  return null;
-}
-
-async function discordFetch(path: string, init: RequestInit) {
-  const base = "https://discord.com/api/v10";
-  const res = await fetch(base + path, init);
-  const text = await res.text();
-  let json: unknown = null;
-  try {
-    json = JSON.parse(text);
-  } catch { }
-  return { res, json, text };
-}
-
-async function syncDiscordMember(opts: {
-  guildId: string;
-  botToken: string;
-  userId: string;
-  nickname?: string;
-  turtleRoleIds: string[];
-  crewRoleIds: string[];
-}) {
-  const { guildId, botToken, userId, nickname, turtleRoleIds, crewRoleIds } = opts;
-
-  // 1) Read current member roles
-  const member = await discordFetch(`/guilds/${guildId}/members/${userId}`, {
-    method: "GET",
-    headers: { Authorization: `Bot ${botToken}` },
-  });
-
-  if (!member.res.ok) {
-    throw new Error(
-      `Discord GET member failed (${member.res.status}): ${(member.json as any)?.message ?? member.text}`
-    );
-  }
-
-  const currentRoles: string[] = Array.isArray((member.json as any)?.roles) ? (member.json as any).roles : [];
-
-  // 2) Add-only: keep all existing roles and add new turtle/crew roles
-  const nextRoles = Array.from(new Set([...currentRoles, ...turtleRoleIds, ...crewRoleIds].map(String)));
-
-  // 3) PATCH member: nick + roles
-  const body: { roles: string[]; nick?: string } = { roles: nextRoles };
-  if (nickname) body.nick = nickname.slice(0, 32); // Discord nickname limit
-
-  const patch = await discordFetch(`/guilds/${guildId}/members/${userId}`, {
-    method: "PATCH",
-    headers: {
-      Authorization: `Bot ${botToken}`,
-      "Content-Type": "application/json",
-    },
-    body: JSON.stringify(body),
-  });
-
-  if (!patch.res.ok) {
-    const msg = (patch.json as any)?.message ?? patch.text;
-    if (patch.res.status === 403) {
-      throw new Error(
-        `Discord PATCH member failed (403): Missing Permissions. ` +
-        `Ensure the bot role has Manage Roles + Manage Nicknames, and that the bot's highest role is ABOVE ` +
-        `every role it is trying to assign. Discord message: ${msg}`
-      );
-    }
-    throw new Error(`Discord PATCH member failed (${patch.res.status}): ${msg}`);
-  }
-
-  return { ok: true, rolesSet: nextRoles.length };
 }
 
 // --- crew mapping lookup (server-side) ---
@@ -336,7 +210,7 @@ const POST_HANDLER = async (req: Request) => {
    */
   let isNewSignup = true; // Track if this is a new signup (for welcome message)
   if (payload.memberId) {
-    const row = await fetchMemberRowById(payload.memberId);
+    const row = await fetchMemberById(payload.memberId);
 
     if (row) {
       // Row exists - this is an UPDATE, verify ownership
