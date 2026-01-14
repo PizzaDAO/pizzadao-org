@@ -143,7 +143,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
           }}>
             {bounty.status === "CLAIMED" ? "In Progress" : "Open"}
           </span>
-          <span style={{ fontSize: 10, opacity: 0.4 }}>#{bounty.id}</span>
+          <span style={{ fontSize: 10, color: "#9ca3af" }}>#{bounty.id}</span>
           {isCreator && (
             <span style={{
               fontSize: 10,
@@ -181,7 +181,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
             View details
           </a>
         )}
-        <div style={{ marginTop: 6, fontSize: 11, opacity: 0.6 }}>
+        <div style={{ marginTop: 6, fontSize: 11, color: "#666" }}>
           Posted by <UserLink discordId={bounty.createdBy} />
         </div>
         {bounty.status === "CLAIMED" && bounty.claimedBy && (
@@ -195,7 +195,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
             alignItems: "center",
             gap: 6
           }}>
-            <span style={{ opacity: 0.6 }}>Claimed by:</span>
+            <span style={{ color: "#666" }}>Claimed by:</span>
             <UserLink discordId={bounty.claimedBy} />
             {isClaimer && <span style={{ color: "#16a34a", fontWeight: 600 }}>(You)</span>}
           </div>

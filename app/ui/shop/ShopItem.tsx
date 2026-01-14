@@ -96,10 +96,10 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
       </div>
 
       {item.description && (
-        <p style={{ fontSize: 13, opacity: 0.6, marginBottom: 12, marginTop: 0 }}>{item.description}</p>
+        <p style={{ fontSize: 13, color: "#666", marginBottom: 12, marginTop: 0 }}>{item.description}</p>
       )}
 
-      <div style={{ fontSize: 12, opacity: 0.5, marginBottom: 12 }}>
+      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
         {item.quantity === -1 ? "Unlimited stock" : `${item.quantity} in stock`}
       </div>
 

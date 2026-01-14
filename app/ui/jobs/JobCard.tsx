@@ -106,7 +106,7 @@ export function JobCard({ job, rewardAmount, alreadyCompleted, onAssign, disable
               Done
             </span>
           )}
-          <span style={{ fontSize: 10, opacity: 0.4 }}>#{job.id}</span>
+          <span style={{ fontSize: 10, color: "#9ca3af" }}>#{job.id}</span>
         </div>
         <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4 }}>{job.description}</p>
         {error && (

@@ -100,7 +100,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
 
       <form onSubmit={handleTransfer} style={{ display: "grid", gap: 16 }}>
         <div>
-          <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+          <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
             Recipient Discord ID
           </label>
           <input
@@ -114,7 +114,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         </div>
 
         <div>
-          <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>Amount</label>
+          <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>Amount</label>
           <input
             type="number"
             placeholder="Amount to send"

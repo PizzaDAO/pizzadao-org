@@ -75,7 +75,7 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
   if (items.length === 0) {
     return (
       <div style={{ ...card(), textAlign: "center" }}>
-        <p style={{ opacity: 0.5 }}>No items available in the shop</p>
+        <p style={{ color: "#6b7280" }}>No items available in the shop</p>
       </div>
     );
   }
