@@ -3,6 +3,8 @@ import { parseGvizJson } from './gviz-parser';
 import { findColumnIndex } from './sheet-utils';
 import { GvizResponse, GvizCell } from './types/gviz';
 
+// POAP service layer - fetches and filters POAPs from Alchemy API and Google Sheets
+
 const POAP_CONTRACT = '0x22C1f6050E56d2876009903609a2cC3fEf83B415';
 const POAP_WHITELIST_SHEET_ID = '1UsQA1Jqm4gCb1qMwWf7i_k0eNsi5EofyOjijmGig3Jc';
 
