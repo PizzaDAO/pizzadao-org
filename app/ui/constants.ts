@@ -58,6 +58,8 @@ export const TURTLE_ROLE_IDS: Record<string, string> = {
   MICHELANGELO: "815277933622591531",
   DONATELLO: "815277900492046356",
   APRIL: "815976204900499537",
+  SPLINTER: "815278060206424085",
+  FOOT_CLAN: "815976604710469692",
 };
 
 export const ROLE_ID_TO_TURTLE: Record<string, string> = Object.entries(TURTLE_ROLE_IDS).reduce((acc, [key, value]) => {

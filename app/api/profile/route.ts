@@ -282,9 +282,12 @@ function resolveTurtleRoleId(turtleName: string): string | null {
   const upper = raw.toUpperCase();
   const lower = raw.toLowerCase();
   const title = raw.charAt(0).toUpperCase() + raw.slice(1).toLowerCase();
+  // Handle "Foot Clan" -> "FOOT_CLAN" (spaces to underscores, uppercase)
+  const upperUnderscore = raw.toUpperCase().replace(/\s+/g, "_");
 
   const candidates = [
     TURTLE_ROLE_IDS[upper as keyof typeof TURTLE_ROLE_IDS],
+    (TURTLE_ROLE_IDS as any)[upperUnderscore], // "FOOT_CLAN"
     (TURTLE_ROLE_IDS as any)[lower],
     (TURTLE_ROLE_IDS as any)[title],
     (TURTLE_ROLE_IDS as any)[`${normalizeTurtleKey(raw)}_role_id`],
