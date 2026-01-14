@@ -1,4 +1,5 @@
 import { prisma } from './db'
+import { ValidationError } from './errors/api-errors'
 
 const PEP_SYMBOL = process.env.PEP_SYMBOL || '$PEP'
 const PEP_NAME = process.env.PEP_NAME || 'PEP'
@@ -48,7 +49,7 @@ export async function updateBalance(userId: string, amount: number) {
   const economy = await getOrCreateEconomy(userId)
 
   if (economy.wallet + amount < 0) {
-    throw new Error('Insufficient funds')
+    throw new ValidationError('Insufficient funds')
   }
 
   return prisma.economy.update({
@@ -65,18 +66,18 @@ export const updateWallet = updateBalance
  */
 export async function transfer(fromId: string, toId: string, amount: number) {
   if (amount <= 0) {
-    throw new Error('Amount must be positive')
+    throw new ValidationError('Amount must be positive')
   }
 
   if (fromId === toId) {
-    throw new Error('Cannot transfer to yourself')
+    throw new ValidationError('Cannot transfer to yourself')
   }
 
   const fromEconomy = await getOrCreateEconomy(fromId)
   await getOrCreateEconomy(toId) // Ensure recipient exists
 
   if (fromEconomy.wallet < amount) {
-    throw new Error('Insufficient funds')
+    throw new ValidationError('Insufficient funds')
   }
 
   // Use transaction to ensure atomicity

@@ -7,6 +7,8 @@ import { sendWelcomeMessage } from "@/app/lib/discord-webhook";
 import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { GvizCell } from "@/app/lib/types/gviz";
+import { withErrorHandling } from "@/app/lib/errors/error-response";
+import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
 
 export const runtime = "nodejs";
 
@@ -247,212 +249,190 @@ function resolveTurtleRoleId(turtleName: string): string | null {
   return candidates.length ? String(candidates[0]) : null;
 }
 
-export async function POST(req: Request) {
-  try {
-    const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
-    const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-    if (!url || !secret) {
-      return NextResponse.json({ error: "Missing Sheets webapp env vars" }, { status: 500 });
-    }
+const POST_HANDLER = async (req: Request) => {
+  const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
+  const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
+  if (!url || !secret) {
+    throw new Error("Missing Sheets webapp env vars");
+  }
 
-    const session = await getSession();
-    if (!session?.discordId) {
-      return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
-    }
+  const session = await getSession();
+  if (!session?.discordId) {
+    throw new UnauthorizedError();
+  }
 
-    const body = await req.json();
+  const body = await req.json();
 
-    // Get submitted turtles from form
-    // Only save turtles that the user explicitly selected - don't auto-add Discord roles
-    const submittedTurtles = Array.isArray(body.turtles)
-      ? body.turtles.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
-      : [];
-    const turtlesArr = submittedTurtles;
+  // Get submitted turtles from form
+  // Only save turtles that the user explicitly selected - don't auto-add Discord roles
+  const submittedTurtles = Array.isArray(body.turtles)
+    ? body.turtles.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
+    : [];
+  const turtlesArr = submittedTurtles;
 
-    const crewsArr = Array.isArray(body.crews)
-      ? body.crews.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
-      : [];
+  const crewsArr = Array.isArray(body.crews)
+    ? body.crews.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
+    : [];
 
-    const memberId = clampStr(body.memberId ?? "", 20);
+  const memberId = clampStr(body.memberId ?? "", 20);
 
-    const payload = {
-      secret,
+  const payload = {
+    secret,
+    source: clampStr(body.source ?? "web", 20),
+    sessionId: clampStr(body.sessionId ?? "", 80),
+
+    mafiaName: clampStr(body.mafiaName, 64),
+    topping: clampStr(body.topping, 50),
+
+    mafiaMovieTitle: clampStr(body.mafiaMovieTitle, 120),
+    resolvedMovieTitle: clampStr(body.resolvedMovieTitle, 120),
+    tmdbMovieId: clampStr(body.tmdbMovieId, 30),
+    releaseDate: clampStr(body.releaseDate, 20),
+
+    city: clampStr(body.city, 120),
+
+    // legacy + new
+    turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
+    turtles: turtlesArr,
+
+    crews: crewsArr,
+    memberId,
+
+    // Identity comes from cookie session, never from client body
+    discordId: clampStr(session.discordId, 64),
+    discordJoined: clampBool(body.discordJoined),
+
+    // richer raw for debugging (no secret)
+    raw: {
       source: clampStr(body.source ?? "web", 20),
       sessionId: clampStr(body.sessionId ?? "", 80),
-
       mafiaName: clampStr(body.mafiaName, 64),
       topping: clampStr(body.topping, 50),
-
       mafiaMovieTitle: clampStr(body.mafiaMovieTitle, 120),
       resolvedMovieTitle: clampStr(body.resolvedMovieTitle, 120),
       tmdbMovieId: clampStr(body.tmdbMovieId, 30),
       releaseDate: clampStr(body.releaseDate, 20),
-
       city: clampStr(body.city, 120),
-
-      // legacy + new
       turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
       turtles: turtlesArr,
-
       crews: crewsArr,
       memberId,
-
-      // Identity comes from cookie session, never from client body
       discordId: clampStr(session.discordId, 64),
       discordJoined: clampBool(body.discordJoined),
+    },
+  };
 
-      // richer raw for debugging (no secret)
-      raw: {
-        source: clampStr(body.source ?? "web", 20),
-        sessionId: clampStr(body.sessionId ?? "", 80),
-        mafiaName: clampStr(body.mafiaName, 64),
-        topping: clampStr(body.topping, 50),
-        mafiaMovieTitle: clampStr(body.mafiaMovieTitle, 120),
-        resolvedMovieTitle: clampStr(body.resolvedMovieTitle, 120),
-        tmdbMovieId: clampStr(body.tmdbMovieId, 30),
-        releaseDate: clampStr(body.releaseDate, 20),
-        city: clampStr(body.city, 120),
-        turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
-        turtles: turtlesArr,
-        crews: crewsArr,
-        memberId,
-        discordId: clampStr(session.discordId, 64),
-        discordJoined: clampBool(body.discordJoined),
-      },
-    };
-
-    // Basic validation (create + update should both require a name)
-    if (!payload.mafiaName) {
-      return NextResponse.json(
-        {
-          error: "Missing required fields.",
-          missing: {
-            mafiaName: !payload.mafiaName,
-          },
-        },
-        { status: 400 }
-      );
-    }
-
-    /**
-     * Authorization: if updating a specific memberId, enforce ownership
-     * Only the Discord user recorded on that row may edit it.
-     *
-     * For NEW signups: memberId is provided but row doesn't exist yet - this is allowed
-     * For UPDATES: memberId exists in sheet - verify the discordId matches
-     */
-    let isNewSignup = true; // Track if this is a new signup (for welcome message)
-    if (payload.memberId) {
-      const row = await fetchMemberRowById(payload.memberId);
-
-      if (row) {
-        // Row exists - this is an UPDATE, verify ownership
-        isNewSignup = false;
-        const sheetDiscord = String(row.discordId || "").trim();
-        if (!sheetDiscord) {
-          return NextResponse.json(
-            { error: "Member is not claimed yet. Use the claim flow first." },
-            { status: 403 }
-          );
-        }
-
-        if (sheetDiscord !== payload.discordId) {
-          return NextResponse.json({ error: "Forbidden: cannot edit another member" }, { status: 403 });
-        }
-
-        // Optional safety: prevent blank-overwrite updates
-        const hasAnyUpdateField =
-          Boolean(payload.city) || payload.turtles.length > 0 || payload.crews.length > 0 || Boolean(payload.topping);
-        if (!hasAnyUpdateField) {
-          return NextResponse.json(
-            { error: "No update fields provided." },
-            { status: 400 }
-          );
-        }
-      }
-      // If row doesn't exist, it's a NEW signup with a chosen memberId - allow it to proceed
-    }
-
-    // 1) Write to Sheets
-    let parsed: unknown;
-    try {
-      parsed = await writeToSheet(payload);
-    } catch (e: unknown) {
-      return NextResponse.json(
-        {
-          error: "Failed to save profile",
-          details: (e as any)?.message ?? String(e),
-        },
-        { status: 502 }
-      );
-    }
-
-    // 2) Sync Discord
-    let discordResult: unknown = null;
-
-    if (payload.discordId) {
-      const guildId = process.env.DISCORD_GUILD_ID;
-      const botToken = process.env.DISCORD_BOT_TOKEN;
-      if (!guildId || !botToken) {
-        discordResult = { ok: false, error: "Missing DISCORD_GUILD_ID or DISCORD_BOT_TOKEN" };
-      } else {
-        // Turtle role IDs (payload.turtles are like "Leonardo", "Raphael", ...)
-        const turtleRoleIds = payload.turtles
-          .map((t: unknown) => resolveTurtleRoleId(String(t)))
-          .filter(Boolean) as string[];
-
-        // Crew role IDs from crew mappings table (column "role")
-        let crewRoleIds: string[] = [];
-        try {
-          crewRoleIds = await fetchCrewRoleIds(req, payload.crews);
-        } catch (e: unknown) {
-          crewRoleIds = [];
-          discordResult = { ok: false, error: `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}` };
-        }
-
-        try {
-          const sync = await syncDiscordMember({
-            guildId,
-            botToken,
-            userId: payload.discordId,
-            nickname: payload.mafiaName,
-            turtleRoleIds,
-            crewRoleIds,
-          });
-
-          discordResult = {
-            ...sync,
-            turtleRoleIds,
-            crewRoleIds,
-          };
-        } catch (e: unknown) {
-          discordResult = {
-            ok: false,
-            error: (e as any)?.message ?? "Discord sync failed",
-            turtleRoleIds,
-            crewRoleIds,
-          };
-        }
-      }
-    }
-
-    // 3) Send welcome message to Discord for NEW signups (not updates)
-    let welcomeResult: unknown = null;
-    if (isNewSignup && payload.discordId) {
-      welcomeResult = await sendWelcomeMessage({
-        discordId: payload.discordId,
-        memberId: payload.memberId,
-        mafiaName: payload.mafiaName,
-        city: payload.city,
-        topping: payload.topping,
-        mafiaMovie: payload.resolvedMovieTitle || payload.mafiaMovieTitle,
-        turtles: payload.turtles,
-        crews: payload.crews,
-      });
-    }
-
-    return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult });
-  } catch (err: unknown) {
-    return NextResponse.json({ error: (err as any)?.message ?? "Unknown error" }, { status: 500 });
+  // Basic validation (create + update should both require a name)
+  if (!payload.mafiaName) {
+    throw new ValidationError("Mafia name is required");
   }
-}
+
+  /**
+   * Authorization: if updating a specific memberId, enforce ownership
+   * Only the Discord user recorded on that row may edit it.
+   *
+   * For NEW signups: memberId is provided but row doesn't exist yet - this is allowed
+   * For UPDATES: memberId exists in sheet - verify the discordId matches
+   */
+  let isNewSignup = true; // Track if this is a new signup (for welcome message)
+  if (payload.memberId) {
+    const row = await fetchMemberRowById(payload.memberId);
+
+    if (row) {
+      // Row exists - this is an UPDATE, verify ownership
+      isNewSignup = false;
+      const sheetDiscord = String(row.discordId || "").trim();
+      if (!sheetDiscord) {
+        throw new ForbiddenError("Member is not claimed yet. Use the claim flow first.");
+      }
+
+      if (sheetDiscord !== payload.discordId) {
+        throw new ForbiddenError("Cannot edit another member");
+      }
+
+      // Optional safety: prevent blank-overwrite updates
+      const hasAnyUpdateField =
+        Boolean(payload.city) || payload.turtles.length > 0 || payload.crews.length > 0 || Boolean(payload.topping);
+      if (!hasAnyUpdateField) {
+        throw new ValidationError("No update fields provided");
+      }
+    }
+    // If row doesn't exist, it's a NEW signup with a chosen memberId - allow it to proceed
+  }
+
+  // 1) Write to Sheets
+  let parsed: unknown;
+  try {
+    parsed = await writeToSheet(payload);
+  } catch (e: unknown) {
+    throw new ExternalServiceError('Google Sheets', (e as any)?.message);
+  }
+
+  // 2) Sync Discord
+  let discordResult: unknown = null;
+
+  if (payload.discordId) {
+    const guildId = process.env.DISCORD_GUILD_ID;
+    const botToken = process.env.DISCORD_BOT_TOKEN;
+    if (!guildId || !botToken) {
+      discordResult = { ok: false, error: "Missing DISCORD_GUILD_ID or DISCORD_BOT_TOKEN" };
+    } else {
+      // Turtle role IDs (payload.turtles are like "Leonardo", "Raphael", ...)
+      const turtleRoleIds = payload.turtles
+        .map((t: unknown) => resolveTurtleRoleId(String(t)))
+        .filter(Boolean) as string[];
+
+      // Crew role IDs from crew mappings table (column "role")
+      let crewRoleIds: string[] = [];
+      try {
+        crewRoleIds = await fetchCrewRoleIds(req, payload.crews);
+      } catch (e: unknown) {
+        crewRoleIds = [];
+        discordResult = { ok: false, error: `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}` };
+      }
+
+      try {
+        const sync = await syncDiscordMember({
+          guildId,
+          botToken,
+          userId: payload.discordId,
+          nickname: payload.mafiaName,
+          turtleRoleIds,
+          crewRoleIds,
+        });
+
+        discordResult = {
+          ...sync,
+          turtleRoleIds,
+          crewRoleIds,
+        };
+      } catch (e: unknown) {
+        discordResult = {
+          ok: false,
+          error: (e as any)?.message ?? "Discord sync failed",
+          turtleRoleIds,
+          crewRoleIds,
+        };
+      }
+    }
+  }
+
+  // 3) Send welcome message to Discord for NEW signups (not updates)
+  let welcomeResult: unknown = null;
+  if (isNewSignup && payload.discordId) {
+    welcomeResult = await sendWelcomeMessage({
+      discordId: payload.discordId,
+      memberId: payload.memberId,
+      mafiaName: payload.mafiaName,
+      city: payload.city,
+      topping: payload.topping,
+      mafiaMovie: payload.resolvedMovieTitle || payload.mafiaMovieTitle,
+      turtles: payload.turtles,
+      crews: payload.crews,
+    });
+  }
+
+  return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult });
+};
+
+export const POST = withErrorHandling(POST_HANDLER);

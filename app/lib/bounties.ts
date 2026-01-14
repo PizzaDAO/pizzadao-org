@@ -1,22 +1,23 @@
 import { prisma } from './db'
 import { getOrCreateEconomy, updateBalance } from './economy'
+import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from './errors/api-errors'
 
 /**
  * Create a bounty with escrowed reward
  */
 export async function createBounty(creatorId: string, description: string, reward: number, link?: string) {
   if (reward <= 0) {
-    throw new Error('Reward must be positive')
+    throw new ValidationError('Reward must be positive')
   }
 
   if (!description.trim()) {
-    throw new Error('Description is required')
+    throw new ValidationError('Description is required')
   }
 
   // Check creator has enough funds
   const economy = await getOrCreateEconomy(creatorId)
   if (economy.wallet < reward) {
-    throw new Error('Insufficient funds to escrow reward')
+    throw new ValidationError('Insufficient funds to escrow reward')
   }
 
   // Escrow the reward from creator's wallet
@@ -75,15 +76,15 @@ export async function claimBounty(userId: string, bountyId: number) {
   })
 
   if (!bounty) {
-    throw new Error('Bounty not found')
+    throw new NotFoundError('Bounty')
   }
 
   if (bounty.status !== 'OPEN') {
-    throw new Error('Bounty is not available')
+    throw new ConflictError('Bounty is not available')
   }
 
   if (bounty.createdBy === userId) {
-    throw new Error('Cannot claim your own bounty')
+    throw new ValidationError('Cannot claim your own bounty')
   }
 
   return prisma.bounty.update({
@@ -104,15 +105,15 @@ export async function giveUpBounty(userId: string, bountyId: number) {
   })
 
   if (!bounty) {
-    throw new Error('Bounty not found')
+    throw new NotFoundError('Bounty')
   }
 
   if (bounty.claimedBy !== userId) {
-    throw new Error('You have not claimed this bounty')
+    throw new ValidationError('You have not claimed this bounty')
   }
 
   if (bounty.status !== 'CLAIMED') {
-    throw new Error('Bounty is not in claimed status')
+    throw new ConflictError('Bounty is not in claimed status')
   }
 
   return prisma.bounty.update({
@@ -133,19 +134,19 @@ export async function completeBounty(creatorId: string, bountyId: number) {
   })
 
   if (!bounty) {
-    throw new Error('Bounty not found')
+    throw new NotFoundError('Bounty')
   }
 
   if (bounty.createdBy !== creatorId) {
-    throw new Error('Only the bounty creator can complete it')
+    throw new ForbiddenError('Only the bounty creator can complete it')
   }
 
   if (bounty.status !== 'CLAIMED') {
-    throw new Error('Bounty must be claimed before completion')
+    throw new ConflictError('Bounty must be claimed before completion')
   }
 
   if (!bounty.claimedBy) {
-    throw new Error('No one has claimed this bounty')
+    throw new ConflictError('No one has claimed this bounty')
   }
 
   // Pay the claimer
@@ -167,19 +168,19 @@ export async function cancelBounty(creatorId: string, bountyId: number) {
   })
 
   if (!bounty) {
-    throw new Error('Bounty not found')
+    throw new NotFoundError('Bounty')
   }
 
   if (bounty.createdBy !== creatorId) {
-    throw new Error('Only the bounty creator can cancel it')
+    throw new ForbiddenError('Only the bounty creator can cancel it')
   }
 
   if (bounty.status === 'COMPLETED') {
-    throw new Error('Cannot cancel a completed bounty')
+    throw new ConflictError('Cannot cancel a completed bounty')
   }
 
   if (bounty.status === 'CANCELLED') {
-    throw new Error('Bounty is already cancelled')
+    throw new ConflictError('Bounty is already cancelled')
   }
 
   // Refund the creator

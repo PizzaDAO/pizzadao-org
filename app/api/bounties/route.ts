@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getAllBounties, createBounty } from '@/app/lib/bounties'
 import { requireOnboarded } from '@/app/lib/economy'
+import { withErrorHandling } from '@/app/lib/errors/error-response'
+import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
 
 export const runtime = 'nodejs'
 
@@ -29,42 +31,39 @@ export async function GET() {
 }
 
 // POST - Create a new bounty
-export async function POST(request: NextRequest) {
-  try {
-    const session = await getSession()
+const POST_HANDLER = async (request: NextRequest) => {
+  const session = await getSession()
 
-    if (!session?.discordId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
-
-    await requireOnboarded(session.discordId)
-
-    const body = await request.json()
-    const { description, reward, link } = body
-
-    if (!description || typeof description !== 'string') {
-      return NextResponse.json({ error: 'Description required' }, { status: 400 })
-    }
-
-    if (!reward || typeof reward !== 'number' || reward <= 0) {
-      return NextResponse.json({ error: 'Valid reward amount required' }, { status: 400 })
-    }
-
-    const bounty = await createBounty(session.discordId, description, reward, link)
-
-    return NextResponse.json({
-      success: true,
-      bounty: {
-        id: bounty.id,
-        description: bounty.description,
-        link: bounty.link,
-        reward: bounty.reward,
-        status: bounty.status,
-        createdAt: bounty.createdAt.toISOString()
-      }
-    })
-  } catch (error) {
-    const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 400 })
+  if (!session?.discordId) {
+    throw new UnauthorizedError()
   }
+
+  await requireOnboarded(session.discordId)
+
+  const body = await request.json()
+  const { description, reward, link } = body
+
+  if (!description || typeof description !== 'string') {
+    throw new ValidationError('Description required')
+  }
+
+  if (!reward || typeof reward !== 'number' || reward <= 0) {
+    throw new ValidationError('Valid reward amount required')
+  }
+
+  const bounty = await createBounty(session.discordId, description, reward, link)
+
+  return NextResponse.json({
+    success: true,
+    bounty: {
+      id: bounty.id,
+      description: bounty.description,
+      link: bounty.link,
+      reward: bounty.reward,
+      status: bounty.status,
+      createdAt: bounty.createdAt.toISOString()
+    }
+  })
 }
+
+export const POST = withErrorHandling(POST_HANDLER)
