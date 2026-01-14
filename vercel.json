@@ -1,11 +1,6 @@
 {
   "buildCommand": "prisma generate && next build",
   "installCommand": "npm install",
-  "env": {
-    "STAGING": {
-      "description": "Staging environment flag (set to true for staging deployments)"
-    }
-  },
   "git": {
     "deploymentEnabled": {
       "main": true,
