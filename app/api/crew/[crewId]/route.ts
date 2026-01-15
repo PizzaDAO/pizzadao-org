@@ -2,6 +2,7 @@ import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from 'next/server'
 import { getTaskLinks, getAgendaStepLinks, getMemberTurtlesMap } from '@/app/api/lib/google-sheets'
 import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
+import { getCrewMappings } from "@/app/lib/crew-mappings";
 
 type Params = { params: Promise<{ crewId: string }> }
 
@@ -219,18 +220,8 @@ export async function GET(req: Request, { params }: Params) {
   const { crewId } = await params
 
   try {
-    // Get crew metadata from crew-mappings
-    const baseUrl = req.headers.get('x-forwarded-host')
-      ? `${req.headers.get('x-forwarded-proto') || 'https'}://${req.headers.get('x-forwarded-host')}`
-      : `http://${req.headers.get('host')}`
-
-    const mappingsRes = await fetch(`${baseUrl}/api/crew-mappings`, { cache: 'no-store' })
-    if (!mappingsRes.ok) {
-      throw new Error('Failed to fetch crew mappings')
-    }
-
-    const mappingsData = await mappingsRes.json()
-    const crews = mappingsData.crews || []
+    // Get crew metadata directly (avoids HTTP fetch which can be blocked by deployment protection)
+    const { crews } = await getCrewMappings()
 
     // Find the crew by ID (case-insensitive)
     const crew = crews.find((c: any) =>
@@ -354,8 +345,8 @@ export async function GET(req: Request, { params }: Params) {
       }
 
       // Use tasks from crew-mappings if sheet parsing didn't find any
-      if (tasks.length === 0 && crew.tasks?.length > 0) {
-        tasks = crew.tasks.map((t: any) => ({
+      if (tasks.length === 0 && (crew.tasks?.length ?? 0) > 0) {
+        tasks = crew.tasks!.map((t: any) => ({
           task: t.label,
           url: t.url,
           priority: '',

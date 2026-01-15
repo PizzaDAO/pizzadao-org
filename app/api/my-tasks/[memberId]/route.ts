@@ -1,8 +1,7 @@
 import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getTaskLinks } from "../../lib/google-sheets";
-
-const CREW_MAPPINGS_URL = "/api/crew-mappings"; // We'll fetch from our own API
+import { getCrewMappings } from "@/app/lib/crew-mappings";
 
 // Simplified types for the tasks API
 type Task = { label: string; url?: string };
@@ -371,13 +370,8 @@ export async function GET(req: Request, { params }: { params: Promise<{ memberId
     if (!memberId) return NextResponse.json({ error: "No memberId" }, { status: 400 });
 
     try {
-        // 1. Get crews list from our own mappings API
-        // We need the absolute URL for fetch in Route Handlers if not using a relative tool
-        const protocol = req.headers.get("x-forwarded-proto") || "http";
-        const host = req.headers.get("host");
-        const mappingsRes = await fetch(`${protocol}://${host}/api/crew-mappings`);
-        if (!mappingsRes.ok) throw new Error("Failed to fetch crew mappings");
-        const { crews } = await mappingsRes.json();
+        // 1. Get crews list directly (avoids HTTP fetch which can be blocked by deployment protection)
+        const { crews } = await getCrewMappings();
 
         const sheetsToFetch = crews.filter((c: any) => c.sheet).map((c: any) => ({
             crewId: String(c.id).toLowerCase(),
