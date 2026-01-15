@@ -9,6 +9,7 @@ import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
 import { PepIcon, PepAmount } from "../../ui/economy";
 import { NFTCollection } from "../../ui/nft";
+import { POAPCollection } from "../../ui/poap";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -588,6 +589,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                     />
                                 )}
                             </div>
+                        </div>
+
+                        {/* POAP Collection - inside profile grid under roles */}
+                        <div style={{ gridColumn: "1 / -1" }}>
+                            <POAPCollection memberId={idValue} />
                         </div>
                     </div>
 
