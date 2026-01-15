@@ -64,9 +64,12 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
 
   return (
     <div className="mt-4">
-      <h4 className="text-sm font-medium text-gray-500 mb-2">
-        POAPs {data && `(${data.totalCount})`}
-      </h4>
+      <a
+        href="/poaps"
+        className="text-sm font-medium text-gray-500 hover:text-yellow-600 mb-2 inline-block transition-colors"
+      >
+        POAPs {data && `(${data.totalCount})`} →
+      </a>
 
       {loading ? (
         // Loading shimmer
