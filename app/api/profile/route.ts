@@ -247,11 +247,12 @@ const POST_HANDLER = async (req: Request) => {
 
       // Crew role IDs from crew mappings table (column "role")
       let crewRoleIds: string[] = [];
+      let crewLookupError: string | null = null;
       try {
         crewRoleIds = await fetchCrewRoleIds(payload.crews);
       } catch (e: unknown) {
         crewRoleIds = [];
-        discordResult = { ok: false, error: `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}` };
+        crewLookupError = `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}`;
       }
 
       try {
@@ -268,6 +269,7 @@ const POST_HANDLER = async (req: Request) => {
           ...sync,
           turtleRoleIds,
           crewRoleIds,
+          crewLookupError, // Preserve any crew lookup error for debugging
         };
       } catch (e: unknown) {
         discordResult = {
@@ -275,6 +277,7 @@ const POST_HANDLER = async (req: Request) => {
           error: (e as any)?.message ?? "Discord sync failed",
           turtleRoleIds,
           crewRoleIds,
+          crewLookupError, // Preserve any crew lookup error for debugging
         };
       }
     }
@@ -293,9 +296,11 @@ const POST_HANDLER = async (req: Request) => {
       turtles: payload.turtles,
       crews: payload.crews,
     });
+  } else if (!isNewSignup) {
+    welcomeResult = { skipped: true, reason: "Not a new signup (member row already existed)" };
   }
 
-  return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult });
+  return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult, isNewSignup });
 };
 
 export const POST = withErrorHandling(POST_HANDLER);
