@@ -120,12 +120,19 @@ export async function GET(req: Request): Promise<NextResponse<WhitelistResponse>
     const allowedIds = await fetchAllowedPOAPIds();
     const eventIds = Array.from(allowedIds);
 
+    // Debug: show first few IDs
+    const debugInfo = {
+      idsCount: eventIds.length,
+      sampleIds: eventIds.slice(0, 5),
+    };
+
     if (eventIds.length === 0) {
       return NextResponse.json({
         events: [],
         totalCount: 0,
         fromCache: false,
-      });
+        debug: { message: 'No whitelist IDs found', ...debugInfo },
+      } as any);
     }
 
     // Fetch event details
@@ -138,14 +145,18 @@ export async function GET(req: Request): Promise<NextResponse<WhitelistResponse>
       return dateB - dateA;
     });
 
-    const result: WhitelistResponse = {
+    const result = {
       events,
       totalCount: events.length,
       fromCache: false,
+      debug: {
+        ...debugInfo,
+        eventsReturned: events.length,
+      },
     };
 
-    // Cache the result
-    await cacheSet('poap-whitelist-details', result, WHITELIST_DETAILS_TTL);
+    // Cache the result (without debug info)
+    await cacheSet('poap-whitelist-details', { events, totalCount: events.length, fromCache: false }, WHITELIST_DETAILS_TTL);
 
     return NextResponse.json(result);
   } catch (error) {
