@@ -18,10 +18,10 @@ export interface POAPDisplayItem {
  * API response from /api/poaps/[memberId]
  */
 export interface POAPCollectionResponse {
-  poaps: POAPDisplayItem[];   // Oldest + 10 newest (max 11 items)
+  poaps: POAPDisplayItem[];   // All whitelisted POAPs, sorted newest first
   totalCount: number;         // Total POAPs user owns (after whitelist filtering)
-  hiddenCount: number;        // Number of POAPs not shown (totalCount - poaps.length)
   walletAddress: string;      // Wallet address used for lookup
+  fromCache?: boolean;        // True if returned from cache (fast path)
   noWallet?: boolean;         // True if member has no wallet address
 }
 

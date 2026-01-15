@@ -590,13 +590,15 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 )}
                             </div>
                         </div>
+
+                        {/* POAP Collection - inside profile grid under roles */}
+                        <div style={{ gridColumn: "1 / -1" }}>
+                            <POAPCollection memberId={idValue} />
+                        </div>
                     </div>
 
                     {/* NFT Collection Section - shows connect prompt if no wallet */}
                     <NFTCollection memberId={idValue} showConnectPrompt={true} />
-
-                    {/* POAP Collection Section - only shows if wallet exists and has POAPs */}
-                    <POAPCollection memberId={idValue} />
 
                     {/* Crews Section - MATCHING STEP 5 UI */}
                     {(() => {

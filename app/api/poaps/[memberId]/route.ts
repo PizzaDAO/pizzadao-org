@@ -101,15 +101,16 @@ export async function GET(
     });
   }
 
-  // 2. Fetch filtered POAPs
+  // 2. Fetch filtered POAPs (uses incremental caching)
   try {
-    const { poaps, totalCount, hiddenCount } = await fetchFilteredPOAPs(walletAddress);
+    const { poaps, totalCount, fromCache, debug } = await fetchFilteredPOAPs(walletAddress);
 
     return NextResponse.json({
       poaps,
       totalCount,
-      hiddenCount,
       walletAddress,
+      fromCache,
+      debug,
     });
   } catch (error) {
     console.error('Error fetching POAPs:', error);
@@ -118,8 +119,9 @@ export async function GET(
     return NextResponse.json({
       poaps: [],
       totalCount: 0,
-      hiddenCount: 0,
       walletAddress,
+      fromCache: false,
+      debug: { error: String(error) },
     });
   }
 }

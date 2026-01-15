@@ -302,13 +302,15 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                 );
                             })()}
                         </div>
+
+                        {/* POAP Collection - inside profile grid under roles */}
+                        <div style={{ gridColumn: "1 / -1" }}>
+                            <POAPCollection memberId={idValue} />
+                        </div>
                     </div>
 
                     {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
                     <NFTCollection memberId={idValue} showConnectPrompt={false} />
-
-                    {/* POAP Collection Section - only shows if wallet exists and has POAPs */}
-                    <POAPCollection memberId={idValue} />
 
                     {/* Crews Section */}
                     {userCrews.length > 0 && (

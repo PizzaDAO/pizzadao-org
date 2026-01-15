@@ -12,6 +12,7 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
   const [data, setData] = useState<POAPCollectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [expanded, setExpanded] = useState(false);
 
   useEffect(() => {
     async function fetchPOAPs() {
@@ -50,51 +51,73 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
     return null;
   }
 
+  // Calculate what to show
+  const totalCount = data?.totalCount || 0;
+  const allPoaps = data?.poaps || [];
+  const hasHidden = totalCount > 14; // More than 13 newest + 1 oldest
+  const hiddenCount = hasHidden ? totalCount - 14 : 0;
+
+  // Split POAPs: newest 13, hidden middle, oldest 1
+  const newest13 = allPoaps.slice(0, 13);
+  const oldest1 = allPoaps.length > 0 ? [allPoaps[allPoaps.length - 1]] : [];
+  const middlePoaps = allPoaps.slice(13, -1); // Everything between newest 13 and oldest 1
+
   return (
-    <div className="mt-6">
-      <h3 className="text-lg font-semibold mb-3">POAPs</h3>
+    <div className="mt-4">
+      <h4 className="text-sm font-medium text-gray-500 mb-2">
+        POAPs {data && `(${data.totalCount})`}
+      </h4>
 
       {loading ? (
         // Loading shimmer
-        <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
+        <div className="flex gap-2 flex-wrap">
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="aspect-square rounded-lg bg-gray-200 animate-pulse"
+              className="w-10 h-10 rounded-full bg-gray-200 animate-pulse flex-shrink-0"
             />
           ))}
         </div>
       ) : (
         data && (
-          <>
-            <div className="grid grid-cols-4 md:grid-cols-6 lg:grid-cols-8 gap-3">
-              {/* Oldest POAP */}
-              {data.poaps[0] && <POAPCard poap={data.poaps[0]} />}
+          <div className="flex flex-wrap items-center gap-2">
+            {/* 13 Newest POAPs */}
+            {newest13.map((poap) => (
+              <POAPCard key={poap.tokenId} poap={poap} size="small" />
+            ))}
 
-              {/* Hidden count indicator */}
-              {data.hiddenCount > 0 && (
-                <div className="aspect-square rounded-lg border border-dashed border-gray-300 flex items-center justify-center bg-gray-50">
-                  <div className="text-center px-2">
-                    <p className="text-2xl font-bold text-gray-400">{data.hiddenCount}</p>
-                    <p className="text-xs text-gray-500 mt-1">hidden</p>
-                  </div>
-                </div>
-              )}
+            {/* Hidden count badge - clickable to expand */}
+            {hasHidden && !expanded && (
+              <button
+                onClick={() => setExpanded(true)}
+                className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 hover:border-yellow-400 flex items-center justify-center bg-gray-50 hover:bg-yellow-50 flex-shrink-0 transition-colors cursor-pointer"
+                title={`Show ${hiddenCount} more POAPs`}
+              >
+                <span className="text-xs font-bold text-gray-500">+{hiddenCount}</span>
+              </button>
+            )}
 
-              {/* 10 Newest POAPs */}
-              {data.poaps.slice(1).map((poap) => (
-                <POAPCard key={poap.tokenId} poap={poap} />
-              ))}
-            </div>
+            {/* Middle POAPs - shown when expanded */}
+            {expanded && middlePoaps.map((poap) => (
+              <POAPCard key={poap.tokenId} poap={poap} size="small" />
+            ))}
 
-            {/* Total count footer */}
-            <p className="text-sm text-gray-500 mt-3">
-              {data.totalCount === 1
-                ? '1 POAP'
-                : `${data.totalCount} POAPs`}
-              {data.hiddenCount > 0 && ` (${data.poaps.length} shown)`}
-            </p>
-          </>
+            {/* Oldest POAP */}
+            {oldest1.map((poap) => (
+              <POAPCard key={poap.tokenId} poap={poap} size="small" />
+            ))}
+
+            {/* Collapse button when expanded */}
+            {expanded && hasHidden && (
+              <button
+                onClick={() => setExpanded(false)}
+                className="w-10 h-10 rounded-full border-2 border-gray-300 hover:border-gray-400 flex items-center justify-center bg-gray-100 hover:bg-gray-200 flex-shrink-0 transition-colors cursor-pointer"
+                title="Show less"
+              >
+                <span className="text-xs font-bold text-gray-500">−</span>
+              </button>
+            )}
+          </div>
         )
       )}
     </div>
