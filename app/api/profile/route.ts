@@ -12,6 +12,7 @@ import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceErro
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { validateProfilePayload } from "@/app/lib/profile/validation";
+import { getCrewMappings } from "@/app/lib/crew-mappings";
 
 export const runtime = "nodejs";
 
@@ -32,25 +33,13 @@ function extractRoleIdFromMention(s: unknown): string | null {
 }
 
 // --- crew mapping lookup (server-side) ---
-type CrewOption = { id: string; role?: string };
-type CrewMappingsResponse = { crews: CrewOption[] };
-
-function getBaseUrl(req: Request) {
-  const host = req.headers.get("x-forwarded-host") ?? req.headers.get("host");
-  const proto = req.headers.get("x-forwarded-proto") ?? "http";
-  return `${proto}://${host}`;
-}
-
-async function fetchCrewRoleIds(req: Request, selectedCrewIds: string[]): Promise<string[]> {
+async function fetchCrewRoleIds(selectedCrewIds: string[]): Promise<string[]> {
   if (!selectedCrewIds.length) return [];
 
-  const base = getBaseUrl(req);
-  const res = await fetch(`${base}/api/crew-mappings`, { cache: "no-store" });
-  const data = (await res.json()) as unknown;
-  if (!res.ok) throw new Error((data as any)?.error || "Failed to load crew mappings (server)");
+  // Use direct function call instead of HTTP fetch to avoid Vercel deployment protection issues
+  const { crews } = await getCrewMappings();
 
-  const crews: CrewOption[] = Array.isArray((data as any)?.crews) ? (data as any).crews : [];
-  const byId = new Map<string, CrewOption>();
+  const byId = new Map<string, { id: string; role?: string }>();
   for (const c of crews) {
     if (c?.id) byId.set(String(c.id), c);
   }
@@ -259,7 +248,7 @@ const POST_HANDLER = async (req: Request) => {
       // Crew role IDs from crew mappings table (column "role")
       let crewRoleIds: string[] = [];
       try {
-        crewRoleIds = await fetchCrewRoleIds(req, payload.crews);
+        crewRoleIds = await fetchCrewRoleIds(payload.crews);
       } catch (e: unknown) {
         crewRoleIds = [];
         discordResult = { ok: false, error: `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}` };
