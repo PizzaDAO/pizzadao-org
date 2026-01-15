@@ -6,7 +6,7 @@
 
 import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { getTaskLinks, getColumnHyperlinks } from "@/app/api/lib/google-sheets";
-import { cacheGet, cacheSet, CACHE_TTL } from "@/app/api/lib/cache";
+import { cacheGet, cacheSet, cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
 import promiseLimit from "promise-limit";
 
 const SHEET_ID = "19itGq86BRQTVehKhtRFKwK8gZqjsUQ_bG5cuVmem9HU";
@@ -75,9 +75,14 @@ function extractUrlFromText(text: string): string | undefined {
   return undefined;
 }
 
-async function fetchCrewTasks(sheetUrl: string): Promise<{ tasks: CrewTask[]; totalCount: number }> {
+async function fetchCrewTasks(sheetUrl: string, forceRefresh = false): Promise<{ tasks: CrewTask[]; totalCount: number }> {
   const id = extractSheetId(sheetUrl);
   if (!id) return { tasks: [], totalCount: 0 };
+
+  // Clear task-links cache for this sheet if force refresh
+  if (forceRefresh) {
+    await cacheDel(`task-links:${id}`);
+  }
 
   try {
     const url = gvizUrl(id);
@@ -350,7 +355,7 @@ content-type=${contentType} url=${gvizEndpoint} preview=${JSON.stringify(preview
   await Promise.all(
     crews.map((c) => limit(async () => {
       if (c.sheet) {
-        const { tasks, totalCount } = await fetchCrewTasks(c.sheet);
+        const { tasks, totalCount } = await fetchCrewTasks(c.sheet, forceRefresh);
         c.tasks = tasks;
         c.taskCount = totalCount;
       }
