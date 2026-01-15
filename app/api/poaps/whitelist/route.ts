@@ -39,7 +39,8 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<{ events: POAP
     const idsArray = batchIds.map(id => parseInt(id, 10)).join(', ');
 
     // Use inline IDs in query (more reliable than variables with bigint type)
-    const query = `query { drops(where: { id: { _in: [${idsArray}] } }, limit: ${BATCH_SIZE}) { id name description image_url start_date end_date city country event_url } }`;
+    // Note: event_url is not a valid field - we construct it from the ID
+    const query = `query { drops(where: { id: { _in: [${idsArray}] } }, limit: ${BATCH_SIZE}) { id name description image_url start_date end_date city country } }`;
 
     try {
       const res = await fetch(POAP_COMPASS_URL, {
