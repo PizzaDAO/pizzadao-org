@@ -132,11 +132,14 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ tasks: CrewTask[]; to
 
     const htmlLinkMap = await getTaskLinks(id);
 
-    const tasksWithMeta: { label: string; url?: string; priority: string }[] = [];
+    const allTasks: { label: string; url?: string; priority: string; isActive: boolean }[] = [];
     for (let i = headerRowIdx + 1; i < rows.length; i++) {
       const r = rows[i]?.c || [];
       const stage = stageIdx !== -1 ? String(r[stageIdx]?.v || "").trim().toLowerCase() : "";
-      const isActive = stage === "now" || stage === "doing" || stage === "in progress" || stage === "todo" || stage.includes("progress");
+
+      // Skip tasks that are "Done" or "Skip"
+      const isDoneOrSkip = stage === "done" || stage === "skip" || stage === "skipped" || stage === "complete" || stage === "completed";
+      if (isDoneOrSkip) continue;
 
       const taskCell = r[taskIdx];
       const rawLabel = String(taskCell?.v || "").trim();
@@ -144,8 +147,11 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ tasks: CrewTask[]; to
       const taskLabel = rawLabel.replace(/\s*\(https?:\/\/[^\s\)]+\)\s*/g, " ").trim();
       const priority = priorityIdx !== -1 ? String(r[priorityIdx]?.v || "").trim() : "";
 
-      if (taskLabel && isActive) {
-        tasksWithMeta.push({ label: taskLabel, url: taskUrl, priority });
+      // Check if task is actively being worked on (for sorting purposes)
+      const isActive = stage === "now" || stage === "doing" || stage === "in progress" || stage === "todo" || stage.includes("progress");
+
+      if (taskLabel) {
+        allTasks.push({ label: taskLabel, url: taskUrl, priority, isActive });
       }
     }
 
@@ -167,10 +173,17 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ tasks: CrewTask[]; to
       return p || undefined;
     };
 
-    tasksWithMeta.sort((a, b) => getPriorityRank(a.priority) - getPriorityRank(b.priority));
+    // Sort by: active tasks first, then by priority
+    allTasks.sort((a, b) => {
+      // Active tasks come first
+      if (a.isActive && !b.isActive) return -1;
+      if (!a.isActive && b.isActive) return 1;
+      // Then sort by priority
+      return getPriorityRank(a.priority) - getPriorityRank(b.priority);
+    });
 
-    const totalCount = tasksWithMeta.length;
-    const topTasks = tasksWithMeta.slice(0, 3).map(t => ({
+    const totalCount = allTasks.length;
+    const topTasks = allTasks.slice(0, 3).map(t => ({
       label: t.label,
       url: t.url,
       priority: getPriorityLabel(t.priority)

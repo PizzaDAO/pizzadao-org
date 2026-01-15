@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server';
 import { fetchAllowedPOAPIds } from '@/app/lib/poap';
-import { cacheGet, cacheSet } from '@/app/api/lib/cache';
+import { cacheGet, cacheSet, cacheDel } from '@/app/api/lib/cache';
 
 // Cache TTL for whitelist with event details (7 days)
 const WHITELIST_DETAILS_TTL = 60 * 60 * 24 * 7;
@@ -95,16 +95,28 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
 /**
  * GET /api/poaps/whitelist
  * Returns all whitelisted POAP events with their details
+ * Use ?fresh=1 to bypass cache
  */
-export async function GET(): Promise<NextResponse<WhitelistResponse>> {
-  // Check cache first
-  const cached = await cacheGet<WhitelistResponse>('poap-whitelist-details');
-  if (cached) {
-    return NextResponse.json({ ...cached, fromCache: true });
+export async function GET(req: Request): Promise<NextResponse<WhitelistResponse>> {
+  const url = new URL(req.url);
+  const forceRefresh = url.searchParams.get('fresh') === '1';
+
+  // Clear caches if force refresh
+  if (forceRefresh) {
+    await cacheDel('poap-whitelist-details');
+    await cacheDel('poap-whitelist-ids');
+  }
+
+  // Check cache first (unless force refresh)
+  if (!forceRefresh) {
+    const cached = await cacheGet<WhitelistResponse>('poap-whitelist-details');
+    if (cached && cached.events && cached.events.length > 0) {
+      return NextResponse.json({ ...cached, fromCache: true });
+    }
   }
 
   try {
-    // Get whitelist IDs
+    // Get whitelist IDs (will fetch fresh since we cleared the cache)
     const allowedIds = await fetchAllowedPOAPIds();
     const eventIds = Array.from(allowedIds);
 
