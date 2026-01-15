@@ -32,27 +32,14 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
   // Fetch in batches of 50 to avoid query size limits
   const BATCH_SIZE = 50;
   const allEvents: POAPEvent[] = [];
+  let debugLog: string[] = [];
 
   for (let i = 0; i < eventIds.length; i += BATCH_SIZE) {
     const batchIds = eventIds.slice(i, i + BATCH_SIZE);
     const idsArray = batchIds.map(id => parseInt(id, 10)).join(', ');
 
     // Use inline IDs in query (more reliable than variables with bigint type)
-    const query = `
-      query {
-        drops(where: { id: { _in: [${idsArray}] } }, limit: ${BATCH_SIZE}) {
-          id
-          name
-          description
-          image_url
-          start_date
-          end_date
-          city
-          country
-          event_url
-        }
-      }
-    `;
+    const query = `query { drops(where: { id: { _in: [${idsArray}] } }, limit: ${BATCH_SIZE}) { id name description image_url start_date end_date city country event_url } }`;
 
     try {
       const res = await fetch(POAP_COMPASS_URL, {
@@ -63,13 +50,28 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
         body: JSON.stringify({ query }),
       });
 
+      const responseText = await res.text();
+      debugLog.push(`Batch ${i / BATCH_SIZE}: status=${res.status}, len=${responseText.length}`);
+
       if (!res.ok) {
-        console.error(`POAP Compass API error: ${res.status}`);
+        debugLog.push(`Error response: ${responseText.slice(0, 200)}`);
         continue;
       }
 
-      const data = await res.json();
+      let data;
+      try {
+        data = JSON.parse(responseText);
+      } catch (parseError) {
+        debugLog.push(`Parse error: ${responseText.slice(0, 200)}`);
+        continue;
+      }
+
+      if (data.errors) {
+        debugLog.push(`GraphQL errors: ${JSON.stringify(data.errors).slice(0, 200)}`);
+      }
+
       const drops = data?.data?.drops || [];
+      debugLog.push(`Batch ${i / BATCH_SIZE}: got ${drops.length} drops`);
 
       for (const drop of drops) {
         allEvents.push({
@@ -84,11 +86,17 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
           eventUrl: drop.event_url || `https://poap.gallery/event/${drop.id}`,
         });
       }
+
+      // Rate limit: wait 100ms between batches
+      if (i + BATCH_SIZE < eventIds.length) {
+        await new Promise(resolve => setTimeout(resolve, 100));
+      }
     } catch (error) {
-      console.error('Error fetching POAP event details:', error);
+      debugLog.push(`Exception: ${error}`);
     }
   }
 
+  console.log('POAP fetch debug:', debugLog.join(' | '));
   return allEvents;
 }
 
