@@ -13,7 +13,6 @@ interface POAPEvent {
   city: string;
   country: string;
   eventUrl: string;
-  supply?: number;
 }
 
 interface WhitelistData {
@@ -136,7 +135,6 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
         >
           {event.startDate && <span>📅 {formatDate(event.startDate)}</span>}
           {location && <span>📍 {location}</span>}
-          {event.supply && <span>🎫 {event.supply.toLocaleString()} minted</span>}
         </div>
       </div>
 

@@ -15,7 +15,6 @@ interface POAPEvent {
   city: string;
   country: string;
   eventUrl: string;
-  supply?: number;
 }
 
 interface WhitelistResponse {
@@ -36,10 +35,12 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
 
   for (let i = 0; i < eventIds.length; i += BATCH_SIZE) {
     const batchIds = eventIds.slice(i, i + BATCH_SIZE);
+    const idsArray = batchIds.map(id => parseInt(id, 10)).join(', ');
 
+    // Use inline IDs in query (more reliable than variables with bigint type)
     const query = `
-      query GetPOAPEvents($ids: [bigint!]!) {
-        drops(where: { id: { _in: $ids } }) {
+      query {
+        drops(where: { id: { _in: [${idsArray}] } }, limit: ${BATCH_SIZE}) {
           id
           name
           description
@@ -49,13 +50,6 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
           city
           country
           event_url
-          stats_by_chain_aggregate {
-            aggregate {
-              sum {
-                transfer_count
-              }
-            }
-          }
         }
       }
     `;
@@ -66,12 +60,7 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
         headers: {
           'Content-Type': 'application/json',
         },
-        body: JSON.stringify({
-          query,
-          variables: {
-            ids: batchIds.map(id => parseInt(id, 10)),
-          },
-        }),
+        body: JSON.stringify({ query }),
       });
 
       if (!res.ok) {
@@ -93,7 +82,6 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
           city: drop.city || '',
           country: drop.country || '',
           eventUrl: drop.event_url || `https://poap.gallery/event/${drop.id}`,
-          supply: drop.stats_by_chain_aggregate?.aggregate?.sum?.transfer_count,
         });
       }
     } catch (error) {

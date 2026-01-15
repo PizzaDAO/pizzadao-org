@@ -6,6 +6,12 @@ import { Inter } from 'next/font/google'
 
 const inter = Inter({ subsets: ['latin'] })
 
+type CrewTask = {
+  label: string
+  url?: string
+  priority?: string
+}
+
 type CrewOption = {
   id: string
   label: string
@@ -16,6 +22,8 @@ type CrewOption = {
   channel?: string
   role?: string
   sheet?: string
+  tasks?: CrewTask[]
+  taskCount?: number
 }
 
 type UserData = {
@@ -327,6 +335,55 @@ export default function AllCrewsPage() {
                     )
                   )}
                 </div>
+
+                {/* Tasks Section */}
+                {crew.tasks && crew.tasks.length > 0 && (
+                  <div style={{ marginTop: 16, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12 }}>
+                    <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                      Top Tasks
+                    </div>
+                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+                      {crew.tasks.map((task, idx) => (
+                        <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                          {task.priority && (
+                            <span style={{
+                              fontSize: 10,
+                              fontWeight: 600,
+                              padding: '2px 6px',
+                              borderRadius: 4,
+                              background: task.priority === 'Top' ? '#fee2e2' :
+                                         task.priority === 'High' ? '#fef3c7' :
+                                         task.priority === 'Mid' ? '#e0f2fe' : '#f3f4f6',
+                              color: task.priority === 'Top' ? '#b91c1c' :
+                                    task.priority === 'High' ? '#b45309' :
+                                    task.priority === 'Mid' ? '#0369a1' : '#4b5563',
+                              flexShrink: 0,
+                            }}>
+                              {task.priority}
+                            </span>
+                          )}
+                          {task.url ? (
+                            <a
+                              href={task.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', lineHeight: 1.3 }}
+                            >
+                              {task.label}
+                            </a>
+                          ) : (
+                            <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.3 }}>{task.label}</span>
+                          )}
+                        </div>
+                      ))}
+                    </div>
+                    {(crew.taskCount ?? 0) > 3 && (
+                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+                        +{(crew.taskCount ?? 0) - 3} more tasks
+                      </div>
+                    )}
+                  </div>
+                )}
 
                 {crew.sheet && (
                   <a

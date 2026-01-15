@@ -30,6 +30,12 @@ function splitList(s: unknown) {
     .filter(Boolean);
 }
 
+export type CrewTask = {
+  label: string;
+  url?: string;
+  priority?: string;
+};
+
 export type CrewOption = {
   id: string;
   label: string;
@@ -42,7 +48,8 @@ export type CrewOption = {
   callTime?: string;
   callTimeUrl?: string;
   callLength?: string;
-  tasks?: { label: string; url?: string }[];
+  tasks?: CrewTask[];
+  taskCount?: number; // Total active tasks (including hidden ones)
 };
 
 function gvizUrl(sheetId: string, tabName?: string) {
@@ -68,14 +75,14 @@ function extractUrlFromText(text: string): string | undefined {
   return undefined;
 }
 
-async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: string }[]> {
+async function fetchCrewTasks(sheetUrl: string): Promise<{ tasks: CrewTask[]; totalCount: number }> {
   const id = extractSheetId(sheetUrl);
-  if (!id) return [];
+  if (!id) return { tasks: [], totalCount: 0 };
 
   try {
     const url = gvizUrl(id);
     const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 300 } });
-    if (!res.ok) return [];
+    if (!res.ok) return { tasks: [], totalCount: 0 };
     const text = await res.text();
     const gviz = parseGvizJson(text);
     const rows = gviz?.table?.rows || [];
@@ -94,7 +101,7 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       if (tasksRowIdx !== -1) break;
     }
 
-    if (tasksRowIdx === -1) return [];
+    if (tasksRowIdx === -1) return { tasks: [], totalCount: 0 };
 
     let headerRowIdx = -1;
     let stageIdx = -1;
@@ -118,7 +125,7 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       }
     }
 
-    if (headerRowIdx === -1) return [];
+    if (headerRowIdx === -1) return { tasks: [], totalCount: 0 };
 
     const headerRow = rows[headerRowIdx]?.c || [];
     const priorityIdx = headerRow.findIndex((c: any) => String(c?.v || "").toLowerCase().includes("priority"));
@@ -135,7 +142,7 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
       const rawLabel = String(taskCell?.v || "").trim();
       const taskUrl = htmlLinkMap[rawLabel] || taskCell?.l || extractUrlFromText(rawLabel);
       const taskLabel = rawLabel.replace(/\s*\(https?:\/\/[^\s\)]+\)\s*/g, " ").trim();
-      const priority = priorityIdx !== -1 ? String(r[priorityIdx]?.v || "").trim().toLowerCase() : "";
+      const priority = priorityIdx !== -1 ? String(r[priorityIdx]?.v || "").trim() : "";
 
       if (taskLabel && isActive) {
         tasksWithMeta.push({ label: taskLabel, url: taskUrl, priority });
@@ -143,17 +150,35 @@ async function fetchCrewTasks(sheetUrl: string): Promise<{ label: string; url?: 
     }
 
     const getPriorityRank = (p: string) => {
-      if (p.includes("top")) return 1;
-      if (p.includes("high")) return 2;
-      if (p.includes("mid")) return 3;
-      if (p.includes("low")) return 4;
+      const lower = p.toLowerCase();
+      if (lower.includes("top") || lower === "0") return 0;
+      if (lower.includes("high") || lower === "1") return 1;
+      if (lower.includes("mid") || lower === "2") return 2;
+      if (lower.includes("low") || lower === "3") return 3;
       return 999;
     };
 
+    const getPriorityLabel = (p: string) => {
+      const lower = p.toLowerCase();
+      if (lower.includes("top") || lower === "0") return "Top";
+      if (lower.includes("high") || lower === "1") return "High";
+      if (lower.includes("mid") || lower === "2") return "Mid";
+      if (lower.includes("low") || lower === "3") return "Low";
+      return p || undefined;
+    };
+
     tasksWithMeta.sort((a, b) => getPriorityRank(a.priority) - getPriorityRank(b.priority));
-    return tasksWithMeta.slice(0, 3).map(t => ({ label: t.label, url: t.url }));
+
+    const totalCount = tasksWithMeta.length;
+    const topTasks = tasksWithMeta.slice(0, 3).map(t => ({
+      label: t.label,
+      url: t.url,
+      priority: getPriorityLabel(t.priority)
+    }));
+
+    return { tasks: topTasks, totalCount };
   } catch (e) {
-    return [];
+    return { tasks: [], totalCount: 0 };
   }
 }
 
@@ -312,7 +337,9 @@ content-type=${contentType} url=${gvizEndpoint} preview=${JSON.stringify(preview
   await Promise.all(
     crews.map((c) => limit(async () => {
       if (c.sheet) {
-        c.tasks = await fetchCrewTasks(c.sheet);
+        const { tasks, totalCount } = await fetchCrewTasks(c.sheet);
+        c.tasks = tasks;
+        c.taskCount = totalCount;
       }
     }))
   );
