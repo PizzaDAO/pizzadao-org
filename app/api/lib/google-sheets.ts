@@ -45,7 +45,7 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
                 const res = await sheets.spreadsheets.get({
                     spreadsheetId: sheetId,
                     includeGridData: true,
-                    fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink))))",
+                    fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
                 });
 
                 const sheetData = res.data.sheets?.[0];
@@ -98,11 +98,33 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
                         const cell = rows[r].values?.[taskColIdx];
                         if (!cell) continue;
 
-                        // Check for direct hyperlink field (Ctrl+K links)
-                        const hyperlink = cell.hyperlink;
                         const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+                        if (!label) continue;
 
-                        if (label && hyperlink) {
+                        // Try multiple ways to get the hyperlink:
+                        // 1. Direct hyperlink property (Ctrl+K links)
+                        let hyperlink = cell.hyperlink;
+
+                        // 2. Rich text links (textFormatRuns with link.uri)
+                        if (!hyperlink && cell.textFormatRuns) {
+                            for (const run of cell.textFormatRuns) {
+                                if (run?.format?.link?.uri) {
+                                    hyperlink = run.format.link.uri;
+                                    break;
+                                }
+                            }
+                        }
+
+                        // 3. HYPERLINK formula in userEnteredValue
+                        if (!hyperlink && cell.userEnteredValue?.formulaValue) {
+                            const formula = cell.userEnteredValue.formulaValue;
+                            const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                            if (match) {
+                                hyperlink = match[1];
+                            }
+                        }
+
+                        if (hyperlink) {
                             linkMap[label.trim()] = hyperlink;
                         }
                     }
@@ -155,7 +177,7 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
         const res = await sheets.spreadsheets.get({
             spreadsheetId: sheetId,
             includeGridData: true,
-            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink))))",
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
         });
 
         const sheetData = res.data.sheets?.[0];
@@ -208,10 +230,33 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
                 const cell = rows[r].values?.[stepColIdx];
                 if (!cell) continue;
 
-                const hyperlink = cell.hyperlink;
                 const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+                if (!label) continue;
 
-                if (label && hyperlink) {
+                // Try multiple ways to get the hyperlink:
+                // 1. Direct hyperlink property (Ctrl+K links)
+                let hyperlink = cell.hyperlink;
+
+                // 2. Rich text links (textFormatRuns with link.uri)
+                if (!hyperlink && cell.textFormatRuns) {
+                    for (const run of cell.textFormatRuns) {
+                        if (run?.format?.link?.uri) {
+                            hyperlink = run.format.link.uri;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. HYPERLINK formula in userEnteredValue
+                if (!hyperlink && cell.userEnteredValue?.formulaValue) {
+                    const formula = cell.userEnteredValue.formulaValue;
+                    const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                    if (match) {
+                        hyperlink = match[1];
+                    }
+                }
+
+                if (hyperlink) {
                     linkMap[label.trim()] = hyperlink;
                 }
             }
