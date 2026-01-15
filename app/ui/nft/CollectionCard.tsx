@@ -10,12 +10,27 @@ interface Holder {
 }
 
 interface CollectionCardProps {
+  contractAddress: string;
   contractName: string;
   chain: string;
   description?: string;
   totalHolders: number;
   totalNFTs: number;
   holders: Holder[];
+}
+
+function getOpenSeaUrl(contractAddress: string, chain: string): string {
+  // Map chain names to OpenSea chain slugs
+  const chainMap: Record<string, string> = {
+    ethereum: 'ethereum',
+    base: 'base',
+    polygon: 'matic',
+    zora: 'zora',
+    optimism: 'optimism',
+    arbitrum: 'arbitrum',
+  };
+  const chainSlug = chainMap[chain.toLowerCase()] || chain.toLowerCase();
+  return `https://opensea.io/assets/${chainSlug}/${contractAddress}`;
 }
 
 function card(): React.CSSProperties {
@@ -55,6 +70,7 @@ function chainBadge(chain: string): React.CSSProperties {
 }
 
 export function CollectionCard({
+  contractAddress,
   contractName,
   chain,
   description,
@@ -62,6 +78,8 @@ export function CollectionCard({
   totalNFTs,
   holders,
 }: CollectionCardProps) {
+  const openSeaUrl = getOpenSeaUrl(contractAddress, chain);
+
   return (
     <div style={card()}>
       {/* Header */}
@@ -73,16 +91,20 @@ export function CollectionCard({
           marginBottom: 12,
         }}
       >
-        <h3
+        <a
+          href={openSeaUrl}
+          target="_blank"
+          rel="noopener noreferrer"
           style={{
             margin: 0,
             fontSize: 18,
             fontWeight: 600,
             color: "#111",
+            textDecoration: "none",
           }}
         >
-          {contractName}
-        </h3>
+          {contractName} ↗
+        </a>
         <span style={chainBadge(chain)}>{chain}</span>
       </div>
 

@@ -226,6 +226,7 @@ export default function NFTsPage() {
                 {data.collections.map((collection) => (
                   <CollectionCard
                     key={collection.contractAddress}
+                    contractAddress={collection.contractAddress}
                     contractName={collection.contractName}
                     chain={collection.chain}
                     description={collection.description}
