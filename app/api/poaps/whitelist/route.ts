@@ -26,13 +26,13 @@ interface WhitelistResponse {
 /**
  * Fetch POAP event details from POAP Compass API
  */
-async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
+async function fetchPOAPEventDetails(eventIds: string[]): Promise<{ events: POAPEvent[]; debugLog: string[] }> {
   const POAP_COMPASS_URL = 'https://public.compass.poap.tech/v1/graphql';
 
   // Fetch in batches of 50 to avoid query size limits
   const BATCH_SIZE = 50;
   const allEvents: POAPEvent[] = [];
-  let debugLog: string[] = [];
+  const debugLog: string[] = [];
 
   for (let i = 0; i < eventIds.length; i += BATCH_SIZE) {
     const batchIds = eventIds.slice(i, i + BATCH_SIZE);
@@ -54,7 +54,7 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
       debugLog.push(`Batch ${i / BATCH_SIZE}: status=${res.status}, len=${responseText.length}`);
 
       if (!res.ok) {
-        debugLog.push(`Error response: ${responseText.slice(0, 200)}`);
+        debugLog.push(`Error: ${responseText.slice(0, 200)}`);
         continue;
       }
 
@@ -96,8 +96,7 @@ async function fetchPOAPEventDetails(eventIds: string[]): Promise<POAPEvent[]> {
     }
   }
 
-  console.log('POAP fetch debug:', debugLog.join(' | '));
-  return allEvents;
+  return { events: allEvents, debugLog };
 }
 
 /**
@@ -144,7 +143,7 @@ export async function GET(req: Request): Promise<NextResponse<WhitelistResponse>
     }
 
     // Fetch event details
-    const events = await fetchPOAPEventDetails(eventIds);
+    const { events, debugLog } = await fetchPOAPEventDetails(eventIds);
 
     // Sort by start date descending (newest first)
     events.sort((a, b) => {
@@ -160,11 +159,14 @@ export async function GET(req: Request): Promise<NextResponse<WhitelistResponse>
       debug: {
         ...debugInfo,
         eventsReturned: events.length,
+        fetchLog: debugLog,
       },
     };
 
-    // Cache the result (without debug info)
-    await cacheSet('poap-whitelist-details', { events, totalCount: events.length, fromCache: false }, WHITELIST_DETAILS_TTL);
+    // Only cache if we got events
+    if (events.length > 0) {
+      await cacheSet('poap-whitelist-details', { events, totalCount: events.length, fromCache: false }, WHITELIST_DETAILS_TTL);
+    }
 
     return NextResponse.json(result);
   } catch (error) {
