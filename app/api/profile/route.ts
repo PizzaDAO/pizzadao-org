@@ -283,9 +283,9 @@ const POST_HANDLER = async (req: Request) => {
     }
   }
 
-  // 3) Send welcome message to Discord for NEW signups (not updates)
+  // 3) Send message to Discord for both new signups and profile updates
   let welcomeResult: unknown = null;
-  if (isNewSignup && payload.discordId) {
+  if (payload.discordId && payload.memberId) {
     welcomeResult = await sendWelcomeMessage({
       discordId: payload.discordId,
       memberId: payload.memberId,
@@ -295,9 +295,8 @@ const POST_HANDLER = async (req: Request) => {
       mafiaMovie: payload.resolvedMovieTitle || payload.mafiaMovieTitle,
       turtles: payload.turtles,
       crews: payload.crews,
+      isNewSignup,
     });
-  } else if (!isNewSignup) {
-    welcomeResult = { skipped: true, reason: "Not a new signup (member row already existed)" };
   }
 
   return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult, isNewSignup });

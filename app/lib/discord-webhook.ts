@@ -149,7 +149,7 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
 }
 
 /**
- * Send a welcome message for a new member signup
+ * Send a welcome/update message for member signup or profile update
  */
 export async function sendWelcomeMessage(opts: {
     discordId: string;
@@ -160,6 +160,7 @@ export async function sendWelcomeMessage(opts: {
     mafiaMovie?: string;
     turtles?: string[];
     crews?: string[];
+    isNewSignup?: boolean;
 }): Promise<{ ok: boolean; error?: string }> {
     try {
         const webhookUrl = await getWebhookUrl("General");
@@ -167,13 +168,16 @@ export async function sendWelcomeMessage(opts: {
             return { ok: false, error: "Could not find General webhook URL" };
         }
 
-        const { discordId, memberId, city, topping, mafiaMovie, turtles, crews } = opts;
+        const { discordId, memberId, city, topping, mafiaMovie, turtles, crews, isNewSignup = true } = opts;
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://onboarding.pizzadao.xyz";
         const profileUrl = `${baseUrl}/profile/${memberId}`;
 
-        // Build the welcome message
+        // Build the message with different greeting for new vs returning members
         const lines: string[] = [];
-        lines.push(`**Welcome to the Family, <@${discordId}>!**`);
+        const greeting = isNewSignup
+            ? `**Welcome to the Family, <@${discordId}>!**`
+            : `**Good to see you, <@${discordId}>!**`;
+        lines.push(greeting);
         lines.push(`[View Profile](${profileUrl})`);
         lines.push("");
 
