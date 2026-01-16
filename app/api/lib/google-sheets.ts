@@ -24,6 +24,11 @@ const auth = new google.auth.GoogleAuth({
 
 const sheets = google.sheets({ version: "v4", auth });
 
+// Normalize string same way as crew route's cellVal/norm
+function normalizeKey(s: string): string {
+    return String(s ?? '').trim().replace(/\s+/g, ' ');
+}
+
 // Extract rich text hyperlinks from a specific sheet
 export async function getTaskLinks(sheetId: string): Promise<Record<string, string>> {
     // Check persistent cache first
@@ -125,7 +130,7 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
                         }
 
                         if (hyperlink) {
-                            linkMap[label.trim()] = hyperlink;
+                            linkMap[normalizeKey(label)] = hyperlink;
                         }
                     }
                 }
@@ -257,7 +262,7 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
                 }
 
                 if (hyperlink) {
-                    linkMap[label.trim()] = hyperlink;
+                    linkMap[normalizeKey(label)] = hyperlink;
                 }
             }
         }
