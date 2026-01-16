@@ -109,7 +109,9 @@
       "Bash(wc:*)",
       "Bash(vercel login)",
       "Bash(vercel redeploy)",
-      "Bash(vercel --prod --yes:*)"
+      "Bash(vercel --prod --yes:*)",
+      "Bash(vercel logs:*)",
+      "Bash(vercel deploy)"
     ]
   }
 }

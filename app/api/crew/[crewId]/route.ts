@@ -2,6 +2,7 @@ import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from 'next/server'
 import { getTaskLinks, getAgendaStepLinks, getMemberTurtlesMap } from '@/app/api/lib/google-sheets'
 import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
+import { cacheDel } from '@/app/api/lib/cache'
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 
 type Params = { params: Promise<{ crewId: string }> }
@@ -280,6 +281,14 @@ export async function GET(req: Request, { params }: Params) {
     // Check for ?fresh=1 to skip cache
     const url = new URL(req.url)
     const forceRefresh = url.searchParams.get('fresh') === '1'
+
+    // Clear task-links and agenda-links caches if force refresh
+    if (forceRefresh) {
+      await Promise.all([
+        cacheDel(`task-links:${sheetId}`),
+        cacheDel(`agenda-links:${sheetId}`),
+      ])
+    }
 
     // Try to get cached data first (unless force refresh)
     type CrewSheetData = { roster: any[]; goals: any[]; tasks: any[]; agenda: any[]; callInfo: any }
