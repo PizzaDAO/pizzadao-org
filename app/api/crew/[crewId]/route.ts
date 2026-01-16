@@ -1,6 +1,6 @@
 import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from 'next/server'
-import { getTaskLinks, getAgendaStepLinks, getMemberTurtlesMap } from '@/app/api/lib/google-sheets'
+import { getTaskLinks, getTaskLinksDebug, getAgendaStepLinks, getMemberTurtlesMap, TaskLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
 import { cacheDel } from '@/app/api/lib/cache'
 import { getCrewMappings } from "@/app/lib/crew-mappings";
@@ -302,27 +302,28 @@ export async function GET(req: Request, { params }: Params) {
     }
 
     // Debug info to track link extraction
-    let debugInfo: { htmlLinkMapKeys?: string[]; htmlLinkMapSample?: Record<string, string> } | null = null
+    let debugInfo: TaskLinksDebugResult | null = null
 
     // If no cached data, fetch fresh
     if (!sheetData) {
 
       // Fetch spreadsheet data via GViz API and HTML links in parallel
       const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
-      const [sheetRes, htmlLinkMap, agendaLinkMap] = await Promise.all([
+
+      // Use debug version when debug mode is enabled
+      let htmlLinkMap: Record<string, string>
+      if (debugMode) {
+        const debugResult = await getTaskLinksDebug(sheetId)
+        debugInfo = debugResult
+        htmlLinkMap = debugResult.linkMap
+      } else {
+        htmlLinkMap = await getTaskLinks(sheetId)
+      }
+
+      const [sheetRes, agendaLinkMap] = await Promise.all([
         fetch(gvizUrl, { cache: 'no-store' }),
-        getTaskLinks(sheetId),
         getAgendaStepLinks(sheetId),
       ])
-
-      // Capture debug info about the link map
-      if (debugMode) {
-        const keys = Object.keys(htmlLinkMap)
-        debugInfo = {
-          htmlLinkMapKeys: keys,
-          htmlLinkMapSample: Object.fromEntries(keys.slice(0, 5).map(k => [k, htmlLinkMap[k]]))
-        }
-      }
       if (!sheetRes.ok) {
         throw new Error('Failed to fetch crew spreadsheet')
       }

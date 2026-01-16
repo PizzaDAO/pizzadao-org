@@ -29,6 +29,16 @@ function normalizeKey(s: string): string {
     return String(s ?? '').trim().replace(/\s+/g, ' ');
 }
 
+// Debug result type
+export interface TaskLinksDebugResult {
+    linkMap: Record<string, string>;
+    error?: string;
+    sheetsApiWorking: boolean;
+    tasksAnchorFound: boolean;
+    taskColFound: boolean;
+    rowsProcessed: number;
+}
+
 // Extract rich text hyperlinks from a specific sheet
 export async function getTaskLinks(sheetId: string): Promise<Record<string, string>> {
     // Check persistent cache first
@@ -164,6 +174,109 @@ export async function getTaskLinks(sheetId: string): Promise<Record<string, stri
         // Fallback or log
     }
     return linkMap;
+}
+
+/**
+ * Debug version of getTaskLinks that returns diagnostic info
+ */
+export async function getTaskLinksDebug(sheetId: string): Promise<TaskLinksDebugResult> {
+    const result: TaskLinksDebugResult = {
+        linkMap: {},
+        sheetsApiWorking: false,
+        tasksAnchorFound: false,
+        taskColFound: false,
+        rowsProcessed: 0,
+    };
+
+    try {
+        const res = await sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            includeGridData: true,
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
+        });
+
+        result.sheetsApiWorking = true;
+
+        const sheetData = res.data.sheets?.[0];
+        if (!sheetData?.data) {
+            result.error = 'No sheet data returned';
+            return result;
+        }
+
+        for (const grid of sheetData.data) {
+            const rows = grid.rowData;
+            if (!rows) continue;
+
+            let tasksHeaderRowIdx = -1;
+            let taskColIdx = -1;
+
+            for (let r = 0; r < rows.length; r++) {
+                const cells = rows[r].values || [];
+                for (let c = 0; c < cells.length; c++) {
+                    const val = cells[c]?.userEnteredValue?.stringValue?.toLowerCase() ||
+                        cells[c]?.formattedValue?.toLowerCase() || "";
+                    if (val === "tasks" || val === "task") {
+                        tasksHeaderRowIdx = r;
+                        result.tasksAnchorFound = true;
+                        break;
+                    }
+                }
+                if (tasksHeaderRowIdx !== -1) break;
+            }
+
+            if (tasksHeaderRowIdx === -1) continue;
+
+            for (let offset = 1; offset <= 3; offset++) {
+                const r = tasksHeaderRowIdx + offset;
+                if (r >= rows.length) break;
+                const cells = rows[r].values || [];
+                for (let c = 0; c < cells.length; c++) {
+                    const val = cells[c]?.userEnteredValue?.stringValue?.toLowerCase() ||
+                        cells[c]?.formattedValue?.toLowerCase() || "";
+                    if (val === "task") {
+                        taskColIdx = c;
+                        result.taskColFound = true;
+                        break;
+                    }
+                }
+                if (taskColIdx !== -1) break;
+            }
+
+            if (taskColIdx === -1) continue;
+
+            for (let r = tasksHeaderRowIdx + 1; r < rows.length; r++) {
+                result.rowsProcessed++;
+                const cell = rows[r].values?.[taskColIdx];
+                if (!cell) continue;
+
+                const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+                if (!label) continue;
+
+                let hyperlink = cell.hyperlink;
+                if (!hyperlink && cell.textFormatRuns) {
+                    for (const run of cell.textFormatRuns) {
+                        if (run?.format?.link?.uri) {
+                            hyperlink = run.format.link.uri;
+                            break;
+                        }
+                    }
+                }
+                if (!hyperlink && cell.userEnteredValue?.formulaValue) {
+                    const formula = cell.userEnteredValue.formulaValue;
+                    const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                    if (match) hyperlink = match[1];
+                }
+
+                if (hyperlink) {
+                    result.linkMap[normalizeKey(label)] = hyperlink;
+                }
+            }
+        }
+    } catch (error: unknown) {
+        result.error = error instanceof Error ? error.message : String(error);
+    }
+
+    return result;
 }
 
 /**
