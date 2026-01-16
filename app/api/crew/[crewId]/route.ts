@@ -278,10 +278,10 @@ export async function GET(req: Request, { params }: Params) {
       })
     }
 
-    // Check for ?fresh=1 to skip cache
+    // Check for ?fresh=1 to skip cache, ?debug=1 for diagnostics
     const url = new URL(req.url)
     const forceRefresh = url.searchParams.get('fresh') === '1'
-    const debugMode = url.searchParams.get('debug') === '1'
+    const debugMode = url.searchParams.get('debug') === '1'  // Shows Sheets API diagnostics
 
     // Clear task-links and agenda-links caches if force refresh
     if (forceRefresh) {
