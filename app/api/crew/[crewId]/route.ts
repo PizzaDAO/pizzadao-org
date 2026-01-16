@@ -281,6 +281,7 @@ export async function GET(req: Request, { params }: Params) {
     // Check for ?fresh=1 to skip cache
     const url = new URL(req.url)
     const forceRefresh = url.searchParams.get('fresh') === '1'
+    const debugMode = url.searchParams.get('debug') === '1'
 
     // Clear task-links and agenda-links caches if force refresh
     if (forceRefresh) {
@@ -300,6 +301,9 @@ export async function GET(req: Request, { params }: Params) {
       }
     }
 
+    // Debug info to track link extraction
+    let debugInfo: { htmlLinkMapKeys?: string[]; htmlLinkMapSample?: Record<string, string> } | null = null
+
     // If no cached data, fetch fresh
     if (!sheetData) {
 
@@ -310,6 +314,15 @@ export async function GET(req: Request, { params }: Params) {
         getTaskLinks(sheetId),
         getAgendaStepLinks(sheetId),
       ])
+
+      // Capture debug info about the link map
+      if (debugMode) {
+        const keys = Object.keys(htmlLinkMap)
+        debugInfo = {
+          htmlLinkMapKeys: keys,
+          htmlLinkMapSample: Object.fromEntries(keys.slice(0, 5).map(k => [k, htmlLinkMap[k]]))
+        }
+      }
       if (!sheetRes.ok) {
         throw new Error('Failed to fetch crew spreadsheet')
       }
@@ -396,6 +409,7 @@ export async function GET(req: Request, { params }: Params) {
         sheet: crew.sheet,
       },
       ...sheetData,
+      ...(debugInfo ? { _debug: debugInfo } : {}),
     })
   } catch (e: unknown) {
     return NextResponse.json(
