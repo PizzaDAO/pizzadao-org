@@ -39,6 +39,21 @@ export interface TaskLinksDebugResult {
     rowsProcessed: number;
 }
 
+// Debug result type for agenda links
+export interface AgendaLinksDebugResult {
+    linkMap: Record<string, string>;
+    error?: string;
+    sheetsApiWorking: boolean;
+    agendaAnchorFound: boolean;
+    agendaAnchorRow: number;
+    agendaAnchorValue: string;
+    stepColFound: boolean;
+    stepColRow: number;
+    detectionStrategy: 'anchor' | 'column-headers' | 'none';
+    rowsProcessed: number;
+    cellsInspected: Array<{ row: number; label: string; hyperlink: string | null }>;
+}
+
 // Extract rich text hyperlinks from a specific sheet
 export async function getTaskLinks(sheetId: string): Promise<Record<string, string>> {
     // Check persistent cache first
@@ -305,16 +320,17 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
             const rows = grid.rowData;
             if (!rows) continue;
 
-            // Find the "Agenda" section
             let agendaHeaderRowIdx = -1;
             let stepColIdx = -1;
 
+            // Strategy 1: Try to find an "Agenda" anchor first
             for (let r = 0; r < rows.length; r++) {
                 const cells = rows[r].values || [];
                 for (let c = 0; c < cells.length; c++) {
                     const val = (cells[c]?.userEnteredValue?.stringValue ||
                         cells[c]?.formattedValue || "").toLowerCase().trim();
-                    if (val === "agenda" || val === "meeting agenda") {
+                    if (val === "agenda" || val === "meeting agenda" ||
+                        val.startsWith("agenda:") || val.startsWith("meeting agenda:")) {
                         agendaHeaderRowIdx = r;
                         break;
                     }
@@ -322,30 +338,60 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
                 if (agendaHeaderRowIdx !== -1) break;
             }
 
-            if (agendaHeaderRowIdx === -1) continue;
+            // If anchor found, look for "Step" column in nearby rows
+            if (agendaHeaderRowIdx !== -1) {
+                for (let offset = 0; offset <= 3; offset++) {
+                    const r = agendaHeaderRowIdx + offset;
+                    if (r >= rows.length) break;
+                    const cells = rows[r].values || [];
+                    for (let c = 0; c < cells.length; c++) {
+                        const val = (cells[c]?.userEnteredValue?.stringValue ||
+                            cells[c]?.formattedValue || "").toLowerCase().trim();
+                        if (val === "step") {
+                            stepColIdx = c;
+                            agendaHeaderRowIdx = r;
+                            break;
+                        }
+                    }
+                    if (stepColIdx !== -1) break;
+                }
+            }
 
-            // Find "Step" column header (1-3 rows after anchor)
-            for (let offset = 0; offset <= 3; offset++) {
-                const r = agendaHeaderRowIdx + offset;
-                if (r >= rows.length) break;
-                const cells = rows[r].values || [];
-                for (let c = 0; c < cells.length; c++) {
-                    const val = (cells[c]?.userEnteredValue?.stringValue ||
-                        cells[c]?.formattedValue || "").toLowerCase().trim();
-                    if (val === "step") {
-                        stepColIdx = c;
-                        agendaHeaderRowIdx = r; // Update to actual header row
+            // Strategy 2: Fallback - find agenda by column headers (step + action/lead)
+            // This matches how the GViz parser detects agenda sections
+            if (stepColIdx === -1) {
+                for (let r = 0; r < rows.length; r++) {
+                    const cells = rows[r].values || [];
+                    const rowVals = cells.map((c: any) =>
+                        (c?.userEnteredValue?.stringValue || c?.formattedValue || "").toLowerCase().trim()
+                    );
+                    // Agenda section: has "step" and either "action" or "lead"
+                    if (rowVals.includes("step") && (rowVals.includes("action") || rowVals.includes("lead"))) {
+                        agendaHeaderRowIdx = r;
+                        stepColIdx = rowVals.indexOf("step");
                         break;
                     }
                 }
-                if (stepColIdx !== -1) break;
             }
 
             if (stepColIdx === -1) continue;
 
-            // Extract links from the Step column
+            // Extract links from the Step column (stop at next section)
             for (let r = agendaHeaderRowIdx + 1; r < rows.length; r++) {
-                const cell = rows[r].values?.[stepColIdx];
+                const cells = rows[r].values || [];
+
+                // Check if we hit another section header (Roster, Tasks, Goals)
+                const rowVals = cells.map((c: any) =>
+                    (c?.userEnteredValue?.stringValue || c?.formattedValue || "").toLowerCase().trim()
+                );
+                // Stop if this row looks like a section header
+                if ((rowVals.includes("name") && (rowVals.includes("status") || rowVals.includes("city"))) ||
+                    (rowVals.includes("task") && !rowVals.includes("step")) ||
+                    (rowVals.includes("goal") && !rowVals.includes("step"))) {
+                    break;
+                }
+
+                const cell = cells[stepColIdx];
                 if (!cell) continue;
 
                 const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
@@ -384,6 +430,174 @@ export async function getAgendaStepLinks(sheetId: string): Promise<Record<string
     } catch (error: unknown) {
     }
     return linkMap;
+}
+
+/**
+ * Debug version of getAgendaStepLinks that returns diagnostic info
+ */
+export async function getAgendaStepLinksDebug(sheetId: string): Promise<AgendaLinksDebugResult> {
+    const result: AgendaLinksDebugResult = {
+        linkMap: {},
+        sheetsApiWorking: false,
+        agendaAnchorFound: false,
+        agendaAnchorRow: -1,
+        agendaAnchorValue: '',
+        stepColFound: false,
+        stepColRow: -1,
+        detectionStrategy: 'none',
+        rowsProcessed: 0,
+        cellsInspected: [],
+    };
+
+    try {
+        const res = await sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            includeGridData: true,
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
+        });
+
+        result.sheetsApiWorking = true;
+
+        const sheetData = res.data.sheets?.[0];
+        if (!sheetData?.data) {
+            result.error = 'No sheet data returned';
+            return result;
+        }
+
+        for (const grid of sheetData.data) {
+            const rows = grid.rowData;
+            if (!rows) continue;
+
+            let agendaHeaderRowIdx = -1;
+            let stepColIdx = -1;
+
+            // Strategy 1: Try to find an "Agenda" anchor first
+            for (let r = 0; r < rows.length; r++) {
+                const cells = rows[r].values || [];
+                for (let c = 0; c < cells.length; c++) {
+                    const rawVal = cells[c]?.userEnteredValue?.stringValue ||
+                        cells[c]?.formattedValue || "";
+                    const val = rawVal.toLowerCase().trim();
+                    if (val === "agenda" || val === "meeting agenda" ||
+                        val.startsWith("agenda:") || val.startsWith("meeting agenda:")) {
+                        agendaHeaderRowIdx = r;
+                        result.agendaAnchorFound = true;
+                        result.agendaAnchorRow = r;
+                        result.agendaAnchorValue = rawVal;
+                        break;
+                    }
+                }
+                if (agendaHeaderRowIdx !== -1) break;
+            }
+
+            // If anchor found, look for "Step" column in nearby rows
+            if (agendaHeaderRowIdx !== -1) {
+                for (let offset = 0; offset <= 3; offset++) {
+                    const r = agendaHeaderRowIdx + offset;
+                    if (r >= rows.length) break;
+                    const cells = rows[r].values || [];
+                    for (let c = 0; c < cells.length; c++) {
+                        const val = (cells[c]?.userEnteredValue?.stringValue ||
+                            cells[c]?.formattedValue || "").toLowerCase().trim();
+                        if (val === "step") {
+                            stepColIdx = c;
+                            result.stepColFound = true;
+                            result.stepColRow = r;
+                            result.detectionStrategy = 'anchor';
+                            agendaHeaderRowIdx = r;
+                            break;
+                        }
+                    }
+                    if (stepColIdx !== -1) break;
+                }
+            }
+
+            // Strategy 2: Fallback - find agenda by column headers (step + action/lead)
+            if (stepColIdx === -1) {
+                for (let r = 0; r < rows.length; r++) {
+                    const cells = rows[r].values || [];
+                    const rowVals = cells.map((c: any) =>
+                        (c?.userEnteredValue?.stringValue || c?.formattedValue || "").toLowerCase().trim()
+                    );
+                    // Agenda section: has "step" and either "action" or "lead"
+                    if (rowVals.includes("step") && (rowVals.includes("action") || rowVals.includes("lead"))) {
+                        agendaHeaderRowIdx = r;
+                        stepColIdx = rowVals.indexOf("step");
+                        result.stepColFound = true;
+                        result.stepColRow = r;
+                        result.detectionStrategy = 'column-headers';
+                        break;
+                    }
+                }
+            }
+
+            if (stepColIdx === -1) {
+                result.error = 'Could not find agenda section by anchor or column headers';
+                continue;
+            }
+
+            // Extract links from the Step column (stop at next section)
+            for (let r = agendaHeaderRowIdx + 1; r < rows.length; r++) {
+                const cells = rows[r].values || [];
+
+                // Check if we hit another section header (Roster, Tasks, Goals)
+                const rowVals = cells.map((c: any) =>
+                    (c?.userEnteredValue?.stringValue || c?.formattedValue || "").toLowerCase().trim()
+                );
+                // Stop if this row looks like a section header
+                if ((rowVals.includes("name") && (rowVals.includes("status") || rowVals.includes("city"))) ||
+                    (rowVals.includes("task") && !rowVals.includes("step")) ||
+                    (rowVals.includes("goal") && !rowVals.includes("step"))) {
+                    break;
+                }
+
+                result.rowsProcessed++;
+                const cell = cells[stepColIdx];
+                if (!cell) continue;
+
+                const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+                if (!label) continue;
+
+                // Try multiple ways to get the hyperlink:
+                // 1. Direct hyperlink property (Ctrl+K links)
+                let hyperlink = cell.hyperlink;
+
+                // 2. Rich text links (textFormatRuns with link.uri)
+                if (!hyperlink && cell.textFormatRuns) {
+                    for (const run of cell.textFormatRuns) {
+                        if (run?.format?.link?.uri) {
+                            hyperlink = run.format.link.uri;
+                            break;
+                        }
+                    }
+                }
+
+                // 3. HYPERLINK formula in userEnteredValue
+                if (!hyperlink && cell.userEnteredValue?.formulaValue) {
+                    const formula = cell.userEnteredValue.formulaValue;
+                    const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                    if (match) {
+                        hyperlink = match[1];
+                    }
+                }
+
+                // Track inspected cells for debugging
+                result.cellsInspected.push({
+                    row: r,
+                    label: normalizeKey(label),
+                    hyperlink: hyperlink || null,
+                });
+
+                if (hyperlink) {
+                    result.linkMap[normalizeKey(label)] = hyperlink;
+                }
+            }
+        }
+    } catch (error: unknown) {
+        result.error = error instanceof Error ? error.message : String(error);
+    }
+
+    return result;
 }
 
 /**

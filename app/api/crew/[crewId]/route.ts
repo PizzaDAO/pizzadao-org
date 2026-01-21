@@ -1,6 +1,6 @@
 import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from 'next/server'
-import { getTaskLinks, getTaskLinksDebug, getAgendaStepLinks, getMemberTurtlesMap, TaskLinksDebugResult } from '@/app/api/lib/google-sheets'
+import { getTaskLinks, getTaskLinksDebug, getAgendaStepLinks, getAgendaStepLinksDebug, getMemberTurtlesMap, TaskLinksDebugResult, AgendaLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
 import { cacheDel } from '@/app/api/lib/cache'
 import { getCrewMappings } from "@/app/lib/crew-mappings";
@@ -302,7 +302,8 @@ export async function GET(req: Request, { params }: Params) {
     }
 
     // Debug info to track link extraction
-    let debugInfo: TaskLinksDebugResult | null = null
+    let taskDebugInfo: TaskLinksDebugResult | null = null
+    let agendaDebugInfo: AgendaLinksDebugResult | null = null
 
     // If no cached data, fetch fresh
     if (!sheetData) {
@@ -312,18 +313,24 @@ export async function GET(req: Request, { params }: Params) {
 
       // Use debug version when debug mode is enabled
       let htmlLinkMap: Record<string, string>
+      let agendaLinkMap: Record<string, string>
       if (debugMode) {
-        const debugResult = await getTaskLinksDebug(sheetId)
-        debugInfo = debugResult
-        htmlLinkMap = debugResult.linkMap
+        const [taskDebugResult, agendaDebugResult] = await Promise.all([
+          getTaskLinksDebug(sheetId),
+          getAgendaStepLinksDebug(sheetId),
+        ])
+        taskDebugInfo = taskDebugResult
+        agendaDebugInfo = agendaDebugResult
+        htmlLinkMap = taskDebugResult.linkMap
+        agendaLinkMap = agendaDebugResult.linkMap
       } else {
-        htmlLinkMap = await getTaskLinks(sheetId)
+        [htmlLinkMap, agendaLinkMap] = await Promise.all([
+          getTaskLinks(sheetId),
+          getAgendaStepLinks(sheetId),
+        ])
       }
 
-      const [sheetRes, agendaLinkMap] = await Promise.all([
-        fetch(gvizUrl, { cache: 'no-store' }),
-        getAgendaStepLinks(sheetId),
-      ])
+      const sheetRes = await fetch(gvizUrl, { cache: 'no-store' })
       if (!sheetRes.ok) {
         throw new Error('Failed to fetch crew spreadsheet')
       }
@@ -410,7 +417,7 @@ export async function GET(req: Request, { params }: Params) {
         sheet: crew.sheet,
       },
       ...sheetData,
-      ...(debugInfo ? { _debug: debugInfo } : {}),
+      ...(taskDebugInfo || agendaDebugInfo ? { _debug: { tasks: taskDebugInfo, agenda: agendaDebugInfo } } : {}),
     })
   } catch (e: unknown) {
     return NextResponse.json(
