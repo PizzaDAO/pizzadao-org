@@ -34,7 +34,8 @@ export function HolderRow({
         display: "flex",
         alignItems: "center",
         gap: 12,
-        padding: "8px 0",
+        minHeight: 44,
+        padding: "6px 0",
         borderBottom: "1px solid rgba(0,0,0,0.06)",
       }}
     >
@@ -60,6 +61,9 @@ export function HolderRow({
           fontWeight: 500,
           color: "#111",
           textDecoration: "none",
+          display: "flex",
+          alignItems: "center",
+          minHeight: 44,
         }}
       >
         {memberName}

@@ -200,12 +200,13 @@ export default function AllCrewsPage() {
     }}>
       <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
-        <div style={{ display: 'flex', gap: 12 }}>
+        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link href="/" style={{
             display: 'inline-flex',
             alignItems: 'center',
             gap: 6,
-            padding: '8px 14px',
+            padding: '10px 16px',
+            minHeight: 44,
             background: 'white',
             border: '1px solid rgba(0,0,0,0.15)',
             borderRadius: 8,
@@ -221,7 +222,8 @@ export default function AllCrewsPage() {
               display: 'inline-flex',
               alignItems: 'center',
               gap: 6,
-              padding: '8px 14px',
+              padding: '10px 16px',
+              minHeight: 44,
               background: 'white',
               border: '1px solid rgba(0,0,0,0.15)',
               borderRadius: 8,
@@ -244,7 +246,7 @@ export default function AllCrewsPage() {
         </header>
 
         {/* Crews Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(300px, 1fr))', gap: 16 }}>
+        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 16 }}>
           {crews.map((crew) => {
             const inCrew = isInCrew(crew.id)
             const isJoining = joining === crew.id
@@ -261,7 +263,7 @@ export default function AllCrewsPage() {
                       {crew.emoji && `${crew.emoji} `}{crew.label}
                     </h2>
                     {(crew.callTime || crew.callLength) && (
-                      <p style={{ fontSize: 13, opacity: 0.7, margin: '8px 0 0' }}>
+                      <p style={{ fontSize: 14, opacity: 0.7, margin: '8px 0 0' }}>
                         {crew.callTime && (
                           crew.callTimeUrl ? (
                             <a href={crew.callTimeUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
@@ -339,7 +341,7 @@ export default function AllCrewsPage() {
                 {/* Tasks Section */}
                 {crew.tasks && crew.tasks.length > 0 && (
                   <div style={{ marginTop: 16, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12 }}>
-                    <div style={{ fontSize: 11, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
                       Top Tasks
                     </div>
                     <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -347,9 +349,9 @@ export default function AllCrewsPage() {
                         <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
                           {task.priority && (
                             <span style={{
-                              fontSize: 10,
+                              fontSize: 11,
                               fontWeight: 600,
-                              padding: '2px 6px',
+                              padding: '3px 8px',
                               borderRadius: 4,
                               background: task.priority === 'Top' ? '#fee2e2' :
                                          task.priority === 'High' ? '#fef3c7' :
@@ -367,18 +369,18 @@ export default function AllCrewsPage() {
                               href={task.url}
                               target="_blank"
                               rel="noreferrer"
-                              style={{ fontSize: 13, color: '#2563eb', textDecoration: 'none', lineHeight: 1.3 }}
+                              style={{ fontSize: 14, color: '#2563eb', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
                             >
                               {task.label}
                             </a>
                           ) : (
-                            <span style={{ fontSize: 13, color: '#374151', lineHeight: 1.3 }}>{task.label}</span>
+                            <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>{task.label}</span>
                           )}
                         </div>
                       ))}
                     </div>
                     {(crew.taskCount ?? 0) > 3 && (
-                      <div style={{ fontSize: 12, color: '#6b7280', marginTop: 8 }}>
+                      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
                         +{(crew.taskCount ?? 0) - 3} more tasks
                       </div>
                     )}
@@ -391,11 +393,13 @@ export default function AllCrewsPage() {
                     target="_blank"
                     rel="noreferrer"
                     style={{
-                      display: 'block',
+                      display: 'inline-flex',
+                      alignItems: 'center',
                       marginTop: 10,
-                      fontSize: 13,
+                      fontSize: 14,
                       opacity: 0.6,
                       textDecoration: 'none',
+                      minHeight: 44,
                     }}
                   >
                     Open sheet ↗
@@ -439,8 +443,11 @@ function card(): React.CSSProperties {
 
 function btn(kind: 'primary' | 'secondary'): React.CSSProperties {
   const base: React.CSSProperties = {
-    display: 'inline-block',
-    padding: '10px 16px',
+    display: 'inline-flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+    padding: '12px 16px',
+    minHeight: 44,
     borderRadius: 10,
     border: '1px solid rgba(0,0,0,0.18)',
     fontWeight: 650,

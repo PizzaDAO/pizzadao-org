@@ -206,7 +206,9 @@ export default function POAPsPage() {
               color: "#666",
               textDecoration: "none",
               marginBottom: 8,
-              display: "inline-block",
+              display: "inline-flex",
+              alignItems: "center",
+              minHeight: 44,
             }}
           >
             ← Back to Home
@@ -280,7 +282,8 @@ export default function POAPsPage() {
             <button
               onClick={() => window.location.reload()}
               style={{
-                padding: "10px 20px",
+                padding: "12px 20px",
+                minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
                 color: "white",

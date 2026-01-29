@@ -100,7 +100,9 @@ export default function NFTsPage() {
                 color: "#666",
                 textDecoration: "none",
                 marginBottom: 8,
-                display: "inline-block",
+                display: "inline-flex",
+                alignItems: "center",
+                minHeight: 44,
               }}
             >
               &larr; Back to Home
@@ -134,7 +136,8 @@ export default function NFTsPage() {
               onClick={handleRefresh}
               disabled={refreshing || loading}
               style={{
-                padding: "8px 16px",
+                padding: "10px 16px",
+                minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
                 color: refreshing ? "#999" : "#333",
@@ -184,7 +187,8 @@ export default function NFTsPage() {
             <button
               onClick={fetchData}
               style={{
-                padding: "10px 20px",
+                padding: "12px 20px",
+                minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
                 color: "white",

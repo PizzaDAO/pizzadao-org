@@ -101,6 +101,9 @@ export function CollectionCard({
             fontWeight: 600,
             color: "#111",
             textDecoration: "none",
+            display: "inline-flex",
+            alignItems: "center",
+            minHeight: 44,
           }}
         >
           {contractName} ↗

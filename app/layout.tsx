@@ -30,19 +30,19 @@ export default function RootLayout({
       >
         <Providers>{children}</Providers>
         {/* GitHub and Google Sheets Links - Fixed Bottom Right */}
-        <div className="fixed bottom-4 right-4 flex items-center gap-3">
+        <div className="fixed bottom-4 right-4 flex items-center gap-2">
           {/* Google Sheets Link */}
           <a
             href="https://docs.google.com/spreadsheets/d/1bRTR85CDHbTAsTG6sVi1jv6H-WjLyf-yvOerLCqeY2Q/edit?gid=0#gid=0"
             target="_blank"
             rel="noopener noreferrer"
-            className="google-sheets-link"
+            className="google-sheets-link min-w-[44px] min-h-[44px] flex items-center justify-center"
             title="View Google Sheets"
           >
             <img
               src="https://cdn.simpleicons.org/googlesheets/000000"
               alt="Google Sheets"
-              className="w-8 h-8 filter"
+              className="w-6 h-6"
             />
           </a>
 
@@ -51,7 +51,7 @@ export default function RootLayout({
             href="https://github.com/PizzaDAO/onboarding"
             target="_blank"
             rel="noopener noreferrer"
-            className="github-link"
+            className="github-link min-w-[44px] min-h-[44px] flex items-center justify-center"
             title="View on GitHub"
           >
             <svg

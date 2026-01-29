@@ -52,7 +52,8 @@ export function HolderLeaderboard({
           onClick={() => setExpanded(!expanded)}
           style={{
             marginTop: 12,
-            padding: "8px 16px",
+            padding: "12px 16px",
+            minHeight: 44,
             fontSize: 14,
             fontWeight: 500,
             color: "#666",
