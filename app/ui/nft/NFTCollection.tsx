@@ -28,7 +28,20 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [walletSaved, setWalletSaved] = useState(false);
+  const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const { address, isConnected } = useAccount();
+
+  const toggleGroup = useCallback((groupKey: string) => {
+    setExpandedGroups(prev => {
+      const next = new Set(prev);
+      if (next.has(groupKey)) {
+        next.delete(groupKey);
+      } else {
+        next.add(groupKey);
+      }
+      return next;
+    });
+  }, []);
 
   const fetchNFTs = useCallback(async () => {
     setLoading(true);
@@ -279,37 +292,85 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
           gap: 10,
         }}
       >
-        {groupedNFTs.map((group) => (
-          <React.Fragment key={`${group.chain}:${group.contract}`}>
-            {group.displayNfts.map((nft, idx) => (
-              <NFTCard
-                key={`${nft.contractAddress}-${nft.tokenId}`}
-                nft={nft}
-                size="small"
-              />
-            ))}
-            {group.overflow > 0 && (
-              <div
-                style={{
-                  width: 80,
-                  height: 80,
-                  borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.12)",
-                  background: "#f5f5f5",
-                  display: "flex",
-                  alignItems: "center",
-                  justifyContent: "center",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  color: "#666",
-                }}
-                title={`${group.overflow} more ${group.contractName}`}
-              >
-                +{group.overflow}
-              </div>
-            )}
-          </React.Fragment>
-        ))}
+        {groupedNFTs.map((group) => {
+          const groupKey = `${group.chain}:${group.contract}`;
+          const isExpanded = expandedGroups.has(groupKey);
+          const nftsToShow = isExpanded ? group.nfts : group.displayNfts;
+
+          return (
+            <React.Fragment key={groupKey}>
+              {nftsToShow.map((nft) => (
+                <NFTCard
+                  key={`${nft.contractAddress}-${nft.tokenId}`}
+                  nft={nft}
+                  size="small"
+                />
+              ))}
+              {group.overflow > 0 && !isExpanded && (
+                <button
+                  onClick={() => toggleGroup(groupKey)}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 12,
+                    border: "2px dashed rgba(0,0,0,0.2)",
+                    background: "#f5f5f5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 14,
+                    fontWeight: 600,
+                    color: "#666",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "#f59e0b";
+                    e.currentTarget.style.background = "#fef3c7";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.2)";
+                    e.currentTarget.style.background = "#f5f5f5";
+                  }}
+                  title={`Show ${group.overflow} more ${group.contractName}`}
+                >
+                  +{group.overflow}
+                </button>
+              )}
+              {group.overflow > 0 && isExpanded && (
+                <button
+                  onClick={() => toggleGroup(groupKey)}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 12,
+                    border: "2px solid rgba(0,0,0,0.15)",
+                    background: "#e5e5e5",
+                    display: "flex",
+                    alignItems: "center",
+                    justifyContent: "center",
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: "#666",
+                    cursor: "pointer",
+                    transition: "all 0.2s ease",
+                  }}
+                  onMouseEnter={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.3)";
+                    e.currentTarget.style.background = "#d5d5d5";
+                  }}
+                  onMouseLeave={(e) => {
+                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.15)";
+                    e.currentTarget.style.background = "#e5e5e5";
+                  }}
+                  title="Show less"
+                >
+                  −
+                </button>
+              )}
+            </React.Fragment>
+          );
+        })}
       </div>
     </div>
   );
