@@ -47,6 +47,7 @@ type CrewData = {
   tasks: Array<{
     priority: string
     stage: string
+    goal?: string
     task: string
     dueDate?: string
     lead?: string
@@ -106,9 +107,10 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
     agenda: false,
     goals: false,
     myTasks: false, // My Tasks expanded by default
-    topTasks: false,
+    topTasks: false, // Top Tasks expanded by default
     otherTasks: true, // Other Tasks collapsed by default
     manuals: false,
+    // Goal sections (goal_0, goal_1, etc.) default to collapsed (handled via ?? true)
   })
   const [showLaterTasks, setShowLaterTasks] = useState(false)
   const [claimingTask, setClaimingTask] = useState<string | null>(null)
@@ -714,17 +716,38 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
         {tasks.length > 0 && (() => {
           const isTopPriority = (p: string) => {
             const lower = p?.toLowerCase() || ''
-            return lower.includes('0.') || lower.includes('top') || lower.includes('1.') || lower.includes('high')
+            return lower.includes('0.') || lower.includes('top')
           }
           const isLater = (t: typeof tasks[0]) => t.stage?.toLowerCase().includes('later')
           const isMyTask = (t: typeof tasks[0]) => user && t.leadId === user.memberId
 
           // My tasks (user is the lead) - shown at top
           const myTasks = tasks.filter(t => isMyTask(t))
-          // Other task categories exclude my tasks
-          const topTasks = tasks.filter(t => isTopPriority(t.priority) && !isLater(t) && !isMyTask(t))
-          const laterTasks = tasks.filter(t => isLater(t) && !isTopPriority(t.priority) && !isMyTask(t))
-          const otherTasks = tasks.filter(t => !isTopPriority(t.priority) && !isLater(t) && !isMyTask(t))
+
+          // Top priority tasks (excluding my tasks and later tasks)
+          const topTasks = tasks.filter(t => isTopPriority(t.priority) && !isMyTask(t) && !isLater(t))
+
+          // Group remaining tasks by goal (excluding my tasks, top tasks, and later tasks)
+          const tasksByGoal = new Map<string, typeof tasks>()
+          const ungroupedTasks: typeof tasks = []
+          const laterTasks: typeof tasks = []
+
+          tasks.filter(t => !isMyTask(t) && !isTopPriority(t.priority)).forEach(task => {
+            if (isLater(task)) {
+              laterTasks.push(task)
+            } else if (task.goal && task.goal.trim()) {
+              const goalKey = task.goal.trim()
+              if (!tasksByGoal.has(goalKey)) {
+                tasksByGoal.set(goalKey, [])
+              }
+              tasksByGoal.get(goalKey)!.push(task)
+            } else {
+              ungroupedTasks.push(task)
+            }
+          })
+
+          // Get sorted goal names for consistent ordering
+          const goalNames = Array.from(tasksByGoal.keys()).sort()
 
           const renderTaskCard = (task: typeof tasks[0], i: number) => {
             const needsLead = !task.lead || task.lead === '#N/A' || task.lead.trim() === ''
@@ -857,18 +880,41 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 </>
               )}
 
-              {(otherTasks.length > 0 || laterTasks.length > 0) && (
+              {/* Goal-based sections */}
+              {goalNames.map((goalName, goalIndex) => {
+                const goalTasks = tasksByGoal.get(goalName)!
+                const sectionKey = `goal_${goalIndex}`
+                const isCollapsed = collapsedSections[sectionKey as keyof typeof collapsedSections] ?? true
+
+                return (
+                  <div key={goalName}>
+                    <h3
+                      onClick={() => toggleSection(sectionKey)}
+                      style={collapsibleHeader('#1565c0')}
+                    >
+                      <span>{isCollapsed ? '▶' : '▼'} {goalName} ({goalTasks.length})</span>
+                    </h3>
+                    {!isCollapsed && (
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                        {goalTasks.map(renderTaskCard)}
+                      </div>
+                    )}
+                  </div>
+                )
+              })}
+
+              {(ungroupedTasks.length > 0 || laterTasks.length > 0) && (
                 <>
                   <h3
                     onClick={() => toggleSection('otherTasks')}
                     style={collapsibleHeader('#757575')}
                   >
-                    <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({otherTasks.length + (showLaterTasks ? laterTasks.length : 0)})</span>
+                    <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({ungroupedTasks.length + (showLaterTasks ? laterTasks.length : 0)})</span>
                   </h3>
                   {!collapsedSections.otherTasks && (
                     <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-                        {otherTasks.map(renderTaskCard)}
+                        {ungroupedTasks.map(renderTaskCard)}
                         {showLaterTasks && laterTasks.map(renderTaskCard)}
                       </div>
                       {laterTasks.length > 0 && (

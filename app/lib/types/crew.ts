@@ -24,6 +24,7 @@ export interface CrewGoal {
 export interface CrewTask {
   priority: string;
   stage: string;
+  goal: string;
   task: string;
   url: string | null;
   dueDate: string;

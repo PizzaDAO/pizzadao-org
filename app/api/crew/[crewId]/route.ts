@@ -170,6 +170,7 @@ function parseTasks(rows: any[], headerIdx: number, headers: string[], htmlLinkM
     tasks.push({
       priority: cellVal(cells[headerMap.get('priority') ?? -1]),
       stage: cellVal(cells[headerMap.get('stage') ?? -1]),
+      goal: cellVal(cells[headerMap.get('goal') ?? -1]),
       task,
       url,
       dueDate: cellVal(cells[headerMap.get('due') ?? headerMap.get('due date') ?? headerMap.get('duedate') ?? -1]),
