@@ -63,6 +63,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const [editingSkills, setEditingSkills] = useState(false);
     const [skillsInput, setSkillsInput] = useState("");
     const [skillsSaving, setSkillsSaving] = useState(false);
+    const [editingOrgs, setEditingOrgs] = useState(false);
+    const [orgsInput, setOrgsInput] = useState("");
+    const [orgsSaving, setOrgsSaving] = useState(false);
     const [pepBalance, setPepBalance] = useState<number | null>(null);
     const [showSendModal, setShowSendModal] = useState(false);
 
@@ -265,8 +268,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const crewsStr = data["Crews"] || "None";
     const discord = data["DiscordID"] || data["Discord"] || "Not linked";
     const status = data["Status"] || data["Frequency"] || "No status";
-    const orgs = data["Affiliation"] || data["Orgs"] || "None";
-    const skills = data["Specialties"] || data["Skills"] || "None";
+    const orgs = data["Orgs"] || "None";
+    const skills = data["Skills"] || "None";
     const telegram = data["Telegram"] || "Not linked";
 
     // Parse turtles
@@ -416,7 +419,112 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         </div>
                         <StatItem label="City" value={city} />
                         <StatItem label="Status" value={status} />
-                        <StatItem label="Orgs" value={orgs} />
+                        {/* Orgs with edit button */}
+                        <div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                                <h3 style={{
+                                    fontSize: 12,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "1px",
+                                    opacity: 0.5,
+                                    margin: 0,
+                                    fontWeight: 700
+                                }}>
+                                    Orgs
+                                </h3>
+                                {!editingOrgs && (
+                                    <button
+                                        onClick={() => {
+                                            setOrgsInput(orgs === "None" ? "" : orgs);
+                                            setEditingOrgs(true);
+                                        }}
+                                        style={{
+                                            background: "transparent",
+                                            border: "none",
+                                            cursor: "pointer",
+                                            opacity: 0.4,
+                                            padding: 0,
+                                            display: "flex",
+                                            alignItems: "center"
+                                        }}
+                                        title="Edit orgs"
+                                    >
+                                        <Pencil size={12} />
+                                    </button>
+                                )}
+                            </div>
+                            {editingOrgs ? (
+                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                    <textarea
+                                        value={orgsInput}
+                                        onChange={(e) => setOrgsInput(e.target.value)}
+                                        placeholder="Enter your orgs (comma separated)"
+                                        style={{
+                                            padding: 8,
+                                            borderRadius: 6,
+                                            border: "1px solid rgba(0,0,0,0.2)",
+                                            fontSize: 14,
+                                            fontFamily: "inherit",
+                                            resize: "vertical",
+                                            minHeight: 60
+                                        }}
+                                    />
+                                    <div style={{ display: "flex", gap: 8 }}>
+                                        <button
+                                            onClick={async () => {
+                                                setOrgsSaving(true);
+                                                try {
+                                                    const res = await fetch("/api/update-orgs", {
+                                                        method: "POST",
+                                                        headers: { "Content-Type": "application/json" },
+                                                        body: JSON.stringify({ memberId: idValue, orgs: orgsInput })
+                                                    });
+                                                    if (res.ok) {
+                                                        setData({ ...data, Orgs: orgsInput });
+                                                        setEditingOrgs(false);
+                                                    } else {
+                                                        const err = await res.json();
+                                                        alert(err.error || "Failed to save");
+                                                    }
+                                                } catch (e) {
+                                                    alert("Failed to save orgs");
+                                                } finally {
+                                                    setOrgsSaving(false);
+                                                }
+                                            }}
+                                            disabled={orgsSaving}
+                                            style={{
+                                                ...btn("primary"),
+                                                fontSize: 12,
+                                                padding: "6px 12px"
+                                            }}
+                                        >
+                                            {orgsSaving ? "Saving..." : "Save"}
+                                        </button>
+                                        <button
+                                            onClick={() => setEditingOrgs(false)}
+                                            style={{
+                                                ...btn("secondary"),
+                                                fontSize: 12,
+                                                padding: "6px 12px"
+                                            }}
+                                        >
+                                            Cancel
+                                        </button>
+                                    </div>
+                                </div>
+                            ) : (
+                                <p style={{
+                                    fontSize: 18,
+                                    fontWeight: 500,
+                                    color: "#111",
+                                    margin: 0,
+                                    wordBreak: "break-word"
+                                }}>
+                                    {orgs}
+                                </p>
+                            )}
+                        </div>
                         {/* Skills with edit button */}
                         <div>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
@@ -478,7 +586,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                         body: JSON.stringify({ memberId: idValue, skills: skillsInput })
                                                     });
                                                     if (res.ok) {
-                                                        setData({ ...data, Specialties: skillsInput, Skills: skillsInput });
+                                                        setData({ ...data, Skills: skillsInput });
                                                         setEditingSkills(false);
                                                     } else {
                                                         const err = await res.json();
