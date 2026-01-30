@@ -116,7 +116,11 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   const [claimingTask, setClaimingTask] = useState<string | null>(null)
 
   const toggleSection = (section: string) => {
-    setCollapsedSections(prev => ({ ...prev, [section]: !prev[section] }))
+    setCollapsedSections(prev => {
+      // Goal sections (goal_0, goal_1, etc.) default to collapsed (true)
+      const currentValue = prev[section] ?? (section.startsWith('goal_') ? true : false)
+      return { ...prev, [section]: !currentValue }
+    })
   }
 
   // Fetch crew data
