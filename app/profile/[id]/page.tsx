@@ -291,8 +291,29 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             </div>
 
                             {(() => {
+                                // Roles to hide from profile display (administrative/verification roles)
+                                const hiddenRoles = new Set([
+                                    "pockets checked",
+                                    "verified",
+                                    "server booster",
+                                    "nitro booster",
+                                    "@everyone",
+                                    "everyone",
+                                    "member",
+                                    "new member",
+                                    "pizza noob",
+                                ]);
                                 const otherRoles = turtleList.filter((tName: string) => {
-                                    return !TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
+                                    const nameLower = tName.toLowerCase();
+                                    // Exclude core turtle roles
+                                    if (TURTLES.find(t => t.id.toLowerCase() === nameLower || t.label.toLowerCase() === nameLower)) {
+                                        return false;
+                                    }
+                                    // Exclude hidden/unimportant roles
+                                    if (hiddenRoles.has(nameLower)) {
+                                        return false;
+                                    }
+                                    return true;
                                 });
                                 if (otherRoles.length === 0) return null;
                                 return (
