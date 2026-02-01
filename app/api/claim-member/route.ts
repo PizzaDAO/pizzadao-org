@@ -4,6 +4,8 @@ import { fetchWithRedirect, findColumnIndex } from "@/app/lib/sheet-utils";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
+import { syncDiscordMember } from "@/app/lib/services/discord-api";
+import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 
 export const runtime = "nodejs";
 
@@ -85,6 +87,26 @@ async function fetchMemberData(id: string) {
     (data as any).__existingDiscordId = existingDiscord;
 
     return data;
+}
+
+/**
+ * Resolve turtle name to Discord role ID.
+ * Handles various key formats in TURTLE_ROLE_IDS.
+ */
+function resolveTurtleRoleId(turtleName: string): string | null {
+    const raw = String(turtleName ?? "").trim();
+    if (!raw) return null;
+
+    const upper = raw.toUpperCase();
+    const upperUnderscore = raw.toUpperCase().replace(/\s+/g, "_");
+
+    const turtleRoleIdsRecord = TURTLE_ROLE_IDS as Record<string, unknown>;
+    const candidates = [
+        TURTLE_ROLE_IDS[upper as keyof typeof TURTLE_ROLE_IDS],
+        turtleRoleIdsRecord[upperUnderscore],
+    ].filter(Boolean);
+
+    return candidates.length ? String(candidates[0]) : null;
 }
 
 export async function POST(req: Request) {
@@ -192,6 +214,30 @@ export async function POST(req: Request) {
             );
         }
 
+        // Sync turtle roles to Discord
+        let discordResult: unknown = null;
+        const guildId = process.env.DISCORD_GUILD_ID;
+        const botToken = process.env.DISCORD_BOT_TOKEN;
+
+        if (guildId && botToken && sessionDiscordId) {
+            const turtleRoleIds = mergedTurtles
+                .map((t) => resolveTurtleRoleId(t))
+                .filter(Boolean) as string[];
+
+            try {
+                discordResult = await syncDiscordMember({
+                    guildId,
+                    botToken,
+                    userId: sessionDiscordId,
+                    turtleRoleIds,
+                    crewRoleIds: [], // Claim doesn't set crews
+                });
+            } catch (e: unknown) {
+                // Log but don't fail - sheet update succeeded
+                console.error("Discord sync failed:", (e as any)?.message);
+                discordResult = { ok: false, error: (e as any)?.message };
+            }
+        }
 
         // Create voting identity for the user (fire-and-forget, don't block on failure)
         try {
@@ -213,7 +259,7 @@ export async function POST(req: Request) {
             // Don't fail the claim if identity creation fails
         }
 
-        return NextResponse.json({ ok: true });
+        return NextResponse.json({ ok: true, discord: discordResult });
     } catch (e: unknown) {
         return NextResponse.json({ error: (e as any)?.message || "Unknown error" }, { status: 500 });
     }
