@@ -674,7 +674,8 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
                 }
 
                 if (label && hyperlink) {
-                    linkMap[label.trim()] = hyperlink;
+                    // Use normalizeKey for consistent matching with API routes
+                    linkMap[normalizeKey(label)] = hyperlink;
                 }
             }
         }

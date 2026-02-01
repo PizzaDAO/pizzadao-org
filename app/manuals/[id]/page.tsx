@@ -47,6 +47,7 @@ export default function ManualDetailPage() {
 
   const [manual, setManual] = useState<Manual | null>(null);
   const [content, setContent] = useState<string | null>(null);
+  const [contentError, setContentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -63,6 +64,7 @@ export default function ManualDetailPage() {
         const data = await res.json();
         setManual(data.manual);
         setContent(data.content);
+        setContentError(data.contentError || null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
       } finally {
@@ -236,10 +238,28 @@ export default function ManualDetailPage() {
                     padding: 40,
                     textAlign: "center",
                     color: "#666",
+                    background: "#fafafa",
+                    borderRadius: 8,
                   }}
                 >
-                  <p style={{ marginBottom: 16 }}>
-                    Unable to load document content.
+                  <div style={{
+                    fontSize: 48,
+                    marginBottom: 16,
+                    opacity: 0.5,
+                  }}>
+                    {contentError?.includes('private') ? '🔒' :
+                     contentError?.includes('not found') ? '🔍' :
+                     contentError?.includes('empty') ? '📄' : '⚠️'}
+                  </div>
+                  <p style={{ marginBottom: 8, fontWeight: 500, color: "#333" }}>
+                    {contentError?.includes('private') ? 'Private Document' :
+                     contentError?.includes('not found') ? 'Document Not Found' :
+                     contentError?.includes('empty') ? 'Empty Document' :
+                     contentError?.includes('No Google Doc link') ? 'No Document Link' :
+                     'Unable to Load Content'}
+                  </p>
+                  <p style={{ marginBottom: 20, fontSize: 14, maxWidth: 400, margin: "0 auto 20px" }}>
+                    {contentError || "The document content could not be loaded."}
                   </p>
                   {manual.url && (
                     <a
@@ -257,8 +277,13 @@ export default function ManualDetailPage() {
                         textDecoration: "none",
                       }}
                     >
-                      View in Google Docs
+                      Open in Google Docs
                     </a>
+                  )}
+                  {!manual.url && manual.status?.toLowerCase() === 'needed' && (
+                    <p style={{ fontSize: 13, color: "#888", marginTop: 12 }}>
+                      This manual needs to be written. Check with the crew lead.
+                    </p>
                   )}
                 </div>
               )}

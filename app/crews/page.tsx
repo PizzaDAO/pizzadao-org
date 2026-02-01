@@ -235,6 +235,22 @@ export default function AllCrewsPage() {
               My Dashboard
             </Link>
           )}
+          <Link href="/manuals" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '10px 16px',
+            minHeight: 44,
+            background: '#eab308',
+            border: '1px solid #ca8a04',
+            borderRadius: 8,
+            color: '#000',
+            textDecoration: 'none',
+            fontSize: 14,
+            fontWeight: 600,
+          }}>
+            Browse All Manuals
+          </Link>
         </div>
 
         {/* Header */}

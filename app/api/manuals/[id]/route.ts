@@ -108,6 +108,7 @@ export async function GET(
     const docId = extractDocId(manual.url)
 
     let content: string | null = null
+    let contentError: string | null = null
 
     if (docId) {
       try {
@@ -118,14 +119,30 @@ export async function GET(
         if (docRes.ok) {
           const rawHtml = await docRes.text()
           content = cleanGoogleDocsHtml(rawHtml)
+          // Check if content is meaningful (not just empty or whitespace)
+          if (!content || content.trim().length < 10) {
+            content = null
+            contentError = 'Document appears to be empty'
+          }
+        } else if (docRes.status === 401 || docRes.status === 403) {
+          contentError = 'This document is private. Please ask the document owner to share it with "Anyone with the link".'
+        } else if (docRes.status === 404) {
+          contentError = 'Document not found. The link may be broken or the document may have been deleted.'
+        } else {
+          contentError = `Failed to load document (status: ${docRes.status})`
         }
       } catch (e) {
-        // If we can't fetch the doc, just return null content
+        // If we can't fetch the doc, provide helpful error message
         console.error('Failed to fetch Google Doc:', e)
+        contentError = 'Unable to connect to Google Docs. Please try again later.'
       }
+    } else if (manual.url) {
+      contentError = 'Could not parse Google Doc link. The URL format may not be recognized.'
+    } else {
+      contentError = 'No Google Doc link is available for this manual.'
     }
 
-    return NextResponse.json({ manual, content })
+    return NextResponse.json({ manual, content, contentError })
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to load manual' },
