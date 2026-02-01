@@ -4,14 +4,14 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-// Use faster timeout for OpenAI calls
+// OpenAI client with reasonable timeout (gpt-4o-mini typically responds in 1-3s)
 const openai = new OpenAI({
   apiKey: process.env.OPENAI_API_KEY,
-  timeout: 2500, // 2.5s timeout for OpenAI calls
+  timeout: 8000, // 8s timeout for OpenAI calls (generous buffer)
 });
 
-// Overall request timeout (3 seconds max)
-const REQUEST_TIMEOUT_MS = 3000;
+// Overall request timeout (10 seconds max - allows for TMDB + OpenAI calls)
+const REQUEST_TIMEOUT_MS = 10000;
 
 type TMDBSearchResult = {
   id: number;
@@ -607,17 +607,8 @@ export async function POST(req: Request) {
       return NextResponse.json({ ...payload, deduped: true });
     }
 
-    // Streamlined prompt for faster generation
-    const system = `Generate mafia-style pizza nicknames. Output JSON only.
-
-Rules:
-- Each name = exactly 2 parts: TOPPING + NAME_PHRASE
-- Valid: "<TOPPING> <LASTNAME>" or "<FIRSTNAME> <TOPPING>"
-- Use cast/director names from the provided list
-- Preserve capitalization (e.g. "De Niro", "LaBeouf")
-- NO excluded names
-
-Return: {"suggestions":["name1","name2","name3"],"candidatePool":["...50 items..."]}`;
+    // Ultra-streamlined prompt for fastest generation
+    const system = `Pizza nicknames: TOPPING+LASTNAME or FIRSTNAME+TOPPING. Use cast names. JSON only: {"suggestions":["n1","n2","n3"],"candidatePool":["...30 names..."]}`;
 
     // ✅ Only ONE OpenAI call per request (prevents single-click consuming multiple RPM).
     const job = (async () => {
@@ -644,7 +635,7 @@ Return: {"suggestions":["name1","name2","name3"],"candidatePool":["...50 items..
             { role: "user", content: JSON.stringify(promptObj) },
           ],
           text: { format: { type: "json_object" } },
-          max_output_tokens: 800, // Reduced for speed
+          max_output_tokens: 500, // Minimal for speed - we only need ~30 names
         })
       );
 
@@ -666,7 +657,7 @@ Return: {"suggestions":["name1","name2","name3"],"candidatePool":["...50 items..
       const fresh = reranked.filter((n) => !excludeSet.has(n.trim().toLowerCase()));
 
       const finalSuggestions = fresh.slice(0, 3);
-      const finalPool = fresh.slice(0, 50); // Reduced pool size for speed
+      const finalPool = fresh.slice(0, 30); // Reduced pool size for speed
 
       if (finalSuggestions.length < 3) {
         throw new Error(
