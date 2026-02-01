@@ -135,18 +135,6 @@ export function NameStep({
         </Field>
       </div>
 
-      <Field label="Vibe">
-        <select
-          value={style}
-          onChange={(e) => onChange({ style: e.target.value as "balanced" | "serious" | "goofy" })}
-          style={input()}
-        >
-          <option value="balanced">Balanced</option>
-          <option value="serious">Serious</option>
-          <option value="goofy">Goofy</option>
-        </select>
-      </Field>
-
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button
           onClick={() => onGenerate(false)}

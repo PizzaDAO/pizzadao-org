@@ -4,7 +4,14 @@ import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+// Use faster timeout for OpenAI calls
+const openai = new OpenAI({
+  apiKey: process.env.OPENAI_API_KEY,
+  timeout: 2500, // 2.5s timeout for OpenAI calls
+});
+
+// Overall request timeout (3 seconds max)
+const REQUEST_TIMEOUT_MS = 3000;
 
 type TMDBSearchResult = {
   id: number;
@@ -145,7 +152,7 @@ function detectFirstNamePhrase(fullName: string): string {
   return parts[0];
 }
 
-async function tmdbFetch(path: string, params: Record<string, string>) {
+async function tmdbFetch(path: string, params: Record<string, string>, signal?: AbortSignal) {
   const key = process.env.TMDB_API_KEY;
   if (!key) throw new Error("Missing TMDB_API_KEY");
 
@@ -155,6 +162,7 @@ async function tmdbFetch(path: string, params: Record<string, string>) {
 
   const res = await fetch(url.toString(), {
     headers: { Accept: "application/json" },
+    signal,
   });
 
   if (!res.ok) throw new Error(`TMDB error ${res.status} for ${path}`);
@@ -384,13 +392,17 @@ function buildFilterAndReranker(
 }
 
 export async function POST(req: Request) {
+  // Create abort controller for overall timeout
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), REQUEST_TIMEOUT_MS);
+
   try {
     const body = await req.json();
 
     const toppingRaw = clampStr(body.topping, 80);
     const mafiaMovieTitle = clampStr(body.movieTitle, 120);
-    const style: "balanced" | "serious" | "goofy" =
-      body.style === "serious" || body.style === "goofy" ? body.style : "balanced";
+    // Always use "balanced" style (vibe dropdown removed)
+    const style: "balanced" | "serious" | "goofy" = "balanced";
 
     const force = body?.force === true;
 
@@ -400,6 +412,7 @@ export async function POST(req: Request) {
     );
 
     if (!toppingRaw || !mafiaMovieTitle) {
+      clearTimeout(timeoutId);
       return NextResponse.json({ error: "Provide topping and movieTitle." }, { status: 400 });
     }
 
@@ -410,7 +423,7 @@ export async function POST(req: Request) {
       query: mafiaMovieTitle,
       include_adult: "false",
       language: "en-US",
-    });
+    }, abortController.signal);
 
     // Filter to only movies and TV shows (exclude person results)
     const results: TMDBMultiSearchResult[] = (Array.isArray(search?.results) ? search.results : [])
@@ -501,6 +514,7 @@ export async function POST(req: Request) {
     const best = ranked[0];
 
     if (!best?.id) {
+      clearTimeout(timeoutId);
       return NextResponse.json({ error: `No movie or TV show found for "${mafiaMovieTitle}"` }, { status: 404 });
     }
 
@@ -510,18 +524,21 @@ export async function POST(req: Request) {
     const releaseDate = getReleaseDate(best) ?? "";
 
     // Cache only for non-force calls (Generate). Regenerate uses force:true so it always changes.
-    // Bump cache version so old behavior won't hit (v10 for TV show support).
-    const cacheKey = `v10|${mediaId}|${mediaType}|${toppingPhrase}|${style}`;
+    // Bump cache version so old behavior won't hit (v11 for fixed style).
+    const cacheKey = `v11|${mediaId}|${mediaType}|${toppingPhrase}`;
     if (!force) {
       const cached = cacheGet(cacheKey);
-      if (cached) return NextResponse.json({ ...cached, cached: true });
+      if (cached) {
+        clearTimeout(timeoutId);
+        return NextResponse.json({ ...cached, cached: true });
+      }
     }
 
     // TMDB credits (cast + crew) - different endpoints for movies vs TV shows
     const creditsPath = mediaType === "movie"
       ? `movie/${mediaId}/credits`
       : `tv/${mediaId}/aggregate_credits`;
-    const credits = await tmdbFetch(creditsPath, { language: "en-US" });
+    const credits = await tmdbFetch(creditsPath, { language: "en-US" }, abortController.signal);
     const cast: TMDBCreditsCast[] = Array.isArray(credits?.cast) ? credits.cast : [];
     const crew: TMDBCreditsCrew[] = Array.isArray(credits?.crew) ? credits.crew : [];
 
@@ -590,52 +607,33 @@ export async function POST(req: Request) {
       return NextResponse.json({ ...payload, deduped: true });
     }
 
-    const system = `
-You are a comedy name-writer with excellent taste for mafia-movie nicknames.
-Names should feel human-chosen, not random, and not like menu items.
+    // Streamlined prompt for faster generation
+    const system = `Generate mafia-style pizza nicknames. Output JSON only.
 
-Hard rules (MUST follow):
-- Output ONLY valid JSON.
-- Each name MUST be EXACTLY TWO PARTS (two chunks), not necessarily two single words.
-- ONE PART MUST be the topping phrase EXACTLY (case-insensitive), e.g. "Green Pepper".
-- The OTHER PART MUST be a name phrase from the provided list (actors, characters, OR directors).
-- Valid forms ONLY:
-  1) "<TOPPING_PHRASE> <LASTNAME_PHRASE>"
-  2) "<FIRSTNAME_PHRASE> <TOPPING_PHRASE>"
-- Do NOT output "<TOPPING_PHRASE> <FIRSTNAME_PHRASE>"
-- Do NOT output "<LASTNAME_PHRASE> <TOPPING_PHRASE>"
-- Lastname phrases may contain spaces (e.g. "De Niro", "Van Zandt", "Coppola")
-- Preserve capitalization as provided in the cast/director phrases (e.g. "LaBeouf", not "Labeouf").
-- IMPORTANT: For "Al Pacino", the lastname is "Pacino" (NOT "Al Pacino"). Same idea for other first+last pairs.
-- Director names are especially good choices as they're iconic (e.g. "Pepperoni Scorsese", "Francis Pepperoni")
+Rules:
+- Each name = exactly 2 parts: TOPPING + NAME_PHRASE
+- Valid: "<TOPPING> <LASTNAME>" or "<FIRSTNAME> <TOPPING>"
+- Use cast/director names from the provided list
+- Preserve capitalization (e.g. "De Niro", "LaBeouf")
+- NO excluded names
 
-Return JSON:
-{
-  "candidatePool": ["..."],  // 120 items
-  "suggestions": ["...", "...", "..."] // best 3 in order
-}
-`;
+Return: {"suggestions":["name1","name2","name3"],"candidatePool":["...50 items..."]}`;
 
     // ✅ Only ONE OpenAI call per request (prevents single-click consuming multiple RPM).
     const job = (async () => {
       // Best-effort local throttle so we fail fast with a friendly Retry-After.
       checkLocalRpmOrThrow();
 
+      // Compact prompt for speed
       const promptObj = {
-        toppingPhrase,
-        media: {
-          inputTitle: mafiaMovieTitle,
-          resolvedTitle,
-          releaseDate,
-          tmdbId: mediaId,
-          mediaType,
-        },
-        style,
-        directors: directorEntries, // Directors first for emphasis
-        cast: topCast,
-        excludeNames: Array.from(excludeSet).slice(0, 200),
-        instruction:
-          "Generate 120 candidates, then pick the best 3. Use EXACT forms only. Director names are great choices! Do NOT output anything in excludeNames (case-insensitive).",
+        topping: toppingPhrase,
+        movie: resolvedTitle,
+        directors: directorEntries.slice(0, 3).map(d => ({ first: d.actorFirstPhrase, last: d.actorLastPhrase })),
+        cast: topCast.slice(0, 12).map(c => ({
+          actor: { first: c.actorFirstPhrase, last: c.actorLastPhrase },
+          char: { first: c.characterFirstPhrase, last: c.characterLastPhrase },
+        })),
+        exclude: Array.from(excludeSet).slice(0, 50),
       };
 
       const resp = await callOpenAIWithBackoff(() =>
@@ -646,7 +644,7 @@ Return JSON:
             { role: "user", content: JSON.stringify(promptObj) },
           ],
           text: { format: { type: "json_object" } },
-          max_output_tokens: 1800,
+          max_output_tokens: 800, // Reduced for speed
         })
       );
 
@@ -668,7 +666,7 @@ Return JSON:
       const fresh = reranked.filter((n) => !excludeSet.has(n.trim().toLowerCase()));
 
       const finalSuggestions = fresh.slice(0, 3);
-      const finalPool = fresh.slice(0, 120);
+      const finalPool = fresh.slice(0, 50); // Reduced pool size for speed
 
       if (finalSuggestions.length < 3) {
         throw new Error(
@@ -698,6 +696,7 @@ Return JSON:
 
     try {
       const payload = await job;
+      clearTimeout(timeoutId);
 
       return new NextResponse(JSON.stringify(payload), {
         headers: {
@@ -709,6 +708,16 @@ Return JSON:
       inflight.delete(inflightKey);
     }
   } catch (err: any) {
+    clearTimeout(timeoutId);
+
+    // Handle timeout/abort errors
+    if (err?.name === "AbortError" || err?.message?.includes("aborted")) {
+      return NextResponse.json(
+        { error: "Request timed out. Please try again." },
+        { status: 504 }
+      );
+    }
+
     if (err?.status === 429 || isRateLimitError(err)) {
       const retryAfter = Number(err?.retryAfter ?? 20);
       return NextResponse.json(
