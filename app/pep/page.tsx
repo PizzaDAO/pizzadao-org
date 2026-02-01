@@ -7,6 +7,19 @@ import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
 
+function useIsMobile(breakpoint = 768) {
+  const [isMobile, setIsMobile] = useState(false);
+
+  useEffect(() => {
+    const checkMobile = () => setIsMobile(window.innerWidth < breakpoint);
+    checkMobile();
+    window.addEventListener("resize", checkMobile);
+    return () => window.removeEventListener("resize", checkMobile);
+  }, [breakpoint]);
+
+  return isMobile;
+}
+
 type SessionData = {
   authenticated: boolean;
   discordId?: string;
@@ -324,6 +337,7 @@ export default function PepDashboard() {
     itemId?: number;
     maxQuantity?: number;
   } | null>(null);
+  const isMobile = useIsMobile();
 
   useEffect(() => {
     const checkSession = async () => {
@@ -404,8 +418,8 @@ export default function PepDashboard() {
           </div>
         </header>
 
-        {/* Two column layout - Jobs left, everything else right */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20 }}>
+        {/* Two column layout - Jobs left, everything else right (stacked on mobile) */}
+        <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1.2fr 1fr", gap: 20 }}>
           {/* Left: Jobs and Bounties */}
           <div>
             <JobBoard onJobCompleted={refreshWallet} />
@@ -414,8 +428,8 @@ export default function PepDashboard() {
 
           {/* Right: Leaderboard, Balance, Inventory, Shop stacked */}
           <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
-            {/* Top row: Leaderboard and Balance side by side */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            {/* Top row: Leaderboard and Balance side by side (stacked on mobile) */}
+            <div style={{ display: "grid", gridTemplateColumns: isMobile ? "1fr" : "1fr 1fr", gap: 20 }}>
               <Leaderboard />
               <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
                 <WalletWithSend walletKey={walletKey} onSendClick={() => setSendModal({ type: "pep" })} />
