@@ -23,34 +23,58 @@ type Manual = {
   notes: string
 }
 
-// Extract Google Doc ID from URL
-function extractDocId(url: string | null): string | null {
+// Extract Google Sheet ID from URL
+function extractSheetId(url: string | null): string | null {
   if (!url) return null
   const match = url.match(/\/d\/([a-zA-Z0-9_-]+)/)
   return match ? match[1] : null
 }
 
-// Clean Google Docs HTML export
-function cleanGoogleDocsHtml(html: string): string {
-  // Remove everything before <body>
-  let cleaned = html.replace(/^[\s\S]*<body[^>]*>/i, '')
-  // Remove everything after </body>
-  cleaned = cleaned.replace(/<\/body>[\s\S]*$/i, '')
-  // Remove <style> tags
-  cleaned = cleaned.replace(/<style[^>]*>[\s\S]*?<\/style>/gi, '')
-  // Remove <script> tags
-  cleaned = cleaned.replace(/<script[^>]*>[\s\S]*?<\/script>/gi, '')
-  // Remove inline styles
-  cleaned = cleaned.replace(/\s*style="[^"]*"/gi, '')
-  // Remove class attributes (Google adds lots of these)
-  cleaned = cleaned.replace(/\s*class="[^"]*"/gi, '')
-  // Remove id attributes
-  cleaned = cleaned.replace(/\s*id="[^"]*"/gi, '')
-  // Remove empty spans
-  cleaned = cleaned.replace(/<span>\s*<\/span>/gi, '')
-  // Clean up whitespace
-  cleaned = cleaned.replace(/\n\s*\n/g, '\n')
-  return cleaned.trim()
+// Fetch sheet content and return as structured data (like agenda)
+async function fetchSheetContent(sheetId: string): Promise<{
+  headers: string[]
+  rows: string[][]
+} | null> {
+  try {
+    const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
+    const res = await fetch(gvizUrl, { cache: 'no-store' })
+
+    if (!res.ok) {
+      return null
+    }
+
+    const text = await res.text()
+    const gviz = parseGvizJson(text)
+    const rawRows = gviz?.table?.rows || []
+
+    if (rawRows.length === 0) {
+      return null
+    }
+
+    // Parse all rows
+    const allRows: string[][] = []
+    for (const row of rawRows) {
+      const cells = row?.c || []
+      const rowValues = cells.map(cellVal)
+      // Skip completely empty rows
+      if (rowValues.some((v: string) => v.length > 0)) {
+        allRows.push(rowValues)
+      }
+    }
+
+    if (allRows.length === 0) {
+      return null
+    }
+
+    // First non-empty row is headers, rest are data rows
+    const headers = allRows[0]
+    const dataRows = allRows.slice(1)
+
+    return { headers, rows: dataRows }
+  } catch (e) {
+    console.error('Failed to fetch sheet content:', e)
+    return null
+  }
 }
 
 export async function GET(
@@ -105,44 +129,23 @@ export async function GET(
     }
 
     const manual = manuals[manualIndex]
-    const docId = extractDocId(manual.url)
+    const sheetId = extractSheetId(manual.url)
 
-    let content: string | null = null
+    let sheetContent: { headers: string[]; rows: string[][] } | null = null
     let contentError: string | null = null
 
-    if (docId) {
-      try {
-        // Fetch Google Doc as HTML
-        const docUrl = `https://docs.google.com/document/d/${docId}/export?format=html`
-        const docRes = await fetch(docUrl, { cache: 'no-store' })
-
-        if (docRes.ok) {
-          const rawHtml = await docRes.text()
-          content = cleanGoogleDocsHtml(rawHtml)
-          // Check if content is meaningful (not just empty or whitespace)
-          if (!content || content.trim().length < 10) {
-            content = null
-            contentError = 'Document appears to be empty'
-          }
-        } else if (docRes.status === 401 || docRes.status === 403) {
-          contentError = 'This document is private. Please ask the document owner to share it with "Anyone with the link".'
-        } else if (docRes.status === 404) {
-          contentError = 'Document not found. The link may be broken or the document may have been deleted.'
-        } else {
-          contentError = `Failed to load document (status: ${docRes.status})`
-        }
-      } catch (e) {
-        // If we can't fetch the doc, provide helpful error message
-        console.error('Failed to fetch Google Doc:', e)
-        contentError = 'Unable to connect to Google Docs. Please try again later.'
+    if (sheetId) {
+      sheetContent = await fetchSheetContent(sheetId)
+      if (!sheetContent) {
+        contentError = 'Unable to load sheet content. The sheet may be private or the link may be broken.'
       }
     } else if (manual.url) {
-      contentError = 'Could not parse Google Doc link. The URL format may not be recognized.'
+      contentError = 'Could not parse Google Sheet link. The URL format may not be recognized.'
     } else {
-      contentError = 'No Google Doc link is available for this manual.'
+      contentError = 'No Google Sheet link is available for this manual.'
     }
 
-    return NextResponse.json({ manual, content, contentError })
+    return NextResponse.json({ manual, sheetContent, contentError })
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to load manual' },

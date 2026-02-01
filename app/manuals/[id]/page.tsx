@@ -15,6 +15,11 @@ type Manual = {
   notes: string;
 };
 
+type SheetContent = {
+  headers: string[];
+  rows: string[][];
+};
+
 function statusBadge(status: string) {
   const s = status.toLowerCase();
   let bg = "#888";
@@ -46,7 +51,7 @@ export default function ManualDetailPage() {
   const id = params.id as string;
 
   const [manual, setManual] = useState<Manual | null>(null);
-  const [content, setContent] = useState<string | null>(null);
+  const [sheetContent, setSheetContent] = useState<SheetContent | null>(null);
   const [contentError, setContentError] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -63,7 +68,7 @@ export default function ManualDetailPage() {
         }
         const data = await res.json();
         setManual(data.manual);
-        setContent(data.content);
+        setSheetContent(data.sheetContent);
         setContentError(data.contentError || null);
       } catch (err) {
         setError(err instanceof Error ? err.message : "Unknown error");
@@ -85,7 +90,7 @@ export default function ManualDetailPage() {
         padding: "40px 20px",
       }}
     >
-      <div style={{ maxWidth: 800, margin: "0 auto" }}>
+      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
           <Link
@@ -100,7 +105,7 @@ export default function ManualDetailPage() {
               minHeight: 44,
             }}
           >
-            ← Back to Manuals
+            &#8592; Back to Manuals
           </Link>
         </div>
 
@@ -219,19 +224,60 @@ export default function ManualDetailPage() {
                       textDecoration: "none",
                     }}
                   >
-                    Open in Google Docs →
+                    Open in Google Sheets &#8594;
                   </a>
                 </div>
               )}
             </div>
 
-            {/* Manual content */}
+            {/* Manual content - Sheet data displayed as table */}
             <div style={{ padding: 24 }}>
-              {content ? (
-                <div
-                  className="manual-content"
-                  dangerouslySetInnerHTML={{ __html: content }}
-                />
+              {sheetContent && sheetContent.rows.length > 0 ? (
+                <div style={{ overflowX: "auto" }}>
+                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
+                    <thead>
+                      <tr>
+                        {sheetContent.headers.map((header, i) => (
+                          <th
+                            key={i}
+                            style={{
+                              textAlign: "left",
+                              padding: "12px 16px",
+                              borderBottom: "2px solid rgba(0,0,0,0.1)",
+                              fontSize: 12,
+                              fontWeight: 700,
+                              textTransform: "uppercase",
+                              letterSpacing: 0.5,
+                              background: "#fafafa",
+                              whiteSpace: "nowrap",
+                            }}
+                          >
+                            {header}
+                          </th>
+                        ))}
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {sheetContent.rows.map((row, rowIndex) => (
+                        <tr key={rowIndex}>
+                          {row.map((cell, cellIndex) => (
+                            <td
+                              key={cellIndex}
+                              style={{
+                                padding: "12px 16px",
+                                borderBottom: "1px solid rgba(0,0,0,0.06)",
+                                fontSize: 14,
+                                verticalAlign: "top",
+                              }}
+                            >
+                              {cell}
+                            </td>
+                          ))}
+                        </tr>
+                      ))}
+                    </tbody>
+                  </table>
+                </div>
               ) : (
                 <div
                   style={{
@@ -247,19 +293,18 @@ export default function ManualDetailPage() {
                     marginBottom: 16,
                     opacity: 0.5,
                   }}>
-                    {contentError?.includes('private') ? '🔒' :
-                     contentError?.includes('not found') ? '🔍' :
-                     contentError?.includes('empty') ? '📄' : '⚠️'}
+                    {contentError?.includes('private') ? '\uD83D\uDD12' :
+                     contentError?.includes('not found') ? '\uD83D\uDD0D' :
+                     contentError?.includes('No Google Sheet link') ? '\uD83D\uDCCB' : '\u26A0\uFE0F'}
                   </div>
                   <p style={{ marginBottom: 8, fontWeight: 500, color: "#333" }}>
-                    {contentError?.includes('private') ? 'Private Document' :
-                     contentError?.includes('not found') ? 'Document Not Found' :
-                     contentError?.includes('empty') ? 'Empty Document' :
-                     contentError?.includes('No Google Doc link') ? 'No Document Link' :
+                    {contentError?.includes('private') ? 'Private Sheet' :
+                     contentError?.includes('not found') ? 'Sheet Not Found' :
+                     contentError?.includes('No Google Sheet link') ? 'No Sheet Link' :
                      'Unable to Load Content'}
                   </p>
                   <p style={{ marginBottom: 20, fontSize: 14, maxWidth: 400, margin: "0 auto 20px" }}>
-                    {contentError || "The document content could not be loaded."}
+                    {contentError || "The sheet content could not be loaded."}
                   </p>
                   {manual.url && (
                     <a
@@ -277,7 +322,7 @@ export default function ManualDetailPage() {
                         textDecoration: "none",
                       }}
                     >
-                      Open in Google Docs
+                      Open in Google Sheets
                     </a>
                   )}
                   {!manual.url && manual.status?.toLowerCase() === 'needed' && (
@@ -301,100 +346,6 @@ export default function ManualDetailPage() {
           50% {
             opacity: 0.5;
           }
-        }
-      `}</style>
-
-      <style jsx global>{`
-        .manual-content {
-          font-size: 15px;
-          line-height: 1.7;
-          color: #333;
-        }
-        .manual-content h1 {
-          font-size: 24px;
-          font-weight: 700;
-          margin: 24px 0 16px 0;
-          color: #111;
-        }
-        .manual-content h2 {
-          font-size: 20px;
-          font-weight: 600;
-          margin: 20px 0 12px 0;
-          color: #111;
-        }
-        .manual-content h3 {
-          font-size: 17px;
-          font-weight: 600;
-          margin: 16px 0 8px 0;
-          color: #111;
-        }
-        .manual-content p {
-          margin: 0 0 16px 0;
-        }
-        .manual-content ul,
-        .manual-content ol {
-          margin: 0 0 16px 0;
-          padding-left: 24px;
-        }
-        .manual-content li {
-          margin-bottom: 8px;
-        }
-        .manual-content a {
-          color: #2563eb;
-          text-decoration: none;
-        }
-        .manual-content a:hover {
-          text-decoration: underline;
-        }
-        .manual-content table {
-          width: 100%;
-          border-collapse: collapse;
-          margin: 16px 0;
-        }
-        .manual-content th,
-        .manual-content td {
-          border: 1px solid #ddd;
-          padding: 8px 12px;
-          text-align: left;
-        }
-        .manual-content th {
-          background: #f5f5f5;
-          font-weight: 600;
-        }
-        .manual-content img {
-          max-width: 100%;
-          height: auto;
-          border-radius: 8px;
-          margin: 16px 0;
-        }
-        .manual-content hr {
-          border: none;
-          border-top: 1px solid #eee;
-          margin: 24px 0;
-        }
-        .manual-content blockquote {
-          margin: 16px 0;
-          padding: 12px 16px;
-          border-left: 4px solid #eab308;
-          background: #fefce8;
-          color: #666;
-        }
-        .manual-content code {
-          background: #f5f5f5;
-          padding: 2px 6px;
-          border-radius: 4px;
-          font-size: 14px;
-        }
-        .manual-content pre {
-          background: #f5f5f5;
-          padding: 16px;
-          border-radius: 8px;
-          overflow-x: auto;
-          margin: 16px 0;
-        }
-        .manual-content pre code {
-          background: none;
-          padding: 0;
         }
       `}</style>
     </div>
