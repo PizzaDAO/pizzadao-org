@@ -11,6 +11,7 @@ export interface ProfilePayload {
   resolvedMovieTitle?: string;
   tmdbMovieId?: string;
   releaseDate?: string;
+  mediaType?: "movie" | "tv";
   discordJoined: boolean;
 }
 
@@ -32,6 +33,9 @@ export function validateProfilePayload(body: any): ProfilePayload {
     ? body.crews.map((x: unknown) => clampStr(x, 40)).filter(Boolean)
     : [];
 
+  // Validate mediaType
+  const mediaType = body.mediaType === "movie" || body.mediaType === "tv" ? body.mediaType : undefined;
+
   return {
     memberId: clampStr(body.memberId ?? "", 20),
     mafiaName: clampStr(body.mafiaName, 64),
@@ -45,6 +49,7 @@ export function validateProfilePayload(body: any): ProfilePayload {
     resolvedMovieTitle: clampStr(body.resolvedMovieTitle, 120),
     tmdbMovieId: clampStr(body.tmdbMovieId, 30),
     releaseDate: clampStr(body.releaseDate, 20),
+    mediaType,
     discordJoined: clampBool(body.discordJoined),
   };
 }

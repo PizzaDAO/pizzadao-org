@@ -16,10 +16,28 @@ type TMDBSearchResult = {
   vote_average?: number;
 };
 
+type TMDBMultiSearchResult = {
+  id: number;
+  media_type: "movie" | "tv" | "person";
+  // Movie fields
+  title?: string;
+  release_date?: string;
+  // TV fields
+  name?: string;
+  first_air_date?: string;
+  // Common fields
+  overview?: string;
+  popularity?: number;
+  vote_count?: number;
+  vote_average?: number;
+};
+
 type TMDBCreditsCast = {
   name: string;
   character?: string;
   order?: number;
+  // TV aggregate_credits has roles array instead of single character
+  roles?: { character?: string; episode_count?: number }[];
 };
 
 type TMDBCreditsCrew = {
@@ -387,14 +405,22 @@ export async function POST(req: Request) {
 
     const toppingPhrase = titleCase(toppingRaw);
 
-    // TMDB search (English overview)
-    const search = await tmdbFetch("search/movie", {
+    // TMDB search (multi search for movies AND TV shows)
+    const search = await tmdbFetch("search/multi", {
       query: mafiaMovieTitle,
       include_adult: "false",
       language: "en-US",
     });
 
-    const results: TMDBSearchResult[] = Array.isArray(search?.results) ? search.results : [];
+    // Filter to only movies and TV shows (exclude person results)
+    const results: TMDBMultiSearchResult[] = (Array.isArray(search?.results) ? search.results : [])
+      .filter((r: any) => r.media_type === "movie" || r.media_type === "tv");
+
+    // Helper to normalize field access for movies vs TV shows
+    const getTitle = (r: TMDBMultiSearchResult) =>
+      r.media_type === "movie" ? r.title : r.name;
+    const getReleaseDate = (r: TMDBMultiSearchResult) =>
+      r.media_type === "movie" ? r.release_date : r.first_air_date;
 
     function normalizeLoose(s: string) {
       const n = normalizeTitle(s);
@@ -408,7 +434,7 @@ export async function POST(req: Request) {
 
     const ranked = results
       .map((r) => {
-        const title = r.title ?? "";
+        const title = getTitle(r) ?? "";
         const titleLower = title.toLowerCase();
 
         const titleNorm = normalizeTitle(title);
@@ -420,7 +446,8 @@ export async function POST(req: Request) {
         const contains = titleLower.includes(inputTitle.toLowerCase());
 
         // Light nostalgia, but don't reward ancient years over popularity.
-        const year = r.release_date ? Number(r.release_date.slice(0, 4)) : 9999;
+        const releaseDate = getReleaseDate(r);
+        const year = releaseDate ? Number(releaseDate.slice(0, 4)) : 9999;
 
         // Soft preference for ~1970–2005 "mafia era" (doesn't hard-ban others)
         const eraBonus =
@@ -474,22 +501,27 @@ export async function POST(req: Request) {
     const best = ranked[0];
 
     if (!best?.id) {
-      return NextResponse.json({ error: `No movie found for "${mafiaMovieTitle}"` }, { status: 404 });
+      return NextResponse.json({ error: `No movie or TV show found for "${mafiaMovieTitle}"` }, { status: 404 });
     }
 
-    const movieId = String(best.id);
-    const releaseDate = best.release_date ?? "";
+    const mediaId = String(best.id);
+    const mediaType = best.media_type;
+    const resolvedTitle = getTitle(best) ?? "";
+    const releaseDate = getReleaseDate(best) ?? "";
 
     // Cache only for non-force calls (Generate). Regenerate uses force:true so it always changes.
-    // Bump cache version so old behavior won't hit.
-    const cacheKey = `v9|${movieId}|${toppingPhrase}|${style}`;
+    // Bump cache version so old behavior won't hit (v10 for TV show support).
+    const cacheKey = `v10|${mediaId}|${mediaType}|${toppingPhrase}|${style}`;
     if (!force) {
       const cached = cacheGet(cacheKey);
       if (cached) return NextResponse.json({ ...cached, cached: true });
     }
 
-    // TMDB credits (cast + crew)
-    const credits = await tmdbFetch(`movie/${movieId}/credits`, { language: "en-US" });
+    // TMDB credits (cast + crew) - different endpoints for movies vs TV shows
+    const creditsPath = mediaType === "movie"
+      ? `movie/${mediaId}/credits`
+      : `tv/${mediaId}/aggregate_credits`;
+    const credits = await tmdbFetch(creditsPath, { language: "en-US" });
     const cast: TMDBCreditsCast[] = Array.isArray(credits?.cast) ? credits.cast : [];
     const crew: TMDBCreditsCrew[] = Array.isArray(credits?.crew) ? credits.crew : [];
 
@@ -505,11 +537,14 @@ export async function POST(req: Request) {
         const actorFirstPhrase = normalizeNamePreserveCase(detectFirstNamePhrase(c.name));
         const actorLastPhrase = normalizeNamePreserveCase(detectLastNamePhrase(c.name));
 
-        const characterFirstPhrase = c.character
-          ? normalizeNamePreserveCase(detectFirstNamePhrase(c.character))
+        // For TV shows, character is in roles[0].character; for movies, it's c.character
+        const character = c.character || c.roles?.[0]?.character || "";
+
+        const characterFirstPhrase = character
+          ? normalizeNamePreserveCase(detectFirstNamePhrase(character))
           : "";
-        const characterLastPhrase = c.character
-          ? normalizeNamePreserveCase(detectLastNamePhrase(c.character))
+        const characterLastPhrase = character
+          ? normalizeNamePreserveCase(detectLastNamePhrase(character))
           : "";
 
         return {
@@ -588,11 +623,12 @@ Return JSON:
 
       const promptObj = {
         toppingPhrase,
-        movie: {
+        media: {
           inputTitle: mafiaMovieTitle,
-          resolvedTitle: best.title,
+          resolvedTitle,
           releaseDate,
-          tmdbMovieId: movieId,
+          tmdbId: mediaId,
+          mediaType,
         },
         style,
         directors: directorEntries, // Directors first for emphasis
@@ -644,9 +680,10 @@ Return JSON:
         cached: false,
         topping: toppingPhrase,
         mafiaMovieTitle,
-        resolvedMovieTitle: best.title,
-        tmdbMovieId: movieId,
+        resolvedMovieTitle: resolvedTitle,
+        tmdbMovieId: mediaId,
         releaseDate,
+        mediaType,
         style,
         suggestions: finalSuggestions,
         candidatePool: finalPool,

@@ -310,6 +310,7 @@ export function OnboardingWizard() {
         resolvedMovieTitle: result.resolvedMovieTitle,
         tmdbMovieId: result.tmdbMovieId,
         releaseDate: result.releaseDate,
+        mediaType: result.mediaType,
         seenNames: mergeSeen(p.seenNames, result.suggestions ?? []),
       }));
 
@@ -343,6 +344,7 @@ export function OnboardingWizard() {
           resolvedMovieTitle: data.resolvedMovieTitle,
           tmdbMovieId: data.tmdbMovieId,
           releaseDate: data.releaseDate,
+          mediaType: data.mediaType,
           city: data.city,
           turtle: data.turtles.join(", "),
           turtles: data.turtles,
@@ -559,6 +561,7 @@ export function OnboardingWizard() {
             suggestions={data.suggestions}
             resolvedMovieTitle={data.resolvedMovieTitle}
             releaseDate={data.releaseDate}
+            mediaType={data.mediaType}
             seenNames={data.seenNames}
             mafiaName={data.mafiaName}
             isUpdate={flow.isUpdate}
