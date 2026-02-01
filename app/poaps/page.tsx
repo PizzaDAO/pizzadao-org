@@ -235,9 +235,6 @@ export default function POAPsPage() {
           >
             PizzaDAO POAPs
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: "#666" }}>
-            Explore all {data?.totalCount || "..."} whitelisted POAP events
-          </p>
         </div>
 
         {/* Search */}
