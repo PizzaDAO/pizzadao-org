@@ -181,22 +181,64 @@ function seededShuffle<T>(arr: T[], seed: number): T[] {
 }
 
 /**
+ * Iconic family names from popular mafia/crime shows and movies.
+ * These should appear first in suggestions when the title matches.
+ */
+const ICONIC_FAMILIES: Record<string, string[]> = {
+  "the sopranos": ["Soprano"],
+  "sopranos": ["Soprano"],
+  "the wire": ["Barksdale", "Bell", "Omar"],
+  "wire": ["Barksdale", "Bell", "Omar"],
+  "the godfather": ["Corleone"],
+  "godfather": ["Corleone"],
+  "the godfather part ii": ["Corleone"],
+  "the godfather part iii": ["Corleone"],
+  "goodfellas": ["Hill", "DeVito"],
+  "scarface": ["Montana"],
+  "boardwalk empire": ["Thompson", "Nucky"],
+  "breaking bad": ["White", "Heisenberg"],
+  "ozark": ["Byrde"],
+  "the departed": ["Costello", "Costigan"],
+  "departed": ["Costello", "Costigan"],
+  "casino": ["Rothstein", "Santoro"],
+  "a bronx tale": ["Calogero", "Sonny"],
+  "bronx tale": ["Calogero", "Sonny"],
+  "donnie brasco": ["Brasco", "Pistone"],
+  "gomorrah": ["Savastano"],
+  "gomorra": ["Savastano"],
+  "peaky blinders": ["Shelby"],
+  "the irishman": ["Sheeran", "Bufalino"],
+  "irishman": ["Sheeran", "Bufalino"],
+  "mob city": ["Cohen"],
+  "power": ["St. Patrick", "Ghost"],
+  "narcos": ["Escobar"],
+  "narcos mexico": ["Gallardo"],
+  "sons of anarchy": ["Teller", "Morrow"],
+};
+
+/**
  * Generate pizza mafia names algorithmically:
  * - Pattern A: "<Topping> <LastName>" (e.g., "Pepperoni Barksdale")
  * - Pattern B: "<FirstName> <Topping>" (e.g., "Omar Pepperoni")
  *
  * Uses cast names from TMDB - no AI needed!
+ *
+ * Prioritization:
+ * 1. Iconic family names from ICONIC_FAMILIES map (if title matches)
+ * 2. Remaining names in TMDB billing order (correlates with screentime)
  */
 function generateNames(
   topping: string,
   castNames: { firstName: string; lastName: string; source: "actor" | "character" }[],
   excludeSet: Set<string>,
-  count: number = 3
+  count: number = 3,
+  resolvedTitle?: string
 ): string[] {
   const results: string[] = [];
   const used = new Set<string>();
 
   // Build candidate pool: both patterns for each cast member
+  // Keep them in order (TMDB billing order = screentime order)
   const candidates: string[] = [];
 
   for (const { firstName, lastName } of castNames) {
@@ -213,12 +255,36 @@ function generateNames(
     }
   }
 
-  // Shuffle with time-based seed for variety on regenerate
-  const seed = Date.now() % 1000000;
-  const shuffled = seededShuffle(candidates, seed);
+  // Check if we have iconic family names for this title
+  const titleKey = resolvedTitle?.toLowerCase().trim() || "";
+  const iconicFamilies = ICONIC_FAMILIES[titleKey] || [];
+
+  // Partition candidates: iconic family names first, then rest in billing order
+  const iconicCandidates: string[] = [];
+  const otherCandidates: string[] = [];
+
+  for (const candidate of candidates) {
+    // Check if this candidate contains an iconic family name
+    const isIconic = iconicFamilies.some((family) => {
+      const familyLower = family.toLowerCase();
+      const candidateLower = candidate.toLowerCase();
+      // Check if the family name appears as a word in the candidate
+      // e.g., "Pepperoni Soprano" contains "Soprano"
+      return candidateLower.includes(familyLower);
+    });
+
+    if (isIconic) {
+      iconicCandidates.push(candidate);
+    } else {
+      otherCandidates.push(candidate);
+    }
+  }
+
+  // Prioritized order: iconic first, then billing order
+  const prioritized = [...iconicCandidates, ...otherCandidates];
 
   // Pick names that aren't excluded or duplicated
-  for (const name of shuffled) {
+  for (const name of prioritized) {
     const normalized = name.toLowerCase();
     if (!excludeSet.has(normalized) && !used.has(normalized)) {
       results.push(name);
@@ -366,11 +432,11 @@ export async function POST(req: Request) {
       }
     }
 
-    // Generate names algorithmically
-    const suggestions = generateNames(toppingPhrase, castNames, excludeSet, 3);
+    // Generate names algorithmically with iconic family prioritization
+    const suggestions = generateNames(toppingPhrase, castNames, excludeSet, 3, resolvedTitle);
 
-    // Generate a larger pool for the UI
-    const allNames = generateNames(toppingPhrase, castNames, new Set(), 30);
+    // Generate a larger pool for the UI (also prioritized)
+    const allNames = generateNames(toppingPhrase, castNames, new Set(), 30, resolvedTitle);
 
     if (suggestions.length < 3) {
       // Fallback: if we can't get 3 unique names, use what we have
