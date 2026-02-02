@@ -6,6 +6,7 @@ import { Leaderboard, PepIcon, PepAmount } from "../ui/economy";
 import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
+import { NotificationBell } from "../ui/notifications";
 
 type SessionData = {
   authenticated: boolean;
@@ -398,9 +399,12 @@ export default function PepDashboard() {
                 Welcome, {memberName || session.username || session.discordId}
               </p>
             </div>
-            <Link href="/" style={{ ...btn("secondary"), fontSize: 14, textDecoration: "none" }}>
-              ← Home
-            </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+              <NotificationBell />
+              <Link href="/" style={{ ...btn("secondary"), fontSize: 14, textDecoration: "none" }}>
+                ← Home
+              </Link>
+            </div>
           </div>
         </header>
 
