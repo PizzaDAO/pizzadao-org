@@ -55,12 +55,77 @@ function getFirstName(fullName: string): string {
   return parts[0] || "";
 }
 
-// Extract last name (everything after first word, or just the last word if complex)
+/**
+ * Multi-word last-name heuristic:
+ * Includes common surname particles like "De", "Van", "Von", "Del", etc.
+ *
+ * Examples:
+ * - "Robert De Niro" → "De Niro"
+ * - "Jean-Claude Van Damme" → "Van Damme"
+ * - "Benicio Del Toro" → "Del Toro"
+ * - "Martin Scorsese" → "Scorsese"
+ *
+ * IMPORTANT: Do NOT include "Al"/"El" because they frequently appear as
+ * first names (e.g., "Al Pacino") and would incorrectly turn the full name
+ * into a "last name phrase".
+ */
 function getLastName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
+  if (parts.length === 0) return "";
+  if (parts.length === 1) return parts[0];
+
+  // Surname particles that indicate multi-word last names
+  const particles = new Set([
+    "da",
+    "de",
+    "del",
+    "della",
+    "der",
+    "di",
+    "du",
+    "la",
+    "le",
+    "st",
+    "st.",
+    "van",
+    "von",
+    "den",
+    "ter",
+    "bin",
+    "ibn",
+    // intentionally NOT including "al" / "el" - common first names
+    "o'",
+    "mc",
+    "mac",
+  ]);
+
+  // Walk backwards from the end, collecting particles
+  let i = parts.length - 1;
+  const phrase: string[] = [parts[i]];
+  i--;
+
+  while (i >= 0) {
+    const w = parts[i].toLowerCase();
+    if (particles.has(w)) {
+      phrase.unshift(parts[i]);
+      i--;
+      continue;
+    }
+    break;
+  }
+
+  return phrase.join(" ");
+}
+
+/**
+ * For directors, keep everything after first name as last name phrase.
+ * This allows "Francis Ford Coppola" → "Ford Coppola" instead of just "Coppola".
+ */
+function getDirectorLastName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
   if (parts.length <= 1) return parts[0] || "";
-  // Return last word for simple cases
-  return parts[parts.length - 1];
+  // Everything after first name becomes the last name phrase
+  return parts.slice(1).join(" ");
 }
 
 // Clean a name part: remove non-alpha chars except hyphens/apostrophes
@@ -262,12 +327,13 @@ export async function POST(req: Request) {
     const castNames: { firstName: string; lastName: string; source: "actor" | "character" }[] = [];
 
     // Add directors first (high priority)
+    // For directors, keep full "last name" (e.g., "Ford Coppola" not just "Coppola")
     const directors = crew.filter((c) => c.job === "Director");
     for (const d of directors.slice(0, 5)) {
       if (d.name) {
         castNames.push({
           firstName: getFirstName(d.name),
-          lastName: getLastName(d.name),
+          lastName: getDirectorLastName(d.name),
           source: "actor",
         });
       }
