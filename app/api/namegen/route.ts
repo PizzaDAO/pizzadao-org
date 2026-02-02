@@ -128,9 +128,10 @@ function getDirectorLastName(fullName: string): string {
   return parts.slice(1).join(" ");
 }
 
-// Clean a name part: remove non-alpha chars except hyphens/apostrophes
+// Clean a name part: remove non-alpha chars except hyphens/apostrophes/spaces
+// Preserves spaces for multi-word names like "De Niro" or "Ford Coppola"
 function cleanNamePart(s: string): string {
-  return s.replace(/[^A-Za-z'-]/g, "").trim();
+  return s.replace(/[^A-Za-z' -]/g, "").trim();
 }
 
 async function tmdbFetch(path: string, params: Record<string, string>, signal?: AbortSignal) {
@@ -339,7 +340,7 @@ export async function POST(req: Request) {
     const getReleaseDate = (r: TMDBMultiSearchResult) =>
       r.media_type === "movie" ? r.release_date : r.first_air_date;
 
-    // Simple ranking: prefer exact matches, then popularity
+    // Ranking: prefer exact matches, classics (older + highly rated), then popularity
     const inputNorm = normalizeTitle(mafiaMovieTitle);
     const ranked = results
       .map((r) => {
@@ -347,10 +348,24 @@ export async function POST(req: Request) {
         const titleNorm = normalizeTitle(title);
         const pop = typeof r.popularity === "number" ? r.popularity : 0;
         const votes = typeof r.vote_count === "number" ? r.vote_count : 0;
+        const rating = typeof r.vote_average === "number" ? r.vote_average : 0;
+        const releaseYear = parseInt(getReleaseDate(r)?.slice(0, 4) || "0", 10);
+
+        // For classic/iconic titles, prefer the original (older) version
+        // A highly-rated older movie is likely the "definitive" version
+        // This helps "godfather" find The Godfather (1972) over recent remakes
+        const isExactOrClose = titleNorm === inputNorm || titleNorm.includes(inputNorm);
+        const isClassic = releaseYear > 0 && releaseYear < 2000 && rating >= 7.5 && votes > 1000;
+        const classicBonus = isExactOrClose && isClassic ? 5000 : 0;
+
+        // Boost highly-rated films with many votes (classics tend to have both)
+        const ratingBonus = rating > 8 && votes > 5000 ? 2000 : 0;
 
         const score =
           (titleNorm === inputNorm ? 10000 : 0) +
           (titleNorm.includes(inputNorm) ? 1000 : 0) +
+          classicBonus +
+          ratingBonus +
           pop * 10 +
           Math.log10(votes + 1) * 100;
 
