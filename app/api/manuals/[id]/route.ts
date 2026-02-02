@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { parseGvizJson } from "@/app/lib/gviz-parser"
-import { getManualLinks } from '@/app/api/lib/google-sheets'
+import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
+import { cacheDel } from '@/app/api/lib/cache'
 
 const MANUALS_SHEET_ID = '1KDAzz8qQubCaFiplWaUFBgCZlHR_mIA0IJHKNqgK5hg'
 
@@ -89,12 +90,39 @@ export async function GET(
       return NextResponse.json({ error: 'Invalid manual ID' }, { status: 400 })
     }
 
+    // Check for debug and refresh params
+    const url = new URL(req.url)
+    const debugMode = url.searchParams.get('debug') === '1'
+    const forceRefresh = url.searchParams.get('fresh') === '1'
+
+    // Clear cache if force refresh
+    if (forceRefresh) {
+      await cacheDel(`manual-links:${MANUALS_SHEET_ID}`)
+    }
+
     // Fetch spreadsheet data and hyperlinks
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${MANUALS_SHEET_ID}/gviz/tq?tqx=out:json&headers=1`
-    const [sheetRes, linkMap] = await Promise.all([
-      fetch(gvizUrl, { cache: 'no-store' }),
-      getManualLinks(MANUALS_SHEET_ID),
-    ])
+
+    let linkMap: Record<string, string>
+    let debugInfo: ManualLinksDebugResult | null = null
+    let sheetRes: Response
+
+    if (debugMode) {
+      const [fetchRes, debugResult] = await Promise.all([
+        fetch(gvizUrl, { cache: 'no-store' }),
+        getManualLinksDebug(MANUALS_SHEET_ID),
+      ])
+      sheetRes = fetchRes
+      debugInfo = debugResult
+      linkMap = debugResult.linkMap
+    } else {
+      const [fetchRes, linkMapResult] = await Promise.all([
+        fetch(gvizUrl, { cache: 'no-store' }),
+        getManualLinks(MANUALS_SHEET_ID),
+      ])
+      sheetRes = fetchRes
+      linkMap = linkMapResult
+    }
 
     if (!sheetRes.ok) {
       throw new Error('Failed to fetch manuals spreadsheet')
@@ -145,7 +173,12 @@ export async function GET(
       contentError = 'No Google Sheet link is available for this manual.'
     }
 
-    return NextResponse.json({ manual, sheetContent, contentError })
+    return NextResponse.json({
+      manual,
+      sheetContent,
+      contentError,
+      ...(debugInfo ? { _debug: debugInfo } : {}),
+    })
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to load manual' },
