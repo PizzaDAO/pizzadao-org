@@ -600,9 +600,22 @@ export async function getAgendaStepLinksDebug(sheetId: string): Promise<AgendaLi
     return result;
 }
 
+// Debug result type for manual links
+export interface ManualLinksDebugResult {
+    linkMap: Record<string, string>;
+    error?: string;
+    sheetsApiWorking: boolean;
+    headerRowIdx: number;
+    manualColIdx: number;
+    rowsProcessed: number;
+    cellsInspected: Array<{ row: number; label: string; hyperlink: string | null }>;
+}
+
 /**
  * Extract hyperlinks from the Manual column in the manuals spreadsheet
  * Returns a map of manual title -> hyperlink URL
+ *
+ * Handles Google Sheets "Tables" feature by scanning first few rows for the header
  */
 export async function getManualLinks(sheetId: string): Promise<Record<string, string>> {
     const cacheKey = `manual-links:${sheetId}`;
@@ -626,24 +639,33 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
             const rows = grid.rowData;
             if (!rows || rows.length === 0) continue;
 
-            // Find the "Manual" column (should be first column, index 0)
-            const headerRow = rows[0]?.values || [];
+            // Find the header row by scanning first several rows (handles Tables feature)
+            // Look for "Manual" or "Manuals" column header
+            let headerRowIdx = -1;
             let manualColIdx = -1;
 
-            for (let c = 0; c < headerRow.length; c++) {
-                const val = (headerRow[c]?.userEnteredValue?.stringValue ||
-                    headerRow[c]?.formattedValue || "").toLowerCase().trim();
-                if (val === "manual" || val === "manuals") {
-                    manualColIdx = c;
-                    break;
+            for (let r = 0; r < Math.min(rows.length, 10); r++) {
+                const rowCells = rows[r]?.values || [];
+                for (let c = 0; c < rowCells.length; c++) {
+                    const val = (rowCells[c]?.userEnteredValue?.stringValue ||
+                        rowCells[c]?.formattedValue || "").toLowerCase().trim();
+                    if (val === "manual" || val === "manuals" || val === "title") {
+                        headerRowIdx = r;
+                        manualColIdx = c;
+                        break;
+                    }
                 }
+                if (headerRowIdx !== -1) break;
             }
 
-            // Default to first column if no header found
-            if (manualColIdx === -1) manualColIdx = 0;
+            // If still not found, default to row 0, column 0
+            if (headerRowIdx === -1) {
+                headerRowIdx = 0;
+                manualColIdx = 0;
+            }
 
-            // Extract links from the Manual column (start from row 1 to skip header)
-            for (let r = 1; r < rows.length; r++) {
+            // Extract links from the Manual column (start from row after header)
+            for (let r = headerRowIdx + 1; r < rows.length; r++) {
                 const cell = rows[r]?.values?.[manualColIdx];
                 if (!cell) continue;
 
@@ -674,15 +696,114 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
                 }
 
                 if (label && hyperlink) {
-                    linkMap[label.trim()] = hyperlink;
+                    // Use normalizeKey for consistent matching with API routes
+                    linkMap[normalizeKey(label)] = hyperlink;
                 }
             }
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
     } catch (error: unknown) {
+        console.error('getManualLinks error:', error);
     }
     return linkMap;
+}
+
+/**
+ * Debug version of getManualLinks that returns diagnostic info
+ */
+export async function getManualLinksDebug(sheetId: string): Promise<ManualLinksDebugResult> {
+    const result: ManualLinksDebugResult = {
+        linkMap: {},
+        sheetsApiWorking: false,
+        headerRowIdx: -1,
+        manualColIdx: -1,
+        rowsProcessed: 0,
+        cellsInspected: [],
+    };
+
+    try {
+        const res = await sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            includeGridData: true,
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
+        });
+
+        result.sheetsApiWorking = true;
+
+        const sheetData = res.data.sheets?.[0];
+        if (!sheetData?.data) {
+            result.error = 'No sheet data returned';
+            return result;
+        }
+
+        for (const grid of sheetData.data) {
+            const rows = grid.rowData;
+            if (!rows || rows.length === 0) continue;
+
+            // Find the header row by scanning first several rows
+            for (let r = 0; r < Math.min(rows.length, 10); r++) {
+                const rowCells = rows[r]?.values || [];
+                for (let c = 0; c < rowCells.length; c++) {
+                    const val = (rowCells[c]?.userEnteredValue?.stringValue ||
+                        rowCells[c]?.formattedValue || "").toLowerCase().trim();
+                    if (val === "manual" || val === "manuals" || val === "title") {
+                        result.headerRowIdx = r;
+                        result.manualColIdx = c;
+                        break;
+                    }
+                }
+                if (result.headerRowIdx !== -1) break;
+            }
+
+            // If still not found, default to row 0, column 0
+            if (result.headerRowIdx === -1) {
+                result.headerRowIdx = 0;
+                result.manualColIdx = 0;
+            }
+
+            // Extract links from the Manual column
+            for (let r = result.headerRowIdx + 1; r < rows.length; r++) {
+                result.rowsProcessed++;
+                const cell = rows[r]?.values?.[result.manualColIdx];
+                if (!cell) continue;
+
+                const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+                if (!label) continue;
+
+                let hyperlink = cell.hyperlink;
+
+                if (!hyperlink && cell.textFormatRuns) {
+                    for (const run of cell.textFormatRuns) {
+                        if (run?.format?.link?.uri) {
+                            hyperlink = run.format.link.uri;
+                            break;
+                        }
+                    }
+                }
+
+                if (!hyperlink && cell.userEnteredValue?.formulaValue) {
+                    const formula = cell.userEnteredValue.formulaValue;
+                    const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                    if (match) hyperlink = match[1];
+                }
+
+                result.cellsInspected.push({
+                    row: r,
+                    label: normalizeKey(label),
+                    hyperlink: hyperlink || null,
+                });
+
+                if (label && hyperlink) {
+                    result.linkMap[normalizeKey(label)] = hyperlink;
+                }
+            }
+        }
+    } catch (error: unknown) {
+        result.error = error instanceof Error ? error.message : String(error);
+    }
+
+    return result;
 }
 
 // Member turtles cache TTL
