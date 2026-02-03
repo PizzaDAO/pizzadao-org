@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
 
 type Manual = {
@@ -106,7 +106,20 @@ export default function ManualsPage() {
   const [error, setError] = useState<string | null>(null);
   const [searchQuery, setSearchQuery] = useState("");
   const [crewFilter, setCrewFilter] = useState("");
-  const [statusFilter, setStatusFilter] = useState("");
+  const [statusFilters, setStatusFilters] = useState<string[]>(["Complete", "Draft"]);
+  const [statusDropdownOpen, setStatusDropdownOpen] = useState(false);
+  const statusDropdownRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdown when clicking outside
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (statusDropdownRef.current && !statusDropdownRef.current.contains(event.target as Node)) {
+        setStatusDropdownOpen(false);
+      }
+    }
+    document.addEventListener("mousedown", handleClickOutside);
+    return () => document.removeEventListener("mousedown", handleClickOutside);
+  }, []);
 
   useEffect(() => {
     async function fetchManuals() {
@@ -129,6 +142,15 @@ export default function ManualsPage() {
   const uniqueCrews = [...new Set(manuals.map((m) => m.crew).filter(Boolean))].sort();
   const uniqueStatuses = [...new Set(manuals.map((m) => m.status).filter(Boolean))].sort();
 
+  // Toggle status filter
+  const toggleStatusFilter = (status: string) => {
+    setStatusFilters((prev) =>
+      prev.includes(status)
+        ? prev.filter((s) => s !== status)
+        : [...prev, status]
+    );
+  };
+
   // Filter manuals
   const filteredManuals = manuals.filter((manual) => {
     const matchesSearch =
@@ -138,7 +160,8 @@ export default function ManualsPage() {
     const matchesCrew =
       !crewFilter || manual.crew.toLowerCase() === crewFilter.toLowerCase();
     const matchesStatus =
-      !statusFilter || manual.status.toLowerCase() === statusFilter.toLowerCase();
+      statusFilters.length === 0 ||
+      statusFilters.some((s) => manual.status.toLowerCase() === s.toLowerCase());
     return matchesSearch && matchesCrew && matchesStatus;
   });
 
@@ -205,13 +228,17 @@ export default function ManualsPage() {
               onChange={(e) => setCrewFilter(e.target.value)}
               style={{
                 flex: 1,
-                padding: "10px 12px",
+                padding: "10px 28px 10px 12px",
                 fontSize: 14,
                 border: "1px solid rgba(0,0,0,0.12)",
                 borderRadius: 8,
                 outline: "none",
                 background: "white",
                 cursor: "pointer",
+                appearance: "none",
+                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                backgroundRepeat: "no-repeat",
+                backgroundPosition: "right 12px center",
               }}
             >
               <option value="">All Crews</option>
@@ -221,27 +248,95 @@ export default function ManualsPage() {
                 </option>
               ))}
             </select>
-            <select
-              value={statusFilter}
-              onChange={(e) => setStatusFilter(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "10px 12px",
-                fontSize: 14,
-                border: "1px solid rgba(0,0,0,0.12)",
-                borderRadius: 8,
-                outline: "none",
-                background: "white",
-                cursor: "pointer",
-              }}
-            >
-              <option value="">All Statuses</option>
-              {uniqueStatuses.map((status) => (
-                <option key={status} value={status}>
-                  {status}
-                </option>
-              ))}
-            </select>
+            {/* Status multi-select dropdown */}
+            <div ref={statusDropdownRef} style={{ flex: 1, position: "relative" }}>
+              <button
+                type="button"
+                onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
+                style={{
+                  width: "100%",
+                  padding: "10px 28px 10px 12px",
+                  fontSize: 14,
+                  border: "1px solid rgba(0,0,0,0.12)",
+                  borderRadius: 8,
+                  outline: "none",
+                  background: "white",
+                  cursor: "pointer",
+                  textAlign: "left",
+                  appearance: "none",
+                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+                  backgroundRepeat: "no-repeat",
+                  backgroundPosition: "right 12px center",
+                }}
+              >
+                {statusFilters.length === 0
+                  ? "All Statuses"
+                  : statusFilters.length === uniqueStatuses.length
+                  ? "All Statuses"
+                  : statusFilters.join(", ")}
+              </button>
+              {statusDropdownOpen && (
+                <div
+                  style={{
+                    position: "absolute",
+                    top: "calc(100% + 4px)",
+                    left: 0,
+                    right: 0,
+                    background: "white",
+                    border: "1px solid rgba(0,0,0,0.12)",
+                    borderRadius: 8,
+                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    zIndex: 10,
+                    padding: "8px 0",
+                  }}
+                >
+                  <label
+                    style={{
+                      display: "flex",
+                      alignItems: "center",
+                      padding: "8px 12px",
+                      cursor: "pointer",
+                      fontSize: 14,
+                      borderBottom: "1px solid rgba(0,0,0,0.06)",
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      checked={statusFilters.length === 0 || statusFilters.length === uniqueStatuses.length}
+                      onChange={() => {
+                        if (statusFilters.length === uniqueStatuses.length) {
+                          setStatusFilters([]);
+                        } else {
+                          setStatusFilters([...uniqueStatuses]);
+                        }
+                      }}
+                      style={{ marginRight: 8, width: 16, height: 16 }}
+                    />
+                    All Statuses
+                  </label>
+                  {uniqueStatuses.map((status) => (
+                    <label
+                      key={status}
+                      style={{
+                        display: "flex",
+                        alignItems: "center",
+                        padding: "8px 12px",
+                        cursor: "pointer",
+                        fontSize: 14,
+                      }}
+                    >
+                      <input
+                        type="checkbox"
+                        checked={statusFilters.includes(status)}
+                        onChange={() => toggleStatusFilter(status)}
+                        style={{ marginRight: 8, width: 16, height: 16 }}
+                      />
+                      {status}
+                    </label>
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
@@ -310,7 +405,7 @@ export default function ManualsPage() {
                 }}
               >
                 <p style={{ fontSize: 16, color: "#666" }}>
-                  {searchQuery || crewFilter || statusFilter
+                  {searchQuery || crewFilter || statusFilters.length > 0
                     ? "No manuals match your filters."
                     : "No manuals found."}
                 </p>
@@ -333,7 +428,7 @@ export default function ManualsPage() {
               </div>
             )}
 
-            {(searchQuery || crewFilter || statusFilter) &&
+            {(searchQuery || crewFilter || (statusFilters.length > 0 && statusFilters.length < uniqueStatuses.length)) &&
               filteredManuals.length > 0 && (
                 <p
                   style={{
