@@ -1,47 +1,41 @@
 import { parseGvizJson } from "@/app/lib/gviz-parser";
+import {
+  TableConfig,
+  parseTable,
+  getColumnValue,
+  isTablesModeDetected,
+} from "@/app/lib/table-parser";
 import { NextResponse } from 'next/server'
 import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
+import { GvizRow, GvizTable } from "@/app/lib/types/gviz";
 
 const MANUALS_SHEET_ID = '1KDAzz8qQubCaFiplWaUFBgCZlHR_mIA0IJHKNqgK5hg'
 
-// Helper to normalize strings
-function norm(s: unknown): string {
-  return String(s ?? '').trim().replace(/\s+/g, ' ')
+/**
+ * Manual table parsing configuration
+ * Handles Google Sheets Tables mode with anchor-based detection
+ */
+const MANUAL_TABLE_CONFIG: TableConfig = {
+  anchorKeywords: ['manuals', 'manual'],
+  headerMappings: [
+    ['manual', ['manual', 'manuals', 'title', 'name']],
+    ['crew', ['crew', 'team', 'group']],
+    ['status', ['status', 'state', 'stage']],
+    ['authorId', ['author id', 'authorid', 'member id']],
+    ['author', ['author', 'creator', 'owner', 'by']],
+    ['lastUpdated', ['last updated', 'updated', 'date', 'modified']],
+    ['notes', ['notes', 'note', 'comments', 'description']],
+  ],
+  requiredColumns: ['manual'],
 }
 
-// Get cell value
-function cellVal(cell: any): string {
-  return norm(cell?.v ?? cell?.f ?? '')
-}
-
-// Extract URL from GViz cell (fallback for when Sheets API doesn't return hyperlinks)
-// This matches the approach used in crew route's parseAgenda
-function extractUrl(cell: any): string | null {
-  if (!cell) return null
-
-  // Check for GViz link property (how GViz returns Ctrl+K hyperlinks)
-  if (cell.l) return cell.l
-
-  // Check for explicit hyperlink in cell properties
-  if (cell.hyperlink) return cell.hyperlink
-
-  // Check formatted value for URL patterns
-  const text = String(cell?.f ?? cell?.v ?? '')
-
-  // Try to extract URL from HYPERLINK formula pattern
-  const hyperlinkMatch = text.match(/HYPERLINK\s*\(\s*"([^"]+)"/i)
-  if (hyperlinkMatch) return hyperlinkMatch[1]
-
-  // Try to extract URL in parentheses: (https://...)
-  const parenMatch = text.match(/\((https?:\/\/[^\s\)]+)\)/)
-  if (parenMatch) return parenMatch[1]
-
-  // Try to extract raw URL from text
-  const urlMatch = text.match(/https?:\/\/[^\s"<>\)]+/)
-  if (urlMatch) return urlMatch[0]
-
-  return null
+// Convert crew label to ID (slug format)
+function crewLabelToId(label: string): string {
+  return label.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
 }
 
 export type Manual = {
@@ -56,12 +50,40 @@ export type Manual = {
   notes: string
 }
 
-// Convert crew label to ID (slug format)
-function crewLabelToId(label: string): string {
-  return label.trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
+/**
+ * Parse a row into a Manual object
+ * Returns null if the row should be skipped (empty or header row)
+ */
+function parseManualRow(
+  row: GvizRow,
+  columns: Record<string, number>,
+  rowIndex: number,
+  linkMap: Record<string, string>
+): Manual | null {
+  const title = getColumnValue(row, columns, 'manual')
+
+  // Skip empty rows
+  if (!title) return null
+
+  // Skip header rows that might have been duplicated
+  const titleLower = title.toLowerCase().trim()
+  if (titleLower === 'manual' || titleLower === 'manuals' || titleLower === 'title') {
+    return null
+  }
+
+  const crew = getColumnValue(row, columns, 'crew')
+
+  return {
+    title,
+    url: linkMap[title] || null,
+    crew,
+    crewId: crewLabelToId(crew),
+    status: getColumnValue(row, columns, 'status'),
+    authorId: getColumnValue(row, columns, 'authorId'),
+    author: getColumnValue(row, columns, 'author'),
+    lastUpdated: getColumnValue(row, columns, 'lastUpdated'),
+    notes: getColumnValue(row, columns, 'notes'),
+  }
 }
 
 export async function GET(req: Request) {
@@ -77,6 +99,7 @@ export async function GET(req: Request) {
     }
 
     // Fetch spreadsheet data via GViz API and hyperlinks via Sheets API in parallel
+    // Note: headers=1 tells GViz to treat first row as headers (but Tables mode ignores this)
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${MANUALS_SHEET_ID}/gviz/tq?tqx=out:json&headers=1`
 
     // Use debug version when debug mode is enabled
@@ -97,39 +120,23 @@ export async function GET(req: Request) {
 
       const text = await sheetRes.text()
       const gviz = parseGvizJson(text)
-      const rows = gviz?.table?.rows || []
+      const table = gviz?.table as GvizTable
 
-      // Parse manuals from rows
-      const manuals: Manual[] = []
-
-      for (const row of rows) {
-        const cells = row?.c || []
-        const title = cellVal(cells[0])
-        if (!title) continue
-
-        const crew = cellVal(cells[1])
-        const status = cellVal(cells[2])
-
-        if (crewFilter && crew.toLowerCase() !== crewFilter) {
-          continue
-        }
-
-        // Priority: 1. Sheets API link map (Ctrl+K/rich text links)  2. GViz extraction (cell.l)
-        const titleCell = cells[0]
-        const url = linkMap[title] || extractUrl(titleCell)
-
-        manuals.push({
-          title,
-          url,
-          crew,
-          crewId: crewLabelToId(crew),
-          status,
-          authorId: cellVal(cells[3]),
-          author: cellVal(cells[4]),
-          lastUpdated: cellVal(cells[5]),
-          notes: cellVal(cells[6]),
-        })
+      if (!table) {
+        throw new Error('No table data in GViz response')
       }
+
+      // Parse manuals using the robust table parser
+      const allManuals = parseTable<Manual>(
+        table,
+        MANUAL_TABLE_CONFIG,
+        (row, columns, rowIndex) => parseManualRow(row, columns, rowIndex, linkMap)
+      )
+
+      // Apply crew filter if specified
+      const manuals = crewFilter
+        ? allManuals.filter(m => m.crew.toLowerCase() === crewFilter)
+        : allManuals
 
       return NextResponse.json({ manuals, _debug: debugInfo })
     }
@@ -146,46 +153,36 @@ export async function GET(req: Request) {
 
     const text = await sheetRes.text()
     const gviz = parseGvizJson(text)
-    const rows = gviz?.table?.rows || []
+    const table = gviz?.table as GvizTable
 
-    // Parse manuals from rows
-    // Expected columns: Manual, Crew, Status, Author ID, Author, Last Updated, Notes
-    const manuals: Manual[] = []
-
-    for (const row of rows) {
-      const cells = row?.c || []
-      const title = cellVal(cells[0])
-      if (!title) continue
-
-      const crew = cellVal(cells[1])
-      const status = cellVal(cells[2])
-
-      // Filter by crew if specified
-      if (crewFilter && crew.toLowerCase() !== crewFilter) {
-        continue
-      }
-
-      // Priority: 1. Sheets API link map (Ctrl+K/rich text links)  2. GViz extraction (cell.l)
-      const titleCell = cells[0]
-      const url = linkMap[title] || extractUrl(titleCell)
-
-      manuals.push({
-        title,
-        url,
-        crew,
-        crewId: crewLabelToId(crew),
-        status,
-        authorId: cellVal(cells[3]),
-        author: cellVal(cells[4]),
-        lastUpdated: cellVal(cells[5]),
-        notes: cellVal(cells[6]),
-      })
+    if (!table) {
+      throw new Error('No table data in GViz response')
     }
+
+    // Check if we're in Tables mode (for logging/debugging)
+    // Note: isTablesModeDetected is called internally by parseTable
+    void isTablesModeDetected(table) // Explicit acknowledgment for debugging
+
+    // Parse manuals using the robust table parser
+    // This handles:
+    // - Dynamic header row detection
+    // - Tables mode (concatenated column labels)
+    // - Various column naming conventions
+    const allManuals = parseTable<Manual>(
+      table,
+      MANUAL_TABLE_CONFIG,
+      (row, columns, rowIndex) => parseManualRow(row, columns, rowIndex, linkMap)
+    )
+
+    // Apply crew filter if specified
+    const manuals = crewFilter
+      ? allManuals.filter(m => m.crew.toLowerCase() === crewFilter)
+      : allManuals
 
     return NextResponse.json({ manuals })
   } catch (e: unknown) {
     return NextResponse.json(
-      { error: e instanceof Error ? (e as any)?.message : 'Failed to load manuals' },
+      { error: e instanceof Error ? e.message : 'Failed to load manuals' },
       { status: 500 }
     )
   }
