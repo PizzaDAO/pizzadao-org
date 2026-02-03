@@ -44,6 +44,7 @@ export type WizardData = {
   resolvedMovieTitle?: string;
   tmdbMovieId?: string;
   releaseDate?: string;
+  mediaType?: "movie" | "tv";
   suggestions?: string[];
   mafiaName?: string;
   seenNames: string[];
@@ -85,6 +86,7 @@ export type NamegenResponse = {
   resolvedMovieTitle: string;
   tmdbMovieId: string;
   releaseDate: string;
+  mediaType?: "movie" | "tv";
   style: "balanced" | "serious" | "goofy";
   suggestions: string[];
 };

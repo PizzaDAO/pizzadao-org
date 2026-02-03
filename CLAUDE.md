@@ -1,5 +1,26 @@
 # PizzaDAO Onboarding App
 
+## CRITICAL RULES - READ FIRST
+
+**NEVER implement code directly in the main repo.** ALL implementation MUST go through:
+1. A background implementation agent
+2. In a separate git worktree
+3. With a draft PR for Vercel preview
+
+**NO EXCEPTIONS.** Not even for "small" or "trivial" fixes.
+
+### Pre-Implementation Checklist
+
+Before writing ANY code to `/app`, `/components`, `/lib`, or `/prisma`:
+
+- [ ] Is there an approved plan in `/plans/{task-id}.md`?
+- [ ] Is the task marked "Doing" in the project sheet?
+- [ ] Am I dispatching a background agent with a worktree?
+
+**If ANY answer is NO → STOP and fix before proceeding.**
+
+---
+
 ## Project Overview
 Next.js application for PizzaDAO member onboarding, profile management, and community features.
 
@@ -26,11 +47,14 @@ Tasks are tracked in the project Google Sheet, accessible via the sheets-claude 
 2. PLAN           →  Spawn planning agents (background, parallel)
 3. SAVE PLANS     →  Plans saved to plans/{task-id}-{slug}.md
 4. REVIEW PLANS   →  Snax and Claude review together
-5. IMPLEMENT      →  Spawn implementation agents on feature branches
-6. REVIEW CODE    →  Snax and Claude review changes via Vercel preview
-7. MERGE          →  Merge approved PRs to main
-8. MARK DONE      →  Update project sheet
+5. START TASK     →  Mark task as "Doing" in sheet before implementing
+6. IMPLEMENT      →  Spawn implementation agents on feature branches
+7. REVIEW CODE    →  Snax and Claude review changes via Vercel preview
+8. MERGE          →  Merge approved PRs to main
+9. MARK DONE      →  Update project sheet to "Done"
 ```
+
+**Important**: Always mark a task as "Doing" in the project sheet before starting implementation work.
 
 ### Phase 1: Planning
 
@@ -71,6 +95,16 @@ Task tool:
 ```
 
 This makes it easy for Snax to refer to specific tasks in conversation.
+
+**When presenting completed implementations**, always show the **Vercel preview URL** (not GitHub PR link):
+
+```
+| Task | Preview |
+|------|---------|
+| example-12345 | https://onboarding-git-feature-example-12345-fix-login-pizza-dao.vercel.app |
+```
+
+Snax reviews via Vercel previews, not GitHub.
 
 ### Phase 3: Implementation
 
@@ -122,7 +156,14 @@ git worktree remove ../onboarding-{task-id}
 
 **Parallel implementation**: Multiple agents work in separate worktrees simultaneously - no conflicts.
 
-**Small tasks** (< 10 lines, single file): Can be done directly by Claude in main repo after plan review.
+### Phase 4: Review & Merge
+
+For each feature branch:
+1. Review the changes with Snax via Vercel preview
+2. Test if needed
+3. Merge PR to main
+4. Clean up worktree: `git worktree remove ../onboarding-{task-id}`
+5. Mark task done in project sheet
 
 ### Branching Convention
 

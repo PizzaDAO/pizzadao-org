@@ -1,4 +1,17 @@
 {
+  "hooks": {
+    "PreToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "powershell -ExecutionPolicy Bypass -File .claude/hooks/check-worktree.ps1"
+          }
+        ]
+      }
+    ]
+  },
   "permissions": {
     "allow": [
       "Bash(npx tsc:*)",
@@ -111,7 +124,11 @@
       "Bash(vercel redeploy)",
       "Bash(vercel --prod --yes:*)",
       "Bash(vercel logs:*)",
-      "Bash(vercel deploy)"
+      "Bash(vercel deploy)",
+      "Bash(node scripts/mobile-audit.mjs:*)",
+      "mcp__sheets-claude__update_task_status",
+      "mcp__sheets-claude__get_project_tasks",
+      "Bash(where npx)"
     ]
   }
 }

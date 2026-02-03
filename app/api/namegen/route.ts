@@ -1,15 +1,17 @@
 // app/api/namegen/route.ts
-import OpenAI from "openai";
+// SIMPLIFIED: No OpenAI - pure algorithmic name generation for instant results
+
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
 
-const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
-
-type TMDBSearchResult = {
+type TMDBMultiSearchResult = {
   id: number;
-  title: string;
+  media_type: "movie" | "tv" | "person";
+  title?: string;
   release_date?: string;
+  name?: string;
+  first_air_date?: string;
   overview?: string;
   popularity?: number;
   vote_count?: number;
@@ -20,6 +22,7 @@ type TMDBCreditsCast = {
   name: string;
   character?: string;
   order?: number;
+  roles?: { character?: string; episode_count?: number }[];
 };
 
 type TMDBCreditsCrew = {
@@ -46,40 +49,32 @@ function normalizeTitle(s: string) {
   return String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
-function normalizeSpaces(s: string) {
-  return s.trim().replace(/\s+/g, " ");
-}
-
-// ✅ normalize spacing but preserve original capitalization (for names)
-function normalizeNamePreserveCase(s: string) {
-  return normalizeSpaces(String(s ?? ""));
-}
-
-function sanitizeNameKeepSpaces(s: string) {
-  // keep spaces, hyphens, apostrophes; remove other punctuation
-  return normalizeSpaces(String(s ?? "")).replace(/[^A-Za-z\s'-]/g, "");
-}
-
-function escapeRegex(s: string) {
-  return s.replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
-}
-
-function splitWords(full: string) {
-  return normalizeSpaces(full).split(" ").filter(Boolean);
+// Extract first name from full name
+function getFirstName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  return parts[0] || "";
 }
 
 /**
  * Multi-word last-name heuristic:
- * - Include common surname particles like "De", "Van", "Von", etc.
- * - IMPORTANT: Do NOT include tokens like "Al"/"El" because they frequently
- *   appear as first names (e.g., "Al Pacino") and would incorrectly turn
- *   the full name into a "last name phrase".
+ * Includes common surname particles like "De", "Van", "Von", "Del", etc.
+ *
+ * Examples:
+ * - "Robert De Niro" → "De Niro"
+ * - "Jean-Claude Van Damme" → "Van Damme"
+ * - "Benicio Del Toro" → "Del Toro"
+ * - "Martin Scorsese" → "Scorsese"
+ *
+ * IMPORTANT: Do NOT include "Al"/"El" because they frequently appear as
+ * first names (e.g., "Al Pacino") and would incorrectly turn the full name
+ * into a "last name phrase".
  */
-function detectLastNamePhrase(fullName: string): string {
-  const parts = splitWords(fullName);
+function getLastName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
   if (parts.length === 0) return "";
   if (parts.length === 1) return parts[0];
 
+  // Surname particles that indicate multi-word last names
   const particles = new Set([
     "da",
     "de",
@@ -98,12 +93,13 @@ function detectLastNamePhrase(fullName: string): string {
     "ter",
     "bin",
     "ibn",
-    // intentionally NOT including "al" / "el"
+    // intentionally NOT including "al" / "el" - common first names
     "o'",
     "mc",
     "mac",
   ]);
 
+  // Walk backwards from the end, collecting particles
   let i = parts.length - 1;
   const phrase: string[] = [parts[i]];
   i--;
@@ -121,13 +117,24 @@ function detectLastNamePhrase(fullName: string): string {
   return phrase.join(" ");
 }
 
-function detectFirstNamePhrase(fullName: string): string {
-  const parts = splitWords(fullName);
-  if (parts.length === 0) return "";
-  return parts[0];
+/**
+ * For directors, keep everything after first name as last name phrase.
+ * This allows "Francis Ford Coppola" → "Ford Coppola" instead of just "Coppola".
+ */
+function getDirectorLastName(fullName: string): string {
+  const parts = fullName.trim().split(/\s+/);
+  if (parts.length <= 1) return parts[0] || "";
+  // Everything after first name becomes the last name phrase
+  return parts.slice(1).join(" ");
 }
 
-async function tmdbFetch(path: string, params: Record<string, string>) {
+// Clean a name part: remove non-alpha chars except hyphens/apostrophes/spaces
+// Preserves spaces for multi-word names like "De Niro" or "Ford Coppola"
+function cleanNamePart(s: string): string {
+  return s.replace(/[^A-Za-z' -]/g, "").trim();
+}
+
+async function tmdbFetch(path: string, params: Record<string, string>, signal?: AbortSignal) {
   const key = process.env.TMDB_API_KEY;
   if (!key) throw new Error("Missing TMDB_API_KEY");
 
@@ -137,15 +144,16 @@ async function tmdbFetch(path: string, params: Record<string, string>) {
 
   const res = await fetch(url.toString(), {
     headers: { Accept: "application/json" },
+    signal,
   });
 
   if (!res.ok) throw new Error(`TMDB error ${res.status} for ${path}`);
   return res.json();
 }
 
-// In-memory cache (local/dev friendly)
+// Simple in-memory cache
 const memCache = new Map<string, { at: number; value: any }>();
-const TTL_MS = 1000 * 60 * 60 * 24 * 7;
+const TTL_MS = 1000 * 60 * 60 * 24; // 24 hours
 
 function cacheGet(key: string) {
   const hit = memCache.get(key);
@@ -161,219 +169,143 @@ function cacheSet(key: string, value: any) {
   memCache.set(key, { at: Date.now(), value });
 }
 
-/**
- * In-flight dedupe:
- * Prevents users from firing multiple OpenAI calls by repeatedly clicking
- * Generate/Regenerate while an identical request is already running.
- */
-const inflight = new Map<string, Promise<any>>();
-
-/**
- * Local RPM gate (best-effort):
- * If you're on a tiny RPM limit (like 3 RPM), fail fast with Retry-After
- * instead of calling OpenAI and getting a raw 429.
- *
- * NOTE: This is per-process. In serverless with multiple instances, it's not
- * a global limiter, but it helps a lot in dev/single-instance deployments.
- */
-const rpmWindow: number[] = [];
-const RPM_LIMIT = 3;
-const WINDOW_MS = 60_000;
-
-function checkLocalRpmOrThrow() {
-  const now = Date.now();
-  while (rpmWindow.length && now - rpmWindow[0] > WINDOW_MS) rpmWindow.shift();
-  if (rpmWindow.length >= RPM_LIMIT) {
-    const retryMs = WINDOW_MS - (now - rpmWindow[0]);
-    const retryAfter = Math.max(1, Math.ceil(retryMs / 1000));
-    const e: any = new Error("Local RPM limit hit");
-    e.status = 429;
-    e.retryAfter = retryAfter;
-    throw e;
+// Seeded random for consistent shuffling within a request
+function seededShuffle<T>(arr: T[], seed: number): T[] {
+  const result = [...arr];
+  let s = seed;
+  for (let i = result.length - 1; i > 0; i--) {
+    s = (s * 1103515245 + 12345) & 0x7fffffff;
+    const j = s % (i + 1);
+    [result[i], result[j]] = [result[j], result[i]];
   }
-  rpmWindow.push(now);
-}
-
-function isRateLimitError(err: any) {
-  const status = err?.status ?? err?.response?.status;
-  const msg = String(err?.message ?? "").toLowerCase();
-  return status === 429 || msg.includes("rate limit") || msg.includes("429");
+  return result;
 }
 
 /**
- * Minimal retry/backoff for OpenAI 429s.
+ * Iconic family names from popular mafia/crime shows and movies.
+ * These should appear first in suggestions when the title matches.
  */
-async function callOpenAIWithBackoff<T>(fn: () => Promise<T>, tries = 3) {
-  let lastErr: any;
-  for (let i = 0; i < tries; i++) {
-    try {
-      return await fn();
-    } catch (e: unknown) {
-      lastErr = e;
-      if (!isRateLimitError(e) || i === tries - 1) throw e;
-
-      // exponential backoff + jitter
-      const delay = Math.min(3000, 300 * 2 ** i) + Math.floor(Math.random() * 250);
-      await new Promise((r) => setTimeout(r, delay));
-    }
-  }
-  throw lastErr;
-}
+const ICONIC_FAMILIES: Record<string, string[]> = {
+  "the sopranos": ["Soprano"],
+  "sopranos": ["Soprano"],
+  "the wire": ["Barksdale", "Bell", "Omar"],
+  "wire": ["Barksdale", "Bell", "Omar"],
+  "the godfather": ["Corleone"],
+  "godfather": ["Corleone"],
+  "the godfather part ii": ["Corleone"],
+  "the godfather part iii": ["Corleone"],
+  "goodfellas": ["Hill", "DeVito"],
+  "scarface": ["Montana"],
+  "boardwalk empire": ["Thompson", "Nucky"],
+  "breaking bad": ["White", "Heisenberg"],
+  "ozark": ["Byrde"],
+  "the departed": ["Costello", "Costigan"],
+  "departed": ["Costello", "Costigan"],
+  "casino": ["Rothstein", "Santoro"],
+  "a bronx tale": ["Calogero", "Sonny"],
+  "bronx tale": ["Calogero", "Sonny"],
+  "donnie brasco": ["Brasco", "Pistone"],
+  "gomorrah": ["Savastano"],
+  "gomorra": ["Savastano"],
+  "peaky blinders": ["Shelby"],
+  "the irishman": ["Sheeran", "Bufalino"],
+  "irishman": ["Sheeran", "Bufalino"],
+  "mob city": ["Cohen"],
+  "power": ["St. Patrick", "Ghost"],
+  "narcos": ["Escobar"],
+  "narcos mexico": ["Gallardo"],
+  "sons of anarchy": ["Teller", "Morrow"],
+};
 
 /**
- * RULE MODEL:
- * - Name is exactly TWO PARTS (two chunks):
- *   1) topping phrase (can be multiword, e.g. "Green Pepper")
- *   2) cast name phrase (can be multiword, e.g. "De Niro")
+ * Generate pizza mafia names algorithmically:
+ * - Pattern A: "<Topping> <LastName>" (e.g., "Pepperoni Barksdale")
+ * - Pattern B: "<FirstName> <Topping>" (e.g., "Omar Pepperoni")
  *
- * Valid forms:
- *   A) "<TOPPING> <LASTNAME_PHRASE>"
- *   B) "<FIRSTNAME_PHRASE> <TOPPING>"
+ * Uses cast names from TMDB - no AI needed!
  *
- * Where:
- * - lastname phrase must be from actor/character last-name phrases
- * - firstname phrase must be from actor/character first-name phrases
- *
- * IMPORTANT:
- * - Preserve capitalization for cast phrases (LaBeouf stays LaBeouf)
- * - Only normalize whitespace for matching
+ * Prioritization:
+ * 1. Iconic family names from ICONIC_FAMILIES map (if title matches)
+ * 2. Remaining names in TMDB billing order (correlates with screentime)
  */
-function buildFilterAndReranker(
-  toppingPhraseRaw: string,
-  topCast: Array<{
-    actorFirstPhrase: string;
-    actorLastPhrase: string;
-    characterFirstPhrase: string;
-    characterLastPhrase: string;
-    castOrder: number;
-  }>,
-  style: "balanced" | "serious" | "goofy"
-) {
-  const toppingPhrase = titleCase(toppingPhraseRaw);
-  const toppingLower = toppingPhrase.toLowerCase();
+function generateNames(
+  topping: string,
+  castNames: { firstName: string; lastName: string; source: "actor" | "character" }[],
+  excludeSet: Set<string>,
+  count: number = 3,
+  resolvedTitle?: string
+): string[] {
+  const results: string[] = [];
+  const used = new Set<string>();
 
-  const firstPhrases = new Set(
-    topCast
-      .flatMap((c) => [c.actorFirstPhrase, c.characterFirstPhrase])
-      .map((x) => normalizeNamePreserveCase(x))
-      .filter(Boolean)
-  );
+  // Build candidate pool: both patterns for each cast member
+  // Keep them in order (TMDB billing order = screentime order)
+  const candidates: string[] = [];
 
-  const lastPhrases = new Set(
-    topCast
-      .flatMap((c) => [c.actorLastPhrase, c.characterLastPhrase])
-      .map((x) => normalizeNamePreserveCase(x))
-      .filter(Boolean)
-  );
+  for (const { firstName, lastName } of castNames) {
+    const cleanFirst = cleanNamePart(firstName);
+    const cleanLast = cleanNamePart(lastName);
 
-  // Order maps (use normalized spacing, preserve case)
-  const firstToOrder = new Map<string, number>();
-  const lastToOrder = new Map<string, number>();
-
-  for (const c of topCast) {
-    const af = normalizeNamePreserveCase(c.actorFirstPhrase);
-    const cf = normalizeNamePreserveCase(c.characterFirstPhrase);
-    const al = normalizeNamePreserveCase(c.actorLastPhrase);
-    const cl = normalizeNamePreserveCase(c.characterLastPhrase);
-
-    if (af && !firstToOrder.has(af)) firstToOrder.set(af, c.castOrder);
-    if (cf && !firstToOrder.has(cf)) firstToOrder.set(cf, c.castOrder);
-
-    if (al && !lastToOrder.has(al)) lastToOrder.set(al, c.castOrder);
-    if (cl && !lastToOrder.has(cl)) lastToOrder.set(cl, c.castOrder);
+    if (cleanLast && cleanLast.length > 1) {
+      // Pattern A: "Topping LastName"
+      candidates.push(`${topping} ${cleanLast}`);
+    }
+    if (cleanFirst && cleanFirst.length > 1) {
+      // Pattern B: "FirstName Topping"
+      candidates.push(`${cleanFirst} ${topping}`);
+    }
   }
 
-  // Match exact two-part patterns (case-insensitive, space-normalized)
-  const topEsc = escapeRegex(toppingPhrase);
-  const reToppingLast = new RegExp(`^${topEsc}\\s+(.+)$`, "i");
-  const reFirstTopping = new RegExp(`^(.+)\\s+${topEsc}$`, "i");
+  // Check if we have iconic family names for this title
+  const titleKey = resolvedTitle?.toLowerCase().trim() || "";
+  const iconicFamilies = ICONIC_FAMILIES[titleKey] || [];
 
-  function isAllowed(name: string) {
-    const nRaw = sanitizeNameKeepSpaces(name);
-    const n = normalizeSpaces(nRaw);
-    if (!n) return false;
+  // Partition candidates: iconic family names first, then rest in billing order
+  const iconicCandidates: string[] = [];
+  const otherCandidates: string[] = [];
 
-    const lower = n.toLowerCase();
+  for (const candidate of candidates) {
+    // Check if this candidate contains an iconic family name
+    const isIconic = iconicFamilies.some((family) => {
+      const familyLower = family.toLowerCase();
+      const candidateLower = candidate.toLowerCase();
+      // Check if the family name appears as a word in the candidate
+      // e.g., "Pepperoni Soprano" contains "Soprano"
+      return candidateLower.includes(familyLower);
+    });
 
-    // "<TOPPING> <LASTNAME_PHRASE>"
-    if (lower.startsWith(toppingLower + " ")) {
-      const m = n.match(reToppingLast);
-      if (!m) return false;
-      const last = normalizeNamePreserveCase(m[1]);
-      return lastPhrases.has(last);
+    if (isIconic) {
+      iconicCandidates.push(candidate);
+    } else {
+      otherCandidates.push(candidate);
     }
-
-    // "<FIRSTNAME_PHRASE> <TOPPING>"
-    if (lower.endsWith(" " + toppingLower)) {
-      const m = n.match(reFirstTopping);
-      if (!m) return false;
-      const first = normalizeNamePreserveCase(m[1]);
-      return firstPhrases.has(first);
-    }
-
-    return false;
   }
 
-  function score(name: string) {
-    const n = normalizeSpaces(sanitizeNameKeepSpaces(name));
-    const lower = n.toLowerCase();
+  // Prioritized order: iconic first, then billing order
+  const prioritized = [...iconicCandidates, ...otherCandidates];
 
-    const toppingIsFirst = lower.startsWith(toppingLower + " ");
-    const toppingIsLast = lower.endsWith(" " + toppingLower);
-
-    // Extract the non-topping phrase (preserve capitalization from candidate)
-    let nonPhrase = "";
-    if (toppingIsFirst) nonPhrase = normalizeNamePreserveCase(n.replace(reToppingLast, "$1"));
-    else if (toppingIsLast) nonPhrase = normalizeNamePreserveCase(n.replace(reFirstTopping, "$1"));
-
-    // If topping is last => nonPhrase is FIRSTNAME_PHRASE (use firstToOrder)
-    // else => nonPhrase is LASTNAME_PHRASE (use lastToOrder)
-    const order = toppingIsLast ? firstToOrder.get(nonPhrase) : lastToOrder.get(nonPhrase);
-    const orderBonus = order == null ? 0 : Math.max(0, 40 - order * 3);
-
-    let s = 0;
-
-    // Pattern preference:
-    // "FirstName Topping" reads nickname-y; "Topping LastName" reads mafia-ish
-    if (toppingIsLast) s += style === "serious" ? 18 : style === "goofy" ? 34 : 26; // First Topping
-    else s += style === "serious" ? 28 : style === "goofy" ? 20 : 24; // Topping Last
-
-    // Cast prominence bonus
-    s += orderBonus;
-
-    // Small adjustments
-    if (style === "serious") {
-      if (nonPhrase.length >= 7) s += 6;
+  // Pick names that aren't excluded or duplicated
+  for (const name of prioritized) {
+    const normalized = name.toLowerCase();
+    if (!excludeSet.has(normalized) && !used.has(normalized)) {
+      results.push(name);
+      used.add(normalized);
+      if (results.length >= count) break;
     }
-    if (style === "goofy") {
-      if (nonPhrase.length <= 6) s += 4;
-    }
-
-    return s;
   }
 
-  function rerank(list: string[]) {
-    const uniq = Array.from(
-      new Set(list.map((x) => normalizeSpaces(sanitizeNameKeepSpaces(x))))
-    ).filter(Boolean);
-
-    const filtered = uniq.filter(isAllowed);
-    filtered.sort((x, y) => score(y) - score(x));
-    return filtered;
-  }
-
-  return { rerank };
+  return results;
 }
 
 export async function POST(req: Request) {
+  const abortController = new AbortController();
+  const timeoutId = setTimeout(() => abortController.abort(), 8000); // 8s timeout
+
   try {
     const body = await req.json();
 
     const toppingRaw = clampStr(body.topping, 80);
     const mafiaMovieTitle = clampStr(body.movieTitle, 120);
-    const style: "balanced" | "serious" | "goofy" =
-      body.style === "serious" || body.style === "goofy" ? body.style : "balanced";
-
     const force = body?.force === true;
 
     const exclude: string[] = Array.isArray(body?.exclude) ? body.exclude : [];
@@ -382,304 +314,189 @@ export async function POST(req: Request) {
     );
 
     if (!toppingRaw || !mafiaMovieTitle) {
+      clearTimeout(timeoutId);
       return NextResponse.json({ error: "Provide topping and movieTitle." }, { status: 400 });
     }
 
     const toppingPhrase = titleCase(toppingRaw);
 
-    // TMDB search (English overview)
-    const search = await tmdbFetch("search/movie", {
-      query: mafiaMovieTitle,
-      include_adult: "false",
-      language: "en-US",
-    });
+    // TMDB search (multi search for movies AND TV shows)
+    const search = await tmdbFetch(
+      "search/multi",
+      {
+        query: mafiaMovieTitle,
+        include_adult: "false",
+        language: "en-US",
+      },
+      abortController.signal
+    );
 
-    const results: TMDBSearchResult[] = Array.isArray(search?.results) ? search.results : [];
+    // Filter to only movies and TV shows
+    const results: TMDBMultiSearchResult[] = (Array.isArray(search?.results) ? search.results : [])
+      .filter((r: any) => r.media_type === "movie" || r.media_type === "tv");
 
-    function normalizeLoose(s: string) {
-      const n = normalizeTitle(s);
-      // treat leading "the" as optional (e.g., "Godfather" ~= "The Godfather")
-      return n.startsWith("the") ? n.slice(3) : n;
-    }
+    const getTitle = (r: TMDBMultiSearchResult) =>
+      r.media_type === "movie" ? r.title : r.name;
+    const getReleaseDate = (r: TMDBMultiSearchResult) =>
+      r.media_type === "movie" ? r.release_date : r.first_air_date;
 
-    const inputTitle = mafiaMovieTitle.trim();
-    const inputNorm = normalizeTitle(inputTitle);
-    const inputLoose = normalizeLoose(inputTitle);
-
+    // Ranking: prefer exact matches, classics (older + highly rated), then popularity
+    const inputNorm = normalizeTitle(mafiaMovieTitle);
     const ranked = results
       .map((r) => {
-        const title = r.title ?? "";
-        const titleLower = title.toLowerCase();
-
+        const title = getTitle(r) ?? "";
         const titleNorm = normalizeTitle(title);
-        const titleLoose = normalizeLoose(title);
-
-        const exact = titleNorm === inputNorm;
-        const exactLoose = titleLoose === inputLoose;
-
-        const contains = titleLower.includes(inputTitle.toLowerCase());
-
-        // Light nostalgia, but don't reward ancient years over popularity.
-        const year = r.release_date ? Number(r.release_date.slice(0, 4)) : 9999;
-
-        // Soft preference for ~1970–2005 "mafia era" (doesn't hard-ban others)
-        const eraBonus =
-          year >= 1970 && year <= 2005 ? 250 : 0;
-
-        // Small penalty for *very* old titles unless they are massively voted
-        const ancientPenalty =
-          year < 1955 ? -800 : 0;
-
-        // If the user typed a year (e.g. "Scarface 1983"), respect it
-        const inputHasYear = /\b(19|20)\d{2}\b/.test(inputTitle);
-        const yearMatchBonus =
-          inputHasYear && inputTitle.includes(String(year)) ? 2500 : 0;
-
-        const overview = (r.overview ?? "").toLowerCase();
-        const mafiaHit =
-          overview.includes("mafia") ||
-          overview.includes("mob") ||
-          overview.includes("gangster") ||
-          overview.includes("organized crime");
-
-        // Popularity + votes: strong "this is the famous one" signal.
         const pop = typeof r.popularity === "number" ? r.popularity : 0;
         const votes = typeof r.vote_count === "number" ? r.vote_count : 0;
+        const rating = typeof r.vote_average === "number" ? r.vote_average : 0;
+        const releaseYear = parseInt(getReleaseDate(r)?.slice(0, 4) || "0", 10);
 
-        // 🔒 Require minimum credibility for "classic" picks
-        const MIN_CLASSIC_VOTES = 500;
-        const credible = votes >= MIN_CLASSIC_VOTES;
+        // For classic/iconic titles, prefer the original (older) version
+        // A highly-rated older movie is likely the "definitive" version
+        // This helps "godfather" find The Godfather (1972) over recent remakes
+        const isExactOrClose = titleNorm === inputNorm || titleNorm.includes(inputNorm);
+        const isClassic = releaseYear > 0 && releaseYear < 2000 && rating >= 7.5 && votes > 1000;
+        const classicBonus = isExactOrClose && isClassic ? 5000 : 0;
 
-        // Log votes so huge titles win without the score exploding.
-        const voteScore = Math.log10(votes + 1) * 250; // ~0..1000-ish
-        const popScore = pop * 8;
-
+        // Boost highly-rated films with many votes (classics tend to have both)
+        const ratingBonus = rating > 8 && votes > 5000 ? 2000 : 0;
 
         const score =
-          (exact ? 8000 : 0) +
-          (exactLoose ? 6000 : 0) +
-          (contains ? 400 : 0) +
-          (mafiaHit ? 700 : 0) +
-          popScore +
-          voteScore +
-          eraBonus +
-          ancientPenalty +
-          yearMatchBonus +
-          (credible ? 0 : -10_000);
+          (titleNorm === inputNorm ? 10000 : 0) +
+          (titleNorm.includes(inputNorm) ? 1000 : 0) +
+          classicBonus +
+          ratingBonus +
+          pop * 10 +
+          Math.log10(votes + 1) * 100;
 
         return { ...r, _score: score };
       })
-      .sort((a, b) => (b as any)._score - (a as any)._score);
+      .sort((a, b) => b._score - a._score);
 
     const best = ranked[0];
 
     if (!best?.id) {
-      return NextResponse.json({ error: `No movie found for "${mafiaMovieTitle}"` }, { status: 404 });
+      clearTimeout(timeoutId);
+      return NextResponse.json(
+        { error: `No movie or TV show found for "${mafiaMovieTitle}"` },
+        { status: 404 }
+      );
     }
 
-    const movieId = String(best.id);
-    const releaseDate = best.release_date ?? "";
+    const mediaId = String(best.id);
+    const mediaType = best.media_type;
+    const resolvedTitle = getTitle(best) ?? "";
+    const releaseDate = getReleaseDate(best) ?? "";
 
-    // Cache only for non-force calls (Generate). Regenerate uses force:true so it always changes.
-    // Bump cache version so old behavior won't hit.
-    const cacheKey = `v9|${movieId}|${toppingPhrase}|${style}`;
-    if (!force) {
-      const cached = cacheGet(cacheKey);
-      if (cached) return NextResponse.json({ ...cached, cached: true });
+    // Check cache for TMDB credits (not final result - allows regenerate to work)
+    const creditsCacheKey = `credits-v2|${mediaId}|${mediaType}`;
+    let credits = cacheGet(creditsCacheKey);
+
+    if (!credits) {
+      // Fetch credits from TMDB
+      const creditsPath = mediaType === "movie"
+        ? `movie/${mediaId}/credits`
+        : `tv/${mediaId}/aggregate_credits`;
+      credits = await tmdbFetch(creditsPath, { language: "en-US" }, abortController.signal);
+      cacheSet(creditsCacheKey, credits);
     }
 
-    // TMDB credits (cast + crew)
-    const credits = await tmdbFetch(`movie/${movieId}/credits`, { language: "en-US" });
     const cast: TMDBCreditsCast[] = Array.isArray(credits?.cast) ? credits.cast : [];
     const crew: TMDBCreditsCrew[] = Array.isArray(credits?.crew) ? credits.crew : [];
 
-    // Extract directors from crew
-    const directors = crew.filter((c) => c.job === "Director");
+    // Extract names from cast (actors + characters) and directors
+    const castNames: { firstName: string; lastName: string; source: "actor" | "character" }[] = [];
 
-    const topCast = cast
+    // Add directors first (high priority)
+    // For directors, keep full "last name" (e.g., "Ford Coppola" not just "Coppola")
+    const directors = crew.filter((c) => c.job === "Director");
+    for (const d of directors.slice(0, 5)) {
+      if (d.name) {
+        castNames.push({
+          firstName: getFirstName(d.name),
+          lastName: getDirectorLastName(d.name),
+          source: "actor",
+        });
+      }
+    }
+
+    // Add top cast (sorted by billing order)
+    const sortedCast = cast
       .slice()
       .sort((a, b) => (a.order ?? 999) - (b.order ?? 999))
-      .slice(0, 24)
-      .map((c) => {
-        // ✅ preserve TMDB capitalization in the phrases we store
-        const actorFirstPhrase = normalizeNamePreserveCase(detectFirstNamePhrase(c.name));
-        const actorLastPhrase = normalizeNamePreserveCase(detectLastNamePhrase(c.name));
+      .slice(0, 30);
 
-        const characterFirstPhrase = c.character
-          ? normalizeNamePreserveCase(detectFirstNamePhrase(c.character))
-          : "";
-        const characterLastPhrase = c.character
-          ? normalizeNamePreserveCase(detectLastNamePhrase(c.character))
-          : "";
+    for (const c of sortedCast) {
+      // Actor name
+      if (c.name) {
+        castNames.push({
+          firstName: getFirstName(c.name),
+          lastName: getLastName(c.name),
+          source: "actor",
+        });
+      }
+      // Character name (handles both movie and TV formats)
+      const character = c.character || c.roles?.[0]?.character || "";
+      if (character && !character.includes("(") && !character.includes("/")) {
+        // Skip complex character descriptions like "Self (archive footage)"
+        castNames.push({
+          firstName: getFirstName(character),
+          lastName: getLastName(character),
+          source: "character",
+        });
+      }
+    }
 
-        return {
-          actorFirstPhrase,
-          actorLastPhrase,
-          characterFirstPhrase,
-          characterLastPhrase,
-          castOrder: c.order ?? 999,
-        };
-      });
+    // Generate names algorithmically with iconic family prioritization
+    const suggestions = generateNames(toppingPhrase, castNames, excludeSet, 3, resolvedTitle);
 
-    // Add directors to the cast list (with high priority - order 0)
-    // For directors, preserve middle names as part of last name (e.g., "Ford Coppola" not just "Coppola")
-    const directorEntries = directors.map((d) => {
-      const parts = splitWords(d.name);
-      const directorFirstPhrase = parts.length > 0 ? normalizeNamePreserveCase(parts[0]) : "";
-      // Everything after first name becomes the "last name phrase" (e.g., "Ford Coppola")
-      const directorLastPhrase = parts.length > 1
-        ? normalizeNamePreserveCase(parts.slice(1).join(" "))
-        : "";
+    // Generate a larger pool for the UI (also prioritized)
+    const allNames = generateNames(toppingPhrase, castNames, new Set(), 30, resolvedTitle);
 
-      return {
-        actorFirstPhrase: directorFirstPhrase,
-        actorLastPhrase: directorLastPhrase,
-        characterFirstPhrase: "", // Directors don't have character names
-        characterLastPhrase: "",
-        castOrder: 0, // Give directors highest priority
-      };
+    if (suggestions.length < 3) {
+      // Fallback: if we can't get 3 unique names, use what we have
+      // This should be rare but prevents the "Could not generate" error
+      while (suggestions.length < 3 && allNames.length > suggestions.length) {
+        const next = allNames.find(n => !excludeSet.has(n.toLowerCase()) && !suggestions.includes(n));
+        if (next) suggestions.push(next);
+        else break;
+      }
+    }
+
+    clearTimeout(timeoutId);
+
+    const payload = {
+      cached: false,
+      topping: toppingPhrase,
+      mafiaMovieTitle,
+      resolvedMovieTitle: resolvedTitle,
+      tmdbMovieId: mediaId,
+      releaseDate,
+      mediaType,
+      style: "balanced",
+      suggestions,
+      candidatePool: allNames,
+    };
+
+    return new NextResponse(JSON.stringify(payload), {
+      headers: {
+        "Content-Type": "application/json",
+        "Cache-Control": force ? "no-store" : "s-maxage=86400, stale-while-revalidate=604800",
+      },
     });
-
-    // Combine directors + cast (directors first for priority)
-    const allCast = [...directorEntries, ...topCast];
-
-    const { rerank } = buildFilterAndReranker(toppingPhrase, allCast, style);
-
-    // ✅ In-flight dedupe key collapses repeated clicks while the first is running.
-    // Include exclude list (normalized) so "Regenerate (no repeats)" stays correct.
-    const excludeKey = Array.from(excludeSet).sort().join("|");
-    const inflightKey = `${cacheKey}|${force ? "force" : "gen"}|ex=${excludeKey}`;
-
-    if (inflight.has(inflightKey)) {
-      const payload = await inflight.get(inflightKey)!;
-      return NextResponse.json({ ...payload, deduped: true });
-    }
-
-    const system = `
-You are a comedy name-writer with excellent taste for mafia-movie nicknames.
-Names should feel human-chosen, not random, and not like menu items.
-
-Hard rules (MUST follow):
-- Output ONLY valid JSON.
-- Each name MUST be EXACTLY TWO PARTS (two chunks), not necessarily two single words.
-- ONE PART MUST be the topping phrase EXACTLY (case-insensitive), e.g. "Green Pepper".
-- The OTHER PART MUST be a name phrase from the provided list (actors, characters, OR directors).
-- Valid forms ONLY:
-  1) "<TOPPING_PHRASE> <LASTNAME_PHRASE>"
-  2) "<FIRSTNAME_PHRASE> <TOPPING_PHRASE>"
-- Do NOT output "<TOPPING_PHRASE> <FIRSTNAME_PHRASE>"
-- Do NOT output "<LASTNAME_PHRASE> <TOPPING_PHRASE>"
-- Lastname phrases may contain spaces (e.g. "De Niro", "Van Zandt", "Coppola")
-- Preserve capitalization as provided in the cast/director phrases (e.g. "LaBeouf", not "Labeouf").
-- IMPORTANT: For "Al Pacino", the lastname is "Pacino" (NOT "Al Pacino"). Same idea for other first+last pairs.
-- Director names are especially good choices as they're iconic (e.g. "Pepperoni Scorsese", "Francis Pepperoni")
-
-Return JSON:
-{
-  "candidatePool": ["..."],  // 120 items
-  "suggestions": ["...", "...", "..."] // best 3 in order
-}
-`;
-
-    // ✅ Only ONE OpenAI call per request (prevents single-click consuming multiple RPM).
-    const job = (async () => {
-      // Best-effort local throttle so we fail fast with a friendly Retry-After.
-      checkLocalRpmOrThrow();
-
-      const promptObj = {
-        toppingPhrase,
-        movie: {
-          inputTitle: mafiaMovieTitle,
-          resolvedTitle: best.title,
-          releaseDate,
-          tmdbMovieId: movieId,
-        },
-        style,
-        directors: directorEntries, // Directors first for emphasis
-        cast: topCast,
-        excludeNames: Array.from(excludeSet).slice(0, 200),
-        instruction:
-          "Generate 120 candidates, then pick the best 3. Use EXACT forms only. Director names are great choices! Do NOT output anything in excludeNames (case-insensitive).",
-      };
-
-      const resp = await callOpenAIWithBackoff(() =>
-        openai.responses.create({
-          model: "gpt-4o-mini",
-          input: [
-            { role: "system", content: system },
-            { role: "user", content: JSON.stringify(promptObj) },
-          ],
-          text: { format: { type: "json_object" } },
-          max_output_tokens: 1800,
-        })
-      );
-
-      let parsed: any;
-      try {
-        parsed = JSON.parse(resp.output_text);
-      } catch {
-        throw new Error("Model returned invalid JSON.");
-      }
-
-      const rawPool: string[] = Array.isArray(parsed?.candidatePool) ? parsed.candidatePool : [];
-      const rawSuggestions: string[] = Array.isArray(parsed?.suggestions) ? parsed.suggestions : [];
-
-      const combined = [...rawSuggestions, ...rawPool].map(sanitizeNameKeepSpaces).filter(Boolean);
-
-      const reranked = rerank(combined);
-
-      // Remove excluded names (previous batches)
-      const fresh = reranked.filter((n) => !excludeSet.has(n.trim().toLowerCase()));
-
-      const finalSuggestions = fresh.slice(0, 3);
-      const finalPool = fresh.slice(0, 120);
-
-      if (finalSuggestions.length < 3) {
-        throw new Error(
-          "Could not generate 3 new (non-repeating) names under the rules. Try a different topping/movie or loosen constraints."
-        );
-      }
-
-      const payload = {
-        cached: false,
-        topping: toppingPhrase,
-        mafiaMovieTitle,
-        resolvedMovieTitle: best.title,
-        tmdbMovieId: movieId,
-        releaseDate,
-        style,
-        suggestions: finalSuggestions,
-        candidatePool: finalPool,
-      };
-
-      if (!force) cacheSet(cacheKey, payload);
-
-      return payload;
-    })();
-
-    inflight.set(inflightKey, job);
-
-    try {
-      const payload = await job;
-
-      return new NextResponse(JSON.stringify(payload), {
-        headers: {
-          "Content-Type": "application/json",
-          "Cache-Control": force ? "no-store" : "s-maxage=86400, stale-while-revalidate=604800",
-        },
-      });
-    } finally {
-      inflight.delete(inflightKey);
-    }
   } catch (err: any) {
-    if (err?.status === 429 || isRateLimitError(err)) {
-      const retryAfter = Number(err?.retryAfter ?? 20);
+    clearTimeout(timeoutId);
+
+    if (err?.name === "AbortError" || err?.message?.includes("aborted")) {
       return NextResponse.json(
-        { error: `Rate limited by OpenAI. Please try again in ~${retryAfter}s.` },
-        { status: 429, headers: { "Retry-After": String(retryAfter) } }
+        { error: "Request timed out. Please try again." },
+        { status: 504 }
       );
     }
 
-    return NextResponse.json({ error: String(err?.message ?? "Unknown error") }, { status: 500 });
+    return NextResponse.json(
+      { error: String(err?.message ?? "Unknown error") },
+      { status: 500 }
+    );
   }
 }
