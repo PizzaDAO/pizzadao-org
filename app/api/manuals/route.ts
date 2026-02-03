@@ -48,11 +48,20 @@ export type Manual = {
   title: string
   url: string | null
   crew: string
+  crewId: string
   status: string
   authorId: string
   author: string
   lastUpdated: string
   notes: string
+}
+
+// Convert crew label to ID (slug format)
+function crewLabelToId(label: string): string {
+  return label.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
 }
 
 export async function GET(req: Request) {
@@ -113,6 +122,7 @@ export async function GET(req: Request) {
           title,
           url,
           crew,
+          crewId: crewLabelToId(crew),
           status,
           authorId: cellVal(cells[3]),
           author: cellVal(cells[4]),
@@ -163,6 +173,7 @@ export async function GET(req: Request) {
         title,
         url,
         crew,
+        crewId: crewLabelToId(crew),
         status,
         authorId: cellVal(cells[3]),
         author: cellVal(cells[4]),

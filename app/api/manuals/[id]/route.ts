@@ -46,11 +46,20 @@ type Manual = {
   title: string
   url: string | null
   crew: string
+  crewId: string
   status: string
   authorId: string
   author: string
   lastUpdated: string
   notes: string
+}
+
+// Convert crew label to ID (slug format)
+function crewLabelToId(label: string): string {
+  return label.trim()
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, '_')
+    .replace(/^_+|_+$/g, '')
 }
 
 // Extract Google Sheet ID from URL
@@ -60,10 +69,17 @@ function extractSheetId(url: string | null): string | null {
   return match ? match[1] : null
 }
 
+// Cell data with optional link
+type CellData = {
+  value: string
+  url: string | null
+}
+
 // Fetch sheet content and return as structured data (like agenda)
+// Now also extracts hyperlinks from cells
 async function fetchSheetContent(sheetId: string): Promise<{
   headers: string[]
-  rows: string[][]
+  rows: CellData[][]
 } | null> {
   try {
     const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
@@ -81,14 +97,17 @@ async function fetchSheetContent(sheetId: string): Promise<{
       return null
     }
 
-    // Parse all rows
-    const allRows: string[][] = []
+    // Parse all rows with link extraction
+    const allRows: CellData[][] = []
     for (const row of rawRows) {
       const cells = row?.c || []
-      const rowValues = cells.map(cellVal)
+      const rowData: CellData[] = cells.map((cell: any) => ({
+        value: cellVal(cell),
+        url: extractUrl(cell)
+      }))
       // Skip completely empty rows
-      if (rowValues.some((v: string) => v.length > 0)) {
-        allRows.push(rowValues)
+      if (rowData.some((d: CellData) => d.value.length > 0)) {
+        allRows.push(rowData)
       }
     }
 
@@ -96,8 +115,8 @@ async function fetchSheetContent(sheetId: string): Promise<{
       return null
     }
 
-    // First non-empty row is headers, rest are data rows
-    const headers = allRows[0]
+    // First non-empty row is headers (just the text values), rest are data rows with links
+    const headers = allRows[0].map(d => d.value)
     const dataRows = allRows.slice(1)
 
     return { headers, rows: dataRows }
@@ -171,11 +190,13 @@ export async function GET(
       // Priority: 1. Sheets API link map (Ctrl+K/rich text links)  2. GViz extraction (cell.l)
       const titleCell = cells[0]
       const url = linkMap[title] || extractUrl(titleCell)
+      const crew = cellVal(cells[1])
 
       manuals.push({
         title,
         url,
-        crew: cellVal(cells[1]),
+        crew,
+        crewId: crewLabelToId(crew),
         status: cellVal(cells[2]),
         authorId: cellVal(cells[3]),
         author: cellVal(cells[4]),
@@ -192,7 +213,7 @@ export async function GET(
     const manual = manuals[manualIndex]
     const sheetId = extractSheetId(manual.url)
 
-    let sheetContent: { headers: string[]; rows: string[][] } | null = null
+    let sheetContent: { headers: string[]; rows: CellData[][] } | null = null
     let contentError: string | null = null
 
     if (sheetId) {

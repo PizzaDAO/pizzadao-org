@@ -8,6 +8,7 @@ type Manual = {
   title: string;
   url: string | null;
   crew: string;
+  crewId: string;
   status: string;
   authorId: string;
   author: string;
@@ -15,9 +16,14 @@ type Manual = {
   notes: string;
 };
 
+type CellData = {
+  value: string;
+  url: string | null;
+};
+
 type SheetContent = {
   headers: string[];
-  rows: string[][];
+  rows: CellData[][];
 };
 
 function statusBadge(status: string) {
@@ -208,8 +214,26 @@ export default function ManualDetailPage() {
                 )}
               </div>
               <div style={{ fontSize: 14, color: "#666", display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
-                {manual.crew && <span>{manual.crew}</span>}
-                {manual.author && <span>by {manual.author}</span>}
+                {manual.crew && (
+                  <Link
+                    href={`/crew/${manual.crewId}`}
+                    style={{ color: "#2563eb", textDecoration: "none" }}
+                  >
+                    {manual.crew}
+                  </Link>
+                )}
+                {manual.author && manual.authorId && (
+                  <span>
+                    by{" "}
+                    <Link
+                      href={`/profile/${manual.authorId}`}
+                      style={{ color: "#2563eb", textDecoration: "none" }}
+                    >
+                      {manual.author}
+                    </Link>
+                  </span>
+                )}
+                {manual.author && !manual.authorId && <span>by {manual.author}</span>}
                 {manual.lastUpdated && <span>Updated: {manual.lastUpdated}</span>}
               </div>
               {manual.url && (
@@ -237,6 +261,23 @@ export default function ManualDetailPage() {
                   <table style={{ width: "100%", borderCollapse: "collapse" }}>
                     <thead>
                       <tr>
+                        {/* Step number column */}
+                        <th
+                          style={{
+                            textAlign: "center",
+                            padding: "12px 16px",
+                            borderBottom: "2px solid rgba(0,0,0,0.1)",
+                            fontSize: 12,
+                            fontWeight: 700,
+                            textTransform: "uppercase",
+                            letterSpacing: 0.5,
+                            background: "#fafafa",
+                            whiteSpace: "nowrap",
+                            width: 50,
+                          }}
+                        >
+                          #
+                        </th>
                         {sheetContent.headers.map((header, i) => (
                           <th
                             key={i}
@@ -260,6 +301,20 @@ export default function ManualDetailPage() {
                     <tbody>
                       {sheetContent.rows.map((row, rowIndex) => (
                         <tr key={rowIndex}>
+                          {/* Step number cell */}
+                          <td
+                            style={{
+                              padding: "12px 16px",
+                              borderBottom: "1px solid rgba(0,0,0,0.06)",
+                              fontSize: 14,
+                              verticalAlign: "top",
+                              textAlign: "center",
+                              fontWeight: 600,
+                              color: "#888",
+                            }}
+                          >
+                            {rowIndex + 1}
+                          </td>
                           {row.map((cell, cellIndex) => (
                             <td
                               key={cellIndex}
@@ -270,7 +325,18 @@ export default function ManualDetailPage() {
                                 verticalAlign: "top",
                               }}
                             >
-                              {cell}
+                              {cell.url ? (
+                                <a
+                                  href={cell.url}
+                                  target="_blank"
+                                  rel="noopener noreferrer"
+                                  style={{ color: "#2563eb", textDecoration: "none" }}
+                                >
+                                  {cell.value}
+                                </a>
+                              ) : (
+                                cell.value
+                              )}
                             </td>
                           ))}
                         </tr>

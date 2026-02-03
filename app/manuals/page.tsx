@@ -7,6 +7,7 @@ type Manual = {
   title: string;
   url: string | null;
   crew: string;
+  crewId: string;
   status: string;
   authorId: string;
   author: string;
@@ -62,8 +63,28 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
             {manual.title}
           </h3>
           <div style={{ marginTop: 6, fontSize: 13, color: "#666" }}>
-            {manual.crew && <span style={{ marginRight: 12 }}>{manual.crew}</span>}
-            {manual.author && <span>by {manual.author}</span>}
+            {manual.crew && (
+              <Link
+                href={`/crew/${manual.crewId}`}
+                style={{ marginRight: 12, color: "#2563eb", textDecoration: "none" }}
+                onClick={(e) => e.stopPropagation()}
+              >
+                {manual.crew}
+              </Link>
+            )}
+            {manual.author && manual.authorId && (
+              <span>
+                by{" "}
+                <Link
+                  href={`/profile/${manual.authorId}`}
+                  style={{ color: "#2563eb", textDecoration: "none" }}
+                  onClick={(e) => e.stopPropagation()}
+                >
+                  {manual.author}
+                </Link>
+              </span>
+            )}
+            {manual.author && !manual.authorId && <span>by {manual.author}</span>}
           </div>
           {manual.lastUpdated && (
             <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
