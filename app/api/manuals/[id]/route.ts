@@ -13,6 +13,35 @@ function cellVal(cell: any): string {
   return norm(cell?.v ?? cell?.f ?? '')
 }
 
+// Extract URL from GViz cell (fallback for when Sheets API doesn't return hyperlinks)
+// This matches the approach used in crew route's parseAgenda
+function extractUrl(cell: any): string | null {
+  if (!cell) return null
+
+  // Check for GViz link property (how GViz returns Ctrl+K hyperlinks)
+  if (cell.l) return cell.l
+
+  // Check for explicit hyperlink in cell properties
+  if (cell.hyperlink) return cell.hyperlink
+
+  // Check formatted value for URL patterns
+  const text = String(cell?.f ?? cell?.v ?? '')
+
+  // Try to extract URL from HYPERLINK formula pattern
+  const hyperlinkMatch = text.match(/HYPERLINK\s*\(\s*"([^"]+)"/i)
+  if (hyperlinkMatch) return hyperlinkMatch[1]
+
+  // Try to extract URL in parentheses: (https://...)
+  const parenMatch = text.match(/\((https?:\/\/[^\s\)]+)\)/)
+  if (parenMatch) return parenMatch[1]
+
+  // Try to extract raw URL from text
+  const urlMatch = text.match(/https?:\/\/[^\s"<>\)]+/)
+  if (urlMatch) return urlMatch[0]
+
+  return null
+}
+
 type Manual = {
   title: string
   url: string | null
@@ -139,9 +168,13 @@ export async function GET(
       const title = cellVal(cells[0])
       if (!title) continue
 
+      // Priority: 1. Sheets API link map (Ctrl+K/rich text links)  2. GViz extraction (cell.l)
+      const titleCell = cells[0]
+      const url = linkMap[title] || extractUrl(titleCell)
+
       manuals.push({
         title,
-        url: linkMap[title] || null,
+        url,
         crew: cellVal(cells[1]),
         status: cellVal(cells[2]),
         authorId: cellVal(cells[3]),
