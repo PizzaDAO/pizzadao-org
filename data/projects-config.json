@@ -1,0 +1,24 @@
+{
+  "projects": {
+    "rsv-pizza": {
+      "status": "active",
+      "liveUrl": "https://rsv.pizza",
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/..."
+    },
+    "onboarding": {
+      "status": "active",
+      "liveUrl": "https://pizzadao.org",
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1bRTR85CDHbTAsTG6sVi1jv6H-WjLyf-yvOerLCqeY2Q"
+    },
+    "pizza-smartcontract": {
+      "status": "maintenance"
+    },
+    "hugo-website": {
+      "status": "archived"
+    }
+  },
+  "excludeRepos": [
+    "pizza-github-actions-test",
+    ".github"
+  ]
+}
