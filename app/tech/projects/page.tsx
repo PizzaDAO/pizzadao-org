@@ -1,9 +1,10 @@
 'use client'
 
 import { useState, useEffect, useCallback } from 'react'
+import Link from 'next/link'
 import { ProjectGrid } from '@/components/projects/ProjectGrid'
 import type { Project } from '@/app/lib/projects/types'
-import { RefreshCw } from 'lucide-react'
+import { RefreshCw, ArrowLeft } from 'lucide-react'
 
 export default function ProjectsPage() {
   const [projects, setProjects] = useState<Project[]>([])
@@ -56,6 +57,15 @@ export default function ProjectsPage() {
   return (
     <div className="min-h-screen bg-gray-50 dark:bg-gray-900">
       <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+        {/* Back link */}
+        <Link
+          href="/crew/tech"
+          className="inline-flex items-center gap-2 text-sm text-gray-600 dark:text-gray-400 hover:text-orange-500 transition-colors mb-4"
+        >
+          <ArrowLeft className="w-4 h-4" />
+          Back to Tech Crew
+        </Link>
+
         {/* Header */}
         <div className="flex items-center justify-between mb-8">
           <div>
