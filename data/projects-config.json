@@ -3,12 +3,21 @@
     "rsv-pizza": {
       "status": "active",
       "liveUrl": "https://rsv.pizza",
-      "sheetUrl": "https://docs.google.com/spreadsheets/d/..."
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/101pcNQxJN6BoUUrocgVkFnFEE9bh9ipLdnFJW-OylkI"
     },
     "pizzadao-org": {
       "status": "active",
       "liveUrl": "https://pizzadao.org",
       "sheetUrl": "https://docs.google.com/spreadsheets/d/1bRTR85CDHbTAsTG6sVi1jv6H-WjLyf-yvOerLCqeY2Q"
+    },
+    "agar.pizza": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1LZaKcHLCpmXDtf3ypT1FpoYvw4f04Afq69YfNX3ecUs"
+    },
+    "pizza-content": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/13WBouU-AFOVad2oJFd7jIhePhTSMo_i04tlzUu_gRHE"
+    },
+    "sheets-claude": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/13WBouU-AFOVad2oJFd7jIhePhTSMo_i04tlzUu_gRHE"
     },
     "pizza-smartcontract": {
       "status": "maintenance"
