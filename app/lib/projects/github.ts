@@ -91,15 +91,20 @@ function getHeaders(): HeadersInit {
  * Handle GitHub API response and provide helpful error messages
  */
 async function handleGitHubResponse<T>(response: Response, context: string): Promise<T> {
+  console.log(`[GitHub API] handleGitHubResponse for ${context}, status: ${response.status}`)
+
   if (response.ok) {
     const text = await response.text()
+    console.log(`[GitHub API] Response text length for ${context}:`, text?.length ?? 0)
+
     if (!text || text.trim() === '') {
+      console.log(`[GitHub API] Empty response for ${context}, returning empty array`)
       return [] as unknown as T // Return empty array for empty responses
     }
     try {
       return JSON.parse(text) as T
-    } catch {
-      console.error(`[GitHub API] Failed to parse JSON for ${context}:`, text.slice(0, 100))
+    } catch (e) {
+      console.error(`[GitHub API] Failed to parse JSON for ${context}:`, text.slice(0, 200), e)
       return [] as unknown as T
     }
   }
@@ -132,12 +137,16 @@ async function handleGitHubResponse<T>(response: Response, context: string): Pro
  * Fetch all public repositories from PizzaDAO organization
  */
 export async function fetchPizzaDAORepos(): Promise<GitHubRepo[]> {
-  const response = await fetch(
-    `${GITHUB_API_BASE}/orgs/${ORG_NAME}/repos?type=public&per_page=100`,
-    { headers: getHeaders() }
-  )
+  const url = `${GITHUB_API_BASE}/orgs/${ORG_NAME}/repos?type=public&per_page=100`
+  console.log('[GitHub API] Fetching repos from:', url)
+  console.log('[GitHub API] Token configured:', !!process.env.GITHUB_TOKEN)
+
+  const response = await fetch(url, { headers: getHeaders() })
+
+  console.log('[GitHub API] Response status:', response.status, response.statusText)
 
   const repos = await handleGitHubResponse<GitHubRepo[]>(response, 'fetching repos')
+  console.log('[GitHub API] Fetched repos count:', repos?.length ?? 0)
 
   // Filter out forked repositories
   return repos.filter((repo) => !repo.fork)
