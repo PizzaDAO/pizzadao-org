@@ -92,7 +92,16 @@ function getHeaders(): HeadersInit {
  */
 async function handleGitHubResponse<T>(response: Response, context: string): Promise<T> {
   if (response.ok) {
-    return response.json()
+    const text = await response.text()
+    if (!text || text.trim() === '') {
+      return [] as unknown as T // Return empty array for empty responses
+    }
+    try {
+      return JSON.parse(text) as T
+    } catch {
+      console.error(`[GitHub API] Failed to parse JSON for ${context}:`, text.slice(0, 100))
+      return [] as unknown as T
+    }
   }
 
   // Check for rate limiting
