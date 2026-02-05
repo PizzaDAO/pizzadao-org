@@ -292,7 +292,7 @@ export function calculateActivityLevel(pushedAt: string): ActivityLevel {
 export function transformGitHubRepo(
   repo: GitHubRepo,
   config?: ProjectConfig
-): Omit<Project, 'openPRs' | 'contributors' | 'recentCommits' | 'tasks'> {
+): Omit<Project, 'openPRs' | 'contributors' | 'recentCommits' | 'recentPRs' | 'tasks'> {
   // Determine status
   let status: ProjectStatus = 'active'
   if (repo.archived) {
