@@ -35,6 +35,20 @@ export interface Commit {
 }
 
 /**
+ * Pull request information from GitHub
+ */
+export interface PullRequest {
+  number: number
+  title: string
+  author: string
+  authorAvatarUrl: string
+  url: string
+  branch: string
+  previewUrl: string
+  createdAt: string
+}
+
+/**
  * Task summary from sheets-claude
  */
 export interface TaskSummary {
@@ -99,6 +113,7 @@ export interface Project {
   openIssues: number
   contributors: Contributor[]
   recentCommits: Commit[]
+  recentPRs: PullRequest[]
 
   // From sheets-claude (optional)
   tasks?: TaskSummary
@@ -136,6 +151,9 @@ export interface GitHubPullRequest {
   user: {
     login: string
     avatar_url: string
+  }
+  head: {
+    ref: string
   }
   created_at: string
   updated_at: string

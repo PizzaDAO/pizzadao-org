@@ -13,6 +13,7 @@ import type {
   ActivityLevel,
   Contributor,
   Commit,
+  PullRequest,
 } from './types'
 
 const GITHUB_API_BASE = 'https://api.github.com'
@@ -159,6 +160,7 @@ export async function fetchRepoDetails(slug: string): Promise<{
   openPRs: number
   contributors: Contributor[]
   recentCommits: Commit[]
+  recentPRs: PullRequest[]
 }> {
   const headers = getHeaders()
 
@@ -209,10 +211,30 @@ export async function fetchRepoDetails(slug: string): Promise<{
     url: c.html_url,
   }))
 
+  // Transform PRs (take first 3)
+  const recentPRs: PullRequest[] = prs.slice(0, 3).map((pr) => {
+    // Convert branch name to Vercel preview URL
+    // Format: https://{project}-git-{branch}-pizza-dao.vercel.app
+    const sanitizedBranch = pr.head.ref.replace(/\//g, '-').toLowerCase()
+    const previewUrl = `https://${slug}-git-${sanitizedBranch}-pizza-dao.vercel.app`
+
+    return {
+      number: pr.number,
+      title: pr.title,
+      author: pr.user.login,
+      authorAvatarUrl: pr.user.avatar_url,
+      url: pr.html_url,
+      branch: pr.head.ref,
+      previewUrl,
+      createdAt: pr.created_at,
+    }
+  })
+
   return {
     openPRs: prs.length,
     contributors,
     recentCommits,
+    recentPRs,
   }
 }
 

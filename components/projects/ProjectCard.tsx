@@ -1,7 +1,8 @@
 'use client'
 
 import type { Project, ProjectStatus } from '@/app/lib/projects/types'
-import { ExternalLink, Github, GitPullRequest, AlertCircle } from 'lucide-react'
+import { ExternalLink, Github, GitPullRequest, AlertCircle, CircleDot } from 'lucide-react'
+import Link from 'next/link'
 
 /**
  * Status badge color mappings
@@ -47,6 +48,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
     liveUrl,
     openPRs,
     openIssues,
+    recentPRs,
     tasks,
     pushedAt,
   } = project
@@ -62,11 +64,22 @@ export function ProjectCard({ project }: ProjectCardProps) {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow">
       {/* Header with name and status */}
       <div className="flex items-start justify-between mb-3">
-        <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-          {name}
-        </h3>
+        {liveUrl ? (
+          <a
+            href={liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-orange-500 transition-colors"
+          >
+            {name}
+          </a>
+        ) : (
+          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
+            {name}
+          </h3>
+        )}
         <span
-          className={`${STATUS_BADGE_CLASSES[status]} text-white text-xs font-medium px-2 py-1 rounded`}
+          className={`${STATUS_BADGE_CLASSES[status]} text-white text-xs font-medium px-2 py-1 rounded flex-shrink-0 ml-2`}
         >
           {STATUS_LABELS[status]}
         </span>
@@ -100,17 +113,50 @@ export function ProjectCard({ project }: ProjectCardProps) {
         <span>Last updated: {lastUpdated}</span>
       </div>
 
-      {/* Stats row */}
+      {/* Stats row - linked to GitHub pages */}
       <div className="flex items-center gap-4 mb-4 text-sm">
-        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+        <a
+          href={`${githubUrl}/pulls`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-orange-500 transition-colors"
+        >
           <GitPullRequest className="w-4 h-4" />
           <span>{openPRs} PRs</span>
-        </div>
-        <div className="flex items-center gap-1 text-gray-600 dark:text-gray-400">
+        </a>
+        <a
+          href={`${githubUrl}/issues`}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="flex items-center gap-1 text-gray-600 dark:text-gray-400 hover:text-orange-500 transition-colors"
+        >
           <AlertCircle className="w-4 h-4" />
           <span>{openIssues} Issues</span>
-        </div>
+        </a>
       </div>
+
+      {/* Recent PRs with Vercel Preview links */}
+      {recentPRs && recentPRs.length > 0 && (
+        <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mb-4">
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Open PRs (Preview):</p>
+          <ul className="space-y-1">
+            {recentPRs.map((pr) => (
+              <li key={pr.number} className="text-xs">
+                <a
+                  href={pr.previewUrl}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors"
+                  title={`Preview: ${pr.previewUrl}`}
+                >
+                  <CircleDot className="w-3 h-3 text-green-500 flex-shrink-0" />
+                  <span className="truncate">#{pr.number} {pr.title}</span>
+                </a>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
 
       {/* Task summary (if available) */}
       {tasks && (
