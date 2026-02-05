@@ -175,12 +175,21 @@ export async function fetchRepoDetails(slug: string): Promise<{
     }),
   ])
 
-  // Parse responses (handle potential failures gracefully)
-  const prs: GitHubPullRequest[] = prsResponse.ok ? await prsResponse.json() : []
-  const contributorsData: GitHubContributor[] = contributorsResponse.ok
-    ? await contributorsResponse.json()
-    : []
-  const commitsData: GitHubCommit[] = commitsResponse.ok ? await commitsResponse.json() : []
+  // Parse responses safely (handle empty responses gracefully)
+  const safeParseJson = async <T>(response: Response, fallback: T): Promise<T> => {
+    if (!response.ok) return fallback
+    try {
+      const text = await response.text()
+      if (!text || text.trim() === '') return fallback
+      return JSON.parse(text) as T
+    } catch {
+      return fallback
+    }
+  }
+
+  const prs = await safeParseJson<GitHubPullRequest[]>(prsResponse, [])
+  const contributorsData = await safeParseJson<GitHubContributor[]>(contributorsResponse, [])
+  const commitsData = await safeParseJson<GitHubCommit[]>(commitsResponse, [])
 
   // Transform contributors
   const contributors: Contributor[] = contributorsData.map((c) => ({
