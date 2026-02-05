@@ -1,7 +1,7 @@
 'use client'
 
 import type { Project, ProjectStatus } from '@/app/lib/projects/types'
-import { ExternalLink, Github, GitPullRequest, AlertCircle, CircleDot } from 'lucide-react'
+import { ExternalLink, Github, GitPullRequest, AlertCircle, CircleDot, FileSpreadsheet } from 'lucide-react'
 import Link from 'next/link'
 
 /**
@@ -46,6 +46,7 @@ export function ProjectCard({ project }: ProjectCardProps) {
     activityLevel,
     githubUrl,
     liveUrl,
+    sheetUrl,
     openPRs,
     openIssues,
     recentPRs,
@@ -202,6 +203,18 @@ export function ProjectCard({ project }: ProjectCardProps) {
           >
             <ExternalLink className="w-4 h-4" />
             <span>Live</span>
+          </a>
+        )}
+        {sheetUrl && (
+          <a
+            href={sheetUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            aria-label="Task Sheet"
+            className="flex items-center gap-1 text-sm text-gray-600 dark:text-gray-400 hover:text-gray-900 dark:hover:text-white transition-colors"
+          >
+            <FileSpreadsheet className="w-4 h-4" />
+            <span>Tasks</span>
           </a>
         )}
       </div>
