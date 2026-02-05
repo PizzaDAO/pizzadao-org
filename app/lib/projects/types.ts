@@ -128,6 +128,7 @@ export interface GitHubRepo {
   full_name: string
   description: string | null
   html_url: string
+  homepage: string | null
   default_branch: string
   created_at: string
   updated_at: string

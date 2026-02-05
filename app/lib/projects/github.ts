@@ -313,7 +313,7 @@ export function transformGitHubRepo(
     techStack: detectTechStack(repo),
     activityLevel: calculateActivityLevel(repo.pushed_at),
     status,
-    liveUrl: config?.liveUrl,
+    liveUrl: config?.liveUrl || repo.homepage || undefined,
     vercelProject: config?.vercelProject,
     sheetUrl: config?.sheetUrl,
     openIssues: repo.open_issues_count,
