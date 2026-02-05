@@ -18,6 +18,9 @@ import type {
 const GITHUB_API_BASE = 'https://api.github.com'
 const ORG_NAME = 'PizzaDAO'
 
+// Log warning once if no token is configured
+let tokenWarningLogged = false
+
 /**
  * Tech stack detection mappings
  */
@@ -69,13 +72,51 @@ function getHeaders(): HeadersInit {
     'User-Agent': 'PizzaDAO-Projects-Dashboard',
   }
 
-  // Add auth token if available (for higher rate limits)
+  // Add auth token if available (for higher rate limits: 5000/hour vs 60/hour)
   const token = process.env.GITHUB_TOKEN
   if (token) {
     headers.Authorization = `Bearer ${token}`
+  } else if (!tokenWarningLogged) {
+    console.warn(
+      '[GitHub API] No GITHUB_TOKEN configured. Using unauthenticated requests (60 req/hour limit). ' +
+      'Set GITHUB_TOKEN environment variable for 5000 req/hour limit.'
+    )
+    tokenWarningLogged = true
   }
 
   return headers
+}
+
+/**
+ * Handle GitHub API response and provide helpful error messages
+ */
+async function handleGitHubResponse<T>(response: Response, context: string): Promise<T> {
+  if (response.ok) {
+    return response.json()
+  }
+
+  // Check for rate limiting
+  if (response.status === 403) {
+    const rateLimitRemaining = response.headers.get('x-ratelimit-remaining')
+    const rateLimitReset = response.headers.get('x-ratelimit-reset')
+
+    if (rateLimitRemaining === '0' || response.statusText.toLowerCase().includes('rate limit')) {
+      const resetTime = rateLimitReset
+        ? new Date(parseInt(rateLimitReset) * 1000).toLocaleTimeString()
+        : 'soon'
+
+      const hasToken = !!process.env.GITHUB_TOKEN
+      const tokenHint = hasToken
+        ? 'Token is configured but rate limit still exceeded. Wait for reset or check token permissions.'
+        : 'Configure GITHUB_TOKEN environment variable to increase limit from 60 to 5000 requests/hour.'
+
+      throw new Error(
+        `GitHub API rate limit exceeded (${context}). Resets at ${resetTime}. ${tokenHint}`
+      )
+    }
+  }
+
+  throw new Error(`GitHub API error (${context}): ${response.status} ${response.statusText}`)
 }
 
 /**
@@ -87,11 +128,7 @@ export async function fetchPizzaDAORepos(): Promise<GitHubRepo[]> {
     { headers: getHeaders() }
   )
 
-  if (!response.ok) {
-    throw new Error(`GitHub API error: ${response.status} ${response.statusText}`)
-  }
-
-  const repos: GitHubRepo[] = await response.json()
+  const repos = await handleGitHubResponse<GitHubRepo[]>(response, 'fetching repos')
 
   // Filter out forked repositories
   return repos.filter((repo) => !repo.fork)
