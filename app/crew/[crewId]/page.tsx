@@ -430,6 +430,23 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           }}>
             All Crews
           </Link>
+          {crewId.toLowerCase() === 'tech' && (
+            <Link href="/tech/projects" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: 'white',
+              border: '1px solid rgba(0,0,0,0.15)',
+              borderRadius: 8,
+              color: '#000',
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 600,
+            }}>
+              Projects
+            </Link>
+          )}
           {user && (
             <Link href={`/dashboard/${user.memberId}`} style={{
               display: 'inline-flex',
