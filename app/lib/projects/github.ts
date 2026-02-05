@@ -293,8 +293,11 @@ export function transformGitHubRepo(
   repo: GitHubRepo,
   config?: ProjectConfig
 ): Omit<Project, 'openPRs' | 'contributors' | 'recentCommits' | 'recentPRs' | 'tasks'> {
-  // Determine status
-  let status: ProjectStatus = 'active'
+  // Determine live URL first (needed for status)
+  const liveUrl = config?.liveUrl || repo.homepage || undefined
+
+  // Determine status - projects without a live URL are "planning" unless overridden
+  let status: ProjectStatus = liveUrl ? 'active' : 'planning'
   if (repo.archived) {
     status = 'archived'
   } else if (config?.status) {
@@ -313,7 +316,7 @@ export function transformGitHubRepo(
     techStack: detectTechStack(repo),
     activityLevel: calculateActivityLevel(repo.pushed_at),
     status,
-    liveUrl: config?.liveUrl || repo.homepage || undefined,
+    liveUrl,
     vercelProject: config?.vercelProject,
     sheetUrl: config?.sheetUrl,
     openIssues: repo.open_issues_count,
