@@ -69,6 +69,8 @@ const OPEN_TASK_3 = makeTask({ task: 'Update CI pipeline' }) // no lead field at
 const CLAIMED_TASK_1 = makeTask({ task: 'Fix login bug', lead: 'Alice', leadId: '100' })
 const CLAIMED_TASK_2 = makeTask({ task: 'Refactor API', lead: 'Bob', leadId: '200' })
 const MY_TASK = makeTask({ task: 'My assigned work', lead: 'TestUser', leadId: '42' })
+const DONE_TASK_NO_LEAD = makeTask({ task: 'Completed task', lead: '', stage: 'Done' })
+const DONE_TASK_WITH_LEAD = makeTask({ task: 'Finished work', lead: 'Charlie', stage: 'Done' })
 
 function buildCrewData(tasks: Task[]): CrewData {
   return {
@@ -158,8 +160,19 @@ async function renderCrewPage(
 // ---- Unit tests for pure filter logic ----
 
 describe('needsLead (filter logic)', () => {
-  // Extracted from the component: const needsLead = (t) => !t.lead || t.lead === '#N/A' || t.lead.trim() === ''
-  const needsLead = (t: Task) => !t.lead || t.lead === '#N/A' || t.lead.trim() === ''
+  // Matches the component logic: open = no lead AND not done
+  const isDone = (t: Task) => {
+    const s = t.stage?.toLowerCase() || ''
+    return s === 'done' || s === 'complete' || s === 'completed' || s === 'skip' || s === 'skipped'
+  }
+  const needsLead = (t: Task) => {
+    if (isDone(t)) return false
+    const lead = t.lead
+    if (!lead) return true
+    const trimmed = lead.trim()
+    if (trimmed === '' || trimmed === '#N/A' || trimmed.toLowerCase() === 'n/a' || trimmed === '-' || trimmed.toLowerCase() === 'tbd') return true
+    return false
+  }
 
   it('returns true when lead is empty string', () => {
     expect(needsLead(makeTask({ lead: '' }))).toBe(true)
@@ -173,17 +186,52 @@ describe('needsLead (filter logic)', () => {
     expect(needsLead(makeTask({ lead: '#N/A' }))).toBe(true)
   })
 
+  it('returns true when lead is N/A (without #)', () => {
+    expect(needsLead(makeTask({ lead: 'N/A' }))).toBe(true)
+  })
+
   it('returns true when lead is whitespace only', () => {
     expect(needsLead(makeTask({ lead: '   ' }))).toBe(true)
+  })
+
+  it('returns true when lead is a dash', () => {
+    expect(needsLead(makeTask({ lead: '-' }))).toBe(true)
+  })
+
+  it('returns true when lead is TBD', () => {
+    expect(needsLead(makeTask({ lead: 'TBD' }))).toBe(true)
   })
 
   it('returns false when lead has a name', () => {
     expect(needsLead(makeTask({ lead: 'Alice' }))).toBe(false)
   })
+
+  it('returns false when task is Done even with no lead', () => {
+    expect(needsLead(makeTask({ lead: '', stage: 'Done' }))).toBe(false)
+  })
+
+  it('returns false when task is completed even with #N/A lead', () => {
+    expect(needsLead(makeTask({ lead: '#N/A', stage: 'completed' }))).toBe(false)
+  })
+
+  it('returns false when task is skipped', () => {
+    expect(needsLead(makeTask({ lead: '', stage: 'Skip' }))).toBe(false)
+  })
 })
 
 describe('filterOpen (filter logic)', () => {
-  const needsLead = (t: Task) => !t.lead || t.lead === '#N/A' || t.lead.trim() === ''
+  const isDone = (t: Task) => {
+    const s = t.stage?.toLowerCase() || ''
+    return s === 'done' || s === 'complete' || s === 'completed' || s === 'skip' || s === 'skipped'
+  }
+  const needsLead = (t: Task) => {
+    if (isDone(t)) return false
+    const lead = t.lead
+    if (!lead) return true
+    const trimmed = lead.trim()
+    if (trimmed === '' || trimmed === '#N/A' || trimmed.toLowerCase() === 'n/a' || trimmed === '-' || trimmed.toLowerCase() === 'tbd') return true
+    return false
+  }
   const filterOpen = (list: Task[], showOpenOnly: boolean) =>
     showOpenOnly ? list.filter(needsLead) : list
 
@@ -203,6 +251,35 @@ describe('filterOpen (filter logic)', () => {
   it('returns empty array when all tasks are claimed and filter is on', () => {
     const tasks = [CLAIMED_TASK_1, CLAIMED_TASK_2]
     expect(filterOpen(tasks, true)).toHaveLength(0)
+  })
+
+  it('excludes Done tasks with no lead from open filter', () => {
+    const tasks = [OPEN_TASK_1, DONE_TASK_NO_LEAD, CLAIMED_TASK_1]
+    const result = filterOpen(tasks, true)
+    expect(result).toHaveLength(1)
+    expect(result).toContain(OPEN_TASK_1)
+    // DONE_TASK_NO_LEAD has lead: '' but stage: 'Done', so it's NOT open
+    expect(result).not.toContain(DONE_TASK_NO_LEAD)
+  })
+
+  it('handles production-realistic data with mixed lead values', () => {
+    // Simulates real data from the comms crew API
+    const productionTasks = [
+      makeTask({ task: 'Use restream', lead: 'Peri Peri Pacino', stage: 'Doing', priority: '0. Top' }),
+      makeTask({ task: 'Podcasts', lead: '#N/A', stage: 'Doing', priority: '0. Top' }),
+      makeTask({ task: 'Influencer research', lead: '#N/A', stage: '' }),
+      makeTask({ task: 'Host videos', lead: '', stage: 'To Do', priority: '0. Top' }),
+      makeTask({ task: 'Instagram Posting', lead: '#N/A', stage: 'Doing', priority: '1. High' }),
+      makeTask({ task: 'PR Strategy', lead: '', stage: 'Done', priority: '1. High' }),
+      makeTask({ task: 'Think Pieces', lead: 'Enzo Pepperoni', stage: 'Doing', priority: '2. Mid' }),
+    ]
+    const result = filterOpen(productionTasks, true)
+    // Open: Podcasts (#N/A), Influencer research (#N/A), Host videos (''), Instagram Posting (#N/A)
+    // NOT open: Use restream (has lead), PR Strategy (Done), Think Pieces (has lead)
+    expect(result).toHaveLength(4)
+    expect(result.map(t => t.task)).toEqual(
+      expect.arrayContaining(['Podcasts', 'Influencer research', 'Host videos', 'Instagram Posting'])
+    )
   })
 })
 
@@ -454,5 +531,74 @@ describe('CrewPage open tasks filter', () => {
     })
     expect(checkbox).not.toBeChecked()
     expect(screen.getByText('Tasks (2)')).toBeInTheDocument()
+  })
+
+  it('does not count Done tasks with no lead as open', async () => {
+    // A Done task with lead: '' should NOT be considered "open"
+    const data = buildCrewData([DONE_TASK_NO_LEAD, DONE_TASK_WITH_LEAD, CLAIMED_TASK_1])
+    await renderCrewPage(data)
+
+    // Wait for the Tasks heading to appear
+    await waitFor(() => {
+      const headings = screen.getAllByText(/Tasks \(3\)/)
+      expect(headings.length).toBeGreaterThanOrEqual(1)
+    })
+
+    // No open tasks exist (Done tasks don't count as open, and CLAIMED_TASK_1 has a lead)
+    expect(screen.queryByText(/Show open tasks only/)).not.toBeInTheDocument()
+  })
+
+  it('shows checkbox with production-realistic data shape', async () => {
+    // Mirrors real API data: tasks have lead: '#N/A', lead: '', and various stages
+    const productionLikeTasks = [
+      makeTask({ task: 'Restream setup', lead: 'Peri Peri Pacino', stage: 'Doing', priority: '0. Top' }),
+      makeTask({ task: 'City photos', lead: 'Don Pizza Czech', leadId: '14', stage: 'Doing', priority: '0. Top' }),
+      makeTask({ task: 'Podcast appearances', lead: '#N/A', stage: 'Doing', priority: '0. Top' }),
+      makeTask({ task: 'Influencer research', lead: '#N/A', stage: '', priority: '' }),
+      makeTask({ task: 'Host spotlight videos', lead: '', stage: 'To Do', priority: '0. Top' }),
+      makeTask({ task: 'Instagram posting', lead: '#N/A', stage: 'Doing', priority: '1. High' }),
+      makeTask({ task: 'PR Strategy', lead: '', stage: 'Done', priority: '1. High' }),
+      makeTask({ task: 'Think pieces', lead: 'Enzo Pepperoni', leadId: '42', stage: 'Doing', priority: '2. Mid' }),
+    ]
+    const data = buildCrewData(productionLikeTasks)
+    await renderCrewPage(data)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Show open tasks only/)).toBeInTheDocument()
+    })
+
+    // Open tasks: Podcast appearances (#N/A), Influencer research (#N/A), Host spotlight videos (''), Instagram posting (#N/A)
+    // NOT open: Restream (has lead), City photos (has lead), PR Strategy (Done), Think pieces (has lead)
+    expect(screen.getByText(/Show open tasks only \(4\)/)).toBeInTheDocument()
+  })
+
+  it('handles tasks with N/A (no hash) as open', async () => {
+    const naTask = makeTask({ task: 'NA without hash', lead: 'N/A', priority: '0. Top' })
+    const data = buildCrewData([naTask, CLAIMED_TASK_1])
+    await renderCrewPage(data)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Show open tasks only \(1\)/)).toBeInTheDocument()
+    })
+  })
+
+  it('handles tasks with TBD lead as open', async () => {
+    const tbdTask = makeTask({ task: 'TBD lead task', lead: 'TBD', priority: '0. Top' })
+    const data = buildCrewData([tbdTask, CLAIMED_TASK_1])
+    await renderCrewPage(data)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Show open tasks only \(1\)/)).toBeInTheDocument()
+    })
+  })
+
+  it('handles tasks with dash lead as open', async () => {
+    const dashTask = makeTask({ task: 'Dash lead task', lead: '-', priority: '0. Top' })
+    const data = buildCrewData([dashTask, CLAIMED_TASK_1])
+    await renderCrewPage(data)
+
+    await waitFor(() => {
+      expect(screen.getByText(/Show open tasks only \(1\)/)).toBeInTheDocument()
+    })
   })
 })

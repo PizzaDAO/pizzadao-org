@@ -784,8 +784,21 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           // Get sorted goal names for consistent ordering
           const goalNames = Array.from(tasksByGoal.keys()).sort()
 
-          // Helper to check if a task needs a lead (open task)
-          const needsLead = (t: typeof tasks[0]) => !t.lead || t.lead === '#N/A' || t.lead.trim() === ''
+          // Helper to check if a task is completed/done
+          const isDone = (t: typeof tasks[0]) => {
+            const s = t.stage?.toLowerCase() || ''
+            return s === 'done' || s === 'complete' || s === 'completed' || s === 'skip' || s === 'skipped'
+          }
+
+          // Helper to check if a task needs a lead (open task = no lead AND not done)
+          const needsLead = (t: typeof tasks[0]) => {
+            if (isDone(t)) return false
+            const lead = t.lead
+            if (!lead) return true
+            const trimmed = lead.trim()
+            if (trimmed === '' || trimmed === '#N/A' || trimmed.toLowerCase() === 'n/a' || trimmed === '-' || trimmed.toLowerCase() === 'tbd') return true
+            return false
+          }
 
           // Filter helper for "show open only" mode
           const filterOpen = (list: typeof tasks) => showOpenOnly ? list.filter(needsLead) : list
