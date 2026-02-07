@@ -14,7 +14,7 @@
     },
     "agar.pizza": {
       "sheetUrl": "https://docs.google.com/spreadsheets/d/1LZaKcHLCpmXDtf3ypT1FpoYvw4f04Afq69YfNX3ecUs",
-      "vercelProject": "agar.pizza"
+      "vercelProject": "agarpizza"
     },
     "pizza-content": {
       "sheetUrl": "https://docs.google.com/spreadsheets/d/13WBouU-AFOVad2oJFd7jIhePhTSMo_i04tlzUu_gRHE",
@@ -48,6 +48,12 @@
     },
     "pizzadao-crew-qa": {
       "vercelProject": "pizzadao-crew-qa"
+    },
+    "mixtape": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1o0LZFnQkuT5GGhqbAWSTi5ozfG1QctUqQD0PQwVBm8g"
+    },
+    "moltobennydelivery": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/10EgfJDorCyW1QbODlYQk28ragDWHeYDdDXGu63XOQK4"
     }
   },
   "excludeRepos": [
