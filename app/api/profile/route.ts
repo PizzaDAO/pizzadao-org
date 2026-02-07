@@ -13,6 +13,7 @@ import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { validateProfilePayload } from "@/app/lib/profile/validation";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { getRegionRoleId, ALL_REGION_ROLE_IDS } from "@/app/lib/region-mapping";
 
 export const runtime = "nodejs";
 
@@ -157,6 +158,7 @@ const POST_HANDLER = async (req: Request) => {
     mediaType,
 
     city: clampStr(body.city, 120),
+    cityRegion: clampStr(body.cityRegion ?? "", 40),
 
     // legacy + new
     turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
@@ -260,6 +262,9 @@ const POST_HANDLER = async (req: Request) => {
         crewLookupError = `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}`;
       }
 
+      // Region role ID from city selection
+      const regionRoleId = payload.cityRegion ? getRegionRoleId(payload.cityRegion) : null;
+
       try {
         const sync = await syncDiscordMember({
           guildId,
@@ -268,12 +273,15 @@ const POST_HANDLER = async (req: Request) => {
           nickname: payload.mafiaName,
           turtleRoleIds,
           crewRoleIds,
+          regionRoleId: regionRoleId ?? undefined,
+          allRegionRoleIds: ALL_REGION_ROLE_IDS,
         });
 
         discordResult = {
           ...sync,
           turtleRoleIds,
           crewRoleIds,
+          regionRoleId,
           crewLookupError, // Preserve any crew lookup error for debugging
         };
       } catch (e: unknown) {
@@ -282,6 +290,7 @@ const POST_HANDLER = async (req: Request) => {
           error: (e as any)?.message ?? "Discord sync failed",
           turtleRoleIds,
           crewRoleIds,
+          regionRoleId,
           crewLookupError, // Preserve any crew lookup error for debugging
         };
       }

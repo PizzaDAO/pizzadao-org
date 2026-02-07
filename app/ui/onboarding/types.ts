@@ -51,6 +51,8 @@ export type WizardData = {
 
   // Step 2: City
   city: string;
+  cityRegion?: string;
+  cityCountryCode?: string;
 
   // Step 3: Roles (turtles)
   turtles: string[];
