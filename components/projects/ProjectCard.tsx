@@ -137,26 +137,24 @@ export function ProjectCard({ project }: ProjectCardProps) {
             {recentPRs.map((pr) => (
               <li key={pr.number} className="text-xs flex items-center gap-1.5">
                 <a
-                  href={pr.url}
+                  href={pr.previewUrl || pr.url}
                   target="_blank"
                   rel="noopener noreferrer"
                   className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors min-w-0"
-                  title={`GitHub: ${pr.url}`}
+                  title={pr.previewUrl ? `Preview: ${pr.previewUrl}` : `GitHub: ${pr.url}`}
                 >
                   <CircleDot className="w-3 h-3 text-green-500 flex-shrink-0" />
                   <span className="truncate">#{pr.number} {pr.title}</span>
                 </a>
-                {pr.previewUrl && (
-                  <a
-                    href={pr.previewUrl}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    className="flex-shrink-0 text-blue-500 hover:text-blue-700 transition-colors"
-                    title={`Preview: ${pr.previewUrl}`}
-                  >
-                    <Eye className="w-3 h-3" />
-                  </a>
-                )}
+                <a
+                  href={pr.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  title="View on GitHub"
+                >
+                  <Github className="w-3 h-3" />
+                </a>
               </li>
             ))}
           </ul>

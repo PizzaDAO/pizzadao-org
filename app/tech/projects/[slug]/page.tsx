@@ -260,7 +260,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ slug: 
                   <div className="min-w-0 flex-1">
                     <div className="flex items-center gap-2">
                       <a
-                        href={pr.url}
+                        href={pr.previewUrl || pr.url}
                         target="_blank"
                         rel="noopener noreferrer"
                         className="font-medium text-gray-900 dark:text-white hover:text-orange-500 transition-colors truncate"
@@ -277,18 +277,6 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ slug: 
                     </div>
                   </div>
                   <div className="flex items-center gap-2 flex-shrink-0">
-                    {pr.previewUrl && (
-                      <a
-                        href={pr.previewUrl}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center gap-1 text-xs text-blue-500 hover:text-blue-700 transition-colors px-2 py-1 rounded bg-blue-50 dark:bg-blue-900/30"
-                        title={`Preview: ${pr.previewUrl}`}
-                      >
-                        <Eye className="w-3 h-3" />
-                        Preview
-                      </a>
-                    )}
                     <a
                       href={pr.url}
                       target="_blank"
@@ -296,7 +284,7 @@ export default function ProjectDetailPage({ params }: { params: Promise<{ slug: 
                       className="inline-flex items-center gap-1 text-xs text-gray-500 hover:text-gray-700 dark:hover:text-gray-300 transition-colors px-2 py-1 rounded bg-gray-100 dark:bg-gray-600"
                     >
                       <Github className="w-3 h-3" />
-                      View
+                      GitHub
                     </a>
                   </div>
                 </div>
