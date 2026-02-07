@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getJob, JOB_REWARD_AMOUNT, hasCompletedJobToday } from '@/app/lib/jobs'
 import { requireOnboarded, updateBalance, formatCurrency } from '@/app/lib/economy'
+import { logTransaction } from '@/app/lib/transactions'
 import { prisma } from '@/app/lib/db'
 
 export const runtime = 'nodejs'
@@ -54,6 +55,9 @@ export async function POST(request: NextRequest) {
 
     // Award the $PEP immediately
     await updateBalance(session.discordId, JOB_REWARD_AMOUNT)
+
+    // Log the transaction (fire and forget)
+    logTransaction(prisma, session.discordId, 'JOB_REWARD', JOB_REWARD_AMOUNT, `Daily job: ${job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())}`, { jobId: job.id }).catch(() => {})
 
     return NextResponse.json({
       success: true,
