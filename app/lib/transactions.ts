@@ -14,7 +14,7 @@ export async function logTransaction(
   type: Prisma.TransactionCreateInput['type'],
   amount: number,
   description: string,
-  metadata?: Record<string, unknown>
+  metadata?: Prisma.InputJsonValue
 ) {
   // Read the current wallet balance to store as running balance
   const economy = await client.economy.findUnique({ where: { id: userId } })
