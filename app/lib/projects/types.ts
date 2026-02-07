@@ -44,7 +44,7 @@ export interface PullRequest {
   authorAvatarUrl: string
   url: string
   branch: string
-  previewUrl: string
+  previewUrl?: string  // Optional - only when Vercel project exists
   createdAt: string
 }
 
@@ -187,6 +187,51 @@ export interface GitHubCommit {
     avatar_url: string
   } | null
   html_url: string
+}
+
+/**
+ * GitHub issue response (simplified)
+ */
+export interface GitHubIssue {
+  id: number
+  number: number
+  title: string
+  state: string
+  html_url: string
+  user: {
+    login: string
+    avatar_url: string
+  }
+  labels: {
+    name: string
+    color: string
+  }[]
+  pull_request?: object
+  created_at: string
+  updated_at: string
+  comments: number
+}
+
+/**
+ * Transformed issue for display
+ */
+export interface Issue {
+  number: number
+  title: string
+  author: string
+  authorAvatarUrl: string
+  url: string
+  labels: { name: string; color: string }[]
+  createdAt: string
+  commentCount: number
+}
+
+/**
+ * Extended project detail with issues and all PRs
+ */
+export interface ProjectDetail extends Project {
+  issues: Issue[]
+  allPRs: PullRequest[]
 }
 
 /**
