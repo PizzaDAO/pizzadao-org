@@ -105,6 +105,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
     bench: true, // Bench collapsed by default
     other: false,
     agenda: false,
+    roster: false,
     goals: false,
     myTasks: false, // My Tasks expanded by default
     topTasks: false, // Top Tasks expanded by default
@@ -553,40 +554,47 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
         {/* Agenda */}
         {agenda.length > 0 && (
           <div style={card()}>
-            <h2 style={sectionTitle()}>Meeting Agenda</h2>
-            <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-              <thead>
-                <tr>
-                  <th style={th()}>Time</th>
-                  <th style={th()}>Lead</th>
-                  <th style={th()}>Step</th>
-                  <th style={th()}>Action</th>
-                </tr>
-              </thead>
-              <tbody>
-                {agenda.map((item, i) => (
-                  <tr key={i}>
-                    <td style={td()}>{item.time}</td>
-                    <td style={td()}>{item.lead}</td>
-                    <td style={td()}>
-                      {item.stepUrl ? (
-                        <a
-                          href={item.stepUrl}
-                          target="_blank"
-                          rel="noreferrer"
-                          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
-                        >
-                          {item.step}
-                        </a>
-                      ) : (
-                        item.step
-                      )}
-                    </td>
-                    <td style={td()}>{item.action}</td>
+            <h2
+              onClick={() => toggleSection('agenda')}
+              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+            >
+              {collapsedSections.agenda ? '▶' : '▼'} Meeting Agenda ({agenda.length})
+            </h2>
+            {!collapsedSections.agenda && (
+              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
+                <thead>
+                  <tr>
+                    <th style={th()}>Time</th>
+                    <th style={th()}>Lead</th>
+                    <th style={th()}>Step</th>
+                    <th style={th()}>Action</th>
                   </tr>
-                ))}
-              </tbody>
-            </table>
+                </thead>
+                <tbody>
+                  {agenda.map((item, i) => (
+                    <tr key={i}>
+                      <td style={td()}>{item.time}</td>
+                      <td style={td()}>{item.lead}</td>
+                      <td style={td()}>
+                        {item.stepUrl ? (
+                          <a
+                            href={item.stepUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                          >
+                            {item.step}
+                          </a>
+                        ) : (
+                          item.step
+                        )}
+                      </td>
+                      <td style={td()}>{item.action}</td>
+                    </tr>
+                  ))}
+                </tbody>
+              </table>
+            )}
           </div>
         )}
 
@@ -661,9 +669,14 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
 
           return (
             <div style={card()}>
-              <h2 style={sectionTitle()}>Crew Roster ({visibleRoster.length} members)</h2>
+              <h2
+                onClick={() => toggleSection('roster')}
+                style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+              >
+                {collapsedSections.roster ? '▶' : '▼'} Crew Roster ({visibleRoster.length} members)
+              </h2>
 
-              {activeMembers.length > 0 && (
+              {!collapsedSections.roster && activeMembers.length > 0 && (
                 <>
                   <h3 style={{ fontSize: 14, fontWeight: 600, color: '#2e7d32', marginBottom: 12, marginTop: 0 }}>
                     Active ({activeMembers.length})
@@ -674,7 +687,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 </>
               )}
 
-              {benchMembers.length > 0 && (
+              {!collapsedSections.roster && benchMembers.length > 0 && (
                 <>
                   <h3
                     onClick={() => toggleSection('bench')}
@@ -690,7 +703,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 </>
               )}
 
-              {otherMembers.length > 0 && (
+              {!collapsedSections.roster && otherMembers.length > 0 && (
                 <>
                   <h3
                     onClick={() => toggleSection('other')}
