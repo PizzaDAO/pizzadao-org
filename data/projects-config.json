@@ -1,0 +1,57 @@
+{
+  "projects": {
+    "rsv-pizza": {
+      "status": "active",
+      "liveUrl": "https://rsv.pizza",
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/101pcNQxJN6BoUUrocgVkFnFEE9bh9ipLdnFJW-OylkI",
+      "vercelProject": "rsvpizza"
+    },
+    "pizzadao-org": {
+      "status": "active",
+      "liveUrl": "https://pizzadao.org",
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1bRTR85CDHbTAsTG6sVi1jv6H-WjLyf-yvOerLCqeY2Q",
+      "vercelProject": "onboarding"
+    },
+    "agar.pizza": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1LZaKcHLCpmXDtf3ypT1FpoYvw4f04Afq69YfNX3ecUs",
+      "vercelProject": "agar.pizza"
+    },
+    "pizza-content": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/13WBouU-AFOVad2oJFd7jIhePhTSMo_i04tlzUu_gRHE",
+      "vercelProject": "pizza-content"
+    },
+    "sheets-claude": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/13WBouU-AFOVad2oJFd7jIhePhTSMo_i04tlzUu_gRHE"
+    },
+    "pizza-chef-v2": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1J3-Usmmfd2B_av_BVvC9m70cRdpLvmGv5Wm2d6m_Y_w",
+      "vercelProject": "pizza-chef"
+    },
+    "pizza-personality": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/11AGr4RN8RN-wZ9OyDsgXgM9RYpSxkOtH-mkWbJVHD-g"
+    },
+    "proof-of-pizza": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1u-ejZIVFzqQ0rNCLEOP4VZuMGqFn-kguML8CtXw5vLQ",
+      "vercelProject": "pizza-faucet-v2"
+    },
+    "pizzadao-landing-page": {
+      "sheetUrl": "https://docs.google.com/spreadsheets/d/1_r-OKdLUcJWGN17a2H8FPi5zUq9yoNadJpGyVoFY5ro"
+    },
+    "pizza-smartcontract": {
+      "status": "maintenance"
+    },
+    "hugo-website": {
+      "status": "archived"
+    },
+    "mealticket-pizzafaucet": {
+      "vercelProject": "mealticket-pizzafaucet"
+    },
+    "pizzadao-crew-qa": {
+      "vercelProject": "pizzadao-crew-qa"
+    }
+  },
+  "excludeRepos": [
+    "pizza-github-actions-test",
+    ".github"
+  ]
+}

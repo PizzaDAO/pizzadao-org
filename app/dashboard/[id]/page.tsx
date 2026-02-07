@@ -313,6 +313,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             All Crews
                         </Link>
+                        <Link href="/tech/projects" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Projects
+                        </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
                             fontSize: 14,

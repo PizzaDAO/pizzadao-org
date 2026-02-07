@@ -66,6 +66,9 @@ export function OnboardingWizard() {
   const [crewOptions, setCrewOptions] = useState<CrewOption[]>([]);
   const [crewsLoading, setCrewsLoading] = useState(false);
 
+  // --- Submission state (for button flash fix) ---
+  const [isSubmitting, setIsSubmitting] = useState(false);
+
   // --- Error state ---
   const [error, setError] = useState<string | undefined>();
   const [errorDetails, setErrorDetails] = useState<string | undefined>();
@@ -310,6 +313,7 @@ export function OnboardingWizard() {
         resolvedMovieTitle: result.resolvedMovieTitle,
         tmdbMovieId: result.tmdbMovieId,
         releaseDate: result.releaseDate,
+        mediaType: result.mediaType,
         seenNames: mergeSeen(p.seenNames, result.suggestions ?? []),
       }));
 
@@ -323,6 +327,7 @@ export function OnboardingWizard() {
 
   // --- Submit profile ---
   async function submitAll() {
+    setIsSubmitting(true);
     setFlow({ type: "submitting" });
     setError(undefined);
 
@@ -343,6 +348,7 @@ export function OnboardingWizard() {
           resolvedMovieTitle: data.resolvedMovieTitle,
           tmdbMovieId: data.tmdbMovieId,
           releaseDate: data.releaseDate,
+          mediaType: data.mediaType,
           city: data.city,
           turtle: data.turtles.join(", "),
           turtles: data.turtles,
@@ -368,6 +374,7 @@ export function OnboardingWizard() {
         setFlow({ type: "success", redirectTo: "/" });
       }
     } catch (e: unknown) {
+      setIsSubmitting(false);
       setError((e as any)?.message || "Failed to save");
       setErrorDetails((e as any)?.details);
       setFlow({
@@ -559,6 +566,7 @@ export function OnboardingWizard() {
             suggestions={data.suggestions}
             resolvedMovieTitle={data.resolvedMovieTitle}
             releaseDate={data.releaseDate}
+            mediaType={data.mediaType}
             seenNames={data.seenNames}
             mafiaName={data.mafiaName}
             isUpdate={flow.isUpdate}
@@ -636,7 +644,7 @@ export function OnboardingWizard() {
             crews={data.crews}
             existingData={data.existingData}
             crewOptions={crewOptions}
-            submitting={false}
+            submitting={isSubmitting}
             onSubmit={submitAll}
             onCancel={() => router.push(`/dashboard/${data.memberId || data.discordId || data.sessionId}`)}
           />

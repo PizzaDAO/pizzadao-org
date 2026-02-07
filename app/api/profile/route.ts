@@ -139,6 +139,9 @@ const POST_HANDLER = async (req: Request) => {
 
   const memberId = clampStr(body.memberId ?? "", 20);
 
+  // Validate mediaType
+  const mediaType = body.mediaType === "movie" || body.mediaType === "tv" ? body.mediaType : undefined;
+
   const payload = {
     secret,
     source: clampStr(body.source ?? "web", 20),
@@ -151,6 +154,7 @@ const POST_HANDLER = async (req: Request) => {
     resolvedMovieTitle: clampStr(body.resolvedMovieTitle, 120),
     tmdbMovieId: clampStr(body.tmdbMovieId, 30),
     releaseDate: clampStr(body.releaseDate, 20),
+    mediaType,
 
     city: clampStr(body.city, 120),
 
@@ -175,6 +179,7 @@ const POST_HANDLER = async (req: Request) => {
       resolvedMovieTitle: clampStr(body.resolvedMovieTitle, 120),
       tmdbMovieId: clampStr(body.tmdbMovieId, 30),
       releaseDate: clampStr(body.releaseDate, 20),
+      mediaType,
       city: clampStr(body.city, 120),
       turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
       turtles: turtlesArr,
@@ -293,6 +298,7 @@ const POST_HANDLER = async (req: Request) => {
       city: payload.city,
       topping: payload.topping,
       mafiaMovie: payload.resolvedMovieTitle || payload.mafiaMovieTitle,
+      mediaType: payload.mediaType,
       turtles: payload.turtles,
       crews: payload.crews,
       isNewSignup,

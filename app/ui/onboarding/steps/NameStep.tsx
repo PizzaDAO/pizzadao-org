@@ -13,6 +13,7 @@ type Props = {
   suggestions?: string[];
   resolvedMovieTitle?: string;
   releaseDate?: string;
+  mediaType?: "movie" | "tv";
   seenNames: string[];
   mafiaName?: string;
 
@@ -43,6 +44,7 @@ export function NameStep({
   suggestions,
   resolvedMovieTitle,
   releaseDate,
+  mediaType,
   seenNames,
   mafiaName,
   isUpdate,
@@ -123,27 +125,15 @@ export function NameStep({
           />
         </Field>
 
-        <Field label="Favorite mafia movie">
+        <Field label="Favorite mafia movie or TV show">
           <input
             value={mafiaMovieTitle}
             onChange={(e) => onChange({ mafiaMovieTitle: e.target.value })}
-            placeholder="Goodfellas"
+            placeholder="Goodfellas, The Sopranos..."
             style={input()}
           />
         </Field>
       </div>
-
-      <Field label="Vibe">
-        <select
-          value={style}
-          onChange={(e) => onChange({ style: e.target.value as "balanced" | "serious" | "goofy" })}
-          style={input()}
-        >
-          <option value="balanced">Balanced</option>
-          <option value="serious">Serious</option>
-          <option value="goofy">Goofy</option>
-        </select>
-      </Field>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
         <button
@@ -167,7 +157,7 @@ export function NameStep({
 
         {resolvedMovieTitle && (
           <span style={{ opacity: 0.75 }}>
-            Matched: <b>{resolvedMovieTitle}</b> {releaseDate ? `(${releaseDate.slice(0, 4)})` : ""}
+            Matched: <b>{resolvedMovieTitle}</b> {releaseDate ? `(${releaseDate.slice(0, 4)})` : ""}{mediaType === "tv" ? " - TV Show" : ""}
           </span>
         )}
       </div>

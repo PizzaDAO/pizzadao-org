@@ -600,9 +600,102 @@ export async function getAgendaStepLinksDebug(sheetId: string): Promise<AgendaLi
     return result;
 }
 
+// Debug result type for manual links
+export interface ManualLinksDebugResult {
+    linkMap: Record<string, string>;
+    error?: string;
+    sheetsApiWorking: boolean;
+    headerRowIdx: number;
+    manualColIdx: number;
+    rowsProcessed: number;
+    cellsInspected: Array<{ row: number; label: string; hyperlink: string | null }>;
+}
+
+/**
+ * Configuration for manual table parsing
+ * Uses anchor-based detection to handle Google Sheets Tables mode
+ */
+const MANUAL_HEADER_MAPPINGS: [string, string[]][] = [
+    ['manual', ['manual', 'manuals', 'title', 'name']],
+    ['crew', ['crew', 'team', 'group']],
+    ['status', ['status', 'state', 'stage']],
+    ['authorId', ['author id', 'authorid', 'member id']],
+    ['author', ['author', 'creator', 'owner', 'by']],
+    ['lastUpdated', ['last updated', 'updated', 'date', 'modified']],
+    ['notes', ['notes', 'note', 'comments', 'description']],
+];
+
+/**
+ * Find manual table headers using robust anchor-based detection
+ * Handles Google Sheets Tables mode (filter dropdowns causing malformed GViz data)
+ */
+function findManualTableHeaders(
+    rows: any[],
+    getCellText: (cell: any) => string
+): { headerRowIndex: number; columns: Record<string, number> } | null {
+    const columns: Record<string, number> = {};
+
+    // Initialize all columns as not found
+    for (const [key] of MANUAL_HEADER_MAPPINGS) {
+        columns[key] = -1;
+    }
+
+    // Search first 10 rows for header row
+    for (let ri = 0; ri < Math.min(10, rows.length); ri++) {
+        const cells = rows[ri]?.values || [];
+        const rowVals = cells.map((c: any) => getCellText(c).toLowerCase().trim());
+
+        // Look for "manual" or "manuals" column header
+        let manualIdx = -1;
+        for (let ci = 0; ci < rowVals.length; ci++) {
+            const val = rowVals[ci];
+            if (val === 'manual' || val === 'manuals' || val === 'title') {
+                manualIdx = ci;
+                break;
+            }
+        }
+
+        // If we found the manual column, this is likely the header row
+        if (manualIdx !== -1) {
+            columns.manual = manualIdx;
+
+            // Map all other columns
+            const assignedCols = new Set<number>([manualIdx]);
+
+            for (const [key, possibleHeaders] of MANUAL_HEADER_MAPPINGS) {
+                if (columns[key] !== -1) continue;
+
+                for (let ci = 0; ci < rowVals.length; ci++) {
+                    if (assignedCols.has(ci)) continue;
+
+                    const val = rowVals[ci];
+                    for (const header of possibleHeaders) {
+                        // Use exact match for single-word headers
+                        if (val === header || val.includes(header)) {
+                            columns[key] = ci;
+                            assignedCols.add(ci);
+                            break;
+                        }
+                    }
+                    if (columns[key] !== -1) break;
+                }
+            }
+
+            return { headerRowIndex: ri, columns };
+        }
+    }
+
+    return null;
+}
+
 /**
  * Extract hyperlinks from the Manual column in the manuals spreadsheet
  * Returns a map of manual title -> hyperlink URL
+ *
+ * Uses robust anchor-based detection to handle:
+ * - Google Sheets Tables mode (filter dropdowns)
+ * - Dynamic header row position
+ * - Various header naming conventions
  */
 export async function getManualLinks(sheetId: string): Promise<Record<string, string>> {
     const cacheKey = `manual-links:${sheetId}`;
@@ -622,33 +715,53 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
         const sheetData = res.data.sheets?.[0];
         if (!sheetData?.data) return linkMap;
 
+        // Helper to get cell text value
+        const getCellText = (cell: any): string => {
+            return cell?.userEnteredValue?.stringValue ||
+                cell?.formattedValue || "";
+        };
+
         for (const grid of sheetData.data) {
             const rows = grid.rowData;
             if (!rows || rows.length === 0) continue;
 
-            // Find the "Manual" column (should be first column, index 0)
-            const headerRow = rows[0]?.values || [];
-            let manualColIdx = -1;
+            // Find header row and column indices using robust detection
+            const headerResult = findManualTableHeaders(rows, getCellText);
 
-            for (let c = 0; c < headerRow.length; c++) {
-                const val = (headerRow[c]?.userEnteredValue?.stringValue ||
-                    headerRow[c]?.formattedValue || "").toLowerCase().trim();
-                if (val === "manual" || val === "manuals") {
-                    manualColIdx = c;
-                    break;
+            // Fallback: assume header at row 0, manual column at index 0
+            let headerRowIndex = 0;
+            let manualColIdx = 0;
+
+            if (headerResult) {
+                headerRowIndex = headerResult.headerRowIndex;
+                manualColIdx = headerResult.columns.manual !== -1
+                    ? headerResult.columns.manual
+                    : 0;
+            } else {
+                // Legacy fallback: search first row for manual header
+                const firstRowCells = rows[0]?.values || [];
+                for (let c = 0; c < firstRowCells.length; c++) {
+                    const val = getCellText(firstRowCells[c]).toLowerCase().trim();
+                    if (val === "manual" || val === "manuals") {
+                        manualColIdx = c;
+                        break;
+                    }
                 }
             }
 
-            // Default to first column if no header found
-            if (manualColIdx === -1) manualColIdx = 0;
-
-            // Extract links from the Manual column (start from row 1 to skip header)
-            for (let r = 1; r < rows.length; r++) {
+            // Extract links from the Manual column (start after header row)
+            for (let r = headerRowIndex + 1; r < rows.length; r++) {
                 const cell = rows[r]?.values?.[manualColIdx];
                 if (!cell) continue;
 
                 const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
                 if (!label) continue;
+
+                // Skip if this looks like a header row (shouldn't happen but safety check)
+                const labelLower = label.toLowerCase().trim();
+                if (labelLower === 'manual' || labelLower === 'manuals' || labelLower === 'title') {
+                    continue;
+                }
 
                 // Try multiple ways to get the hyperlink:
                 // 1. Direct hyperlink property (Ctrl+K links)
@@ -674,15 +787,114 @@ export async function getManualLinks(sheetId: string): Promise<Record<string, st
                 }
 
                 if (label && hyperlink) {
-                    linkMap[label.trim()] = hyperlink;
+                    // Use normalizeKey for consistent matching with API routes
+                    linkMap[normalizeKey(label)] = hyperlink;
                 }
             }
         }
 
         await cacheSet(cacheKey, linkMap, CACHE_TTL.TASK_LINKS);
     } catch (error: unknown) {
+        console.error('getManualLinks error:', error);
     }
     return linkMap;
+}
+
+/**
+ * Debug version of getManualLinks that returns diagnostic info
+ */
+export async function getManualLinksDebug(sheetId: string): Promise<ManualLinksDebugResult> {
+    const result: ManualLinksDebugResult = {
+        linkMap: {},
+        sheetsApiWorking: false,
+        headerRowIdx: -1,
+        manualColIdx: -1,
+        rowsProcessed: 0,
+        cellsInspected: [],
+    };
+
+    try {
+        const res = await sheets.spreadsheets.get({
+            spreadsheetId: sheetId,
+            includeGridData: true,
+            fields: "sheets(data(rowData(values(userEnteredValue,formattedValue,hyperlink,textFormatRuns))))",
+        });
+
+        result.sheetsApiWorking = true;
+
+        const sheetData = res.data.sheets?.[0];
+        if (!sheetData?.data) {
+            result.error = 'No sheet data returned';
+            return result;
+        }
+
+        for (const grid of sheetData.data) {
+            const rows = grid.rowData;
+            if (!rows || rows.length === 0) continue;
+
+            // Find the header row by scanning first several rows
+            for (let r = 0; r < Math.min(rows.length, 10); r++) {
+                const rowCells = rows[r]?.values || [];
+                for (let c = 0; c < rowCells.length; c++) {
+                    const val = (rowCells[c]?.userEnteredValue?.stringValue ||
+                        rowCells[c]?.formattedValue || "").toLowerCase().trim();
+                    if (val === "manual" || val === "manuals" || val === "title") {
+                        result.headerRowIdx = r;
+                        result.manualColIdx = c;
+                        break;
+                    }
+                }
+                if (result.headerRowIdx !== -1) break;
+            }
+
+            // If still not found, default to row 0, column 0
+            if (result.headerRowIdx === -1) {
+                result.headerRowIdx = 0;
+                result.manualColIdx = 0;
+            }
+
+            // Extract links from the Manual column
+            for (let r = result.headerRowIdx + 1; r < rows.length; r++) {
+                result.rowsProcessed++;
+                const cell = rows[r]?.values?.[result.manualColIdx];
+                if (!cell) continue;
+
+                const label = cell.userEnteredValue?.stringValue || cell.formattedValue;
+                if (!label) continue;
+
+                let hyperlink = cell.hyperlink;
+
+                if (!hyperlink && cell.textFormatRuns) {
+                    for (const run of cell.textFormatRuns) {
+                        if (run?.format?.link?.uri) {
+                            hyperlink = run.format.link.uri;
+                            break;
+                        }
+                    }
+                }
+
+                if (!hyperlink && cell.userEnteredValue?.formulaValue) {
+                    const formula = cell.userEnteredValue.formulaValue;
+                    const match = formula.match(/=\s*HYPERLINK\s*\(\s*"([^"]+)"/i);
+                    if (match) hyperlink = match[1];
+                }
+
+                result.cellsInspected.push({
+                    row: r,
+                    label: normalizeKey(label),
+                    hyperlink: hyperlink || null,
+                });
+
+                if (label && hyperlink) {
+                    result.linkMap[normalizeKey(label)] = hyperlink;
+                }
+            }
+        }
+    } catch (error: unknown) {
+        result.error = error instanceof Error ? error.message : String(error);
+    }
+
+    return result;
 }
 
 // Member turtles cache TTL

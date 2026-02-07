@@ -158,6 +158,7 @@ export async function sendWelcomeMessage(opts: {
     city?: string;
     topping?: string;
     mafiaMovie?: string;
+    mediaType?: "movie" | "tv";
     turtles?: string[];
     crews?: string[];
     isNewSignup?: boolean;
@@ -168,7 +169,7 @@ export async function sendWelcomeMessage(opts: {
             return { ok: false, error: "Could not find General webhook URL" };
         }
 
-        const { discordId, memberId, city, topping, mafiaMovie, turtles, crews, isNewSignup = true } = opts;
+        const { discordId, memberId, city, topping, mafiaMovie, mediaType, turtles, crews, isNewSignup = true } = opts;
         const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://onboarding.pizzadao.xyz";
         const profileUrl = `${baseUrl}/profile/${memberId}`;
 
@@ -190,7 +191,10 @@ export async function sendWelcomeMessage(opts: {
         }
 
         if (mafiaMovie) {
-            lines.push(`**Favorite Mafia Movie:** ${mafiaMovie}`);
+            const label = mediaType === "tv"
+                ? "Favorite Mafia TV Show"
+                : "Favorite Mafia Movie";
+            lines.push(`**${label}:** ${mafiaMovie}`);
         }
 
         if (turtles && turtles.length > 0) {

@@ -430,6 +430,23 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           }}>
             All Crews
           </Link>
+          {crewId.toLowerCase() === 'tech' && (
+            <Link href="/tech/projects" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: 'white',
+              border: '1px solid rgba(0,0,0,0.15)',
+              borderRadius: 8,
+              color: '#000',
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 600,
+            }}>
+              Projects
+            </Link>
+          )}
           {user && (
             <Link href={`/dashboard/${user.memberId}`} style={{
               display: 'inline-flex',
@@ -796,7 +813,18 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 </div>
                 {(task.lead && task.lead !== '#N/A') || task.dueDate ? (
                   <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
-                    {task.lead && task.lead !== '#N/A' && <span>Lead: {task.lead}</span>}
+                    {task.lead && task.lead !== '#N/A' && (
+                      <span>Lead: {task.leadId ? (
+                        <Link
+                          href={`/profile/${task.leadId}`}
+                          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                        >
+                          {task.lead}
+                        </Link>
+                      ) : (
+                        task.lead
+                      )}</span>
+                    )}
                     {task.lead && task.lead !== '#N/A' && task.dueDate && <span> • </span>}
                     {task.dueDate && <span>Due: {task.dueDate}</span>}
                   </div>

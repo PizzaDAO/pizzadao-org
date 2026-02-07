@@ -35,9 +35,18 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'You have already completed this job today' }, { status: 400 })
     }
 
-    // Record the job completion
-    await prisma.jobAssignment.create({
-      data: {
+    // Record the job completion (upsert to handle re-completing jobs on different days)
+    await prisma.jobAssignment.upsert({
+      where: {
+        jobId_userId: {
+          jobId,
+          userId: session.discordId
+        }
+      },
+      update: {
+        assignedAt: new Date()
+      },
+      create: {
         jobId,
         userId: session.discordId
       }
