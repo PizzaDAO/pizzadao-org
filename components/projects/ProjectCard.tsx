@@ -66,12 +66,23 @@ export function ProjectCard({ project }: ProjectCardProps) {
     <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow relative">
       {/* Header with name and status */}
       <div className="flex items-start justify-between mb-3">
-        <Link
-          href={`/tech/projects/${slug}`}
-          className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-orange-500 transition-colors"
-        >
-          {name}
-        </Link>
+        {liveUrl ? (
+          <a
+            href={liveUrl}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-orange-500 transition-colors"
+          >
+            {name}
+          </a>
+        ) : (
+          <Link
+            href={`/tech/projects/${slug}`}
+            className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-orange-500 transition-colors"
+          >
+            {name}
+          </Link>
+        )}
         <span
           className={`${STATUS_BADGE_CLASSES[status]} text-white text-xs font-medium px-2 py-1 rounded flex-shrink-0 ml-2`}
         >
