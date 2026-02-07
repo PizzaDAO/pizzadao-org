@@ -1,5 +1,6 @@
 import { prisma } from './db'
 import { getOrCreateEconomy } from './economy'
+import { logTransaction } from './transactions'
 
 /**
  * Get all available shop items
@@ -91,6 +92,9 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
         quantity: { increment: quantity }
       }
     })
+
+    // Log the purchase transaction
+    await logTransaction(tx, userId, 'SHOP_PURCHASE', -totalCost, `Purchased ${quantity}x ${item.name}`, { itemId, itemName: item.name, quantity })
   })
 
   return {

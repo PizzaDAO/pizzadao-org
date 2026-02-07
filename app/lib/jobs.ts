@@ -1,5 +1,6 @@
 import { prisma } from './db'
 import { updateWallet } from './economy'
+import { logTransaction } from './transactions'
 
 const JOB_REWARD_AMOUNT = parseInt(process.env.JOB_REWARD_AMOUNT || '50', 10)
 const JOBS_SHEET_ID = process.env.JOBS_SHEET_ID
@@ -259,6 +260,9 @@ export async function completeJob(userId: string, reward: number) {
   // Award the reward if > 0
   if (reward > 0) {
     await updateWallet(userId, reward)
+
+    // Log the job reward transaction (fire and forget)
+    logTransaction(prisma, userId, 'JOB_REWARD', reward, `Job reward: ${assignment.job.description}`, { jobId: assignment.job.id }).catch(() => {})
   }
 
   return {
