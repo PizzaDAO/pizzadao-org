@@ -1,8 +1,9 @@
 'use client'
 
-import { useEffect, useState } from 'react'
+import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
+import { groupCrewsByDay } from '@/app/lib/crew-schedule'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -40,6 +41,15 @@ export default function AllCrewsPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [joining, setJoining] = useState<string | null>(null)
   const [leaving, setLeaving] = useState<string | null>(null)
+  const [isMobile, setIsMobile] = useState(false)
+
+  // Detect mobile viewport
+  useEffect(() => {
+    const check = () => setIsMobile(window.innerWidth < 768)
+    check()
+    window.addEventListener('resize', check)
+    return () => window.removeEventListener('resize', check)
+  }, [])
 
   // Fetch crews and user data
   useEffect(() => {
@@ -80,6 +90,9 @@ export default function AllCrewsPage() {
     }
     fetchData()
   }, [])
+
+  // Group crews by day of week
+  const crewsByDay = useMemo(() => groupCrewsByDay(crews), [crews])
 
   const handleJoinCrew = async (crewId: string) => {
     if (!user) {
@@ -143,6 +156,168 @@ export default function AllCrewsPage() {
     return user.crews.some(c => c.toLowerCase() === crewId.toLowerCase())
   }
 
+  const renderCrewCard = (crew: CrewOption) => {
+    const inCrew = isInCrew(crew.id)
+    const isJoining = joining === crew.id
+    const isLeaving = leaving === crew.id
+
+    return (
+      <div key={crew.id} style={{
+        ...card(),
+        border: inCrew ? '2px solid #4caf50' : '1px solid rgba(0,0,0,0.12)',
+      }}>
+        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
+          <div>
+            <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+              {crew.emoji && `${crew.emoji} `}{crew.label}
+            </h2>
+            {(crew.callTime || crew.callLength) && (
+              <p style={{ fontSize: 14, opacity: 0.7, margin: '8px 0 0' }}>
+                {crew.callTime && (
+                  crew.callTimeUrl ? (
+                    <a href={crew.callTimeUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+                      {crew.callTime}
+                    </a>
+                  ) : crew.callTime
+                )}
+                {crew.callTime && crew.callLength && ' \u2022 '}
+                {crew.callLength}
+              </p>
+            )}
+          </div>
+          {inCrew && (
+            <span style={{
+              background: '#e8f5e9',
+              color: '#2e7d32',
+              padding: '4px 10px',
+              borderRadius: 12,
+              fontSize: 12,
+              fontWeight: 600,
+            }}>
+              Joined
+            </span>
+          )}
+        </div>
+
+        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
+          <Link
+            href={`/crew/${crew.id}`}
+            style={{
+              ...btn('secondary'),
+              flex: 1,
+              textAlign: 'center',
+              fontSize: 14,
+            }}
+          >
+            View Crew
+          </Link>
+
+          {user && (
+            inCrew ? (
+              <button
+                onClick={() => handleLeaveCrew(crew.id)}
+                disabled={isLeaving}
+                style={{
+                  ...btn('secondary'),
+                  flex: 1,
+                  fontSize: 14,
+                  opacity: isLeaving ? 0.6 : 1,
+                  cursor: isLeaving ? 'wait' : 'pointer',
+                  color: '#d32f2f',
+                  borderColor: '#d32f2f',
+                }}
+              >
+                {isLeaving ? 'Leaving...' : 'Leave Crew'}
+              </button>
+            ) : (
+              <button
+                onClick={() => handleJoinCrew(crew.id)}
+                disabled={isJoining}
+                style={{
+                  ...btn('primary'),
+                  flex: 1,
+                  fontSize: 14,
+                  opacity: isJoining ? 0.6 : 1,
+                  cursor: isJoining ? 'wait' : 'pointer',
+                }}
+              >
+                {isJoining ? 'Joining...' : 'Join Crew'}
+              </button>
+            )
+          )}
+        </div>
+
+        {/* Tasks Section */}
+        {crew.tasks && crew.tasks.length > 0 && (
+          <div style={{ marginTop: 16, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+              Top Tasks
+            </div>
+            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+              {crew.tasks.map((task, idx) => (
+                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                  {task.priority && (
+                    <span style={{
+                      fontSize: 11,
+                      fontWeight: 600,
+                      padding: '3px 8px',
+                      borderRadius: 4,
+                      background: task.priority === 'Top' ? '#fee2e2' :
+                                 task.priority === 'High' ? '#fef3c7' :
+                                 task.priority === 'Mid' ? '#e0f2fe' : '#f3f4f6',
+                      color: task.priority === 'Top' ? '#b91c1c' :
+                            task.priority === 'High' ? '#b45309' :
+                            task.priority === 'Mid' ? '#0369a1' : '#4b5563',
+                      flexShrink: 0,
+                    }}>
+                      {task.priority}
+                    </span>
+                  )}
+                  {task.url ? (
+                    <a
+                      href={task.url}
+                      target="_blank"
+                      rel="noreferrer"
+                      style={{ fontSize: 14, color: '#2563eb', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
+                    >
+                      {task.label}
+                    </a>
+                  ) : (
+                    <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>{task.label}</span>
+                  )}
+                </div>
+              ))}
+            </div>
+            {(crew.taskCount ?? 0) > 3 && (
+              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
+                +{(crew.taskCount ?? 0) - 3} more tasks
+              </div>
+            )}
+          </div>
+        )}
+
+        {crew.sheet && (
+          <a
+            href={crew.sheet}
+            target="_blank"
+            rel="noreferrer"
+            style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              marginTop: 10,
+              fontSize: 14,
+              opacity: 0.6,
+              textDecoration: 'none',
+              minHeight: 44,
+            }}
+          >
+            Open sheet ↗
+          </a>
+        )}
+      </div>
+    )
+  }
+
   if (loading) {
     return (
       <div style={{
@@ -198,7 +373,7 @@ export default function AllCrewsPage() {
       fontFamily: inter.style.fontFamily,
       padding: '40px 20px',
     }}>
-      <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
+      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link href="/" style={{
@@ -261,170 +436,51 @@ export default function AllCrewsPage() {
           </p>
         </header>
 
-        {/* Crews Grid */}
-        <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(100%, 300px), 1fr))', gap: 16 }}>
-          {crews.map((crew) => {
-            const inCrew = isInCrew(crew.id)
-            const isJoining = joining === crew.id
-            const isLeaving = leaving === crew.id
-
-            return (
-              <div key={crew.id} style={{
-                ...card(),
-                border: inCrew ? '2px solid #4caf50' : '1px solid rgba(0,0,0,0.12)',
-              }}>
-                <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                  <div>
-                    <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
-                      {crew.emoji && `${crew.emoji} `}{crew.label}
-                    </h2>
-                    {(crew.callTime || crew.callLength) && (
-                      <p style={{ fontSize: 14, opacity: 0.7, margin: '8px 0 0' }}>
-                        {crew.callTime && (
-                          crew.callTimeUrl ? (
-                            <a href={crew.callTimeUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
-                              {crew.callTime}
-                            </a>
-                          ) : crew.callTime
-                        )}
-                        {crew.callTime && crew.callLength && ' • '}
-                        {crew.callLength}
-                      </p>
-                    )}
-                  </div>
-                  {inCrew && (
-                    <span style={{
-                      background: '#e8f5e9',
-                      color: '#2e7d32',
-                      padding: '4px 10px',
-                      borderRadius: 12,
-                      fontSize: 12,
-                      fontWeight: 600,
-                    }}>
-                      Joined
-                    </span>
-                  )}
+        {/* Crews by Day of Week */}
+        {isMobile ? (
+          /* Mobile: stacked day sections */
+          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
+            {crewsByDay.map(({ day, crews: dayCrews }) => (
+              <div key={day}>
+                <h3 style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                  color: '#333',
+                  borderBottom: '2px solid #e5e7eb',
+                  paddingBottom: 8,
+                }}>
+                  {day}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {dayCrews.map(crew => renderCrewCard(crew as CrewOption))}
                 </div>
-
-                <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-                  <Link
-                    href={`/crew/${crew.id}`}
-                    style={{
-                      ...btn('secondary'),
-                      flex: 1,
-                      textAlign: 'center',
-                      fontSize: 14,
-                    }}
-                  >
-                    View Crew
-                  </Link>
-
-                  {user && (
-                    inCrew ? (
-                      <button
-                        onClick={() => handleLeaveCrew(crew.id)}
-                        disabled={isLeaving}
-                        style={{
-                          ...btn('secondary'),
-                          flex: 1,
-                          fontSize: 14,
-                          opacity: isLeaving ? 0.6 : 1,
-                          cursor: isLeaving ? 'wait' : 'pointer',
-                          color: '#d32f2f',
-                          borderColor: '#d32f2f',
-                        }}
-                      >
-                        {isLeaving ? 'Leaving...' : 'Leave Crew'}
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => handleJoinCrew(crew.id)}
-                        disabled={isJoining}
-                        style={{
-                          ...btn('primary'),
-                          flex: 1,
-                          fontSize: 14,
-                          opacity: isJoining ? 0.6 : 1,
-                          cursor: isJoining ? 'wait' : 'pointer',
-                        }}
-                      >
-                        {isJoining ? 'Joining...' : 'Join Crew'}
-                      </button>
-                    )
-                  )}
-                </div>
-
-                {/* Tasks Section */}
-                {crew.tasks && crew.tasks.length > 0 && (
-                  <div style={{ marginTop: 16, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12 }}>
-                    <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-                      Top Tasks
-                    </div>
-                    <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
-                      {crew.tasks.map((task, idx) => (
-                        <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
-                          {task.priority && (
-                            <span style={{
-                              fontSize: 11,
-                              fontWeight: 600,
-                              padding: '3px 8px',
-                              borderRadius: 4,
-                              background: task.priority === 'Top' ? '#fee2e2' :
-                                         task.priority === 'High' ? '#fef3c7' :
-                                         task.priority === 'Mid' ? '#e0f2fe' : '#f3f4f6',
-                              color: task.priority === 'Top' ? '#b91c1c' :
-                                    task.priority === 'High' ? '#b45309' :
-                                    task.priority === 'Mid' ? '#0369a1' : '#4b5563',
-                              flexShrink: 0,
-                            }}>
-                              {task.priority}
-                            </span>
-                          )}
-                          {task.url ? (
-                            <a
-                              href={task.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              style={{ fontSize: 14, color: '#2563eb', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
-                            >
-                              {task.label}
-                            </a>
-                          ) : (
-                            <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>{task.label}</span>
-                          )}
-                        </div>
-                      ))}
-                    </div>
-                    {(crew.taskCount ?? 0) > 3 && (
-                      <div style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
-                        +{(crew.taskCount ?? 0) - 3} more tasks
-                      </div>
-                    )}
-                  </div>
-                )}
-
-                {crew.sheet && (
-                  <a
-                    href={crew.sheet}
-                    target="_blank"
-                    rel="noreferrer"
-                    style={{
-                      display: 'inline-flex',
-                      alignItems: 'center',
-                      marginTop: 10,
-                      fontSize: 14,
-                      opacity: 0.6,
-                      textDecoration: 'none',
-                      minHeight: 44,
-                    }}
-                  >
-                    Open sheet ↗
-                  </a>
-                )}
               </div>
-            )
-          })}
-        </div>
+            ))}
+          </div>
+        ) : (
+          /* Desktop: side-by-side day columns */
+          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
+            {crewsByDay.map(({ day, crews: dayCrews }) => (
+              <div key={day} style={{ flex: 1, minWidth: 0 }}>
+                <h3 style={{
+                  fontSize: 16,
+                  fontWeight: 700,
+                  marginBottom: 12,
+                  color: '#333',
+                  borderBottom: '2px solid #e5e7eb',
+                  paddingBottom: 8,
+                  textAlign: 'center',
+                }}>
+                  {day}
+                </h3>
+                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
+                  {dayCrews.map(crew => renderCrewCard(crew as CrewOption))}
+                </div>
+              </div>
+            ))}
+          </div>
+        )}
 
         {/* Not logged in message */}
         {!user && (
