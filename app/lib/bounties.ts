@@ -1,6 +1,7 @@
 import { prisma } from './db'
 import { getOrCreateEconomy, updateBalance } from './economy'
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from './errors/api-errors'
+import { notifyBountyClaimed, notifyBountyCompleted } from './notifications'
 
 /**
  * Create a bounty with escrowed reward
@@ -87,13 +88,18 @@ export async function claimBounty(userId: string, bountyId: number) {
     throw new ValidationError('Cannot claim your own bounty')
   }
 
-  return prisma.bounty.update({
+  const updatedBounty = await prisma.bounty.update({
     where: { id: bountyId },
     data: {
       claimedBy: userId,
       status: 'CLAIMED'
     }
   })
+
+  // Notify the bounty poster (fire and forget - don't block on notification)
+  notifyBountyClaimed(bounty.createdBy, userId, bountyId, bounty.description).catch(() => {})
+
+  return updatedBounty
 }
 
 /**
@@ -153,10 +159,15 @@ export async function completeBounty(creatorId: string, bountyId: number) {
   await updateBalance(bounty.claimedBy, bounty.reward)
 
   // Mark as completed
-  return prisma.bounty.update({
+  const updatedBounty = await prisma.bounty.update({
     where: { id: bountyId },
     data: { status: 'COMPLETED' }
   })
+
+  // Notify the claimer (fire and forget - don't block on notification)
+  notifyBountyCompleted(bounty.claimedBy, creatorId, bountyId, bounty.description, bounty.reward).catch(() => {})
+
+  return updatedBounty
 }
 
 /**

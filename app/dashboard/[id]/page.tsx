@@ -10,6 +10,7 @@ import { TURTLES, CREWS } from "../../ui/constants";
 import { PepIcon, PepAmount } from "../../ui/economy";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
+import { NotificationBell } from "../../ui/notifications";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -304,6 +305,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 {/* Main Card */}
                 <div style={card()}>
                     <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                        <NotificationBell />
                         <Link href="/crews" style={{
                             ...btn("secondary"),
                             fontSize: 14,

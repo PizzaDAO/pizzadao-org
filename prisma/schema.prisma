@@ -154,3 +154,28 @@ model ConsumedToken {
   pollId    String
   consumedAt DateTime @default(now())
 }
+
+// ===== NOTIFICATION SYSTEM =====
+
+enum NotificationType {
+  BOUNTY_CLAIMED     // Someone claimed your bounty
+  BOUNTY_COMPLETED   // Bounty you claimed is approved, reward paid
+  TASK_ASSIGNED      // A task was assigned to you
+  TASK_DUE_SOON      // Task due within a week
+}
+
+model Notification {
+  id          String           @id @default(cuid())
+  type        NotificationType
+  recipientId String           // Discord ID of notification recipient
+  actorId     String?          // Discord ID of user who triggered it (optional)
+  title       String           // Short title (e.g., "Bounty Claimed")
+  message     String           // Detailed message
+  metadata    Json?            // Type-specific data (bountyId, taskId, etc.)
+  linkUrl     String?          // Optional deep link (e.g., /pep for bounty)
+  createdAt   DateTime         @default(now())
+  readAt      DateTime?        // Null = unread, timestamp = when read
+
+  @@index([recipientId, createdAt])
+  @@index([recipientId, readAt])
+}
