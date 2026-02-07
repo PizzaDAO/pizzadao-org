@@ -23,7 +23,7 @@
     "sheets-claude": {
       "sheetUrl": "https://docs.google.com/spreadsheets/d/13WBouU-AFOVad2oJFd7jIhePhTSMo_i04tlzUu_gRHE"
     },
-    "pizza-chef-v2": {
+    "pizza-chef": {
       "sheetUrl": "https://docs.google.com/spreadsheets/d/1J3-Usmmfd2B_av_BVvC9m70cRdpLvmGv5Wm2d6m_Y_w",
       "vercelProject": "pizza-chef"
     },
