@@ -1,6 +1,7 @@
 // app/api/discord/callback/route.ts
 import { NextResponse } from "next/server";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
+import { decodeOAuthState, validateReturnTo, createTransferToken } from "@/app/lib/oauth-proxy";
 
 export const runtime = "nodejs";
 
@@ -108,7 +109,8 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const code = url.searchParams.get("code");
-    const state = url.searchParams.get("state") || ""; // sessionId
+    const rawState = url.searchParams.get("state") || "";
+    const { sessionId: state, return_to } = decodeOAuthState(rawState);
 
     if (!code) return NextResponse.json({ error: "Missing code" }, { status: 400 });
 
@@ -120,6 +122,21 @@ export async function GET(req: Request) {
     const guildMember = await fetchGuildMember(me.id);
 
     const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
+
+    // If this is a proxy flow (return_to exists), create transfer token
+    // and redirect back to the preview
+    if (return_to && validateReturnTo(return_to)) {
+      const transferToken = createTransferToken({
+        discordId: me.id,
+        username: me.username,
+        nick: nick,
+        origin: return_to,
+      });
+
+      const transferUrl = new URL("/api/auth/session-transfer", return_to);
+      transferUrl.searchParams.set("token", transferToken);
+      return NextResponse.redirect(transferUrl.toString());
+    }
 
     // Create session token
     const sessionToken = createSessionToken({
