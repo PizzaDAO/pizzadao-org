@@ -2,7 +2,7 @@
 
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
-import { Leaderboard, PepIcon, PepAmount } from "../ui/economy";
+import { Leaderboard, PepIcon, PepAmount, TransactionHistory } from "../ui/economy";
 import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
@@ -440,6 +440,9 @@ export default function PepDashboard() {
               <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Shop</h2>
               <ShopGrid key={`shop-${walletKey}`} onPurchase={refreshWallet} />
             </div>
+
+            {/* Transaction History */}
+            <TransactionHistory refreshKey={walletKey} />
           </div>
         </div>
       </div>

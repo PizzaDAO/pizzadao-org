@@ -155,6 +155,31 @@ model ConsumedToken {
   consumedAt DateTime @default(now())
 }
 
+// ===== TRANSACTION HISTORY =====
+
+enum TransactionType {
+  TRANSFER_SENT      // Sent $PEP to another user
+  TRANSFER_RECEIVED  // Received $PEP from another user
+  SHOP_PURCHASE      // Bought an item from the shop
+  JOB_REWARD         // Earned $PEP from completing a job
+  BOUNTY_ESCROW      // Escrowed $PEP when creating a bounty
+  BOUNTY_REWARD      // Earned $PEP from completing a bounty
+  BOUNTY_REFUND      // Refunded $PEP from cancelling a bounty
+}
+
+model Transaction {
+  id          Int             @id @default(autoincrement())
+  userId      String          // Discord ID of the user
+  type        TransactionType
+  amount      Int             // Signed: positive = credit, negative = debit
+  balance     Int             // Running balance after this transaction
+  description String          // Human-readable description
+  metadata    Json?           // Optional extra data (bountyId, itemId, etc.)
+  createdAt   DateTime        @default(now())
+
+  @@index([userId, createdAt])
+}
+
 // ===== NOTIFICATION SYSTEM =====
 
 enum NotificationType {

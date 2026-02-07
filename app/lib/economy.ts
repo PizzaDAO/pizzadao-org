@@ -1,5 +1,6 @@
 import { prisma } from './db'
 import { ValidationError } from './errors/api-errors'
+import { logTransaction } from './transactions'
 
 const PEP_SYMBOL = process.env.PEP_SYMBOL || '$PEP'
 const PEP_NAME = process.env.PEP_NAME || 'PEP'
@@ -80,17 +81,21 @@ export async function transfer(fromId: string, toId: string, amount: number) {
     throw new ValidationError('Insufficient funds')
   }
 
-  // Use transaction to ensure atomicity
-  await prisma.$transaction([
-    prisma.economy.update({
+  // Use interactive transaction to ensure atomicity and log both sides
+  await prisma.$transaction(async (tx) => {
+    await tx.economy.update({
       where: { id: fromId },
       data: { wallet: { decrement: amount } }
-    }),
-    prisma.economy.update({
+    })
+    await tx.economy.update({
       where: { id: toId },
       data: { wallet: { increment: amount } }
     })
-  ])
+
+    // Log both sides of the transfer
+    await logTransaction(tx, fromId, 'TRANSFER_SENT', -amount, `Transfer to ${toId}`, { toUserId: toId })
+    await logTransaction(tx, toId, 'TRANSFER_RECEIVED', amount, `Transfer from ${fromId}`, { fromUserId: fromId })
+  })
 
   return { success: true, amount }
 }

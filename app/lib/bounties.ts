@@ -2,6 +2,7 @@ import { prisma } from './db'
 import { getOrCreateEconomy, updateBalance } from './economy'
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from './errors/api-errors'
 import { notifyBountyClaimed, notifyBountyCompleted } from './notifications'
+import { logTransaction } from './transactions'
 
 /**
  * Create a bounty with escrowed reward
@@ -34,6 +35,9 @@ export async function createBounty(creatorId: string, description: string, rewar
       status: 'OPEN'
     }
   })
+
+  // Log the escrow transaction (fire and forget)
+  logTransaction(prisma, creatorId, 'BOUNTY_ESCROW', -reward, `Bounty escrow: ${description.trim()}`, { bountyId: bounty.id }).catch(() => {})
 
   return bounty
 }
@@ -158,6 +162,9 @@ export async function completeBounty(creatorId: string, bountyId: number) {
   // Pay the claimer
   await updateBalance(bounty.claimedBy, bounty.reward)
 
+  // Log the reward transaction (fire and forget)
+  logTransaction(prisma, bounty.claimedBy, 'BOUNTY_REWARD', bounty.reward, `Bounty reward: ${bounty.description}`, { bountyId }).catch(() => {})
+
   // Mark as completed
   const updatedBounty = await prisma.bounty.update({
     where: { id: bountyId },
@@ -196,6 +203,9 @@ export async function cancelBounty(creatorId: string, bountyId: number) {
 
   // Refund the creator
   await updateBalance(creatorId, bounty.reward)
+
+  // Log the refund transaction (fire and forget)
+  logTransaction(prisma, creatorId, 'BOUNTY_REFUND', bounty.reward, `Bounty refund: ${bounty.description}`, { bountyId }).catch(() => {})
 
   // Mark as cancelled
   return prisma.bounty.update({
