@@ -4,13 +4,13 @@ import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/
 
 export const runtime = "nodejs";
 
-async function exchangeCodeForToken(code: string) {
+async function exchangeCodeForToken(code: string, redirectUri: string) {
   const body = new URLSearchParams();
   body.set("client_id", process.env.DISCORD_CLIENT_ID!);
   body.set("client_secret", process.env.DISCORD_CLIENT_SECRET!);
   body.set("grant_type", "authorization_code");
   body.set("code", code);
-  body.set("redirect_uri", process.env.DISCORD_REDIRECT_URI!);
+  body.set("redirect_uri", redirectUri);
 
   const r = await fetch("https://discord.com/api/oauth2/token", {
     method: "POST",
@@ -112,7 +112,8 @@ export async function GET(req: Request) {
 
     if (!code) return NextResponse.json({ error: "Missing code" }, { status: 400 });
 
-    const token = await exchangeCodeForToken(code);
+    const redirectUri = process.env.DISCORD_REDIRECT_URI || `${url.origin}/api/discord/callback`;
+    const token = await exchangeCodeForToken(code, redirectUri);
     const me = await fetchDiscordMe(token.access_token);
 
     const joinResult = await addUserToGuild(me.id, token.access_token);

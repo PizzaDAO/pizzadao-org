@@ -7,7 +7,7 @@ export async function GET(req: Request) {
   const state = url.searchParams.get("state") || ""; // pass sessionId here
 
   const clientId = process.env.DISCORD_CLIENT_ID!;
-  const redirectUri = process.env.DISCORD_REDIRECT_URI!;
+  const redirectUri = process.env.DISCORD_REDIRECT_URI || `${url.origin}/api/discord/callback`;
 
   const auth = new URL("https://discord.com/api/oauth2/authorize");
   auth.searchParams.set("client_id", clientId);
