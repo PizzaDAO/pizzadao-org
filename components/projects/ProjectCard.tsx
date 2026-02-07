@@ -1,7 +1,7 @@
 'use client'
 
 import type { Project, ProjectStatus } from '@/app/lib/projects/types'
-import { ExternalLink, Github, GitPullRequest, AlertCircle, CircleDot, FileSpreadsheet } from 'lucide-react'
+import { ExternalLink, Github, GitPullRequest, AlertCircle, CircleDot, FileSpreadsheet, Eye } from 'lucide-react'
 import Link from 'next/link'
 
 /**
@@ -40,6 +40,7 @@ interface ProjectCardProps {
 export function ProjectCard({ project }: ProjectCardProps) {
   const {
     name,
+    slug,
     description,
     status,
     techStack,
@@ -62,23 +63,15 @@ export function ProjectCard({ project }: ProjectCardProps) {
   })
 
   return (
-    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow">
+    <div className="bg-white dark:bg-gray-800 rounded-lg shadow-md border border-gray-200 dark:border-gray-700 p-5 hover:shadow-lg transition-shadow relative">
       {/* Header with name and status */}
       <div className="flex items-start justify-between mb-3">
-        {liveUrl ? (
-          <a
-            href={liveUrl}
-            target="_blank"
-            rel="noopener noreferrer"
-            className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-orange-500 transition-colors"
-          >
-            {name}
-          </a>
-        ) : (
-          <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">
-            {name}
-          </h3>
-        )}
+        <Link
+          href={`/tech/projects/${slug}`}
+          className="text-lg font-semibold text-gray-900 dark:text-white truncate hover:text-orange-500 transition-colors"
+        >
+          {name}
+        </Link>
         <span
           className={`${STATUS_BADGE_CLASSES[status]} text-white text-xs font-medium px-2 py-1 rounded flex-shrink-0 ml-2`}
         >
@@ -136,22 +129,31 @@ export function ProjectCard({ project }: ProjectCardProps) {
         </a>
       </div>
 
-      {/* Recent PRs with Vercel Preview links */}
+      {/* Recent PRs with GitHub links and optional Vercel Preview */}
       {recentPRs && recentPRs.length > 0 && (
         <div className="border-t border-gray-200 dark:border-gray-600 pt-3 mb-4">
-          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Open PRs (Preview):</p>
+          <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Open PRs:</p>
           <ul className="space-y-1">
             {recentPRs.map((pr) => (
-              <li key={pr.number} className="text-xs">
+              <li key={pr.number} className="text-xs flex items-center gap-1.5">
                 <a
-                  href={pr.previewUrl}
+                  href={pr.previewUrl || pr.url}
                   target="_blank"
                   rel="noopener noreferrer"
-                  className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors"
-                  title={`Preview: ${pr.previewUrl}`}
+                  className="flex items-center gap-1.5 text-gray-700 dark:text-gray-300 hover:text-orange-500 transition-colors min-w-0"
+                  title={pr.previewUrl ? `Preview: ${pr.previewUrl}` : `GitHub: ${pr.url}`}
                 >
                   <CircleDot className="w-3 h-3 text-green-500 flex-shrink-0" />
                   <span className="truncate">#{pr.number} {pr.title}</span>
+                </a>
+                <a
+                  href={pr.url}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="flex-shrink-0 text-gray-400 hover:text-gray-600 dark:hover:text-gray-300 transition-colors"
+                  title="View on GitHub"
+                >
+                  <Github className="w-3 h-3" />
                 </a>
               </li>
             ))}
@@ -217,6 +219,13 @@ export function ProjectCard({ project }: ProjectCardProps) {
             <span>Tasks</span>
           </a>
         )}
+        <Link
+          href={`/tech/projects/${slug}`}
+          className="flex items-center gap-1 text-sm text-orange-500 hover:text-orange-600 transition-colors ml-auto"
+        >
+          <span>Details</span>
+          <span aria-hidden="true">&rarr;</span>
+        </Link>
       </div>
     </div>
   )

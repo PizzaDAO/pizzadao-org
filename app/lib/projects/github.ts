@@ -7,13 +7,16 @@ import type {
   GitHubPullRequest,
   GitHubContributor,
   GitHubCommit,
+  GitHubIssue,
   Project,
   ProjectConfig,
+  ProjectDetail,
   ProjectStatus,
   ActivityLevel,
   Contributor,
   Commit,
   PullRequest,
+  Issue,
 } from './types'
 
 const GITHUB_API_BASE = 'https://api.github.com'
@@ -135,6 +138,20 @@ async function handleGitHubResponse<T>(response: Response, context: string): Pro
 }
 
 /**
+ * Safely parse JSON from a response with a fallback value
+ */
+async function safeParseJson<T>(response: Response, fallback: T): Promise<T> {
+  if (!response.ok) return fallback
+  try {
+    const text = await response.text()
+    if (!text || text.trim() === '') return fallback
+    return JSON.parse(text) as T
+  } catch {
+    return fallback
+  }
+}
+
+/**
  * Fetch all public repositories from PizzaDAO organization
  */
 export async function fetchPizzaDAORepos(): Promise<GitHubRepo[]> {
@@ -156,7 +173,7 @@ export async function fetchPizzaDAORepos(): Promise<GitHubRepo[]> {
 /**
  * Fetch detailed information for a specific repository
  */
-export async function fetchRepoDetails(slug: string): Promise<{
+export async function fetchRepoDetails(slug: string, vercelProject?: string): Promise<{
   openPRs: number
   contributors: Contributor[]
   recentCommits: Commit[]
@@ -176,18 +193,6 @@ export async function fetchRepoDetails(slug: string): Promise<{
       headers,
     }),
   ])
-
-  // Parse responses safely (handle empty responses gracefully)
-  const safeParseJson = async <T>(response: Response, fallback: T): Promise<T> => {
-    if (!response.ok) return fallback
-    try {
-      const text = await response.text()
-      if (!text || text.trim() === '') return fallback
-      return JSON.parse(text) as T
-    } catch {
-      return fallback
-    }
-  }
 
   const prs = await safeParseJson<GitHubPullRequest[]>(prsResponse, [])
   const contributorsData = await safeParseJson<GitHubContributor[]>(contributorsResponse, [])
@@ -213,10 +218,10 @@ export async function fetchRepoDetails(slug: string): Promise<{
 
   // Transform PRs (take first 3)
   const recentPRs: PullRequest[] = prs.slice(0, 3).map((pr) => {
-    // Convert branch name to Vercel preview URL
-    // Format: https://{project}-git-{branch}-pizza-dao.vercel.app
     const sanitizedBranch = pr.head.ref.replace(/\//g, '-').toLowerCase()
-    const previewUrl = `https://${slug}-git-${sanitizedBranch}-pizza-dao.vercel.app`
+    const previewUrl = vercelProject
+      ? `https://${vercelProject}-git-${sanitizedBranch}-pizza-dao.vercel.app`
+      : undefined
 
     return {
       number: pr.number,
@@ -236,6 +241,83 @@ export async function fetchRepoDetails(slug: string): Promise<{
     recentCommits,
     recentPRs,
   }
+}
+
+/**
+ * Fetch open issues for a repository (excluding PRs)
+ */
+export async function fetchRepoIssues(slug: string): Promise<Issue[]> {
+  const response = await fetch(
+    `${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/issues?state=open&per_page=100`,
+    { headers: getHeaders() }
+  )
+  const issues = await handleGitHubResponse<GitHubIssue[]>(response, `issues for ${slug}`)
+
+  // Filter out PRs (GitHub returns PRs in the issues endpoint)
+  return issues
+    .filter(issue => !issue.pull_request)
+    .map(issue => ({
+      number: issue.number,
+      title: issue.title,
+      author: issue.user.login,
+      authorAvatarUrl: issue.user.avatar_url,
+      url: issue.html_url,
+      labels: issue.labels.map(l => ({ name: l.name, color: l.color })),
+      createdAt: issue.created_at,
+      commentCount: issue.comments,
+    }))
+}
+
+/**
+ * Fetch full project detail for a single project
+ */
+export async function fetchProjectDetail(
+  slug: string,
+  config?: ProjectConfig
+): Promise<ProjectDetail | null> {
+  // Fetch repo info
+  const response = await fetch(
+    `${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}`,
+    { headers: getHeaders() }
+  )
+  if (!response.ok) return null
+
+  const repo = await response.json() as GitHubRepo
+  const baseProject = transformGitHubRepo(repo, config)
+
+  // Fetch details, all PRs, and issues in parallel
+  const [details, issues, allPRsResponse] = await Promise.all([
+    fetchRepoDetails(slug, config?.vercelProject),
+    fetchRepoIssues(slug),
+    fetch(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/pulls?state=open&per_page=100`, {
+      headers: getHeaders(),
+    }),
+  ])
+
+  const allPRsData = await safeParseJson<GitHubPullRequest[]>(allPRsResponse, [])
+  const allPRs: PullRequest[] = allPRsData.map(pr => {
+    const sanitizedBranch = pr.head.ref.replace(/\//g, '-').toLowerCase()
+    const previewUrl = config?.vercelProject
+      ? `https://${config.vercelProject}-git-${sanitizedBranch}-pizza-dao.vercel.app`
+      : undefined
+    return {
+      number: pr.number,
+      title: pr.title,
+      author: pr.user.login,
+      authorAvatarUrl: pr.user.avatar_url,
+      url: pr.html_url,
+      branch: pr.head.ref,
+      previewUrl,
+      createdAt: pr.created_at,
+    }
+  })
+
+  return {
+    ...baseProject,
+    ...details,
+    issues,
+    allPRs,
+  } as ProjectDetail
 }
 
 /**
@@ -340,7 +422,7 @@ export async function fetchAllProjects(
   const projects = await Promise.all(
     filteredRepos.map(async (repo) => {
       const baseProject = transformGitHubRepo(repo, config?.[repo.name])
-      const details = await fetchRepoDetails(repo.name)
+      const details = await fetchRepoDetails(repo.name, config?.[repo.name]?.vercelProject)
 
       return {
         ...baseProject,
