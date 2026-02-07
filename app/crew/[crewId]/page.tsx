@@ -114,6 +114,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
     // Goal sections (goal_0, goal_1, etc.) default to collapsed (handled via ?? true)
   })
   const [showLaterTasks, setShowLaterTasks] = useState(false)
+  const [showOpenOnly, setShowOpenOnly] = useState(false)
   const [claimingTask, setClaimingTask] = useState<string | null>(null)
 
   const toggleSection = (section: string) => {
@@ -783,14 +784,34 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
           // Get sorted goal names for consistent ordering
           const goalNames = Array.from(tasksByGoal.keys()).sort()
 
+          // Helper to check if a task needs a lead (open task)
+          const needsLead = (t: typeof tasks[0]) => !t.lead || t.lead === '#N/A' || t.lead.trim() === ''
+
+          // Filter helper for "show open only" mode
+          const filterOpen = (list: typeof tasks) => showOpenOnly ? list.filter(needsLead) : list
+
+          // Apply filter to all groups EXCEPT myTasks
+          const filteredTopTasks = filterOpen(topTasks)
+          const filteredUngroupedTasks = filterOpen(ungroupedTasks)
+          const filteredLaterTasks = filterOpen(laterTasks)
+          const filteredTasksByGoal = new Map<string, typeof tasks>()
+          const filteredGoalNames: string[] = []
+          for (const goalName of goalNames) {
+            const filtered = filterOpen(tasksByGoal.get(goalName)!)
+            if (filtered.length > 0) {
+              filteredTasksByGoal.set(goalName, filtered)
+              filteredGoalNames.push(goalName)
+            }
+          }
+
           const renderTaskCard = (task: typeof tasks[0], i: number) => {
-            const needsLead = !task.lead || task.lead === '#N/A' || task.lead.trim() === ''
+            const taskNeedsLead = needsLead(task)
             const isClaiming = claimingTask === task.task
 
             return (
               <div key={i} style={{
                 ...itemCard(),
-                ...(needsLead ? {
+                ...(taskNeedsLead ? {
                   background: '#fff8e1',
                   borderColor: '#ffb300',
                   borderWidth: '2px',
@@ -799,7 +820,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {task.priority && <span style={priorityBadge(task.priority)}>{task.priority}</span>}
                   {task.stage && <span style={stageBadge(task.stage)}>{task.stage}</span>}
-                  {needsLead && <span style={{
+                  {taskNeedsLead && <span style={{
                     display: 'inline-block',
                     padding: '3px 8px',
                     borderRadius: 6,
@@ -845,7 +866,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 {task.notes && (
                   <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{task.notes}</div>
                 )}
-                {needsLead && user && (
+                {taskNeedsLead && user && (
                   <button
                     onClick={() => handleClaimTask(task.task)}
                     disabled={isClaiming}
@@ -865,7 +886,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                     {isClaiming ? 'Claiming...' : 'Claim Task'}
                   </button>
                 )}
-                {!needsLead && user && task.leadId === user.memberId && (
+                {!taskNeedsLead && user && task.leadId === user.memberId && (
                   <button
                     onClick={() => handleGiveUpTask(task.task)}
                     disabled={isClaiming}
@@ -891,7 +912,28 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
 
           return (
             <div style={card()}>
-              <h2 style={sectionTitle()}>Tasks ({tasks.length})</h2>
+              <h2 style={sectionTitle()}>
+                {showOpenOnly
+                  ? `Tasks (${tasks.filter(needsLead).length} open / ${tasks.length} total)`
+                  : `Tasks (${tasks.length})`
+                }
+              </h2>
+
+              {(() => {
+                const openCount = tasks.filter(needsLead).length
+                if (openCount === 0) return null
+                return (
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, opacity: 0.7, cursor: 'pointer' }}>
+                    <input
+                      type="checkbox"
+                      checked={showOpenOnly}
+                      onChange={(e) => setShowOpenOnly(e.target.checked)}
+                      style={{ cursor: 'pointer' }}
+                    />
+                    Show open tasks only ({openCount})
+                  </label>
+                )
+              })()}
 
               {myTasks.length > 0 && (
                 <>
@@ -909,25 +951,25 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 </>
               )}
 
-              {topTasks.length > 0 && (
+              {filteredTopTasks.length > 0 && (
                 <>
                   <h3
                     onClick={() => toggleSection('topTasks')}
                     style={collapsibleHeader('#d32f2f')}
                   >
-                    <span>{collapsedSections.topTasks ? '▶' : '▼'} Top Tasks ({topTasks.length})</span>
+                    <span>{collapsedSections.topTasks ? '▶' : '▼'} Top Tasks ({filteredTopTasks.length})</span>
                   </h3>
                   {!collapsedSections.topTasks && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
-                      {topTasks.map(renderTaskCard)}
+                      {filteredTopTasks.map(renderTaskCard)}
                     </div>
                   )}
                 </>
               )}
 
               {/* Goal-based sections */}
-              {goalNames.map((goalName, goalIndex) => {
-                const goalTasks = tasksByGoal.get(goalName)!
+              {filteredGoalNames.map((goalName, goalIndex) => {
+                const goalTasks = filteredTasksByGoal.get(goalName)!
                 const sectionKey = `goal_${goalIndex}`
                 const isCollapsed = collapsedSections[sectionKey as keyof typeof collapsedSections] ?? true
 
@@ -948,21 +990,21 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 )
               })}
 
-              {(ungroupedTasks.length > 0 || laterTasks.length > 0) && (
+              {(filteredUngroupedTasks.length > 0 || filteredLaterTasks.length > 0) && (
                 <>
                   <h3
                     onClick={() => toggleSection('otherTasks')}
                     style={collapsibleHeader('#757575')}
                   >
-                    <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({ungroupedTasks.length + (showLaterTasks ? laterTasks.length : 0)})</span>
+                    <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({filteredUngroupedTasks.length + (showLaterTasks ? filteredLaterTasks.length : 0)})</span>
                   </h3>
                   {!collapsedSections.otherTasks && (
                     <>
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
-                        {ungroupedTasks.map(renderTaskCard)}
-                        {showLaterTasks && laterTasks.map(renderTaskCard)}
+                        {filteredUngroupedTasks.map(renderTaskCard)}
+                        {showLaterTasks && filteredLaterTasks.map(renderTaskCard)}
                       </div>
-                      {laterTasks.length > 0 && (
+                      {filteredLaterTasks.length > 0 && (
                         <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, fontSize: 13, opacity: 0.7, cursor: 'pointer' }}>
                           <input
                             type="checkbox"
@@ -970,7 +1012,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                             onChange={(e) => setShowLaterTasks(e.target.checked)}
                             style={{ cursor: 'pointer' }}
                           />
-                          Show "Later" tasks ({laterTasks.length})
+                          Show "Later" tasks ({filteredLaterTasks.length})
                         </label>
                       )}
                     </>
