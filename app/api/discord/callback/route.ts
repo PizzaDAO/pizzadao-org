@@ -108,11 +108,27 @@ async function checkExistingMember(discordId: string, origin: string): Promise<{
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
-    const code = url.searchParams.get("code");
     const rawState = url.searchParams.get("state") || "";
-    const { sessionId: state, return_to } = decodeOAuthState(rawState);
+    const { return_to } = decodeOAuthState(rawState);
 
-    if (!code) return NextResponse.json({ error: "Missing code" }, { status: 400 });
+    // Handle OAuth errors (e.g. user clicked "Cancel" on Discord authorization screen)
+    const oauthError = url.searchParams.get("error");
+    if (oauthError) {
+      // If this was a proxy flow, redirect back to the preview origin
+      if (return_to && validateReturnTo(return_to)) {
+        return NextResponse.redirect(return_to);
+      }
+      // Otherwise redirect to home page
+      return NextResponse.redirect(new URL("/", url.origin).toString());
+    }
+
+    const code = url.searchParams.get("code");
+    const { sessionId: state } = decodeOAuthState(rawState);
+
+    // No code and no error — something unexpected; redirect home gracefully
+    if (!code) {
+      return NextResponse.redirect(new URL("/", url.origin).toString());
+    }
 
     const redirectUri = process.env.DISCORD_REDIRECT_URI || `${url.origin}/api/discord/callback`;
     const token = await exchangeCodeForToken(code, redirectUri);
