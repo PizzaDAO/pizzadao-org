@@ -42,8 +42,8 @@ export default function AnonymousVote({ pollId }: { pollId: string }) {
       try {
         const res = await fetch(`/api/polls/${pollId}/status`)
         if (res.status === 401) {
-          // Not logged in - redirect to login
-          window.location.href = '/api/discord/login'
+          // Not logged in - redirect to login (break out of iframe if embedded)
+          ;(window.top || window).location.href = '/api/discord/login'
           return
         }
         if (!res.ok) {

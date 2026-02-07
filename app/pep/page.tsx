@@ -377,9 +377,9 @@ export default function PepDashboard() {
           <p style={{ color: "#666", marginBottom: 24 }}>
             Please log in with Discord to access the economy features.
           </p>
-          <Link href="/api/discord/login" style={btn("primary")}>
+          <button onClick={() => { (window.top || window).location.href = '/api/discord/login' }} style={btn("primary")}>
             Login with Discord
-          </Link>
+          </button>
         </div>
       </div>
     );

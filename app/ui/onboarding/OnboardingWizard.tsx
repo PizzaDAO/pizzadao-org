@@ -393,7 +393,8 @@ export function OnboardingWizard() {
         localStorage.setItem(LS_KEY, JSON.stringify(data));
         localStorage.setItem(PENDING_CLAIM_KEY, "1");
       } catch {}
-      window.location.href = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
+      const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
+      (window.top || window).location.href = loginUrl;
       return;
     }
     submitAll();
@@ -553,7 +554,8 @@ export function OnboardingWizard() {
           <WelcomeStep
             onJoin={() => goToStep(1)}
             onLogin={() => {
-              window.location.href = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
+              const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
+              (window.top || window).location.href = loginUrl;
             }}
           />
         )}
