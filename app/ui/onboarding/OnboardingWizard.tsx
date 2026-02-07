@@ -350,6 +350,8 @@ export function OnboardingWizard() {
           releaseDate: data.releaseDate,
           mediaType: data.mediaType,
           city: data.city,
+          cityRegion: data.cityRegion,
+          cityCountryCode: data.cityCountryCode,
           turtle: data.turtles.join(", "),
           turtles: data.turtles,
           crews: data.crews,
@@ -600,6 +602,13 @@ export function OnboardingWizard() {
           <CityStep
             city={data.city}
             onChange={(city) => setData((p) => ({ ...p, city }))}
+            onRegionResolved={(region, countryCode) =>
+              setData((p) => ({
+                ...p,
+                cityRegion: region ?? undefined,
+                cityCountryCode: countryCode ?? undefined,
+              }))
+            }
             onNext={() => goToStep(3)}
             onBack={() => goToStep(1)}
           />
