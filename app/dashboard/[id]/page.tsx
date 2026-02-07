@@ -693,18 +693,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                     })()}
                                 </div>
 
-                                {/* Sync Button */}
-                                {discord && discord !== "Not linked" && (
-                                    <SyncRolesButton
-                                        memberId={idValue}
-                                        discordId={discord}
-                                        name={name}
-                                        onSync={(newTurtles, others) => {
-                                            // Ideally we force a reload, but for now we can just reload the page
-                                            window.location.reload();
-                                        }}
-                                    />
-                                )}
+                                {/* Sync Button - hidden: roles now auto-sync on login.
+                                   Keeping the SyncRolesButton component and API route
+                                   intact for potential manual use later. */}
                             </div>
                         </div>
 

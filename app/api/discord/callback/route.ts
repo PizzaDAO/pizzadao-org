@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
 import { decodeOAuthState, validateReturnTo, createTransferToken } from "@/app/lib/oauth-proxy";
+import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 
 export const runtime = "nodejs";
 
@@ -164,6 +165,15 @@ export async function GET(req: Request) {
 
     // Check if user already has a member record
     const existingMember = await checkExistingMember(me.id, url.origin);
+
+    // Fire-and-forget: sync Discord roles to the sheet on every login.
+    // This is intentionally not awaited so it never blocks the redirect.
+    syncRolesOnLogin(
+      url.origin,
+      me.id,
+      existingMember?.memberId,
+      existingMember?.name ?? nick,
+    ).catch(() => {}); // extra safety net
 
     // Build redirect URL
     let redirectUrl: URL;
