@@ -180,6 +180,22 @@ model Transaction {
   @@index([userId, createdAt])
 }
 
+// ===== PROFILE LINKS =====
+
+// User-added links on their profile (emoji + URL)
+model ProfileLink {
+  id        Int      @id @default(autoincrement())
+  memberId  String   // Member ID from Google Sheets (not Discord ID)
+  emoji     String   // Single emoji character
+  url       String   // Full URL
+  label     String?  // Optional display label
+  sortOrder Int      @default(0)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  @@index([memberId])
+}
+
 // ===== NOTIFICATION SYSTEM =====
 
 enum NotificationType {

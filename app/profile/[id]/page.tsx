@@ -8,6 +8,7 @@ import { Inter } from "next/font/google";
 import { TURTLES, CREWS } from "../../ui/constants";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
+import { ProfileLinksDisplay } from "../../ui/profile-links";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -328,6 +329,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         <div style={{ gridColumn: "1 / -1" }}>
                             <POAPCollection memberId={idValue} />
                         </div>
+
+                        {/* Profile Links - read-only display */}
+                        <ProfileLinksDisplay memberId={idValue} />
                     </div>
 
                     {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
