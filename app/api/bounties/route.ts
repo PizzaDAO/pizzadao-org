@@ -21,7 +21,8 @@ export async function GET() {
         createdBy: b.createdBy,
         claimedBy: b.claimedBy,
         status: b.status,
-        createdAt: b.createdAt.toISOString()
+        createdAt: b.createdAt.toISOString(),
+        commentCount: b._count.comments
       }))
     })
   } catch (error) {

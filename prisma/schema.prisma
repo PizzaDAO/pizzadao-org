@@ -81,15 +81,28 @@ model JobCycle {
 
 // User-created bounties with escrowed rewards
 model Bounty {
-  id          Int          @id @default(autoincrement())
+  id          Int              @id @default(autoincrement())
   description String
-  link        String?      // Optional link for more details
-  reward      Int          // Escrowed amount
-  createdBy   String       // Discord ID of poster
-  claimedBy   String?      // Discord ID of claimer
-  status      BountyStatus @default(OPEN)
-  createdAt   DateTime     @default(now())
-  updatedAt   DateTime     @updatedAt
+  link        String?          // Optional link for more details
+  reward      Int              // Escrowed amount
+  createdBy   String           // Discord ID of poster
+  claimedBy   String?          // Discord ID of claimer
+  status      BountyStatus     @default(OPEN)
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  comments    BountyComment[]
+}
+
+// Comments/updates on bounties
+model BountyComment {
+  id        Int      @id @default(autoincrement())
+  bountyId  Int
+  authorId  String   // Discord ID of commenter
+  content   String
+  createdAt DateTime @default(now())
+  bounty    Bounty   @relation(fields: [bountyId], references: [id], onDelete: Cascade)
+
+  @@index([bountyId, createdAt])
 }
 
 enum BountyStatus {
@@ -201,6 +214,7 @@ model ProfileLink {
 enum NotificationType {
   BOUNTY_CLAIMED     // Someone claimed your bounty
   BOUNTY_COMPLETED   // Bounty you claimed is approved, reward paid
+  BOUNTY_COMMENT     // New comment on a bounty you're involved in
   TASK_ASSIGNED      // A task was assigned to you
   TASK_DUE_SOON      // Task due within a week
 }

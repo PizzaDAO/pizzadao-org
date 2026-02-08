@@ -13,6 +13,7 @@ type Bounty = {
   claimedBy: string | null;
   status: "OPEN" | "CLAIMED";
   createdAt: string;
+  commentCount: number;
 };
 
 function card(): React.CSSProperties {
