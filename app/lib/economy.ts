@@ -82,7 +82,7 @@ export async function transfer(fromId: string, toId: string, amount: number) {
   }
 
   // Use interactive transaction to ensure atomicity and log both sides
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     await tx.economy.update({
       where: { id: fromId },
       data: { wallet: { decrement: amount } }
@@ -109,7 +109,7 @@ export async function getLeaderboard(limit = 10) {
     take: limit
   })
 
-  return economies.map(e => ({
+  return economies.map((e: any) => ({
     userId: e.id,
     balance: e.wallet
   }))

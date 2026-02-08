@@ -13,7 +13,7 @@ export async function GET() {
     const bounties = await getAllBounties()
 
     return NextResponse.json({
-      bounties: bounties.map(b => ({
+      bounties: bounties.map((b: any) => ({
         id: b.id,
         description: b.description,
         link: b.link,

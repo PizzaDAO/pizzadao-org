@@ -18,7 +18,7 @@ export async function GET() {
     const inventory = await getInventory(session.discordId)
 
     return NextResponse.json({
-      inventory: inventory.map(inv => ({
+      inventory: inventory.map((inv: any) => ({
         itemId: inv.itemId,
         name: inv.item.name,
         description: inv.item.description,

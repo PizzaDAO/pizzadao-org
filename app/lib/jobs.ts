@@ -51,7 +51,7 @@ export async function getCompletedJobsToday(userId: string): Promise<number[]> {
     },
     select: { jobId: true }
   })
-  return assignments.map(a => a.jobId)
+  return assignments.map((a: any) => a.jobId)
 }
 
 /**
@@ -116,11 +116,11 @@ export async function getJobs() {
     orderBy: { id: 'asc' }
   })
 
-  return jobs.map(job => ({
+  return jobs.map((job: any) => ({
     id: job.id,
     description: job.description,
     type: job.type,
-    assignees: job.assignments.map(a => a.userId)
+    assignees: job.assignments.map((a: any) => a.userId)
   }))
 }
 
@@ -350,7 +350,7 @@ export async function syncJobsFromData(jobs: Array<{ type: string; description: 
 
   // Get current jobs
   const currentJobs = await prisma.job.findMany()
-  const currentByDescription = new Map(currentJobs.map(j => [j.description, j]))
+  const currentByDescription = new Map(currentJobs.map((j: any) => [j.description, j]))
 
   let added = 0
   let updated = 0
@@ -418,7 +418,7 @@ export async function syncJobsFromSheet() {
     where: { isActive: true }
   })
 
-  const currentDescriptions = new Set(currentJobs.map(j => j.description))
+  const currentDescriptions = new Set(currentJobs.map((j: any) => j.description))
   let added = 0
 
   // Add new jobs
