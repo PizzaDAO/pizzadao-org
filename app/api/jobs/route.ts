@@ -21,7 +21,7 @@ export async function GET() {
     }
 
     return NextResponse.json({
-      jobs: jobs.map(job => ({
+      jobs: jobs.map((job: any) => ({
         id: job.id,
         description: replaceAmountPlaceholder(job.description),
         type: job.type,

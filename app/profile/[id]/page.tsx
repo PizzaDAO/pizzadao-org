@@ -276,13 +276,17 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                         const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
                                         if (!tDef) return null;
                                         return (
-                                            <img
+                                            <Link
                                                 key={tDef.id}
-                                                src={tDef.image}
-                                                alt={tDef.label}
-                                                title={tDef.label}
-                                                style={{ width: 40, height: 40, objectFit: "contain" }}
-                                            />
+                                                href={`/turtles/${encodeURIComponent(tDef.id)}`}
+                                                title={`View all ${tDef.label} members`}
+                                            >
+                                                <img
+                                                    src={tDef.image}
+                                                    alt={tDef.label}
+                                                    style={{ width: 40, height: 40, objectFit: "contain" }}
+                                                />
+                                            </Link>
                                         );
                                     })
                                 ) : (

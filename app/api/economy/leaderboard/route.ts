@@ -8,7 +8,7 @@ export async function GET() {
     const leaderboard = await getLeaderboard(10)
 
     return NextResponse.json({
-      leaderboard: leaderboard.map((entry, index) => ({
+      leaderboard: leaderboard.map((entry: any, index: number) => ({
         rank: index + 1,
         userId: entry.userId,
         balance: entry.balance,

@@ -48,7 +48,7 @@ export async function POST(request: NextRequest) {
     await getOrCreateEconomy(toUserId)
 
     // Transfer the item
-    await prisma.$transaction(async (tx) => {
+    await prisma.$transaction(async (tx: any) => {
       // Decrement or remove from sender
       if (senderInventory.quantity === quantity) {
         await tx.inventory.delete({

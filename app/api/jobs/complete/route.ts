@@ -18,7 +18,7 @@ async function isAdmin(discordId: string): Promise<boolean> {
 
   if (!user) return false
 
-  return user.roles.some(role => ADMIN_ROLE_IDS.includes(role))
+  return user.roles.some((role: string) => ADMIN_ROLE_IDS.includes(role))
 }
 
 export async function POST(request: NextRequest) {

@@ -63,7 +63,7 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
   }
 
   // Use transaction for atomicity
-  await prisma.$transaction(async (tx) => {
+  await prisma.$transaction(async (tx: any) => {
     // Deduct from balance
     await tx.economy.update({
       where: { id: userId },
@@ -181,7 +181,7 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
 
   // Get current items
   const currentItems = await prisma.shopItem.findMany()
-  const currentByName = new Map(currentItems.map(i => [i.name, i]))
+  const currentByName = new Map(currentItems.map((i: any) => [i.name, i]))
 
   let added = 0
   let updated = 0

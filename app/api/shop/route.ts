@@ -9,7 +9,7 @@ export async function GET() {
     const items = await getShopItems()
 
     return NextResponse.json({
-      items: items.map(item => ({
+      items: items.map((item: any) => ({
         id: item.id,
         name: item.name,
         description: item.description,
