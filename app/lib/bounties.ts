@@ -224,13 +224,66 @@ export async function getBounty(bountyId: number) {
 }
 
 /**
- * Get all bounties (for listing)
+ * Get all bounties (for listing) with comment counts
  */
 export async function getAllBounties() {
   return prisma.bounty.findMany({
     where: {
       status: { in: ['OPEN', 'CLAIMED'] }
     },
-    orderBy: { createdAt: 'desc' }
+    orderBy: { createdAt: 'desc' },
+    include: {
+      _count: {
+        select: { comments: true }
+      }
+    }
+  })
+}
+
+/**
+ * Get comments for a bounty
+ */
+export async function getBountyComments(bountyId: number) {
+  const bounty = await prisma.bounty.findUnique({
+    where: { id: bountyId }
+  })
+
+  if (!bounty) {
+    throw new NotFoundError('Bounty')
+  }
+
+  return prisma.bountyComment.findMany({
+    where: { bountyId },
+    orderBy: { createdAt: 'asc' }
+  })
+}
+
+/**
+ * Add a comment to a bounty (only creator or claimer can comment)
+ */
+export async function addBountyComment(userId: string, bountyId: number, content: string) {
+  if (!content.trim()) {
+    throw new ValidationError('Comment content is required')
+  }
+
+  const bounty = await prisma.bounty.findUnique({
+    where: { id: bountyId }
+  })
+
+  if (!bounty) {
+    throw new NotFoundError('Bounty')
+  }
+
+  // Only the bounty creator or claimer can comment
+  if (bounty.createdBy !== userId && bounty.claimedBy !== userId) {
+    throw new ForbiddenError('Only the bounty creator or claimer can post comments')
+  }
+
+  return prisma.bountyComment.create({
+    data: {
+      bountyId,
+      authorId: userId,
+      content: content.trim()
+    }
   })
 }
