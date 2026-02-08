@@ -91,8 +91,10 @@ export default function AllCrewsPage() {
     fetchData()
   }, [])
 
-  // Group crews by day of week
+  // Group crews by day of week, separating "Other" crews
   const crewsByDay = useMemo(() => groupCrewsByDay(crews), [crews])
+  const scheduledCrews = useMemo(() => crewsByDay.filter(g => g.day !== 'Other'), [crewsByDay])
+  const otherCrews = useMemo(() => crewsByDay.find(g => g.day === 'Other')?.crews ?? [], [crewsByDay])
 
   const handleJoinCrew = async (crewId: string) => {
     if (!user) {
@@ -440,7 +442,7 @@ export default function AllCrewsPage() {
         {isMobile ? (
           /* Mobile: stacked day sections */
           <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {crewsByDay.map(({ day, crews: dayCrews }) => (
+            {scheduledCrews.map(({ day, crews: dayCrews }) => (
               <div key={day}>
                 <h3 style={{
                   fontSize: 16,
@@ -461,7 +463,7 @@ export default function AllCrewsPage() {
         ) : (
           /* Desktop: side-by-side day columns */
           <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-            {crewsByDay.map(({ day, crews: dayCrews }) => (
+            {scheduledCrews.map(({ day, crews: dayCrews }) => (
               <div key={day} style={{ flex: 1, minWidth: 0 }}>
                 <h3 style={{
                   fontSize: 16,
@@ -479,6 +481,29 @@ export default function AllCrewsPage() {
                 </div>
               </div>
             ))}
+          </div>
+        )}
+
+        {/* Other Crews Section */}
+        {otherCrews.length > 0 && (
+          <div style={{ marginTop: 16 }}>
+            <h2 style={{
+              fontSize: 24,
+              fontWeight: 700,
+              marginBottom: 16,
+              color: '#333',
+              borderBottom: '2px solid #e5e7eb',
+              paddingBottom: 10,
+            }}>
+              Other Crews
+            </h2>
+            <div style={{
+              display: 'grid',
+              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
+              gap: 16,
+            }}>
+              {otherCrews.map(crew => renderCrewCard(crew as CrewOption))}
+            </div>
           </div>
         )}
 
