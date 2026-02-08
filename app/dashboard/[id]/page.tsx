@@ -700,13 +700,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             </div>
                         </div>
 
+                        {/* Profile Links - editable */}
+                        <ProfileLinksEditor memberId={idValue} />
+
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
                             <POAPCollection memberId={idValue} />
                         </div>
-
-                        {/* Profile Links - editable */}
-                        <ProfileLinksEditor memberId={idValue} />
                     </div>
 
                     {/* NFT Collection Section - shows connect prompt if no wallet */}

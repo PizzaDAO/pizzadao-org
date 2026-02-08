@@ -325,13 +325,13 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             })()}
                         </div>
 
+                        {/* Profile Links - read-only display */}
+                        <ProfileLinksDisplay memberId={idValue} />
+
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
                             <POAPCollection memberId={idValue} />
                         </div>
-
-                        {/* Profile Links - read-only display */}
-                        <ProfileLinksDisplay memberId={idValue} />
                     </div>
 
                     {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
