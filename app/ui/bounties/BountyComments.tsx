@@ -39,6 +39,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
   const [newComment, setNewComment] = useState("");
   const [posting, setPosting] = useState(false);
   const [postError, setPostError] = useState<string | null>(null);
+  const [deletingId, setDeletingId] = useState<number | null>(null);
 
   const fetchComments = async () => {
     try {
@@ -82,6 +83,28 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
     }
   };
 
+  const handleDeleteComment = async (commentId: number) => {
+    if (deletingId) return; // Already deleting
+    setDeletingId(commentId);
+
+    try {
+      const res = await fetch(`/api/bounties/${bountyId}/comments`, {
+        method: "DELETE",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ commentId }),
+      });
+      const data = await res.json();
+      if (!res.ok) throw new Error(data.error || "Failed to delete comment");
+
+      // Remove the comment from the local state
+      setComments((prev) => prev.filter((c) => c.id !== commentId));
+    } catch (err) {
+      setPostError(err instanceof Error ? err.message : "Failed to delete comment");
+    } finally {
+      setDeletingId(null);
+    }
+  };
+
   if (loading) {
     return (
       <div style={{ padding: "8px 0" }}>
@@ -115,7 +138,31 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                 <UserLink discordId={comment.authorId} style={{ fontSize: 12 }} />
-                <span style={{ fontSize: 10, color: "#9ca3af" }}>{timeAgo(comment.createdAt)}</span>
+                <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
+                  <span style={{ fontSize: 10, color: "#9ca3af" }}>{timeAgo(comment.createdAt)}</span>
+                  {comment.authorId === currentUserId && (
+                    <button
+                      onClick={() => handleDeleteComment(comment.id)}
+                      disabled={deletingId === comment.id}
+                      title="Delete comment"
+                      style={{
+                        background: "none",
+                        border: "none",
+                        cursor: deletingId === comment.id ? "not-allowed" : "pointer",
+                        padding: "0 2px",
+                        fontSize: 12,
+                        color: deletingId === comment.id ? "#d1d5db" : "#9ca3af",
+                        lineHeight: 1,
+                        opacity: deletingId === comment.id ? 0.5 : 1,
+                        transition: "color 0.15s",
+                      }}
+                      onMouseEnter={(e) => { if (deletingId !== comment.id) (e.target as HTMLElement).style.color = "#ef4444"; }}
+                      onMouseLeave={(e) => { if (deletingId !== comment.id) (e.target as HTMLElement).style.color = "#9ca3af"; }}
+                    >
+                      {deletingId === comment.id ? "\u2026" : "\u2715"}
+                    </button>
+                  )}
+                </div>
               </div>
               <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: "#374151" }}>
                 {comment.content}

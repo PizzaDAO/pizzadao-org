@@ -198,6 +198,7 @@ model Transaction {
 enum NotificationType {
   BOUNTY_CLAIMED     // Someone claimed your bounty
   BOUNTY_COMPLETED   // Bounty you claimed is approved, reward paid
+  BOUNTY_COMMENT     // New comment on a bounty you're involved in
   TASK_ASSIGNED      // A task was assigned to you
   TASK_DUE_SOON      // Task due within a week
 }

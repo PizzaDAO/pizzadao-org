@@ -134,6 +134,54 @@ export async function notifyBountyCompleted(
 }
 
 /**
+ * Notify all involved parties when a new comment is posted on a bounty.
+ * Recipients: bounty poster, bounty claimer, and all previous commenters.
+ * Excludes the person who just posted the comment.
+ */
+export async function notifyBountyComment(
+  commenterId: string,
+  bountyId: number,
+  bountyDescription: string,
+  posterId: string,
+  claimerId: string | null
+) {
+  // Gather all unique commenter IDs from existing comments on this bounty
+  const existingComments = await prisma.bountyComment.findMany({
+    where: { bountyId },
+    select: { authorId: true },
+    distinct: ['authorId']
+  })
+
+  // Build a set of all recipients: poster + claimer + existing commenters
+  const recipientSet = new Set<string>()
+  recipientSet.add(posterId)
+  if (claimerId) recipientSet.add(claimerId)
+  for (const c of existingComments) {
+    recipientSet.add(c.authorId)
+  }
+
+  // Remove the commenter themselves (don't notify yourself)
+  recipientSet.delete(commenterId)
+
+  if (recipientSet.size === 0) return
+
+  // Create notifications for all recipients
+  const notifications = Array.from(recipientSet).map(recipientId =>
+    createNotification({
+      type: NotificationType.BOUNTY_COMMENT,
+      recipientId,
+      actorId: commenterId,
+      title: 'New Bounty Comment',
+      message: `New comment on bounty: "${truncate(bountyDescription, 50)}"`,
+      metadata: { bountyId },
+      linkUrl: '/pep'
+    })
+  )
+
+  await Promise.allSettled(notifications)
+}
+
+/**
  * Truncate a string with ellipsis
  */
 function truncate(str: string, maxLength: number): string {

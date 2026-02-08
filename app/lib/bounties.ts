@@ -1,7 +1,7 @@
 import { prisma } from './db'
 import { getOrCreateEconomy, updateBalance } from './economy'
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from './errors/api-errors'
-import { notifyBountyClaimed, notifyBountyCompleted } from './notifications'
+import { notifyBountyClaimed, notifyBountyCompleted, notifyBountyComment } from './notifications'
 import { logTransaction } from './transactions'
 
 /**
@@ -279,11 +279,37 @@ export async function addBountyComment(userId: string, bountyId: number, content
     throw new ForbiddenError('Only the bounty creator or claimer can post comments')
   }
 
-  return prisma.bountyComment.create({
+  const comment = await prisma.bountyComment.create({
     data: {
       bountyId,
       authorId: userId,
       content: content.trim()
     }
+  })
+
+  // Send notifications to all involved parties (fire and forget)
+  notifyBountyComment(userId, bountyId, bounty.description, bounty.createdBy, bounty.claimedBy).catch(() => {})
+
+  return comment
+}
+
+/**
+ * Delete a comment (only the author can delete their own comment)
+ */
+export async function deleteBountyComment(userId: string, commentId: number) {
+  const comment = await prisma.bountyComment.findUnique({
+    where: { id: commentId }
+  })
+
+  if (!comment) {
+    throw new NotFoundError('Comment')
+  }
+
+  if (comment.authorId !== userId) {
+    throw new ForbiddenError('You can only delete your own comments')
+  }
+
+  return prisma.bountyComment.delete({
+    where: { id: commentId }
   })
 }

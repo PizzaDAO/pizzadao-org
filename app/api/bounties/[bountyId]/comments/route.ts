@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { getBountyComments, addBountyComment } from '@/app/lib/bounties'
+import { getBountyComments, addBountyComment, deleteBountyComment } from '@/app/lib/bounties'
 import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
@@ -77,3 +77,27 @@ const POST_HANDLER = async (
 }
 
 export const POST = withErrorHandling(POST_HANDLER)
+
+// DELETE - Delete a comment (only the author can delete their own)
+const DELETE_HANDLER = async (
+  request: NextRequest,
+) => {
+  const session = await getSession()
+
+  if (!session?.discordId) {
+    throw new UnauthorizedError()
+  }
+
+  const body = await request.json()
+  const { commentId } = body
+
+  if (!commentId || typeof commentId !== 'number') {
+    throw new ValidationError('Valid comment ID required')
+  }
+
+  await deleteBountyComment(session.discordId, commentId)
+
+  return NextResponse.json({ success: true })
+}
+
+export const DELETE = withErrorHandling(DELETE_HANDLER)
