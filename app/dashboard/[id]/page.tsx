@@ -11,6 +11,7 @@ import { PepIcon, PepAmount } from "../../ui/economy";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { NotificationBell } from "../../ui/notifications";
+import { ProfileLinksEditor } from "../../ui/profile-links";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -698,6 +699,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                    intact for potential manual use later. */}
                             </div>
                         </div>
+
+                        {/* Profile Links - editable */}
+                        <ProfileLinksEditor memberId={idValue} />
 
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
