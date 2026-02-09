@@ -19,11 +19,11 @@ type ShopGridProps = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -58,7 +58,7 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
     return (
       <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
         {[...Array(4)].map((_, i) => (
-          <div key={i} style={{ height: 120, background: "rgba(0,0,0,0.04)", borderRadius: 14 }} />
+          <div key={i} style={{ height: 120, background: 'var(--color-surface-hover)', borderRadius: 14 }} />
         ))}
       </div>
     );
@@ -75,7 +75,7 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
   if (items.length === 0) {
     return (
       <div style={{ ...card(), textAlign: "center" }}>
-        <p style={{ color: "#6b7280" }}>No items available in the shop</p>
+        <p style={{ color: 'var(--color-text-secondary)' }}>No items available in the shop</p>
       </div>
     );
   }

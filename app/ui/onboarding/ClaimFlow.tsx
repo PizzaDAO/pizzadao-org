@@ -77,7 +77,7 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        background: "#fafafa",
+        background: 'var(--color-page-bg)',
         padding: 20,
       }}
     >

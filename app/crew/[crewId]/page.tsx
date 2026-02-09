@@ -344,15 +344,15 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#fafafa',
+        background: 'var(--color-page-bg)',
         fontFamily: inter.style.fontFamily,
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             width: 50,
             height: 50,
-            border: '4px solid rgba(0,0,0,0.1)',
-            borderTop: '4px solid #ff4d4d',
+            border: '4px solid var(--color-spinner-track)',
+            borderTop: '4px solid var(--color-spinner-active)',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto 20px',
@@ -376,7 +376,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#fafafa',
+        background: 'var(--color-page-bg)',
         fontFamily: inter.style.fontFamily,
         padding: 20,
       }}>
@@ -394,8 +394,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#fafafa',
-      color: '#000',
+      background: 'var(--color-page-bg)',
+      color: 'var(--color-text)',
       fontFamily: inter.style.fontFamily,
       padding: '40px 20px',
     }}>
@@ -407,10 +407,10 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
             alignItems: 'center',
             gap: 6,
             padding: '8px 14px',
-            background: 'white',
-            border: '1px solid rgba(0,0,0,0.15)',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border-strong)',
             borderRadius: 8,
-            color: '#000',
+            color: 'var(--color-text)',
             textDecoration: 'none',
             fontSize: 14,
             fontWeight: 600,
@@ -422,10 +422,10 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
             alignItems: 'center',
             gap: 6,
             padding: '8px 14px',
-            background: 'white',
-            border: '1px solid rgba(0,0,0,0.15)',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border-strong)',
             borderRadius: 8,
-            color: '#000',
+            color: 'var(--color-text)',
             textDecoration: 'none',
             fontSize: 14,
             fontWeight: 600,
@@ -438,10 +438,10 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               alignItems: 'center',
               gap: 6,
               padding: '8px 14px',
-              background: 'white',
-              border: '1px solid rgba(0,0,0,0.15)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border-strong)',
               borderRadius: 8,
-              color: '#000',
+              color: 'var(--color-text)',
               textDecoration: 'none',
               fontSize: 14,
               fontWeight: 600,
@@ -455,10 +455,10 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               alignItems: 'center',
               gap: 6,
               padding: '8px 14px',
-              background: 'white',
-              border: '1px solid rgba(0,0,0,0.15)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border-strong)',
               borderRadius: 8,
-              color: '#000',
+              color: 'var(--color-text)',
               textDecoration: 'none',
               fontSize: 14,
               fontWeight: 600,
@@ -472,10 +472,10 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               alignItems: 'center',
               gap: 6,
               padding: '8px 14px',
-              background: 'white',
-              border: '1px solid rgba(0,0,0,0.15)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border-strong)',
               borderRadius: 8,
-              color: '#000',
+              color: 'var(--color-text)',
               textDecoration: 'none',
               fontSize: 14,
               fontWeight: 600,
@@ -531,7 +531,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                       padding: '8px 16px',
                       borderRadius: 10,
                       border: '1px solid #d32f2f',
-                      background: 'white',
+                      background: 'var(--color-surface)',
                       color: '#d32f2f',
                       fontSize: 14,
                       fontWeight: 600,
@@ -550,8 +550,8 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                     padding: '12px 24px',
                     borderRadius: 10,
                     border: 'none',
-                    background: 'black',
-                    color: 'white',
+                    background: 'var(--color-btn-primary-bg)',
+                    color: 'var(--color-btn-primary-text)',
                     fontSize: 16,
                     fontWeight: 600,
                     cursor: joining ? 'wait' : 'pointer',
@@ -906,7 +906,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                       borderRadius: 6,
                       border: 'none',
                       background: '#ff8f00',
-                      color: 'white',
+                      color: 'var(--color-btn-primary-text)',
                       fontSize: 12,
                       fontWeight: 600,
                       cursor: isClaiming ? 'wait' : 'pointer',
@@ -925,7 +925,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                       padding: '6px 12px',
                       borderRadius: 6,
                       border: '1px solid #d32f2f',
-                      background: 'white',
+                      background: 'var(--color-surface)',
                       color: '#d32f2f',
                       fontSize: 12,
                       fontWeight: 600,
@@ -1110,11 +1110,11 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
 // Styles
 function card(): React.CSSProperties {
   return {
-    border: '1px solid rgba(0,0,0,0.12)',
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 24,
-    boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
-    background: 'white',
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   }
 }
 
@@ -1123,14 +1123,14 @@ function btn(kind: 'primary' | 'secondary'): React.CSSProperties {
     display: 'inline-block',
     padding: '10px 16px',
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.18)',
+    border: '1px solid var(--color-border-strong)',
     fontWeight: 650,
     cursor: 'pointer',
     textDecoration: 'none',
     textAlign: 'center',
   }
-  if (kind === 'primary') return { ...base, background: 'black', color: 'white', borderColor: 'black' }
-  return { ...base, background: 'white', color: 'black' }
+  if (kind === 'primary') return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' }
+  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' }
 }
 
 function badge(): React.CSSProperties {
@@ -1151,7 +1151,7 @@ function sectionTitle(): React.CSSProperties {
     marginTop: 0,
     marginBottom: 16,
     paddingBottom: 12,
-    borderBottom: '1px solid rgba(0,0,0,0.1)',
+    borderBottom: '1px solid var(--color-divider)',
   }
 }
 
@@ -1159,7 +1159,7 @@ function th(): React.CSSProperties {
   return {
     textAlign: 'left',
     padding: '8px 12px',
-    borderBottom: '2px solid rgba(0,0,0,0.1)',
+    borderBottom: '2px solid var(--color-divider)',
     fontSize: 12,
     fontWeight: 700,
     textTransform: 'uppercase',
@@ -1170,7 +1170,7 @@ function th(): React.CSSProperties {
 function td(): React.CSSProperties {
   return {
     padding: '10px 12px',
-    borderBottom: '1px solid rgba(0,0,0,0.06)',
+    borderBottom: '1px solid var(--color-divider)',
     fontSize: 14,
   }
 }
@@ -1179,8 +1179,8 @@ function memberCard(): React.CSSProperties {
   return {
     padding: 14,
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.1)',
-    background: '#fafafa',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-page-bg)',
   }
 }
 
@@ -1215,9 +1215,9 @@ function itemCard(priority?: string): React.CSSProperties {
   return {
     padding: 14,
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.1)',
+    border: '1px solid var(--color-border)',
     borderLeft: `4px solid ${borderColor}`,
-    background: '#fafafa',
+    background: 'var(--color-page-bg)',
   }
 }
 
@@ -1262,9 +1262,9 @@ function goalCard(priority: string): React.CSSProperties {
   return {
     padding: 14,
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.1)',
+    border: '1px solid var(--color-border)',
     borderLeft: `4px solid ${borderColor}`,
-    background: 'white',
+    background: 'var(--color-surface)',
     display: 'flex',
     gap: 12,
     alignItems: 'center',
@@ -1275,8 +1275,8 @@ function taskCard(stage: string): React.CSSProperties {
   return {
     padding: 14,
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.1)',
-    background: 'white',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-surface)',
   }
 }
 
@@ -1351,9 +1351,9 @@ function manualCard(status: string): React.CSSProperties {
   return {
     padding: 14,
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.1)',
+    border: '1px solid var(--color-border)',
     borderLeft: `4px solid ${borderColor}`,
-    background: 'white',
+    background: 'var(--color-surface)',
   }
 }
 

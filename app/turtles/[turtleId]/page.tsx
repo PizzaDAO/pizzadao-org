@@ -90,15 +90,15 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#fafafa',
+        background: 'var(--color-page-bg)',
         fontFamily: inter.style.fontFamily,
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             width: 50,
             height: 50,
-            border: '4px solid rgba(0,0,0,0.1)',
-            borderTop: '4px solid #ff4d4d',
+            border: '4px solid var(--color-spinner-track)',
+            borderTop: '4px solid var(--color-spinner-active)',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto 20px',
@@ -117,7 +117,7 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#fafafa',
+        background: 'var(--color-page-bg)',
         fontFamily: inter.style.fontFamily,
         padding: 20,
       }}>
@@ -135,8 +135,8 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#fafafa',
-      color: '#000',
+      background: 'var(--color-page-bg)',
+      color: 'var(--color-text)',
       fontFamily: inter.style.fontFamily,
       padding: '40px 20px',
     }}>
@@ -313,11 +313,11 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
 // Styles
 function card(): React.CSSProperties {
   return {
-    border: '1px solid rgba(0,0,0,0.12)',
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 24,
-    boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
-    background: 'white',
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   }
 }
 
@@ -327,10 +327,10 @@ function navBtn(): React.CSSProperties {
     alignItems: 'center',
     gap: 6,
     padding: '8px 14px',
-    background: 'white',
-    border: '1px solid rgba(0,0,0,0.15)',
+    background: 'var(--color-surface)',
+    border: '1px solid var(--color-border-strong)',
     borderRadius: 8,
-    color: '#000',
+    color: 'var(--color-text)',
     textDecoration: 'none',
     fontSize: 14,
     fontWeight: 600,
@@ -342,22 +342,22 @@ function btn(kind: 'primary' | 'secondary'): React.CSSProperties {
     display: 'inline-block',
     padding: '10px 16px',
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.18)',
+    border: '1px solid var(--color-border-strong)',
     fontWeight: 650,
     cursor: 'pointer',
     textDecoration: 'none',
     textAlign: 'center',
   }
-  if (kind === 'primary') return { ...base, background: 'black', color: 'white', borderColor: 'black' }
-  return { ...base, background: 'white', color: 'black' }
+  if (kind === 'primary') return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' }
+  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' }
 }
 
 function memberCard(): React.CSSProperties {
   return {
     padding: 14,
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.1)',
-    background: 'white',
+    border: '1px solid var(--color-border)',
+    background: 'var(--color-surface)',
   }
 }
 

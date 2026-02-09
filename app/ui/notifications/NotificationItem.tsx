@@ -99,7 +99,7 @@ function itemContainer(isRead: boolean): React.CSSProperties {
     cursor: "pointer",
     transition: "background 0.15s",
     background: isRead ? "transparent" : "rgba(37,99,235,0.04)",
-    borderBottom: "1px solid rgba(0,0,0,0.06)",
+    borderBottom: '1px solid var(--color-divider)',
   };
 }
 

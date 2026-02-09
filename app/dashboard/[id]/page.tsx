@@ -12,6 +12,7 @@ import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
+import { ThemeToggle } from "../../ui/ThemeToggle";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -195,16 +196,16 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "#fafafa",
-                color: "#000",
+                background: 'var(--color-page-bg)',
+                color: 'var(--color-text)',
                 fontFamily: inter.style.fontFamily
             }}>
                 <div style={{ textAlign: "center" }}>
                     <div className="spinner" style={{
                         width: 50,
                         height: 50,
-                        border: "4px solid rgba(0,0,0,0.1)",
-                        borderTop: "4px solid #ff4d4d",
+                        border: '4px solid var(--color-spinner-track)',
+                        borderTop: '4px solid var(--color-spinner-active)',
                         borderRadius: "50%",
                         animation: "spin 1s linear infinite",
                         margin: "0 auto 20px"
@@ -225,8 +226,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "#fafafa",
-                color: "#000",
+                background: 'var(--color-page-bg)',
+                color: 'var(--color-text)',
                 fontFamily: inter.style.fontFamily,
                 padding: 20
             }}>
@@ -248,8 +249,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "#fafafa",
-                color: "#000",
+                background: 'var(--color-page-bg)',
+                color: 'var(--color-text)',
                 fontFamily: inter.style.fontFamily,
                 padding: 20
             }}>
@@ -284,8 +285,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     return (
         <div style={{
             minHeight: "100vh",
-            background: "#fafafa",
-            color: "#000",
+            background: 'var(--color-page-bg)',
+            color: 'var(--color-text)',
             fontFamily: inter.style.fontFamily,
             padding: "40px 20px"
         }}>
@@ -306,6 +307,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 {/* Main Card */}
                 <div style={card()}>
                     <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
+                        <ThemeToggle />
                         <NotificationBell />
                         <Link href="/crews" style={{
                             ...btn("secondary"),
@@ -381,7 +383,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 style={{
                                     fontSize: 18,
                                     fontWeight: 500,
-                                    color: "#111",
+                                    color: 'var(--color-text-primary)',
                                     textDecoration: "none"
                                 }}
                                 onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
@@ -472,7 +474,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                         style={{
                                             padding: 8,
                                             borderRadius: 6,
-                                            border: "1px solid rgba(0,0,0,0.2)",
+                                            border: '1px solid var(--color-border-strong)',
                                             fontSize: 14,
                                             fontFamily: "inherit",
                                             resize: "vertical",
@@ -527,7 +529,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 <p style={{
                                     fontSize: 18,
                                     fontWeight: 500,
-                                    color: "#111",
+                                    color: 'var(--color-text-primary)',
                                     margin: 0,
                                     wordBreak: "break-word"
                                 }}>
@@ -578,7 +580,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                         style={{
                                             padding: 8,
                                             borderRadius: 6,
-                                            border: "1px solid rgba(0,0,0,0.2)",
+                                            border: '1px solid var(--color-border-strong)',
                                             fontSize: 14,
                                             fontFamily: "inherit",
                                             resize: "vertical",
@@ -633,7 +635,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 <p style={{
                                     fontSize: 18,
                                     fontWeight: 500,
-                                    color: "#111",
+                                    color: 'var(--color-text-primary)',
                                     margin: 0,
                                     wordBreak: "break-word"
                                 }}>
@@ -727,7 +729,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         if (allDisplayIds.length === 0) return null;
 
                         return (
-                            <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)" }}>
+                            <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
                                 <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>Your Crews</h3>
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
                                     {allDisplayIds.map((cid) => {
@@ -885,7 +887,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         );
                     })()}
 
-                    <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)", textAlign: "center" }}>
+                    <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)', textAlign: "center" }}>
                         <button
                             onClick={async () => {
                                 try {
@@ -966,11 +968,11 @@ function StatItem({ label, value, highlight }: { label: string, value: string, h
 
 function card(): React.CSSProperties {
     return {
-        border: "1px solid rgba(0,0,0,0.12)",
+        border: '1px solid var(--color-border)',
         borderRadius: 14,
         padding: 24,
-        boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-        background: "white",
+        boxShadow: 'var(--shadow-card)',
+        background: 'var(--color-surface)',
         display: "grid",
         gap: 14,
     };
@@ -981,22 +983,22 @@ function btn(kind: "primary" | "secondary"): React.CSSProperties {
         display: "inline-block", // ensure links behave like buttons
         padding: "10px 16px",
         borderRadius: 10,
-        border: "1px solid rgba(0,0,0,0.18)",
+        border: '1px solid var(--color-border-strong)',
         fontWeight: 650,
         cursor: "pointer",
         textDecoration: "none",
         textAlign: "center"
     };
-    if (kind === "primary") return { ...base, background: "black", color: "white", borderColor: "black" };
-    return { ...base, background: "white", color: "black" };
+    if (kind === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' };
+    return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' };
 }
 
 function tile(): React.CSSProperties {
     return {
         padding: 12,
         borderRadius: 12,
-        border: "1px solid rgba(0,0,0,0.12)", // slightly lighter border for display only
-        background: "white",
+        border: '1px solid var(--color-border)', // slightly lighter border for display only
+        background: 'var(--color-surface)',
         textAlign: "left",
     };
 }
@@ -1009,8 +1011,8 @@ function crewCard(): React.CSSProperties {
         alignItems: "flex-start", // changed to flex-start for multiline
         padding: 10,
         borderRadius: 12,
-        border: "1px solid rgba(0,0,0,0.12)",
-        background: "white",
+        border: '1px solid var(--color-border)',
+        background: 'var(--color-surface)',
     };
 }
 
@@ -1047,7 +1049,7 @@ function SendPepModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         width: "100%",
         padding: "10px 12px",
         borderRadius: 10,
-        border: "1px solid rgba(0,0,0,0.18)",
+        border: '1px solid var(--color-border-strong)',
         fontSize: 14,
         outline: "none",
         boxSizing: "border-box" as const,
@@ -1060,7 +1062,7 @@ function SendPepModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
             left: 0,
             right: 0,
             bottom: 0,
-            background: "rgba(0,0,0,0.5)",
+            background: 'var(--color-overlay)',
             display: "flex",
             alignItems: "center",
             justifyContent: "center",

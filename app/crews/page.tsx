@@ -252,7 +252,7 @@ export default function AllCrewsPage() {
         {/* Tasks Section */}
         {crew.tasks && crew.tasks.length > 0 && (
           <div style={{ marginTop: 16, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: '#666', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Top Tasks
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -285,13 +285,13 @@ export default function AllCrewsPage() {
                       {task.label}
                     </a>
                   ) : (
-                    <span style={{ fontSize: 14, color: '#374151', lineHeight: 1.4 }}>{task.label}</span>
+                    <span style={{ fontSize: 14, color: 'var(--color-text-primary)', lineHeight: 1.4 }}>{task.label}</span>
                   )}
                 </div>
               ))}
             </div>
             {(crew.taskCount ?? 0) > 3 && (
-              <div style={{ fontSize: 13, color: '#6b7280', marginTop: 8 }}>
+              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 8 }}>
                 +{(crew.taskCount ?? 0) - 3} more tasks
               </div>
             )}
@@ -327,15 +327,15 @@ export default function AllCrewsPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#fafafa',
+        background: 'var(--color-page-bg)',
         fontFamily: inter.style.fontFamily,
       }}>
         <div style={{ textAlign: 'center' }}>
           <div style={{
             width: 50,
             height: 50,
-            border: '4px solid rgba(0,0,0,0.1)',
-            borderTop: '4px solid #ff4d4d',
+            border: '4px solid var(--color-spinner-track)',
+            borderTop: '4px solid var(--color-spinner-active)',
             borderRadius: '50%',
             animation: 'spin 1s linear infinite',
             margin: '0 auto 20px',
@@ -354,7 +354,7 @@ export default function AllCrewsPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: '#fafafa',
+        background: 'var(--color-page-bg)',
         fontFamily: inter.style.fontFamily,
         padding: 20,
       }}>
@@ -370,8 +370,8 @@ export default function AllCrewsPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#fafafa',
-      color: '#000',
+      background: 'var(--color-page-bg)',
+      color: 'var(--color-text)',
       fontFamily: inter.style.fontFamily,
       padding: '40px 20px',
     }}>
@@ -384,10 +384,10 @@ export default function AllCrewsPage() {
             gap: 6,
             padding: '10px 16px',
             minHeight: 44,
-            background: 'white',
-            border: '1px solid rgba(0,0,0,0.15)',
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border-strong)',
             borderRadius: 8,
-            color: '#000',
+            color: 'var(--color-text)',
             textDecoration: 'none',
             fontSize: 14,
             fontWeight: 600,
@@ -401,10 +401,10 @@ export default function AllCrewsPage() {
               gap: 6,
               padding: '10px 16px',
               minHeight: 44,
-              background: 'white',
-              border: '1px solid rgba(0,0,0,0.15)',
+              background: 'var(--color-surface)',
+              border: '1px solid var(--color-border-strong)',
               borderRadius: 8,
-              color: '#000',
+              color: 'var(--color-text)',
               textDecoration: 'none',
               fontSize: 14,
               fontWeight: 600,
@@ -421,7 +421,7 @@ export default function AllCrewsPage() {
             background: '#eab308',
             border: '1px solid #ca8a04',
             borderRadius: 8,
-            color: '#000',
+            color: 'var(--color-text)',
             textDecoration: 'none',
             fontSize: 14,
             fontWeight: 600,
@@ -448,8 +448,8 @@ export default function AllCrewsPage() {
                   fontSize: 16,
                   fontWeight: 700,
                   marginBottom: 12,
-                  color: '#333',
-                  borderBottom: '2px solid #e5e7eb',
+                  color: 'var(--color-text-primary)',
+                  borderBottom: '2px solid var(--color-divider)',
                   paddingBottom: 8,
                 }}>
                   {day}
@@ -469,8 +469,8 @@ export default function AllCrewsPage() {
                   fontSize: 16,
                   fontWeight: 700,
                   marginBottom: 12,
-                  color: '#333',
-                  borderBottom: '2px solid #e5e7eb',
+                  color: 'var(--color-text-primary)',
+                  borderBottom: '2px solid var(--color-divider)',
                   paddingBottom: 8,
                   textAlign: 'center',
                 }}>
@@ -491,8 +491,8 @@ export default function AllCrewsPage() {
               fontSize: 24,
               fontWeight: 700,
               marginBottom: 16,
-              color: '#333',
-              borderBottom: '2px solid #e5e7eb',
+              color: 'var(--color-text-primary)',
+              borderBottom: '2px solid var(--color-divider)',
               paddingBottom: 10,
             }}>
               Other Crews
@@ -530,11 +530,11 @@ export default function AllCrewsPage() {
 // Styles
 function card(): React.CSSProperties {
   return {
-    border: '1px solid rgba(0,0,0,0.12)',
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
-    background: 'white',
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   }
 }
 
@@ -546,13 +546,13 @@ function btn(kind: 'primary' | 'secondary'): React.CSSProperties {
     padding: '12px 16px',
     minHeight: 44,
     borderRadius: 10,
-    border: '1px solid rgba(0,0,0,0.18)',
+    border: '1px solid var(--color-border-strong)',
     fontWeight: 650,
     cursor: 'pointer',
     textDecoration: 'none',
     textAlign: 'center',
     fontFamily: 'inherit',
   }
-  if (kind === 'primary') return { ...base, background: 'black', color: 'white', borderColor: 'black' }
-  return { ...base, background: 'white', color: 'black' }
+  if (kind === 'primary') return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' }
+  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' }
 }

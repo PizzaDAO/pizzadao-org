@@ -48,9 +48,9 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
       style={{
         display: "block",
         padding: 16,
-        background: "white",
+        background: 'var(--color-surface)',
         borderRadius: 12,
-        border: "1px solid rgba(0,0,0,0.08)",
+        border: '1px solid var(--color-border)',
         textDecoration: "none",
         color: "inherit",
         transition: "all 0.2s ease",
@@ -59,10 +59,10 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: "#111" }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
             {manual.title}
           </h3>
-          <div style={{ marginTop: 6, fontSize: 13, color: "#666" }}>
+          <div style={{ marginTop: 6, fontSize: 13, color: 'var(--color-text-secondary)' }}>
             {manual.crew && (
               <Link
                 href={`/crew/${manual.crewId}`}
@@ -87,7 +87,7 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
             {manual.author && !manual.authorId && <span>by {manual.author}</span>}
           </div>
           {manual.lastUpdated && (
-            <div style={{ marginTop: 4, fontSize: 12, color: "#999" }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-secondary)' }}>
               Updated: {manual.lastUpdated}
             </div>
           )}
@@ -169,7 +169,7 @@ export default function ManualsPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#fafafa",
+        background: 'var(--color-page-bg)',
         padding: "40px 20px",
       }}
     >
@@ -180,7 +180,7 @@ export default function ManualsPage() {
             href="/"
             style={{
               fontSize: 14,
-              color: "#666",
+              color: 'var(--color-text-secondary)',
               textDecoration: "none",
               marginBottom: 8,
               display: "inline-flex",
@@ -195,12 +195,12 @@ export default function ManualsPage() {
               margin: "8px 0 4px 0",
               fontSize: 28,
               fontWeight: 700,
-              color: "#111",
+              color: 'var(--color-text-primary)',
             }}
           >
             PizzaDAO Manuals
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: "#666" }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>
             Operating manuals and documentation for PizzaDAO crews
           </p>
         </div>
@@ -216,10 +216,10 @@ export default function ManualsPage() {
               width: "100%",
               padding: "12px 16px",
               fontSize: 14,
-              border: "1px solid rgba(0,0,0,0.12)",
+              border: '1px solid var(--color-border)',
               borderRadius: 8,
               outline: "none",
-              background: "white",
+              background: 'var(--color-surface)',
             }}
           />
           <div style={{ display: "flex", gap: 12 }}>
@@ -230,10 +230,10 @@ export default function ManualsPage() {
                 flex: 1,
                 padding: "10px 28px 10px 12px",
                 fontSize: 14,
-                border: "1px solid rgba(0,0,0,0.12)",
+                border: '1px solid var(--color-border)',
                 borderRadius: 8,
                 outline: "none",
-                background: "white",
+                background: 'var(--color-surface)',
                 cursor: "pointer",
                 appearance: "none",
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
@@ -257,10 +257,10 @@ export default function ManualsPage() {
                   width: "100%",
                   padding: "10px 28px 10px 12px",
                   fontSize: 14,
-                  border: "1px solid rgba(0,0,0,0.12)",
+                  border: '1px solid var(--color-border)',
                   borderRadius: 8,
                   outline: "none",
-                  background: "white",
+                  background: 'var(--color-surface)',
                   cursor: "pointer",
                   textAlign: "left",
                   appearance: "none",
@@ -282,10 +282,10 @@ export default function ManualsPage() {
                     top: "calc(100% + 4px)",
                     left: 0,
                     right: 0,
-                    background: "white",
-                    border: "1px solid rgba(0,0,0,0.12)",
+                    background: 'var(--color-surface)',
+                    border: '1px solid var(--color-border)',
                     borderRadius: 8,
-                    boxShadow: "0 4px 12px rgba(0,0,0,0.1)",
+                    boxShadow: 'var(--shadow-elevated)',
                     zIndex: 10,
                     padding: "8px 0",
                   }}
@@ -297,7 +297,7 @@ export default function ManualsPage() {
                       padding: "8px 12px",
                       cursor: "pointer",
                       fontSize: 14,
-                      borderBottom: "1px solid rgba(0,0,0,0.06)",
+                      borderBottom: '1px solid var(--color-divider)',
                     }}
                   >
                     <input
@@ -348,9 +348,9 @@ export default function ManualsPage() {
                 key={i}
                 style={{
                   height: 80,
-                  background: "white",
+                  background: 'var(--color-surface)',
                   borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.08)",
+                  border: '1px solid var(--color-border)',
                   animation: "pulse 1.5s infinite",
                 }}
               />
@@ -364,9 +364,9 @@ export default function ManualsPage() {
             style={{
               padding: 40,
               textAlign: "center",
-              background: "white",
+              background: 'var(--color-surface)',
               borderRadius: 12,
-              border: "1px solid rgba(0,0,0,0.08)",
+              border: '1px solid var(--color-border)',
             }}
           >
             <p style={{ fontSize: 16, color: "#c00", marginBottom: 16 }}>
@@ -379,8 +379,8 @@ export default function ManualsPage() {
                 minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
-                color: "white",
-                background: "#111",
+                color: 'var(--color-btn-primary-text)',
+                background: 'var(--color-btn-primary-bg)',
                 border: "none",
                 borderRadius: 8,
                 cursor: "pointer",
@@ -399,12 +399,12 @@ export default function ManualsPage() {
                 style={{
                   padding: 40,
                   textAlign: "center",
-                  background: "white",
+                  background: 'var(--color-surface)',
                   borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.08)",
+                  border: '1px solid var(--color-border)',
                 }}
               >
-                <p style={{ fontSize: 16, color: "#666" }}>
+                <p style={{ fontSize: 16, color: 'var(--color-text-secondary)' }}>
                   {searchQuery || crewFilter || statusFilters.length > 0
                     ? "No manuals match your filters."
                     : "No manuals found."}
@@ -435,7 +435,7 @@ export default function ManualsPage() {
                     marginTop: 16,
                     textAlign: "center",
                     fontSize: 13,
-                    color: "#888",
+                    color: 'var(--color-text-secondary)',
                   }}
                 >
                   Showing {filteredManuals.length} of {manuals.length} manuals

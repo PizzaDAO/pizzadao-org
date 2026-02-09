@@ -26,7 +26,7 @@ export function HolderLeaderboard({
 
   if (holders.length === 0) {
     return (
-      <p style={{ fontSize: 14, color: "#666", margin: 0 }}>
+      <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', margin: 0 }}>
         No registered members hold this collection
       </p>
     );
@@ -56,8 +56,8 @@ export function HolderLeaderboard({
             minHeight: 44,
             fontSize: 14,
             fontWeight: 500,
-            color: "#666",
-            background: "rgba(0,0,0,0.04)",
+            color: 'var(--color-text-secondary)',
+            background: 'var(--color-surface-hover)',
             border: "none",
             borderRadius: 8,
             cursor: "pointer",

@@ -21,8 +21,8 @@ function btn(kind: "primary" | "danger", disabled?: boolean): React.CSSPropertie
     opacity: disabled ? 0.5 : 1,
     fontSize: 14,
   };
-  if (kind === "danger") return { ...base, background: "#dc2626", color: "white" };
-  return { ...base, background: "black", color: "white" };
+  if (kind === "danger") return { ...base, background: "#dc2626", color: 'var(--color-btn-primary-text)' };
+  return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)' };
 }
 
 export function ActiveJob({ job, onQuit }: ActiveJobProps) {

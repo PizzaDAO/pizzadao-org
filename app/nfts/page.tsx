@@ -76,7 +76,7 @@ export default function NFTsPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#fafafa",
+        background: 'var(--color-page-bg)',
         padding: "40px 20px",
       }}
     >
@@ -97,7 +97,7 @@ export default function NFTsPage() {
               href="/"
               style={{
                 fontSize: 14,
-                color: "#666",
+                color: 'var(--color-text-secondary)',
                 textDecoration: "none",
                 marginBottom: 8,
                 display: "inline-flex",
@@ -112,7 +112,7 @@ export default function NFTsPage() {
                 margin: "8px 0 4px 0",
                 fontSize: 28,
                 fontWeight: 700,
-                color: "#111",
+                color: 'var(--color-text-primary)',
               }}
             >
               PizzaDAO NFTs
@@ -125,7 +125,7 @@ export default function NFTsPage() {
                 style={{
                   margin: "0 0 8px 0",
                   fontSize: 12,
-                  color: "#888",
+                  color: 'var(--color-text-secondary)',
                 }}
               >
                 Last updated: {formatTimestamp(data.lastUpdated)}
@@ -141,8 +141,8 @@ export default function NFTsPage() {
                 fontSize: 14,
                 fontWeight: 500,
                 color: refreshing ? "#999" : "#333",
-                background: "white",
-                border: "1px solid rgba(0,0,0,0.12)",
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border)',
                 borderRadius: 8,
                 cursor: refreshing || loading ? "not-allowed" : "pointer",
               }}
@@ -160,9 +160,9 @@ export default function NFTsPage() {
                 key={i}
                 style={{
                   height: 300,
-                  background: "white",
+                  background: 'var(--color-surface)',
                   borderRadius: 14,
-                  border: "1px solid rgba(0,0,0,0.08)",
+                  border: '1px solid var(--color-border)',
                   animation: "pulse 1.5s infinite",
                 }}
               />
@@ -176,9 +176,9 @@ export default function NFTsPage() {
             style={{
               padding: 40,
               textAlign: "center",
-              background: "white",
+              background: 'var(--color-surface)',
               borderRadius: 14,
-              border: "1px solid rgba(0,0,0,0.08)",
+              border: '1px solid var(--color-border)',
             }}
           >
             <p style={{ fontSize: 16, color: "#c00", marginBottom: 16 }}>
@@ -191,8 +191,8 @@ export default function NFTsPage() {
                 minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
-                color: "white",
-                background: "#111",
+                color: 'var(--color-btn-primary-text)',
+                background: 'var(--color-btn-primary-bg)',
                 border: "none",
                 borderRadius: 8,
                 cursor: "pointer",
@@ -211,15 +211,15 @@ export default function NFTsPage() {
                 style={{
                   padding: 40,
                   textAlign: "center",
-                  background: "white",
+                  background: 'var(--color-surface)',
                   borderRadius: 14,
-                  border: "1px solid rgba(0,0,0,0.08)",
+                  border: '1px solid var(--color-border)',
                 }}
               >
-                <p style={{ fontSize: 16, color: "#666" }}>
+                <p style={{ fontSize: 16, color: 'var(--color-text-secondary)' }}>
                   No collections with member holders found.
                 </p>
-                <p style={{ fontSize: 14, color: "#999", marginTop: 8 }}>
+                <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8 }}>
                   {data.memberCount === 0
                     ? "No members have connected wallets yet."
                     : "Members may not hold any of the tracked collections."}
@@ -251,7 +251,7 @@ export default function NFTsPage() {
               marginTop: 32,
               textAlign: "center",
               fontSize: 12,
-              color: "#888",
+              color: 'var(--color-text-secondary)',
             }}
           >
             Scanning {data.memberCount} member wallets

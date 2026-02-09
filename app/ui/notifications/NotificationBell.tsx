@@ -35,7 +35,7 @@ function badge(): React.CSSProperties {
     padding: "0 4px",
     borderRadius: 8,
     background: "#dc2626",
-    color: "white",
+    color: 'var(--color-btn-primary-text)',
     fontSize: 10,
     fontWeight: 700,
     display: "flex",
@@ -54,8 +54,8 @@ function dropdown(): React.CSSProperties {
     width: 320,
     maxHeight: 400,
     overflowY: "auto",
-    background: "white",
-    border: "1px solid rgba(0,0,0,0.12)",
+    background: 'var(--color-surface)',
+    border: '1px solid var(--color-border)',
     borderRadius: 12,
     boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
     zIndex: 1000,
@@ -68,7 +68,7 @@ function header(): React.CSSProperties {
     alignItems: "center",
     justifyContent: "space-between",
     padding: "12px 14px",
-    borderBottom: "1px solid rgba(0,0,0,0.08)",
+    borderBottom: '1px solid var(--color-divider)',
   };
 }
 
@@ -96,7 +96,7 @@ function emptyState(): React.CSSProperties {
   return {
     padding: 24,
     textAlign: "center",
-    color: "#999",
+    color: 'var(--color-text-secondary)',
     fontSize: 13,
   };
 }

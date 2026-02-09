@@ -13,11 +13,11 @@ type Job = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -100,7 +100,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
       <div style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "grid", gap: 12 }}>
           {[...Array(3)].map((_, i) => (
-            <div key={i} style={{ height: 120, background: "rgba(0,0,0,0.04)", borderRadius: 14 }} />
+            <div key={i} style={{ height: 120, background: 'var(--color-surface-hover)', borderRadius: 14 }} />
           ))}
         </div>
       </div>
@@ -126,11 +126,11 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
               alignItems: "center",
               gap: 8,
               padding: "6px 12px",
-              background: "#fafafa",
+              background: 'var(--color-page-bg)',
               borderRadius: 8,
               fontSize: 13
             }}>
-              <span style={{ color: "#666" }}>New jobs in:</span>
+              <span style={{ color: 'var(--color-text-secondary)' }}>New jobs in:</span>
               <span style={{ fontWeight: 700, fontFamily: "monospace", color: "#2563eb" }}>
                 {countdown}
               </span>
@@ -153,7 +153,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
                 background: "#f5f5f5",
                 cursor: "pointer",
                 fontSize: 12,
-                color: "#666",
+                color: 'var(--color-text-secondary)',
               }}
               title="Reset today's jobs"
             >
@@ -164,7 +164,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
 
         {jobs.length === 0 ? (
           <div style={{ ...card(), textAlign: "center" }}>
-            <p style={{ color: "#666" }}>No jobs available at the moment</p>
+            <p style={{ color: 'var(--color-text-secondary)' }}>No jobs available at the moment</p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>

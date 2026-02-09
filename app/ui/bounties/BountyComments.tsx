@@ -108,7 +108,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
   if (loading) {
     return (
       <div style={{ padding: "8px 0" }}>
-        <div style={{ height: 20, background: "rgba(0,0,0,0.04)", borderRadius: 4 }} />
+        <div style={{ height: 20, background: 'var(--color-surface-hover)', borderRadius: 4 }} />
       </div>
     );
   }
@@ -164,7 +164,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
                   )}
                 </div>
               </div>
-              <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: "#374151" }}>
+              <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
                 {comment.content}
               </p>
             </div>
@@ -191,7 +191,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
               flex: 1,
               padding: "8px 10px",
               borderRadius: 6,
-              border: "1px solid rgba(0,0,0,0.15)",
+              border: '1px solid var(--color-border-strong)',
               fontSize: 12,
               outline: "none",
               boxSizing: "border-box" as const,
@@ -205,7 +205,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
               borderRadius: 6,
               border: "none",
               background: posting || !newComment.trim() ? "#d1d5db" : "#8b5cf6",
-              color: "white",
+              color: 'var(--color-btn-primary-text)',
               fontSize: 12,
               fontWeight: 600,
               cursor: posting || !newComment.trim() ? "not-allowed" : "pointer",

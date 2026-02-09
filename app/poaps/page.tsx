@@ -38,9 +38,9 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
     <div
       style={{
         padding: 12,
-        background: "white",
+        background: 'var(--color-surface)',
         borderRadius: 12,
-        border: "1px solid rgba(0,0,0,0.08)",
+        border: '1px solid var(--color-border)',
         transition: "all 0.2s ease",
       }}
       className="poap-card"
@@ -79,7 +79,7 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                color: "#999",
+                color: 'var(--color-text-secondary)',
                 fontSize: 10,
               }}
             >
@@ -98,7 +98,7 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
               margin: 0,
               fontSize: 15,
               fontWeight: 600,
-              color: "#111",
+              color: 'var(--color-text-primary)',
               textDecoration: "none",
               display: "-webkit-box",
               WebkitLineClamp: 2,
@@ -114,7 +114,7 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
             style={{
               marginTop: 4,
               fontSize: 13,
-              color: "#888",
+              color: 'var(--color-text-secondary)',
             }}
           >
             {event.startDate && <span>📅 {formatDate(event.startDate)}</span>}
@@ -129,9 +129,9 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
               width: 36,
               height: 36,
               borderRadius: "50%",
-              border: "1px solid rgba(0,0,0,0.1)",
+              border: '1px solid var(--color-border)',
               background: expanded ? "#f0f0f0" : "white",
-              color: "#666",
+              color: 'var(--color-text-secondary)',
               fontSize: 16,
               cursor: "pointer",
               display: "flex",
@@ -152,7 +152,7 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
           style={{
             margin: "12px 0 0 0",
             padding: "12px 0 0 0",
-            borderTop: "1px solid rgba(0,0,0,0.06)",
+            borderTop: '1px solid var(--color-divider)',
             fontSize: 14,
             color: "#555",
             lineHeight: 1.5,
@@ -204,7 +204,7 @@ export default function POAPsPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "#fafafa",
+        background: 'var(--color-page-bg)',
         padding: "40px 20px",
       }}
     >
@@ -215,7 +215,7 @@ export default function POAPsPage() {
             href="/"
             style={{
               fontSize: 14,
-              color: "#666",
+              color: 'var(--color-text-secondary)',
               textDecoration: "none",
               marginBottom: 8,
               display: "inline-flex",
@@ -230,7 +230,7 @@ export default function POAPsPage() {
               margin: "8px 0 4px 0",
               fontSize: 28,
               fontWeight: 700,
-              color: "#111",
+              color: 'var(--color-text-primary)',
             }}
           >
             PizzaDAO POAPs
@@ -248,10 +248,10 @@ export default function POAPsPage() {
               width: "100%",
               padding: "12px 16px",
               fontSize: 14,
-              border: "1px solid rgba(0,0,0,0.12)",
+              border: '1px solid var(--color-border)',
               borderRadius: 8,
               outline: "none",
-              background: "white",
+              background: 'var(--color-surface)',
             }}
           />
         </div>
@@ -264,9 +264,9 @@ export default function POAPsPage() {
                 key={i}
                 style={{
                   height: 112,
-                  background: "white",
+                  background: 'var(--color-surface)',
                   borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.08)",
+                  border: '1px solid var(--color-border)',
                   animation: "pulse 1.5s infinite",
                 }}
               />
@@ -280,9 +280,9 @@ export default function POAPsPage() {
             style={{
               padding: 40,
               textAlign: "center",
-              background: "white",
+              background: 'var(--color-surface)',
               borderRadius: 12,
-              border: "1px solid rgba(0,0,0,0.08)",
+              border: '1px solid var(--color-border)',
             }}
           >
             <p style={{ fontSize: 16, color: "#c00", marginBottom: 16 }}>
@@ -295,8 +295,8 @@ export default function POAPsPage() {
                 minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
-                color: "white",
-                background: "#111",
+                color: 'var(--color-btn-primary-text)',
+                background: 'var(--color-btn-primary-bg)',
                 border: "none",
                 borderRadius: 8,
                 cursor: "pointer",
@@ -315,12 +315,12 @@ export default function POAPsPage() {
                 style={{
                   padding: 40,
                   textAlign: "center",
-                  background: "white",
+                  background: 'var(--color-surface)',
                   borderRadius: 12,
-                  border: "1px solid rgba(0,0,0,0.08)",
+                  border: '1px solid var(--color-border)',
                 }}
               >
-                <p style={{ fontSize: 16, color: "#666" }}>
+                <p style={{ fontSize: 16, color: 'var(--color-text-secondary)' }}>
                   {searchQuery
                     ? "No POAPs match your search."
                     : "No whitelisted POAPs found."}
@@ -340,7 +340,7 @@ export default function POAPsPage() {
                   marginTop: 16,
                   textAlign: "center",
                   fontSize: 13,
-                  color: "#888",
+                  color: 'var(--color-text-secondary)',
                 }}
               >
                 Showing {filteredEvents.length} of {data.totalCount} POAPs

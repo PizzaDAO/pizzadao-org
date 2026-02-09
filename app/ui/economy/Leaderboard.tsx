@@ -13,11 +13,11 @@ type LeaderboardEntry = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -49,7 +49,7 @@ export function Leaderboard() {
         <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>Leaderboard</h2>
         <div style={{ display: "grid", gap: 8 }}>
           {[...Array(3)].map((_, i) => (
-            <div key={i} style={{ height: 48, background: "rgba(0,0,0,0.04)", borderRadius: 10 }} />
+            <div key={i} style={{ height: 48, background: 'var(--color-surface-hover)', borderRadius: 10 }} />
           ))}
         </div>
       </div>
@@ -73,7 +73,7 @@ export function Leaderboard() {
       case 3:
         return { background: "rgba(217,119,6,0.1)", borderColor: "rgba(217,119,6,0.4)" };
       default:
-        return { background: "#fafafa", borderColor: "rgba(0,0,0,0.1)" };
+        return { background: 'var(--color-page-bg)', borderColor: "rgba(0,0,0,0.1)" };
     }
   };
 
@@ -95,7 +95,7 @@ export function Leaderboard() {
       <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0 }}>Leaderboard</h2>
 
       {entries.length === 0 ? (
-        <p style={{ color: "#666", textAlign: "center", padding: "32px 0" }}>No entries yet</p>
+        <p style={{ color: 'var(--color-text-secondary)', textAlign: "center", padding: "32px 0" }}>No entries yet</p>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {entries.map((entry) => (

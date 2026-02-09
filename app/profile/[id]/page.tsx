@@ -121,16 +121,16 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "#fafafa",
-                color: "#000",
+                background: 'var(--color-page-bg)',
+                color: 'var(--color-text)',
                 fontFamily: inter.style.fontFamily
             }}>
                 <div style={{ textAlign: "center" }}>
                     <div style={{
                         width: 50,
                         height: 50,
-                        border: "4px solid rgba(0,0,0,0.1)",
-                        borderTop: "4px solid #ff4d4d",
+                        border: '4px solid var(--color-spinner-track)',
+                        borderTop: '4px solid var(--color-spinner-active)',
                         borderRadius: "50%",
                         animation: "spin 1s linear infinite",
                         margin: "0 auto 20px"
@@ -151,8 +151,8 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: "#fafafa",
-                color: "#000",
+                background: 'var(--color-page-bg)',
+                color: 'var(--color-text)',
                 fontFamily: inter.style.fontFamily,
                 padding: 20
             }}>
@@ -186,8 +186,8 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     return (
         <div style={{
             minHeight: "100vh",
-            background: "#fafafa",
-            color: "#000",
+            background: 'var(--color-page-bg)',
+            color: 'var(--color-text)',
             fontFamily: inter.style.fontFamily,
             padding: "40px 20px"
         }}>
@@ -202,7 +202,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             cursor: "pointer",
                             fontSize: 16,
                             fontWeight: 600,
-                            color: "#666",
+                            color: 'var(--color-text-secondary)',
                             padding: 0,
                             fontFamily: "inherit"
                         }}
@@ -343,7 +343,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                     {/* Crews Section */}
                     {userCrews.length > 0 && (
-                        <div style={{ marginTop: 24, paddingTop: 24, borderTop: "1px solid rgba(0,0,0,0.1)" }}>
+                        <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
                             <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>Crews</h3>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
                                 {userCrews.map((crewName) => {
@@ -363,8 +363,8 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                             style={{
                                                 padding: 12,
                                                 borderRadius: 12,
-                                                border: "1px solid rgba(0,0,0,0.12)",
-                                                background: "white",
+                                                border: '1px solid var(--color-border)',
+                                                background: 'var(--color-surface)',
                                             }}
                                         >
                                             <Link
@@ -464,7 +464,7 @@ function StatItem({ label, value }: { label: string; value: string }) {
             <p style={{
                 fontSize: 18,
                 fontWeight: 500,
-                color: "#111",
+                color: 'var(--color-text-primary)',
                 margin: 0,
                 wordBreak: "break-word"
             }}>
@@ -476,11 +476,11 @@ function StatItem({ label, value }: { label: string; value: string }) {
 
 function card(): React.CSSProperties {
     return {
-        border: "1px solid rgba(0,0,0,0.12)",
+        border: '1px solid var(--color-border)',
         borderRadius: 14,
         padding: 24,
-        boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-        background: "white",
+        boxShadow: 'var(--shadow-card)',
+        background: 'var(--color-surface)',
         display: "grid",
         gap: 14,
     };
@@ -491,13 +491,13 @@ function btn(kind: "primary" | "secondary"): React.CSSProperties {
         display: "inline-block",
         padding: "10px 16px",
         borderRadius: 10,
-        border: "1px solid rgba(0,0,0,0.18)",
+        border: '1px solid var(--color-border-strong)',
         fontWeight: 650,
         cursor: "pointer",
         textDecoration: "none",
         textAlign: "center",
         fontFamily: "inherit"
     };
-    if (kind === "primary") return { ...base, background: "black", color: "white", borderColor: "black" };
-    return { ...base, background: "white", color: "black" };
+    if (kind === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' };
+    return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' };
 }

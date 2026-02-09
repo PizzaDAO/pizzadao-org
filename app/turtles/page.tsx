@@ -44,8 +44,8 @@ export default function TurtlesIndexPage() {
   return (
     <div style={{
       minHeight: '100vh',
-      background: '#fafafa',
-      color: '#000',
+      background: 'var(--color-page-bg)',
+      color: 'var(--color-text)',
       fontFamily: inter.style.fontFamily,
       padding: '40px 20px',
     }}>
@@ -172,11 +172,11 @@ export default function TurtlesIndexPage() {
 // Styles
 function card(): React.CSSProperties {
   return {
-    border: '1px solid rgba(0,0,0,0.12)',
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: '0 8px 30px rgba(0,0,0,0.06)',
-    background: 'white',
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   }
 }
 
@@ -186,10 +186,10 @@ function navBtn(): React.CSSProperties {
     alignItems: 'center',
     gap: 6,
     padding: '8px 14px',
-    background: 'white',
-    border: '1px solid rgba(0,0,0,0.15)',
+    background: 'var(--color-surface)',
+    border: '1px solid var(--color-border-strong)',
     borderRadius: 8,
-    color: '#000',
+    color: 'var(--color-text)',
     textDecoration: 'none',
     fontSize: 14,
     fontWeight: 600,

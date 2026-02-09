@@ -36,7 +36,7 @@ export function HolderRow({
         gap: 12,
         minHeight: 44,
         padding: "6px 0",
-        borderBottom: "1px solid rgba(0,0,0,0.06)",
+        borderBottom: '1px solid var(--color-divider)',
       }}
     >
       {/* Rank */}
@@ -46,7 +46,7 @@ export function HolderRow({
           textAlign: "center",
           fontSize: 14,
           fontWeight: 500,
-          color: "#666",
+          color: 'var(--color-text-secondary)',
         }}
       >
         {rank}
@@ -59,7 +59,7 @@ export function HolderRow({
           flex: 1,
           fontSize: 14,
           fontWeight: 500,
-          color: "#111",
+          color: 'var(--color-text-primary)',
           textDecoration: "none",
           display: "flex",
           alignItems: "center",
@@ -91,7 +91,7 @@ export function HolderRow({
         style={{
           fontSize: 14,
           fontWeight: 600,
-          color: "#333",
+          color: 'var(--color-text-primary)',
           minWidth: 32,
           textAlign: "right",
         }}

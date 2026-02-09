@@ -23,7 +23,7 @@ function card(completed?: boolean): React.CSSProperties {
     border: completed ? "1px solid rgba(22,163,74,0.3)" : "1px solid rgba(0,0,0,0.12)",
     borderRadius: 14,
     padding: 16,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
+    boxShadow: 'var(--shadow-card)',
     background: completed ? "rgba(22,163,74,0.05)" : "white",
   };
 }
@@ -36,8 +36,8 @@ function btn(disabled?: boolean): React.CSSProperties {
     fontWeight: 650,
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
-    background: "black",
-    color: "white",
+    background: 'var(--color-btn-primary-bg)',
+    color: 'var(--color-btn-primary-text)',
     fontSize: 12,
     whiteSpace: "nowrap" as const,
   };
@@ -108,7 +108,7 @@ export function JobCard({ job, rewardAmount, alreadyCompleted, onAssign, disable
           )}
           <span style={{ fontSize: 10, color: "#9ca3af" }}>#{job.id}</span>
         </div>
-        <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: "#374151" }}>{job.description}</p>
+        <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{job.description}</p>
         {error && (
           <div style={{ marginTop: 8, padding: 6, background: "rgba(255,0,0,0.05)", borderRadius: 4, color: "#c00", fontSize: 11 }}>
             {error}

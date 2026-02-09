@@ -44,10 +44,10 @@ function cardStyle(size: "small" | "medium" | "large"): React.CSSProperties {
     width: sizes[size],
     height: sizes[size],
     borderRadius: 12,
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     overflow: "hidden",
     position: "relative",
-    background: "#fafafa",
+    background: 'var(--color-page-bg)',
     flexShrink: 0,
   };
 }
@@ -102,7 +102,7 @@ export function NFTCard({ nft, size = "medium" }: NFTCardProps) {
           bottom: 4,
           right: 4,
           background: chainColor,
-          color: "white",
+          color: 'var(--color-btn-primary-text)',
           fontSize: 8,
           fontWeight: 700,
           padding: "2px 4px",
