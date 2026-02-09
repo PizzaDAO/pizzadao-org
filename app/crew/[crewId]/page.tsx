@@ -449,6 +449,23 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               Projects
             </Link>
           )}
+          {crewId.toLowerCase() === 'comms' && (
+            <a href="https://pizzadao.xyz/brand" target="_blank" rel="noreferrer" style={{
+              display: 'inline-flex',
+              alignItems: 'center',
+              gap: 6,
+              padding: '8px 14px',
+              background: 'white',
+              border: '1px solid rgba(0,0,0,0.15)',
+              borderRadius: 8,
+              color: '#000',
+              textDecoration: 'none',
+              fontSize: 14,
+              fontWeight: 600,
+            }}>
+              Brand Kit
+            </a>
+          )}
           {user && (
             <Link href={`/dashboard/${user.memberId}`} style={{
               display: 'inline-flex',
