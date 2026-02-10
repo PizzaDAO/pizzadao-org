@@ -157,8 +157,8 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
               border: "none",
               fontWeight: 650,
               cursor: "pointer",
-              background: showForm ? "#f5f5f5" : "#8b5cf6",
-              color: showForm ? "black" : "white",
+              background: showForm ? "var(--color-surface-hover)" : "#8b5cf6",
+              color: showForm ? "var(--color-text)" : "var(--color-btn-primary-text)",
               fontSize: 12,
             }}
           >

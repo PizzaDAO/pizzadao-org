@@ -203,7 +203,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                     >
                       {tx.description}
                     </div>
-                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
                       {formatRelativeTime(tx.createdAt)}
                     </div>
                   </div>

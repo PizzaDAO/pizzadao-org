@@ -20,11 +20,11 @@ type JobCardProps = {
 
 function card(completed?: boolean): React.CSSProperties {
   return {
-    border: completed ? "1px solid rgba(22,163,74,0.3)" : "1px solid rgba(0,0,0,0.12)",
+    border: completed ? "1px solid rgba(22,163,74,0.3)" : "1px solid var(--color-border)",
     borderRadius: 14,
     padding: 16,
     boxShadow: 'var(--shadow-card)',
-    background: completed ? "rgba(22,163,74,0.05)" : "white",
+    background: completed ? "rgba(22,163,74,0.05)" : "var(--color-surface)",
   };
 }
 
@@ -106,7 +106,7 @@ export function JobCard({ job, rewardAmount, alreadyCompleted, onAssign, disable
               Done
             </span>
           )}
-          <span style={{ fontSize: 10, color: "#9ca3af" }}>#{job.id}</span>
+          <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>#{job.id}</span>
         </div>
         <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{job.description}</p>
         {error && (

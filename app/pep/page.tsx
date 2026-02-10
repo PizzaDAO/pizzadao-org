@@ -130,7 +130,7 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
         </h2>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
+          <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "var(--color-danger)", fontSize: 14 }}>
             {error}
           </div>
         )}
@@ -199,8 +199,8 @@ function SendIcon({ size = 16, onClick }: { size?: number; onClick: () => void }
         color: 'var(--color-text-secondary)',
         transition: "color 0.2s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "#000")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "#666")}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-text)")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
       title="Send"
     >
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">

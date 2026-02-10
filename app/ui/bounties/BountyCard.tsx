@@ -24,11 +24,11 @@ type BountyCardProps = {
 
 function card(status: "OPEN" | "CLAIMED"): React.CSSProperties {
   return {
-    border: status === "CLAIMED" ? "1px solid rgba(234,179,8,0.3)" : "1px solid rgba(0,0,0,0.12)",
+    border: status === "CLAIMED" ? "1px solid rgba(234,179,8,0.3)" : "1px solid var(--color-border)",
     borderRadius: 14,
     padding: 16,
     boxShadow: 'var(--shadow-card)',
-    background: status === "CLAIMED" ? "rgba(234,179,8,0.05)" : "white",
+    background: status === "CLAIMED" ? "rgba(234,179,8,0.05)" : "var(--color-surface)",
   };
 }
 
@@ -44,7 +44,7 @@ function btn(variant: "primary" | "secondary" | "danger"): React.CSSProperties {
   };
   if (variant === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)' };
   if (variant === "danger") return { ...base, background: "#dc2626", color: 'var(--color-btn-primary-text)' };
-  return { ...base, background: "#f5f5f5", color: 'var(--color-text)' };
+  return { ...base, background: "var(--color-surface-hover)", color: 'var(--color-text)' };
 }
 
 export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps) {
@@ -148,7 +148,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
             }}>
               {bounty.status === "CLAIMED" ? "In Progress" : "Open"}
             </span>
-            <span style={{ fontSize: 10, color: "#9ca3af" }}>#{bounty.id}</span>
+            <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>#{bounty.id}</span>
             {isCreator && (
               <span style={{
                 fontSize: 10,

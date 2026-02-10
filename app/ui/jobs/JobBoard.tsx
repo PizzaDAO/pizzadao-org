@@ -150,7 +150,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
                 padding: "6px 10px",
                 borderRadius: 6,
                 border: "none",
-                background: "#f5f5f5",
+                background: "var(--color-surface-hover)",
                 cursor: "pointer",
                 fontSize: 12,
                 color: 'var(--color-text-secondary)',

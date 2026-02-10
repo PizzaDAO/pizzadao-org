@@ -21,7 +21,7 @@ function bellButton(hasUnread: boolean): React.CSSProperties {
     justifyContent: "center",
     borderRadius: 8,
     transition: "background 0.15s",
-    color: hasUnread ? "#2563eb" : "#666",
+    color: hasUnread ? "#2563eb" : "var(--color-text-secondary)",
   };
 }
 
@@ -57,7 +57,7 @@ function dropdown(): React.CSSProperties {
     background: 'var(--color-surface)',
     border: '1px solid var(--color-border)',
     borderRadius: 12,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
+    boxShadow: "var(--shadow-elevated)",
     zIndex: 1000,
   };
 }
@@ -203,7 +203,7 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
         onClick={handleToggle}
         style={bellButton(unreadCount > 0)}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "rgba(0,0,0,0.04)";
+          e.currentTarget.style.background = "var(--color-surface-hover)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.background = "none";

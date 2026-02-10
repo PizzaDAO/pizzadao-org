@@ -73,7 +73,7 @@ export function Leaderboard() {
       case 3:
         return { background: "rgba(217,119,6,0.1)", borderColor: "rgba(217,119,6,0.4)" };
       default:
-        return { background: 'var(--color-page-bg)', borderColor: "rgba(0,0,0,0.1)" };
+        return { background: 'var(--color-page-bg)', borderColor: "var(--color-border)" };
     }
   };
 
