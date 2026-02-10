@@ -166,7 +166,7 @@ export default function AllCrewsPage() {
     return (
       <div key={crew.id} style={{
         ...card(),
-        border: inCrew ? '2px solid #4caf50' : '1px solid rgba(0,0,0,0.12)',
+        border: inCrew ? '2px solid #4caf50' : '1px solid var(--color-border)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
@@ -189,7 +189,7 @@ export default function AllCrewsPage() {
           </div>
           {inCrew && (
             <span style={{
-              background: '#e8f5e9',
+              background: 'rgba(76,175,80,0.15)',
               color: '#2e7d32',
               padding: '4px 10px',
               borderRadius: 12,
@@ -251,7 +251,7 @@ export default function AllCrewsPage() {
 
         {/* Tasks Section */}
         {crew.tasks && crew.tasks.length > 0 && (
-          <div style={{ marginTop: 16, borderTop: '1px solid rgba(0,0,0,0.08)', paddingTop: 12 }}>
+          <div style={{ marginTop: 16, borderTop: '1px solid var(--color-divider)', paddingTop: 12 }}>
             <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Top Tasks
             </div>
@@ -264,12 +264,12 @@ export default function AllCrewsPage() {
                       fontWeight: 600,
                       padding: '3px 8px',
                       borderRadius: 4,
-                      background: task.priority === 'Top' ? '#fee2e2' :
-                                 task.priority === 'High' ? '#fef3c7' :
-                                 task.priority === 'Mid' ? '#e0f2fe' : '#f3f4f6',
-                      color: task.priority === 'Top' ? '#b91c1c' :
-                            task.priority === 'High' ? '#b45309' :
-                            task.priority === 'Mid' ? '#0369a1' : '#4b5563',
+                      background: task.priority === 'Top' ? 'rgba(255,77,77,0.15)' :
+                                 task.priority === 'High' ? 'rgba(255,167,38,0.15)' :
+                                 task.priority === 'Mid' ? 'rgba(33,150,243,0.15)' : 'var(--color-surface-hover)',
+                      color: task.priority === 'Top' ? '#d32f2f' :
+                            task.priority === 'High' ? '#ef6c00' :
+                            task.priority === 'Mid' ? '#1565c0' : 'var(--color-text-secondary)',
                       flexShrink: 0,
                     }}>
                       {task.priority}
@@ -280,7 +280,7 @@ export default function AllCrewsPage() {
                       href={task.url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ fontSize: 14, color: '#2563eb', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
+                      style={{ fontSize: 14, color: '#5b9cff', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
                     >
                       {task.label}
                     </a>

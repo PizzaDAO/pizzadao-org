@@ -515,7 +515,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               isInCrew ? (
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{
-                    background: '#e8f5e9',
+                    background: 'rgba(76,175,80,0.15)',
                     color: '#2e7d32',
                     padding: '8px 16px',
                     borderRadius: 20,
@@ -842,7 +842,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               <div key={i} style={{
                 ...itemCard(),
                 ...(taskNeedsLead ? {
-                  background: '#fff8e1',
+                  background: 'rgba(255,179,0,0.1)',
                   borderColor: '#ffb300',
                   borderWidth: '2px',
                 } : {}),
@@ -1138,7 +1138,7 @@ function badge(): React.CSSProperties {
     display: 'inline-block',
     padding: '6px 12px',
     borderRadius: 20,
-    background: 'rgba(0,0,0,0.06)',
+    background: 'var(--color-surface-hover)',
     fontSize: 13,
     fontWeight: 500,
   }
@@ -1198,7 +1198,7 @@ function collapsibleHeader(color: string): React.CSSProperties {
 
 function itemCard(priority?: string): React.CSSProperties {
   const lower = priority?.toLowerCase() || ''
-  let borderColor = 'rgba(0,0,0,0.1)'
+  let borderColor = 'var(--color-border)'
 
   if (lower.includes('top') || lower.includes('high') || lower.includes('0.') || lower.includes('1.')) {
     borderColor = '#ff4d4d'
@@ -1223,8 +1223,8 @@ function itemCard(priority?: string): React.CSSProperties {
 
 function statusBadge(status: string): React.CSSProperties {
   const lower = status.toLowerCase()
-  let bg = 'rgba(0,0,0,0.1)'
-  let color = '#333'
+  let bg = 'var(--color-surface-hover)'
+  let color = 'var(--color-text-primary)'
 
   if (lower.includes('lead') || lower.includes('capo')) {
     bg = 'rgba(255,77,77,0.15)'
@@ -1251,7 +1251,7 @@ function statusBadge(status: string): React.CSSProperties {
 
 function goalCard(priority: string): React.CSSProperties {
   const lower = priority?.toLowerCase() || ''
-  let borderColor = 'rgba(0,0,0,0.1)'
+  let borderColor = 'var(--color-border)'
 
   if (lower.includes('top') || lower.includes('high')) {
     borderColor = '#ff4d4d'
@@ -1282,8 +1282,8 @@ function taskCard(stage: string): React.CSSProperties {
 
 function priorityBadge(priority: string): React.CSSProperties {
   const lower = priority?.toLowerCase() || ''
-  let bg = 'rgba(0,0,0,0.1)'
-  let color = '#333'
+  let bg = 'var(--color-surface-hover)'
+  let color = 'var(--color-text-primary)'
 
   if (lower.includes('top') || lower.includes('high')) {
     bg = 'rgba(255,77,77,0.15)'
@@ -1310,8 +1310,8 @@ function priorityBadge(priority: string): React.CSSProperties {
 
 function stageBadge(stage: string): React.CSSProperties {
   const lower = stage?.toLowerCase() || ''
-  let bg = 'rgba(0,0,0,0.08)'
-  let color = '#666'
+  let bg = 'var(--color-surface-hover)'
+  let color = 'var(--color-text-secondary)'
 
   if (lower.includes('now') || lower.includes('doing') || lower.includes('progress')) {
     bg = 'rgba(33,150,243,0.15)'
@@ -1338,7 +1338,7 @@ function stageBadge(stage: string): React.CSSProperties {
 
 function manualCard(status: string): React.CSSProperties {
   const lower = status?.toLowerCase() || ''
-  let borderColor = 'rgba(0,0,0,0.1)'
+  let borderColor = 'var(--color-border)'
 
   if (lower.includes('complete')) {
     borderColor = '#4caf50'
@@ -1359,8 +1359,8 @@ function manualCard(status: string): React.CSSProperties {
 
 function manualStatusBadge(status: string): React.CSSProperties {
   const lower = status?.toLowerCase() || ''
-  let bg = 'rgba(0,0,0,0.08)'
-  let color = '#666'
+  let bg = 'var(--color-surface-hover)'
+  let color = 'var(--color-text-secondary)'
 
   if (lower.includes('complete')) {
     bg = 'rgba(76,175,80,0.15)'
