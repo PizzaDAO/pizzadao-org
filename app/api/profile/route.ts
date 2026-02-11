@@ -157,6 +157,8 @@ const POST_HANDLER = async (req: Request) => {
     mediaType,
 
     city: clampStr(body.city, 120),
+    timezone: clampStr(body.timezone ?? "", 60),
+    timezoneLabel: clampStr(body.timezoneLabel ?? "", 40),
 
     // legacy + new
     turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
@@ -181,6 +183,8 @@ const POST_HANDLER = async (req: Request) => {
       releaseDate: clampStr(body.releaseDate, 20),
       mediaType,
       city: clampStr(body.city, 120),
+      timezone: clampStr(body.timezone ?? "", 60),
+      timezoneLabel: clampStr(body.timezoneLabel ?? "", 40),
       turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
       turtles: turtlesArr,
       crews: crewsArr,

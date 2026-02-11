@@ -9,17 +9,18 @@ import type { CityPrediction } from "../types";
 type Props = {
   city: string;
   onChange: (city: string) => void;
+  onTimezoneResolved?: (timezoneId: string | null, timezoneLabel: string | null) => void;
   onNext: () => void;
   onBack: () => void;
 };
 
-export function CityStep({ city, onChange, onNext, onBack }: Props) {
+export function CityStep({ city, onChange, onTimezoneResolved, onNext, onBack }: Props) {
   const canProceed = city.trim().length > 0;
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <Field label="City">
-        <CityAutocomplete value={city} onChange={onChange} />
+        <CityAutocomplete value={city} onChange={onChange} onTimezoneResolved={onTimezoneResolved} />
       </Field>
 
       <div style={{ display: "flex", gap: 10 }}>
@@ -38,7 +39,15 @@ export function CityStep({ city, onChange, onNext, onBack }: Props) {
   );
 }
 
-function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CityAutocomplete({
+  value,
+  onChange,
+  onTimezoneResolved,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onTimezoneResolved?: (timezoneId: string | null, timezoneLabel: string | null) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<CityPrediction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,6 +93,23 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
     return () => window.clearTimeout(t);
   }, [value]);
 
+  /** Fire-and-forget: resolve timezone from a place_id */
+  function resolveTimezone(placeId: string) {
+    if (!onTimezoneResolved) return;
+    fetch("/api/city-timezone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ place_id: placeId }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        onTimezoneResolved(data?.timezoneId ?? null, data?.label ?? null);
+      })
+      .catch(() => {
+        // Non-blocking: if timezone resolution fails, just skip it
+      });
+  }
+
   return (
     <div style={{ position: "relative" }}>
       <input
@@ -128,6 +154,7 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
               onClick={() => {
                 suppressForValueRef.current = it.description;
                 onChange(it.description);
+                resolveTimezone(it.place_id);
                 setOpen(false);
                 setItems([]);
               }}
