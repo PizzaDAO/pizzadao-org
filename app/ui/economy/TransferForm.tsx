@@ -9,11 +9,11 @@ type TransferFormProps = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -22,7 +22,7 @@ function input(): React.CSSProperties {
     width: "100%",
     padding: "10px 12px",
     borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.18)",
+    border: '1px solid var(--color-border-strong)',
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box",
@@ -38,8 +38,8 @@ function btn(disabled?: boolean): React.CSSProperties {
     fontWeight: 650,
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
-    background: "black",
-    color: "white",
+    background: 'var(--color-btn-primary-bg)',
+    color: 'var(--color-btn-primary-text)',
   };
 }
 
@@ -100,7 +100,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
 
       <form onSubmit={handleTransfer} style={{ display: "grid", gap: 16 }}>
         <div>
-          <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
+          <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
             Recipient Discord ID
           </label>
           <input
@@ -114,7 +114,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         </div>
 
         <div>
-          <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>Amount</label>
+          <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Amount</label>
           <input
             type="number"
             placeholder="Amount to send"

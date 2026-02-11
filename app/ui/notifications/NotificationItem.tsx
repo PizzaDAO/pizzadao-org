@@ -70,7 +70,7 @@ function getIconColor(type: NotificationData["type"]): string {
     case "TASK_DUE_SOON":
       return "#dc2626"; // Red
     default:
-      return "#666";
+      return "var(--color-text-secondary)";
   }
 }
 
@@ -99,7 +99,7 @@ function itemContainer(isRead: boolean): React.CSSProperties {
     cursor: "pointer",
     transition: "background 0.15s",
     background: isRead ? "transparent" : "rgba(37,99,235,0.04)",
-    borderBottom: "1px solid rgba(0,0,0,0.06)",
+    borderBottom: '1px solid var(--color-divider)',
   };
 }
 
@@ -128,7 +128,7 @@ function titleStyle(isRead: boolean): React.CSSProperties {
   return {
     fontSize: 13,
     fontWeight: isRead ? 500 : 650,
-    color: isRead ? "#666" : "#111",
+    color: isRead ? "var(--color-text-secondary)" : "var(--color-text-primary)",
     margin: 0,
     marginBottom: 2,
   };
@@ -137,7 +137,7 @@ function titleStyle(isRead: boolean): React.CSSProperties {
 function messageStyle(isRead: boolean): React.CSSProperties {
   return {
     fontSize: 12,
-    color: isRead ? "#999" : "#666",
+    color: isRead ? "var(--color-text-muted)" : "var(--color-text-secondary)",
     margin: 0,
     lineHeight: 1.4,
     overflow: "hidden",
@@ -151,7 +151,7 @@ function messageStyle(isRead: boolean): React.CSSProperties {
 function timeStyle(): React.CSSProperties {
   return {
     fontSize: 10,
-    color: "#9ca3af",
+    color: "var(--color-text-muted)",
     marginTop: 4,
   };
 }
@@ -174,7 +174,7 @@ export function NotificationItem({ notification, onMarkRead, onNavigate }: Notif
       style={itemContainer(isRead)}
       onClick={handleClick}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = isRead ? "rgba(0,0,0,0.02)" : "rgba(37,99,235,0.08)";
+        e.currentTarget.style.background = isRead ? "var(--color-surface-hover)" : "rgba(37,99,235,0.08)";
       }}
       onMouseLeave={(e) => {
         e.currentTarget.style.background = isRead ? "transparent" : "rgba(37,99,235,0.04)";

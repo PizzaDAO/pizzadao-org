@@ -24,11 +24,11 @@ type BountyCardProps = {
 
 function card(status: "OPEN" | "CLAIMED"): React.CSSProperties {
   return {
-    border: status === "CLAIMED" ? "1px solid rgba(234,179,8,0.3)" : "1px solid rgba(0,0,0,0.12)",
+    border: status === "CLAIMED" ? "1px solid rgba(234,179,8,0.3)" : "1px solid var(--color-border)",
     borderRadius: 14,
     padding: 16,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: status === "CLAIMED" ? "rgba(234,179,8,0.05)" : "white",
+    boxShadow: 'var(--shadow-card)',
+    background: status === "CLAIMED" ? "rgba(234,179,8,0.05)" : "var(--color-surface)",
   };
 }
 
@@ -42,9 +42,9 @@ function btn(variant: "primary" | "secondary" | "danger"): React.CSSProperties {
     fontSize: 12,
     whiteSpace: "nowrap" as const,
   };
-  if (variant === "primary") return { ...base, background: "black", color: "white" };
-  if (variant === "danger") return { ...base, background: "#dc2626", color: "white" };
-  return { ...base, background: "#f5f5f5", color: "black" };
+  if (variant === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)' };
+  if (variant === "danger") return { ...base, background: "#dc2626", color: 'var(--color-btn-primary-text)' };
+  return { ...base, background: "var(--color-surface-hover)", color: 'var(--color-text)' };
 }
 
 export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps) {
@@ -148,7 +148,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
             }}>
               {bounty.status === "CLAIMED" ? "In Progress" : "Open"}
             </span>
-            <span style={{ fontSize: 10, color: "#9ca3af" }}>#{bounty.id}</span>
+            <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>#{bounty.id}</span>
             {isCreator && (
               <span style={{
                 fontSize: 10,
@@ -186,7 +186,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
               View details
             </a>
           )}
-          <div style={{ marginTop: 6, fontSize: 11, color: "#666" }}>
+          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-secondary)' }}>
             Posted by <UserLink discordId={bounty.createdBy} />
           </div>
           {bounty.status === "CLAIMED" && bounty.claimedBy && (
@@ -200,7 +200,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
               alignItems: "center",
               gap: 6
             }}>
-              <span style={{ color: "#666" }}>Claimed by:</span>
+              <span style={{ color: 'var(--color-text-secondary)' }}>Claimed by:</span>
               <UserLink discordId={bounty.claimedBy} />
               {isClaimer && <span style={{ color: "#16a34a", fontWeight: 600 }}>(You)</span>}
             </div>
@@ -278,7 +278,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
       </div>
 
       {/* Comments toggle and section */}
-      <div style={{ marginTop: 10, borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 8 }}>
+      <div style={{ marginTop: 10, borderTop: '1px solid var(--color-divider)', paddingTop: 8 }}>
         <button
           onClick={() => setShowComments(!showComments)}
           style={{
@@ -286,7 +286,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
             border: "none",
             cursor: "pointer",
             fontSize: 12,
-            color: "#6b7280",
+            color: 'var(--color-text-secondary)',
             padding: 0,
             display: "flex",
             alignItems: "center",

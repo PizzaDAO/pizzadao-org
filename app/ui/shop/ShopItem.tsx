@@ -20,11 +20,11 @@ type ShopItemProps = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 16,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -33,7 +33,7 @@ function input(): React.CSSProperties {
     width: 50,
     padding: "6px 8px",
     borderRadius: 8,
-    border: "1px solid rgba(0,0,0,0.18)",
+    border: '1px solid var(--color-border-strong)',
     fontSize: 14,
     textAlign: "center" as const,
     outline: "none",
@@ -49,8 +49,8 @@ function btn(disabled?: boolean): React.CSSProperties {
     fontWeight: 650,
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
-    background: "black",
-    color: "white",
+    background: 'var(--color-btn-primary-bg)',
+    color: 'var(--color-btn-primary-text)',
     fontSize: 13,
   };
 }
@@ -96,10 +96,10 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
       </div>
 
       {item.description && (
-        <p style={{ fontSize: 13, color: "#666", marginBottom: 12, marginTop: 0 }}>{item.description}</p>
+        <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12, marginTop: 0 }}>{item.description}</p>
       )}
 
-      <div style={{ fontSize: 12, color: "#6b7280", marginBottom: 12 }}>
+      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
         {item.quantity === -1 ? "Unlimited stock" : `${item.quantity} in stock`}
       </div>
 

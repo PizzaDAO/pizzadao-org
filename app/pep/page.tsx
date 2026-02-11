@@ -36,11 +36,11 @@ type SendModalProps = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -49,14 +49,14 @@ function btn(kind: "primary" | "secondary"): React.CSSProperties {
     display: "inline-block",
     padding: "10px 16px",
     borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.18)",
+    border: '1px solid var(--color-border-strong)',
     fontWeight: 650,
     cursor: "pointer",
     textDecoration: "none",
     textAlign: "center",
   };
-  if (kind === "primary") return { ...base, background: "black", color: "white", borderColor: "black" };
-  return { ...base, background: "white", color: "black" };
+  if (kind === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' };
+  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' };
 }
 
 function input(): React.CSSProperties {
@@ -64,7 +64,7 @@ function input(): React.CSSProperties {
     width: "100%",
     padding: "10px 12px",
     borderRadius: 10,
-    border: "1px solid rgba(0,0,0,0.18)",
+    border: '1px solid var(--color-border-strong)',
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box" as const,
@@ -118,7 +118,7 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
       left: 0,
       right: 0,
       bottom: 0,
-      background: "rgba(0,0,0,0.5)",
+      background: 'var(--color-overlay)',
       display: "flex",
       alignItems: "center",
       justifyContent: "center",
@@ -130,14 +130,14 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
         </h2>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
+          <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "var(--color-danger)", fontSize: 14 }}>
             {error}
           </div>
         )}
 
         <form onSubmit={handleSend} style={{ display: "grid", gap: 16 }}>
           <div>
-            <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
+            <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
               Recipient Member ID
             </label>
             <input
@@ -151,7 +151,7 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
           </div>
 
           <div>
-            <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
+            <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
               Amount {maxQuantity && `(max: ${maxQuantity})`}
             </label>
             <input
@@ -196,11 +196,11 @@ function SendIcon({ size = 16, onClick }: { size?: number; onClick: () => void }
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: "#666",
+        color: 'var(--color-text-secondary)',
         transition: "color 0.2s",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "#000")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "#666")}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-text)")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
       title="Send"
     >
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -233,9 +233,9 @@ function WalletWithSend({ walletKey, onSendClick }: { walletKey: number; onSendC
   return (
     <div style={card()}>
       <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, marginBottom: 16 }}>Your Balance</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 20, background: "#fafafa", borderRadius: 10 }}>
+      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 20, background: 'var(--color-page-bg)', borderRadius: 10 }}>
         {loading ? (
-          <div style={{ height: 38, flex: 1, background: "rgba(0,0,0,0.04)", borderRadius: 8 }} />
+          <div style={{ height: 38, flex: 1, background: 'var(--color-surface-hover)', borderRadius: 8 }} />
         ) : (
           <>
             <div style={{ fontSize: 32, fontWeight: 700, color: "#16a34a", flex: 1 }}>
@@ -272,7 +272,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
     return (
       <div style={card()}>
         <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, marginBottom: 16 }}>Your Inventory</h2>
-        <div style={{ height: 60, background: "rgba(0,0,0,0.04)", borderRadius: 8 }} />
+        <div style={{ height: 60, background: 'var(--color-surface-hover)', borderRadius: 8 }} />
       </div>
     );
   }
@@ -281,7 +281,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
     <div style={card()}>
       <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, marginBottom: 16 }}>Your Inventory</h2>
       {items.length === 0 ? (
-        <p style={{ color: "#666", textAlign: "center", padding: "16px 0", margin: 0 }}>No items yet</p>
+        <p style={{ color: 'var(--color-text-secondary)', textAlign: "center", padding: "16px 0", margin: 0 }}>No items yet</p>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {items.map((inv) => (
@@ -292,7 +292,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: 12,
-                background: "#fafafa",
+                background: 'var(--color-page-bg)',
                 borderRadius: 10,
               }}
             >
@@ -302,7 +302,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
                 )}
                 <div>
                   <div style={{ fontWeight: 600, fontSize: 14 }}>{inv.item.name}</div>
-                  <div style={{ fontSize: 12, color: "#666" }}>x{inv.quantity}</div>
+                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>x{inv.quantity}</div>
                 </div>
               </div>
               <SendIcon size={16} onClick={() => onSendItem(inv)} />
@@ -362,9 +362,9 @@ export default function PepDashboard() {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "40px 20px" }}>
+      <div style={{ minHeight: "100vh", background: 'var(--color-page-bg)', padding: "40px 20px" }}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ ...card(), height: 200, background: "rgba(0,0,0,0.04)" }} />
+          <div style={{ ...card(), height: 200, background: 'var(--color-surface-hover)' }} />
         </div>
       </div>
     );
@@ -372,10 +372,10 @@ export default function PepDashboard() {
 
   if (!session?.authenticated) {
     return (
-      <div style={{ minHeight: "100vh", background: "#fafafa", padding: "40px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
+      <div style={{ minHeight: "100vh", background: 'var(--color-page-bg)', padding: "40px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
         <div style={{ ...card(), maxWidth: 400, textAlign: "center" }}>
           <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}><PepIcon size={28} /> Economy</h1>
-          <p style={{ color: "#666", marginBottom: 24 }}>
+          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 24 }}>
             Please log in with Discord to access the economy features.
           </p>
           <button onClick={() => { (window.top || window).location.href = '/api/discord/login' }} style={btn("primary")}>
@@ -387,7 +387,7 @@ export default function PepDashboard() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: "#fafafa", padding: "40px 20px" }}>
+    <div style={{ minHeight: "100vh", background: 'var(--color-page-bg)', padding: "40px 20px" }}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
         <header style={{ marginBottom: 24 }}>
           <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
@@ -395,7 +395,7 @@ export default function PepDashboard() {
               <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
                 <PepIcon size={28} /> Economy
               </h1>
-              <p style={{ color: "#666", margin: 0 }}>
+              <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
                 Welcome, {memberName || session.username || session.discordId}
               </p>
             </div>

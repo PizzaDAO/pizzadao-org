@@ -58,7 +58,7 @@ export function ReviewStep({
         style={{
           display: "grid",
           gap: 0,
-          border: "1px solid rgba(0,0,0,0.1)",
+          border: '1px solid var(--color-border)',
           borderRadius: 10,
           overflow: "hidden",
         }}

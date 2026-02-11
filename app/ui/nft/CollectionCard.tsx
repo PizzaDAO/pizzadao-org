@@ -35,11 +35,11 @@ function getOpenSeaUrl(contractAddress: string, chain: string): string {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -99,7 +99,7 @@ export function CollectionCard({
             margin: 0,
             fontSize: 18,
             fontWeight: 600,
-            color: "#111",
+            color: 'var(--color-text-primary)',
             textDecoration: "none",
             display: "inline-flex",
             alignItems: "center",
@@ -117,7 +117,7 @@ export function CollectionCard({
           style={{
             margin: "0 0 16px 0",
             fontSize: 14,
-            color: "#666",
+            color: 'var(--color-text-secondary)',
             lineHeight: 1.5,
           }}
         >
@@ -132,7 +132,7 @@ export function CollectionCard({
           gap: 16,
           marginBottom: 16,
           fontSize: 14,
-          color: "#888",
+          color: 'var(--color-text-secondary)',
         }}
       >
         <span>{totalHolders} holders</span>

@@ -18,11 +18,11 @@ type Bounty = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -31,7 +31,7 @@ function input(): React.CSSProperties {
     width: "100%",
     padding: "10px 12px",
     borderRadius: 8,
-    border: "1px solid rgba(0,0,0,0.18)",
+    border: '1px solid var(--color-border-strong)',
     fontSize: 14,
     outline: "none",
     boxSizing: "border-box" as const,
@@ -47,7 +47,7 @@ function btn(disabled?: boolean): React.CSSProperties {
     cursor: disabled ? "not-allowed" : "pointer",
     opacity: disabled ? 0.5 : 1,
     background: "#8b5cf6",
-    color: "white",
+    color: 'var(--color-btn-primary-text)',
     fontSize: 14,
   };
 }
@@ -129,7 +129,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
       <div style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "grid", gap: 12 }}>
           {[...Array(2)].map((_, i) => (
-            <div key={i} style={{ height: 80, background: "rgba(0,0,0,0.04)", borderRadius: 14 }} />
+            <div key={i} style={{ height: 80, background: 'var(--color-surface-hover)', borderRadius: 14 }} />
           ))}
         </div>
       </div>
@@ -157,8 +157,8 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
               border: "none",
               fontWeight: 650,
               cursor: "pointer",
-              background: showForm ? "#f5f5f5" : "#8b5cf6",
-              color: showForm ? "black" : "white",
+              background: showForm ? "var(--color-surface-hover)" : "#8b5cf6",
+              color: showForm ? "var(--color-text)" : "var(--color-btn-primary-text)",
               fontSize: 12,
             }}
           >
@@ -171,7 +171,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
           <div style={{ ...card(), marginBottom: 16 }}>
             <form onSubmit={handleCreateBounty} style={{ display: "grid", gap: 12 }}>
               <div>
-                <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                   What do you need done?
                 </label>
                 <textarea
@@ -183,7 +183,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                   Link (optional)
                 </label>
                 <input
@@ -196,7 +196,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                 />
               </div>
               <div>
-                <label style={{ display: "block", fontSize: 13, color: "#666", marginBottom: 6 }}>
+                <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
                   Reward amount (will be escrowed)
                 </label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
@@ -230,7 +230,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
 
         {bounties.length === 0 ? (
           <div style={{ ...card(), textAlign: "center" }}>
-            <p style={{ color: "#666", margin: 0 }}>No bounties posted yet</p>
+            <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>No bounties posted yet</p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>

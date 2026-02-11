@@ -125,8 +125,8 @@ export function CrewsStep({
                         gap: 6,
                         padding: "2px 8px",
                         borderRadius: 999,
-                        border: "1px solid rgba(0,0,0,0.18)",
-                        background: "rgba(0,0,0,0.04)",
+                        border: '1px solid var(--color-border-strong)',
+                        background: 'var(--color-surface-hover)',
                       }}
                     >
                       <div style={{ display: "flex", alignItems: "center" }}>

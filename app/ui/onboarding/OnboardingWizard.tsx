@@ -490,7 +490,7 @@ export function OnboardingWizard() {
             style={{
               opacity: 0.9,
               fontSize: 16,
-              borderBottom: "1px solid rgba(0,0,0,0.06)",
+              borderBottom: '1px solid var(--color-divider)',
               paddingBottom: 8,
               marginBottom: 12,
               display: "flex",

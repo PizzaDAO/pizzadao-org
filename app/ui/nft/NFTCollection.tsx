@@ -131,7 +131,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   const sectionStyle: React.CSSProperties = {
     marginTop: 24,
     paddingTop: 24,
-    borderTop: "1px solid rgba(0,0,0,0.1)",
+    borderTop: '1px solid var(--color-divider)',
   };
 
   // Show connect wallet prompt if no wallet is saved (only if showConnectPrompt is true)
@@ -155,7 +155,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             padding: "32px 16px",
             borderRadius: 12,
             border: "1px dashed rgba(0,0,0,0.2)",
-            background: "#fafafa",
+            background: 'var(--color-page-bg)',
             gap: 16,
           }}
         >
@@ -186,7 +186,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             padding: "32px 16px",
             borderRadius: 12,
             border: "1px dashed rgba(0,0,0,0.2)",
-            background: "#fafafa",
+            background: 'var(--color-page-bg)',
             gap: 16,
           }}
         >
@@ -199,8 +199,8 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
               display: "inline-block",
               padding: "10px 20px",
               borderRadius: 10,
-              background: "black",
-              color: "white",
+              background: 'var(--color-btn-primary-bg)',
+              color: 'var(--color-btn-primary-text)',
               fontWeight: 600,
               fontSize: 14,
               textDecoration: "none",
@@ -320,7 +320,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
                     justifyContent: "center",
                     fontSize: 14,
                     fontWeight: 600,
-                    color: "#666",
+                    color: 'var(--color-text-secondary)',
                     cursor: "pointer",
                     transition: "all 0.2s ease",
                   }}
@@ -351,7 +351,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
                     justifyContent: "center",
                     fontSize: 18,
                     fontWeight: 600,
-                    color: "#666",
+                    color: 'var(--color-text-secondary)',
                     cursor: "pointer",
                     transition: "all 0.2s ease",
                   }}

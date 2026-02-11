@@ -86,7 +86,7 @@ function getTypeIcon(type: string): { icon: React.ReactNode; color: string } {
       };
     default:
       return {
-        color: "#666",
+        color: 'var(--color-text-secondary)',
         icon: (
           <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
             <line x1="12" y1="1" x2="12" y2="23" />
@@ -99,11 +99,11 @@ function getTypeIcon(type: string): { icon: React.ReactNode; color: string } {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -151,9 +151,9 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
       </h2>
 
       {loading ? (
-        <div style={{ height: 80, background: "rgba(0,0,0,0.04)", borderRadius: 8 }} />
+        <div style={{ height: 80, background: 'var(--color-surface-hover)', borderRadius: 8 }} />
       ) : transactions.length === 0 ? (
-        <p style={{ color: "#666", textAlign: "center", padding: "24px 0", margin: 0 }}>
+        <p style={{ color: 'var(--color-text-secondary)', textAlign: "center", padding: "24px 0", margin: 0 }}>
           No transactions yet. Earn, spend, or transfer some <PepIcon size={14} /> to see your history here.
         </p>
       ) : (
@@ -171,7 +171,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                     alignItems: "center",
                     gap: 10,
                     padding: "10px 0",
-                    borderBottom: "1px solid rgba(0,0,0,0.06)",
+                    borderBottom: '1px solid var(--color-divider)',
                   }}
                 >
                   <div
@@ -195,7 +195,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                       style={{
                         fontSize: 13,
                         fontWeight: 600,
-                        color: "#111",
+                        color: 'var(--color-text-primary)',
                         overflow: "hidden",
                         textOverflow: "ellipsis",
                         whiteSpace: "nowrap",
@@ -203,7 +203,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                     >
                       {tx.description}
                     </div>
-                    <div style={{ fontSize: 11, color: "#9ca3af", marginTop: 2 }}>
+                    <div style={{ fontSize: 11, color: "var(--color-text-muted)", marginTop: 2 }}>
                       {formatRelativeTime(tx.createdAt)}
                     </div>
                   </div>
@@ -237,12 +237,12 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                 width: "100%",
                 marginTop: 12,
                 padding: "10px 0",
-                background: "white",
-                border: "1px solid rgba(0,0,0,0.18)",
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border-strong)',
                 borderRadius: 10,
                 fontSize: 13,
                 fontWeight: 650,
-                color: "#333",
+                color: 'var(--color-text-primary)',
                 cursor: loadingMore ? "default" : "pointer",
                 opacity: loadingMore ? 0.5 : 1,
               }}

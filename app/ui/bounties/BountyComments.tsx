@@ -108,7 +108,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
   if (loading) {
     return (
       <div style={{ padding: "8px 0" }}>
-        <div style={{ height: 20, background: "rgba(0,0,0,0.04)", borderRadius: 4 }} />
+        <div style={{ height: 20, background: 'var(--color-surface-hover)', borderRadius: 4 }} />
       </div>
     );
   }
@@ -131,15 +131,15 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
               key={comment.id}
               style={{
                 padding: "8px 10px",
-                background: comment.authorId === currentUserId ? "rgba(139,92,246,0.05)" : "rgba(0,0,0,0.02)",
+                background: comment.authorId === currentUserId ? "rgba(139,92,246,0.05)" : "var(--color-surface-hover)",
                 borderRadius: 8,
-                borderLeft: `3px solid ${comment.authorId === currentUserId ? "#8b5cf6" : "#e5e7eb"}`,
+                borderLeft: `3px solid ${comment.authorId === currentUserId ? "#8b5cf6" : "var(--color-border)"}`,
               }}
             >
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
                 <UserLink discordId={comment.authorId} style={{ fontSize: 12 }} />
                 <div style={{ display: "flex", alignItems: "center", gap: 6 }}>
-                  <span style={{ fontSize: 10, color: "#9ca3af" }}>{timeAgo(comment.createdAt)}</span>
+                  <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>{timeAgo(comment.createdAt)}</span>
                   {comment.authorId === currentUserId && (
                     <button
                       onClick={() => handleDeleteComment(comment.id)}
@@ -151,20 +151,20 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
                         cursor: deletingId === comment.id ? "not-allowed" : "pointer",
                         padding: "0 2px",
                         fontSize: 12,
-                        color: deletingId === comment.id ? "#d1d5db" : "#9ca3af",
+                        color: deletingId === comment.id ? "var(--color-border)" : "var(--color-text-muted)",
                         lineHeight: 1,
                         opacity: deletingId === comment.id ? 0.5 : 1,
                         transition: "color 0.15s",
                       }}
                       onMouseEnter={(e) => { if (deletingId !== comment.id) (e.target as HTMLElement).style.color = "#ef4444"; }}
-                      onMouseLeave={(e) => { if (deletingId !== comment.id) (e.target as HTMLElement).style.color = "#9ca3af"; }}
+                      onMouseLeave={(e) => { if (deletingId !== comment.id) (e.target as HTMLElement).style.color = "var(--color-text-muted)"; }}
                     >
                       {deletingId === comment.id ? "\u2026" : "\u2715"}
                     </button>
                   )}
                 </div>
               </div>
-              <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: "#374151" }}>
+              <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>
                 {comment.content}
               </p>
             </div>
@@ -173,7 +173,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
       )}
 
       {comments.length === 0 && !canComment && (
-        <p style={{ fontSize: 12, color: "#9ca3af", margin: 0, textAlign: "center", padding: "4px 0" }}>
+        <p style={{ fontSize: 12, color: "var(--color-text-muted)", margin: 0, textAlign: "center", padding: "4px 0" }}>
           No updates yet
         </p>
       )}
@@ -191,7 +191,7 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
               flex: 1,
               padding: "8px 10px",
               borderRadius: 6,
-              border: "1px solid rgba(0,0,0,0.15)",
+              border: '1px solid var(--color-border-strong)',
               fontSize: 12,
               outline: "none",
               boxSizing: "border-box" as const,
@@ -204,8 +204,8 @@ export function BountyComments({ bountyId, currentUserId, canComment }: BountyCo
               padding: "8px 12px",
               borderRadius: 6,
               border: "none",
-              background: posting || !newComment.trim() ? "#d1d5db" : "#8b5cf6",
-              color: "white",
+              background: posting || !newComment.trim() ? "var(--color-border)" : "#8b5cf6",
+              color: 'var(--color-btn-primary-text)',
               fontSize: 12,
               fontWeight: 600,
               cursor: posting || !newComment.trim() ? "not-allowed" : "pointer",

@@ -87,7 +87,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
         </div>
       )}
 
-      <div style={{ borderTop: "1px solid rgba(0,0,0,0.06)", paddingTop: 16 }}>
+      <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
         <Field label="Or check a specific number:">
           <div style={{ display: "flex", gap: 10 }}>
             <input
@@ -128,7 +128,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
                   onClick={() => onChange(availability.id)}
                   style={{
                     backgroundColor: "black",
-                    color: "white",
+                    color: 'var(--color-btn-primary-text)',
                     border: "none",
                     padding: "4px 8px",
                     borderRadius: 4,

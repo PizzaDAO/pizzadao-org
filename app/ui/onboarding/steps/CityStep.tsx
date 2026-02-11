@@ -112,9 +112,9 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
             right: 0,
             top: "100%",
             marginTop: 6,
-            border: "1px solid rgba(0,0,0,0.18)",
+            border: '1px solid var(--color-border-strong)',
             borderRadius: 12,
-            background: "white",
+            background: 'var(--color-surface)',
             boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
             overflow: "hidden",
             zIndex: 50,
@@ -136,8 +136,8 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
                 textAlign: "left",
                 padding: "10px 12px",
                 border: "none",
-                background: "white",
-                color: "#000000",
+                background: 'var(--color-surface)',
+                color: 'var(--color-text)',
                 cursor: "pointer",
               }}
             >

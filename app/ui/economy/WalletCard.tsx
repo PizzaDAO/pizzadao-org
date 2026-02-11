@@ -10,11 +10,11 @@ type Balance = {
 
 function card(): React.CSSProperties {
   return {
-    border: "1px solid rgba(0,0,0,0.12)",
+    border: '1px solid var(--color-border)',
     borderRadius: 14,
     padding: 20,
-    boxShadow: "0 8px 30px rgba(0,0,0,0.06)",
-    background: "white",
+    boxShadow: 'var(--shadow-card)',
+    background: 'var(--color-surface)',
   };
 }
 
@@ -43,7 +43,7 @@ export function WalletCard() {
 
   if (loading) {
     return (
-      <div style={{ ...card(), height: 120, background: "rgba(0,0,0,0.04)" }} />
+      <div style={{ ...card(), height: 120, background: 'var(--color-surface-hover)' }} />
     );
   }
 
@@ -65,7 +65,7 @@ export function WalletCard() {
         </div>
       )}
 
-      <div style={{ textAlign: "center", padding: 20, background: "#fafafa", borderRadius: 10 }}>
+      <div style={{ textAlign: "center", padding: 20, background: 'var(--color-page-bg)', borderRadius: 10 }}>
         <div style={{ fontSize: 32, fontWeight: 700, margin: 0, color: "#16a34a" }}>
           <PepAmount amount={balance?.balance ?? 0} size={32} />
         </div>
