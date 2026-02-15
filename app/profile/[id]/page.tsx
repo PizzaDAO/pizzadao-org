@@ -13,6 +13,7 @@ import { AttendanceCard } from "../../ui/attendance-card";
 import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletDisplay } from "../../ui/wallet-manager/WalletDisplay";
+import { AddFriendButton } from "../../ui/friends/AddFriendButton";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -49,6 +50,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
     const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
     const [articles, setArticles] = useState<{ slug: string; title: string; excerpt?: string; publishedAt?: string }[]>([]);
+    const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
 
     // Fetch public profile data
     useEffect(() => {
@@ -97,6 +99,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
         })();
     }, [id]);
 
+<<<<<<< HEAD
     // Fetch published articles by this member
     useEffect(() => {
         (async () => {
@@ -109,6 +112,21 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
             } catch {}
         })();
     }, [id]);
+
+    // Fetch current user's memberId for AddFriendButton
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/me");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.memberId) setCurrentMemberId(data.memberId);
+                }
+            } catch {
+                // Not authenticated or failed - that's ok
+            }
+        })();
+    }, []);
 
     // Fetch crew mappings for crew info
     useEffect(() => {
@@ -281,6 +299,14 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             />
                         </div>
                     )}
+
+                    {/* Add Friend Button */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                        <AddFriendButton
+                            targetMemberId={idValue}
+                            currentMemberId={currentMemberId}
+                        />
+                    </div>
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
                         <div>
