@@ -4,7 +4,7 @@ import React from "react";
 
 export type NotificationData = {
   id: string;
-  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "TASK_ASSIGNED" | "TASK_DUE_SOON";
+  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "FRIEND_ADDED";
   title: string;
   message: string;
   linkUrl: string | null;
@@ -49,6 +49,15 @@ function getIcon(type: NotificationData["type"]): React.ReactNode {
           <line x1="12" y1="16" x2="12.01" y2="16" />
         </svg>
       );
+    case "FRIEND_ADDED":
+      return (
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
+          <circle cx="9" cy="7" r="4" />
+          <line x1="19" y1="8" x2="19" y2="14" />
+          <line x1="22" y1="11" x2="16" y2="11" />
+        </svg>
+      );
     default:
       return (
         <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -69,6 +78,8 @@ function getIconColor(type: NotificationData["type"]): string {
       return "#2563eb"; // Blue
     case "TASK_DUE_SOON":
       return "#dc2626"; // Red
+    case "FRIEND_ADDED":
+      return "#8B5CF6"; // Purple
     default:
       return "var(--color-text-secondary)";
   }
