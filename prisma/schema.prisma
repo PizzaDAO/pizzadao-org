@@ -217,6 +217,7 @@ enum NotificationType {
   BOUNTY_COMMENT     // New comment on a bounty you're involved in
   TASK_ASSIGNED      // A task was assigned to you
   TASK_DUE_SOON      // Task due within a week
+  FRIEND_ADDED       // Someone started following you
 }
 
 model Notification {
@@ -233,4 +234,46 @@ model Notification {
 
   @@index([recipientId, createdAt])
   @@index([recipientId, readAt])
+}
+
+// ===== FRIENDS IN THE DAO =====
+
+enum SocialPlatform {
+  TWITTER
+  FARCASTER
+}
+
+enum FriendSource {
+  PIZZADAO
+  TWITTER
+  FARCASTER
+}
+
+// Social accounts linked to a member (X handle, Farcaster username)
+model SocialAccount {
+  id         Int            @id @default(autoincrement())
+  memberId   String
+  platform   SocialPlatform
+  handle     String
+  platformId String?
+  verified   Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([memberId, platform])
+  @@index([platform, handle])
+  @@index([platform, platformId])
+}
+
+// One-way follow relationship between members
+model Friendship {
+  id         Int          @id @default(autoincrement())
+  followerId String
+  followeeId String
+  source     FriendSource @default(PIZZADAO)
+  createdAt  DateTime     @default(now())
+
+  @@unique([followerId, followeeId])
+  @@index([followerId])
+  @@index([followeeId])
 }
