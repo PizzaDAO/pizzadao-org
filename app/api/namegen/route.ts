@@ -49,6 +49,11 @@ function normalizeTitle(s: string) {
   return String(s).toLowerCase().replace(/[^a-z0-9]/g, "");
 }
 
+/** Strip leading articles so "The Godfather" and "Godfather" compare equal */
+function stripLeadingArticle(normalized: string) {
+  return normalized.replace(/^(the|an|a)(?=[a-z0-9])/, "");
+}
+
 // Extract first name from full name
 function getFirstName(fullName: string): string {
   const parts = fullName.trim().split(/\s+/);
@@ -342,19 +347,25 @@ export async function POST(req: Request) {
 
     // Ranking: prefer exact matches, classics (older + highly rated), then popularity
     const inputNorm = normalizeTitle(mafiaMovieTitle);
+    const inputStripped = stripLeadingArticle(inputNorm);
     const ranked = results
       .map((r) => {
         const title = getTitle(r) ?? "";
         const titleNorm = normalizeTitle(title);
+        const titleStripped = stripLeadingArticle(titleNorm);
         const pop = typeof r.popularity === "number" ? r.popularity : 0;
         const votes = typeof r.vote_count === "number" ? r.vote_count : 0;
         const rating = typeof r.vote_average === "number" ? r.vote_average : 0;
         const releaseYear = parseInt(getReleaseDate(r)?.slice(0, 4) || "0", 10);
 
+        // Exact match: treat "godfather" and "the godfather" as equivalent
+        const isExact = titleNorm === inputNorm || titleStripped === inputStripped;
+        const isClose = titleNorm.includes(inputNorm) || titleStripped.includes(inputStripped);
+
         // For classic/iconic titles, prefer the original (older) version
         // A highly-rated older movie is likely the "definitive" version
         // This helps "godfather" find The Godfather (1972) over recent remakes
-        const isExactOrClose = titleNorm === inputNorm || titleNorm.includes(inputNorm);
+        const isExactOrClose = isExact || isClose;
         const isClassic = releaseYear > 0 && releaseYear < 2000 && rating >= 7.5 && votes > 1000;
         const classicBonus = isExactOrClose && isClassic ? 5000 : 0;
 
@@ -362,8 +373,8 @@ export async function POST(req: Request) {
         const ratingBonus = rating > 8 && votes > 5000 ? 2000 : 0;
 
         const score =
-          (titleNorm === inputNorm ? 10000 : 0) +
-          (titleNorm.includes(inputNorm) ? 1000 : 0) +
+          (isExact ? 10000 : 0) +
+          (isClose ? 1000 : 0) +
           classicBonus +
           ratingBonus +
           pop * 10 +
