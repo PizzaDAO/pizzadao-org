@@ -71,6 +71,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const [orgsSaving, setOrgsSaving] = useState(false);
     const [pepBalance, setPepBalance] = useState<number | null>(null);
     const [showSendModal, setShowSendModal] = useState(false);
+    const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
+    const [xDisconnecting, setXDisconnecting] = useState(false);
 
     // New state for rich crew data
     const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
@@ -108,6 +110,19 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
             }
         }
         verifyAuth();
+    }, [id]);
+
+    // Fetch X account status
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`/api/x/account/${id}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    setXAccount(json);
+                }
+            } catch {}
+        })();
     }, [id]);
 
     // Fetch profile picture
@@ -704,6 +719,91 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                         {/* Profile Links - editable */}
                         <ProfileLinksEditor memberId={idValue} />
+
+                        {/* Connect X Account */}
+                        <div style={{
+                            gridColumn: "1 / -1",
+                            padding: 16,
+                            borderRadius: 12,
+                            border: '1px solid var(--color-border)',
+                            background: 'var(--color-surface)',
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 12,
+                        }}>
+                            {/* X Logo */}
+                            <svg width={24} height={24} viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                            </svg>
+
+                            {xAccount?.connected ? (
+                                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                    <div>
+                                        <a
+                                            href={`https://x.com/${xAccount.username}`}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            style={{
+                                                fontWeight: 600,
+                                                fontSize: 16,
+                                                color: 'var(--color-text-primary)',
+                                                textDecoration: "none",
+                                            }}
+                                            onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
+                                            onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                        >
+                                            @{xAccount.username}
+                                        </a>
+                                        <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>Connected</div>
+                                    </div>
+                                    <button
+                                        onClick={async () => {
+                                            setXDisconnecting(true);
+                                            try {
+                                                const res = await fetch("/api/x/disconnect", { method: "DELETE" });
+                                                if (res.ok) {
+                                                    setXAccount({ connected: false });
+                                                }
+                                            } catch {} finally {
+                                                setXDisconnecting(false);
+                                            }
+                                        }}
+                                        disabled={xDisconnecting}
+                                        style={{
+                                            background: "transparent",
+                                            border: '1px solid var(--color-border-strong)',
+                                            borderRadius: 8,
+                                            padding: "6px 12px",
+                                            fontSize: 12,
+                                            cursor: "pointer",
+                                            opacity: xDisconnecting ? 0.5 : 0.7,
+                                            fontFamily: "inherit",
+                                            color: 'var(--color-text)',
+                                        }}
+                                    >
+                                        {xDisconnecting ? "Disconnecting..." : "Disconnect"}
+                                    </button>
+                                </div>
+                            ) : (
+                                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                    <span style={{ fontSize: 14, opacity: 0.6 }}>Connect your X account</span>
+                                    <a
+                                        href={`/api/x/login?memberId=${idValue}`}
+                                        style={{
+                                            ...btn("primary"),
+                                            fontSize: 13,
+                                            padding: "8px 16px",
+                                            textDecoration: "none",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 6,
+                                        }}
+                                    >
+                                        Connect X
+                                    </a>
+                                </div>
+                            )}
+                        </div>
 
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
