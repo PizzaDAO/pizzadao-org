@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyXState, encryptToken } from "@/app/lib/x-oauth";
 import { prisma } from "@/app/lib/db";
+import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 
 export const runtime = "nodejs";
 
@@ -100,6 +101,19 @@ export async function GET(req: Request) {
         refreshToken: tokenData.refresh_token ? encryptToken(tokenData.refresh_token) : null,
       },
     });
+
+    // Write X username to Google Sheet (fire-and-forget)
+    const sheetsUrl = process.env.GOOGLE_SHEETS_WEBAPP_URL;
+    const sheetsSecret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
+    if (sheetsUrl && sheetsSecret && stateData.memberId) {
+      fetchWithRedirect(sheetsUrl, {
+        secret: sheetsSecret,
+        source: "x-connect",
+        memberId: stateData.memberId,
+        discordId: stateData.discordId,
+        x: xUser.username,
+      }).catch(() => {}); // Silently ignore sheet write failures
+    }
 
     // Clear PKCE cookie and redirect to dashboard
     const memberId = stateData.memberId;
