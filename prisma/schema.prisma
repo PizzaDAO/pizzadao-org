@@ -209,6 +209,24 @@ model ProfileLink {
   @@index([memberId])
 }
 
+// ===== X (TWITTER) ACCOUNT LINKING =====
+
+model XAccount {
+  id               Int      @id @default(autoincrement())
+  discordId        String   @unique
+  memberId         String?
+  xId              String   @unique
+  xUsername         String
+  xDisplayName     String?
+  xProfileImageUrl String?
+  accessToken      String
+  refreshToken     String?
+  connectedAt      DateTime @default(now())
+  updatedAt        DateTime @updatedAt
+
+  @@index([memberId])
+}
+
 // ===== NOTIFICATION SYSTEM =====
 
 enum NotificationType {

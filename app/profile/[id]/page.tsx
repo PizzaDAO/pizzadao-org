@@ -43,6 +43,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const [crewOptions, setCrewOptions] = useState<CrewOption[]>([]);
     const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
     const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
+    const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
 
     // Fetch public profile data
     useEffect(() => {
@@ -75,6 +76,19 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                 }
             } catch (e) {
             }
+        })();
+    }, [id]);
+
+    // Fetch X account status
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`/api/x/account/${id}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    setXAccount(json);
+                }
+            } catch {}
         })();
     }, [id]);
 
@@ -257,6 +271,46 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         <StatItem label="ID" value={`#${idValue}`} />
                         {orgs && <StatItem label="Orgs" value={orgs} />}
                         {skills && <StatItem label="Skills" value={skills} />}
+
+                        {/* X Account */}
+                        {xAccount?.connected && (
+                            <div>
+                                <h3 style={{
+                                    fontSize: 12,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "1px",
+                                    opacity: 0.5,
+                                    marginTop: 0,
+                                    marginBottom: 6,
+                                    fontWeight: 700
+                                }}>
+                                    X
+                                </h3>
+                                <a
+                                    href={`https://x.com/${xAccount.username}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: 500,
+                                        color: 'var(--color-text-primary)',
+                                        textDecoration: "none",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
+                                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                >
+                                    @{xAccount.username}
+                                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                        <polyline points="15 3 21 3 21 9" />
+                                        <line x1="10" y1="14" x2="21" y2="3" />
+                                    </svg>
+                                </a>
+                            </div>
+                        )}
 
                         {/* Roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
