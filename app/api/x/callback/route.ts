@@ -102,17 +102,27 @@ export async function GET(req: Request) {
       },
     });
 
-    // Write X username to Google Sheet (fire-and-forget)
+    // Write X username to Google Sheet
     const sheetsUrl = process.env.GOOGLE_SHEETS_WEBAPP_URL;
     const sheetsSecret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
     if (sheetsUrl && sheetsSecret && stateData.memberId) {
-      fetchWithRedirect(sheetsUrl, {
-        secret: sheetsSecret,
-        source: "x-connect",
+      try {
+        await fetchWithRedirect(sheetsUrl, {
+          secret: sheetsSecret,
+          source: "x-connect",
+          memberId: stateData.memberId,
+          discordId: stateData.discordId,
+          x: xUser.username,
+        });
+      } catch (sheetErr) {
+        console.error("X sheet write failed:", sheetErr);
+      }
+    } else {
+      console.warn("X sheet write skipped — missing:", {
+        sheetsUrl: !!sheetsUrl,
+        sheetsSecret: !!sheetsSecret,
         memberId: stateData.memberId,
-        discordId: stateData.discordId,
-        x: xUser.username,
-      }).catch(() => {}); // Silently ignore sheet write failures
+      });
     }
 
     // Clear PKCE cookie and redirect to dashboard
