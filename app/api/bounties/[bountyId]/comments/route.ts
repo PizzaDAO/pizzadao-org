@@ -22,7 +22,7 @@ export async function GET(
     const comments = await getBountyComments(id)
 
     return NextResponse.json({
-      comments: comments.map(c => ({
+      comments: comments.map((c: { id: number; bountyId: number; authorId: string; content: string; createdAt: Date }) => ({
         id: c.id,
         bountyId: c.bountyId,
         authorId: c.authorId,
