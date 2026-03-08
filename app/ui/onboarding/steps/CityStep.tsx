@@ -9,17 +9,18 @@ import type { CityPrediction } from "../types";
 type Props = {
   city: string;
   onChange: (city: string) => void;
+  onRegionResolved?: (region: string | null, countryCode: string | null) => void;
   onNext: () => void;
   onBack: () => void;
 };
 
-export function CityStep({ city, onChange, onNext, onBack }: Props) {
+export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: Props) {
   const canProceed = city.trim().length > 0;
 
   return (
     <div style={{ display: "grid", gap: 12 }}>
       <Field label="City">
-        <CityAutocomplete value={city} onChange={onChange} />
+        <CityAutocomplete value={city} onChange={onChange} onRegionResolved={onRegionResolved} />
       </Field>
 
       <div style={{ display: "flex", gap: 10 }}>
@@ -38,7 +39,15 @@ export function CityStep({ city, onChange, onNext, onBack }: Props) {
   );
 }
 
-function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: string) => void }) {
+function CityAutocomplete({
+  value,
+  onChange,
+  onRegionResolved,
+}: {
+  value: string;
+  onChange: (v: string) => void;
+  onRegionResolved?: (region: string | null, countryCode: string | null) => void;
+}) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<CityPrediction[]>([]);
   const [loading, setLoading] = useState(false);
@@ -84,6 +93,23 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
     return () => window.clearTimeout(t);
   }, [value]);
 
+  /** Fire-and-forget: resolve region from a place_id */
+  function resolveRegion(placeId: string) {
+    if (!onRegionResolved) return;
+    fetch("/api/city-region", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ place_id: placeId }),
+    })
+      .then((r) => r.json())
+      .then((data) => {
+        onRegionResolved(data?.region ?? null, data?.countryCode ?? null);
+      })
+      .catch(() => {
+        // Non-blocking: if region resolution fails, just skip it
+      });
+  }
+
   return (
     <div style={{ position: "relative" }}>
       <input
@@ -128,6 +154,7 @@ function CityAutocomplete({ value, onChange }: { value: string; onChange: (v: st
               onClick={() => {
                 suppressForValueRef.current = it.description;
                 onChange(it.description);
+                resolveRegion(it.place_id);
                 setOpen(false);
                 setItems([]);
               }}
