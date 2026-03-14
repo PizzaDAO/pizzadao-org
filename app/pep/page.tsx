@@ -408,6 +408,24 @@ export default function PepDashboard() {
           </div>
         </header>
 
+        {/* Under construction warning */}
+        <div style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 10,
+          padding: "12px 16px",
+          marginBottom: 20,
+          borderRadius: 10,
+          border: "1px solid #f59e0b",
+          background: "rgba(245, 158, 11, 0.08)",
+          color: "#b45309",
+          fontSize: 14,
+          fontWeight: 500,
+        }}>
+          <span style={{ fontSize: 20 }}>🚧</span>
+          <span>This page is under construction. Features may be incomplete or change without notice.</span>
+        </div>
+
         {/* Two column layout - Jobs left, everything else right */}
         <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20 }}>
           {/* Left: Jobs and Bounties */}
