@@ -92,6 +92,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           <div style={{ display: "flex", gap: 10 }}>
             <input
               type="number"
+              min={1}
               value={availability.id}
               onChange={(e) => setAvailability({ id: e.target.value, status: null })}
               placeholder="Enter ID"

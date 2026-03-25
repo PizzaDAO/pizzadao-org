@@ -89,7 +89,7 @@ export async function GET(request: Request) {
 
         if (checkId) {
             const idToCheck = parseInt(checkId, 10);
-            if (isNaN(idToCheck)) {
+            if (isNaN(idToCheck) || idToCheck <= 0) {
                 return NextResponse.json({ available: false, error: "Invalid ID" });
             }
             return NextResponse.json({ available: !claimedIds.has(idToCheck) });
