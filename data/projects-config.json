@@ -54,6 +54,10 @@
     },
     "moltobennydelivery": {
       "sheetUrl": "https://docs.google.com/spreadsheets/d/10EgfJDorCyW1QbODlYQk28ragDWHeYDdDXGu63XOQK4"
+    },
+    "dow-pizza-party": {
+      "vercelProject": "dow-pizza-party",
+      "liveUrl": "https://dow-pizza-party-pizza-dao.vercel.app"
     }
   },
   "excludeRepos": [
