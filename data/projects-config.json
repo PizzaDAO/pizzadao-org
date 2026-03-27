@@ -57,7 +57,7 @@
     },
     "dow-pizza-party": {
       "vercelProject": "dow-pizza-party",
-      "liveUrl": "https://dow-pizza-party-pizza-dao.vercel.app"
+      "liveUrl": "https://dow-pizza-party.vercel.app"
     }
   },
   "excludeRepos": [
