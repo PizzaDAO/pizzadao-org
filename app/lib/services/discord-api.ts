@@ -15,7 +15,11 @@ export async function discordFetch(path: string, init: RequestInit) {
 }
 
 /**
- * Sync Discord member roles and nickname
+ * Sync Discord member roles and nickname.
+ *
+ * Region roles are "exclusive": at most one region role at a time.
+ * When a new region role is provided, all existing region roles
+ * (from allRegionRoleIds) are removed before the new one is added.
  */
 export async function syncDiscordMember(opts: {
   guildId: string;
@@ -24,8 +28,21 @@ export async function syncDiscordMember(opts: {
   nickname?: string;
   turtleRoleIds: string[];
   crewRoleIds: string[];
+  /** The single region role to assign (if any). */
+  regionRoleId?: string;
+  /** The full set of managed region role IDs, so old ones can be stripped. */
+  allRegionRoleIds?: Set<string>;
 }) {
-  const { guildId, botToken, userId, nickname, turtleRoleIds, crewRoleIds } = opts;
+  const {
+    guildId,
+    botToken,
+    userId,
+    nickname,
+    turtleRoleIds,
+    crewRoleIds,
+    regionRoleId,
+    allRegionRoleIds,
+  } = opts;
 
   // 1. GET current member roles
   const member = await discordFetch(`/guilds/${guildId}/members/${userId}`, {
@@ -43,8 +60,21 @@ export async function syncDiscordMember(opts: {
     ? (member.json as any).roles
     : [];
 
-  // 2. Merge roles (add-only)
-  const nextRoles = Array.from(new Set([...currentRoles, ...turtleRoleIds, ...crewRoleIds].map(String)));
+  // 2. Build the next role set
+  //    Start with current roles, strip any old region roles, then add turtle + crew + new region
+  let baseRoles = currentRoles;
+
+  if (allRegionRoleIds && allRegionRoleIds.size > 0) {
+    // Remove all managed region roles from current set
+    baseRoles = currentRoles.filter((r) => !allRegionRoleIds.has(r));
+  }
+
+  const rolesToAdd = [...turtleRoleIds, ...crewRoleIds];
+  if (regionRoleId) {
+    rolesToAdd.push(regionRoleId);
+  }
+
+  const nextRoles = Array.from(new Set([...baseRoles, ...rolesToAdd].map(String)));
 
   // 3. PATCH member
   const body: { roles: string[]; nick?: string } = { roles: nextRoles };
