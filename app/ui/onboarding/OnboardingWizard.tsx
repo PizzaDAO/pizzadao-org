@@ -350,6 +350,8 @@ export function OnboardingWizard() {
           releaseDate: data.releaseDate,
           mediaType: data.mediaType,
           city: data.city,
+          timezone: data.timezone,
+          timezoneLabel: data.timezoneLabel,
           turtle: data.turtles.join(", "),
           turtles: data.turtles,
           crews: data.crews,
@@ -600,6 +602,13 @@ export function OnboardingWizard() {
           <CityStep
             city={data.city}
             onChange={(city) => setData((p) => ({ ...p, city }))}
+            onTimezoneResolved={(timezoneId, timezoneLabel) =>
+              setData((p) => ({
+                ...p,
+                timezone: timezoneId ?? undefined,
+                timezoneLabel: timezoneLabel ?? undefined,
+              }))
+            }
             onNext={() => goToStep(3)}
             onBack={() => goToStep(1)}
           />
