@@ -31,7 +31,9 @@
     "promise-limit": "^2.7.0",
     "react": "19.2.3",
     "react-dom": "19.2.3",
+    "react-markdown": "^10.1.0",
     "recharts": "^3.7.0",
+    "remark-gfm": "^4.0.1",
     "viem": "^2.44.1",
     "wagmi": "^2.19.5"
   },
