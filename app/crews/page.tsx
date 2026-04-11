@@ -412,6 +412,22 @@ export default function AllCrewsPage() {
               My Dashboard
             </Link>
           )}
+          <Link href="/crew" style={{
+            display: 'inline-flex',
+            alignItems: 'center',
+            gap: 6,
+            padding: '10px 16px',
+            minHeight: 44,
+            background: 'var(--color-surface)',
+            border: '1px solid var(--color-border-strong)',
+            borderRadius: 8,
+            color: 'var(--color-text)',
+            textDecoration: 'none',
+            fontSize: 14,
+            fontWeight: 600,
+          }}>
+            Browse Members
+          </Link>
           <Link href="/manuals" style={{
             display: 'inline-flex',
             alignItems: 'center',
