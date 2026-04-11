@@ -71,3 +71,9 @@ export const ROLE_ID_TO_TURTLE: Record<string, string> = Object.entries(TURTLE_R
 export const ADMIN_ROLE_IDS = [
   TURTLE_ROLE_IDS.LEONARDO, // Leader role
 ] as const;
+
+// Roles allowed to author articles at pizzadao.org/articles
+// Start with Leonardo (Leader); future iterations may add Comms crew role, etc.
+export const ARTICLE_AUTHOR_ROLE_IDS = [
+  TURTLE_ROLE_IDS.LEONARDO,
+] as const;

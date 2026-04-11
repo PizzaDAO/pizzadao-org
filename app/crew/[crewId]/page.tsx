@@ -450,21 +450,38 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
             </Link>
           )}
           {crewId.toLowerCase() === 'comms' && (
-            <a href="https://pizzadao.xyz/brand" target="_blank" rel="noreferrer" style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 14px',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border-strong)',
-              borderRadius: 8,
-              color: 'var(--color-text)',
-              textDecoration: 'none',
-              fontSize: 14,
-              fontWeight: 600,
-            }}>
-              Brand Kit
-            </a>
+            <>
+              <Link href="/articles" style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border-strong)',
+                borderRadius: 8,
+                color: 'var(--color-text)',
+                textDecoration: 'none',
+                fontSize: 14,
+                fontWeight: 600,
+              }}>
+                Articles
+              </Link>
+              <a href="https://pizzadao.xyz/brand" target="_blank" rel="noreferrer" style={{
+                display: 'inline-flex',
+                alignItems: 'center',
+                gap: 6,
+                padding: '8px 14px',
+                background: 'var(--color-surface)',
+                border: '1px solid var(--color-border-strong)',
+                borderRadius: 8,
+                color: 'var(--color-text)',
+                textDecoration: 'none',
+                fontSize: 14,
+                fontWeight: 600,
+              }}>
+                Brand Kit
+              </a>
+            </>
           )}
           {user && (
             <Link href={`/dashboard/${user.memberId}`} style={{
