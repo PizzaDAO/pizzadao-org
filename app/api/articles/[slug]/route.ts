@@ -13,6 +13,7 @@ import {
   getArticleBySlug,
   updateArticle,
 } from '@/app/lib/articles'
+import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 
 export const runtime = 'nodejs'
 
@@ -39,7 +40,9 @@ const GET_HANDLER = async (_req: NextRequest, { params }: Params) => {
     }
   }
 
-  return NextResponse.json({ article })
+  const authorMemberId = await fetchMemberIdByDiscordId(article.authorId).catch(() => null)
+
+  return NextResponse.json({ article: { ...article, authorMemberId } })
 }
 
 // PATCH /api/articles/[slug] - Update article (author or admin)

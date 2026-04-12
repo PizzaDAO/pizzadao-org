@@ -13,6 +13,7 @@ interface Article {
   coverImage?: string | null;
   authorId: string;
   authorName?: string | null;
+  authorMemberId?: string | null;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
   tags: string[];
   publishedAt?: string | null;
@@ -269,7 +270,7 @@ export default function ArticleDetailPage({ params }: { params: Promise<{ slug: 
                 <span>
                   by{" "}
                   <Link
-                    href={`/profile/${article.authorId}`}
+                    href={article.authorMemberId ? `/profile/${article.authorMemberId}` : "#"}
                     style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}
                   >
                     {article.authorName}
