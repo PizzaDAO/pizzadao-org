@@ -1,8 +1,39 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, useRef } from "react";
 import ArticleRenderer from "./ArticleRenderer";
 import TagBadge from "./TagBadge";
+
+const MAX_BYTES = 5 * 1024 * 1024; // 5 MB
+const ALLOWED_TYPES = new Set([
+  "image/png",
+  "image/jpeg",
+  "image/webp",
+  "image/gif",
+]);
+const ACCEPT_ATTR = "image/png,image/jpeg,image/webp,image/gif";
+
+async function uploadImage(
+  file: File
+): Promise<{ url: string; filename: string }> {
+  if (!ALLOWED_TYPES.has(file.type)) {
+    throw new Error("Unsupported file type. Use PNG, JPEG, WebP, or GIF.");
+  }
+  if (file.size > MAX_BYTES) {
+    throw new Error("File too large. Max 5 MB.");
+  }
+  const fd = new FormData();
+  fd.append("file", file);
+  const res = await fetch("/api/articles/upload", {
+    method: "POST",
+    body: fd,
+  });
+  if (!res.ok) {
+    const data = await res.json().catch(() => ({}));
+    throw new Error(data.error || "Upload failed");
+  }
+  return res.json();
+}
 
 export interface ArticleEditorValue {
   title: string;
@@ -62,6 +93,12 @@ export default function ArticleEditor({
   const [tags, setTags] = useState<string[]>(initialValue?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [uploading, setUploading] = useState<"content" | "cover" | null>(null);
+  const [uploadError, setUploadError] = useState<string | null>(null);
+
+  const contentRef = useRef<HTMLTextAreaElement | null>(null);
+  const imageInputRef = useRef<HTMLInputElement | null>(null);
+  const coverInputRef = useRef<HTMLInputElement | null>(null);
 
   // When parent-supplied initial value changes (e.g., edit page loads article), refresh state.
   useEffect(() => {
@@ -95,6 +132,83 @@ export default function ArticleEditor({
     return { title, excerpt, content, coverImage, tags };
   }
 
+  function insertAtCursor(ta: HTMLTextAreaElement, text: string) {
+    const start = ta.selectionStart ?? content.length;
+    const end = ta.selectionEnd ?? content.length;
+    const next = content.slice(0, start) + text + content.slice(end);
+    setContent(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      const pos = start + text.length;
+      ta.setSelectionRange(pos, pos);
+    });
+  }
+
+  async function handleContentFile(file: File) {
+    setUploadError(null);
+    setUploading("content");
+    try {
+      const { url, filename } = await uploadImage(file);
+      const alt = filename.replace(/\.[^.]+$/, "");
+      const md = `![${alt}](${url})`;
+      const ta = contentRef.current;
+      if (ta) {
+        insertAtCursor(ta, md);
+      } else {
+        setContent(content + "\n\n" + md);
+      }
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  async function handleCoverFile(file: File) {
+    setUploadError(null);
+    setUploading("cover");
+    try {
+      const { url } = await uploadImage(file);
+      setCoverImage(url);
+    } catch (err) {
+      setUploadError(err instanceof Error ? err.message : "Upload failed");
+    } finally {
+      setUploading(null);
+    }
+  }
+
+  function onContentPaste(e: React.ClipboardEvent<HTMLTextAreaElement>) {
+    const items = e.clipboardData?.items;
+    if (!items) return;
+    for (const item of items) {
+      if (item.kind === "file" && item.type.startsWith("image/")) {
+        const f = item.getAsFile();
+        if (f) {
+          e.preventDefault();
+          handleContentFile(f);
+          return;
+        }
+      }
+    }
+  }
+
+  function onContentDrop(e: React.DragEvent<HTMLTextAreaElement>) {
+    const files = Array.from(e.dataTransfer?.files || []);
+    const img = files.find((f) => f.type.startsWith("image/"));
+    if (img) {
+      e.preventDefault();
+      handleContentFile(img);
+    }
+  }
+
+  function onContentDragOver(e: React.DragEvent<HTMLTextAreaElement>) {
+    if (
+      Array.from(e.dataTransfer?.items || []).some((i) => i.kind === "file")
+    ) {
+      e.preventDefault();
+    }
+  }
+
   return (
     <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
       {error && (
@@ -109,6 +223,42 @@ export default function ArticleEditor({
           }}
         >
           {error}
+        </div>
+      )}
+
+      {uploadError && (
+        <div
+          style={{
+            padding: 12,
+            background: "rgba(239, 68, 68, 0.1)",
+            border: "1px solid rgba(239, 68, 68, 0.3)",
+            color: "#c00",
+            borderRadius: 8,
+            fontSize: 14,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 12,
+          }}
+          role="alert"
+        >
+          <span>Image upload failed: {uploadError}</span>
+          <button
+            type="button"
+            onClick={() => setUploadError(null)}
+            aria-label="Dismiss upload error"
+            style={{
+              background: "transparent",
+              border: "none",
+              color: "#c00",
+              cursor: "pointer",
+              fontSize: 18,
+              padding: 0,
+              lineHeight: 1,
+            }}
+          >
+            ×
+          </button>
         </div>
       )}
 
@@ -140,13 +290,45 @@ export default function ArticleEditor({
 
       <div>
         <label style={labelStyle}>Cover image URL (optional)</label>
-        <input
-          type="url"
-          value={coverImage}
-          onChange={(e) => setCoverImage(e.target.value)}
-          placeholder="https://example.com/image.jpg"
-          style={inputStyle}
-        />
+        <div style={{ display: "flex", gap: 8 }}>
+          <input
+            type="url"
+            value={coverImage}
+            onChange={(e) => setCoverImage(e.target.value)}
+            placeholder="https://example.com/image.jpg"
+            style={{ ...inputStyle, flex: 1 }}
+          />
+          <button
+            type="button"
+            onClick={() => coverInputRef.current?.click()}
+            disabled={uploading === "cover"}
+            style={{
+              padding: "10px 16px",
+              borderRadius: 8,
+              border: "1px solid var(--color-border-strong, var(--color-border))",
+              background: "var(--color-surface)",
+              color: "var(--color-text)",
+              fontSize: 14,
+              fontWeight: 600,
+              cursor: uploading === "cover" ? "not-allowed" : "pointer",
+              opacity: uploading === "cover" ? 0.6 : 1,
+              whiteSpace: "nowrap",
+            }}
+          >
+            {uploading === "cover" ? "Uploading…" : "Upload"}
+          </button>
+          <input
+            ref={coverInputRef}
+            type="file"
+            accept={ACCEPT_ATTR}
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const f = e.target.files?.[0];
+              if (f) handleCoverFile(f);
+              e.target.value = "";
+            }}
+          />
+        </div>
         {coverImage && (
           <div style={{ marginTop: 8 }}>
             {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -232,22 +414,53 @@ export default function ArticleEditor({
       <div>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
           <label style={labelStyle}>Content (Markdown) *</label>
-          <button
-            type="button"
-            onClick={() => setShowPreview(!showPreview)}
-            style={{
-              padding: "4px 10px",
-              fontSize: 12,
-              borderRadius: 6,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
-              color: "var(--color-text)",
-              cursor: "pointer",
-              fontWeight: 600,
-            }}
-          >
-            {showPreview ? "Hide preview" : "Show preview"}
-          </button>
+          <div style={{ display: "flex", gap: 8 }}>
+            <button
+              type="button"
+              onClick={() => imageInputRef.current?.click()}
+              disabled={uploading === "content"}
+              style={{
+                padding: "4px 10px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+                color: "var(--color-text)",
+                cursor: uploading === "content" ? "not-allowed" : "pointer",
+                opacity: uploading === "content" ? 0.6 : 1,
+                fontWeight: 600,
+              }}
+            >
+              {uploading === "content" ? "Uploading…" : "Insert image"}
+            </button>
+            <input
+              ref={imageInputRef}
+              type="file"
+              accept={ACCEPT_ATTR}
+              style={{ display: "none" }}
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                if (f) handleContentFile(f);
+                e.target.value = "";
+              }}
+            />
+            <button
+              type="button"
+              onClick={() => setShowPreview(!showPreview)}
+              style={{
+                padding: "4px 10px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid var(--color-border)",
+                background: "var(--color-surface)",
+                color: "var(--color-text)",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              {showPreview ? "Hide preview" : "Show preview"}
+            </button>
+          </div>
         </div>
         <div
           style={{
@@ -257,9 +470,13 @@ export default function ArticleEditor({
           }}
         >
           <textarea
+            ref={contentRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
-            placeholder="Write your article in Markdown..."
+            onPaste={onContentPaste}
+            onDrop={onContentDrop}
+            onDragOver={onContentDragOver}
+            placeholder="Write your article in Markdown... (paste or drop images to upload!)"
             style={{
               ...inputStyle,
               minHeight: 400,
