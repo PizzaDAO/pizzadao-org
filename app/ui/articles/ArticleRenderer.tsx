@@ -80,10 +80,15 @@ export default function ArticleRenderer({ content }: ArticleRendererProps) {
         .article-content p {
           margin: 1em 0;
         }
-        .article-content ul,
+        .article-content ul {
+          margin: 1em 0;
+          padding-left: 2em;
+          list-style-type: disc;
+        }
         .article-content ol {
           margin: 1em 0;
           padding-left: 2em;
+          list-style-type: decimal;
         }
         .article-content li {
           margin: 0.3em 0;
