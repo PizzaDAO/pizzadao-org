@@ -75,5 +75,6 @@ export const ADMIN_ROLE_IDS = [
 // Roles allowed to author articles at pizzadao.org/articles
 export const ARTICLE_AUTHOR_ROLE_IDS = [
   TURTLE_ROLE_IDS.LEONARDO, // Leader role
+  TURTLE_ROLE_IDS.APRIL, // April role
   "812131585327235113", // Dread Pizza Roberts
 ] as const;
