@@ -502,7 +502,7 @@ export default function ArticleEditor({
             <div>*italic* &rarr; <em>italic</em></div>
             <div>~~strikethrough~~ &rarr; <s>strikethrough</s></div>
             <div>[link text](url) &rarr; link</div>
-            <div>![alt](url) &rarr; image</div>
+            <div>![alt](url &quot;caption&quot;) &rarr; image with caption</div>
             <div>&gt; blockquote</div>
             <div>- bullet list</div>
             <div>1. numbered list</div>

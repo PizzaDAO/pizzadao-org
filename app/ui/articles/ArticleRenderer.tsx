@@ -29,14 +29,34 @@ export default function ArticleRenderer({ content }: ArticleRendererProps) {
             </a>
           ),
           // eslint-disable-next-line @next/next/no-img-element
-          img: ({ src, alt }) => (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
-              src={typeof src === "string" ? src : undefined}
-              alt={alt || ""}
-              style={{ maxWidth: "100%", height: "auto", borderRadius: 8, margin: "16px 0" }}
-            />
-          ),
+          img: ({ src, alt, title }) => {
+            const imgEl = (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img
+                src={typeof src === "string" ? src : undefined}
+                alt={alt || ""}
+                style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
+              />
+            );
+            if (title) {
+              return (
+                <figure style={{ margin: "16px 0", padding: 0 }}>
+                  {imgEl}
+                  <figcaption style={{
+                    marginTop: 6,
+                    fontSize: "0.85em",
+                    color: "var(--color-text-secondary, var(--color-text))",
+                    opacity: 0.7,
+                    textAlign: "center",
+                    lineHeight: 1.4,
+                  }}>
+                    {title}
+                  </figcaption>
+                </figure>
+              );
+            }
+            return <span style={{ display: "block", margin: "16px 0" }}>{imgEl}</span>;
+          },
         }}
       >
         {content}
