@@ -44,6 +44,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
     const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
     const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
+    const [articles, setArticles] = useState<{ slug: string; title: string; excerpt?: string; publishedAt?: string }[]>([]);
 
     // Fetch public profile data
     useEffect(() => {
@@ -87,6 +88,19 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                 if (res.ok) {
                     const json = await res.json();
                     setXAccount(json);
+                }
+            } catch {}
+        })();
+    }, [id]);
+
+    // Fetch published articles by this member
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`/api/articles/by-member/${id}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json.articles) setArticles(json.articles);
                 }
             } catch {}
         })();
@@ -385,6 +399,54 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                         {/* Profile Links - read-only display */}
                         <ProfileLinksDisplay memberId={idValue} />
+
+                        {/* Articles by this member */}
+                        {articles.length > 0 && (
+                            <div style={{ gridColumn: "1 / -1" }}>
+                                <h3 style={{
+                                    fontSize: 12,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "1px",
+                                    opacity: 0.5,
+                                    marginTop: 0,
+                                    marginBottom: 8,
+                                    fontWeight: 700
+                                }}>
+                                    Articles
+                                </h3>
+                                <div style={{ display: "grid", gap: 8 }}>
+                                    {articles.map((a) => (
+                                        <Link
+                                            key={a.slug}
+                                            href={`/articles/${a.slug}`}
+                                            style={{
+                                                display: "block",
+                                                padding: 12,
+                                                borderRadius: 10,
+                                                border: '1px solid var(--color-border)',
+                                                background: 'var(--color-surface)',
+                                                textDecoration: "none",
+                                                color: "inherit",
+                                            }}
+                                        >
+                                            <div style={{ fontWeight: 600, fontSize: 15 }}>{a.title}</div>
+                                            {a.excerpt && (
+                                                <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
+                                                    {a.excerpt}
+                                                </div>
+                                            )}
+                                            {a.publishedAt && (
+                                                <div style={{ fontSize: 11, opacity: 0.4, marginTop: 4 }}>
+                                                    {new Date(a.publishedAt).toLocaleDateString('en-US', {
+                                                        year: 'numeric', month: 'short', day: 'numeric'
+                                                    })}
+                                                </div>
+                                            )}
+                                        </Link>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
 
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
