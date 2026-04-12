@@ -93,6 +93,7 @@ export default function ArticleEditor({
   const [tags, setTags] = useState<string[]>(initialValue?.tags ?? []);
   const [tagInput, setTagInput] = useState("");
   const [showPreview, setShowPreview] = useState(false);
+  const [showCheatSheet, setShowCheatSheet] = useState(false);
   const [uploading, setUploading] = useState<"content" | "cover" | null>(null);
   const [uploadError, setUploadError] = useState<string | null>(null);
 
@@ -446,6 +447,22 @@ export default function ArticleEditor({
             />
             <button
               type="button"
+              onClick={() => setShowCheatSheet(!showCheatSheet)}
+              style={{
+                padding: "4px 10px",
+                fontSize: 12,
+                borderRadius: 6,
+                border: "1px solid var(--color-border)",
+                background: showCheatSheet ? "var(--color-text)" : "var(--color-surface)",
+                color: showCheatSheet ? "var(--color-surface)" : "var(--color-text)",
+                cursor: "pointer",
+                fontWeight: 600,
+              }}
+            >
+              Markdown help
+            </button>
+            <button
+              type="button"
               onClick={() => setShowPreview(!showPreview)}
               style={{
                 padding: "4px 10px",
@@ -462,6 +479,39 @@ export default function ArticleEditor({
             </button>
           </div>
         </div>
+        {showCheatSheet && (
+          <div
+            style={{
+              marginBottom: 8,
+              padding: 12,
+              border: "1px solid var(--color-border)",
+              borderRadius: 8,
+              background: "var(--color-surface)",
+              fontSize: 13,
+              lineHeight: 1.5,
+              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              display: "grid",
+              gridTemplateColumns: "1fr 1fr",
+              gap: "4px 24px",
+              color: "var(--color-text)",
+            }}
+          >
+            <div><strong style={{ fontFamily: "inherit" }}># Heading 1</strong></div>
+            <div><strong style={{ fontFamily: "inherit" }}>## Heading 2</strong></div>
+            <div>**bold** &rarr; <strong>bold</strong></div>
+            <div>*italic* &rarr; <em>italic</em></div>
+            <div>~~strikethrough~~ &rarr; <s>strikethrough</s></div>
+            <div>[link text](url) &rarr; link</div>
+            <div>![alt](url) &rarr; image</div>
+            <div>&gt; blockquote</div>
+            <div>- bullet list</div>
+            <div>1. numbered list</div>
+            <div>`inline code`</div>
+            <div>```language &hellip; ``` &rarr; code block</div>
+            <div>--- &rarr; horizontal rule</div>
+            <div>| col | col | &rarr; table</div>
+          </div>
+        )}
         <div
           style={{
             display: "grid",
