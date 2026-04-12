@@ -20,7 +20,7 @@ export const runtime = 'nodejs'
 type Params = { params: Promise<{ slug: string }> }
 
 // GET /api/articles/[slug] - Read a single article.
-// Published articles are public. Drafts require author or admin.
+// Published articles are public. Drafts require author, collaborator, or admin.
 const GET_HANDLER = async (_req: NextRequest, { params }: Params) => {
   const { slug } = await params
   const article = await getArticleBySlug(slug)
@@ -32,10 +32,14 @@ const GET_HANDLER = async (_req: NextRequest, { params }: Params) => {
       throw new NotFoundError('Article')
     }
     const isAuthor = session.discordId === article.authorId
-    const isAdmin = isAuthor
+    const myMemberId = await fetchMemberIdByDiscordId(session.discordId).catch(() => null)
+    const isCollaborator = myMemberId
+      ? (article.collaboratorMemberIds ?? []).includes(myMemberId)
+      : false
+    const isAdmin = isAuthor || isCollaborator
       ? true
       : await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)
-    if (!isAuthor && !isAdmin) {
+    if (!isAuthor && !isCollaborator && !isAdmin) {
       throw new NotFoundError('Article')
     }
   }
@@ -57,9 +61,13 @@ const PATCH_HANDLER = async (request: NextRequest, { params }: Params) => {
   if (!existing) throw new NotFoundError('Article')
 
   const isAuthor = session.discordId === existing.authorId
+  const myMemberId = await fetchMemberIdByDiscordId(session.discordId).catch(() => null)
+  const isCollaborator = myMemberId
+    ? (existing.collaboratorMemberIds ?? []).includes(myMemberId)
+    : false
   const isAdmin = await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)
-  if (!isAuthor && !isAdmin) {
-    throw new ForbiddenError('Only the author or an admin can edit this article')
+  if (!isAuthor && !isCollaborator && !isAdmin) {
+    throw new ForbiddenError('Only the author, a collaborator, or an admin can edit this article')
   }
 
   const body = await request.json()

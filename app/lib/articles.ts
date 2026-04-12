@@ -260,3 +260,18 @@ export async function getArticlesByAuthor(authorId: string) {
     orderBy: { updatedAt: 'desc' },
   })
 }
+
+/**
+ * Get draft articles where the given memberId is a collaborator
+ * (but not the author, to avoid duplicates).
+ */
+export async function getCollaboratorDrafts(memberId: string, excludeAuthorId?: string) {
+  return prisma.article.findMany({
+    where: {
+      collaboratorMemberIds: { has: memberId },
+      status: 'DRAFT',
+      ...(excludeAuthorId ? { authorId: { not: excludeAuthorId } } : {}),
+    },
+    orderBy: { updatedAt: 'desc' },
+  })
+}

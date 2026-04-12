@@ -262,19 +262,20 @@ enum ArticleStatus {
 }
 
 model Article {
-  id          Int           @id @default(autoincrement())
-  slug        String        @unique
-  title       String
-  excerpt     String?
-  content     String        // Markdown
-  coverImage  String?       // URL
-  authorId    String        // Discord ID
-  authorName  String?       // Cached display name
-  status      ArticleStatus @default(DRAFT)
-  tags        String[]      // PostgreSQL array
-  publishedAt DateTime?
-  createdAt   DateTime      @default(now())
-  updatedAt   DateTime      @updatedAt
+  id                    Int           @id @default(autoincrement())
+  slug                  String        @unique
+  title                 String
+  excerpt               String?
+  content               String        // Markdown
+  coverImage            String?       // URL
+  authorId              String        // Discord ID
+  authorName            String?       // Cached display name
+  status                ArticleStatus @default(DRAFT)
+  tags                  String[]      // PostgreSQL array
+  collaboratorMemberIds String[]      // Member IDs who can view/edit drafts
+  publishedAt           DateTime?
+  createdAt             DateTime      @default(now())
+  updatedAt             DateTime      @updatedAt
 
   @@index([status, publishedAt])
   @@index([authorId])
