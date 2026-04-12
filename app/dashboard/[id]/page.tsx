@@ -13,6 +13,8 @@ import { POAPCollection } from "../../ui/poap";
 import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
+import { FriendsWidget } from "../../ui/friends/FriendsWidget";
+import { SocialAccountLinker } from "../../ui/friends/SocialAccountLinker";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -344,6 +346,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             textDecoration: "none"
                         }}>
                             Articles
+                        </Link>
+                        <Link href="/friends" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Friends
                         </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
@@ -811,6 +820,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 </div>
                             )}
                         </div>
+
+                        {/* Social Accounts - link X and Farcaster handles */}
+                        <SocialAccountLinker memberId={idValue} />
+
+                        {/* Friends Widget */}
+                        <FriendsWidget memberId={idValue} />
 
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
