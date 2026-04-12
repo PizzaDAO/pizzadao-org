@@ -21,6 +21,7 @@ export default function ArticlesListPage() {
   const [activeTag, setActiveTag] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [canAuthor, setCanAuthor] = useState(false);
+  const [drafts, setDrafts] = useState<ArticleCardData[]>([]);
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -47,18 +48,22 @@ export default function ArticlesListPage() {
     fetchArticles();
   }, [fetchArticles]);
 
-  // Check if the current user has draft access (author role). Used to show "New article" button.
+  // Fetch user's drafts (also determines if they can author)
   useEffect(() => {
     let cancelled = false;
-    async function checkAuthor() {
+    async function fetchDrafts() {
       try {
-        const res = await fetch("/api/articles/drafts");
-        if (!cancelled) setCanAuthor(res.ok);
+        const res = await fetch("/api/articles/drafts?all=1");
+        if (!cancelled && res.ok) {
+          const data = await res.json();
+          setCanAuthor(true);
+          setDrafts(data.articles || []);
+        }
       } catch {
         if (!cancelled) setCanAuthor(false);
       }
     }
-    checkAuthor();
+    fetchDrafts();
     return () => {
       cancelled = true;
     };
@@ -237,6 +242,96 @@ export default function ArticlesListPage() {
             </div>
           )}
         </div>
+
+        {/* My Drafts section */}
+        {drafts.length > 0 && (
+          <div style={{ marginBottom: 32 }}>
+            <h2
+              style={{
+                fontSize: 18,
+                fontWeight: 700,
+                color: "var(--color-text-primary, var(--color-text))",
+                marginBottom: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+              }}
+            >
+              My Drafts
+              <span
+                style={{
+                  fontSize: 11,
+                  fontWeight: 600,
+                  padding: "2px 8px",
+                  borderRadius: 4,
+                  background: "rgba(234, 179, 8, 0.15)",
+                  color: "#b45309",
+                  textTransform: "uppercase",
+                  letterSpacing: "0.5px",
+                }}
+              >
+                {drafts.length}
+              </span>
+            </h2>
+            <div
+              style={{
+                display: "grid",
+                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
+                gap: 16,
+              }}
+            >
+              {drafts.map((d) => (
+                <Link
+                  key={d.slug}
+                  href={`/articles/${d.slug}/edit`}
+                  style={{
+                    display: "block",
+                    padding: 16,
+                    borderRadius: 12,
+                    border: "1px dashed var(--color-border)",
+                    background: "var(--color-surface)",
+                    textDecoration: "none",
+                    color: "inherit",
+                  }}
+                >
+                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                    <span
+                      style={{
+                        fontSize: 10,
+                        fontWeight: 700,
+                        padding: "2px 6px",
+                        borderRadius: 4,
+                        background: d.status === "DRAFT"
+                          ? "rgba(234, 179, 8, 0.15)"
+                          : "rgba(34, 197, 94, 0.15)",
+                        color: d.status === "DRAFT" ? "#b45309" : "#15803d",
+                        textTransform: "uppercase",
+                      }}
+                    >
+                      {d.status || "DRAFT"}
+                    </span>
+                  </div>
+                  <div style={{ fontWeight: 600, fontSize: 15 }}>{d.title}</div>
+                  {d.excerpt && (
+                    <div
+                      style={{
+                        fontSize: 13,
+                        opacity: 0.6,
+                        marginTop: 4,
+                        display: "-webkit-box",
+                        WebkitLineClamp: 2,
+                        WebkitBoxOrient: "vertical",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {d.excerpt}
+                    </div>
+                  )}
+                </Link>
+              ))}
+            </div>
+          </div>
+        )}
 
         {error && (
           <div
