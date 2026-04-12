@@ -145,6 +145,48 @@ export default function ArticleEditor({
     });
   }
 
+  function wrapSelection(ta: HTMLTextAreaElement, before: string, after: string) {
+    const start = ta.selectionStart ?? 0;
+    const end = ta.selectionEnd ?? 0;
+    const selected = content.slice(start, end);
+    const next = content.slice(0, start) + before + selected + after + content.slice(end);
+    setContent(next);
+    requestAnimationFrame(() => {
+      ta.focus();
+      if (selected) {
+        ta.setSelectionRange(start + before.length, end + before.length);
+      } else {
+        ta.setSelectionRange(start + before.length, start + before.length);
+      }
+    });
+  }
+
+  function onContentKeyDown(e: React.KeyboardEvent<HTMLTextAreaElement>) {
+    const mod = e.ctrlKey || e.metaKey;
+    if (!mod) return;
+    const ta = contentRef.current;
+    if (!ta) return;
+
+    switch (e.key.toLowerCase()) {
+      case "b":
+        e.preventDefault();
+        wrapSelection(ta, "**", "**");
+        break;
+      case "i":
+        e.preventDefault();
+        wrapSelection(ta, "*", "*");
+        break;
+      case "k":
+        e.preventDefault();
+        wrapSelection(ta, "[", "](url)");
+        break;
+      case "e":
+        e.preventDefault();
+        wrapSelection(ta, "`", "`");
+        break;
+    }
+  }
+
   async function handleContentFile(file: File) {
     setUploadError(null);
     setUploading("content");
@@ -498,15 +540,15 @@ export default function ArticleEditor({
           >
             <div><strong style={{ fontFamily: "inherit" }}># Heading 1</strong></div>
             <div><strong style={{ fontFamily: "inherit" }}>## Heading 2</strong></div>
-            <div>**bold** &rarr; <strong>bold</strong></div>
-            <div>*italic* &rarr; <em>italic</em></div>
+            <div>**bold** &rarr; <strong>bold</strong> <span style={{ opacity: 0.5 }}>(Ctrl+B)</span></div>
+            <div>*italic* &rarr; <em>italic</em> <span style={{ opacity: 0.5 }}>(Ctrl+I)</span></div>
             <div>~~strikethrough~~ &rarr; <s>strikethrough</s></div>
-            <div>[link text](url) &rarr; link</div>
+            <div>[link text](url) &rarr; link <span style={{ opacity: 0.5 }}>(Ctrl+K)</span></div>
             <div>![alt](url &quot;caption&quot;) &rarr; image with caption</div>
             <div>&gt; blockquote</div>
             <div>- bullet list</div>
             <div>1. numbered list</div>
-            <div>`inline code`</div>
+            <div>`inline code` <span style={{ opacity: 0.5 }}>(Ctrl+E)</span></div>
             <div>```language &hellip; ``` &rarr; code block</div>
             <div>--- &rarr; horizontal rule</div>
             <div>| col | col | &rarr; table</div>
@@ -523,6 +565,7 @@ export default function ArticleEditor({
             ref={contentRef}
             value={content}
             onChange={(e) => setContent(e.target.value)}
+            onKeyDown={onContentKeyDown}
             onPaste={onContentPaste}
             onDrop={onContentDrop}
             onDragOver={onContentDragOver}
