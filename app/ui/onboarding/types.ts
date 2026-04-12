@@ -51,6 +51,8 @@ export type WizardData = {
 
   // Step 2: City
   city: string;
+  timezone?: string; // IANA timezone ID, e.g. "America/New_York"
+  timezoneLabel?: string; // Human-friendly label, e.g. "EST (UTC-5)"
 
   // Step 3: Roles (turtles)
   turtles: string[];
