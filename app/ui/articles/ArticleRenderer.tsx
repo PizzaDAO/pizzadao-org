@@ -47,7 +47,7 @@ export default function ArticleRenderer({ content }: ArticleRendererProps) {
                     fontSize: "0.85em",
                     color: "var(--color-text-secondary, var(--color-text))",
                     opacity: 0.7,
-                    textAlign: "center",
+                    textAlign: "left",
                     lineHeight: 1.4,
                   }}>
                     {title}
