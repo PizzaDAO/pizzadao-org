@@ -49,7 +49,7 @@ export const CREWS = [
   { id: "comms", label: "Comms" },
   { id: "events", label: "Events" },
   { id: "design", label: "Design" },
-  { id: "partnerships", label: "Partnerships" },
+  { id: "biz_dev", label: "Biz Dev" },
 ] as const;
 
 export const TURTLE_ROLE_IDS: Record<string, string> = {
