@@ -51,6 +51,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
     const [articles, setArticles] = useState<{ slug: string; title: string; excerpt?: string; publishedAt?: string }[]>([]);
     const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
+    const [missionLevel, setMissionLevel] = useState<{ currentLevel: number; levelTitle: string | null; approvedCount: number; totalMissions: number } | null>(null);
 
     // Fetch public profile data
     useEffect(() => {
@@ -126,6 +127,19 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
             }
         })();
     }, []);
+
+    // Fetch mission level
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch(`/api/missions/progress/by-member/${id}`);
+                if (res.ok) {
+                    const json = await res.json();
+                    if (json.currentLevel) setMissionLevel(json);
+                }
+            } catch {}
+        })();
+    }, [id]);
 
     // Fetch crew mappings for crew info
     useEffect(() => {
@@ -338,6 +352,45 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         <StatItem label="ID" value={`#${idValue}`} />
                         {orgs && <StatItem label="Orgs" value={orgs} />}
                         {skills && <StatItem label="Skills" value={skills} />}
+
+                        {/* Mission Level */}
+                        {missionLevel && missionLevel.approvedCount > 0 && (
+                            <div>
+                                <h3 style={{
+                                    fontSize: 12,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "1px",
+                                    opacity: 0.5,
+                                    marginTop: 0,
+                                    marginBottom: 6,
+                                    fontWeight: 700
+                                }}>
+                                    Mission Level
+                                </h3>
+                                <Link
+                                    href="/missions"
+                                    style={{
+                                        fontSize: 18,
+                                        fontWeight: 500,
+                                        color: 'var(--color-text-primary)',
+                                        textDecoration: "none",
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 6,
+                                    }}
+                                >
+                                    Lv.{missionLevel.currentLevel > 8 ? "MAX" : missionLevel.currentLevel}
+                                    {missionLevel.levelTitle && (
+                                        <span style={{ fontSize: 14, opacity: 0.6 }}>
+                                            {missionLevel.levelTitle}
+                                        </span>
+                                    )}
+                                </Link>
+                                <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>
+                                    {missionLevel.approvedCount}/{missionLevel.totalMissions} missions completed
+                                </div>
+                            </div>
+                        )}
 
                         {/* X Account */}
                         {xAccount?.connected && (

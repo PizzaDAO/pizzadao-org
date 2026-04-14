@@ -17,6 +17,7 @@ import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletManager } from "../../ui/wallet-manager/WalletManager";
 import { FriendsWidget } from "../../ui/friends/FriendsWidget";
 import { SocialAccountLinker } from "../../ui/friends/SocialAccountLinker";
+import { MissionsProgress } from "../../ui/missions";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -356,6 +357,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             All Members
                         </Link>
+                        <Link href="/missions" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Missions
+                        </Link>
                         <Link href="/friends" style={{
                             ...btn("secondary"),
                             fontSize: 14,
@@ -369,13 +377,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             textDecoration: "none"
                         }}>
                             Calls
-                        </Link>
-                        <Link href="/friends" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            Friends
                         </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
@@ -864,6 +865,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     {/* Pizza Party Tickets */}
                     <UnlockTicketCard memberId={idValue} />
+
+                    {/* Missions Progress */}
+                    <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
+                        <MissionsProgress />
+                    </div>
 
                     {/* Crews Section - MATCHING STEP 5 UI */}
                     {(() => {

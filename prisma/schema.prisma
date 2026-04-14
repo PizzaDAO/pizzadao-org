@@ -179,6 +179,7 @@ enum TransactionType {
   BOUNTY_ESCROW      // Escrowed $PEP when creating a bounty
   BOUNTY_REWARD      // Earned $PEP from completing a bounty
   BOUNTY_REFUND      // Refunded $PEP from cancelling a bounty
+  MISSION_REWARD     // Earned $PEP from completing all missions in a level
 }
 
 model Transaction {
@@ -237,6 +238,9 @@ enum NotificationType {
   TASK_ASSIGNED      // A task was assigned to you
   TASK_DUE_SOON      // Task due within a week
   FRIEND_ADDED       // Someone started following you
+  MISSION_APPROVED   // A mission submission was approved
+  MISSION_REJECTED   // A mission submission was rejected
+  LEVEL_COMPLETED    // All missions in a level completed, reward paid
 }
 
 model Notification {
@@ -455,4 +459,45 @@ model MemberWallet {
   @@unique([memberId, walletAddress])
   @@index([memberId])
   @@index([walletAddress])
+}
+
+// ===== MISSIONS / LEVELING SYSTEM =====
+
+enum MissionStatus {
+  PENDING      // Submitted, awaiting verification
+  APPROVED     // Verified and reward paid
+  REJECTED     // Admin rejected
+}
+
+model Mission {
+  id          Int      @id @default(autoincrement())
+  level       Int      // 1-8
+  index       Int      // 0-based within level
+  title       String
+  description String?
+  reward      Int      @default(0) // PEP reward (per-level, shared)
+  levelTitle  String?  // e.g., "Pizza Trainee"
+  autoVerify  Boolean  @default(false)
+  isActive    Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  completions MissionCompletion[]
+  @@unique([level, index])
+}
+
+model MissionCompletion {
+  id          Int           @id @default(autoincrement())
+  missionId   Int
+  discordId   String
+  memberId    String?
+  status      MissionStatus @default(PENDING)
+  evidence    String?       // Proof URL or description
+  notes       String?
+  reviewedBy  String?
+  reviewNote  String?
+  submittedAt DateTime      @default(now())
+  reviewedAt  DateTime?
+  mission     Mission       @relation(fields: [missionId], references: [id])
+  @@unique([missionId, discordId])
+  @@index([discordId])
+  @@index([status])
 }
