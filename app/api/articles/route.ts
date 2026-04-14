@@ -4,7 +4,7 @@ import { hasAnyRole } from '@/app/lib/discord'
 import { ARTICLE_AUTHOR_ROLE_IDS } from '@/app/ui/constants'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
-import { createArticle, getPublishedArticles } from '@/app/lib/articles'
+import { createArticle, getPublishedArticles, extractFirstImage } from '@/app/lib/articles'
 
 export const runtime = 'nodejs'
 
@@ -27,7 +27,13 @@ const GET_HANDLER = async (request: NextRequest) => {
     search,
   })
 
-  return NextResponse.json(result)
+  // Compute thumbnail and strip content from list responses to reduce payload
+  const articles = result.articles.map(({ content, ...rest }) => ({
+    ...rest,
+    thumbnail: rest.coverImage || extractFirstImage(content) || null,
+  }))
+
+  return NextResponse.json({ articles, pagination: result.pagination })
 }
 
 // POST /api/articles - Create a new article (role-gated)

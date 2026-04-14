@@ -1,6 +1,6 @@
 "use client";
 
-import { useEffect, useState, use } from "react";
+import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { ArticleEditor, type ArticleEditorValue } from "@/app/ui/articles";
@@ -26,6 +26,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
   const [loadError, setLoadError] = useState<string | null>(null);
   const [submitting, setSubmitting] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const successTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     let cancelled = false;
@@ -63,6 +65,14 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
     if (!article) return;
     setSubmitting(true);
     setError(null);
+    setSuccessMessage(null);
+
+    // Clear any pending success timeout
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+      successTimeoutRef.current = null;
+    }
+
     try {
       const patchRes = await fetch(`/api/articles/${article.slug}`, {
         method: "PATCH",
@@ -85,7 +95,20 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
       const data = await patchRes.json();
       const updated = data.article;
 
-      router.push(`/articles/${updated.slug}`);
+      // Update local article state with server response
+      setArticle(updated);
+
+      // Show success toast
+      setSuccessMessage(publish ? "Article published!" : "Changes saved.");
+      successTimeoutRef.current = setTimeout(() => {
+        setSuccessMessage(null);
+        successTimeoutRef.current = null;
+      }, 3000);
+
+      // If slug changed (draft title change), update URL without navigation
+      if (updated.slug !== article.slug) {
+        router.replace(`/articles/${updated.slug}/edit`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -205,6 +228,23 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
             Archive
           </button>
         </div>
+
+        {successMessage && (
+          <div
+            style={{
+              padding: "12px 16px",
+              background: "rgba(34, 197, 94, 0.1)",
+              border: "1px solid rgba(34, 197, 94, 0.3)",
+              color: "#15803d",
+              borderRadius: 8,
+              marginBottom: 16,
+              fontSize: 14,
+              fontWeight: 600,
+            }}
+          >
+            {successMessage}
+          </div>
+        )}
 
         <ArticleEditor
           initialValue={{
