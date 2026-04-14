@@ -68,14 +68,31 @@ function extractSheetId(url: string): string | null {
 }
 
 /**
- * Parse a date string from the Attendance tab (col A).
- * Common formats: "1/15/2025", "2025-01-15", "Jan 15, 2025"
+ * Convert a Google Sheets serial date number to a JS Date.
+ * Google Sheets epoch uses the Lotus 1-2-3 convention.
+ * Serial 1 = 1900-01-01. Offset: serial - 25569 = Unix days.
+ */
+function serialToDate(serial: number): Date | null {
+  if (isNaN(serial) || serial < 1 || serial > 100000) return null;
+  const ms = (serial - 25569) * 86400000;
+  return new Date(ms);
+}
+
+/**
+ * Parse a date from the Attendance tab (col A).
+ * Handles both date strings ("1/15/2025") and serial numbers (45566).
  */
 function parseDate(raw: string): Date | null {
   if (!raw) return null;
-  const d = new Date(raw);
-  if (isNaN(d.getTime())) return null;
-  return d;
+  const trimmed = raw.trim();
+  // Try as serial number first (pure digits, possibly with decimal)
+  if (/^\d+(\.\d+)?$/.test(trimmed)) {
+    return serialToDate(Number(trimmed));
+  }
+  // Try as date string
+  const d = new Date(trimmed);
+  if (!isNaN(d.getTime()) && d.getFullYear() > 1990 && d.getFullYear() < 2100) return d;
+  return null;
 }
 
 // ---------------------------------------------------------------------------
@@ -195,17 +212,69 @@ async function fetchDailySheet(
   }
 
   const gviz = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
+  const allRows = gviz?.table?.rows || [];
+  if (allRows.length === 0) return [];
+
+  // GViz headers=1 doesn't always work — first row may be column headers.
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  let dataRows: any[] = allRows;
+  let headerRow: string[] | null = null;
+  // eslint-disable-next-line @typescript-eslint/no-explicit-any
+  const firstRowVals = (allRows[0].c || []).map((c: any) =>
+    getCellValue(c).toLowerCase()
+  );
+  const looksLikeHeader = firstRowVals.some(
+    (v: string) =>
+      v.includes("discord") || v.includes("name") || v.includes("timestamp")
+  );
+  if (looksLikeHeader) {
+    headerRow = firstRowVals;
+    dataRows = allRows.slice(1);
+  }
+
+  // Find Discord ID column: scan for the column with the most 17-20 digit values
+  const numCols = Math.max(
+    ...dataRows.map((r: { c?: unknown[] }) => (r.c || []).length),
+    0
+  );
+  let discordIdCol = -1;
+  let displayNameCol = -1;
+  let maxDiscordIds = 0;
+
+  for (let col = 0; col < numCols; col++) {
+    let count = 0;
+    for (const row of dataRows) {
+      const v = getCellValue((row.c || [])[col]).trim();
+      if (/^\d{17,20}$/.test(v)) count++;
+    }
+    if (count > maxDiscordIds) {
+      maxDiscordIds = count;
+      discordIdCol = col;
+    }
+  }
+
+  if (discordIdCol < 0) return []; // no column with Discord IDs
+
+  // Find display name column from headers, or adjacent to Discord ID col
+  if (headerRow) {
+    const nameIdx = headerRow.findIndex(
+      (v: string) =>
+        (v.includes("name") || v.includes("display")) &&
+        !v.includes("discord")
+    );
+    if (nameIdx >= 0) displayNameCol = nameIdx;
+  }
+  if (displayNameCol < 0) {
+    displayNameCol = discordIdCol === 0 ? 1 : discordIdCol - 1;
+  }
 
   const attendees: Attendee[] = [];
   const seen = new Set<string>();
 
-  for (const row of rows) {
+  for (const row of dataRows) {
     const cells = row.c || [];
-    // Column B (index 1) = display name
-    // Column C (index 2) = Discord User ID
-    const displayName = getCellValue(cells[1]).trim();
-    const discordId = getCellValue(cells[2]).trim();
+    const displayName = getCellValue(cells[displayNameCol]).trim();
+    const discordId = getCellValue(cells[discordIdCol]).trim();
 
     // Discord IDs are 17-19 digit numeric strings
     if (!discordId || !/^\d{17,20}$/.test(discordId)) continue;
