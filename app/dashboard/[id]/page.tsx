@@ -13,6 +13,7 @@ import { POAPCollection } from "../../ui/poap";
 import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
+import { MissionsProgress } from "../../ui/missions";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -351,6 +352,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             textDecoration: "none"
                         }}>
                             All Members
+                        </Link>
+                        <Link href="/missions" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Missions
                         </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
@@ -827,6 +835,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     {/* NFT Collection Section - shows connect prompt if no wallet */}
                     <NFTCollection memberId={idValue} showConnectPrompt={true} />
+
+                    {/* Missions Progress */}
+                    <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
+                        <MissionsProgress />
+                    </div>
 
                     {/* Crews Section - MATCHING STEP 5 UI */}
                     {(() => {
