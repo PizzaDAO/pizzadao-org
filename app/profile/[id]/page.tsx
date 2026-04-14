@@ -9,6 +9,7 @@ import { TURTLES, CREWS } from "../../ui/constants";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { ProfileLinksDisplay } from "../../ui/profile-links";
+import { AttendanceCard } from "../../ui/attendance-card";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -552,6 +553,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             </div>
                         </div>
                     )}
+
+                    {/* Crew Call Attendance */}
+                    <AttendanceCard memberId={idValue} />
                 </div>
 
                 {/* Footer */}

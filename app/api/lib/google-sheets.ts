@@ -23,6 +23,7 @@ const auth = new google.auth.GoogleAuth({
 });
 
 const sheets = google.sheets({ version: "v4", auth });
+export { sheets as sheetsClient };
 
 // Normalize string same way as crew route's cellVal/norm
 function normalizeKey(s: string): string {

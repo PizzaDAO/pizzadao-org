@@ -280,3 +280,33 @@ model Article {
   @@index([status, publishedAt])
   @@index([authorId])
 }
+
+// ===== CREW CALL ATTENDANCE =====
+
+// Individual attendance records — one per person per call
+model CallAttendance {
+  id          Int      @id @default(autoincrement())
+  discordId   String   // Discord User ID of attendee
+  displayName String?  // Discord display name at time of call
+  crewId      String   // Crew slug (ops, comms, etc.) or "community_call"
+  crewLabel   String   // Display name (Ops, Comms, Community Call)
+  callDate    DateTime // Date of the call
+  dailySheetId String  // Google Sheet ID of the daily attendance sheet (for dedup)
+  createdAt   DateTime @default(now())
+
+  @@unique([discordId, dailySheetId]) // One record per person per call
+  @@index([discordId])
+  @@index([crewId])
+  @@index([callDate])
+}
+
+// Track which daily sheets have already been synced
+model AttendanceSyncLog {
+  id            Int      @id @default(autoincrement())
+  crewSheetId   String   // Crew spreadsheet ID
+  crewId        String   // Crew slug
+  dailySheetId  String   @unique // Daily attendance sheet ID (dedup key)
+  callDate      DateTime
+  attendeeCount Int
+  syncedAt      DateTime @default(now())
+}
