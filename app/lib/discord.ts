@@ -35,3 +35,69 @@ export async function getUserRoles(userId: string): Promise<string[]> {
   const member = await fetchGuildMember(userId)
   return member?.roles ?? []
 }
+
+// Search guild members by username query
+export async function searchGuildMembers(query: string, limit = 5) {
+  const guildId = process.env.DISCORD_GUILD_ID!
+  const botToken = process.env.DISCORD_BOT_TOKEN!
+
+  const r = await fetch(
+    `https://discord.com/api/v10/guilds/${guildId}/members/search?query=${encodeURIComponent(query)}&limit=${limit}`,
+    { headers: { Authorization: `Bot ${botToken}` }, cache: "no-store" },
+  )
+
+  if (!r.ok) return []
+  return await r.json() as Array<{
+    nick?: string
+    roles: string[]
+    user: { id: string; username: string; global_name?: string }
+  }>
+}
+
+// Send a DM to a Discord user via the bot
+export async function sendDM(
+  userId: string,
+  content: string,
+): Promise<{ success: boolean; error?: string }> {
+  const botToken = process.env.DISCORD_BOT_TOKEN!
+
+  // Step 1: Create/open DM channel
+  const chanRes = await fetch("https://discord.com/api/v10/users/@me/channels", {
+    method: "POST",
+    headers: {
+      Authorization: `Bot ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ recipient_id: userId }),
+  })
+
+  if (!chanRes.ok) {
+    const err = await chanRes.text()
+    if (chanRes.status === 403) {
+      return { success: false, error: "dms_disabled" }
+    }
+    return { success: false, error: `dm_channel_failed: ${err}` }
+  }
+
+  const channel = (await chanRes.json()) as { id: string }
+
+  // Step 2: Send message
+  const msgRes = await fetch(`https://discord.com/api/v10/channels/${channel.id}/messages`, {
+    method: "POST",
+    headers: {
+      Authorization: `Bot ${botToken}`,
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify({ content }),
+  })
+
+  if (!msgRes.ok) {
+    const err = await msgRes.text()
+    if (msgRes.status === 403) {
+      return { success: false, error: "dms_disabled" }
+    }
+    return { success: false, error: `dm_send_failed: ${err}` }
+  }
+
+  return { success: true }
+}
