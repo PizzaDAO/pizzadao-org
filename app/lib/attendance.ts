@@ -450,7 +450,52 @@ export async function syncAllCrewAttendance(): Promise<SyncStats> {
 }
 
 // ---------------------------------------------------------------------------
-// 5. Query attendance for a member
+// 5. Batch attendance summary (for crew page member cards)
+// ---------------------------------------------------------------------------
+
+export interface AttendanceSummary {
+  totalCalls: number;
+  lastCallDate: string | null;
+}
+
+let batchCache: { time: number; data: Map<string, AttendanceSummary> } | null =
+  null;
+const BATCH_CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch attendance summary for ALL members in a single query.
+ * Returns a Map keyed by discordId with totalCalls and lastCallDate.
+ * Cached in-memory for 5 minutes.
+ */
+export async function getBatchAttendanceSummary(): Promise<
+  Map<string, AttendanceSummary>
+> {
+  if (batchCache && Date.now() - batchCache.time < BATCH_CACHE_TTL) {
+    return batchCache.data;
+  }
+
+  const rows = await prisma.callAttendance.groupBy({
+    by: ["discordId"],
+    _count: { id: true },
+    _max: { callDate: true },
+  });
+
+  const map = new Map<string, AttendanceSummary>();
+  for (const row of rows) {
+    map.set(row.discordId, {
+      totalCalls: row._count.id,
+      lastCallDate: row._max.callDate
+        ? row._max.callDate.toISOString()
+        : null,
+    });
+  }
+
+  batchCache = { time: Date.now(), data: map };
+  return map;
+}
+
+// ---------------------------------------------------------------------------
+// 6. Query attendance for a member
 // ---------------------------------------------------------------------------
 
 export async function getAttendanceForMember(
