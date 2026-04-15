@@ -310,3 +310,18 @@ model AttendanceSyncLog {
   attendeeCount Int
   syncedAt      DateTime @default(now())
 }
+
+// ===== MAGIC LOGIN VIA DISCORD DM =====
+
+model MagicLoginToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique   // SHA-256 of raw token (raw goes in DM link)
+  discordId String
+  username  String
+  nick      String?
+  expiresAt DateTime            // 10 min from creation
+  usedAt    DateTime?           // null = unused
+  createdAt DateTime  @default(now())
+
+  @@index([discordId, createdAt])
+}

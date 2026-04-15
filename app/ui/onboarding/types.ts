@@ -24,6 +24,7 @@ export type FlowState =
     }
   | { type: "wizard"; step: 0 | 1 | 2 | 3 | 4 | 5 | 6; isUpdate: boolean }
   | { type: "success"; redirectTo: string }
+  | { type: "magic_login" }
   | { type: "error"; message: string; details?: string };
 
 // ============================================================================
