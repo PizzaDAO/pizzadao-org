@@ -27,14 +27,19 @@ export interface PublicMember {
   status: string;
 }
 
+export interface InternalMember extends PublicMember {
+  discordId: string;
+}
+
 export interface FetchMembersOptions {
   includeUnonboarded?: boolean;
+  includeDiscordId?: boolean;
   forceRefresh?: boolean;
 }
 
 type CacheEntry = {
   time: number;
-  data: PublicMember[];
+  data: (PublicMember | InternalMember)[];
 };
 
 const CACHE = new Map<string, CacheEntry>();
@@ -88,13 +93,23 @@ function isOnboarded(
  * Fetch and parse the entire public member list.
  *
  * Results are cached for 5 minutes in-memory, keyed on the
- * `includeUnonboarded` flag. Pass `forceRefresh: true` to bypass.
+ * `includeUnonboarded` and `includeDiscordId` flags.
+ * Pass `forceRefresh: true` to bypass.
  */
 export async function fetchAllMembers(
+  opts: FetchMembersOptions & { includeDiscordId: true }
+): Promise<InternalMember[]>;
+export async function fetchAllMembers(
+  opts?: FetchMembersOptions
+): Promise<PublicMember[]>;
+export async function fetchAllMembers(
   opts: FetchMembersOptions = {}
-): Promise<PublicMember[]> {
+): Promise<PublicMember[] | InternalMember[]> {
   const includeUnonboarded = !!opts.includeUnonboarded;
-  const cacheKey = includeUnonboarded ? "all" : "onboarded";
+  const includeDiscordId = !!opts.includeDiscordId;
+  const cacheKey =
+    (includeUnonboarded ? "all" : "onboarded") +
+    (includeDiscordId ? "_with_discord" : "");
 
   if (!opts.forceRefresh) {
     const cached = CACHE.get(cacheKey);
@@ -136,7 +151,7 @@ export async function fetchAllMembers(
     throw new Error("Could not find header row in Crew sheet");
   }
 
-  // Column indices (allow-list: only what PublicMember needs)
+  // Column indices (allow-list: only what PublicMember needs + optional discordId)
   const idColIdx =
     findColumnIndex(headerRowVals, ["id", "crew id", "member id"], 0) ?? 0;
   const nameColIdx = findColumnIndex(headerRowVals, ["name", "mafia name"]);
@@ -157,13 +172,16 @@ export async function fetchAllMembers(
     "specialties",
     "specialty",
   ]);
+  const discordIdColIdx = includeDiscordId
+    ? findColumnIndex(headerRowVals, ["discordid", "discord id", "discord"])
+    : null;
 
   if (nameColIdx === null) {
     throw new Error("Could not find required Name column in Crew sheet");
   }
 
   const dataStartIdx = headerRowIdx + 1;
-  const members: PublicMember[] = [];
+  const members: (PublicMember | InternalMember)[] = [];
 
   for (let ri = dataStartIdx; ri < rows.length; ri++) {
     const cells = rows[ri]?.c || [];
@@ -192,7 +210,7 @@ export async function fetchAllMembers(
       continue;
     }
 
-    members.push({
+    const member: PublicMember = {
       id,
       name,
       city,
@@ -201,7 +219,16 @@ export async function fetchAllMembers(
       orgs,
       skills,
       status,
-    });
+    };
+
+    if (includeDiscordId && discordIdColIdx !== null) {
+      const discordId = cellString(cells[discordIdColIdx]);
+      (member as InternalMember).discordId = discordId;
+    } else if (includeDiscordId) {
+      (member as InternalMember).discordId = "";
+    }
+
+    members.push(member);
   }
 
   CACHE.set(cacheKey, { time: Date.now(), data: members });
