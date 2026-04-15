@@ -7,7 +7,12 @@ import { fetchPizzaDAONFTs } from "@/app/lib/nft";
 import { fetchFilteredPOAPs } from "@/app/lib/poap";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { cacheGetOrSet } from "@/app/api/lib/cache";
-import { MAFIA_POINT_SOURCES, type PointSource } from "./config";
+import {
+  MAFIA_POINT_SOURCES,
+  REGIONAL_CREW_IDS,
+  COMMUNITY_CREW_IDS,
+  type PointSource,
+} from "./config";
 
 const CACHE_TTL_MEMBER = 15 * 60; // 15 minutes
 
@@ -91,22 +96,42 @@ export async function calculateMafiaPoints(
       }
     }
 
-    // --- Call Attendance ---
-    const attendanceCount = await prisma.callAttendance.count({
+    // --- Call Attendance (split by crew/regional/community) ---
+    const allAttendance = await prisma.callAttendance.findMany({
       where: { discordId },
+      select: { crewId: true },
     });
-    if (attendanceCount > 0) {
-      const attendanceSource = MAFIA_POINT_SOURCES.find(
-        (s) => s.id === "call-attendance",
-      )!;
-      breakdown.push({
-        sourceId: attendanceSource.id,
-        label: attendanceSource.label,
-        category: attendanceSource.category,
-        points: attendanceSource.points,
-        quantity: attendanceCount,
-        total: attendanceSource.points * attendanceCount,
-      });
+
+    if (allAttendance.length > 0) {
+      let crewCount = 0;
+      let regionalCount = 0;
+      let communityCount = 0;
+
+      for (const a of allAttendance) {
+        if (COMMUNITY_CREW_IDS.includes(a.crewId)) communityCount++;
+        else if (REGIONAL_CREW_IDS.includes(a.crewId)) regionalCount++;
+        else crewCount++;
+      }
+
+      const attendanceEntries: Array<{ id: string; count: number }> = [
+        { id: "crew-call-attendance", count: crewCount },
+        { id: "regional-call-attendance", count: regionalCount },
+        { id: "community-call-attendance", count: communityCount },
+      ];
+
+      for (const entry of attendanceEntries) {
+        if (entry.count > 0) {
+          const source = MAFIA_POINT_SOURCES.find((s) => s.id === entry.id)!;
+          breakdown.push({
+            sourceId: source.id,
+            label: source.label,
+            category: source.category,
+            points: source.points,
+            quantity: entry.count,
+            total: source.points * entry.count,
+          });
+        }
+      }
     }
   }
 

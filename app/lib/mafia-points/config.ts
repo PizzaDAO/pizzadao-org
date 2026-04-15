@@ -3,11 +3,12 @@
 export interface PointSource {
   id: string;
   label: string;
-  category: "discord_role" | "nft" | "poap" | "attendance";
+  category: "discord_role" | "nft" | "poap" | "attendance" | "manual";
   points: number;
   roleId?: string;
   roleIds?: string[]; // "any of these" (Toppings Artists)
   contractName?: string; // matches NFTContract.name from contracts sheet
+  crewIds?: string[]; // for attendance subtypes
 }
 
 // Discord role IDs (from guild query)
@@ -34,20 +35,25 @@ export const TOPPINGS_ARTIST_ROLE_IDS = [
   "813435285216034858", // Packaging
 ];
 
+// Attendance crew categorization
+export const REGIONAL_CREW_IDS = ["latam", "africa"];
+export const COMMUNITY_CREW_IDS = ["community_call"];
+// Everything else is a crew call
+
 export const MAFIA_POINT_SOURCES: PointSource[] = [
   // Discord Roles
   {
     id: "dread-pizza-roberts",
     label: "Dread Pizza Roberts",
     category: "discord_role",
-    points: 69420,
+    points: 125000,
     roleId: ROLE_DREAD_PIZZA_ROBERTS,
   },
   {
     id: "pizza-capo",
     label: "Pizza Capo",
     category: "discord_role",
-    points: 13370,
+    points: 25000,
     roleId: ROLE_PIZZA_CAPO,
   },
   {
@@ -112,7 +118,7 @@ export const MAFIA_POINT_SOURCES: PointSource[] = [
     id: "partner-nfts",
     label: "Partner NFTs",
     category: "nft",
-    points: 314,
+    points: 1337,
     contractName: "Partner NFTs",
   },
   {
@@ -130,6 +136,12 @@ export const MAFIA_POINT_SOURCES: PointSource[] = [
     contractName: "Zora Pizza",
   },
   {
+    id: "pizzadao-poap",
+    label: "PizzaDAO POAP Holders",
+    category: "poap",
+    points: 690,
+  },
+  {
     id: "pizza-people",
     label: "Pizza People",
     category: "nft",
@@ -137,19 +149,55 @@ export const MAFIA_POINT_SOURCES: PointSource[] = [
     contractName: "Pizza People",
   },
 
-  // POAPs (per-item)
+  // Attendance (per-call, split by type)
   {
-    id: "pizzadao-poap",
-    label: "PizzaDAO POAP",
-    category: "poap",
-    points: 100,
+    id: "crew-call-attendance",
+    label: "Crew Call Attendance",
+    category: "attendance",
+    points: 4269,
+  },
+  {
+    id: "regional-call-attendance",
+    label: "Regional Call Attendance",
+    category: "attendance",
+    points: 1337,
+  },
+  {
+    id: "community-call-attendance",
+    label: "Community Call Attendance",
+    category: "attendance",
+    points: 1337,
   },
 
-  // Attendance (per-call)
+  // Manual sources (not yet auto-computed — Phase 4)
   {
-    id: "call-attendance",
-    label: "Call Attendance",
-    category: "attendance",
-    points: 100,
+    id: "conference-event-host",
+    label: "Conference Event Host",
+    category: "manual",
+    points: 10000,
+  },
+  {
+    id: "global-pizza-party-host",
+    label: "Global Pizza Party Host",
+    category: "manual",
+    points: 10000,
+  },
+  {
+    id: "art-show-participant",
+    label: "Art Show Participant",
+    category: "manual",
+    points: 4269,
+  },
+  {
+    id: "octant-voters",
+    label: "Octant Voters",
+    category: "manual",
+    points: 2000,
+  },
+  {
+    id: "global-pizza-party-attendance",
+    label: "Global Pizza Party Attendance",
+    category: "manual",
+    points: 420,
   },
 ];
