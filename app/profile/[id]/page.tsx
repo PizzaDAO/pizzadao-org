@@ -10,6 +10,7 @@ import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { ProfileLinksDisplay } from "../../ui/profile-links";
 import { AttendanceCard } from "../../ui/attendance-card";
+import { MafiaPointsCard } from "../../ui/mafia-points/MafiaPointsCard";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -556,6 +557,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                     {/* Crew Call Attendance */}
                     <AttendanceCard memberId={idValue} />
+
+                    {/* Mafia Points */}
+                    <MafiaPointsCard memberId={idValue} />
                 </div>
 
                 {/* Footer */}
