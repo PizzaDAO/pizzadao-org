@@ -58,7 +58,7 @@ export async function requestMagicLogin(
   const message = [
     "**PizzaDAO Login Link**",
     "",
-    `Click to log in: ${loginUrl}`,
+    `Click to log in: <${loginUrl}>`,
     "",
     "This link expires in 10 minutes and can only be used once.",
     "If you didn't request this, you can ignore it.",
