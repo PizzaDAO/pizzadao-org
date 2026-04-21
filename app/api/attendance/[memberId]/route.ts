@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
-import { fetchMemberById } from "@/app/lib/sheets/member-repository";
-import { getAttendanceForMember } from "@/app/lib/attendance";
+import { prisma } from "@/app/lib/db";
 
 export async function GET(
   _req: Request,
@@ -16,27 +15,32 @@ export async function GET(
   }
 
   try {
-    // Resolve memberId to discordId via the member sheet
-    const member = await fetchMemberById(memberId);
-    if (!member) {
-      return NextResponse.json(
-        { error: "Member not found" },
-        { status: 404 }
-      );
-    }
+    // Read pre-computed summary directly — no Google Sheets call, no aggregation
+    const summary = await prisma.attendanceSummary.findFirst({
+      where: { memberId },
+    });
 
-    const discordId = member.discordId;
-    if (!discordId) {
-      // Member exists but has no Discord ID — return empty result
+    if (!summary) {
       return NextResponse.json({
         totalCalls: 0,
         crewBreakdown: {},
         recentCalls: [],
+      }, {
+        headers: {
+          "Cache-Control": "public, s-maxage=31536000, stale-while-revalidate=31536000",
+        },
       });
     }
 
-    const attendance = await getAttendanceForMember(discordId);
-    return NextResponse.json(attendance);
+    return NextResponse.json({
+      totalCalls: summary.totalCalls,
+      crewBreakdown: summary.crewBreakdown,
+      recentCalls: summary.recentCalls,
+    }, {
+      headers: {
+        "Cache-Control": "public, s-maxage=31536000, stale-while-revalidate=31536000",
+      },
+    });
   } catch (err) {
     console.error("[attendance] GET error:", err);
     return NextResponse.json(

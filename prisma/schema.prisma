@@ -300,6 +300,19 @@ model CallAttendance {
   @@index([callDate])
 }
 
+// Pre-computed per-member attendance aggregates (rebuilt on sync)
+model AttendanceSummary {
+  discordId     String   @id
+  memberId      String?  @unique
+  totalCalls    Int
+  crewBreakdown Json     // { [crewId]: { crewLabel, count, lastAttended } }
+  recentCalls   Json     // [{ date, crew, crewId }] last 10
+  lastSyncedAt  DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([memberId])
+}
+
 // Track which daily sheets have already been synced
 model AttendanceSyncLog {
   id            Int      @id @default(autoincrement())
@@ -324,4 +337,32 @@ model MagicLoginToken {
   createdAt DateTime  @default(now())
 
   @@index([discordId, createdAt])
+}
+
+// ===== DISCORD SERVER ACTIVITY =====
+
+// Per-member participation stats computed from Discord export metadata
+model DiscordActivity {
+  discordId          String   @id
+  authorName         String?  // Latest known username
+  totalMessages      Int
+  firstSeen          DateTime
+  lastSeen           DateTime
+  activeDays         Int
+  activeMonths       Int
+  channelsActive     Int
+  topChannels        Json     // [{name, count}] top 10
+  categoryBreakdown  Json     // {category: messageCount}
+  repliesSent        Int
+  reactionsReceived  Int
+  threadMessages     Int
+  avgContentLen      Float
+  monthlyBreakdown   Json     // [{month: "2024-01", count: 42}]
+  engagementScore    Float    // Composite 0-100
+  scoreBreakdown     Json     // {volume, consistency, recency, diversity, engagement}
+  lastSyncedAt       DateTime @default(now())
+
+  @@index([engagementScore])
+  @@index([totalMessages])
+  @@index([lastSeen])
 }
