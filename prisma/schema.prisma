@@ -15,6 +15,7 @@ model User {
 
   pendingSignatures PendingSignature[]
   economy           Economy?
+  unlockTicketClaim UnlockTicketClaim?
 }
 
 // ===== $PEP ECONOMY SYSTEM =====
@@ -324,4 +325,32 @@ model MagicLoginToken {
   createdAt DateTime  @default(now())
 
   @@index([discordId, createdAt])
+}
+
+// ===== UNLOCK TICKET CLAIMS =====
+
+model UnlockTicketClaim {
+  id            Int                  @id @default(autoincrement())
+  discordId     String               @unique
+  memberId      String
+  walletAddress String               @unique
+  ticketCount   Int
+  pointsAwarded Int
+  claimedAt     DateTime             @default(now())
+  tickets       UnlockTicketRecord[]
+  user          User                 @relation(fields: [discordId], references: [id])
+
+  @@index([memberId])
+}
+
+model UnlockTicketRecord {
+  id          Int               @id @default(autoincrement())
+  claimId     Int
+  lockAddress String
+  networkId   Int
+  eventName   String
+  tokenId     String
+  claim       UnlockTicketClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([lockAddress, tokenId, networkId])
 }

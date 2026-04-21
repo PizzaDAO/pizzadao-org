@@ -13,6 +13,7 @@ import { POAPCollection } from "../../ui/poap";
 import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
+import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -827,6 +828,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     {/* NFT Collection Section - shows connect prompt if no wallet */}
                     <NFTCollection memberId={idValue} showConnectPrompt={true} />
+
+                    {/* Pizza Party Tickets */}
+                    <UnlockTicketCard memberId={idValue} />
 
                     {/* Crews Section - MATCHING STEP 5 UI */}
                     {(() => {

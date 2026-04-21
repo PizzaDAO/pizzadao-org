@@ -14,6 +14,7 @@ export interface Session {
     discordId: string;
     username?: string;
     nick?: string;
+    unlockWallet?: string;  // recovered from Unlock SIWE
     createdAt: number;
 }
 
