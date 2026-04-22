@@ -15,6 +15,7 @@ model User {
 
   pendingSignatures PendingSignature[]
   economy           Economy?
+  unlockTicketClaim UnlockTicketClaim?
 }
 
 // ===== $PEP ECONOMY SYSTEM =====
@@ -300,6 +301,19 @@ model CallAttendance {
   @@index([callDate])
 }
 
+// Pre-computed per-member attendance aggregates (rebuilt on sync)
+model AttendanceSummary {
+  discordId     String   @id
+  memberId      String?  @unique
+  totalCalls    Int
+  crewBreakdown Json     // { [crewId]: { crewLabel, count, lastAttended } }
+  recentCalls   Json     // [{ date, crew, crewId }] last 10
+  lastSyncedAt  DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([memberId])
+}
+
 // Track which daily sheets have already been synced
 model AttendanceSyncLog {
   id            Int      @id @default(autoincrement())
@@ -309,4 +323,75 @@ model AttendanceSyncLog {
   callDate      DateTime
   attendeeCount Int
   syncedAt      DateTime @default(now())
+}
+
+// ===== MAGIC LOGIN VIA DISCORD DM =====
+
+model MagicLoginToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique   // SHA-256 of raw token (raw goes in DM link)
+  discordId String
+  username  String
+  nick      String?
+  expiresAt DateTime            // 10 min from creation
+  usedAt    DateTime?           // null = unused
+  createdAt DateTime  @default(now())
+
+  @@index([discordId, createdAt])
+}
+
+// ===== DISCORD SERVER ACTIVITY =====
+
+// Per-member participation stats computed from Discord export metadata
+model DiscordActivity {
+  discordId          String   @id
+  authorName         String?  // Latest known username
+  totalMessages      Int
+  firstSeen          DateTime
+  lastSeen           DateTime
+  activeDays         Int
+  activeMonths       Int
+  channelsActive     Int
+  topChannels        Json     // [{name, count}] top 10
+  categoryBreakdown  Json     // {category: messageCount}
+  repliesSent        Int
+  reactionsReceived  Int
+  threadMessages     Int
+  avgContentLen      Float
+  monthlyBreakdown   Json     // [{month: "2024-01", count: 42}]
+  engagementScore    Float    // Composite 0-100
+  scoreBreakdown     Json     // {volume, consistency, recency, diversity, engagement}
+  lastSyncedAt       DateTime @default(now())
+
+  @@index([engagementScore])
+  @@index([totalMessages])
+  @@index([lastSeen])
+}
+
+// ===== UNLOCK TICKET CLAIMS =====
+
+model UnlockTicketClaim {
+  id            Int                  @id @default(autoincrement())
+  discordId     String               @unique
+  memberId      String
+  walletAddress String               @unique
+  ticketCount   Int
+  pointsAwarded Int
+  claimedAt     DateTime             @default(now())
+  tickets       UnlockTicketRecord[]
+  user          User                 @relation(fields: [discordId], references: [id])
+
+  @@index([memberId])
+}
+
+model UnlockTicketRecord {
+  id          Int               @id @default(autoincrement())
+  claimId     Int
+  lockAddress String
+  networkId   Int
+  eventName   String
+  tokenId     String
+  claim       UnlockTicketClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([lockAddress, tokenId, networkId])
 }

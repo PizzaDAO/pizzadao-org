@@ -11,6 +11,7 @@ import { POAPCollection } from "../../ui/poap";
 import { ProfileLinksDisplay } from "../../ui/profile-links";
 import { AttendanceCard } from "../../ui/attendance-card";
 import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
+import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -581,6 +582,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                     {/* Crew Call Attendance */}
                     <AttendanceCard memberId={idValue} />
+
+                    {/* Pizza Party Tickets */}
+                    <UnlockTicketCard memberId={idValue} />
                 </div>
 
                 {/* Footer */}

@@ -6,9 +6,10 @@ import { btn } from "../styles";
 type Props = {
   onJoin: () => void;
   onLogin: () => void;
+  onMagicLogin: () => void;
 };
 
-export function WelcomeStep({ onJoin, onLogin }: Props) {
+export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
   return (
     <div style={{ display: "grid", gap: 20, textAlign: "center", padding: "20px 0" }}>
       <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
@@ -35,6 +36,21 @@ export function WelcomeStep({ onJoin, onLogin }: Props) {
           Already in our Discord? Login
         </button>
       </div>
+      <button
+        onClick={onMagicLogin}
+        style={{
+          background: "none",
+          border: "none",
+          color: "var(--color-text)",
+          opacity: 0.5,
+          fontSize: 13,
+          cursor: "pointer",
+          textDecoration: "underline",
+          padding: 4,
+        }}
+      >
+        Can't log in? Try Discord DM
+      </button>
     </div>
   );
 }

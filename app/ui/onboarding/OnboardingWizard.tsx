@@ -7,6 +7,7 @@ import { TURTLES } from "../constants";
 
 import { LoadingScreen } from "./LoadingScreen";
 import { ClaimFlow } from "./ClaimFlow";
+import { MagicLoginFlow } from "./MagicLoginFlow";
 import { WelcomeStep } from "./steps/WelcomeStep";
 import { NameStep } from "./steps/NameStep";
 import { CityStep } from "./steps/CityStep";
@@ -73,6 +74,9 @@ export function OnboardingWizard() {
   const [error, setError] = useState<string | undefined>();
   const [errorDetails, setErrorDetails] = useState<string | undefined>();
 
+  // --- Magic login error from redirect ---
+  const [loginError, setLoginError] = useState<string | null>(null);
+
   // --- Name generation state ---
   const [generatingNames, setGeneratingNames] = useState(false);
   const [lastGenParams, setLastGenParams] = useState<{ topping: string; movie: string; style: string } | null>(null);
@@ -114,9 +118,10 @@ export function OnboardingWizard() {
     const discordNick = url.searchParams.get("discordNick") || undefined;
     const isEdit = url.searchParams.get("edit") === "1";
     const memberId = url.searchParams.get("memberId") || undefined;
+    const loginErrorParam = url.searchParams.get("loginError");
 
     // Clean URL params
-    if (discordId || isEdit) {
+    if (discordId || isEdit || loginErrorParam) {
       hasProcessedParams.current = true;
       url.searchParams.delete("discordId");
       url.searchParams.delete("discordJoined");
@@ -124,7 +129,15 @@ export function OnboardingWizard() {
       url.searchParams.delete("discordNick");
       url.searchParams.delete("edit");
       url.searchParams.delete("memberId");
+      url.searchParams.delete("loginError");
       window.history.replaceState({}, "", url.toString());
+    }
+
+    // Handle magic login error redirect
+    if (loginErrorParam) {
+      setLoginError(loginErrorParam);
+      setFlow({ type: "magic_login" });
+      return;
     }
 
     // Handle Discord OAuth callback
@@ -435,6 +448,22 @@ export function OnboardingWizard() {
     return <LoadingScreen flow={flow} />;
   }
 
+  // Magic login flow
+  if (flow.type === "magic_login") {
+    return (
+      <div style={card()}>
+        <h2 style={{ margin: 0, fontWeight: 800 }}>Login via Discord DM</h2>
+        <MagicLoginFlow
+          onBack={() => {
+            setLoginError(null);
+            setFlow({ type: "wizard", step: 0, isUpdate: false });
+          }}
+          loginError={loginError}
+        />
+      </div>
+    );
+  }
+
   // Claim flow
   if (flow.type === "claim_flow") {
     return (
@@ -559,6 +588,7 @@ export function OnboardingWizard() {
               const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
               (window.top || window).location.href = loginUrl;
             }}
+            onMagicLogin={() => setFlow({ type: "magic_login" })}
           />
         )}
 
