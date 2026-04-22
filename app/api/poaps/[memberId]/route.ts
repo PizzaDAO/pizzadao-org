@@ -79,6 +79,9 @@ export async function GET(
   { params }: { params: Promise<{ memberId: string }> }
 ): Promise<NextResponse<POAPCollectionResponse>> {
   const { memberId } = await params;
+  const url = new URL(req.url);
+  const limitParam = url.searchParams.get('limit');
+  const limit = limitParam ? parseInt(limitParam, 10) : 0;
 
   if (!memberId) {
     return NextResponse.json(
@@ -104,6 +107,20 @@ export async function GET(
   // 2. Fetch filtered POAPs (uses incremental caching)
   try {
     const { poaps, totalCount, fromCache, debug } = await fetchFilteredPOAPs(walletAddress);
+
+    // When limit is set, return first (limit-1) newest + 1 oldest POAP
+    // This matches the collapsed UI layout (13 newest + 1 oldest = limit 14)
+    if (limit > 0 && poaps.length > limit) {
+      const newest = poaps.slice(0, limit - 1);
+      const oldest = poaps[poaps.length - 1];
+      return NextResponse.json({
+        poaps: [...newest, oldest],
+        totalCount,
+        walletAddress,
+        fromCache,
+        debug,
+      });
+    }
 
     return NextResponse.json({
       poaps,

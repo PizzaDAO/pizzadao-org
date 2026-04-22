@@ -40,10 +40,19 @@ export interface NFTDisplayItem {
   metadata?: Record<string, unknown>;
 }
 
+export interface NFTGroupInfo {
+  contractName: string;
+  chain: string;
+  contract: string;
+  totalInGroup: number;
+  order?: number;
+}
+
 export interface NFTCollectionResponse {
   nfts: NFTDisplayItem[];
   totalCount: number;
   walletAddress: string | null;
   noWallet?: boolean;
   error?: string;
+  groups?: NFTGroupInfo[];
 }

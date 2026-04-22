@@ -10,6 +10,7 @@ import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { ProfileLinksDisplay } from "../../ui/profile-links";
 import { AttendanceCard } from "../../ui/attendance-card";
+import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 
 const inter = Inter({ subsets: ["latin"] });
@@ -281,7 +282,31 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                     )}
 
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                        <StatItem label="Name" value={name} />
+                        <div>
+                            <h3 style={{
+                                fontSize: 12,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                                opacity: 0.5,
+                                marginTop: 0,
+                                marginBottom: 6,
+                                fontWeight: 700
+                            }}>
+                                Name
+                            </h3>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                <p style={{
+                                    fontSize: 18,
+                                    fontWeight: 500,
+                                    color: 'var(--color-text-primary)',
+                                    margin: 0,
+                                    wordBreak: "break-word"
+                                }}>
+                                    {name}
+                                </p>
+                                <MafiaRankBadge memberId={idValue} />
+                            </div>
+                        </div>
                         <StatItem label="City" value={city} />
                         <StatItem label="Status" value={status || "—"} />
                         <StatItem label="ID" value={`#${idValue}`} />

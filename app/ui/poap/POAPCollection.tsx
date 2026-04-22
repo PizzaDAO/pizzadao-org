@@ -10,6 +10,7 @@ interface POAPCollectionProps {
 
 export function POAPCollection({ memberId }: POAPCollectionProps) {
   const [data, setData] = useState<POAPCollectionResponse | null>(null);
+  const [fullData, setFullData] = useState<POAPCollectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState(false);
@@ -20,7 +21,8 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
         setLoading(true);
         setError(false);
 
-        const res = await fetch(`/api/poaps/${memberId}`);
+        // Initial fetch: only 13 newest + 1 oldest (limit=14)
+        const res = await fetch(`/api/poaps/${memberId}?limit=14`);
 
         if (!res.ok) {
           throw new Error('Failed to fetch POAPs');
@@ -51,9 +53,12 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
     return null;
   }
 
+  // Use full data when expanded and available, otherwise use initial limited data
+  const activeData = (expanded && fullData) ? fullData : data;
+
   // Calculate what to show
   const totalCount = data?.totalCount || 0;
-  const allPoaps = data?.poaps || [];
+  const allPoaps = activeData?.poaps || [];
   const hasHidden = totalCount > 14; // More than 13 newest + 1 oldest
   const hiddenCount = hasHidden ? totalCount - 14 : 0;
 
@@ -61,6 +66,22 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
   const newest13 = allPoaps.slice(0, 13);
   const oldest1 = allPoaps.length > 0 ? [allPoaps[allPoaps.length - 1]] : [];
   const middlePoaps = allPoaps.slice(13, -1); // Everything between newest 13 and oldest 1
+
+  async function handleExpand() {
+    setExpanded(true);
+    // Fetch full data if we haven't yet
+    if (!fullData) {
+      try {
+        const res = await fetch(`/api/poaps/${memberId}`);
+        if (res.ok) {
+          const result: POAPCollectionResponse = await res.json();
+          setFullData(result);
+        }
+      } catch {
+        // Keep using limited data
+      }
+    }
+  }
 
   return (
     <div className="mt-4">
@@ -92,7 +113,7 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
             {/* Hidden count badge - clickable to expand */}
             {hasHidden && !expanded && (
               <button
-                onClick={() => setExpanded(true)}
+                onClick={handleExpand}
                 className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 hover:border-yellow-400 flex items-center justify-center bg-gray-50 hover:bg-yellow-50 flex-shrink-0 transition-colors cursor-pointer"
                 title={`Show ${hiddenCount} more POAPs`}
               >
