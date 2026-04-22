@@ -14,8 +14,9 @@ export function MafiaRankBadge({ memberId }: { memberId: string }) {
   if (!rank) return null;
 
   return (
-    <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-amber-100 text-amber-800 dark:bg-amber-900/30 dark:text-amber-300">
-      {rank}
-    </span>
+    <div className="text-xs">
+      <span className="text-zinc-500 dark:text-zinc-400">Pizza Mafia Rank</span>
+      <p className="font-semibold text-amber-700 dark:text-amber-300">{rank}</p>
+    </div>
   );
 }

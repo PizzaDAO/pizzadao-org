@@ -212,7 +212,7 @@ export interface MafiaRank {
 }
 
 export const MAFIA_RANKS: MafiaRank[] = [
-  { name: "Boss", minPoints: 250000 },
+  { name: "Don", minPoints: 250000 },
   { name: "Consigliere", minPoints: 100000 },
   { name: "Underboss", minPoints: 50000 },
   { name: "Capo", minPoints: 15000 },
