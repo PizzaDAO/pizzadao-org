@@ -15,7 +15,7 @@ import {
   getRankForPoints,
 } from "./config";
 
-const CACHE_TTL_MEMBER = 15 * 60; // 15 minutes
+const CACHE_TTL_MEMBER = 2 * 60 * 60; // 2 hours — rank changes rarely
 
 // ---------------------------------------------------------------------------
 // Types
@@ -71,121 +71,117 @@ async function calculateMafiaPoints(
 
   const breakdown: PointBreakdown[] = [];
 
-  // --- Discord Roles ---
-  if (discordId) {
-    const guildMember = await fetchGuildMember(discordId);
-    const userRoles = guildMember?.roles ?? [];
+  // Run all data fetches in parallel
+  const [guildMember, allAttendance, nftData, poapData] = await Promise.all([
+    discordId ? fetchGuildMember(discordId) : Promise.resolve(null),
+    discordId
+      ? prisma.callAttendance.findMany({ where: { discordId }, select: { crewId: true } })
+      : Promise.resolve([]),
+    wallet ? fetchPizzaDAONFTs(wallet) : Promise.resolve({ nfts: [] as Array<{ contractName: string }> }),
+    wallet
+      ? fetchFilteredPOAPs(wallet).catch(() => ({ totalCount: 0 }))
+      : Promise.resolve({ totalCount: 0 }),
+  ]);
 
-    for (const source of MAFIA_POINT_SOURCES.filter(
-      (s) => s.category === "discord_role",
-    )) {
-      if (source.roleId && userRoles.includes(source.roleId)) {
+  // --- Discord Roles ---
+  const userRoles = guildMember?.roles ?? [];
+
+  for (const source of MAFIA_POINT_SOURCES.filter(
+    (s) => s.category === "discord_role",
+  )) {
+    if (source.roleId && userRoles.includes(source.roleId)) {
+      breakdown.push({
+        sourceId: source.id,
+        label: source.label,
+        category: source.category,
+        points: source.points,
+        quantity: 1,
+        total: source.points,
+      });
+    } else if (source.roleIds) {
+      // "any of these roles" — count how many the user has
+      const count = source.roleIds.filter((r) => userRoles.includes(r)).length;
+      if (count > 0) {
         breakdown.push({
           sourceId: source.id,
           label: source.label,
           category: source.category,
           points: source.points,
-          quantity: 1,
-          total: source.points,
+          quantity: count,
+          total: source.points * count,
         });
-      } else if (source.roleIds) {
-        // "any of these roles" — count how many the user has
-        const count = source.roleIds.filter((r) => userRoles.includes(r)).length;
-        if (count > 0) {
-          breakdown.push({
-            sourceId: source.id,
-            label: source.label,
-            category: source.category,
-            points: source.points,
-            quantity: count,
-            total: source.points * count,
-          });
-        }
       }
     }
+  }
 
-    // --- Call Attendance (split by crew/regional/community) ---
-    const allAttendance = await prisma.callAttendance.findMany({
-      where: { discordId },
-      select: { crewId: true },
-    });
+  // --- Call Attendance (split by crew/regional/community) ---
+  if (allAttendance.length > 0) {
+    let crewCount = 0;
+    let regionalCount = 0;
+    let communityCount = 0;
 
-    if (allAttendance.length > 0) {
-      let crewCount = 0;
-      let regionalCount = 0;
-      let communityCount = 0;
+    for (const a of allAttendance) {
+      if (COMMUNITY_CREW_IDS.includes(a.crewId)) communityCount++;
+      else if (REGIONAL_CREW_IDS.includes(a.crewId)) regionalCount++;
+      else crewCount++;
+    }
 
-      for (const a of allAttendance) {
-        if (COMMUNITY_CREW_IDS.includes(a.crewId)) communityCount++;
-        else if (REGIONAL_CREW_IDS.includes(a.crewId)) regionalCount++;
-        else crewCount++;
-      }
+    const attendanceEntries: Array<{ id: string; count: number }> = [
+      { id: "crew-call-attendance", count: crewCount },
+      { id: "regional-call-attendance", count: regionalCount },
+      { id: "community-call-attendance", count: communityCount },
+    ];
 
-      const attendanceEntries: Array<{ id: string; count: number }> = [
-        { id: "crew-call-attendance", count: crewCount },
-        { id: "regional-call-attendance", count: regionalCount },
-        { id: "community-call-attendance", count: communityCount },
-      ];
-
-      for (const entry of attendanceEntries) {
-        if (entry.count > 0) {
-          const source = MAFIA_POINT_SOURCES.find((s) => s.id === entry.id)!;
-          breakdown.push({
-            sourceId: source.id,
-            label: source.label,
-            category: source.category,
-            points: source.points,
-            quantity: entry.count,
-            total: source.points * entry.count,
-          });
-        }
+    for (const entry of attendanceEntries) {
+      if (entry.count > 0) {
+        const source = MAFIA_POINT_SOURCES.find((s) => s.id === entry.id)!;
+        breakdown.push({
+          sourceId: source.id,
+          label: source.label,
+          category: source.category,
+          points: source.points,
+          quantity: entry.count,
+          total: source.points * entry.count,
+        });
       }
     }
   }
 
   // --- NFTs (per-item) ---
-  if (wallet) {
-    const nftData = await fetchPizzaDAONFTs(wallet);
-    if (nftData.nfts.length > 0) {
-      const nftSources = MAFIA_POINT_SOURCES.filter(
-        (s) => s.category === "nft",
-      );
+  if (nftData.nfts.length > 0) {
+    const nftSources = MAFIA_POINT_SOURCES.filter(
+      (s) => s.category === "nft",
+    );
 
-      // Count NFTs per source by matching contractName
-      for (const source of nftSources) {
-        const count = countNFTsForSource(nftData.nfts, source);
-        if (count > 0) {
-          breakdown.push({
-            sourceId: source.id,
-            label: source.label,
-            category: source.category,
-            points: source.points,
-            quantity: count,
-            total: source.points * count,
-          });
-        }
-      }
-    }
-
-    // --- POAPs ---
-    try {
-      const poapData = await fetchFilteredPOAPs(wallet);
-      if (poapData.totalCount > 0) {
-        const poapSource = MAFIA_POINT_SOURCES.find(
-          (s) => s.id === "pizzadao-poap",
-        )!;
+    // Count NFTs per source by matching contractName
+    for (const source of nftSources) {
+      const count = countNFTsForSource(nftData.nfts, source);
+      if (count > 0) {
         breakdown.push({
-          sourceId: poapSource.id,
-          label: poapSource.label,
-          category: poapSource.category,
-          points: poapSource.points,
-          quantity: poapData.totalCount,
-          total: poapSource.points * poapData.totalCount,
+          sourceId: source.id,
+          label: source.label,
+          category: source.category,
+          points: source.points,
+          quantity: count,
+          total: source.points * count,
         });
       }
-    } catch {
-      // POAP fetch can fail — don't break the whole calculation
     }
+  }
+
+  // --- POAPs ---
+  if (poapData.totalCount > 0) {
+    const poapSource = MAFIA_POINT_SOURCES.find(
+      (s) => s.id === "pizzadao-poap",
+    )!;
+    breakdown.push({
+      sourceId: poapSource.id,
+      label: poapSource.label,
+      category: poapSource.category,
+      points: poapSource.points,
+      quantity: poapData.totalCount,
+      total: poapSource.points * poapData.totalCount,
+    });
   }
 
   // Sort by total descending
