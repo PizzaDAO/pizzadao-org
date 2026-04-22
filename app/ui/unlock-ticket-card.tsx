@@ -168,7 +168,7 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
 
   function handleUnlockLogin() {
     const redirectUri = `${window.location.origin}/api/unlock/callback`;
-    const url = `${UNLOCK_CHECKOUT_URL}?client_id=${encodeURIComponent(window.location.origin)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
+    const url = `${UNLOCK_CHECKOUT_URL}?redirectUri=${encodeURIComponent(redirectUri)}`;
     window.location.href = url;
   }
 
@@ -282,8 +282,7 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
       {state === "own-unclaimed" && (
         <div style={{ textAlign: "center", padding: 20 }}>
           <p style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>
-            Verify your Unlock wallet to claim Pizza Points for your GPP
-            tickets.
+            Sign in with Unlock to show your tickets.
           </p>
           <button
             onClick={handleUnlockLogin}
