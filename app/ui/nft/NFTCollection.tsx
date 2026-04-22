@@ -25,13 +25,14 @@ type GroupedNFT = {
 
 export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPrompt = true }: NFTCollectionProps) {
   const [data, setData] = useState<NFTCollectionResponse | null>(null);
+  const [fullData, setFullData] = useState<NFTCollectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [walletSaved, setWalletSaved] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const { address, isConnected } = useAccount();
 
-  const toggleGroup = useCallback((groupKey: string) => {
+  const toggleGroup = useCallback(async (groupKey: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
       if (next.has(groupKey)) {
@@ -41,12 +42,23 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
       }
       return next;
     });
-  }, []);
+
+    // If expanding and we haven't fetched full data yet, fetch it
+    if (!expandedGroups.has(groupKey) && !fullData) {
+      try {
+        const res = await fetch(`/api/nfts/${memberId}`);
+        const json = await res.json();
+        setFullData(json);
+      } catch {
+        // Keep using limited data
+      }
+    }
+  }, [expandedGroups, fullData, memberId]);
 
   const fetchNFTs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/nfts/${memberId}`);
+      const res = await fetch(`/api/nfts/${memberId}?limit=${maxPerCollection}`);
       const json = await res.json();
       setData(json);
     } catch (e) {
@@ -54,7 +66,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
     } finally {
       setLoading(false);
     }
-  }, [memberId]);
+  }, [memberId, maxPerCollection]);
 
   useEffect(() => {
     fetchNFTs();
@@ -87,6 +99,28 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
     saveWallet();
   }, [isConnected, address, data?.noWallet, walletSaved, saving, memberId, fetchNFTs]);
 
+  // Build a lookup of group totals from the API groups metadata
+  const groupTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const g of data?.groups || []) {
+      map.set(`${g.chain}:${g.contract}`, g.totalInGroup);
+    }
+    return map;
+  }, [data?.groups]);
+
+  // When full data is loaded, build a lookup for full NFT lists per group
+  const fullGroupNfts = useMemo(() => {
+    if (!fullData?.nfts) return new Map<string, NFTDisplayItem[]>();
+    const map = new Map<string, NFTDisplayItem[]>();
+    for (const nft of fullData.nfts) {
+      const key = `${nft.chain}:${nft.contractAddress}`;
+      const list = map.get(key) || [];
+      list.push(nft);
+      map.set(key, list);
+    }
+    return map;
+  }, [fullData?.nfts]);
+
   // Group NFTs by contract address
   const groupedNFTs = useMemo(() => {
     if (!data?.nfts) return [];
@@ -111,11 +145,16 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
 
     // Calculate display NFTs and overflow for each group, then sort by order
     return Object.values(groups)
-      .map((group) => ({
-        ...group,
-        displayNfts: group.nfts.slice(0, maxPerCollection),
-        overflow: Math.max(0, group.nfts.length - maxPerCollection),
-      }))
+      .map((group) => {
+        const key = `${group.chain}:${group.contract}`;
+        // Use API group metadata for total count (accounts for limited response)
+        const totalInGroup = groupTotals.get(key) || group.nfts.length;
+        return {
+          ...group,
+          displayNfts: group.nfts.slice(0, maxPerCollection),
+          overflow: Math.max(0, totalInGroup - maxPerCollection),
+        };
+      })
       .sort((a, b) => {
         // Items with order come first, sorted by order value
         // Items without order come last
@@ -126,7 +165,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
         if (b.order !== undefined) return 1;
         return 0;
       });
-  }, [data?.nfts, maxPerCollection]);
+  }, [data?.nfts, maxPerCollection, groupTotals]);
 
   const sectionStyle: React.CSSProperties = {
     marginTop: 24,
@@ -295,7 +334,9 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
         {groupedNFTs.map((group) => {
           const groupKey = `${group.chain}:${group.contract}`;
           const isExpanded = expandedGroups.has(groupKey);
-          const nftsToShow = isExpanded ? group.nfts : group.displayNfts;
+          // When expanded, prefer full data if available, else fall back to limited data
+          const allNftsForGroup = fullGroupNfts.get(groupKey) || group.nfts;
+          const nftsToShow = isExpanded ? allNftsForGroup : group.displayNfts;
 
           return (
             <React.Fragment key={groupKey}>
