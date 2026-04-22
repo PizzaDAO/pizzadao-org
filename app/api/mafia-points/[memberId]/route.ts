@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { getMafiaPoints } from "@/app/lib/mafia-points";
+import { getMafiaRank } from "@/app/lib/mafia-points";
 
 export const runtime = "nodejs";
 
@@ -14,12 +14,17 @@ export async function GET(
   }
 
   try {
-    const result = await getMafiaPoints(memberId);
-    return NextResponse.json(result);
+    const result = await getMafiaRank(memberId);
+    return NextResponse.json({
+      memberId: result.memberId,
+      memberName: result.memberName,
+      rank: result.rank.name,
+      lastCalculated: result.lastCalculated,
+    });
   } catch (e: unknown) {
-    console.error("Mafia points error:", e);
+    console.error("Mafia rank error:", e);
     return NextResponse.json(
-      { error: "Failed to calculate mafia points" },
+      { error: "Failed to calculate mafia rank" },
       { status: 500 },
     );
   }

@@ -12,6 +12,7 @@ import {
   REGIONAL_CREW_IDS,
   COMMUNITY_CREW_IDS,
   type PointSource,
+  getRankForPoints,
 } from "./config";
 
 const CACHE_TTL_MEMBER = 15 * 60; // 15 minutes
@@ -20,7 +21,7 @@ const CACHE_TTL_MEMBER = 15 * 60; // 15 minutes
 // Types
 // ---------------------------------------------------------------------------
 
-export interface PointBreakdown {
+interface PointBreakdown {
   sourceId: string;
   label: string;
   category: string;
@@ -29,7 +30,7 @@ export interface PointBreakdown {
   total: number; // points × quantity
 }
 
-export interface MafiaPointsResult {
+interface MafiaPointsResult {
   memberId: string;
   memberName: string;
   totalPoints: number;
@@ -37,11 +38,18 @@ export interface MafiaPointsResult {
   lastCalculated: number;
 }
 
+export interface MafiaRankResult {
+  memberId: string;
+  memberName: string;
+  rank: { name: string; minPoints: number };
+  lastCalculated: number;
+}
+
 // ---------------------------------------------------------------------------
 // Core calculation
 // ---------------------------------------------------------------------------
 
-export async function calculateMafiaPoints(
+async function calculateMafiaPoints(
   memberId: string,
 ): Promise<MafiaPointsResult> {
   // Fetch member data from crew sheet to get discordId + wallet
@@ -198,7 +206,7 @@ export async function calculateMafiaPoints(
 // Cached accessor
 // ---------------------------------------------------------------------------
 
-export async function getMafiaPoints(
+async function getMafiaPoints(
   memberId: string,
 ): Promise<MafiaPointsResult> {
   const cacheKey = `mafia-points:${memberId}`;
@@ -207,6 +215,22 @@ export async function getMafiaPoints(
     () => calculateMafiaPoints(memberId),
     CACHE_TTL_MEMBER,
   );
+}
+
+/**
+ * Public API — returns only the rank tier, not points.
+ */
+export async function getMafiaRank(
+  memberId: string,
+): Promise<MafiaRankResult> {
+  const result = await getMafiaPoints(memberId);
+  const rank = getRankForPoints(result.totalPoints);
+  return {
+    memberId: result.memberId,
+    memberName: result.memberName,
+    rank: { name: rank.name, minPoints: rank.minPoints },
+    lastCalculated: result.lastCalculated,
+  };
 }
 
 // ---------------------------------------------------------------------------

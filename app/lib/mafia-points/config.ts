@@ -46,7 +46,7 @@ export const MAFIA_POINT_SOURCES: PointSource[] = [
     id: "dread-pizza-roberts",
     label: "Dread Pizza Roberts",
     category: "discord_role",
-    points: 125000,
+    points: 250000,
     roleId: ROLE_DREAD_PIZZA_ROBERTS,
   },
   {
@@ -69,7 +69,7 @@ export const MAFIA_POINT_SOURCES: PointSource[] = [
     id: "pizza-amuse-brooch",
     label: "Pizza Amuse Brooch",
     category: "nft",
-    points: 10000,
+    points: 15000,
     contractName: "Pizza Amuse Brooch",
   },
   {
@@ -83,7 +83,7 @@ export const MAFIA_POINT_SOURCES: PointSource[] = [
     id: "rare-pizza",
     label: "Rare Pizza",
     category: "nft",
-    points: 4000,
+    points: 5000,
     contractName: "Rare Pizzas",
   },
   {
@@ -198,6 +198,29 @@ export const MAFIA_POINT_SOURCES: PointSource[] = [
     id: "global-pizza-party-attendance",
     label: "Global Pizza Party Attendance",
     category: "manual",
-    points: 420,
+    points: 1000,
   },
 ];
+
+// ---------------------------------------------------------------------------
+// Mafia Rank tiers — derived from total points
+// ---------------------------------------------------------------------------
+
+export interface MafiaRank {
+  name: string;
+  minPoints: number;
+}
+
+export const MAFIA_RANKS: MafiaRank[] = [
+  { name: "Boss", minPoints: 250000 },
+  { name: "Consigliere", minPoints: 100000 },
+  { name: "Underboss", minPoints: 50000 },
+  { name: "Capo", minPoints: 15000 },
+  { name: "Wise Pie", minPoints: 5000 },
+  { name: "Associate", minPoints: 1000 },
+  { name: "Intern", minPoints: 0 },
+];
+
+export function getRankForPoints(points: number): MafiaRank {
+  return MAFIA_RANKS.find(r => points >= r.minPoints) || MAFIA_RANKS[MAFIA_RANKS.length - 1];
+}
