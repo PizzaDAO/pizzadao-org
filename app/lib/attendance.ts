@@ -15,6 +15,7 @@ import { prisma } from "@/app/lib/db";
 import { sheetsClient } from "@/app/api/lib/google-sheets";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { parseGvizJson, getCellValue } from "@/app/lib/gviz-parser";
+import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import promiseLimit from "promise-limit";
 
 // ---------------------------------------------------------------------------
@@ -297,11 +298,11 @@ async function syncCrewAttendance(
   crewSheetId: string,
   crewId: string,
   crewLabel: string
-): Promise<{ newCalls: number; newRecords: number }> {
+): Promise<{ newCalls: number; newRecords: number; affectedDiscordIds: string[] }> {
   // 1. Read Attendance tab entries
   const entries = await readAttendanceTab(crewSheetId);
   if (entries.length === 0) {
-    return { newCalls: 0, newRecords: 0 };
+    return { newCalls: 0, newRecords: 0, affectedDiscordIds: [] };
   }
 
   // 2. Check which daily sheets are already synced
@@ -315,7 +316,7 @@ async function syncCrewAttendance(
 
   const newEntries = entries.filter((e) => !syncedSet.has(e.dailySheetId));
   if (newEntries.length === 0) {
-    return { newCalls: 0, newRecords: 0 };
+    return { newCalls: 0, newRecords: 0, affectedDiscordIds: [] };
   }
 
   // 3. Fetch new daily sheets (throttled)
@@ -344,12 +345,21 @@ async function syncCrewAttendance(
   // 4. Insert records
   let totalNewRecords = 0;
   let totalNewCalls = 0;
+  const affectedDiscordIds = new Set<string>();
 
   for (const result of results) {
     if (!result) continue;
     const { entry, attendees } = result;
 
     if (attendees.length === 0) continue;
+
+    // Guard: skip sheets with >100 attendees — these are full roster dumps, not real attendance
+    if (attendees.length > 100) {
+      console.warn(
+        `[attendance] Skipping sheet ${entry.dailySheetId} (${attendees.length} attendees — likely a roster dump)`
+      );
+      continue;
+    }
 
     // Bulk insert attendance records (skip duplicates via unique constraint)
     const created = await prisma.callAttendance.createMany({
@@ -366,6 +376,11 @@ async function syncCrewAttendance(
 
     totalNewRecords += created.count;
 
+    // Track affected members for summary rebuild
+    if (created.count > 0) {
+      for (const a of attendees) affectedDiscordIds.add(a.discordId);
+    }
+
     // Log the sync
     await prisma.attendanceSyncLog.create({
       data: {
@@ -380,7 +395,11 @@ async function syncCrewAttendance(
     totalNewCalls++;
   }
 
-  return { newCalls: totalNewCalls, newRecords: totalNewRecords };
+  return {
+    newCalls: totalNewCalls,
+    newRecords: totalNewRecords,
+    affectedDiscordIds: [...affectedDiscordIds],
+  };
 }
 
 // ---------------------------------------------------------------------------
@@ -428,6 +447,7 @@ export async function syncAllCrewAttendance(): Promise<SyncStats> {
   }
 
   // Sync each crew sequentially (the daily sheet fetches within are throttled)
+  const allAffectedIds = new Set<string>();
   for (const crew of crewsToSync) {
     try {
       const result = await syncCrewAttendance(
@@ -440,9 +460,21 @@ export async function syncAllCrewAttendance(): Promise<SyncStats> {
       if (result.newCalls > 0) {
         stats.crews.push(crew.crewLabel);
       }
+      for (const id of result.affectedDiscordIds) allAffectedIds.add(id);
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err);
       stats.errors.push(`${crew.crewLabel}: ${msg}`);
+    }
+  }
+
+  // Rebuild attendance summaries for affected members
+  if (allAffectedIds.size > 0) {
+    try {
+      const rebuilt = await rebuildAttendanceSummaries([...allAffectedIds]);
+      console.log(`[attendance] Rebuilt ${rebuilt} attendance summaries`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : String(err);
+      stats.errors.push(`Summary rebuild: ${msg}`);
     }
   }
 
@@ -543,4 +575,65 @@ export async function getAttendanceForMember(
     crewBreakdown,
     recentCalls,
   };
+}
+
+// ---------------------------------------------------------------------------
+// 7. Rebuild pre-computed attendance summaries
+// ---------------------------------------------------------------------------
+
+/**
+ * Rebuild AttendanceSummary rows from raw CallAttendance data.
+ * - If discordIds provided: only rebuild those (incremental, after sync)
+ * - If omitted: rebuild all members
+ *
+ * Returns the number of summaries upserted.
+ */
+export async function rebuildAttendanceSummaries(
+  discordIds?: string[]
+): Promise<number> {
+  // Get the list of discordIds to rebuild
+  let ids: string[];
+  if (discordIds && discordIds.length > 0) {
+    ids = discordIds;
+  } else {
+    const rows = await prisma.callAttendance.findMany({
+      select: { discordId: true },
+      distinct: ["discordId"],
+    });
+    ids = rows.map((r) => r.discordId);
+  }
+
+  if (ids.length === 0) return 0;
+
+  let upserted = 0;
+
+  for (const discordId of ids) {
+    // Aggregate from raw records (reuse existing logic)
+    const result = await getAttendanceForMember(discordId);
+
+    // Resolve discordId → memberId (first call fetches sheet, rest use cache)
+    const memberId = await fetchMemberIdByDiscordId(discordId);
+
+    await prisma.attendanceSummary.upsert({
+      where: { discordId },
+      create: {
+        discordId,
+        memberId: memberId || null,
+        totalCalls: result.totalCalls,
+        crewBreakdown: result.crewBreakdown as object,
+        recentCalls: result.recentCalls as object[],
+      },
+      update: {
+        memberId: memberId || null,
+        totalCalls: result.totalCalls,
+        crewBreakdown: result.crewBreakdown as object,
+        recentCalls: result.recentCalls as object[],
+        lastSyncedAt: new Date(),
+      },
+    });
+
+    upserted++;
+  }
+
+  return upserted;
 }
