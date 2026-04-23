@@ -36,44 +36,52 @@ export async function GET(req: Request) {
     createdAt: Date.now(),
   });
 
-  // Check for existing member record
-  let redirectUrl: URL;
+  // Look up member by Discord ID, with searchName fallback so we can
+  // find users whose sheet entry exists by name but isn't yet linked
+  // by Discord ID. This mirrors the wizard's handleDiscordCallback
+  // behavior so the magic-login flow can auto-link accounts.
+  const searchName = result.nick ?? result.username;
+  let memberId: string | undefined;
+  let memberName: string | undefined;
+
   try {
     const lookupRes = await fetch(
-      `${url.origin}/api/member-lookup/${result.discordId}`,
+      `${url.origin}/api/member-lookup/${result.discordId}?searchName=${encodeURIComponent(searchName)}`,
       { cache: "no-store" },
     );
     if (lookupRes.ok) {
       const lookup = await lookupRes.json();
       if (lookup.found && lookup.memberId) {
-        redirectUrl = new URL(`/dashboard/${lookup.memberId}`, url.origin);
-
-        // Fire-and-forget role sync
-        syncRolesOnLogin(
-          url.origin,
-          result.discordId,
-          lookup.memberId,
-          lookup.name ?? result.nick ?? result.username,
-        ).catch(() => {});
-      } else {
-        // New user — redirect to onboarding with Discord info
-        redirectUrl = new URL("/", url.origin);
-        redirectUrl.searchParams.set("discordId", result.discordId);
-        redirectUrl.searchParams.set("discordJoined", "1");
-        if (result.nick) redirectUrl.searchParams.set("discordNick", result.nick);
+        memberId = String(lookup.memberId);
+        memberName = lookup.memberName;
       }
-    } else {
-      // Lookup failed — go to onboarding
-      redirectUrl = new URL("/", url.origin);
-      redirectUrl.searchParams.set("discordId", result.discordId);
-      redirectUrl.searchParams.set("discordJoined", "1");
-      if (result.nick) redirectUrl.searchParams.set("discordNick", result.nick);
     }
   } catch {
-    // Fallback — still create session and send to home
+    // Lookup failure is non-fatal — we'll still create the session
+    // and send the user to onboarding.
+  }
+
+  // Always sync Discord roles + Discord ID to the sheet — mirrors OAuth
+  // callback. When member-lookup found the row by name match, this
+  // writes the user's Discord ID into that row (since the GAS script
+  // searches by memberId first, then writes discordId to that row).
+  syncRolesOnLogin(
+    url.origin,
+    result.discordId,
+    memberId,
+    memberName ?? result.nick ?? result.username,
+  ).catch(() => {});
+
+  // Build redirect URL
+  let redirectUrl: URL;
+  if (memberId) {
+    redirectUrl = new URL(`/dashboard/${memberId}`, url.origin);
+  } else {
+    // New user — redirect to onboarding with Discord info
     redirectUrl = new URL("/", url.origin);
     redirectUrl.searchParams.set("discordId", result.discordId);
     redirectUrl.searchParams.set("discordJoined", "1");
+    if (result.nick) redirectUrl.searchParams.set("discordNick", result.nick);
   }
 
   const res = NextResponse.redirect(redirectUrl.toString());
