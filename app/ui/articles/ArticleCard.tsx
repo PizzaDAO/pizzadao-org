@@ -9,6 +9,7 @@ export interface ArticleCardData {
   title: string;
   excerpt?: string | null;
   coverImage?: string | null;
+  thumbnail?: string | null;
   authorId: string;
   authorName?: string | null;
   status: "DRAFT" | "PUBLISHED" | "ARCHIVED";
@@ -18,7 +19,7 @@ export interface ArticleCardData {
   updatedAt: string;
 }
 
-function formatDate(iso?: string | null) {
+export function formatDate(iso?: string | null) {
   if (!iso) return "";
   try {
     return new Date(iso).toLocaleDateString(undefined, {
@@ -59,6 +60,7 @@ interface ArticleCardProps {
 
 export default function ArticleCard({ article, showStatus = false }: ArticleCardProps) {
   const displayDate = formatDate(article.publishedAt || article.createdAt);
+  const imageUrl = article.coverImage || article.thumbnail;
 
   return (
     <Link
@@ -76,7 +78,7 @@ export default function ArticleCard({ article, showStatus = false }: ArticleCard
         transition: "all 0.2s ease",
       }}
     >
-      {article.coverImage && (
+      {imageUrl && (
         <div
           style={{
             width: "100%",
@@ -87,7 +89,7 @@ export default function ArticleCard({ article, showStatus = false }: ArticleCard
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
-            src={article.coverImage}
+            src={imageUrl}
             alt=""
             style={{
               width: "100%",

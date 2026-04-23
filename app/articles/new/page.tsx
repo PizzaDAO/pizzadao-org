@@ -78,7 +78,13 @@ export default function NewArticlePage() {
         }
       }
 
-      router.push(`/articles/${created.slug}`);
+      if (publish) {
+        // Published: go to the published article view
+        router.push(`/articles/${created.slug}`);
+      } else {
+        // Draft saved: redirect to edit page to continue editing
+        router.push(`/articles/${created.slug}/edit`);
+      }
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {

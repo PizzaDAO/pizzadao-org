@@ -3,6 +3,15 @@ import { ValidationError, NotFoundError } from './errors/api-errors'
 
 export type ArticleStatusType = 'DRAFT' | 'PUBLISHED' | 'ARCHIVED'
 
+/**
+ * Extract the URL of the first Markdown image from content.
+ * Looks for ![alt](url) patterns and returns the URL, or null if none found.
+ */
+export function extractFirstImage(markdown: string): string | null {
+  const match = markdown.match(/!\[[^\]]*\]\(([^)\s]+)/)
+  return match ? match[1] : null
+}
+
 export interface ArticleInput {
   title: string
   content: string
