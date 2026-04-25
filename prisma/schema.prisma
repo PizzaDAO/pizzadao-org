@@ -15,7 +15,7 @@ model User {
 
   pendingSignatures PendingSignature[]
   economy           Economy?
-  unlockTicketClaim UnlockTicketClaim?
+  unlockTicketClaims UnlockTicketClaim[]
 }
 
 // ===== $PEP ECONOMY SYSTEM =====
@@ -372,15 +372,15 @@ model DiscordActivity {
 
 model UnlockTicketClaim {
   id            Int                  @id @default(autoincrement())
-  discordId     String               @unique
+  discordId     String
   memberId      String
   walletAddress String               @unique
   ticketCount   Int
-  pointsAwarded Int
-  claimedAt     DateTime             @default(now())
+  connectedAt   DateTime             @default(now())
   tickets       UnlockTicketRecord[]
   user          User                 @relation(fields: [discordId], references: [id])
 
+  @@index([discordId])
   @@index([memberId])
 }
 

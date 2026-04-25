@@ -15,31 +15,35 @@ export async function GET(
     // Resolve memberId to discordId
     const member = await fetchMemberById(memberId);
     if (!member?.discordId) {
-      return NextResponse.json({ claimed: false });
+      return NextResponse.json({ wallets: [], totalTickets: 0 });
     }
 
-    const claim = await prisma.unlockTicketClaim.findUnique({
+    const claims = await prisma.unlockTicketClaim.findMany({
       where: { discordId: member.discordId },
       include: { tickets: true },
+      orderBy: { connectedAt: "desc" },
     });
 
-    if (!claim) {
-      return NextResponse.json({ claimed: false });
+    if (claims.length === 0) {
+      return NextResponse.json({ wallets: [], totalTickets: 0 });
     }
 
-    return NextResponse.json({
-      claimed: true,
-      claimId: claim.id,
-      ticketCount: claim.ticketCount,
-      pointsAwarded: claim.pointsAwarded,
-      claimedAt: claim.claimedAt,
-      tickets: claim.tickets.map((t) => ({
+    const wallets = claims.map((c) => ({
+      id: c.id,
+      walletAddress: c.walletAddress,
+      ticketCount: c.ticketCount,
+      connectedAt: c.connectedAt,
+      tickets: c.tickets.map((t) => ({
         eventName: t.eventName,
         networkId: t.networkId,
         lockAddress: t.lockAddress,
         tokenId: t.tokenId,
       })),
-    });
+    }));
+
+    const totalTickets = claims.reduce((sum, c) => sum + c.ticketCount, 0);
+
+    return NextResponse.json({ wallets, totalTickets });
   } catch (error) {
     console.error("Error fetching unlock tickets:", error);
     return NextResponse.json(
