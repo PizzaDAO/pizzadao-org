@@ -168,7 +168,8 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
 
   function handleUnlockLogin() {
     const redirectUri = `${window.location.origin}/api/unlock/callback`;
-    const url = `${UNLOCK_CHECKOUT_URL}?redirectUri=${encodeURIComponent(redirectUri)}`;
+    const clientId = window.location.host;
+    const url = `${UNLOCK_CHECKOUT_URL}?client_id=${encodeURIComponent(clientId)}&redirect_uri=${encodeURIComponent(redirectUri)}`;
     window.location.href = url;
   }
 
