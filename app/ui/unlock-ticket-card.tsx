@@ -40,8 +40,6 @@ type CardState =
   | "error"
   | "hidden";
 
-const UNLOCK_CHECKOUT_URL = "https://app.unlock-protocol.com/checkout";
-
 const NETWORK_NAMES: Record<number, string> = {
   1: "Ethereum",
   10: "Optimism",
@@ -95,21 +93,6 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
           return;
         }
         setIsOwner(true);
-
-        // Check if redirected back from Unlock with verified wallet
-        const urlParams = new URLSearchParams(window.location.search);
-        if (urlParams.get("unlock") === "verified") {
-          // Clean up URL
-          const cleanUrl = new URL(window.location.href);
-          cleanUrl.searchParams.delete("unlock");
-          window.history.replaceState({}, "", cleanUrl.toString());
-
-          // Auto-trigger verification
-          setState("verifying");
-          await verifyTickets();
-          return;
-        }
-
         setState("own-unclaimed");
       } catch {
         setState("hidden");
@@ -166,10 +149,53 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
     }
   }
 
-  function handleUnlockLogin() {
-    const redirectUri = `${window.location.origin}/api/unlock/callback`;
-    const url = `${UNLOCK_CHECKOUT_URL}?client_id=${encodeURIComponent(window.location.origin)}&redirect_uri=${encodeURIComponent(redirectUri)}&response_type=code`;
-    window.location.href = url;
+  async function handleConnectWallet() {
+    const eth = (window as unknown as { ethereum?: { request: (args: { method: string; params?: unknown[] }) => Promise<unknown> } }).ethereum;
+    if (!eth) {
+      setError("No wallet found. Please install MetaMask or another browser wallet.");
+      setState("error");
+      return;
+    }
+
+    try {
+      setState("verifying");
+
+      // Connect wallet
+      const accounts = await eth.request({ method: "eth_requestAccounts" }) as string[];
+      const address = accounts[0];
+      if (!address) throw new Error("No account selected");
+
+      // Create and sign a verification message
+      const message = `Verify wallet for PizzaDAO GPP ticket claim.\n\nWallet: ${address}\nTimestamp: ${Date.now()}`;
+      const signature = await eth.request({
+        method: "personal_sign",
+        params: [message, address],
+      }) as string;
+
+      // Send to server to verify and store in session
+      const res = await fetch("/api/unlock/verify-wallet", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ message, signature, address }),
+      });
+
+      if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error || "Wallet verification failed");
+      }
+
+      // Now verify tickets with the stored wallet
+      await verifyTickets();
+    } catch (e: unknown) {
+      const msg = e instanceof Error ? e.message : "Wallet connection failed";
+      // User rejected the request — go back to unclaimed state
+      if (msg.includes("rejected") || msg.includes("denied")) {
+        setState("own-unclaimed");
+        return;
+      }
+      setError(msg);
+      setState("error");
+    }
   }
 
   // Hidden states -- render nothing
@@ -282,11 +308,11 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
       {state === "own-unclaimed" && (
         <div style={{ textAlign: "center", padding: 20 }}>
           <p style={{ fontSize: 14, opacity: 0.7, marginBottom: 16 }}>
-            Verify your Unlock wallet to claim Pizza Points for your GPP
-            tickets.
+            Connect your wallet to claim Pizza Points for your Global Pizza
+            Party tickets.
           </p>
           <button
-            onClick={handleUnlockLogin}
+            onClick={handleConnectWallet}
             style={{
               padding: "10px 24px",
               borderRadius: 8,
@@ -298,7 +324,7 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
               cursor: "pointer",
             }}
           >
-            Sign in with Unlock
+            Connect Wallet
           </button>
         </div>
       )}
@@ -455,7 +481,7 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
           </p>
           {isOwner && (
             <button
-              onClick={handleUnlockLogin}
+              onClick={handleConnectWallet}
               style={{
                 padding: "10px 24px",
                 borderRadius: 8,
