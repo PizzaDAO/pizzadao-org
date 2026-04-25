@@ -395,3 +395,15 @@ model UnlockTicketRecord {
 
   @@unique([lockAddress, tokenId, networkId])
 }
+
+// Cached wallet address for a member (avoids Google Sheets lookup)
+model MemberWallet {
+  memberId      String   @id
+  discordId     String?
+  walletAddress String
+  source        String   @default("sheet")
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([walletAddress])
+}

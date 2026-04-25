@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { writeToSheet } from "../profile/route";
+import { saveWalletForMember } from "@/app/lib/wallet-lookup";
 
 export const runtime = "nodejs";
 
@@ -21,9 +22,10 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: "Invalid wallet address" }, { status: 400 });
     }
 
+    // Save to DB for fast lookups
+    await saveWalletForMember(String(memberId), walletAddress, "wallet_connect");
 
-    // Use the same writeToSheet approach as profile/auto-claim routes
-    // The Apps Script correctly finds rows by ID (not GViz indices which skip hidden rows)
+    // Also write to Google Sheet for backward compatibility
     const payload = {
       secret,
       source: "wallet_connect",
