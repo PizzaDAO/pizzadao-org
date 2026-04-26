@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchPizzaDAONFTs } from "@/app/lib/nft";
 import { NFTDisplayItem, NFTGroupInfo } from "@/app/lib/nft-types";
-import { getWalletForMember } from "@/app/lib/wallet-lookup";
+import { getEvmWalletsForMember, getWalletForMember } from "@/app/lib/wallet-lookup";
 
 export const runtime = "nodejs";
 
@@ -16,10 +16,18 @@ export async function GET(
       return NextResponse.json({ error: "Missing member ID" }, { status: 400 });
     }
 
-    // Get wallet address (DB first, sheet fallback + auto-cache)
-    const walletAddress = await getWalletForMember(memberId);
+    // Get ALL EVM wallets for this member
+    let walletAddresses = await getEvmWalletsForMember(memberId);
 
-    if (!walletAddress) {
+    // If no wallets in DB, try sheet fallback for backward compat
+    if (walletAddresses.length === 0) {
+      const sheetWallet = await getWalletForMember(memberId);
+      if (sheetWallet) {
+        walletAddresses = [sheetWallet];
+      }
+    }
+
+    if (walletAddresses.length === 0) {
       return NextResponse.json({
         nfts: [],
         totalCount: 0,
@@ -29,18 +37,38 @@ export async function GET(
       });
     }
 
-    // Fetch NFTs from Alchemy
-    const nftData = await fetchPizzaDAONFTs(walletAddress);
+    // Fetch NFTs from all EVM wallets in parallel
+    const results = await Promise.all(
+      walletAddresses.map((addr) => fetchPizzaDAONFTs(addr))
+    );
+
+    // Merge and deduplicate by chain:contract:tokenId
+    const seen = new Set<string>();
+    const allNfts: NFTDisplayItem[] = [];
+
+    for (const result of results) {
+      for (const nft of result.nfts) {
+        const key = `${nft.chain}:${nft.contractAddress}:${nft.tokenId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          allNfts.push(nft);
+        }
+      }
+    }
+
+    const totalCount = allNfts.length;
+    // Use primary wallet for OpenSea link
+    const primaryWallet = walletAddresses[0];
 
     // Optional limit param — when set, return at most `limit` NFTs per
     // collection group but still include full group metadata with counts.
     const limitParam = request.nextUrl.searchParams.get("limit");
     const limit = limitParam ? parseInt(limitParam, 10) : 0;
 
-    if (limit > 0 && nftData.nfts.length > 0) {
+    if (limit > 0 && allNfts.length > 0) {
       // Group NFTs by chain:contract
       const groupMap = new Map<string, NFTDisplayItem[]>();
-      for (const nft of nftData.nfts) {
+      for (const nft of allNfts) {
         const key = `${nft.chain}:${nft.contractAddress}`;
         const list = groupMap.get(key) || [];
         list.push(nft);
@@ -72,17 +100,17 @@ export async function GET(
 
       return NextResponse.json({
         nfts: limitedNfts,
-        totalCount: nftData.totalCount,
-        walletAddress,
+        totalCount,
+        walletAddress: primaryWallet,
         noWallet: false,
         groups,
       });
     }
 
-    // Ensure walletAddress and noWallet are always included
     return NextResponse.json({
-      ...nftData,
-      walletAddress,
+      nfts: allNfts,
+      totalCount,
+      walletAddress: primaryWallet,
       noWallet: false,
     });
   } catch (error) {

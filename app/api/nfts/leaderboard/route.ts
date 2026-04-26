@@ -154,18 +154,26 @@ async function aggregateLeaderboard(): Promise<LeaderboardResponse> {
     getNFTContracts(),
   ]);
 
-  // Build MemberInfo array by joining wallet data with member details
-  const members: MemberInfo[] = walletEntries
-    .filter((w) => w.walletAddress.startsWith("0x") && w.walletAddress.length >= 42)
-    .map((w) => {
-      const details = memberDetails.get(w.memberId);
-      return {
-        memberId: w.memberId,
-        name: details?.name || `Member ${w.memberId}`,
-        wallet: w.walletAddress.toLowerCase(),
-        turtles: details?.turtles || [],
-      };
+  // Group wallets by memberId so we can aggregate across all wallets
+  const walletsByMember = new Map<string, string[]>();
+  for (const w of walletEntries) {
+    if (!w.walletAddress.startsWith("0x") || w.walletAddress.length < 42) continue;
+    const existing = walletsByMember.get(w.memberId) || [];
+    existing.push(w.walletAddress.toLowerCase());
+    walletsByMember.set(w.memberId, existing);
+  }
+
+  // Build MemberInfo array (one entry per member, first wallet as representative)
+  const members: MemberInfo[] = [];
+  for (const [memberId, wallets] of walletsByMember) {
+    const details = memberDetails.get(memberId);
+    members.push({
+      memberId,
+      name: details?.name || `Member ${memberId}`,
+      wallet: wallets[0], // representative wallet for display
+      turtles: details?.turtles || [],
     });
+  }
 
   if (members.length === 0) {
     return {
@@ -189,17 +197,23 @@ async function aggregateLeaderboard(): Promise<LeaderboardResponse> {
   }
 
   // Process members with concurrency limit (5 at a time)
+  // For each member, fetch NFT counts across ALL their wallets and sum
   const CONCURRENCY = 5;
   const memberQueue = [...members];
   let processed = 0;
 
   async function processMember(member: MemberInfo) {
+    const memberWallets = walletsByMember.get(member.memberId) || [member.wallet];
     for (const contract of contracts) {
-      const count = await fetchNFTCount(member.wallet, contract);
-      if (count > 0) {
+      // Sum NFT counts across all wallets for this member
+      let totalCount = 0;
+      for (const wallet of memberWallets) {
+        totalCount += await fetchNFTCount(wallet, contract);
+      }
+      if (totalCount > 0) {
         const holders = collectionHolders.get(contract.address.toLowerCase());
         if (holders) {
-          holders.set(member.memberId, { info: member, count });
+          holders.set(member.memberId, { info: member, count: totalCount });
         }
       }
     }

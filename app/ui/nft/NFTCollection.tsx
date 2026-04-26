@@ -4,8 +4,6 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { NFTCard } from "./NFTCard";
 import { NFTCollectionResponse, NFTDisplayItem } from "@/app/lib/nft-types";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
 
 type NFTCollectionProps = {
   memberId: string;
@@ -27,11 +25,8 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   const [data, setData] = useState<NFTCollectionResponse | null>(null);
   const [fullData, setFullData] = useState<NFTCollectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [walletSaved, setWalletSaved] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
   const [expandLoading, setExpandLoading] = useState(false);
-  const { address, isConnected } = useAccount();
 
   const toggleGroup = useCallback(async (groupKey: string) => {
     setExpandedGroups(prev => {
@@ -75,33 +70,6 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   useEffect(() => {
     fetchNFTs();
   }, [fetchNFTs]);
-
-  // When user connects wallet and we have no wallet saved, save it
-  useEffect(() => {
-    async function saveWallet() {
-      if (isConnected && address && data?.noWallet && !walletSaved && !saving) {
-        setSaving(true);
-        try {
-          const res = await fetch("/api/wallet", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ memberId, walletAddress: address }),
-          });
-          const resData = await res.json();
-          if (res.ok) {
-            setWalletSaved(true);
-            // Refetch NFTs with the new wallet
-            await fetchNFTs();
-          } else {
-          }
-        } catch (e) {
-        } finally {
-          setSaving(false);
-        }
-      }
-    }
-    saveWallet();
-  }, [isConnected, address, data?.noWallet, walletSaved, saving, memberId, fetchNFTs]);
 
   // Build a lookup of group totals from the API groups metadata
   const groupTotals = useMemo(() => {
@@ -177,8 +145,8 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
     borderTop: '1px solid var(--color-divider)',
   };
 
-  // Show connect wallet prompt if no wallet is saved (only if showConnectPrompt is true)
-  if (!loading && data?.noWallet && !walletSaved) {
+  // Show prompt if no wallet is saved (only if showConnectPrompt is true)
+  if (!loading && data?.noWallet) {
     if (!showConnectPrompt) {
       return null; // Hide completely on profile page if no wallet
     }
@@ -203,9 +171,8 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
           }}
         >
           <p style={{ margin: 0, fontSize: 14, opacity: 0.7, textAlign: "center" }}>
-            {saving ? "Saving wallet..." : "Connect your wallet to display your NFT collection"}
+            Add a wallet in your Wallet Manager above to display your NFT collection
           </p>
-          {!saving && <ConnectButton />}
         </div>
       </div>
     );

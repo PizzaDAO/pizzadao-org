@@ -14,6 +14,7 @@ import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
+import { WalletManager } from "../../ui/wallet-manager/WalletManager";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -833,8 +834,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         </div>
                     </div>
 
-                    {/* NFT Collection Section - shows connect prompt if no wallet */}
-                    <NFTCollection memberId={idValue} showConnectPrompt={true} />
+                    {/* Wallet Manager - connect, edit, remove wallets */}
+                    <WalletManager memberId={idValue} />
+
+                    {/* NFT Collection Section */}
+                    <NFTCollection memberId={idValue} showConnectPrompt={false} />
 
                     {/* Pizza Party Tickets */}
                     <UnlockTicketCard memberId={idValue} />
