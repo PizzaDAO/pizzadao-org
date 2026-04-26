@@ -12,7 +12,6 @@ type TelegramMatch = {
   country?: string;
   region?: string;
   chatUrl?: string;
-  host?: string;
 };
 
 type Props = {
