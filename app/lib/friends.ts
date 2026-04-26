@@ -9,18 +9,18 @@ export { FriendSource }
  * Add a friend (vouch). Creates a one-way vouch relationship.
  */
 export async function addFriend(
-  followerId: string,
-  followeeId: string,
+  voucherId: string,
+  vouchedId: string,
   source: FriendSource = FriendSource.PIZZADAO
 ) {
-  if (followerId === followeeId) {
+  if (voucherId === vouchedId) {
     throw new Error('Cannot vouch for yourself')
   }
 
   return prisma.friendship.create({
     data: {
-      followerId,
-      followeeId,
+      voucherId,
+      vouchedId,
       source
     }
   })
@@ -29,9 +29,9 @@ export async function addFriend(
 /**
  * Remove a friend (remove vouch). Deletes the one-way vouch relationship.
  */
-export async function removeFriend(followerId: string, followeeId: string) {
+export async function removeFriend(voucherId: string, vouchedId: string) {
   return prisma.friendship.deleteMany({
-    where: { followerId, followeeId }
+    where: { voucherId, vouchedId }
   })
 }
 
@@ -43,7 +43,7 @@ export async function getFriends(
   limit = 50,
   source?: FriendSource
 ) {
-  const where: any = { followerId: memberId }
+  const where: any = { voucherId: memberId }
   if (source) where.source = source
 
   const friendships = await prisma.friendship.findMany({
@@ -56,9 +56,9 @@ export async function getFriends(
   const friends = await Promise.all(
     friendships.map(async (f) => {
       try {
-        const member = await fetchMemberById(f.followeeId)
+        const member = await fetchMemberById(f.vouchedId)
         return {
-          memberId: f.followeeId,
+          memberId: f.vouchedId,
           name: member?.['Name'] || member?.['Mafia Name'] || 'Unknown',
           city: member?.['City'] || '',
           crews: member?.['Crews'] || '',
@@ -67,7 +67,7 @@ export async function getFriends(
         }
       } catch {
         return {
-          memberId: f.followeeId,
+          memberId: f.vouchedId,
           name: 'Unknown',
           city: '',
           crews: '',
@@ -86,17 +86,17 @@ export async function getFriends(
  */
 export async function getFriendCounts(memberId: string) {
   const [total, pizzadao, farcaster, twitter, followers] = await Promise.all([
-    prisma.friendship.count({ where: { followerId: memberId } }),
+    prisma.friendship.count({ where: { voucherId: memberId } }),
     prisma.friendship.count({
-      where: { followerId: memberId, source: FriendSource.PIZZADAO }
+      where: { voucherId: memberId, source: FriendSource.PIZZADAO }
     }),
     prisma.friendship.count({
-      where: { followerId: memberId, source: FriendSource.FARCASTER }
+      where: { voucherId: memberId, source: FriendSource.FARCASTER }
     }),
     prisma.friendship.count({
-      where: { followerId: memberId, source: FriendSource.TWITTER }
+      where: { voucherId: memberId, source: FriendSource.TWITTER }
     }),
-    prisma.friendship.count({ where: { followeeId: memberId } })
+    prisma.friendship.count({ where: { vouchedId: memberId } })
   ])
 
   return { total, pizzadao, farcaster, twitter, followers }
@@ -106,11 +106,11 @@ export async function getFriendCounts(memberId: string) {
  * Check if a member has vouched for another member
  */
 export async function isFriend(
-  followerId: string,
-  followeeId: string
+  voucherId: string,
+  vouchedId: string
 ): Promise<boolean> {
   const count = await prisma.friendship.count({
-    where: { followerId, followeeId }
+    where: { voucherId, vouchedId }
   })
   return count > 0
 }
@@ -124,22 +124,22 @@ export async function getMutualFriends(
 ): Promise<string[]> {
   // Friends of A
   const friendsOfA = await prisma.friendship.findMany({
-    where: { followerId: memberIdA },
-    select: { followeeId: true }
+    where: { voucherId: memberIdA },
+    select: { vouchedId: true }
   })
-  const aFollowees = new Set(friendsOfA.map((f) => f.followeeId))
+  const aVouched = new Set(friendsOfA.map((f) => f.vouchedId))
 
   // Friends of B
   const friendsOfB = await prisma.friendship.findMany({
-    where: { followerId: memberIdB },
-    select: { followeeId: true }
+    where: { voucherId: memberIdB },
+    select: { vouchedId: true }
   })
-  const bFollowees = new Set(friendsOfB.map((f) => f.followeeId))
+  const bVouched = new Set(friendsOfB.map((f) => f.vouchedId))
 
   // Intersection
   const mutual: string[] = []
-  for (const id of aFollowees) {
-    if (bFollowees.has(id)) {
+  for (const id of aVouched) {
+    if (bVouched.has(id)) {
       mutual.push(id)
     }
   }

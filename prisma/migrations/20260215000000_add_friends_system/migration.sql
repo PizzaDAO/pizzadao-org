@@ -24,8 +24,8 @@ CREATE TABLE "SocialAccount" (
 -- CreateTable
 CREATE TABLE "Friendship" (
     "id" SERIAL NOT NULL,
-    "followerId" TEXT NOT NULL,
-    "followeeId" TEXT NOT NULL,
+    "voucherId" TEXT NOT NULL,
+    "vouchedId" TEXT NOT NULL,
     "source" "FriendSource" NOT NULL DEFAULT 'PIZZADAO',
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
@@ -42,10 +42,10 @@ CREATE INDEX "SocialAccount_platform_platformId_idx" ON "SocialAccount"("platfor
 CREATE UNIQUE INDEX "SocialAccount_memberId_platform_key" ON "SocialAccount"("memberId", "platform");
 
 -- CreateIndex
-CREATE INDEX "Friendship_followerId_idx" ON "Friendship"("followerId");
+CREATE INDEX "Friendship_voucherId_idx" ON "Friendship"("voucherId");
 
 -- CreateIndex
-CREATE INDEX "Friendship_followeeId_idx" ON "Friendship"("followeeId");
+CREATE INDEX "Friendship_vouchedId_idx" ON "Friendship"("vouchedId");
 
 -- CreateIndex
-CREATE UNIQUE INDEX "Friendship_followerId_followeeId_key" ON "Friendship"("followerId", "followeeId");
+CREATE UNIQUE INDEX "Friendship_voucherId_vouchedId_key" ON "Friendship"("voucherId", "vouchedId");
