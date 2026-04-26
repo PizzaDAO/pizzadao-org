@@ -7,6 +7,7 @@ import {
   unlinkSocialAccount,
   SocialPlatform,
 } from "@/app/lib/social-accounts";
+import { prisma } from "@/app/lib/db";
 
 export const runtime = "nodejs";
 
@@ -93,6 +94,23 @@ export async function POST(req: NextRequest) {
     }
 
     await linkSocialAccount(memberId, platform, cleanHandle);
+
+    // Resolve Farcaster FID via Neynar and store it
+    if (platform === "FARCASTER") {
+      try {
+        const { lookupFarcasterUser } = await import("@/app/lib/farcaster");
+        const fcUser = await lookupFarcasterUser(cleanHandle);
+        if (fcUser) {
+          await prisma.socialAccount.update({
+            where: { memberId_platform: { memberId, platform: "FARCASTER" } },
+            data: { platformId: String(fcUser.fid) },
+          });
+        }
+      } catch (err) {
+        // Non-fatal - FID will be resolved later on discovery
+        console.warn("Could not resolve Farcaster FID:", err);
+      }
+    }
 
     return NextResponse.json({ ok: true, platform, handle: cleanHandle });
   } catch (err: unknown) {

@@ -6,6 +6,7 @@ import Link from "next/link";
 import { Inter } from "next/font/google";
 import { FriendCard } from "../ui/friends/FriendCard";
 import { SocialAccountLinker } from "../ui/friends/SocialAccountLinker";
+import { FarcasterDiscovery } from "../ui/friends/FarcasterDiscovery";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -35,6 +36,7 @@ export default function FriendsPage() {
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
+  const [hasFarcaster, setHasFarcaster] = useState(false);
 
   // Auth check and data load
   useEffect(() => {
@@ -258,7 +260,21 @@ export default function FriendsPage() {
         {/* Social Account Linking */}
         {memberId && (
           <div style={cardStyle()}>
-            <SocialAccountLinker memberId={memberId} />
+            <SocialAccountLinker
+              memberId={memberId}
+              onAccountChange={(accounts) => {
+                setHasFarcaster(
+                  accounts.some((a) => a.platform === "FARCASTER")
+                );
+              }}
+            />
+          </div>
+        )}
+
+        {/* Farcaster Discovery */}
+        {memberId && hasFarcaster && (
+          <div style={cardStyle()}>
+            <FarcasterDiscovery currentMemberId={memberId} />
           </div>
         )}
 
