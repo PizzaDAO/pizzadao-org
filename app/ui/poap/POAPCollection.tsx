@@ -64,9 +64,10 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
   const hiddenCount = hasHidden ? totalCount - 14 : 0;
 
   // Split POAPs: newest 13, hidden middle, oldest 1
+  // Only separate oldest when there are enough POAPs to avoid duplicates
   const newest13 = allPoaps.slice(0, 13);
-  const oldest1 = allPoaps.length > 0 ? [allPoaps[allPoaps.length - 1]] : [];
-  const middlePoaps = allPoaps.slice(13, -1); // Everything between newest 13 and oldest 1
+  const oldest1 = allPoaps.length > 13 ? [allPoaps[allPoaps.length - 1]] : [];
+  const middlePoaps = allPoaps.length > 14 ? allPoaps.slice(13, -1) : [];
 
   async function handleExpand() {
     setExpanded(true);

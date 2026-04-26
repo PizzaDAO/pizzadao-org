@@ -310,8 +310,9 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
           }
         }
 
-        // Merge with existing POAPs
-        const allPOAPs = [...newPOAPs, ...cached.poaps];
+        // Merge with existing POAPs, dedup by tokenId
+        const seen = new Set(newPOAPs.map(p => p.tokenId));
+        const allPOAPs = [...newPOAPs, ...cached.poaps.filter(p => !seen.has(p.tokenId))];
 
         // Sort by token ID descending (newest first)
         allPOAPs.sort((a, b) => parseInt(b.tokenId, 10) - parseInt(a.tokenId, 10));
