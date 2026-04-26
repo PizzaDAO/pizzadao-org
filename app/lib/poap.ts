@@ -11,7 +11,7 @@ const POAP_WHITELIST_SHEET_ID = '1UsQA1Jqm4gCb1qMwWf7i_k0eNsi5EofyOjijmGig3Jc';
 
 // Cache TTLs (in seconds)
 const POAP_WHITELIST_TTL = 60 * 60 * 24 * 7; // 7 days - whitelist rarely changes
-const POAP_USER_TTL = 60 * 60 * 24 * 7; // 7 days - POAPs don't change often, incremental updates handle new ones
+const POAP_USER_TTL = 0; // No expiry — POAPs are immutable, only new ones are fetched incrementally
 
 // Cache structure for user POAPs
 interface POAPCache {

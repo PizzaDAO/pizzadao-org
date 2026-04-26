@@ -41,12 +41,16 @@ export async function cacheGet<T>(key: string): Promise<T | null> {
 export async function cacheSet<T>(key: string, value: T, ttlSeconds: number = DEFAULT_TTL): Promise<void> {
   try {
     if (isKVConfigured()) {
-      await kv.set(key, value, { ex: ttlSeconds });
+      if (ttlSeconds > 0) {
+        await kv.set(key, value, { ex: ttlSeconds });
+      } else {
+        await kv.set(key, value); // No expiry
+      }
     } else {
       // Fallback to memory cache
       memoryCache.set(key, {
         value,
-        expiresAt: Date.now() + ttlSeconds * 1000,
+        expiresAt: ttlSeconds > 0 ? Date.now() + ttlSeconds * 1000 : Infinity,
       });
     }
   } catch (error) {
