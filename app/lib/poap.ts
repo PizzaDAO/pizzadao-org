@@ -282,11 +282,10 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
   const cached = await cacheGet<POAPCache>(cacheKey);
 
   if (cached) {
-    // Return cached data immediately - it's always fresh enough
-    // Check if we should do an incremental update (every 5 minutes)
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    // Check if we should do an incremental update (once per day)
+    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
 
-    if (cached.lastUpdated > fiveMinutesAgo) {
+    if (cached.lastUpdated > oneDayAgo) {
       // Cache is fresh, return as-is
       return {
         poaps: cached.poaps,
