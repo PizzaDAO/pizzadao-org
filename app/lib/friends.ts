@@ -6,7 +6,7 @@ import { fetchMemberById } from './sheets/member-repository'
 export { FriendSource }
 
 /**
- * Add a friend (follow). Creates a one-way follow relationship.
+ * Add a friend (vouch). Creates a one-way vouch relationship.
  */
 export async function addFriend(
   followerId: string,
@@ -14,7 +14,7 @@ export async function addFriend(
   source: FriendSource = FriendSource.PIZZADAO
 ) {
   if (followerId === followeeId) {
-    throw new Error('Cannot follow yourself')
+    throw new Error('Cannot vouch for yourself')
   }
 
   return prisma.friendship.create({
@@ -27,7 +27,7 @@ export async function addFriend(
 }
 
 /**
- * Remove a friend (unfollow). Deletes the one-way follow relationship.
+ * Remove a friend (remove vouch). Deletes the one-way vouch relationship.
  */
 export async function removeFriend(followerId: string, followeeId: string) {
   return prisma.friendship.deleteMany({
@@ -36,7 +36,7 @@ export async function removeFriend(followerId: string, followeeId: string) {
 }
 
 /**
- * Get friends (people the member is following) with enriched data from Google Sheets.
+ * Get friends (people the member is vouching for) with enriched data from Google Sheets.
  */
 export async function getFriends(
   memberId: string,
@@ -103,7 +103,7 @@ export async function getFriendCounts(memberId: string) {
 }
 
 /**
- * Check if a member is following another member
+ * Check if a member has vouched for another member
  */
 export async function isFriend(
   followerId: string,
@@ -148,7 +148,7 @@ export async function getMutualFriends(
 }
 
 /**
- * Notify a member that someone started following them
+ * Notify a member that someone vouched for them
  */
 export async function notifyFriendAdded(
   targetMemberId: string,
@@ -159,8 +159,8 @@ export async function notifyFriendAdded(
   return createNotification({
     type: NotificationType.FRIEND_ADDED,
     recipientId: targetDiscordId,
-    title: 'New Follower',
-    message: `${followerName} started following you`,
+    title: 'New Vouch',
+    message: `${followerName} vouched for you`,
     metadata: { followerMemberId },
     linkUrl: `/profile/${followerMemberId}`
   })

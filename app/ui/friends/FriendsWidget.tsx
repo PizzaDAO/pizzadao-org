@@ -162,7 +162,7 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
               margin: 0,
             }}
           >
-            No friends yet. Visit member profiles to follow them!
+            No friends yet. Visit member profiles to vouch for them!
           </p>
           <Link
             href="/friends"

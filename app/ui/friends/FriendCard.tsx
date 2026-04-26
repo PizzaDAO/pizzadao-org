@@ -137,7 +137,7 @@ export function FriendCard({
             (e.currentTarget.style.color = "var(--color-text-muted)")
           }
         >
-          Unfollow
+          Remove Vouch
         </button>
       )}
     </div>

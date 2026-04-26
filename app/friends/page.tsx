@@ -253,7 +253,7 @@ export default function FriendsPage() {
               margin: 0,
             }}
           >
-            {counts.total} following &middot; {counts.followers} followers
+            {counts.total} vouching for &middot; {counts.followers} vouchers
           </p>
         </header>
 
@@ -393,7 +393,7 @@ export default function FriendsPage() {
                     marginBottom: 16,
                   }}
                 >
-                  Visit member profiles to follow them, or link your social
+                  Visit member profiles to vouch for them, or link your social
                   accounts to find friends.
                 </p>
               </>

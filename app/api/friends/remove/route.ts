@@ -7,7 +7,7 @@ export const runtime = "nodejs";
 
 /**
  * POST /api/friends/remove
- * Authenticated - remove a friend (unfollow)
+ * Authenticated - remove a friend (remove vouch)
  * Body: { targetMemberId }
  */
 export async function POST(req: NextRequest) {
