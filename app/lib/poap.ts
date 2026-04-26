@@ -19,6 +19,7 @@ interface POAPCache {
   totalCount: number;
   highestPoapId: number; // For incremental fetching
   lastUpdated: number;
+  whitelistSize: number; // Track whitelist size to detect new POAP events
 }
 
 /**
@@ -282,11 +283,11 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
   const cached = await cacheGet<POAPCache>(cacheKey);
 
   if (cached) {
-    // Check if we should do an incremental update (once per day)
-    const oneDayAgo = Date.now() - 24 * 60 * 60 * 1000;
+    // Only do an incremental update when the whitelist has grown (new POAP events added)
+    const allowedEventIds = await fetchAllowedPOAPIds();
 
-    if (cached.lastUpdated > oneDayAgo) {
-      // Cache is fresh, return as-is
+    if (allowedEventIds.size <= (cached.whitelistSize || 0)) {
+      // Whitelist unchanged — cached data is complete
       return {
         poaps: cached.poaps,
         totalCount: cached.totalCount,
@@ -294,9 +295,8 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
       };
     }
 
-    // Cache exists but is older than 5 min - do incremental update
+    // Whitelist grew — fetch new POAPs since last cached ID
     try {
-      const allowedEventIds = await fetchAllowedPOAPIds();
       const newRawPOAPs = await fetchPOAPsFromAPI(walletAddress, cached.highestPoapId);
 
       if (newRawPOAPs.length > 0) {
@@ -328,6 +328,7 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
           totalCount: allPOAPs.length,
           highestPoapId,
           lastUpdated: Date.now(),
+          whitelistSize: allowedEventIds.size,
         };
         await cacheSet(cacheKey, newCache, POAP_USER_TTL);
 
@@ -343,8 +344,9 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
         };
       }
 
-      // No new POAPs, just update timestamp
+      // No new POAPs, just update whitelist size
       cached.lastUpdated = Date.now();
+      cached.whitelistSize = allowedEventIds.size;
       await cacheSet(cacheKey, cached, POAP_USER_TTL);
 
       return {
@@ -391,6 +393,7 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
     totalCount: allPOAPs.length,
     highestPoapId,
     lastUpdated: Date.now(),
+    whitelistSize: allowedEventIds.size,
   };
   await cacheSet(cacheKey, newCache, POAP_USER_TTL);
 
