@@ -35,9 +35,15 @@ export function AttendanceCard({ memberId }: AttendanceCardProps) {
     return null;
   }
 
-  const crewEntries = Object.entries(data.crewBreakdown).sort(
-    (a, b) => b[1].count - a[1].count
-  );
+  const crewEntries = Object.entries(data.crewBreakdown)
+    .map(([key, value]) => {
+      // Handle both formats: flat number (from rebuild script) or { crewLabel, count }
+      if (typeof value === "number") {
+        return [key, { crewLabel: key, count: value }] as const;
+      }
+      return [key, value as { crewLabel: string; count: number }] as const;
+    })
+    .sort((a, b) => b[1].count - a[1].count);
 
   return (
     <div
@@ -48,7 +54,7 @@ export function AttendanceCard({ memberId }: AttendanceCardProps) {
       }}
     >
       <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>
-        Crew Call Attendance
+        Call Attendance
       </h3>
 
       {/* Total calls — big number */}
