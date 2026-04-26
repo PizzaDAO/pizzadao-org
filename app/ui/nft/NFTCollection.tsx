@@ -30,6 +30,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   const [saving, setSaving] = useState(false);
   const [walletSaved, setWalletSaved] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
+  const [expandLoading, setExpandLoading] = useState(false);
   const { address, isConnected } = useAccount();
 
   const toggleGroup = useCallback(async (groupKey: string) => {
@@ -45,12 +46,15 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
 
     // If expanding and we haven't fetched full data yet, fetch it
     if (!expandedGroups.has(groupKey) && !fullData) {
+      setExpandLoading(true);
       try {
         const res = await fetch(`/api/nfts/${memberId}`);
         const json = await res.json();
         setFullData(json);
       } catch {
         // Keep using limited data
+      } finally {
+        setExpandLoading(false);
       }
     }
   }, [expandedGroups, fullData, memberId]);
@@ -334,6 +338,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
         {groupedNFTs.map((group) => {
           const groupKey = `${group.chain}:${group.contract}`;
           const isExpanded = expandedGroups.has(groupKey);
+          const isGroupLoading = isExpanded && expandLoading && !fullGroupNfts.has(groupKey);
           // When expanded, prefer full data if available, else fall back to limited data
           const allNftsForGroup = fullGroupNfts.get(groupKey) || group.nfts;
           const nftsToShow = isExpanded ? allNftsForGroup : group.displayNfts;
@@ -345,6 +350,19 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
                   key={`${nft.contractAddress}-${nft.tokenId}`}
                   nft={nft}
                   size="small"
+                />
+              ))}
+              {isGroupLoading && Array.from({ length: Math.min(group.overflow, 6) }).map((_, i) => (
+                <div
+                  key={`shimmer-${i}`}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 12,
+                    background: "linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)",
+                    backgroundSize: "200% 100%",
+                    animation: "shimmer 1.5s infinite",
+                  }}
                 />
               ))}
               {group.overflow > 0 && !isExpanded && (

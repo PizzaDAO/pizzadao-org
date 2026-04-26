@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
+import { fetchMemberById } from "@/app/lib/sheets/member-repository";
+
+const CACHE_HEADERS = {
+  "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
+};
+
+const EMPTY_RESPONSE = { totalCalls: 0, crewBreakdown: {}, recentCalls: [] };
 
 export async function GET(
   _req: Request,
@@ -15,21 +22,34 @@ export async function GET(
   }
 
   try {
-    // Read pre-computed summary directly — no Google Sheets call, no aggregation
-    const summary = await prisma.attendanceSummary.findFirst({
+    // 1. Try direct lookup by memberId
+    let summary = await prisma.attendanceSummary.findFirst({
       where: { memberId },
     });
 
+    // 2. If not found, resolve memberId → discordId and try by discordId
+    //    This handles cases where the summary exists but memberId wasn't linked yet
     if (!summary) {
-      return NextResponse.json({
-        totalCalls: 0,
-        crewBreakdown: {},
-        recentCalls: [],
-      }, {
-        headers: {
-          "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
-        },
-      });
+      const member = await fetchMemberById(memberId);
+      const discordId = member?.discordId;
+
+      if (discordId) {
+        summary = await prisma.attendanceSummary.findUnique({
+          where: { discordId },
+        });
+
+        // Backfill the memberId so future lookups are instant
+        if (summary && !summary.memberId) {
+          await prisma.attendanceSummary.update({
+            where: { discordId },
+            data: { memberId },
+          });
+        }
+      }
+    }
+
+    if (!summary) {
+      return NextResponse.json(EMPTY_RESPONSE, { headers: CACHE_HEADERS });
     }
 
     return NextResponse.json({
@@ -37,9 +57,7 @@ export async function GET(
       crewBreakdown: summary.crewBreakdown,
       recentCalls: summary.recentCalls,
     }, {
-      headers: {
-        "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400",
-      },
+      headers: CACHE_HEADERS,
     });
   } catch (err) {
     console.error("[attendance] GET error:", err);

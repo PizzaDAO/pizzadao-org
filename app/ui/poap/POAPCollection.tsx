@@ -14,6 +14,7 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
   const [expanded, setExpanded] = useState(false);
+  const [expandLoading, setExpandLoading] = useState(false);
 
   useEffect(() => {
     async function fetchPOAPs() {
@@ -71,6 +72,7 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
     setExpanded(true);
     // Fetch full data if we haven't yet
     if (!fullData) {
+      setExpandLoading(true);
       try {
         const res = await fetch(`/api/poaps/${memberId}`);
         if (res.ok) {
@@ -79,6 +81,8 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
         }
       } catch {
         // Keep using limited data
+      } finally {
+        setExpandLoading(false);
       }
     }
   }
@@ -121,8 +125,16 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
               </button>
             )}
 
+            {/* Loading shimmer when fetching full data */}
+            {expanded && expandLoading && Array.from({ length: Math.min(hiddenCount, 12) }).map((_, i) => (
+              <div
+                key={`shimmer-${i}`}
+                className="w-10 h-10 rounded-full bg-gray-200 animate-pulse flex-shrink-0"
+              />
+            ))}
+
             {/* Middle POAPs - shown when expanded */}
-            {expanded && middlePoaps.map((poap) => (
+            {expanded && !expandLoading && middlePoaps.map((poap) => (
               <POAPCard key={poap.tokenId} poap={poap} size="small" />
             ))}
 
