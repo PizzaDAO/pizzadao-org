@@ -396,14 +396,20 @@ model UnlockTicketRecord {
   @@unique([lockAddress, tokenId, networkId])
 }
 
-// Cached wallet address for a member (avoids Google Sheets lookup)
+// Multi-wallet: each member can have multiple wallets (EVM, Solana, etc.)
 model MemberWallet {
-  memberId      String   @id
+  id            Int      @id @default(autoincrement())
+  memberId      String
   discordId     String?
   walletAddress String
+  label         String?            // "Main", "Vault", etc.
+  chainType     String   @default("evm")  // "evm" | "solana"
   source        String   @default("sheet")
+  isPrimary     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([memberId, walletAddress])
+  @@index([memberId])
   @@index([walletAddress])
 }

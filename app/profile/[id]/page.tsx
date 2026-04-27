@@ -12,6 +12,7 @@ import { ProfileLinksDisplay } from "../../ui/profile-links";
 import { AttendanceCard } from "../../ui/attendance-card";
 import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
+import { WalletDisplay } from "../../ui/wallet-manager/WalletDisplay";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -480,6 +481,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             <POAPCollection memberId={idValue} />
                         </div>
                     </div>
+
+                    {/* Wallet addresses (read-only) */}
+                    <WalletDisplay memberId={idValue} />
 
                     {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
                     <NFTCollection memberId={idValue} showConnectPrompt={false} />

@@ -1,11 +1,11 @@
 import { NextResponse } from 'next/server';
 import { fetchFilteredPOAPs } from '@/app/lib/poap';
-import { POAPCollectionResponse } from '@/app/lib/poap-types';
-import { getWalletForMember } from '@/app/lib/wallet-lookup';
+import { POAPCollectionResponse, POAPDisplayItem } from '@/app/lib/poap-types';
+import { getEvmWalletsForMember, getWalletForMember } from '@/app/lib/wallet-lookup';
 
 /**
  * GET /api/poaps/[memberId]
- * Returns user's POAPs filtered by whitelist, with oldest + 10 newest selected
+ * Returns user's POAPs filtered by whitelist, from ALL EVM wallets, deduplicated
  */
 export async function GET(
   req: Request,
@@ -23,10 +23,18 @@ export async function GET(
     );
   }
 
-  // 1. Get wallet address (DB first, sheet fallback + auto-cache)
-  const walletAddress = await getWalletForMember(memberId);
+  // 1. Get ALL EVM wallets for this member
+  let walletAddresses = await getEvmWalletsForMember(memberId);
 
-  if (!walletAddress) {
+  // Fallback to sheet if no wallets in DB
+  if (walletAddresses.length === 0) {
+    const sheetWallet = await getWalletForMember(memberId);
+    if (sheetWallet) {
+      walletAddresses = [sheetWallet];
+    }
+  }
+
+  if (walletAddresses.length === 0) {
     // No wallet address - return noWallet flag
     return NextResponse.json({
       poaps: [],
@@ -37,30 +45,50 @@ export async function GET(
     });
   }
 
-  // 2. Fetch filtered POAPs (uses incremental caching)
+  // 2. Fetch filtered POAPs from ALL wallets, deduplicate by eventId
   try {
-    const { poaps, totalCount, fromCache, debug } = await fetchFilteredPOAPs(walletAddress);
+    const results = await Promise.all(
+      walletAddresses.map((addr) => fetchFilteredPOAPs(addr))
+    );
+
+    // Merge and deduplicate by eventId
+    const seenEvents = new Set<string>();
+    const allPoaps: POAPDisplayItem[] = [];
+    let fromCacheAll = true;
+
+    for (const result of results) {
+      if (!result.fromCache) fromCacheAll = false;
+      for (const poap of result.poaps) {
+        if (!seenEvents.has(poap.eventId)) {
+          seenEvents.add(poap.eventId);
+          allPoaps.push(poap);
+        }
+      }
+    }
+
+    // Sort by tokenId descending (newest first)
+    allPoaps.sort((a, b) => parseInt(b.tokenId) - parseInt(a.tokenId));
+
+    const totalCount = allPoaps.length;
+    const primaryWallet = walletAddresses[0];
 
     // When limit is set, return first (limit-1) newest + 1 oldest POAP
-    // This matches the collapsed UI layout (13 newest + 1 oldest = limit 14)
-    if (limit > 0 && poaps.length > limit) {
-      const newest = poaps.slice(0, limit - 1);
-      const oldest = poaps[poaps.length - 1];
+    if (limit > 0 && allPoaps.length > limit) {
+      const newest = allPoaps.slice(0, limit - 1);
+      const oldest = allPoaps[allPoaps.length - 1];
       return NextResponse.json({
         poaps: [...newest, oldest],
         totalCount,
-        walletAddress,
-        fromCache,
-        debug,
+        walletAddress: primaryWallet,
+        fromCache: fromCacheAll,
       });
     }
 
     return NextResponse.json({
-      poaps,
+      poaps: allPoaps,
       totalCount,
-      walletAddress,
-      fromCache,
-      debug,
+      walletAddress: primaryWallet,
+      fromCache: fromCacheAll,
     });
   } catch (error) {
     console.error('Error fetching POAPs:', error);
@@ -69,7 +97,7 @@ export async function GET(
     return NextResponse.json({
       poaps: [],
       totalCount: 0,
-      walletAddress,
+      walletAddress: walletAddresses[0],
       fromCache: false,
       debug: { error: String(error) },
     });
