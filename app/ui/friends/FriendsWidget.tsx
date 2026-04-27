@@ -70,7 +70,7 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
             fontWeight: 700,
           }}
         >
-          Friends in the DAO
+          Vouches in the DAO
           {total > 0 && (
             <span
               style={{
@@ -85,7 +85,7 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
         </h3>
         {total > 0 && (
           <Link
-            href="/friends"
+            href="/vouches"
             style={{
               fontSize: 13,
               fontWeight: 650,
@@ -162,10 +162,10 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
               margin: 0,
             }}
           >
-            No friends yet. Visit member profiles to vouch for them!
+            No vouches yet. Visit member profiles to vouch for them!
           </p>
           <Link
-            href="/friends"
+            href="/vouches"
             style={{
               display: "inline-block",
               marginTop: 8,
@@ -175,7 +175,7 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
               textDecoration: "none",
             }}
           >
-            Find Friends
+            Find Vouches
           </Link>
         </div>
       )}
