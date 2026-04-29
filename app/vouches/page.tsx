@@ -45,7 +45,7 @@ export default function FriendsPage() {
         // Get current user's memberId via the /api/me endpoint or member-lookup
         const meRes = await fetch("/api/me");
         if (!meRes.ok) {
-          setAuthError("Please log in to view your friends");
+          setAuthError("Please log in to view your vouches");
           setLoading(false);
           return;
         }
@@ -78,8 +78,8 @@ export default function FriendsPage() {
           );
         }
       } catch (err) {
-        console.error("Failed to load friends:", err);
-        setAuthError("Failed to load friends page");
+        console.error("Failed to load vouches:", err);
+        setAuthError("Failed to load vouches page");
       } finally {
         setLoading(false);
       }
@@ -152,7 +152,7 @@ export default function FriendsPage() {
               margin: "0 auto 20px",
             }}
           />
-          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading friends...</p>
+          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading vouches...</p>
           <style jsx>{`
             @keyframes spin {
               0% {
@@ -184,7 +184,7 @@ export default function FriendsPage() {
       >
         <div style={cardStyle()}>
           <h1 style={{ fontSize: 24, marginBottom: 16 }}>
-            Friends in the DAO
+            Vouches in the DAO
           </h1>
           <p style={{ opacity: 0.7, marginBottom: 32 }}>{authError}</p>
           <Link href="/" style={btnStyle("primary")}>
@@ -244,7 +244,7 @@ export default function FriendsPage() {
               fontWeight: 800,
             }}
           >
-            Friends in the DAO
+            Vouches in the DAO
           </h1>
           <p
             style={{
@@ -253,7 +253,7 @@ export default function FriendsPage() {
               margin: 0,
             }}
           >
-            {counts.total} following &middot; {counts.followers} followers
+            {counts.total} vouching for &middot; {counts.followers} vouchers
           </p>
         </header>
 
@@ -328,7 +328,7 @@ export default function FriendsPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search friends by name, city, or crew..."
+          placeholder="Search vouches by name, city, or crew..."
           style={{
             width: "100%",
             padding: "12px 16px",
@@ -384,7 +384,7 @@ export default function FriendsPage() {
                     color: "var(--color-text-primary)",
                   }}
                 >
-                  No friends yet
+                  No vouches yet
                 </p>
                 <p
                   style={{
@@ -393,8 +393,8 @@ export default function FriendsPage() {
                     marginBottom: 16,
                   }}
                 >
-                  Visit member profiles to follow them, or link your social
-                  accounts to find friends.
+                  Visit member profiles to vouch for them, or link your social
+                  accounts to discover vouches.
                 </p>
               </>
             ) : (
@@ -404,7 +404,7 @@ export default function FriendsPage() {
                   color: "var(--color-text-muted)",
                 }}
               >
-                No friends match your search.
+                No vouches match your search.
               </p>
             )}
           </div>

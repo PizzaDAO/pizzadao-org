@@ -370,6 +370,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             Calls
                         </Link>
+                        <Link href="/friends" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Friends
+                        </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
                             fontSize: 14,

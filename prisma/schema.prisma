@@ -283,6 +283,48 @@ model Article {
   @@index([authorId])
 }
 
+// ===== FRIENDS IN THE DAO =====
+
+enum SocialPlatform {
+  TWITTER
+  FARCASTER
+}
+
+enum FriendSource {
+  PIZZADAO
+  TWITTER
+  FARCASTER
+}
+
+// Social accounts linked to a member (X handle, Farcaster username)
+model SocialAccount {
+  id         Int            @id @default(autoincrement())
+  memberId   String
+  platform   SocialPlatform
+  handle     String
+  platformId String?
+  verified   Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([memberId, platform])
+  @@index([platform, handle])
+  @@index([platform, platformId])
+}
+
+// One-way follow relationship between members
+model Friendship {
+  id         Int          @id @default(autoincrement())
+  followerId String
+  followeeId String
+  source     FriendSource @default(PIZZADAO)
+  createdAt  DateTime     @default(now())
+
+  @@unique([followerId, followeeId])
+  @@index([followerId])
+  @@index([followeeId])
+}
+
 // ===== CREW CALL ATTENDANCE =====
 
 // Individual attendance records — one per person per call
@@ -413,46 +455,4 @@ model MemberWallet {
   @@unique([memberId, walletAddress])
   @@index([memberId])
   @@index([walletAddress])
-}
-
-// ===== FRIENDS IN THE DAO =====
-
-enum SocialPlatform {
-  TWITTER
-  FARCASTER
-}
-
-enum FriendSource {
-  PIZZADAO
-  TWITTER
-  FARCASTER
-}
-
-// Social accounts linked to a member (X handle, Farcaster username)
-model SocialAccount {
-  id         Int            @id @default(autoincrement())
-  memberId   String
-  platform   SocialPlatform
-  handle     String
-  platformId String?
-  verified   Boolean        @default(false)
-  createdAt  DateTime       @default(now())
-  updatedAt  DateTime       @updatedAt
-
-  @@unique([memberId, platform])
-  @@index([platform, handle])
-  @@index([platform, platformId])
-}
-
-// One-way follow relationship between members
-model Friendship {
-  id         Int          @id @default(autoincrement())
-  followerId String
-  followeeId String
-  source     FriendSource @default(PIZZADAO)
-  createdAt  DateTime     @default(now())
-
-  @@unique([followerId, followeeId])
-  @@index([followerId])
-  @@index([followeeId])
 }

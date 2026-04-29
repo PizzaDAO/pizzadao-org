@@ -10,9 +10,13 @@ type SocialAccount = {
 
 type SocialAccountLinkerProps = {
   memberId: string;
+  onAccountChange?: (accounts: { platform: string; handle: string }[]) => void;
 };
 
-export function SocialAccountLinker({ memberId }: SocialAccountLinkerProps) {
+export function SocialAccountLinker({
+  memberId,
+  onAccountChange,
+}: SocialAccountLinkerProps) {
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [twitterHandle, setTwitterHandle] = useState("");
   const [farcasterHandle, setFarcasterHandle] = useState("");
@@ -32,6 +36,12 @@ export function SocialAccountLinker({ memberId }: SocialAccountLinkerProps) {
           const data = await res.json();
           const accts = data.accounts || [];
           setAccounts(accts);
+          onAccountChange?.(
+            accts.map((a: SocialAccount) => ({
+              platform: a.platform,
+              handle: a.handle,
+            }))
+          );
 
           const twitter = accts.find(
             (a: SocialAccount) => a.platform === "TWITTER"
@@ -84,6 +94,9 @@ export function SocialAccountLinker({ memberId }: SocialAccountLinkerProps) {
         });
       }
       setAccounts(newAccounts);
+      onAccountChange?.(
+        newAccounts.map((a) => ({ platform: a.platform, handle: a.handle }))
+      );
     } catch (err: unknown) {
       setError((err as Error).message || "Failed to save");
     } finally {
@@ -108,7 +121,11 @@ export function SocialAccountLinker({ memberId }: SocialAccountLinkerProps) {
         throw new Error(data.error || "Failed to unlink");
       }
 
-      setAccounts(accounts.filter((a) => a.platform !== platform));
+      const newAccounts = accounts.filter((a) => a.platform !== platform);
+      setAccounts(newAccounts);
+      onAccountChange?.(
+        newAccounts.map((a) => ({ platform: a.platform, handle: a.handle }))
+      );
       if (platform === "TWITTER") setTwitterHandle("");
       if (platform === "FARCASTER") setFarcasterHandle("");
     } catch (err: unknown) {

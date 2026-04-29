@@ -99,7 +99,6 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
         })();
     }, [id]);
 
-<<<<<<< HEAD
     // Fetch published articles by this member
     useEffect(() => {
         (async () => {
