@@ -6,44 +6,44 @@ import { fetchMemberById } from './sheets/member-repository'
 export { FriendSource }
 
 /**
- * Add a friend (vouch). Creates a one-way vouch relationship.
+ * Add a friend (follow). Creates a one-way follow relationship.
  */
 export async function addFriend(
-  voucherId: string,
-  vouchedId: string,
+  followerId: string,
+  followeeId: string,
   source: FriendSource = FriendSource.PIZZADAO
 ) {
-  if (voucherId === vouchedId) {
-    throw new Error('Cannot vouch for yourself')
+  if (followerId === followeeId) {
+    throw new Error('Cannot follow yourself')
   }
 
   return prisma.friendship.create({
     data: {
-      voucherId,
-      vouchedId,
+      followerId,
+      followeeId,
       source
     }
   })
 }
 
 /**
- * Remove a friend (remove vouch). Deletes the one-way vouch relationship.
+ * Remove a friend (unfollow). Deletes the one-way follow relationship.
  */
-export async function removeFriend(voucherId: string, vouchedId: string) {
+export async function removeFriend(followerId: string, followeeId: string) {
   return prisma.friendship.deleteMany({
-    where: { voucherId, vouchedId }
+    where: { followerId, followeeId }
   })
 }
 
 /**
- * Get friends (people the member is vouching for) with enriched data from Google Sheets.
+ * Get friends (people the member is following) with enriched data from Google Sheets.
  */
 export async function getFriends(
   memberId: string,
   limit = 50,
   source?: FriendSource
 ) {
-  const where: any = { voucherId: memberId }
+  const where: any = { followerId: memberId }
   if (source) where.source = source
 
   const friendships = await prisma.friendship.findMany({
@@ -56,9 +56,9 @@ export async function getFriends(
   const friends = await Promise.all(
     friendships.map(async (f) => {
       try {
-        const member = await fetchMemberById(f.vouchedId)
+        const member = await fetchMemberById(f.followeeId)
         return {
-          memberId: f.vouchedId,
+          memberId: f.followeeId,
           name: member?.['Name'] || member?.['Mafia Name'] || 'Unknown',
           city: member?.['City'] || '',
           crews: member?.['Crews'] || '',
@@ -67,7 +67,7 @@ export async function getFriends(
         }
       } catch {
         return {
-          memberId: f.vouchedId,
+          memberId: f.followeeId,
           name: 'Unknown',
           city: '',
           crews: '',
@@ -86,31 +86,31 @@ export async function getFriends(
  */
 export async function getFriendCounts(memberId: string) {
   const [total, pizzadao, farcaster, twitter, followers] = await Promise.all([
-    prisma.friendship.count({ where: { voucherId: memberId } }),
+    prisma.friendship.count({ where: { followerId: memberId } }),
     prisma.friendship.count({
-      where: { voucherId: memberId, source: FriendSource.PIZZADAO }
+      where: { followerId: memberId, source: FriendSource.PIZZADAO }
     }),
     prisma.friendship.count({
-      where: { voucherId: memberId, source: FriendSource.FARCASTER }
+      where: { followerId: memberId, source: FriendSource.FARCASTER }
     }),
     prisma.friendship.count({
-      where: { voucherId: memberId, source: FriendSource.TWITTER }
+      where: { followerId: memberId, source: FriendSource.TWITTER }
     }),
-    prisma.friendship.count({ where: { vouchedId: memberId } })
+    prisma.friendship.count({ where: { followeeId: memberId } })
   ])
 
   return { total, pizzadao, farcaster, twitter, followers }
 }
 
 /**
- * Check if a member has vouched for another member
+ * Check if a member is following another member
  */
 export async function isFriend(
-  voucherId: string,
-  vouchedId: string
+  followerId: string,
+  followeeId: string
 ): Promise<boolean> {
   const count = await prisma.friendship.count({
-    where: { voucherId, vouchedId }
+    where: { followerId, followeeId }
   })
   return count > 0
 }
@@ -124,22 +124,22 @@ export async function getMutualFriends(
 ): Promise<string[]> {
   // Friends of A
   const friendsOfA = await prisma.friendship.findMany({
-    where: { voucherId: memberIdA },
-    select: { vouchedId: true }
+    where: { followerId: memberIdA },
+    select: { followeeId: true }
   })
-  const aVouched = new Set(friendsOfA.map((f) => f.vouchedId))
+  const aFollowees = new Set(friendsOfA.map((f) => f.followeeId))
 
   // Friends of B
   const friendsOfB = await prisma.friendship.findMany({
-    where: { voucherId: memberIdB },
-    select: { vouchedId: true }
+    where: { followerId: memberIdB },
+    select: { followeeId: true }
   })
-  const bVouched = new Set(friendsOfB.map((f) => f.vouchedId))
+  const bFollowees = new Set(friendsOfB.map((f) => f.followeeId))
 
   // Intersection
   const mutual: string[] = []
-  for (const id of aVouched) {
-    if (bVouched.has(id)) {
+  for (const id of aFollowees) {
+    if (bFollowees.has(id)) {
       mutual.push(id)
     }
   }
@@ -148,7 +148,7 @@ export async function getMutualFriends(
 }
 
 /**
- * Notify a member that someone vouched for them
+ * Notify a member that someone started following them
  */
 export async function notifyFriendAdded(
   targetMemberId: string,
@@ -159,8 +159,8 @@ export async function notifyFriendAdded(
   return createNotification({
     type: NotificationType.FRIEND_ADDED,
     recipientId: targetDiscordId,
-    title: 'New Vouch',
-    message: `${followerName} vouched for you`,
+    title: 'New Follower',
+    message: `${followerName} started following you`,
     metadata: { followerMemberId },
     linkUrl: `/profile/${followerMemberId}`
   })

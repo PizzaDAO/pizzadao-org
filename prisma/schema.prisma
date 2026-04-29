@@ -312,17 +312,17 @@ model SocialAccount {
   @@index([platform, platformId])
 }
 
-// One-way vouch relationship between members
+// One-way follow relationship between members
 model Friendship {
   id         Int          @id @default(autoincrement())
-  voucherId  String
-  vouchedId  String
+  followerId String
+  followeeId String
   source     FriendSource @default(PIZZADAO)
   createdAt  DateTime     @default(now())
 
-  @@unique([voucherId, vouchedId])
-  @@index([voucherId])
-  @@index([vouchedId])
+  @@unique([followerId, followeeId])
+  @@index([followerId])
+  @@index([followeeId])
 }
 
 // ===== CREW CALL ATTENDANCE =====
@@ -439,14 +439,20 @@ model UnlockTicketRecord {
   @@unique([lockAddress, tokenId, networkId])
 }
 
-// Cached wallet address for a member (avoids Google Sheets lookup)
+// Multi-wallet: each member can have multiple wallets (EVM, Solana, etc.)
 model MemberWallet {
-  memberId      String   @id
+  id            Int      @id @default(autoincrement())
+  memberId      String
   discordId     String?
   walletAddress String
+  label         String?            // "Main", "Vault", etc.
+  chainType     String   @default("evm")  // "evm" | "solana"
   source        String   @default("sheet")
+  isPrimary     Boolean  @default(false)
   createdAt     DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
+  @@unique([memberId, walletAddress])
+  @@index([memberId])
   @@index([walletAddress])
 }

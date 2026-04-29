@@ -6,45 +6,106 @@ import { GvizResponse, GvizCell } from "@/app/lib/types/gviz";
 const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
 const TAB_NAME = "Crew";
 
+// ---------------------------------------------------------------------------
+// Public types
+// ---------------------------------------------------------------------------
+
+export interface WalletRecord {
+  id: number;
+  memberId: string;
+  discordId: string | null;
+  walletAddress: string;
+  label: string | null;
+  chainType: string;
+  source: string;
+  isPrimary: boolean;
+  createdAt: Date;
+  updatedAt: Date;
+}
+
+// ---------------------------------------------------------------------------
+// Read helpers
+// ---------------------------------------------------------------------------
+
 /**
- * Look up wallet for a member: DB first, sheet fallback + auto-cache
+ * Look up PRIMARY wallet for a member: DB first, sheet fallback + auto-cache.
+ * Backward-compatible for sheet sync and existing consumers.
  */
 export async function getWalletForMember(
   memberId: string
 ): Promise<string | null> {
-  // 1. Try DB
-  const cached = await prisma.memberWallet.findUnique({
-    where: { memberId },
+  // 1. Try DB — get primary wallet
+  const primary = await prisma.memberWallet.findFirst({
+    where: { memberId, isPrimary: true },
     select: { walletAddress: true },
   });
-  if (cached) return cached.walletAddress;
+  if (primary) return primary.walletAddress;
+
+  // 1b. If no primary, try any wallet for this member
+  const any = await prisma.memberWallet.findFirst({
+    where: { memberId },
+    orderBy: { createdAt: "asc" },
+    select: { walletAddress: true },
+  });
+  if (any) return any.walletAddress;
 
   // 2. Fall back to sheet
   const sheetWallet = await fetchWalletFromSheet(memberId);
   if (!sheetWallet) return null;
 
-  // 3. Auto-cache in DB
+  // 3. Auto-cache in DB as primary
   try {
-    await prisma.memberWallet.upsert({
-      where: { memberId },
-      create: { memberId, walletAddress: sheetWallet, source: "sheet" },
-      update: { walletAddress: sheetWallet, source: "sheet" },
+    await prisma.memberWallet.create({
+      data: {
+        memberId,
+        walletAddress: sheetWallet,
+        source: "sheet",
+        isPrimary: true,
+      },
     });
   } catch {
-    // Non-fatal — DB write failure shouldn't block wallet lookup
+    // Unique constraint or other non-fatal error
   }
 
   return sheetWallet;
 }
 
 /**
+ * Return ALL wallets for a member (used by NFT/POAP/UI).
+ */
+export async function getAllWalletsForMember(
+  memberId: string
+): Promise<WalletRecord[]> {
+  return prisma.memberWallet.findMany({
+    where: { memberId },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+  });
+}
+
+/**
+ * Return only EVM wallets for a member (NFT/POAP consumers).
+ */
+export async function getEvmWalletsForMember(
+  memberId: string
+): Promise<string[]> {
+  const wallets = await prisma.memberWallet.findMany({
+    where: { memberId, chainType: "evm" },
+    select: { walletAddress: true },
+    orderBy: [{ isPrimary: "desc" }, { createdAt: "asc" }],
+  });
+  return wallets.map((w) => w.walletAddress);
+}
+
+/**
  * Get all member wallets from DB (for leaderboard).
+ * Returns all wallets grouped by member.
  * Falls back to sheet if DB is empty (pre-backfill).
  */
 export async function getAllMemberWallets(): Promise<
   Array<{ memberId: string; walletAddress: string }>
 > {
   const dbWallets = await prisma.memberWallet.findMany({
+    where: { chainType: "evm" },
     select: { memberId: true, walletAddress: true },
   });
   if (dbWallets.length > 0) return dbWallets;
@@ -53,20 +114,113 @@ export async function getAllMemberWallets(): Promise<
   return fetchAllWalletsFromSheet();
 }
 
+// ---------------------------------------------------------------------------
+// Write helpers
+// ---------------------------------------------------------------------------
+
 /**
- * Save wallet to DB
+ * Save a new wallet for a member. First wallet is automatically primary.
  */
 export async function saveWalletForMember(
   memberId: string,
   walletAddress: string,
   source: string = "wallet_connect",
-  discordId?: string
-): Promise<void> {
-  await prisma.memberWallet.upsert({
+  discordId?: string,
+  chainType: string = "evm",
+  label?: string
+): Promise<WalletRecord> {
+  // Check if member has any existing wallets
+  const existingCount = await prisma.memberWallet.count({
     where: { memberId },
-    create: { memberId, walletAddress, source, discordId },
-    update: { walletAddress, source, discordId },
   });
+  const isPrimary = existingCount === 0;
+
+  return prisma.memberWallet.create({
+    data: {
+      memberId,
+      walletAddress,
+      source,
+      discordId,
+      chainType,
+      label,
+      isPrimary,
+    },
+  });
+}
+
+/**
+ * Delete a wallet for a member. If deleted wallet was primary, promote next oldest.
+ */
+export async function deleteWalletForMember(
+  memberId: string,
+  walletId: number
+): Promise<void> {
+  const wallet = await prisma.memberWallet.findFirst({
+    where: { id: walletId, memberId },
+  });
+  if (!wallet) throw new Error("Wallet not found");
+
+  await prisma.memberWallet.delete({ where: { id: walletId } });
+
+  // If deleted wallet was primary, promote next oldest
+  if (wallet.isPrimary) {
+    const next = await prisma.memberWallet.findFirst({
+      where: { memberId },
+      orderBy: { createdAt: "asc" },
+    });
+    if (next) {
+      await prisma.memberWallet.update({
+        where: { id: next.id },
+        data: { isPrimary: true },
+      });
+    }
+  }
+}
+
+/**
+ * Update wallet label or other editable fields.
+ */
+export async function updateWalletForMember(
+  memberId: string,
+  walletId: number,
+  updates: { label?: string }
+): Promise<WalletRecord> {
+  // Verify ownership
+  const wallet = await prisma.memberWallet.findFirst({
+    where: { id: walletId, memberId },
+  });
+  if (!wallet) throw new Error("Wallet not found");
+
+  return prisma.memberWallet.update({
+    where: { id: walletId },
+    data: { label: updates.label },
+  });
+}
+
+/**
+ * Set a wallet as primary (unset old primary, set new).
+ */
+export async function setPrimaryWallet(
+  memberId: string,
+  walletId: number
+): Promise<void> {
+  // Verify ownership
+  const wallet = await prisma.memberWallet.findFirst({
+    where: { id: walletId, memberId },
+  });
+  if (!wallet) throw new Error("Wallet not found");
+
+  // Unset all primaries for this member, then set the new one
+  await prisma.$transaction([
+    prisma.memberWallet.updateMany({
+      where: { memberId, isPrimary: true },
+      data: { isPrimary: false },
+    }),
+    prisma.memberWallet.update({
+      where: { id: walletId },
+      data: { isPrimary: true },
+    }),
+  ]);
 }
 
 // ---------------------------------------------------------------------------

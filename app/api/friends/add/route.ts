@@ -8,7 +8,7 @@ export const runtime = "nodejs";
 
 /**
  * POST /api/friends/add
- * Authenticated - add a friend (vouch)
+ * Authenticated - add a friend (follow)
  * Body: { targetMemberId }
  */
 export async function POST(req: NextRequest) {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     if (currentUser.memberId === targetMemberId) {
       return NextResponse.json(
-        { error: "Cannot vouch for yourself" },
+        { error: "Cannot follow yourself" },
         { status: 400 }
       );
     }
@@ -71,10 +71,10 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    // Handle unique constraint violation (already vouched)
+    // Handle unique constraint violation (already following)
     if (err?.code === "P2002") {
       return NextResponse.json(
-        { error: "Already vouched for this member" },
+        { error: "Already following this member" },
         { status: 409 }
       );
     }

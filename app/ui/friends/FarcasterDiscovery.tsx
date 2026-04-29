@@ -142,7 +142,7 @@ export function FarcasterDiscovery({
             fontFamily: "inherit",
           }}
         >
-          Discover Farcaster Vouches
+          Discover Farcaster Friends
         </button>
       </div>
     );

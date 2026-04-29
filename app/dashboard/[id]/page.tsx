@@ -14,6 +14,7 @@ import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
+import { WalletManager } from "../../ui/wallet-manager/WalletManager";
 import { FriendsWidget } from "../../ui/friends/FriendsWidget";
 import { SocialAccountLinker } from "../../ui/friends/SocialAccountLinker";
 
@@ -355,6 +356,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             All Members
                         </Link>
+                        <Link href="/friends" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Friends
+                        </Link>
                         <Link href="/calls" style={{
                             ...btn("secondary"),
                             fontSize: 14,
@@ -362,12 +370,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             Calls
                         </Link>
-                        <Link href="/vouches" style={{
+                        <Link href="/friends" style={{
                             ...btn("secondary"),
                             fontSize: 14,
                             textDecoration: "none"
                         }}>
-                            Vouches
+                            Friends
                         </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
@@ -848,8 +856,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         </div>
                     </div>
 
-                    {/* NFT Collection Section - shows connect prompt if no wallet */}
-                    <NFTCollection memberId={idValue} showConnectPrompt={true} />
+                    {/* Wallet Manager - connect, edit, remove wallets */}
+                    <WalletManager memberId={idValue} />
+
+                    {/* NFT Collection Section */}
+                    <NFTCollection memberId={idValue} showConnectPrompt={false} />
 
                     {/* Pizza Party Tickets */}
                     <UnlockTicketCard memberId={idValue} />

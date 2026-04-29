@@ -11,13 +11,13 @@ export function AddFriendButton({
   targetMemberId,
   currentMemberId,
 }: AddFriendButtonProps) {
-  const [isVouched, setIsVouched] = useState(false);
+  const [isFollowing, setIsFollowing] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
 
   const shouldShow = !!currentMemberId && currentMemberId !== targetMemberId;
 
-  // Check if already vouched on mount
+  // Check if already following on mount
   useEffect(() => {
     if (!shouldShow) {
       setLoading(false);
@@ -31,10 +31,10 @@ export function AddFriendButton({
         );
         if (res.ok) {
           const data = await res.json();
-          const vouched = data.friends?.some(
+          const following = data.friends?.some(
             (f: any) => f.memberId === targetMemberId
           );
-          setIsVouched(!!vouched);
+          setIsFollowing(!!following);
         }
       } catch {
         // Silently fail
@@ -52,7 +52,7 @@ export function AddFriendButton({
   const handleToggle = async () => {
     setActionLoading(true);
     try {
-      const endpoint = isVouched ? "/api/friends/remove" : "/api/friends/add";
+      const endpoint = isFollowing ? "/api/friends/remove" : "/api/friends/add";
       const res = await fetch(endpoint, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
@@ -61,12 +61,12 @@ export function AddFriendButton({
       });
 
       if (res.ok) {
-        setIsVouched(!isVouched);
+        setIsFollowing(!isFollowing);
       } else {
         const data = await res.json();
-        // If already vouched and we tried to add, just set the state
+        // If already following and we tried to add, just set the state
         if (res.status === 409) {
-          setIsVouched(true);
+          setIsFollowing(true);
         } else {
           console.error("Friend action failed:", data.error);
         }
@@ -88,13 +88,13 @@ export function AddFriendButton({
         gap: 6,
         padding: "8px 16px",
         borderRadius: 10,
-        border: isVouched
+        border: isFollowing
           ? "1px solid var(--color-border-strong)"
           : "1px solid var(--color-btn-primary-border)",
-        background: isVouched
+        background: isFollowing
           ? "var(--color-surface)"
           : "var(--color-btn-primary-bg)",
-        color: isVouched
+        color: isFollowing
           ? "var(--color-text)"
           : "var(--color-btn-primary-text)",
         fontWeight: 650,
@@ -105,25 +105,25 @@ export function AddFriendButton({
         transition: "all 0.15s",
       }}
       onMouseEnter={(e) => {
-        if (isVouched && !actionLoading) {
+        if (isFollowing && !actionLoading) {
           e.currentTarget.style.borderColor = "var(--color-danger)";
           e.currentTarget.style.color = "var(--color-danger)";
-          e.currentTarget.textContent = "Remove Vouch";
+          e.currentTarget.textContent = "Unfollow";
         }
       }}
       onMouseLeave={(e) => {
-        if (isVouched && !actionLoading) {
+        if (isFollowing && !actionLoading) {
           e.currentTarget.style.borderColor = "var(--color-border-strong)";
           e.currentTarget.style.color = "var(--color-text)";
-          e.currentTarget.textContent = "Vouched";
+          e.currentTarget.textContent = "Following";
         }
       }}
     >
       {actionLoading
         ? "..."
-        : isVouched
-        ? "Vouched"
-        : "+ Vouch"}
+        : isFollowing
+        ? "Following"
+        : "+ Follow"}
     </button>
   );
 }
