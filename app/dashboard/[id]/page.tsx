@@ -15,6 +15,8 @@ import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletManager } from "../../ui/wallet-manager/WalletManager";
+import { FriendsWidget } from "../../ui/friends/FriendsWidget";
+import { SocialAccountLinker } from "../../ui/friends/SocialAccountLinker";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -353,6 +355,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             textDecoration: "none"
                         }}>
                             All Members
+                        </Link>
+                        <Link href="/friends" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Friends
                         </Link>
                         <Link href="/calls" style={{
                             ...btn("secondary"),
@@ -827,6 +836,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 </div>
                             )}
                         </div>
+
+                        {/* Social Accounts - link X and Farcaster handles */}
+                        <SocialAccountLinker memberId={idValue} />
+
+                        {/* Friends Widget */}
+                        <FriendsWidget memberId={idValue} />
 
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
