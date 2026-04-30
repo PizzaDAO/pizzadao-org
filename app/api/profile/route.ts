@@ -14,6 +14,7 @@ import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { validateProfilePayload } from "@/app/lib/profile/validation";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { getRegionRoleId, ALL_REGION_ROLE_IDS } from "@/app/lib/region-mapping";
+import { crewIdToLabel } from "@/app/lib/crew-labels";
 
 export const runtime = "nodejs";
 
@@ -164,7 +165,7 @@ const POST_HANDLER = async (req: Request) => {
     turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
     turtles: turtlesArr,
 
-    crews: crewsArr,
+    crews: crewsArr.map(crewIdToLabel),
     memberId,
 
     // Identity comes from cookie session, never from client body
@@ -185,7 +186,7 @@ const POST_HANDLER = async (req: Request) => {
       city: clampStr(body.city, 120),
       turtle: clampStr(body.turtle ?? (turtlesArr.length ? turtlesArr.join(", ") : ""), 200),
       turtles: turtlesArr,
-      crews: crewsArr,
+      crews: crewsArr.map(crewIdToLabel),
       memberId,
       discordId: clampStr(session.discordId, 64),
       discordJoined: clampBool(body.discordJoined),

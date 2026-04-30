@@ -3,6 +3,7 @@ import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
+import { crewIdToLabel, normalizeCrewId } from "@/app/lib/crew-labels";
 
 export const runtime = "nodejs";
 
@@ -196,25 +197,25 @@ export async function POST(req: Request) {
 
     // Parse current crews
     const currentCrews = member.crews
-      ? member.crews.split(",").map((c) => c.trim().toLowerCase()).filter(Boolean)
+      ? member.crews.split(",").map((c) => normalizeCrewId(c)).filter(Boolean)
       : [];
 
     // Calculate new crews
     let newCrews: string[];
     if (action === "join") {
-      if (currentCrews.includes(crewId.toLowerCase())) {
+      if (currentCrews.includes(normalizeCrewId(crewId))) {
         return NextResponse.json({ error: "Already in this crew" }, { status: 400 });
       }
-      newCrews = [...currentCrews, crewId.toLowerCase()];
+      newCrews = [...currentCrews, normalizeCrewId(crewId)];
     } else {
-      if (!currentCrews.includes(crewId.toLowerCase())) {
+      if (!currentCrews.includes(normalizeCrewId(crewId))) {
         return NextResponse.json({ error: "Not in this crew" }, { status: 400 });
       }
-      newCrews = currentCrews.filter((c) => c !== crewId.toLowerCase());
+      newCrews = currentCrews.filter((c) => c !== normalizeCrewId(crewId));
     }
 
     // Update sheet
-    await updateCrewsInSheet(member.memberId, newCrews);
+    await updateCrewsInSheet(member.memberId, newCrews.map(crewIdToLabel));
 
     // Update Discord roles
     const guildId = process.env.DISCORD_GUILD_ID;
