@@ -30,8 +30,7 @@ const sql = neon(DATABASE_URL)
 
 const missions = [
   // Level 1 - Pizza Trainee (69 PEP)
-  { level: 1, index: 0, title: 'Tell us your favorite topping and mafia movie in #general', description: 'Introduce yourself in the #general channel with your favorite pizza topping and favorite mafia movie.', reward: 69, levelTitle: 'Pizza Trainee', autoVerify: true },
-  { level: 1, index: 1, title: 'Follow @RarePizzas and @Pizza_DAO on X', description: 'Follow both @RarePizzas and @Pizza_DAO on X (Twitter).', reward: 69, levelTitle: 'Pizza Trainee', autoVerify: true },
+  { level: 1, index: 0, title: 'Follow @RarePizzas and @Pizza_DAO on X', description: 'Follow both @RarePizzas and @Pizza_DAO on X (Twitter).', reward: 69, levelTitle: 'Pizza Trainee', autoVerify: true },
 
   // Level 2 - Pizza Noob (420 PEP)
   { level: 2, index: 0, title: 'Say hi on a community or crew call', description: 'Attend a community or crew call and introduce yourself.', reward: 420, levelTitle: 'Pizza Noob', autoVerify: false },
@@ -42,8 +41,7 @@ const missions = [
   { level: 3, index: 1, title: 'Invite a friend to Discord', description: 'Invite a friend to join the PizzaDAO Discord server.', reward: 1337, levelTitle: null, autoVerify: false },
 
   // Level 4 (3,141 PEP)
-  { level: 4, index: 0, title: 'Claim your crew number and create a profile', description: 'Claim your crew number and set up your PizzaDAO profile.', reward: 3141, levelTitle: null, autoVerify: false },
-  { level: 4, index: 1, title: 'Make a POAP for a community call', description: 'Create a POAP (Proof of Attendance Protocol) for one of the community calls.', reward: 3141, levelTitle: null, autoVerify: false },
+  { level: 4, index: 0, title: 'Make a POAP for a community call', description: 'Create a POAP (Proof of Attendance Protocol) for one of the community calls.', reward: 3141, levelTitle: null, autoVerify: false },
 
   // Level 5 (4,269 PEP)
   { level: 5, index: 0, title: 'Join three crew calls', description: 'Attend at least three different crew calls.', reward: 4269, levelTitle: null, autoVerify: false },
