@@ -13,7 +13,7 @@ import { AttendanceCard } from "../../ui/attendance-card";
 import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletDisplay } from "../../ui/wallet-manager/WalletDisplay";
-import { AddFriendButton } from "../../ui/friends/AddFriendButton";
+import { AddVouchButton } from "../../ui/vouches/AddVouchButton";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -112,7 +112,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
         })();
     }, [id]);
 
-    // Fetch current user's memberId for AddFriendButton
+    // Fetch current user's memberId for AddVouchButton
     useEffect(() => {
         (async () => {
             try {
@@ -299,9 +299,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         </div>
                     )}
 
-                    {/* Add Friend Button */}
+                    {/* Vouch Button */}
                     <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                        <AddFriendButton
+                        <AddVouchButton
                             targetMemberId={idValue}
                             currentMemberId={currentMemberId}
                         />

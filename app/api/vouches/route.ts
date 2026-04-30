@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFriends, FriendSource, getFriendCounts } from "@/app/lib/friends";
+import { getVouches, VouchSource, getVouchCounts } from "@/app/lib/vouches";
 
 export const runtime = "nodejs";
 
-const VALID_SOURCES: FriendSource[] = ["PIZZADAO", "TWITTER", "FARCASTER"];
+const VALID_SOURCES: VouchSource[] = ["PIZZADAO", "TWITTER", "FARCASTER"];
 
 /**
- * GET /api/friends?memberId=X&limit=N&source=PIZZADAO
- * Public - returns friends list for a member
+ * GET /api/vouches?memberId=X&limit=N&source=PIZZADAO
+ * Public - returns vouches list for a member
  */
 export async function GET(req: NextRequest) {
   const memberId = req.nextUrl.searchParams.get("memberId");
@@ -20,21 +20,21 @@ export async function GET(req: NextRequest) {
 
   const sourceStr = req.nextUrl.searchParams.get("source");
   const source =
-    sourceStr && VALID_SOURCES.includes(sourceStr as FriendSource)
-      ? (sourceStr as FriendSource)
+    sourceStr && VALID_SOURCES.includes(sourceStr as VouchSource)
+      ? (sourceStr as VouchSource)
       : undefined;
 
   try {
-    const [friends, counts] = await Promise.all([
-      getFriends(memberId, limit, source),
-      getFriendCounts(memberId),
+    const [vouches, counts] = await Promise.all([
+      getVouches(memberId, limit, source),
+      getVouchCounts(memberId),
     ]);
 
-    return NextResponse.json({ friends, counts });
+    return NextResponse.json({ vouches, counts });
   } catch (err: unknown) {
-    console.error("Failed to fetch friends:", err);
+    console.error("Failed to fetch vouches:", err);
     return NextResponse.json(
-      { error: "Failed to fetch friends" },
+      { error: "Failed to fetch vouches" },
       { status: 500 }
     );
   }
