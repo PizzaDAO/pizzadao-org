@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle } from '@/app/lib/missions'
+import { getCachedMissionsList, setCachedMissionsList } from '@/app/lib/mission-cache'
 
 export const runtime = 'nodejs'
 
@@ -31,23 +32,35 @@ export async function GET() {
       }
     }
 
-    // Build levels array for response
-    const levels = Object.entries(missionsByLevel).map(([levelNum, missions]) => {
-      const level = parseInt(levelNum)
-      return {
-        level,
-        title: missions[0]?.levelTitle || null,
-        reward: missions[0]?.reward || 0,
-        missions: missions.map(m => ({
-          id: m.id,
-          index: m.index,
-          title: m.title,
-          description: m.description,
-          autoVerify: m.autoVerify,
-          progress: progressMap[m.id] || null,
-        })),
+    // Use cached mission definitions if available (for unauthenticated requests)
+    // For authenticated requests, we need per-user progress so only cache the base levels
+    let levels
+    const cachedLevels = !session?.discordId ? getCachedMissionsList() : null
+    if (cachedLevels) {
+      levels = cachedLevels
+    } else {
+      levels = Object.entries(missionsByLevel).map(([levelNum, missions]) => {
+        const level = parseInt(levelNum)
+        return {
+          level,
+          title: missions[0]?.levelTitle || null,
+          reward: missions[0]?.reward || 0,
+          missions: missions.map(m => ({
+            id: m.id,
+            index: m.index,
+            title: m.title,
+            description: m.description,
+            autoVerify: m.autoVerify,
+            progress: progressMap[m.id] || null,
+          })),
+        }
+      })
+
+      // Cache unauthenticated mission list (no per-user progress)
+      if (!session?.discordId) {
+        setCachedMissionsList(levels)
       }
-    })
+    }
 
     return NextResponse.json({
       levels,

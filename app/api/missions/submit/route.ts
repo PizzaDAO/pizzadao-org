@@ -4,6 +4,7 @@ import { submitMissionCompletion } from '@/app/lib/missions'
 import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
+import { invalidateProgressCache } from '@/app/lib/mission-cache'
 
 export const runtime = 'nodejs'
 
@@ -31,6 +32,9 @@ const POST_HANDLER = async (request: NextRequest) => {
     notes,
     memberId
   )
+
+  // Invalidate cached progress for this user
+  invalidateProgressCache(session.discordId)
 
   return NextResponse.json({
     success: true,
