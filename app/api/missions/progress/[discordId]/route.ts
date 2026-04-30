@@ -17,7 +17,9 @@ export async function GET(
 
     const summary = await getUserProgressSummary(discordId)
 
-    return NextResponse.json(summary)
+    return NextResponse.json(summary, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' }
+    })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

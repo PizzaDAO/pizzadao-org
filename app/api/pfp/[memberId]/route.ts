@@ -15,6 +15,7 @@ export async function GET(
             return NextResponse.json({ error: "Missing memberId" }, { status: 400 });
         }
 
+        const cacheHeaders = { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' };
         const pfpDir = path.join(process.cwd(), "public", "pfp");
 
         // Try jpg first, then png
@@ -22,11 +23,11 @@ export async function GET(
         const pngPath = path.join(pfpDir, `${memberId}.png`);
 
         if (fs.existsSync(jpgPath)) {
-            return NextResponse.json({ url: `/pfp/${memberId}.jpg` });
+            return NextResponse.json({ url: `/pfp/${memberId}.jpg` }, { headers: cacheHeaders });
         }
 
         if (fs.existsSync(pngPath)) {
-            return NextResponse.json({ url: `/pfp/${memberId}.png` });
+            return NextResponse.json({ url: `/pfp/${memberId}.png` }, { headers: cacheHeaders });
         }
 
         // Check for default
@@ -34,15 +35,15 @@ export async function GET(
         const defaultPng = path.join(pfpDir, "default.png");
 
         if (fs.existsSync(defaultJpg)) {
-            return NextResponse.json({ url: `/pfp/default.jpg` });
+            return NextResponse.json({ url: `/pfp/default.jpg` }, { headers: cacheHeaders });
         }
 
         if (fs.existsSync(defaultPng)) {
-            return NextResponse.json({ url: `/pfp/default.png` });
+            return NextResponse.json({ url: `/pfp/default.png` }, { headers: cacheHeaders });
         }
 
         // No image found
-        return NextResponse.json({ url: null });
+        return NextResponse.json({ url: null }, { headers: cacheHeaders });
     } catch (error) {
         return NextResponse.json({ error: "Failed to get profile picture" }, { status: 500 });
     }

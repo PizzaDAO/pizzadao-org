@@ -33,7 +33,9 @@ const GET_HANDLER = async (request: NextRequest) => {
     thumbnail: rest.coverImage || extractFirstImage(content) || null,
   }))
 
-  return NextResponse.json({ articles, pagination: result.pagination })
+  return NextResponse.json({ articles, pagination: result.pagination }, {
+    headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
+  })
 }
 
 // POST /api/articles - Create a new article (role-gated)

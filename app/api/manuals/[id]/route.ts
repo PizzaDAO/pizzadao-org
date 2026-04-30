@@ -232,6 +232,8 @@ export async function GET(
       sheetContent,
       contentError,
       ...(debugInfo ? { _debug: debugInfo } : {}),
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (e: unknown) {
     return NextResponse.json(

@@ -138,7 +138,9 @@ export async function GET(req: Request) {
         ? allManuals.filter(m => m.crew.toLowerCase() === crewFilter)
         : allManuals
 
-      return NextResponse.json({ manuals, _debug: debugInfo })
+      return NextResponse.json({ manuals, _debug: debugInfo }, {
+        headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+      })
     }
 
     const [sheetRes, linkMapResult] = await Promise.all([
@@ -179,7 +181,9 @@ export async function GET(req: Request) {
       ? allManuals.filter(m => m.crew.toLowerCase() === crewFilter)
       : allManuals
 
-    return NextResponse.json({ manuals })
+    return NextResponse.json({ manuals }, {
+      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+    })
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? e.message : 'Failed to load manuals' },

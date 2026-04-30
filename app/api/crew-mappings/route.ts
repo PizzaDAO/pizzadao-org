@@ -10,7 +10,9 @@ export async function GET(req: Request) {
     const forceRefresh = url.searchParams.get('fresh') === '1';
 
     const result = await getCrewMappings(forceRefresh);
-    return NextResponse.json(result);
+    return NextResponse.json(result, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
+    });
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message ?? "Unknown error") }, { status: 500 });
   }

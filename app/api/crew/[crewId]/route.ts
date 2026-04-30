@@ -235,6 +235,8 @@ export async function GET(req: Request, { params }: Params) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 })
     }
 
+    const cacheHeaders = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' };
+
     // If crew has no sheet URL, return just the metadata
     if (!crew.sheet) {
       return NextResponse.json({
@@ -253,7 +255,7 @@ export async function GET(req: Request, { params }: Params) {
         tasks: crew.tasks || [],
         agenda: [],
         callInfo: null,
-      })
+      }, { headers: cacheHeaders })
     }
 
     // Extract sheet ID and fetch data
@@ -276,7 +278,7 @@ export async function GET(req: Request, { params }: Params) {
         agenda: [],
         callInfo: null,
         error: 'Invalid sheet URL',
-      })
+      }, { headers: cacheHeaders })
     }
 
     // Check for ?fresh=1 to skip cache, ?debug=1 for diagnostics
@@ -419,7 +421,7 @@ export async function GET(req: Request, { params }: Params) {
       },
       ...sheetData,
       ...(taskDebugInfo || agendaDebugInfo ? { _debug: { tasks: taskDebugInfo, agenda: agendaDebugInfo } } : {}),
-    })
+    }, { headers: cacheHeaders })
   } catch (e: unknown) {
     return NextResponse.json(
       { error: e instanceof Error ? (e as any)?.message : 'Failed to load crew data' },

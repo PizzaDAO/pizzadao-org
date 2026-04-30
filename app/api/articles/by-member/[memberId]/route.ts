@@ -46,7 +46,9 @@ const GET_HANDLER = async (_req: NextRequest, { params }: Params) => {
     take: 20,
   })
 
-  return NextResponse.json({ articles })
+  return NextResponse.json({ articles }, {
+    headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' }
+  })
 }
 
 export const GET = withErrorHandling(GET_HANDLER)

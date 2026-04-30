@@ -25,7 +25,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const accounts = await getSocialAccounts(memberId);
-    return NextResponse.json({ accounts });
+    return NextResponse.json({ accounts }, {
+      headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=7200' }
+    });
   } catch (err: unknown) {
     console.error("Failed to fetch social accounts:", err);
     return NextResponse.json(
