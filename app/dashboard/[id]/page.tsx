@@ -13,6 +13,7 @@ import { POAPCollection } from "../../ui/poap";
 import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
+import { MissionsProgress } from "../../ui/missions";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletManager } from "../../ui/wallet-manager/WalletManager";
 import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
@@ -356,12 +357,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             All Members
                         </Link>
-                        <Link href="/vouches" style={{
+                        <Link href="/missions" style={{
                             ...btn("secondary"),
                             fontSize: 14,
                             textDecoration: "none"
                         }}>
-                            Vouches
+                            Missions
                         </Link>
                         <Link href="/calls" style={{
                             ...btn("secondary"),
@@ -864,6 +865,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     {/* Pizza Party Tickets */}
                     <UnlockTicketCard memberId={idValue} />
+
+                    {/* Missions Progress */}
+                    <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
+                        <MissionsProgress />
+                    </div>
 
                     {/* Crews Section - MATCHING STEP 5 UI */}
                     {(() => {
