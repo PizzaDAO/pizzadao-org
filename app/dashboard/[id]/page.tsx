@@ -14,6 +14,10 @@ import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import { MissionsProgress } from "../../ui/missions";
+import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
+import { WalletManager } from "../../ui/wallet-manager/WalletManager";
+import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
+import { SocialAccountLinker } from "../../ui/vouches/SocialAccountLinker";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -359,6 +363,20 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             textDecoration: "none"
                         }}>
                             Missions
+                        </Link>
+                        <Link href="/calls" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Calls
+                        </Link>
+                        <Link href="/vouches" style={{
+                            ...btn("secondary"),
+                            fontSize: 14,
+                            textDecoration: "none"
+                        }}>
+                            Vouches
                         </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
@@ -827,14 +845,26 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             )}
                         </div>
 
+                        {/* Social Accounts - link X and Farcaster handles */}
+                        <SocialAccountLinker memberId={idValue} />
+
+                        {/* Vouches Widget */}
+                        <VouchesWidget memberId={idValue} />
+
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>
                             <POAPCollection memberId={idValue} />
                         </div>
                     </div>
 
-                    {/* NFT Collection Section - shows connect prompt if no wallet */}
-                    <NFTCollection memberId={idValue} showConnectPrompt={true} />
+                    {/* Wallet Manager - connect, edit, remove wallets */}
+                    <WalletManager memberId={idValue} />
+
+                    {/* NFT Collection Section */}
+                    <NFTCollection memberId={idValue} showConnectPrompt={false} />
+
+                    {/* Pizza Party Tickets */}
+                    <UnlockTicketCard memberId={idValue} />
 
                     {/* Missions Progress */}
                     <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>

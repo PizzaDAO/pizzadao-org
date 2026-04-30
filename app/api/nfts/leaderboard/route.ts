@@ -4,6 +4,7 @@ import { NextResponse } from "next/server";
 import { getNFTContracts, ALCHEMY_CHAIN_URLS } from "@/app/lib/nft-config";
 import { NFTContract } from "@/app/lib/nft-types";
 import { cacheGet, cacheSet } from "../../lib/cache";
+import { getAllMemberWallets } from "@/app/lib/wallet-lookup";
 
 export const runtime = "nodejs";
 
@@ -49,12 +50,15 @@ interface LeaderboardResponse {
 
 
 /**
- * Fetch all members with valid wallet addresses
+ * Fetch member names and turtles from the Crew sheet.
+ * Returns a map of memberId -> { name, turtles }.
  */
-async function fetchMembersWithWallets(): Promise<MemberInfo[]> {
+async function fetchMemberDetails(): Promise<
+  Map<string, { name: string; turtles: string[] }>
+> {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${TAB_NAME}&tqx=out:json&headers=0`;
   const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch crew sheet");
+  if (!res.ok) return new Map();
 
   const text = await res.text();
   const gviz = parseGvizJson(text);
@@ -80,9 +84,7 @@ async function fetchMembersWithWallets(): Promise<MemberInfo[]> {
     }
   }
 
-  if (headerRowIdx === -1) {
-    throw new Error("Header row not found");
-  }
+  if (headerRowIdx === -1) return new Map();
 
   // Find column indices
   let idxId = headerVals.findIndex((h) =>
@@ -91,42 +93,26 @@ async function fetchMembersWithWallets(): Promise<MemberInfo[]> {
   if (idxId === -1) idxId = 0;
 
   const idxName = headerVals.findIndex((h) => h === "name");
-  let idxWallet = headerVals.findIndex((h) => h === "wallet");
-  if (idxWallet === -1) {
-    idxWallet = headerVals.findIndex((h) => h === "address" || h.includes("wallet"));
-  }
   const idxTurtles = headerVals.findIndex((h) => h === "turtles" || h === "roles");
 
-  if (idxWallet === -1) {
-    return [];
-  }
-
-  const members: MemberInfo[] = [];
+  const details = new Map<string, { name: string; turtles: string[] }>();
 
   for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
     const cells = rows[ri]?.c || [];
     const id = String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim();
     const name = idxName >= 0 ? String(cells[idxName]?.v ?? cells[idxName]?.f ?? "").trim() : "";
-    const wallet = String(cells[idxWallet]?.v ?? cells[idxWallet]?.f ?? "").trim();
     const turtlesRaw = idxTurtles >= 0 ? String(cells[idxTurtles]?.v ?? cells[idxTurtles]?.f ?? "") : "";
 
-    // Validate wallet address
-    if (wallet && wallet.startsWith("0x") && wallet.length === 42) {
+    if (id) {
       const turtles = turtlesRaw
         .split(",")
         .map((t) => t.trim())
         .filter(Boolean);
-
-      members.push({
-        memberId: id,
-        name: name || `Member ${id}`,
-        wallet: wallet.toLowerCase(),
-        turtles,
-      });
+      details.set(id, { name: name || `Member ${id}`, turtles });
     }
   }
 
-  return members;
+  return details;
 }
 
 /**
@@ -161,10 +147,33 @@ async function fetchNFTCount(
  * Aggregate NFT holdings across all members with concurrency limit
  */
 async function aggregateLeaderboard(): Promise<LeaderboardResponse> {
-  const [members, contracts] = await Promise.all([
-    fetchMembersWithWallets(),
+  // Fetch wallets from DB (or sheet fallback) and member details in parallel
+  const [walletEntries, memberDetails, contracts] = await Promise.all([
+    getAllMemberWallets(),
+    fetchMemberDetails(),
     getNFTContracts(),
   ]);
+
+  // Group wallets by memberId so we can aggregate across all wallets
+  const walletsByMember = new Map<string, string[]>();
+  for (const w of walletEntries) {
+    if (!w.walletAddress.startsWith("0x") || w.walletAddress.length < 42) continue;
+    const existing = walletsByMember.get(w.memberId) || [];
+    existing.push(w.walletAddress.toLowerCase());
+    walletsByMember.set(w.memberId, existing);
+  }
+
+  // Build MemberInfo array (one entry per member, first wallet as representative)
+  const members: MemberInfo[] = [];
+  for (const [memberId, wallets] of walletsByMember) {
+    const details = memberDetails.get(memberId);
+    members.push({
+      memberId,
+      name: details?.name || `Member ${memberId}`,
+      wallet: wallets[0], // representative wallet for display
+      turtles: details?.turtles || [],
+    });
+  }
 
   if (members.length === 0) {
     return {
@@ -188,17 +197,23 @@ async function aggregateLeaderboard(): Promise<LeaderboardResponse> {
   }
 
   // Process members with concurrency limit (5 at a time)
+  // For each member, fetch NFT counts across ALL their wallets and sum
   const CONCURRENCY = 5;
   const memberQueue = [...members];
   let processed = 0;
 
   async function processMember(member: MemberInfo) {
+    const memberWallets = walletsByMember.get(member.memberId) || [member.wallet];
     for (const contract of contracts) {
-      const count = await fetchNFTCount(member.wallet, contract);
-      if (count > 0) {
+      // Sum NFT counts across all wallets for this member
+      let totalCount = 0;
+      for (const wallet of memberWallets) {
+        totalCount += await fetchNFTCount(wallet, contract);
+      }
+      if (totalCount > 0) {
         const holders = collectionHolders.get(contract.address.toLowerCase());
         if (holders) {
-          holders.set(member.memberId, { info: member, count });
+          holders.set(member.memberId, { info: member, count: totalCount });
         }
       }
     }

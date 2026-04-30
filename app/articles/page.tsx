@@ -2,7 +2,7 @@
 
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
-import { ArticleList, TagBadge, type ArticleCardData } from "@/app/ui/articles";
+import { ArticleList, TagBadge, type ArticleCardData, type ViewMode } from "@/app/ui/articles";
 
 interface Pagination {
   page: number;
@@ -22,6 +22,28 @@ export default function ArticlesListPage() {
   const [page, setPage] = useState(1);
   const [canAuthor, setCanAuthor] = useState(false);
   const [drafts, setDrafts] = useState<ArticleCardData[]>([]);
+  const [viewMode, setViewMode] = useState<ViewMode>("gallery");
+
+  // Read persisted view mode from localStorage on mount (avoids hydration mismatch)
+  useEffect(() => {
+    try {
+      const saved = localStorage.getItem("articles-view-mode");
+      if (saved === "gallery" || saved === "list") {
+        setViewMode(saved);
+      }
+    } catch {
+      // localStorage may be unavailable
+    }
+  }, []);
+
+  function handleViewModeChange(mode: ViewMode) {
+    setViewMode(mode);
+    try {
+      localStorage.setItem("articles-view-mode", mode);
+    } catch {
+      // localStorage may be unavailable
+    }
+  }
 
   const fetchArticles = useCallback(async () => {
     setLoading(true);
@@ -349,9 +371,85 @@ export default function ArticlesListPage() {
           </div>
         )}
 
+        {/* View toggle */}
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "flex-end",
+            marginBottom: 16,
+          }}
+        >
+          <div
+            style={{
+              display: "inline-flex",
+              borderRadius: 8,
+              border: "1px solid var(--color-border)",
+              overflow: "hidden",
+            }}
+          >
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("gallery")}
+              title="Gallery view"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 36,
+                height: 32,
+                border: "none",
+                cursor: "pointer",
+                background: viewMode === "gallery"
+                  ? "var(--color-btn-primary-bg)"
+                  : "var(--color-surface)",
+                color: viewMode === "gallery"
+                  ? "var(--color-btn-primary-text)"
+                  : "var(--color-text-secondary, var(--color-text))",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor" />
+                <rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor" />
+                <rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor" />
+                <rect x="9" y="9" width="6" height="6" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+            <button
+              type="button"
+              onClick={() => handleViewModeChange("list")}
+              title="List view"
+              style={{
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                width: 36,
+                height: 32,
+                border: "none",
+                borderLeft: "1px solid var(--color-border)",
+                cursor: "pointer",
+                background: viewMode === "list"
+                  ? "var(--color-btn-primary-bg)"
+                  : "var(--color-surface)",
+                color: viewMode === "list"
+                  ? "var(--color-btn-primary-text)"
+                  : "var(--color-text-secondary, var(--color-text))",
+                transition: "all 0.15s ease",
+              }}
+            >
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+                <rect x="1" y="1" width="14" height="3" rx="1" fill="currentColor" />
+                <rect x="1" y="6.5" width="14" height="3" rx="1" fill="currentColor" />
+                <rect x="1" y="12" width="14" height="3" rx="1" fill="currentColor" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
         <ArticleList
           articles={articles}
           loading={loading}
+          viewMode={viewMode}
           emptyMessage={
             search || activeTag ? "No articles match your filters." : "No articles published yet."
           }

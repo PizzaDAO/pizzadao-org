@@ -11,7 +11,7 @@ const POAP_WHITELIST_SHEET_ID = '1UsQA1Jqm4gCb1qMwWf7i_k0eNsi5EofyOjijmGig3Jc';
 
 // Cache TTLs (in seconds)
 const POAP_WHITELIST_TTL = 60 * 60 * 24 * 7; // 7 days - whitelist rarely changes
-const POAP_USER_TTL = 60 * 60 * 24 * 7; // 7 days - POAPs don't change often, incremental updates handle new ones
+const POAP_USER_TTL = 0; // No expiry — POAPs are immutable, only new ones are fetched incrementally
 
 // Cache structure for user POAPs
 interface POAPCache {
@@ -19,6 +19,7 @@ interface POAPCache {
   totalCount: number;
   highestPoapId: number; // For incremental fetching
   lastUpdated: number;
+  whitelistSize: number; // Track whitelist size to detect new POAP events
 }
 
 /**
@@ -282,12 +283,11 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
   const cached = await cacheGet<POAPCache>(cacheKey);
 
   if (cached) {
-    // Return cached data immediately - it's always fresh enough
-    // Check if we should do an incremental update (every 5 minutes)
-    const fiveMinutesAgo = Date.now() - 5 * 60 * 1000;
+    // Only do an incremental update when the whitelist has grown (new POAP events added)
+    const allowedEventIds = await fetchAllowedPOAPIds();
 
-    if (cached.lastUpdated > fiveMinutesAgo) {
-      // Cache is fresh, return as-is
+    if (allowedEventIds.size <= (cached.whitelistSize || 0)) {
+      // Whitelist unchanged — cached data is complete
       return {
         poaps: cached.poaps,
         totalCount: cached.totalCount,
@@ -295,9 +295,8 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
       };
     }
 
-    // Cache exists but is older than 5 min - do incremental update
+    // Whitelist grew — fetch new POAPs since last cached ID
     try {
-      const allowedEventIds = await fetchAllowedPOAPIds();
       const newRawPOAPs = await fetchPOAPsFromAPI(walletAddress, cached.highestPoapId);
 
       if (newRawPOAPs.length > 0) {
@@ -310,8 +309,9 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
           }
         }
 
-        // Merge with existing POAPs
-        const allPOAPs = [...newPOAPs, ...cached.poaps];
+        // Merge with existing POAPs, dedup by tokenId
+        const seen = new Set(newPOAPs.map(p => p.tokenId));
+        const allPOAPs = [...newPOAPs, ...cached.poaps.filter(p => !seen.has(p.tokenId))];
 
         // Sort by token ID descending (newest first)
         allPOAPs.sort((a, b) => parseInt(b.tokenId, 10) - parseInt(a.tokenId, 10));
@@ -328,6 +328,7 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
           totalCount: allPOAPs.length,
           highestPoapId,
           lastUpdated: Date.now(),
+          whitelistSize: allowedEventIds.size,
         };
         await cacheSet(cacheKey, newCache, POAP_USER_TTL);
 
@@ -343,8 +344,9 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
         };
       }
 
-      // No new POAPs, just update timestamp
+      // No new POAPs, just update whitelist size
       cached.lastUpdated = Date.now();
+      cached.whitelistSize = allowedEventIds.size;
       await cacheSet(cacheKey, cached, POAP_USER_TTL);
 
       return {
@@ -391,6 +393,7 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
     totalCount: allPOAPs.length,
     highestPoapId,
     lastUpdated: Date.now(),
+    whitelistSize: allowedEventIds.size,
   };
   await cacheSet(cacheKey, newCache, POAP_USER_TTL);
 

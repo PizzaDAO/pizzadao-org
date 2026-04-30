@@ -1,0 +1,3791 @@
+[
+  {
+    "address": "0xDc9cB3da0Dd410c8b16a1605b1FaefaEBF1A1139",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": " Global pizza party ijoko city",
+    "event_slug": "ijoko-global-pizza-party",
+    "event_location": "TUNEX HOTEL AND LOUNGE, local government, Agbado-Ijoko Road, Ijoko, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xa439285bE36F907379e72fDfDC423fd02F2FF221",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "\"Global Pizza Day\" Ulaanbaatar, Mongolia Хамтдаа тэмдэглэн өнгөрүүлцгээе!",
+    "event_slug": "global-pizza-day-ulaanbaatar-mongolia",
+    "event_location": "Sukhbaatar Street Elixir Coffee & Wine Bar, CHD - 1 khoroo, Ulaanbaatar, Mongolia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x55AF69863cf3094059252Dd3F45D124ccb713D18",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "🇬🇹 Día de la Pizza Bitcoin 🍕 Ciudad de Guatemala",
+    "event_slug": "global-pizza-party-ciudad-de-guatemala",
+    "event_location": "Salones Colonia Centro América, 31 Avenida, Guatemala City, Guatemala",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf7eC884fF6E3606b051D3ee75F7F2045D791F822",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "✨Global Pizza Party TGU 🍕",
+    "event_slug": "global-pizza-party-tgu",
+    "event_location": "Vita Restaurante, Tegucigalpa, Honduras",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x070Bc6855e961764fFD456F016d4E48a093dc2B2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "🍕 Beirut Global Pizza Party 2025 🍕",
+    "event_slug": "beirut-global-pizza-party-2025",
+    "event_location": "Bavaglino, Beirut, Lebanon",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x821197342E97100Fff560e12f87dfEd12065B965",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "🍕 Bitcoin Pizza Day 2025 Mérida 🇲🇽",
+    "event_slug": "bitcoin-pizza-day-2025-mrida",
+    "event_location": "Zavi Pizza, Calle 25, Colonia México, México Oriente, Mérida, Yucatán, México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xb2ccE334a66387dfD499A62c895d0Fa7BA15e31F",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "🍕 Global Pizza Party Ottawa 2025 🍕",
+    "event_slug": "global-pizza-party-ottawa-2025",
+    "event_location": "Happy Fish Elgin, Elgin Street, Ottawa, ON, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2be7bc727a309110Ee92291a978Da4e8d0927bCE",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "🍕₿ Global Pizza Party – Singapore ₿🍕",
+    "event_slug": "global-pizza-party-singapore-1",
+    "event_location": "Stamford Road, SMU Connexion, Active Learning Classroom 3-2 Singapore",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2d92C4b1036B3b5DCC1782ffBf830d41c80465eB",
+    "network_id": 1,
+    "network_name": "Ethereum",
+    "event_name": "🍕ETHCluj x Pizza DAO Global Pizza Party🍕",
+    "event_slug": "eth-cluj-x-pizza-dao-global-pizza-party",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x997740C929509A7a6Cc478514924d139455b83B2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "🍕Proof of Craic Pizza Party🇮🇪",
+    "event_slug": "proof-of-craic-pizza-party-10",
+    "event_location": "53 Capel Street, North City, Dublin, Ireland",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x353e522DEC3Ad9511007501f6BB31920003B5fa7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "2026 Global Pizza Party: Toronto",
+    "event_slug": "2025-global-pizza-party-toronto-1",
+    "event_location": "Christie Pits Park, Bloor Street West, Toronto, ON, Canada",
+    "event_start_date": "2026-05-22"
+  },
+  {
+    "address": "0xa0f22a8EdB5B303B2BfD8c5104e78768fBB9Fc93",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "AIperitivo x Global Pizza Party - Florence",
+    "event_slug": "a-iperitivo-x-global-pizza-party",
+    "event_location": "Il Conventino Caffè Letterario, Arte e Artigianato, Via Giano della Bella, Firenze, FI, Italia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1A22939aF01CdC69C40812ae527f50A0dBd1f250",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Berlin Bitcoin Pizza Party ",
+    "event_slug": "berlin-bitcoin-pizza-party-1",
+    "event_location": "Berlin, Germany",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x16d0746D73074A5068076365cb230743672b2669",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Block Party TLV x PizzaDAO",
+    "event_slug": "yalla-bitcoin-pizza-party",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x33F7949B870972bE4409A9176622B758CEA24B3B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Pizza Day",
+    "event_slug": "bitcoin-pizza-day",
+    "event_location": "Al 21Restaurant, Avenue de la Liberté, Gare Luxembourg",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x92e57137eE3a75b2E4B453D47734beA606C64694",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Pizza Day - Chongqing 2025",
+    "event_slug": "bitcoin-pizza-day-chongqing-2025",
+    "event_location": "Chongqing, China",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x17907BC379d6f4d53204E051F8b2a40E3DA2d4fC",
+    "network_id": 10,
+    "network_name": "Optimism",
+    "event_name": "Bitcoin Pizza Day - Columbus Squad",
+    "event_slug": "bitcoin-pizza-day-columbus-squad",
+    "event_location": "Pins Mechanical Co., Riverside Drive, Dublin, OH, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6B178A97d5F6271bB46C705E54eCbD52D8233d86",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Pizza Day 2025 in Montréal",
+    "event_slug": "bitcoin-pizza-day-2025-in-montral",
+    "event_location": "Brigade pizzeria Montreal (Stanley), Stanley Street, Montreal, QC, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xc1B1e6a2645B7d457284787F130B4387011e5BBF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Pizza Day Party Addis Ababa ",
+    "event_slug": "bitcoin-pizza-day-party-addis-ababa",
+    "event_location": "Magnolia Hotel & Conference Center | Bole Atlas | ማግኖሊያ ሆቴል | ቦሌ አትላስ, Addis Ababa, Ethiopia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8D23f67E85eb009EB2BB7bee4baa15fa3FBB69AF",
+    "network_id": 56,
+    "network_name": "BSC",
+    "event_name": "Bitcoin Pizza Day Party with PizzaDAO",
+    "event_slug": "bitcoin-pizza-day-party-with-pizza-dao",
+    "event_location": "Riverside Taphouse, Light Street, Baltimore, MD, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xDdCFDb5C0F4B8a494aEA99A98c4b37f2b35CAdD7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Pizza Day PH",
+    "event_slug": "bitcoin-pizza-day-ph-1",
+    "event_location": "",
+    "event_start_date": "2025-05-15"
+  },
+  {
+    "address": "0x9DadF39aA633577c2ABf7e9c1Acd3D7158d842a2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Pizza Day Sydney ",
+    "event_slug": "bitcoin-pizza-day-sydney",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBfdaE4350aeCf69b98E027Bed70cc80fF6B04d19",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Bitcoin Pizza Party Sacramento",
+    "event_slug": "bitcoin-pizza-party-sacramento",
+    "event_location": "Giovanni's Old World New York Pizzeria, Folsom Boulevard, Sacramento, CA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3BeD078a2717F4BE3663c36c1FaDDDfa62E55ce8",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "BitcoinsafariTz Bitcoin Pizza 🍕 Day Hangout ",
+    "event_slug": "bitcoinsafari-tz-bitcoin-pizza-day-hangout-11",
+    "event_location": "Dar es Salaam, Tanzania",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x05B0fc43D7bb36Fdb5C6aa8e974F1193019F5A13",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Blobal Pizza Party Pachuca",
+    "event_slug": "blobal-pizza-party-pachuca",
+    "event_location": "Avenida Piracantos 1507, Fraccionamiento Alborada, Pachuca de Soto, Hgo., México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x70Ceb620b9f867e5F10ee90E751D3D18e8D07e87",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "BTC Pizza Day Halifax",
+    "event_slug": "btc-pizza-day-halifax",
+    "event_location": "Freeman's Little New York, Grafton Street, Halifax, Nova Scotia, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x577e474e34992af83dC6962EF744e738289B9231",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "BTC Pizza Day on Este Lugar",
+    "event_slug": "btc-pizza-day-on-este-lugar",
+    "event_location": "Este Lugar, Lourdes, Punta del Este Departamento de Maldonado, Uruguay",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xCD32c8bd6Daa70f67D272437310301C416E79147",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Francistown Pizza Party",
+    "event_slug": "francistown-pizza-party",
+    "event_location": "Francistown, Botswana",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x839515A47eA7611E10fa8f0821bfd783B0C368F9",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Bitcoin Pizza Day Bayelsa",
+    "event_slug": "global-bitcoin-pizza-day-bayelsa",
+    "event_location": "Ebitare Hotels, Yenagoa, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xFfa94A207B732058125Bb76C2Ffc2E47f869C36b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Bitcoin Pizza Day EDO",
+    "event_slug": "global-bitcoin-pizza-day-edo",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC311507f850FBbFeDAdD3907090783B4A4A29C40",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Day Košice",
+    "event_slug": "global-pizza-day-koice",
+    "event_location": "Tabačka Kulturfabrik, Gorkého, Old Town, Košice, Slovakia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x19aC1135Da51Cd4a48701c7699dB07118b14926D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party",
+    "event_slug": "global-pizza-party-34",
+    "event_location": "Vester Voldgade 7B, København, Danmark",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4f1e9692849740932caaBA2E9eB042F8Ca04F8Dc",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Bahia Crypto Hub",
+    "event_slug": "global-pizza-party-bahia-crypto-hub",
+    "event_location": "R. da Fonte do Boi, 5 - Rio Vermelho, Salvador - Bahia, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0702051aC3aA362A7646A89113180BF747D4A309",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Brasilia",
+    "event_slug": "global-pizza-party-brasilia",
+    "event_location": "SMPW quadra 05 Q 5 Nação Club Complexo Esportivo-Águas Claras | Crossfit | Futvolei | Tênis | Funcional | Contra Turno | Futebol | Academia - Parque Way, Brasília - DF, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xAa2DF1A263EF79e887b4f9b5212b8cF721a7a0f0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Cuenca 2025",
+    "event_slug": "global-pizza-party-cuenca-2025-3",
+    "event_location": "Facultad de Ciencia y Tecnologia UDA, Avenida 24 de Mayo, Cuenca, Ecuador",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x75507Bd22B59874520DFe56392D0BEbf8e6282Dc",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Dubai",
+    "event_slug": "global-pizza-party-dubai-1",
+    "event_location": "PizzaExpress, Dubai World Trade Centre - Sheikh Zayed Road - Dubai - United Arab Emirates",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC02289d48d02FFCCE007130e7e279E1B74C80959",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Gran Canaria",
+    "event_slug": "global-pizza-party-gran-canaria-4",
+    "event_location": "Restaurante La Pizza, Calle Tomás Miller, Las Palmas de Gran Canaria, Spain",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6091cA716112BEb6F3AF3c0dF5b23A738b76cbC1",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Guayaquil 2025",
+    "event_slug": "global-pizza-party-guayaquil-2025",
+    "event_location": "Salinerito, Victor Emilio Estrada, Guayaquil, Ecuador",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x49497F81fB0254Efa2813FBF25fdb1AD367498A7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Islamabad",
+    "event_slug": "global-pizza-party-islamabad-1",
+    "event_location": "Islamabad, Pakistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0f26eB6b323FB9E7Cb6aBAE8Da45b452fE708D70",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Kilifi",
+    "event_slug": "global-pizza-party-kilifi",
+    "event_location": "Distant Relatives Ecolodge & Backpackers, Kilifi Town, Kenya",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2bB08648DA8c1469B2c4C9BA1A82A796282B9759",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Near Antigua",
+    "event_slug": "global-pizza-party-near-antigua-1",
+    "event_location": "Green Apple, Five Islands village, Antigua and Barbuda",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf84e8cFb9a6c4026790Ca16bfb6b9d0841026353",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Porto Alegre",
+    "event_slug": "global-pizza-party-porto-alegre",
+    "event_location": "Rua Olavo Bilac, 251 - Azenha, Porto Alegre - RS, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA5104B189FCEFd71c926479b80C3A16262b31cA2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Quito 2025",
+    "event_slug": "global-pizza-party-quito-2025",
+    "event_location": "IMPAQTO Coworking- La Carolina, y, Quito, Ecuador",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xe37e564A17808184C9Fdb4A98C52de4314Ff7327",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Rio Crypto Hub",
+    "event_slug": "global-pizza-party-rio-crypto-hub",
+    "event_location": "Porto Maravalley - Avenida Professor Pereira Reis - Santo Cristo, Rio de Janeiro - RJ, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xD90D5c986579132d258A8Fe934903647cB79b26D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - São Paulo ",
+    "event_slug": "global-pizza-party-so-paulo",
+    "event_location": "Bless Skateshop & BarberShop - Santana - Rua Ezequiel Freire - Santana, São Paulo - SP, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x530f95310f14C1bc5FD4fe73D8B53e870cf45B18",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - SLC",
+    "event_slug": "pizza-slc",
+    "event_location": "Velvet Headquarters, Pierpont Avenue, Salt Lake City, UT, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x01bD9FB478Cc2E4ae90CB57046D4bA9C05DBAa2d",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party - Yerevan",
+    "event_slug": "global-pizza-party-yerevan-3",
+    "event_location": "Meridian Exhibition Center, Voskerichneri Street, Yerevan, Armenia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7B2BD9f9abC7F99dc7696f3Df264e4215b570D94",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Global Pizza Party (San Francisco)",
+    "event_slug": "global-pizza-party-san-francisco-1",
+    "event_location": "Frontier Tower | Berlinhouse, Market Street, San Francisco, CA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9bDbd7d8067255ffc0a0d45e94002DAE83DBebfd",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party @ Network School",
+    "event_slug": "global-pizza-party-network-school-1",
+    "event_location": "Forest City Marina Hotel, Pulau Satu, Gelang Patah, Johor, Malesia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8698D7d21FaCB6091020CDFC1D75Fee4d36BA9c7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "GLOBAL PIZZA PARTY / 5th BITGET BITCOIN PIZZA DAY PRAGUE",
+    "event_slug": "global-pizza-party-5th-bitcoin-pizza-day-prague",
+    "event_location": "Cross Club, Plynární, Praha 7-Holešovice, Česko",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x476531C50366396b00EBDc2AD04A4B7174D6835c",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party • Portland, Maine",
+    "event_slug": "global-pizza-party-portland-maine",
+    "event_location": "Brickyard Hollow Brewing Company, Commercial Street, Portland, ME, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x43452A3b600F5419aC99Be3E1DEe585494d64c5e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party + Monterrey",
+    "event_slug": "global-pizza-party-monterrey",
+    "event_location": "LaCuraduria, Calle Hidalgo Nte, La Fama, Ciudad Santa Catarina, N.L., México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x25b0d25284da88950E74CE4D481dF2f837a67F7A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party + Palermo ",
+    "event_slug": "global-pizza-party-palermo",
+    "event_location": "Arte e Tradizione, Via Santa Teresa, 2, 90133 Palermo, PA, Italia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC688DB1Bb08757ED3552BaC133D81085A2F7B9c3",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Global Pizza Party 2024: CHARLOTTE BLOCKPARTY EDITION",
+    "event_slug": "global-pizza-party-2024-charlotte-blockparty-edition",
+    "event_location": "510 E 15th St, Charlotte, NC 28206, USA",
+    "event_start_date": "2024-05-22"
+  },
+  {
+    "address": "0x8CA11df93e2a184d28704Cfb08d88109167B4338",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party 2025",
+    "event_slug": "global-pizza-party-2025",
+    "event_location": "Black Iris Social Club, West Broad Street, Richmond, VA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x481d8f78f5A8b4619fd3Ee615f6DC9943682587f",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party 2025 - Milano 🇮🇹",
+    "event_slug": "global-pizza-party-2025-milano",
+    "event_location": "LUX Gourmet Social Club, Via Eugenio Carpi, Milan, Metropolitan City of Milan, Italy",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC1A18552c8BEddb4a5848714D9F192dAc6e89a25",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Global Pizza Party 2025 - Tallinn",
+    "event_slug": "global-pizza-party-2025-tallinn",
+    "event_location": "Carlo’s Kitchen Porto Franco, Kai tänav, Tallinn, Estonia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xa3116d5D2B4B0E52a74D4204eD55bb05DDa13A43",
+    "network_id": 10,
+    "network_name": "Optimism",
+    "event_name": "Global Pizza Party 2025 - Xela (Quetzaltenango)",
+    "event_slug": "global-pizza-party-2025-xela-quetzaltenango",
+    "event_location": "Pizza Project | Detroit Style en Guatemala, Quetzaltenango, Guatemala",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x068766f41A411729203aF45015A5aB2053D9F8fe",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party 2025 Cayman Islands",
+    "event_slug": "global-pizza-party-2025-cayman-islands-20",
+    "event_location": "KARoo Restaurant & Bar, The Crescent, Cayman Islands",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0eE847cf6e583B06Ee2e3dd71745305724CB99D4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "GLOBAL PIZZA PARTY 2025 Kumamoto",
+    "event_slug": "global-pizza-party-2025-kumamoto-1",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2AeA0A9cAc451Fe51E5Bf5AE8B8537f30042c285",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party 2025 NYC ",
+    "event_slug": "global-pizza-party-2025-nyc",
+    "event_location": "Racket NYC, West 16th Street, New York, NY, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBDac3F746D6d7007c120a8b6882eb2DF0BB39D63",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party 2025-Hangzhou City",
+    "event_slug": "global-pizza-party-2025-hangzhou-city",
+    "event_location": "中国浙江省杭州市滨江区南环路4287号",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x95E12E9e96963C68bdB3FfEC729Ee11e5C0b182B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Abeokuta",
+    "event_slug": "global-pizza-party-abeokuta",
+    "event_location": "Buckingham Mall, Kofesu Street, Alabata Road, opposite Zenith Bank, Abeokuta, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9CDBe8E56095db8Ac686Bc39F98dAfA179D8eed5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party ABIA City",
+    "event_slug": "global-pizza-party-abia-city-74",
+    "event_location": "Kilimanjaro Fast Food, Factory Road, Aba, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x49BD3f640149389053bb516f36318818F7D86568",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Abidjan",
+    "event_slug": "global-pizza-party-abidjan",
+    "event_location": "Mama Doble Bar à Tapas, Rue Marconi, Abidjan, Côte d'Ivoire",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x72Fd74741D980C15542136AB851486F346793011",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Acadia",
+    "event_slug": "global-pizza-party-acadia",
+    "event_location": "20 State St, Ellsworth, ME 04605, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xaC72cbae87B3de312069F5a7f50A8C85D6B5AF2e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Accra 2025",
+    "event_slug": "global-pizza-party-accra",
+    "event_location": "Accra Mall, Spintex Road, Accra, Ghana",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x38a9b539F43f01dB59d768ee5754f8bA898BB9a8",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Agartala",
+    "event_slug": "global-pizza-party-agartala",
+    "event_location": "Pizza'ria, BK Road, opp. Women's college, Palace Compound, Indranagar, Agartala, Tripura, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1FB0c1F6ce17eEB7637FB697c9ac9B578b78632b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Agra",
+    "event_slug": "global-pizza-party-agra",
+    "event_location": "Newton's Pizza, Pashupati Colony, Khandari, Agra, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xE67e85f73Af1E0a48e82dE8008A550e835f35e65",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ahmedabad",
+    "event_slug": "global-pizza-party-ahmedabad",
+    "event_location": "K's Charcoal, Sindhu Bhavan Marg, PRL Colony, Thaltej, Ahmedabad, Gujarat, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9Caf5A3Fd4616E817cAE9678f42Fc6b8612f2114",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ahmednagar",
+    "event_slug": "global-pizza-party-ahmednagar-66",
+    "event_location": "Crazy Cheesy Cafe - Ahilyanagar, Manmad Road, opp. Padmavati Petrol Pump Nagar, Savedi, Ahilya Nagar, Maharashtra, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xF384E955d83fC9E5BA6c8d074bf0FC0Ef47776D2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Aizawl",
+    "event_slug": "global-pizza-party-aizawl-1",
+    "event_location": "Groovy Bites, Chanmari Road, Chaltlang, Aizawl, Mizoram, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x932a45C51A34e3e6212Dd8394EA8CAF4BDe879ac",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Aklan",
+    "event_slug": "global-pizza-party-aklan",
+    "event_location": "Grande Villa Delgado Resort, New Washington, Aklan, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x059fEE09cDaC15f3606739a7B9A7D96be0feA444",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Akure",
+    "event_slug": "global-pizza-party-akure",
+    "event_location": "Cakes 'N' Pastries Plaza, Futa Campus Main Road, Akure, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xD021c3f44f96ce5c2d828Fe024fe2f013E01417f",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Akwa Ibom",
+    "event_slug": "global-pizza-party-akwa-ibom",
+    "event_location": "The Concave, General Edet Akpan Avenue, Uyo, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA6E518096911CE3f0F053f5c174a8aD3fEc91d82",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Alexandria",
+    "event_slug": "global-pizza-party-alexandria",
+    "event_location": "Pizza Queen, Alex، Smoha Sq., Ezbet Saad, Sidi Gaber, Egypt",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x83522F5550576dC85B6fbA4B5031129fe651eAdB",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Aligarh",
+    "event_slug": "global-pizza-party-aligarh-2",
+    "event_location": "Antares Cafe- आंतरेज़ कैफ़े, Marris Road, Krishnapuram, Hari Om Nagar, Civil Lines, Aligarh, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x189A381a3c4229E2f6de9ca7BFFE9081dFA74740",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Almaty",
+    "event_slug": "bitcoin-pizza-day-almaty",
+    "event_location": "Pikapika, Kurmangazy Street, Almaty, Kazakhstan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA94Eb27f9b385998Bf3E4325dCfb3E43A9cc0833",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ambala",
+    "event_slug": "global-pizza-party-ambala",
+    "event_location": "HUNGRY HUB 2, Manav Chowk, Ambala, Haryana, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x152Efa54A32c4BD24eA399122B734e1734D4f6AF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Amritsar",
+    "event_slug": "global-pizza-party-amritsar-3",
+    "event_location": "Hangries Amritsar, Sultanwind Road, near Kalra Hospital, Ajit Nagar, Katra Ahluwalia, Amritsar, Punjab, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9BbB4285c749689449DDCD0a768AC268393629B4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Amsterdam",
+    "event_slug": "global-pizza-party-amsterdam-12",
+    "event_location": "NFT Playground, Eerste Weteringdwarsstraat, Amsterdam, Netherlands",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA9bfd3EDF2C7a306E13C5d5a9f90d5D6204A3B17",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Anambra 2025",
+    "event_slug": "global-pizza-party-anambra-2025",
+    "event_location": "ZARA STORE 🏬🏪 AWKA, Awka, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xE4D33Ab63833522Ff51318Ec22d3D785A91Dfb27",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Antwerp",
+    "event_slug": "global-pizza-party-antwerp",
+    "event_location": "Wolf Sharing Food Market | Felix Pakhuis, Godefriduskaai, Antwerpen, Belgium",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x754B92f9746597a1CDCB36d2028f7EA21D31287a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Arua ",
+    "event_slug": "global-pizza-party-arua",
+    "event_location": "Rojey Creamery Arua, Pakwach Road, Arua, Uganda",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0487ba0c3Ad10Adb4E3c4012d3f1424A6F1063bC",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Arusha",
+    "event_slug": "global-pizza-party-arusha-1",
+    "event_location": "Arusha, Tanzania",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x26C39DD304D2eA528bA62343BE381b71E23557ad",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Asaba",
+    "event_slug": "global-pizza-party-asaba-11",
+    "event_location": "Kilimanjaro Restaurant, Asaba, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x217dfEa8Cf20b96E5647D12Dc63A32344018EC69",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Asheville",
+    "event_slug": "global-pizza-party-asheville",
+    "event_location": "47 Bryant St, Asheville, NC 28806, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3B8C7353Bb2bb15Ce141b21e3c19491573e9fF6B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Astana",
+    "event_slug": "global-pizza-party-astana-4",
+    "event_location": "Nasha Pitstsa, Prospekt Mangilik Yel. 52, 020000 Astana, Казахстан",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1E58DeAAf6648D7667a13354Ae5e3711b8225B20",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Athens",
+    "event_slug": "global-pizza-party-athens-1",
+    "event_location": "SuiHub, Agiou Markou, Athens, Greece",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x497076ccEEAD485f9C68a7e5B9C440dC05912BAd",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Atlanta",
+    "event_slug": "global-pizza-party-atlanta-1",
+    "event_location": "Atlanta Blockchain Center, Old Ivy Road Northeast, Atlanta, GA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3c3bb1f51fcCd309Dc72fe96815F5Ffba1F8a6B2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Atlantic City",
+    "event_slug": "global-pizza-party-atlantic-city",
+    "event_location": "Tony Boloney's - Atlantic City, Oriental Avenue, Atlantic City, NJ, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xE0E8099931285B7666710efEf90AAE8913c4208D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Auburn",
+    "event_slug": "global-pizza-party-auburn",
+    "event_location": "104 S 8th St, Opelika, AL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x441206F9955De9Ec850f3880B0a450FFC9033e03",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Austin",
+    "event_slug": "global-pizza-party-austin",
+    "event_location": "2907 East 12th Street, Austin, TX, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xc028f216812D1EAA60EE862A2BF58987Ccf2913F",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ayodhya",
+    "event_slug": "global-pizza-party-ayodhya-1",
+    "event_location": "Tipsy Town, near cmo office, Civil Line, Ayodhya, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x370d4eBF0B19E1565210D39b005BB0a6e21bb1bc",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bali",
+    "event_slug": "global-pizza-party-bali",
+    "event_location": "Jalan Batu Mejan Canggu, Canggu, Kec. Kuta Utara, Kabupatén Badung, Bali 80351, Indonesia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x11F9ade6f3401A2A7C1B7f302419b1732E887221",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bangalore",
+    "event_slug": "global-pizza-party-bangalore",
+    "event_location": "Zo House, S.T. Bed, 1st Block Koramangala, Koramangala, Bengaluru, Karnataka, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1fCb98D0c40F0e7f4Ee41754ec0Fd4A6f5c12143",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bangkok",
+    "event_slug": "global-pizza-party-bangkok-1",
+    "event_location": "Chef Bing Pizza, Soi Ruam Rudi 2, Lumphini, Pathum Wan, Bangkok, Thailand",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xDEc499C062b9EC0076F1ec4F03Dbc19A424d4e3F",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Barcelona",
+    "event_slug": "global-pizza-party-barcelona-1",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2607650deDAb8Fd12907e7b9358dF53bB61A43c7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Belize City",
+    "event_slug": "global-pizza-party-belize-city-10",
+    "event_location": "Leo Bradley Library, Princess Margaret Drive, Belize City, Belize",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xe4F529595980F3635D370d6a8Df9dee8a7b79618",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Belo Horizonte -BR",
+    "event_slug": "global-pizza-party-belo-horizonte-br-1",
+    "event_location": "2blackbeer - Avenida Assis Chateaubriand - Centro, Belo Horizonte - MG, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x43D9711B1244353317C34FC56Dc2A4e1d3e42083",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bhilai",
+    "event_slug": "global-pizza-party-bhilai",
+    "event_location": "Ek Saath Specialty Coffee & Pizzeria, Vidya Vihar Colony, Nehru Nagar, Bhilai, Chhattisgarh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf13261b9A35C3Df50a9f507B27410Cf20CDF7559",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bhopal",
+    "event_slug": "global-pizza-party-bhopal",
+    "event_location": "S.PACE, 10 No. Stop, E-3, Arera Colony, Bhopal, Madhya Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5cA04A345880B7044F42F4cf3503DEFC7450c6a4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bhubaneswar",
+    "event_slug": "global-pizza-party-bhub",
+    "event_location": "TERRA ROSSO, Janpath Road, beside Bocca Cafe, Master Canteen Area, Kharvela Nagar, Bhubaneswar, Odisha, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2E22620bB6E27af08142FC5b508cff925918B2F0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bogotá ",
+    "event_slug": "global-pizza-party-bogot-1",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x65da89572aE8E09bC0b8Db0F4432537a2acAa62b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Boise Idaho ",
+    "event_slug": "global-pizza-party-boise-idaho",
+    "event_location": "Anzalone Pizza, South 8th Street, Boise, ID, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xAf323314D6155FAB01353a2fE90373B3930FdA9D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bordeaux",
+    "event_slug": "global-pizza-party-bordeaux-5",
+    "event_location": "Backyard, Allées d'Orléans, Bordeaux, France",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xDC67D1B51AdCac2E599103b2aE5ecaCA8Cb6AAA7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Boulder",
+    "event_slug": "global-pizza-party-boulder",
+    "event_location": "Boulder, CO, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xfc3a28426Bd11835549D072be357B96207E3c981",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bowie",
+    "event_slug": "global-pizza-party-bowie",
+    "event_location": "Anthony's NY Pizza & Pasta House, Annapolis Road, Bowie, MD, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2034257D750BD4A41A63Cf99086b546CcD81572a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bratislava",
+    "event_slug": "global-pizza-party-bratislava",
+    "event_location": "The Spot, Bottova, Bratislava, Slovakia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6546062f85331D49f074EcE8C8760351d84b17ca",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Brisbane",
+    "event_slug": "global-pizza-party-brisbane-2",
+    "event_location": "Felons Brewing Co, Boundary Street, Brisbane City QLD, Australia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2c483C356395DCFb2362cC003717c9351387F3D2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Brno",
+    "event_slug": "global-pizza-party-brno",
+    "event_location": "ArtBar Druhý Pád, Štefánikova, Brno-střed-Veveří, Czechia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8315054C73552489D3f2985A4D0fb1dd03dAdb41",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Brussels",
+    "event_slug": "global-pizza-party-brussels-7",
+    "event_location": "Silversquare Bailli - Espace de coworking à Bruxelles, Avenue Louise, Bruxelles, Belgique",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xd2942D04AdD794b14d292f97940Fb12c51c9883F",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bucharest",
+    "event_slug": "global-pizza-party-bucharest",
+    "event_location": "Pe Baricade, Strada Radu Vodă, București, România",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x37749B2a3e25cDE958bDA5a8caCd310f67821919",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Global Pizza Party Budapest",
+    "event_slug": "global-pizza-party-budapest",
+    "event_location": "Budapest, Este11, Villányi út, Magyarország",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1F5Bfb9646234fE1A87F69ae57528AABca5e112B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Buenos Aires",
+    "event_slug": "global-pizza-party-buenos-aires",
+    "event_location": "DUNE PARK, Aráoz, Ciudad Autónoma de Buenos Aires, Argentina",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC18b52FB9736fD9A9105A18C1e2B784109be623A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Buffalo",
+    "event_slug": "global-pizza-party-buffalo",
+    "event_location": "Eli Fish Brewing Co., Main Street, Batavia, NY, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xfFc19ac65d08Fc80a4ebB032DD3887E11f80202E",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Bulawayo ",
+    "event_slug": "global-pizza-party-bulawayo-2",
+    "event_location": "Hillside Walk, Percy Avenue, Bulawayo, Zimbabwe",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x927aE52EfBdcd274385Ef45888B4344F651A1E08",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Butwal",
+    "event_slug": "global-pizza-party-butwal",
+    "event_location": "El Dorado Avenue, Butwal, Nepal",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4819Ac73356c2eFeA9B7F86C50cfc5AD214687c6",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Buzios - Brazil",
+    "event_slug": "global-pizza-party-buzios-brazil",
+    "event_location": "Belli Belli Clube de Praia Aretê - Avenida José Bento Ribeiro Dantas - Vila Luiza, Armação dos Búzios - RJ, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xb6726456C427C7B035345E9377C5ec08142C7310",
+    "network_id": 10,
+    "network_name": "Optimism",
+    "event_name": "Global Pizza Party by PizzaDAO - Pune",
+    "event_slug": "global-pizza-party-by-pizza-dao-pune-3",
+    "event_location": "Da Nonna's Pizzeria, Doctor Ketkar Road, Shreeman Society, Shivaji Nagar, Deccan Gymkhana, Pune, Maharashtra, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7cb23aa4A90C79ecc5a61C69B4d3F2bAF0024C03",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party by PizzaFi : abcd - APAC Blockchain Day",
+    "event_slug": "pizza-fi-abcd-apac-blockchain-day",
+    "event_location": "VSING Mi Bar - Sri Petaling, Jalan Radin Bagus 3, Bandar Baru Sri Petaling, Kuala Lumpur, Federal Territory of Kuala Lumpur, Malaysia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x357C8C525d365819c361eAe12481778fc8e281Bc",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cairo",
+    "event_slug": "global-pizza-party-cairo",
+    "event_location": "What the Crust, Ezbet Fahmy, El Basatin, Egypt",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x301B7235a8b6958e060B5688D94B1DBf8c7146B7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Calabar",
+    "event_slug": "global-pizza-party-calabar",
+    "event_location": "Alyce ice, Ndidem Usang Iso Road, Calabar, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8124EcAAfB8f762ea25D6E8feaEB83292Baa6D8A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Calavi",
+    "event_slug": "global-pizza-party-calavi",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xbec1c699fDeA6403EfECF78C5f72d6707127Db54",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Calgary",
+    "event_slug": "global-pizza-party-calgary",
+    "event_location": "1212 9th Avenue Southeast, Inglewood, Calgary, AB, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x95cDEA5535E8b601a4B588dF8F19bb02C618f0e1",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cali 🇨🇴",
+    "event_slug": "global-pizza-party-cali",
+    "event_location": "Albahaca Terraza, Carrera 5, San Nicolas, Cali, Valle del Cauca, Colombia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBa1EecF751Cee1a4bca21614f13B6e6722CCa44a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Campinas",
+    "event_slug": "global-pizza-party-campinas",
+    "event_location": "Rua Doutor Buarque de Macedo, 815 - Vila Nova, Campinas - State of São Paulo, Brazil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x145a01e35A65CF0DBe4Fda1fF2641395FAD02483",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cannes",
+    "event_slug": "global-pizza-party-cannes",
+    "event_location": "La Pizza Cresci - Cannes, Quai Saint-Pierre, Cannes, France",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf89CCAAb5a053d740561B87DcF5435927924A96f",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cape Town",
+    "event_slug": "global-pizza-party-cape-town-1",
+    "event_location": "Pizza Shed Bree, Bree Street, Cape Town City Centre, Cape Town, South Africa",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3D5724dBcA55C655D1D59e7DcE6aF3FC58728285",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Caracas",
+    "event_slug": "global-pizza-party-caracas-1",
+    "event_location": "foodkart candelaria, Avenida Este 0, Caracas, Distrito Capital, Venezuela",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC6410052C158Bd4654EF479B2846E65E7b311831",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cartagena",
+    "event_slug": "global-pizza-party-cartagena",
+    "event_location": "Mama's Pizza, Calle 35, El Centro, Cartagena de Indias, Provincia de Cartagena, Bolívar, Colombia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x99e367f973284EDe228c0e0371AF631263AA7837",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cedar Rapids",
+    "event_slug": "global-pizza-party-cedar-rapids",
+    "event_location": "The Pines Pizza and Pub, River Ridge Drive Northeast, Cedar Rapids, IA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x535d2F4a7662AB78DF50340EA2DdEf1157bba57F",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Chandigarh",
+    "event_slug": "global-pizza-party-chandigarh-3",
+    "event_location": "Antier Solutions Pvt. Ltd, Phase 8B, Industrial Area, Sector 74, Sahibzada Ajit Singh Nagar, Punjab, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xc09cDa5E77C3030AEe434ADd17a178AB8BF289c5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Charlotte North Carolina",
+    "event_slug": "global-pizza-party-charlotte-north-carolina-1",
+    "event_location": "412 West Palmer Street, Charlotte, NC, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8da512D511EfD5C17b32462309cc89922e3680D1",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Chengdu",
+    "event_slug": "global-pizza-party-chengdu",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x95e08913ffBB74e0c2De77A8A698f51422C0E016",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Chennai",
+    "event_slug": "global-pizza-party-chennai",
+    "event_location": "Café Manana, 21st Street, L Block, Annanagar East, Chennai, Tamil Nadu, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xe3712ABcC6026826612b10b120D243687483F667",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party ChiangMai City",
+    "event_slug": "global-pizza-party-chiang-mai-city",
+    "event_location": "Why Pizza (Moon Muang), Moon Muang Road Soi 9, Si Phum, Muang Chiang Mai, Thailand",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBce33B2713596c027bc81fc7E58A179558BA1BC5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Chicago",
+    "event_slug": "global-pizza-party-chicago",
+    "event_location": "406 North Sangamon Street, Chicago, IL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x203c044803b4b45eD6c96C2Ef307dcDB26952A34",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Christchurch",
+    "event_slug": "global-pizza-party-christchurch",
+    "event_location": "Rehua, University of Canterbury, Forestry and Arts, Ilam, Christchurch, New Zealand",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x60e8Ff3535dB219513bFe7dCafb140A3DD60Cd59",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cincinnati",
+    "event_slug": "global-pizza-party-cincinnati",
+    "event_location": "Mikey's Late Night Slice, Elm Street, Cincinnati, OH, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf679AC6344d75aC4c7f803b9bdb6ef0790a66d95",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cleveland",
+    "event_slug": "global-pizza-party-cleveland",
+    "event_location": "Pizza (216), Euclid Avenue, Cleveland, OH, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xB72BCe55C7B4AE0F81012fcfd0b35190fA3e4460",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cochabamba 2025",
+    "event_slug": "global-pizza-party-cochabamba-2025-3",
+    "event_location": "Trotamundos Recoleta Video BAR, Cochabamba, Bolivia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xB2ae34803aD9e44FA586F2Dc0E7f0304E9c48a4A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Coimbatore",
+    "event_slug": "global-pizza-party-coimbatore",
+    "event_location": "AIC RAISE Business Incubator, Rathinam Techzone, Eachanari, Coimbatore, Tamil Nadu, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3A8Ff5797b087b1b3157bcB4810EB4B799feF8Bf",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Colombo 2025",
+    "event_slug": "global-pizza-party-colombo",
+    "event_location": "CeyCube - Sri Lanka's Premier Web3.0 Co-working Space, Park Street, Colombo, Sri Lanka",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5Bd907988c08F0974D1973D19439A2784A7675DA",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Córdoba ",
+    "event_slug": "global-pizza-party-crdoba-10",
+    "event_location": "Bro Bar, Belgrano, Córdoba, Argentina",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x91eF1A8a286F3f84eb76c3BcB95e0156bca61143",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Craiova",
+    "event_slug": "global-pizza-party-craiova-9",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8611F142D3A9ac047e4Af602D885d944D1c90646",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Culiacán",
+    "event_slug": "global-pizza-party-culiacn",
+    "event_location": "PEIS ITESM, Congreso del Estado, Culiacán, Sinaloa, México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x53140aB96a9e144779f57B8BE0A78E99AF4Ff64E",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Curitiba",
+    "event_slug": "global-pizza-party-curitiba",
+    "event_location": "Fumaçônica Brewery - Rua Simão Bolívar - Hugo Lange, Curitiba - PR, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6b21EDd13c74918A0424c7f78C3Dc3f7F1e06C90",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Cusco",
+    "event_slug": "global-pizza-party-cusco-5",
+    "event_location": "Paraninfo Universitario (Cuzco), Cusco, Peru",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7c0aE0c221B2147abE8237B58a274919120263E1",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Da Nang",
+    "event_slug": "global-pizza-party-da-nang-1",
+    "event_location": "Da Nang, Vietnam",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xD4d5D0245156c09c0C0bd87A3059bd4FD97669Bb",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Dali - 披萨日在云南大理",
+    "event_slug": "global-pizza-party-dali",
+    "event_location": "Dali, Yunnan, China",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xaA57f9f5C772191BED798AF1AD9b5160be3b3e6c",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Dallas",
+    "event_slug": "global-pizza-party-dallas",
+    "event_location": "Arcade 92 Retro Arcade, Bar and Restaurant, International Parkway, Flower Mound, TX, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x427cF4B325aA15bA0883F2C73e5c6569217D2209",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Dehradun",
+    "event_slug": "global-pizza-party-dehradun-1",
+    "event_location": "ENSO - Sourdough Pizza by Nomad - Dehradun, Nigam, Subhash Road, Race Course, Dehradun, Uttarakhand, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xb9797B588D475eC0184980f5F20aCfFBf3936C80",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Denver",
+    "event_slug": "global-pizza-party-denver-2",
+    "event_location": "Mirus Gallery & Art Bar Denver, Broadway Street, Denver, CO, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9aFFB821a2E5F60e73C9B4558E40f1b5f479e185",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Detroit",
+    "event_slug": "global-pizza-party-detroit",
+    "event_location": "The Norwood, Woodward Avenue, Detroit, MI, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xF685CA37a1954f47F20e85220F3E46283b4ce024",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Diani",
+    "event_slug": "global-pizza-party-diani",
+    "event_location": "Leonardo's Restaurant, Diani Beach Road, Diani Beach, Kenya",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4a22E14aeD47Ae78552B683761DD197024CB7E96",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Doha",
+    "event_slug": "global-pizza-party-doha",
+    "event_location": "Yellow Cab Pizza، Khalifa Street, Doha, Qatar",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xbB5E56AAE7F5A28C4507083Cb8D3bfffc6Da8FC1",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Durban South Africa",
+    "event_slug": "global-pizza-party-durban-south-africa",
+    "event_location": "394 Esther Roberts Road, Glenwood, Durban, South Africa",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xCb801C9a5Ac93887a942F864121a2216fE2C1f2e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Durham",
+    "event_slug": "global-pizza-party-durham",
+    "event_location": "Ponysaurus Brewing Co., Hood Street, Durham, NC, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x84c90f99d959Af21DF877FD837d1d44EAC4875e7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Düsseldorf",
+    "event_slug": "global-pizza-party-dsseldorf",
+    "event_location": "Enzos Trattoria, Akademiestraße, Düsseldorf, Germany",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3a8b02032Aa1A9Ac1Ce7a44F0e5A0018173E28bF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ebonyi",
+    "event_slug": "global-pizza-party-ebonyi",
+    "event_location": "Osborne La Palm Extension, Abakaliki, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x83B317B1Aec79E523E1Df595114ca4b80B69756B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Edmonton",
+    "event_slug": "global-pizza-party-2025-edmonton",
+    "event_location": "9620 152 Street Northwest, Edmonton, AB, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBdB92d0Da0953c4d278eD2974A6666eD0199d0D2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party El Hatillo 🌎🍕",
+    "event_slug": "global-pizza-party-el-hatillo",
+    "event_location": "Vida Verde, Vida Verde, Calle Corralito, Caracas, Miranda, Venezuela",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5DAa5d3f5255a711841D9Da1692E934cb03a13A7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Entebbe",
+    "event_slug": "global-pizza-party-entebbe-1",
+    "event_location": "DVIC ESTATE, Uganda",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xD8433aC193531890Fd2b97a0142ef764daD601A3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Enugu 2025",
+    "event_slug": "global-pizza-party-enugu-2025",
+    "event_location": "Cafe One Enugu, Okpara Avenue, Enugu, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x04de1B6246c5fb23262D9B2be63459da16592Be2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Faridabad",
+    "event_slug": "global-pizza-party-faridabad-2",
+    "event_location": "Cafe Parmesan, Sector 15, Faridabad, Haryana, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1D71d7468C20770668ed4d4ecaEEddf9B4718923",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Faryab",
+    "event_slug": "global-pizza-party-faryab-1",
+    "event_location": "Shirin Tagab, Afghanistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xfbc4575a3F1B34F6E9F5F6082853A204bcD2BdaC",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Floripa",
+    "event_slug": "global-pizza-party-floripa",
+    "event_location": "Founder Haus - Jurere In - Avenida dos Merlins - Jurerê Internacional, Florianópolis - State of Santa Catarina, Brazil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x220053E66910b8920DEeBaB4516e04e40F058779",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Fort Lauderdale",
+    "event_slug": "global-pizza-party-fort-lauderdale",
+    "event_location": "LauderAle Brewery, Southeast 14th Avenue, Fort Lauderdale, FL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x086A0F9952bAe38f4865c3e149dFa3b0955c4328",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Fortaleza-BR",
+    "event_slug": "global-pizza-party-fortaleza-br",
+    "event_location": "Itália Beach Restaurante Italiano | Aqui em Porto das Dunas - Rua Agua Viva - Porto das Dunas, Fortaleza - CE, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5823B5a284dF029EE82d34EE31dBf78b59925216",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gaborone ",
+    "event_slug": "global-pizza-party-gaborone",
+    "event_location": "Bull & Bush, Gaborone, Botswana",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf316FBeb5cEF872348c6D55c72eCa0f03B4f68D3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Galle - 2025",
+    "event_slug": "global-pizza-party-galle-17",
+    "event_location": "Pizza Den, Wakwella Road, Galle, Sri Lanka",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xaDCB4C63e11549F031DaAB97eabC216395A69762",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gandhinagar",
+    "event_slug": "global-pizza-party-gandhinagar-1",
+    "event_location": "La Milano Pizzeria, near Reliance Cross Road, Kudasan, Gandhinagar, Gujarat, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4D29720C0fbD47F54582BCA82a6904b9Bc713E31",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gangtok",
+    "event_slug": "global-pizza-party-gangtok-2",
+    "event_location": "Lhasa Newar, Road, Bakthang, Gangtok, Sikkim, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC663ce2f4Cd578ada31FFc8Ba75B17821E27BF1A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party General Santos",
+    "event_slug": "global-pizza-party-general-santos",
+    "event_location": "Edsai Café, NLSA Road, General Santos City, South Cotabato, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x77943aea95bD10DFDe0307da7ef55C5db8434C8D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ghaziabad",
+    "event_slug": "global-pizza-party-ghaziabad-1",
+    "event_location": "The Flying Dutchman, Habitat Centre, Ahinsa Khand 1, Indirapuram, Ghaziabad, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x33B0bC7d891ba739D72Ab35ef7Dd11d33233c94E",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Goa",
+    "event_slug": "global-pizza-party-goa",
+    "event_location": "The Coworking Space Goa - Meeting Rooms & Co working, Old Market, opp. District and Sessions Court, Fatorda, Madgaon, Goa, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1Df5aB11D5bb8139DFA0d940B88cF9F3A3f30855",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gorakhpur",
+    "event_slug": "global-pizza-party-gorakhpur-1",
+    "event_location": "La Pino'z Pizza - Medical Road Gorakhpur, Medical Road, near Khajanchi Chauraha, Khajanchi Chauraha, RailVihar Ph-2 Colony, Chargawa,, Gorakhpur, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2A38342c509C74041833B37720217117Bc9Ea2EF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Goshen, Indiana",
+    "event_slug": "global-pizza-party-goshen",
+    "event_location": "Venturi, East Lincoln Avenue, Goshen, IN, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9E363b61A5aCc972a18Ca13eB05bFdAa4d4322e8",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Göteborg",
+    "event_slug": "global-pizza-party-gteborg",
+    "event_location": "Consid, Vasagatan, Göteborg, Švedska",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x977ab06b37dd93a89c9871c709869E8dBc095509",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Guadalajara",
+    "event_slug": "global-pizza-party-guadalajara",
+    "event_location": "Sofy Boom Chapalita, Avenida Guadalupe, Chapalita Oriente, Zapopan, Jalisco, México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4790E714CeC350eada1DC768e5403B7457d4e39D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gualeguaychú Entre Ríos ",
+    "event_slug": "global-pizza-party-gualeguaych-entre-ros",
+    "event_location": "Bar del Mercado Frigorífico Gualeguaychú, Gualeguaychú, Entre Ríos, Argentina",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3cB26866106ef0709758D2Ac3DA86D2e8E4e64E7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Guangzhou",
+    "event_slug": "global-pizza-party-guangzhou-2",
+    "event_location": "China, Guangdong Province, Guangzhou, Haizhu District, Yuejiang West Road, 广州塔",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3016a9425A2A0E6D32070Cd4929c7546175D4BaF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Guaynabo City",
+    "event_slug": "global-pizza-party-guaynabo-city-4",
+    "event_location": "La Rotonda Pizza from Scratch, Puerto Rico 833, Guaynabo, Puerto Rico",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x90FFdEE2437Ba0F2D25Fe874A497699b8ec96541",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gurgaon",
+    "event_slug": "global-pizza-party-gurgaon-1",
+    "event_location": "Kolaba - Specialty Coffee And Pizzeria, Badshahpur Sohna Road Highway, Block C, Sector 48, Gurugram, Haryana, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA28Cdf5cfc252123f5E572650eB8d968d1b62832",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Guwahati",
+    "event_slug": "global-pizza-party-guwahati-2",
+    "event_location": "Nuts and Brew, GS Road, above Forever 21, in front of Novotel Hotel, Rukmini Gaon, Guwahati, Assam, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA27435F0c20A9bEa8305882a53540d339ff072A0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gwalior",
+    "event_slug": "global-pizza-party-gwalior",
+    "event_location": "ZUDIO - Keshar towers, Gwalior, Racecourse Rd, Railway Colony, LNUPE Campus, Gwalior, Madhya Pradesh 474002, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xD8B022b29a45179DbC80D0c3A2606CAebB2750fD",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Gyumri",
+    "event_slug": "global-pizza-party-gyumri-8",
+    "event_location": "Berlin ART Hotel, Haghtanaki Avenue, Gyumri, Armenia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC4b469C5c8e1b1DD3331996C80061c8F1356554D",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Global Pizza Party Hamburg ",
+    "event_slug": "global-pizza-party-hamburg-7",
+    "event_location": "Alte Rabenstraße 32, Eimsbüttel, Deutschland",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5ae6D3cBb97d074487D14F509789b83347D9B1C9",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Hanoi",
+    "event_slug": "global-pizza-party-hanoi",
+    "event_location": "COGO Coworking Space, Phố Thái Hà, Trung Liệt, Đống Đa, Hanoi, Vietnam",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9d3b18f9Ea219F2fAC0fAA83D505e6C98Aa914EB",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Harare ",
+    "event_slug": "global-pizza-party-harare",
+    "event_location": "Stable Sports, Kingsmead Road, Harare, Zimbabwe",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x057A1a12a926EC818c9B69204019F7F48eaBcd64",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Hardoi",
+    "event_slug": "global-pizza-party-hardoi",
+    "event_location": "S1 pizza 99, Sandi - Shahabad Road, Nawabganj, Sandi, Mirzapur, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x97aF35B22caEdd053C11C96c2cCD336D6acCc200",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Helsinki",
+    "event_slug": "global-pizza-party-helsinki-1",
+    "event_location": "Kruunuvuorenkatu 4, Helsinki, Finland",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x83231d96dB87cC264e52BB076119F522E3B1aC8C",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Hong Kong",
+    "event_slug": "global-pizza-party-hong-kong",
+    "event_location": "Emmer Pizzeria & Café, Shop, Queensway, Admiralty, Hong Kong",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6016F7b65DD0668A650b815748a43245Fa0216fF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Houston",
+    "event_slug": "global-pizza-party-houston",
+    "event_location": "The Cannon West Houston, The Cannon at West Houston, Brittmoore Road, Houston, TX, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xc6Fc26966ccE45A06dac43321029F90228FB091D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Huancayo",
+    "event_slug": "global-pizza-party-huancayo",
+    "event_location": "365-NEPTUNO, Jirón Antonio Lobato, Huancayo, Perú",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x774E8c6EFb369CE2b42910Cc462634913c0Ed060",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Hue ",
+    "event_slug": "global-pizza-party-hue-4",
+    "event_location": "Bèo Tấm, Đường Lê Đức Anh, Thủy Vân, Huế, Thành phố Huế, Việt Nam",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x24D17de709E951A6b2BB371cb0642E6738f4040b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Hyderabad",
+    "event_slug": "global-pizza-party-hyderabad",
+    "event_location": "La Pino'z Pizza - Madhapur, Telangana, Mindspace, Centre, Madhapur, Hyderabad, Telangana, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xD5E1f13CB87f17422206280cA39b86887AB30a67",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ibadan ",
+    "event_slug": "global-pizza-party-ibadan-17",
+    "event_location": "University of Ibadan Second Gate,, Ojoo-Samonda Expressway, Ibadan, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x860360BBb6a079Ba4554dD059F151cBdeB511F61",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Idaho Falls",
+    "event_slug": "global-pizza-party-idaho-falls",
+    "event_location": "Papa Tom's Pizza, South Woodruff Avenue, Idaho Falls, ID, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x33dDDcA0fceB2aa8F06158C72cc0070782474131",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ilocos",
+    "event_slug": "global-pizza-party-ilocos-1",
+    "event_location": "Amare La Cucina, Bantay, Ilocos Sur, Brgy, National Highway, Bantay, Ilocos Sur, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x30172f0BFd8eeFD6CaeC6065bBa03Bc679dd2E68",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Imphal",
+    "event_slug": "global-pizza-party-imphal-4",
+    "event_location": "uspizza imphal, Airport Road, Thouda Bhavok Leikai, Keishamthong, Imphal, Manipur, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5B513E6e13a1DF0F7cE18500a370026351a8FE87",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Global Pizza Party in Gotemba",
+    "event_slug": "global-pizza-party-in-gotemba",
+    "event_location": "日本、静岡県御殿場市新橋１９８８ ザ・ゴテンバカン（ＴＨＥ・ＧＯＴＥＭＢＡＫＡＮ） レストラン グランテラッセ",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xb586eF7c7f498AE7079c65E3B3925659e24B2f95",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party in Naples, ITALY",
+    "event_slug": "global-pizza-party-naples-1",
+    "event_location": "Vico Lungo Teatro Nuovo, 39, 80134 Napoli, NA, Italy",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7c9e8A09192310Ef80753a26445393f00331f044",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party in Numazu Pizza DAO",
+    "event_slug": "global-pizza-party-in-numazu-pizza-dao-1",
+    "event_location": "日本、静岡県沼津市高島町２８−１５ わたらいクリーニング・ぬまつー(仮)基地",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2d93e8E82A7760C8Eb37B6A5D9B39c648408b209",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party in Petrozavodsk (Progress Club))",
+    "event_slug": "global-pizza-party-in-petrozavodsk-progress-club-1",
+    "event_location": "улица Кирова, 2, Петрозаводск, Россия",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1bFAcFFFE667738aDfB6421ba102e1aE6D012b66",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Indianapolis",
+    "event_slug": "global-pizza-party-indianapolis",
+    "event_location": "329 Massachusetts Avenue, Indianapolis, IN, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x34b9EF54A69b672908cB4B4272364219D2054569",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Indore",
+    "event_slug": "global-pizza-party-indore-1",
+    "event_location": "Kafka's, LIG Square, Anoop Nagar, Indore, Madhya Pradesh 452001, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA5ea59035aC846078915174dB346D685B51D99f3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Isla Margarita, Venezuela",
+    "event_slug": "global-pizza-party-valencia-isla-margarita-venezuela",
+    "event_location": "Oxygen Bar, Porlamar Mariño, Nueva Esparta, Venezuela",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x27521c2F73E7F53e78C2cDB343E64AA45039bd4D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Itahari",
+    "event_slug": "global-pizza-party-itahari",
+    "event_location": "Chhaano Restro & Bakery, Mahendra Highway, Itahari, Nepal",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xB251DF07bEA211D15239083b0533F89F2C50FD39",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Itanagar",
+    "event_slug": "global-pizza-party-itanagar-1",
+    "event_location": "Asian Flavours Restaurant, opposite icici Bank, Doni colony, Itanagar",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4b9f4acFD54b23171BA1617d0935B4EFa321ef72",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jabalpur",
+    "event_slug": "global-pizza-party-jabalpur",
+    "event_location": "MPIDC RO Jabalpur, Howbagh Railway Station Road, MCI Colony, Gorakhpur, Jabalpur, Madhya Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC1c5215e4D19d9A52C988c9d93C09B218D408B92",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jacksonville",
+    "event_slug": "global-pizza-party-jacksonville",
+    "event_location": "V Pizza + Sidecar - Gate Parkway, Gate Parkway, Jacksonville, FL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xE6DBd306d4Db0e4f42B16fB3B58655FaAd2A67b0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jaipur",
+    "event_slug": "global-pizza-party-jaipur-1",
+    "event_location": "La Pino'z Pizza Malviya Nagar, Jaipur, SL Marg, opposite cafe lazymojo, Lal Bahadur Nagar, Chandrakala Colony, Malviya Nagar, Jaipur, Rajasthan, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0a65A531cf40e339072623F5829EB038d3153c2A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jakarta",
+    "event_slug": "global-pizza-party-jakarta",
+    "event_location": "Mewatu Coffee & Gallery, Jl. KH. Ahmad Dahlan, RT.1/RW.1, Kramat Pela, South Jakarta City, Jakarta, Indonesia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x186BC446443bd735f189AB541f414C17E78BFcA3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jalandhar",
+    "event_slug": "global-pizza-party-jalandhar-2",
+    "event_location": "Love Italy - Lounge & Restaurant, Gujral Nagar, Jalandhar, Punjab, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xE2A6Fb625f3aB1A66f18d58Ba5AEDcc320E5CdC0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jammu",
+    "event_slug": "global-pizza-party-jammu-3",
+    "event_location": "Pizza Wings | Bahu Plaza (Jammu), Bahu Road, Vidhata Nagar, Preet Nagar, Jammu",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xDB1caC1979F0d18C0b8A50f7CaD15307e3af9Cab",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jamshedpur",
+    "event_slug": "global-pizza-party-jamshedpur-4",
+    "event_location": "Laziz Pizza, Laziz pizza, Purulia Road, Jawahar Nagar, Mango, Jamshedpur, Jharkhand, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xB00CF4037209883D8ADd26eD1592AAEc813D0eA9",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Janakpur",
+    "event_slug": "global-pizza-party-janakpur",
+    "event_location": "Folsom Cafe and Restaurant, Shiva Chowk, Janakpur, Nepal",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6C67EF3eE8121920C820D861E46D86F2157F0d5C",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jhansi",
+    "event_slug": "global-pizza-party-jhansi-4",
+    "event_location": "La pino'z pizza, Station Road, Civil Lines, Jhansi, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xEc8A55c2eeB6071B6B8964A4196dDd4B809CA1fe",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Jinja",
+    "event_slug": "global-pizza-party-jinja",
+    "event_location": "Chicken Papa, Iganga Road, Jinja, Uganda",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xCa4760b1639830D0095335103D17A2f4A328E849",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Johannesburg",
+    "event_slug": "global-pizza-party-johannesburg-5",
+    "event_location": "The Wild Side Restaurant, 6 Burnside Ave, Craighall Park, Randburg, 2196, South Africa",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x692b259ff264F08596293DAAa0555B90cce0F566",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kabul",
+    "event_slug": "global-pizza-party-kabul",
+    "event_location": "Shahr-e-Naw Hotel (Wedding Hall), Kabul, Afghanistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x876F6b08775A47B5F536ADA9bE8c1701c2453CD9",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kaduna",
+    "event_slug": "global-pizza-party-kaduna",
+    "event_location": "CBAE, Epitome hotel, besides, Congo Street, Kaduna, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x51755AD5f000EDb832C98ABac11e2963014Eb993",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kandy",
+    "event_slug": "global-pizza-party-kandy-1",
+    "event_location": "Vito Wood Fired Pizza - Peradeniya, Peradeniya Road, Kandy, Sri Lanka",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3405b0D56901CA440728A2ce7B5Ec1a098030835",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kanpur",
+    "event_slug": "global-pizza-party-kanpur",
+    "event_location": "Pizza Hut | Swaroop Nagar, Kanpur, opposite Shiv Mandir, Scheme No 7, Khalasi Line, Swaroop Nagar, Kanpur, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x74038142378d1ae965dC6276f7684d26729Df4eE",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kansas City ",
+    "event_slug": "global-pizza-party-kansas-city",
+    "event_location": "900 West 39th Street, Kansas City, MO, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf5F52866B9dC94773fE8898C0C4a7AD1BD208427",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party KARA",
+    "event_slug": "global-pizza-party-lome-1",
+    "event_location": "Kara, Togo, Togo",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x10792ea3CC3fBA399dB29Ce6022A7956b1be4DA6",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Karachi 2025",
+    "event_slug": "global-pizza-party-karachi-2025-9",
+    "event_location": "Rosati Bistro, Shahra-e-Faisal, KDA Scheme #1 Karsaz KDA Scheme 1, Karachi, Pakistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6dE96f2d5DE632Faa2F1C3A726C08b76F45e8093",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kathmandu",
+    "event_slug": "global-pizza-party-kathmandu",
+    "event_location": "Vinoliva Restaurant & Bar, Narayanhiti Palace Museum North Gate Rd, Kathmandu, Nepal",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x21BF4899d366F51008aebc428A2b591536EBcfDa",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kelowna",
+    "event_slug": "global-pizza-party-kelowna",
+    "event_location": "DunnEnzies Pizza Mission, Lakeshore Road, Kelowna, BC, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xB1D495f6766AEeB77A3e5d81ADE41803CeA9D561",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kigali 2025",
+    "event_slug": "global-pizza-party-kigali-2025-4",
+    "event_location": "DTC, Kigali, Rwanda",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x56eba3324ee758b197026c3E25a418b44623c79d",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kisumu City",
+    "event_slug": "global-pizza-party-kisumu-city-1",
+    "event_location": "Mega Cinemas, Kisumu, Kenya",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xaA2cc9e72164e695cc95d72d3304dC692aFAb622",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party kitwe",
+    "event_slug": "global-pizza-party-kitwe-1",
+    "event_location": "The Copperbelt University, Jambo Drive, Kitwe, Zambia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xcaE1A25cb1541918f79A14E2fc55Af23b36590bC",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kochi",
+    "event_slug": "global-pizza-party-kochi-2",
+    "event_location": "Sijis Pizza Street, opp. Manjooran's Moon Stone Appartment, Palarivattom, Ernakulam, Kerala, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7eb5DbEc34921C326Ad6706f1A45B327B2A7cc03",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Koh Phangan",
+    "event_slug": "global-pizza-party-koh-phangan-1",
+    "event_location": "NASHE MESTO, PX5V, Ko Pha-ngan, Koh Phangan, Surat Thani, Thailand",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xee0F24543be8e276E9E9E924a2850E2e729abD22",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kohima",
+    "event_slug": "global-pizza-party-kohima-1",
+    "event_location": "Ooopar, Jail Colony, Kohima, Nagaland, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x72671024d15138656c179585b0f232C03bC6974b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kolkata",
+    "event_slug": "global-pizza-party-kolkata-1",
+    "event_location": "Chai Break Foreshoreroad, 99, Foreshore Rd, 1A, Shibpur, Howrah, West Bengal 711102, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xD8635e5faCEF07165a5565c1c314Dea9275C5D45",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kollam",
+    "event_slug": "global-pizza-party-kollam-2",
+    "event_location": "Supreme Uppercrust Kollam, Supreme Experienza, TOWN LIMIT, Bavana Nagar, Kollam, Kerala, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xd5F3856248Afc946D949B7E2B635Bfe16e9c332d",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kota",
+    "event_slug": "global-pizza-party-kota-1",
+    "event_location": "Morgans-The Italian Pizzaria, Kamla Udhyan Road, Kunadi, Electricity Board Area, Kota, Rajasthan, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8803D44E379C66EA51601FC2Db7cAf505354F1c3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kozhikode",
+    "event_slug": "global-pizza-party-kozhikode-1",
+    "event_location": "Mac's Cafe Steak House & Pizzeria, Balan K Nair Road, St. Vincent Colony, Kozhikode, Kerala, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xcD0935627E115681963Fc0c34878dFae606f01D9",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kwara City",
+    "event_slug": "global-pizza-party-kwara-city-1",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBA7f1809720494D1855b6c2ACE77cF7E48DC16D3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Kyiv",
+    "event_slug": "global-pizza-party-kyiv",
+    "event_location": "WORKIT Space, вулиця Марка Безручка, Київ, Україна",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4832178827Bc6770b09690bDAae078C16ec9372d",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party La Paz",
+    "event_slug": "global-pizza-party-la-paz",
+    "event_location": "La Paz, Bolivia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6014F9638C5b92F5402Bb49bb2Dd2C11305965a2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party La Plata 2025",
+    "event_slug": "global-pizza-party-la-plata-2025",
+    "event_location": "Blunt Bar La Plata, Calle 57, La Plata, Provincia de Buenos Aires, Argentina",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2d3cd68369788fcb9a91595f37448dbd0f589b44",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Lagos 2025",
+    "event_slug": "global-pizza-party-3",
+    "event_location": "The base lounge and restaurants, Of, Awolowo Road, bachuss bustop, Lagos, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf18ad4EE63cD44f70e4096551391648FF3036278",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Laguna",
+    "event_slug": "global-pizza-party-laguna",
+    "event_location": "Yohji Ridgeway Resort, South Barretto Road, Calamba, Laguna, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xc85BaC7e92830F4e5170091eD62d57759b94c2BB",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Lamu",
+    "event_slug": "global-pizza-party-lamu-5",
+    "event_location": "Sailors Joint, Corniche Path, Lamu, Kenya",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x30489BC65da6AA41a7b85aCC87A984878836b983",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Las Pinas",
+    "event_slug": "global-pizza-party-las-pinas",
+    "event_location": "BF Resort Park, Ligaya Pascual, Las Piñas, Metro Manila, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf2375b59B2B6487fa6d3E3c219170142beafbb98",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party León",
+    "event_slug": "global-pizza-party-len-1",
+    "event_location": "Bigfoot Hostel & Volcano Boarding, León, Nicaragua",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6dF720D8E551d7A2CFE98dA518d9905562bBa3e8",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Lima ",
+    "event_slug": "global-pizza-party-lima",
+    "event_location": "Calle Esperanza 335, Miraflores, Perú",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xfa2d5B63bA95735428dd372c22D1a9C508352cec",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Limassol",
+    "event_slug": "global-pizza-party-limassol",
+    "event_location": "Limassol AGORA, Saripolou, Limassol, Кипр",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5A4F4dbfa1129C75c8Bef874dbe2cfFbc6094712",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Lisbon",
+    "event_slug": "global-pizza-party-lisbon-1",
+    "event_location": "O Javali, Avenida 5 de Outubro, Lisbona, Portogallo",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4455932fCBd3D69BCdD388a4cCaDAd348b82245A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Lokoja",
+    "event_slug": "global-pizza-party-lokoja-city-25",
+    "event_location": "RAFIKI FOODS, Lokoja, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xc0B25FCa63c25dDfFEaE768047798a9b478360E9",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party LOME",
+    "event_slug": "global-pizza-party-lome",
+    "event_location": "55VR+JPQ Lomé, Togo",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x500cDA2421edFE4701C7977e7febBBBA8654F957",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party London",
+    "event_slug": "global-pizza-party-london",
+    "event_location": "Westbourne Studios, Acklam Road, London, UK",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x80C15C8AC6EB0AFCfad9b33f89b3b9c165BC13C7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Los Angeles",
+    "event_slug": "global-pizza-party-los-angeles-1",
+    "event_location": "7207 Melrose Ave, Los Angeles, CA 90046, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6D0Cc20131fc9dC5E00dA68C2014726AeBed1969",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Lucknow",
+    "event_slug": "global-pizza-party-lucknow",
+    "event_location": "Mashup 2.0 - Sports Bar and Night Club, Vibhuti Khand, Gomti Nagar, Lucknow, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x70662d19f3CBC5A029807Eae9e7aC8Cd9fB9CAa7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ludhiana",
+    "event_slug": "global-pizza-party-ludhiana-1",
+    "event_location": "FreakBaker, Sunet, GHS Sunet, Bhai Randhir Singh Nagar, Ludhiana, Punjab, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x74357A7cB34eCb1df7289cE525ff6b89009204De",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party lusaka",
+    "event_slug": "global-pizza-party-lusaka-1",
+    "event_location": "Try Rooftop ZM, Great East Road, Lusaka, Zambia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x360bdb068978f059C59e54C7c814Cd7C9d566d50",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Lviv",
+    "event_slug": "global-pizza-party-lviv",
+    "event_location": "Pizza Celentano Drive, вулиця Кульпарківська, Львів, Lviv Oblast, Україна",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0D8358Ad1E8BD0dBF170134CaE3658D2aAB6970C",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Macaé-BR",
+    "event_slug": "global-pizza-party-maca-br-3",
+    "event_location": "R. Marco Antônio Aguiar Azevedo, 125 - Riviera Fluminense, Macaé - RJ, 27937-340, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0c194613925fB27866B1CeabEE05A8777bB8Ba94",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Madurai",
+    "event_slug": "global-pizza-party-madurai-2",
+    "event_location": "Phil's Bistro, 9th Main Road, Managiri, Madurai, Tamil Nadu, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x11aaA00f4bc98D4f3E8CDF7b9D8F55b698e2e0f0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Malaga",
+    "event_slug": "global-pizza-party-malaga-1",
+    "event_location": "Regus, Avenida Juan Sebastián Elcano, Málaga, Spain",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xADe53aF056F4Ab0a7C8C331E8c5363670e578FE9",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Manchester",
+    "event_slug": "global-pizza-party-manchester",
+    "event_location": "L'Antica Pizzeria da Michele, King Street, Manchester, UK",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3Ca2af1C3C4b3dC743D2388940D5B19D7fB4A196",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mangalore",
+    "event_slug": "global-pizza-party-mangalore-1",
+    "event_location": "The Loft, Nandigudda Road, Attavar, Mangaluru, Karnataka, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2882648Fe751252867c839fAe71F43C64A4f23D4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Manila ",
+    "event_slug": "global-pizza-party-manila",
+    "event_location": "Good Sh*t Coffee, Enriquez, Makati, Metro Manila, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xAc71205C6e72D47b3BaCBB673D46dD2eaFe02B36",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Maracaibo",
+    "event_slug": "global-pizza-party-maracaibo",
+    "event_location": "Pa Que Masitas, Calle 84, Maracaibo, Zulia, Venezuela",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA1FD39Cd55Bb447F7582263ac3fE4F53a38272E4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Markudi 2025",
+    "event_slug": "global-pizza-party-35",
+    "event_location": "College of Health Science Library, Gboko-Makurdi Road, Makurdi, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xd764B5bc68106348EDa29A21E05728880DF352b7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mathura",
+    "event_slug": "global-pizza-party-mathura",
+    "event_location": "Göttlich - Pizzeria & Cafe, Mathura, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xdA945b9cbF8519a41aeEba83dd077c1a1842c304",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Maullín",
+    "event_slug": "global-pizza-party-maulln",
+    "event_location": "Maullin, Maullín, Chile",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1622e6B9205711E2067f5DBfF5144735B53E8509",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mazar-e-Sharif",
+    "event_slug": "global-pizza-party-mazar-e-sharif",
+    "event_location": "Rawza e Mubarak Museum, Mazar-i-Sharif, Afghanistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC96c343cCCB059754C18121f0E2072420A6C68DC",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mbarara",
+    "event_slug": "global-pizza-party-mbarara-2",
+    "event_location": "Acacia Country Inn, Mbarara, Uganda",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xF25eb1cf808B78C704668850315988bc697Cd527",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mechelen",
+    "event_slug": "global-pizza-party-mechelen-1",
+    "event_location": "Mechelen, Belgium",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf369DB8Da72efe04f9Db41562229119E61559cf5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Medellin",
+    "event_slug": "global-pizza-party-medellin",
+    "event_location": "Hash House Club, Carrera 32d, El Poblado, Medellín, Antioquia, Colombia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xAfe9a7A9E9b5AAE4a4Ac91dE28B04751d5400499",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Melbourne",
+    "event_slug": "global-pizza-party-melbourne",
+    "event_location": "10-20 Gwynne St, Cremorne VIC 3121, Australia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA3f841B50b6C86d68Cb9e816063A0a45451cB9F4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Memphis",
+    "event_slug": "global-pizza-party-memphis-3",
+    "event_location": "Court Square Park, North Main Street, Memphis, TN, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xb5f048629bE9Ed96452B364563e83E8D8fCc6F9f",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mendoza",
+    "event_slug": "global-pizza-party-mendoza",
+    "event_location": "Cerveza Patagonia - Refugio Aristides, Arístides Villanueva, Mendoza, Argentina",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x23306a32191920378c31942A3E03dD3475d0214B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mexico City",
+    "event_slug": "global-pizza-party-mexico-city-1",
+    "event_location": "Anticlub House, Calle 3, Francisco I. Madero, Ciudad de México, CDMX, México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xb0602926c4AF3B7cd0b139d2f65cC1634E67325b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Miami",
+    "event_slug": "global-pizza-party-33",
+    "event_location": "Batch Gastropub, Southwest 12th Street, Miami, FL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x83D79c40d3B1Bc8a788f48b6A2776f489D691635",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Milwaukee",
+    "event_slug": "global-pizza-party-milwaukee",
+    "event_location": "Transfer Pizzeria Café, West Mitchell Street, Milwaukee, WI, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xDE6e3d7e46D9ac90d1b56523364fb0971d0F10F3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Minna",
+    "event_slug": "global-pizza-party-minna",
+    "event_location": "IBB Library Complex, Baganakwo, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xd29C7baF0733C33D493999994C663072c899010a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Minneapolis",
+    "event_slug": "global-pizza-party-minneapolis-1",
+    "event_location": "New Hope, MN, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x66cD362fddD4B2e715F70346BFD2055Ee25d5193",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Misiones",
+    "event_slug": "global-pizza-party-misiones",
+    "event_location": "Alfonso de Arrechea 3300, N3301 Posadas, Misiones, Argentina",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4000D9064aCDaBA0c9610247B0f6CB523556aC12",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mobile Alabama",
+    "event_slug": "global-pizza-party-mobile-alabama-1",
+    "event_location": "Lost Pizza Co. Mobile Midtown, Old Shell Road, Mobile, AL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8abFC7254682F28AdB2f1713fD0934610F2724EC",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mombasa",
+    "event_slug": "global-pizza-party-mombasa",
+    "event_location": "Tudor Water Sports Marina, Tom Mboya Road, Mombasa, Kenya",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x661EA70f98D18f523D3ed549f9882453c54f13Df",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party MONACO",
+    "event_slug": "global-pizza-party-monaco-2",
+    "event_location": "Neptune Monaco Beach, Monaco-Ville, Monako",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xF7cFf6910f5D125779c7626d05bB0ffB5ca4E197",
+    "network_id": 56,
+    "network_name": "BSC",
+    "event_name": "Global Pizza Party Montevideo",
+    "event_slug": "global-pizza-party-montevideo-1",
+    "event_location": "Roderichs Crypto House - Transferencias Cripto Seguras - Exchange Activos Digitales, Doctor Mario Cassinoni, Montevideo Departamento de Montevideo, Uruguay",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xc9075775fD667989dA25AaAb4AeB94ecfEf8ac8D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Montgomery",
+    "event_slug": "global-pizza-party-montgomery",
+    "event_location": "39 Dexter Avenue, Montgomery, AL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xB2900b4752AA6556519de86dfe9D50FB7c39259B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Moscow",
+    "event_slug": "global-pizza-party-moscow",
+    "event_location": "Депо \"Три Вокзала\", Ооо, Новорязанская улица, Москва, Россия",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3d02DD2416EA4A3AF19d7985CcE5B8AB825531Cf",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mt. Rainer",
+    "event_slug": "global-pizza-party-mt-rainer",
+    "event_location": "3311 Rhode Island Avenue, Mount Rainier, MD, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBA0E64e124ad3DEa8dF7A2D02Ae4efD54BeDc54A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mumbai City",
+    "event_slug": "global-pizza-party-mumbai-city",
+    "event_location": "Mumbai, Maharashtra, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x95e6E06C2A4534a83931F63dc2916090ea209714",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mwanza",
+    "event_slug": "global-pizza-party-mwanza-37",
+    "event_location": "The Breeze, Mwanza, Tanzania",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x44427Fe909c55dB80422579Ac87D2CA37D5eF8D1",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Mysore",
+    "event_slug": "global-pizza-party-mysore",
+    "event_location": "PIZZAIOLO, Gokulam Main Road, Jayalakshmipuram, Mysuru, Karnataka, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x818Db286598f4e29DDf28c571377030Db55C9450",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Nagpur",
+    "event_slug": "global-pizza-party-nagpur-1",
+    "event_location": "ZINQ - Kitchen. Bar. Bistro, beside Hislop College Road, Dobhi Nagar, Civil Lines, Nagpur, Maharashtra, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4e9872eC758234D8C05C0E6502C3Ea08d472BFcF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Nasarawa",
+    "event_slug": "global-pizza-party-nasarawa-1",
+    "event_location": "Bingham University, Abuja-Keffi Rd, New Karu, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xd701Bd4C337a4269A671D797fc0c29600D4c2A9D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Nashik",
+    "event_slug": "global-pizza-party-nashik-1",
+    "event_location": "The D Pizza, College Road, Yeolekar Mala, Ramdas Colony, Nashik, Maharashtra, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9e23D060F33A6c4719EDdB50DEF598A33e30CC96",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Nashville Tennessee ",
+    "event_slug": "global-pizza-party-nashville-tennessee-1",
+    "event_location": "1401 4th Avenue South, Nashville, TN, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xdE7B88C96E1ffd5630B69Aaff8cFf89E2285Ac45",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Natal-BR",
+    "event_slug": "global-pizza-party-natal-br-1",
+    "event_location": "Cervejaria Resistência - Rua Leonora Armstrong - Ponta Negra, Natal - RN, Brasil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xfA8e183eC26152B766fC7bBA21ceB49Bf1d36d9D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Neath",
+    "event_slug": "global-pizza-party-neath",
+    "event_location": "The Duke Of Wellington, 8 Old Market St, Neath SA11 3NA, UK",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1703fbD33D3263bDFc8f965B01f8b0d8875798D7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party New Delhi",
+    "event_slug": "global-pizza-party-new-delhi-2",
+    "event_location": "The Immigrant Café, Block B, Connaught Place, New Delhi, Delhi, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBa6feaEFC84230163A9B6E8a6e21CF7BA4f26C9b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party New Haven",
+    "event_slug": "global-pizza-party-new-haven-2",
+    "event_location": "410 Blake St #5, New Haven, CT 06515, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x73abAa52C1C4d6680342c509Bd7D332Ae700ffC4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party New Orleans",
+    "event_slug": "global-pizza-party-new-orleans",
+    "event_location": "The Nieux, Saint Charles Avenue, New Orleans, LA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7f6625650789B58a898CC7c17d92CB0404CB2831",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global pizza party Nigeria Abuja ",
+    "event_slug": "global-pizza-party-nigeria-abuja-16",
+    "event_location": "Genesis Restaurant, 1st Avenue, Gwarinpa, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xeEa6f303F44c0489bb7a79C27e74Da154c0e9253",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Noida",
+    "event_slug": "global-pizza-party-noida",
+    "event_location": "Technopolis IT Hub, C Block, Phase 2, Industrial Area, Sector 62, Noida, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0C6F7e2432f29A7D77A76062cA6015aE11682075",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Nsukka",
+    "event_slug": "global-pizza-party-nsukka",
+    "event_location": "University Of Nigeria Nsukka Bookshop, Nsukka, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x457389C219C169cDe06769351053fD7B5b3fA4fB",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Oakland",
+    "event_slug": "global-pizza-party-oakland",
+    "event_location": "Square Pie Guys, Dr Huey P. Newton Wy, 9th Street, Oakland, CA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1BaB6608A7382662B9A0005DD1Fd586e1729B94A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ojeda",
+    "event_slug": "global-pizza-party-ojeda-4",
+    "event_location": "Pizza House Club, Ciudad Ojeda, Zulia, Venezuela",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1B552F830F0970185525744e6110D6d37127605e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Oklahoma City",
+    "event_slug": "global-pizza-party-oklahoma-city",
+    "event_location": "2200 N Bryant Ave, Oklahoma City, OK 73121, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xEc63Db8901189901bc696823Dc066fEc813c1200",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Olomouc - Long Story Short ",
+    "event_slug": "global-pizza-party-olomouc",
+    "event_location": "Long Story Short Hostel, Koželužská, Olomouc 9, Czechia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xd1A2C9CD577e4e10B4424c41C9772660930e95E4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Omaha",
+    "event_slug": "global-pizza-party-omaha-1",
+    "event_location": "Williamsburg Pizza Omaha, Audrey Street, Omaha, NE, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xaB3B8FD8e1b73A64dFD3Eefd1d58B84FD77A2c2e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Orlando ",
+    "event_slug": "global-pizza-party-orlando",
+    "event_location": "150 South Magnolia Avenue, Orlando, FL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x94d823EA1c2b9f7bb72Bf7Ec7680665629B2DCAa",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Oslo",
+    "event_slug": "global-pizza-party-oslo-2",
+    "event_location": "Brugata 17, Oslo, Norway",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6Eca24d3ee0D9b64ab4219Fec60CC79296AB1cdE",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Osogbo",
+    "event_slug": "global-pizza-party-osogbo",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6295045aC37218E6037E24cc1cB9AD9969A5E0f5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party OUAGADOUGOU",
+    "event_slug": "global-pizza-party-ouagadougou-12",
+    "event_location": "RESTAURANT THE NILE, Ouagadougou, Burkina Faso",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2c84440bd7877E05965a52C7F30988EFf3F348b5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Owerri",
+    "event_slug": "global-pizza-party-owerri",
+    "event_location": "The Pizza Jungle, Owerri - Orlu Road, Owerri, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8056931b3286c2BF563Eb21FC10fB4b2679e321f",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Palm Beach",
+    "event_slug": "global-pizza-party-boynton-beach",
+    "event_location": "Copperpoint Brewing Company, Commerce Road, Boynton Beach, FL, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3b338864de09e1F1B3Ea7a0F6BD7467f2751e792",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Panama City",
+    "event_slug": "global-pizza-party-panama-city",
+    "event_location": "Rock&Folk PTY, Calle 49 Este, Panama City, Panama",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf862DEEf2B6778Be2b46ffe1C3fF5FB0d09aABFD",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Papeete",
+    "event_slug": "global-pizza-party-papeete",
+    "event_location": "Jardin de Paofai, Papeete, Polynésie française",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0b9d71cAa43746A4D7E4ec7aaC4dEF411094117E",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Paris",
+    "event_slug": "global-pizza-party-paris-1",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x841731fa2AacAF06ad9e6F048d19EC8d56cEAcdF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Patna",
+    "event_slug": "global-pizza-party-patna-1",
+    "event_location": "Rare Window, More, beside Kamini Center, Patliputra Colony, Patna, Bihar, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5F6733c174c2d7E19d125Aa89B498C257d2701D2",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Pensacola Florida",
+    "event_slug": "global-pizza-party-pensacola-florida-1",
+    "event_location": "5 Via De Luna Dr suite g, Pensacola Beach, Gulf Breeze, FL 32561, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xce14f64b0621149ef57078f3b31086dd0cf3a558",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Philadelphia",
+    "event_slug": "global-pizza-party-philadelphia",
+    "event_location": "Indy Hall Clubhouse, North 2nd Street, Philadelphia, PA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8A07d30A09AFF4329399Fd89987B8A0b5A46Ae4F",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Phnom Penh",
+    "event_slug": "global-pizza-party-phnom-penh",
+    "event_location": "",
+    "event_start_date": "2025-05-23"
+  },
+  {
+    "address": "0x1c3AeC7A74DD524296778Bb8ee9c2EF0C8E87342",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Phoenix",
+    "event_slug": "global-pizza-party-phoenix-4",
+    "event_location": "Flavor Eatery and Lounge, South Mill Avenue, Tempe, AZ, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3b2274dd4171fe8cAE73ccA29cc40a39218b090F",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Phuket",
+    "event_slug": "global-pizza-party-phuket",
+    "event_location": "MARNI, Montri Road, Talad yai, Mueang Phuket District, Phuket, Thailand",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0923F21A37C02d53ED89D76f735b2323565d3800",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Piura ",
+    "event_slug": "global-pizza-party-piura",
+    "event_location": "GOTINI PIZZA & GRILL, Piura, Perú",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x39A743EF8f2Fe767858C17d3267cb0A5933f21A7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Portland Oregon!🍕",
+    "event_slug": "portlands-global-bitcoin-pizza-party-1",
+    "event_location": "openHAUS coworking + shared workspace, Northeast Martin Luther King Junior Boulevard, Portland, OR, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x959749f5336cb0dB78c00533C326Ce35C40F9b60",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Portoviejo",
+    "event_slug": "global-pizza-party-portoviejo",
+    "event_location": "Iglesia Fuente de Paz, C. Alamos, Portoviejo, Ecuador",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x82d487455dD38B45400b2d0c29e1d487929d691B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Prayagraj",
+    "event_slug": "global-pizza-party-prayagraj",
+    "event_location": "INCOLA'S PIZZA, Naini, Prayagraj, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x86ae837e34b3F68CdFc5B967965E1f157a5ca9b4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Prilep",
+    "event_slug": "global-pizza-party-prilep",
+    "event_location": "Monarca Gastrobar, Orde Kabeco, Prilep, Macedonia del Nord",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x578f505C1933fB6d8629B33BB6f6c4e3B8A90589",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Providence",
+    "event_slug": "global-pizza-party-providence-1",
+    "event_location": "378 Main St, East Greenwich, RI, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5b4C63A3fb071efc0e3E5719F605479b718c8206",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Quezon",
+    "event_slug": "global-pizza-party-quezon",
+    "event_location": "51 Magiting, Diliman, Quezon City, Metro Manila, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x76bfF42b0E6C0dDf33c0cf55ebcC3D9F249747D3",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Raipur",
+    "event_slug": "global-pizza-party-raipur-1",
+    "event_location": "Nukkad's Bihan Cafe, VIP Road, Raipur, Chhattisgarh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x16ffe438B68C707b5E12bB99480aC4c69C935783",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Rajkot",
+    "event_slug": "global-pizza-party-rajkot",
+    "event_location": "Pizza Zone, AP Park, Nana Mava, Rajkot, Gujarat, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x226DD522E66B814541624cA4bb4f507A8d380Db5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Ranchi",
+    "event_slug": "global-pizza-party-ranchi-1",
+    "event_location": "Little Italiano, Hotel Yuvraj, near Rajendra Chowk, Forest Officers' Colony, Doranda, Ranchi, Jharkhand, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x481E645d5e6a2a4E433A97168E9dea11a6DaE4C6",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Reading",
+    "event_slug": "global-pizza-party-reading",
+    "event_location": "Spencers Wood, Reading, UK",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2cE506cc17B05Bd445b7D8A36A4E5c5f9374DB77",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Rio Claro",
+    "event_slug": "global-pizza-party-rio-claro-1",
+    "event_location": "Avenida 57, 1323 - Jardim Kennedy, Rio Claro - State of São Paulo, Brazil",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x73e6225b4b02e0fA35dAc6395Ae9ccc0840Df67B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Rivera",
+    "event_slug": "global-pizza-party-rivera",
+    "event_location": "La Tuna Empanadas & Bistro, José Enrique Rodó, Rivera Departamento de Rivera, Uruguay",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x88020D32137E0B0f4F272c15d7cAEB9C32cDbD93",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Roorkee",
+    "event_slug": "global-pizza-party-roorkee-1",
+    "event_location": "The White Rabbit, Boat Club Road, near axis bank, Civil Lines, Roorkee, Uttarakhand, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4E65124998D6BD1c4AA5b5d0Fc2c7fb31BeB9707",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Rosario",
+    "event_slug": "global-pizza-party-rosario-1",
+    "event_location": "Mitico bar, Oroño Boulevard, Rosario, Santa Fe Province, Argentina",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xfecbD72aB9582De8E6E2f22E529FF00cDDBCA9e0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Rourkela",
+    "event_slug": "global-pizza-party-rourkela",
+    "event_location": "Moksha, Kachery Road, Udit Nagar, Rourkela, Odisha, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8a5cA5f7a09247d96d91E58258B05a5D8aB84A3e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Salama",
+    "event_slug": "global-pizza-party-salam",
+    "event_location": "El Puente, Salamá, Guatemala",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x67A2840aD01968dE730FaD6ae25C70952900b121",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party San Carlos City",
+    "event_slug": "global-pizza-party-san-carlos-city",
+    "event_location": "Carmel's Inn and Restaurant, San Carlos City, Negros Occidental, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xaac162AE1424baa52da0b0f4cf77Ad0118805240",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party San Juan",
+    "event_slug": "global-pizza-party-san-juan",
+    "event_location": "Edif. Centro de Seguros, Avenida de la Constitución, San Juan, Puerto Rico",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7955511F0E5D66A56a3A6b186878d2d3C68d0ff7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party San Pedro Sula",
+    "event_slug": "global-pizza-party-san-pedro-sula",
+    "event_location": "AQV, 9 Calle South, San Pedro Sula, Honduras",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xF87305692b717f59A679F3132603b2d5BecF7c25",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party San Salvador",
+    "event_slug": "global-pizza-party-san-salvador-4",
+    "event_location": "Simmer Down • Sivar, Bulevar Del Hipodromo, San Salvador, El Salvador",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x81440C8bc5e92BF2C8057f93a316F3dB672Af463",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Santa Cruz de la Sierra",
+    "event_slug": "global-pizza-party-santa-cruz-de-la-sierra-8",
+    "event_location": "Cozzolisi, Avenida Marcelo Terceros Bánzer, Santa Cruz de la Sierra, Bolivia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0758f8c940Dc18158A44C2a638d57A0968ABE283",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Santiago",
+    "event_slug": "global-pizza-party-santiago-5",
+    "event_location": "Avenida Vicuña Mackenna 7320, La Florida, Chile",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xe774FcE3a620b67d804ac9BD17Dfd0999fB038Fe",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Saskatoon",
+    "event_slug": "global-pizza-party-saskatoon-1",
+    "event_location": "505a Nelson Rd, Saskatoon, SK S7S 1P4, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6dE6F114D4Bfd3BaA300eaf86E66a7B3034dA241",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Seattle ",
+    "event_slug": "global-pizza-party-seattle",
+    "event_location": "Stoup Brewing - Capitol Hill, Broadway, Seattle, WA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x672E66ab39AC6e49d5CEFCCbB2056976DE0F0A49",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Seoul",
+    "event_slug": "global-pizza-party-seoul-2",
+    "event_location": "823-21 Yeoksam-dong, Gangnam District, Seoul, South Korea",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA8E11ccA90257f4DF2366aDcE202038D57C991aE",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Shahjahanpur",
+    "event_slug": "global-pizza-party-shahjahanpur",
+    "event_location": "D.S.VIRK TOWER, near Ghanta Ghar, Ghanta Ghar, Shahjahanpur, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xac7d4113fD15DE07ea03E2C79dEC2A41A44f3E67",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Shanghai",
+    "event_slug": "global-pizza-party-shanghai-1",
+    "event_location": "35 Yongjia Road, Huangpu, Shanghai, China",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8033F88Bd201E335A2DC9487A115760469E930Cc",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Sharjah ",
+    "event_slug": "global-pizza-party-sharjah-3",
+    "event_location": "Madam Road - Sharjah - United Arab Emirates",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x05E4A3d9190B5dbCC9888BF835cF22839b555820",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Sheberghan",
+    "event_slug": "global-pizza-party-sheberghan",
+    "event_location": "Sheberghan, Afghanistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xddF4C30Cf089D25fe49CB03F3Ddf49A10F01eFD8",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Shillong",
+    "event_slug": "global-pizza-party-shillong",
+    "event_location": "Tring Tring - Shillong, Police Bazar, Shillong, Meghalaya, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3d4f900c71Ae60ae56A1CfE4dFc958C28d15CeDd",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Shimla",
+    "event_slug": "global-pizza-party-shimla-1",
+    "event_location": "Cafe Simla Times : Cafe, Biergarten & Bar on the Mall Road Shimla ( Awarded Most Instagrammable Cafe of Himachal), the Cafe, Bemloi, Shimla, Himachal Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4436E225aEeEcBf5b01835bf7B1AE0C415d33231",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Sofia",
+    "event_slug": "global-pizza-party-sofia-2",
+    "event_location": "Barter Community Hub, Sofia, Bulgaria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7d0331226A0cC30C2Ba5D35B6f13fE97214d8A9b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Solukumbhu",
+    "event_slug": "global-pizza-party-solukumbhu-1",
+    "event_location": "HighCamp Cafe, Namche Marg, Namche, Nepal",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x88B4ba00b3d89B47c3bBa533A6e058DC2B4ff32d",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Split",
+    "event_slug": "global-pizza-party-split-1",
+    "event_location": "The Rabbit Hole cafe&bar, rooseveltova, Split, Hrvatska",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4105e30AAf3111de8517715edD230f8F3215C51D",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party St. Petersburg",
+    "event_slug": "global-pizza-party-st-petersburg",
+    "event_location": "OVERSIZE pizza club, Гражданская улица, Санкт-Петербург, Россия",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xdAc620172482200dd79A3A4c5685f1C56fd2BD2A",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Stockholm",
+    "event_slug": "global-pizza-party-stockholm-1",
+    "event_location": "Deglabbet Vasastan, Upplandsgatan, Stockholm, Sweden",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x26c6f51E3eEeE5e796569B5E2D4695721D112500",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Surat",
+    "event_slug": "global-pizza-party-surat-1",
+    "event_location": "La Milano Pizzeria, Surat - Kamrej Hwy, Sarthana Jakat Naka, Subhash Nagar, Nana Varachha, Surat, Khadsad, Gujarat 395006, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8D8a2Ea5f759a82aFFc49f10E3AA31a502c29bEd",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Taipei",
+    "event_slug": "global-pizza-party-taipei",
+    "event_location": "台湾台北市中山区玉门街Roos Pizza Bar",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xF1e72FeebF358be898E22A0B4FAF59ae998BaB1a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tamarindo",
+    "event_slug": "global-pizza-party-tamarindo",
+    "event_location": "Potrero Brewing Company, 100m Oeste de Bar La Perla, Ruta 911, Guanacaste Province, Playa Potrero, Costa Rica",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x50aA4d10fD4431aaF1eEC0DDAD7DF9F04834AC8C",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tatu city",
+    "event_slug": "global-pizza-party-tatu-city",
+    "event_location": "Cascade Kitchens, Tatu City, Kiambu County Province, Kenya",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x17c780def4874fC7dFa041f1b8C8db3a9d4FF208",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Thiruvananthapuram",
+    "event_slug": "global-pizza-party-thiruvananthapuram",
+    "event_location": "Dotspace, Devaswom Board Junction, Pandits Colony Extension, Kowdiar, Thiruvananthapuram, Kerala, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7F9aA744700A52a9168eaaf4AE2e1cfD463AD484",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Thrissur",
+    "event_slug": "global-pizza-party-thrissur-1",
+    "event_location": "Thrissur IT Park, Mahatma Gandhi Road, Marar Road Area, Thrissur, Kerala, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5f079FFBe365AE546F747bE752Be0B7f28820036",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tirana",
+    "event_slug": "global-pizza-party-tirana-4",
+    "event_location": "The Taproom by Pan’s Microbrewery, Rruga Komuna e Parisit, Tiranë, Albania",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xB673B7F157bd848b7a936cf775950C3D1b53B455",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tokyo",
+    "event_slug": "global-pizza-party-tokyo",
+    "event_location": "日本、東京都渋谷区恵比寿南３丁目５−７ Crypto Cafe&Bar クリプトカフェアンドバー",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7E11D10210c3e2a229dE86b4D6d8317299Fc8DF0",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tomas Morato ",
+    "event_slug": "global-pizza-party-tomas-morato",
+    "event_location": "CTTM SQUARE, Timog Avenue, Diliman, Quezon City, Metro Manila, Philippines",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6214B4e69d417725bfC502718BAC467e7cf8f916",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Trujillo",
+    "event_slug": "global-pizza-party-trujillo-6",
+    "event_location": "LA VANGUARDIA, Las Magnolias, Víctor Larco Herrera, Perú",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xbc5D6F1534006C3B93369C81DA883858cEF98e59",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tucson",
+    "event_slug": "global-pizza-party-tucson-1",
+    "event_location": "6612 East Tanque Verde Road, Tucson, AZ, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xaB1c99b1A816B249805e068f318Fd1dB3Ee1C8Cc",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tucumcari",
+    "event_slug": "global-pizza-party-tucumcari",
+    "event_location": "Art City, 10134 New Mexico 104, Tucumcari, NM, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x157f979A63e942f945fB67997C8Bbe23E2D3326E",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tulum",
+    "event_slug": "global-pizza-party-tulum-1",
+    "event_location": "NFT BOUTIQUE, Tulum Centro, Colonia Huracanes, Tulum, Quintana Roo, Mexico",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x4b3eCdC5985D673C0376483589ad38a1654E4763",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Tunis",
+    "event_slug": "global-pizza-party-tunis",
+    "event_location": "Le Matignon, Rue Ibn Hazm, Tunis, Tunisia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x964Eb8593477Ee54F1AA6E980718da8AF2Ded0Ce",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Udaipur",
+    "event_slug": "global-pizza-party-udaipur-1",
+    "event_location": "Pizzeria by the lake (PBTL), Ambamata, Udaipur, Rajasthan, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xe3094e2B6E2A8ABBa931B10F87263119C7E7aB49",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Vadodara",
+    "event_slug": "global-pizza-party-vadodra",
+    "event_location": "The Brewery., BIDC Gorwa Estate, Gorwa, Vadodara, Gujarat 390003, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9b4Ff3FC3183b80b415f5D7d24ef668f42A7eD81",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Valencia 🇻🇪",
+    "event_slug": "global-pizza-party-valencia-6",
+    "event_location": "ZAVOOCLUB, Avenida Monseñor Adams, Valencia, Carabobo, Venezuela",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xBA4EEE2feC46cb669741e805fB62A4aaB100A38d",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Valencia Spain City",
+    "event_slug": "global-pizza-party-valencia-spain-city-11",
+    "event_location": "Startup Valencia, Base 2, La Marina de Valencia, Calle de la Travesía, Valencia, Spain",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x8734D1cDf90564d61C952804674E34038c072c07",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Vanadzor ",
+    "event_slug": "global-pizza-party-vanadzor-101",
+    "event_location": "40°48'46.0\"N 44°28'38.2\"E",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x230B9aA3dB7218bAA43507AE97a1C31AF714c52d",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Vancouver",
+    "event_slug": "global-pizza-party-vancouver-1",
+    "event_location": "565 Great Northern Way, Vancouver, BC, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf42a9752A531aD1B99841E4530eE751077EcfDFF",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Varanasi",
+    "event_slug": "global-pizza-party-varanasi-1",
+    "event_location": "Roma's Cafe Diner, near Ravidas Gate, Lanka, Varanasi, Uttar Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xEaf66F0314FeBd3784739b5F0e80f5D3728b3e96",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Veracruz",
+    "event_slug": "global-pizza-party-veracruz",
+    "event_location": "UV Facultad de Administracion, Calle Puesta del Sol, Vistamar, Veracruz, México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x14A108f5B068Aa036EdF0cc9A59c0A73788C3e64",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Vienna",
+    "event_slug": "global-pizza-party-vienna",
+    "event_location": "Museum of Applied Arts, Stubenring, Vienna, Austria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xa8b98d71848baD47559A259C36EAbFDF5ed3cc55",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Vijaywada",
+    "event_slug": "global-pizza-party-vijaywada-3",
+    "event_location": "The Cowork Spaces - Benz Circle, Screw Bridge, beside National Highway 16, Patamatalanka, Vijayawada, Andhra Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5343592b923A25ff80FA5b76799A212a0b270e2B",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Vizag",
+    "event_slug": "global-pizza-party-vizag",
+    "event_location": "Ciros pizzeria vizag, beside More Super Market, Dutt Island, Siripuram, Visakhapatnam, Andhra Pradesh, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xcbc4DeeaE2e2107b5213a086874E072BAa11498E",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party WA",
+    "event_slug": "global-pizza-party-wa-1",
+    "event_location": "FUGITIVE PUB, Wa, Ghana",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xE1f75278c4546617a295bb69E8283976Bb0C96DB",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Warsaw",
+    "event_slug": "global-pizza-party-warsaw-2",
+    "event_location": "Restauracja Giovanni Rubino, Krakowskie Przedmieście, Warsaw, Poland",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9B5D95F55781ee8B8d9CC8f541B75E5746EbcDa5",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Washington D.C.",
+    "event_slug": "global-pizza-party-washington-d-c",
+    "event_location": "Wunder Garten, First Street Northeast, Washington, DC, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x35E75E352ecbfe5f661b680124cC22d8fEe65a1e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Waterloo",
+    "event_slug": "global-pizza-party-waterloo",
+    "event_location": "333 King Street North, Waterloo, ON, Canada",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xEBc267C618FC599BF4Ca2508BF2Bd4bFF5a93B8E",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Wayanad",
+    "event_slug": "global-pizza-party-wayanad",
+    "event_location": "Crossroads hostel, Varadoor - Kallenchira Palam Road, Kaniyambetta, Kalpetta, Kerala, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xbE4b95aD739B68Ddf9D3300dFf4118A2984c382a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Windhoek",
+    "event_slug": "global-pizza-party-windhoek",
+    "event_location": "Windhoek, Namibia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x17a49E25C952505525996B23C0e96Ec4034C0f17",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party with Boston DAO & PizzaDAO",
+    "event_slug": "global-pizza-party-with-boston-dao-pizza-dao-12",
+    "event_location": "Lala's Neapolitan-ish Pizza, Park Drive, Boston, MA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xf35555890Ecd8835Bd438BfeEdcb14Ce6Afed60e",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Yangon",
+    "event_slug": "global-pizza-party-yangon-2",
+    "event_location": "Impact Hub Yangon, Inya Yeiktha Street, Yangon, Myanmar (Burma)",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x461e0BF250D7bDb19D75B358Ff239acA71b63bD4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Zagreb 2025",
+    "event_slug": "global-pizza-party-zagreb-2025-1",
+    "event_location": "HoB, Slavonska Avenija, Zagreb, Hırvatistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x6A4FD24c56608f4c9Db77BD649464Ec127a9CF30",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party Zuitzerland",
+    "event_slug": "global-pizza-party-zuitzerland",
+    "event_location": "rocksresort, Via Murschetg, Laax, Switzerland",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xAa419755a91cD2D101C32B43187610D3e42B4c5a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party, Warri",
+    "event_slug": "global-pizza-party-delta",
+    "event_location": "MEGROASTY FOODS, DELTA, Hospital Road, Ekpan, Nigeria",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9d960594A5fb32c6071e3AFD4419F12bA33433fd",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Global Pizza Party: Zug",
+    "event_slug": "global-pizza-party-zug-1",
+    "event_location": "CV Labs Zug, Dammstrasse, Zug, Switzerland",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x28AccbD429E7DBC0DD44C39Afce0619F2Ac7cfa7",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Haifa Pizza Party",
+    "event_slug": "haifa-pizza-party",
+    "event_location": "Chester Kittchen - Live Music & Testy Food & Friends, Ha-Namal Street, Haifa, Israel",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x47CEBF37D46cE61d8e430AdCa300B028f71e276a",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Honolulu BTC Pizza day",
+    "event_slug": "honolulu-btc-pizza-day",
+    "event_location": "Treehouse Coworking, Kilauea Avenue, Honolulu, HI, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x0Ec7E5bd6e0BB4A912d5b174Ce644Ce4dd1f2faa",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Istanbul Global Pizza Party 2025 🍕 ",
+    "event_slug": "istanbul-global-pizza-party-2025",
+    "event_location": "Pablo Pub, Caferağa, Pavlonya Sokak, Kadıköy/İstanbul, Türkiye",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xe4F7ae3aa17275232Afa4d6f4E2575737FAdBFb8",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Offchain Saigon & Pizza DAO - Global Pizza Party - \"Bitcoin Pizza Day\"",
+    "event_slug": "offchain-saigon-pizza-dao-global-pizza-party-bitcoin-pizza-day-1",
+    "event_location": "Ho Chi Minh, Ho Chi Minh City, Vietnam",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x631291f39c4D014601EC840A01C5582AEd800290",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Pineapple and jalapenos is a good pizza topping",
+    "event_slug": "pineapple-and-jalapenos-is-a-good-pizza-topping",
+    "event_location": "SCALO Catania, Presso Vecchia Dogana, Via Cardinale Dusmet, Catania, CT, Italia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x1F0A29fc5C8D8A8502B3cE6327cdFcC58Af8502E",
+    "network_id": 10,
+    "network_name": "Optimism",
+    "event_name": "Pizza DAO 5th Global Pizza Party 2025 (Kampala Editions)",
+    "event_slug": "pizza-dao-5th-global-pizza-party-2025-3",
+    "event_location": "Thrones Lounge Bar & Restaurant, Bandali Rise, Kampala, Uganda",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x2d035c89e8D6EE74887660F2BCc8CFae30107962",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Pizza DAO Madrid Bitcoin Party 2025",
+    "event_slug": "pizza-dao-madrid-bitcoin-party-2025",
+    "event_location": "C. de Joaquín Costa, 27, Chamartín, 28002 Madrid, España",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9F3Ef6b56bDfBf77ff46ebBf893308beBE646836",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Pizza Day - Rome",
+    "event_slug": "pizza-day-rome-3",
+    "event_location": "Urbe Hub, Largo Dino Frisullo, Roma, RM, Italia",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9a83668BE1D8Cb5C9b50312a6Df524C1052fF631",
+    "network_id": 137,
+    "network_name": "Polygon",
+    "event_name": "Pizza Day Frankfurt 2025",
+    "event_slug": "pizza-day-frankfurt-2025-1",
+    "event_location": "Napolimania Da Salvatore, Gaußstraße, Frankfurt am Main-Innenstadt III, Germany",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xCc7eE7e1f5B09c0998Cecd25F859Bb8fe49d4ff4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Pizza Party Lahore",
+    "event_slug": "pizza-party-lahore",
+    "event_location": "Caprinos Pizza DHA Raya, Lahore, Fairways Commercial Raya, CP-35, Defence Raya Golf Resort Sector M DHA Phase 6, Lahore, Pakistan",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x7c684b80a92d6C5C009917E3888e65445eC6C839",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Pizza Party Munich 2025",
+    "event_slug": "pizza-party-munich-2025-1",
+    "event_location": "Impact Hub Munich, Gotzinger Straße, Munich, Germany",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xC6b768AE07476a5f1EFb06C427D06A4384Fb700b",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Pizza Party Puebla",
+    "event_slug": "pizza-party-puebla-1",
+    "event_location": "Thinkhub Coworking, Vía Atlixcáyotl, Reserva Territorial Atlixcáyotl, Villas de Atlixco, San Bernardino Tlaxcalancingo, Pue., México",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x623F3A1672bcFB350008A895B40fc1EB28ECfDF4",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "PizzaDAO Global Pizza Day 2025 - Casablanca",
+    "event_slug": "pizza-dao-global-pizza-day-2025-casablanca",
+    "event_location": "",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5FA021A7aabc0dB7B3Cb8fF8824e971D6a0F3916",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "PizzaDAO Global Pizza Day 2025 - Tangier ",
+    "event_slug": "pizza-dao-global-pizza-day-2025-tangier",
+    "event_location": "Iberia, Tangier, Morocco",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xbF380f908aBB6eB11be41D13eD252ECbC5F4eca8",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "PizzaDAO Siwan",
+    "event_slug": "pizza-dao-siwan-1",
+    "event_location": "Siwan, Bihar, India",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x72b393b821aF61A74F62B4d957b4bECBBF635d76",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "PizzaDAO X Offchain Shenzhen Mixer",
+    "event_slug": "pizza-dao-x-offchain-shenzhen-mixer-6",
+    "event_location": "China, Guangdong Province, Shenzhen, Nanshan, Liyumen Street, 前海深港青年梦工场",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0xA96B62d97c190C3F9d17f586f7501384a76F0d51",
+    "network_id": 42161,
+    "network_name": "Arbitrum",
+    "event_name": "PizzaDAO x Rock Roller Golf, Global Pizza Party",
+    "event_slug": "miguels-x-pizza-dao-global-pizza-party",
+    "event_location": "Miguel's Pizza, Natural Bridge Road, Slade, KY, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x9Ba46A141300a45471048eF4fcC47cB25C9d2d45",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "San Diego x PizzaDAO Global Pizza Party!",
+    "event_slug": "san-diego-x-pizza-dao-global-pizza-party-1",
+    "event_location": "The Sandbox, Garnet Avenue, San Diego, CA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x5917534CB63C8b2d5f5c5D547e0F192988b3BceA",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Santa Barbara Pizza Party @ Saint Bibiana Pizza",
+    "event_slug": "santa-barbara-pizza-party-1",
+    "event_location": "17 W Ortega St, Santa Barbara, CA 93101, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x18f5358b7ef5DEE2D1F0f30F0e506EC945E1c32c",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Slices & Chains - Bitcoin Pizza Day Special",
+    "event_slug": "slices-chains-bitcoin-pizza-day-special-1",
+    "event_location": "Heritage Park, Homer Avenue, Palo Alto, CA, USA",
+    "event_start_date": "2025-05-22"
+  },
+  {
+    "address": "0x3dbafca15a5c511b422d3A71ABc7324D9ceAdF30",
+    "network_id": 8453,
+    "network_name": "Base",
+    "event_name": "Vegas - Global Bitcoin Pizza Day May 22nd at Velocity Esports",
+    "event_slug": "vegas-global-bitcoin-pizza-day-may-22nd-at-velocity-esports",
+    "event_location": "Velocity Esports Las Vegas, South Las Vegas Boulevard, Las Vegas, NV, USA",
+    "event_start_date": "2025-05-22"
+  }
+]

@@ -3,7 +3,7 @@
 
 import { getContractsByChain, ALCHEMY_CHAIN_URLS } from "./nft-config";
 import { AlchemyNFT, NFTDisplayItem, NFTCollectionResponse, NFTContract } from "./nft-types";
-import { cacheGetOrSet, CACHE_TTL } from "../api/lib/cache";
+import { cacheGetOrSet } from "../api/lib/cache";
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
 
@@ -123,6 +123,6 @@ export async function fetchPizzaDAONFTs(
         walletAddress,
       };
     },
-    CACHE_TTL.CREW_MAPPINGS // 5 minutes, same as other profile data
+    2 * 60 * 60 // 2 hours — NFT holdings change rarely
   );
 }

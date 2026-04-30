@@ -13,6 +13,8 @@ interface PublicMember {
   orgs: string;
   skills: string;
   status: string;
+  totalCalls: number;
+  lastCallDate: string | null;
 }
 
 interface Pagination {
@@ -61,6 +63,7 @@ export default function CrewMembersPage() {
   const [crewFilter, setCrewFilter] = useState<string | null>(null);
   const [turtleFilter, setTurtleFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
+  const [sort, setSort] = useState("name_asc");
   const [pfpUrls, setPfpUrls] = useState<Record<string, string>>({});
 
   const fetchMembers = useCallback(async () => {
@@ -73,6 +76,7 @@ export default function CrewMembersPage() {
       if (search) params.set("search", search);
       if (crewFilter) params.set("crew", crewFilter);
       if (turtleFilter) params.set("turtle", turtleFilter);
+      if (sort !== "name_asc") params.set("sort", sort);
 
       const res = await fetch(`/api/crew/members?${params.toString()}`);
       if (!res.ok) {
@@ -91,7 +95,7 @@ export default function CrewMembersPage() {
     } finally {
       setLoading(false);
     }
-  }, [page, search, crewFilter, turtleFilter]);
+  }, [page, search, crewFilter, turtleFilter, sort]);
 
   useEffect(() => {
     fetchMembers();
@@ -157,10 +161,11 @@ export default function CrewMembersPage() {
     setSearch("");
     setCrewFilter(null);
     setTurtleFilter(null);
+    setSort("name_asc");
     setPage(1);
   }
 
-  const hasActiveFilters = !!(search || crewFilter || turtleFilter);
+  const hasActiveFilters = !!(search || crewFilter || turtleFilter || sort !== "name_asc");
 
   return (
     <div
@@ -357,20 +362,47 @@ export default function CrewMembersPage() {
           </div>
         </div>
 
-        {/* Count */}
+        {/* Count + Sort */}
         {!loading && !error && (
           <div
             style={{
               fontSize: 13,
               opacity: 0.7,
               marginBottom: 12,
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "center",
             }}
           >
-            {pagination.total === 0
-              ? "No members match your filters"
-              : `Showing ${members.length} of ${pagination.total} member${
-                  pagination.total === 1 ? "" : "s"
-                }`}
+            <span>
+              {pagination.total === 0
+                ? "No members match your filters"
+                : `Showing ${members.length} of ${pagination.total} member${
+                    pagination.total === 1 ? "" : "s"
+                  }`}
+            </span>
+            <select
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value);
+                setPage(1);
+              }}
+              style={{
+                padding: "6px 10px",
+                fontSize: 13,
+                border: "1px solid var(--color-border)",
+                borderRadius: 8,
+                background: "var(--color-surface)",
+                color: "var(--color-text)",
+                cursor: "pointer",
+                outline: "none",
+              }}
+            >
+              <option value="name_asc">Name A–Z</option>
+              <option value="name_desc">Name Z–A</option>
+              <option value="most_calls">Most Calls</option>
+              <option value="recent_call">Most Recent Call</option>
+            </select>
           </div>
         )}
 
@@ -672,6 +704,28 @@ function MemberCardItem({
                 }}
               >
                 {member.city}
+              </div>
+            )}
+
+            {/* Attendance */}
+            {member.totalCalls > 0 && (
+              <div
+                style={{
+                  fontSize: 12,
+                  opacity: 0.6,
+                  marginTop: 2,
+                }}
+              >
+                {member.totalCalls} call{member.totalCalls === 1 ? "" : "s"}
+                {member.lastCallDate && (
+                  <>
+                    {" · Last: "}
+                    {new Date(member.lastCallDate).toLocaleDateString("en-US", {
+                      month: "short",
+                      day: "numeric",
+                    })}
+                  </>
+                )}
               </div>
             )}
 

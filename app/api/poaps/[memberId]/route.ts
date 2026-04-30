@@ -1,84 +1,20 @@
 import { NextResponse } from 'next/server';
 import { fetchFilteredPOAPs } from '@/app/lib/poap';
-import { POAPCollectionResponse } from '@/app/lib/poap-types';
-import { parseGvizJson } from '@/app/lib/gviz-parser';
-import { findColumnIndex } from '@/app/lib/sheet-utils';
-import { GvizResponse, GvizCell } from '@/app/lib/types/gviz';
-
-const SHEET_ID = '16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM';
-const TAB_NAME = 'Crew';
-
-/**
- * Get wallet address from Google Sheet for a given member ID
- */
-async function getWalletForMember(memberId: string): Promise<string | null> {
-  try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-      TAB_NAME
-    )}&tqx=out:json&headers=0`;
-
-    const res = await fetch(url, { cache: 'no-store' });
-    if (!res.ok) return null;
-
-    const text = await res.text();
-    const gviz: GvizResponse = parseGvizJson(text);
-    const rows = gviz?.table?.rows || [];
-
-    // Find header row (same logic as member-repository.ts)
-    let headerRowIdx = -1;
-    let headerVals: string[] = [];
-
-    for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-      const rowCells = rows[ri]?.c || [];
-      const rowVals = rowCells.map((c: GvizCell) =>
-        String(c?.v || c?.f || '').trim().toLowerCase()
-      );
-      const hasName = rowVals.includes('name');
-      const hasStatus = rowVals.includes('status') || rowVals.includes('frequency');
-      const hasCity = rowVals.includes('city') || rowVals.includes('crews');
-
-      if (hasName && (hasStatus || hasCity)) {
-        headerRowIdx = ri;
-        headerVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || '').trim());
-        break;
-      }
-    }
-
-    if (headerRowIdx === -1) return null;
-
-    // Find ID and Wallet columns
-    const idxId = findColumnIndex(headerVals, ['id', 'member id', 'memberid'], 0) ?? 0;
-    const idxWallet = findColumnIndex(headerVals, ['wallet', 'wallet address', 'eth address', 'address']);
-
-    if (idxWallet == null) return null;
-
-    // Find member row
-    for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-      const cells = rows[ri]?.c || [];
-      const idVal = String(cells[idxId]?.v ?? cells[idxId]?.f ?? '').trim();
-
-      if (idVal && idVal === memberId) {
-        const walletVal = String(cells[idxWallet]?.v ?? cells[idxWallet]?.f ?? '').trim();
-        return walletVal || null;
-      }
-    }
-
-    return null;
-  } catch (error) {
-    console.error('Error fetching wallet for member:', error);
-    return null;
-  }
-}
+import { POAPCollectionResponse, POAPDisplayItem } from '@/app/lib/poap-types';
+import { getEvmWalletsForMember, getWalletForMember } from '@/app/lib/wallet-lookup';
 
 /**
  * GET /api/poaps/[memberId]
- * Returns user's POAPs filtered by whitelist, with oldest + 10 newest selected
+ * Returns user's POAPs filtered by whitelist, from ALL EVM wallets, deduplicated
  */
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ memberId: string }> }
 ): Promise<NextResponse<POAPCollectionResponse>> {
   const { memberId } = await params;
+  const url = new URL(req.url);
+  const limitParam = url.searchParams.get('limit');
+  const limit = limitParam ? parseInt(limitParam, 10) : 0;
 
   if (!memberId) {
     return NextResponse.json(
@@ -87,10 +23,18 @@ export async function GET(
     );
   }
 
-  // 1. Get wallet address from Google Sheet
-  const walletAddress = await getWalletForMember(memberId);
+  // 1. Get ALL EVM wallets for this member
+  let walletAddresses = await getEvmWalletsForMember(memberId);
 
-  if (!walletAddress) {
+  // Fallback to sheet if no wallets in DB
+  if (walletAddresses.length === 0) {
+    const sheetWallet = await getWalletForMember(memberId);
+    if (sheetWallet) {
+      walletAddresses = [sheetWallet];
+    }
+  }
+
+  if (walletAddresses.length === 0) {
     // No wallet address - return noWallet flag
     return NextResponse.json({
       poaps: [],
@@ -101,16 +45,50 @@ export async function GET(
     });
   }
 
-  // 2. Fetch filtered POAPs (uses incremental caching)
+  // 2. Fetch filtered POAPs from ALL wallets, deduplicate by eventId
   try {
-    const { poaps, totalCount, fromCache, debug } = await fetchFilteredPOAPs(walletAddress);
+    const results = await Promise.all(
+      walletAddresses.map((addr) => fetchFilteredPOAPs(addr))
+    );
+
+    // Merge and deduplicate by eventId
+    const seenEvents = new Set<string>();
+    const allPoaps: POAPDisplayItem[] = [];
+    let fromCacheAll = true;
+
+    for (const result of results) {
+      if (!result.fromCache) fromCacheAll = false;
+      for (const poap of result.poaps) {
+        if (!seenEvents.has(poap.eventId)) {
+          seenEvents.add(poap.eventId);
+          allPoaps.push(poap);
+        }
+      }
+    }
+
+    // Sort by tokenId descending (newest first)
+    allPoaps.sort((a, b) => parseInt(b.tokenId) - parseInt(a.tokenId));
+
+    const totalCount = allPoaps.length;
+    const primaryWallet = walletAddresses[0];
+
+    // When limit is set, return first (limit-1) newest + 1 oldest POAP
+    if (limit > 0 && allPoaps.length > limit) {
+      const newest = allPoaps.slice(0, limit - 1);
+      const oldest = allPoaps[allPoaps.length - 1];
+      return NextResponse.json({
+        poaps: [...newest, oldest],
+        totalCount,
+        walletAddress: primaryWallet,
+        fromCache: fromCacheAll,
+      });
+    }
 
     return NextResponse.json({
-      poaps,
+      poaps: allPoaps,
       totalCount,
-      walletAddress,
-      fromCache,
-      debug,
+      walletAddress: primaryWallet,
+      fromCache: fromCacheAll,
     });
   } catch (error) {
     console.error('Error fetching POAPs:', error);
@@ -119,7 +97,7 @@ export async function GET(
     return NextResponse.json({
       poaps: [],
       totalCount: 0,
-      walletAddress,
+      walletAddress: walletAddresses[0],
       fromCache: false,
       debug: { error: String(error) },
     });

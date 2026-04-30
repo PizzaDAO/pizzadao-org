@@ -4,8 +4,6 @@ import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { NFTCard } from "./NFTCard";
 import { NFTCollectionResponse, NFTDisplayItem } from "@/app/lib/nft-types";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
 
 type NFTCollectionProps = {
   memberId: string;
@@ -25,13 +23,12 @@ type GroupedNFT = {
 
 export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPrompt = true }: NFTCollectionProps) {
   const [data, setData] = useState<NFTCollectionResponse | null>(null);
+  const [fullData, setFullData] = useState<NFTCollectionResponse | null>(null);
   const [loading, setLoading] = useState(true);
-  const [saving, setSaving] = useState(false);
-  const [walletSaved, setWalletSaved] = useState(false);
   const [expandedGroups, setExpandedGroups] = useState<Set<string>>(new Set());
-  const { address, isConnected } = useAccount();
+  const [expandLoading, setExpandLoading] = useState(false);
 
-  const toggleGroup = useCallback((groupKey: string) => {
+  const toggleGroup = useCallback(async (groupKey: string) => {
     setExpandedGroups(prev => {
       const next = new Set(prev);
       if (next.has(groupKey)) {
@@ -41,12 +38,26 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
       }
       return next;
     });
-  }, []);
+
+    // If expanding and we haven't fetched full data yet, fetch it
+    if (!expandedGroups.has(groupKey) && !fullData) {
+      setExpandLoading(true);
+      try {
+        const res = await fetch(`/api/nfts/${memberId}`);
+        const json = await res.json();
+        setFullData(json);
+      } catch {
+        // Keep using limited data
+      } finally {
+        setExpandLoading(false);
+      }
+    }
+  }, [expandedGroups, fullData, memberId]);
 
   const fetchNFTs = useCallback(async () => {
     setLoading(true);
     try {
-      const res = await fetch(`/api/nfts/${memberId}`);
+      const res = await fetch(`/api/nfts/${memberId}?limit=${maxPerCollection}`);
       const json = await res.json();
       setData(json);
     } catch (e) {
@@ -54,38 +65,33 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
     } finally {
       setLoading(false);
     }
-  }, [memberId]);
+  }, [memberId, maxPerCollection]);
 
   useEffect(() => {
     fetchNFTs();
   }, [fetchNFTs]);
 
-  // When user connects wallet and we have no wallet saved, save it
-  useEffect(() => {
-    async function saveWallet() {
-      if (isConnected && address && data?.noWallet && !walletSaved && !saving) {
-        setSaving(true);
-        try {
-          const res = await fetch("/api/wallet", {
-            method: "POST",
-            headers: { "Content-Type": "application/json" },
-            body: JSON.stringify({ memberId, walletAddress: address }),
-          });
-          const resData = await res.json();
-          if (res.ok) {
-            setWalletSaved(true);
-            // Refetch NFTs with the new wallet
-            await fetchNFTs();
-          } else {
-          }
-        } catch (e) {
-        } finally {
-          setSaving(false);
-        }
-      }
+  // Build a lookup of group totals from the API groups metadata
+  const groupTotals = useMemo(() => {
+    const map = new Map<string, number>();
+    for (const g of data?.groups || []) {
+      map.set(`${g.chain}:${g.contract}`, g.totalInGroup);
     }
-    saveWallet();
-  }, [isConnected, address, data?.noWallet, walletSaved, saving, memberId, fetchNFTs]);
+    return map;
+  }, [data?.groups]);
+
+  // When full data is loaded, build a lookup for full NFT lists per group
+  const fullGroupNfts = useMemo(() => {
+    if (!fullData?.nfts) return new Map<string, NFTDisplayItem[]>();
+    const map = new Map<string, NFTDisplayItem[]>();
+    for (const nft of fullData.nfts) {
+      const key = `${nft.chain}:${nft.contractAddress}`;
+      const list = map.get(key) || [];
+      list.push(nft);
+      map.set(key, list);
+    }
+    return map;
+  }, [fullData?.nfts]);
 
   // Group NFTs by contract address
   const groupedNFTs = useMemo(() => {
@@ -111,11 +117,16 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
 
     // Calculate display NFTs and overflow for each group, then sort by order
     return Object.values(groups)
-      .map((group) => ({
-        ...group,
-        displayNfts: group.nfts.slice(0, maxPerCollection),
-        overflow: Math.max(0, group.nfts.length - maxPerCollection),
-      }))
+      .map((group) => {
+        const key = `${group.chain}:${group.contract}`;
+        // Use API group metadata for total count (accounts for limited response)
+        const totalInGroup = groupTotals.get(key) || group.nfts.length;
+        return {
+          ...group,
+          displayNfts: group.nfts.slice(0, maxPerCollection),
+          overflow: Math.max(0, totalInGroup - maxPerCollection),
+        };
+      })
       .sort((a, b) => {
         // Items with order come first, sorted by order value
         // Items without order come last
@@ -126,7 +137,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
         if (b.order !== undefined) return 1;
         return 0;
       });
-  }, [data?.nfts, maxPerCollection]);
+  }, [data?.nfts, maxPerCollection, groupTotals]);
 
   const sectionStyle: React.CSSProperties = {
     marginTop: 24,
@@ -134,8 +145,8 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
     borderTop: '1px solid var(--color-divider)',
   };
 
-  // Show connect wallet prompt if no wallet is saved (only if showConnectPrompt is true)
-  if (!loading && data?.noWallet && !walletSaved) {
+  // Show prompt if no wallet is saved (only if showConnectPrompt is true)
+  if (!loading && data?.noWallet) {
     if (!showConnectPrompt) {
       return null; // Hide completely on profile page if no wallet
     }
@@ -160,9 +171,8 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
           }}
         >
           <p style={{ margin: 0, fontSize: 14, opacity: 0.7, textAlign: "center" }}>
-            {saving ? "Saving wallet..." : "Connect your wallet to display your NFT collection"}
+            Add a wallet in your Wallet Manager above to display your NFT collection
           </p>
-          {!saving && <ConnectButton />}
         </div>
       </div>
     );
@@ -295,7 +305,10 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
         {groupedNFTs.map((group) => {
           const groupKey = `${group.chain}:${group.contract}`;
           const isExpanded = expandedGroups.has(groupKey);
-          const nftsToShow = isExpanded ? group.nfts : group.displayNfts;
+          const isGroupLoading = isExpanded && expandLoading && !fullGroupNfts.has(groupKey);
+          // When expanded, prefer full data if available, else fall back to limited data
+          const allNftsForGroup = fullGroupNfts.get(groupKey) || group.nfts;
+          const nftsToShow = isExpanded ? allNftsForGroup : group.displayNfts;
 
           return (
             <React.Fragment key={groupKey}>
@@ -304,6 +317,19 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
                   key={`${nft.contractAddress}-${nft.tokenId}`}
                   nft={nft}
                   size="small"
+                />
+              ))}
+              {isGroupLoading && Array.from({ length: Math.min(group.overflow, 6) }).map((_, i) => (
+                <div
+                  key={`shimmer-${i}`}
+                  style={{
+                    width: 80,
+                    height: 80,
+                    borderRadius: 12,
+                    background: "linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)",
+                    backgroundSize: "200% 100%",
+                    animation: "shimmer 1.5s infinite",
+                  }}
                 />
               ))}
               {group.overflow > 0 && !isExpanded && (

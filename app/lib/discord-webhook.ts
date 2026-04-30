@@ -1,6 +1,7 @@
 // app/lib/discord-webhook.ts
 
 import { google } from "googleapis";
+import { getCrewMappings } from "./crew-mappings";
 
 const WEBHOOK_SHEET_ID = "1bSLN2mL1K-qr3nLiURVjhm31Zxn0J3ta1Pq0txlXsPI";
 
@@ -25,72 +26,17 @@ const sheets = auth ? google.sheets({ version: "v4", auth }) : null;
 const webhookCache = new Map<string, { url: string; time: number }>();
 const CACHE_TTL = 5 * 60 * 1000;
 
-// Cache for crew mappings (id -> label)
-let crewLabelCache: { time: number; data: Map<string, string> } | null = null;
-const CREW_CACHE_TTL = 10 * 60 * 1000; // 10 minutes
-
 /**
- * Fetch crew ID -> label mapping from the crew mappings sheet
- */
-async function getCrewLabels(): Promise<Map<string, string>> {
-    if (crewLabelCache && Date.now() - crewLabelCache.time < CREW_CACHE_TTL) {
-        return crewLabelCache.data;
-    }
-
-    const labelMap = new Map<string, string>();
-
-    try {
-        // Use the same sheet as crew-mappings API
-        const CREW_MAPPINGS_SHEET_ID = "1bSLN2mL1K-qr3nLiURVjhm31Zxn0J3ta1Pq0txlXsPI";
-
-        if (!sheets) {
-            return labelMap;
-        }
-
-        const res = await sheets.spreadsheets.values.get({
-            spreadsheetId: CREW_MAPPINGS_SHEET_ID,
-            range: "Crews!A:Z",
-        });
-
-        const rows = res.data.values || [];
-        if (rows.length === 0) return labelMap;
-
-        // Find header indices
-        const headers = rows[0].map((h: string) => String(h || "").toLowerCase().trim());
-        const idIdx = headers.findIndex((h: string) => h === "id" || h === "crew id");
-        const labelIdx = headers.findIndex((h: string) => h === "crew" || h === "label" || h === "name");
-
-        if (idIdx === -1 || labelIdx === -1) {
-            // Fallback: assume id in col 0, label in col 1
-            for (let i = 1; i < rows.length; i++) {
-                const id = String(rows[i][0] || "").trim().toLowerCase();
-                const label = String(rows[i][1] || "").trim();
-                if (id && label) labelMap.set(id, label);
-            }
-        } else {
-            for (let i = 1; i < rows.length; i++) {
-                const id = String(rows[i][idIdx] || "").trim().toLowerCase();
-                const label = String(rows[i][labelIdx] || "").trim();
-                if (id && label) labelMap.set(id, label);
-            }
-        }
-
-        crewLabelCache = { time: Date.now(), data: labelMap };
-    } catch (error: any) {
-    }
-
-    return labelMap;
-}
-
-/**
- * Convert crew IDs to display labels
+ * Convert crew IDs to display labels using the crew-mappings module
  */
 async function formatCrewNames(crewIds: string[]): Promise<string[]> {
-    const labelMap = await getCrewLabels();
-    return crewIds.map(id => {
-        const normalizedId = id.toLowerCase().trim();
-        return labelMap.get(normalizedId) || id; // Fallback to original if not found
-    });
+    try {
+        const { crews } = await getCrewMappings();
+        const labelMap = new Map(crews.map(c => [c.id.toLowerCase(), c.label]));
+        return crewIds.map(id => labelMap.get(id.toLowerCase().trim()) || id);
+    } catch {
+        return crewIds;
+    }
 }
 
 /**

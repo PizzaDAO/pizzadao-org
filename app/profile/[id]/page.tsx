@@ -9,6 +9,11 @@ import { TURTLES, CREWS } from "../../ui/constants";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { ProfileLinksDisplay } from "../../ui/profile-links";
+import { AttendanceCard } from "../../ui/attendance-card";
+import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
+import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
+import { WalletDisplay } from "../../ui/wallet-manager/WalletDisplay";
+import { AddVouchButton } from "../../ui/vouches/AddVouchButton";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -46,6 +51,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
     const [articles, setArticles] = useState<{ slug: string; title: string; excerpt?: string; publishedAt?: string }[]>([]);
     const [missionLevel, setMissionLevel] = useState<{ currentLevel: number; levelTitle: string | null; approvedCount: number; totalMissions: number } | null>(null);
+    const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
 
     // Fetch public profile data
     useEffect(() => {
@@ -119,6 +125,21 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
             } catch {}
         })();
     }, [id]);
+
+    // Fetch current user's memberId for AddVouchButton
+    useEffect(() => {
+        (async () => {
+            try {
+                const res = await fetch("/api/me");
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data.memberId) setCurrentMemberId(data.memberId);
+                }
+            } catch {
+                // Not authenticated or failed - that's ok
+            }
+        })();
+    }, []);
 
     // Fetch crew mappings for crew info
     useEffect(() => {
@@ -292,8 +313,40 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         </div>
                     )}
 
+                    {/* Vouch Button */}
+                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
+                        <AddVouchButton
+                            targetMemberId={idValue}
+                            currentMemberId={currentMemberId}
+                        />
+                    </div>
+
                     <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                        <StatItem label="Name" value={name} />
+                        <div>
+                            <h3 style={{
+                                fontSize: 12,
+                                textTransform: "uppercase",
+                                letterSpacing: "1px",
+                                opacity: 0.5,
+                                marginTop: 0,
+                                marginBottom: 6,
+                                fontWeight: 700
+                            }}>
+                                Name
+                            </h3>
+                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
+                                <p style={{
+                                    fontSize: 18,
+                                    fontWeight: 500,
+                                    color: 'var(--color-text-primary)',
+                                    margin: 0,
+                                    wordBreak: "break-word"
+                                }}>
+                                    {name}
+                                </p>
+                                <MafiaRankBadge memberId={idValue} />
+                            </div>
+                        </div>
                         <StatItem label="City" value={city} />
                         <StatItem label="Status" value={status || "—"} />
                         <StatItem label="ID" value={`#${idValue}`} />
@@ -507,6 +560,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         </div>
                     </div>
 
+                    {/* Wallet addresses (read-only) */}
+                    <WalletDisplay memberId={idValue} />
+
                     {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
                     <NFTCollection memberId={idValue} showConnectPrompt={false} />
 
@@ -605,6 +661,12 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             </div>
                         </div>
                     )}
+
+                    {/* Crew Call Attendance */}
+                    <AttendanceCard memberId={idValue} />
+
+                    {/* Pizza Party Tickets */}
+                    <UnlockTicketCard memberId={idValue} />
                 </div>
 
                 {/* Footer */}

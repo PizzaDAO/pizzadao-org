@@ -15,6 +15,7 @@ model User {
 
   pendingSignatures PendingSignature[]
   economy           Economy?
+  unlockTicketClaims UnlockTicketClaim[]
 }
 
 // ===== $PEP ECONOMY SYSTEM =====
@@ -239,6 +240,7 @@ enum NotificationType {
   MISSION_APPROVED   // A mission submission was approved
   MISSION_REJECTED   // A mission submission was rejected
   LEVEL_COMPLETED    // All missions in a level completed, reward paid
+  VOUCH_ADDED @map("FRIEND_ADDED") // Someone vouched for you
 }
 
 model Notification {
@@ -324,4 +326,181 @@ model MissionCompletion {
   @@unique([missionId, discordId])
   @@index([discordId])
   @@index([status])
+}
+
+// ===== VOUCHES IN THE DAO =====
+
+enum SocialPlatform {
+  TWITTER
+  FARCASTER
+}
+
+enum VouchSource {
+  PIZZADAO
+  TWITTER
+  FARCASTER
+
+  @@map("FriendSource")
+}
+
+// Social accounts linked to a member (X handle, Farcaster username)
+model SocialAccount {
+  id         Int            @id @default(autoincrement())
+  memberId   String
+  platform   SocialPlatform
+  handle     String
+  platformId String?
+  verified   Boolean        @default(false)
+  createdAt  DateTime       @default(now())
+  updatedAt  DateTime       @updatedAt
+
+  @@unique([memberId, platform])
+  @@index([platform, handle])
+  @@index([platform, platformId])
+}
+
+// One-way vouch relationship between members
+model Vouch {
+  id         Int         @id @default(autoincrement())
+  followerId String
+  followeeId String
+  source     VouchSource @default(PIZZADAO)
+  createdAt  DateTime    @default(now())
+
+  @@unique([followerId, followeeId])
+  @@index([followerId])
+  @@index([followeeId])
+  @@map("Friendship")
+}
+
+// ===== CREW CALL ATTENDANCE =====
+
+// Individual attendance records — one per person per call
+model CallAttendance {
+  id          Int      @id @default(autoincrement())
+  discordId   String   // Discord User ID of attendee
+  displayName String?  // Discord display name at time of call
+  crewId      String   // Crew slug (ops, comms, etc.) or "community_call"
+  crewLabel   String   // Display name (Ops, Comms, Community Call)
+  callDate    DateTime // Date of the call
+  dailySheetId String  // Google Sheet ID of the daily attendance sheet (for dedup)
+  createdAt   DateTime @default(now())
+
+  @@unique([discordId, dailySheetId]) // One record per person per call
+  @@index([discordId])
+  @@index([crewId])
+  @@index([callDate])
+}
+
+// Pre-computed per-member attendance aggregates (rebuilt on sync)
+model AttendanceSummary {
+  discordId     String   @id
+  memberId      String?  @unique
+  totalCalls    Int
+  crewBreakdown Json     // { [crewId]: { crewLabel, count, lastAttended } }
+  recentCalls   Json     // [{ date, crew, crewId }] last 10
+  lastSyncedAt  DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@index([memberId])
+}
+
+// Track which daily sheets have already been synced
+model AttendanceSyncLog {
+  id            Int      @id @default(autoincrement())
+  crewSheetId   String   // Crew spreadsheet ID
+  crewId        String   // Crew slug
+  dailySheetId  String   @unique // Daily attendance sheet ID (dedup key)
+  callDate      DateTime
+  attendeeCount Int
+  syncedAt      DateTime @default(now())
+}
+
+// ===== MAGIC LOGIN VIA DISCORD DM =====
+
+model MagicLoginToken {
+  id        String    @id @default(cuid())
+  tokenHash String    @unique   // SHA-256 of raw token (raw goes in DM link)
+  discordId String
+  username  String
+  nick      String?
+  expiresAt DateTime            // 10 min from creation
+  usedAt    DateTime?           // null = unused
+  createdAt DateTime  @default(now())
+
+  @@index([discordId, createdAt])
+}
+
+// ===== DISCORD SERVER ACTIVITY =====
+
+// Per-member participation stats computed from Discord export metadata
+model DiscordActivity {
+  discordId          String   @id
+  authorName         String?  // Latest known username
+  totalMessages      Int
+  firstSeen          DateTime
+  lastSeen           DateTime
+  activeDays         Int
+  activeMonths       Int
+  channelsActive     Int
+  topChannels        Json     // [{name, count}] top 10
+  categoryBreakdown  Json     // {category: messageCount}
+  repliesSent        Int
+  reactionsReceived  Int
+  threadMessages     Int
+  avgContentLen      Float
+  monthlyBreakdown   Json     // [{month: "2024-01", count: 42}]
+  engagementScore    Float    // Composite 0-100
+  scoreBreakdown     Json     // {volume, consistency, recency, diversity, engagement}
+  lastSyncedAt       DateTime @default(now())
+
+  @@index([engagementScore])
+  @@index([totalMessages])
+  @@index([lastSeen])
+}
+
+// ===== UNLOCK TICKET CLAIMS =====
+
+model UnlockTicketClaim {
+  id            Int                  @id @default(autoincrement())
+  discordId     String
+  memberId      String
+  walletAddress String               @unique
+  ticketCount   Int
+  connectedAt   DateTime             @default(now())
+  tickets       UnlockTicketRecord[]
+  user          User                 @relation(fields: [discordId], references: [id])
+
+  @@index([discordId])
+  @@index([memberId])
+}
+
+model UnlockTicketRecord {
+  id          Int               @id @default(autoincrement())
+  claimId     Int
+  lockAddress String
+  networkId   Int
+  eventName   String
+  tokenId     String
+  claim       UnlockTicketClaim @relation(fields: [claimId], references: [id], onDelete: Cascade)
+
+  @@unique([lockAddress, tokenId, networkId])
+}
+
+// Multi-wallet: each member can have multiple wallets (EVM, Solana, etc.)
+model MemberWallet {
+  id            Int      @id @default(autoincrement())
+  memberId      String
+  discordId     String?
+  walletAddress String
+  label         String?            // "Main", "Vault", etc.
+  chainType     String   @default("evm")  // "evm" | "solana"
+  source        String   @default("sheet")
+  isPrimary     Boolean  @default(false)
+  createdAt     DateTime @default(now())
+  updatedAt     DateTime @updatedAt
+
+  @@unique([memberId, walletAddress])
+  @@index([memberId])
+  @@index([walletAddress])
 }

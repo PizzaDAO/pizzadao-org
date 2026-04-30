@@ -1,0 +1,3176 @@
+[
+  {
+    "city": "Calavi",
+    "country": "Benin",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+NfSwNeX1R2Y1Yzdh"
+  },
+  {
+    "city": "Francistown",
+    "country": "Botswana",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+KLqD4B7ryLAyZjA0"
+  },
+  {
+    "city": "Gaborone",
+    "country": "Botswana",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+ymH9l-lc8oNlYmUx"
+  },
+  {
+    "city": "Ouagadougou",
+    "country": "Burkina Faso",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+oFnFdTPoiu5mYmU5"
+  },
+  {
+    "city": "Bujumbura",
+    "country": "Burundi",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+Rggy1kNGygg5Mzdh"
+  },
+  {
+    "city": "Kinshasa",
+    "country": "Drc",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+--0ghlqnmqNlZGMx"
+  },
+  {
+    "city": "Cairo",
+    "country": "Egypt",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+Uuex2EX2rxE0ODdh"
+  },
+  {
+    "city": "Addis Ababa",
+    "country": "Ethiopia",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+ngZO1Vye-Fw4OWYx"
+  },
+  {
+    "city": "Accra",
+    "country": "Ghana",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+fEIgyRNvfJM1NzJh"
+  },
+  {
+    "city": "Wa",
+    "country": "Ghana",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+0G0yxQkwy1ZiOWQx"
+  },
+  {
+    "city": "Abidjan",
+    "country": "Ivory Coast",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+JWOR_uVzisw3NWZk"
+  },
+  {
+    "city": "Diani",
+    "country": "Kenya",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+0xIsLjQwZik2ZDFh"
+  },
+  {
+    "city": "Kilifi",
+    "country": "Kenya",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+R1sHGLbke2tmOGUx"
+  },
+  {
+    "city": "Kisumu",
+    "country": "Kenya",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+GqJNj0CgIc4xNzQ0"
+  },
+  {
+    "city": "Mombasa",
+    "country": "Kenya",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+aUB73Pg_7AozN2Qx"
+  },
+  {
+    "city": "Tatu",
+    "country": "Kenya",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+cIMDDm9UMj05YTI8"
+  },
+  {
+    "city": "Agadir",
+    "country": "Morocco",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+nfEqqV09JOVhM2Ux"
+  },
+  {
+    "city": "Casablanca",
+    "country": "Morocco",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+bZT_3pcvEWtiOTkx"
+  },
+  {
+    "city": "Marrakech",
+    "country": "Morocco",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+ACv3eoIimYIzYzYx"
+  },
+  {
+    "city": "Rabat",
+    "country": "Morocco",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+ajNxZ87r7ek4YTdh"
+  },
+  {
+    "city": "Tangier",
+    "country": "Morocco",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+iHAnygD0L_Y1MGYx"
+  },
+  {
+    "city": "Windhoek",
+    "country": "Namibia",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+a7we9IRuu_FkY2Ex"
+  },
+  {
+    "city": "Minna",
+    "country": "Niger",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+__7LS9ExqJ5hNWIx"
+  },
+  {
+    "city": "Abia",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+y7sxYa2HvyA1MDQ8"
+  },
+  {
+    "city": "Akwa Ibom",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+vkT_b8g_m4sxNzQx"
+  },
+  {
+    "city": "Asaba",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+XlCTV_yt36llMDlh"
+  },
+  {
+    "city": "Calabar",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+TU93RMJyMM5lNTZh"
+  },
+  {
+    "city": "Ebonyi",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+nPtJoG7-JMM1Yjgx"
+  },
+  {
+    "city": "Ibadan",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+muLqtAzxjSM3YmE5"
+  },
+  {
+    "city": "Kaduna",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+dGo4dci6qPRlZWJh"
+  },
+  {
+    "city": "Keffi",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+mM8wP6FZZFZmOWIx"
+  },
+  {
+    "city": "Kwara",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+fznrs_gQK7o4Yzc0"
+  },
+  {
+    "city": "Lokoja City",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+Ox5H1huZpjdiMjUx"
+  },
+  {
+    "city": "Markudi",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+TUg3_mBiHac1OWFk"
+  },
+  {
+    "city": "Osogbo",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+uhZa8PpO4wg0Yzkx"
+  },
+  {
+    "city": "Abeokuta",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+1C2aJzTdDqZiZWYx"
+  },
+  {
+    "city": "Abuja",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+PSiwGnJpLvo1NTJh"
+  },
+  {
+    "city": "Akure",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+27ihEo3GGq1kMzdh"
+  },
+  {
+    "city": "Anambra",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+nFsu2DXq_y5jZDQx"
+  },
+  {
+    "city": "Benin City",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+qSuotV0sPglmMDZh"
+  },
+  {
+    "city": "Enugu City",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+FN-o8aMZhjJmOTcx"
+  },
+  {
+    "city": "Ijoko",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+CKxe32vDKyVkMDcx"
+  },
+  {
+    "city": "Lagos",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+zOdAqKYVfYZjYTMx"
+  },
+  {
+    "city": "Nsukka",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+rTpcAPYAHikyMzkx"
+  },
+  {
+    "city": "Port Harcourt",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+s4A7qfjC6ZxhYTY5"
+  },
+  {
+    "city": "Warri",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+le84XK42P_RmOGEx"
+  },
+  {
+    "city": "Yenagoa",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+yZkp7kEtqVNiOWVh"
+  },
+  {
+    "city": "Kigali",
+    "country": "Rwanda",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+08IUt0my5kI5MzZk"
+  },
+  {
+    "city": "Cape Town",
+    "country": "South Africa",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+jB8hcNG1q2Q1NTYx"
+  },
+  {
+    "city": "Durban",
+    "country": "South Africa",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+Lt7pM-oTAWdiMmUx"
+  },
+  {
+    "city": "Johannesberg",
+    "country": "South Africa",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+xx0YVLpwQyFkY2Mx"
+  },
+  {
+    "city": "Arusha",
+    "country": "Tanzania",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+tW1qWy1RioEzZDg5"
+  },
+  {
+    "city": "Dar Es Salaam",
+    "country": "Tanzania",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+yJJu6C0dO0cwYTI5"
+  },
+  {
+    "city": "Mwanza",
+    "country": "Tanzania",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+KPm9D-X2GExiNzcx"
+  },
+  {
+    "city": "Kara",
+    "country": "Togo",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+YFhbTCqVoQwyMGZh"
+  },
+  {
+    "city": "Lomé",
+    "country": "Togo",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+SIk1s_i7r5kyZWVh"
+  },
+  {
+    "city": "Tunis",
+    "country": "Tunisia",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+0F9F_J8xfYtiMWZh"
+  },
+  {
+    "city": "Kampala",
+    "country": "Uganda",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+nCyNgF5C-5AwZjBh"
+  },
+  {
+    "city": "Mbarara",
+    "country": "Uganda",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+3ClPOPm_xrdhNjA0"
+  },
+  {
+    "city": "Kitwe",
+    "country": "Zambia",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+KG4m5hMdqcM2MWJh"
+  },
+  {
+    "city": "Lusaka",
+    "country": "Zambia",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+01kAFecVL9ZkNmQx"
+  },
+  {
+    "city": "Bulawayo",
+    "country": "Zimbabwe",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+3hjtBMqyxgZiMWEx"
+  },
+  {
+    "city": "Harare",
+    "country": "Zimbabwe",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+i06gg9ln789kYTAx"
+  },
+  {
+    "city": "Ekiti",
+    "country": "Nigeria",
+    "region": "Africa",
+    "chatUrl": "https://t.me/+gorp1dmFZFFlYzgx"
+  },
+  {
+    "city": "Dhaka",
+    "country": "Bangladesh",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+bH7zVshRZB9iYWEx"
+  },
+  {
+    "city": "Thimphu",
+    "country": "Bhutan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+7ws-r97knwpiNmY5"
+  },
+  {
+    "city": "Phnom Penh",
+    "country": "Cambodia",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Pan9PiYoPv82M2Zh"
+  },
+  {
+    "city": "Beijing",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+NhdAVPA34GY3YWJh"
+  },
+  {
+    "city": "Changsha",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+6734pXkmIYZkMzhi"
+  },
+  {
+    "city": "Chengdu",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+UG4LYZ0OouZkODc5"
+  },
+  {
+    "city": "Chongqing",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+3dG3-6FQeb00ZDY5"
+  },
+  {
+    "city": "Dali",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+xg1rEtf7m7o3Y2Ix"
+  },
+  {
+    "city": "Guangzhou",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+eoObOkazHvc2ODVh"
+  },
+  {
+    "city": "Hangzhou",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Va-EpaETUd5jNDYx"
+  },
+  {
+    "city": "Hong Kong",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+ArdjT-D2uWw3NmZh"
+  },
+  {
+    "city": "Macao",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+TFGd3-QXRnMxMmUx"
+  },
+  {
+    "city": "Ningbo",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+n1e-YBy88vIzZGZh"
+  },
+  {
+    "city": "Shanghai",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+BHjrUZdqcAcxZjhh"
+  },
+  {
+    "city": "Shenzhen",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+PwBxC85_y8tjYmUx"
+  },
+  {
+    "city": "Yiwu",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+9RWmbYBBljQzOWMx"
+  },
+  {
+    "city": "Suzhou",
+    "country": "China",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+mJwcuPAgdkJhNTMx"
+  },
+  {
+    "city": "Agartala",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+ciLIN6nTuiJkYTFh"
+  },
+  {
+    "city": "Agra",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Q-a8BPCjEHU2NDc1"
+  },
+  {
+    "city": "Ahmedabad",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+SzeiTWewYTw2YzVh"
+  },
+  {
+    "city": "Ahmednagar",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+-00dRBVro_85M2Yx"
+  },
+  {
+    "city": "Aligarh",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+75FuXgZOdDE5ZmM1"
+  },
+  {
+    "city": "Ambala",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+KS32ziRipBk1M2Y1"
+  },
+  {
+    "city": "Amritsar",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+8R8C164OSXk2NmU9"
+  },
+  {
+    "city": "Ayodhya",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+1TGHuZiVQFMzMmNl"
+  },
+  {
+    "city": "Bangalore",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+bqndjevOTtwxNWIx"
+  },
+  {
+    "city": "Bhopal",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+zwA6PBoy1cxhYTU1"
+  },
+  {
+    "city": "Bhubnasewar",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+n65hVxa_tNJmZWM1"
+  },
+  {
+    "city": "Chamoli",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+wb7Rcm6RgZVlZDNl"
+  },
+  {
+    "city": "Chandigarh",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+b-vLVlMO-REyNTAx"
+  },
+  {
+    "city": "Chennai",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+-mqY8n8888AyZTAx"
+  },
+  {
+    "city": "Coimbatore",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+BuBtX1FXGr0xMWEx"
+  },
+  {
+    "city": "Dehradun",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Y32B_fmTlc45N2Y1"
+  },
+  {
+    "city": "Delhi",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+2n1ZfVvYcScyZTM5"
+  },
+  {
+    "city": "Faridabad",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+7id_nIHh_twwYWY1"
+  },
+  {
+    "city": "Ghaziabad",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+xAWR_AX1tn9hNjhl"
+  },
+  {
+    "city": "Goa",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+LagCHsVi0RExOTY9"
+  },
+  {
+    "city": "Gorakhpur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+y2P02WSWriU0OTY1"
+  },
+  {
+    "city": "Gurugram",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Wjob1vjI6pc3N2I9"
+  },
+  {
+    "city": "Guwahati",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+hTTreVvoGIdmZDE1"
+  },
+  {
+    "city": "Gwalior",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+G4T86JWjqLYzOGUx"
+  },
+  {
+    "city": "Hardoi",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+IqRwTJKQooU5ZGZl"
+  },
+  {
+    "city": "Hyderabad",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+JBqqowFwPB40N2Qx"
+  },
+  {
+    "city": "Imphal",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+i55Ee8vt3ww0NGI1"
+  },
+  {
+    "city": "Indore",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+IeHvdDzi8fcyNWU1"
+  },
+  {
+    "city": "Jalandhar",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+_-jzXGdtY400MjUx"
+  },
+  {
+    "city": "Jammu",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+AOgQeakCyGUzMzdh"
+  },
+  {
+    "city": "Jamshedpur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+QX8YRLusFH4xNDE1"
+  },
+  {
+    "city": "Jhansi",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+qnzE3sF6QD03NTM1"
+  },
+  {
+    "city": "Kanpur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+-ONbG27fNZ80MzU1"
+  },
+  {
+    "city": "Kochi",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+dF0gCf_lrkMzMmE5"
+  },
+  {
+    "city": "Kohima",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+RBN7jw6VWG5mNThl"
+  },
+  {
+    "city": "Kolkata",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.co/aCq1RdmlKA"
+  },
+  {
+    "city": "Kollam",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Ui9BJzoBAI0zMjk9"
+  },
+  {
+    "city": "Kota",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+_Yyp5Ar1tBRmZTU1"
+  },
+  {
+    "city": "Kozhikode",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+I4IuWWiECzs1YTg1"
+  },
+  {
+    "city": "Lucknow",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+radyFxGzZ7QxZjgx"
+  },
+  {
+    "city": "Mangalore",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+iQrk5KGj76dmYmQ1"
+  },
+  {
+    "city": "Mathura",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+eBdApQ9gMxQzMjc1"
+  },
+  {
+    "city": "Mumbai",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+h9Bcpt-O94g5MTQx"
+  },
+  {
+    "city": "Mysore",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+YAOG6rb6WJ03YzZl"
+  },
+  {
+    "city": "Nagpur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+E1Mi70lIcp04NGM9"
+  },
+  {
+    "city": "Nashik",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+KbN-PU0bnOg1Yjk1"
+  },
+  {
+    "city": "Noida",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+5f24Qc6Mgqc4ZWI9"
+  },
+  {
+    "city": "Patna",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+fThRvDAxIxwxNzc1"
+  },
+  {
+    "city": "Prayagraj",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+KtQmGluEK5E1YmM1"
+  },
+  {
+    "city": "Pune",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+JYdir9P0hixlZDNh"
+  },
+  {
+    "city": "Raipur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+KeXzkjOuCytjZWZl"
+  },
+  {
+    "city": "Ranchi",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+TwvTS1_ZJM0yYTRl"
+  },
+  {
+    "city": "Roorkee",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+k-jvq3aTkI82OTc1"
+  },
+  {
+    "city": "Shahjahanpur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+omufl83EJtYyNmJl"
+  },
+  {
+    "city": "Shillong",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+uiNkf1ksHwZiY2Q9"
+  },
+  {
+    "city": "Siwan",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+9M30D9llBktkMzMx"
+  },
+  {
+    "city": "Solapur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+1JaXzazebNMzZDJl"
+  },
+  {
+    "city": "Surat",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.co/mBvp2E8FvO"
+  },
+  {
+    "city": "Thiruvananthapuram",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+PqU16qZR4DdjOTc1"
+  },
+  {
+    "city": "Thrissur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+v3A7_ZMxadNjMGM9"
+  },
+  {
+    "city": "Udaipur",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+oN1ESo4tC3cyYjM9"
+  },
+  {
+    "city": "Vadodara",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Tecl9_f_d3syODJl"
+  },
+  {
+    "city": "Varanasi",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+3f0ycIbmQ5IxMTk1"
+  },
+  {
+    "city": "Vijayawada",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+t8Qb5PEHJBtiOGI1"
+  },
+  {
+    "city": "Visakhapatnam",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+vaLp7d4o4mgwYzRl"
+  },
+  {
+    "city": "Wayanad",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+4pXYF7Zbbe45ZmM1"
+  },
+  {
+    "city": "Gandhinagar",
+    "country": "India",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+PZCn-8ayigFhNjE9"
+  },
+  {
+    "city": "Bali",
+    "country": "Indonesia",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+C6UPG1BdjfEyYTIx"
+  },
+  {
+    "city": "Gotemba",
+    "country": "Japan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Oa0M5kucughkZjVh"
+  },
+  {
+    "city": "Kumamoto",
+    "country": "Japan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+mn4Hv6M-QFRjZjY5"
+  },
+  {
+    "city": "Kyoto",
+    "country": "Japan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+0J_Vmtjs4edhOWMx"
+  },
+  {
+    "city": "Nagano",
+    "country": "Japan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+KCJ8STyCnSQ1MDQx"
+  },
+  {
+    "city": "Numazu",
+    "country": "Japan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+PNEm8qu08-Y2NTcx"
+  },
+  {
+    "city": "Osaka",
+    "country": "Japan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+LX5mEkU1qxwxNjUx"
+  },
+  {
+    "city": "Tokyo",
+    "country": "Japan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+5I5rAu6HoX9lMDNh"
+  },
+  {
+    "city": "Seoul",
+    "country": "Korea",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Wqx0SiZtewI4NGE8"
+  },
+  {
+    "city": "Vientiane",
+    "country": "Laos",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+n4gtga6hsys1OTgx"
+  },
+  {
+    "city": "Genting",
+    "country": "Malaysia",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+HcyvpoVz4X4wNDgx"
+  },
+  {
+    "city": "Kuala Lumpur",
+    "country": "Malaysia",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Ch_P65PD5J83ZDYx"
+  },
+  {
+    "city": "Network State",
+    "country": "Malaysia",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+uc50jrRZiYNjM2Yx"
+  },
+  {
+    "city": "Ulaanbaatar",
+    "country": "Mongolia",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+gdzA1uLNSZgwYTMx"
+  },
+  {
+    "city": "Yangon",
+    "country": "Myanmar",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+vnjOsSlcW5NiODZh"
+  },
+  {
+    "city": "Butwal",
+    "country": "Nepal",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+t_B61lffzgU3OWIx"
+  },
+  {
+    "city": "Itahari",
+    "country": "Nepal",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+lpQmm_L5uZFlNmQ5"
+  },
+  {
+    "city": "Janakpur",
+    "country": "Nepal",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+durEI_iwz04yODIx"
+  },
+  {
+    "city": "Kathmandu",
+    "country": "Nepal",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+GafPKUPCog45YThh"
+  },
+  {
+    "city": "Lalitpur",
+    "country": "Nepal",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+to7J34paTIw4OTIx"
+  },
+  {
+    "city": "Pokhara",
+    "country": "Nepal",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+YCf0OECX4_1iOGZh"
+  },
+  {
+    "city": "Solukumbhu",
+    "country": "Nepal",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+AlE5Q0DFN0IzNjgx"
+  },
+  {
+    "city": "Islamabad",
+    "country": "Pakistan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+kVImvt5_UfY3NTIx"
+  },
+  {
+    "city": "Lahore",
+    "country": "Pakistan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+yS7riBYRgTEyNzdl"
+  },
+  {
+    "city": "Koror",
+    "country": "Palau",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+NmeGQAD1m_EzN2Qx"
+  },
+  {
+    "city": "Aklan",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+KKgvymkDMcY5NTMx"
+  },
+  {
+    "city": "Baguio",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+iwBMQ2xqQGEyNDUx"
+  },
+  {
+    "city": "Boracay",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+DuZu8iHM1e5lMWQ5"
+  },
+  {
+    "city": "Cebu City",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+8ziIJeUO4nM0YzQx"
+  },
+  {
+    "city": "Davao City",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+MO6VmWLSv79mYTQx"
+  },
+  {
+    "city": "General Santos",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+VJz3dGazUJY2OWEx"
+  },
+  {
+    "city": "Ilocos",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+2QFwSwwGjOE0Zjgx"
+  },
+  {
+    "city": "Laguna",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+YwfqXDBQO945NTg5"
+  },
+  {
+    "city": "Las Pinas",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+icY-CNtpn-g4MDhh"
+  },
+  {
+    "city": "Manila",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+4FkaReqixsA0MjMx"
+  },
+  {
+    "city": "Paranaque",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+sEalu6O9iVgyYzUx"
+  },
+  {
+    "city": "Quezon",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+39EiWfztZz9lNTMx"
+  },
+  {
+    "city": "Siargao",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+NRd6vXyPQlk2Y2Ex"
+  },
+  {
+    "city": "Siquijor",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+qmG5rFJdwZw0Yjhh"
+  },
+  {
+    "city": "Tomas Morato",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+fy7tqrfr_qA4Mjdh"
+  },
+  {
+    "city": "Vigan/ilocos",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+nP4nS8c2AbRlMTRh"
+  },
+  {
+    "city": "San Carlos",
+    "country": "Philippines",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+2Py-LpPVjQg3NmYx"
+  },
+  {
+    "city": "Singapore",
+    "country": "Singapore",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+3xoZROco3_tkYzMx"
+  },
+  {
+    "city": "Colombo",
+    "country": "Sri Lanka",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+-wwdYHq8wx0zOTIx"
+  },
+  {
+    "city": "Galle",
+    "country": "Sri Lanka",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Y26Ba6VmwVQyNDYx"
+  },
+  {
+    "city": "Kandy",
+    "country": "Sri Lanka",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+nIAH1LX6UW8zNWM5"
+  },
+  {
+    "city": "Paramaribo",
+    "country": "Suriname",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+D_IJlXjZ4vUxZjA5"
+  },
+  {
+    "city": "Taipei",
+    "country": "Taiwan",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+ZxoowO2hW_tjYTMx"
+  },
+  {
+    "city": "Bangkok",
+    "country": "Thailand",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+xLLV1VHhZVgyYjBh"
+  },
+  {
+    "city": "Chiang Mai",
+    "country": "Thailand",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+O6XqQEM6byoyMzUx"
+  },
+  {
+    "city": "Koh Phangan",
+    "country": "Thailand",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+YZJPPA5aXrExZmMx"
+  },
+  {
+    "city": "Phuket",
+    "country": "Thailand",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+XSwWCgpP5J85MGIx"
+  },
+  {
+    "city": "Sharjah",
+    "country": "Uae",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Ie-FLlCfVhQ3ZDcx"
+  },
+  {
+    "city": "Da Nang",
+    "country": "Vietnam",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+WlRVOj6tmFRiNjlh"
+  },
+  {
+    "city": "Hanoi",
+    "country": "Vietnam",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+Z0WgPvd7_wwzMzAx"
+  },
+  {
+    "city": "Ho Chi Minh City",
+    "country": "Vietnam",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+5x1Rya5F5yBlYTlh"
+  },
+  {
+    "city": "Hue City",
+    "country": "Vietnam",
+    "region": "Asia",
+    "chatUrl": "https://t.me/+PxMQXP3dDD4wNWFh"
+  },
+  {
+    "city": "Antigua",
+    "country": "Antigua",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+WBvUDAd8CY9kOWFh"
+  },
+  {
+    "city": "Cayman Islands",
+    "country": "Cayman Islands",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+MvRD2I72Vt82YzEx"
+  },
+  {
+    "city": "Uvita",
+    "country": "Costa  Rica",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+_ie1-wZwRyRiMGIx"
+  },
+  {
+    "city": "San Jose",
+    "country": "Costa Rica",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+BtFO1PRVtTs5Yjkx"
+  },
+  {
+    "city": "Tamarindo",
+    "country": "Costa Rica",
+    "region": "Central America",
+    "chatUrl": "https://chat.whatsapp.com/H3K0ICNhGMhC6HPOE83S1l"
+  },
+  {
+    "city": "La Havana",
+    "country": "Cuba",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+V51JNP8ZAcFiM2Mx"
+  },
+  {
+    "city": "San Salvador",
+    "country": "El Salvador",
+    "region": "Central America",
+    "chatUrl": "https://t.me/gppelsalvador"
+  },
+  {
+    "city": "Salamá",
+    "country": "Guatemala",
+    "region": "Central America",
+    "chatUrl": "https://t.me/gppelsalvador"
+  },
+  {
+    "city": "Guatemala City",
+    "country": "Guatemala",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+HqhltY2xBmliMWYx"
+  },
+  {
+    "city": "Quetzaltenango",
+    "country": "Guatemala",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+hAke7dCDibU2YTQx"
+  },
+  {
+    "city": "San Pedro De Sula",
+    "country": "Honduras",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+TT8zsWyMx4MxNjFh"
+  },
+  {
+    "city": "Tegucigalpa",
+    "country": "Honduras",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+S98DeFzxOIlmMjUx"
+  },
+  {
+    "city": "Panama City",
+    "country": "Panama",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+hhdQmJ8qtiE5ZTE5"
+  },
+  {
+    "city": "San Juan",
+    "country": "Puerto Rico",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+p81KaKF0bfk0Njkx"
+  },
+  {
+    "city": "Guaynabo",
+    "country": "Puerto Rico",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+O1xdPZNptj0wNmUx"
+  },
+  {
+    "city": "Santo Domingo",
+    "country": "Rep.dominicana",
+    "region": "Central America",
+    "chatUrl": "https://t.me/+FVnbLNBt28Y3MjIx"
+  },
+  {
+    "city": "Tirana",
+    "country": "Albania",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+De-WOUKfhihlYmVk"
+  },
+  {
+    "city": "Mostar",
+    "country": "Bosnia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+UdDKCH4OpTg1NDIx"
+  },
+  {
+    "city": "Sofia",
+    "country": "Bulgaria",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+BzYbFevfR9k0NjVh"
+  },
+  {
+    "city": "Varna",
+    "country": "Bulgaria",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+bkn0PfEL1x5mNWNh"
+  },
+  {
+    "city": "Split",
+    "country": "Croatia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+-ydn-Koboz5mZmY5"
+  },
+  {
+    "city": "Zagreb",
+    "country": "Croatia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+4f4f6bi5ReI4MGUx"
+  },
+  {
+    "city": "Brno",
+    "country": "Czech Republic",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+1zMGBlbOn0NmMWEx"
+  },
+  {
+    "city": "Prague",
+    "country": "Czech Republic",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+HHvYSQ5Sd9QxMmRh"
+  },
+  {
+    "city": "Tallinn",
+    "country": "Estonia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+uNchwPHO7iQ0ZjAx"
+  },
+  {
+    "city": "Athens",
+    "country": "Greece",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+C-J2NaCcDMI2YmI5"
+  },
+  {
+    "city": "Vilnius",
+    "country": "Lithuania",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+CzNIxQK9pak2OGUx"
+  },
+  {
+    "city": "Bitola",
+    "country": "Macedonia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+pCcVxUvDGC44NTU5"
+  },
+  {
+    "city": "Prilep",
+    "country": "Macedonia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+ERQW8YyLliU5YTJk"
+  },
+  {
+    "city": "Skopje",
+    "country": "Macedonia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+73mWPYmoe74xOTdh"
+  },
+  {
+    "city": "Podgorica",
+    "country": "Montenegro",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+Mc3N9aGeFacwYTU5"
+  },
+  {
+    "city": "Krakow",
+    "country": "Poland",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+IG1kLGKIt3IzNjUx"
+  },
+  {
+    "city": "Warsaw",
+    "country": "Poland",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+pI53T5LHWfdhMjgx"
+  },
+  {
+    "city": "Bucharest",
+    "country": "Romania",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+_PBg32ciHDU2NWRh"
+  },
+  {
+    "city": "Cluj",
+    "country": "Romania",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+gGrrM1kdJrgyNTc0"
+  },
+  {
+    "city": "Craiova",
+    "country": "Romania",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+pwlLgytvbYE5Zjdk"
+  },
+  {
+    "city": "Moscow",
+    "country": "Russia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+X1M7zABbNdxiNWMy"
+  },
+  {
+    "city": "Petrozavodsk",
+    "country": "Russia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+mY5K44qlxTQzYWM5"
+  },
+  {
+    "city": "Saint Petersburg",
+    "country": "Russia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+uhteIo_oAbtjOTgx"
+  },
+  {
+    "city": "Belgrade",
+    "country": "Serbia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+3OT7bulyIXI3MjNh"
+  },
+  {
+    "city": "Bratislava",
+    "country": "Slovakia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+TYU9KL2TKB8xNDUx"
+  },
+  {
+    "city": "Kosice",
+    "country": "Slovakia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+kOoQtd0n3yM1YjQx"
+  },
+  {
+    "city": "Ljubljana",
+    "country": "Slovenia",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+F7IlQDeSEgU4NTBh"
+  },
+  {
+    "city": "Kharkiv",
+    "country": "Ukraine",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+R0jSEJbf-Dw2MTlh"
+  },
+  {
+    "city": "Kyiv",
+    "country": "Ukraine",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+RXGufr6xOm82NTQx"
+  },
+  {
+    "city": "Lviv",
+    "country": "Ukraine",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+X8CJvWh5wLY2NTFh"
+  },
+  {
+    "city": "Vinnytsia",
+    "country": "Ukraine",
+    "region": "Eastern Europe",
+    "chatUrl": "https://t.me/+0XQz4A393GhkNTMx"
+  },
+  {
+    "city": "Nomad",
+    "country": "Earth",
+    "region": "Metaverse",
+    "chatUrl": "https://t.me/+LWk-fjrSPisyY2Yx"
+  },
+  {
+    "city": "Decentraland",
+    "country": "Metaverse",
+    "region": "Metaverse",
+    "chatUrl": "https://t.me/+5iOZbwF-V1UzYjdh"
+  },
+  {
+    "city": "Discord",
+    "country": "Metaverse",
+    "region": "Metaverse",
+    "chatUrl": "https://t.me/+JQY4VUcxDDMyMDAx"
+  },
+  {
+    "city": "Spatial",
+    "country": "Metaverse",
+    "region": "Metaverse",
+    "chatUrl": "https://t.me/+hSOFYgx9mrAwNDUx"
+  },
+  {
+    "city": "Twitter Spaces",
+    "country": "Metaverse",
+    "region": "Metaverse",
+    "chatUrl": "https://t.me/+edROzSEYwFA3ZWUx"
+  },
+  {
+    "city": "Voxels",
+    "country": "Metaverse",
+    "region": "Metaverse",
+    "chatUrl": "https://t.me/+LUnbIgPb_EBmNjIx"
+  },
+  {
+    "city": "Zoom",
+    "country": "Metaverse",
+    "region": "Metaverse",
+    "chatUrl": "https://t.me/+vtuOJylJMugwMThh"
+  },
+  {
+    "city": "Mazar-e-sharif",
+    "country": "Afghanistan",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+Q8ChxoCFslAzMzFh"
+  },
+  {
+    "city": "Gyumri",
+    "country": "Armenia",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+pujGWaWqnEI2NGYx"
+  },
+  {
+    "city": "Yerevan",
+    "country": "Armenia",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+TBASb-ziPXBiZjAy"
+  },
+  {
+    "city": "Limassol",
+    "country": "Cyprus",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+nt-7Y0JFQysyM2Nh"
+  },
+  {
+    "city": "Alexandria",
+    "country": "Egypt",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+pUrucfrCEWdlMzRh"
+  },
+  {
+    "city": "Vanadzor",
+    "country": "Armenia",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+vgsVb0Gw_Bs0Mjdh"
+  },
+  {
+    "city": "Haifa",
+    "country": "Israel",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+EpI8rOOZdcw1NjM5"
+  },
+  {
+    "city": "Tel Aviv",
+    "country": "Israel",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+r4DLeAksHldkYjEx"
+  },
+  {
+    "city": "Astana",
+    "country": "Kazakhstan",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+YhCRpfCqA1AyZWM5"
+  },
+  {
+    "city": "Almaty",
+    "country": "Kazakhstan",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+dD3f-1zEh981OGUx"
+  },
+  {
+    "city": "Beirut",
+    "country": "Lebanon",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+h-cVQMfuH_tkOWMx"
+  },
+  {
+    "city": "Karachi",
+    "country": "Pakistan",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+i2EUTOxcpf41MTAx"
+  },
+  {
+    "city": "Larkana",
+    "country": "Pakistan",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+erfvIwA0KThmYWRk"
+  },
+  {
+    "city": "Doha",
+    "country": "Qatar",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+X1RVyILxrZMzM2Zh"
+  },
+  {
+    "city": "Istanbul",
+    "country": "Turkey",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+KFGFTGuqT2hhZDcx"
+  },
+  {
+    "city": "Dubai",
+    "country": "Uae",
+    "region": "Middle East",
+    "chatUrl": "https://t.me/+1TgAfrDVFfo0MWIx"
+  },
+  {
+    "city": "Nassau",
+    "country": "Bahamas",
+    "region": "North America",
+    "chatUrl": "https://t.me/+4HAbUBUVpMY1ZTYx"
+  },
+  {
+    "city": "Kelowna",
+    "country": "Canada",
+    "region": "North America",
+    "chatUrl": "https://t.me/+y3JXryPBr_RkODBh"
+  },
+  {
+    "city": "Calgary",
+    "country": "Canada Alberta",
+    "region": "North America",
+    "chatUrl": "https://t.me/+UxccHo5CQTxmNjJh"
+  },
+  {
+    "city": "Edmonton",
+    "country": "Canada Alberta",
+    "region": "North America",
+    "chatUrl": "https://t.me/+LJ0EsIyEwjs5MjBh"
+  },
+  {
+    "city": "Vancouver",
+    "country": "Canada British Columbia",
+    "region": "North America",
+    "chatUrl": "https://t.me/+1h_LYj6IrOk0NmVh"
+  },
+  {
+    "city": "Victoria",
+    "country": "Canada British Columbia",
+    "region": "North America",
+    "chatUrl": "https://t.me/+KF_9qDyWWsszMGIx"
+  },
+  {
+    "city": "Winnipeg",
+    "country": "Canada Manitoba",
+    "region": "North America",
+    "chatUrl": "https://t.me/+RvDmLMcR9KlhYTEx"
+  },
+  {
+    "city": "Halifax",
+    "country": "Canada Nova Scotia",
+    "region": "North America",
+    "chatUrl": "https://t.me/+fLOZ2z7q19xmOWNh"
+  },
+  {
+    "city": "Hamilton",
+    "country": "Canada Ontario",
+    "region": "North America",
+    "chatUrl": "https://t.me/+gJPQnJFeGK1jOWM5"
+  },
+  {
+    "city": "Ottawa",
+    "country": "Canada Ontario",
+    "region": "North America",
+    "chatUrl": "https://t.me/+2h3lm4H0YZ1lMTRh"
+  },
+  {
+    "city": "Toronto",
+    "country": "Canada Ontario",
+    "region": "North America",
+    "chatUrl": "https://t.me/+kk5ViBwxPnIzMDkx"
+  },
+  {
+    "city": "Waterloo",
+    "country": "Canada Ontario",
+    "region": "North America",
+    "chatUrl": "https://t.me/+r_9imDlPNhU2YmJh"
+  },
+  {
+    "city": "Montreal",
+    "country": "Canada Quebec",
+    "region": "North America",
+    "chatUrl": "https://t.me/+g0YK4rU95SRiNGMx"
+  },
+  {
+    "city": "Saskatoon",
+    "country": "Canada Saskatchewan",
+    "region": "North America",
+    "chatUrl": "https://t.me/+LjPOB159sSthNDNh"
+  },
+  {
+    "city": "Des Moines",
+    "country": "Iowa",
+    "region": "North America",
+    "chatUrl": "https://t.me/+1TiL2EdeuHM4YmQx"
+  },
+  {
+    "city": "Acapulco",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+LpV6bahuS2diMWFh"
+  },
+  {
+    "city": "Cancun",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+owB12ZtbYe04MWZh"
+  },
+  {
+    "city": "Culiacán",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+IZiBUFIWXFE4OWRh"
+  },
+  {
+    "city": "Guadalajara",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+Qty6hBmar21kNmIx"
+  },
+  {
+    "city": "Leon",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+41396pKhRlRjYTMx"
+  },
+  {
+    "city": "Merida",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+s6gJ8AnpYx0zYjgx"
+  },
+  {
+    "city": "Mexico City",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+YJGgOtUO-jY3OWUx"
+  },
+  {
+    "city": "Monterrey",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+CtQVH8n1hiA3N2Mx"
+  },
+  {
+    "city": "Puebla",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+W107dypiEko2YjFh"
+  },
+  {
+    "city": "Puerto Vallarta",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+35MWMtj9Y_hkZDgx"
+  },
+  {
+    "city": "Tijuana",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+voDjfcOpL1RmZTZh"
+  },
+  {
+    "city": "Tulum",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+lBSdKdkYn2M3MWM5"
+  },
+  {
+    "city": "Veracruz",
+    "country": "Mexico",
+    "region": "North America",
+    "chatUrl": "https://t.me/+hIzlS5ulBBMyNDcx"
+  },
+  {
+    "city": "Auburn",
+    "country": "Usa Al",
+    "region": "North America",
+    "chatUrl": "https://t.me/+SXEG2-K0W7JjMjMx"
+  },
+  {
+    "city": "Mobile",
+    "country": "Usa Al",
+    "region": "North America",
+    "chatUrl": "https://t.me/+5-RwsDjsWkY2MDUx"
+  },
+  {
+    "city": "Montgomery, Al",
+    "country": "Usa Al",
+    "region": "North America",
+    "chatUrl": "https://t.me/+2Uq2tmJtvuYwNzQx"
+  },
+  {
+    "city": "Little Rock",
+    "country": "Usa Ar",
+    "region": "North America",
+    "chatUrl": "https://t.me/+lNJnhl3Qi81lYzVh"
+  },
+  {
+    "city": "Phoenix",
+    "country": "Usa Az",
+    "region": "North America",
+    "chatUrl": "https://t.me/+MVRkWvVbw1o1NDAx"
+  },
+  {
+    "city": "Tucson",
+    "country": "Usa Az",
+    "region": "North America",
+    "chatUrl": "https://t.me/+anxfwcEJIZs5NjNh"
+  },
+  {
+    "city": "Mesa",
+    "country": "Usa Az",
+    "region": "North America",
+    "chatUrl": "https://t.me/+s4OcZEIu8PcxNWY5"
+  },
+  {
+    "city": "Laguna Beach",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+1kZe6qvjD-VkNDdh"
+  },
+  {
+    "city": "Los Angeles",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+RkBppH46fno0Mzhh"
+  },
+  {
+    "city": "Oakland",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+QX6i7Wa_72g4MzUx"
+  },
+  {
+    "city": "Palo Alto",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+vLslVNMMRNBmM2Rh"
+  },
+  {
+    "city": "Sacramento",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+u5psCYkK3XswNzVh"
+  },
+  {
+    "city": "San Diego",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+lSPm0xLjhcllNGYx"
+  },
+  {
+    "city": "San Francisco",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+AS4yAcoKJ_gyMmNh"
+  },
+  {
+    "city": "Santa Barbara",
+    "country": "Usa Ca",
+    "region": "North America",
+    "chatUrl": "https://t.me/+i_bI6WuiBik3ODNh"
+  },
+  {
+    "city": "Boulder",
+    "country": "Usa Co",
+    "region": "North America",
+    "chatUrl": "https://t.me/+hrSOTJFmDKxlNDhh"
+  },
+  {
+    "city": "Breckenridge",
+    "country": "Usa Co",
+    "region": "North America",
+    "chatUrl": "https://t.me/+gNLg6x3vI8o4OThh"
+  },
+  {
+    "city": "Denver",
+    "country": "Usa Co",
+    "region": "North America",
+    "chatUrl": "https://t.me/+d7SLX-caPJY0NWVh"
+  },
+  {
+    "city": "New Haven",
+    "country": "Usa Ct",
+    "region": "North America",
+    "chatUrl": "https://t.me/+X91wtHELfVE4ODMx"
+  },
+  {
+    "city": "Washington Dc",
+    "country": "Usa Dc",
+    "region": "North America",
+    "chatUrl": "https://t.me/+pKB4CbfhSgFkMGRh"
+  },
+  {
+    "city": "Arden",
+    "country": "Usa De",
+    "region": "North America",
+    "chatUrl": "https://t.me/+p75b7_Cv_sw3ODBh"
+  },
+  {
+    "city": "Fort Lauderdale",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+rEocnMP6U2ZjNDE5"
+  },
+  {
+    "city": "Fort Myers, Florida",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+pnOEUF5A02JlOTEx"
+  },
+  {
+    "city": "Jacksonville",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+7JypWCxwrwUyN2U5"
+  },
+  {
+    "city": "Palm Beach",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+ZZgNhfSUGwlkNWQx"
+  },
+  {
+    "city": "Pensacola",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+aiymHQffjWw1M2Ex"
+  },
+  {
+    "city": "Sarasota",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+qzQ_VMoaRTlmOTYx"
+  },
+  {
+    "city": "Tampa",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+uSjXMqqhWKs2NDNh"
+  },
+  {
+    "city": "Miami",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+vN4-DUbEpbUzYzlh"
+  },
+  {
+    "city": "Orlando",
+    "country": "Usa Fl",
+    "region": "North America",
+    "chatUrl": "https://t.me/+MJXe-gLvWp1kZGRh"
+  },
+  {
+    "city": "Atlanta",
+    "country": "Usa Ga",
+    "region": "North America",
+    "chatUrl": "https://t.me/+bamsDW_7unBhYWUx"
+  },
+  {
+    "city": "Macon",
+    "country": "Usa Ga",
+    "region": "North America",
+    "chatUrl": "https://t.me/+i95-fKe1vLhjNjYx"
+  },
+  {
+    "city": "Savannah",
+    "country": "Usa Ga",
+    "region": "North America",
+    "chatUrl": "https://t.me/+QHH4uQZuXFhiODNh"
+  },
+  {
+    "city": "Honolulu",
+    "country": "Usa Hi",
+    "region": "North America",
+    "chatUrl": "https://t.me/+xQfXJDHFWuAxZWJh"
+  },
+  {
+    "city": "Maui",
+    "country": "Usa Hi",
+    "region": "North America",
+    "chatUrl": "https://t.me/+Je9mLVLkTIVjNzlh"
+  },
+  {
+    "city": "Cedar Rapids",
+    "country": "Usa Ia",
+    "region": "North America",
+    "chatUrl": "https://t.me/+mJCKvvNT5mtjMGYx"
+  },
+  {
+    "city": "Quad Cities",
+    "country": "Usa Ia/il",
+    "region": "North America",
+    "chatUrl": "https://t.me/+l3MwN7RUZWpiNjEx"
+  },
+  {
+    "city": "Boise",
+    "country": "Usa Id",
+    "region": "North America",
+    "chatUrl": "https://t.me/+AzbmW_uM9mg3NGUx"
+  },
+  {
+    "city": "Idaho Falls",
+    "country": "Usa Id",
+    "region": "North America",
+    "chatUrl": "https://t.me/+pyTqiwfdEc1hMjYx"
+  },
+  {
+    "city": "Chicago",
+    "country": "Usa Il",
+    "region": "North America",
+    "chatUrl": "https://t.me/+4nPNFdwz4jplMjZh"
+  },
+  {
+    "city": "Goshen",
+    "country": "Usa In",
+    "region": "North America",
+    "chatUrl": "https://t.me/+l4cuG3fzVpw5ZTYx"
+  },
+  {
+    "city": "Indianapolis",
+    "country": "Usa In",
+    "region": "North America",
+    "chatUrl": "https://t.me/+PqvWHeA2KFoyMzAx"
+  },
+  {
+    "city": "Red River Gorge",
+    "country": "Usa Ky",
+    "region": "North America",
+    "chatUrl": "https://t.me/+FGqC6sNSDnxkNmNh"
+  },
+  {
+    "city": "Baton Rouge",
+    "country": "Usa La",
+    "region": "North America",
+    "chatUrl": "https://t.me/+yG2hgGBp2cplMjcx"
+  },
+  {
+    "city": "Lafayette",
+    "country": "Usa La",
+    "region": "North America",
+    "chatUrl": "https://t.me/+qdntGRPCiuk4MjVh"
+  },
+  {
+    "city": "New Orleans",
+    "country": "Usa La",
+    "region": "North America",
+    "chatUrl": "https://t.me/+KpSt9__p6HtkZGFh"
+  },
+  {
+    "city": "Boston",
+    "country": "Usa Ma",
+    "region": "North America",
+    "chatUrl": "https://t.me/+wOJakZRTsAsyOTYx"
+  },
+  {
+    "city": "Baltimore",
+    "country": "Usa Md",
+    "region": "North America",
+    "chatUrl": "https://t.me/+IwdyttUkCY4xZWRh"
+  },
+  {
+    "city": "Bowie",
+    "country": "Usa Md",
+    "region": "North America",
+    "chatUrl": "https://t.me/+ugpPjs5GxzE5ZTY5"
+  },
+  {
+    "city": "Mt. Rainier",
+    "country": "Usa Md",
+    "region": "North America",
+    "chatUrl": "https://t.me/+bgUeOsMOBx45NTVh"
+  },
+  {
+    "city": "Bar Harbor",
+    "country": "Usa Me",
+    "region": "North America",
+    "chatUrl": "https://t.me/+fZHiSsqXJzkxMWNh"
+  },
+  {
+    "city": "Portland Me",
+    "country": "Usa Me",
+    "region": "North America",
+    "chatUrl": "https://t.me/+uPXnn4hhcRQ2NzZh"
+  },
+  {
+    "city": "Detroit",
+    "country": "Usa Mi",
+    "region": "North America",
+    "chatUrl": "https://t.me/+wh1VsLXGZSQ0ZGNh"
+  },
+  {
+    "city": "Minneapolis",
+    "country": "Usa Mn",
+    "region": "North America",
+    "chatUrl": "https://t.me/+ozZADc9SdDo1NjI5"
+  },
+  {
+    "city": "Kansas City",
+    "country": "Usa Mo",
+    "region": "North America",
+    "chatUrl": "https://t.me/+8QNU8o2wA3lmNjMx"
+  },
+  {
+    "city": "St. Louis",
+    "country": "Usa Mo",
+    "region": "North America",
+    "chatUrl": "https://t.me/+4PgaMue1d-E5YThh"
+  },
+  {
+    "city": "Jackson",
+    "country": "Usa Ms",
+    "region": "North America",
+    "chatUrl": "https://t.me/+cQWRXlXxXn0yZGQx"
+  },
+  {
+    "city": "Billings",
+    "country": "Usa Mt",
+    "region": "North America",
+    "chatUrl": "https://t.me/+eEXewhRLjx85ZTRh"
+  },
+  {
+    "city": "Asheville",
+    "country": "Usa Nc",
+    "region": "North America",
+    "chatUrl": "https://t.me/+twziZvY06SdiYTc5"
+  },
+  {
+    "city": "Charlotte",
+    "country": "Usa Nc",
+    "region": "North America",
+    "chatUrl": "https://t.me/+NqGCsRp9f7NkZWE5"
+  },
+  {
+    "city": "Durham",
+    "country": "Usa Nc",
+    "region": "North America",
+    "chatUrl": "https://t.me/+SjD_d9-sQV8wMzMx"
+  },
+  {
+    "city": "Omaha",
+    "country": "Usa Ne",
+    "region": "North America",
+    "chatUrl": "https://t.me/+BmV6x3L-55AxZDBh"
+  },
+  {
+    "city": "Dartmouth",
+    "country": "Usa Nh",
+    "region": "North America",
+    "chatUrl": "https://t.me/+4hzuze60H_k5Y2Nh"
+  },
+  {
+    "city": "Laconia",
+    "country": "Usa Nh",
+    "region": "North America",
+    "chatUrl": "https://t.me/+veFEz1urPmMyYjUx"
+  },
+  {
+    "city": "Atlantic City",
+    "country": "Usa Nj",
+    "region": "North America",
+    "chatUrl": "https://t.me/+rGtfdMLxF_4zOTZh"
+  },
+  {
+    "city": "Princeton",
+    "country": "Usa Nj",
+    "region": "North America",
+    "chatUrl": "https://t.me/+Oijp2tmfJv01YWEx"
+  },
+  {
+    "city": "Tucumcari",
+    "country": "Usa Nm",
+    "region": "North America",
+    "chatUrl": "https://t.me/+bY63l41DNMpmZGQx"
+  },
+  {
+    "city": "Las Vegas",
+    "country": "Usa Nv",
+    "region": "North America",
+    "chatUrl": "https://t.me/+iTjqCmTu8WE0MWYx"
+  },
+  {
+    "city": "Hamptons",
+    "country": "Usa Ny",
+    "region": "North America",
+    "chatUrl": "https://t.me/+3VVFKLua_tNiNWRh"
+  },
+  {
+    "city": "New York City",
+    "country": "Usa Ny",
+    "region": "North America",
+    "chatUrl": "https://t.me/+GqDSZQksjbUzYmJh"
+  },
+  {
+    "city": "Syracuse",
+    "country": "Usa Ny",
+    "region": "North America",
+    "chatUrl": "https://t.me/+LAACD1grYo42ZGJh"
+  },
+  {
+    "city": "Cincinnati",
+    "country": "Usa Oh",
+    "region": "North America",
+    "chatUrl": "https://t.me/+eVJxkVbunFJkYzM5"
+  },
+  {
+    "city": "Cleveland",
+    "country": "Usa Oh",
+    "region": "North America",
+    "chatUrl": "https://t.me/+DwiKB0vu01FlOTYx"
+  },
+  {
+    "city": "Columbus",
+    "country": "Usa Oh",
+    "region": "North America",
+    "chatUrl": "https://t.me/+f3A-jHKjjZM5ZWUx"
+  },
+  {
+    "city": "Toledo",
+    "country": "Usa Oh",
+    "region": "North America",
+    "chatUrl": "https://t.me/+PVOuYtrvQe42MWMx"
+  },
+  {
+    "city": "Oklahoma City",
+    "country": "Usa Ok",
+    "region": "North America",
+    "chatUrl": "https://t.me/+yQyQEtAyWKxlYTBh"
+  },
+  {
+    "city": "Tulsa",
+    "country": "Usa Ok",
+    "region": "North America",
+    "chatUrl": "https://t.me/+e6toEK8-cD4wZDMx"
+  },
+  {
+    "city": "Portland Oregon",
+    "country": "Usa Or",
+    "region": "North America",
+    "chatUrl": "https://t.me/+wjMKnf-PjZliZDFh"
+  },
+  {
+    "city": "Philadelphia",
+    "country": "Usa Pa",
+    "region": "North America",
+    "chatUrl": "https://t.me/+F_xcWStGv3cyZjZh"
+  },
+  {
+    "city": "Pittsburgh",
+    "country": "Usa Pa",
+    "region": "North America",
+    "chatUrl": "https://t.me/+m-4LshblVMczZTFh"
+  },
+  {
+    "city": "Providence",
+    "country": "Usa Ri",
+    "region": "North America",
+    "chatUrl": "https://t.me/+cZm6wCyBFe9jZDIx"
+  },
+  {
+    "city": "Charleston",
+    "country": "Usa Sc",
+    "region": "North America",
+    "chatUrl": "https://t.me/+j42gKZ3zj9NjYTk5"
+  },
+  {
+    "city": "Memphis",
+    "country": "Usa Tn",
+    "region": "North America",
+    "chatUrl": "https://t.me/+aFHZ_DgR-jdhZDhh"
+  },
+  {
+    "city": "Nashville",
+    "country": "Usa Tn",
+    "region": "North America",
+    "chatUrl": "https://t.me/+1oZKgTYeDzIwYzVh"
+  },
+  {
+    "city": "Austin",
+    "country": "Usa Tx",
+    "region": "North America",
+    "chatUrl": "https://t.me/+leFse3SJr8s1M2Y5"
+  },
+  {
+    "city": "Dallas",
+    "country": "Usa Tx",
+    "region": "North America",
+    "chatUrl": "https://t.me/+Nuzj4PmfrSwzYTJh"
+  },
+  {
+    "city": "Houston",
+    "country": "Usa Tx",
+    "region": "North America",
+    "chatUrl": "https://t.me/+pxvIVFZQHwE2Yjcx"
+  },
+  {
+    "city": "Saint George",
+    "country": "Usa Ut",
+    "region": "North America",
+    "chatUrl": "https://t.me/+L6ZmZLORtYI1NDJh"
+  },
+  {
+    "city": "Salt Lake City",
+    "country": "Usa Ut",
+    "region": "North America",
+    "chatUrl": "https://t.me/+WD_p-cvJKBQyNWQx"
+  },
+  {
+    "city": "Richmond Virginia",
+    "country": "Usa Va",
+    "region": "North America",
+    "chatUrl": "https://t.me/+vKktl1TNLJBlZmYx"
+  },
+  {
+    "city": "Williamsburg",
+    "country": "Usa Va",
+    "region": "North America",
+    "chatUrl": "https://t.me/+NR7r06G_YDRiZjcx"
+  },
+  {
+    "city": "Seattle",
+    "country": "Usa Wa",
+    "region": "North America",
+    "chatUrl": "https://t.me/+wrWMCY2bRvUzZTkx"
+  },
+  {
+    "city": "Milwaukee",
+    "country": "Usa Wi",
+    "region": "North America",
+    "chatUrl": "https://t.me/+W5yHpIDxRjM3MTNh"
+  },
+  {
+    "city": "Morgantown",
+    "country": "Usa Wv",
+    "region": "North America",
+    "chatUrl": "https://t.me/+HAgY7iOKizplZjEx"
+  },
+  {
+    "city": "Cheyenne",
+    "country": "Usa Wy",
+    "region": "North America",
+    "chatUrl": "https://t.me/+52M5aeUbd040Zjhh"
+  },
+  {
+    "city": "Adelaide",
+    "country": "Australia",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+GDtIMwgyoZ5mOTUx"
+  },
+  {
+    "city": "Brisbane",
+    "country": "Australia",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+MUqLxsm0M4s4ZDkx"
+  },
+  {
+    "city": "Gold Coast (Queensland)",
+    "country": "Australia",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+3ZfOj2tI3NowMjFh"
+  },
+  {
+    "city": "Melbourne",
+    "country": "Australia",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+VMUXCL1IsntlMjc5"
+  },
+  {
+    "city": "Perth",
+    "country": "Australia",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+jbMQUJtjAG0yMDY5"
+  },
+  {
+    "city": "Sydney",
+    "country": "Australia",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+j_xPt-6TXgQ0NmRh"
+  },
+  {
+    "city": "Jakarta",
+    "country": "Indonesia",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+7ZhU-9cB9pwxMGQx"
+  },
+  {
+    "city": "Christchurch",
+    "country": "New Zealand",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+VWfv7NwUe8Q3OWIx"
+  },
+  {
+    "city": "Auckland",
+    "country": "New Zealand",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+arUSLcbzBiMxNGI5"
+  },
+  {
+    "city": "Papeete",
+    "country": "Tahití",
+    "region": "Oceania",
+    "chatUrl": "https://t.me/+qMxQM8diAeBlOTI0"
+  },
+  {
+    "city": "Buenos Aires",
+    "country": "Argentina",
+    "region": "South America",
+    "chatUrl": "https://t.me/+Am905YSPAo1jMTkx"
+  },
+  {
+    "city": "Córdoba",
+    "country": "Argentina",
+    "region": "South America",
+    "chatUrl": "https://t.me/+oK58UluVeuFhZjgx"
+  },
+  {
+    "city": "Gualeguaychú Entre Ríos",
+    "country": "Argentina",
+    "region": "South America",
+    "chatUrl": "https://t.me/+kK8avIREGho1MWQ5"
+  },
+  {
+    "city": "La Plata",
+    "country": "Argentina",
+    "region": "South America",
+    "chatUrl": "https://t.me/+tPDvp05Fw0BmYzZh"
+  },
+  {
+    "city": "Mendoza",
+    "country": "Argentina",
+    "region": "South America",
+    "chatUrl": "https://t.me/+aM2DNNqo31VkZTc5"
+  },
+  {
+    "city": "Misiones",
+    "country": "Argentina",
+    "region": "South America",
+    "chatUrl": "https://t.me/+yISwTIJCl0QxYjcx"
+  },
+  {
+    "city": "Rosario",
+    "country": "Argentina",
+    "region": "South America",
+    "chatUrl": "https://t.me/+ktLf9LALBGZlYjU5"
+  },
+  {
+    "city": "Cochabamba",
+    "country": "Bolivia",
+    "region": "South America",
+    "chatUrl": "https://t.me/+Vqhstej8FqQyMjIx"
+  },
+  {
+    "city": "La Paz",
+    "country": "Bolivia",
+    "region": "South America",
+    "chatUrl": "https://t.me/+tiNxBYnwRx83MDIx"
+  },
+  {
+    "city": "Belo Horizonte",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+MBnpRab-Wbw2MWI5"
+  },
+  {
+    "city": "Brasilia",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+wGJjX7piV4gzM2Nh"
+  },
+  {
+    "city": "Curitiba",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+TuwveySkWm4xYTgx"
+  },
+  {
+    "city": "Florianopolis",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+XEDeLsqPBZllYzUx"
+  },
+  {
+    "city": "Fortaleza",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+kuccroQVpL05Yzgx"
+  },
+  {
+    "city": "Macaé",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+jNq-cQiSFZ43OWQ5"
+  },
+  {
+    "city": "Natal",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+_vMAWwbDaEZhYTRh"
+  },
+  {
+    "city": "Porto Alegre",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+RhvB_7_MmjZmOWMx"
+  },
+  {
+    "city": "Rio Claro",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+8DE9E5TpXio0ZjJh"
+  },
+  {
+    "city": "Rio De Janeiro",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+Khe94ae94OMxOTdh"
+  },
+  {
+    "city": "Salvador Bahia",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+JRFX1SxqVTYzZDNh"
+  },
+  {
+    "city": "Sao Paulo",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+Q_BUhWfjQdtkOGMx"
+  },
+  {
+    "city": "Búzios",
+    "country": "Brazil",
+    "region": "South America",
+    "chatUrl": "https://t.me/+WlqFgKPYcjJhMTFh"
+  },
+  {
+    "city": "Puerto Varas",
+    "country": "Chile",
+    "region": "South America",
+    "chatUrl": "https://t.me/+8OCKqharNkVkMDRh"
+  },
+  {
+    "city": "Maullin",
+    "country": "Chile",
+    "region": "South America",
+    "chatUrl": "https://t.me/+kkaBTQya8YVmNTYx"
+  },
+  {
+    "city": "Santiago",
+    "country": "Chile",
+    "region": "South America",
+    "chatUrl": "https://t.me/+oAq1WtYo2Wg3YTgx"
+  },
+  {
+    "city": "Arauca",
+    "country": "Colombia",
+    "region": "South America",
+    "chatUrl": "https://chat.whatsapp.com/JA6vQCP6uCaIj0Gv2kiU1A"
+  },
+  {
+    "city": "Bogota",
+    "country": "Colombia",
+    "region": "South America",
+    "chatUrl": "https://t.me/+OsL4g8b52KBiOWIx"
+  },
+  {
+    "city": "Cali",
+    "country": "Colombia",
+    "region": "South America",
+    "chatUrl": "https://t.me/+5jv65SAxeu5jYzhh"
+  },
+  {
+    "city": "Cartagena De Indias",
+    "country": "Colombia",
+    "region": "South America",
+    "chatUrl": "https://t.me/+KKC3CCLGYX03Y2M5"
+  },
+  {
+    "city": "Mayapo",
+    "country": "Colombia",
+    "region": "South America",
+    "chatUrl": "https://chat.whatsapp.com/JA6vQCP6uCaIj0Gv2kiU1A"
+  },
+  {
+    "city": "Medellin",
+    "country": "Colombia",
+    "region": "South America",
+    "chatUrl": "https://t.me/+CcALe_aqnew2OTJh"
+  },
+  {
+    "city": "Guayaquil",
+    "country": "Ecuador",
+    "region": "South America",
+    "chatUrl": "https://t.me/+Y0aZCIfpRK83NTdh"
+  },
+  {
+    "city": "Quito",
+    "country": "Ecuador",
+    "region": "South America",
+    "chatUrl": "https://t.me/+a4wbKve3DlcxMThh"
+  },
+  {
+    "city": "Cuenca",
+    "country": "Ecuador",
+    "region": "South America",
+    "chatUrl": "https://t.me/+ah_n4HHko1k5MmJh"
+  },
+  {
+    "city": "Portoviejo",
+    "country": "Ecuador",
+    "region": "South America",
+    "chatUrl": "https://t.me/+HQXoPag4mUU1YzJh"
+  },
+  {
+    "city": "León",
+    "country": "Nicaragua",
+    "region": "South America",
+    "chatUrl": "https://t.me/+uL9hke26N0oxNTQx"
+  },
+  {
+    "city": "Huancayo",
+    "country": "Peru",
+    "region": "South America",
+    "chatUrl": "https://t.me/+KPSP3rqp-A4zYzFh"
+  },
+  {
+    "city": "Lima",
+    "country": "Peru",
+    "region": "South America",
+    "chatUrl": "https://t.me/+8QnRNKTE77Q5YzBh"
+  },
+  {
+    "city": "Cuzco",
+    "country": "Peru",
+    "region": "South America",
+    "chatUrl": "https://t.me/+M1MwSfps-WU5MjMx"
+  },
+  {
+    "city": "Trujillo",
+    "country": "Peru",
+    "region": "South America",
+    "chatUrl": "https://t.me/+AW5F96Tf7hljZjIx"
+  },
+  {
+    "city": "Montevideo",
+    "country": "Uruguay",
+    "region": "South America",
+    "chatUrl": "https://t.me/+6YKirsMQtsc1OGMx"
+  },
+  {
+    "city": "Punta Del Este",
+    "country": "Uruguay",
+    "region": "South America",
+    "chatUrl": "https://t.me/+ens68u7Nhio1YWQx"
+  },
+  {
+    "city": "Rivera",
+    "country": "Uruguay",
+    "region": "South America",
+    "chatUrl": "https://t.me/+AYWeAOWOGUViZDAx"
+  },
+  {
+    "city": "Caracas",
+    "country": "Venezuela",
+    "region": "South America",
+    "chatUrl": "https://t.me/+x7IozaDgL9lmMGNh"
+  },
+  {
+    "city": "El Hatillo",
+    "country": "Venezuela",
+    "region": "South America",
+    "chatUrl": "https://t.me/+JHW2B_ef5iA1MTNh"
+  },
+  {
+    "city": "Isla Margarita",
+    "country": "Venezuela",
+    "region": "South America",
+    "chatUrl": "https://t.me/+mwc3i1JFqHgzYzI5"
+  },
+  {
+    "city": "Ojeda",
+    "country": "Venezuela",
+    "region": "South America",
+    "chatUrl": "https://t.me/+oxLXGv7ryDA5NmU5"
+  },
+  {
+    "city": "Valencia",
+    "country": "Venezuela",
+    "region": "South America",
+    "chatUrl": "https://t.me/+riWU5_Wwzj84Zjhh"
+  },
+  {
+    "city": "Maracaibo",
+    "country": "Venezuela",
+    "region": "South America",
+    "chatUrl": "https://t.me/+9wnptRM4urE3OTIx"
+  },
+  {
+    "city": "Tachira",
+    "country": "Venezuela",
+    "region": "South America",
+    "chatUrl": "https://t.me/+uvrkg5VQRz4yYWUx"
+  },
+  {
+    "city": "Innsbruck",
+    "country": "Austria",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+mE-D2SOrAps1M2E5"
+  },
+  {
+    "city": "Linz",
+    "country": "Austria",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+oo5s3q_J5Hc5ZGMx"
+  },
+  {
+    "city": "Vienna",
+    "country": "Austria",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Z8xFwfPs8MxkZjNh"
+  },
+  {
+    "city": "Antwerp",
+    "country": "Belgium",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Ce_3l8rwPfViY2Qx"
+  },
+  {
+    "city": "Bruges",
+    "country": "Belgium",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+IWXHcddW5GI5Y2Ex"
+  },
+  {
+    "city": "Brussels",
+    "country": "Belgium",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+18lGeHKKqiw4ZGJh"
+  },
+  {
+    "city": "Mechelen",
+    "country": "Belgium",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+ZjQb1HSSQxwxMjJk"
+  },
+  {
+    "city": "Olomouc",
+    "country": "Czech Republic",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+5sGq4xvrKlhmMTFk"
+  },
+  {
+    "city": "Aarhus",
+    "country": "Denmark",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+YfOriak4O0A1M2Fh"
+  },
+  {
+    "city": "Copenhagen",
+    "country": "Denmark",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+LG9DLtgq2nxlMmQx"
+  },
+  {
+    "city": "Helsinki",
+    "country": "Finland",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+e8GY4JBLtM4zMjI0"
+  },
+  {
+    "city": "Oulu",
+    "country": "Finland",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Ly5wslXZN9I5ZGQx"
+  },
+  {
+    "city": "Bordeaux",
+    "country": "France",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+o-Ol66rgWnEwYWQx"
+  },
+  {
+    "city": "Cannes",
+    "country": "France",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+kiFuHN8XzPAzNWIx"
+  },
+  {
+    "city": "Montpellier",
+    "country": "France",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+xgRATrNsFxJiZTUx"
+  },
+  {
+    "city": "Paris",
+    "country": "France",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+OXkspPnYexhhYmEx"
+  },
+  {
+    "city": "Berlin",
+    "country": "Germany",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+cPd97vNeP6AxMzFi"
+  },
+  {
+    "city": "Frankfurt",
+    "country": "Germany",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+5zzcEsIGZcBhMGEx"
+  },
+  {
+    "city": "Hamburg",
+    "country": "Germany",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+3zcD3mEHKo9jZTFh"
+  },
+  {
+    "city": "Leipzig",
+    "country": "Germany",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+c5TQkM9iRZxhMDIx"
+  },
+  {
+    "city": "Munich",
+    "country": "Germany",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Ln0Ibrrnkf0zYmUx"
+  },
+  {
+    "city": "Nuremberg",
+    "country": "Germany",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+QNPu1e8Q_-VhYmY5"
+  },
+  {
+    "city": "Gibraltar",
+    "country": "Gibraltar",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+PK6cMbKdJ4k0OTQx"
+  },
+  {
+    "city": "Budapest",
+    "country": "Hungary",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+t0seZhjvXVoxNDMx"
+  },
+  {
+    "city": "Reykjavík",
+    "country": "Iceland",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+rV2KH5GN-PE4NzQx"
+  },
+  {
+    "city": "Dublin",
+    "country": "Ireland",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+U-ejTzqWEoszNjIx"
+  },
+  {
+    "city": "Bari",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Tp2XGqcS2Vw0MmIx"
+  },
+  {
+    "city": "Catania",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+KjbiRENfMdpkNDAx"
+  },
+  {
+    "city": "Florence",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+ndGH31mZT5RjNjBh"
+  },
+  {
+    "city": "Genoa",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+K4ILyFBk6Ck4MDAx"
+  },
+  {
+    "city": "Milan",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+mWC7GYS6mEQ1MjIx"
+  },
+  {
+    "city": "Naples",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+VZgY-cV5V9UyNjY0"
+  },
+  {
+    "city": "Palermo",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+zubMPilnn81kZjdh"
+  },
+  {
+    "city": "Rome",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+dR9DUtKAmp4xY2Ix"
+  },
+  {
+    "city": "Siena",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+paPW6yTu1hthMzNh"
+  },
+  {
+    "city": "Venice",
+    "country": "Italy",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+NEzkFTj8Q884ZGVh"
+  },
+  {
+    "city": "Luxembourg",
+    "country": "Luxembourg",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+PdqHLV7b_ls0MTVk"
+  },
+  {
+    "city": "Monaco",
+    "country": "Monaco",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+G4HJGaXFsuxhMWI5"
+  },
+  {
+    "city": "Amsterdam",
+    "country": "Netherlands",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+naMfu79QMfVlYzNl"
+  },
+  {
+    "city": "Rotterdam",
+    "country": "Netherlands",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+ipov30XKajMwMTEx"
+  },
+  {
+    "city": "Kongsberg",
+    "country": "Norway",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+aJUS7O_iE0Y2YTVh"
+  },
+  {
+    "city": "Kristiansand",
+    "country": "Norway",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+6h3xXZDKYIpkYTQx"
+  },
+  {
+    "city": "Svalbard",
+    "country": "Norway",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Dz5rMEexZP4yMmMx"
+  },
+  {
+    "city": "Vennesla",
+    "country": "Norway",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+GlSGeUpKgcAyZDhh"
+  },
+  {
+    "city": "Lisbon",
+    "country": "Portugal",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+IsepskfDTyZmNWYx"
+  },
+  {
+    "city": "Loule",
+    "country": "Portugal",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Kf0xXoADzPRjMGIx"
+  },
+  {
+    "city": "Barcelona",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+NQ07jFmUgTUwMjEx"
+  },
+  {
+    "city": "Burgos",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+3RnvXOt6f4szMGEx"
+  },
+  {
+    "city": "Las Palmas De Gran Canaria",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+o0uLz-mAh0g2NTMx"
+  },
+  {
+    "city": "Madrid",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+6CS2vjriPNJhMDQx"
+  },
+  {
+    "city": "Málaga",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Br0YD2x4qFAzOWQx"
+  },
+  {
+    "city": "Marbella",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+Ry40vWGyQRZiNGUx"
+  },
+  {
+    "city": "Sevilla",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+6UgKgyN2mVQ4Mjgx"
+  },
+  {
+    "city": "Valencia",
+    "country": "Spain",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+-D7ejg_nIUhlYTJh"
+  },
+  {
+    "city": "Göteborg",
+    "country": "Sweden",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+FTFIURURfNplYzAx"
+  },
+  {
+    "city": "Stockholm",
+    "country": "Sweden",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+3DgTGOZy81s5NTYx"
+  },
+  {
+    "city": "Lulea",
+    "country": "Sweden",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+fMgKGVPYLL5jMzcx"
+  },
+  {
+    "city": "Lund",
+    "country": "Sweden",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+hkiCtDehzhxmOTc5"
+  },
+  {
+    "city": "Zug",
+    "country": "Switzerland",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+N4Gs0Ki8fuE3NDEx"
+  },
+  {
+    "city": "Zurich",
+    "country": "Switzerland",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+_rluvh99fnVhOGZh"
+  },
+  {
+    "city": "Lugano",
+    "country": "Switzerland",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+NMOBj_4urIEzNmRh"
+  },
+  {
+    "city": "Cambridge",
+    "country": "United Kingdom",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+LH5K36-G6U44MTEx"
+  },
+  {
+    "city": "London",
+    "country": "United Kingdom",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+A1RZij0a-B80YjAx"
+  },
+  {
+    "city": "Manchester",
+    "country": "United Kingdom",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+wlwhI6-ENUMxMDQx"
+  },
+  {
+    "city": "Neath",
+    "country": "United Kingdom",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+bIix-Y-NkwUzZjMx"
+  },
+  {
+    "city": "Reading",
+    "country": "United Kingdom",
+    "region": "Western Europe",
+    "chatUrl": "https://t.me/+ShPIN5zPxWw5ZTQx"
+  },
+  {
+    "city": "Belize City",
+    "country": "Belize",
+    "region": "",
+    "chatUrl": "https://t.me/+79hCpu3tacA5NGMx"
+  },
+  {
+    "city": "Laax",
+    "country": "Switzerland",
+    "region": "",
+    "chatUrl": "https://t.me/+GXLkscR2BTUwNGMx"
+  },
+  {
+    "city": "Portsmouth",
+    "country": "Usa Nh",
+    "region": "",
+    "chatUrl": "https://t.me/+57YVJjICNLFiMDFh"
+  },
+  {
+    "city": "Aizawl",
+    "country": "India",
+    "region": "",
+    "chatUrl": "https://t.me/+haFaQ4Zj8phhNzZh"
+  },
+  {
+    "city": "Bristol",
+    "country": "United Kingdom",
+    "region": "",
+    "chatUrl": "https://t.me/+p1ADgydbWklhNWFh"
+  }
+]

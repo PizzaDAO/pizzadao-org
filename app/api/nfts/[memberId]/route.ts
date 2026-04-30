@@ -1,89 +1,9 @@
-import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextRequest, NextResponse } from "next/server";
 import { fetchPizzaDAONFTs } from "@/app/lib/nft";
+import { NFTDisplayItem, NFTGroupInfo } from "@/app/lib/nft-types";
+import { getEvmWalletsForMember, getWalletForMember } from "@/app/lib/wallet-lookup";
 
 export const runtime = "nodejs";
-
-const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const TAB_NAME = "Crew";
-
-// Cache for wallet lookups
-const WALLET_CACHE = new Map<string, { time: number; wallet: string | null }>();
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
-
-async function getWalletForMember(memberId: string): Promise<string | null> {
-  // Check cache
-  const cached = WALLET_CACHE.get(memberId);
-  if (cached && Date.now() - cached.time < CACHE_TTL) {
-    return cached.wallet;
-  }
-
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${TAB_NAME}&tqx=out:json&headers=0`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch sheet");
-
-  const text = await res.text();
-  const gviz = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
-
-  // Find header row - use same logic as member-lookup (name + status/city)
-  let headerRowIdx = -1;
-  let headerRowVals: string[] = [];
-
-  for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-    const rowCells = rows[ri]?.c || [];
-    const rowVals = rowCells.map((c: { v?: unknown; f?: unknown }) =>
-      String(c?.v || c?.f || "").trim().toLowerCase()
-    );
-    const hasName = rowVals.includes("name");
-    const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
-    const hasCity = rowVals.includes("city") || rowVals.includes("crews");
-
-    if (hasName && (hasStatus || hasCity)) {
-      headerRowIdx = ri;
-      headerRowVals = rowCells.map((c: { v?: unknown; f?: unknown }) =>
-        String(c?.v || c?.f || "").trim().toLowerCase()
-      );
-      break;
-    }
-  }
-
-  if (headerRowIdx === -1) {
-    WALLET_CACHE.set(memberId, { time: Date.now(), wallet: null });
-    return null;
-  }
-
-  // Find ID column (default to column 0 if not found, like profile API)
-  let idColIdx = headerRowVals.findIndex((h) =>
-    ["id", "crewid", "memberid"].includes(h.replace(/[#\s\-_]/g, ""))
-  );
-  if (idColIdx === -1) idColIdx = 0;
-
-  // Find Wallet column - prefer exact "wallet" match over "wallet address"
-  let walletColIdx = headerRowVals.findIndex((h) => h === "wallet");
-  if (walletColIdx === -1) {
-    walletColIdx = headerRowVals.findIndex((h) => h === "address" || h.includes("wallet"));
-  }
-
-  if (walletColIdx === -1) {
-    WALLET_CACHE.set(memberId, { time: Date.now(), wallet: null });
-    return null;
-  }
-
-  const targetId = parseInt(memberId, 10);
-  const userRow = rows.slice(headerRowIdx + 1).find((r: { c?: Array<{ v?: unknown }> }) => {
-    const val = r?.c?.[idColIdx]?.v;
-    return typeof val === "number" ? val === targetId : parseInt(String(val), 10) === targetId;
-  });
-
-  const wallet = userRow?.c?.[walletColIdx]?.v;
-  const walletAddress =
-    wallet && typeof wallet === "string" && wallet.startsWith("0x") ? wallet : null;
-
-  WALLET_CACHE.set(memberId, { time: Date.now(), wallet: walletAddress });
-  return walletAddress;
-}
 
 export async function GET(
   request: NextRequest,
@@ -96,10 +16,18 @@ export async function GET(
       return NextResponse.json({ error: "Missing member ID" }, { status: 400 });
     }
 
-    // Get wallet address from Google Sheet
-    const walletAddress = await getWalletForMember(memberId);
+    // Get ALL EVM wallets for this member
+    let walletAddresses = await getEvmWalletsForMember(memberId);
 
-    if (!walletAddress) {
+    // If no wallets in DB, try sheet fallback for backward compat
+    if (walletAddresses.length === 0) {
+      const sheetWallet = await getWalletForMember(memberId);
+      if (sheetWallet) {
+        walletAddresses = [sheetWallet];
+      }
+    }
+
+    if (walletAddresses.length === 0) {
       return NextResponse.json({
         nfts: [],
         totalCount: 0,
@@ -109,13 +37,80 @@ export async function GET(
       });
     }
 
-    // Fetch NFTs from Alchemy
-    const nftData = await fetchPizzaDAONFTs(walletAddress);
+    // Fetch NFTs from all EVM wallets in parallel
+    const results = await Promise.all(
+      walletAddresses.map((addr) => fetchPizzaDAONFTs(addr))
+    );
 
-    // Ensure walletAddress and noWallet are always included
+    // Merge and deduplicate by chain:contract:tokenId
+    const seen = new Set<string>();
+    const allNfts: NFTDisplayItem[] = [];
+
+    for (const result of results) {
+      for (const nft of result.nfts) {
+        const key = `${nft.chain}:${nft.contractAddress}:${nft.tokenId}`;
+        if (!seen.has(key)) {
+          seen.add(key);
+          allNfts.push(nft);
+        }
+      }
+    }
+
+    const totalCount = allNfts.length;
+    // Use primary wallet for OpenSea link
+    const primaryWallet = walletAddresses[0];
+
+    // Optional limit param — when set, return at most `limit` NFTs per
+    // collection group but still include full group metadata with counts.
+    const limitParam = request.nextUrl.searchParams.get("limit");
+    const limit = limitParam ? parseInt(limitParam, 10) : 0;
+
+    if (limit > 0 && allNfts.length > 0) {
+      // Group NFTs by chain:contract
+      const groupMap = new Map<string, NFTDisplayItem[]>();
+      for (const nft of allNfts) {
+        const key = `${nft.chain}:${nft.contractAddress}`;
+        const list = groupMap.get(key) || [];
+        list.push(nft);
+        groupMap.set(key, list);
+      }
+
+      const limitedNfts: NFTDisplayItem[] = [];
+      const groups: NFTGroupInfo[] = [];
+
+      for (const [, nfts] of groupMap) {
+        const first = nfts[0];
+        groups.push({
+          contractName: first.contractName,
+          chain: first.chain,
+          contract: first.contractAddress,
+          totalInGroup: nfts.length,
+          order: first.order,
+        });
+        limitedNfts.push(...nfts.slice(0, limit));
+      }
+
+      // Sort groups by order
+      groups.sort((a, b) => {
+        if (a.order !== undefined && b.order !== undefined) return a.order - b.order;
+        if (a.order !== undefined) return -1;
+        if (b.order !== undefined) return 1;
+        return 0;
+      });
+
+      return NextResponse.json({
+        nfts: limitedNfts,
+        totalCount,
+        walletAddress: primaryWallet,
+        noWallet: false,
+        groups,
+      });
+    }
+
     return NextResponse.json({
-      ...nftData,
-      walletAddress,
+      nfts: allNfts,
+      totalCount,
+      walletAddress: primaryWallet,
       noWallet: false,
     });
   } catch (error) {
