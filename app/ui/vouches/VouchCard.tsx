@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 
-type FriendCardProps = {
+type VouchCardProps = {
   memberId: string;
   name: string;
   city: string;
@@ -18,7 +18,7 @@ const SOURCE_LABELS: Record<string, { label: string; color: string }> = {
   FARCASTER: { label: "Farcaster", color: "#8A63D2" },
 };
 
-export function FriendCard({
+export function VouchCard({
   memberId,
   name,
   city,
@@ -26,7 +26,7 @@ export function FriendCard({
   source,
   isOwnList,
   onRemove,
-}: FriendCardProps) {
+}: VouchCardProps) {
   const sourceInfo = SOURCE_LABELS[source] || SOURCE_LABELS.PIZZADAO;
 
   return (
@@ -137,7 +137,7 @@ export function FriendCard({
             (e.currentTarget.style.color = "var(--color-text-muted)")
           }
         >
-          Unfollow
+          Unvouch
         </button>
       )}
     </div>

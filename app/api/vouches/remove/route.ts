@@ -1,13 +1,13 @@
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { findMemberIdByDiscordId } from "@/app/lib/member-utils";
-import { removeFriend } from "@/app/lib/friends";
+import { removeVouch } from "@/app/lib/vouches";
 
 export const runtime = "nodejs";
 
 /**
- * POST /api/friends/remove
- * Authenticated - remove a friend (unfollow)
+ * POST /api/vouches/remove
+ * Authenticated - remove a vouch (unvouch)
  * Body: { targetMemberId }
  */
 export async function POST(req: NextRequest) {
@@ -36,13 +36,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    await removeFriend(currentMemberId, targetMemberId);
+    await removeVouch(currentMemberId, targetMemberId);
 
     return NextResponse.json({ success: true });
   } catch (err: unknown) {
-    console.error("Failed to remove friend:", err);
+    console.error("Failed to remove vouch:", err);
     return NextResponse.json(
-      { error: "Failed to remove friend" },
+      { error: "Failed to remove vouch" },
       { status: 500 }
     );
   }

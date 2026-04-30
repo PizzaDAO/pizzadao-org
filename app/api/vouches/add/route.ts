@@ -2,13 +2,13 @@ import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { findMemberByDiscordId } from "@/app/lib/member-utils";
-import { addFriend, notifyFriendAdded } from "@/app/lib/friends";
+import { addVouch, notifyVouchAdded } from "@/app/lib/vouches";
 
 export const runtime = "nodejs";
 
 /**
- * POST /api/friends/add
- * Authenticated - add a friend (follow)
+ * POST /api/vouches/add
+ * Authenticated - add a vouch
  * Body: { targetMemberId }
  */
 export async function POST(req: NextRequest) {
@@ -39,7 +39,7 @@ export async function POST(req: NextRequest) {
 
     if (currentUser.memberId === targetMemberId) {
       return NextResponse.json(
-        { error: "Cannot follow yourself" },
+        { error: "Cannot vouch for yourself" },
         { status: 400 }
       );
     }
@@ -53,13 +53,13 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Create the friendship
-    await addFriend(currentUser.memberId, targetMemberId);
+    // Create the vouch
+    await addVouch(currentUser.memberId, targetMemberId);
 
     // Notify the target (non-blocking)
     const targetDiscordId = targetMember.discordId;
     if (targetDiscordId) {
-      notifyFriendAdded(
+      notifyVouchAdded(
         targetMemberId,
         currentUser.name || "Someone",
         currentUser.memberId,
@@ -71,16 +71,16 @@ export async function POST(req: NextRequest) {
 
     return NextResponse.json({ success: true });
   } catch (err: any) {
-    // Handle unique constraint violation (already following)
+    // Handle unique constraint violation (already vouched)
     if (err?.code === "P2002") {
       return NextResponse.json(
-        { error: "Already following this member" },
+        { error: "Already vouched for this member" },
         { status: 409 }
       );
     }
-    console.error("Failed to add friend:", err);
+    console.error("Failed to add vouch:", err);
     return NextResponse.json(
-      { error: "Failed to add friend" },
+      { error: "Failed to add vouch" },
       { status: 500 }
     );
   }

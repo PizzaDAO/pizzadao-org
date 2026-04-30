@@ -15,8 +15,8 @@ import { ProfileLinksEditor } from "../../ui/profile-links";
 import { ThemeToggle } from "../../ui/ThemeToggle";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletManager } from "../../ui/wallet-manager/WalletManager";
-import { FriendsWidget } from "../../ui/friends/FriendsWidget";
-import { SocialAccountLinker } from "../../ui/friends/SocialAccountLinker";
+import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
+import { SocialAccountLinker } from "../../ui/vouches/SocialAccountLinker";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -356,12 +356,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             All Members
                         </Link>
-                        <Link href="/friends" style={{
+                        <Link href="/vouches" style={{
                             ...btn("secondary"),
                             fontSize: 14,
                             textDecoration: "none"
                         }}>
-                            Friends
+                            Vouches
                         </Link>
                         <Link href="/calls" style={{
                             ...btn("secondary"),
@@ -370,12 +370,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         }}>
                             Calls
                         </Link>
-                        <Link href="/friends" style={{
+                        <Link href="/vouches" style={{
                             ...btn("secondary"),
                             fontSize: 14,
                             textDecoration: "none"
                         }}>
-                            Friends
+                            Vouches
                         </Link>
                         <Link href="/pep" style={{
                             ...btn("secondary"),
@@ -847,8 +847,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         {/* Social Accounts - link X and Farcaster handles */}
                         <SocialAccountLinker memberId={idValue} />
 
-                        {/* Friends Widget */}
-                        <FriendsWidget memberId={idValue} />
+                        {/* Vouches Widget */}
+                        <VouchesWidget memberId={idValue} />
 
                         {/* POAP Collection - inside profile grid under roles */}
                         <div style={{ gridColumn: "1 / -1" }}>

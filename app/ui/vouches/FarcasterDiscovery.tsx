@@ -1,7 +1,7 @@
 "use client";
 
 import { useState } from "react";
-import { AddFriendButton } from "./AddFriendButton";
+import { AddVouchButton } from "./AddVouchButton";
 import Link from "next/link";
 
 type PizzaDAOMember = {
@@ -142,7 +142,7 @@ export function FarcasterDiscovery({
             fontFamily: "inherit",
           }}
         >
-          Discover Farcaster Friends
+          Discover Farcaster Vouches
         </button>
       </div>
     );
@@ -369,7 +369,7 @@ export function FarcasterDiscovery({
                       @{m.fcUsername}
                     </p>
                   </div>
-                  <AddFriendButton
+                  <AddVouchButton
                     targetMemberId={m.memberId}
                     currentMemberId={currentMemberId}
                   />

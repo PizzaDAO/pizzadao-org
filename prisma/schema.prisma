@@ -236,7 +236,7 @@ enum NotificationType {
   BOUNTY_COMMENT     // New comment on a bounty you're involved in
   TASK_ASSIGNED      // A task was assigned to you
   TASK_DUE_SOON      // Task due within a week
-  FRIEND_ADDED       // Someone started following you
+  VOUCH_ADDED @map("FRIEND_ADDED") // Someone vouched for you
 }
 
 model Notification {
@@ -283,17 +283,19 @@ model Article {
   @@index([authorId])
 }
 
-// ===== FRIENDS IN THE DAO =====
+// ===== VOUCHES IN THE DAO =====
 
 enum SocialPlatform {
   TWITTER
   FARCASTER
 }
 
-enum FriendSource {
+enum VouchSource {
   PIZZADAO
   TWITTER
   FARCASTER
+
+  @@map("FriendSource")
 }
 
 // Social accounts linked to a member (X handle, Farcaster username)
@@ -312,17 +314,18 @@ model SocialAccount {
   @@index([platform, platformId])
 }
 
-// One-way follow relationship between members
-model Friendship {
-  id         Int          @id @default(autoincrement())
+// One-way vouch relationship between members
+model Vouch {
+  id         Int         @id @default(autoincrement())
   followerId String
   followeeId String
-  source     FriendSource @default(PIZZADAO)
-  createdAt  DateTime     @default(now())
+  source     VouchSource @default(PIZZADAO)
+  createdAt  DateTime    @default(now())
 
   @@unique([followerId, followeeId])
   @@index([followerId])
   @@index([followeeId])
+  @@map("Friendship")
 }
 
 // ===== CREW CALL ATTENDANCE =====

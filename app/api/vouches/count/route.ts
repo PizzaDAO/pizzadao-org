@@ -1,11 +1,11 @@
 import { NextRequest, NextResponse } from "next/server";
-import { getFriendCounts } from "@/app/lib/friends";
+import { getVouchCounts } from "@/app/lib/vouches";
 
 export const runtime = "nodejs";
 
 /**
- * GET /api/friends/count?memberId=X
- * Public - returns friend counts by source
+ * GET /api/vouches/count?memberId=X
+ * Public - returns vouch counts by source
  */
 export async function GET(req: NextRequest) {
   const memberId = req.nextUrl.searchParams.get("memberId");
@@ -14,12 +14,12 @@ export async function GET(req: NextRequest) {
   }
 
   try {
-    const counts = await getFriendCounts(memberId);
+    const counts = await getVouchCounts(memberId);
     return NextResponse.json(counts);
   } catch (err: unknown) {
-    console.error("Failed to fetch friend counts:", err);
+    console.error("Failed to fetch vouch counts:", err);
     return NextResponse.json(
-      { error: "Failed to fetch friend counts" },
+      { error: "Failed to fetch vouch counts" },
       { status: 500 }
     );
   }

@@ -4,13 +4,13 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Inter } from "next/font/google";
-import { FriendCard } from "../ui/friends/FriendCard";
-import { SocialAccountLinker } from "../ui/friends/SocialAccountLinker";
-import { FarcasterDiscovery } from "../ui/friends/FarcasterDiscovery";
+import { VouchCard } from "../ui/vouches/VouchCard";
+import { SocialAccountLinker } from "../ui/vouches/SocialAccountLinker";
+import { FarcasterDiscovery } from "../ui/vouches/FarcasterDiscovery";
 
 const inter = Inter({ subsets: ["latin"] });
 
-type FriendData = {
+type VouchData = {
   memberId: string;
   name: string;
   city: string;
@@ -20,12 +20,12 @@ type FriendData = {
 
 type FilterTab = "ALL" | "PIZZADAO" | "FARCASTER" | "TWITTER";
 
-export default function FriendsPage() {
+export default function VouchesPage() {
   const router = useRouter();
   const [loading, setLoading] = useState(true);
   const [authError, setAuthError] = useState<string | null>(null);
   const [memberId, setMemberId] = useState<string | null>(null);
-  const [friends, setFriends] = useState<FriendData[]>([]);
+  const [vouches, setVouches] = useState<VouchData[]>([]);
   const [counts, setCounts] = useState({
     total: 0,
     pizzadao: 0,
@@ -60,13 +60,13 @@ export default function FriendsPage() {
 
         setMemberId(myMemberId);
 
-        // Fetch friends
-        const friendsRes = await fetch(
-          `/api/friends?memberId=${encodeURIComponent(myMemberId)}&limit=200`
+        // Fetch vouches
+        const vouchesRes = await fetch(
+          `/api/vouches?memberId=${encodeURIComponent(myMemberId)}&limit=200`
         );
-        if (friendsRes.ok) {
-          const data = await friendsRes.json();
-          setFriends(data.friends || []);
+        if (vouchesRes.ok) {
+          const data = await vouchesRes.json();
+          setVouches(data.vouches || []);
           setCounts(
             data.counts || {
               total: 0,
@@ -89,7 +89,7 @@ export default function FriendsPage() {
   const handleRemove = async (targetMemberId: string) => {
     setRemovingId(targetMemberId);
     try {
-      const res = await fetch("/api/friends/remove", {
+      const res = await fetch("/api/vouches/remove", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         credentials: "include",
@@ -97,8 +97,8 @@ export default function FriendsPage() {
       });
 
       if (res.ok) {
-        setFriends((prev) =>
-          prev.filter((f) => f.memberId !== targetMemberId)
+        setVouches((prev) =>
+          prev.filter((v) => v.memberId !== targetMemberId)
         );
         setCounts((prev) => ({
           ...prev,
@@ -113,15 +113,15 @@ export default function FriendsPage() {
     }
   };
 
-  // Filter friends
-  const filteredFriends = friends.filter((f) => {
-    if (activeTab !== "ALL" && f.source !== activeTab) return false;
+  // Filter vouches
+  const filteredVouches = vouches.filter((v) => {
+    if (activeTab !== "ALL" && v.source !== activeTab) return false;
     if (searchQuery) {
       const q = searchQuery.toLowerCase();
       return (
-        f.name.toLowerCase().includes(q) ||
-        f.city.toLowerCase().includes(q) ||
-        f.crews.toLowerCase().includes(q)
+        v.name.toLowerCase().includes(q) ||
+        v.city.toLowerCase().includes(q) ||
+        v.crews.toLowerCase().includes(q)
       );
     }
     return true;
@@ -184,7 +184,7 @@ export default function FriendsPage() {
       >
         <div style={cardStyle()}>
           <h1 style={{ fontSize: 24, marginBottom: 16 }}>
-            Vouches in the DAO
+            Vouches
           </h1>
           <p style={{ opacity: 0.7, marginBottom: 32 }}>{authError}</p>
           <Link href="/" style={btnStyle("primary")}>
@@ -244,7 +244,7 @@ export default function FriendsPage() {
               fontWeight: 800,
             }}
           >
-            Vouches in the DAO
+            Vouches
           </h1>
           <p
             style={{
@@ -343,8 +343,8 @@ export default function FriendsPage() {
           }}
         />
 
-        {/* Friends Grid */}
-        {filteredFriends.length > 0 ? (
+        {/* Vouches Grid */}
+        {filteredVouches.length > 0 ? (
           <div
             style={{
               display: "grid",
@@ -352,14 +352,14 @@ export default function FriendsPage() {
               gap: 12,
             }}
           >
-            {filteredFriends.map((f) => (
-              <FriendCard
-                key={f.memberId}
-                memberId={f.memberId}
-                name={f.name}
-                city={f.city}
-                crews={f.crews}
-                source={f.source}
+            {filteredVouches.map((v) => (
+              <VouchCard
+                key={v.memberId}
+                memberId={v.memberId}
+                name={v.name}
+                city={v.city}
+                crews={v.crews}
+                source={v.source}
                 isOwnList={true}
                 onRemove={handleRemove}
               />
@@ -374,7 +374,7 @@ export default function FriendsPage() {
               textAlign: "center",
             }}
           >
-            {friends.length === 0 ? (
+            {vouches.length === 0 ? (
               <>
                 <p
                   style={{

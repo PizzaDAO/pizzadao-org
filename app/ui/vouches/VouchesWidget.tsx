@@ -3,18 +3,18 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 
-type FriendSummary = {
+type VouchSummary = {
   memberId: string;
   name: string;
   city: string;
 };
 
-type FriendsWidgetProps = {
+type VouchesWidgetProps = {
   memberId: string;
 };
 
-export function FriendsWidget({ memberId }: FriendsWidgetProps) {
-  const [friends, setFriends] = useState<FriendSummary[]>([]);
+export function VouchesWidget({ memberId }: VouchesWidgetProps) {
+  const [vouches, setVouches] = useState<VouchSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loaded, setLoaded] = useState(false);
 
@@ -22,15 +22,15 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
     (async () => {
       try {
         const res = await fetch(
-          `/api/friends?memberId=${encodeURIComponent(memberId)}&limit=5`
+          `/api/vouches?memberId=${encodeURIComponent(memberId)}&limit=5`
         );
         if (res.ok) {
           const data = await res.json();
-          setFriends(
-            (data.friends || []).map((f: any) => ({
-              memberId: f.memberId,
-              name: f.name || "Unknown",
-              city: f.city || "",
+          setVouches(
+            (data.vouches || []).map((v: any) => ({
+              memberId: v.memberId,
+              name: v.name || "Unknown",
+              city: v.city || "",
             }))
           );
           setTotal(data.counts?.total || 0);
@@ -70,7 +70,7 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
             fontWeight: 700,
           }}
         >
-          Friends in the DAO
+          Vouches
           {total > 0 && (
             <span
               style={{
@@ -85,7 +85,7 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
         </h3>
         {total > 0 && (
           <Link
-            href="/friends"
+            href="/vouches"
             style={{
               fontSize: 13,
               fontWeight: 650,
@@ -98,12 +98,12 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
         )}
       </div>
 
-      {friends.length > 0 ? (
+      {vouches.length > 0 ? (
         <div style={{ display: "grid", gap: 6 }}>
-          {friends.map((f) => (
+          {vouches.map((v) => (
             <Link
-              key={f.memberId}
-              href={`/profile/${f.memberId}`}
+              key={v.memberId}
+              href={`/profile/${v.memberId}`}
               style={{
                 display: "flex",
                 justifyContent: "space-between",
@@ -131,16 +131,16 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
                   color: "var(--color-text-primary)",
                 }}
               >
-                {f.name}
+                {v.name}
               </span>
-              {f.city && (
+              {v.city && (
                 <span
                   style={{
                     fontSize: 12,
                     color: "var(--color-text-muted)",
                   }}
                 >
-                  {f.city}
+                  {v.city}
                 </span>
               )}
             </Link>
@@ -162,10 +162,10 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
               margin: 0,
             }}
           >
-            No friends yet. Visit member profiles to follow them!
+            No vouches yet. Visit member profiles to vouch for them!
           </p>
           <Link
-            href="/friends"
+            href="/vouches"
             style={{
               display: "inline-block",
               marginTop: 8,
@@ -175,7 +175,7 @@ export function FriendsWidget({ memberId }: FriendsWidgetProps) {
               textDecoration: "none",
             }}
           >
-            Find Friends
+            Find Vouches
           </Link>
         </div>
       )}
