@@ -27,6 +27,7 @@ export async function GET(
 
     // Resolve memberId to discordId via the crew sheet
     const member = await fetchMemberById(memberId)
+
     if (!member?.discordId) {
       // No discordId found - return empty progress (don't cache empty results)
       return NextResponse.json({
@@ -36,7 +37,7 @@ export async function GET(
         approvedCount: 0,
         currentLevelMissions: 0,
         currentLevelApproved: 0,
-      })
+      }, { headers: CACHE_HEADERS })
     }
 
     // Check cache by discordId (may have been cached from the other route)

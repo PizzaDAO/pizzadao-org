@@ -18,6 +18,8 @@ import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletManager } from "../../ui/wallet-manager/WalletManager";
 import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
 import { SocialAccountLinker } from "../../ui/vouches/SocialAccountLinker";
+import { useQueryClient } from "@tanstack/react-query";
+import { useUserData, usePfp, useXAccount, useCrewMappings, useMyTasks, useMyBalance } from "../../lib/hooks/use-api";
 
 const inter = Inter({ subsets: ["latin"] });
 const outfit = Outfit({ subsets: ["latin"] });
@@ -36,10 +38,6 @@ type CrewOption = {
     callTimeUrl?: string;
     callLength?: string;
     tasks?: { label: string; url?: string }[];
-};
-
-type CrewMappingsResponse = {
-    crews: CrewOption[];
 };
 
 function norm(s: unknown) {
@@ -61,153 +59,82 @@ function splitTurtlesCell(v: unknown): string[] {
 export default function Dashboard({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
+    const queryClient = useQueryClient();
+
+    // --- React Query hooks for data fetching ---
+    const { data: userData, isLoading: userDataLoading, error: userDataError } = useUserData(id);
+    const { data: pfpData } = usePfp(id);
+    const { data: xAccountData } = useXAccount(id);
+    const { data: crewMappingsData } = useCrewMappings();
+    const { data: tasksData } = useMyTasks(id);
+    const { data: balanceData } = useMyBalance();
+
+    // Derive auth/loading/error from the useUserData hook
+    const loading = userDataLoading;
+    const authError = userDataError?.message === '__AUTH_401__'
+        ? "Please log in to view your dashboard"
+        : userDataError?.message === '__AUTH_403__'
+        ? "You don't have permission to view this dashboard"
+        : null;
+    const error = userDataError && !authError ? userDataError.message : null;
+
+    // Local mutable state for data (save handlers update it optimistically)
     const [data, setData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [authError, setAuthError] = useState<string | null>(null);
-    const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
-    const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
-    const [pfpUrl, setPfpUrl] = useState<string | null>(null);
+    useEffect(() => {
+        if (userData) setData(userData);
+    }, [userData]);
+
+    // Derived data from hooks
+    const pfpUrl = pfpData?.url ?? null;
+    const pepBalance = balanceData?.balance ?? null;
+    const myTasks = tasksData?.tasksByCrew ?? {};
+    const doneCounts = tasksData?.doneCountsByCrew ?? {};
+
+    // X account: local state because disconnect handler mutates it
+    const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
+    useEffect(() => {
+        if (xAccountData) setXAccount(xAccountData);
+    }, [xAccountData]);
+
+    // Crew options: derived from hook data with fallback to static CREWS
+    const crewOptions: CrewOption[] = (() => {
+        const crews = crewMappingsData?.crews;
+        if (Array.isArray(crews) && crews.length > 0) {
+            return crews
+                .map((c: any) => ({
+                    ...c,
+                    id: String(c?.id ?? ""),
+                    label: norm(c?.label ?? ""),
+                    turtles: splitTurtlesCell(c?.turtles),
+                    emoji: norm(c?.emoji) || undefined,
+                    role: norm(c?.role) || undefined,
+                    channel: norm(c?.channel) || undefined,
+                    event: norm(c?.event) || undefined,
+                    sheet: norm(c?.sheet) || undefined,
+                    callTime: norm(c?.callTime) || undefined,
+                    callTimeUrl: norm(c?.callTimeUrl) || undefined,
+                    callLength: norm(c?.callLength) || undefined,
+                    tasks: Array.isArray(c?.tasks) ? c.tasks : [],
+                }))
+                .filter((c: CrewOption) => c.id && c.label);
+        }
+        // Fallback to static CREWS
+        return (CREWS ?? []).map((c: any) => ({
+            id: String(c.id),
+            label: String(c.label ?? c.id),
+            turtles: [] as string[],
+        }));
+    })();
+
+    // --- UI-only state (not data fetching) ---
     const [editingSkills, setEditingSkills] = useState(false);
     const [skillsInput, setSkillsInput] = useState("");
     const [skillsSaving, setSkillsSaving] = useState(false);
     const [editingOrgs, setEditingOrgs] = useState(false);
     const [orgsInput, setOrgsInput] = useState("");
     const [orgsSaving, setOrgsSaving] = useState(false);
-    const [pepBalance, setPepBalance] = useState<number | null>(null);
     const [showSendModal, setShowSendModal] = useState(false);
-    const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
     const [xDisconnecting, setXDisconnecting] = useState(false);
-
-    // New state for rich crew data
-    const [crewOptions, setCrewOptions] = useState<CrewOption[]>(() =>
-        (CREWS ?? []).map((c: any) => ({
-            id: String(c.id),
-            label: String(c.label ?? c.id),
-            turtles: [],
-        }))
-    );
-
-    // Verify auth on mount - API handles ownership check
-    useEffect(() => {
-        async function verifyAuth() {
-            try {
-                // Fetch user data - API requires auth and verifies ownership
-                const dataRes = await fetch(`/api/user-data/${id}`);
-                if (!dataRes.ok) {
-                    const errData = await dataRes.json();
-                    if (dataRes.status === 401) {
-                        setAuthError("Please log in to view your dashboard");
-                        return;
-                    }
-                    if (dataRes.status === 403) {
-                        setAuthError("You don't have permission to view this dashboard");
-                        return;
-                    }
-                    throw new Error(errData.error || "Failed to load dashboard");
-                }
-                const userData = await dataRes.json();
-                setData(userData);
-            } catch (e: unknown) {
-                setError((e as any)?.message);
-            } finally {
-                setLoading(false);
-            }
-        }
-        verifyAuth();
-    }, [id]);
-
-    // Fetch X account status
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/x/account/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    setXAccount(json);
-                }
-            } catch {}
-        })();
-    }, [id]);
-
-    // Fetch profile picture
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/pfp/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json.url) setPfpUrl(json.url);
-                }
-            } catch (e) {
-            }
-        })();
-    }, [id]);
-
-    // Fetch crew mappings to get tasks, call times etc.
-    useEffect(() => {
-        let alive = true;
-        (async () => {
-            try {
-                const res = await fetch("/api/crew-mappings", { cache: "no-store" });
-                const data = (await res.json()) as CrewMappingsResponse | any;
-                if (!res.ok) throw new Error(data?.error || "Failed to load crews");
-
-                const crews: CrewOption[] = Array.isArray(data?.crews) ? data.crews : [];
-                const cleaned = crews
-                    .map((c) => ({
-                        ...c,
-                        id: String((c as any)?.id ?? ""),
-                        label: norm((c as any)?.label ?? ""),
-                        turtles: splitTurtlesCell((c as any)?.turtles),
-                        emoji: norm((c as any)?.emoji) || undefined,
-                        role: norm((c as any)?.role) || undefined,
-                        channel: norm((c as any)?.channel) || undefined,
-                        event: norm((c as any)?.event) || undefined,
-                        sheet: norm((c as any)?.sheet) || undefined,
-                        callTime: norm((c as any)?.callTime) || undefined,
-                        callTimeUrl: norm((c as any)?.callTimeUrl) || undefined,
-                        callLength: norm((c as any)?.callLength) || undefined,
-                        tasks: Array.isArray((c as any)?.tasks) ? (c as any).tasks : [],
-                    }))
-                    .filter((c) => c.id && c.label);
-
-                if (!alive) return;
-                if (cleaned.length) setCrewOptions(cleaned);
-            } catch {
-                // keep fallback crews
-            }
-        })();
-
-        // Fetch personalized tasks
-        (async () => {
-            try {
-                const res = await fetch(`/api/my-tasks/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json.tasksByCrew) setMyTasks(json.tasksByCrew);
-                    if (json.doneCountsByCrew) setDoneCounts(json.doneCountsByCrew);
-                }
-            } catch (e) {
-            }
-        })();
-
-        // Fetch $PEP balance
-        (async () => {
-            try {
-                const res = await fetch("/api/economy/balance");
-                if (res.ok) {
-                    const json = await res.json();
-                    setPepBalance(json.balance);
-                }
-            } catch (e) {
-            }
-        })();
-
-        return () => {
-            alive = false;
-        };
-    }, [id]);
 
     if (loading) {
         return (
@@ -1082,11 +1009,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     onClose={() => setShowSendModal(false)}
                     onSuccess={() => {
                         setShowSendModal(false);
-                        // Refresh balance
-                        fetch("/api/economy/balance")
-                            .then(res => res.json())
-                            .then(json => setPepBalance(json.balance))
-                            .catch(() => {});
+                        // Refresh balance via React Query
+                        queryClient.invalidateQueries({ queryKey: ['my-balance'] });
                     }}
                 />
             )}

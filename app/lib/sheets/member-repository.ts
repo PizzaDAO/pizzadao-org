@@ -10,104 +10,40 @@ export interface MemberSheetData {
   discordId?: string;
 }
 
-/**
- * Fetch member data from Google Sheets by member ID
- * Replaces duplicated fetchMemberRowById() in profile, update-skills, claim-member routes
- */
-export async function fetchMemberById(memberId: string): Promise<MemberSheetData | null> {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-    TAB_NAME
-  )}&tqx=out:json&headers=0`;
+// Cache the full parsed sheet data
+interface SheetCache {
+  rows: MemberSheetData[];               // All member rows with header-keyed data
+  discordToMember: Map<string, string>;  // discordId -> memberId
+  memberToIdx: Map<string, number>;      // memberId -> index in rows[]
+  timestamp: number;
+}
 
+let sheetCache: SheetCache | null = null;
+const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
+
+/**
+ * Fetch and cache the full Crew sheet data.
+ * Returns the cached result if still fresh (5 min TTL).
+ */
+export async function getSheetData(): Promise<SheetCache> {
+  if (sheetCache && Date.now() - sheetCache.timestamp < CACHE_TTL) {
+    return sheetCache;
+  }
+
+  // Fetch and parse the full sheet once
+  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(TAB_NAME)}&tqx=out:json&headers=0`;
   const res = await fetch(url, { cache: "no-store" });
   if (!res.ok) throw new Error(`Sheet fetch failed: ${res.status}`);
 
   const text = await res.text();
   const gviz: GvizResponse = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
+  const rawRows = gviz?.table?.rows || [];
 
   // Find header row
   let headerRowIdx = -1;
   let headerVals: string[] = [];
-
-  for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-    const rowCells = rows[ri]?.c || [];
-    const rowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
-    const hasName = rowVals.includes("name");
-    const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
-    const hasCity = rowVals.includes("city") || rowVals.includes("crews");
-
-    if (hasName && (hasStatus || hasCity)) {
-      headerRowIdx = ri;
-      headerVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim());
-      break;
-    }
-  }
-
-  if (headerRowIdx === -1) throw new Error("Header row not found");
-
-  // Find ID column
-  const idxId = findColumnIndex(headerVals, ["id", "member id", "memberid"], 0) ?? 0;
-  const idxDiscord = findColumnIndex(headerVals, ["discordid", "discord id", "discord"]);
-
-  // Find member row
-  for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || [];
-    const idVal = String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim();
-
-    if (idVal && idVal === memberId) {
-      const discordVal = idxDiscord != null
-        ? String(cells[idxDiscord]?.v ?? cells[idxDiscord]?.f ?? "").trim()
-        : "";
-
-      const data: MemberSheetData = { discordId: discordVal };
-      headerVals.forEach((key, idx) => {
-        if (key) {
-          data[key] = cells[idx]?.v ?? cells[idx]?.f;
-        }
-      });
-
-      return data;
-    }
-  }
-
-  return null;
-}
-
-// Cache: discordId → memberId (5 min TTL)
-let discordToMemberCache: Map<string, string> | null = null;
-let discordCacheTime = 0;
-const CACHE_TTL = 5 * 60 * 1000;
-
-/**
- * Resolve a Discord ID to the corresponding member ID from the Crew sheet.
- * Returns null if no matching row is found.
- */
-export async function fetchMemberIdByDiscordId(discordId: string): Promise<string | null> {
-  if (!discordId) return null;
-
-  // Check cache
-  if (discordToMemberCache && Date.now() - discordCacheTime < CACHE_TTL) {
-    const cached = discordToMemberCache.get(discordId);
-    if (cached !== undefined) return cached;
-  }
-
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-    TAB_NAME
-  )}&tqx=out:json&headers=0`;
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) return null;
-
-  const text = await res.text();
-  const gviz: GvizResponse = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
-
-  let headerRowIdx = -1;
-  let headerVals: string[] = [];
-
-  for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-    const rowCells = rows[ri]?.c || [];
+  for (let ri = 0; ri < Math.min(rawRows.length, 100); ri++) {
+    const rowCells = rawRows[ri]?.c || [];
     const rowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
     if (rowVals.includes("name") && (rowVals.includes("status") || rowVals.includes("frequency") || rowVals.includes("city") || rowVals.includes("crews"))) {
       headerRowIdx = ri;
@@ -115,26 +51,74 @@ export async function fetchMemberIdByDiscordId(discordId: string): Promise<strin
       break;
     }
   }
-
-  if (headerRowIdx === -1) return null;
+  if (headerRowIdx === -1) throw new Error("Header row not found");
 
   const idxId = findColumnIndex(headerVals, ["id", "member id", "memberid"], 0) ?? 0;
   const idxDiscord = findColumnIndex(headerVals, ["discordid", "discord id", "discord"]);
-  if (idxDiscord == null) return null;
 
-  // Build full map and cache it
-  const map = new Map<string, string>();
-  for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || [];
+  // Build full parsed rows + lookup maps
+  const rows: MemberSheetData[] = [];
+  const discordToMember = new Map<string, string>();
+  const memberToIdx = new Map<string, number>();
+
+  for (let ri = headerRowIdx + 1; ri < rawRows.length; ri++) {
+    const cells = rawRows[ri]?.c || [];
     const memberId = String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim();
-    const dId = String(cells[idxDiscord]?.v ?? cells[idxDiscord]?.f ?? "").trim();
-    if (memberId && dId) {
-      map.set(dId, memberId);
-    }
+    if (!memberId) continue;
+
+    const discordId = idxDiscord != null
+      ? String(cells[idxDiscord]?.v ?? cells[idxDiscord]?.f ?? "").trim()
+      : "";
+
+    const data: MemberSheetData = { discordId };
+    headerVals.forEach((key, idx) => {
+      if (key) data[key] = cells[idx]?.v ?? cells[idx]?.f;
+    });
+
+    const idx = rows.length;
+    rows.push(data);
+    memberToIdx.set(memberId, idx);
+    if (discordId) discordToMember.set(discordId, memberId);
   }
 
-  discordToMemberCache = map;
-  discordCacheTime = Date.now();
+  sheetCache = { rows, discordToMember, memberToIdx, timestamp: Date.now() };
+  return sheetCache;
+}
 
-  return map.get(discordId) ?? null;
+/**
+ * Fetch member data from Google Sheets by member ID.
+ * Uses the shared 5-min sheet cache.
+ */
+export async function fetchMemberById(memberId: string): Promise<MemberSheetData | null> {
+  const cache = await getSheetData();
+  const idx = cache.memberToIdx.get(memberId);
+  if (idx === undefined) return null;
+  return cache.rows[idx];
+}
+
+/**
+ * Resolve a Discord ID to the corresponding member ID from the Crew sheet.
+ * Uses the shared 5-min sheet cache.
+ * Returns null if no matching row is found.
+ */
+export async function fetchMemberIdByDiscordId(discordId: string): Promise<string | null> {
+  if (!discordId) return null;
+  const cache = await getSheetData();
+  return cache.discordToMember.get(discordId) ?? null;
+}
+
+/**
+ * Look up a member's memberId and name from their Discord ID.
+ * Uses the shared 5-min sheet cache.
+ */
+export async function fetchMemberByDiscordId(discordId: string): Promise<{ memberId: string; name: string } | null> {
+  if (!discordId) return null;
+  const cache = await getSheetData();
+  const memberId = cache.discordToMember.get(discordId);
+  if (!memberId) return null;
+  const idx = cache.memberToIdx.get(memberId);
+  if (idx === undefined) return null;
+  const row = cache.rows[idx];
+  const name = String(row["Name"] || row["Mafia Name"] || "").trim();
+  return { memberId, name };
 }

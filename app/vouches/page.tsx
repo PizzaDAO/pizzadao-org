@@ -7,6 +7,7 @@ import { Inter } from "next/font/google";
 import { VouchCard } from "../ui/vouches/VouchCard";
 import { SocialAccountLinker } from "../ui/vouches/SocialAccountLinker";
 import { FarcasterDiscovery } from "../ui/vouches/FarcasterDiscovery";
+import { useMe, useVouches } from "../lib/hooks/use-api";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -22,9 +23,20 @@ type FilterTab = "ALL" | "PIZZADAO" | "FARCASTER" | "TWITTER";
 
 export default function VouchesPage() {
   const router = useRouter();
-  const [loading, setLoading] = useState(true);
-  const [authError, setAuthError] = useState<string | null>(null);
-  const [memberId, setMemberId] = useState<string | null>(null);
+
+  // --- React Query hooks ---
+  const { data: meData, isLoading: meLoading, error: meError } = useMe();
+  const memberId = meData?.memberId ?? null;
+  const { data: vouchesData, isLoading: vouchesLoading } = useVouches(memberId, { limit: 200 });
+
+  const loading = meLoading || (!!memberId && vouchesLoading);
+  const authError = meError
+    ? "Please log in to view your vouches"
+    : meData && !memberId
+    ? "Could not find your member profile"
+    : null;
+
+  // Local state for vouches/counts (mutated optimistically on remove)
   const [vouches, setVouches] = useState<VouchData[]>([]);
   const [counts, setCounts] = useState({
     total: 0,
@@ -33,58 +45,27 @@ export default function VouchesPage() {
     twitter: 0,
     followers: 0,
   });
+
+  // Sync hook data to local state
+  useEffect(() => {
+    if (vouchesData) {
+      setVouches(vouchesData.vouches || []);
+      setCounts(
+        vouchesData.counts || {
+          total: 0,
+          pizzadao: 0,
+          farcaster: 0,
+          twitter: 0,
+          followers: 0,
+        }
+      );
+    }
+  }, [vouchesData]);
+
   const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
   const [hasFarcaster, setHasFarcaster] = useState(false);
-
-  // Auth check and data load
-  useEffect(() => {
-    (async () => {
-      try {
-        // Get current user's memberId via the /api/me endpoint or member-lookup
-        const meRes = await fetch("/api/me");
-        if (!meRes.ok) {
-          setAuthError("Please log in to view your vouches");
-          setLoading(false);
-          return;
-        }
-        const meData = await meRes.json();
-        const myMemberId = meData.memberId;
-
-        if (!myMemberId) {
-          setAuthError("Could not find your member profile");
-          setLoading(false);
-          return;
-        }
-
-        setMemberId(myMemberId);
-
-        // Fetch vouches
-        const vouchesRes = await fetch(
-          `/api/vouches?memberId=${encodeURIComponent(myMemberId)}&limit=200`
-        );
-        if (vouchesRes.ok) {
-          const data = await vouchesRes.json();
-          setVouches(data.vouches || []);
-          setCounts(
-            data.counts || {
-              total: 0,
-              pizzadao: 0,
-              farcaster: 0,
-              twitter: 0,
-              followers: 0,
-            }
-          );
-        }
-      } catch (err) {
-        console.error("Failed to load vouches:", err);
-        setAuthError("Failed to load vouches page");
-      } finally {
-        setLoading(false);
-      }
-    })();
-  }, []);
 
   const handleRemove = async (targetMemberId: string) => {
     setRemovingId(targetMemberId);

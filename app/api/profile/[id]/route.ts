@@ -31,9 +31,11 @@ export async function GET(
         }
 
         // Check cache
+        const cacheHeaders = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' };
+
         const cached = CACHE.get(id);
         if (cached && Date.now() - cached.time < CACHE_TTL) {
-            return NextResponse.json(cached.data);
+            return NextResponse.json(cached.data, { headers: cacheHeaders });
         }
 
         const url = gvizUrl(SHEET_ID, TAB_NAME);
@@ -114,7 +116,7 @@ export async function GET(
         // Cache the result
         CACHE.set(id, { time: Date.now(), data });
 
-        return NextResponse.json(data);
+        return NextResponse.json(data, { headers: cacheHeaders });
     } catch (error: any) {
         return NextResponse.json({ error: "Failed to load profile" }, { status: 500 });
     }

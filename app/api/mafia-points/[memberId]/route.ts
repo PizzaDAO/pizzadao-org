@@ -20,6 +20,8 @@ export async function GET(
       memberName: result.memberName,
       rank: result.rank.name,
       lastCalculated: result.lastCalculated,
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' }
     });
   } catch (e: unknown) {
     console.error("Mafia rank error:", e);
