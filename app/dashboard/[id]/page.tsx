@@ -381,7 +381,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                         return (
                             <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
-                                <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>Your Crews</h3>
+                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+                                    <h3 style={{ margin: 0, fontSize: 18 }}>Your Crews</h3>
+                                    <Link href="/crew" style={{ fontSize: 13, fontWeight: 650, color: "#ff4d4d", textDecoration: "none" }}>
+                                        View all crews →
+                                    </Link>
+                                </div>
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
                                     {allDisplayIds.map((cid) => {
                                         // Find rich crew definition
