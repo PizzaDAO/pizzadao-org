@@ -5,6 +5,7 @@ import { hasAnyRole } from '@/app/lib/discord'
 import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError, ValidationError } from '@/app/lib/errors/api-errors'
+import { invalidateProgressCache } from '@/app/lib/mission-cache'
 
 export const runtime = 'nodejs'
 
@@ -38,6 +39,9 @@ const POST_HANDLER = async (request: NextRequest) => {
   } else {
     result = await rejectMission(session.discordId, completionId, reviewNote)
   }
+
+  // Invalidate cached progress for the submission's owner
+  invalidateProgressCache(result.discordId)
 
   return NextResponse.json({
     success: true,

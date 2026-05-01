@@ -46,7 +46,9 @@ const GET_HANDLER = async (_req: NextRequest, { params }: Params) => {
 
   const authorMemberId = await fetchMemberIdByDiscordId(article.authorId).catch(() => null)
 
-  return NextResponse.json({ article: { ...article, authorMemberId } })
+  return NextResponse.json({ article: { ...article, authorMemberId } }, {
+    headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+  })
 }
 
 // PATCH /api/articles/[slug] - Update article (author or admin)

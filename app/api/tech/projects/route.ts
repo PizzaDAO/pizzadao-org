@@ -24,6 +24,8 @@ export async function GET(request: Request) {
           projects: cached,
           cached: true,
           ...metadata,
+        }, {
+          headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
         })
       }
     }
@@ -47,6 +49,8 @@ export async function GET(request: Request) {
       projects,
       cached: false,
       ...metadata,
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (error) {
     console.error('Error fetching projects:', error)
@@ -59,7 +63,10 @@ export async function GET(request: Request) {
         cached: true,
         stale: true,
         error: 'Using stale cache due to fetch error',
-      }, { status: 200 })
+      }, {
+        status: 200,
+        headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+      })
     }
 
     return NextResponse.json(

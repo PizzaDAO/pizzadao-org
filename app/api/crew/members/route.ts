@@ -181,5 +181,7 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
     },
   };
 
-  return NextResponse.json(body);
+  return NextResponse.json(body, {
+    headers: { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=7200' }
+  });
 });

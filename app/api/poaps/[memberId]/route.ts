@@ -34,6 +34,8 @@ export async function GET(
     }
   }
 
+  const cacheHeaders = { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' };
+
   if (walletAddresses.length === 0) {
     // No wallet address - return noWallet flag
     return NextResponse.json({
@@ -42,7 +44,7 @@ export async function GET(
       hiddenCount: 0,
       walletAddress: '',
       noWallet: true,
-    });
+    }, { headers: cacheHeaders });
   }
 
   // 2. Fetch filtered POAPs from ALL wallets, deduplicate by eventId
@@ -81,7 +83,7 @@ export async function GET(
         totalCount,
         walletAddress: primaryWallet,
         fromCache: fromCacheAll,
-      });
+      }, { headers: cacheHeaders });
     }
 
     return NextResponse.json({
@@ -89,7 +91,7 @@ export async function GET(
       totalCount,
       walletAddress: primaryWallet,
       fromCache: fromCacheAll,
-    });
+    }, { headers: cacheHeaders });
   } catch (error) {
     console.error('Error fetching POAPs:', error);
 
