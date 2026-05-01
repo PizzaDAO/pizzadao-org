@@ -54,6 +54,8 @@ export async function GET() {
       currentLevel,
       levelTitle,
       isAuthenticated: !!session?.discordId,
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

@@ -15,7 +15,9 @@ export async function GET(req: NextRequest) {
 
   try {
     const counts = await getVouchCounts(memberId);
-    return NextResponse.json(counts);
+    return NextResponse.json(counts, {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
+    });
   } catch (err: unknown) {
     console.error("Failed to fetch vouch counts:", err);
     return NextResponse.json(

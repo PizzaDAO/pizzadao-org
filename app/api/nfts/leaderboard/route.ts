@@ -281,8 +281,10 @@ export async function GET() {
   try {
     // Check cache first
     const cached = await cacheGet<LeaderboardResponse>(CACHE_KEY);
+    const cacheHeaders = { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' };
+
     if (cached) {
-      return NextResponse.json({ ...cached, cached: true });
+      return NextResponse.json({ ...cached, cached: true }, { headers: cacheHeaders });
     }
 
     // Aggregate fresh data
@@ -291,7 +293,7 @@ export async function GET() {
     // Cache the result
     await cacheSet(CACHE_KEY, data, CACHE_TTL);
 
-    return NextResponse.json(data);
+    return NextResponse.json(data, { headers: cacheHeaders });
   } catch (error) {
     return NextResponse.json(
       {

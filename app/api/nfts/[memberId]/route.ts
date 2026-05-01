@@ -27,6 +27,8 @@ export async function GET(
       }
     }
 
+    const cacheHeaders = { 'Cache-Control': 'public, s-maxage=1800, stale-while-revalidate=3600' };
+
     if (walletAddresses.length === 0) {
       return NextResponse.json({
         nfts: [],
@@ -34,7 +36,7 @@ export async function GET(
         walletAddress: null,
         noWallet: true,
         message: "No wallet address found for this member",
-      });
+      }, { headers: cacheHeaders });
     }
 
     // Fetch NFTs from all EVM wallets in parallel
@@ -104,7 +106,7 @@ export async function GET(
         walletAddress: primaryWallet,
         noWallet: false,
         groups,
-      });
+      }, { headers: cacheHeaders });
     }
 
     return NextResponse.json({
@@ -112,7 +114,7 @@ export async function GET(
       totalCount,
       walletAddress: primaryWallet,
       noWallet: false,
-    });
+    }, { headers: cacheHeaders });
   } catch (error) {
     return NextResponse.json(
       {

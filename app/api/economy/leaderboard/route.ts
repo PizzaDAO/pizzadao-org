@@ -14,6 +14,8 @@ export async function GET() {
         balance: entry.balance,
         formatted: formatCurrency(entry.balance)
       }))
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' }
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

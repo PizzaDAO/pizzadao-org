@@ -30,7 +30,9 @@ export async function GET(req: NextRequest) {
       getVouchCounts(memberId),
     ]);
 
-    return NextResponse.json({ vouches, counts });
+    return NextResponse.json({ vouches, counts }, {
+      headers: { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' }
+    });
   } catch (err: unknown) {
     console.error("Failed to fetch vouches:", err);
     return NextResponse.json(

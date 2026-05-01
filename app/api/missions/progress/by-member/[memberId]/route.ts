@@ -18,6 +18,8 @@ export async function GET(
 
     // Resolve memberId to discordId via the crew sheet
     const member = await fetchMemberById(memberId)
+    const cacheHeaders = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' };
+
     if (!member?.discordId) {
       // No discordId found - return empty progress
       return NextResponse.json({
@@ -27,12 +29,12 @@ export async function GET(
         approvedCount: 0,
         currentLevelMissions: 0,
         currentLevelApproved: 0,
-      })
+      }, { headers: cacheHeaders })
     }
 
     const summary = await getUserProgressSummary(member.discordId)
 
-    return NextResponse.json(summary)
+    return NextResponse.json(summary, { headers: cacheHeaders })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

@@ -24,6 +24,8 @@ export async function GET() {
         createdAt: b.createdAt.toISOString(),
         commentCount: b._count.comments
       }))
+    }, {
+      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' }
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
