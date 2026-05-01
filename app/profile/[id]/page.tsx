@@ -1,7 +1,7 @@
 // app/profile/[id]/page.tsx
 "use client";
 
-import { use, useEffect, useState } from "react";
+import { use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
@@ -14,6 +14,7 @@ import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletDisplay } from "../../ui/wallet-manager/WalletDisplay";
 import { AddVouchButton } from "../../ui/vouches/AddVouchButton";
+import { useProfile, usePfp, useXAccount, useArticlesByMember, useMissionProgress, useMe, useCrewMappings, useMyTasks } from "../../lib/hooks/use-api";
 
 const inter = Inter({ subsets: ["latin"] });
 
@@ -41,141 +42,31 @@ function splitTurtlesCell(v: unknown): string[] {
 export default function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
-    const [data, setData] = useState<any>(null);
-    const [loading, setLoading] = useState(true);
-    const [error, setError] = useState<string | null>(null);
-    const [pfpUrl, setPfpUrl] = useState<string | null>(null);
-    const [crewOptions, setCrewOptions] = useState<CrewOption[]>([]);
-    const [myTasks, setMyTasks] = useState<Record<string, { label: string; url?: string }[]>>({});
-    const [doneCounts, setDoneCounts] = useState<Record<string, number>>({});
-    const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
-    const [articles, setArticles] = useState<{ slug: string; title: string; excerpt?: string; publishedAt?: string }[]>([]);
-    const [missionLevel, setMissionLevel] = useState<{ currentLevel: number; levelTitle: string | null; approvedCount: number; totalMissions: number } | null>(null);
-    const [currentMemberId, setCurrentMemberId] = useState<string | null>(null);
 
-    // Fetch public profile data
-    useEffect(() => {
-        async function fetchProfile() {
-            try {
-                const res = await fetch(`/api/profile/${id}`);
-                if (!res.ok) {
-                    const errData = await res.json();
-                    throw new Error(errData.error || "Failed to load profile");
-                }
-                const profileData = await res.json();
-                setData(profileData);
-            } catch (e: unknown) {
-                setError((e as any)?.message);
-            } finally {
-                setLoading(false);
-            }
-        }
-        fetchProfile();
-    }, [id]);
+    const { data, isLoading: loading, error } = useProfile(id);
+    const { data: pfpData } = usePfp(id);
+    const { data: xAccount } = useXAccount(id);
+    const { data: articlesData } = useArticlesByMember(id);
+    const { data: missionProgress } = useMissionProgress(id);
+    const { data: meData } = useMe();
+    const { data: crewData } = useCrewMappings();
+    const { data: tasksData } = useMyTasks(id);
 
-    // Fetch profile picture
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/pfp/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json.url) setPfpUrl(json.url);
-                }
-            } catch (e) {
-            }
-        })();
-    }, [id]);
-
-    // Fetch X account status
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/x/account/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    setXAccount(json);
-                }
-            } catch {}
-        })();
-    }, [id]);
-
-    // Fetch published articles by this member
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/articles/by-member/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json.articles) setArticles(json.articles);
-                }
-            } catch {}
-        })();
-    }, [id]);
-
-    // Fetch mission level
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/missions/progress/by-member/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json.currentLevel) setMissionLevel(json);
-                }
-            } catch {}
-        })();
-    }, [id]);
-
-    // Fetch current user's memberId for AddVouchButton
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch("/api/me");
-                if (res.ok) {
-                    const data = await res.json();
-                    if (data.memberId) setCurrentMemberId(data.memberId);
-                }
-            } catch {
-                // Not authenticated or failed - that's ok
-            }
-        })();
-    }, []);
-
-    // Fetch crew mappings for crew info
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch("/api/crew-mappings", { cache: "no-store" });
-                const data = await res.json();
-                if (res.ok && Array.isArray(data?.crews)) {
-                    setCrewOptions(data.crews.map((c: any) => ({
-                        id: String(c?.id ?? ""),
-                        label: norm(c?.label ?? ""),
-                        turtles: splitTurtlesCell(c?.turtles),
-                        emoji: norm(c?.emoji) || undefined,
-                        callTime: norm(c?.callTime) || undefined,
-                        callTimeUrl: norm(c?.callTimeUrl) || undefined,
-                        callLength: norm(c?.callLength) || undefined,
-                    })));
-                }
-            } catch { }
-        })();
-    }, []);
-
-    // Fetch member's tasks
-    useEffect(() => {
-        (async () => {
-            try {
-                const res = await fetch(`/api/my-tasks/${id}`);
-                if (res.ok) {
-                    const json = await res.json();
-                    if (json.tasksByCrew) setMyTasks(json.tasksByCrew);
-                    if (json.doneCountsByCrew) setDoneCounts(json.doneCountsByCrew);
-                }
-            } catch (e) {
-            }
-        })();
-    }, [id]);
+    const pfpUrl = pfpData?.url ?? null;
+    const articles = articlesData?.articles ?? [];
+    const missionLevel = missionProgress?.currentLevel ? missionProgress : null;
+    const currentMemberId = meData?.memberId ?? null;
+    const crewOptions: CrewOption[] = (crewData?.crews ?? []).map((c: any) => ({
+        id: String(c?.id ?? ""),
+        label: norm(c?.label ?? ""),
+        turtles: splitTurtlesCell(c?.turtles),
+        emoji: norm(c?.emoji) || undefined,
+        callTime: norm(c?.callTime) || undefined,
+        callTimeUrl: norm(c?.callTimeUrl) || undefined,
+        callLength: norm(c?.callLength) || undefined,
+    }));
+    const myTasks = tasksData?.tasksByCrew ?? {};
+    const doneCounts = tasksData?.doneCountsByCrew ?? {};
 
     if (loading) {
         return (
@@ -221,7 +112,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
             }}>
                 <div style={card()}>
                     <h1 style={{ fontSize: 24, marginBottom: 16 }}>Profile Not Found</h1>
-                    <p style={{ opacity: 0.7, marginBottom: 32 }}>{error || "This member doesn't exist."}</p>
+                    <p style={{ opacity: 0.7, marginBottom: 32 }}>{error?.message || "This member doesn't exist."}</p>
                     <button onClick={() => router.back()} style={btn("primary")}>
                         ← Go Back
                     </button>

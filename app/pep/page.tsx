@@ -7,6 +7,7 @@ import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
 import { NotificationBell } from "../ui/notifications";
+import { useMe, useMemberLookup } from "../lib/hooks/use-api";
 
 type SessionData = {
   authenticated: boolean;
@@ -315,9 +316,14 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
 }
 
 export default function PepDashboard() {
-  const [session, setSession] = useState<SessionData | null>(null);
-  const [memberName, setMemberName] = useState<string | null>(null);
-  const [loading, setLoading] = useState(true);
+  const { data: meData, isLoading: meLoading } = useMe();
+  const session: SessionData | null = meLoading ? null : (meData ?? { authenticated: false });
+  const { data: memberData } = useMemberLookup(
+    meData?.authenticated && meData?.discordId ? meData.discordId : undefined
+  );
+  const memberName = memberData?.memberName ?? null;
+  const loading = meLoading;
+
   const [walletKey, setWalletKey] = useState(0);
   const [sendModal, setSendModal] = useState<{
     type: "pep" | "item";
@@ -325,36 +331,6 @@ export default function PepDashboard() {
     itemId?: number;
     maxQuantity?: number;
   } | null>(null);
-
-  useEffect(() => {
-    const checkSession = async () => {
-      try {
-        const res = await fetch("/api/me");
-        const data = await res.json();
-        setSession(data);
-
-        // Fetch member name if authenticated
-        if (data.authenticated && data.discordId) {
-          try {
-            const memberRes = await fetch(`/api/member-lookup/${data.discordId}`);
-            if (memberRes.ok) {
-              const memberData = await memberRes.json();
-              if (memberData.memberName) {
-                setMemberName(memberData.memberName);
-              }
-            }
-          } catch {
-            // Ignore - fallback to username
-          }
-        }
-      } catch {
-        setSession({ authenticated: false });
-      } finally {
-        setLoading(false);
-      }
-    };
-    checkSession();
-  }, []);
 
   const refreshWallet = () => {
     setWalletKey(k => k + 1);
