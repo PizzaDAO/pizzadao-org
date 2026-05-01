@@ -896,7 +896,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                                             {hasPersonal ? "Your Tasks" : "Top Tasks"}
                                                                         </div>
                                                                         {displayTasks.map((t, idx) => {
-                                                                            const isPersonal = personalTasks?.some(pt => pt.label === t.label);
+                                                                            const isPersonal = personalTasks?.some((pt: { label: string }) => pt.label === t.label);
                                                                             return (
                                                                                 <div key={idx} style={{
                                                                                     fontSize: 12,

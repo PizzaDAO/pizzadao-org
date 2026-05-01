@@ -52,7 +52,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const { data: tasksData } = useMyTasks(id);
 
     const pfpUrl = pfpData?.url ?? null;
-    const articles = articlesData?.articles ?? [];
+    const articles: { slug: string; title: string; excerpt?: string; publishedAt?: string }[] = articlesData?.articles ?? [];
     const missionLevel = missionProgress?.currentLevel ? missionProgress : null;
     const currentMemberId = meData?.memberId ?? null;
     const crewOptions: CrewOption[] = (crewData?.crews ?? []).map((c: any) => ({
@@ -64,7 +64,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
         callTimeUrl: norm(c?.callTimeUrl) || undefined,
         callLength: norm(c?.callLength) || undefined,
     }));
-    const myTasks = tasksData?.tasksByCrew ?? {};
+    const myTasks: Record<string, { label: string; url?: string }[]> = tasksData?.tasksByCrew ?? {};
     const doneCounts = tasksData?.doneCountsByCrew ?? {};
 
     if (loading) {
