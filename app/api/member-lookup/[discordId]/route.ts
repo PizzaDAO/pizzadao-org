@@ -1,20 +1,8 @@
 // app/api/member-lookup/[discordId]/route.ts
-import { parseGvizJson } from "@/app/lib/gviz-parser";
+import { getSheetData } from "@/app/lib/sheets/member-repository";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
-
-const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const TAB_NAME = "Crew";
-
-
-function gvizUrl(sheetId: string, tabName?: string) {
-    const url = new URL(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`);
-    url.searchParams.set("tqx", "out:json");
-    if (tabName) url.searchParams.set("sheet", tabName);
-    url.searchParams.set("headers", "0");
-    return url.toString();
-}
 
 export async function GET(
     request: Request,
@@ -27,110 +15,47 @@ export async function GET(
         const searchParams = new URL(request.url).searchParams;
         const searchName = (searchParams.get("searchName") || "").trim().toLowerCase();
 
-        const url = gvizUrl(SHEET_ID, TAB_NAME);
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed to fetch sheet");
-        const text = await res.text();
-        const gviz = parseGvizJson(text);
-        const rows = gviz?.table?.rows || [];
-        const cols = gviz?.table?.cols || [];
+        const cache = await getSheetData();
 
-        // --- Header Row Hunter ---
-        let headerRowIdx = -1;
-        let headerRowVals: string[] = [];
+        // 1. Search by Discord ID
+        let memberId = cache.discordToMember.get(discordId);
+        let foundMethod = "discord_id";
+        let memberData = memberId != null ? cache.rows[cache.memberToIdx.get(memberId)!] : undefined;
 
-        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-            const rowCells = rows[ri]?.c || [];
-            const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
+        // 2. Fallback: Search by Name (if provided and Discord ID not found)
+        if (!memberData && searchName) {
+            for (let idx = 0; idx < cache.rows.length; idx++) {
+                const row = cache.rows[idx];
+                const rowDiscord = String(row.discordId ?? "").trim();
+                if (rowDiscord && rowDiscord !== "null" && rowDiscord !== "undefined") continue;
 
-            const hasName = rowVals.includes("name");
-            const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
-            const hasCity = rowVals.includes("city") || rowVals.includes("crews");
-
-            if (hasName && (hasStatus || hasCity)) {
-                headerRowIdx = ri;
-                headerRowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
-                break;
+                const name = String(row["Name"] || row["Mafia Name"] || row["Real Name"] || "").trim().toLowerCase();
+                if (name === searchName) {
+                    memberData = row;
+                    // Find memberId from memberToIdx (reverse lookup)
+                    for (const [mid, i] of cache.memberToIdx) {
+                        if (i === idx) { memberId = mid; break; }
+                    }
+                    foundMethod = "name_match";
+                    break;
+                }
             }
         }
 
-        if (headerRowIdx === -1) {
-            throw new Error(`Could not find header row (Name + Status/City). Checked 100 rows.`);
-        }
-
-        // Find standard column indices in the detected header row
-        let idColIdx = -1;
-        let discordColIdx = -1;
-        const nameColIndices: number[] = []; // Store ALL name columns
-
-        const normalizedHeaders = headerRowVals.map(h => h.toLowerCase().replace(/[#\s\-_]+/g, ""));
-
-        normalizedHeaders.forEach((h, ci) => {
-            if (h === "id" || h === "crewid" || h === "memberid") idColIdx = ci;
-            if (h === "discordid" || h === "discord" || h === "discorduser") discordColIdx = ci;
-            if (h === "name" || h === "mafianame" || h === "realname") nameColIndices.push(ci);
-        });
-
-        if (idColIdx === -1) idColIdx = 0; // fallback to A
-        if (discordColIdx === -1) {
-            throw new Error(`Could not find Discord column (DiscordID, Discord). Found: ${headerRowVals.join(", ")}`);
-        }
-
-
-        const dataStartIdx = headerRowIdx + 1;
-
-        // 1. Search by Discord ID
-        let userRow = rows.slice(dataStartIdx).find((r: any) => {
-            const cellVal = r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f;
-            if (cellVal === null || cellVal === undefined) return false;
-            return String(cellVal).trim() === discordId;
-        });
-
-        let foundMethod = "discord_id";
-
-        // 2. Fallback: Search by Name (if provided and Discord ID not found)
-        if (!userRow && searchName && nameColIndices.length > 0) {
-            userRow = rows.slice(dataStartIdx).find((r: any) => {
-                const discordVal = String(r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f ?? "").trim();
-
-                // Must have EMPTY Discord ID
-                const isEmptyDiscord = !discordVal || discordVal === "null" || discordVal === "undefined";
-                if (!isEmptyDiscord) return false;
-
-                // Check ANY name column
-                return nameColIndices.some(idx => {
-                    const val = String(r?.c?.[idx]?.v ?? r?.c?.[idx]?.f ?? "").trim().toLowerCase();
-                    return val === searchName;
-                });
-            });
-            if (userRow) foundMethod = "name_match";
-        }
-
-        if (!userRow) {
-            const sampleDiscordIds = rows.slice(dataStartIdx, dataStartIdx + 5).map((r: any) => r?.c?.[discordColIdx]?.v ?? r?.c?.[discordColIdx]?.f).filter(Boolean);
+        if (!memberData || !memberId) {
             return NextResponse.json({
-                error: `Member not found for Discord ID '${discordId}' (or name '${searchName}'). Found in sheet: ${sampleDiscordIds.join(", ")}.`,
+                error: `Member not found for Discord ID '${discordId}' (or name '${searchName}').`,
                 status: 404
             }, { status: 404 });
         }
 
-        // Map data using human-readable keys from the header row
-        const data: any = {};
-        headerRowVals.forEach((rawKey, idx) => {
-            if (!rawKey) return;
-            const val = userRow.c?.[idx]?.v ?? userRow.c?.[idx]?.f;
-            data[rawKey] = val;
-        });
-
-        // Add standardized aliases for UI convenience
+        // Build data with standardized aliases
+        const data: Record<string, any> = { ...memberData };
         data["Status"] = data["Status"] || data["Frequency"];
         data["Orgs"] = data["Orgs"] || data["Affiliation"];
         data["Skills"] = data["Skills"] || data["Specialties"];
         data["DiscordID"] = data["DiscordID"] || data["Discord"];
 
-        const memberId = userRow.c?.[idColIdx]?.v ?? userRow.c?.[idColIdx]?.f;
-
-        // Get member name for auto-claim verification
         const memberName = data["Name"] || data["Mafia Name"] || "";
 
         return NextResponse.json({ found: true, memberId, memberName, data, method: foundMethod });
