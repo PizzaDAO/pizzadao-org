@@ -179,7 +179,9 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   }
 
   // Show prompt to get NFTs if wallet connected but no NFTs found
+  // Hide on profile pages (showConnectPrompt=false) — don't expose wallet info
   if (!loading && data?.walletAddress && data.totalCount === 0) {
+    if (!showConnectPrompt) return null;
     return (
       <div style={sectionStyle}>
         <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
