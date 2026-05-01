@@ -52,7 +52,7 @@ export default function MissionsPage() {
 
   async function fetchMissions() {
     try {
-      const res = await fetch("/api/missions");
+      const res = await fetch("/api/missions", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load missions");
       const json = await res.json();
       setData(json);
@@ -93,8 +93,27 @@ export default function MissionsPage() {
       throw new Error(json.error);
     }
 
-    // Refresh data
-    await fetchMissions();
+    const result = await res.json();
+    const status = result.completion?.status || "PENDING";
+
+    // Optimistically update the UI immediately
+    setData((prev) => {
+      if (!prev) return prev;
+      return {
+        ...prev,
+        levels: prev.levels.map((level) => ({
+          ...level,
+          missions: level.missions.map((m) =>
+            m.id === missionId
+              ? { ...m, progress: { status, submittedAt: new Date().toISOString() } }
+              : m
+          ),
+        })),
+      };
+    });
+
+    // Then refresh from server for accurate level/reward data
+    fetchMissions();
   }
 
   if (loading) {
