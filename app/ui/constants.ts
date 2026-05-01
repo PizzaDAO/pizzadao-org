@@ -72,6 +72,13 @@ export const ADMIN_ROLE_IDS = [
   TURTLE_ROLE_IDS.LEONARDO, // Leader role
 ] as const;
 
+// Roles notified when a mission needs manual review
+export const MISSION_REVIEWER_ROLE_IDS = [
+  "812131585327235113", // Dread Pizza Roberts
+  "839206162837798945", // Pizza Capo
+  "823266914834841610", // Pepperoni Mafia
+] as const;
+
 // Roles allowed to author articles at pizzadao.org/articles
 export const ARTICLE_AUTHOR_ROLE_IDS = [
   TURTLE_ROLE_IDS.LEONARDO, // Leader role

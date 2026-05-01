@@ -2,6 +2,8 @@ import { prisma } from './db'
 import { updateBalance } from './economy'
 import { logTransaction } from './transactions'
 import { createNotification } from './notifications'
+import { getMembersWithRoles } from './discord'
+import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
 import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from './errors/api-errors'
 
 // ===== QUERIES =====
@@ -145,6 +147,9 @@ export async function submitMissionCompletion(
   // If auto-verified, check if the full level is now complete
   if (mission.autoVerify) {
     await checkAndAwardLevelReward(discordId, mission.level)
+  } else {
+    // Notify reviewers that a mission needs manual review
+    notifyReviewers(discordId, mission.title).catch(() => {})
   }
 
   return completion
@@ -358,6 +363,28 @@ export async function getUserProgressSummary(discordId: string) {
 }
 
 // ===== HELPERS =====
+
+/**
+ * Notify all members with reviewer roles that a mission needs review
+ */
+async function notifyReviewers(submitterDiscordId: string, missionTitle: string) {
+  const reviewerIds = await getMembersWithRoles(MISSION_REVIEWER_ROLE_IDS)
+
+  await Promise.allSettled(
+    reviewerIds
+      .filter(id => id !== submitterDiscordId)
+      .map(recipientId =>
+        createNotification({
+          type: 'MISSION_SUBMITTED',
+          recipientId,
+          actorId: submitterDiscordId,
+          title: 'Mission Needs Review',
+          message: `New submission for "${truncate(missionTitle, 50)}" needs approval.`,
+          linkUrl: '/missions/review',
+        })
+      )
+  )
+}
 
 function truncate(str: string, maxLength: number): string {
   if (str.length <= maxLength) return str

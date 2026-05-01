@@ -54,6 +54,45 @@ export async function searchGuildMembers(query: string, limit = 5) {
   }>
 }
 
+// Get Discord IDs of all members who have any of the specified roles (cached 10 min)
+let membersByRoleCache: { key: string; ids: string[]; timestamp: number } | null = null
+const MEMBERS_BY_ROLE_TTL = 10 * 60 * 1000
+
+export async function getMembersWithRoles(roleIds: readonly string[]): Promise<string[]> {
+  const key = [...roleIds].sort().join(',')
+  if (membersByRoleCache && membersByRoleCache.key === key && Date.now() - membersByRoleCache.timestamp < MEMBERS_BY_ROLE_TTL) {
+    return membersByRoleCache.ids
+  }
+
+  const guildId = process.env.DISCORD_GUILD_ID!
+  const botToken = process.env.DISCORD_BOT_TOKEN!
+  const ids: string[] = []
+  let after = '0'
+
+  // Paginate through guild members (1000 per page)
+  for (let page = 0; page < 10; page++) {
+    const r = await fetch(
+      `https://discord.com/api/v10/guilds/${guildId}/members?limit=1000&after=${after}`,
+      { headers: { Authorization: `Bot ${botToken}` }, cache: 'no-store' }
+    )
+    if (!r.ok) break
+    const members = await r.json() as Array<{ roles: string[]; user: { id: string } }>
+    if (members.length === 0) break
+
+    for (const m of members) {
+      if (m.roles.some(r => roleIds.includes(r))) {
+        ids.push(m.user.id)
+      }
+    }
+
+    after = members[members.length - 1].user.id
+    if (members.length < 1000) break
+  }
+
+  membersByRoleCache = { key, ids, timestamp: Date.now() }
+  return ids
+}
+
 // Send a DM to a Discord user via the bot
 export async function sendDM(
   userId: string,

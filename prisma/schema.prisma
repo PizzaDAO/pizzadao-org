@@ -237,6 +237,7 @@ enum NotificationType {
   BOUNTY_COMMENT     // New comment on a bounty you're involved in
   TASK_ASSIGNED      // A task was assigned to you
   TASK_DUE_SOON      // Task due within a week
+  MISSION_SUBMITTED  // A mission submission needs admin review
   MISSION_APPROVED   // A mission submission was approved
   MISSION_REJECTED   // A mission submission was rejected
   LEVEL_COMPLETED    // All missions in a level completed, reward paid
