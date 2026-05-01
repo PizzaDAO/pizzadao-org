@@ -280,7 +280,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             </span>
           </h3>
         </Link>
-        {data?.walletAddress && (
+        {showConnectPrompt && data?.walletAddress && (
           <a
             href={`https://opensea.io/${data.walletAddress}`}
             target="_blank"
