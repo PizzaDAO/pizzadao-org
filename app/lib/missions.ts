@@ -380,7 +380,7 @@ async function notifyReviewers(submitterDiscordId: string, missionTitle: string)
           actorId: submitterDiscordId,
           title: 'Mission Needs Review',
           message: `New submission for "${truncate(missionTitle, 50)}" needs approval.`,
-          linkUrl: '/missions/review',
+          linkUrl: '/missions',
         })
       )
   )
