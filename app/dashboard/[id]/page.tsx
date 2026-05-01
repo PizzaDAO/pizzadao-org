@@ -96,6 +96,16 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         if (xAccountData) setXAccount(xAccountData);
     }, [xAccountData]);
 
+    // Mission level for hero header
+    const [missionLevel, setMissionLevel] = useState<{ level: number; title: string } | null>(null);
+    useEffect(() => {
+        fetch("/api/missions").then(r => r.ok ? r.json() : null).then(d => {
+            if (d?.currentLevel != null) {
+                setMissionLevel({ level: d.currentLevel, title: d.levelTitle || "" });
+            }
+        }).catch(() => {});
+    }, []);
+
     // Crew options: derived from hook data with fallback to static CREWS
     const crewOptions: CrewOption[] = (() => {
         const crews = crewMappingsData?.crews;
@@ -238,567 +248,124 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
             padding: "40px 20px"
         }}>
             <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
-                {/* Header */}
-                <header style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h1 style={{
-                        marginTop: 0,
-                        fontSize: 32,
-                        marginBottom: 8,
-                        fontWeight: 800
-                    }}>
-                        PizzaDAO Dashboard
-                    </h1>
-                    <p style={{ fontSize: 18, opacity: 0.6 }}>Welcome to the Family, Member #{idValue}</p>
-                </header>
-
                 {/* Main Card */}
                 <div style={card()}>
-                    <div style={{ display: "flex", justifyContent: "flex-end", alignItems: "center", gap: 10, marginBottom: 10, flexWrap: "wrap" }}>
-                        <ThemeToggle />
-                        <NotificationBell />
-                        <Link href="/crews" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            All Crews
-                        </Link>
-                        <Link href="/tech/projects" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            Projects
-                        </Link>
-                        <Link href="/articles" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            Articles
-                        </Link>
-                        <Link href="/crew" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            All Members
-                        </Link>
-                        <Link href="/missions" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            Missions
-                        </Link>
-                        <Link href="/calls" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            Calls
-                        </Link>
-                        <Link href="/vouches" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            Vouches
-                        </Link>
-                        <Link href="/pep" style={{
-                            ...btn("secondary"),
-                            fontSize: 14,
-                            textDecoration: "none",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6
-                        }}>
-                            <PepIcon size={16} /> Economy
-                        </Link>
-                        <Link href={`/?edit=1&memberId=${idValue}`} style={{
-                            ...btn("primary"),
-                            fontSize: 14,
-                            textDecoration: "none"
-                        }}>
-                            Edit Profile
-                        </Link>
-                    </div>
 
-                    {/* Profile Picture */}
-                    {pfpUrl && (
-                        <div style={{ textAlign: "center", marginBottom: 16 }}>
+                    {/* ── 1. Compact Hero Header ── */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
+                        {pfpUrl && (
                             <img
                                 src={pfpUrl}
                                 alt={`${name}'s profile`}
                                 style={{
-                                    width: 150,
-                                    height: 150,
+                                    width: 80,
+                                    height: 80,
                                     borderRadius: "50%",
                                     objectFit: "cover",
                                     objectPosition: "top",
-                                    border: "4px solid #fafafa",
-                                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                                    imageRendering: "crisp-edges"
+                                    border: "3px solid #fafafa",
+                                    boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
+                                    imageRendering: "crisp-edges",
+                                    flexShrink: 0,
                                 }}
                                 onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = "none";
                                 }}
                             />
-                        </div>
-                    )}
-
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                        <div>
-                            <h3 style={{
-                                fontSize: 12,
-                                textTransform: "uppercase",
-                                letterSpacing: "1px",
-                                opacity: 0.5,
-                                marginTop: 0,
-                                marginBottom: 6,
-                                fontWeight: 700
-                            }}>
-                                Name
-                            </h3>
-                            <Link
-                                href={`/profile/${idValue}`}
-                                style={{
-                                    fontSize: 18,
-                                    fontWeight: 500,
-                                    color: 'var(--color-text-primary)',
-                                    textDecoration: "none"
-                                }}
-                                onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
-                                onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
-                            >
-                                {name}
-                            </Link>
-                        </div>
-                        <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                                {/* Wallet Icon */}
-                                <svg width={24} height={24} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.5 }}>
-                                    <path d="M21 12V7H5a2 2 0 0 1 0-4h14v4" />
-                                    <path d="M3 5v14a2 2 0 0 0 2 2h16v-5" />
-                                    <path d="M18 12a2 2 0 0 0 0 4h4v-4Z" />
-                                </svg>
-                                <span style={{
-                                    fontSize: 24,
-                                    fontWeight: 700,
-                                    color: "#16a34a"
-                                }}>
-                                    {pepBalance !== null ? <PepAmount amount={pepBalance} size={20} /> : "—"}
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
+                            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+                                <Link
+                                    href={`/profile/${idValue}`}
+                                    style={{
+                                        fontSize: 24,
+                                        fontWeight: 800,
+                                        color: 'var(--color-text-primary)',
+                                        textDecoration: "none",
+                                    }}
+                                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
+                                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                >
+                                    {name}
+                                </Link>
+                                {missionLevel && (
+                                    <span style={{ fontSize: 13, opacity: 0.55, whiteSpace: "nowrap" }}>
+                                        Lv.{missionLevel.level} {missionLevel.title}
+                                    </span>
+                                )}
+                            </div>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 14, opacity: 0.6 }}>{city}</span>
+                                <span style={{ opacity: 0.3 }}>·</span>
+                                <span style={{ fontSize: 14, fontWeight: 600, color: "#16a34a", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                                    {pepBalance !== null ? <PepAmount amount={pepBalance} size={14} /> : "—"}
                                 </span>
-                                {/* Send Button */}
                                 <button
                                     onClick={() => setShowSendModal(true)}
                                     style={{
                                         background: "none",
                                         border: "none",
                                         cursor: "pointer",
-                                        padding: 4,
+                                        padding: 2,
                                         display: "flex",
                                         alignItems: "center",
-                                        justifyContent: "center",
-                                        opacity: 0.6,
+                                        opacity: 0.5,
                                     }}
                                     title="Send PEP"
                                 >
-                                    <svg width={18} height={18} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
                                         <path d="M22 2L11 13" />
                                         <path d="M22 2L15 22L11 13L2 9L22 2Z" />
                                     </svg>
                                 </button>
                             </div>
                         </div>
-                        <StatItem label="City" value={city} />
-                        <StatItem label="Status" value={status} />
-                        {/* Orgs with edit button */}
-                        <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                <h3 style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "1px",
-                                    opacity: 0.5,
-                                    margin: 0,
-                                    fontWeight: 700
-                                }}>
-                                    Orgs
-                                </h3>
-                                {!editingOrgs && (
-                                    <button
-                                        onClick={() => {
-                                            setOrgsInput(orgs === "None" ? "" : orgs);
-                                            setEditingOrgs(true);
-                                        }}
-                                        style={{
-                                            background: "transparent",
-                                            border: "none",
-                                            cursor: "pointer",
-                                            opacity: 0.4,
-                                            padding: 0,
-                                            display: "flex",
-                                            alignItems: "center"
-                                        }}
-                                        title="Edit orgs"
-                                    >
-                                        <Pencil size={12} />
-                                    </button>
-                                )}
-                            </div>
-                            {editingOrgs ? (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                    <textarea
-                                        value={orgsInput}
-                                        onChange={(e) => setOrgsInput(e.target.value)}
-                                        placeholder="Enter your orgs (comma separated)"
-                                        style={{
-                                            padding: 8,
-                                            borderRadius: 6,
-                                            border: '1px solid var(--color-border-strong)',
-                                            fontSize: 14,
-                                            fontFamily: "inherit",
-                                            resize: "vertical",
-                                            minHeight: 60
-                                        }}
-                                    />
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        <button
-                                            onClick={async () => {
-                                                setOrgsSaving(true);
-                                                try {
-                                                    const res = await fetch("/api/update-orgs", {
-                                                        method: "POST",
-                                                        headers: { "Content-Type": "application/json" },
-                                                        body: JSON.stringify({ memberId: idValue, orgs: orgsInput })
-                                                    });
-                                                    if (res.ok) {
-                                                        setData({ ...data, Orgs: orgsInput });
-                                                        setEditingOrgs(false);
-                                                    } else {
-                                                        const err = await res.json();
-                                                        alert(err.error || "Failed to save");
-                                                    }
-                                                } catch (e) {
-                                                    alert("Failed to save orgs");
-                                                } finally {
-                                                    setOrgsSaving(false);
-                                                }
-                                            }}
-                                            disabled={orgsSaving}
-                                            style={{
-                                                ...btn("primary"),
-                                                fontSize: 12,
-                                                padding: "6px 12px"
-                                            }}
-                                        >
-                                            {orgsSaving ? "Saving..." : "Save"}
-                                        </button>
-                                        <button
-                                            onClick={() => setEditingOrgs(false)}
-                                            style={{
-                                                ...btn("secondary"),
-                                                fontSize: 12,
-                                                padding: "6px 12px"
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p style={{
-                                    fontSize: 18,
-                                    fontWeight: 500,
-                                    color: 'var(--color-text-primary)',
-                                    margin: 0,
-                                    wordBreak: "break-word"
-                                }}>
-                                    {orgs}
-                                </p>
-                            )}
-                        </div>
-                        {/* Skills with edit button */}
-                        <div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
-                                <h3 style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "1px",
-                                    opacity: 0.5,
-                                    margin: 0,
-                                    fontWeight: 700
-                                }}>
-                                    Skills
-                                </h3>
-                                {!editingSkills && (
-                                    <button
-                                        onClick={() => {
-                                            setSkillsInput(skills === "None" ? "" : skills);
-                                            setEditingSkills(true);
-                                        }}
-                                        style={{
-                                            background: "transparent",
-                                            border: "none",
-                                            cursor: "pointer",
-                                            opacity: 0.4,
-                                            padding: 0,
-                                            display: "flex",
-                                            alignItems: "center"
-                                        }}
-                                        title="Edit skills"
-                                    >
-                                        <Pencil size={12} />
-                                    </button>
-                                )}
-                            </div>
-                            {editingSkills ? (
-                                <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-                                    <textarea
-                                        value={skillsInput}
-                                        onChange={(e) => setSkillsInput(e.target.value)}
-                                        placeholder="Enter your skills (comma separated)"
-                                        style={{
-                                            padding: 8,
-                                            borderRadius: 6,
-                                            border: '1px solid var(--color-border-strong)',
-                                            fontSize: 14,
-                                            fontFamily: "inherit",
-                                            resize: "vertical",
-                                            minHeight: 60
-                                        }}
-                                    />
-                                    <div style={{ display: "flex", gap: 8 }}>
-                                        <button
-                                            onClick={async () => {
-                                                setSkillsSaving(true);
-                                                try {
-                                                    const res = await fetch("/api/update-skills", {
-                                                        method: "POST",
-                                                        headers: { "Content-Type": "application/json" },
-                                                        body: JSON.stringify({ memberId: idValue, skills: skillsInput })
-                                                    });
-                                                    if (res.ok) {
-                                                        setData({ ...data, Skills: skillsInput });
-                                                        setEditingSkills(false);
-                                                    } else {
-                                                        const err = await res.json();
-                                                        alert(err.error || "Failed to save");
-                                                    }
-                                                } catch (e) {
-                                                    alert("Failed to save skills");
-                                                } finally {
-                                                    setSkillsSaving(false);
-                                                }
-                                            }}
-                                            disabled={skillsSaving}
-                                            style={{
-                                                ...btn("primary"),
-                                                fontSize: 12,
-                                                padding: "6px 12px"
-                                            }}
-                                        >
-                                            {skillsSaving ? "Saving..." : "Save"}
-                                        </button>
-                                        <button
-                                            onClick={() => setEditingSkills(false)}
-                                            style={{
-                                                ...btn("secondary"),
-                                                fontSize: 12,
-                                                padding: "6px 12px"
-                                            }}
-                                        >
-                                            Cancel
-                                        </button>
-                                    </div>
-                                </div>
-                            ) : (
-                                <p style={{
-                                    fontSize: 18,
-                                    fontWeight: 500,
-                                    color: 'var(--color-text-primary)',
-                                    margin: 0,
-                                    wordBreak: "break-word"
-                                }}>
-                                    {skills}
-                                </p>
-                            )}
-                        </div>
-                        <StatItem label="Discord" value={discord} />
-                        <StatItem label="Telegram" value={telegram} />
-
-                        {/* Roles moved here - Images + Sync Button */}
-                        <div style={{ gridColumn: "1 / -1" }}>
-                            <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
-                                <div>
-                                    <h3 style={{
-                                        fontSize: 12,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "1px",
-                                        opacity: 0.5,
-                                        marginTop: 0,
-                                        marginBottom: 6,
-                                        fontWeight: 700
-                                    }}>
-                                        Roles
-                                    </h3>
-                                    <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                                        {turtleList.length > 0 ? (
-                                            turtleList.map((tName: string) => {
-                                                const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
-                                                if (!tDef) return null;
-                                                return (
-                                                    <img
-                                                        key={tDef.id}
-                                                        src={tDef.image}
-                                                        alt={tDef.label}
-                                                        title={tDef.label}
-                                                        style={{ width: 40, height: 40, objectFit: "contain" }}
-                                                    />
-                                                );
-                                            })
-                                        ) : (
-                                            <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
-                                        )}
-                                    </div>
-
-                                    {/* Other Roles List */}
-                                    {(() => {
-                                        const otherRoles = turtleList.filter((tName: string) => {
-                                            return !TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
-                                        });
-
-                                        if (otherRoles.length === 0) return null;
-                                        return (
-                                            <div style={{ marginTop: 8, fontSize: 14, opacity: 0.8 }}>
-                                                <strong>Other Roles:</strong> {otherRoles.join(", ")}
-                                            </div>
-                                        );
-                                    })()}
-                                </div>
-
-                                {/* Sync Button - hidden: roles now auto-sync on login.
-                                   Keeping the SyncRolesButton component and API route
-                                   intact for potential manual use later. */}
-                            </div>
-                        </div>
-
-                        {/* Profile Links - editable */}
-                        <ProfileLinksEditor memberId={idValue} />
-
-                        {/* Connect X Account */}
-                        <div style={{
-                            gridColumn: "1 / -1",
-                            padding: 16,
-                            borderRadius: 12,
-                            border: '1px solid var(--color-border)',
-                            background: 'var(--color-surface)',
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 12,
-                        }}>
-                            {/* X Logo */}
-                            <svg width={24} height={24} viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
-                                <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
-                            </svg>
-
-                            {xAccount?.connected ? (
-                                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                                    <div>
-                                        <a
-                                            href={`https://x.com/${xAccount.username}`}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            style={{
-                                                fontWeight: 600,
-                                                fontSize: 16,
-                                                color: 'var(--color-text-primary)',
-                                                textDecoration: "none",
-                                            }}
-                                            onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
-                                            onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
-                                        >
-                                            @{xAccount.username}
-                                        </a>
-                                        <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>Connected</div>
-                                    </div>
-                                    <button
-                                        onClick={async () => {
-                                            setXDisconnecting(true);
-                                            try {
-                                                const res = await fetch("/api/x/disconnect", { method: "DELETE" });
-                                                if (res.ok) {
-                                                    setXAccount({ connected: false });
-                                                }
-                                            } catch {} finally {
-                                                setXDisconnecting(false);
-                                            }
-                                        }}
-                                        disabled={xDisconnecting}
-                                        style={{
-                                            background: "transparent",
-                                            border: '1px solid var(--color-border-strong)',
-                                            borderRadius: 8,
-                                            padding: "6px 12px",
-                                            fontSize: 12,
-                                            cursor: "pointer",
-                                            opacity: xDisconnecting ? 0.5 : 0.7,
-                                            fontFamily: "inherit",
-                                            color: 'var(--color-text)',
-                                        }}
-                                    >
-                                        {xDisconnecting ? "Disconnecting..." : "Disconnect"}
-                                    </button>
-                                </div>
-                            ) : (
-                                <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
-                                    <span style={{ fontSize: 14, opacity: 0.6 }}>Connect your X account</span>
-                                    <a
-                                        href={`/api/x/login?memberId=${idValue}`}
-                                        style={{
-                                            ...btn("primary"),
-                                            fontSize: 13,
-                                            padding: "8px 16px",
-                                            textDecoration: "none",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: 6,
-                                        }}
-                                    >
-                                        Connect X
-                                    </a>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Social Accounts - link X and Farcaster handles */}
-                        <SocialAccountLinker memberId={idValue} />
-
-                        {/* Vouches Widget */}
-                        <VouchesWidget memberId={idValue} />
-
-                        {/* POAP Collection - inside profile grid under roles */}
-                        <div style={{ gridColumn: "1 / -1" }}>
-                            <POAPCollection memberId={idValue} />
+                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
+                            <Link href={`/?edit=1&memberId=${idValue}`} style={{
+                                ...btn("primary"),
+                                fontSize: 13,
+                                padding: "6px 12px",
+                                textDecoration: "none",
+                            }}>
+                                Edit Profile
+                            </Link>
+                            <ThemeToggle />
+                            <NotificationBell />
                         </div>
                     </div>
 
-                    {/* Wallet Manager - connect, edit, remove wallets */}
-                    <WalletManager memberId={idValue} />
+                    {/* ── 2. Slim Nav (5 links) ── */}
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+                        <Link href="/tech/projects" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
+                            Projects
+                        </Link>
+                        <Link href="/articles" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
+                            Articles
+                        </Link>
+                        <Link href="/crew" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
+                            All Members
+                        </Link>
+                        <Link href="/calls" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
+                            Calls
+                        </Link>
+                        <Link href="/pep" style={{
+                            ...btn("secondary"),
+                            fontSize: 13,
+                            textDecoration: "none",
+                            display: "flex",
+                            alignItems: "center",
+                            gap: 6,
+                        }}>
+                            <PepIcon size={14} /> Economy
+                        </Link>
+                    </div>
 
-                    {/* NFT Collection Section */}
-                    <NFTCollection memberId={idValue} showConnectPrompt={false} />
-
-                    {/* Pizza Party Tickets */}
-                    <UnlockTicketCard memberId={idValue} />
-
-                    {/* Missions Progress */}
-                    <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
+                    {/* ── 3. Missions Progress ── */}
+                    <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
                         <MissionsProgress />
                     </div>
 
-                    {/* Crews Section - MATCHING STEP 5 UI */}
+                    {/* ── 4. Your Crews ── */}
                     {(() => {
                         // Normalize userCrews to IDs where possible
                         const userCrewIds = userCrews.map(name => {
@@ -813,7 +380,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         if (allDisplayIds.length === 0) return null;
 
                         return (
-                            <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
+                            <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
                                 <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>Your Crews</h3>
                                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
                                     {allDisplayIds.map((cid) => {
@@ -971,7 +538,390 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         );
                     })()}
 
-                    <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)', textAlign: "center" }}>
+                    {/* ── 5. Vouches Widget ── */}
+                    <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+                        <VouchesWidget memberId={idValue} />
+                    </div>
+
+                    {/* ── 6. Collapsible "Profile Details" ── */}
+                    <CollapsibleSection title="Profile Details">
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                            <StatItem label="Status" value={status} />
+
+                            {/* Orgs with edit button */}
+                            <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                                    <h3 style={{
+                                        fontSize: 12,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "1px",
+                                        opacity: 0.5,
+                                        margin: 0,
+                                        fontWeight: 700
+                                    }}>
+                                        Orgs
+                                    </h3>
+                                    {!editingOrgs && (
+                                        <button
+                                            onClick={() => {
+                                                setOrgsInput(orgs === "None" ? "" : orgs);
+                                                setEditingOrgs(true);
+                                            }}
+                                            style={{
+                                                background: "transparent",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                opacity: 0.4,
+                                                padding: 0,
+                                                display: "flex",
+                                                alignItems: "center"
+                                            }}
+                                            title="Edit orgs"
+                                        >
+                                            <Pencil size={12} />
+                                        </button>
+                                    )}
+                                </div>
+                                {editingOrgs ? (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                        <textarea
+                                            value={orgsInput}
+                                            onChange={(e) => setOrgsInput(e.target.value)}
+                                            placeholder="Enter your orgs (comma separated)"
+                                            style={{
+                                                padding: 8,
+                                                borderRadius: 6,
+                                                border: '1px solid var(--color-border-strong)',
+                                                fontSize: 14,
+                                                fontFamily: "inherit",
+                                                resize: "vertical",
+                                                minHeight: 60
+                                            }}
+                                        />
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            <button
+                                                onClick={async () => {
+                                                    setOrgsSaving(true);
+                                                    try {
+                                                        const res = await fetch("/api/update-orgs", {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ memberId: idValue, orgs: orgsInput })
+                                                        });
+                                                        if (res.ok) {
+                                                            setData({ ...data, Orgs: orgsInput });
+                                                            setEditingOrgs(false);
+                                                        } else {
+                                                            const err = await res.json();
+                                                            alert(err.error || "Failed to save");
+                                                        }
+                                                    } catch (e) {
+                                                        alert("Failed to save orgs");
+                                                    } finally {
+                                                        setOrgsSaving(false);
+                                                    }
+                                                }}
+                                                disabled={orgsSaving}
+                                                style={{
+                                                    ...btn("primary"),
+                                                    fontSize: 12,
+                                                    padding: "6px 12px"
+                                                }}
+                                            >
+                                                {orgsSaving ? "Saving..." : "Save"}
+                                            </button>
+                                            <button
+                                                onClick={() => setEditingOrgs(false)}
+                                                style={{
+                                                    ...btn("secondary"),
+                                                    fontSize: 12,
+                                                    padding: "6px 12px"
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p style={{
+                                        fontSize: 18,
+                                        fontWeight: 500,
+                                        color: 'var(--color-text-primary)',
+                                        margin: 0,
+                                        wordBreak: "break-word"
+                                    }}>
+                                        {orgs}
+                                    </p>
+                                )}
+                            </div>
+
+                            {/* Skills with edit button */}
+                            <div>
+                                <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                                    <h3 style={{
+                                        fontSize: 12,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "1px",
+                                        opacity: 0.5,
+                                        margin: 0,
+                                        fontWeight: 700
+                                    }}>
+                                        Skills
+                                    </h3>
+                                    {!editingSkills && (
+                                        <button
+                                            onClick={() => {
+                                                setSkillsInput(skills === "None" ? "" : skills);
+                                                setEditingSkills(true);
+                                            }}
+                                            style={{
+                                                background: "transparent",
+                                                border: "none",
+                                                cursor: "pointer",
+                                                opacity: 0.4,
+                                                padding: 0,
+                                                display: "flex",
+                                                alignItems: "center"
+                                            }}
+                                            title="Edit skills"
+                                        >
+                                            <Pencil size={12} />
+                                        </button>
+                                    )}
+                                </div>
+                                {editingSkills ? (
+                                    <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+                                        <textarea
+                                            value={skillsInput}
+                                            onChange={(e) => setSkillsInput(e.target.value)}
+                                            placeholder="Enter your skills (comma separated)"
+                                            style={{
+                                                padding: 8,
+                                                borderRadius: 6,
+                                                border: '1px solid var(--color-border-strong)',
+                                                fontSize: 14,
+                                                fontFamily: "inherit",
+                                                resize: "vertical",
+                                                minHeight: 60
+                                            }}
+                                        />
+                                        <div style={{ display: "flex", gap: 8 }}>
+                                            <button
+                                                onClick={async () => {
+                                                    setSkillsSaving(true);
+                                                    try {
+                                                        const res = await fetch("/api/update-skills", {
+                                                            method: "POST",
+                                                            headers: { "Content-Type": "application/json" },
+                                                            body: JSON.stringify({ memberId: idValue, skills: skillsInput })
+                                                        });
+                                                        if (res.ok) {
+                                                            setData({ ...data, Skills: skillsInput });
+                                                            setEditingSkills(false);
+                                                        } else {
+                                                            const err = await res.json();
+                                                            alert(err.error || "Failed to save");
+                                                        }
+                                                    } catch (e) {
+                                                        alert("Failed to save skills");
+                                                    } finally {
+                                                        setSkillsSaving(false);
+                                                    }
+                                                }}
+                                                disabled={skillsSaving}
+                                                style={{
+                                                    ...btn("primary"),
+                                                    fontSize: 12,
+                                                    padding: "6px 12px"
+                                                }}
+                                            >
+                                                {skillsSaving ? "Saving..." : "Save"}
+                                            </button>
+                                            <button
+                                                onClick={() => setEditingSkills(false)}
+                                                style={{
+                                                    ...btn("secondary"),
+                                                    fontSize: 12,
+                                                    padding: "6px 12px"
+                                                }}
+                                            >
+                                                Cancel
+                                            </button>
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <p style={{
+                                        fontSize: 18,
+                                        fontWeight: 500,
+                                        color: 'var(--color-text-primary)',
+                                        margin: 0,
+                                        wordBreak: "break-word"
+                                    }}>
+                                        {skills}
+                                    </p>
+                                )}
+                            </div>
+
+                            <StatItem label="Discord" value={discord} />
+                            <StatItem label="Telegram" value={telegram} />
+
+                            {/* Roles */}
+                            <div style={{ gridColumn: "1 / -1" }}>
+                                <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
+                                    <div>
+                                        <h3 style={{
+                                            fontSize: 12,
+                                            textTransform: "uppercase",
+                                            letterSpacing: "1px",
+                                            opacity: 0.5,
+                                            marginTop: 0,
+                                            marginBottom: 6,
+                                            fontWeight: 700
+                                        }}>
+                                            Roles
+                                        </h3>
+                                        <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                                            {turtleList.length > 0 ? (
+                                                turtleList.map((tName: string) => {
+                                                    const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
+                                                    if (!tDef) return null;
+                                                    return (
+                                                        <img
+                                                            key={tDef.id}
+                                                            src={tDef.image}
+                                                            alt={tDef.label}
+                                                            title={tDef.label}
+                                                            style={{ width: 40, height: 40, objectFit: "contain" }}
+                                                        />
+                                                    );
+                                                })
+                                            ) : (
+                                                <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
+                                            )}
+                                        </div>
+
+                                        {/* Other Roles List */}
+                                        {(() => {
+                                            const otherRoles = turtleList.filter((tName: string) => {
+                                                return !TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
+                                            });
+
+                                            if (otherRoles.length === 0) return null;
+                                            return (
+                                                <div style={{ marginTop: 8, fontSize: 14, opacity: 0.8 }}>
+                                                    <strong>Other Roles:</strong> {otherRoles.join(", ")}
+                                                </div>
+                                            );
+                                        })()}
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Profile Links - editable */}
+                            <ProfileLinksEditor memberId={idValue} />
+
+                            {/* Connect X Account */}
+                            <div style={{
+                                gridColumn: "1 / -1",
+                                padding: 16,
+                                borderRadius: 12,
+                                border: '1px solid var(--color-border)',
+                                background: 'var(--color-surface)',
+                                display: "flex",
+                                alignItems: "center",
+                                gap: 12,
+                            }}>
+                                {/* X Logo */}
+                                <svg width={24} height={24} viewBox="0 0 24 24" fill="currentColor" style={{ flexShrink: 0 }}>
+                                    <path d="M18.244 2.25h3.308l-7.227 8.26 8.502 11.24H16.17l-5.214-6.817L4.99 21.75H1.68l7.73-8.835L1.254 2.25H8.08l4.713 6.231zm-1.161 17.52h1.833L7.084 4.126H5.117z" />
+                                </svg>
+
+                                {xAccount?.connected ? (
+                                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                        <div>
+                                            <a
+                                                href={`https://x.com/${xAccount.username}`}
+                                                target="_blank"
+                                                rel="noreferrer"
+                                                style={{
+                                                    fontWeight: 600,
+                                                    fontSize: 16,
+                                                    color: 'var(--color-text-primary)',
+                                                    textDecoration: "none",
+                                                }}
+                                                onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
+                                                onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                            >
+                                                @{xAccount.username}
+                                            </a>
+                                            <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>Connected</div>
+                                        </div>
+                                        <button
+                                            onClick={async () => {
+                                                setXDisconnecting(true);
+                                                try {
+                                                    const res = await fetch("/api/x/disconnect", { method: "DELETE" });
+                                                    if (res.ok) {
+                                                        setXAccount({ connected: false });
+                                                    }
+                                                } catch {} finally {
+                                                    setXDisconnecting(false);
+                                                }
+                                            }}
+                                            disabled={xDisconnecting}
+                                            style={{
+                                                background: "transparent",
+                                                border: '1px solid var(--color-border-strong)',
+                                                borderRadius: 8,
+                                                padding: "6px 12px",
+                                                fontSize: 12,
+                                                cursor: "pointer",
+                                                opacity: xDisconnecting ? 0.5 : 0.7,
+                                                fontFamily: "inherit",
+                                                color: 'var(--color-text)',
+                                            }}
+                                        >
+                                            {xDisconnecting ? "Disconnecting..." : "Disconnect"}
+                                        </button>
+                                    </div>
+                                ) : (
+                                    <div style={{ flex: 1, display: "flex", alignItems: "center", justifyContent: "space-between", flexWrap: "wrap", gap: 8 }}>
+                                        <span style={{ fontSize: 14, opacity: 0.6 }}>Connect your X account</span>
+                                        <a
+                                            href={`/api/x/login?memberId=${idValue}`}
+                                            style={{
+                                                ...btn("primary"),
+                                                fontSize: 13,
+                                                padding: "8px 16px",
+                                                textDecoration: "none",
+                                                display: "inline-flex",
+                                                alignItems: "center",
+                                                gap: 6,
+                                            }}
+                                        >
+                                            Connect X
+                                        </a>
+                                    </div>
+                                )}
+                            </div>
+
+                            {/* Social Accounts - link X and Farcaster handles */}
+                            <SocialAccountLinker memberId={idValue} />
+                        </div>
+                    </CollapsibleSection>
+
+                    {/* ── 7. Collapsible "Collections" ── */}
+                    <CollapsibleSection title="Collections">
+                        <div style={{ display: "grid", gap: 14 }}>
+                            <WalletManager memberId={idValue} />
+                            <POAPCollection memberId={idValue} />
+                            <NFTCollection memberId={idValue} showConnectPrompt={false} />
+                            <UnlockTicketCard memberId={idValue} />
+                        </div>
+                    </CollapsibleSection>
+
+                    {/* ── 8. Logout ── */}
+                    <div style={{ paddingTop: 16, borderTop: '1px solid var(--color-divider)', textAlign: "center" }}>
                         <button
                             onClick={async () => {
                                 try {
@@ -1013,6 +963,45 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         queryClient.invalidateQueries({ queryKey: ['my-balance'] });
                     }}
                 />
+            )}
+        </div>
+    );
+}
+
+function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+            <button
+                onClick={() => setOpen(!open)}
+                style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 0,
+                    width: "100%",
+                    textAlign: "left",
+                    color: 'var(--color-text)',
+                    fontFamily: "inherit",
+                }}
+            >
+                <span style={{
+                    display: "inline-block",
+                    fontSize: 12,
+                    transition: "transform 0.2s",
+                    transform: open ? "rotate(90deg)" : "rotate(0deg)",
+                }}>
+                    ▶
+                </span>
+                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{title}</h3>
+            </button>
+            {open && (
+                <div style={{ marginTop: 16 }}>
+                    {children}
+                </div>
             )}
         </div>
     );
