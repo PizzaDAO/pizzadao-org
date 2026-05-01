@@ -5,6 +5,7 @@ import { hasAnyRole } from '@/app/lib/discord'
 import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
+import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
 
 export const runtime = 'nodejs'
 
@@ -23,12 +24,23 @@ const GET_HANDLER = async () => {
 
   const pending = await getPendingSubmissions()
 
+  // Resolve Discord IDs to member names
+  const uniqueDiscordIds = [...new Set(pending.map(p => p.discordId))]
+  const memberLookups = await Promise.all(
+    uniqueDiscordIds.map(async (did) => {
+      const member = await fetchMemberByDiscordId(did)
+      return [did, member?.name ?? null] as const
+    })
+  )
+  const nameMap = new Map(memberLookups)
+
   return NextResponse.json({
     submissions: pending.map(p => ({
       id: p.id,
       missionId: p.missionId,
       discordId: p.discordId,
       memberId: p.memberId,
+      memberName: nameMap.get(p.discordId) ?? null,
       evidence: p.evidence,
       notes: p.notes,
       submittedAt: p.submittedAt.toISOString(),

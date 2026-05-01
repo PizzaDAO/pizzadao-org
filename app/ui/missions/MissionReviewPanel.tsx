@@ -8,6 +8,7 @@ type Submission = {
   missionId: number;
   discordId: string;
   memberId: string | null;
+  memberName: string | null;
   evidence: string | null;
   notes: string | null;
   submittedAt: string;
@@ -110,7 +111,7 @@ export function MissionReviewPanel() {
                   Level {sub.mission.level}: {sub.mission.title}
                 </div>
                 <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
-                  by {sub.memberId ? `#${sub.memberId}` : sub.discordId} &middot;{" "}
+                  by {sub.memberName ?? sub.discordId} &middot;{" "}
                   {new Date(sub.submittedAt).toLocaleDateString("en-US", {
                     month: "short",
                     day: "numeric",
