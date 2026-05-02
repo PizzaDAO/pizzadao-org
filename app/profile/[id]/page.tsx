@@ -1,7 +1,7 @@
 // app/profile/[id]/page.tsx
 "use client";
 
-import { use } from "react";
+import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Inter } from "next/font/google";
@@ -36,6 +36,43 @@ function splitTurtlesCell(v: unknown): string[] {
     const s = norm(v);
     if (!s) return [];
     return s.split(/[,/|]+/).map((x) => norm(x)).filter(Boolean);
+}
+
+function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+    const [open, setOpen] = useState(defaultOpen);
+    return (
+        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
+            <button
+                onClick={() => setOpen(!open)}
+                style={{
+                    background: "none",
+                    border: "none",
+                    cursor: "pointer",
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 8,
+                    padding: 0,
+                    width: "100%",
+                    textAlign: "left",
+                    fontFamily: "inherit",
+                    fontSize: 18,
+                    fontWeight: 600,
+                    color: 'var(--color-text)',
+                }}
+            >
+                <span style={{
+                    display: "inline-block",
+                    transition: "transform 0.2s",
+                    transform: open ? "rotate(90deg)" : "rotate(0deg)",
+                    fontSize: 12,
+                }}>
+                    ▶
+                </span>
+                {title}
+            </button>
+            {open && <div style={{ marginTop: 12 }}>{children}</div>}
+        </div>
+    );
 }
 
 export default function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
@@ -133,8 +170,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
     const userCrews = (crewsStr !== "None" ? crewsStr.split(",").map((c: string) => c.trim()).filter(Boolean) : []) as string[];
 
-    const isPizzaMafia = turtleList.some(t => t.toLowerCase().includes("pizza mafia") || t.toLowerCase() === "mafia");
-    const memberTitle = isPizzaMafia ? "Pizza Mafia" : "PizzaDAO Member";
+    const levelStr = missionLevel && missionLevel.approvedCount > 0
+        ? `Lv.${missionLevel.currentLevel > 8 ? "MAX" : missionLevel.currentLevel} ${missionLevel.levelTitle || ""}`
+        : null;
 
     return (
         <div style={{
@@ -164,299 +202,63 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                     </button>
                 </div>
 
-                {/* Header */}
-                <header style={{ textAlign: "center", marginBottom: 20 }}>
-                    <h1 style={{
-                        marginTop: 0,
-                        fontSize: 32,
-                        marginBottom: 8,
-                        fontWeight: 800
-                    }}>
-                        {memberTitle}
-                    </h1>
-                </header>
-
                 {/* Main Card */}
                 <div style={card()}>
-                    {/* Profile Picture */}
-                    {pfpUrl && (
-                        <div style={{ textAlign: "center", marginBottom: 16 }}>
+                    {/* Compact Hero */}
+                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                        {pfpUrl && (
                             <img
                                 src={pfpUrl}
                                 alt={`${name}'s profile`}
                                 style={{
-                                    width: 150,
-                                    height: 150,
+                                    width: 80,
+                                    height: 80,
                                     borderRadius: "50%",
                                     objectFit: "cover",
                                     objectPosition: "top",
-                                    border: "4px solid #fafafa",
-                                    boxShadow: "0 4px 20px rgba(0,0,0,0.15)",
-                                    imageRendering: "crisp-edges",
-                                    WebkitBackfaceVisibility: "hidden",
-                                    transform: "translateZ(0)"
+                                    border: "3px solid #fafafa",
+                                    boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
+                                    flexShrink: 0,
                                 }}
                                 onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = "none";
                                 }}
                             />
-                        </div>
-                    )}
-
-                    {/* Vouch Button */}
-                    <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 8 }}>
-                        <AddVouchButton
-                            targetMemberId={idValue}
-                            currentMemberId={currentMemberId}
-                        />
-                    </div>
-
-                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                        <div>
-                            <h3 style={{
-                                fontSize: 12,
-                                textTransform: "uppercase",
-                                letterSpacing: "1px",
-                                opacity: 0.5,
-                                marginTop: 0,
-                                marginBottom: 6,
-                                fontWeight: 700
-                            }}>
-                                Name
-                            </h3>
+                        )}
+                        <div style={{ flex: 1, minWidth: 0 }}>
                             <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                <p style={{
-                                    fontSize: 18,
-                                    fontWeight: 500,
-                                    color: 'var(--color-text-primary)',
+                                <h1 style={{
+                                    fontSize: 22,
+                                    fontWeight: 700,
                                     margin: 0,
-                                    wordBreak: "break-word"
+                                    wordBreak: "break-word",
                                 }}>
                                     {name}
-                                </p>
+                                </h1>
                                 <MafiaRankBadge memberId={idValue} />
                             </div>
-                        </div>
-                        <StatItem label="City" value={city} />
-                        <StatItem label="Status" value={status || "—"} />
-                        <StatItem label="ID" value={`#${idValue}`} />
-                        {orgs && <StatItem label="Orgs" value={orgs} />}
-                        {skills && <StatItem label="Skills" value={skills} />}
-
-                        {/* Mission Level */}
-                        {missionLevel && missionLevel.approvedCount > 0 && (
-                            <div>
-                                <h3 style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "1px",
-                                    opacity: 0.5,
-                                    marginTop: 0,
-                                    marginBottom: 6,
-                                    fontWeight: 700
-                                }}>
-                                    Mission Level
-                                </h3>
-                                <Link
-                                    href="/missions"
-                                    style={{
-                                        fontSize: 18,
-                                        fontWeight: 500,
-                                        color: 'var(--color-text-primary)',
-                                        textDecoration: "none",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 6,
-                                    }}
-                                >
-                                    Lv.{missionLevel.currentLevel > 8 ? "MAX" : missionLevel.currentLevel}
-                                    {missionLevel.levelTitle && (
-                                        <span style={{ fontSize: 14, opacity: 0.6 }}>
-                                            {missionLevel.levelTitle}
-                                        </span>
-                                    )}
-                                </Link>
-                                <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>
-                                    {missionLevel.approvedCount}/{missionLevel.totalMissions} missions completed
-                                </div>
-                            </div>
-                        )}
-
-                        {/* X Account */}
-                        {xAccount?.connected && (
-                            <div>
-                                <h3 style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "1px",
-                                    opacity: 0.5,
-                                    marginTop: 0,
-                                    marginBottom: 6,
-                                    fontWeight: 700
-                                }}>
-                                    X
-                                </h3>
-                                <a
-                                    href={`https://x.com/${xAccount.username}`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{
-                                        fontSize: 18,
-                                        fontWeight: 500,
-                                        color: 'var(--color-text-primary)',
-                                        textDecoration: "none",
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 6,
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
-                                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
-                                >
-                                    @{xAccount.username}
-                                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
-                                        <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                        <polyline points="15 3 21 3 21 9" />
-                                        <line x1="10" y1="14" x2="21" y2="3" />
-                                    </svg>
-                                </a>
-                            </div>
-                        )}
-
-                        {/* Roles */}
-                        <div style={{ gridColumn: "1 / -1" }}>
-                            <h3 style={{
-                                fontSize: 12,
-                                textTransform: "uppercase",
-                                letterSpacing: "1px",
-                                opacity: 0.5,
-                                marginTop: 0,
-                                marginBottom: 6,
-                                fontWeight: 700
-                            }}>
-                                Roles
-                            </h3>
-                            <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                                {turtleList.length > 0 ? (
-                                    turtleList.map((tName: string) => {
-                                        const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
-                                        if (!tDef) return null;
-                                        return (
-                                            <Link
-                                                key={tDef.id}
-                                                href={`/turtles/${encodeURIComponent(tDef.id)}`}
-                                                title={`View all ${tDef.label} members`}
-                                            >
-                                                <img
-                                                    src={tDef.image}
-                                                    alt={tDef.label}
-                                                    style={{ width: 40, height: 40, objectFit: "contain" }}
-                                                />
-                                            </Link>
-                                        );
-                                    })
-                                ) : (
-                                    <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
+                            <div style={{ fontSize: 14, opacity: 0.6, marginTop: 4 }}>
+                                {levelStr && (
+                                    <Link href="/missions" style={{ color: "inherit", textDecoration: "none" }}>
+                                        {levelStr}
+                                    </Link>
                                 )}
+                                {levelStr && " · "}
+                                {city}
                             </div>
-
-                            {(() => {
-                                // Roles to hide from profile display (administrative/verification roles)
-                                const hiddenRoles = new Set([
-                                    "pockets checked",
-                                    "verified",
-                                    "server booster",
-                                    "nitro booster",
-                                    "@everyone",
-                                    "everyone",
-                                    "member",
-                                    "new member",
-                                    "pizza noob",
-                                ]);
-                                const otherRoles = turtleList.filter((tName: string) => {
-                                    const nameLower = tName.toLowerCase();
-                                    // Exclude core turtle roles
-                                    if (TURTLES.find(t => t.id.toLowerCase() === nameLower || t.label.toLowerCase() === nameLower)) {
-                                        return false;
-                                    }
-                                    // Exclude hidden/unimportant roles
-                                    if (hiddenRoles.has(nameLower)) {
-                                        return false;
-                                    }
-                                    return true;
-                                });
-                                if (otherRoles.length === 0) return null;
-                                return (
-                                    <div style={{ marginTop: 8, fontSize: 14, opacity: 0.8 }}>
-                                        <strong>Other Roles:</strong> {otherRoles.join(", ")}
-                                    </div>
-                                );
-                            })()}
                         </div>
-
-                        {/* Profile Links - read-only display */}
-                        <ProfileLinksDisplay memberId={idValue} />
-
-                        {/* Articles by this member */}
-                        {articles.length > 0 && (
-                            <div style={{ gridColumn: "1 / -1" }}>
-                                <h3 style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "1px",
-                                    opacity: 0.5,
-                                    marginTop: 0,
-                                    marginBottom: 8,
-                                    fontWeight: 700
-                                }}>
-                                    Articles
-                                </h3>
-                                <div style={{ display: "grid", gap: 8 }}>
-                                    {articles.map((a) => (
-                                        <Link
-                                            key={a.slug}
-                                            href={`/articles/${a.slug}`}
-                                            style={{
-                                                display: "block",
-                                                padding: 12,
-                                                borderRadius: 10,
-                                                border: '1px solid var(--color-border)',
-                                                background: 'var(--color-surface)',
-                                                textDecoration: "none",
-                                                color: "inherit",
-                                            }}
-                                        >
-                                            <div style={{ fontWeight: 600, fontSize: 15 }}>{a.title}</div>
-                                            {a.excerpt && (
-                                                <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
-                                                    {a.excerpt}
-                                                </div>
-                                            )}
-                                            {a.publishedAt && (
-                                                <div style={{ fontSize: 11, opacity: 0.4, marginTop: 4 }}>
-                                                    {new Date(a.publishedAt).toLocaleDateString('en-US', {
-                                                        year: 'numeric', month: 'short', day: 'numeric'
-                                                    })}
-                                                </div>
-                                            )}
-                                        </Link>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* POAP Collection - inside profile grid under roles */}
-                        <div style={{ gridColumn: "1 / -1" }}>
-                            <POAPCollection memberId={idValue} />
+                        <div style={{ flexShrink: 0 }}>
+                            <AddVouchButton
+                                targetMemberId={idValue}
+                                currentMemberId={currentMemberId}
+                            />
                         </div>
                     </div>
-
-                    {/* NFT Collection Section - only shows if wallet exists and has NFTs */}
-                    <NFTCollection memberId={idValue} showConnectPrompt={false} />
 
                     {/* Crews Section */}
                     {userCrews.length > 0 && (
-                        <div style={{ marginTop: 24, paddingTop: 24, borderTop: '1px solid var(--color-divider)' }}>
-                            <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>Crews</h3>
+                        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
+                            <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 18, fontWeight: 600 }}>Crews</h3>
                             <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
                                 {userCrews.map((crewName) => {
                                     const c = crewOptions.find(opt =>
@@ -549,11 +351,183 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         </div>
                     )}
 
-                    {/* Crew Call Attendance */}
+                    {/* Articles */}
+                    {articles.length > 0 && (
+                        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
+                            <h3 style={{
+                                fontSize: 18,
+                                fontWeight: 600,
+                                marginTop: 0,
+                                marginBottom: 12,
+                            }}>
+                                Articles
+                            </h3>
+                            <div style={{ display: "grid", gap: 8 }}>
+                                {articles.map((a) => (
+                                    <Link
+                                        key={a.slug}
+                                        href={`/articles/${a.slug}`}
+                                        style={{
+                                            display: "block",
+                                            padding: 12,
+                                            borderRadius: 10,
+                                            border: '1px solid var(--color-border)',
+                                            background: 'var(--color-surface)',
+                                            textDecoration: "none",
+                                            color: "inherit",
+                                        }}
+                                    >
+                                        <div style={{ fontWeight: 600, fontSize: 15 }}>{a.title}</div>
+                                        {a.excerpt && (
+                                            <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
+                                                {a.excerpt}
+                                            </div>
+                                        )}
+                                        {a.publishedAt && (
+                                            <div style={{ fontSize: 11, opacity: 0.4, marginTop: 4 }}>
+                                                {new Date(a.publishedAt).toLocaleDateString('en-US', {
+                                                    year: 'numeric', month: 'short', day: 'numeric'
+                                                })}
+                                            </div>
+                                        )}
+                                    </Link>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+
+                    {/* Attendance Card */}
                     <AttendanceCard memberId={idValue} />
 
-                    {/* Pizza Party Tickets */}
-                    <UnlockTicketCard memberId={idValue} />
+                    {/* Collapsible About */}
+                    <CollapsibleSection title="About" defaultOpen={false}>
+                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                            <StatItem label="Status" value={status || "—"} />
+                            <StatItem label="ID" value={`#${idValue}`} />
+                            {orgs && <StatItem label="Orgs" value={orgs} />}
+                            {skills && <StatItem label="Skills" value={skills} />}
+
+                            {/* X Account */}
+                            {xAccount?.connected && (
+                                <div>
+                                    <h3 style={{
+                                        fontSize: 12,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "1px",
+                                        opacity: 0.5,
+                                        marginTop: 0,
+                                        marginBottom: 6,
+                                        fontWeight: 700
+                                    }}>
+                                        X
+                                    </h3>
+                                    <a
+                                        href={`https://x.com/${xAccount.username}`}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        style={{
+                                            fontSize: 18,
+                                            fontWeight: 500,
+                                            color: 'var(--color-text-primary)',
+                                            textDecoration: "none",
+                                            display: "inline-flex",
+                                            alignItems: "center",
+                                            gap: 6,
+                                        }}
+                                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
+                                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                    >
+                                        @{xAccount.username}
+                                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
+                                            <polyline points="15 3 21 3 21 9" />
+                                            <line x1="10" y1="14" x2="21" y2="3" />
+                                        </svg>
+                                    </a>
+                                </div>
+                            )}
+
+                            {/* Roles */}
+                            <div style={{ gridColumn: "1 / -1" }}>
+                                <h3 style={{
+                                    fontSize: 12,
+                                    textTransform: "uppercase",
+                                    letterSpacing: "1px",
+                                    opacity: 0.5,
+                                    marginTop: 0,
+                                    marginBottom: 6,
+                                    fontWeight: 700
+                                }}>
+                                    Roles
+                                </h3>
+                                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                                    {turtleList.length > 0 ? (
+                                        turtleList.map((tName: string) => {
+                                            const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
+                                            if (!tDef) return null;
+                                            return (
+                                                <Link
+                                                    key={tDef.id}
+                                                    href={`/turtles/${encodeURIComponent(tDef.id)}`}
+                                                    title={`View all ${tDef.label} members`}
+                                                >
+                                                    <img
+                                                        src={tDef.image}
+                                                        alt={tDef.label}
+                                                        style={{ width: 40, height: 40, objectFit: "contain" }}
+                                                    />
+                                                </Link>
+                                            );
+                                        })
+                                    ) : (
+                                        <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
+                                    )}
+                                </div>
+
+                                {(() => {
+                                    const hiddenRoles = new Set([
+                                        "pockets checked",
+                                        "verified",
+                                        "server booster",
+                                        "nitro booster",
+                                        "@everyone",
+                                        "everyone",
+                                        "member",
+                                        "new member",
+                                        "pizza noob",
+                                    ]);
+                                    const otherRoles = turtleList.filter((tName: string) => {
+                                        const nameLower = tName.toLowerCase();
+                                        if (TURTLES.find(t => t.id.toLowerCase() === nameLower || t.label.toLowerCase() === nameLower)) {
+                                            return false;
+                                        }
+                                        if (hiddenRoles.has(nameLower)) {
+                                            return false;
+                                        }
+                                        return true;
+                                    });
+                                    if (otherRoles.length === 0) return null;
+                                    return (
+                                        <div style={{ marginTop: 8, fontSize: 14, opacity: 0.8 }}>
+                                            <strong>Other Roles:</strong> {otherRoles.join(", ")}
+                                        </div>
+                                    );
+                                })()}
+                            </div>
+
+                            {/* Profile Links */}
+                            <ProfileLinksDisplay memberId={idValue} />
+                        </div>
+                    </CollapsibleSection>
+
+                    {/* Collapsible Collections */}
+                    <CollapsibleSection title="Collections" defaultOpen={false}>
+                        <div style={{ display: "grid", gap: 16 }}>
+                            <POAPCollection memberId={idValue} />
+                            <NFTCollection memberId={idValue} showConnectPrompt={false} />
+                            <UnlockTicketCard memberId={idValue} />
+                        </div>
+                    </CollapsibleSection>
                 </div>
 
                 {/* Footer */}
