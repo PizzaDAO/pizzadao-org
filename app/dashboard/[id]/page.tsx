@@ -4,7 +4,6 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Inter, Outfit } from "next/font/google"; // Keep fonts if needed, or use defaults
 import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
 import { PepIcon, PepAmount } from "../../ui/economy";
@@ -21,8 +20,10 @@ import { SocialAccountLinker } from "../../ui/vouches/SocialAccountLinker";
 import { useQueryClient } from "@tanstack/react-query";
 import { useUserData, usePfp, useXAccount, useCrewMappings, useMyTasks, useMyBalance } from "../../lib/hooks/use-api";
 
-const inter = Inter({ subsets: ["latin"] });
-const outfit = Outfit({ subsets: ["latin"] });
+// Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
+// --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
+const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
+const FONT_DISPLAY = "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 // Types copied from OnboardingWizard to ensure compatibility
 type CrewOption = {
@@ -153,21 +154,21 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: 'var(--color-page-bg)',
-                color: 'var(--color-text)',
-                fontFamily: inter.style.fontFamily
+                background: "hsl(var(--background))",
+                color: "hsl(var(--foreground))",
+                fontFamily: FONT_SANS,
             }}>
                 <div style={{ textAlign: "center" }}>
                     <div className="spinner" style={{
                         width: 50,
                         height: 50,
-                        border: '4px solid var(--color-spinner-track)',
-                        borderTop: '4px solid var(--color-spinner-active)',
+                        border: '4px solid hsl(var(--ink) / 0.10)',
+                        borderTop: '4px solid hsl(var(--tomato))',
                         borderRadius: "50%",
                         animation: "spin 1s linear infinite",
                         margin: "0 auto 20px"
                     }} />
-                    <p style={{ fontSize: 18, opacity: 0.8 }}>Loading your Mafia stats...</p>
+                    <p style={{ fontSize: 18, color: "hsl(var(--muted-foreground))", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Loading your Mafia stats...</p>
                     <style jsx>{`
             @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
           `}</style>
@@ -183,14 +184,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: 'var(--color-page-bg)',
-                color: 'var(--color-text)',
-                fontFamily: inter.style.fontFamily,
+                background: "hsl(var(--background))",
+                color: "hsl(var(--foreground))",
+                fontFamily: FONT_SANS,
                 padding: 20
             }}>
                 <div style={card()}>
-                    <h1 style={{ fontSize: 24, marginBottom: 16 }}>Access Denied</h1>
-                    <p style={{ opacity: 0.7, marginBottom: 32 }}>{authError}</p>
+                    <h1 style={{ fontSize: 28, marginBottom: 16, fontFamily: FONT_DISPLAY, fontWeight: 800, letterSpacing: "-0.01em" }}>Access Denied</h1>
+                    <p style={{ color: "hsl(var(--muted-foreground))", marginBottom: 32 }}>{authError}</p>
                     <Link href="/" style={btn("primary")}>
                         Back to Home
                     </Link>
@@ -206,14 +207,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
-                background: 'var(--color-page-bg)',
-                color: 'var(--color-text)',
-                fontFamily: inter.style.fontFamily,
+                background: "hsl(var(--background))",
+                color: "hsl(var(--foreground))",
+                fontFamily: FONT_SANS,
                 padding: 20
             }}>
                 <div style={card()}>
-                    <h1 style={{ fontSize: 24, marginBottom: 16 }}>Oops!</h1>
-                    <p style={{ opacity: 0.7, marginBottom: 32 }}>{error || "We couldn't find your data. Are you sure you're in the Crew yet?"}</p>
+                    <h1 style={{ fontSize: 28, marginBottom: 16, fontFamily: FONT_DISPLAY, fontWeight: 800, letterSpacing: "-0.01em" }}>Oops!</h1>
+                    <p style={{ color: "hsl(var(--muted-foreground))", marginBottom: 32 }}>{error || "We couldn't find your data. Are you sure you're in the Crew yet?"}</p>
                     <Link href="/" style={btn("primary")}>
                         Back to Home
                     </Link>
@@ -242,9 +243,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     return (
         <div style={{
             minHeight: "100vh",
-            background: 'var(--color-page-bg)',
-            color: 'var(--color-text)',
-            fontFamily: inter.style.fontFamily,
+            background: "hsl(var(--background))",
+            color: "hsl(var(--foreground))",
+            fontFamily: FONT_SANS,
             padding: "40px 20px"
         }}>
             <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
@@ -263,8 +264,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                     borderRadius: "50%",
                                     objectFit: "cover",
                                     objectPosition: "top",
-                                    border: "3px solid #fafafa",
-                                    boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
+                                    border: "3px solid hsl(var(--cream))",
+                                    boxShadow: "0 2px 12px hsl(var(--ink) / 0.12)",
                                     imageRendering: "crisp-edges",
                                     flexShrink: 0,
                                 }}
@@ -278,26 +279,45 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 <Link
                                     href={`/profile/${idValue}`}
                                     style={{
-                                        fontSize: 24,
+                                        fontSize: "clamp(1.75rem, 4vw, 2.25rem)",
+                                        lineHeight: 1.05,
                                         fontWeight: 800,
-                                        color: 'var(--color-text-primary)',
+                                        fontFamily: FONT_DISPLAY,
+                                        letterSpacing: "-0.02em",
+                                        color: "hsl(var(--foreground))",
                                         textDecoration: "none",
-                                    }}
-                                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
-                                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                        textWrap: "balance",
+                                    } as React.CSSProperties}
+                                    onMouseEnter={(e) => e.currentTarget.style.color = "hsl(var(--tomato))"}
+                                    onMouseLeave={(e) => e.currentTarget.style.color = "hsl(var(--foreground))"}
                                 >
                                     {name}
                                 </Link>
                                 {missionLevel && (
-                                    <span style={{ fontSize: 13, opacity: 0.55, whiteSpace: "nowrap" }}>
+                                    <span style={{
+                                        display: "inline-flex",
+                                        alignItems: "center",
+                                        gap: 4,
+                                        fontSize: 12,
+                                        fontWeight: 700,
+                                        fontFamily: FONT_DISPLAY,
+                                        textTransform: "uppercase",
+                                        letterSpacing: "0.04em",
+                                        padding: "2px 8px",
+                                        borderRadius: 999,
+                                        background: "hsl(var(--butter) / 0.25)",
+                                        color: "hsl(var(--ink))",
+                                        border: "1px solid hsl(var(--butter) / 0.55)",
+                                        whiteSpace: "nowrap",
+                                    }}>
                                         Lv.{missionLevel.level} {missionLevel.title}
                                     </span>
                                 )}
                             </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 4, flexWrap: "wrap" }}>
-                                <span style={{ fontSize: 14, opacity: 0.6 }}>{city}</span>
-                                <span style={{ opacity: 0.3 }}>·</span>
-                                <span style={{ fontSize: 14, fontWeight: 600, color: "#16a34a", display: "inline-flex", alignItems: "center", gap: 4 }}>
+                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
+                                <span style={{ fontSize: 14, color: "hsl(var(--muted-foreground))" }}>{city}</span>
+                                <span style={{ color: "hsl(var(--muted-foreground))", opacity: 0.5 }}>·</span>
+                                <span style={{ fontSize: 14, fontWeight: 700, color: "hsl(var(--tomato))", display: "inline-flex", alignItems: "center", gap: 4 }}>
                                     {pepBalance !== null ? <PepAmount amount={pepBalance} size={14} /> : "—"}
                                 </span>
                                 <button
@@ -309,7 +329,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                         padding: 2,
                                         display: "flex",
                                         alignItems: "center",
-                                        opacity: 0.5,
+                                        color: "hsl(var(--muted-foreground))",
                                     }}
                                     title="Send PEP"
                                 >
@@ -335,7 +355,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     </div>
 
                     {/* ── 2. Slim Nav (5 links) ── */}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
                         <Link href="/tech/projects" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
                             Projects
                         </Link>
@@ -361,7 +381,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     </div>
 
                     {/* ── 3. Missions Progress ── */}
-                    <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+                    <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
                         <MissionsProgress />
                     </div>
 
@@ -380,10 +400,21 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         if (allDisplayIds.length === 0) return null;
 
                         return (
-                            <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+                            <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
                                 <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                                    <h3 style={{ margin: 0, fontSize: 18 }}>Your Crews</h3>
-                                    <Link href="/crew" style={{ fontSize: 13, fontWeight: 650, color: "#ff4d4d", textDecoration: "none" }}>
+                                    <h3 style={{ margin: 0, fontSize: 20, fontFamily: FONT_DISPLAY, fontWeight: 700, letterSpacing: "-0.01em" }}>Your Crews</h3>
+                                    <Link
+                                        href="/crew"
+                                        style={{
+                                            fontSize: 13,
+                                            fontWeight: 600,
+                                            color: "hsl(var(--tomato))",
+                                            textDecorationColor: "hsl(var(--tomato))",
+                                            textDecoration: "none",
+                                        }}
+                                        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                                        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                                    >
                                         View all crews →
                                     </Link>
                                 </div>
@@ -446,10 +477,10 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                                     <div style={{
                                                                         fontSize: 11,
                                                                         fontWeight: 700,
-                                                                        opacity: 0.8,
+                                                                        fontFamily: FONT_DISPLAY,
                                                                         textTransform: "uppercase",
                                                                         letterSpacing: 0.5,
-                                                                        color: "#10b981",
+                                                                        color: "hsl(142 60% 32%)",
                                                                         marginBottom: 2
                                                                     }}>
                                                                         Closed: {doneCount}
@@ -460,10 +491,10 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                                         <div style={{
                                                                             fontSize: 11,
                                                                             fontWeight: 700,
-                                                                            opacity: 0.8,
+                                                                            fontFamily: FONT_DISPLAY,
                                                                             textTransform: "uppercase",
                                                                             letterSpacing: 0.5,
-                                                                            color: hasPersonal ? "#ff4d4d" : "rgba(0,0,0,0.6)"
+                                                                            color: hasPersonal ? "hsl(var(--tomato))" : "hsl(var(--muted-foreground))"
                                                                         }}>
                                                                             {hasPersonal ? "Your Tasks" : "Top Tasks"}
                                                                         </div>
@@ -472,14 +503,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                                             return (
                                                                                 <div key={idx} style={{
                                                                                     fontSize: 12,
-                                                                                    opacity: isPersonal ? 1 : 0.7,
+                                                                                    color: isPersonal ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
                                                                                     fontWeight: isPersonal ? 600 : 400,
                                                                                     display: "flex",
                                                                                     alignItems: "baseline",
                                                                                     gap: 4,
                                                                                     minWidth: 0
                                                                                 }}>
-                                                                                    <span style={{ flexShrink: 0, color: isPersonal ? "#ff4d4d" : "inherit" }}>•</span>
+                                                                                    <span style={{ flexShrink: 0, color: isPersonal ? "hsl(var(--tomato))" : "inherit" }}>•</span>
                                                                                     <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
                                                                                         {t.url ? (
                                                                                             <a
@@ -509,10 +540,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                             href={`/crew/${c?.id || cid}`}
                                                             style={{
                                                                 fontSize: 13,
-                                                                fontWeight: 650,
-                                                                color: "#ff4d4d",
+                                                                fontWeight: 600,
+                                                                color: "hsl(var(--tomato))",
                                                                 textDecoration: "none",
                                                             }}
+                                                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+                                                            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
                                                         >
                                                             View crew page →
                                                         </Link>
@@ -524,8 +557,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                                 onClick={(e) => e.stopPropagation()}
                                                                 style={{
                                                                     fontSize: 13,
-                                                                    fontWeight: 650,
-                                                                    opacity: 0.7,
+                                                                    fontWeight: 600,
+                                                                    color: "hsl(var(--muted-foreground))",
                                                                     textDecoration: "none",
                                                                 }}
                                                                 title={c.sheet}
@@ -544,7 +577,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     })()}
 
                     {/* ── 5. Vouches Widget ── */}
-                    <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+                    <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
                         <VouchesWidget memberId={idValue} />
                     </div>
 
@@ -557,12 +590,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             <div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                                     <h3 style={{
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         textTransform: "uppercase",
-                                        letterSpacing: "1px",
-                                        opacity: 0.5,
+                                        letterSpacing: "0.08em",
+                                        color: "hsl(var(--muted-foreground))",
                                         margin: 0,
-                                        fontWeight: 700
+                                        fontWeight: 700,
+                                        fontFamily: FONT_DISPLAY,
                                     }}>
                                         Orgs
                                     </h3>
@@ -596,7 +630,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                             style={{
                                                 padding: 8,
                                                 borderRadius: 6,
-                                                border: '1px solid var(--color-border-strong)',
+                                                border: '1px solid hsl(var(--rule) / 0.22)',
                                                 fontSize: 14,
                                                 fontFamily: "inherit",
                                                 resize: "vertical",
@@ -651,7 +685,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                     <p style={{
                                         fontSize: 18,
                                         fontWeight: 500,
-                                        color: 'var(--color-text-primary)',
+                                        color: 'hsl(var(--foreground))',
                                         margin: 0,
                                         wordBreak: "break-word"
                                     }}>
@@ -664,12 +698,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                             <div>
                                 <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
                                     <h3 style={{
-                                        fontSize: 12,
+                                        fontSize: 11,
                                         textTransform: "uppercase",
-                                        letterSpacing: "1px",
-                                        opacity: 0.5,
+                                        letterSpacing: "0.08em",
+                                        color: "hsl(var(--muted-foreground))",
                                         margin: 0,
-                                        fontWeight: 700
+                                        fontWeight: 700,
+                                        fontFamily: FONT_DISPLAY,
                                     }}>
                                         Skills
                                     </h3>
@@ -703,7 +738,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                             style={{
                                                 padding: 8,
                                                 borderRadius: 6,
-                                                border: '1px solid var(--color-border-strong)',
+                                                border: '1px solid hsl(var(--rule) / 0.22)',
                                                 fontSize: 14,
                                                 fontFamily: "inherit",
                                                 resize: "vertical",
@@ -758,7 +793,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                     <p style={{
                                         fontSize: 18,
                                         fontWeight: 500,
-                                        color: 'var(--color-text-primary)',
+                                        color: 'hsl(var(--foreground))',
                                         margin: 0,
                                         wordBreak: "break-word"
                                     }}>
@@ -775,13 +810,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 <div style={{ display: "flex", alignItems: "flex-start", justifyContent: "space-between" }}>
                                     <div>
                                         <h3 style={{
-                                            fontSize: 12,
+                                            fontSize: 11,
                                             textTransform: "uppercase",
-                                            letterSpacing: "1px",
-                                            opacity: 0.5,
+                                            letterSpacing: "0.08em",
+                                            color: "hsl(var(--muted-foreground))",
                                             marginTop: 0,
                                             marginBottom: 6,
-                                            fontWeight: 700
+                                            fontWeight: 700,
+                                            fontFamily: FONT_DISPLAY,
                                         }}>
                                             Roles
                                         </h3>
@@ -830,8 +866,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 gridColumn: "1 / -1",
                                 padding: 16,
                                 borderRadius: 12,
-                                border: '1px solid var(--color-border)',
-                                background: 'var(--color-surface)',
+                                border: '1px solid hsl(var(--rule) / 0.12)',
+                                background: 'hsl(var(--card))',
                                 display: "flex",
                                 alignItems: "center",
                                 gap: 12,
@@ -851,7 +887,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                                 style={{
                                                     fontWeight: 600,
                                                     fontSize: 16,
-                                                    color: 'var(--color-text-primary)',
+                                                    color: 'hsl(var(--foreground))',
                                                     textDecoration: "none",
                                                 }}
                                                 onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
@@ -876,14 +912,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                             disabled={xDisconnecting}
                                             style={{
                                                 background: "transparent",
-                                                border: '1px solid var(--color-border-strong)',
+                                                border: '1px solid hsl(var(--rule) / 0.22)',
                                                 borderRadius: 8,
                                                 padding: "6px 12px",
                                                 fontSize: 12,
                                                 cursor: "pointer",
                                                 opacity: xDisconnecting ? 0.5 : 0.7,
                                                 fontFamily: "inherit",
-                                                color: 'var(--color-text)',
+                                                color: 'hsl(var(--foreground))',
                                             }}
                                         >
                                             {xDisconnecting ? "Disconnecting..." : "Disconnect"}
@@ -926,7 +962,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     </CollapsibleSection>
 
                     {/* ── 8. Logout ── */}
-                    <div style={{ paddingTop: 16, borderTop: '1px solid var(--color-divider)', textAlign: "center" }}>
+                    <div style={{ paddingTop: 16, borderTop: '1px solid hsl(var(--rule) / 0.12)', textAlign: "center" }}>
                         <button
                             onClick={async () => {
                                 try {
@@ -953,7 +989,17 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 </div>
 
                 {/* Footer info */}
-                <div style={{ textAlign: "center", marginTop: 40, opacity: 0.4, fontSize: 13 }}>
+                <div style={{
+                    textAlign: "center",
+                    marginTop: 40,
+                    fontSize: 12,
+                    fontFamily: FONT_DISPLAY,
+                    fontWeight: 700,
+                    letterSpacing: "0.12em",
+                    textTransform: "uppercase",
+                    color: "hsl(var(--muted-foreground))",
+                    opacity: 0.7,
+                }}>
                     PizzaDAO
                 </div>
             </div>
@@ -976,7 +1022,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
     const [open, setOpen] = useState(defaultOpen);
     return (
-        <div style={{ paddingTop: 10, borderTop: '1px solid var(--color-divider)' }}>
+        <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
             <button
                 onClick={() => setOpen(!open)}
                 style={{
@@ -989,19 +1035,27 @@ function CollapsibleSection({ title, defaultOpen = false, children }: { title: s
                     padding: 0,
                     width: "100%",
                     textAlign: "left",
-                    color: 'var(--color-text)',
+                    color: 'hsl(var(--foreground))',
                     fontFamily: "inherit",
                 }}
             >
                 <span style={{
                     display: "inline-block",
                     fontSize: 12,
+                    color: "hsl(var(--muted-foreground))",
                     transition: "transform 0.2s",
                     transform: open ? "rotate(90deg)" : "rotate(0deg)",
                 }}>
                     ▶
                 </span>
-                <h3 style={{ margin: 0, fontSize: 18, fontWeight: 700 }}>{title}</h3>
+                <h3 style={{
+                    margin: 0,
+                    fontSize: 20,
+                    fontWeight: 700,
+                    fontFamily: FONT_DISPLAY,
+                    letterSpacing: "-0.01em",
+                    color: "hsl(var(--foreground))",
+                }}>{title}</h3>
             </button>
             {open && (
                 <div style={{ marginTop: 16 }}>
@@ -1016,20 +1070,23 @@ function StatItem({ label, value, highlight }: { label: string, value: string, h
     return (
         <div>
             <h3 style={{
-                fontSize: 12,
+                fontSize: 11,
                 textTransform: "uppercase",
-                letterSpacing: "1px",
-                opacity: 0.5,
+                letterSpacing: "0.08em",
+                color: "hsl(var(--muted-foreground))",
                 marginTop: 0,
                 marginBottom: 6,
-                fontWeight: 700
+                fontWeight: 700,
+                fontFamily: FONT_DISPLAY,
             }}>
                 {label}
             </h3>
             <p style={{
-                fontSize: highlight ? 24 : 18,
-                fontWeight: highlight ? 700 : 500,
-                color: highlight ? "#16a34a" : "#111",
+                fontSize: highlight ? 28 : 18,
+                fontWeight: highlight ? 800 : 500,
+                fontFamily: highlight ? FONT_DISPLAY : FONT_SANS,
+                letterSpacing: highlight ? "-0.01em" : "normal",
+                color: highlight ? "hsl(var(--tomato))" : "hsl(var(--foreground))",
                 margin: 0,
                 wordBreak: "break-word"
             }}>
@@ -1039,41 +1096,66 @@ function StatItem({ label, value, highlight }: { label: string, value: string, h
     );
 }
 
-// --- Styles copied/adapted from OnboardingWizard ---
+// --- Local style helpers — consume Phase 1 HSL tokens directly. ---
+// (Kept local rather than imported from shared-styles to preserve the slightly
+// tighter card padding/radius this page has used historically.)
 
 function card(): React.CSSProperties {
     return {
-        border: '1px solid var(--color-border)',
-        borderRadius: 14,
+        border: '1px solid hsl(var(--rule) / 0.12)',
+        borderRadius: "var(--radius)",
         padding: 24,
-        boxShadow: 'var(--shadow-card)',
-        background: 'var(--color-surface)',
+        boxShadow: '0 8px 30px hsl(var(--ink) / 0.06)',
+        background: 'hsl(var(--card))',
+        color: 'hsl(var(--card-foreground))',
         display: "grid",
         gap: 14,
     };
 }
 
-function btn(kind: "primary" | "secondary"): React.CSSProperties {
+function btn(kind: "primary" | "secondary" | "accent"): React.CSSProperties {
     const base: React.CSSProperties = {
         display: "inline-block", // ensure links behave like buttons
         padding: "10px 16px",
-        borderRadius: 10,
-        border: '1px solid var(--color-border-strong)',
-        fontWeight: 650,
+        borderRadius: "var(--radius)",
+        border: '1px solid transparent',
+        fontWeight: 600,
+        fontFamily: FONT_DISPLAY,
         cursor: "pointer",
         textDecoration: "none",
-        textAlign: "center"
+        textAlign: "center",
+        transition: "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
     };
-    if (kind === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' };
-    return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' };
+    if (kind === "primary") {
+        return {
+            ...base,
+            background: 'hsl(var(--primary))',
+            color: 'hsl(var(--primary-foreground))',
+            borderColor: 'hsl(var(--primary))',
+        };
+    }
+    if (kind === "accent") {
+        return {
+            ...base,
+            background: 'hsl(var(--tomato))',
+            color: 'hsl(var(--cream))',
+            borderColor: 'hsl(var(--tomato))',
+        };
+    }
+    return {
+        ...base,
+        background: 'hsl(var(--secondary))',
+        color: 'hsl(var(--secondary-foreground))',
+        borderColor: 'hsl(var(--rule) / 0.22)',
+    };
 }
 
 function tile(): React.CSSProperties {
     return {
         padding: 12,
-        borderRadius: 12,
-        border: '1px solid var(--color-border)', // slightly lighter border for display only
-        background: 'var(--color-surface)',
+        borderRadius: "var(--radius)",
+        border: '1px solid hsl(var(--rule) / 0.12)', // slightly lighter border for display only
+        background: 'hsl(var(--card))',
         textAlign: "left",
     };
 }
@@ -1084,10 +1166,12 @@ function crewCard(): React.CSSProperties {
         display: "flex",
         gap: 10,
         alignItems: "flex-start", // changed to flex-start for multiline
-        padding: 10,
-        borderRadius: 12,
-        border: '1px solid var(--color-border)',
-        background: 'var(--color-surface)',
+        padding: 12,
+        borderRadius: "var(--radius)",
+        border: '1px solid hsl(var(--rule) / 0.12)',
+        background: 'hsl(var(--cream-warm))',
+        color: 'hsl(var(--foreground))',
+        transition: "border-color 150ms ease, box-shadow 150ms ease",
     };
 }
 
@@ -1124,7 +1208,7 @@ function SendPepModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
         width: "100%",
         padding: "10px 12px",
         borderRadius: 10,
-        border: '1px solid var(--color-border-strong)',
+        border: '1px solid hsl(var(--rule) / 0.22)',
         fontSize: 14,
         outline: "none",
         boxSizing: "border-box" as const,
@@ -1137,19 +1221,19 @@ function SendPepModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: 
             left: 0,
             right: 0,
             bottom: 0,
-            background: 'var(--color-overlay)',
+            background: 'hsl(var(--ink) / 0.5)',
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
             zIndex: 1000,
         }} onClick={onClose}>
             <div style={{ ...card(), maxWidth: 400, width: "90%" }} onClick={e => e.stopPropagation()}>
-                <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                    Send <PepIcon size={18} />
+                <h2 style={{ fontSize: 22, fontWeight: 800, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em", marginTop: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
+                    Send <PepIcon size={20} />
                 </h2>
 
                 {error && (
-                    <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
+                    <div style={{ marginBottom: 16, padding: 12, background: "hsl(var(--tomato) / 0.08)", border: "1px solid hsl(var(--tomato) / 0.30)", borderRadius: "var(--radius)", color: "hsl(var(--tomato-deep))", fontSize: 14 }}>
                         {error}
                     </div>
                 )}
@@ -1235,10 +1319,11 @@ const SyncRolesButton = ({ memberId, discordId, name, onSync }: { memberId: stri
             disabled={loading}
             style={{
                 background: "transparent",
-                border: "1px solid #ccc",
-                borderRadius: 4,
+                border: "1px solid hsl(var(--rule) / 0.22)",
+                borderRadius: "var(--radius)",
                 padding: "4px 8px",
                 fontSize: 12,
+                color: "hsl(var(--foreground))",
                 cursor: loading ? "wait" : "pointer",
                 display: "flex",
                 alignItems: "center",
