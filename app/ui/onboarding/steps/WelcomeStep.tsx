@@ -24,7 +24,7 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
         className="font-[family-name:var(--font-display)] uppercase tracking-tight text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground"
         style={{ textWrap: "balance" } as React.CSSProperties}
       >
-        Join the world&apos;s largest pizza co-op
+        Join the pizza mafia
       </h1>
 
       <p
