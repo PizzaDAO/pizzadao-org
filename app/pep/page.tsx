@@ -1,5 +1,13 @@
 "use client";
 
+// app/pep/page.tsx
+//
+// anchovy-67435 (Restyle Phase 4d): migrated off legacy `--color-*` aliases
+// onto the new semantic HSL tokens + shared `card()`/`btn()` primitives.
+// Page bg = cream, large Asap Condensed h1 "PEP economy", subtitle in
+// muted-foreground. Send modal uses the shared `Field` label + tomato CTA.
+// See plans/site-restyle-pizzadao-org.md.
+
 import React, { useEffect, useState } from "react";
 import Link from "next/link";
 import { Leaderboard, PepIcon, PepAmount, TransactionHistory } from "../ui/economy";
@@ -8,6 +16,8 @@ import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
 import { NotificationBell } from "../ui/notifications";
 import { useMe, useMemberLookup } from "../lib/hooks/use-api";
+import { card, btn, input, overlay, pageContainer } from "../ui/shared-styles";
+import { Field } from "../ui/onboarding/Field";
 
 type SessionData = {
   authenticated: boolean;
@@ -35,41 +45,20 @@ type SendModalProps = {
   onSuccess: () => void;
 };
 
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  };
-}
+const DISPLAY_FONT =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
-function btn(kind: "primary" | "secondary"): React.CSSProperties {
-  const base: React.CSSProperties = {
-    display: "inline-block",
-    padding: "10px 16px",
-    borderRadius: 10,
-    border: '1px solid var(--color-border-strong)',
-    fontWeight: 650,
-    cursor: "pointer",
-    textDecoration: "none",
-    textAlign: "center",
-  };
-  if (kind === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' };
-  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' };
-}
-
-function input(): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: '1px solid var(--color-border-strong)',
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box" as const,
-  };
+function inputWithFocus(
+  e: React.FocusEvent<HTMLInputElement>,
+  focused: boolean,
+) {
+  if (focused) {
+    e.currentTarget.style.borderColor = "hsl(var(--ring))";
+    e.currentTarget.style.boxShadow = "0 0 0 3px hsl(var(--ring) / 0.20)";
+  } else {
+    e.currentTarget.style.borderColor = "hsl(var(--rule) / 0.22)";
+    e.currentTarget.style.boxShadow = "none";
+  }
 }
 
 function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: SendModalProps) {
@@ -112,35 +101,47 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
     }
   };
 
+  const disabled = loading || !memberId || !amount;
+
   return (
-    <div style={{
-      position: "fixed",
-      top: 0,
-      left: 0,
-      right: 0,
-      bottom: 0,
-      background: 'var(--color-overlay)',
-      display: "flex",
-      alignItems: "center",
-      justifyContent: "center",
-      zIndex: 1000,
-    }} onClick={onClose}>
-      <div style={{ ...card(), maxWidth: 400, width: "90%" }} onClick={e => e.stopPropagation()}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-          Send {type === "pep" ? <><PepIcon size={18} /></> : itemName}
+    <div style={overlay()} onClick={onClose}>
+      <div
+        style={{ ...card(), maxWidth: 420, width: "90%" }}
+        onClick={(e) => e.stopPropagation()}
+      >
+        <h2
+          style={{
+            fontFamily: DISPLAY_FONT,
+            fontSize: 22,
+            fontWeight: 700,
+            letterSpacing: "-0.01em",
+            margin: 0,
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            color: "hsl(var(--foreground))",
+          }}
+        >
+          Send {type === "pep" ? <PepIcon size={18} /> : itemName}
         </h2>
 
         {error && (
-          <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "var(--color-danger)", fontSize: 14 }}>
+          <div
+            style={{
+              padding: 12,
+              background: "hsl(var(--tomato) / 0.08)",
+              border: "1px solid hsl(var(--tomato) / 0.30)",
+              borderRadius: "var(--radius)",
+              color: "hsl(var(--tomato))",
+              fontSize: 14,
+            }}
+          >
             {error}
           </div>
         )}
 
         <form onSubmit={handleSend} style={{ display: "grid", gap: 16 }}>
-          <div>
-            <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-              Recipient Member ID
-            </label>
+          <Field label="Recipient Member ID">
             <input
               type="text"
               placeholder="Enter member ID"
@@ -148,13 +149,12 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
               onChange={(e) => setMemberId(e.target.value)}
               style={input()}
               disabled={loading}
+              onFocus={(e) => inputWithFocus(e, true)}
+              onBlur={(e) => inputWithFocus(e, false)}
             />
-          </div>
+          </Field>
 
-          <div>
-            <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-              Amount {maxQuantity && `(max: ${maxQuantity})`}
-            </label>
+          <Field label={`Amount${maxQuantity ? ` (max: ${maxQuantity})` : ""}`}>
             <input
               type="number"
               placeholder="Amount"
@@ -164,17 +164,23 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
               disabled={loading}
               min="1"
               max={maxQuantity}
+              onFocus={(e) => inputWithFocus(e, true)}
+              onBlur={(e) => inputWithFocus(e, false)}
             />
-          </div>
+          </Field>
 
           <div style={{ display: "flex", gap: 10 }}>
-            <button type="button" onClick={onClose} style={{ ...btn("secondary"), flex: 1 }}>
+            <button
+              type="button"
+              onClick={onClose}
+              style={{ ...btn("secondary"), flex: 1 }}
+            >
               Cancel
             </button>
             <button
               type="submit"
-              disabled={loading || !memberId || !amount}
-              style={{ ...btn("primary"), flex: 1, opacity: loading || !memberId || !amount ? 0.5 : 1 }}
+              disabled={disabled}
+              style={{ ...btn("accent", disabled), flex: 1 }}
             >
               {loading ? "Sending..." : "Send"}
             </button>
@@ -197,11 +203,11 @@ function SendIcon({ size = 16, onClick }: { size?: number; onClick: () => void }
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
-        color: 'var(--color-text-secondary)',
-        transition: "color 0.2s",
+        color: "hsl(var(--muted-foreground))",
+        transition: "color 150ms ease",
       }}
-      onMouseEnter={(e) => (e.currentTarget.style.color = "var(--color-text)")}
-      onMouseLeave={(e) => (e.currentTarget.style.color = "var(--color-text-secondary)")}
+      onMouseEnter={(e) => (e.currentTarget.style.color = "hsl(var(--tomato))")}
+      onMouseLeave={(e) => (e.currentTarget.style.color = "hsl(var(--muted-foreground))")}
       title="Send"
     >
       <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
@@ -233,16 +239,54 @@ function WalletWithSend({ walletKey, onSendClick }: { walletKey: number; onSendC
 
   return (
     <div style={card()}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, marginBottom: 16 }}>Your Balance</h2>
-      <div style={{ display: "flex", alignItems: "center", gap: 12, padding: 20, background: 'var(--color-page-bg)', borderRadius: 10 }}>
+      <h2
+        style={{
+          fontFamily: DISPLAY_FONT,
+          fontSize: 22,
+          fontWeight: 700,
+          letterSpacing: "-0.01em",
+          margin: 0,
+          color: "hsl(var(--foreground))",
+        }}
+      >
+        Your balance
+      </h2>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 12,
+          padding: "20px 22px",
+          background: "hsl(var(--background))",
+          border: "1px solid hsl(var(--rule) / 0.12)",
+          borderRadius: "var(--radius)",
+        }}
+      >
         {loading ? (
-          <div style={{ height: 38, flex: 1, background: 'var(--color-surface-hover)', borderRadius: 8 }} />
+          <div
+            style={{
+              height: 44,
+              flex: 1,
+              background: "hsl(var(--muted))",
+              borderRadius: "var(--radius)",
+            }}
+          />
         ) : (
           <>
-            <div style={{ fontSize: 32, fontWeight: 700, color: "#16a34a", flex: 1 }}>
+            <div
+              style={{
+                fontFamily: DISPLAY_FONT,
+                fontSize: 40,
+                fontWeight: 800,
+                letterSpacing: "-0.02em",
+                lineHeight: 1,
+                color: "hsl(var(--tomato))",
+                flex: 1,
+              }}
+            >
               <PepAmount amount={balance ?? 0} size={32} />
             </div>
-            <SendIcon size={20} onClick={onSendClick} />
+            <SendIcon size={22} onClick={onSendClick} />
           </>
         )}
       </div>
@@ -269,20 +313,50 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
     fetchInventory();
   }, [walletKey]);
 
+  const heading = (
+    <h2
+      style={{
+        fontFamily: DISPLAY_FONT,
+        fontSize: 22,
+        fontWeight: 700,
+        letterSpacing: "-0.01em",
+        margin: 0,
+        color: "hsl(var(--foreground))",
+      }}
+    >
+      Your inventory
+    </h2>
+  );
+
   if (loading) {
     return (
       <div style={card()}>
-        <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, marginBottom: 16 }}>Your Inventory</h2>
-        <div style={{ height: 60, background: 'var(--color-surface-hover)', borderRadius: 8 }} />
+        {heading}
+        <div
+          style={{
+            height: 60,
+            background: "hsl(var(--muted))",
+            borderRadius: "var(--radius)",
+          }}
+        />
       </div>
     );
   }
 
   return (
     <div style={card()}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0, marginBottom: 16 }}>Your Inventory</h2>
+      {heading}
       {items.length === 0 ? (
-        <p style={{ color: 'var(--color-text-secondary)', textAlign: "center", padding: "16px 0", margin: 0 }}>No items yet</p>
+        <p
+          style={{
+            color: "hsl(var(--muted-foreground))",
+            textAlign: "center",
+            padding: "16px 0",
+            margin: 0,
+          }}
+        >
+          No items yet
+        </p>
       ) : (
         <div style={{ display: "grid", gap: 8 }}>
           {items.map((inv) => (
@@ -293,17 +367,27 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
                 alignItems: "center",
                 justifyContent: "space-between",
                 padding: 12,
-                background: 'var(--color-page-bg)',
-                borderRadius: 10,
+                background: "hsl(var(--background))",
+                border: "1px solid hsl(var(--rule) / 0.12)",
+                borderRadius: "var(--radius)",
               }}
             >
               <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
                 {inv.item.image && (
-                  <img src={inv.item.image} alt={inv.item.name} style={{ width: 32, height: 32, borderRadius: 6 }} />
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img
+                    src={inv.item.image}
+                    alt={inv.item.name}
+                    style={{ width: 32, height: 32, borderRadius: 6 }}
+                  />
                 )}
                 <div>
-                  <div style={{ fontWeight: 600, fontSize: 14 }}>{inv.item.name}</div>
-                  <div style={{ fontSize: 12, color: 'var(--color-text-secondary)' }}>x{inv.quantity}</div>
+                  <div style={{ fontWeight: 600, fontSize: 14, color: "hsl(var(--foreground))" }}>
+                    {inv.item.name}
+                  </div>
+                  <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))" }}>
+                    x{inv.quantity}
+                  </div>
                 </div>
               </div>
               <SendIcon size={16} onClick={() => onSendItem(inv)} />
@@ -333,14 +417,16 @@ export default function PepDashboard() {
   } | null>(null);
 
   const refreshWallet = () => {
-    setWalletKey(k => k + 1);
+    setWalletKey((k) => k + 1);
   };
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: 'var(--color-page-bg)', padding: "40px 20px" }}>
+      <div style={pageContainer()}>
         <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-          <div style={{ ...card(), height: 200, background: 'var(--color-surface-hover)' }} />
+          <div
+            style={{ ...card(), height: 220, background: "hsl(var(--muted))" }}
+          />
         </div>
       </div>
     );
@@ -348,13 +434,40 @@ export default function PepDashboard() {
 
   if (!session?.authenticated) {
     return (
-      <div style={{ minHeight: "100vh", background: 'var(--color-page-bg)', padding: "40px 20px", display: "flex", alignItems: "center", justifyContent: "center" }}>
-        <div style={{ ...card(), maxWidth: 400, textAlign: "center" }}>
-          <h1 style={{ fontSize: 28, fontWeight: 800, marginBottom: 16, display: "flex", alignItems: "center", gap: 8, justifyContent: "center" }}><PepIcon size={28} /> Economy</h1>
-          <p style={{ color: 'var(--color-text-secondary)', marginBottom: 24 }}>
+      <div
+        style={{
+          ...pageContainer(),
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+        }}
+      >
+        <div style={{ ...card(), maxWidth: 420, textAlign: "center" }}>
+          <h1
+            style={{
+              fontFamily: DISPLAY_FONT,
+              fontSize: 40,
+              fontWeight: 800,
+              letterSpacing: "-0.02em",
+              margin: 0,
+              display: "flex",
+              alignItems: "center",
+              gap: 10,
+              justifyContent: "center",
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            <PepIcon size={32} /> PEP economy
+          </h1>
+          <p style={{ color: "hsl(var(--muted-foreground))", margin: 0 }}>
             Please log in with Discord to access the economy features.
           </p>
-          <button onClick={() => { (window.top || window).location.href = '/api/discord/login' }} style={btn("primary")}>
+          <button
+            onClick={() => {
+              (window.top || window).location.href = "/api/discord/login";
+            }}
+            style={btn("accent")}
+          >
             Login with Discord
           </button>
         </div>
@@ -363,21 +476,51 @@ export default function PepDashboard() {
   }
 
   return (
-    <div style={{ minHeight: "100vh", background: 'var(--color-page-bg)', padding: "40px 20px" }}>
+    <div style={pageContainer()}>
       <div style={{ maxWidth: 1100, margin: "0 auto" }}>
-        <header style={{ marginBottom: 24 }}>
-          <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-            <div>
-              <h1 style={{ fontSize: 28, fontWeight: 800, margin: 0, display: "flex", alignItems: "center", gap: 8 }}>
-                <PepIcon size={28} /> Economy
+        <header style={{ marginBottom: 28 }}>
+          <div
+            style={{
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 16,
+              marginBottom: 8,
+            }}
+          >
+            <div style={{ minWidth: 0 }}>
+              <h1
+                style={{
+                  fontFamily: DISPLAY_FONT,
+                  fontSize: 56,
+                  lineHeight: 1,
+                  fontWeight: 800,
+                  letterSpacing: "-0.03em",
+                  margin: 0,
+                  display: "flex",
+                  alignItems: "center",
+                  gap: 12,
+                  color: "hsl(var(--foreground))",
+                }}
+              >
+                <PepIcon size={44} /> PEP economy
               </h1>
-              <p style={{ color: 'var(--color-text-secondary)', margin: 0 }}>
-                Welcome, {memberName || session.username || session.discordId}
+              <p
+                style={{
+                  color: "hsl(var(--muted-foreground))",
+                  margin: "10px 0 0",
+                  fontSize: 16,
+                }}
+              >
+                Welcome,{" "}
+                <span style={{ color: "hsl(var(--foreground))", fontWeight: 600 }}>
+                  {memberName || session.username || session.discordId}
+                </span>
               </p>
             </div>
             <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
               <NotificationBell />
-              <Link href="/" style={{ ...btn("secondary"), fontSize: 14, textDecoration: "none" }}>
+              <Link href="/" style={{ ...btn("secondary"), fontSize: 14 }}>
                 ← Home
               </Link>
             </div>
@@ -385,21 +528,25 @@ export default function PepDashboard() {
         </header>
 
         {/* Under construction warning */}
-        <div style={{
-          display: "flex",
-          alignItems: "center",
-          gap: 10,
-          padding: "12px 16px",
-          marginBottom: 20,
-          borderRadius: 10,
-          border: "1px solid #f59e0b",
-          background: "rgba(245, 158, 11, 0.08)",
-          color: "#b45309",
-          fontSize: 14,
-          fontWeight: 500,
-        }}>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 10,
+            padding: "12px 16px",
+            marginBottom: 24,
+            borderRadius: "var(--radius)",
+            border: "1px solid hsl(var(--butter) / 0.55)",
+            background: "hsl(var(--butter) / 0.18)",
+            color: "hsl(var(--ink))",
+            fontSize: 14,
+            fontWeight: 500,
+          }}
+        >
           <span style={{ fontSize: 20 }}>🚧</span>
-          <span>This page is under construction. Features may be incomplete or change without notice.</span>
+          <span>
+            This page is under construction. Features may be incomplete or change without notice.
+          </span>
         </div>
 
         {/* Two column layout - Jobs left, everything else right */}
@@ -407,7 +554,10 @@ export default function PepDashboard() {
           {/* Left: Jobs and Bounties */}
           <div>
             <JobBoard onJobCompleted={refreshWallet} />
-            <BountyBoard currentUserId={session.discordId || ""} onBountyAction={refreshWallet} />
+            <BountyBoard
+              currentUserId={session.discordId || ""}
+              onBountyAction={refreshWallet}
+            />
           </div>
 
           {/* Right: Leaderboard, Balance, Inventory, Shop stacked */}
@@ -416,22 +566,38 @@ export default function PepDashboard() {
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
               <Leaderboard />
               <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
-                <WalletWithSend walletKey={walletKey} onSendClick={() => setSendModal({ type: "pep" })} />
+                <WalletWithSend
+                  walletKey={walletKey}
+                  onSendClick={() => setSendModal({ type: "pep" })}
+                />
                 <InventoryWithSend
                   walletKey={walletKey}
-                  onSendItem={(inv) => setSendModal({
-                    type: "item",
-                    itemName: inv.item.name,
-                    itemId: inv.itemId,
-                    maxQuantity: inv.quantity
-                  })}
+                  onSendItem={(inv) =>
+                    setSendModal({
+                      type: "item",
+                      itemName: inv.item.name,
+                      itemId: inv.itemId,
+                      maxQuantity: inv.quantity,
+                    })
+                  }
                 />
               </div>
             </div>
 
             {/* Shop below */}
             <div style={card()}>
-              <h2 style={{ fontSize: 18, fontWeight: 700, marginTop: 0, marginBottom: 16 }}>Shop</h2>
+              <h2
+                style={{
+                  fontFamily: DISPLAY_FONT,
+                  fontSize: 22,
+                  fontWeight: 700,
+                  letterSpacing: "-0.01em",
+                  margin: 0,
+                  color: "hsl(var(--foreground))",
+                }}
+              >
+                Shop
+              </h2>
               <ShopGrid key={`shop-${walletKey}`} onPurchase={refreshWallet} />
             </div>
 
