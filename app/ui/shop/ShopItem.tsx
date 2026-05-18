@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { PepAmount } from "../economy/PepIcon";
+import { card as cardBase, btn, input } from "../shared-styles";
 
 type Item = {
   id: number;
@@ -17,43 +18,6 @@ type ShopItemProps = {
   item: Item;
   onPurchase?: () => void;
 };
-
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 16,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  };
-}
-
-function input(): React.CSSProperties {
-  return {
-    width: 50,
-    padding: "6px 8px",
-    borderRadius: 8,
-    border: '1px solid var(--color-border-strong)',
-    fontSize: 14,
-    textAlign: "center" as const,
-    outline: "none",
-  };
-}
-
-function btn(disabled?: boolean): React.CSSProperties {
-  return {
-    flex: 1,
-    padding: "8px 12px",
-    borderRadius: 8,
-    border: "none",
-    fontWeight: 650,
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    background: 'var(--color-btn-primary-bg)',
-    color: 'var(--color-btn-primary-text)',
-    fontSize: 13,
-  };
-}
 
 export function ShopItem({ item, onPurchase }: ShopItemProps) {
   const [loading, setLoading] = useState(false);
@@ -89,46 +53,168 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
   };
 
   return (
-    <div style={card()}>
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 8 }}>
-        <h3 style={{ fontWeight: 700, fontSize: 16, margin: 0 }}>{item.name}</h3>
-        <span style={{ fontWeight: 700, color: "#16a34a" }}><PepAmount amount={item.price} size={14} /></span>
+    <div
+      style={{
+        ...cardBase(),
+        padding: 0,
+        gap: 0,
+        display: "flex",
+        flexDirection: "column",
+        overflow: "hidden",
+      }}
+    >
+      {/* Image placeholder area (top of card) */}
+      <div
+        style={{
+          aspectRatio: "1 / 1",
+          background:
+            "linear-gradient(135deg, hsl(var(--butter) / 0.40) 0%, hsl(var(--tomato) / 0.25) 100%)",
+          borderTopLeftRadius: "var(--radius)",
+          borderTopRightRadius: "var(--radius)",
+          borderBottom: "1px solid hsl(var(--rule) / 0.12)",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          fontSize: 36,
+          color: "hsl(var(--ink) / 0.30)",
+          fontFamily:
+            "var(--font-display), var(--font-sans), system-ui, sans-serif",
+          fontWeight: 700,
+          letterSpacing: "0.02em",
+        }}
+      >
+        {item.name.charAt(0).toUpperCase()}
       </div>
 
-      {item.description && (
-        <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 12, marginTop: 0 }}>{item.description}</p>
-      )}
+      {/* Body */}
+      <div
+        style={{
+          padding: 14,
+          display: "flex",
+          flexDirection: "column",
+          flex: 1,
+          gap: 6,
+        }}
+      >
+        <h3
+          style={{
+            fontWeight: 700,
+            fontSize: 16,
+            margin: 0,
+            fontFamily:
+              "var(--font-display), var(--font-sans), system-ui, sans-serif",
+            letterSpacing: "-0.01em",
+            color: "hsl(var(--foreground))",
+          }}
+        >
+          {item.name}
+        </h3>
 
-      <div style={{ fontSize: 12, color: 'var(--color-text-secondary)', marginBottom: 12 }}>
-        {item.quantity === -1 ? "Unlimited stock" : `${item.quantity} in stock`}
+        {item.description && (
+          <p
+            style={{
+              fontSize: 13,
+              color: "hsl(var(--muted-foreground))",
+              margin: 0,
+              lineHeight: 1.4,
+            }}
+          >
+            {item.description}
+          </p>
+        )}
+
+        <div
+          style={{
+            fontSize: 12,
+            color: "hsl(var(--muted-foreground))",
+            marginTop: "auto",
+            paddingTop: 6,
+          }}
+        >
+          {item.quantity === -1
+            ? "Unlimited stock"
+            : `${item.quantity} in stock`}
+        </div>
+
+        {error && (
+          <div
+            style={{
+              padding: 8,
+              background: "hsl(var(--tomato) / 0.06)",
+              border: "1px solid hsl(var(--tomato) / 0.30)",
+              borderRadius: "var(--radius)",
+              color: "hsl(var(--tomato))",
+              fontSize: 12,
+            }}
+          >
+            {error}
+          </div>
+        )}
+
+        {success && (
+          <div
+            style={{
+              padding: 8,
+              background: "hsl(142 71% 35% / 0.10)",
+              border: "1px solid hsl(142 71% 35% / 0.35)",
+              borderRadius: "var(--radius)",
+              color: "hsl(142 71% 28%)",
+              fontSize: 12,
+            }}
+          >
+            Purchase successful!
+          </div>
+        )}
       </div>
 
-      {error && (
-        <div style={{ marginBottom: 12, padding: 8, background: "rgba(255,0,0,0.05)", borderRadius: 6, color: "#c00", fontSize: 12 }}>
-          {error}
+      {/* Footer with price + buy */}
+      <div
+        style={{
+          padding: 14,
+          borderTop: "1px solid hsl(var(--rule) / 0.12)",
+          background: "hsl(var(--cream-warm))",
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+        }}
+      >
+        <div
+          style={{
+            fontSize: 22,
+            fontWeight: 700,
+            color: "hsl(var(--tomato))",
+            fontFamily:
+              "var(--font-display), var(--font-sans), system-ui, sans-serif",
+            letterSpacing: "-0.01em",
+            display: "flex",
+            alignItems: "center",
+          }}
+        >
+          <PepAmount amount={item.price} size={18} />
         </div>
-      )}
-
-      {success && (
-        <div style={{ marginBottom: 12, padding: 8, background: "rgba(0,200,0,0.08)", borderRadius: 6, color: "#16a34a", fontSize: 12 }}>
-          Purchase successful!
-        </div>
-      )}
-
-      <div style={{ display: "flex", gap: 8 }}>
         <input
           type="number"
           value={quantity}
           onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
           min="1"
           max={item.quantity === -1 ? 999 : item.quantity}
-          style={input()}
+          style={{
+            ...input(),
+            width: 56,
+            textAlign: "center",
+            padding: "8px 6px",
+          }}
           disabled={loading || !item.inStock}
         />
         <button
           onClick={handleBuy}
           disabled={loading || !item.inStock}
-          style={btn(loading || !item.inStock)}
+          style={{
+            ...btn("accent", loading || !item.inStock),
+            flex: 1,
+            padding: "8px 12px",
+            fontSize: 13,
+          }}
         >
           {loading ? "Buying..." : item.inStock ? "Buy" : "Out of Stock"}
         </button>

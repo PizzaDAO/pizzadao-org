@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { PepIcon, PepAmount } from "../economy/PepIcon";
+import { PepAmount } from "../economy/PepIcon";
+import { card as cardBase, btn, badge } from "../shared-styles";
 
 type Job = {
   id: number;
@@ -18,32 +19,30 @@ type JobCardProps = {
   disabled?: boolean;
 };
 
-function card(completed?: boolean): React.CSSProperties {
+function cardStyle(completed?: boolean): React.CSSProperties {
+  if (completed) {
+    return {
+      ...cardBase(),
+      padding: 16,
+      gap: 0,
+      borderColor: "hsl(142 71% 35% / 0.35)",
+      background: "hsl(142 71% 35% / 0.06)",
+    };
+  }
   return {
-    border: completed ? "1px solid rgba(22,163,74,0.3)" : "1px solid var(--color-border)",
-    borderRadius: 14,
+    ...cardBase(),
     padding: 16,
-    boxShadow: 'var(--shadow-card)',
-    background: completed ? "rgba(22,163,74,0.05)" : "var(--color-surface)",
+    gap: 0,
   };
 }
 
-function btn(disabled?: boolean): React.CSSProperties {
-  return {
-    padding: "6px 12px",
-    borderRadius: 6,
-    border: "none",
-    fontWeight: 650,
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    background: 'var(--color-btn-primary-bg)',
-    color: 'var(--color-btn-primary-text)',
-    fontSize: 12,
-    whiteSpace: "nowrap" as const,
-  };
-}
-
-export function JobCard({ job, rewardAmount, alreadyCompleted, onAssign, disabled }: JobCardProps) {
+export function JobCard({
+  job,
+  rewardAmount,
+  alreadyCompleted,
+  onAssign,
+  disabled,
+}: JobCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [justCompleted, setJustCompleted] = useState(false);
@@ -80,37 +79,47 @@ export function JobCard({ job, rewardAmount, alreadyCompleted, onAssign, disable
   };
 
   return (
-    <div style={{ ...card(completed), display: "flex", alignItems: "center", gap: 12 }}>
+    <div style={{ ...cardStyle(completed), display: "flex", alignItems: "center", gap: 12 }}>
       {/* Left side - content */}
       <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-          <span style={{
-            fontSize: 10,
-            fontWeight: 600,
-            padding: "3px 6px",
-            background: "rgba(37,99,235,0.1)",
-            color: "#2563eb",
-            borderRadius: 4,
-          }}>
-            {job.type || "General"}
-          </span>
+        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6, flexWrap: "wrap" }}>
+          <span style={badge("default")}>{job.type || "General"}</span>
           {completed && (
-            <span style={{
-              fontSize: 10,
-              fontWeight: 600,
-              padding: "3px 6px",
-              background: "rgba(22,163,74,0.1)",
-              color: "#16a34a",
-              borderRadius: 4,
-            }}>
+            <span
+              style={{
+                ...badge("default"),
+                background: "hsl(142 71% 35% / 0.12)",
+                color: "hsl(142 71% 30%)",
+                borderColor: "hsl(142 71% 35% / 0.35)",
+              }}
+            >
               Done
             </span>
           )}
-          <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>#{job.id}</span>
+          <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}>#{job.id}</span>
         </div>
-        <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4, color: 'var(--color-text-primary)' }}>{job.description}</p>
+        <p
+          style={{
+            fontSize: 14,
+            margin: 0,
+            lineHeight: 1.45,
+            color: "hsl(var(--foreground))",
+          }}
+        >
+          {job.description}
+        </p>
         {error && (
-          <div style={{ marginTop: 8, padding: 6, background: "rgba(255,0,0,0.05)", borderRadius: 4, color: "#c00", fontSize: 11 }}>
+          <div
+            style={{
+              marginTop: 8,
+              padding: 8,
+              background: "hsl(var(--tomato) / 0.06)",
+              border: "1px solid hsl(var(--tomato) / 0.30)",
+              borderRadius: "var(--radius)",
+              color: "hsl(var(--tomato))",
+              fontSize: 12,
+            }}
+          >
             {error}
           </div>
         )}
@@ -119,26 +128,34 @@ export function JobCard({ job, rewardAmount, alreadyCompleted, onAssign, disable
       {/* Right side - button */}
       <div style={{ flexShrink: 0 }}>
         {completed ? (
-          <div style={{
-            padding: "6px 10px",
-            background: "rgba(22,163,74,0.1)",
-            borderRadius: 6,
-            color: "#16a34a",
-            fontWeight: 700,
-            fontSize: 12,
-            display: "flex",
-            alignItems: "center",
-            gap: 4
-          }}>
-            {earnedReward ? "+" : ""}<PepAmount amount={earnedReward || rewardAmount} size={12} />
+          <div
+            style={{
+              padding: "8px 12px",
+              background: "hsl(142 71% 35% / 0.12)",
+              border: "1px solid hsl(142 71% 35% / 0.30)",
+              borderRadius: "var(--radius)",
+              color: "hsl(142 71% 28%)",
+              fontWeight: 700,
+              fontSize: 14,
+              display: "flex",
+              alignItems: "center",
+              gap: 4,
+            }}
+          >
+            {earnedReward ? "+" : ""}
+            <PepAmount amount={earnedReward || rewardAmount} size={14} />
           </div>
         ) : (
           <button
             onClick={handleAssign}
             disabled={loading || disabled}
-            style={btn(loading || disabled)}
+            style={{
+              ...btn("accent", loading || disabled),
+              padding: "8px 14px",
+              fontSize: 14,
+            }}
           >
-            {loading ? "..." : <PepAmount amount={rewardAmount} size={12} />}
+            {loading ? "..." : <PepAmount amount={rewardAmount} size={14} />}
           </button>
         )}
       </div>

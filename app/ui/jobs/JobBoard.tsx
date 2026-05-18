@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { JobCard } from "./JobCard";
+import { card, btn } from "../shared-styles";
 
 type Job = {
   id: number;
@@ -10,16 +11,6 @@ type Job = {
   assignees: string[];
   completed: boolean;
 };
-
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  };
-}
 
 function formatCountdown(ms: number): string {
   if (ms <= 0) return "Refreshing...";
@@ -100,7 +91,14 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
       <div style={{ display: "grid", gap: 16 }}>
         <div style={{ display: "grid", gap: 12 }}>
           {[...Array(3)].map((_, i) => (
-            <div key={i} style={{ height: 120, background: 'var(--color-surface-hover)', borderRadius: 14 }} />
+            <div
+              key={i}
+              style={{
+                height: 120,
+                background: "hsl(var(--muted))",
+                borderRadius: "var(--radius)",
+              }}
+            />
           ))}
         </div>
       </div>
@@ -109,8 +107,14 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
 
   if (error) {
     return (
-      <div style={{ ...card(), background: "rgba(255,0,0,0.05)", borderColor: "rgba(255,0,0,0.3)" }}>
-        <p style={{ color: "#c00" }}>{error}</p>
+      <div
+        style={{
+          ...card(),
+          background: "hsl(var(--tomato) / 0.06)",
+          borderColor: "hsl(var(--tomato) / 0.30)",
+        }}
+      >
+        <p style={{ color: "hsl(var(--tomato))", margin: 0 }}>{error}</p>
       </div>
     );
   }
@@ -118,20 +122,52 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
   return (
     <div style={{ display: "grid", gap: 20 }}>
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-          <h2 style={{ fontSize: 18, fontWeight: 700, margin: 0 }}>Today's Jobs</h2>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            marginBottom: 16,
+            gap: 12,
+            flexWrap: "wrap",
+          }}
+        >
+          <h2
+            style={{
+              fontSize: 22,
+              fontWeight: 700,
+              margin: 0,
+              fontFamily:
+                "var(--font-display), var(--font-sans), system-ui, sans-serif",
+              letterSpacing: "-0.01em",
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            Today's Jobs
+          </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-            <div style={{
-              display: "flex",
-              alignItems: "center",
-              gap: 8,
-              padding: "6px 12px",
-              background: 'var(--color-page-bg)',
-              borderRadius: 8,
-              fontSize: 13
-            }}>
-              <span style={{ color: 'var(--color-text-secondary)' }}>New jobs in:</span>
-              <span style={{ fontWeight: 700, fontFamily: "monospace", color: "#2563eb" }}>
+            <div
+              style={{
+                display: "flex",
+                alignItems: "center",
+                gap: 8,
+                padding: "6px 12px",
+                background: "hsl(var(--muted))",
+                border: "1px solid hsl(var(--rule) / 0.12)",
+                borderRadius: "var(--radius)",
+                fontSize: 13,
+              }}
+            >
+              <span style={{ color: "hsl(var(--muted-foreground))" }}>
+                New jobs in:
+              </span>
+              <span
+                style={{
+                  fontWeight: 700,
+                  fontFamily: "var(--font-mono), monospace",
+                  color: "hsl(var(--tomato))",
+                }}
+              >
                 {countdown}
               </span>
             </div>
@@ -147,13 +183,9 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
                 } catch {}
               }}
               style={{
+                ...btn("secondary"),
                 padding: "6px 10px",
-                borderRadius: 6,
-                border: "none",
-                background: "var(--color-surface-hover)",
-                cursor: "pointer",
                 fontSize: 12,
-                color: 'var(--color-text-secondary)',
               }}
               title="Reset today's jobs"
             >
@@ -164,7 +196,9 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
 
         {jobs.length === 0 ? (
           <div style={{ ...card(), textAlign: "center" }}>
-            <p style={{ color: 'var(--color-text-secondary)' }}>No jobs available at the moment</p>
+            <p style={{ color: "hsl(var(--muted-foreground))", margin: 0 }}>
+              No jobs available at the moment
+            </p>
           </div>
         ) : (
           <div style={{ display: "grid", gap: 12 }}>
