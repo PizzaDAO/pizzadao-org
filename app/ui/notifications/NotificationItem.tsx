@@ -18,6 +18,9 @@ type NotificationItemProps = {
   onNavigate: (url: string) => void;
 };
 
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
+
 function getIcon(type: NotificationData["type"]): React.ReactNode {
   switch (type) {
     case "BOUNTY_CLAIMED":
@@ -68,20 +71,33 @@ function getIcon(type: NotificationData["type"]): React.ReactNode {
   }
 }
 
+// Icon palettes — all mapped to design tokens so light/dark mode stays consistent.
+function getIconBg(type: NotificationData["type"]): string {
+  switch (type) {
+    case "BOUNTY_CLAIMED":
+    case "TASK_DUE_SOON":
+      return "hsl(var(--tomato) / 0.12)";
+    case "BOUNTY_COMPLETED":
+    case "TASK_ASSIGNED":
+      return "hsl(var(--butter) / 0.35)";
+    case "VOUCH_ADDED":
+      return "hsl(var(--muted))";
+    default:
+      return "hsl(var(--muted))";
+  }
+}
+
 function getIconColor(type: NotificationData["type"]): string {
   switch (type) {
     case "BOUNTY_CLAIMED":
-      return "#ca8a04"; // Yellow
-    case "BOUNTY_COMPLETED":
-      return "#16a34a"; // Green
-    case "TASK_ASSIGNED":
-      return "#2563eb"; // Blue
     case "TASK_DUE_SOON":
-      return "#dc2626"; // Red
+      return "hsl(var(--tomato))";
+    case "BOUNTY_COMPLETED":
+    case "TASK_ASSIGNED":
     case "VOUCH_ADDED":
-      return "#8B5CF6"; // Purple
+      return "hsl(var(--foreground))";
     default:
-      return "var(--color-text-secondary)";
+      return "hsl(var(--muted-foreground))";
   }
 }
 
@@ -108,13 +124,14 @@ function itemContainer(isRead: boolean): React.CSSProperties {
     gap: 10,
     padding: "10px 12px",
     cursor: "pointer",
-    transition: "background 0.15s",
-    background: isRead ? "transparent" : "rgba(37,99,235,0.04)",
-    borderBottom: '1px solid var(--color-divider)',
+    transition: "background-color 150ms ease",
+    background: isRead ? "transparent" : "hsl(var(--cream-warm))",
+    borderBottom: "1px solid hsl(var(--rule) / 0.12)",
+    borderLeft: isRead ? "3px solid transparent" : "3px solid hsl(var(--tomato))",
   };
 }
 
-function iconWrapper(color: string): React.CSSProperties {
+function iconWrapper(bg: string, color: string): React.CSSProperties {
   return {
     flexShrink: 0,
     width: 28,
@@ -123,8 +140,8 @@ function iconWrapper(color: string): React.CSSProperties {
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "50%",
-    background: `${color}15`,
-    color: color,
+    background: bg,
+    color,
   };
 }
 
@@ -137,18 +154,21 @@ function contentWrapper(): React.CSSProperties {
 
 function titleStyle(isRead: boolean): React.CSSProperties {
   return {
+    fontFamily: "var(--font-sans), system-ui, sans-serif",
     fontSize: 13,
-    fontWeight: isRead ? 500 : 650,
-    color: isRead ? "var(--color-text-secondary)" : "var(--color-text-primary)",
+    fontWeight: isRead ? 500 : 700,
+    color: isRead
+      ? "hsl(var(--muted-foreground))"
+      : "hsl(var(--foreground))",
     margin: 0,
     marginBottom: 2,
   };
 }
 
-function messageStyle(isRead: boolean): React.CSSProperties {
+function messageStyle(): React.CSSProperties {
   return {
     fontSize: 12,
-    color: isRead ? "var(--color-text-muted)" : "var(--color-text-secondary)",
+    color: "hsl(var(--muted-foreground))",
     margin: 0,
     lineHeight: 1.4,
     overflow: "hidden",
@@ -162,14 +182,17 @@ function messageStyle(isRead: boolean): React.CSSProperties {
 function timeStyle(): React.CSSProperties {
   return {
     fontSize: 10,
-    color: "var(--color-text-muted)",
+    color: "hsl(var(--muted-foreground))",
     marginTop: 4,
+    fontFamily: displayFont,
+    letterSpacing: "0.02em",
   };
 }
 
 export function NotificationItem({ notification, onMarkRead, onNavigate }: NotificationItemProps) {
   const isRead = notification.readAt !== null;
   const iconColor = getIconColor(notification.type);
+  const iconBg = getIconBg(notification.type);
 
   const handleClick = () => {
     if (!isRead) {
@@ -185,16 +208,20 @@ export function NotificationItem({ notification, onMarkRead, onNavigate }: Notif
       style={itemContainer(isRead)}
       onClick={handleClick}
       onMouseEnter={(e) => {
-        e.currentTarget.style.background = isRead ? "var(--color-surface-hover)" : "rgba(37,99,235,0.08)";
+        e.currentTarget.style.background = isRead
+          ? "hsl(var(--muted))"
+          : "hsl(var(--cream-warm))";
       }}
       onMouseLeave={(e) => {
-        e.currentTarget.style.background = isRead ? "transparent" : "rgba(37,99,235,0.04)";
+        e.currentTarget.style.background = isRead
+          ? "transparent"
+          : "hsl(var(--cream-warm))";
       }}
     >
-      <div style={iconWrapper(iconColor)}>{getIcon(notification.type)}</div>
+      <div style={iconWrapper(iconBg, iconColor)}>{getIcon(notification.type)}</div>
       <div style={contentWrapper()}>
         <p style={titleStyle(isRead)}>{notification.title}</p>
-        <p style={messageStyle(isRead)}>{notification.message}</p>
+        <p style={messageStyle()}>{notification.message}</p>
         <div style={timeStyle()}>{formatRelativeTime(notification.createdAt)}</div>
       </div>
       {!isRead && (
@@ -203,7 +230,7 @@ export function NotificationItem({ notification, onMarkRead, onNavigate }: Notif
             width: 8,
             height: 8,
             borderRadius: "50%",
-            background: "#2563eb",
+            background: "hsl(var(--tomato))",
             flexShrink: 0,
             alignSelf: "center",
           }}

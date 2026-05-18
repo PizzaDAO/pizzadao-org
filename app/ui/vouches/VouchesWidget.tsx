@@ -13,6 +13,9 @@ type VouchesWidgetProps = {
   memberId: string;
 };
 
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
+
 export function VouchesWidget({ memberId }: VouchesWidgetProps) {
   const [vouches, setVouches] = useState<VouchSummary[]>([]);
   const [total, setTotal] = useState(0);
@@ -62,24 +65,37 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
       >
         <h3
           style={{
+            fontFamily: displayFont,
             fontSize: 12,
             textTransform: "uppercase",
-            letterSpacing: "1px",
-            opacity: 0.5,
+            letterSpacing: "0.08em",
+            color: "hsl(var(--muted-foreground))",
             margin: 0,
             fontWeight: 700,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 8,
           }}
         >
           Vouches
           {total > 0 && (
             <span
               style={{
-                marginLeft: 6,
+                display: "inline-flex",
+                alignItems: "center",
+                background: "hsl(var(--butter) / 0.35)",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--butter) / 0.60)",
+                padding: "2px 8px",
+                borderRadius: 999,
                 fontSize: 11,
-                opacity: 0.8,
+                fontWeight: 700,
+                letterSpacing: 0,
+                textTransform: "none",
+                fontVariantNumeric: "tabular-nums",
               }}
             >
-              ({total})
+              {total}
             </span>
           )}
         </h3>
@@ -87,10 +103,18 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
           <Link
             href="/vouches"
             style={{
+              fontFamily: displayFont,
               fontSize: 13,
-              fontWeight: 650,
-              color: "var(--color-accent)",
+              fontWeight: 700,
+              color: "hsl(var(--tomato))",
               textDecoration: "none",
+              textUnderlineOffset: 2,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.textDecoration = "underline";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.textDecoration = "none";
             }}
           >
             View All
@@ -109,26 +133,27 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
                 justifyContent: "space-between",
                 alignItems: "center",
                 padding: "8px 12px",
-                borderRadius: 10,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
+                borderRadius: "var(--radius)",
+                border: "1px solid hsl(var(--rule) / 0.12)",
+                background: "hsl(var(--card))",
+                color: "hsl(var(--card-foreground))",
                 textDecoration: "none",
-                color: "inherit",
-                transition: "border-color 0.15s",
+                transition: "border-color 150ms ease",
               }}
-              onMouseEnter={(e) =>
-                (e.currentTarget.style.borderColor =
-                  "var(--color-border-strong)")
-              }
-              onMouseLeave={(e) =>
-                (e.currentTarget.style.borderColor = "var(--color-border)")
-              }
+              onMouseEnter={(e) => {
+                e.currentTarget.style.borderColor =
+                  "hsl(var(--rule) / 0.22)";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.borderColor =
+                  "hsl(var(--rule) / 0.12)";
+              }}
             >
               <span
                 style={{
                   fontSize: 14,
                   fontWeight: 600,
-                  color: "var(--color-text-primary)",
+                  color: "hsl(var(--foreground))",
                 }}
               >
                 {v.name}
@@ -137,7 +162,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
                 <span
                   style={{
                     fontSize: 12,
-                    color: "var(--color-text-muted)",
+                    color: "hsl(var(--muted-foreground))",
                   }}
                 >
                   {v.city}
@@ -150,15 +175,16 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
         <div
           style={{
             padding: 16,
-            borderRadius: 10,
-            border: "1px dashed var(--color-border)",
+            borderRadius: "var(--radius)",
+            border: "1px dashed hsl(var(--rule) / 0.22)",
+            background: "hsl(var(--card))",
             textAlign: "center",
           }}
         >
           <p
             style={{
               fontSize: 14,
-              color: "var(--color-text-muted)",
+              color: "hsl(var(--muted-foreground))",
               margin: 0,
             }}
           >
@@ -169,10 +195,18 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
             style={{
               display: "inline-block",
               marginTop: 8,
+              fontFamily: displayFont,
               fontSize: 13,
-              fontWeight: 650,
-              color: "var(--color-accent)",
+              fontWeight: 700,
+              color: "hsl(var(--tomato))",
               textDecoration: "none",
+              textUnderlineOffset: 2,
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.textDecoration = "underline";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.textDecoration = "none";
             }}
           >
             Find Vouches
