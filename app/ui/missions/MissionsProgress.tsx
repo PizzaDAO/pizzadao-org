@@ -67,29 +67,51 @@ export function MissionsProgress() {
   return (
     <div style={{ ...card(), gap: 12 }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center" }}>
-        <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>Missions</h3>
+        <h3 style={{
+          margin: 0,
+          fontSize: 18,
+          fontWeight: 700,
+          fontFamily: "var(--font-display), var(--font-sans), system-ui, sans-serif",
+          letterSpacing: "-0.01em",
+        }}>Missions</h3>
         <Link
           href="/missions"
           style={{
             fontSize: 13,
-            color: "var(--color-text-secondary)",
+            fontWeight: 600,
+            color: "hsl(var(--tomato))",
             textDecoration: "none",
           }}
+          onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
+          onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
         >
           View All &rarr;
         </Link>
       </div>
 
       {/* Current Level */}
-      <div style={{ display: "flex", alignItems: "baseline", gap: 8 }}>
-        <span style={{ fontSize: 24, fontWeight: 800 }}>
+      <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
+        <span style={{
+          fontSize: 36,
+          fontWeight: 800,
+          lineHeight: 1,
+          fontFamily: "var(--font-display), var(--font-sans), system-ui, sans-serif",
+          color: "hsl(var(--tomato))",
+        }}>
           {allDone ? "MAX" : `Lv.${currentLevel}`}
         </span>
         {levelTitle && (
-          <span style={{ fontSize: 14, opacity: 0.6 }}>{levelTitle}</span>
+          <span style={{
+            fontSize: 14,
+            fontWeight: 500,
+            color: "hsl(var(--muted-foreground))",
+          }}>{levelTitle}</span>
         )}
         {allDone && (
-          <span style={{ fontSize: 14, opacity: 0.6 }}>All levels complete!</span>
+          <span style={{
+            fontSize: 14,
+            color: "hsl(var(--muted-foreground))",
+          }}>All levels complete!</span>
         )}
       </div>
 
@@ -102,8 +124,8 @@ export function MissionsProgress() {
                 display: "flex",
                 justifyContent: "space-between",
                 fontSize: 12,
-                opacity: 0.6,
-                marginBottom: 4,
+                color: "hsl(var(--muted-foreground))",
+                marginBottom: 6,
               }}
             >
               <span>
@@ -114,8 +136,8 @@ export function MissionsProgress() {
             <div
               style={{
                 height: 8,
-                borderRadius: 4,
-                background: "var(--color-border)",
+                borderRadius: 999,
+                background: "hsl(var(--muted))",
                 overflow: "hidden",
               }}
             >
@@ -123,8 +145,8 @@ export function MissionsProgress() {
                 style={{
                   width: `${progressPercent}%`,
                   height: "100%",
-                  borderRadius: 4,
-                  background: "#16a34a",
+                  borderRadius: 999,
+                  background: "hsl(var(--tomato))",
                   transition: "width 0.3s ease",
                 }}
               />
@@ -144,7 +166,7 @@ export function MissionsProgress() {
                     alignItems: "center",
                     gap: 8,
                     fontSize: 13,
-                    opacity: done ? 0.6 : 1,
+                    color: done ? "hsl(var(--muted-foreground))" : "hsl(var(--foreground))",
                   }}
                 >
                   <span style={{ flexShrink: 0 }}>
@@ -168,8 +190,8 @@ export function MissionsProgress() {
       <div
         style={{
           fontSize: 12,
-          opacity: 0.5,
-          borderTop: "1px solid var(--color-border)",
+          color: "hsl(var(--muted-foreground))",
+          borderTop: "1px solid hsl(var(--rule) / 0.12)",
           paddingTop: 8,
         }}
       >
