@@ -31,7 +31,7 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
         className="text-base sm:text-lg text-muted-foreground mx-auto max-w-md leading-relaxed"
         style={{ textWrap: "pretty" } as React.CSSProperties}
       >
-        Mafia names, slice meet-ups, and a global crew of pizza chefs. Welcome to PizzaDAO.
+        We&apos;re a global pizza co-op that throws a Global Pizza Party every year.
       </p>
 
       <div className="grid gap-3 mt-2">
