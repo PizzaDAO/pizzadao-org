@@ -1,5 +1,8 @@
 "use client";
 
+// truffle-11395 (Restyle Phase 2): consume the new semantic HSL tokens
+// directly. Active variant uses the tomato accent; inactive uses muted.
+
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
@@ -19,15 +22,16 @@ export default function TagBadge({ tag, href, onClick, size = "md", active = fal
     fontSize: size === "sm" ? 11 : 12,
     fontWeight: 600,
     background: active
-      ? "var(--color-btn-primary-bg)"
-      : "var(--color-surface-hover, rgba(0,0,0,0.04))",
+      ? "hsl(var(--tomato) / 0.10)"
+      : "hsl(var(--muted))",
     color: active
-      ? "var(--color-btn-primary-text)"
-      : "var(--color-text-secondary, var(--color-text))",
-    border: `1px solid ${active ? "var(--color-btn-primary-border)" : "var(--color-border)"}`,
+      ? "hsl(var(--tomato))"
+      : "hsl(var(--foreground))",
+    border: `1px solid ${active ? "hsl(var(--tomato) / 0.30)" : "hsl(var(--rule) / 0.22)"}`,
     textDecoration: "none",
     cursor: href || onClick ? "pointer" : "default",
     whiteSpace: "nowrap",
+    transition: "background-color 150ms ease, border-color 150ms ease",
   };
 
   if (href) {
