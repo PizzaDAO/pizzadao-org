@@ -3,7 +3,7 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { card, btn } from "./styles";
+import { card, btn, input as inputStyle, alert } from "./styles";
 
 type ClaimStep = "ask" | "input-id" | "input-pass" | "processing";
 
@@ -71,32 +71,30 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        display: "flex",
-        alignItems: "center",
-        justifyContent: "center",
-        background: 'var(--color-page-bg)',
-        padding: 20,
-      }}
-    >
-      <div style={card()}>
+    <div className="min-h-screen bg-background flex items-center justify-center p-5">
+      <div style={card()} className="w-full max-w-lg">
         {step === "ask" && (
           <>
-            <h2 style={{ fontSize: 24, marginBottom: 16 }}>Welcome, Pizza Chef!</h2>
-            <p style={{ marginBottom: 24, lineHeight: 1.5 }}>
-              We authenticated your Discord, but we couldn't automatically find your Profile.
+            <h2
+              className="font-[family-name:var(--font-display)] uppercase tracking-tight text-3xl sm:text-4xl font-extrabold text-foreground mb-2"
+              style={{ textWrap: "balance" } as React.CSSProperties}
+            >
+              Welcome, Pizza Chef!
+            </h2>
+            <p className="mb-6 leading-relaxed text-muted-foreground">
+              We authenticated your Discord, but we couldn&apos;t automatically find your Profile.
               <br />
               <br />
-              <strong>Do you already have a PizzaDAO Member ID?</strong>
+              <strong className="text-foreground">
+                Do you already have a PizzaDAO Member ID?
+              </strong>
             </p>
-            <div style={{ display: "flex", gap: 12 }}>
-              <button onClick={() => setStep("input-id")} style={btn("primary")}>
+            <div className="flex gap-3">
+              <button onClick={() => setStep("input-id")} style={btn("accent")}>
                 Yes, I have an ID
               </button>
               <button onClick={onStartRegistration} style={btn("secondary")}>
-                No, I'm new
+                No, I&apos;m new
               </button>
             </div>
           </>
@@ -104,8 +102,10 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
 
         {step === "input-id" && (
           <>
-            <h2 style={{ fontSize: 20, marginBottom: 16 }}>Find Your Profile</h2>
-            <p style={{ marginBottom: 16, fontSize: 14, opacity: 0.8 }}>
+            <h2 className="font-[family-name:var(--font-display)] text-2xl font-extrabold text-foreground mb-3">
+              Find Your Profile
+            </h2>
+            <p className="mb-3 text-sm text-muted-foreground">
               Please enter your numeric Member ID.
             </p>
             <input
@@ -113,20 +113,15 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
               placeholder="e.g. 60"
               value={memberId}
               onChange={(e) => setMemberId(e.target.value)}
-              style={{
-                padding: "10px 12px",
-                borderRadius: 8,
-                border: "1px solid #ccc",
-                fontSize: 16,
-                width: "100%",
-                marginBottom: 16,
-              }}
+              style={{ ...inputStyle(), marginBottom: 16 }}
             />
             {error && (
-              <div style={{ color: "red", fontSize: 14, marginBottom: 16 }}>{error}</div>
+              <div style={alert("error")} className="mb-3">
+                {error}
+              </div>
             )}
-            <div style={{ display: "flex", gap: 12 }}>
-              <button onClick={checkMemberId} style={btn("primary")}>
+            <div className="flex gap-3">
+              <button onClick={checkMemberId} style={btn("accent")}>
                 Search ID
               </button>
               <button
@@ -144,8 +139,10 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
 
         {step === "input-pass" && (
           <>
-            <h2 style={{ fontSize: 20, marginBottom: 16 }}>Claim Profile: {foundName}</h2>
-            <p style={{ marginBottom: 16, fontSize: 14, opacity: 0.8 }}>
+            <h2 className="font-[family-name:var(--font-display)] text-2xl font-extrabold text-foreground mb-3">
+              Claim Profile: {foundName}
+            </h2>
+            <p className="mb-3 text-sm text-muted-foreground">
               To verify this is you, please enter the claim password.
             </p>
             <form
@@ -160,20 +157,15 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
                 type="password"
                 placeholder="Password"
                 autoFocus
-                style={{
-                  padding: "10px 12px",
-                  borderRadius: 8,
-                  border: "1px solid #ccc",
-                  fontSize: 16,
-                  width: "100%",
-                  marginBottom: 16,
-                }}
+                style={{ ...inputStyle(), marginBottom: 16 }}
               />
               {error && (
-                <div style={{ color: "red", fontSize: 14, marginBottom: 16 }}>{error}</div>
+                <div style={alert("error")} className="mb-3">
+                  {error}
+                </div>
               )}
-              <div style={{ display: "flex", gap: 12 }}>
-                <button type="submit" style={btn("primary")}>
+              <div className="flex gap-3">
+                <button type="submit" style={btn("accent")}>
                   Claim Profile
                 </button>
                 <button
@@ -192,7 +184,7 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
         )}
 
         {step === "processing" && (
-          <div style={{ textAlign: "center", padding: 20 }}>Checking...</div>
+          <div className="text-center py-5 text-muted-foreground">Checking...</div>
         )}
       </div>
     </div>

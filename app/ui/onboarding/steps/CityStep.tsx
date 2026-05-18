@@ -69,7 +69,7 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
   }, [city]);
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="grid gap-3">
       <Field label="City">
         <CityAutocomplete value={city} onChange={onChange} onRegionResolved={onRegionResolved} />
       </Field>
@@ -84,19 +84,19 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
       )}
 
       {telegramLoading && (
-        <div style={{ fontSize: 13, opacity: 0.5 }}>
+        <div className="text-xs text-muted-foreground/70">
           Looking for a local PizzaDAO chapter...
         </div>
       )}
 
-      <div style={{ display: "flex", gap: 10 }}>
+      <div className="flex gap-2.5">
         <button onClick={onBack} style={btn("secondary")}>
           Back
         </button>
         <button
           onClick={onNext}
           disabled={!canProceed}
-          style={btn("primary", !canProceed)}
+          style={btn("accent", !canProceed)}
         >
           Next
         </button>
@@ -121,20 +121,11 @@ function TelegramInvite({
   const location = country ? `${chapterCity}, ${country}` : chapterCity;
 
   return (
-    <div
-      style={{
-        padding: "12px 14px",
-        borderRadius: 12,
-        border: "1px solid rgba(0, 150, 255, 0.25)",
-        background: "rgba(0, 150, 255, 0.04)",
-        display: "grid",
-        gap: 8,
-      }}
-    >
-      <div style={{ fontWeight: 700, fontSize: 14, color: "#000000" }}>
+    <div className="p-3.5 rounded-[--radius] border border-rule bg-secondary grid gap-2">
+      <div className="font-[family-name:var(--font-display)] font-bold text-base text-foreground">
         PizzaDAO {chapterCity} Chapter
       </div>
-      <div style={{ fontSize: 13, opacity: 0.8, color: "#000000" }}>
+      <div className="text-sm text-muted-foreground">
         There&apos;s a local PizzaDAO community in {location}! Join the group chat to
         connect with pizza fam near you.
       </div>
@@ -142,20 +133,10 @@ function TelegramInvite({
         href={chatUrl}
         target="_blank"
         rel="noopener noreferrer"
+        className="inline-flex items-center gap-1.5 rounded-[--radius] no-underline cursor-pointer w-fit text-sm font-semibold text-cream"
         style={{
-          display: "inline-flex",
-          alignItems: "center",
-          gap: 6,
-          padding: "8px 14px",
-          borderRadius: 10,
-          border: "none",
           background: "#0088cc",
-          color: "white",
-          fontWeight: 650,
-          fontSize: 14,
-          textDecoration: "none",
-          cursor: "pointer",
-          width: "fit-content",
+          padding: "8px 14px",
         }}
       >
         <TelegramIcon />
@@ -265,24 +246,13 @@ function CityAutocomplete({
       />
 
       {loading && (
-        <div style={{ position: "absolute", right: 10, top: 10, opacity: 0.6, fontSize: 12 }}>...</div>
+        <div className="absolute right-2.5 top-2.5 text-xs text-muted-foreground/70">...</div>
       )}
 
       {open && items.length > 0 && (
         <div
-          style={{
-            position: "absolute",
-            left: 0,
-            right: 0,
-            top: "100%",
-            marginTop: 6,
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 12,
-            background: 'var(--color-surface)',
-            boxShadow: "0 10px 30px rgba(0,0,0,0.08)",
-            overflow: "hidden",
-            zIndex: 50,
-          }}
+          className="absolute left-0 right-0 top-full mt-1.5 rounded-[--radius] border border-rule bg-card overflow-hidden z-50"
+          style={{ boxShadow: "0 10px 30px hsl(var(--ink) / 0.08)" }}
         >
           {items.slice(0, 8).map((it) => (
             <button
@@ -296,15 +266,7 @@ function CityAutocomplete({
                 setOpen(false);
                 setItems([]);
               }}
-              style={{
-                width: "100%",
-                textAlign: "left",
-                padding: "10px 12px",
-                border: "none",
-                background: 'var(--color-surface)',
-                color: 'var(--color-text)',
-                cursor: "pointer",
-              }}
+              className="w-full text-left px-3 py-2.5 border-0 bg-card text-card-foreground hover:bg-secondary cursor-pointer"
             >
               {it.description}
             </button>

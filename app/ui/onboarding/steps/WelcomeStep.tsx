@@ -11,21 +11,33 @@ type Props = {
 
 export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
   return (
-    <div style={{ display: "grid", gap: 20, textAlign: "center", padding: "20px 0" }}>
-      <div style={{ display: "flex", justifyContent: "center", marginBottom: 10 }}>
+    <div className="grid gap-8 text-center py-4 sm:py-6">
+      <div className="flex justify-center">
         <img
           src="https://i.imgur.com/lRq8iK7.png"
           alt="PizzaDAO"
-          style={{ height: 60, width: "auto", maxWidth: "100%", objectFit: "contain" }}
+          className="h-16 w-auto max-w-full object-contain"
         />
       </div>
-      <div style={{ fontSize: 18, lineHeight: 1.5, opacity: 0.9 }}>
-        Join the world's largest pizza co-op.
-      </div>
-      <div style={{ display: "grid", gap: 12 }}>
+
+      <h1
+        className="font-[family-name:var(--font-display)] uppercase tracking-tight text-4xl sm:text-5xl lg:text-6xl font-extrabold text-foreground"
+        style={{ textWrap: "balance" } as React.CSSProperties}
+      >
+        Join the world&apos;s largest pizza co-op
+      </h1>
+
+      <p
+        className="text-base sm:text-lg text-muted-foreground mx-auto max-w-md leading-relaxed"
+        style={{ textWrap: "pretty" } as React.CSSProperties}
+      >
+        Mafia names, slice meet-ups, and a global crew of pizza chefs. Welcome to PizzaDAO.
+      </p>
+
+      <div className="grid gap-3 mt-2">
         <button
           onClick={onJoin}
-          style={{ ...btn("primary"), padding: "16px 20px", fontSize: 18 }}
+          style={{ ...btn("accent"), padding: "16px 20px", fontSize: 18 }}
         >
           Join PizzaDAO
         </button>
@@ -36,20 +48,13 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
           Already in our Discord? Login
         </button>
       </div>
+
       <button
         onClick={onMagicLogin}
-        style={{
-          background: "none",
-          border: "none",
-          color: "var(--color-text)",
-          opacity: 0.5,
-          fontSize: 13,
-          cursor: "pointer",
-          textDecoration: "underline",
-          padding: 4,
-        }}
+        className="text-muted-foreground/80 hover:text-foreground text-sm underline underline-offset-4 cursor-pointer transition-colors mx-auto"
+        style={{ background: "none", border: "none", padding: 4 }}
       >
-        Can't log in? Try Discord DM
+        Can&apos;t log in? Try Discord DM
       </button>
     </div>
   );

@@ -53,30 +53,10 @@ export function ReviewStep({
   ];
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
-      <div
-        style={{
-          display: "grid",
-          gap: 0,
-          border: '1px solid var(--color-border)',
-          borderRadius: 10,
-          overflow: "hidden",
-        }}
-      >
+    <div className="grid gap-4">
+      <div className="grid border border-rule rounded-[--radius] overflow-hidden">
         {/* Header */}
-        <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "100px 1fr 1fr",
-            gap: 10,
-            background: "rgba(0,0,0,0.06)",
-            padding: "12px 16px",
-            fontWeight: 750,
-            fontSize: 13,
-            textTransform: "uppercase",
-            letterSpacing: 0.6,
-          }}
-        >
+        <div className="grid grid-cols-[100px_1fr_1fr] gap-2.5 px-4 py-3 bg-secondary font-[family-name:var(--font-display)] font-bold text-xs uppercase tracking-wider text-foreground">
           <div>Field</div>
           <div>New (Entered)</div>
           <div>Existing (In Sheet)</div>
@@ -93,41 +73,34 @@ export function ReviewStep({
           return (
             <div
               key={i}
-              style={{
-                display: "grid",
-                gridTemplateColumns: "100px 1fr 1fr",
-                gap: 10,
-                padding: "12px 16px",
-                background: i % 2 === 1 ? "rgba(0,0,0,0.01)" : "white",
-                borderTop: "1px solid rgba(0,0,0,0.05)",
-              }}
+              className={`grid grid-cols-[100px_1fr_1fr] gap-2.5 px-4 py-3 border-t border-rule ${
+                i % 2 === 1 ? "bg-secondary/40" : "bg-card"
+              }`}
             >
-              <div style={{ fontWeight: 600, fontSize: 14, color: "rgba(0,0,0,0.5)" }}>{row.label}</div>
+              <div className="font-semibold text-sm text-muted-foreground">{row.label}</div>
               <div
-                style={{
-                  fontWeight: hasChange ? 750 : 400,
-                  color: hasChange ? "#000" : "#777",
-                  fontSize: 14,
-                }}
+                className={`text-sm ${
+                  hasChange ? "font-bold text-foreground" : "text-muted-foreground"
+                }`}
               >
                 {row.new || "-"}
                 {hasChange && (
-                  <span style={{ marginLeft: 6, color: "#10b981", fontSize: 16 }} title="Modified">
+                  <span className="ml-1.5 text-tomato text-base" title="Modified">
                     *
                   </span>
                 )}
               </div>
-              <div style={{ opacity: 0.6, fontSize: 14 }}>{row.old || "-"}</div>
+              <div className="text-muted-foreground text-sm">{row.old || "-"}</div>
             </div>
           );
         })}
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
+      <div className="flex flex-wrap gap-3 mt-2">
         <button
           onClick={onSubmit}
           disabled={submitting}
-          style={{ ...btn("primary", submitting), flex: 1 }}
+          style={{ ...btn("accent", submitting), flex: 1 }}
         >
           {submitting ? "Updating Profile..." : "Yes, Update My Profile"}
         </button>
@@ -136,7 +109,7 @@ export function ReviewStep({
           disabled={submitting}
           style={{ ...btn("secondary"), flex: 1 }}
         >
-          Don't Update
+          Don&apos;t Update
         </button>
       </div>
     </div>

@@ -66,7 +66,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
     };
 
     return (
-      <div style={{ display: "grid", gap: 16, padding: "20px 0" }}>
+      <div className="grid gap-4 py-5">
         <div style={alert("error")}>
           {errorMessages[loginError] || "Login failed. Please try again."}
         </div>
@@ -80,15 +80,15 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
   // Sent state — check your DMs
   if (state.step === "sent") {
     return (
-      <div style={{ display: "grid", gap: 16, textAlign: "center", padding: "20px 0" }}>
+      <div className="grid gap-4 text-center py-5">
         <div style={alert("success")}>
           Check your Discord DMs!
         </div>
-        <div style={{ fontSize: 14, opacity: 0.8 }}>
-          We sent a login link to <strong>{state.username}</strong> on Discord.
+        <div className="text-sm text-muted-foreground">
+          We sent a login link to <strong className="text-foreground">{state.username}</strong> on Discord.
           The link expires in 10 minutes.
         </div>
-        <div style={{ display: "grid", gap: 10 }}>
+        <div className="grid gap-2.5">
           <button
             onClick={() => handleSubmit(state.username)}
             style={btn("secondary")}
@@ -108,11 +108,11 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
     // Not in server
     if (state.code === "not_found") {
       return (
-        <div style={{ display: "grid", gap: 16, padding: "20px 0" }}>
+        <div className="grid gap-4 py-5">
           <div style={alert("info")}>
             You need to be in the PizzaDAO Discord to use this.
           </div>
-          <div style={{ fontSize: 14, opacity: 0.8 }}>
+          <div className="text-sm text-muted-foreground">
             Our bot can only DM members of the server. Join first, then try again.
           </div>
           <a
@@ -120,7 +120,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             target="_blank"
             rel="noopener noreferrer"
             style={{
-              ...btn("primary"),
+              ...btn("accent"),
               textAlign: "center",
               textDecoration: "none",
               display: "block",
@@ -132,7 +132,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             onClick={() => handleSubmit(state.username)}
             style={btn("secondary")}
           >
-            I've joined, try again
+            I&apos;ve joined, try again
           </button>
           <button onClick={onBack} style={{ ...btn("secondary"), opacity: 0.7 }}>
             Back
@@ -144,21 +144,21 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
     // DMs disabled
     if (state.code === "dm_failed") {
       return (
-        <div style={{ display: "grid", gap: 16, padding: "20px 0" }}>
+        <div className="grid gap-4 py-5">
           <div style={alert("error")}>
-            Couldn't send you a DM
+            Couldn&apos;t send you a DM
           </div>
-          <div style={{ fontSize: 14, opacity: 0.8, lineHeight: 1.6 }}>
+          <div className="text-sm text-muted-foreground leading-relaxed">
             To receive the login link, enable DMs from server members:
           </div>
-          <ol style={{ fontSize: 14, opacity: 0.8, lineHeight: 1.8, margin: 0, paddingLeft: 20 }}>
+          <ol className="text-sm text-muted-foreground leading-loose m-0 pl-5">
             <li>Open Discord and go to the PizzaDAO server</li>
             <li>Click the server name at the top</li>
-            <li>Privacy Settings → Enable "Direct Messages"</li>
+            <li>Privacy Settings → Enable &quot;Direct Messages&quot;</li>
           </ol>
           <button
             onClick={() => handleSubmit(state.username)}
-            style={btn("primary")}
+            style={btn("accent")}
           >
             Try again
           </button>
@@ -172,7 +172,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
     // Rate limited
     if (state.code === "rate_limited") {
       return (
-        <div style={{ display: "grid", gap: 16, padding: "20px 0" }}>
+        <div className="grid gap-4 py-5">
           <div style={alert("error")}>
             Too many requests. Please try again in a few minutes.
           </div>
@@ -185,11 +185,11 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
 
     // Generic error
     return (
-      <div style={{ display: "grid", gap: 16, padding: "20px 0" }}>
+      <div className="grid gap-4 py-5">
         <div style={alert("error")}>{state.message}</div>
         <button
           onClick={() => handleSubmit(state.username)}
-          style={btn("primary")}
+          style={btn("accent")}
         >
           Try again
         </button>
@@ -202,9 +202,9 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
 
   // Form / sending state
   return (
-    <div style={{ display: "grid", gap: 16, padding: "20px 0" }}>
-      <div style={{ fontSize: 16, lineHeight: 1.5, opacity: 0.9 }}>
-        Enter your Discord username and we'll DM you a login link.
+    <div className="grid gap-4 py-5">
+      <div className="text-base leading-relaxed text-muted-foreground">
+        Enter your Discord username and we&apos;ll DM you a login link.
       </div>
       <input
         type="text"
@@ -219,7 +219,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       <button
         onClick={() => handleSubmit()}
         disabled={state.step === "sending" || username.trim().length < 2}
-        style={btn("primary", state.step === "sending" || username.trim().length < 2)}
+        style={btn("accent", state.step === "sending" || username.trim().length < 2)}
       >
         {state.step === "sending" ? "Sending..." : "Send Login Link"}
       </button>
