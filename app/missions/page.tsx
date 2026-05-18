@@ -1,13 +1,17 @@
 "use client";
 
+// garlic-68749 (Restyle Phase 4b): /missions migrated onto the pizzadao.org
+// design system — cream background, Asap Condensed display headings, butter
+// level pills, tomato PEP accents, emerald/butter/tomato status states.
+// See plans/site-restyle-pizzadao-org.md (Phase 4).
+//
+// MissionsProgress.tsx is OUT OF SCOPE here — Phase 3b already migrated it.
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { Inter } from "next/font/google";
-import { card, btn, pageContainer } from "../ui/shared-styles";
+import { card, btn, pageContainer, loadingSpinner } from "../ui/shared-styles";
 import { MissionCard } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
-
-const inter = Inter({ subsets: ["latin"] });
 
 type MissionData = {
   id: number;
@@ -39,6 +43,9 @@ const LEVEL_TITLES: Record<number, string> = {
   7: "Made Mafia",
   8: "Don of Dons",
 };
+
+const DISPLAY_FONT =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export default function MissionsPage() {
   const [data, setData] = useState<MissionsResponse | null>(null);
@@ -120,25 +127,17 @@ export default function MissionsPage() {
     return (
       <div
         style={{
-          ...pageContainer(inter.style.fontFamily),
+          ...pageContainer(),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div
-            style={{
-              width: 50,
-              height: 50,
-              border: "4px solid var(--color-spinner-track)",
-              borderTop: "4px solid var(--color-spinner-active)",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto 20px",
-            }}
-          />
-          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading missions...</p>
+          <div style={loadingSpinner()} />
+          <p style={{ fontSize: 18, color: "hsl(var(--muted-foreground))" }}>
+            Loading missions...
+          </p>
           <style jsx>{`
             @keyframes spin {
               0% {
@@ -156,11 +155,22 @@ export default function MissionsPage() {
 
   if (error || !data) {
     return (
-      <div style={pageContainer(inter.style.fontFamily)}>
+      <div style={pageContainer()}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
           <div style={card()}>
-            <h1 style={{ margin: 0, fontSize: 24 }}>Error</h1>
-            <p style={{ opacity: 0.6 }}>{error || "Failed to load missions"}</p>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 28,
+                fontFamily: DISPLAY_FONT,
+                fontWeight: 700,
+              }}
+            >
+              Error
+            </h1>
+            <p style={{ color: "hsl(var(--muted-foreground))" }}>
+              {error || "Failed to load missions"}
+            </p>
             <button onClick={() => window.location.reload()} style={btn("primary")}>
               Retry
             </button>
@@ -173,13 +183,39 @@ export default function MissionsPage() {
   const { levels, currentLevel, isAuthenticated } = data;
 
   return (
-    <div style={pageContainer(inter.style.fontFamily)}>
+    <div style={pageContainer()}>
       <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: 12 }}>
+        <div
+          style={{
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "flex-end",
+            flexWrap: "wrap",
+            gap: 12,
+          }}
+        >
           <div>
-            <h1 style={{ margin: 0, fontSize: 28, fontWeight: 800 }}>Missions</h1>
-            <p style={{ margin: "4px 0 0", opacity: 0.6, fontSize: 15 }}>
+            <h1
+              style={{
+                margin: 0,
+                fontSize: 44,
+                lineHeight: 1.05,
+                letterSpacing: "-0.01em",
+                fontFamily: DISPLAY_FONT,
+                fontWeight: 800,
+                color: "hsl(var(--foreground))",
+              }}
+            >
+              Missions
+            </h1>
+            <p
+              style={{
+                margin: "6px 0 0",
+                fontSize: 16,
+                color: "hsl(var(--muted-foreground))",
+              }}
+            >
               Complete missions to level up and earn $PEP rewards
             </p>
           </div>
@@ -199,7 +235,14 @@ export default function MissionsPage() {
         {!isAuthenticated && (
           <div style={{ ...card(), textAlign: "center" }}>
             <p style={{ margin: 0, fontSize: 15 }}>
-              <a href="/api/auth/discord" style={{ color: "var(--color-text-primary)", fontWeight: 600 }}>
+              <a
+                href="/api/auth/discord"
+                style={{
+                  color: "hsl(var(--tomato))",
+                  fontWeight: 700,
+                  textDecoration: "underline",
+                }}
+              >
                 Log in with Discord
               </a>{" "}
               to track your progress and submit missions.
@@ -212,22 +255,50 @@ export default function MissionsPage() {
           <div
             style={{
               ...card(),
-              background: "linear-gradient(135deg, var(--color-surface) 0%, var(--color-surface-hover) 100%)",
+              background:
+                "linear-gradient(135deg, hsl(var(--cream-warm)) 0%, hsl(var(--butter) / 0.25) 100%)",
               textAlign: "center",
-              padding: 20,
+              padding: 24,
+              gap: 6,
             }}
           >
-            <div style={{ fontSize: 14, opacity: 0.6, textTransform: "uppercase", letterSpacing: 1 }}>
+            <div
+              style={{
+                fontSize: 12,
+                color: "hsl(var(--muted-foreground))",
+                textTransform: "uppercase",
+                letterSpacing: 1.5,
+                fontWeight: 600,
+              }}
+            >
               Current Level
             </div>
-            <div style={{ fontSize: 36, fontWeight: 800, margin: "4px 0" }}>
+            <div
+              style={{
+                fontSize: 56,
+                fontWeight: 800,
+                margin: 0,
+                lineHeight: 1,
+                fontFamily: DISPLAY_FONT,
+                color: "hsl(var(--tomato))",
+              }}
+            >
               {currentLevel > 8 ? "MAX" : currentLevel}
             </div>
             {data.levelTitle && (
-              <div style={{ fontSize: 16, opacity: 0.8 }}>{data.levelTitle}</div>
+              <div
+                style={{
+                  fontSize: 18,
+                  fontFamily: DISPLAY_FONT,
+                  fontWeight: 600,
+                  color: "hsl(var(--foreground))",
+                }}
+              >
+                {data.levelTitle}
+              </div>
             )}
             {currentLevel > 8 && (
-              <div style={{ fontSize: 14, opacity: 0.6, marginTop: 4 }}>
+              <div style={{ fontSize: 14, color: "hsl(var(--muted-foreground))" }}>
                 All levels complete! You are a true Pizza Don.
               </div>
             )}
@@ -252,8 +323,32 @@ export default function MissionsPage() {
 
           const title = levelData.title || LEVEL_TITLES[levelData.level] || null;
 
+          // Butter pill for level number; emerald when complete; ink ring on current.
+          const pillBg = isComplete
+            ? "rgb(16, 185, 129)"
+            : isCurrentLevel
+              ? "hsl(var(--butter))"
+              : "hsl(var(--muted))";
+          const pillColor = isComplete
+            ? "hsl(var(--cream))"
+            : "hsl(var(--ink))";
+          const pillBorder = isCurrentLevel && !isComplete
+            ? "2px solid hsl(var(--ink))"
+            : "1px solid hsl(var(--rule) / 0.22)";
+
           return (
-            <div key={levelData.level} style={{ ...card(), padding: 0, overflow: "hidden" }}>
+            <div
+              key={levelData.level}
+              style={{
+                ...card(),
+                padding: 0,
+                gap: 0,
+                overflow: "hidden",
+                background: isCurrentLevel
+                  ? "hsl(var(--cream-warm))"
+                  : "hsl(var(--card))",
+              }}
+            >
               {/* Level Header */}
               <button
                 onClick={() => toggleLevel(levelData.level)}
@@ -262,10 +357,8 @@ export default function MissionsPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "16px 20px",
-                  background: isCurrentLevel
-                    ? "var(--color-surface-hover)"
-                    : "transparent",
+                  padding: "18px 22px",
+                  background: "transparent",
                   border: "none",
                   cursor: "pointer",
                   fontFamily: "inherit",
@@ -274,50 +367,68 @@ export default function MissionsPage() {
                   gap: 12,
                 }}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
+                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
                   <div
                     style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: "50%",
+                      width: 42,
+                      height: 42,
+                      borderRadius: 999,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontWeight: 800,
-                      fontSize: 16,
-                      background: isComplete
-                        ? "#16a34a"
-                        : isCurrentLevel
-                          ? "var(--color-btn-primary-bg)"
-                          : "var(--color-border)",
-                      color: isComplete || isCurrentLevel
-                        ? "#fff"
-                        : "var(--color-text-secondary)",
+                      fontSize: 18,
+                      fontFamily: DISPLAY_FONT,
+                      background: pillBg,
+                      color: pillColor,
+                      border: pillBorder,
                       flexShrink: 0,
                     }}
                   >
-                    {isComplete ? "\u2713" : levelData.level}
+                    {isComplete ? "✓" : levelData.level}
                   </div>
                   <div>
-                    <div style={{ fontWeight: 700, fontSize: 15 }}>
+                    <div
+                      style={{
+                        fontFamily: DISPLAY_FONT,
+                        fontWeight: 700,
+                        fontSize: 20,
+                        lineHeight: 1.15,
+                        color: "hsl(var(--foreground))",
+                      }}
+                    >
                       Level {levelData.level}
                       {title && (
-                        <span style={{ fontWeight: 400, opacity: 0.6, marginLeft: 8 }}>
+                        <span
+                          style={{
+                            fontWeight: 500,
+                            color: "hsl(var(--muted-foreground))",
+                            marginLeft: 8,
+                          }}
+                        >
                           {title}
                         </span>
                       )}
                     </div>
-                    <div style={{ fontSize: 12, opacity: 0.5, marginTop: 2 }}>
+                    <div
+                      style={{
+                        fontSize: 13,
+                        color: "hsl(var(--muted-foreground))",
+                        marginTop: 2,
+                      }}
+                    >
                       {completedCount}/{levelData.missions.length} missions &middot;{" "}
-                      {levelData.reward.toLocaleString()} $PEP
+                      <span style={{ color: "hsl(var(--tomato))", fontWeight: 700 }}>
+                        {levelData.reward.toLocaleString()} $PEP
+                      </span>
                     </div>
                   </div>
                 </div>
                 <span
                   style={{
-                    fontSize: 18,
-                    opacity: 0.4,
-                    transition: "transform 0.2s",
+                    fontSize: 16,
+                    color: "hsl(var(--muted-foreground))",
+                    transition: "transform 200ms ease",
                     transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
                   }}
                 >
@@ -327,14 +438,21 @@ export default function MissionsPage() {
 
               {/* Level Content */}
               {isExpanded && (
-                <div style={{ padding: "0 20px 16px", display: "grid", gap: 8 }}>
+                <div
+                  style={{
+                    padding: "4px 22px 20px",
+                    display: "grid",
+                    gap: 10,
+                    borderTop: "1px solid hsl(var(--rule) / 0.12)",
+                  }}
+                >
                   {!isUnlocked && (
                     <div
                       style={{
                         textAlign: "center",
                         padding: 16,
                         fontSize: 13,
-                        opacity: 0.5,
+                        color: "hsl(var(--muted-foreground))",
                         fontStyle: "italic",
                       }}
                     >
@@ -353,10 +471,14 @@ export default function MissionsPage() {
                     <div
                       style={{
                         textAlign: "center",
-                        padding: 12,
+                        padding: "12px 16px",
                         fontSize: 14,
-                        color: "#16a34a",
-                        fontWeight: 600,
+                        fontWeight: 700,
+                        fontFamily: DISPLAY_FONT,
+                        color: "rgb(4, 120, 87)",
+                        background: "rgba(16, 185, 129, 0.10)",
+                        border: "1px solid rgba(16, 185, 129, 0.30)",
+                        borderRadius: "var(--radius)",
                       }}
                     >
                       Level Complete! +{levelData.reward.toLocaleString()} $PEP earned
@@ -369,7 +491,17 @@ export default function MissionsPage() {
         })}
 
         {/* Footer */}
-        <div style={{ textAlign: "center", opacity: 0.4, fontSize: 13, marginTop: 20 }}>
+        <div
+          style={{
+            textAlign: "center",
+            color: "hsl(var(--muted-foreground))",
+            fontSize: 13,
+            marginTop: 20,
+            fontFamily: DISPLAY_FONT,
+            fontWeight: 600,
+            letterSpacing: 0.5,
+          }}
+        >
           PizzaDAO
         </div>
       </div>
