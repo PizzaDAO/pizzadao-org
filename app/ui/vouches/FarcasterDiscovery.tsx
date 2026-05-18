@@ -73,7 +73,7 @@ export function FarcasterDiscovery({
 
   const openInvite = () => {
     const usernames = Array.from(selected);
-    const baseText = "Join the party on PizzaDAO! \uD83C\uDF55 pizzadao.org";
+    const baseText = "Join the party on PizzaDAO! \uD83C\uDF55 app.pizzadao.org";
 
     // Batch into casts that fit within ~900 chars
     const batches: string[][] = [];
