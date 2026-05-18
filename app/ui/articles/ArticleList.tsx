@@ -17,46 +17,17 @@ interface ArticleListProps {
 function SkeletonCard() {
   return (
     <div
-      style={{
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 12,
-        overflow: "hidden",
-        animation: "pulse 1.5s infinite",
-      }}
+      className="bg-card border border-[hsl(var(--rule)/0.12)] rounded-[--radius] overflow-hidden"
+      style={{ animation: "pulse 1.5s infinite" }}
     >
       <div
-        style={{
-          width: "100%",
-          aspectRatio: "16 / 9",
-          background: "var(--color-surface-hover, rgba(0,0,0,0.08))",
-        }}
+        className="w-full bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
+        style={{ aspectRatio: "16 / 9" }}
       />
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8 }}>
-        <div
-          style={{
-            height: 18,
-            background: "var(--color-surface-hover, rgba(0,0,0,0.08))",
-            borderRadius: 4,
-            width: "80%",
-          }}
-        />
-        <div
-          style={{
-            height: 14,
-            background: "var(--color-surface-hover, rgba(0,0,0,0.08))",
-            borderRadius: 4,
-            width: "100%",
-          }}
-        />
-        <div
-          style={{
-            height: 14,
-            background: "var(--color-surface-hover, rgba(0,0,0,0.08))",
-            borderRadius: 4,
-            width: "60%",
-          }}
-        />
+      <div className="p-4 flex flex-col gap-2">
+        <div className="h-5 bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)] rounded-md w-4/5" />
+        <div className="h-3.5 bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)] rounded-md w-full" />
+        <div className="h-3.5 bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)] rounded-md w-3/5" />
       </div>
     </div>
   );
@@ -65,43 +36,13 @@ function SkeletonCard() {
 function SkeletonRow() {
   return (
     <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        padding: "12px 16px",
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 10,
-        animation: "pulse 1.5s infinite",
-      }}
+      className="flex items-center gap-4 px-4 py-3 bg-card border border-[hsl(var(--rule)/0.12)] rounded-[--radius]"
+      style={{ animation: "pulse 1.5s infinite" }}
     >
-      <div
-        style={{
-          width: 80,
-          height: 56,
-          borderRadius: 6,
-          background: "var(--color-surface-hover, rgba(0,0,0,0.08))",
-          flexShrink: 0,
-        }}
-      />
-      <div style={{ flex: 1, display: "flex", flexDirection: "column", gap: 6 }}>
-        <div
-          style={{
-            height: 16,
-            background: "var(--color-surface-hover, rgba(0,0,0,0.08))",
-            borderRadius: 4,
-            width: "60%",
-          }}
-        />
-        <div
-          style={{
-            height: 12,
-            background: "var(--color-surface-hover, rgba(0,0,0,0.08))",
-            borderRadius: 4,
-            width: "40%",
-          }}
-        />
+      <div className="w-20 h-14 rounded-md bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)] flex-shrink-0" />
+      <div className="flex-1 flex flex-col gap-1.5">
+        <div className="h-4 bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)] rounded-md w-3/5" />
+        <div className="h-3 bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)] rounded-md w-2/5" />
       </div>
     </div>
   );
@@ -114,105 +55,41 @@ function ArticleListRow({ article }: { article: ArticleCardData }) {
   return (
     <Link
       href={`/articles/${article.slug}`}
-      className="article-card"
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 16,
-        padding: "12px 16px",
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 10,
-        textDecoration: "none",
-        color: "inherit",
-        transition: "all 0.2s ease",
-      }}
+      className="article-card flex items-center gap-4 px-4 py-3 bg-card text-card-foreground border border-[hsl(var(--rule)/0.12)] rounded-[--radius] no-underline transition-all duration-200 hover:border-[hsl(var(--tomato)/0.50)] hover:-translate-y-px hover:shadow-[0_4px_16px_hsl(var(--ink)/0.08)]"
     >
       {imageUrl && (
-        <div
-          style={{
-            width: 80,
-            height: 56,
-            borderRadius: 6,
-            overflow: "hidden",
-            flexShrink: 0,
-            background: "var(--color-surface-hover, rgba(0,0,0,0.04))",
-          }}
-        >
+        <div className="w-20 h-14 rounded-md overflow-hidden flex-shrink-0 bg-[hsl(var(--ink)/0.04)] dark:bg-[hsl(var(--cream)/0.04)]">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
             alt=""
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-            }}
+            className="w-full h-full object-cover block"
             onError={(e) => {
               (e.target as HTMLImageElement).parentElement!.style.display = "none";
             }}
           />
         </div>
       )}
-      <div style={{ flex: 1, minWidth: 0 }}>
+      <div className="flex-1 min-w-0">
         <h3
-          style={{
-            margin: 0,
-            fontSize: 15,
-            fontWeight: 700,
-            color: "var(--color-text-primary, var(--color-text))",
-            lineHeight: 1.3,
-            whiteSpace: "nowrap",
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-          }}
+          className="font-display text-base font-bold text-foreground leading-snug m-0 whitespace-nowrap overflow-hidden text-ellipsis"
         >
           {article.title}
         </h3>
-        <div
-          style={{
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-            marginTop: 4,
-            fontSize: 12,
-            color: "var(--color-text-secondary, var(--color-text))",
-            opacity: 0.8,
-          }}
-        >
+        <div className="flex items-center gap-2 mt-1 text-xs text-muted-foreground">
           <span>
             {article.authorName ? `by ${article.authorName}` : ""}
             {displayDate ? ` · ${displayDate}` : ""}
           </span>
         </div>
         {article.excerpt && (
-          <p
-            style={{
-              margin: "4px 0 0",
-              fontSize: 13,
-              lineHeight: 1.4,
-              color: "var(--color-text-secondary, var(--color-text))",
-              opacity: 0.7,
-              whiteSpace: "nowrap",
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-            }}
-          >
+          <p className="mt-1 mb-0 text-[13px] leading-snug text-muted-foreground whitespace-nowrap overflow-hidden text-ellipsis">
             {article.excerpt}
           </p>
         )}
       </div>
       {article.tags && article.tags.length > 0 && (
-        <div
-          style={{
-            display: "flex",
-            flexWrap: "wrap",
-            gap: 4,
-            flexShrink: 0,
-            maxWidth: 200,
-          }}
-        >
+        <div className="hidden sm:flex flex-wrap gap-1 flex-shrink-0 max-w-[200px]">
           {article.tags.slice(0, 3).map((tag) => (
             <TagBadge key={tag} tag={tag} size="sm" />
           ))}
@@ -232,7 +109,7 @@ export default function ArticleList({
   if (loading) {
     if (viewMode === "list") {
       return (
-        <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+        <div className="flex flex-col gap-2">
           {[1, 2, 3, 4, 5, 6].map((i) => (
             <SkeletonRow key={i} />
           ))}
@@ -252,11 +129,8 @@ export default function ArticleList({
     }
     return (
       <div
-        style={{
-          display: "grid",
-          gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-          gap: 20,
-        }}
+        className="grid gap-5"
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}
       >
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <SkeletonCard key={i} />
@@ -278,58 +152,30 @@ export default function ArticleList({
 
   if (!articles || articles.length === 0) {
     return (
-      <div
-        style={{
-          padding: 40,
-          textAlign: "center",
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-          borderRadius: 12,
-          color: "var(--color-text-secondary, var(--color-text))",
-        }}
-      >
-        <p style={{ fontSize: 16, margin: 0 }}>{emptyMessage}</p>
+      <div className="p-10 text-center bg-card text-card-foreground border border-[hsl(var(--rule)/0.12)] rounded-[--radius]">
+        <p className="text-base text-muted-foreground m-0">{emptyMessage}</p>
       </div>
     );
   }
 
   if (viewMode === "list") {
     return (
-      <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
+      <div className="flex flex-col gap-2">
         {articles.map((article) => (
           <ArticleListRow key={article.id} article={article} />
         ))}
-
-        <style jsx global>{`
-          .article-card:hover {
-            border-color: rgba(234, 179, 8, 0.5) !important;
-            box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-            transform: translateY(-1px);
-          }
-        `}</style>
       </div>
     );
   }
 
   return (
     <div
-      style={{
-        display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-        gap: 20,
-      }}
+      className="grid gap-5"
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}
     >
       {articles.map((article) => (
         <ArticleCard key={article.id} article={article} showStatus={showStatus} />
       ))}
-
-      <style jsx global>{`
-        .article-card:hover {
-          border-color: rgba(234, 179, 8, 0.5) !important;
-          box-shadow: 0 4px 16px rgba(0, 0, 0, 0.08);
-          transform: translateY(-2px);
-        }
-      `}</style>
     </div>
   );
 }

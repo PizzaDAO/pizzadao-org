@@ -81,35 +81,19 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-page-bg)", padding: "60px 20px" }}>
-        <div style={{ maxWidth: 760, margin: "0 auto" }}>
+      <div className="min-h-screen bg-background text-foreground px-5 py-14">
+        <div className="mx-auto max-w-[760px]">
           <div
-            style={{
-              height: 32,
-              width: "60%",
-              background: "var(--color-surface)",
-              borderRadius: 6,
-              marginBottom: 16,
-              animation: "pulse 1.5s infinite",
-            }}
+            className="h-8 w-3/5 mb-4 rounded-md bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
+            style={{ animation: "pulse 1.5s infinite" }}
           />
           <div
-            style={{
-              height: 16,
-              width: "40%",
-              background: "var(--color-surface)",
-              borderRadius: 6,
-              marginBottom: 32,
-              animation: "pulse 1.5s infinite",
-            }}
+            className="h-4 w-2/5 mb-8 rounded-md bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
+            style={{ animation: "pulse 1.5s infinite" }}
           />
           <div
-            style={{
-              height: 300,
-              background: "var(--color-surface)",
-              borderRadius: 12,
-              animation: "pulse 1.5s infinite",
-            }}
+            className="h-72 rounded-[--radius] bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
+            style={{ animation: "pulse 1.5s infinite" }}
           />
         </div>
         <style jsx>{`
@@ -129,29 +113,14 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
 
   if (error || !article) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--color-page-bg)",
-          padding: "60px 20px",
-        }}
-      >
-        <div style={{ maxWidth: 760, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ color: "var(--color-text-primary, var(--color-text))" }}>
+      <div className="min-h-screen bg-background text-foreground px-5 py-14">
+        <div className="mx-auto max-w-[760px] text-center">
+          <h1 className="font-display text-3xl font-bold text-foreground">
             {error || "Article not found"}
           </h1>
           <Link
             href="/articles"
-            style={{
-              display: "inline-block",
-              marginTop: 16,
-              padding: "10px 18px",
-              borderRadius: 8,
-              background: "var(--color-btn-primary-bg)",
-              color: "var(--color-btn-primary-text)",
-              textDecoration: "none",
-              fontWeight: 600,
-            }}
+            className="inline-block mt-4 px-5 py-2.5 rounded-[--radius] bg-primary text-primary-foreground font-display font-semibold hover:opacity-90 transition-opacity no-underline"
           >
             Back to articles
           </Link>
@@ -163,59 +132,29 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
   const displayDate = formatDate(article.publishedAt || article.createdAt);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        padding: "40px 20px 80px",
-      }}
-    >
-      <div style={{ maxWidth: 760, margin: "0 auto" }}>
+    <div className="min-h-screen bg-background text-foreground px-5 pt-10 pb-20">
+      <div className="mx-auto max-w-[760px]">
         <Link
           href="/articles"
-          style={{
-            fontSize: 14,
-            color: "var(--color-text-secondary, var(--color-text))",
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: 44,
-          }}
+          className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors no-underline"
         >
           ← All articles
         </Link>
 
         {article.status !== "PUBLISHED" && (
-          <div
-            style={{
-              marginTop: 12,
-              padding: "8px 12px",
-              background: "rgba(245, 158, 11, 0.12)",
-              border: "1px solid rgba(245, 158, 11, 0.4)",
-              color: "#b45309",
-              borderRadius: 8,
-              fontSize: 13,
-              fontWeight: 600,
-            }}
-          >
+          <div className="mt-3 px-3 py-2 rounded-[--radius] text-sm font-semibold bg-[hsl(var(--butter)/0.20)] border border-[hsl(var(--butter)/0.50)] text-[hsl(var(--ink))]">
             This article is {article.status.toLowerCase()} and is only visible to you and admins.
           </div>
         )}
 
-        <article style={{ marginTop: 20 }}>
+        <article className="mt-5">
           {article.coverImage && (
-            <div style={{ marginBottom: 24 }}>
+            <div className="mb-6">
               {/* eslint-disable-next-line @next/next/no-img-element */}
               <img
                 src={article.coverImage}
                 alt=""
-                style={{
-                  width: "100%",
-                  maxHeight: 420,
-                  objectFit: "cover",
-                  borderRadius: 12,
-                  border: "1px solid var(--color-border)",
-                }}
+                className="w-full max-h-[420px] object-cover rounded-[--radius] border border-[hsl(var(--rule)/0.22)]"
                 onError={(e) => {
                   (e.target as HTMLImageElement).style.display = "none";
                 }}
@@ -224,53 +163,29 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
           )}
 
           <h1
-            style={{
-              margin: "8px 0 12px 0",
-              fontSize: 36,
-              fontWeight: 800,
-              lineHeight: 1.2,
-              color: "var(--color-text-primary, var(--color-text))",
-            }}
+            className="font-display text-4xl md:text-5xl font-extrabold leading-[1.1] tracking-tight text-foreground my-3"
+            style={{ textWrap: "balance" }}
           >
             {article.title}
           </h1>
 
           {article.excerpt && (
             <p
-              style={{
-                margin: "0 0 20px 0",
-                fontSize: 18,
-                lineHeight: 1.5,
-                color: "var(--color-text-secondary, var(--color-text))",
-                opacity: 0.85,
-              }}
+              className="text-lg leading-relaxed text-muted-foreground mt-0 mb-5"
+              style={{ textWrap: "pretty" }}
             >
               {article.excerpt}
             </p>
           )}
 
-          <div
-            style={{
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "space-between",
-              flexWrap: "wrap",
-              gap: 12,
-              padding: "12px 0",
-              marginBottom: 24,
-              borderTop: "1px solid var(--color-border)",
-              borderBottom: "1px solid var(--color-border)",
-              fontSize: 14,
-              color: "var(--color-text-secondary, var(--color-text))",
-            }}
-          >
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3 mb-6 border-t border-b border-[hsl(var(--rule)/0.12)] text-sm text-muted-foreground">
             <div>
               {article.authorName && (
                 <span>
                   by{" "}
                   <Link
                     href={article.authorMemberId ? `/profile/${article.authorMemberId}` : "#"}
-                    style={{ color: "#2563eb", textDecoration: "none", fontWeight: 600 }}
+                    className="font-semibold text-[hsl(var(--tomato))] hover:text-[hsl(var(--tomato-deep))] transition-colors no-underline"
                   >
                     {article.authorName}
                   </Link>
@@ -281,16 +196,7 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
             {canEdit && (
               <Link
                 href={`/articles/${article.slug}/edit`}
-                style={{
-                  padding: "6px 12px",
-                  borderRadius: 6,
-                  border: "1px solid var(--color-border-strong, var(--color-border))",
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
-                  textDecoration: "none",
-                  fontSize: 13,
-                  fontWeight: 600,
-                }}
+                className="px-3 py-1.5 rounded-md border border-[hsl(var(--rule)/0.22)] bg-card text-foreground text-xs font-semibold hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors no-underline"
               >
                 Edit
               </Link>
@@ -300,16 +206,7 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
           <ArticleRenderer content={article.content} />
 
           {article.tags && article.tags.length > 0 && (
-            <div
-              style={{
-                marginTop: 40,
-                paddingTop: 20,
-                borderTop: "1px solid var(--color-border)",
-                display: "flex",
-                flexWrap: "wrap",
-                gap: 8,
-              }}
-            >
+            <div className="mt-10 pt-5 border-t border-[hsl(var(--rule)/0.12)] flex flex-wrap gap-2">
               {article.tags.map((tag) => (
                 <TagBadge key={tag} tag={tag} href={`/articles?tag=${encodeURIComponent(tag)}`} />
               ))}

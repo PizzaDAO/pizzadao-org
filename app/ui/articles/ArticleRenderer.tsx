@@ -11,6 +11,10 @@ interface ArticleRendererProps {
  * Renders article markdown content with themed styles.
  * Uses react-markdown with remark-gfm for GitHub-flavored markdown.
  * Safe by default: no rehype-raw, no arbitrary HTML.
+ *
+ * jalapeno-18281 (Restyle Phase 4a): switched to cream/ink/tomato/butter
+ * tokens — Asap body, Asap Condensed headings, tomato links, ink-soft
+ * code surfaces, muted-foreground italic figcaptions.
  */
 export default function ArticleRenderer({ content }: ArticleRendererProps) {
   return (
@@ -35,27 +39,34 @@ export default function ArticleRenderer({ content }: ArticleRendererProps) {
               <img
                 src={typeof src === "string" ? src : undefined}
                 alt={alt || ""}
-                style={{ maxWidth: "100%", height: "auto", borderRadius: 8 }}
+                style={{
+                  maxWidth: "100%",
+                  height: "auto",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid hsl(var(--rule) / 0.12)",
+                }}
               />
             );
             if (title) {
               return (
-                <figure style={{ margin: "16px 0", padding: 0 }}>
+                <figure style={{ margin: "20px 0", padding: 0 }}>
                   {imgEl}
-                  <figcaption style={{
-                    marginTop: 6,
-                    fontSize: "0.85em",
-                    color: "var(--color-text-secondary, var(--color-text))",
-                    opacity: 0.7,
-                    textAlign: "left",
-                    lineHeight: 1.4,
-                  }}>
+                  <figcaption
+                    style={{
+                      marginTop: 8,
+                      fontSize: "0.875em",
+                      fontStyle: "italic",
+                      color: "hsl(var(--muted-foreground))",
+                      textAlign: "left",
+                      lineHeight: 1.4,
+                    }}
+                  >
                     {title}
                   </figcaption>
                 </figure>
               );
             }
-            return <span style={{ display: "block", margin: "16px 0" }}>{imgEl}</span>;
+            return <span style={{ display: "block", margin: "20px 0" }}>{imgEl}</span>;
           },
         }}
       >
@@ -64,10 +75,15 @@ export default function ArticleRenderer({ content }: ArticleRendererProps) {
 
       <style jsx global>{`
         .article-content {
-          color: var(--color-text);
-          line-height: 1.7;
-          font-size: 16px;
+          color: hsl(var(--foreground));
+          line-height: 1.75;
+          font-size: 17px;
+          font-family: var(--font-sans), system-ui, sans-serif;
           word-wrap: break-word;
+        }
+        .article-content p {
+          margin: 1.1em 0;
+          text-wrap: pretty;
         }
         .article-content h1,
         .article-content h2,
@@ -75,54 +91,58 @@ export default function ArticleRenderer({ content }: ArticleRendererProps) {
         .article-content h4,
         .article-content h5,
         .article-content h6 {
-          color: var(--color-text-primary, var(--color-text));
+          color: hsl(var(--foreground));
+          font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
           font-weight: 700;
-          line-height: 1.25;
+          letter-spacing: -0.01em;
+          line-height: 1.2;
           margin-top: 1.8em;
-          margin-bottom: 0.6em;
+          margin-bottom: 0.5em;
+          text-wrap: balance;
         }
         .article-content h1 {
           font-size: 2em;
-          border-bottom: 1px solid var(--color-border);
           padding-bottom: 0.3em;
+          border-bottom: 1px solid hsl(var(--rule) / 0.12);
         }
         .article-content h2 {
-          font-size: 1.5em;
-          border-bottom: 1px solid var(--color-border);
-          padding-bottom: 0.3em;
+          font-size: 1.55em;
+          padding-bottom: 0.25em;
+          border-bottom: 1px solid hsl(var(--rule) / 0.12);
         }
         .article-content h3 {
-          font-size: 1.25em;
+          font-size: 1.28em;
         }
         .article-content h4 {
-          font-size: 1em;
-        }
-        .article-content p {
-          margin: 1em 0;
+          font-size: 1.08em;
         }
         .article-content ul {
           margin: 1em 0;
-          padding-left: 2em;
+          padding-left: 1.6em;
           list-style-type: disc;
         }
         .article-content ol {
           margin: 1em 0;
-          padding-left: 2em;
+          padding-left: 1.6em;
           list-style-type: decimal;
         }
         .article-content li {
-          margin: 0.3em 0;
+          margin: 0.35em 0;
         }
         .article-content li > p {
-          margin: 0.3em 0;
+          margin: 0.35em 0;
         }
         .article-content blockquote {
-          margin: 1.2em 0;
-          padding: 0.5em 1em;
-          border-left: 4px solid var(--color-border-strong, var(--color-border));
-          background: var(--color-surface-hover, rgba(0, 0, 0, 0.03));
-          color: var(--color-text-secondary, var(--color-text));
-          border-radius: 0 8px 8px 0;
+          margin: 1.5em 0;
+          padding: 0.6em 1.1em;
+          border-left: 4px solid hsl(var(--tomato));
+          background: hsl(var(--ink) / 0.04);
+          color: hsl(var(--ink-soft));
+          border-radius: 0 var(--radius) var(--radius) 0;
+        }
+        [data-theme="dark"] .article-content blockquote {
+          background: hsl(var(--cream) / 0.06);
+          color: hsl(var(--muted-foreground));
         }
         .article-content blockquote > :first-child {
           margin-top: 0;
@@ -131,56 +151,72 @@ export default function ArticleRenderer({ content }: ArticleRendererProps) {
           margin-bottom: 0;
         }
         .article-content code {
-          font-family: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
           font-size: 0.9em;
-          padding: 0.2em 0.4em;
-          background: var(--color-surface-hover, rgba(0, 0, 0, 0.06));
-          border-radius: 4px;
+          padding: 0.18em 0.4em;
+          background: hsl(var(--ink) / 0.04);
+          border: 1px solid hsl(var(--rule) / 0.12);
+          border-radius: 6px;
+        }
+        [data-theme="dark"] .article-content code {
+          background: hsl(var(--cream) / 0.06);
         }
         .article-content pre {
-          background: var(--color-surface-hover, rgba(0, 0, 0, 0.06));
-          border: 1px solid var(--color-border);
-          border-radius: 8px;
-          padding: 14px 16px;
+          font-family: var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
+          background: hsl(var(--ink) / 0.04);
+          border: 1px solid hsl(var(--rule) / 0.12);
+          border-radius: var(--radius);
+          padding: 16px 18px;
           overflow-x: auto;
-          margin: 1.2em 0;
+          margin: 1.4em 0;
           font-size: 0.9em;
-          line-height: 1.5;
+          line-height: 1.55;
+        }
+        [data-theme="dark"] .article-content pre {
+          background: hsl(var(--cream) / 0.06);
         }
         .article-content pre code {
           padding: 0;
           background: transparent;
+          border: none;
           border-radius: 0;
           font-size: 1em;
         }
         .article-content a {
-          color: #2563eb;
+          color: hsl(var(--tomato));
           text-decoration: underline;
-          text-underline-offset: 2px;
+          text-underline-offset: 3px;
+          text-decoration-thickness: 1px;
+          transition: color 150ms ease;
         }
         .article-content a:hover {
+          color: hsl(var(--tomato-deep));
           text-decoration: none;
         }
         .article-content hr {
           border: none;
-          border-top: 1px solid var(--color-border);
+          border-top: 1px solid hsl(var(--rule) / 0.12);
           margin: 2em 0;
         }
         .article-content table {
           border-collapse: collapse;
           width: 100%;
-          margin: 1.2em 0;
+          margin: 1.4em 0;
           font-size: 0.95em;
         }
         .article-content th,
         .article-content td {
-          border: 1px solid var(--color-border);
-          padding: 8px 12px;
+          border: 1px solid hsl(var(--rule) / 0.12);
+          padding: 10px 14px;
           text-align: left;
         }
         .article-content th {
-          background: var(--color-surface-hover, rgba(0, 0, 0, 0.04));
+          background: hsl(var(--ink) / 0.04);
+          font-family: var(--font-display), var(--font-sans), system-ui, sans-serif;
           font-weight: 700;
+        }
+        [data-theme="dark"] .article-content th {
+          background: hsl(var(--cream) / 0.06);
         }
         .article-content img {
           max-width: 100%;

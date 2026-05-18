@@ -94,32 +94,23 @@ export default function NewArticlePage() {
 
   if (authStatus === "checking") {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-page-bg)", padding: 60, textAlign: "center" }}>
-        <p style={{ color: "var(--color-text-secondary, var(--color-text))" }}>Loading...</p>
+      <div className="min-h-screen bg-background text-foreground py-14 px-5 text-center">
+        <p className="text-muted-foreground">Loading…</p>
       </div>
     );
   }
 
   if (authStatus === "anon") {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-page-bg)", padding: "60px 20px" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ color: "var(--color-text-primary, var(--color-text))" }}>Sign in required</h1>
-          <p style={{ color: "var(--color-text-secondary, var(--color-text))" }}>
+      <div className="min-h-screen bg-background text-foreground px-5 py-14">
+        <div className="mx-auto max-w-[600px] text-center">
+          <h1 className="font-display text-3xl font-bold text-foreground">Sign in required</h1>
+          <p className="text-muted-foreground mt-2">
             You need to sign in with Discord to create articles.
           </p>
           <Link
             href="/"
-            style={{
-              display: "inline-block",
-              marginTop: 16,
-              padding: "10px 18px",
-              borderRadius: 8,
-              background: "var(--color-btn-primary-bg)",
-              color: "var(--color-btn-primary-text)",
-              textDecoration: "none",
-              fontWeight: 600,
-            }}
+            className="inline-block mt-4 px-5 py-2.5 rounded-[--radius] bg-primary text-primary-foreground font-display font-semibold hover:opacity-90 transition-opacity no-underline"
           >
             Go home
           </Link>
@@ -130,24 +121,15 @@ export default function NewArticlePage() {
 
   if (authStatus === "forbidden") {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-page-bg)", padding: "60px 20px" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ color: "var(--color-text-primary, var(--color-text))" }}>Not authorized</h1>
-          <p style={{ color: "var(--color-text-secondary, var(--color-text))" }}>
+      <div className="min-h-screen bg-background text-foreground px-5 py-14">
+        <div className="mx-auto max-w-[600px] text-center">
+          <h1 className="font-display text-3xl font-bold text-foreground">Not authorized</h1>
+          <p className="text-muted-foreground mt-2">
             You do not have the required Discord role to author articles.
           </p>
           <Link
             href="/articles"
-            style={{
-              display: "inline-block",
-              marginTop: 16,
-              padding: "10px 18px",
-              borderRadius: 8,
-              background: "var(--color-btn-primary-bg)",
-              color: "var(--color-btn-primary-text)",
-              textDecoration: "none",
-              fontWeight: 600,
-            }}
+            className="inline-block mt-4 px-5 py-2.5 rounded-[--radius] bg-primary text-primary-foreground font-display font-semibold hover:opacity-90 transition-opacity no-underline"
           >
             Back to articles
           </Link>
@@ -157,34 +139,17 @@ export default function NewArticlePage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        padding: "40px 20px 80px",
-      }}
-    >
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div className="min-h-screen bg-background text-foreground px-5 pt-10 pb-20">
+      <div className="mx-auto max-w-[1100px]">
         <Link
           href="/articles"
-          style={{
-            fontSize: 14,
-            color: "var(--color-text-secondary, var(--color-text))",
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: 44,
-          }}
+          className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors no-underline"
         >
           ← Cancel
         </Link>
         <h1
-          style={{
-            margin: "8px 0 20px 0",
-            fontSize: 28,
-            fontWeight: 800,
-            color: "var(--color-text-primary, var(--color-text))",
-          }}
+          className="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-foreground my-2 mb-5"
+          style={{ textWrap: "balance" }}
         >
           New article
         </h1>

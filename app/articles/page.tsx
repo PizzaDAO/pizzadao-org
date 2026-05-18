@@ -108,74 +108,32 @@ export default function ArticlesListPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div className="min-h-screen bg-background text-foreground px-5 py-10">
+      <div className="mx-auto max-w-[1100px]">
         {/* Header */}
-        <div style={{ marginBottom: 24 }}>
+        <div className="mb-6">
           <Link
             href="/"
-            style={{
-              fontSize: 14,
-              color: "var(--color-text-secondary, var(--color-text))",
-              textDecoration: "none",
-              marginBottom: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              minHeight: 44,
-            }}
+            className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
           >
             ← Back to Home
           </Link>
-          <div
-            style={{
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "flex-start",
-              gap: 16,
-              flexWrap: "wrap",
-            }}
-          >
+          <div className="flex flex-wrap items-start justify-between gap-4">
             <div>
               <h1
-                style={{
-                  margin: "8px 0 4px 0",
-                  fontSize: 32,
-                  fontWeight: 800,
-                  color: "var(--color-text-primary, var(--color-text))",
-                }}
+                className="font-display text-4xl md:text-5xl font-extrabold leading-tight tracking-tight text-foreground my-1"
+                style={{ textWrap: "balance" }}
               >
                 Articles
               </h1>
-              <p
-                style={{
-                  margin: 0,
-                  fontSize: 15,
-                  color: "var(--color-text-secondary, var(--color-text))",
-                  opacity: 0.8,
-                }}
-              >
+              <p className="m-0 text-base text-muted-foreground">
                 Stories, updates, and deep dives from PizzaDAO
               </p>
             </div>
             {canAuthor && (
               <Link
                 href="/articles/new"
-                style={{
-                  padding: "10px 16px",
-                  borderRadius: 10,
-                  background: "var(--color-btn-primary-bg)",
-                  color: "var(--color-btn-primary-text)",
-                  border: "1px solid var(--color-btn-primary-border)",
-                  textDecoration: "none",
-                  fontWeight: 700,
-                  fontSize: 14,
-                }}
+                className="inline-flex items-center font-display font-bold text-sm px-4 py-2.5 rounded-[--radius] bg-tomato text-cream border border-tomato hover:bg-[hsl(var(--tomato-deep))] hover:border-[hsl(var(--tomato-deep))] transition-colors"
               >
                 + New article
               </Link>
@@ -184,36 +142,18 @@ export default function ArticlesListPage() {
         </div>
 
         {/* Search and filters */}
-        <div style={{ marginBottom: 24, display: "flex", flexDirection: "column", gap: 12 }}>
-          <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: 8 }}>
+        <div className="mb-6 flex flex-col gap-3">
+          <form onSubmit={handleSearchSubmit} className="flex gap-2">
             <input
               type="text"
               placeholder="Search articles..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "12px 16px",
-                fontSize: 14,
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                outline: "none",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-              }}
+              className="flex-1 px-4 py-3 text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule)/0.22)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
             />
             <button
               type="submit"
-              style={{
-                padding: "10px 20px",
-                fontSize: 14,
-                fontWeight: 600,
-                borderRadius: 8,
-                border: "1px solid var(--color-border-strong, var(--color-border))",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor: "pointer",
-              }}
+              className="px-5 py-2.5 text-sm font-semibold rounded-[--radius] bg-secondary text-secondary-foreground border border-[hsl(var(--rule)/0.22)] hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
             >
               Search
             </button>
@@ -221,16 +161,7 @@ export default function ArticlesListPage() {
               <button
                 type="button"
                 onClick={clearFilters}
-                style={{
-                  padding: "10px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                  background: "transparent",
-                  color: "var(--color-text)",
-                  cursor: "pointer",
-                }}
+                className="px-4 py-2.5 text-sm font-semibold rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-transparent text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
               >
                 Clear
               </button>
@@ -238,18 +169,8 @@ export default function ArticlesListPage() {
           </form>
 
           {availableTags.length > 0 && (
-            <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-              <span
-                style={{
-                  fontSize: 12,
-                  color: "var(--color-text-secondary, var(--color-text))",
-                  opacity: 0.7,
-                  alignSelf: "center",
-                  marginRight: 4,
-                }}
-              >
-                Tags:
-              </span>
+            <div className="flex flex-wrap items-center gap-1.5">
+              <span className="self-center text-xs text-muted-foreground mr-1">Tags:</span>
               {availableTags.map((tag) => (
                 <TagBadge
                   key={tag}
@@ -267,83 +188,42 @@ export default function ArticlesListPage() {
 
         {/* My Drafts section */}
         {drafts.length > 0 && (
-          <div style={{ marginBottom: 32 }}>
-            <h2
-              style={{
-                fontSize: 18,
-                fontWeight: 700,
-                color: "var(--color-text-primary, var(--color-text))",
-                marginBottom: 12,
-                display: "flex",
-                alignItems: "center",
-                gap: 8,
-              }}
-            >
+          <div className="mb-8">
+            <h2 className="font-display text-2xl font-bold text-foreground mb-3 flex items-center gap-2">
               My Drafts
-              <span
-                style={{
-                  fontSize: 11,
-                  fontWeight: 600,
-                  padding: "2px 8px",
-                  borderRadius: 4,
-                  background: "rgba(234, 179, 8, 0.15)",
-                  color: "#b45309",
-                  textTransform: "uppercase",
-                  letterSpacing: "0.5px",
-                }}
-              >
+              <span className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-[hsl(var(--butter)/0.30)] text-[hsl(var(--ink))]">
                 {drafts.length}
               </span>
             </h2>
             <div
-              style={{
-                display: "grid",
-                gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))",
-                gap: 16,
-              }}
+              className="grid gap-4"
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}
             >
               {drafts.map((d) => (
                 <Link
                   key={d.slug}
                   href={`/articles/${d.slug}/edit`}
-                  style={{
-                    display: "block",
-                    padding: 16,
-                    borderRadius: 12,
-                    border: "1px dashed var(--color-border)",
-                    background: "var(--color-surface)",
-                    textDecoration: "none",
-                    color: "inherit",
-                  }}
+                  className="block p-4 rounded-[--radius] border border-dashed border-[hsl(var(--rule)/0.30)] bg-card text-card-foreground hover:bg-[hsl(var(--ink)/0.04)] dark:hover:bg-[hsl(var(--cream)/0.04)] hover:border-[hsl(var(--tomato)/0.50)] transition-colors no-underline"
                 >
-                  <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 6 }}>
+                  <div className="flex items-center gap-2 mb-1.5">
                     <span
-                      style={{
-                        fontSize: 10,
-                        fontWeight: 700,
-                        padding: "2px 6px",
-                        borderRadius: 4,
-                        background: d.status === "DRAFT"
-                          ? "rgba(234, 179, 8, 0.15)"
-                          : "rgba(34, 197, 94, 0.15)",
-                        color: d.status === "DRAFT" ? "#b45309" : "#15803d",
-                        textTransform: "uppercase",
-                      }}
+                      className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md ${
+                        d.status === "DRAFT"
+                          ? "bg-[hsl(var(--butter)/0.30)] text-[hsl(var(--ink))]"
+                          : "bg-[hsl(142_71%_45%/0.18)] text-[hsl(142_71%_25%)] dark:text-[hsl(142_71%_60%)]"
+                      }`}
                     >
                       {d.status || "DRAFT"}
                     </span>
                   </div>
-                  <div style={{ fontWeight: 600, fontSize: 15 }}>{d.title}</div>
+                  <div className="font-display font-bold text-base text-foreground">{d.title}</div>
                   {d.excerpt && (
                     <div
+                      className="text-sm text-muted-foreground mt-1 overflow-hidden"
                       style={{
-                        fontSize: 13,
-                        opacity: 0.6,
-                        marginTop: 4,
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
-                        overflow: "hidden",
                       }}
                     >
                       {d.excerpt}
@@ -357,56 +237,25 @@ export default function ArticlesListPage() {
 
         {error && (
           <div
-            style={{
-              padding: 16,
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "#c00",
-              borderRadius: 8,
-              marginBottom: 16,
-              fontSize: 14,
-            }}
+            role="alert"
+            className="p-4 mb-4 rounded-[--radius] text-sm font-semibold border bg-[hsl(var(--destructive)/0.10)] border-[hsl(var(--destructive)/0.30)] text-[hsl(var(--destructive))]"
           >
             {error}
           </div>
         )}
 
         {/* View toggle */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "flex-end",
-            marginBottom: 16,
-          }}
-        >
-          <div
-            style={{
-              display: "inline-flex",
-              borderRadius: 8,
-              border: "1px solid var(--color-border)",
-              overflow: "hidden",
-            }}
-          >
+        <div className="mb-4 flex justify-end">
+          <div className="inline-flex rounded-[--radius] border border-[hsl(var(--rule)/0.22)] overflow-hidden">
             <button
               type="button"
               onClick={() => handleViewModeChange("gallery")}
               title="Gallery view"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 36,
-                height: 32,
-                border: "none",
-                cursor: "pointer",
-                background: viewMode === "gallery"
-                  ? "var(--color-btn-primary-bg)"
-                  : "var(--color-surface)",
-                color: viewMode === "gallery"
-                  ? "var(--color-btn-primary-text)"
-                  : "var(--color-text-secondary, var(--color-text))",
-                transition: "all 0.15s ease",
-              }}
+              className={`flex items-center justify-center w-9 h-8 cursor-pointer transition-colors ${
+                viewMode === "gallery"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
+              }`}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor" />
@@ -419,23 +268,11 @@ export default function ArticlesListPage() {
               type="button"
               onClick={() => handleViewModeChange("list")}
               title="List view"
-              style={{
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                width: 36,
-                height: 32,
-                border: "none",
-                borderLeft: "1px solid var(--color-border)",
-                cursor: "pointer",
-                background: viewMode === "list"
-                  ? "var(--color-btn-primary-bg)"
-                  : "var(--color-surface)",
-                color: viewMode === "list"
-                  ? "var(--color-btn-primary-text)"
-                  : "var(--color-text-secondary, var(--color-text))",
-                transition: "all 0.15s ease",
-              }}
+              className={`flex items-center justify-center w-9 h-8 cursor-pointer border-l border-[hsl(var(--rule)/0.22)] transition-colors ${
+                viewMode === "list"
+                  ? "bg-primary text-primary-foreground"
+                  : "bg-card text-muted-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
+              }`}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
                 <rect x="1" y="1" width="14" height="3" rx="1" fill="currentColor" />
@@ -457,49 +294,23 @@ export default function ArticlesListPage() {
 
         {/* Pagination */}
         {!loading && pagination.totalPages > 1 && (
-          <div
-            style={{
-              marginTop: 32,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 12,
-            }}
-          >
+          <div className="mt-8 flex items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page <= 1}
-              style={{
-                padding: "8px 14px",
-                fontSize: 14,
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor: page <= 1 ? "not-allowed" : "pointer",
-                opacity: page <= 1 ? 0.5 : 1,
-              }}
+              className="px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               ← Prev
             </button>
-            <span style={{ fontSize: 14, color: "var(--color-text-secondary, var(--color-text))" }}>
+            <span className="text-sm text-muted-foreground">
               Page {pagination.page} of {pagination.totalPages}
             </span>
             <button
               type="button"
               onClick={() => setPage(Math.min(pagination.totalPages, page + 1))}
               disabled={page >= pagination.totalPages}
-              style={{
-                padding: "8px 14px",
-                fontSize: 14,
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor: page >= pagination.totalPages ? "not-allowed" : "pointer",
-                opacity: page >= pagination.totalPages ? 0.5 : 1,
-              }}
+              className="px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               Next →
             </button>
