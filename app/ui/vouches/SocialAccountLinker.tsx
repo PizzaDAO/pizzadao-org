@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useState } from "react";
+import { btn, input as inputStyle } from "../shared-styles";
 
 type SocialAccount = {
   platform: "TWITTER" | "FARCASTER";
@@ -12,6 +13,24 @@ type SocialAccountLinkerProps = {
   memberId: string;
   onAccountChange?: (accounts: { platform: string; handle: string }[]) => void;
 };
+
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
+
+function chip(): React.CSSProperties {
+  return {
+    display: "inline-flex",
+    alignItems: "center",
+    gap: 4,
+    padding: "4px 10px",
+    borderRadius: 999,
+    border: "1px solid hsl(var(--rule) / 0.22)",
+    background: "hsl(var(--secondary))",
+    fontSize: 13,
+    color: "hsl(var(--foreground))",
+    fontFamily: "var(--font-sans), system-ui, sans-serif",
+  };
+}
 
 export function SocialAccountLinker({
   memberId,
@@ -141,6 +160,67 @@ export function SocialAccountLinker({
   const hasFarcaster = accounts.some((a) => a.platform === "FARCASTER");
   const linkedCount = accounts.length;
 
+  const renderRow = (
+    platform: "TWITTER" | "FARCASTER",
+    label: string,
+    placeholder: string,
+    value: string,
+    setValue: (s: string) => void,
+    hasAccount: boolean
+  ) => (
+    <div
+      style={{
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        flexWrap: "wrap",
+      }}
+    >
+      <span
+        style={{
+          fontFamily: displayFont,
+          fontSize: 13,
+          fontWeight: 600,
+          minWidth: 80,
+          color: "hsl(var(--foreground))",
+        }}
+      >
+        {label}
+      </span>
+      <input
+        type="text"
+        value={value}
+        onChange={(e) => setValue(e.target.value)}
+        placeholder={placeholder}
+        style={{ ...inputStyle(), flex: 1, minWidth: 150 }}
+      />
+      <button
+        onClick={() => saveAccount(platform, value)}
+        disabled={saving === platform || !value.trim()}
+        style={{
+          ...btn("primary", saving === platform || !value.trim()),
+          padding: "8px 14px",
+          fontSize: 13,
+        }}
+      >
+        {saving === platform ? "…" : hasAccount ? "Connect" : "Connect"}
+      </button>
+      {hasAccount && (
+        <button
+          onClick={() => unlinkAccount(platform)}
+          disabled={saving === platform}
+          style={{
+            ...btn("secondary", saving === platform),
+            padding: "8px 12px",
+            fontSize: 12,
+          }}
+        >
+          Disconnect
+        </button>
+      )}
+    </div>
+  );
+
   return (
     <div style={{ gridColumn: "1 / -1" }}>
       <div
@@ -155,26 +235,44 @@ export function SocialAccountLinker({
       >
         <h3
           style={{
+            fontFamily: displayFont,
             fontSize: 12,
             textTransform: "uppercase",
-            letterSpacing: "1px",
-            opacity: 0.5,
+            letterSpacing: "0.08em",
+            color: "hsl(var(--muted-foreground))",
             margin: 0,
             fontWeight: 700,
+            display: "inline-flex",
+            alignItems: "center",
+            gap: 6,
           }}
         >
           Social Accounts
           {linkedCount > 0 && (
-            <span style={{ marginLeft: 4, opacity: 0.8 }}>
-              ({linkedCount})
+            <span
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                background: "hsl(var(--butter) / 0.35)",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--butter) / 0.60)",
+                padding: "1px 8px",
+                borderRadius: 999,
+                fontSize: 11,
+                fontWeight: 700,
+                textTransform: "none",
+                letterSpacing: 0,
+              }}
+            >
+              {linkedCount}
             </span>
           )}
         </h3>
         <span
           style={{
             fontSize: 12,
-            opacity: 0.4,
-            transition: "transform 0.2s",
+            color: "hsl(var(--muted-foreground))",
+            transition: "transform 200ms ease",
             transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
           }}
         >
@@ -192,19 +290,7 @@ export function SocialAccountLinker({
           }}
         >
           {accounts.map((a) => (
-            <span
-              key={a.platform}
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 4,
-                padding: "4px 10px",
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                fontSize: 13,
-                color: "var(--color-text-secondary)",
-              }}
-            >
+            <span key={a.platform} style={chip()}>
               {a.platform === "TWITTER" ? "X" : "Farcaster"}: @{a.handle}
             </span>
           ))}
@@ -217,9 +303,10 @@ export function SocialAccountLinker({
             <div
               style={{
                 padding: 10,
-                background: "rgba(255,0,0,0.05)",
-                borderRadius: 8,
-                color: "var(--color-danger)",
+                background: "hsl(var(--tomato) / 0.08)",
+                border: "1px solid hsl(var(--tomato) / 0.30)",
+                borderRadius: "var(--radius)",
+                color: "hsl(var(--tomato))",
                 fontSize: 13,
               }}
             >
@@ -227,169 +314,22 @@ export function SocialAccountLinker({
             </div>
           )}
 
-          {/* X (Twitter) */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                minWidth: 70,
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              X
-            </span>
-            <input
-              type="text"
-              value={twitterHandle}
-              onChange={(e) => setTwitterHandle(e.target.value)}
-              placeholder="@handle"
-              style={{
-                flex: 1,
-                minWidth: 150,
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--color-input-border)",
-                fontSize: 14,
-                outline: "none",
-                background: "var(--color-input-bg)",
-                color: "var(--color-input-text)",
-                fontFamily: "inherit",
-              }}
-            />
-            <button
-              onClick={() => saveAccount("TWITTER", twitterHandle)}
-              disabled={
-                saving === "TWITTER" || !twitterHandle.trim()
-              }
-              style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid var(--color-btn-primary-border)",
-                background: "var(--color-btn-primary-bg)",
-                color: "var(--color-btn-primary-text)",
-                fontSize: 13,
-                fontWeight: 650,
-                cursor:
-                  saving === "TWITTER" || !twitterHandle.trim()
-                    ? "not-allowed"
-                    : "pointer",
-                opacity:
-                  saving === "TWITTER" || !twitterHandle.trim() ? 0.5 : 1,
-                fontFamily: "inherit",
-              }}
-            >
-              {saving === "TWITTER" ? "..." : "Save"}
-            </button>
-            {hasTwitter && (
-              <button
-                onClick={() => unlinkAccount("TWITTER")}
-                disabled={saving === "TWITTER"}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                  background: "transparent",
-                  color: "var(--color-text-muted)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                Unlink
-              </button>
-            )}
-          </div>
-
-          {/* Farcaster */}
-          <div
-            style={{
-              display: "flex",
-              gap: 8,
-              alignItems: "center",
-              flexWrap: "wrap",
-            }}
-          >
-            <span
-              style={{
-                fontSize: 13,
-                fontWeight: 600,
-                minWidth: 70,
-                color: "var(--color-text-secondary)",
-              }}
-            >
-              Farcaster
-            </span>
-            <input
-              type="text"
-              value={farcasterHandle}
-              onChange={(e) => setFarcasterHandle(e.target.value)}
-              placeholder="username"
-              style={{
-                flex: 1,
-                minWidth: 150,
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "1px solid var(--color-input-border)",
-                fontSize: 14,
-                outline: "none",
-                background: "var(--color-input-bg)",
-                color: "var(--color-input-text)",
-                fontFamily: "inherit",
-              }}
-            />
-            <button
-              onClick={() => saveAccount("FARCASTER", farcasterHandle)}
-              disabled={
-                saving === "FARCASTER" || !farcasterHandle.trim()
-              }
-              style={{
-                padding: "8px 14px",
-                borderRadius: 8,
-                border: "1px solid var(--color-btn-primary-border)",
-                background: "var(--color-btn-primary-bg)",
-                color: "var(--color-btn-primary-text)",
-                fontSize: 13,
-                fontWeight: 650,
-                cursor:
-                  saving === "FARCASTER" || !farcasterHandle.trim()
-                    ? "not-allowed"
-                    : "pointer",
-                opacity:
-                  saving === "FARCASTER" || !farcasterHandle.trim()
-                    ? 0.5
-                    : 1,
-                fontFamily: "inherit",
-              }}
-            >
-              {saving === "FARCASTER" ? "..." : "Save"}
-            </button>
-            {hasFarcaster && (
-              <button
-                onClick={() => unlinkAccount("FARCASTER")}
-                disabled={saving === "FARCASTER"}
-                style={{
-                  padding: "8px 10px",
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
-                  background: "transparent",
-                  color: "var(--color-text-muted)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
-                Unlink
-              </button>
-            )}
-          </div>
+          {renderRow(
+            "TWITTER",
+            "X",
+            "@handle",
+            twitterHandle,
+            setTwitterHandle,
+            hasTwitter
+          )}
+          {renderRow(
+            "FARCASTER",
+            "Farcaster",
+            "username",
+            farcasterHandle,
+            setFarcasterHandle,
+            hasFarcaster
+          )}
         </div>
       )}
     </div>

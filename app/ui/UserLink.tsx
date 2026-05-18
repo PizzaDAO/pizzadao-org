@@ -11,6 +11,11 @@ type UserLinkProps = {
 const nameCache: Record<string, string> = {};
 const memberIdCache: Record<string, string> = {};
 
+/**
+ * Text link to a member's profile. Uses foreground color by default,
+ * shifts to tomato on hover with a 2px underline offset to match the
+ * pizzadao.org link treatment.
+ */
 export function UserLink({ discordId, style }: UserLinkProps) {
   const [name, setName] = useState<string | null>(nameCache[discordId] || null);
   const [memberId, setMemberId] = useState<string | null>(memberIdCache[discordId] || null);
@@ -57,10 +62,20 @@ export function UserLink({ discordId, style }: UserLinkProps) {
     <a
       href={`/profile/${profileId}`}
       style={{
-        color: "#2563eb",
+        color: "hsl(var(--foreground))",
         textDecoration: "none",
         fontWeight: 600,
+        textUnderlineOffset: 2,
+        transition: "color 150ms ease",
         ...style,
+      }}
+      onMouseEnter={(e) => {
+        e.currentTarget.style.color = "hsl(var(--tomato))";
+        e.currentTarget.style.textDecoration = "underline";
+      }}
+      onMouseLeave={(e) => {
+        e.currentTarget.style.color = (style?.color as string) ?? "hsl(var(--foreground))";
+        e.currentTarget.style.textDecoration = "none";
       }}
     >
       {displayName}
