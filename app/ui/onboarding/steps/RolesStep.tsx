@@ -21,41 +21,45 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate }: Props
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
-      <div style={{ opacity: 0.75, fontSize: 13 }}>Pick one or more:</div>
+    <div className="grid gap-3">
+      <div className="text-sm text-muted-foreground">Pick one or more:</div>
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {TURTLES.map((t) => {
           const selected = turtles.includes(t.id);
           return (
             <button key={t.id} onClick={() => toggleTurtle(t.id)} style={tile(selected)}>
-              <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
-                <img src={t.image} alt={t.label} style={{ width: 40, height: 40, objectFit: "contain" }} />
+              <div className="flex gap-3 items-center">
+                <img src={t.image} alt={t.label} className="w-10 h-10 object-contain" />
 
-                <div style={{ flex: 1 }}>
-                  <div style={{ fontWeight: 800 }}>{t.label}</div>
-                  <div style={{ opacity: 0.7, fontSize: 13 }}>{t.role}</div>
+                <div className="flex-1 text-left">
+                  <div className="font-[family-name:var(--font-display)] font-extrabold text-foreground">
+                    {t.label}
+                  </div>
+                  <div className="text-muted-foreground text-xs">{t.role}</div>
                 </div>
 
-                {selected && <div style={{ fontSize: 12, opacity: 0.7 }}>Selected</div>}
+                {selected && (
+                  <div className="text-xs font-semibold text-tomato">Selected</div>
+                )}
               </div>
             </button>
           );
         })}
       </div>
 
-      <div style={{ opacity: 0.75 }}>
-        Selected: <b>{turtles.length ? turtles.join(", ") : "(none)"}</b>
+      <div className="text-muted-foreground text-sm">
+        Selected: <b className="text-foreground">{turtles.length ? turtles.join(", ") : "(none)"}</b>
       </div>
 
-      <div style={{ display: "flex", gap: 10 }}>
+      <div className="flex gap-2.5">
         <button onClick={onBack} style={btn("secondary")}>
           Back
         </button>
         <button
           onClick={onNext}
           disabled={!canProceed}
-          style={btn("primary", !canProceed)}
+          style={btn("accent", !canProceed)}
         >
           Next
         </button>

@@ -452,7 +452,12 @@ export function OnboardingWizard() {
   if (flow.type === "magic_login") {
     return (
       <div style={card()}>
-        <h2 style={{ margin: 0, fontWeight: 800 }}>Login via Discord DM</h2>
+        <h2
+          className="font-[family-name:var(--font-display)] uppercase tracking-tight text-3xl sm:text-4xl font-extrabold text-foreground m-0"
+          style={{ textWrap: "balance" } as React.CSSProperties}
+        >
+          Login via Discord DM
+        </h2>
         <MagicLoginFlow
           onBack={() => {
             setLoginError(null);
@@ -485,7 +490,9 @@ export function OnboardingWizard() {
     return (
       <div style={card()}>
         <div style={alert("error")}>
-          <div style={{ fontWeight: 800 }}>{flow.message}</div>
+          <div className="font-[family-name:var(--font-display)] text-xl font-extrabold">
+            {flow.message}
+          </div>
           {flow.details && (
             <details style={{ marginTop: 8 }}>
               <summary>Details</summary>
@@ -513,64 +520,90 @@ export function OnboardingWizard() {
   if (flow.type === "wizard") {
     const stepTitle = getStepTitle(flow.step, flow.isUpdate);
 
+    // Welcome step (step 0) renders without the card chrome so the hero can
+    // breathe like the marketing site.
+    if (flow.step === 0) {
+      return (
+        <WelcomeStep
+          onJoin={() => goToStep(1)}
+          onLogin={() => {
+            const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
+            (window.top || window).location.href = loginUrl;
+          }}
+          onMagicLogin={() => setFlow({ type: "magic_login" })}
+        />
+      );
+    }
+
+    // Progress (steps 1..6 = 6 visible steps)
+    const totalSteps = 6;
+    const currentIndex = Math.max(1, flow.step);
+    const progress = Math.min(100, Math.round((currentIndex / totalSteps) * 100));
+
     return (
       <div style={card()}>
+        {/* Progress */}
+        <div className="grid gap-2">
+          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground font-semibold">
+            <span>Step {currentIndex} of {totalSteps}</span>
+            <span>{progress}%</span>
+          </div>
+          <div className="h-1.5 w-full rounded-full bg-rule overflow-hidden">
+            <div
+              className="h-full bg-tomato transition-all duration-300 ease-out"
+              style={{ width: `${progress}%` }}
+            />
+          </div>
+        </div>
+
         {/* Summary bar */}
         {(data.mafiaName || data.city || data.turtles.length > 0) && (
-          <div
-            style={{
-              opacity: 0.9,
-              fontSize: 16,
-              borderBottom: '1px solid var(--color-divider)',
-              paddingBottom: 8,
-              marginBottom: 12,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 10,
-            }}
-          >
+          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground border-b border-rule pb-2">
             {data.mafiaName && (
               <span>
-                Name: <b>{data.mafiaName}</b>
+                Name: <b className="text-foreground">{data.mafiaName}</b>
               </span>
             )}
             {data.city && (
               <span>
-                {" "}
-                - City: <b>{data.city}</b>
+                City: <b className="text-foreground">{data.city}</b>
               </span>
             )}
             {data.turtles.length > 0 && (
               <span>
-                {" "}
-                - Roles: <b>{data.turtles.join(", ")}</b>
+                Roles: <b className="text-foreground">{data.turtles.join(", ")}</b>
               </span>
             )}
           </div>
         )}
 
         {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          {flow.step > 0 && <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>}
-          {flow.step > 0 && (
-            <button
-              onClick={() => {
-                localStorage.removeItem(LS_KEY);
-                localStorage.removeItem(PENDING_CLAIM_KEY);
-                setData({ ...initialWizardData, sessionId: uuidLike() });
-                setFlow({ type: "wizard", step: 1, isUpdate: false });
-              }}
-              style={btn("secondary")}
-            >
-              Reset
-            </button>
-          )}
+        <div className="flex justify-between gap-3 items-center">
+          <h2
+            className="font-[family-name:var(--font-display)] tracking-tight text-3xl sm:text-4xl font-extrabold text-foreground m-0"
+            style={{ textWrap: "balance" } as React.CSSProperties}
+          >
+            {stepTitle}
+          </h2>
+          <button
+            onClick={() => {
+              localStorage.removeItem(LS_KEY);
+              localStorage.removeItem(PENDING_CLAIM_KEY);
+              setData({ ...initialWizardData, sessionId: uuidLike() });
+              setFlow({ type: "wizard", step: 1, isUpdate: false });
+            }}
+            style={btn("secondary")}
+          >
+            Reset
+          </button>
         </div>
 
         {/* Error display */}
         {error && (
           <div style={alert("error")}>
-            <div style={{ fontWeight: 800 }}>{error}</div>
+            <div className="font-[family-name:var(--font-display)] text-lg font-extrabold">
+              {error}
+            </div>
             {errorDetails && (
               <details style={{ marginTop: 8 }}>
                 <summary>Details</summary>
@@ -581,17 +614,6 @@ export function OnboardingWizard() {
         )}
 
         {/* Step content */}
-        {flow.step === 0 && (
-          <WelcomeStep
-            onJoin={() => goToStep(1)}
-            onLogin={() => {
-              const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
-              (window.top || window).location.href = loginUrl;
-            }}
-            onMagicLogin={() => setFlow({ type: "magic_login" })}
-          />
-        )}
-
         {flow.step === 1 && (
           <NameStep
             topping={data.topping}
