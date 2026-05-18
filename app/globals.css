@@ -44,11 +44,18 @@
   --ring:                   var(--tomato);
 
   /* ---------------------------------------------------------------------------
-     Back-compat aliases — Phase 1 leaves these so the build stays green.
-     940+ usages of the old `--color-*` tokens across ~74 files; Phase 2
-     migrates primitives (styles.ts, shared-styles.ts) to the new semantic
-     Tailwind utilities and then deletes this block.
-     TODO(restyle phase 2): remove the back-compat block below.
+     Back-compat aliases — kept through Phase 2 because page-level files still
+     consume them. truffle-11395 (Phase 2) migrated the shared primitives
+     (app/ui/onboarding/styles.ts, app/ui/shared-styles.ts, Field.tsx,
+     TagBadge.tsx) onto the new semantic HSL tokens, but ~50 page-level
+     consumers remain across app/(vouches, profile, pep, poaps, missions,
+     nfts, manuals, dashboard, crew, crews, articles, calls, turtles)/
+     page.tsx plus most files under app/ui/ (wallet-manager, vouches,
+     unlock-ticket-card, shop, profile-links, notifications, nft, missions,
+     jobs, economy, bounties, attendance-card, articles). Those are
+     Phase 3+ scope — one PR per route cluster per the plan.
+     TODO(restyle phase 5/polish): once every consumer is migrated, delete
+     this entire back-compat block.
   --------------------------------------------------------------------------- */
   --color-page-bg:            hsl(var(--background));
   --color-surface:            hsl(var(--card));
