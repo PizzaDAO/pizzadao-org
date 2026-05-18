@@ -21,6 +21,11 @@ type GroupedNFT = {
   overflow: number;
 };
 
+/**
+ * NFTCollection — capers-48272 (Phase 4e restyle)
+ * Cream/ink/tomato palette via globals.css tokens. Each contract grouped
+ * with an overflow "+N" pill that expands inline.
+ */
 export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPrompt = true }: NFTCollectionProps) {
   const [data, setData] = useState<NFTCollectionResponse | null>(null);
   const [fullData, setFullData] = useState<NFTCollectionResponse | null>(null);
@@ -60,7 +65,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
       const res = await fetch(`/api/nfts/${memberId}?limit=${maxPerCollection}`);
       const json = await res.json();
       setData(json);
-    } catch (e) {
+    } catch {
       setData({ nfts: [], totalCount: 0, walletAddress: null, error: "Failed to load" });
     } finally {
       setLoading(false);
@@ -139,11 +144,18 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
       });
   }, [data?.nfts, maxPerCollection, groupTotals]);
 
-  const sectionStyle: React.CSSProperties = {
-    marginTop: 24,
-    paddingTop: 24,
-    borderTop: '1px solid var(--color-divider)',
-  };
+  // Section wrapper class — divider above + heading row.
+  const sectionClass = "mt-6 pt-6 border-t border-rule";
+
+  // Heading link — Asap Condensed with tomato hover.
+  const headingLink = (
+    <Link
+      href="/nfts"
+      className="block no-underline text-foreground hover:text-tomato transition-colors"
+    >
+      <h3 className="font-display text-lg font-semibold m-0 mb-4">NFT Collection</h3>
+    </Link>
+  );
 
   // Show prompt if no wallet is saved (only if showConnectPrompt is true)
   if (!loading && data?.noWallet) {
@@ -151,26 +163,10 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
       return null; // Hide completely on profile page if no wallet
     }
     return (
-      <div style={sectionStyle}>
-        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
-          <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
-            NFT Collection
-          </h3>
-        </Link>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "32px 16px",
-            borderRadius: 12,
-            border: "1px dashed rgba(0,0,0,0.2)",
-            background: 'var(--color-page-bg)',
-            gap: 16,
-          }}
-        >
-          <p style={{ margin: 0, fontSize: 14, opacity: 0.7, textAlign: "center" }}>
+      <div className={sectionClass}>
+        {headingLink}
+        <div className="flex flex-col items-center justify-center gap-4 px-4 py-8 rounded-[var(--radius)] border border-dashed border-rule bg-background">
+          <p className="m-0 text-sm text-muted-foreground italic text-center">
             Add a wallet in your Wallet Manager above to display your NFT collection
           </p>
         </div>
@@ -183,40 +179,15 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
   if (!loading && data?.walletAddress && data.totalCount === 0) {
     if (!showConnectPrompt) return null;
     return (
-      <div style={sectionStyle}>
-        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
-          <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
-            NFT Collection
-          </h3>
-        </Link>
-        <div
-          style={{
-            display: "flex",
-            flexDirection: "column",
-            alignItems: "center",
-            justifyContent: "center",
-            padding: "32px 16px",
-            borderRadius: 12,
-            border: "1px dashed rgba(0,0,0,0.2)",
-            background: 'var(--color-page-bg)',
-            gap: 16,
-          }}
-        >
-          <p style={{ margin: 0, fontSize: 14, opacity: 0.7, textAlign: "center" }}>
+      <div className={sectionClass}>
+        {headingLink}
+        <div className="flex flex-col items-center justify-center gap-4 px-4 py-8 rounded-[var(--radius)] border border-dashed border-rule bg-background">
+          <p className="m-0 text-sm text-muted-foreground italic text-center">
             No PizzaDAO NFTs found in this wallet
           </p>
           <a
             href="/nfts"
-            style={{
-              display: "inline-block",
-              padding: "10px 20px",
-              borderRadius: 10,
-              background: 'var(--color-btn-primary-bg)',
-              color: 'var(--color-btn-primary-text)',
-              fontWeight: 600,
-              fontSize: 14,
-              textDecoration: "none",
-            }}
+            className="inline-block px-5 py-2.5 rounded-[var(--radius)] bg-primary text-primary-foreground font-display font-semibold text-sm no-underline hover:bg-tomato hover:text-cream transition-colors"
           >
             Browse PizzaDAO NFTs
           </a>
@@ -227,55 +198,30 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
 
   if (loading) {
     return (
-      <div style={sectionStyle}>
-        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
-          <h3 style={{ fontSize: 18, marginTop: 0, marginBottom: 16, fontWeight: 600 }}>
-            NFT Collection
-          </h3>
-        </Link>
-        <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+      <div className={sectionClass}>
+        {headingLink}
+        <div className="flex gap-2.5 flex-wrap">
           {[1, 2, 3].map((i) => (
             <div
               key={i}
-              style={{
-                width: 80,
-                height: 80,
-                borderRadius: 12,
-                background: "linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)",
-                backgroundSize: "200% 100%",
-                animation: "shimmer 1.5s infinite",
-              }}
+              className="w-20 h-20 rounded-[var(--radius)] bg-muted animate-pulse"
             />
           ))}
         </div>
-        <style>{`
-          @keyframes shimmer {
-            0% { background-position: 200% 0; }
-            100% { background-position: -200% 0; }
-          }
-        `}</style>
       </div>
     );
   }
 
   return (
-    <div style={sectionStyle}>
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          marginBottom: 16,
-          flexWrap: "wrap",
-          gap: 8,
-        }}
-      >
-        <Link href="/nfts" style={{ textDecoration: "none", color: "inherit" }}>
-          <h3 style={{ fontSize: 18, margin: 0, fontWeight: 600 }}>
+    <div className={sectionClass}>
+      <div className="flex items-center justify-between flex-wrap gap-2 mb-4">
+        <Link
+          href="/nfts"
+          className="no-underline text-foreground hover:text-tomato transition-colors"
+        >
+          <h3 className="font-display text-lg font-semibold m-0">
             NFT Collection
-            <span
-              style={{ fontSize: 14, fontWeight: 400, opacity: 0.6, marginLeft: 8 }}
-            >
+            <span className="ml-2 text-sm font-normal text-muted-foreground">
               ({data!.totalCount})
             </span>
           </h3>
@@ -285,25 +231,14 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
             href={`https://opensea.io/${data.walletAddress}`}
             target="_blank"
             rel="noreferrer"
-            style={{
-              fontSize: 12,
-              opacity: 0.6,
-              color: "inherit",
-              textDecoration: "none",
-            }}
+            className="text-xs text-muted-foreground hover:text-tomato no-underline transition-colors"
           >
             View on OpenSea &rarr;
           </a>
         )}
       </div>
 
-      <div
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 10,
-        }}
-      >
+      <div className="flex flex-wrap gap-2.5">
         {groupedNFTs.map((group) => {
           const groupKey = `${group.chain}:${group.contract}`;
           const isExpanded = expandedGroups.has(groupKey);
@@ -324,42 +259,13 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
               {isGroupLoading && Array.from({ length: Math.min(group.overflow, 6) }).map((_, i) => (
                 <div
                   key={`shimmer-${i}`}
-                  style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 12,
-                    background: "linear-gradient(90deg, #f0f0f0 25%, #e0e0e0 50%, #f0f0f0 75%)",
-                    backgroundSize: "200% 100%",
-                    animation: "shimmer 1.5s infinite",
-                  }}
+                  className="w-20 h-20 rounded-[var(--radius)] bg-muted animate-pulse"
                 />
               ))}
               {group.overflow > 0 && !isExpanded && (
                 <button
                   onClick={() => toggleGroup(groupKey)}
-                  style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 12,
-                    border: "2px dashed rgba(0,0,0,0.2)",
-                    background: "#f5f5f5",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 14,
-                    fontWeight: 600,
-                    color: 'var(--color-text-secondary)',
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "#f59e0b";
-                    e.currentTarget.style.background = "#fef3c7";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.2)";
-                    e.currentTarget.style.background = "#f5f5f5";
-                  }}
+                  className="w-20 h-20 rounded-[var(--radius)] border border-dashed border-rule bg-muted hover:border-tomato hover:bg-tomato/10 flex items-center justify-center font-display font-semibold text-muted-foreground transition-colors cursor-pointer"
                   title={`Show ${group.overflow} more ${group.contractName}`}
                 >
                   +{group.overflow}
@@ -368,29 +274,7 @@ export function NFTCollection({ memberId, maxPerCollection = 3, showConnectPromp
               {group.overflow > 0 && isExpanded && (
                 <button
                   onClick={() => toggleGroup(groupKey)}
-                  style={{
-                    width: 80,
-                    height: 80,
-                    borderRadius: 12,
-                    border: "2px solid rgba(0,0,0,0.15)",
-                    background: "#e5e5e5",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: 'var(--color-text-secondary)',
-                    cursor: "pointer",
-                    transition: "all 0.2s ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.3)";
-                    e.currentTarget.style.background = "#d5d5d5";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.15)";
-                    e.currentTarget.style.background = "#e5e5e5";
-                  }}
+                  className="w-20 h-20 rounded-[var(--radius)] border border-rule bg-muted hover:bg-muted/70 flex items-center justify-center font-display text-lg font-semibold text-muted-foreground transition-colors cursor-pointer"
                   title="Show less"
                 >
                   −

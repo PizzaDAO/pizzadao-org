@@ -9,14 +9,7 @@ type NFTCardProps = {
   size?: "small" | "medium" | "large";
 };
 
-const CHAIN_COLORS: Record<string, string> = {
-  ethereum: "#627eea",
-  base: "#0052ff",
-  polygon: "#8247e5",
-  zora: "#000000",
-  optimism: "#ff0420",
-};
-
+// Chain identifiers — labels only. Visual styling uses brand tokens.
 const CHAIN_LABELS: Record<string, string> = {
   ethereum: "ETH",
   base: "BASE",
@@ -38,24 +31,21 @@ function getOpenSeaUrl(nft: NFTDisplayItem): string {
   return `https://opensea.io/assets/${chainSlug}/${nft.contractAddress}/${nft.tokenId}`;
 }
 
-function cardStyle(size: "small" | "medium" | "large"): React.CSSProperties {
-  const sizes = { small: 80, medium: 120, large: 180 };
-  return {
-    width: sizes[size],
-    height: sizes[size],
-    borderRadius: 12,
-    border: '1px solid var(--color-border)',
-    overflow: "hidden",
-    position: "relative",
-    background: 'var(--color-page-bg)',
-    flexShrink: 0,
-  };
-}
+const SIZE_PX: Record<NonNullable<NFTCardProps["size"]>, number> = {
+  small: 80,
+  medium: 120,
+  large: 180,
+};
 
+/**
+ * NFTCard — capers-48272 (Phase 4e restyle)
+ * Square image tile with rounded corners + ink-tinted border. Chain badge
+ * uses the brand ink-on-cream pill rather than the chain's native brand color
+ * so the grid reads consistently against the cream surface.
+ */
 export function NFTCard({ nft, size = "medium" }: NFTCardProps) {
   const [imageError, setImageError] = useState(false);
-  const dimensions = { small: 80, medium: 120, large: 180 }[size];
-  const chainColor = CHAIN_COLORS[nft.chain] || "#888";
+  const dimensions = SIZE_PX[size];
   const chainLabel = CHAIN_LABELS[nft.chain] || nft.chain.toUpperCase().slice(0, 4);
   const openSeaUrl = getOpenSeaUrl(nft);
 
@@ -64,7 +54,8 @@ export function NFTCard({ nft, size = "medium" }: NFTCardProps) {
       href={openSeaUrl}
       target="_blank"
       rel="noreferrer"
-      style={{ ...cardStyle(size), display: "block", textDecoration: "none" }}
+      className="group relative block rounded-[var(--radius)] border border-rule bg-muted overflow-hidden flex-shrink-0 hover:border-tomato hover:shadow-md transition-all duration-200"
+      style={{ width: dimensions, height: dimensions }}
       title={`${nft.name} - ${nft.contractName}`}
     >
       {!imageError && (nft.thumbnailUrl || nft.imageUrl) ? (
@@ -73,43 +64,19 @@ export function NFTCard({ nft, size = "medium" }: NFTCardProps) {
           alt={nft.name}
           width={dimensions}
           height={dimensions}
-          style={{ objectFit: "cover", width: "100%", height: "100%" }}
+          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
+          style={{ objectFit: "cover" }}
           onError={() => setImageError(true)}
           unoptimized
         />
       ) : (
-        <div
-          style={{
-            width: "100%",
-            height: "100%",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            fontSize: size === "small" ? 10 : 12,
-            color: "rgba(0,0,0,0.4)",
-            textAlign: "center",
-            padding: 8,
-            boxSizing: "border-box",
-          }}
-        >
+        <div className="w-full h-full flex items-center justify-center text-muted-foreground text-center px-2 italic"
+             style={{ fontSize: size === "small" ? 10 : 12 }}>
           {nft.name}
         </div>
       )}
-      {/* Chain badge */}
-      <div
-        style={{
-          position: "absolute",
-          bottom: 4,
-          right: 4,
-          background: chainColor,
-          color: 'var(--color-btn-primary-text)',
-          fontSize: 8,
-          fontWeight: 700,
-          padding: "2px 4px",
-          borderRadius: 4,
-          textTransform: "uppercase",
-        }}
-      >
+      {/* Chain badge — ink pill on cream */}
+      <div className="absolute bottom-1 right-1 px-1.5 py-0.5 rounded text-[8px] font-bold uppercase font-display bg-ink/85 text-cream tracking-wide">
         {chainLabel}
       </div>
     </a>

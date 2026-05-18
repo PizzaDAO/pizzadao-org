@@ -11,6 +11,11 @@ interface HolderRowProps {
   turtles: string[];
 }
 
+/**
+ * HolderRow — capers-48272 (Phase 4e restyle)
+ * Rank | name (linked) | turtle badges | NFT count.
+ * Rank + count in Asap Condensed; name uses tomato hover.
+ */
 export function HolderRow({
   rank,
   memberId,
@@ -29,73 +34,35 @@ export function HolderRow({
     .filter(Boolean) as { id: string; image: string }[];
 
   return (
-    <div
-      style={{
-        display: "flex",
-        alignItems: "center",
-        gap: 12,
-        minHeight: 44,
-        padding: "6px 0",
-        borderBottom: '1px solid var(--color-divider)',
-      }}
-    >
-      {/* Rank */}
-      <span
-        style={{
-          width: 24,
-          textAlign: "center",
-          fontSize: 14,
-          fontWeight: 500,
-          color: 'var(--color-text-secondary)',
-        }}
-      >
+    <div className="flex items-center gap-3 min-h-[44px] py-1.5 border-b border-rule">
+      {/* Rank — Asap Condensed */}
+      <span className="w-6 text-center font-display text-sm font-semibold text-muted-foreground">
         {rank}
       </span>
 
-      {/* Name (link to profile) */}
+      {/* Name (link to profile) — tomato hover */}
       <Link
         href={`/profile/${memberId}`}
-        style={{
-          flex: 1,
-          fontSize: 14,
-          fontWeight: 500,
-          color: 'var(--color-text-primary)',
-          textDecoration: "none",
-          display: "flex",
-          alignItems: "center",
-          minHeight: 44,
-        }}
+        className="flex-1 flex items-center min-h-[44px] text-sm font-medium text-foreground hover:text-tomato no-underline transition-colors"
       >
         {memberName}
       </Link>
 
       {/* Turtle badges */}
-      <div style={{ display: "flex", gap: 4 }}>
+      <div className="flex gap-1">
         {turtleImages.map((t) => (
           <img
             key={t.id}
             src={t.image}
             alt={t.id}
             title={t.id}
-            style={{
-              width: 24,
-              height: 24,
-              borderRadius: "50%",
-            }}
+            className="w-6 h-6 rounded-full border border-rule"
           />
         ))}
       </div>
 
-      {/* NFT count */}
-      <span
-        style={{
-          fontSize: 14,
-          fontWeight: 600,
-          color: 'var(--color-text-primary)',
-          minWidth: 32,
-          textAlign: "right",
-        }}
-      >
+      {/* NFT count — Asap Condensed */}
+      <span className="font-display text-sm font-semibold text-foreground min-w-[32px] text-right">
         {nftCount}
       </span>
     </div>
