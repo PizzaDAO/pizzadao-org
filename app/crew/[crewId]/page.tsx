@@ -2,10 +2,15 @@
 
 import { use, useEffect, useState, useCallback } from 'react'
 import Link from 'next/link'
-import { Inter } from 'next/font/google'
 import { TURTLES } from '@/app/ui/constants'
-
-const inter = Inter({ subsets: ['latin'] })
+import {
+  badge,
+  btn,
+  card,
+  loadingSpinner,
+  navBtn,
+  pageContainer,
+} from '@/app/ui/shared-styles'
 
 // Loading stages to show progress
 const LOADING_STAGES = [
@@ -15,6 +20,9 @@ const LOADING_STAGES = [
   'Loading tasks...',
   'Almost ready...',
 ]
+
+const DISPLAY_FONT =
+  'var(--font-display), var(--font-sans), system-ui, sans-serif'
 
 type CrewData = {
   crew: {
@@ -340,27 +348,23 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   if (loading) {
     return (
       <div style={{
-        minHeight: '100vh',
+        ...pageContainer(),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-page-bg)',
-        fontFamily: inter.style.fontFamily,
+        padding: 20,
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 50,
-            height: 50,
-            border: '4px solid var(--color-spinner-track)',
-            borderTop: '4px solid var(--color-spinner-active)',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px',
-          }} />
-          <p style={{ fontSize: 18, opacity: 0.8, marginBottom: 8 }}>
+          <div style={loadingSpinner()} />
+          <p style={{
+            fontSize: 18,
+            color: 'hsl(var(--foreground))',
+            marginBottom: 8,
+            fontFamily: DISPLAY_FONT,
+          }}>
             {LOADING_STAGES[loadingStage]}
           </p>
-          <p style={{ fontSize: 13, opacity: 0.5 }}>
+          <p style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>
             {elapsedTime.toFixed(1)}s
           </p>
           <style jsx>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
@@ -372,17 +376,23 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   if (error || !data) {
     return (
       <div style={{
-        minHeight: '100vh',
+        ...pageContainer(),
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-page-bg)',
-        fontFamily: inter.style.fontFamily,
         padding: 20,
       }}>
         <div style={card()}>
-          <h1 style={{ fontSize: 24, marginBottom: 16 }}>Crew Not Found</h1>
-          <p style={{ opacity: 0.7, marginBottom: 32 }}>{error || 'Could not load crew data'}</p>
+          <h1 style={{
+            fontSize: 28,
+            margin: 0,
+            fontFamily: DISPLAY_FONT,
+            fontWeight: 800,
+            letterSpacing: '-0.01em',
+          }}>Crew Not Found</h1>
+          <p style={{ color: 'hsl(var(--muted-foreground))', margin: 0 }}>
+            {error || 'Could not load crew data'}
+          </p>
           <Link href="/" style={btn('primary')}>Back to Home</Link>
         </div>
       </div>
@@ -392,139 +402,59 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   const { crew, roster, goals, tasks, agenda, callInfo } = data
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'var(--color-page-bg)',
-      color: 'var(--color-text)',
-      fontFamily: inter.style.fontFamily,
-      padding: '40px 20px',
-    }}>
+    <div style={pageContainer()}>
       <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 8,
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600,
-          }}>
-            ← Home
-          </Link>
-          <Link href="/crews" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 8,
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600,
-          }}>
-            All Crews
-          </Link>
-          <Link href="/crew" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '8px 14px',
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 8,
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600,
-          }}>
-            ← All Members
-          </Link>
+          <Link href="/" style={navBtn()}>← Home</Link>
+          <Link href="/crews" style={navBtn()}>All Crews</Link>
+          <Link href="/crew" style={navBtn()}>← All Members</Link>
           {crewId.toLowerCase() === 'tech' && (
-            <Link href="/tech/projects" style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 14px',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border-strong)',
-              borderRadius: 8,
-              color: 'var(--color-text)',
-              textDecoration: 'none',
-              fontSize: 14,
-              fontWeight: 600,
-            }}>
-              Projects
-            </Link>
+            <Link href="/tech/projects" style={navBtn()}>Projects</Link>
           )}
           {crewId.toLowerCase() === 'comms' && (
             <>
-              <Link href="/articles" style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border-strong)',
-                borderRadius: 8,
-                color: 'var(--color-text)',
-                textDecoration: 'none',
-                fontSize: 14,
-                fontWeight: 600,
-              }}>
-                Articles
-              </Link>
-              <a href="https://pizzadao.xyz/brand" target="_blank" rel="noreferrer" style={{
-                display: 'inline-flex',
-                alignItems: 'center',
-                gap: 6,
-                padding: '8px 14px',
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border-strong)',
-                borderRadius: 8,
-                color: 'var(--color-text)',
-                textDecoration: 'none',
-                fontSize: 14,
-                fontWeight: 600,
-              }}>
+              <Link href="/articles" style={navBtn()}>Articles</Link>
+              <a
+                href="https://pizzadao.xyz/brand"
+                target="_blank"
+                rel="noreferrer"
+                style={navBtn()}
+              >
                 Brand Kit
               </a>
             </>
           )}
           {user && (
-            <Link href={`/dashboard/${user.memberId}`} style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '8px 14px',
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border-strong)',
-              borderRadius: 8,
-              color: 'var(--color-text)',
-              textDecoration: 'none',
-              fontSize: 14,
-              fontWeight: 600,
-            }}>
+            <Link href={`/dashboard/${user.memberId}`} style={navBtn()}>
               My Dashboard
             </Link>
           )}
         </div>
 
         {/* Header */}
-        <header style={{ textAlign: 'center', marginBottom: 20 }}>
-          <div style={{ fontSize: 48, marginBottom: 8 }}>{crew.emoji || '🍕'}</div>
-          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>{crew.label}</h1>
-          <div style={{ display: 'flex', gap: 16, justifyContent: 'center', marginTop: 16, flexWrap: 'wrap' }}>
+        <header style={{ textAlign: 'center', marginBottom: 8 }}>
+          <div style={{ fontSize: 56, marginBottom: 8, lineHeight: 1 }}>{crew.emoji || '🍕'}</div>
+          <h1 style={{
+            fontSize: 56,
+            lineHeight: 1.02,
+            fontWeight: 800,
+            margin: 0,
+            letterSpacing: '-0.015em',
+            fontFamily: DISPLAY_FONT,
+            color: 'hsl(var(--foreground))',
+          }}>
+            {crew.label}
+          </h1>
+          <div style={{ display: 'flex', gap: 8, justifyContent: 'center', marginTop: 18, flexWrap: 'wrap' }}>
             {crew.callTime && (
               crew.callTimeUrl ? (
-                <a href={crew.callTimeUrl} target="_blank" rel="noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
+                <a
+                  href={crew.callTimeUrl}
+                  target="_blank"
+                  rel="noreferrer"
+                  style={{ ...badge(), textDecoration: 'none' }}
+                >
                   🕐 {crew.callTime}
                 </a>
               ) : (
@@ -535,7 +465,12 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               <span style={badge()}>⏱ {crew.callLength}</span>
             )}
             {crew.sheet && (
-              <a href={crew.sheet} target="_blank" rel="noreferrer" style={{ ...badge(), textDecoration: 'none' }}>
+              <a
+                href={crew.sheet}
+                target="_blank"
+                rel="noreferrer"
+                style={{ ...badge(), textDecoration: 'none' }}
+              >
                 📊 Open Sheet
               </a>
             )}
@@ -547,28 +482,24 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               isInCrew ? (
                 <div style={{ display: 'flex', gap: 12, justifyContent: 'center', alignItems: 'center', flexWrap: 'wrap' }}>
                   <span style={{
-                    background: 'rgba(76,175,80,0.15)',
-                    color: '#2e7d32',
+                    background: 'hsl(142 71% 35% / 0.10)',
+                    color: 'hsl(142 71% 30%)',
                     padding: '8px 16px',
-                    borderRadius: 20,
+                    borderRadius: 999,
                     fontSize: 14,
                     fontWeight: 600,
+                    border: '1px solid hsl(142 71% 35% / 0.25)',
                   }}>
-                    You're a member of this crew
+                    You&apos;re a member of this crew
                   </span>
                   <button
                     onClick={handleLeaveCrew}
                     disabled={leaving}
                     style={{
-                      padding: '8px 16px',
-                      borderRadius: 10,
-                      border: '1px solid #d32f2f',
-                      background: 'var(--color-surface)',
-                      color: '#d32f2f',
-                      fontSize: 14,
-                      fontWeight: 600,
-                      cursor: leaving ? 'wait' : 'pointer',
-                      opacity: leaving ? 0.6 : 1,
+                      ...btn('secondary', leaving),
+                      borderColor: 'hsl(var(--tomato) / 0.35)',
+                      color: 'hsl(var(--tomato))',
+                      background: 'transparent',
                     }}
                   >
                     {leaving ? 'Leaving...' : 'Leave Crew'}
@@ -578,24 +509,24 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <button
                   onClick={handleJoinCrew}
                   disabled={joining}
-                  style={{
-                    padding: '12px 24px',
-                    borderRadius: 10,
-                    border: 'none',
-                    background: 'var(--color-btn-primary-bg)',
-                    color: 'var(--color-btn-primary-text)',
-                    fontSize: 16,
-                    fontWeight: 600,
-                    cursor: joining ? 'wait' : 'pointer',
-                    opacity: joining ? 0.6 : 1,
-                  }}
+                  style={btn('accent', joining)}
                 >
                   {joining ? 'Joining...' : 'Join This Crew'}
                 </button>
               )
             ) : (
-              <p style={{ fontSize: 14, opacity: 0.6 }}>
-                <Link href="/" style={{ color: '#ff4d4d' }}>Log in</Link> to join this crew
+              <p style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>
+                <Link
+                  href="/"
+                  style={{
+                    color: 'hsl(var(--tomato))',
+                    textDecoration: 'none',
+                    fontWeight: 600,
+                  }}
+                >
+                  Log in
+                </Link>
+                {' '}to join this crew
               </p>
             )}
           </div>
@@ -631,7 +562,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                             href={item.stepUrl}
                             target="_blank"
                             rel="noreferrer"
-                            style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                            style={inlineLink()}
                           >
                             {item.step}
                           </a>
@@ -666,17 +597,29 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
 
           const renderMemberCard = (member: typeof roster[0], i: number) => (
             <div key={i} style={memberCard()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-                <div>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
+                <div style={{ minWidth: 0 }}>
                   <Link
                     href={`/profile/${member.id}`}
-                    style={{ fontWeight: 700, fontSize: 16, color: 'inherit', textDecoration: 'none' }}
-                    onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
-                    onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
+                    style={{
+                      fontWeight: 700,
+                      fontSize: 17,
+                      color: 'hsl(var(--foreground))',
+                      textDecoration: 'none',
+                      fontFamily: DISPLAY_FONT,
+                      letterSpacing: '-0.005em',
+                      transition: 'color 150ms ease',
+                    }}
+                    onMouseEnter={(e) => (e.currentTarget.style.color = 'hsl(var(--tomato))')}
+                    onMouseLeave={(e) => (e.currentTarget.style.color = 'hsl(var(--foreground))')}
                   >
                     {member.name}
                   </Link>
-                  {member.city && <div style={{ fontSize: 13, opacity: 0.7 }}>{member.city}</div>}
+                  {member.city && (
+                    <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))', marginTop: 2 }}>
+                      {member.city}
+                    </div>
+                  )}
                 </div>
                 {member.status && (
                   <span style={statusBadge(member.status)}>{member.status}</span>
@@ -703,13 +646,13 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 </div>
               )}
               {member.skills && (
-                <div style={{ marginTop: 6, fontSize: 12, opacity: 0.8 }}>
-                  <strong>Skills:</strong> {member.skills}
+                <div style={{ marginTop: 8, fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>
+                  <strong style={{ color: 'hsl(var(--foreground))' }}>Skills:</strong> {member.skills}
                 </div>
               )}
               {member.org && (
-                <div style={{ fontSize: 12, opacity: 0.8, marginTop: 4 }}>
-                  <strong>Orgs:</strong> {member.org}
+                <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 4 }}>
+                  <strong style={{ color: 'hsl(var(--foreground))' }}>Orgs:</strong> {member.org}
                 </div>
               )}
             </div>
@@ -728,7 +671,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
 
               {!collapsedSections.roster && activeMembers.length > 0 && (
                 <>
-                  <h3 style={{ fontSize: 14, fontWeight: 600, color: '#2e7d32', marginBottom: 12, marginTop: 0 }}>
+                  <h3 style={subSectionTitle('hsl(142 71% 30%)')}>
                     Active ({activeMembers.length})
                   </h3>
                   <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
@@ -741,7 +684,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <>
                   <h3
                     onClick={() => toggleSection('bench')}
-                    style={collapsibleHeader('#5c6bc0')}
+                    style={collapsibleHeader('hsl(var(--ink-soft))')}
                   >
                     <span>{collapsedSections.bench ? '▶' : '▼'} Bench ({benchMembers.length})</span>
                   </h3>
@@ -757,7 +700,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <>
                   <h3
                     onClick={() => toggleSection('other')}
-                    style={collapsibleHeader('#757575')}
+                    style={collapsibleHeader('hsl(var(--muted-foreground))')}
                   >
                     <span>{collapsedSections.other ? '▶' : '▼'} Other ({otherMembers.length})</span>
                   </h3>
@@ -874,32 +817,32 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
               <div key={i} style={{
                 ...itemCard(),
                 ...(taskNeedsLead ? {
-                  background: 'rgba(255,179,0,0.1)',
-                  borderColor: '#ffb300',
-                  borderWidth: '2px',
+                  background: 'hsl(var(--butter) / 0.15)',
+                  borderColor: 'hsl(var(--butter))',
+                  borderWidth: 2,
                 } : {}),
               }}>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {task.priority && <span style={priorityBadge(task.priority)}>{task.priority}</span>}
                   {task.stage && <span style={stageBadge(task.stage)}>{task.stage}</span>}
-                  {taskNeedsLead && <span style={{
-                    display: 'inline-block',
-                    padding: '3px 8px',
-                    borderRadius: 6,
-                    fontSize: 10,
-                    fontWeight: 700,
-                    background: 'rgba(255,179,0,0.2)',
-                    color: '#ff8f00',
-                    textTransform: 'uppercase',
-                  }}>Needs Lead</span>}
+                  {taskNeedsLead && (
+                    <span style={needsLeadBadge()}>Needs Lead</span>
+                  )}
                 </div>
-                <div style={{ marginTop: 8, fontWeight: 500 }}>
+                <div style={{
+                  marginTop: 8,
+                  fontWeight: 600,
+                  fontFamily: DISPLAY_FONT,
+                  fontSize: 16,
+                  letterSpacing: '-0.005em',
+                  color: 'hsl(var(--foreground))',
+                }}>
                   {task.url ? (
                     <a
                       href={task.url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                      style={inlineLink()}
                     >
                       {task.task}
                     </a>
@@ -908,41 +851,40 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                   )}
                 </div>
                 {(task.lead && task.lead !== '#N/A') || task.dueDate ? (
-                  <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+                  <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
                     {task.lead && task.lead !== '#N/A' && (
-                      <span>Lead: {task.leadId ? (
-                        <Link
-                          href={`/profile/${task.leadId}`}
-                          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
-                        >
-                          {task.lead}
-                        </Link>
-                      ) : (
-                        task.lead
-                      )}</span>
+                      <span>
+                        Lead:{' '}
+                        {task.leadId ? (
+                          <Link
+                            href={`/profile/${task.leadId}`}
+                            style={tomatoLink()}
+                          >
+                            {task.lead}
+                          </Link>
+                        ) : (
+                          task.lead
+                        )}
+                      </span>
                     )}
                     {task.lead && task.lead !== '#N/A' && task.dueDate && <span> • </span>}
                     {task.dueDate && <span>Due: {task.dueDate}</span>}
                   </div>
                 ) : null}
                 {task.notes && (
-                  <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{task.notes}</div>
+                  <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 4, fontStyle: 'italic' }}>
+                    {task.notes}
+                  </div>
                 )}
                 {taskNeedsLead && user && (
                   <button
                     onClick={() => handleClaimTask(task.task)}
                     disabled={isClaiming}
                     style={{
+                      ...btn('accent', isClaiming),
                       marginTop: 10,
                       padding: '6px 12px',
-                      borderRadius: 6,
-                      border: 'none',
-                      background: '#ff8f00',
-                      color: 'var(--color-btn-primary-text)',
                       fontSize: 12,
-                      fontWeight: 600,
-                      cursor: isClaiming ? 'wait' : 'pointer',
-                      opacity: isClaiming ? 0.6 : 1,
                     }}
                   >
                     {isClaiming ? 'Claiming...' : 'Claim Task'}
@@ -953,16 +895,13 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                     onClick={() => handleGiveUpTask(task.task)}
                     disabled={isClaiming}
                     style={{
+                      ...btn('secondary', isClaiming),
                       marginTop: 10,
                       padding: '6px 12px',
-                      borderRadius: 6,
-                      border: '1px solid #d32f2f',
-                      background: 'var(--color-surface)',
-                      color: '#d32f2f',
                       fontSize: 12,
-                      fontWeight: 600,
-                      cursor: isClaiming ? 'wait' : 'pointer',
-                      opacity: isClaiming ? 0.6 : 1,
+                      borderColor: 'hsl(var(--tomato) / 0.35)',
+                      color: 'hsl(var(--tomato))',
+                      background: 'transparent',
                     }}
                   >
                     {isClaiming ? 'Giving up...' : 'Give Up'}
@@ -985,12 +924,12 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 const openCount = tasks.filter(needsLead).length
                 if (openCount === 0) return null
                 return (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, opacity: 0.7, cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, color: 'hsl(var(--muted-foreground))', cursor: 'pointer' }}>
                     <input
                       type="checkbox"
                       checked={showOpenOnly}
                       onChange={(e) => setShowOpenOnly(e.target.checked)}
-                      style={{ cursor: 'pointer' }}
+                      style={{ cursor: 'pointer', accentColor: 'hsl(var(--tomato))' }}
                     />
                     Show open tasks only ({openCount})
                   </label>
@@ -1001,7 +940,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <>
                   <h3
                     onClick={() => toggleSection('myTasks')}
-                    style={collapsibleHeader('#2e7d32')}
+                    style={collapsibleHeader('hsl(142 71% 30%)')}
                   >
                     <span>{collapsedSections.myTasks ? '▶' : '▼'} My Tasks ({myTasks.length})</span>
                   </h3>
@@ -1017,7 +956,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <>
                   <h3
                     onClick={() => toggleSection('topTasks')}
-                    style={collapsibleHeader('#d32f2f')}
+                    style={collapsibleHeader('hsl(var(--tomato))')}
                   >
                     <span>{collapsedSections.topTasks ? '▶' : '▼'} Top Tasks ({filteredTopTasks.length})</span>
                   </h3>
@@ -1039,7 +978,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                   <div key={goalName}>
                     <h3
                       onClick={() => toggleSection(sectionKey)}
-                      style={collapsibleHeader('#1565c0')}
+                      style={collapsibleHeader('hsl(var(--foreground))')}
                     >
                       <span>{isCollapsed ? '▶' : '▼'} {goalName} ({goalTasks.length})</span>
                     </h3>
@@ -1056,7 +995,7 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 <>
                   <h3
                     onClick={() => toggleSection('otherTasks')}
-                    style={collapsibleHeader('#757575')}
+                    style={collapsibleHeader('hsl(var(--muted-foreground))')}
                   >
                     <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({filteredUngroupedTasks.length + (showLaterTasks ? filteredLaterTasks.length : 0)})</span>
                   </h3>
@@ -1067,14 +1006,14 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                         {showLaterTasks && filteredLaterTasks.map(renderTaskCard)}
                       </div>
                       {filteredLaterTasks.length > 0 && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, fontSize: 13, opacity: 0.7, cursor: 'pointer' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, fontSize: 13, color: 'hsl(var(--muted-foreground))', cursor: 'pointer' }}>
                           <input
                             type="checkbox"
                             checked={showLaterTasks}
                             onChange={(e) => setShowLaterTasks(e.target.checked)}
-                            style={{ cursor: 'pointer' }}
+                            style={{ cursor: 'pointer', accentColor: 'hsl(var(--tomato))' }}
                           />
-                          Show "Later" tasks ({filteredLaterTasks.length})
+                          Show &quot;Later&quot; tasks ({filteredLaterTasks.length})
                         </label>
                       )}
                     </>
@@ -1099,13 +1038,19 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                 {manuals.map((manual, i) => (
                   <div key={i} style={itemCard(manual.status)}>
                     {manual.status && <span style={manualStatusBadge(manual.status)}>{manual.status}</span>}
-                    <div style={{ fontWeight: 600, fontSize: 15, marginTop: manual.status ? 8 : 0 }}>
+                    <div style={{
+                      fontWeight: 600,
+                      fontSize: 15,
+                      marginTop: manual.status ? 8 : 0,
+                      fontFamily: DISPLAY_FONT,
+                      letterSpacing: '-0.005em',
+                    }}>
                       {manual.url ? (
                         <a
                           href={manual.url}
                           target="_blank"
                           rel="noreferrer"
-                          style={{ color: 'inherit', textDecoration: 'underline', textUnderlineOffset: '2px' }}
+                          style={inlineLink()}
                         >
                           {manual.title}
                         </a>
@@ -1114,14 +1059,16 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
                       )}
                     </div>
                     {(manual.author || manual.lastUpdated) && (
-                      <div style={{ fontSize: 12, opacity: 0.7, marginTop: 6 }}>
+                      <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 6 }}>
                         {manual.author && manual.author !== '#N/A' && <span>By {manual.author}</span>}
                         {manual.author && manual.author !== '#N/A' && manual.lastUpdated && <span> • </span>}
                         {manual.lastUpdated && <span>Updated: {manual.lastUpdated}</span>}
                       </div>
                     )}
                     {manual.notes && (
-                      <div style={{ fontSize: 12, opacity: 0.6, marginTop: 4 }}>{manual.notes}</div>
+                      <div style={{ fontSize: 12, color: 'hsl(var(--muted-foreground))', marginTop: 4, fontStyle: 'italic' }}>
+                        {manual.notes}
+                      </div>
                     )}
                   </div>
                 ))}
@@ -1139,51 +1086,35 @@ export default function CrewPage({ params }: { params: Promise<{ crewId: string 
   )
 }
 
-// Styles
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 24,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  }
-}
-
-function btn(kind: 'primary' | 'secondary'): React.CSSProperties {
-  const base: React.CSSProperties = {
-    display: 'inline-block',
-    padding: '10px 16px',
-    borderRadius: 10,
-    border: '1px solid var(--color-border-strong)',
-    fontWeight: 650,
-    cursor: 'pointer',
-    textDecoration: 'none',
-    textAlign: 'center',
-  }
-  if (kind === 'primary') return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' }
-  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' }
-}
-
-function badge(): React.CSSProperties {
-  return {
-    display: 'inline-block',
-    padding: '6px 12px',
-    borderRadius: 20,
-    background: 'var(--color-surface-hover)',
-    fontSize: 13,
-    fontWeight: 500,
-  }
-}
+// ---------------------------------------------------------------------------
+// Local style helpers — tuned for the crew detail page. Surface primitives
+// (card / btn / badge / navBtn / pageContainer / loadingSpinner) come from
+// @/app/ui/shared-styles so they stay in sync with the Phase 2 token system.
+// ---------------------------------------------------------------------------
 
 function sectionTitle(): React.CSSProperties {
   return {
-    fontSize: 20,
+    fontSize: 22,
     fontWeight: 700,
     marginTop: 0,
     marginBottom: 16,
     paddingBottom: 12,
-    borderBottom: '1px solid var(--color-divider)',
+    borderBottom: '1px solid hsl(var(--rule) / 0.12)',
+    fontFamily: DISPLAY_FONT,
+    letterSpacing: '-0.01em',
+    color: 'hsl(var(--foreground))',
+  }
+}
+
+function subSectionTitle(color: string): React.CSSProperties {
+  return {
+    fontSize: 14,
+    fontWeight: 700,
+    color: color,
+    marginBottom: 12,
+    marginTop: 0,
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
   }
 }
 
@@ -1191,231 +1122,228 @@ function th(): React.CSSProperties {
   return {
     textAlign: 'left',
     padding: '8px 12px',
-    borderBottom: '2px solid var(--color-divider)',
+    borderBottom: '2px solid hsl(var(--rule) / 0.12)',
     fontSize: 12,
     fontWeight: 700,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
+    color: 'hsl(var(--muted-foreground))',
   }
 }
 
 function td(): React.CSSProperties {
   return {
     padding: '10px 12px',
-    borderBottom: '1px solid var(--color-divider)',
+    borderBottom: '1px solid hsl(var(--rule) / 0.10)',
     fontSize: 14,
+    color: 'hsl(var(--foreground))',
   }
 }
 
 function memberCard(): React.CSSProperties {
   return {
     padding: 14,
-    borderRadius: 10,
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-page-bg)',
+    borderRadius: 'var(--radius)',
+    border: '1px solid hsl(var(--rule) / 0.12)',
+    background: 'hsl(var(--background))',
+    color: 'hsl(var(--foreground))',
+    transition: 'border-color 150ms ease',
   }
 }
 
 function collapsibleHeader(color: string): React.CSSProperties {
   return {
     fontSize: 14,
-    fontWeight: 600,
+    fontWeight: 700,
     color: color,
     marginBottom: 12,
     marginTop: 0,
     cursor: 'pointer',
     userSelect: 'none',
+    textTransform: 'uppercase',
+    letterSpacing: '0.06em',
   }
 }
 
 function itemCard(priority?: string): React.CSSProperties {
   const lower = priority?.toLowerCase() || ''
-  let borderColor = 'var(--color-border)'
+  let borderColor = 'hsl(var(--rule) / 0.12)'
+  let accent: string | null = null
 
   if (lower.includes('top') || lower.includes('high') || lower.includes('0.') || lower.includes('1.')) {
-    borderColor = '#ff4d4d'
+    accent = 'hsl(var(--tomato))'
   } else if (lower.includes('mid') || lower.includes('2.')) {
-    borderColor = '#ffa726'
+    accent = 'hsl(var(--butter))'
   } else if (lower.includes('complete')) {
-    borderColor = '#4caf50'
+    accent = 'hsl(142 71% 40%)'
   } else if (lower.includes('draft')) {
-    borderColor = '#ff9800'
+    accent = 'hsl(var(--butter))'
   } else if (lower.includes('needed')) {
-    borderColor = '#f44336'
+    accent = 'hsl(var(--tomato))'
   }
 
   return {
     padding: 14,
-    borderRadius: 10,
-    border: '1px solid var(--color-border)',
-    borderLeft: `4px solid ${borderColor}`,
-    background: 'var(--color-page-bg)',
+    borderRadius: 'var(--radius)',
+    border: `1px solid ${borderColor}`,
+    borderLeft: accent ? `4px solid ${accent}` : `1px solid ${borderColor}`,
+    background: 'hsl(var(--background))',
+    color: 'hsl(var(--foreground))',
   }
 }
 
 function statusBadge(status: string): React.CSSProperties {
   const lower = status.toLowerCase()
-  let bg = 'var(--color-surface-hover)'
-  let color = 'var(--color-text-primary)'
+  let bg = 'hsl(var(--muted))'
+  let color = 'hsl(var(--foreground))'
 
   if (lower.includes('lead') || lower.includes('capo')) {
-    bg = 'rgba(255,77,77,0.15)'
-    color = '#d32f2f'
+    bg = 'hsl(var(--tomato) / 0.12)'
+    color = 'hsl(var(--tomato))'
   } else if (lower.includes('active') || lower.includes('daily')) {
-    bg = 'rgba(76,175,80,0.15)'
-    color = '#2e7d32'
+    bg = 'hsl(142 71% 35% / 0.12)'
+    color = 'hsl(142 71% 30%)'
   } else if (lower.includes('weekly')) {
-    bg = 'rgba(33,150,243,0.15)'
-    color = '#1565c0'
+    bg = 'hsl(var(--butter) / 0.25)'
+    color = 'hsl(var(--ink-soft))'
   }
 
   return {
     display: 'inline-block',
     padding: '3px 8px',
-    borderRadius: 6,
+    borderRadius: 999,
     fontSize: 11,
-    fontWeight: 600,
+    fontWeight: 700,
     background: bg,
     color: color,
     textTransform: 'uppercase',
-  }
-}
-
-function goalCard(priority: string): React.CSSProperties {
-  const lower = priority?.toLowerCase() || ''
-  let borderColor = 'var(--color-border)'
-
-  if (lower.includes('top') || lower.includes('high')) {
-    borderColor = '#ff4d4d'
-  } else if (lower.includes('mid')) {
-    borderColor = '#ffa726'
-  }
-
-  return {
-    padding: 14,
-    borderRadius: 10,
-    border: '1px solid var(--color-border)',
-    borderLeft: `4px solid ${borderColor}`,
-    background: 'var(--color-surface)',
-    display: 'flex',
-    gap: 12,
-    alignItems: 'center',
-  }
-}
-
-function taskCard(stage: string): React.CSSProperties {
-  return {
-    padding: 14,
-    borderRadius: 10,
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-surface)',
+    letterSpacing: '0.03em',
+    whiteSpace: 'nowrap',
   }
 }
 
 function priorityBadge(priority: string): React.CSSProperties {
   const lower = priority?.toLowerCase() || ''
-  let bg = 'var(--color-surface-hover)'
-  let color = 'var(--color-text-primary)'
+  let bg = 'hsl(var(--muted))'
+  let color = 'hsl(var(--foreground))'
 
-  if (lower.includes('top') || lower.includes('high')) {
-    bg = 'rgba(255,77,77,0.15)'
-    color = '#d32f2f'
-  } else if (lower.includes('mid')) {
-    bg = 'rgba(255,167,38,0.15)'
-    color = '#ef6c00'
+  if (lower.includes('top') || lower.includes('high') || lower.includes('0.') || lower.includes('1.')) {
+    bg = 'hsl(var(--tomato) / 0.12)'
+    color = 'hsl(var(--tomato))'
+  } else if (lower.includes('mid') || lower.includes('2.')) {
+    bg = 'hsl(var(--butter) / 0.25)'
+    color = 'hsl(var(--ink-soft))'
   } else if (lower.includes('low')) {
-    bg = 'rgba(76,175,80,0.15)'
-    color = '#2e7d32'
+    bg = 'hsl(var(--muted))'
+    color = 'hsl(var(--muted-foreground))'
   }
 
   return {
     display: 'inline-block',
     padding: '3px 8px',
-    borderRadius: 6,
+    borderRadius: 999,
     fontSize: 10,
     fontWeight: 700,
     background: bg,
     color: color,
     textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    whiteSpace: 'nowrap',
   }
 }
 
 function stageBadge(stage: string): React.CSSProperties {
   const lower = stage?.toLowerCase() || ''
-  let bg = 'var(--color-surface-hover)'
-  let color = 'var(--color-text-secondary)'
+  let bg = 'hsl(var(--muted))'
+  let color = 'hsl(var(--muted-foreground))'
 
   if (lower.includes('now') || lower.includes('doing') || lower.includes('progress')) {
-    bg = 'rgba(33,150,243,0.15)'
-    color = '#1565c0'
+    bg = 'hsl(var(--butter) / 0.25)'
+    color = 'hsl(var(--ink-soft))'
   } else if (lower.includes('done') || lower.includes('complete')) {
-    bg = 'rgba(76,175,80,0.15)'
-    color = '#2e7d32'
+    bg = 'hsl(142 71% 35% / 0.12)'
+    color = 'hsl(142 71% 30%)'
   } else if (lower.includes('todo') || lower.includes('next')) {
-    bg = 'rgba(156,39,176,0.15)'
-    color = '#7b1fa2'
+    bg = 'hsl(var(--muted))'
+    color = 'hsl(var(--muted-foreground))'
   }
 
   return {
     display: 'inline-block',
     padding: '3px 8px',
-    borderRadius: 6,
+    borderRadius: 999,
     fontSize: 10,
     fontWeight: 700,
     background: bg,
     color: color,
     textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    whiteSpace: 'nowrap',
   }
 }
 
-function manualCard(status: string): React.CSSProperties {
-  const lower = status?.toLowerCase() || ''
-  let borderColor = 'var(--color-border)'
-
-  if (lower.includes('complete')) {
-    borderColor = '#4caf50'
-  } else if (lower.includes('draft')) {
-    borderColor = '#ff9800'
-  } else if (lower.includes('needed')) {
-    borderColor = '#f44336'
-  }
-
+function needsLeadBadge(): React.CSSProperties {
   return {
-    padding: 14,
-    borderRadius: 10,
-    border: '1px solid var(--color-border)',
-    borderLeft: `4px solid ${borderColor}`,
-    background: 'var(--color-surface)',
+    display: 'inline-block',
+    padding: '3px 8px',
+    borderRadius: 999,
+    fontSize: 10,
+    fontWeight: 700,
+    background: 'hsl(var(--butter) / 0.35)',
+    color: 'hsl(var(--ink))',
+    textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    whiteSpace: 'nowrap',
   }
 }
 
 function manualStatusBadge(status: string): React.CSSProperties {
   const lower = status?.toLowerCase() || ''
-  let bg = 'var(--color-surface-hover)'
-  let color = 'var(--color-text-secondary)'
+  let bg = 'hsl(var(--muted))'
+  let color = 'hsl(var(--muted-foreground))'
 
   if (lower.includes('complete')) {
-    bg = 'rgba(76,175,80,0.15)'
-    color = '#2e7d32'
+    bg = 'hsl(142 71% 35% / 0.12)'
+    color = 'hsl(142 71% 30%)'
   } else if (lower.includes('draft')) {
-    bg = 'rgba(255,152,0,0.15)'
-    color = '#ef6c00'
+    bg = 'hsl(var(--butter) / 0.25)'
+    color = 'hsl(var(--ink-soft))'
   } else if (lower.includes('needed')) {
-    bg = 'rgba(244,67,54,0.15)'
-    color = '#d32f2f'
+    bg = 'hsl(var(--tomato) / 0.12)'
+    color = 'hsl(var(--tomato))'
   } else if (lower.includes('backlog')) {
-    bg = 'rgba(156,39,176,0.15)'
-    color = '#7b1fa2'
+    bg = 'hsl(var(--muted))'
+    color = 'hsl(var(--muted-foreground))'
   }
 
   return {
     display: 'inline-block',
     padding: '3px 8px',
-    borderRadius: 6,
+    borderRadius: 999,
     fontSize: 10,
     fontWeight: 700,
     background: bg,
     color: color,
     textTransform: 'uppercase',
+    letterSpacing: '0.04em',
+    whiteSpace: 'nowrap',
+  }
+}
+
+function inlineLink(): React.CSSProperties {
+  return {
+    color: 'inherit',
+    textDecoration: 'underline',
+    textDecorationColor: 'hsl(var(--tomato) / 0.55)',
+    textUnderlineOffset: '3px',
+  }
+}
+
+function tomatoLink(): React.CSSProperties {
+  return {
+    color: 'hsl(var(--tomato))',
+    textDecoration: 'none',
+    fontWeight: 600,
+    textUnderlineOffset: '2px',
   }
 }
