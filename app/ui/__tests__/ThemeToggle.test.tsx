@@ -7,9 +7,12 @@ vi.mock('next-themes', () => ({
   useTheme: vi.fn(() => ({ theme: 'light', setTheme: mockSetTheme, resolvedTheme: 'light', themes: [], systemTheme: undefined, forcedTheme: undefined })),
 }))
 
-// Mock next/font
+// Mock next/font — buffalo-69872 swapped Geist for Asap + Asap_Condensed
+// in app/layout.tsx (Phase 1 restyle foundation).
 vi.mock('next/font/google', () => ({
-  Inter: () => ({ style: { fontFamily: 'Inter' } }),
+  Asap: () => ({ variable: '--font-sans-asap', style: { fontFamily: 'Asap' } }),
+  Asap_Condensed: () => ({ variable: '--font-display-asap-condensed', style: { fontFamily: 'Asap Condensed' } }),
+  Geist_Mono: () => ({ variable: '--font-geist-mono', style: { fontFamily: 'Geist Mono' } }),
 }))
 
 import { ThemeToggle } from '../ThemeToggle'

@@ -1,13 +1,25 @@
 import type { Metadata } from "next";
-import { Geist, Geist_Mono } from "next/font/google";
+import { Asap, Asap_Condensed, Geist_Mono } from "next/font/google";
 import "./globals.css";
 import { Providers } from "./providers";
 
-const geistSans = Geist({
-  variable: "--font-geist-sans",
+// Body / UI sans — matches pizzadao.org marketing site.
+const asapSans = Asap({
+  variable: "--font-sans-asap",
   subsets: ["latin"],
+  weight: ["400", "500", "600", "700"],
+  display: "swap",
 });
 
+// Display / headings — Asap Condensed.
+const asapDisplay = Asap_Condensed({
+  variable: "--font-display-asap-condensed",
+  subsets: ["latin"],
+  weight: ["500", "600", "700", "800"],
+  display: "swap",
+});
+
+// Kept for `font-mono` consumers (app/tech/projects/[slug]/page.tsx).
 const geistMono = Geist_Mono({
   variable: "--font-geist-mono",
   subsets: ["latin"],
@@ -26,7 +38,7 @@ export default function RootLayout({
   return (
     <html lang="en" suppressHydrationWarning>
       <body
-        className={`${geistSans.variable} ${geistMono.variable} antialiased`}
+        className={`${asapSans.variable} ${asapDisplay.variable} ${geistMono.variable} antialiased`}
       >
         <Providers>{children}</Providers>
         {/* GitHub and Google Sheets Links - Fixed Bottom Right */}
