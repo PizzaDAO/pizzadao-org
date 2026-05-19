@@ -3,6 +3,14 @@
 import { useEffect, useState } from "react";
 import type { AttendanceResult } from "@/app/lib/attendance";
 
+/**
+ * Per-member call attendance summary card.
+ *
+ * Phase 3c restyle: replaced `--color-*` back-compat CSS variables with
+ * semantic Tailwind classes and HSL tokens so the card matches the
+ * pizzadao.org cream-warm rhythm. Tomato accent on the headline number
+ * gives the same "loud key stat" treatment used on the marketing site.
+ */
 interface AttendanceCardProps {
   memberId: string;
 }
@@ -46,48 +54,23 @@ export function AttendanceCard({ memberId }: AttendanceCardProps) {
     .sort((a, b) => b[1].count - a[1].count);
 
   return (
-    <div
-      style={{
-        marginTop: 24,
-        paddingTop: 24,
-        borderTop: "1px solid var(--color-divider)",
-      }}
-    >
-      <h3 style={{ marginTop: 0, marginBottom: 16, fontSize: 18 }}>
+    <div className="mt-6 pt-6 border-t border-rule">
+      <h3 className="mt-0 mb-4 font-display text-lg font-semibold text-foreground">
         Call Attendance
       </h3>
 
-      {/* Total calls — big number */}
+      {/* Total calls — big number, tomato accent */}
       <div
-        style={{
-          textAlign: "center",
-          marginBottom: 20,
-          padding: 16,
-          borderRadius: 12,
-          background: "var(--color-surface)",
-          border: "1px solid var(--color-border)",
-        }}
+        className="text-center mb-5 p-4 rounded-[--radius] border border-rule"
+        style={{ background: "hsl(var(--background))" }}
       >
         <div
-          style={{
-            fontSize: 40,
-            fontWeight: 800,
-            lineHeight: 1,
-            color: "var(--color-text)",
-          }}
+          className="font-display font-bold leading-none"
+          style={{ fontSize: "2.5rem", color: "hsl(var(--tomato))" }}
         >
           {data.totalCalls}
         </div>
-        <div
-          style={{
-            fontSize: 13,
-            fontWeight: 600,
-            textTransform: "uppercase",
-            letterSpacing: 1,
-            opacity: 0.5,
-            marginTop: 6,
-          }}
-        >
+        <div className="mt-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
           Total Calls Attended
         </div>
       </div>
@@ -95,41 +78,19 @@ export function AttendanceCard({ memberId }: AttendanceCardProps) {
       {/* Per-crew breakdown */}
       {crewEntries.length > 0 && (
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))",
-            gap: 8,
-            marginBottom: 20,
-          }}
+          className="grid gap-2 mb-5"
+          style={{ gridTemplateColumns: "repeat(auto-fit, minmax(140px, 1fr))" }}
         >
           {crewEntries.map(([crewId, info]) => (
             <div
               key={crewId}
-              style={{
-                padding: 12,
-                borderRadius: 10,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                textAlign: "center",
-              }}
+              className="p-3 rounded-[--radius] border border-rule text-center"
+              style={{ background: "hsl(var(--background))" }}
             >
-              <div
-                style={{
-                  fontSize: 22,
-                  fontWeight: 700,
-                  color: "var(--color-text)",
-                }}
-              >
+              <div className="font-display font-bold text-2xl text-foreground">
                 {info.count}
               </div>
-              <div
-                style={{
-                  fontSize: 12,
-                  fontWeight: 600,
-                  opacity: 0.7,
-                  marginTop: 2,
-                }}
-              >
+              <div className="mt-0.5 text-xs font-semibold text-muted-foreground">
                 {info.crewLabel}
               </div>
             </div>
@@ -140,38 +101,21 @@ export function AttendanceCard({ memberId }: AttendanceCardProps) {
       {/* Recent calls list */}
       {data.recentCalls.length > 0 && (
         <div>
-          <h4
-            style={{
-              fontSize: 12,
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              opacity: 0.5,
-              marginTop: 0,
-              marginBottom: 8,
-              fontWeight: 700,
-            }}
-          >
+          <h4 className="m-0 mb-2 text-xs uppercase tracking-wider font-bold text-muted-foreground">
             Recent Calls
           </h4>
-          <div style={{ display: "grid", gap: 4 }}>
+          <div className="grid gap-1">
             {data.recentCalls.map((call, idx) => (
               <div
                 key={idx}
+                className="flex justify-between items-center px-2.5 py-1.5 rounded-md text-sm"
                 style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "center",
-                  padding: "6px 10px",
-                  borderRadius: 8,
                   background:
-                    idx % 2 === 0
-                      ? "transparent"
-                      : "var(--color-surface)",
-                  fontSize: 13,
+                    idx % 2 === 0 ? "transparent" : "hsl(var(--background))",
                 }}
               >
-                <span style={{ fontWeight: 500 }}>{call.crew}</span>
-                <span style={{ opacity: 0.5, fontSize: 12 }}>
+                <span className="font-medium text-foreground">{call.crew}</span>
+                <span className="text-xs text-muted-foreground">
                   {new Date(call.date).toLocaleDateString("en-US", {
                     year: "numeric",
                     month: "short",

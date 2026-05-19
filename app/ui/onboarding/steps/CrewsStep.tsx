@@ -88,14 +88,14 @@ export function CrewsStep({
   }
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="grid gap-3">
       {crewsLoading && (
-        <div style={{ display: "flex", justifyContent: "flex-end", marginBottom: 4 }}>
-          <div style={{ opacity: 0.65, fontSize: 13 }}>Loading crews...</div>
+        <div className="flex justify-end mb-1">
+          <div className="text-xs text-muted-foreground/80">Loading crews...</div>
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, minmax(0, 1fr))", gap: 10 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5">
         {crewOptions.map((c) => {
           const idStr = String(c.id);
           const checked = crews.includes(idStr);
@@ -110,26 +110,16 @@ export function CrewsStep({
                 style={{ transform: "scale(1.1)" }}
               />
 
-              <div style={{ display: "grid", gap: 4 }}>
-                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                  <span style={{ fontWeight: 700 }}>
+              <div className="grid gap-1">
+                <div className="flex gap-2 items-baseline flex-wrap">
+                  <span className="font-[family-name:var(--font-display)] font-bold text-foreground">
                     {c.emoji ? `${c.emoji} ` : ""}
                     {c.label}
                   </span>
 
                   {recommended && recommended.length > 0 && (
-                    <div
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        gap: 6,
-                        padding: "2px 8px",
-                        borderRadius: 999,
-                        border: '1px solid var(--color-border-strong)',
-                        background: 'var(--color-surface-hover)',
-                      }}
-                    >
-                      <div style={{ display: "flex", alignItems: "center" }}>
+                    <div className="flex items-center gap-1.5 px-2 py-0.5 rounded-full border border-tomato/30 bg-tomato/10">
+                      <div className="flex items-center">
                         {recommended.map((tId, idx) => {
                           const img = TURTLES.find((t) => t.id === tId)?.image;
                           if (!img) return null;
@@ -149,13 +139,13 @@ export function CrewsStep({
                           );
                         })}
                       </div>
-                      <span style={{ fontSize: 12, fontWeight: 750 }}>Recommended</span>
+                      <span className="text-xs font-bold text-tomato">Recommended</span>
                     </div>
                   )}
                 </div>
 
                 {(c.callTime || c.callLength) && (
-                  <div style={{ opacity: 0.7, fontSize: 13 }}>
+                  <div className="text-xs text-muted-foreground">
                     {c.callTime ? c.callTime : ""}
                     {c.callTime && c.callLength ? " - " : ""}
                     {c.callLength ? c.callLength : ""}
@@ -163,39 +153,21 @@ export function CrewsStep({
                 )}
 
                 {c.tasks && c.tasks.length > 0 && (
-                  <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        fontWeight: 700,
-                        opacity: 0.6,
-                        textTransform: "uppercase",
-                        letterSpacing: 0.5,
-                      }}
-                    >
+                  <div className="mt-1.5 grid gap-0.5">
+                    <div className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground/80">
                       Top Tasks
                     </div>
                     {c.tasks.map((t, idx) => (
-                      <div
-                        key={idx}
-                        style={{
-                          fontSize: 12,
-                          opacity: 0.85,
-                          display: "flex",
-                          alignItems: "baseline",
-                          gap: 4,
-                          minWidth: 0,
-                        }}
-                      >
-                        <span style={{ flexShrink: 0 }}>-</span>
-                        <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
+                      <div key={idx} className="text-xs text-foreground/85 flex items-baseline gap-1 min-w-0">
+                        <span className="shrink-0">-</span>
+                        <div className="overflow-hidden text-ellipsis whitespace-nowrap">
                           {t.url ? (
                             <a
                               href={t.url}
                               target="_blank"
                               rel="noreferrer"
                               onClick={(e) => e.stopPropagation()}
-                              style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
+                              className="text-inherit underline underline-offset-2"
                             >
                               {t.label}
                             </a>
@@ -214,12 +186,7 @@ export function CrewsStep({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    style={{
-                      fontSize: 13,
-                      fontWeight: 650,
-                      opacity: 0.85,
-                      textDecoration: "none",
-                    }}
+                    className="text-xs font-semibold text-foreground/85 no-underline hover:text-tomato"
                     title={c.sheet}
                   >
                     Open crew sheet
@@ -231,12 +198,12 @@ export function CrewsStep({
         })}
       </div>
 
-      <div style={{ display: "grid", gap: 6 }}>
-        <div style={{ display: "flex", gap: 10 }}>
+      <div className="grid gap-1.5">
+        <div className="flex gap-2.5">
           <button onClick={onBack} style={btn("secondary")}>
             Back
           </button>
-          <button onClick={onSubmit} disabled={submitting} style={btn("primary", submitting)}>
+          <button onClick={onSubmit} disabled={submitting} style={btn("accent", submitting)}>
             {submitting
               ? isUpdate
                 ? "Updating..."
@@ -249,12 +216,12 @@ export function CrewsStep({
       </div>
 
       {success && successData && (
-        <div style={{ display: "grid", gap: 10, marginTop: 6 }}>
+        <div className="grid gap-2.5 mt-1.5">
           <div style={alert("success")}>
-            Done! You're officially <b>{successData.mafiaName}</b>.
+            Done! You&apos;re officially <b>{successData.mafiaName}</b>.
           </div>
 
-          <div style={{ lineHeight: 1.6 }}>
+          <div className="leading-relaxed text-sm">
             <div>
               <b>City:</b> {successData.city}
             </div>
@@ -281,7 +248,7 @@ export function CrewsStep({
             {successData.discordId && (
               <div>
                 <b>Discord:</b> {successData.discordJoined ? "Joined" : "Linked"} -{" "}
-                <span style={{ fontFamily: "monospace" }}>{successData.discordId}</span>
+                <span className="font-mono">{successData.discordId}</span>
               </div>
             )}
           </div>

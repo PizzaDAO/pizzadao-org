@@ -2,82 +2,189 @@
 
 @custom-variant dark (&:where([data-theme="dark"], [data-theme="dark"] *));
 
-:root {
-  --background: #ffffff;
-  --foreground: #171717;
+/* -----------------------------------------------------------------------------
+   PizzaDAO restyle — Phase 1 foundation tokens.
+   See plans/site-restyle-pizzadao-org.md.
 
-  --color-page-bg: #fafafa;
-  --color-surface: #ffffff;
-  --color-surface-hover: rgba(0, 0, 0, 0.04);
-  --color-text: #000000;
-  --color-text-primary: #111111;
-  --color-text-secondary: #666666;
-  --color-text-muted: rgba(0, 0, 0, 0.5);
-  --color-text-inverse: #ffffff;
-  --color-border: rgba(0, 0, 0, 0.12);
-  --color-border-strong: rgba(0, 0, 0, 0.18);
-  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.06);
-  --shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.12);
-  --color-btn-primary-bg: #000000;
-  --color-btn-primary-text: #ffffff;
-  --color-btn-primary-border: #000000;
-  --color-btn-secondary-bg: #ffffff;
-  --color-btn-secondary-text: #000000;
-  --color-btn-secondary-border: rgba(0, 0, 0, 0.18);
-  --color-input-bg: #ffffff;
-  --color-input-text: #000000;
-  --color-input-border: rgba(0, 0, 0, 0.18);
-  --color-spinner-track: rgba(0, 0, 0, 0.1);
-  --color-spinner-active: #ff4d4d;
-  --color-overlay: rgba(0, 0, 0, 0.5);
-  --color-divider: rgba(0, 0, 0, 0.1);
-  --color-accent: #ff4d4d;
-  --color-success: #16a34a;
-  --color-danger: #dc2626;
+   Raw HSL triplets so Tailwind opacity modifiers (e.g. `bg-tomato/30`) work
+   when consumed via `hsl(var(--token))` — matching pizzadao.org's convention.
+----------------------------------------------------------------------------- */
+
+:root {
+  /* Raw palette */
+  --cream:        44 80% 99%;
+  --cream-warm:   44 80% 99%;
+  --ink:          0 0% 4%;
+  --ink-soft:     0 0% 14%;
+  --tomato:       0 93% 60%;
+  --tomato-deep:  0 70% 50%;
+  --butter:       46 100% 62%;
+  --muted:        44 30% 88%;
+  --rule:         0 0% 8%;
+  --radius:       0.875rem;
+
+  /* Semantic roles — light */
+  --background:             var(--cream);
+  --foreground:             var(--ink);
+  --primary:                var(--ink);
+  --primary-foreground:     var(--cream);
+  --secondary:              var(--cream-warm);
+  --secondary-foreground:   var(--ink);
+  --accent:                 var(--tomato);
+  --accent-foreground:      var(--cream);
+  --destructive:            var(--tomato);
+  --destructive-foreground: var(--cream);
+  --muted-foreground:       var(--ink-soft);
+  --card:                   47 78% 97%;
+  --card-foreground:        var(--ink);
+  --popover:                var(--cream);
+  --popover-foreground:     var(--ink);
+  --border:                 var(--ink);
+  --input:                  var(--ink);
+  --ring:                   var(--tomato);
+
+  /* ---------------------------------------------------------------------------
+     Back-compat aliases — kept through Phase 2 because page-level files still
+     consume them. truffle-11395 (Phase 2) migrated the shared primitives
+     (app/ui/onboarding/styles.ts, app/ui/shared-styles.ts, Field.tsx,
+     TagBadge.tsx) onto the new semantic HSL tokens, but ~50 page-level
+     consumers remain across app/(vouches, profile, pep, poaps, missions,
+     nfts, manuals, dashboard, crew, crews, articles, calls, turtles)/
+     page.tsx plus most files under app/ui/ (wallet-manager, vouches,
+     unlock-ticket-card, shop, profile-links, notifications, nft, missions,
+     jobs, economy, bounties, attendance-card, articles). Those are
+     Phase 3+ scope — one PR per route cluster per the plan.
+     TODO(restyle phase 5/polish): once every consumer is migrated, delete
+     this entire back-compat block.
+  --------------------------------------------------------------------------- */
+  --color-page-bg:            hsl(var(--background));
+  --color-surface:            hsl(var(--card));
+  --color-surface-hover:      hsl(var(--ink) / 0.06);
+  --color-text:               hsl(var(--foreground));
+  --color-text-primary:       hsl(var(--foreground));
+  --color-text-secondary:     hsl(var(--muted-foreground));
+  --color-text-muted:         hsl(var(--ink) / 0.55);
+  --color-text-inverse:       hsl(var(--primary-foreground));
+  --color-border:             hsl(var(--rule) / 0.12);
+  --color-border-strong:      hsl(var(--rule) / 0.22);
+  --shadow-card:              0 8px 30px hsl(var(--ink) / 0.06);
+  --shadow-elevated:          0 8px 30px hsl(var(--ink) / 0.12);
+  --color-btn-primary-bg:     hsl(var(--primary));
+  --color-btn-primary-text:   hsl(var(--primary-foreground));
+  --color-btn-primary-border: hsl(var(--primary));
+  --color-btn-secondary-bg:   hsl(var(--secondary));
+  --color-btn-secondary-text: hsl(var(--secondary-foreground));
+  --color-btn-secondary-border: hsl(var(--rule) / 0.22);
+  --color-input-bg:           hsl(var(--cream));
+  --color-input-text:         hsl(var(--foreground));
+  --color-input-border:       hsl(var(--rule) / 0.22);
+  --color-spinner-track:      hsl(var(--ink) / 0.10);
+  --color-spinner-active:     hsl(var(--tomato));
+  --color-overlay:            hsl(var(--ink) / 0.50);
+  --color-divider:            hsl(var(--rule) / 0.10);
+  --color-accent:             hsl(var(--tomato));
+  --color-success:            hsl(142 71% 35%);
+  --color-danger:             hsl(0 84% 50%);
 }
 
 [data-theme="dark"] {
-  --background: #0a0a0a;
-  --foreground: #ededed;
+  /* Raw palette tweaks for dark mode */
+  --muted:        0 0% 12%;
+  --rule:         0 0% 100%;
 
-  --color-page-bg: #0f0f0f;
-  --color-surface: #1a1a1a;
-  --color-surface-hover: rgba(255, 255, 255, 0.06);
-  --color-text: #ededed;
-  --color-text-primary: #e0e0e0;
-  --color-text-secondary: #999999;
-  --color-text-muted: rgba(255, 255, 255, 0.5);
-  --color-text-inverse: #000000;
-  --color-border: rgba(255, 255, 255, 0.12);
-  --color-border-strong: rgba(255, 255, 255, 0.18);
-  --shadow-card: 0 8px 30px rgba(0, 0, 0, 0.3);
-  --shadow-elevated: 0 8px 30px rgba(0, 0, 0, 0.4);
-  --color-btn-primary-bg: #ffffff;
-  --color-btn-primary-text: #000000;
-  --color-btn-primary-border: #ffffff;
-  --color-btn-secondary-bg: #1a1a1a;
-  --color-btn-secondary-text: #ededed;
-  --color-btn-secondary-border: rgba(255, 255, 255, 0.18);
-  --color-input-bg: #1a1a1a;
-  --color-input-text: #ededed;
-  --color-input-border: rgba(255, 255, 255, 0.18);
-  --color-spinner-track: rgba(255, 255, 255, 0.1);
-  --color-spinner-active: #ff6666;
-  --color-overlay: rgba(0, 0, 0, 0.7);
-  --color-divider: rgba(255, 255, 255, 0.1);
+  /* Semantic roles — dark */
+  --background:             var(--ink);
+  --foreground:             var(--cream);
+  --primary:                var(--cream);
+  --primary-foreground:     var(--ink);
+  --secondary:              0 0% 12%;
+  --secondary-foreground:   var(--cream);
+  --accent:                 var(--tomato);
+  --accent-foreground:      var(--cream);
+  --destructive:            var(--tomato);
+  --destructive-foreground: var(--cream);
+  --muted-foreground:       44 80% 85%;
+  --card:                   0 0% 8%;
+  --card-foreground:        var(--cream);
+  --popover:                0 0% 8%;
+  --popover-foreground:     var(--cream);
+  --border:                 var(--cream);
+  --input:                  var(--cream);
+  --ring:                   var(--tomato);
+
+  /* Back-compat aliases — dark */
+  --color-page-bg:            hsl(var(--background));
+  --color-surface:            hsl(var(--card));
+  --color-surface-hover:      hsl(var(--cream) / 0.06);
+  --color-text:               hsl(var(--foreground));
+  --color-text-primary:       hsl(var(--foreground));
+  --color-text-secondary:     hsl(var(--muted-foreground));
+  --color-text-muted:         hsl(var(--cream) / 0.55);
+  --color-text-inverse:       hsl(var(--primary-foreground));
+  --color-border:             hsl(var(--cream) / 0.12);
+  --color-border-strong:      hsl(var(--cream) / 0.22);
+  --shadow-card:              0 8px 30px hsl(0 0% 0% / 0.30);
+  --shadow-elevated:          0 8px 30px hsl(0 0% 0% / 0.40);
+  --color-btn-primary-bg:     hsl(var(--primary));
+  --color-btn-primary-text:   hsl(var(--primary-foreground));
+  --color-btn-primary-border: hsl(var(--primary));
+  --color-btn-secondary-bg:   hsl(var(--secondary));
+  --color-btn-secondary-text: hsl(var(--secondary-foreground));
+  --color-btn-secondary-border: hsl(var(--cream) / 0.22);
+  --color-input-bg:           hsl(var(--card));
+  --color-input-text:         hsl(var(--foreground));
+  --color-input-border:       hsl(var(--cream) / 0.22);
+  --color-spinner-track:      hsl(var(--cream) / 0.10);
+  --color-spinner-active:     hsl(var(--tomato));
+  --color-overlay:            hsl(0 0% 0% / 0.70);
+  --color-divider:            hsl(var(--cream) / 0.10);
+  --color-accent:             hsl(var(--tomato));
+  --color-success:            hsl(142 71% 45%);
+  --color-danger:             hsl(0 84% 60%);
 }
 
 @theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+  /* Raw palette → Tailwind utilities (bg-cream, text-tomato, border-rule, etc.) */
+  --color-cream:        hsl(var(--cream));
+  --color-cream-warm:   hsl(var(--cream-warm));
+  --color-ink:          hsl(var(--ink));
+  --color-ink-soft:     hsl(var(--ink-soft));
+  --color-tomato:       hsl(var(--tomato));
+  --color-tomato-deep:  hsl(var(--tomato-deep));
+  --color-butter:       hsl(var(--butter));
+  --color-muted:        hsl(var(--muted));
+  --color-rule:         hsl(var(--rule) / 0.12);
+
+  /* Semantic roles → Tailwind utilities */
+  --color-background:             hsl(var(--background));
+  --color-foreground:             hsl(var(--foreground));
+  --color-primary:                hsl(var(--primary));
+  --color-primary-foreground:     hsl(var(--primary-foreground));
+  --color-secondary:              hsl(var(--secondary));
+  --color-secondary-foreground:   hsl(var(--secondary-foreground));
+  --color-accent:                 hsl(var(--accent));
+  --color-accent-foreground:      hsl(var(--accent-foreground));
+  --color-destructive:            hsl(var(--destructive));
+  --color-destructive-foreground: hsl(var(--destructive-foreground));
+  --color-muted-foreground:       hsl(var(--muted-foreground));
+  --color-card:                   hsl(var(--card));
+  --color-card-foreground:        hsl(var(--card-foreground));
+  --color-popover:                hsl(var(--popover));
+  --color-popover-foreground:     hsl(var(--popover-foreground));
+  --color-border:                 hsl(var(--border));
+  --color-input:                  hsl(var(--input));
+  --color-ring:                   hsl(var(--ring));
+
+  /* Fonts */
+  --font-sans:    var(--font-sans-asap);
+  --font-display: var(--font-display-asap-condensed);
+  --font-mono:    var(--font-geist-mono);
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  background: hsl(var(--background));
+  color: hsl(var(--foreground));
+  font-family: var(--font-sans), system-ui, sans-serif;
 }
 
 /* Dark mode: invert icons that use black color */

@@ -2,6 +2,7 @@
 
 import React, { useState, useEffect } from "react";
 import { ShopItem } from "./ShopItem";
+import { card } from "../shared-styles";
 
 type Item = {
   id: number;
@@ -16,16 +17,6 @@ type Item = {
 type ShopGridProps = {
   onPurchase?: () => void;
 };
-
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  };
-}
 
 export function ShopGrid({ onPurchase }: ShopGridProps) {
   const [items, setItems] = useState<Item[]>([]);
@@ -54,11 +45,25 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
     onPurchase?.();
   };
 
+  // 2-col on small, 3-col mid, 4-col wide per spec.
+  const gridStyle: React.CSSProperties = {
+    display: "grid",
+    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gap: 14,
+  };
+
   if (loading) {
     return (
-      <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+      <div style={gridStyle}>
         {[...Array(4)].map((_, i) => (
-          <div key={i} style={{ height: 120, background: 'var(--color-surface-hover)', borderRadius: 14 }} />
+          <div
+            key={i}
+            style={{
+              height: 180,
+              background: "hsl(var(--muted))",
+              borderRadius: "var(--radius)",
+            }}
+          />
         ))}
       </div>
     );
@@ -66,8 +71,14 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
 
   if (error) {
     return (
-      <div style={{ ...card(), background: "rgba(255,0,0,0.05)", borderColor: "rgba(255,0,0,0.3)" }}>
-        <p style={{ color: "#c00" }}>{error}</p>
+      <div
+        style={{
+          ...card(),
+          background: "hsl(var(--tomato) / 0.06)",
+          borderColor: "hsl(var(--tomato) / 0.30)",
+        }}
+      >
+        <p style={{ color: "hsl(var(--tomato))", margin: 0 }}>{error}</p>
       </div>
     );
   }
@@ -75,13 +86,15 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
   if (items.length === 0) {
     return (
       <div style={{ ...card(), textAlign: "center" }}>
-        <p style={{ color: 'var(--color-text-secondary)' }}>No items available in the shop</p>
+        <p style={{ color: "hsl(var(--muted-foreground))", margin: 0 }}>
+          No items available in the shop
+        </p>
       </div>
     );
   }
 
   return (
-    <div style={{ display: "grid", gridTemplateColumns: "repeat(2, 1fr)", gap: 12 }}>
+    <div style={gridStyle}>
       {items.map((item) => (
         <ShopItem key={item.id} item={item} onPurchase={handlePurchase} />
       ))}

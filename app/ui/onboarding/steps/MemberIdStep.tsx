@@ -64,19 +64,19 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
   }
 
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="grid gap-4">
       {loadingSuggestions ? (
-        <div style={{ opacity: 0.6 }}>Loading suggestions...</div>
+        <div className="text-muted-foreground/70">Loading suggestions...</div>
       ) : (
-        <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ opacity: 0.7, fontSize: 13 }}>Next available IDs:</div>
-          <div style={{ display: "flex", gap: 10, flexWrap: "wrap" }}>
+        <div className="grid gap-2.5">
+          <div className="text-sm text-muted-foreground">Next available IDs:</div>
+          <div className="flex gap-2.5 flex-wrap">
             {suggestions.map((id) => (
               <button
                 key={id}
                 onClick={() => onChange(String(id))}
                 style={{
-                  ...btn(value === String(id) ? "primary" : "secondary"),
+                  ...btn(value === String(id) ? "accent" : "secondary"),
                   padding: "8px 16px",
                 }}
               >
@@ -87,9 +87,9 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
         </div>
       )}
 
-      <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
+      <div className="border-t border-rule pt-4">
         <Field label="Or check a specific number:">
-          <div style={{ display: "flex", gap: 10 }}>
+          <div className="flex gap-2.5">
             <input
               type="number"
               min={1}
@@ -109,53 +109,37 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
         </Field>
 
         {availability.status && (
-          <div
-            style={{
-              marginTop: 8,
-              fontSize: 14,
-              fontWeight: 600,
-              color:
-                availability.status === "available"
-                  ? "green"
-                  : availability.status === "taken"
-                    ? "red"
-                    : "orange",
-            }}
-          >
+          <div className="mt-2 text-sm font-semibold">
             {availability.status === "available" && (
-              <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+              <div className="flex items-center gap-2 text-foreground">
                 <span>ID {availability.id} is available!</span>
                 <button
                   onClick={() => onChange(availability.id)}
-                  style={{
-                    backgroundColor: "black",
-                    color: 'var(--color-btn-primary-text)',
-                    border: "none",
-                    padding: "4px 8px",
-                    borderRadius: 4,
-                    fontSize: 12,
-                    cursor: "pointer",
-                  }}
+                  className="px-2 py-1 rounded-md text-xs cursor-pointer bg-primary text-primary-foreground border-0"
                 >
                   Pick this
                 </button>
               </div>
             )}
-            {availability.status === "taken" && `ID ${availability.id} is already taken.`}
-            {availability.status === "invalid" && "Invalid ID."}
+            {availability.status === "taken" && (
+              <span className="text-destructive">ID {availability.id} is already taken.</span>
+            )}
+            {availability.status === "invalid" && (
+              <span className="text-tomato">Invalid ID.</span>
+            )}
           </div>
         )}
       </div>
 
-      <div style={{ marginTop: 8 }}>
-        Selected Member ID: <b>{value || "(none)"}</b>
+      <div className="mt-2 text-sm">
+        Selected Member ID: <b className="text-foreground">{value || "(none)"}</b>
       </div>
 
-      <div style={{ display: "flex", gap: 10, marginTop: 8 }}>
+      <div className="flex gap-2.5 mt-2">
         <button onClick={onBack} style={btn("secondary")}>
           Back
         </button>
-        <button onClick={onNext} disabled={!value} style={btn("primary", !value)}>
+        <button onClick={onNext} disabled={!value} style={btn("accent", !value)}>
           Next
         </button>
       </div>

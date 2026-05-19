@@ -15,6 +15,11 @@ interface HolderLeaderboardProps {
   maxVisible?: number;
 }
 
+/**
+ * HolderLeaderboard — capers-48272 (Phase 4e restyle)
+ * Stacked ranked list of members holding a collection, with a
+ * "View More" toggle. Empty state is muted-foreground italic.
+ */
 export function HolderLeaderboard({
   holders,
   maxVisible = 8,
@@ -26,7 +31,7 @@ export function HolderLeaderboard({
 
   if (holders.length === 0) {
     return (
-      <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', margin: 0 }}>
+      <p className="m-0 text-sm text-muted-foreground italic text-center py-4">
         No registered members hold this collection
       </p>
     );
@@ -50,19 +55,7 @@ export function HolderLeaderboard({
       {hasMore && (
         <button
           onClick={() => setExpanded(!expanded)}
-          style={{
-            marginTop: 12,
-            padding: "12px 16px",
-            minHeight: 44,
-            fontSize: 14,
-            fontWeight: 500,
-            color: 'var(--color-text-secondary)',
-            background: 'var(--color-surface-hover)',
-            border: "none",
-            borderRadius: 8,
-            cursor: "pointer",
-            width: "100%",
-          }}
+          className="mt-3 w-full min-h-[44px] px-4 py-3 rounded-[var(--radius)] font-display text-sm font-semibold text-foreground bg-muted hover:bg-tomato/10 hover:text-tomato border border-rule transition-colors cursor-pointer"
         >
           {expanded
             ? "Show Less"

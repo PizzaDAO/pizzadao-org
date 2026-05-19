@@ -31,20 +31,17 @@ export function LoadingScreen({ message, flow }: Props) {
 
   return (
     <div style={card()}>
-      <div style={{ textAlign: "center", padding: "40px 0" }}>
+      <div className="text-center py-10">
         <div
-          className="spinner"
+          className="spinner mx-auto mb-5 w-10 h-10 rounded-full border-[3px] border-rule"
           style={{
-            width: 40,
-            height: 40,
-            border: "3px solid rgba(0,0,0,0.1)",
-            borderTop: "3px solid #ff4d4d",
-            borderRadius: "50%",
+            borderTopColor: "hsl(var(--tomato))",
             animation: "spin 1s linear infinite",
-            margin: "0 auto 20px",
           }}
         />
-        <p style={{ fontSize: 18, opacity: 0.8 }}>{displayMessage}</p>
+        <p className="text-lg text-muted-foreground font-[family-name:var(--font-display)]">
+          {displayMessage}
+        </p>
         <style jsx>{`
           @keyframes spin {
             0% {

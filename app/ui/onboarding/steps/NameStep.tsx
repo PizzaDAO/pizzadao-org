@@ -66,56 +66,34 @@ export function NameStep({
   const showKeepDiscord = !isUpdate && discordNick && (mafiaName === discordNick || !mafiaName);
 
   return (
-    <div style={{ display: "grid", gap: 12 }}>
+    <div className="grid gap-3">
       {/* Keep existing mafia name option */}
       {showKeepExisting && (
-        <div
-          style={{
-            padding: 16,
-            background: "rgba(76, 175, 80, 0.1)",
-            borderRadius: 12,
-            border: "2px solid rgba(76, 175, 80, 0.3)",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ marginBottom: 8, fontSize: 14, opacity: 0.8 }}>Keep your current mafia name?</div>
-          <button
-            onClick={onKeepExisting}
-            style={{ ...btn("primary"), background: "#4CAF50" }}
-          >
-            Keep "{existingName}" and continue
+        <div className="p-4 rounded-[--radius] border border-tomato/30 bg-tomato/10 text-center">
+          <div className="mb-2 text-sm text-muted-foreground">Keep your current mafia name?</div>
+          <button onClick={onKeepExisting} style={btn("accent")}>
+            Keep &quot;{existingName}&quot; and continue
           </button>
         </div>
       )}
 
       {/* Keep Discord Nickname option */}
       {showKeepDiscord && (
-        <div
-          style={{
-            padding: 16,
-            background: "rgba(76, 175, 80, 0.1)",
-            borderRadius: 12,
-            border: "2px solid rgba(76, 175, 80, 0.3)",
-            textAlign: "center",
-          }}
-        >
-          <div style={{ marginBottom: 8, fontSize: 14, opacity: 0.8 }}>Want to use your Discord nickname?</div>
-          <button
-            onClick={onKeepExisting}
-            style={{ ...btn("primary"), background: "#4CAF50" }}
-          >
-            Keep "{discordNick}" and continue
+        <div className="p-4 rounded-[--radius] border border-tomato/30 bg-tomato/10 text-center">
+          <div className="mb-2 text-sm text-muted-foreground">Want to use your Discord nickname?</div>
+          <button onClick={onKeepExisting} style={btn("accent")}>
+            Keep &quot;{discordNick}&quot; and continue
           </button>
         </div>
       )}
 
       {(showKeepExisting || showKeepDiscord) && (
-        <div style={{ textAlign: "center", opacity: 0.6, fontSize: 13 }}>
+        <div className="text-center text-muted-foreground/80 text-sm">
           - or generate a new name instead -
         </div>
       )}
 
-      <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+      <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
         <Field label="Favorite pizza topping">
           <input
             value={topping}
@@ -135,11 +113,11 @@ export function NameStep({
         </Field>
       </div>
 
-      <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+      <div className="flex flex-wrap gap-2.5 items-center">
         <button
           onClick={() => onGenerate(false)}
           disabled={!canGenerate || submitting}
-          style={btn("primary", !canGenerate || submitting)}
+          style={btn("accent", !canGenerate || submitting)}
         >
           {submitting ? "Generating..." : "Generate 3 names"}
         </button>
@@ -156,35 +134,38 @@ export function NameStep({
         )}
 
         {resolvedMovieTitle && (
-          <span style={{ opacity: 0.75 }}>
-            Matched: <b>{resolvedMovieTitle}</b> {releaseDate ? `(${releaseDate.slice(0, 4)})` : ""}{mediaType === "tv" ? " - TV Show" : ""}
+          <span className="text-muted-foreground text-sm">
+            Matched: <b className="text-foreground">{resolvedMovieTitle}</b>{" "}
+            {releaseDate ? `(${releaseDate.slice(0, 4)})` : ""}
+            {mediaType === "tv" ? " - TV Show" : ""}
           </span>
         )}
       </div>
 
       {seenNames.length > 0 && (
-        <div style={{ opacity: 0.65, fontSize: 13 }}>
-          Seen this session: <b>{seenNames.length}</b>
+        <div className="text-muted-foreground/80 text-xs">
+          Seen this session: <b className="text-foreground">{seenNames.length}</b>
         </div>
       )}
 
       {(suggestions || submitting) && (
-        <div style={{ display: "grid", gap: 10 }}>
-          <div style={{ fontWeight: 600, display: "flex", alignItems: "center", gap: 8 }}>
+        <div className="grid gap-2.5">
+          <div className="font-[family-name:var(--font-display)] text-lg font-bold flex items-center gap-2 text-foreground">
             Pick one:
             {submitting && (
-              <span style={{
-                display: "inline-block",
-                width: 16,
-                height: 16,
-                border: "2px solid rgba(0,0,0,0.1)",
-                borderTop: "2px solid #ff4d4d",
-                borderRadius: "50%",
-                animation: "spin 1s linear infinite",
-              }} />
+              <span
+                className="inline-block w-4 h-4 rounded-full border-2 border-rule"
+                style={{
+                  borderTopColor: "hsl(var(--tomato))",
+                  animation: "spin 1s linear infinite",
+                }}
+              />
             )}
           </div>
-          <div style={{ display: "grid", gridTemplateColumns: "1fr", gap: 10, opacity: submitting ? 0.5 : 1 }}>
+          <div
+            className="grid grid-cols-1 gap-2.5"
+            style={{ opacity: submitting ? 0.5 : 1 }}
+          >
             {suggestions?.map((name) => (
               <button key={name} onClick={() => onPickName(name)} disabled={submitting} style={choiceBtn()}>
                 {name}
@@ -195,7 +176,7 @@ export function NameStep({
         </div>
       )}
 
-      <div style={{ marginTop: 12 }}>
+      <div className="mt-3">
         <button onClick={onBack} style={btn("secondary")}>
           {isUpdate ? "Cancel" : "Back"}
         </button>

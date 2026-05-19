@@ -1,45 +1,36 @@
 "use client";
 
+// app/ui/economy/TransferForm.tsx
+//
+// anchovy-67435 (Restyle Phase 4d): migrated off legacy `--color-*` aliases
+// onto the shared `card()`, `btn("accent")`, and `input()` primitives + the
+// shared `Field` label so the form matches the pizzadao.org look (cream bg,
+// tomato focus ring, tomato CTA). See plans/site-restyle-pizzadao-org.md.
+
 import React, { useState } from "react";
 import { PepIcon } from "./PepIcon";
+import { card, btn, input } from "../shared-styles";
+import { Field } from "../onboarding/Field";
 
 type TransferFormProps = {
   onSuccess?: () => void;
 };
 
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  };
-}
+const DISPLAY_FONT =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
-function input(): React.CSSProperties {
+function focusableInputProps() {
+  // Add the tomato focus ring on focus / remove on blur. We can't use
+  // pseudo-classes from inline styles, so wire it via onFocus/onBlur.
   return {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: '1px solid var(--color-border-strong)',
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box",
-  };
-}
-
-function btn(disabled?: boolean): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "12px 16px",
-    borderRadius: 10,
-    border: "none",
-    fontWeight: 650,
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    background: 'var(--color-btn-primary-bg)',
-    color: 'var(--color-btn-primary-text)',
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.style.borderColor = "hsl(var(--ring))";
+      e.currentTarget.style.boxShadow = "0 0 0 3px hsl(var(--ring) / 0.20)";
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.style.borderColor = "hsl(var(--rule) / 0.22)";
+      e.currentTarget.style.boxShadow = "none";
+    },
   };
 }
 
@@ -82,27 +73,58 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
     }
   };
 
+  const disabled = loading || !toUserId || !amount;
+
   return (
     <div style={card()}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0, display: "flex", alignItems: "center", gap: 6 }}>Send <PepIcon size={18} /></h2>
+      <h2
+        style={{
+          fontFamily: DISPLAY_FONT,
+          fontSize: 22,
+          fontWeight: 700,
+          letterSpacing: "-0.01em",
+          margin: 0,
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          color: "hsl(var(--foreground))",
+        }}
+      >
+        Send <PepIcon size={20} />
+      </h2>
 
       {error && (
-        <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
+        <div
+          style={{
+            padding: 12,
+            background: "hsl(var(--tomato) / 0.08)",
+            border: "1px solid hsl(var(--tomato) / 0.30)",
+            borderRadius: "var(--radius)",
+            color: "hsl(var(--tomato))",
+            fontSize: 14,
+          }}
+        >
           {error}
         </div>
       )}
 
       {success && (
-        <div style={{ marginBottom: 16, padding: 12, background: "rgba(0,200,0,0.08)", borderRadius: 8, color: "#16a34a", fontSize: 14 }}>
+        <div
+          style={{
+            padding: 12,
+            background: "hsl(142 71% 35% / 0.10)",
+            border: "1px solid hsl(142 71% 35% / 0.30)",
+            borderRadius: "var(--radius)",
+            color: "hsl(142 71% 28%)",
+            fontSize: 14,
+          }}
+        >
           {success}
         </div>
       )}
 
       <form onSubmit={handleTransfer} style={{ display: "grid", gap: 16 }}>
-        <div>
-          <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-            Recipient Discord ID
-          </label>
+        <Field label="Recipient Discord ID">
           <input
             type="text"
             placeholder="Enter Discord user ID"
@@ -110,11 +132,11 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
             onChange={(e) => setToUserId(e.target.value)}
             style={input()}
             disabled={loading}
+            {...focusableInputProps()}
           />
-        </div>
+        </Field>
 
-        <div>
-          <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Amount</label>
+        <Field label="Amount">
           <input
             type="number"
             placeholder="Amount to send"
@@ -123,15 +145,22 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
             style={input()}
             disabled={loading}
             min="1"
+            {...focusableInputProps()}
           />
-        </div>
+        </Field>
 
         <button
           type="submit"
-          disabled={loading || !toUserId || !amount}
-          style={btn(loading || !toUserId || !amount)}
+          disabled={disabled}
+          style={{ ...btn("accent", disabled), width: "100%", padding: "12px 16px" }}
         >
-          {loading ? "Sending..." : <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Send <PepIcon size={14} /></span>}
+          {loading ? (
+            "Sending..."
+          ) : (
+            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+              Send <PepIcon size={14} />
+            </span>
+          )}
         </button>
       </form>
     </div>

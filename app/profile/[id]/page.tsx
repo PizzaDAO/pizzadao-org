@@ -1,11 +1,15 @@
 // app/profile/[id]/page.tsx
+//
+// Phase 3c (capricciosa-61151): restyled to pizzadao.org look.
+// Ink hero band with cream typography, butter level pill, tomato CTA,
+// cream-warm card surfaces, semantic dividers (border-rule).
+// See plans/site-restyle-pizzadao-org.md.
 "use client";
 
 import { use, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import { TURTLES, CREWS } from "../../ui/constants";
+import { TURTLES } from "../../ui/constants";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { ProfileLinksDisplay } from "../../ui/profile-links";
@@ -13,9 +17,17 @@ import { AttendanceCard } from "../../ui/attendance-card";
 import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { AddVouchButton } from "../../ui/vouches/AddVouchButton";
-import { useProfile, usePfp, useXAccount, useArticlesByMember, useMissionProgress, useMe, useCrewMappings, useMyTasks } from "../../lib/hooks/use-api";
-
-const inter = Inter({ subsets: ["latin"] });
+import { btn } from "../../ui/onboarding/styles";
+import {
+    useProfile,
+    usePfp,
+    useXAccount,
+    useArticlesByMember,
+    useMissionProgress,
+    useMe,
+    useCrewMappings,
+    useMyTasks,
+} from "../../lib/hooks/use-api";
 
 type CrewOption = {
     id: string;
@@ -38,39 +50,33 @@ function splitTurtlesCell(v: unknown): string[] {
     return s.split(/[,/|]+/).map((x) => norm(x)).filter(Boolean);
 }
 
-function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
+function CollapsibleSection({
+    title,
+    defaultOpen = false,
+    children,
+}: {
+    title: string;
+    defaultOpen?: boolean;
+    children: React.ReactNode;
+}) {
     const [open, setOpen] = useState(defaultOpen);
     return (
-        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
+        <div className="border-t border-rule pt-4">
             <button
                 onClick={() => setOpen(!open)}
-                style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: 0,
-                    width: "100%",
-                    textAlign: "left",
-                    fontFamily: "inherit",
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: 'var(--color-text)',
-                }}
+                className="flex w-full items-center gap-2 bg-transparent border-0 p-0 text-left text-foreground font-display text-lg font-semibold cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
+                aria-expanded={open}
             >
-                <span style={{
-                    display: "inline-block",
-                    transition: "transform 0.2s",
-                    transform: open ? "rotate(90deg)" : "rotate(0deg)",
-                    fontSize: 12,
-                }}>
+                <span
+                    className="inline-block text-muted-foreground text-[10px] transition-transform duration-200"
+                    style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
+                    aria-hidden
+                >
                     ▶
                 </span>
                 {title}
             </button>
-            {open && <div style={{ marginTop: 12 }}>{children}</div>}
+            {open && <div className="mt-3">{children}</div>}
         </div>
     );
 }
@@ -89,7 +95,8 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const { data: tasksData } = useMyTasks(id);
 
     const pfpUrl = pfpData?.url ?? null;
-    const articles: { slug: string; title: string; excerpt?: string; publishedAt?: string }[] = articlesData?.articles ?? [];
+    const articles: { slug: string; title: string; excerpt?: string; publishedAt?: string }[] =
+        articlesData?.articles ?? [];
     const missionLevel = missionProgress?.currentLevel ? missionProgress : null;
     const currentMemberId = meData?.memberId ?? null;
     const crewOptions: CrewOption[] = (crewData?.crews ?? []).map((c: any) => ({
@@ -106,28 +113,22 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
     if (loading) {
         return (
-            <div style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: 'var(--color-page-bg)',
-                color: 'var(--color-text)',
-                fontFamily: inter.style.fontFamily
-            }}>
-                <div style={{ textAlign: "center" }}>
-                    <div style={{
-                        width: 50,
-                        height: 50,
-                        border: '4px solid var(--color-spinner-track)',
-                        borderTop: '4px solid var(--color-spinner-active)',
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite",
-                        margin: "0 auto 20px"
-                    }} />
-                    <p style={{ fontSize: 18, opacity: 0.8 }}>Loading profile...</p>
+            <div className="min-h-screen bg-background text-foreground flex items-center justify-center">
+                <div className="text-center">
+                    <div
+                        className="mx-auto mb-5 h-12 w-12 rounded-full"
+                        style={{
+                            border: "4px solid hsl(var(--ink) / 0.10)",
+                            borderTopColor: "hsl(var(--tomato))",
+                            animation: "spin 1s linear infinite",
+                        }}
+                    />
+                    <p className="text-lg text-muted-foreground">Loading profile...</p>
                     <style jsx>{`
-                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
+                        @keyframes spin {
+                            0% { transform: rotate(0deg); }
+                            100% { transform: rotate(360deg); }
+                        }
                     `}</style>
                 </div>
             </div>
@@ -136,19 +137,14 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
     if (error || !data) {
         return (
-            <div style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: 'var(--color-page-bg)',
-                color: 'var(--color-text)',
-                fontFamily: inter.style.fontFamily,
-                padding: 20
-            }}>
-                <div style={card()}>
-                    <h1 style={{ fontSize: 24, marginBottom: 16 }}>Profile Not Found</h1>
-                    <p style={{ opacity: 0.7, marginBottom: 32 }}>{error?.message || "This member doesn't exist."}</p>
+            <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-5">
+                <div className="grid gap-3 rounded-[--radius] border border-rule bg-card text-card-foreground p-6 shadow-sm max-w-md w-full">
+                    <h1 className="text-2xl font-display font-bold m-0 [text-wrap:balance]">
+                        Profile Not Found
+                    </h1>
+                    <p className="text-muted-foreground mb-4">
+                        {error?.message || "This member doesn't exist."}
+                    </p>
                     <button onClick={() => router.back()} style={btn("primary")}>
                         ← Go Back
                     </button>
@@ -166,88 +162,63 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
     const skills = data["Specialties"] || data["Skills"] || "";
 
     const rawTurtles = data["Turtles"] || data["Roles"] || [];
-    const turtleList = (Array.isArray(rawTurtles) ? rawTurtles : String(rawTurtles).split(",").map(t => t.trim())).filter(Boolean);
+    const turtleList = (Array.isArray(rawTurtles)
+        ? rawTurtles
+        : String(rawTurtles).split(",").map((t) => t.trim())
+    ).filter(Boolean);
 
-    const userCrews = (crewsStr !== "None" ? crewsStr.split(",").map((c: string) => c.trim()).filter(Boolean) : []) as string[];
+    const userCrews = (crewsStr !== "None"
+        ? crewsStr.split(",").map((c: string) => c.trim()).filter(Boolean)
+        : []) as string[];
 
-    const levelStr = missionLevel && missionLevel.approvedCount > 0
-        ? `Lv.${missionLevel.currentLevel > 8 ? "MAX" : missionLevel.currentLevel} ${missionLevel.levelTitle || ""}`
+    const levelNum = missionLevel && missionLevel.approvedCount > 0
+        ? (missionLevel.currentLevel > 8 ? "MAX" : missionLevel.currentLevel)
         : null;
+    const levelTitle = missionLevel?.levelTitle || "";
 
     return (
-        <div style={{
-            minHeight: "100vh",
-            background: 'var(--color-page-bg)',
-            color: 'var(--color-text)',
-            fontFamily: inter.style.fontFamily,
-            padding: "40px 20px"
-        }}>
-            <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
+        <div className="min-h-screen bg-background text-foreground">
+            <div className="mx-auto max-w-3xl px-5 py-6 grid gap-5">
                 {/* Back Button */}
                 <div>
                     <button
                         onClick={() => router.back()}
-                        style={{
-                            background: "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: 16,
-                            fontWeight: 600,
-                            color: 'var(--color-text-secondary)',
-                            padding: 0,
-                            fontFamily: "inherit"
-                        }}
+                        className="bg-transparent border-0 p-0 text-base font-semibold text-muted-foreground hover:text-foreground cursor-pointer transition-colors"
                     >
                         ← Back
                     </button>
                 </div>
 
-                {/* Main Card */}
-                <div style={card()}>
-                    {/* Compact Hero */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
+                {/* Ink hero card — compact, dark, cream type */}
+                <section className="rounded-[--radius] bg-ink text-cream border border-cream/15 shadow-sm overflow-hidden">
+                    <div className="p-5 sm:p-6 flex items-center gap-4">
                         {pfpUrl && (
                             <img
                                 src={pfpUrl}
                                 alt={`${name}'s profile`}
+                                className="h-20 w-20 sm:h-24 sm:w-24 rounded-full object-cover shrink-0"
                                 style={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: "50%",
-                                    objectFit: "cover",
                                     objectPosition: "top",
-                                    border: "3px solid #fafafa",
-                                    boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
-                                    flexShrink: 0,
+                                    border: "3px solid hsl(var(--cream))",
+                                    boxShadow: "0 2px 12px hsl(0 0% 0% / 0.25)",
                                 }}
                                 onError={(e) => {
                                     (e.target as HTMLImageElement).style.display = "none";
                                 }}
                             />
                         )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                <h1 style={{
-                                    fontSize: 22,
-                                    fontWeight: 700,
-                                    margin: 0,
-                                    wordBreak: "break-word",
-                                }}>
+                        <div className="flex-1 min-w-0">
+                            <div className="flex items-center gap-2 flex-wrap">
+                                <h1 className="m-0 font-display font-bold text-3xl sm:text-4xl text-cream [text-wrap:balance] break-words leading-[1.05]">
                                     {name}
                                 </h1>
                                 <MafiaRankBadge memberId={idValue} />
                             </div>
-                            <div style={{ fontSize: 14, opacity: 0.6, marginTop: 4 }}>
-                                {levelStr && (
-                                    <Link href="/missions" style={{ color: "inherit", textDecoration: "none" }}>
-                                        {levelStr}
-                                    </Link>
-                                )}
-                                {levelStr && " · "}
+                            <div className="mt-1 text-sm text-cream/70">
                                 {city}
                             </div>
                         </div>
-                        <div style={{ flexShrink: 0 }}>
+                        <div className="shrink-0">
                             <AddVouchButton
                                 targetMemberId={idValue}
                                 currentMemberId={currentMemberId}
@@ -255,15 +226,55 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                         </div>
                     </div>
 
+                    {/* Level / PEP stripe — butter accent */}
+                    {levelNum !== null && (
+                        <Link
+                            href="/missions"
+                            className="block border-t border-cream/15 px-5 sm:px-6 py-4 hover:bg-cream/5 transition-colors group"
+                        >
+                            <div className="flex items-baseline gap-3 flex-wrap">
+                                <span className="text-[11px] uppercase tracking-[0.12em] font-bold text-cream/60">
+                                    Level
+                                </span>
+                                <span
+                                    className="font-display font-bold text-4xl sm:text-5xl leading-none"
+                                    style={{ color: "hsl(var(--butter))" }}
+                                >
+                                    {levelNum}
+                                </span>
+                                {levelTitle && (
+                                    <span className="font-display text-lg sm:text-xl text-cream/85 group-hover:text-cream transition-colors">
+                                        {levelTitle}
+                                    </span>
+                                )}
+                            </div>
+                        </Link>
+                    )}
+                </section>
+
+                {/* Main Card — cream-warm surface for the rest of the profile */}
+                <section
+                    className="grid gap-4 rounded-[--radius] border border-rule p-5 sm:p-6 shadow-sm"
+                    style={{
+                        background: "hsl(var(--card))",
+                        color: "hsl(var(--card-foreground))",
+                    }}
+                >
                     {/* Crews Section */}
                     {userCrews.length > 0 && (
-                        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
-                            <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 18, fontWeight: 600 }}>Crews</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+                        <div>
+                            <h3 className="mt-0 mb-3 font-display text-lg font-semibold text-foreground">
+                                Crews
+                            </h3>
+                            <div
+                                className="grid gap-2.5"
+                                style={{ gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))" }}
+                            >
                                 {userCrews.map((crewName) => {
-                                    const c = crewOptions.find(opt =>
-                                        opt.label.toLowerCase() === crewName.toLowerCase() ||
-                                        opt.id.toLowerCase() === crewName.toLowerCase()
+                                    const c = crewOptions.find(
+                                        (opt) =>
+                                            opt.label.toLowerCase() === crewName.toLowerCase() ||
+                                            opt.id.toLowerCase() === crewName.toLowerCase()
                                     );
                                     const label = c?.label || crewName;
                                     const emoji = c?.emoji || "🍕";
@@ -274,66 +285,44 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                     return (
                                         <div
                                             key={crewName}
-                                            style={{
-                                                padding: 12,
-                                                borderRadius: 12,
-                                                border: '1px solid var(--color-border)',
-                                                background: 'var(--color-surface)',
-                                            }}
+                                            className="rounded-[--radius] border border-rule p-3"
+                                            style={{ background: "hsl(var(--background))" }}
                                         >
                                             <Link
                                                 href={`/crew/${c?.id || crewName.toLowerCase().replace(/\s+/g, "_")}`}
-                                                style={{
-                                                    fontWeight: 600,
-                                                    textDecoration: "none",
-                                                    color: "inherit"
-                                                }}
+                                                className="font-display font-semibold text-foreground no-underline hover:text-tomato transition-colors"
                                             >
                                                 {emoji} {label}
                                             </Link>
 
                                             {/* Closed count */}
                                             {doneCount > 0 && (
-                                                <div style={{
-                                                    marginTop: 8,
-                                                    fontSize: 11,
-                                                    fontWeight: 700,
-                                                    textTransform: "uppercase",
-                                                    letterSpacing: 0.5,
-                                                    color: "#10b981"
-                                                }}>
+                                                <div
+                                                    className="mt-2 text-[11px] font-bold uppercase tracking-wider"
+                                                    style={{ color: "hsl(142 71% 35%)" }}
+                                                >
                                                     Closed: {doneCount}
                                                 </div>
                                             )}
 
                                             {/* Claimed tasks */}
                                             {tasks.length > 0 && (
-                                                <div style={{ marginTop: 8 }}>
-                                                    <div style={{
-                                                        fontSize: 11,
-                                                        fontWeight: 700,
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: 0.5,
-                                                        color: "#ff4d4d",
-                                                        marginBottom: 4
-                                                    }}>
+                                                <div className="mt-2">
+                                                    <div className="text-[11px] font-bold uppercase tracking-wider text-tomato mb-1">
                                                         Claimed Tasks
                                                     </div>
                                                     {tasks.slice(0, 3).map((t, idx) => (
-                                                        <div key={idx} style={{
-                                                            fontSize: 12,
-                                                            display: "flex",
-                                                            alignItems: "baseline",
-                                                            gap: 4,
-                                                            marginTop: 2
-                                                        }}>
-                                                            <span style={{ color: "#ff4d4d" }}>•</span>
+                                                        <div
+                                                            key={idx}
+                                                            className="text-xs flex items-baseline gap-1 mt-0.5"
+                                                        >
+                                                            <span className="text-tomato">•</span>
                                                             {t.url ? (
                                                                 <a
                                                                     href={t.url}
                                                                     target="_blank"
                                                                     rel="noreferrer"
-                                                                    style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
+                                                                    className="text-foreground underline underline-offset-2 hover:text-tomato transition-colors"
                                                                 >
                                                                     {t.label}
                                                                 </a>
@@ -353,40 +342,30 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                     {/* Articles */}
                     {articles.length > 0 && (
-                        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
-                            <h3 style={{
-                                fontSize: 18,
-                                fontWeight: 600,
-                                marginTop: 0,
-                                marginBottom: 12,
-                            }}>
+                        <div className="border-t border-rule pt-4">
+                            <h3 className="mt-0 mb-3 font-display text-lg font-semibold text-foreground">
                                 Articles
                             </h3>
-                            <div style={{ display: "grid", gap: 8 }}>
+                            <div className="grid gap-2">
                                 {articles.map((a) => (
                                     <Link
                                         key={a.slug}
                                         href={`/articles/${a.slug}`}
-                                        style={{
-                                            display: "block",
-                                            padding: 12,
-                                            borderRadius: 10,
-                                            border: '1px solid var(--color-border)',
-                                            background: 'var(--color-surface)',
-                                            textDecoration: "none",
-                                            color: "inherit",
-                                        }}
+                                        className="block rounded-[--radius] border border-rule p-3 no-underline text-foreground hover:border-tomato/40 transition-colors"
+                                        style={{ background: "hsl(var(--background))" }}
                                     >
-                                        <div style={{ fontWeight: 600, fontSize: 15 }}>{a.title}</div>
+                                        <div className="font-display font-semibold text-base">{a.title}</div>
                                         {a.excerpt && (
-                                            <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
+                                            <div className="mt-1 text-sm text-muted-foreground">
                                                 {a.excerpt}
                                             </div>
                                         )}
                                         {a.publishedAt && (
-                                            <div style={{ fontSize: 11, opacity: 0.4, marginTop: 4 }}>
-                                                {new Date(a.publishedAt).toLocaleDateString('en-US', {
-                                                    year: 'numeric', month: 'short', day: 'numeric'
+                                            <div className="mt-1 text-[11px] text-muted-foreground opacity-70">
+                                                {new Date(a.publishedAt).toLocaleDateString("en-US", {
+                                                    year: "numeric",
+                                                    month: "short",
+                                                    day: "numeric",
                                                 })}
                                             </div>
                                         )}
@@ -401,7 +380,7 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                     {/* Collapsible About */}
                     <CollapsibleSection title="About" defaultOpen={false}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                        <div className="grid gap-6 sm:grid-cols-2">
                             <StatItem label="Status" value={status || "—"} />
                             <StatItem label="ID" value={`#${idValue}`} />
                             {orgs && <StatItem label="Orgs" value={orgs} />}
@@ -410,35 +389,27 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             {/* X Account */}
                             {xAccount?.connected && (
                                 <div>
-                                    <h3 style={{
-                                        fontSize: 12,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "1px",
-                                        opacity: 0.5,
-                                        marginTop: 0,
-                                        marginBottom: 6,
-                                        fontWeight: 700
-                                    }}>
+                                    <h3 className="m-0 mb-1.5 text-xs uppercase tracking-wider font-bold text-muted-foreground">
                                         X
                                     </h3>
                                     <a
                                         href={`https://x.com/${xAccount.username}`}
                                         target="_blank"
                                         rel="noreferrer"
-                                        style={{
-                                            fontSize: 18,
-                                            fontWeight: 500,
-                                            color: 'var(--color-text-primary)',
-                                            textDecoration: "none",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: 6,
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
-                                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
+                                        className="inline-flex items-center gap-1.5 text-lg font-medium text-foreground no-underline hover:text-tomato hover:underline transition-colors"
                                     >
                                         @{xAccount.username}
-                                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
+                                        <svg
+                                            width={14}
+                                            height={14}
+                                            viewBox="0 0 24 24"
+                                            fill="none"
+                                            stroke="currentColor"
+                                            strokeWidth="2"
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            style={{ opacity: 0.4 }}
+                                        >
                                             <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                                             <polyline points="15 3 21 3 21 9" />
                                             <line x1="10" y1="14" x2="21" y2="3" />
@@ -448,39 +419,42 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                             )}
 
                             {/* Roles */}
-                            <div style={{ gridColumn: "1 / -1" }}>
-                                <h3 style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "1px",
-                                    opacity: 0.5,
-                                    marginTop: 0,
-                                    marginBottom: 6,
-                                    fontWeight: 700
-                                }}>
+                            <div className="sm:col-span-2">
+                                <h3 className="m-0 mb-1.5 text-xs uppercase tracking-wider font-bold text-muted-foreground">
                                     Roles
                                 </h3>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                                <div className="flex flex-wrap items-center gap-2">
                                     {turtleList.length > 0 ? (
                                         turtleList.map((tName: string) => {
-                                            const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
+                                            const tDef = TURTLES.find(
+                                                (t) =>
+                                                    t.id.toLowerCase() === tName.toLowerCase() ||
+                                                    t.label.toLowerCase() === tName.toLowerCase()
+                                            );
                                             if (!tDef) return null;
                                             return (
                                                 <Link
                                                     key={tDef.id}
                                                     href={`/turtles/${encodeURIComponent(tDef.id)}`}
                                                     title={`View all ${tDef.label} members`}
+                                                    className="hover:opacity-80 transition-opacity"
                                                 >
                                                     <img
                                                         src={tDef.image}
                                                         alt={tDef.label}
-                                                        style={{ width: 40, height: 40, objectFit: "contain" }}
+                                                        style={{
+                                                            width: 40,
+                                                            height: 40,
+                                                            objectFit: "contain",
+                                                        }}
                                                     />
                                                 </Link>
                                             );
                                         })
                                     ) : (
-                                        <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
+                                        <span className="text-lg font-medium text-muted-foreground">
+                                            None
+                                        </span>
                                     )}
                                 </div>
 
@@ -498,7 +472,13 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                     ]);
                                     const otherRoles = turtleList.filter((tName: string) => {
                                         const nameLower = tName.toLowerCase();
-                                        if (TURTLES.find(t => t.id.toLowerCase() === nameLower || t.label.toLowerCase() === nameLower)) {
+                                        if (
+                                            TURTLES.find(
+                                                (t) =>
+                                                    t.id.toLowerCase() === nameLower ||
+                                                    t.label.toLowerCase() === nameLower
+                                            )
+                                        ) {
                                             return false;
                                         }
                                         if (hiddenRoles.has(nameLower)) {
@@ -508,8 +488,9 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
                                     });
                                     if (otherRoles.length === 0) return null;
                                     return (
-                                        <div style={{ marginTop: 8, fontSize: 14, opacity: 0.8 }}>
-                                            <strong>Other Roles:</strong> {otherRoles.join(", ")}
+                                        <div className="mt-2 text-sm text-muted-foreground">
+                                            <strong className="text-foreground">Other Roles:</strong>{" "}
+                                            {otherRoles.join(", ")}
                                         </div>
                                     );
                                 })()}
@@ -522,16 +503,16 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 
                     {/* Collapsible Collections */}
                     <CollapsibleSection title="Collections" defaultOpen={false}>
-                        <div style={{ display: "grid", gap: 16 }}>
+                        <div className="grid gap-4">
                             <POAPCollection memberId={idValue} />
                             <NFTCollection memberId={idValue} showConnectPrompt={false} />
                             <UnlockTicketCard memberId={idValue} />
                         </div>
                     </CollapsibleSection>
-                </div>
+                </section>
 
                 {/* Footer */}
-                <div style={{ textAlign: "center", marginTop: 40, opacity: 0.4, fontSize: 13 }}>
+                <div className="text-center mt-10 text-sm text-muted-foreground opacity-60 font-display">
                     PizzaDAO
                 </div>
             </div>
@@ -542,54 +523,10 @@ export default function ProfilePage({ params }: { params: Promise<{ id: string }
 function StatItem({ label, value }: { label: string; value: string }) {
     return (
         <div>
-            <h3 style={{
-                fontSize: 12,
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-                opacity: 0.5,
-                marginTop: 0,
-                marginBottom: 6,
-                fontWeight: 700
-            }}>
+            <h3 className="m-0 mb-1.5 text-xs uppercase tracking-wider font-bold text-muted-foreground">
                 {label}
             </h3>
-            <p style={{
-                fontSize: 18,
-                fontWeight: 500,
-                color: 'var(--color-text-primary)',
-                margin: 0,
-                wordBreak: "break-word"
-            }}>
-                {value}
-            </p>
+            <p className="m-0 text-lg font-medium text-foreground break-words">{value}</p>
         </div>
     );
-}
-
-function card(): React.CSSProperties {
-    return {
-        border: '1px solid var(--color-border)',
-        borderRadius: 14,
-        padding: 24,
-        boxShadow: 'var(--shadow-card)',
-        background: 'var(--color-surface)',
-        display: "grid",
-        gap: 14,
-    };
-}
-
-function btn(kind: "primary" | "secondary"): React.CSSProperties {
-    const base: React.CSSProperties = {
-        display: "inline-block",
-        padding: "10px 16px",
-        borderRadius: 10,
-        border: '1px solid var(--color-border-strong)',
-        fontWeight: 650,
-        cursor: "pointer",
-        textDecoration: "none",
-        textAlign: "center",
-        fontFamily: "inherit"
-    };
-    if (kind === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' };
-    return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' };
 }

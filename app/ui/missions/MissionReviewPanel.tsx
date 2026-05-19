@@ -1,7 +1,14 @@
 "use client";
 
+// garlic-68749 (Restyle Phase 4b): admin review panel restyled — cream-warm
+// surface with butter ring (pending = butter), submission rows are subdued
+// card surfaces, approve = `btn("primary")` ink, reject = `btn("secondary")`,
+// ban-hammer would use the destructive (`bg-destructive`) treatment (not
+// currently rendered — no ban action wired up here yet, but tokens are ready
+// if/when the API exposes one).
+
 import { useState, useEffect } from "react";
-import { card, btn, input } from "../shared-styles";
+import { btn, input } from "../shared-styles";
 
 type Submission = {
   id: number;
@@ -19,6 +26,9 @@ type Submission = {
     description: string | null;
   };
 };
+
+const DISPLAY_FONT =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export function MissionReviewPanel() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -87,30 +97,92 @@ export function MissionReviewPanel() {
   if (submissions.length === 0) return null;
 
   return (
-    <div style={{ ...card(), borderColor: "#eab30833" }}>
-      <h3 style={{ margin: 0, fontSize: 16, fontWeight: 700 }}>
-        Pending Reviews ({submissions.length})
-      </h3>
+    <div
+      style={{
+        border: "1px solid hsl(var(--butter))",
+        borderRadius: "var(--radius)",
+        padding: 22,
+        boxShadow: "0 8px 30px hsl(var(--ink) / 0.06)",
+        background: "hsl(var(--cream-warm))",
+        color: "hsl(var(--card-foreground))",
+        display: "grid",
+        gap: 16,
+      }}
+    >
+      <div style={{ display: "flex", alignItems: "center", gap: 10 }}>
+        <span
+          style={{
+            display: "inline-flex",
+            alignItems: "center",
+            padding: "4px 12px",
+            borderRadius: 999,
+            background: "hsl(var(--butter))",
+            color: "hsl(var(--ink))",
+            fontFamily: DISPLAY_FONT,
+            fontWeight: 800,
+            fontSize: 13,
+            letterSpacing: 0.5,
+            textTransform: "uppercase",
+          }}
+        >
+          Admin
+        </span>
+        <h3
+          style={{
+            margin: 0,
+            fontSize: 20,
+            fontFamily: DISPLAY_FONT,
+            fontWeight: 700,
+            color: "hsl(var(--foreground))",
+          }}
+        >
+          Pending Reviews ({submissions.length})
+        </h3>
+      </div>
 
       <div style={{ display: "grid", gap: 12 }}>
         {submissions.map((sub) => (
           <div
             key={sub.id}
             style={{
-              padding: 12,
-              borderRadius: 10,
-              border: "1px solid var(--color-border)",
-              background: "var(--color-surface)",
+              padding: 14,
+              borderRadius: "var(--radius)",
+              border: "1px solid hsl(var(--rule) / 0.12)",
+              background: "hsl(var(--card))",
               display: "grid",
-              gap: 8,
+              gap: 10,
             }}
           >
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", flexWrap: "wrap", gap: 8 }}>
+            <div
+              style={{
+                display: "flex",
+                justifyContent: "space-between",
+                alignItems: "flex-start",
+                flexWrap: "wrap",
+                gap: 8,
+              }}
+            >
               <div>
-                <div style={{ fontWeight: 600, fontSize: 14 }}>
-                  Level {sub.mission.level}: {sub.mission.title}
+                <div
+                  style={{
+                    fontFamily: DISPLAY_FONT,
+                    fontWeight: 700,
+                    fontSize: 16,
+                    color: "hsl(var(--foreground))",
+                  }}
+                >
+                  <span style={{ color: "hsl(var(--tomato))", marginRight: 6 }}>
+                    Lv.{sub.mission.level}
+                  </span>
+                  {sub.mission.title}
                 </div>
-                <div style={{ fontSize: 12, opacity: 0.6, marginTop: 2 }}>
+                <div
+                  style={{
+                    fontSize: 12,
+                    color: "hsl(var(--muted-foreground))",
+                    marginTop: 2,
+                  }}
+                >
                   by {sub.memberName ?? sub.discordId} &middot;{" "}
                   {new Date(sub.submittedAt).toLocaleDateString("en-US", {
                     month: "short",
@@ -120,17 +192,38 @@ export function MissionReviewPanel() {
                   })}
                 </div>
               </div>
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  padding: "3px 10px",
+                  borderRadius: 999,
+                  background: "hsl(var(--butter) / 0.25)",
+                  color: "hsl(var(--ink))",
+                  border: "1px solid hsl(var(--butter))",
+                  fontFamily: DISPLAY_FONT,
+                  fontWeight: 700,
+                  fontSize: 11,
+                  letterSpacing: 0.4,
+                  textTransform: "uppercase",
+                }}
+              >
+                Pending
+              </span>
             </div>
 
             {sub.evidence && (
-              <div style={{ fontSize: 13 }}>
-                <strong>Evidence:</strong>{" "}
+              <div style={{ fontSize: 13, color: "hsl(var(--foreground))" }}>
+                <strong style={{ fontFamily: DISPLAY_FONT }}>Evidence:</strong>{" "}
                 {sub.evidence.startsWith("http") ? (
                   <a
                     href={sub.evidence}
                     target="_blank"
                     rel="noreferrer"
-                    style={{ color: "var(--color-text-primary)", textDecoration: "underline" }}
+                    style={{
+                      color: "hsl(var(--tomato))",
+                      textDecoration: "underline",
+                    }}
                   >
                     {sub.evidence}
                   </a>
@@ -141,12 +234,20 @@ export function MissionReviewPanel() {
             )}
 
             {sub.notes && (
-              <div style={{ fontSize: 13 }}>
-                <strong>Notes:</strong> {sub.notes}
+              <div style={{ fontSize: 13, color: "hsl(var(--foreground))" }}>
+                <strong style={{ fontFamily: DISPLAY_FONT }}>Notes:</strong>{" "}
+                {sub.notes}
               </div>
             )}
 
-            <div style={{ display: "flex", gap: 8, alignItems: "center", flexWrap: "wrap" }}>
+            <div
+              style={{
+                display: "flex",
+                gap: 8,
+                alignItems: "center",
+                flexWrap: "wrap",
+              }}
+            >
               <input
                 type="text"
                 value={reviewNotes[sub.id] || ""}
@@ -154,18 +255,15 @@ export function MissionReviewPanel() {
                   setReviewNotes((prev) => ({ ...prev, [sub.id]: e.target.value }))
                 }
                 placeholder="Review note (optional)"
-                style={{ ...input(), fontSize: 12, flex: 1, minWidth: 150 }}
+                style={{ ...input(), fontSize: 13, flex: 1, minWidth: 160 }}
               />
               <button
                 onClick={() => handleReview(sub.id, "approve")}
                 disabled={processing.has(sub.id)}
                 style={{
                   ...btn("primary", processing.has(sub.id)),
-                  fontSize: 12,
-                  padding: "6px 14px",
-                  background: "#16a34a",
-                  borderColor: "#16a34a",
-                  color: "#fff",
+                  fontSize: 13,
+                  padding: "8px 16px",
                 }}
               >
                 Approve
@@ -175,10 +273,8 @@ export function MissionReviewPanel() {
                 disabled={processing.has(sub.id)}
                 style={{
                   ...btn("secondary", processing.has(sub.id)),
-                  fontSize: 12,
-                  padding: "6px 14px",
-                  color: "#ef4444",
-                  borderColor: "#ef4444",
+                  fontSize: 13,
+                  padding: "8px 16px",
                 }}
               >
                 Reject

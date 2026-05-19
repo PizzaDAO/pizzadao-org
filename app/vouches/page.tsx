@@ -3,13 +3,17 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Inter } from "next/font/google";
 import { VouchCard } from "../ui/vouches/VouchCard";
 import { SocialAccountLinker } from "../ui/vouches/SocialAccountLinker";
 import { FarcasterDiscovery } from "../ui/vouches/FarcasterDiscovery";
 import { useMe, useVouches } from "../lib/hooks/use-api";
-
-const inter = Inter({ subsets: ["latin"] });
+import {
+  btn,
+  card,
+  input as inputStyle,
+  loadingSpinner,
+  pageContainer,
+} from "../ui/shared-styles";
 
 type VouchData = {
   memberId: string;
@@ -20,6 +24,9 @@ type VouchData = {
 };
 
 type FilterTab = "ALL" | "PIZZADAO" | "FARCASTER" | "TWITTER";
+
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export default function VouchesPage() {
   const router = useRouter();
@@ -112,28 +119,22 @@ export default function VouchesPage() {
     return (
       <div
         style={{
-          minHeight: "100vh",
+          ...pageContainer(),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--color-page-bg)",
-          color: "var(--color-text)",
-          fontFamily: inter.style.fontFamily,
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div
+          <div style={loadingSpinner()} />
+          <p
             style={{
-              width: 50,
-              height: 50,
-              border: "4px solid var(--color-spinner-track)",
-              borderTop: "4px solid var(--color-spinner-active)",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto 20px",
+              fontSize: 18,
+              color: "hsl(var(--muted-foreground))",
             }}
-          />
-          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading vouches...</p>
+          >
+            Loading vouches…
+          </p>
           <style jsx>{`
             @keyframes spin {
               0% {
@@ -153,22 +154,33 @@ export default function VouchesPage() {
     return (
       <div
         style={{
-          minHeight: "100vh",
+          ...pageContainer(),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--color-page-bg)",
-          color: "var(--color-text)",
-          fontFamily: inter.style.fontFamily,
-          padding: 20,
         }}
       >
-        <div style={cardStyle()}>
-          <h1 style={{ fontSize: 24, marginBottom: 16 }}>
+        <div style={card()}>
+          <h1
+            style={{
+              fontFamily: displayFont,
+              fontSize: 32,
+              fontWeight: 800,
+              margin: 0,
+              letterSpacing: "-0.01em",
+            }}
+          >
             Vouches
           </h1>
-          <p style={{ opacity: 0.7, marginBottom: 32 }}>{authError}</p>
-          <Link href="/" style={btnStyle("primary")}>
+          <p
+            style={{
+              color: "hsl(var(--muted-foreground))",
+              margin: 0,
+            }}
+          >
+            {authError}
+          </p>
+          <Link href="/" style={btn("primary")}>
             Back to Home
           </Link>
         </div>
@@ -184,15 +196,7 @@ export default function VouchesPage() {
   ];
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        color: "var(--color-text)",
-        fontFamily: inter.style.fontFamily,
-        padding: "40px 20px",
-      }}
-    >
+    <div style={pageContainer()}>
       <div
         style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}
       >
@@ -204,9 +208,9 @@ export default function VouchesPage() {
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "hsl(var(--muted-foreground))",
               padding: 0,
               fontFamily: "inherit",
             }}
@@ -220,9 +224,12 @@ export default function VouchesPage() {
           <h1
             style={{
               marginTop: 0,
-              fontSize: 32,
+              fontFamily: displayFont,
+              fontSize: 44,
               marginBottom: 8,
               fontWeight: 800,
+              letterSpacing: "-0.01em",
+              textWrap: "balance",
             }}
           >
             Vouches
@@ -230,17 +237,17 @@ export default function VouchesPage() {
           <p
             style={{
               fontSize: 16,
-              color: "var(--color-text-secondary)",
+              color: "hsl(var(--muted-foreground))",
               margin: 0,
             }}
           >
-            {counts.total} vouching for &middot; {counts.followers} vouchers
+            {counts.total} vouching for · {counts.followers} vouchers
           </p>
         </header>
 
         {/* Social Account Linking */}
         {memberId && (
-          <div style={cardStyle()}>
+          <div style={card()}>
             <SocialAccountLinker
               memberId={memberId}
               onAccountChange={(accounts) => {
@@ -254,7 +261,7 @@ export default function VouchesPage() {
 
         {/* Farcaster Discovery */}
         {memberId && hasFarcaster && (
-          <div style={cardStyle()}>
+          <div style={card()}>
             <FarcasterDiscovery currentMemberId={memberId} />
           </div>
         )}
@@ -265,43 +272,49 @@ export default function VouchesPage() {
             display: "flex",
             gap: 4,
             padding: 4,
-            borderRadius: 12,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
+            borderRadius: "var(--radius)",
+            background: "hsl(var(--card))",
+            border: "1px solid hsl(var(--rule) / 0.12)",
           }}
         >
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                flex: 1,
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "none",
-                background:
-                  activeTab === tab.id
-                    ? "var(--color-btn-primary-bg)"
-                    : "transparent",
-                color:
-                  activeTab === tab.id
-                    ? "var(--color-btn-primary-text)"
-                    : "var(--color-text-secondary)",
-                fontSize: 13,
-                fontWeight: 650,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "all 0.15s",
-              }}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span style={{ marginLeft: 4, opacity: 0.7 }}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
+          {tabs.map((tab) => {
+            const active = activeTab === tab.id;
+            return (
+              <button
+                key={tab.id}
+                onClick={() => setActiveTab(tab.id)}
+                style={{
+                  flex: 1,
+                  padding: "8px 12px",
+                  borderRadius: "calc(var(--radius) - 4px)",
+                  border: "none",
+                  background: active ? "hsl(var(--primary))" : "transparent",
+                  color: active
+                    ? "hsl(var(--primary-foreground))"
+                    : "hsl(var(--muted-foreground))",
+                  fontSize: 13,
+                  fontWeight: 600,
+                  fontFamily: displayFont,
+                  cursor: "pointer",
+                  transition:
+                    "background-color 150ms ease, color 150ms ease",
+                }}
+              >
+                {tab.label}
+                {tab.count > 0 && (
+                  <span
+                    style={{
+                      marginLeft: 6,
+                      opacity: 0.75,
+                      fontVariantNumeric: "tabular-nums",
+                    }}
+                  >
+                    {tab.count}
+                  </span>
+                )}
+              </button>
+            );
+          })}
         </div>
 
         {/* Search */}
@@ -309,19 +322,8 @@ export default function VouchesPage() {
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search vouches by name, city, or crew..."
-          style={{
-            width: "100%",
-            padding: "12px 16px",
-            borderRadius: 12,
-            border: "1px solid var(--color-input-border)",
-            fontSize: 14,
-            outline: "none",
-            boxSizing: "border-box",
-            background: "var(--color-input-bg)",
-            color: "var(--color-input-text)",
-            fontFamily: "inherit",
-          }}
+          placeholder="Search vouches by name, city, or crew…"
+          style={inputStyle()}
         />
 
         {/* Vouches Grid */}
@@ -350,8 +352,9 @@ export default function VouchesPage() {
           <div
             style={{
               padding: 40,
-              borderRadius: 14,
-              border: "1px dashed var(--color-border)",
+              borderRadius: "var(--radius)",
+              border: "1px dashed hsl(var(--rule) / 0.22)",
+              background: "hsl(var(--card))",
               textAlign: "center",
             }}
           >
@@ -359,10 +362,11 @@ export default function VouchesPage() {
               <>
                 <p
                   style={{
+                    fontFamily: displayFont,
                     fontSize: 18,
-                    fontWeight: 600,
+                    fontWeight: 700,
                     marginBottom: 8,
-                    color: "var(--color-text-primary)",
+                    color: "hsl(var(--foreground))",
                   }}
                 >
                   No vouches yet
@@ -370,7 +374,7 @@ export default function VouchesPage() {
                 <p
                   style={{
                     fontSize: 14,
-                    color: "var(--color-text-muted)",
+                    color: "hsl(var(--muted-foreground))",
                     marginBottom: 16,
                   }}
                 >
@@ -382,7 +386,7 @@ export default function VouchesPage() {
               <p
                 style={{
                   fontSize: 14,
-                  color: "var(--color-text-muted)",
+                  color: "hsl(var(--muted-foreground))",
                 }}
               >
                 No vouches match your search.
@@ -396,8 +400,10 @@ export default function VouchesPage() {
           style={{
             textAlign: "center",
             marginTop: 40,
-            opacity: 0.4,
+            color: "hsl(var(--muted-foreground))",
+            fontFamily: displayFont,
             fontSize: 13,
+            opacity: 0.6,
           }}
         >
           PizzaDAO
@@ -405,42 +411,4 @@ export default function VouchesPage() {
       </div>
     </div>
   );
-}
-
-function cardStyle(): React.CSSProperties {
-  return {
-    border: "1px solid var(--color-border)",
-    borderRadius: 14,
-    padding: 24,
-    boxShadow: "var(--shadow-card)",
-    background: "var(--color-surface)",
-    display: "grid",
-    gap: 14,
-  };
-}
-
-function btnStyle(kind: "primary" | "secondary"): React.CSSProperties {
-  const base: React.CSSProperties = {
-    display: "inline-block",
-    padding: "10px 16px",
-    borderRadius: 10,
-    border: "1px solid var(--color-border-strong)",
-    fontWeight: 650,
-    cursor: "pointer",
-    textDecoration: "none",
-    textAlign: "center",
-    fontFamily: "inherit",
-  };
-  if (kind === "primary")
-    return {
-      ...base,
-      background: "var(--color-btn-primary-bg)",
-      color: "var(--color-btn-primary-text)",
-      borderColor: "var(--color-btn-primary-border)",
-    };
-  return {
-    ...base,
-    background: "var(--color-surface)",
-    color: "var(--color-text)",
-  };
 }
