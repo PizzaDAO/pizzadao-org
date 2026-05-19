@@ -143,8 +143,8 @@ export default function CallsPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        color: "var(--color-text)",
+        background: "hsl(var(--background))",
+        color: "hsl(var(--foreground))",
         padding: "40px 20px",
       }}
     >
@@ -155,11 +155,12 @@ export default function CallsPage() {
             href="/"
             style={{
               fontSize: 14,
-              color: "var(--color-text-secondary, var(--color-text))",
+              color: "hsl(var(--muted-foreground))",
               textDecoration: "none",
               display: "inline-flex",
               alignItems: "center",
               minHeight: 44,
+              transition: "color 200ms ease-out",
             }}
           >
             &larr; Back to Home
@@ -169,8 +170,9 @@ export default function CallsPage() {
               margin: "8px 0 4px 0",
               fontSize: 32,
               fontWeight: 800,
-              color: "var(--color-text-primary, var(--color-text))",
-            }}
+              color: "hsl(var(--foreground))",
+              textWrap: 'balance',
+            } as React.CSSProperties}
           >
             Call History
           </h1>
@@ -179,7 +181,7 @@ export default function CallsPage() {
               style={{
                 margin: 0,
                 fontSize: 15,
-                color: "var(--color-text-secondary, var(--color-text))",
+                color: "hsl(var(--muted-foreground))",
                 opacity: 0.8,
               }}
             >
@@ -250,10 +252,11 @@ export default function CallsPage() {
                     fontSize: 12,
                     fontWeight: 600,
                     borderRadius: 8,
-                    border: "1px solid var(--color-border)",
+                    border: "1px solid hsl(var(--rule) / 0.12)",
                     background: "transparent",
-                    color: "var(--color-text)",
+                    color: "hsl(var(--foreground))",
                     cursor: "pointer",
+                    transition: "background-color 200ms ease-out, border-color 200ms ease-out",
                   }}
                 >
                   Clear filters
@@ -268,10 +271,10 @@ export default function CallsPage() {
                 style={{
                   padding: "6px 10px",
                   fontSize: 13,
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid hsl(var(--rule) / 0.12)",
                   borderRadius: 8,
-                  background: "var(--color-surface)",
-                  color: "var(--color-text)",
+                  background: "hsl(var(--card))",
+                  color: "hsl(var(--foreground))",
                   cursor: "pointer",
                   outline: "none",
                 }}
@@ -288,9 +291,9 @@ export default function CallsPage() {
           <div
             style={{
               padding: 16,
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "#c00",
+              background: "hsl(var(--destructive) / 0.10)",
+              border: "1px solid hsl(var(--destructive) / 0.30)",
+              color: "hsl(var(--destructive))",
               borderRadius: 8,
               marginBottom: 16,
               fontSize: 14,
@@ -309,8 +312,8 @@ export default function CallsPage() {
                 style={{
                   padding: 16,
                   borderRadius: 10,
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
+                  border: "1px solid hsl(var(--rule) / 0.12)",
+                  background: "hsl(var(--card))",
                   height: 56,
                   opacity: 0.5,
                   animation: "pulse 1.6s ease-in-out infinite",
@@ -337,9 +340,9 @@ export default function CallsPage() {
             style={{
               padding: 40,
               textAlign: "center",
-              border: "1px solid var(--color-border)",
-              borderRadius: 12,
-              background: "var(--color-surface)",
+              border: "1px solid hsl(var(--rule) / 0.12)",
+              borderRadius: 'var(--radius)',
+              background: "hsl(var(--card))",
             }}
           >
             <p style={{ margin: 0, fontSize: 16, opacity: 0.7 }}>
@@ -355,10 +358,11 @@ export default function CallsPage() {
                   fontSize: 14,
                   fontWeight: 600,
                   borderRadius: 8,
-                  border: "1px solid var(--color-border)",
+                  border: "1px solid hsl(var(--rule) / 0.12)",
                   background: "transparent",
-                  color: "var(--color-text)",
+                  color: "hsl(var(--foreground))",
                   cursor: "pointer",
+                  transition: "background-color 200ms ease-out",
                 }}
               >
                 Clear filters
@@ -382,20 +386,16 @@ export default function CallsPage() {
                       width: "100%",
                       padding: "12px 16px",
                       borderRadius: isExpanded ? "10px 10px 0 0" : 10,
-                      border: "1px solid var(--color-border)",
-                      borderBottom: isExpanded
-                        ? "1px solid var(--color-border)"
-                        : "1px solid var(--color-border)",
-                      background: isExpanded
-                        ? "var(--color-surface)"
-                        : "var(--color-surface)",
-                      color: "var(--color-text)",
+                      border: "1px solid hsl(var(--rule) / 0.12)",
+                      borderBottom: "1px solid hsl(var(--rule) / 0.12)",
+                      background: "hsl(var(--card))",
+                      color: "hsl(var(--foreground))",
                       cursor: "pointer",
                       textAlign: "left",
                       display: "flex",
                       alignItems: "center",
                       gap: 12,
-                      transition: "background 0.15s",
+                      transition: "background-color 200ms ease-out, border-color 200ms ease-out",
                     }}
                   >
                     <span
@@ -403,7 +403,7 @@ export default function CallsPage() {
                         fontSize: 14,
                         fontWeight: 600,
                         minWidth: 120,
-                        color: "var(--color-text-primary, var(--color-text))",
+                        color: "hsl(var(--foreground))",
                       }}
                     >
                       {formatDate(call.date)}
@@ -414,8 +414,8 @@ export default function CallsPage() {
                         fontWeight: 600,
                         padding: "2px 8px",
                         borderRadius: 10,
-                        background: "rgba(91,156,255,0.12)",
-                        color: "#5b9cff",
+                        background: "hsl(var(--tomato) / 0.12)",
+                        color: "hsl(var(--tomato))",
                         whiteSpace: "nowrap",
                       }}
                     >
@@ -449,9 +449,9 @@ export default function CallsPage() {
                       style={{
                         padding: "12px 16px",
                         borderRadius: "0 0 10px 10px",
-                        border: "1px solid var(--color-border)",
+                        border: "1px solid hsl(var(--rule) / 0.12)",
                         borderTop: "none",
-                        background: "var(--color-surface)",
+                        background: "hsl(var(--card))",
                       }}
                     >
                       {detailLoading && (
@@ -481,8 +481,8 @@ export default function CallsPage() {
                                   fontSize: 13,
                                   padding: "4px 10px",
                                   borderRadius: 8,
-                                  background: "rgba(91,156,255,0.08)",
-                                  color: "#5b9cff",
+                                  background: "hsl(var(--tomato) / 0.08)",
+                                  color: "hsl(var(--tomato))",
                                   textDecoration: "none",
                                   whiteSpace: "nowrap",
                                 }}
@@ -496,9 +496,8 @@ export default function CallsPage() {
                                   fontSize: 13,
                                   padding: "4px 10px",
                                   borderRadius: 8,
-                                  background:
-                                    "var(--color-bg-secondary, rgba(0,0,0,0.04))",
-                                  color: "var(--color-text)",
+                                  background: "hsl(var(--ink) / 0.06)",
+                                  color: "hsl(var(--foreground))",
                                   opacity: 0.7,
                                   whiteSpace: "nowrap",
                                 }}
@@ -539,11 +538,12 @@ export default function CallsPage() {
                 padding: "8px 14px",
                 fontSize: 14,
                 borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
+                border: "1px solid hsl(var(--rule) / 0.12)",
+                background: "hsl(var(--card))",
+                color: "hsl(var(--foreground))",
                 cursor: page <= 1 ? "not-allowed" : "pointer",
                 opacity: page <= 1 ? 0.5 : 1,
+                transition: "background-color 200ms ease-out",
               }}
             >
               &larr; Prev
@@ -551,7 +551,7 @@ export default function CallsPage() {
             <span
               style={{
                 fontSize: 14,
-                color: "var(--color-text-secondary, var(--color-text))",
+                color: "hsl(var(--muted-foreground))",
               }}
             >
               Page {pagination.page} of {pagination.totalPages}
@@ -567,11 +567,12 @@ export default function CallsPage() {
                 padding: "8px 14px",
                 fontSize: 14,
                 borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
+                border: "1px solid hsl(var(--rule) / 0.12)",
+                background: "hsl(var(--card))",
+                color: "hsl(var(--foreground))",
                 cursor: page >= pagination.totalPages ? "not-allowed" : "pointer",
                 opacity: page >= pagination.totalPages ? 0.5 : 1,
+                transition: "background-color 200ms ease-out",
               }}
             >
               Next &rarr;
@@ -602,15 +603,16 @@ function FilterChip({
         fontWeight: 600,
         borderRadius: 999,
         border: active
-          ? "1px solid var(--color-btn-primary-border, #ff4d4d)"
-          : "1px solid var(--color-border)",
+          ? "1px solid hsl(var(--tomato))"
+          : "1px solid hsl(var(--rule) / 0.12)",
         background: active
-          ? "var(--color-btn-primary-bg, rgba(255,77,77,0.15))"
-          : "var(--color-surface)",
+          ? "hsl(var(--tomato) / 0.15)"
+          : "hsl(var(--card))",
         color: active
-          ? "var(--color-btn-primary-text, #ff4d4d)"
-          : "var(--color-text)",
+          ? "hsl(var(--tomato))"
+          : "hsl(var(--foreground))",
         cursor: "pointer",
+        transition: "background-color 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out",
       }}
     >
       {label}
