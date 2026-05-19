@@ -4,6 +4,13 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
 import { groupCrewsByDay } from '@/app/lib/crew-schedule'
+import {
+  btn,
+  card,
+  loadingSpinner,
+  navBtn,
+  pageContainer,
+} from '@/app/ui/shared-styles'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -166,11 +173,19 @@ export default function AllCrewsPage() {
     return (
       <div key={crew.id} style={{
         ...card(),
-        border: inCrew ? '2px solid #4caf50' : '1px solid var(--color-border)',
+        padding: 20,
+        border: inCrew ? '2px solid hsl(var(--tomato))' : '1px solid hsl(var(--rule) / 0.12)',
       }}>
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
           <div>
-            <h2 style={{ fontSize: 20, fontWeight: 700, margin: 0 }}>
+            <h2
+              style={{
+                fontSize: 20,
+                fontWeight: 700,
+                margin: 0,
+                textWrap: 'balance',
+              } as React.CSSProperties}
+            >
               {crew.emoji && `${crew.emoji} `}{crew.label}
             </h2>
             {(crew.callTime || crew.callLength) && (
@@ -189,8 +204,8 @@ export default function AllCrewsPage() {
           </div>
           {inCrew && (
             <span style={{
-              background: 'rgba(76,175,80,0.15)',
-              color: '#2e7d32',
+              background: 'hsl(var(--tomato) / 0.12)',
+              color: 'hsl(var(--tomato))',
               padding: '4px 10px',
               borderRadius: 12,
               fontSize: 12,
@@ -225,8 +240,8 @@ export default function AllCrewsPage() {
                   fontSize: 14,
                   opacity: isLeaving ? 0.6 : 1,
                   cursor: isLeaving ? 'wait' : 'pointer',
-                  color: '#d32f2f',
-                  borderColor: '#d32f2f',
+                  color: 'hsl(var(--destructive))',
+                  borderColor: 'hsl(var(--destructive) / 0.5)',
                 }}
               >
                 {isLeaving ? 'Leaving...' : 'Leave Crew'}
@@ -251,8 +266,8 @@ export default function AllCrewsPage() {
 
         {/* Tasks Section */}
         {crew.tasks && crew.tasks.length > 0 && (
-          <div style={{ marginTop: 16, borderTop: '1px solid var(--color-divider)', paddingTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'var(--color-text-secondary)', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
+          <div style={{ marginTop: 16, borderTop: '1px solid hsl(var(--rule) / 0.10)', paddingTop: 12 }}>
+            <div style={{ fontSize: 12, fontWeight: 600, color: 'hsl(var(--muted-foreground))', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
               Top Tasks
             </div>
             <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
@@ -264,12 +279,12 @@ export default function AllCrewsPage() {
                       fontWeight: 600,
                       padding: '3px 8px',
                       borderRadius: 4,
-                      background: task.priority === 'Top' ? 'rgba(255,77,77,0.15)' :
+                      background: task.priority === 'Top' ? 'hsl(var(--tomato) / 0.15)' :
                                  task.priority === 'High' ? 'rgba(255,167,38,0.15)' :
-                                 task.priority === 'Mid' ? 'rgba(33,150,243,0.15)' : 'var(--color-surface-hover)',
-                      color: task.priority === 'Top' ? '#d32f2f' :
+                                 task.priority === 'Mid' ? 'rgba(33,150,243,0.15)' : 'hsl(var(--ink) / 0.06)',
+                      color: task.priority === 'Top' ? 'hsl(var(--tomato))' :
                             task.priority === 'High' ? '#ef6c00' :
-                            task.priority === 'Mid' ? '#1565c0' : 'var(--color-text-secondary)',
+                            task.priority === 'Mid' ? '#1565c0' : 'hsl(var(--muted-foreground))',
                       flexShrink: 0,
                     }}>
                       {task.priority}
@@ -280,18 +295,18 @@ export default function AllCrewsPage() {
                       href={task.url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ fontSize: 14, color: '#5b9cff', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
+                      style={{ fontSize: 14, color: 'hsl(var(--tomato))', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
                     >
                       {task.label}
                     </a>
                   ) : (
-                    <span style={{ fontSize: 14, color: 'var(--color-text-primary)', lineHeight: 1.4 }}>{task.label}</span>
+                    <span style={{ fontSize: 14, color: 'hsl(var(--foreground))', lineHeight: 1.4 }}>{task.label}</span>
                   )}
                 </div>
               ))}
             </div>
             {(crew.taskCount ?? 0) > 3 && (
-              <div style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+              <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))', marginTop: 8 }}>
                 +{(crew.taskCount ?? 0) - 3} more tasks
               </div>
             )}
@@ -327,19 +342,11 @@ export default function AllCrewsPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-page-bg)',
+        background: 'hsl(var(--background))',
         fontFamily: inter.style.fontFamily,
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 50,
-            height: 50,
-            border: '4px solid var(--color-spinner-track)',
-            borderTop: '4px solid var(--color-spinner-active)',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px',
-          }} />
+          <div style={loadingSpinner()} />
           <p style={{ fontSize: 18, opacity: 0.8 }}>Loading crews...</p>
           <style jsx>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
@@ -354,12 +361,21 @@ export default function AllCrewsPage() {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-page-bg)',
+        background: 'hsl(var(--background))',
+        color: 'hsl(var(--foreground))',
         fontFamily: inter.style.fontFamily,
         padding: 20,
       }}>
         <div style={card()}>
-          <h1 style={{ fontSize: 24, marginBottom: 16 }}>Error</h1>
+          <h1
+            style={{
+              fontSize: 24,
+              marginBottom: 16,
+              textWrap: 'balance',
+            } as React.CSSProperties}
+          >
+            Error
+          </h1>
           <p style={{ opacity: 0.7, marginBottom: 32 }}>{error}</p>
           <Link href="/" style={btn('primary')}>Back to Home</Link>
         </div>
@@ -368,87 +384,48 @@ export default function AllCrewsPage() {
   }
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'var(--color-page-bg)',
-      color: 'var(--color-text)',
-      fontFamily: inter.style.fontFamily,
-      padding: '40px 20px',
-    }}>
+    <div style={pageContainer(inter.style.fontFamily)}>
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '10px 16px',
-            minHeight: 44,
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 8,
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600,
-          }}>
+          <Link href="/" style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
             ← Home
           </Link>
           {user && (
-            <Link href={`/dashboard/${user.memberId}`} style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              gap: 6,
-              padding: '10px 16px',
-              minHeight: 44,
-              background: 'var(--color-surface)',
-              border: '1px solid var(--color-border-strong)',
-              borderRadius: 8,
-              color: 'var(--color-text)',
-              textDecoration: 'none',
-              fontSize: 14,
-              fontWeight: 600,
-            }}>
+            <Link href={`/dashboard/${user.memberId}`} style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
               My Dashboard
             </Link>
           )}
-          <Link href="/crew" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '10px 16px',
-            minHeight: 44,
-            background: 'var(--color-surface)',
-            border: '1px solid var(--color-border-strong)',
-            borderRadius: 8,
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600,
-          }}>
+          <Link href="/crew" style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
             Browse Members
           </Link>
-          <Link href="/manuals" style={{
-            display: 'inline-flex',
-            alignItems: 'center',
-            gap: 6,
-            padding: '10px 16px',
-            minHeight: 44,
-            background: '#eab308',
-            border: '1px solid #ca8a04',
-            borderRadius: 8,
-            color: 'var(--color-text)',
-            textDecoration: 'none',
-            fontSize: 14,
-            fontWeight: 600,
-          }}>
+          <Link
+            href="/manuals"
+            style={{
+              ...navBtn(),
+              padding: '10px 16px',
+              minHeight: 44,
+              background: 'hsl(var(--butter))',
+              borderColor: 'hsl(var(--butter))',
+              color: 'hsl(var(--ink))',
+            }}
+          >
             Browse All Manuals
           </Link>
         </div>
 
         {/* Header */}
         <header style={{ textAlign: 'center', marginBottom: 20 }}>
-          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>All Crews</h1>
+          <h1
+            style={{
+              fontSize: 36,
+              fontWeight: 800,
+              margin: 0,
+              textWrap: 'balance',
+            } as React.CSSProperties}
+          >
+            All Crews
+          </h1>
           <p style={{ fontSize: 16, opacity: 0.6, marginTop: 8 }}>
             {user ? `Welcome, ${user.name}! Join crews to get involved.` : 'Log in to join crews'}
           </p>
@@ -464,8 +441,8 @@ export default function AllCrewsPage() {
                   fontSize: 16,
                   fontWeight: 700,
                   marginBottom: 12,
-                  color: 'var(--color-text-primary)',
-                  borderBottom: '2px solid var(--color-divider)',
+                  color: 'hsl(var(--foreground))',
+                  borderBottom: '2px solid hsl(var(--rule) / 0.10)',
                   paddingBottom: 8,
                 }}>
                   {day}
@@ -485,8 +462,8 @@ export default function AllCrewsPage() {
                   fontSize: 16,
                   fontWeight: 700,
                   marginBottom: 12,
-                  color: 'var(--color-text-primary)',
-                  borderBottom: '2px solid var(--color-divider)',
+                  color: 'hsl(var(--foreground))',
+                  borderBottom: '2px solid hsl(var(--rule) / 0.10)',
                   paddingBottom: 8,
                   textAlign: 'center',
                 }}>
@@ -503,14 +480,17 @@ export default function AllCrewsPage() {
         {/* Other Crews Section */}
         {otherCrews.length > 0 && (
           <div style={{ marginTop: 16 }}>
-            <h2 style={{
-              fontSize: 24,
-              fontWeight: 700,
-              marginBottom: 16,
-              color: 'var(--color-text-primary)',
-              borderBottom: '2px solid var(--color-divider)',
-              paddingBottom: 10,
-            }}>
+            <h2
+              style={{
+                fontSize: 24,
+                fontWeight: 700,
+                marginBottom: 16,
+                color: 'hsl(var(--foreground))',
+                borderBottom: '2px solid hsl(var(--rule) / 0.10)',
+                paddingBottom: 10,
+                textWrap: 'balance',
+              } as React.CSSProperties}
+            >
               Other Crews
             </h2>
             <div style={{
@@ -541,34 +521,4 @@ export default function AllCrewsPage() {
       </div>
     </div>
   )
-}
-
-// Styles
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  }
-}
-
-function btn(kind: 'primary' | 'secondary'): React.CSSProperties {
-  const base: React.CSSProperties = {
-    display: 'inline-flex',
-    alignItems: 'center',
-    justifyContent: 'center',
-    padding: '12px 16px',
-    minHeight: 44,
-    borderRadius: 10,
-    border: '1px solid var(--color-border-strong)',
-    fontWeight: 650,
-    cursor: 'pointer',
-    textDecoration: 'none',
-    textAlign: 'center',
-    fontFamily: 'inherit',
-  }
-  if (kind === 'primary') return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' }
-  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' }
 }
