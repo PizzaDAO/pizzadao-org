@@ -23,6 +23,7 @@ import {
     useMyTasks,
     useMyBalance,
     useMissions,
+    useDashboardSummary,
 } from "../../lib/hooks/use-api";
 import { HeroBlock } from "./components/HeroBlock";
 import { YourCrews, type CrewOption } from "./components/YourCrews";
@@ -53,6 +54,10 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const router = useRouter();
 
     // --- React Query hooks for data fetching ---
+    // The BFF (`useDashboardSummary`) collapses the previous 8 child queries
+    // into one request. The individual hooks below remain as a fallback while
+    // the summary is loading or if it errors — same data, just slower.
+    const { data: summary } = useDashboardSummary(id);
     const { data: userData, isLoading: userDataLoading, error: userDataError } = useUserData(id);
     const { data: pfpData } = usePfp(id);
     const { data: xAccountData } = useXAccount(id);
@@ -77,11 +82,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         if (userData) setData(userData);
     }, [userData]);
 
-    // Derived data from hooks
-    const pfpUrl = pfpData?.url ?? null;
-    const pepBalance = balanceData?.balance ?? null;
+    // Derived data — prefer the summary payload when present, fall back to
+    // the individual hooks. Visual output is identical either way.
+    const pfpUrl = summary?.member?.pfpUrl ?? pfpData?.url ?? null;
+    const pepBalance = summary?.pep?.balance ?? balanceData?.balance ?? null;
     const myTasks = tasksData?.tasksByCrew ?? {};
     const doneCounts = tasksData?.doneCountsByCrew ?? {};
+    const hydratedCrews = summary?.crewsHydrated;
 
     // X account: local state because disconnect handler mutates it
     const [xAccount, setXAccount] = useState<{ connected: boolean; username?: string; displayName?: string } | null>(null);
@@ -89,11 +96,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         if (xAccountData) setXAccount(xAccountData);
     }, [xAccountData]);
 
-    // Mission level for hero header — derived from the shared `useMissions` query
-    // rather than a separate fetch. Equivalent to: { level: currentLevel, title: levelTitle }.
-    const missionLevel = missionsData?.currentLevel != null
-        ? { level: missionsData.currentLevel as number, title: (missionsData.levelTitle as string) || "" }
-        : null;
+    // Mission level for hero header — sourced from the BFF summary when
+    // available, otherwise from the shared `useMissions` query.
+    const missionLevel = summary?.level?.current != null
+        ? { level: summary.level.current as number, title: (summary.level.title as string) || "" }
+        : missionsData?.currentLevel != null
+            ? { level: missionsData.currentLevel as number, title: (missionsData.levelTitle as string) || "" }
+            : null;
 
     // Crew options: derived from hook data with fallback to static CREWS
     const crewOptions: CrewOption[] = (() => {
@@ -280,7 +289,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     {/* ── 3. Missions Progress ── */}
                     <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
-                        <MissionsProgress />
+                        <MissionsProgress summary={missionsData} />
                     </div>
 
                     {/* ── 4. Your Crews ── */}
@@ -290,6 +299,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         myTasks={myTasks}
                         doneCounts={doneCounts}
                         currentMemberId={idValue}
+                        hydratedCrews={hydratedCrews}
                     />
 
                     {/* ── 5. Vouches Widget ── */}
