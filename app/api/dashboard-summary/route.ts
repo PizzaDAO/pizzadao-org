@@ -26,6 +26,8 @@ import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { fetchMyTasksForCrew } from "@/app/lib/my-tasks";
 import { resolveNextAction, type NextAction } from "@/app/dashboard/[id]/lib/next-action";
+import { hasAnyRole } from "@/app/lib/discord";
+import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
 
 export const runtime = "nodejs";
 
@@ -200,6 +202,14 @@ export async function GET(request: NextRequest) {
             safe(getCrewMappings(), { crews: [] as CrewOption[], cached: false }),
         ]);
 
+        // Reviewer detection — pulled in parallel-after-session so the Discord
+        // guild fetch doesn't gate the rest of the payload. `hasAnyRole`
+        // already caches the guild-member lookup for 60s.
+        const isReviewer = await safe(
+            hasAnyRole(discordId, MISSION_REVIEWER_ROLE_IDS),
+            false,
+        );
+
         // --- Level info ---
         const levelTitle = await safe(getLevelTitle(currentLevel), null);
         const currentLevelMissions = (missionsByLevel as any)[currentLevel] || [];
@@ -342,7 +352,7 @@ export async function GET(request: NextRequest) {
                       }
                     : null,
             },
-            isReviewer: false, // PR3: wire in reviewer detection
+            isReviewer,
         });
 
         const summary: DashboardSummary = {
