@@ -520,3 +520,135 @@ export function useUpdateTagline(memberId: string | undefined) {
   })
 }
 
+// ============ Discover (Dashboard PR4 — diavola-58369) ============
+
+/**
+ * Shape of the data fed to the `<Discover />` component on /dashboard/[id].
+ * Mirrors the item types declared in
+ * `app/dashboard/[id]/components/Discover.tsx`. Each list is already capped at
+ * 3 items by this hook so the component can render them as-is.
+ *
+ * Plan: plans/garlic-96648-dashboard-redesign.md §4 + §7 (PR4).
+ */
+export interface DiscoverData {
+  bounties: Array<{
+    id: number
+    description: string
+    reward: number
+    status: 'OPEN' | 'CLAIMED'
+  }>
+  jobs: Array<{
+    id: number
+    description: string
+    crew?: string | null
+    completed?: boolean
+  }>
+  articles: Array<{
+    id: number
+    slug: string
+    title: string
+    authorName?: string | null
+    publishedAt?: string | null
+  }>
+  calls: Array<{
+    crewId: string
+    crewLabel: string
+    date: string
+  }>
+}
+
+/**
+ * Fetches the "Discover" preview lists for /dashboard/[id]. Calls each
+ * upstream endpoint in parallel, tolerates per-source failures (a single 500
+ * does not collapse the section — the failing tab just falls back to an
+ * empty state), and slices the result to 3 items per category.
+ *
+ * The `/api/articles` endpoint accepts a `limit` query param; `/api/calls`
+ * does too. `/api/bounties` and `/api/jobs` don't paginate server-side, so
+ * the hook fetches the full list and slices client-side.
+ */
+export function useDiscover() {
+  return useQuery<DiscoverData>({
+    queryKey: ['discover'],
+    queryFn: async () => {
+      type RawArticle = {
+        id: number
+        slug: string
+        title: string
+        authorName?: string | null
+        publishedAt?: string | null
+      }
+      type RawCall = { crewId: string; crewLabel: string; date: string }
+
+      const safeJson = async <T,>(p: Promise<Response>, fallback: T): Promise<T> => {
+        try {
+          const res = await p
+          if (!res.ok) return fallback
+          return (await res.json()) as T
+        } catch {
+          return fallback
+        }
+      }
+
+      const [bountiesRes, jobsRes, articlesRes, callsRes] = await Promise.all([
+        safeJson<{ bounties?: DiscoverData['bounties'] }>(
+          fetch('/api/bounties'),
+          {},
+        ),
+        safeJson<{ jobs?: Array<{ id: number; description: string; type?: string; completed?: boolean }> }>(
+          fetch('/api/jobs'),
+          {},
+        ),
+        safeJson<{ articles?: RawArticle[] }>(
+          fetch('/api/articles?limit=3'),
+          {},
+        ),
+        safeJson<{ calls?: RawCall[] }>(
+          fetch('/api/calls?limit=3&sort=newest'),
+          {},
+        ),
+      ])
+
+      const bounties: DiscoverData['bounties'] = (bountiesRes.bounties ?? [])
+        .filter((b) => b.status === 'OPEN')
+        .slice(0, 3)
+        .map((b) => ({
+          id: b.id,
+          description: b.description,
+          reward: b.reward,
+          status: b.status,
+        }))
+
+      const jobs: DiscoverData['jobs'] = (jobsRes.jobs ?? [])
+        .slice(0, 3)
+        .map((j) => ({
+          id: j.id,
+          description: j.description,
+          crew: j.type ?? null,
+          completed: j.completed,
+        }))
+
+      const articles: DiscoverData['articles'] = (articlesRes.articles ?? [])
+        .slice(0, 3)
+        .map((a) => ({
+          id: a.id,
+          slug: a.slug,
+          title: a.title,
+          authorName: a.authorName ?? null,
+          publishedAt: a.publishedAt ?? null,
+        }))
+
+      const calls: DiscoverData['calls'] = (callsRes.calls ?? [])
+        .slice(0, 3)
+        .map((c) => ({
+          crewId: c.crewId,
+          crewLabel: c.crewLabel,
+          date: c.date,
+        }))
+
+      return { bounties, jobs, articles, calls }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
+}
