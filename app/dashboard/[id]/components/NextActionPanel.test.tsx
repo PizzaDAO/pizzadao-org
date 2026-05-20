@@ -56,13 +56,13 @@ describe("<NextActionPanel />", () => {
     it("renders the connect_wallet variant", () => {
         const a = makeAction({
             kind: "connect_wallet",
-            headline: "Link a wallet to collect POAPs and NFTs",
+            headline: "Link a wallet to display your PizzaDAO POAPs and NFTs",
             body: undefined,
             primaryCta: { label: "Connect a wallet", href: "/profile/42" },
         });
         render(<NextActionPanel nextAction={a} />);
         expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
-            "Link a wallet to collect POAPs and NFTs",
+            "Link a wallet to display your PizzaDAO POAPs and NFTs",
         );
         const cta = screen.getByRole("link", { name: "Connect a wallet" });
         expect(cta).toHaveAttribute("href", "/profile/42");
