@@ -10,12 +10,28 @@ import type { AttendanceResult } from "@/app/lib/attendance";
  * semantic Tailwind classes and HSL tokens so the card matches the
  * pizzadao.org cream-warm rhythm. Tomato accent on the headline number
  * gives the same "loud key stat" treatment used on the marketing site.
+ *
+ * Layout-leak fix (truffle-91035 PR1): the card used to own its own
+ * `mt-6 pt-6 border-t border-rule` wrapper, which made it always render
+ * glued to a top-border regardless of where it was placed. The `variant`
+ * prop now decouples that. `"standalone"` (default) preserves the
+ * original wrapper — keeping all current call sites visually identical to
+ * main. `"inline"` drops the wrapper so a parent section can own the
+ * spacing/border, which the profile redesign needs.
  */
 interface AttendanceCardProps {
   memberId: string;
+  /**
+   * Visual variant.
+   * - `"standalone"` (default): renders inside a `mt-6 pt-6 border-t border-rule`
+   *   wrapper, identical to the pre-refactor behavior.
+   * - `"inline"`: renders without the outer spacing/border wrapper. Use when the
+   *   parent owns the section chrome (e.g. inside a `CollapsibleSection`).
+   */
+  variant?: "standalone" | "inline";
 }
 
-export function AttendanceCard({ memberId }: AttendanceCardProps) {
+export function AttendanceCard({ memberId, variant = "standalone" }: AttendanceCardProps) {
   const [data, setData] = useState<AttendanceResult | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -53,8 +69,8 @@ export function AttendanceCard({ memberId }: AttendanceCardProps) {
     })
     .sort((a, b) => b[1].count - a[1].count);
 
-  return (
-    <div className="mt-6 pt-6 border-t border-rule">
+  const body = (
+    <>
       <h3 className="mt-0 mb-4 font-display text-lg font-semibold text-foreground">
         Call Attendance
       </h3>
@@ -127,6 +143,12 @@ export function AttendanceCard({ memberId }: AttendanceCardProps) {
           </div>
         </div>
       )}
-    </div>
+    </>
   );
+
+  if (variant === "inline") {
+    return body;
+  }
+
+  return <div className="mt-6 pt-6 border-t border-rule">{body}</div>;
 }
