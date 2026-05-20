@@ -488,6 +488,19 @@ model UnlockTicketRecord {
   @@unique([lockAddress, tokenId, networkId])
 }
 
+// ===== MEMBER PROFILE EXTRAS =====
+//
+// Free-form profile fields owned by the member (not from the sheet). Today
+// just `tagline`; will expand as we add member-editable bio fields.
+//
+// Plan: truffle-91035 (PR4 — burrata-13316).
+model MemberProfileExtras {
+  memberId  String   @id // Member ID from Google Sheets (not Discord ID)
+  tagline   String?  @db.VarChar(140)
+  updatedAt DateTime @updatedAt
+  createdAt DateTime @default(now())
+}
+
 // Multi-wallet: each member can have multiple wallets (EVM, Solana, etc.)
 model MemberWallet {
   id            Int      @id @default(autoincrement())

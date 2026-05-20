@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 // ============ Auth ============
 
@@ -452,5 +452,203 @@ export function useProfileSummary(memberId: string | undefined) {
     staleTime: 60_000,
     gcTime: 10 * 60 * 1000,
     retry: false,
+  })
+}
+
+// ============ Profile Extras (Tagline) ============
+//
+// Appended at the end of the file (per plan note in PR4 — burrata-13316) to
+// minimize merge friction with sibling profile/dashboard PRs.
+
+export interface ProfileExtras {
+  tagline: string | null
+}
+
+/**
+ * Read the member's editable profile-extras row (tagline only for now).
+ * Public — anyone can read; owner-only writes go through `useUpdateTagline`.
+ */
+export function useProfileExtras(memberId: string | undefined) {
+  return useQuery<ProfileExtras>({
+    queryKey: ['profile-extras', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile-extras/${memberId}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Failed to load profile extras')
+      }
+      return res.json()
+    },
+    enabled: !!memberId,
+    staleTime: 60_000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}
+
+/**
+ * Owner-only tagline write. Optimistically updates the profile-extras +
+ * profile-summary caches so the hero re-renders without waiting for a
+ * round-trip.
+ */
+export function useUpdateTagline(memberId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation<ProfileExtras, Error, string>({
+    mutationFn: async (tagline: string) => {
+      const res = await fetch(`/api/profile-extras/${memberId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagline }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Failed to save tagline')
+      }
+      return res.json()
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(['profile-extras', memberId], data)
+      // Patch the cached profile-summary so the hero updates immediately.
+      qc.setQueryData<ProfileSummaryData | undefined>(
+        ['profile-summary', memberId],
+        (prev) =>
+          prev
+            ? { ...prev, hero: { ...prev.hero, tagline: data.tagline ?? '' } }
+            : prev,
+      )
+    },
+  })
+}
+
+// ============ Discover (Dashboard PR4 — diavola-58369) ============
+
+/**
+ * Shape of the data fed to the `<Discover />` component on /dashboard/[id].
+ * Mirrors the item types declared in
+ * `app/dashboard/[id]/components/Discover.tsx`. Each list is already capped at
+ * 3 items by this hook so the component can render them as-is.
+ *
+ * Plan: plans/garlic-96648-dashboard-redesign.md §4 + §7 (PR4).
+ */
+export interface DiscoverData {
+  bounties: Array<{
+    id: number
+    description: string
+    reward: number
+    status: 'OPEN' | 'CLAIMED'
+  }>
+  jobs: Array<{
+    id: number
+    description: string
+    crew?: string | null
+    completed?: boolean
+  }>
+  articles: Array<{
+    id: number
+    slug: string
+    title: string
+    authorName?: string | null
+    publishedAt?: string | null
+  }>
+  calls: Array<{
+    crewId: string
+    crewLabel: string
+    date: string
+  }>
+}
+
+/**
+ * Fetches the "Discover" preview lists for /dashboard/[id]. Calls each
+ * upstream endpoint in parallel, tolerates per-source failures (a single 500
+ * does not collapse the section — the failing tab just falls back to an
+ * empty state), and slices the result to 3 items per category.
+ *
+ * The `/api/articles` endpoint accepts a `limit` query param; `/api/calls`
+ * does too. `/api/bounties` and `/api/jobs` don't paginate server-side, so
+ * the hook fetches the full list and slices client-side.
+ */
+export function useDiscover() {
+  return useQuery<DiscoverData>({
+    queryKey: ['discover'],
+    queryFn: async () => {
+      type RawArticle = {
+        id: number
+        slug: string
+        title: string
+        authorName?: string | null
+        publishedAt?: string | null
+      }
+      type RawCall = { crewId: string; crewLabel: string; date: string }
+
+      const safeJson = async <T,>(p: Promise<Response>, fallback: T): Promise<T> => {
+        try {
+          const res = await p
+          if (!res.ok) return fallback
+          return (await res.json()) as T
+        } catch {
+          return fallback
+        }
+      }
+
+      const [bountiesRes, jobsRes, articlesRes, callsRes] = await Promise.all([
+        safeJson<{ bounties?: DiscoverData['bounties'] }>(
+          fetch('/api/bounties'),
+          {},
+        ),
+        safeJson<{ jobs?: Array<{ id: number; description: string; type?: string; completed?: boolean }> }>(
+          fetch('/api/jobs'),
+          {},
+        ),
+        safeJson<{ articles?: RawArticle[] }>(
+          fetch('/api/articles?limit=3'),
+          {},
+        ),
+        safeJson<{ calls?: RawCall[] }>(
+          fetch('/api/calls?limit=3&sort=newest'),
+          {},
+        ),
+      ])
+
+      const bounties: DiscoverData['bounties'] = (bountiesRes.bounties ?? [])
+        .filter((b) => b.status === 'OPEN')
+        .slice(0, 3)
+        .map((b) => ({
+          id: b.id,
+          description: b.description,
+          reward: b.reward,
+          status: b.status,
+        }))
+
+      const jobs: DiscoverData['jobs'] = (jobsRes.jobs ?? [])
+        .slice(0, 3)
+        .map((j) => ({
+          id: j.id,
+          description: j.description,
+          crew: j.type ?? null,
+          completed: j.completed,
+        }))
+
+      const articles: DiscoverData['articles'] = (articlesRes.articles ?? [])
+        .slice(0, 3)
+        .map((a) => ({
+          id: a.id,
+          slug: a.slug,
+          title: a.title,
+          authorName: a.authorName ?? null,
+          publishedAt: a.publishedAt ?? null,
+        }))
+
+      const calls: DiscoverData['calls'] = (callsRes.calls ?? [])
+        .slice(0, 3)
+        .map((c) => ({
+          crewId: c.crewId,
+          crewLabel: c.crewLabel,
+          date: c.date,
+        }))
+
+      return { bounties, jobs, articles, calls }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
   })
 }

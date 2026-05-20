@@ -27,6 +27,7 @@ import Link from "next/link";
 import { Field } from "../../../ui/onboarding/Field";
 import { ProfileLinksEditor } from "../../../ui/profile-links";
 import { SocialAccountLinker } from "../../../ui/vouches/SocialAccountLinker";
+import { TaglineEditor } from "../../../dashboard/[id]/components/TaglineEditor";
 import { useUserData, useXAccount } from "../../../lib/hooks/use-api";
 
 const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
@@ -430,6 +431,10 @@ export function EditClient({ memberId }: { memberId: string }) {
         () => String((userData as any)?.["Skills"] ?? "") || "",
         [userData]
     );
+    const taglineInitial = useMemo(
+        () => String((userData as any)?.["Tagline"] ?? "") || "",
+        [userData]
+    );
 
     if (isLoading) {
         return (
@@ -569,6 +574,24 @@ export function EditClient({ memberId }: { memberId: string }) {
                         View public profile
                     </Link>
                 </div>
+
+                {/* Tagline — single-line public bio */}
+                <section style={card()}>
+                    <h2 style={sectionTitle()}>Tagline</h2>
+                    <p
+                        style={{
+                            margin: 0,
+                            fontSize: 13,
+                            color: "hsl(var(--muted-foreground))",
+                        }}
+                    >
+                        One line. Shows under your name on your profile and in social previews.
+                    </p>
+                    <TaglineEditor
+                        memberId={memberId}
+                        initialTagline={taglineInitial}
+                    />
+                </section>
 
                 {/* Status / About */}
                 <section style={card()}>
