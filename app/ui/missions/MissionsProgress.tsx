@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { card, btn } from "../shared-styles";
+import { card } from "../shared-styles";
 
 type LevelData = {
   level: number;
@@ -15,30 +15,49 @@ type LevelData = {
   }[];
 };
 
-export function MissionsProgress() {
-  const [data, setData] = useState<{
-    levels: LevelData[];
-    currentLevel: number;
-    levelTitle: string | null;
-    isAuthenticated: boolean;
-  } | null>(null);
-  const [loading, setLoading] = useState(true);
+export type MissionsSummary = {
+  levels: LevelData[];
+  currentLevel: number;
+  levelTitle: string | null;
+  isAuthenticated: boolean;
+};
+
+export type MissionsProgressProps = {
+  /** Optional pre-fetched summary. When omitted, the component self-fetches
+   * `/api/missions` (legacy behavior — used by `/missions` page). */
+  summary?: MissionsSummary;
+};
+
+export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
+  const [fetched, setFetched] = useState<MissionsSummary | null>(null);
+  const [loading, setLoading] = useState(summary === undefined);
 
   useEffect(() => {
+    // If parent passed a summary, do not self-fetch.
+    if (summary !== undefined) {
+      setLoading(false);
+      return;
+    }
+    let cancelled = false;
     (async () => {
       try {
         const res = await fetch("/api/missions");
         if (res.ok) {
-          const json = await res.json();
-          setData(json);
+          const json = (await res.json()) as MissionsSummary;
+          if (!cancelled) setFetched(json);
         }
       } catch {
         // Silently fail - card just won't show
       } finally {
-        setLoading(false);
+        if (!cancelled) setLoading(false);
       }
     })();
-  }, []);
+    return () => {
+      cancelled = true;
+    };
+  }, [summary]);
+
+  const data = summary ?? fetched;
 
   if (loading || !data || !data.isAuthenticated) return null;
 
@@ -170,7 +189,7 @@ export function MissionsProgress() {
                   }}
                 >
                   <span style={{ flexShrink: 0 }}>
-                    {done ? "\u2705" : pending ? "\u23F3" : "\u25CB"}
+                    {done ? "✅" : pending ? "⏳" : "○"}
                   </span>
                   <span
                     style={{
