@@ -140,13 +140,17 @@ export function usePOAPs(memberId: string | undefined) {
 
 // ============ Vouches ============
 
-export function useVouches(memberId: string | undefined, options?: { limit?: number; source?: string }) {
+export function useVouches(
+  memberId: string | undefined,
+  options?: { limit?: number; source?: string; direction?: 'in' | 'out' }
+) {
   return useQuery({
     queryKey: ['vouches', memberId, options],
     queryFn: async () => {
       const params = new URLSearchParams({ memberId: memberId! })
       if (options?.limit) params.set('limit', String(options.limit))
       if (options?.source) params.set('source', options.source)
+      if (options?.direction) params.set('direction', options.direction)
       const res = await fetch(`/api/vouches?${params}`)
       if (!res.ok) throw new Error('Failed to load vouches')
       return res.json()
