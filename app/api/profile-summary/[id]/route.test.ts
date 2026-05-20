@@ -107,6 +107,7 @@ function setupHappyPath() {
         farcaster: 1,
         twitter: 0,
         followers: 7,
+        pizzadaoFollowers: 5,
     });
     (
         prisma as unknown as {

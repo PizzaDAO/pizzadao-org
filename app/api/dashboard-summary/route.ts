@@ -182,6 +182,7 @@ export async function GET(request: NextRequest) {
                 farcaster: 0,
                 twitter: 0,
                 followers: 0,
+                pizzadaoFollowers: 0,
             }),
             safe(
                 prisma.memberWallet.findMany({
