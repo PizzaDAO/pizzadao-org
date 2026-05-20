@@ -59,8 +59,9 @@ export type HeroBlockProps = {
     /** Alias retained for the plan's prop name; behaves the same as `levelBadge`. */
     missionLevel?: { level: number; title: string } | null;
     onSendPep: () => void;
-    /** Optional override for the Edit Profile click. When omitted, the rendered Link
-     * navigates to `/?edit=1&memberId={idValue}` (the original behavior). */
+    /** Optional override for the Edit Profile click. When omitted, the rendered
+     * Link navigates to `/profile/{idValue}/edit` (the new owner-only edit
+     * route introduced in PR5 slice-61816). */
     onOpenEditProfile?: () => void;
 };
 
@@ -165,15 +166,29 @@ export function HeroBlock({
                     </button>
                 </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                <Link href={`/?edit=1&memberId=${idValue}`} style={{
-                    ...btn("primary"),
-                    fontSize: 13,
-                    padding: "6px 12px",
-                    textDecoration: "none",
-                }}>
-                    Edit Profile
-                </Link>
+            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+                <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
+                    <Link href={`/profile/${idValue}/edit`} style={{
+                        ...btn("primary"),
+                        fontSize: 13,
+                        padding: "6px 12px",
+                        textDecoration: "none",
+                    }}>
+                        Edit Profile
+                    </Link>
+                    <Link
+                        href="/me/wallets"
+                        style={{
+                            fontSize: 12,
+                            color: "hsl(var(--muted-foreground))",
+                            textDecoration: "none",
+                            fontFamily: FONT_DISPLAY,
+                            fontWeight: 600,
+                        }}
+                    >
+                        Manage wallets →
+                    </Link>
+                </div>
                 <ThemeToggle />
                 <NotificationBell />
             </div>
