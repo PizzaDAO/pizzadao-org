@@ -30,36 +30,47 @@ export default function VouchesPage() {
   // --- React Query hooks ---
   const { data: meData, isLoading: meLoading, error: meError } = useMe();
   const memberId = meData?.memberId ?? null;
-  // Internal PIZZADAO vouches only — Farcaster/Twitter sources are out of scope here.
-  const { data: vouchesData, isLoading: vouchesLoading } = useVouches(
+  // Outbound: people I'm vouching for. Internal PIZZADAO only.
+  const { data: outboundData, isLoading: outboundLoading } = useVouches(
     memberId,
-    { limit: 200, source: "PIZZADAO" },
+    { limit: 200, source: "PIZZADAO", direction: "out" },
+  );
+  // Inbound: people vouching for me. Internal PIZZADAO only.
+  const { data: inboundData, isLoading: inboundLoading } = useVouches(
+    memberId,
+    { limit: 200, source: "PIZZADAO", direction: "in" },
   );
 
-  const loading = meLoading || (!!memberId && vouchesLoading);
+  const loading =
+    meLoading || (!!memberId && (outboundLoading || inboundLoading));
   const authError = meError
     ? "Please log in to view your vouches"
     : meData && !memberId
     ? "Could not find your member profile"
     : null;
 
-  // Local state for vouches/counts (mutated optimistically on remove)
-  const [vouches, setVouches] = useState<VouchData[]>([]);
+  // Local state — mutated optimistically on outbound remove.
+  const [outbound, setOutbound] = useState<VouchData[]>([]);
+  const [inbound, setInbound] = useState<VouchData[]>([]);
   const [counts, setCounts] = useState({
     pizzadao: 0,
     pizzadaoFollowers: 0,
   });
 
-  // Sync hook data to local state
+  // Sync hook data to local state. Counts come from the outbound payload
+  // (the API returns the same counts shape regardless of direction).
   useEffect(() => {
-    if (vouchesData) {
-      setVouches(vouchesData.vouches || []);
+    if (outboundData) {
+      setOutbound(outboundData.vouches || []);
       setCounts({
-        pizzadao: vouchesData.counts?.pizzadao ?? 0,
-        pizzadaoFollowers: vouchesData.counts?.pizzadaoFollowers ?? 0,
+        pizzadao: outboundData.counts?.pizzadao ?? 0,
+        pizzadaoFollowers: outboundData.counts?.pizzadaoFollowers ?? 0,
       });
     }
-  }, [vouchesData]);
+  }, [outboundData]);
+  useEffect(() => {
+    if (inboundData) setInbound(inboundData.vouches || []);
+  }, [inboundData]);
 
   const [searchQuery, setSearchQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
@@ -75,9 +86,7 @@ export default function VouchesPage() {
       });
 
       if (res.ok) {
-        setVouches((prev) =>
-          prev.filter((v) => v.memberId !== targetMemberId)
-        );
+        setOutbound((prev) => prev.filter((v) => v.memberId !== targetMemberId));
         setCounts((prev) => ({
           ...prev,
           pizzadao: Math.max(0, prev.pizzadao - 1),
@@ -90,8 +99,7 @@ export default function VouchesPage() {
     }
   };
 
-  // Filter by search only (source filter removed — only PIZZADAO comes from the API now)
-  const filteredVouches = vouches.filter((v) => {
+  const matchesSearch = (v: VouchData) => {
     if (!searchQuery) return true;
     const q = searchQuery.toLowerCase();
     return (
@@ -99,7 +107,9 @@ export default function VouchesPage() {
       v.city.toLowerCase().includes(q) ||
       v.crews.toLowerCase().includes(q)
     );
-  });
+  };
+  const filteredOutbound = outbound.filter(matchesSearch);
+  const filteredInbound = inbound.filter(matchesSearch);
 
   if (loading) {
     return (
@@ -174,6 +184,90 @@ export default function VouchesPage() {
     );
   }
 
+  const sectionHeading = (label: string, count: number) => (
+    <h2
+      style={{
+        margin: "0 0 8px",
+        fontFamily: displayFont,
+        fontSize: 20,
+        fontWeight: 800,
+        letterSpacing: "-0.01em",
+        color: "hsl(var(--foreground))",
+      }}
+    >
+      {label}
+      <span
+        style={{
+          marginLeft: 8,
+          fontSize: 16,
+          fontWeight: 700,
+          color: "hsl(var(--muted-foreground))",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {count}
+      </span>
+    </h2>
+  );
+
+  const emptyState = (msg: string, sub?: string) => (
+    <div
+      style={{
+        padding: 32,
+        borderRadius: "var(--radius)",
+        border: "1px dashed hsl(var(--rule) / 0.22)",
+        background: "hsl(var(--card))",
+        textAlign: "center",
+      }}
+    >
+      <p
+        style={{
+          fontFamily: displayFont,
+          fontSize: 16,
+          fontWeight: 700,
+          margin: 0,
+          color: "hsl(var(--foreground))",
+        }}
+      >
+        {msg}
+      </p>
+      {sub && (
+        <p
+          style={{
+            fontSize: 14,
+            color: "hsl(var(--muted-foreground))",
+            margin: "6px 0 0",
+          }}
+        >
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+
+  const grid = (items: VouchData[], showRemove: boolean) => (
+    <div
+      style={{
+        display: "grid",
+        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+        gap: 12,
+      }}
+    >
+      {items.map((v) => (
+        <VouchCard
+          key={v.memberId}
+          memberId={v.memberId}
+          name={v.name}
+          city={v.city}
+          crews={v.crews}
+          source={v.source}
+          isOwnList={showRemove}
+          onRemove={showRemove ? handleRemove : undefined}
+        />
+      ))}
+    </div>
+  );
+
   return (
     <div style={pageContainer()}>
       <div
@@ -233,73 +327,31 @@ export default function VouchesPage() {
           style={inputStyle()}
         />
 
-        {/* Vouches Grid */}
-        {filteredVouches.length > 0 ? (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {filteredVouches.map((v) => (
-              <VouchCard
-                key={v.memberId}
-                memberId={v.memberId}
-                name={v.name}
-                city={v.city}
-                crews={v.crews}
-                source={v.source}
-                isOwnList={true}
-                onRemove={handleRemove}
-              />
-            ))}
-          </div>
-        ) : (
-          <div
-            style={{
-              padding: 40,
-              borderRadius: "var(--radius)",
-              border: "1px dashed hsl(var(--rule) / 0.22)",
-              background: "hsl(var(--card))",
-              textAlign: "center",
-            }}
-          >
-            {vouches.length === 0 ? (
-              <>
-                <p
-                  style={{
-                    fontFamily: displayFont,
-                    fontSize: 18,
-                    fontWeight: 700,
-                    marginBottom: 8,
-                    color: "hsl(var(--foreground))",
-                  }}
-                >
-                  No vouches yet
-                </p>
-                <p
-                  style={{
-                    fontSize: 14,
-                    color: "hsl(var(--muted-foreground))",
-                    marginBottom: 16,
-                  }}
-                >
-                  Visit a member profile and tap “+ Vouch” to add one.
-                </p>
-              </>
-            ) : (
-              <p
-                style={{
-                  fontSize: 14,
-                  color: "hsl(var(--muted-foreground))",
-                }}
-              >
-                No vouches match your search.
-              </p>
-            )}
-          </div>
-        )}
+        {/* Vouching for you (inbound) */}
+        <section>
+          {sectionHeading("Vouching for you", counts.pizzadaoFollowers)}
+          {filteredInbound.length > 0
+            ? grid(filteredInbound, false)
+            : inbound.length === 0
+            ? emptyState(
+                "Nobody has vouched for you yet",
+                "Build your reputation — ask a few members to vouch for you on their profile.",
+              )
+            : emptyState("No vouchers match your search.")}
+        </section>
+
+        {/* You vouch for (outbound) */}
+        <section>
+          {sectionHeading("You vouch for", counts.pizzadao)}
+          {filteredOutbound.length > 0
+            ? grid(filteredOutbound, true)
+            : outbound.length === 0
+            ? emptyState(
+                "You haven't vouched for anyone yet",
+                "Visit a member profile and tap “+ Vouch” to add one.",
+              )
+            : emptyState("No vouches match your search.")}
+        </section>
 
         {/* Footer */}
         <div

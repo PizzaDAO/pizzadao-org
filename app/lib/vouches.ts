@@ -82,6 +82,52 @@ export async function getVouches(
 }
 
 /**
+ * Get vouchers (people who have vouched for the member) with enriched data
+ * from Google Sheets. Inbound counterpart to {@link getVouches}.
+ */
+export async function getVouchers(
+  memberId: string,
+  limit = 50,
+  source?: VouchSource
+) {
+  const where: any = { followeeId: memberId }
+  if (source) where.source = source
+
+  const vouches = await prisma.vouch.findMany({
+    where,
+    orderBy: { createdAt: 'desc' },
+    take: limit
+  })
+
+  const enriched = await Promise.all(
+    vouches.map(async (v) => {
+      try {
+        const member = await fetchMemberById(v.followerId)
+        return {
+          memberId: v.followerId,
+          name: member?.['Name'] || member?.['Mafia Name'] || 'Unknown',
+          city: member?.['City'] || '',
+          crews: member?.['Crews'] || '',
+          source: v.source,
+          createdAt: v.createdAt
+        }
+      } catch {
+        return {
+          memberId: v.followerId,
+          name: 'Unknown',
+          city: '',
+          crews: '',
+          source: v.source,
+          createdAt: v.createdAt
+        }
+      }
+    })
+  )
+
+  return enriched
+}
+
+/**
  * Get vouch counts by source
  */
 export async function getVouchCounts(memberId: string) {
