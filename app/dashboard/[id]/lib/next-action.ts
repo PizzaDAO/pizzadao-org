@@ -98,7 +98,7 @@ export function resolveNextAction(input: NextActionInput): NextAction {
   if (wallets.count === 0) {
     return {
       kind: "connect_wallet",
-      headline: "Link a wallet to collect POAPs and NFTs",
+      headline: "Link a wallet to display your PizzaDAO POAPs and NFTs",
       primaryCta: { label: "Connect a wallet", href: `/profile/${member.id}` },
     };
   }
