@@ -38,6 +38,17 @@ function crewCard(): React.CSSProperties {
     };
 }
 
+export type HydratedCrew = {
+    id: string;
+    label: string;
+    emoji?: string;
+    callTime?: string;
+    callTimeUrl?: string;
+    callLength?: string;
+    claimedTaskCount: number;
+    doneCount: number;
+};
+
 export type YourCrewsProps = {
     crewOptions: CrewOption[];
     userCrews: string[];
@@ -45,18 +56,41 @@ export type YourCrewsProps = {
     doneCounts: Record<string, number>;
     /** Reserved for future per-member behavior; not currently used. */
     currentMemberId?: string;
+    /**
+     * Optional pre-hydrated crews array from `/api/dashboard-summary`.
+     * When provided, takes precedence over computing the crew list from
+     * `crewOptions + userCrews`. The myTasks/doneCounts props remain the
+     * source of truth for the in-card "Your Tasks" / "Closed: N" detail
+     * until the summary endpoint exposes per-task labels (PR3+).
+     */
+    hydratedCrews?: HydratedCrew[];
 };
 
-export function YourCrews({ crewOptions, userCrews, myTasks, doneCounts }: YourCrewsProps) {
-    // Normalize userCrews to IDs where possible
-    const userCrewIds = userCrews.map(name => {
-        const found = crewOptions.find(opt => opt.label.toLowerCase() === name.toLowerCase() || opt.id.toLowerCase() === name.toLowerCase());
-        return found ? found.id : name;
-    });
+export function YourCrews({ crewOptions, userCrews, myTasks, doneCounts, hydratedCrews }: YourCrewsProps) {
+    // Prefer the server-hydrated crew list when available. The visual output
+    // is identical — same card layout, call times, top-tasks etc. — but the
+    // crew IDs come from the BFF instead of being re-derived on the client.
+    // The myTasks prop continues to drive the in-card "Your Tasks" detail
+    // until PR3+ exposes per-task labels through the summary.
+    let allDisplayIds: string[];
+    const effectiveDoneCounts: Record<string, number> = { ...(doneCounts || {}) };
 
-    // Combine with IDs from myTasks
-    const taskCrewIds = Object.keys(myTasks);
-    const allDisplayIds = Array.from(new Set([...userCrewIds, ...taskCrewIds]));
+    if (hydratedCrews && hydratedCrews.length > 0) {
+        allDisplayIds = hydratedCrews.map((c) => c.id);
+        for (const c of hydratedCrews) {
+            effectiveDoneCounts[c.id.toLowerCase()] = c.doneCount;
+        }
+    } else {
+        // Normalize userCrews to IDs where possible
+        const userCrewIds = userCrews.map(name => {
+            const found = crewOptions.find(opt => opt.label.toLowerCase() === name.toLowerCase() || opt.id.toLowerCase() === name.toLowerCase());
+            return found ? found.id : name;
+        });
+
+        // Combine with IDs from myTasks
+        const taskCrewIds = Object.keys(myTasks);
+        allDisplayIds = Array.from(new Set([...userCrewIds, ...taskCrewIds]));
+    }
 
     if (allDisplayIds.length === 0) return null;
 
@@ -114,7 +148,7 @@ export function YourCrews({ crewOptions, userCrews, myTasks, doneCounts }: YourC
 
                                 {(() => {
                                     const currentCid = String(c?.id || cid).toLowerCase();
-                                    const doneCount = doneCounts[currentCid] || 0;
+                                    const doneCount = effectiveDoneCounts[currentCid] || 0;
                                     const personalTasks = myTasks[currentCid] || [];
                                     const topTasks = c?.tasks || [];
                                     const hasPersonal = personalTasks && personalTasks.length > 0;

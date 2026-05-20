@@ -340,6 +340,33 @@ export function useMemberLookup(discordId: string | undefined) {
   })
 }
 
+// ============ Dashboard Summary (BFF) ============
+
+/**
+ * Fetch the consolidated dashboard payload from /api/dashboard-summary.
+ * Replaces the ~8 concurrent client fetches the dashboard previously did
+ * (user-data, missions, balance, my-tasks, vouches, wallets, x, notifications).
+ *
+ * Plan: plans/garlic-96648-dashboard-redesign.md §6.3
+ */
+export function useDashboardSummary(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ['dashboard-summary', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard-summary?memberId=${encodeURIComponent(memberId!)}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to load dashboard summary')
+      }
+      return res.json()
+    },
+    enabled: !!memberId,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}
+
 // ============ Profile Summary (composed, client-side) ============
 
 /**
