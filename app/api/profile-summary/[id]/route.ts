@@ -195,6 +195,7 @@ export async function composeProfileSummary(
             farcaster: 0,
             twitter: 0,
             followers: 0,
+            pizzadaoFollowers: 0,
         }),
         safe(
             (prisma as unknown as {

@@ -85,21 +85,25 @@ export async function getVouches(
  * Get vouch counts by source
  */
 export async function getVouchCounts(memberId: string) {
-  const [total, pizzadao, farcaster, twitter, followers] = await Promise.all([
-    prisma.vouch.count({ where: { followerId: memberId } }),
-    prisma.vouch.count({
-      where: { followerId: memberId, source: VouchSource.PIZZADAO }
-    }),
-    prisma.vouch.count({
-      where: { followerId: memberId, source: VouchSource.FARCASTER }
-    }),
-    prisma.vouch.count({
-      where: { followerId: memberId, source: VouchSource.TWITTER }
-    }),
-    prisma.vouch.count({ where: { followeeId: memberId } })
-  ])
+  const [total, pizzadao, farcaster, twitter, followers, pizzadaoFollowers] =
+    await Promise.all([
+      prisma.vouch.count({ where: { followerId: memberId } }),
+      prisma.vouch.count({
+        where: { followerId: memberId, source: VouchSource.PIZZADAO }
+      }),
+      prisma.vouch.count({
+        where: { followerId: memberId, source: VouchSource.FARCASTER }
+      }),
+      prisma.vouch.count({
+        where: { followerId: memberId, source: VouchSource.TWITTER }
+      }),
+      prisma.vouch.count({ where: { followeeId: memberId } }),
+      prisma.vouch.count({
+        where: { followeeId: memberId, source: VouchSource.PIZZADAO }
+      })
+    ])
 
-  return { total, pizzadao, farcaster, twitter, followers }
+  return { total, pizzadao, farcaster, twitter, followers, pizzadaoFollowers }
 }
 
 /**

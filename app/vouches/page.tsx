@@ -4,8 +4,6 @@ import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { VouchCard } from "../ui/vouches/VouchCard";
-import { SocialAccountLinker } from "../ui/vouches/SocialAccountLinker";
-import { FarcasterDiscovery } from "../ui/vouches/FarcasterDiscovery";
 import { useMe, useVouches } from "../lib/hooks/use-api";
 import {
   btn,
@@ -23,8 +21,6 @@ type VouchData = {
   source: "PIZZADAO" | "TWITTER" | "FARCASTER";
 };
 
-type FilterTab = "ALL" | "PIZZADAO" | "FARCASTER" | "TWITTER";
-
 const displayFont =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
@@ -34,7 +30,11 @@ export default function VouchesPage() {
   // --- React Query hooks ---
   const { data: meData, isLoading: meLoading, error: meError } = useMe();
   const memberId = meData?.memberId ?? null;
-  const { data: vouchesData, isLoading: vouchesLoading } = useVouches(memberId, { limit: 200 });
+  // Internal PIZZADAO vouches only — Farcaster/Twitter sources are out of scope here.
+  const { data: vouchesData, isLoading: vouchesLoading } = useVouches(
+    memberId,
+    { limit: 200, source: "PIZZADAO" },
+  );
 
   const loading = meLoading || (!!memberId && vouchesLoading);
   const authError = meError
@@ -46,33 +46,23 @@ export default function VouchesPage() {
   // Local state for vouches/counts (mutated optimistically on remove)
   const [vouches, setVouches] = useState<VouchData[]>([]);
   const [counts, setCounts] = useState({
-    total: 0,
     pizzadao: 0,
-    farcaster: 0,
-    twitter: 0,
-    followers: 0,
+    pizzadaoFollowers: 0,
   });
 
   // Sync hook data to local state
   useEffect(() => {
     if (vouchesData) {
       setVouches(vouchesData.vouches || []);
-      setCounts(
-        vouchesData.counts || {
-          total: 0,
-          pizzadao: 0,
-          farcaster: 0,
-          twitter: 0,
-          followers: 0,
-        }
-      );
+      setCounts({
+        pizzadao: vouchesData.counts?.pizzadao ?? 0,
+        pizzadaoFollowers: vouchesData.counts?.pizzadaoFollowers ?? 0,
+      });
     }
   }, [vouchesData]);
 
-  const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [hasFarcaster, setHasFarcaster] = useState(false);
 
   const handleRemove = async (targetMemberId: string) => {
     setRemovingId(targetMemberId);
@@ -90,7 +80,6 @@ export default function VouchesPage() {
         );
         setCounts((prev) => ({
           ...prev,
-          total: Math.max(0, prev.total - 1),
           pizzadao: Math.max(0, prev.pizzadao - 1),
         }));
       }
@@ -101,18 +90,15 @@ export default function VouchesPage() {
     }
   };
 
-  // Filter vouches
+  // Filter by search only (source filter removed — only PIZZADAO comes from the API now)
   const filteredVouches = vouches.filter((v) => {
-    if (activeTab !== "ALL" && v.source !== activeTab) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        v.name.toLowerCase().includes(q) ||
-        v.city.toLowerCase().includes(q) ||
-        v.crews.toLowerCase().includes(q)
-      );
-    }
-    return true;
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      v.name.toLowerCase().includes(q) ||
+      v.city.toLowerCase().includes(q) ||
+      v.crews.toLowerCase().includes(q)
+    );
   });
 
   if (loading) {
@@ -188,13 +174,6 @@ export default function VouchesPage() {
     );
   }
 
-  const tabs: { id: FilterTab; label: string; count: number }[] = [
-    { id: "ALL", label: "All", count: counts.total },
-    { id: "PIZZADAO", label: "PizzaDAO", count: counts.pizzadao },
-    { id: "FARCASTER", label: "Farcaster", count: counts.farcaster },
-    { id: "TWITTER", label: "X", count: counts.twitter },
-  ];
-
   return (
     <div style={pageContainer()}>
       <div
@@ -241,81 +220,9 @@ export default function VouchesPage() {
               margin: 0,
             }}
           >
-            {counts.total} vouching for · {counts.followers} vouchers
+            {counts.pizzadao} vouching for · {counts.pizzadaoFollowers} vouchers
           </p>
         </header>
-
-        {/* Social Account Linking */}
-        {memberId && (
-          <div style={card()}>
-            <SocialAccountLinker
-              memberId={memberId}
-              onAccountChange={(accounts) => {
-                setHasFarcaster(
-                  accounts.some((a) => a.platform === "FARCASTER")
-                );
-              }}
-            />
-          </div>
-        )}
-
-        {/* Farcaster Discovery */}
-        {memberId && hasFarcaster && (
-          <div style={card()}>
-            <FarcasterDiscovery currentMemberId={memberId} />
-          </div>
-        )}
-
-        {/* Filter Tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            padding: 4,
-            borderRadius: "var(--radius)",
-            background: "hsl(var(--card))",
-            border: "1px solid hsl(var(--rule) / 0.12)",
-          }}
-        >
-          {tabs.map((tab) => {
-            const active = activeTab === tab.id;
-            return (
-              <button
-                key={tab.id}
-                onClick={() => setActiveTab(tab.id)}
-                style={{
-                  flex: 1,
-                  padding: "8px 12px",
-                  borderRadius: "calc(var(--radius) - 4px)",
-                  border: "none",
-                  background: active ? "hsl(var(--primary))" : "transparent",
-                  color: active
-                    ? "hsl(var(--primary-foreground))"
-                    : "hsl(var(--muted-foreground))",
-                  fontSize: 13,
-                  fontWeight: 600,
-                  fontFamily: displayFont,
-                  cursor: "pointer",
-                  transition:
-                    "background-color 150ms ease, color 150ms ease",
-                }}
-              >
-                {tab.label}
-                {tab.count > 0 && (
-                  <span
-                    style={{
-                      marginLeft: 6,
-                      opacity: 0.75,
-                      fontVariantNumeric: "tabular-nums",
-                    }}
-                  >
-                    {tab.count}
-                  </span>
-                )}
-              </button>
-            );
-          })}
-        </div>
 
         {/* Search */}
         <input
@@ -378,8 +285,7 @@ export default function VouchesPage() {
                     marginBottom: 16,
                   }}
                 >
-                  Visit member profiles to vouch for them, or link your social
-                  accounts to discover vouches.
+                  Visit a member profile and tap “+ Vouch” to add one.
                 </p>
               </>
             ) : (
