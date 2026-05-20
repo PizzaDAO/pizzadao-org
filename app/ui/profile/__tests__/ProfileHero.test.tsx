@@ -97,4 +97,72 @@ describe("ProfileHero", () => {
         );
         expect(screen.queryByText(/this is your public profile/i)).toBeNull();
     });
+
+    // ---- PR4 — tagline rendering (burrata-13316) -------------------------
+
+    it("renders the tagline when present", () => {
+        render(
+            <ProfileHero
+                {...base}
+                tagline="I make round food for round people."
+                mode="public"
+                viewerId={null}
+            />,
+        );
+        expect(
+            screen.getByText("I make round food for round people."),
+        ).toBeTruthy();
+    });
+
+    it("renders nothing in the tagline slot when empty (no placeholder for visitors)", () => {
+        const { container } = render(
+            <ProfileHero
+                {...base}
+                tagline=""
+                mode="public"
+                viewerId={null}
+            />,
+        );
+        // The placeholder text used by the owner editor should never leak
+        // into the public hero.
+        expect(screen.queryByText(/add a tagline/i)).toBeNull();
+        // No <p> child below the <h1> for the tagline.
+        const h1 = container.querySelector("h1");
+        const sibling = h1?.nextElementSibling;
+        // Either there's no sibling at all, or the next element is the
+        // identity line (a <div>, not a <p>).
+        expect(sibling?.tagName).not.toBe("P");
+    });
+
+    it("treats a whitespace-only tagline as empty", () => {
+        render(
+            <ProfileHero
+                {...base}
+                tagline="   "
+                mode="public"
+                viewerId={null}
+            />,
+        );
+        // The ProfileHero guards via `tagline.trim().length > 0`, so a
+        // whitespace-only tagline should not render a <p> with empty text.
+        const paragraphs = document.querySelectorAll("p");
+        const whitespaceOnly = Array.from(paragraphs).some(
+            (p) => p.textContent !== null && p.textContent.trim() === "",
+        );
+        expect(whitespaceOnly).toBe(false);
+        // Name still renders.
+        expect(screen.getByText("Test Member")).toBeTruthy();
+    });
+
+    it("renders null tagline as empty (no crash)", () => {
+        render(
+            <ProfileHero
+                {...base}
+                tagline={null}
+                mode="public"
+                viewerId={null}
+            />,
+        );
+        expect(screen.getByText("Test Member")).toBeTruthy();
+    });
 });

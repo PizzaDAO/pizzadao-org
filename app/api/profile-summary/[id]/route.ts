@@ -19,6 +19,7 @@ import { getMafiaRank } from "@/app/lib/mafia-points";
 import { getVouchCounts } from "@/app/lib/vouches";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { prisma } from "@/app/lib/db";
+import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 
 export const runtime = "nodejs";
 
@@ -180,7 +181,7 @@ export async function composeProfileSummary(
     const memberDiscordId = String(member.discordId || "").trim();
 
     // Pull supplementary data in parallel.
-    const [pfpUrl, mission, mafia, vouchCounts, xRow, crewMappings] = await Promise.all([
+    const [pfpUrl, mission, mafia, vouchCounts, xRow, crewMappings, dbTagline] = await Promise.all([
         safe(resolvePfpUrl(memberId), null as string | null),
         memberDiscordId
             ? safe(getUserProgressSummary(memberDiscordId), null as Awaited<
@@ -207,13 +208,21 @@ export async function composeProfileSummary(
             null as { xUsername: string } | null
         ),
         safe(getCrewMappings(), { crews: [] as CrewOption[], cached: false }),
+        // PR4 — tagline from MemberProfileExtras (Postgres). Wins over the
+        // sheet read below when present.
+        safe(getMemberTagline(memberId), null as string | null),
     ]);
 
     const publicMember = publicMemberView(member);
 
     const name = strField(publicMember, "Name", "Mafia Name") || "Anonymous Pizza Maker";
     const city = strField(publicMember, "City") || "Worldwide";
-    const tagline = strField(publicMember, "Tagline");
+    // Tagline resolution: Postgres `MemberProfileExtras.tagline` (PR4) wins,
+    // then the deprecated sheet `Tagline` column, then empty string. This is
+    // the migration path the plan calls for in §6.3 / PR3 notes — sheet
+    // column will be removed once all live taglines are in Postgres.
+    const sheetTagline = strField(publicMember, "Tagline");
+    const tagline = (dbTagline && dbTagline.trim()) || sheetTagline || "";
     const orgs = strField(publicMember, "Affiliation", "Orgs");
     const skills = strField(publicMember, "Specialties", "Skills");
 

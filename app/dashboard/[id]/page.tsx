@@ -31,6 +31,7 @@ import { HeroBlock } from "./components/HeroBlock";
 import { YourCrews, type CrewOption } from "./components/YourCrews";
 import { NextActionPanel } from "./components/NextActionPanel";
 import { RecentActivity } from "./components/RecentActivity";
+import { TaglineEditor } from "./components/TaglineEditor";
 import { Discover } from "./components/Discover";
 
 // Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
@@ -309,6 +310,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     {/* ── 6. Collapsible "Profile Details" ── */}
                     <CollapsibleSection title="Profile Details">
                         <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
+                            {/* Tagline editor — full row at top. Saves to MemberProfileExtras
+                                via POST /api/profile-extras/[id] and patches the profile-summary
+                                cache so the public hero reflects the change. */}
+                            <TaglineEditor
+                                memberId={idValue}
+                                initialTagline={String(data["Tagline"] || "")}
+                            />
+
                             <StatItem label="Status" value={status} />
 
                             {/* Orgs with edit button */}
