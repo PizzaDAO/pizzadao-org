@@ -339,3 +339,94 @@ export function useMemberLookup(discordId: string | undefined) {
     staleTime: 10 * 60 * 1000,
   })
 }
+
+// ============ Profile Summary (composed, client-side) ============
+
+/**
+ * Profile-summary aggregator hook — Plan: truffle-91035 (PR2 — pepperoni-77692).
+ *
+ * Client-side composition over existing hooks. The PR3 follow-up replaces
+ * the inner fetches with a single `/api/profile-summary/[id]` BFF endpoint;
+ * this hook's external shape is the contract the page consumes, so the
+ * swap is a one-file change.
+ *
+ * Returns null `data` until the core `useProfile` finishes (loading or
+ * error). The supplementary hooks (pfp, x, articles, mission progress,
+ * me, crew mappings) degrade gracefully — missing data leaves fields
+ * blank rather than blocking the page.
+ */
+export function useProfileSummary(memberId: string | undefined) {
+  const profile = useProfile(memberId)
+  const pfp = usePfp(memberId)
+  const x = useXAccount(memberId)
+  const mission = useMissionProgress(memberId)
+  const me = useMe()
+  const crewMappings = useCrewMappings()
+
+  const data = (() => {
+    if (!profile.data) return null
+    const p: Record<string, unknown> = profile.data
+    const get = (k: string) => (typeof p[k] === 'string' ? (p[k] as string) : '')
+
+    const name =
+      get('Name') || get('Mafia Name') || 'Anonymous Pizza Maker'
+    const city = get('City') || 'Worldwide'
+    const crewsStr = get('Crews') || 'None'
+    const orgs = get('Affiliation') || get('Orgs') || ''
+    const skills = get('Specialties') || get('Skills') || ''
+    const tagline = get('Tagline') || ''
+
+    const rawTurtles = p['Turtles'] ?? p['Roles'] ?? []
+    const turtleList = (Array.isArray(rawTurtles)
+      ? (rawTurtles as unknown[]).map((s) => String(s).trim())
+      : String(rawTurtles).split(',').map((t) => t.trim())
+    ).filter(Boolean)
+
+    const crewIds = crewsStr !== 'None'
+      ? crewsStr.split(',').map((c) => c.trim()).filter(Boolean)
+      : []
+
+    const mp = mission.data as
+      | { currentLevel?: number; approvedCount?: number; levelTitle?: string }
+      | null
+      | undefined
+    let level: number | string | null = null
+    let levelTitle = ''
+    if (mp && typeof mp.currentLevel === 'number' && (mp.approvedCount ?? 0) > 0) {
+      level = mp.currentLevel > 8 ? 'MAX' : mp.currentLevel
+      levelTitle = mp.levelTitle ?? ''
+    }
+
+    const viewerId: string | null =
+      (me.data && typeof me.data === 'object' && 'memberId' in (me.data as Record<string, unknown>)
+        ? ((me.data as { memberId?: string | null }).memberId ?? null)
+        : null)
+
+    return {
+      hero: {
+        name,
+        pfpUrl: (pfp.data as { url?: string | null } | undefined)?.url ?? null,
+        tagline,
+        city,
+        level,
+        levelTitle,
+      },
+      about: {
+        skills,
+        orgs,
+        turtles: turtleList,
+        xAccount: (x.data as { connected?: boolean; username?: string } | null | undefined) ?? null,
+      },
+      crewIds,
+      crewOptions: ((crewMappings.data as { crews?: unknown[] } | undefined)?.crews ?? []) as unknown[],
+      viewerId,
+      isOwner: !!viewerId && String(viewerId) === String(memberId),
+    }
+  })()
+
+  return {
+    data,
+    isLoading: profile.isLoading,
+    error: profile.error,
+  }
+}
