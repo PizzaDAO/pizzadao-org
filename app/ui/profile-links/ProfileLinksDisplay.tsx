@@ -15,8 +15,28 @@ type ProfileLink = {
  *
  * Phase 3c restyle: subtle ink chips on cream-warm background that
  * shift to tomato on hover, matching the pizzadao.org accent style.
+ *
+ * Layout-leak fix (truffle-91035 PR1): the component used to own its
+ * outer `sm:col-span-2` wrapper, which forced it to span two columns
+ * of its parent grid regardless of where it was placed. The `variant`
+ * prop now decouples that. `"standalone"` (default) preserves the
+ * outer wrapper — keeping all current call sites visually identical
+ * to main. `"inline"` drops the wrapper so the parent owns layout.
  */
-export function ProfileLinksDisplay({ memberId }: { memberId: string }) {
+export function ProfileLinksDisplay({
+  memberId,
+  variant = "standalone",
+}: {
+  memberId: string;
+  /**
+   * Visual variant.
+   * - `"standalone"` (default): renders inside an `sm:col-span-2` wrapper,
+   *   identical to the pre-refactor behavior.
+   * - `"inline"`: renders without the outer grid-spanning wrapper. Use when
+   *   the parent owns the section layout.
+   */
+  variant?: "standalone" | "inline";
+}) {
   const [links, setLinks] = useState<ProfileLink[]>([]);
   const [loading, setLoading] = useState(true);
 
@@ -42,8 +62,8 @@ export function ProfileLinksDisplay({ memberId }: { memberId: string }) {
 
   if (loading || links.length === 0) return null;
 
-  return (
-    <div className="sm:col-span-2">
+  const body = (
+    <>
       <h3 className="m-0 mb-2 text-xs uppercase tracking-wider font-bold text-muted-foreground">
         Links
       </h3>
@@ -74,6 +94,12 @@ export function ProfileLinksDisplay({ memberId }: { memberId: string }) {
           );
         })}
       </div>
-    </div>
+    </>
   );
+
+  if (variant === "inline") {
+    return body;
+  }
+
+  return <div className="sm:col-span-2">{body}</div>;
 }

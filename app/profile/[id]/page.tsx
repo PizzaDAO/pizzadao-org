@@ -6,7 +6,7 @@
 // See plans/site-restyle-pizzadao-org.md.
 "use client";
 
-import { use, useState } from "react";
+import { use } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { TURTLES } from "../../ui/constants";
@@ -17,6 +17,7 @@ import { AttendanceCard } from "../../ui/attendance-card";
 import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { AddVouchButton } from "../../ui/vouches/AddVouchButton";
+import { CollapsibleSection } from "../../ui/shared/CollapsibleSection";
 import { btn } from "../../ui/onboarding/styles";
 import {
     useProfile,
@@ -48,37 +49,6 @@ function splitTurtlesCell(v: unknown): string[] {
     const s = norm(v);
     if (!s) return [];
     return s.split(/[,/|]+/).map((x) => norm(x)).filter(Boolean);
-}
-
-function CollapsibleSection({
-    title,
-    defaultOpen = false,
-    children,
-}: {
-    title: string;
-    defaultOpen?: boolean;
-    children: React.ReactNode;
-}) {
-    const [open, setOpen] = useState(defaultOpen);
-    return (
-        <div className="border-t border-rule pt-4">
-            <button
-                onClick={() => setOpen(!open)}
-                className="flex w-full items-center gap-2 bg-transparent border-0 p-0 text-left text-foreground font-display text-lg font-semibold cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-background rounded-sm"
-                aria-expanded={open}
-            >
-                <span
-                    className="inline-block text-muted-foreground text-[10px] transition-transform duration-200"
-                    style={{ transform: open ? "rotate(90deg)" : "rotate(0deg)" }}
-                    aria-hidden
-                >
-                    ▶
-                </span>
-                {title}
-            </button>
-            {open && <div className="mt-3">{children}</div>}
-        </div>
-    );
 }
 
 export default function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
