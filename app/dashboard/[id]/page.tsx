@@ -24,9 +24,12 @@ import {
     useMyBalance,
     useMissions,
     useDashboardSummary,
+    useActivity,
 } from "../../lib/hooks/use-api";
 import { HeroBlock } from "./components/HeroBlock";
 import { YourCrews, type CrewOption } from "./components/YourCrews";
+import { NextActionPanel } from "./components/NextActionPanel";
+import { RecentActivity } from "./components/RecentActivity";
 
 // Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
 // --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
@@ -58,6 +61,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     // into one request. The individual hooks below remain as a fallback while
     // the summary is loading or if it errors — same data, just slower.
     const { data: summary } = useDashboardSummary(id);
+    const { data: activity } = useActivity(id);
     const { data: userData, isLoading: userDataLoading, error: userDataError } = useUserData(id);
     const { data: pfpData } = usePfp(id);
     const { data: xAccountData } = useXAccount(id);
@@ -261,6 +265,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         onSendPep={() => setShowSendModal(true)}
                     />
 
+                    {/* ── 1.5. Next Action (PR3 — above the fold) ── */}
+                    {summary?.nextAction && (
+                        <NextActionPanel nextAction={summary.nextAction} />
+                    )}
+
                     {/* ── 2. Slim Nav (5 links) ── */}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
                         <Link href="/tech/projects" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
@@ -301,6 +310,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         currentMemberId={idValue}
                         hydratedCrews={hydratedCrews}
                     />
+
+                    {/* ── 4.5. Recent Activity (PR3 — last 5 events) ── */}
+                    <RecentActivity events={(activity?.events ?? []).slice(0, 5)} />
 
                     {/* ── 5. Vouches Widget ── */}
                     <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>

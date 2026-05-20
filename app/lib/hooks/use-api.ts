@@ -367,6 +367,33 @@ export function useDashboardSummary(memberId: string | undefined) {
   })
 }
 
+// ============ Activity Feed ============
+
+/**
+ * Recent-activity feed for the dashboard. Backs the `RecentActivity`
+ * component on /dashboard/[id]. Aggregated server-side over Prisma sources
+ * (vouches, mission completions, unlock tickets, notifications); the page
+ * surfaces the top 5 of the returned (max 20) events.
+ *
+ * Plan: plans/garlic-96648-dashboard-redesign.md §6.3, PR3.
+ */
+export function useActivity(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ['activity', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/activity/${memberId}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to load activity')
+      }
+      return res.json() as Promise<{ events: import('../../dashboard/[id]/lib/activity-types').ActivityEvent[] }>
+    },
+    enabled: !!memberId,
+    staleTime: 30 * 1000,
+    retry: false,
+  })
+}
+
 // ============ Profile Summary (composed, client-side) ============
 
 /**
