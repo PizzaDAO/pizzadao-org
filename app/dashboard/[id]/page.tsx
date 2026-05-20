@@ -6,7 +6,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
-import { PepIcon, SendPepModal } from "../../ui/economy";
+import { SendPepModal } from "../../ui/economy";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
 import { ProfileLinksEditor } from "../../ui/profile-links";
@@ -25,11 +25,13 @@ import {
     useMissions,
     useDashboardSummary,
     useActivity,
+    useDiscover,
 } from "../../lib/hooks/use-api";
 import { HeroBlock } from "./components/HeroBlock";
 import { YourCrews, type CrewOption } from "./components/YourCrews";
 import { NextActionPanel } from "./components/NextActionPanel";
 import { RecentActivity } from "./components/RecentActivity";
+import { Discover } from "./components/Discover";
 
 // Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
 // --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
@@ -70,6 +72,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const { data: balanceData } = useMyBalance();
     // Shared cache with MissionsProgress — no double-fetch.
     const { data: missionsData } = useMissions();
+    // PR4 — Discover section (replaces the slim nav row). Single hook,
+    // parallel fetches with per-source fallbacks; safe to render any time.
+    const { data: discoverData } = useDiscover();
 
     // Derive auth/loading/error from the useUserData hook
     const loading = userDataLoading;
@@ -270,31 +275,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         <NextActionPanel nextAction={summary.nextAction} />
                     )}
 
-                    {/* ── 2. Slim Nav (5 links) ── */}
-                    <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
-                        <Link href="/tech/projects" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
-                            Projects
-                        </Link>
-                        <Link href="/articles" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
-                            Articles
-                        </Link>
-                        <Link href="/crew" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
-                            All Members
-                        </Link>
-                        <Link href="/calls" style={{ ...btn("secondary"), fontSize: 13, textDecoration: "none" }}>
-                            Calls
-                        </Link>
-                        <Link href="/pep" style={{
-                            ...btn("secondary"),
-                            fontSize: 13,
-                            textDecoration: "none",
-                            display: "flex",
-                            alignItems: "center",
-                            gap: 6,
-                        }}>
-                            <PepIcon size={14} /> Economy
-                        </Link>
-                    </div>
+                    {/* ── 2. Discover (PR4 — replaces slim nav) ── */}
+                    <Discover
+                        bounties={discoverData?.bounties}
+                        jobs={discoverData?.jobs}
+                        articles={discoverData?.articles}
+                        calls={discoverData?.calls}
+                    />
 
                     {/* ── 3. Missions Progress ── */}
                     <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
