@@ -6,40 +6,31 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { Pencil } from "lucide-react";
 import { TURTLES, CREWS } from "../../ui/constants";
-import { PepIcon, PepAmount } from "../../ui/economy";
+import { PepIcon, SendPepModal } from "../../ui/economy";
 import { NFTCollection } from "../../ui/nft";
 import { POAPCollection } from "../../ui/poap";
-import { NotificationBell } from "../../ui/notifications";
 import { ProfileLinksEditor } from "../../ui/profile-links";
-import { ThemeToggle } from "../../ui/ThemeToggle";
 import { MissionsProgress } from "../../ui/missions";
 import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
 import { WalletManager } from "../../ui/wallet-manager/WalletManager";
 import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
 import { SocialAccountLinker } from "../../ui/vouches/SocialAccountLinker";
-import { useQueryClient } from "@tanstack/react-query";
-import { useUserData, usePfp, useXAccount, useCrewMappings, useMyTasks, useMyBalance } from "../../lib/hooks/use-api";
+import {
+    useUserData,
+    usePfp,
+    useXAccount,
+    useCrewMappings,
+    useMyTasks,
+    useMyBalance,
+    useMissions,
+} from "../../lib/hooks/use-api";
+import { HeroBlock } from "./components/HeroBlock";
+import { YourCrews, type CrewOption } from "./components/YourCrews";
 
 // Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
 // --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
 const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
 const FONT_DISPLAY = "var(--font-display), var(--font-sans), system-ui, sans-serif";
-
-// Types copied from OnboardingWizard to ensure compatibility
-type CrewOption = {
-    id: string;
-    label: string;
-    turtles?: string[] | string;
-    role?: string;
-    channel?: string;
-    event?: string;
-    emoji?: string;
-    sheet?: string;
-    callTime?: string;
-    callTimeUrl?: string;
-    callLength?: string;
-    tasks?: { label: string; url?: string }[];
-};
 
 function norm(s: unknown) {
     return String(s ?? "")
@@ -60,7 +51,6 @@ function splitTurtlesCell(v: unknown): string[] {
 export default function Dashboard({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
-    const queryClient = useQueryClient();
 
     // --- React Query hooks for data fetching ---
     const { data: userData, isLoading: userDataLoading, error: userDataError } = useUserData(id);
@@ -69,6 +59,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const { data: crewMappingsData } = useCrewMappings();
     const { data: tasksData } = useMyTasks(id);
     const { data: balanceData } = useMyBalance();
+    // Shared cache with MissionsProgress — no double-fetch.
+    const { data: missionsData } = useMissions();
 
     // Derive auth/loading/error from the useUserData hook
     const loading = userDataLoading;
@@ -97,15 +89,11 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         if (xAccountData) setXAccount(xAccountData);
     }, [xAccountData]);
 
-    // Mission level for hero header
-    const [missionLevel, setMissionLevel] = useState<{ level: number; title: string } | null>(null);
-    useEffect(() => {
-        fetch("/api/missions").then(r => r.ok ? r.json() : null).then(d => {
-            if (d?.currentLevel != null) {
-                setMissionLevel({ level: d.currentLevel, title: d.levelTitle || "" });
-            }
-        }).catch(() => {});
-    }, []);
+    // Mission level for hero header — derived from the shared `useMissions` query
+    // rather than a separate fetch. Equivalent to: { level: currentLevel, title: levelTitle }.
+    const missionLevel = missionsData?.currentLevel != null
+        ? { level: missionsData.currentLevel as number, title: (missionsData.levelTitle as string) || "" }
+        : null;
 
     // Crew options: derived from hook data with fallback to static CREWS
     const crewOptions: CrewOption[] = (() => {
@@ -253,106 +241,16 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 <div style={card()}>
 
                     {/* ── 1. Compact Hero Header ── */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 16, flexWrap: "wrap" }}>
-                        {pfpUrl && (
-                            <img
-                                src={pfpUrl}
-                                alt={`${name}'s profile`}
-                                style={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: "50%",
-                                    objectFit: "cover",
-                                    objectPosition: "top",
-                                    border: "3px solid hsl(var(--cream))",
-                                    boxShadow: "0 2px 12px hsl(var(--ink) / 0.12)",
-                                    imageRendering: "crisp-edges",
-                                    flexShrink: 0,
-                                }}
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = "none";
-                                }}
-                            />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "baseline", gap: 10, flexWrap: "wrap" }}>
-                                <Link
-                                    href={`/profile/${idValue}`}
-                                    style={{
-                                        fontSize: "clamp(1.75rem, 4vw, 2.25rem)",
-                                        lineHeight: 1.05,
-                                        fontWeight: 800,
-                                        fontFamily: FONT_DISPLAY,
-                                        letterSpacing: "-0.02em",
-                                        color: "hsl(var(--foreground))",
-                                        textDecoration: "none",
-                                        textWrap: "balance",
-                                    } as React.CSSProperties}
-                                    onMouseEnter={(e) => e.currentTarget.style.color = "hsl(var(--tomato))"}
-                                    onMouseLeave={(e) => e.currentTarget.style.color = "hsl(var(--foreground))"}
-                                >
-                                    {name}
-                                </Link>
-                                {missionLevel && (
-                                    <span style={{
-                                        display: "inline-flex",
-                                        alignItems: "center",
-                                        gap: 4,
-                                        fontSize: 12,
-                                        fontWeight: 700,
-                                        fontFamily: FONT_DISPLAY,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "0.04em",
-                                        padding: "2px 8px",
-                                        borderRadius: 999,
-                                        background: "hsl(var(--butter) / 0.25)",
-                                        color: "hsl(var(--ink))",
-                                        border: "1px solid hsl(var(--butter) / 0.55)",
-                                        whiteSpace: "nowrap",
-                                    }}>
-                                        Lv.{missionLevel.level} {missionLevel.title}
-                                    </span>
-                                )}
-                            </div>
-                            <div style={{ display: "flex", alignItems: "center", gap: 10, marginTop: 6, flexWrap: "wrap" }}>
-                                <span style={{ fontSize: 14, color: "hsl(var(--muted-foreground))" }}>{city}</span>
-                                <span style={{ color: "hsl(var(--muted-foreground))", opacity: 0.5 }}>·</span>
-                                <span style={{ fontSize: 14, fontWeight: 700, color: "hsl(var(--tomato))", display: "inline-flex", alignItems: "center", gap: 4 }}>
-                                    {pepBalance !== null ? <PepAmount amount={pepBalance} size={14} /> : "—"}
-                                </span>
-                                <button
-                                    onClick={() => setShowSendModal(true)}
-                                    style={{
-                                        background: "none",
-                                        border: "none",
-                                        cursor: "pointer",
-                                        padding: 2,
-                                        display: "flex",
-                                        alignItems: "center",
-                                        color: "hsl(var(--muted-foreground))",
-                                    }}
-                                    title="Send PEP"
-                                >
-                                    <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
-                                        <path d="M22 2L11 13" />
-                                        <path d="M22 2L15 22L11 13L2 9L22 2Z" />
-                                    </svg>
-                                </button>
-                            </div>
-                        </div>
-                        <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0 }}>
-                            <Link href={`/?edit=1&memberId=${idValue}`} style={{
-                                ...btn("primary"),
-                                fontSize: 13,
-                                padding: "6px 12px",
-                                textDecoration: "none",
-                            }}>
-                                Edit Profile
-                            </Link>
-                            <ThemeToggle />
-                            <NotificationBell />
-                        </div>
-                    </div>
+                    <HeroBlock
+                        name={name}
+                        pfpUrl={pfpUrl}
+                        levelBadge={missionLevel}
+                        pepBalance={pepBalance}
+                        city={city}
+                        idValue={idValue}
+                        missionLevel={missionLevel}
+                        onSendPep={() => setShowSendModal(true)}
+                    />
 
                     {/* ── 2. Slim Nav (5 links) ── */}
                     <div style={{ display: "flex", gap: 8, flexWrap: "wrap", paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
@@ -386,195 +284,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     </div>
 
                     {/* ── 4. Your Crews ── */}
-                    {(() => {
-                        // Normalize userCrews to IDs where possible
-                        const userCrewIds = userCrews.map(name => {
-                            const found = crewOptions.find(opt => opt.label.toLowerCase() === name.toLowerCase() || opt.id.toLowerCase() === name.toLowerCase());
-                            return found ? found.id : name;
-                        });
-
-                        // Combine with IDs from myTasks
-                        const taskCrewIds = Object.keys(myTasks);
-                        const allDisplayIds = Array.from(new Set([...userCrewIds, ...taskCrewIds]));
-
-                        if (allDisplayIds.length === 0) return null;
-
-                        return (
-                            <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
-                                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                                    <h3 style={{ margin: 0, fontSize: 20, fontFamily: FONT_DISPLAY, fontWeight: 700, letterSpacing: "-0.01em" }}>Your Crews</h3>
-                                    <Link
-                                        href="/crew"
-                                        style={{
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            color: "hsl(var(--tomato))",
-                                            textDecorationColor: "hsl(var(--tomato))",
-                                            textDecoration: "none",
-                                        }}
-                                        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                                        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-                                    >
-                                        View all crews →
-                                    </Link>
-                                </div>
-                                <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
-                                    {allDisplayIds.map((cid) => {
-                                        // Find rich crew definition
-                                        const c = crewOptions.find(opt => opt.id.toLowerCase() === cid.toLowerCase() || opt.label.toLowerCase() === cid.toLowerCase());
-
-                                        // If not found, use a basic fallback
-                                        const label = c?.label || cid;
-                                        const emoji = c?.emoji || "🍕";
-
-                                        return (
-                                            <div key={cid} style={crewCard()}>
-                                                <div style={{ display: "grid", gap: 4 }}>
-                                                    <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                                                        <span style={{ fontWeight: 700 }}>
-                                                            {emoji ? `${emoji} ` : ""}
-                                                            {label}
-                                                        </span>
-                                                    </div>
-
-                                                    {(c?.callTime || c?.callLength) && (
-                                                        <div style={{ opacity: 0.7, fontSize: 13 }}>
-                                                            {c.callTime ? (
-                                                                c.callTimeUrl ? (
-                                                                    <a href={c.callTimeUrl} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>
-                                                                        {c.callTime}
-                                                                    </a>
-                                                                ) : c.callTime
-                                                            ) : ""}
-                                                            {c.callTime && c.callLength ? " • " : ""}
-                                                            {c.callLength ? c.callLength : ""}
-                                                        </div>
-                                                    )}
-
-                                                    {(() => {
-                                                        const currentCid = String(c?.id || cid).toLowerCase();
-                                                        const doneCount = doneCounts[currentCid] || 0;
-                                                        const personalTasks = myTasks[currentCid] || [];
-                                                        const topTasks = c?.tasks || [];
-                                                        const hasPersonal = personalTasks && personalTasks.length > 0;
-
-                                                        // Merge: Personal first, then Top Tasks to fill up to 3
-                                                        let displayTasks = [...personalTasks];
-                                                        if (displayTasks.length < 3) {
-                                                            const remaining = 3 - displayTasks.length;
-                                                            // Filter out top tasks that are already in personal tasks (by label)
-                                                            const personalLabels = new Set(displayTasks.map(t => t.label.toLowerCase()));
-                                                            const additional = topTasks
-                                                                .filter(t => !personalLabels.has(t.label.toLowerCase()))
-                                                                .slice(0, remaining);
-                                                            displayTasks = [...displayTasks, ...additional];
-                                                        }
-                                                        if (displayTasks.length === 0 && doneCount === 0) return null;
-
-                                                        return (
-                                                            <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
-                                                                {doneCount > 0 && (
-                                                                    <div style={{
-                                                                        fontSize: 11,
-                                                                        fontWeight: 700,
-                                                                        fontFamily: FONT_DISPLAY,
-                                                                        textTransform: "uppercase",
-                                                                        letterSpacing: 0.5,
-                                                                        color: "hsl(142 60% 32%)",
-                                                                        marginBottom: 2
-                                                                    }}>
-                                                                        Closed: {doneCount}
-                                                                    </div>
-                                                                )}
-                                                                {displayTasks.length > 0 && (
-                                                                    <>
-                                                                        <div style={{
-                                                                            fontSize: 11,
-                                                                            fontWeight: 700,
-                                                                            fontFamily: FONT_DISPLAY,
-                                                                            textTransform: "uppercase",
-                                                                            letterSpacing: 0.5,
-                                                                            color: hasPersonal ? "hsl(var(--tomato))" : "hsl(var(--muted-foreground))"
-                                                                        }}>
-                                                                            {hasPersonal ? "Your Tasks" : "Top Tasks"}
-                                                                        </div>
-                                                                        {displayTasks.map((t, idx) => {
-                                                                            const isPersonal = personalTasks?.some((pt: { label: string }) => pt.label === t.label);
-                                                                            return (
-                                                                                <div key={idx} style={{
-                                                                                    fontSize: 12,
-                                                                                    color: isPersonal ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
-                                                                                    fontWeight: isPersonal ? 600 : 400,
-                                                                                    display: "flex",
-                                                                                    alignItems: "baseline",
-                                                                                    gap: 4,
-                                                                                    minWidth: 0
-                                                                                }}>
-                                                                                    <span style={{ flexShrink: 0, color: isPersonal ? "hsl(var(--tomato))" : "inherit" }}>•</span>
-                                                                                    <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                                                        {t.url ? (
-                                                                                            <a
-                                                                                                href={t.url}
-                                                                                                target="_blank"
-                                                                                                rel="noreferrer"
-                                                                                                onClick={(e) => e.stopPropagation()}
-                                                                                                style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
-                                                                                            >
-                                                                                                {t.label}
-                                                                                            </a>
-                                                                                        ) : (
-                                                                                            <span>{t.label}</span>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-                                                                            );
-                                                                        })}
-                                                                    </>
-                                                                )}
-                                                            </div>
-                                                        );
-                                                    })()}
-
-                                                    <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                                                        <Link
-                                                            href={`/crew/${c?.id || cid}`}
-                                                            style={{
-                                                                fontSize: 13,
-                                                                fontWeight: 600,
-                                                                color: "hsl(var(--tomato))",
-                                                                textDecoration: "none",
-                                                            }}
-                                                            onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                                                            onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
-                                                        >
-                                                            View crew page →
-                                                        </Link>
-                                                        {c?.sheet && (
-                                                            <a
-                                                                href={c.sheet}
-                                                                target="_blank"
-                                                                rel="noreferrer"
-                                                                onClick={(e) => e.stopPropagation()}
-                                                                style={{
-                                                                    fontSize: 13,
-                                                                    fontWeight: 600,
-                                                                    color: "hsl(var(--muted-foreground))",
-                                                                    textDecoration: "none",
-                                                                }}
-                                                                title={c.sheet}
-                                                            >
-                                                                Open sheet ↗
-                                                            </a>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        );
-                    })()}
+                    <YourCrews
+                        crewOptions={crewOptions}
+                        userCrews={userCrews}
+                        myTasks={myTasks}
+                        doneCounts={doneCounts}
+                        currentMemberId={idValue}
+                    />
 
                     {/* ── 5. Vouches Widget ── */}
                     <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
@@ -1004,21 +720,20 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 </div>
             </div>
 
-            {/* Send Modal */}
-            {showSendModal && (
-                <SendPepModal
-                    onClose={() => setShowSendModal(false)}
-                    onSuccess={() => {
-                        setShowSendModal(false);
-                        // Refresh balance via React Query
-                        queryClient.invalidateQueries({ queryKey: ['my-balance'] });
-                    }}
-                />
-            )}
+            {/* Send PEP Modal — extracted to app/ui/economy/SendPepModal.tsx */}
+            <SendPepModal
+                open={showSendModal}
+                onClose={() => setShowSendModal(false)}
+                currentMemberId={idValue}
+            />
         </div>
     );
 }
 
+// NOTE: This local `CollapsibleSection` is intentionally NOT swapped for the
+// shared `app/ui/shared/CollapsibleSection.tsx` extracted by sibling PR
+// (capers-23453, PR #72). A follow-up PR after that one merges will switch
+// dashboard to the shared component. Until then, this preserves visual parity.
 function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
     const [open, setOpen] = useState(defaultOpen);
     return (
@@ -1115,7 +830,7 @@ function card(): React.CSSProperties {
 
 function btn(kind: "primary" | "secondary" | "accent"): React.CSSProperties {
     const base: React.CSSProperties = {
-        display: "inline-block", // ensure links behave like buttons
+        display: "inline-block",
         padding: "10px 16px",
         borderRadius: "var(--radius)",
         border: '1px solid transparent',
@@ -1149,188 +864,3 @@ function btn(kind: "primary" | "secondary" | "accent"): React.CSSProperties {
         borderColor: 'hsl(var(--rule) / 0.22)',
     };
 }
-
-function tile(): React.CSSProperties {
-    return {
-        padding: 12,
-        borderRadius: "var(--radius)",
-        border: '1px solid hsl(var(--rule) / 0.12)', // slightly lighter border for display only
-        background: 'hsl(var(--card))',
-        textAlign: "left",
-    };
-}
-
-// Adapted from crewRow in OnboardingWizard but without the checkbox styling logic
-function crewCard(): React.CSSProperties {
-    return {
-        display: "flex",
-        gap: 10,
-        alignItems: "flex-start", // changed to flex-start for multiline
-        padding: 12,
-        borderRadius: "var(--radius)",
-        border: '1px solid hsl(var(--rule) / 0.12)',
-        background: 'hsl(var(--cream-warm))',
-        color: 'hsl(var(--foreground))',
-        transition: "border-color 150ms ease, box-shadow 150ms ease",
-    };
-}
-
-function SendPepModal({ onClose, onSuccess }: { onClose: () => void; onSuccess: () => void }) {
-    const [memberId, setMemberId] = useState("");
-    const [amount, setAmount] = useState("");
-    const [loading, setLoading] = useState(false);
-    const [error, setError] = useState<string | null>(null);
-
-    const handleSend = async (e: React.FormEvent) => {
-        e.preventDefault();
-        if (!memberId || !amount) return;
-
-        setLoading(true);
-        setError(null);
-
-        try {
-            const res = await fetch("/api/economy/transfer", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ toUserId: memberId, amount: Number(amount) }),
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error);
-            onSuccess();
-        } catch (err) {
-            setError(err instanceof Error ? err.message : "Failed to send");
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    const inputStyle: React.CSSProperties = {
-        width: "100%",
-        padding: "10px 12px",
-        borderRadius: 10,
-        border: '1px solid hsl(var(--rule) / 0.22)',
-        fontSize: 14,
-        outline: "none",
-        boxSizing: "border-box" as const,
-    };
-
-    return (
-        <div style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'hsl(var(--ink) / 0.5)',
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            zIndex: 1000,
-        }} onClick={onClose}>
-            <div style={{ ...card(), maxWidth: 400, width: "90%" }} onClick={e => e.stopPropagation()}>
-                <h2 style={{ fontSize: 22, fontWeight: 800, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em", marginTop: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                    Send <PepIcon size={20} />
-                </h2>
-
-                {error && (
-                    <div style={{ marginBottom: 16, padding: 12, background: "hsl(var(--tomato) / 0.08)", border: "1px solid hsl(var(--tomato) / 0.30)", borderRadius: "var(--radius)", color: "hsl(var(--tomato-deep))", fontSize: 14 }}>
-                        {error}
-                    </div>
-                )}
-
-                <form onSubmit={handleSend} style={{ display: "grid", gap: 16 }}>
-                    <div>
-                        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
-                            Recipient Member ID
-                        </label>
-                        <input
-                            type="text"
-                            placeholder="Enter member ID"
-                            value={memberId}
-                            onChange={(e) => setMemberId(e.target.value)}
-                            style={inputStyle}
-                            disabled={loading}
-                        />
-                    </div>
-
-                    <div>
-                        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
-                            Amount
-                        </label>
-                        <input
-                            type="number"
-                            placeholder="Amount"
-                            value={amount}
-                            onChange={(e) => setAmount(e.target.value)}
-                            style={inputStyle}
-                            disabled={loading}
-                            min="1"
-                        />
-                    </div>
-
-                    <div style={{ display: "flex", gap: 10 }}>
-                        <button type="button" onClick={onClose} style={{ ...btn("secondary"), flex: 1, fontFamily: "inherit" }}>
-                            Cancel
-                        </button>
-                        <button
-                            type="submit"
-                            disabled={loading || !memberId || !amount}
-                            style={{ ...btn("primary"), flex: 1, fontFamily: "inherit", opacity: loading || !memberId || !amount ? 0.5 : 1 }}
-                        >
-                            {loading ? "Sending..." : "Send"}
-                        </button>
-                    </div>
-                </form>
-            </div>
-        </div>
-    );
-}
-
-const SyncRolesButton = ({ memberId, discordId, name, onSync }: { memberId: string, discordId: string, name: string, onSync: (turtles: string[], others: string[]) => void }) => {
-    const [loading, setLoading] = useState(false);
-    const [msg, setMsg] = useState("");
-
-    const handleSync = async () => {
-        setLoading(true);
-        setMsg("Syncing...");
-        try {
-            const res = await fetch("/api/discord/sync-to-sheet", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ memberId, discordId, mafiaName: name })
-            });
-            const data = await res.json();
-            if (!res.ok) throw new Error(data.error || "Sync failed");
-
-            setMsg("Done!");
-            setTimeout(() => setMsg(""), 2000);
-            onSync(data.turtles, data.otherRoles);
-        } catch (e: unknown) {
-            setMsg("Error!");
-            setTimeout(() => setMsg(""), 2000);
-        } finally {
-            setLoading(false);
-        }
-    };
-
-    return (
-        <button
-            onClick={handleSync}
-            disabled={loading}
-            style={{
-                background: "transparent",
-                border: "1px solid hsl(var(--rule) / 0.22)",
-                borderRadius: "var(--radius)",
-                padding: "4px 8px",
-                fontSize: 12,
-                color: "hsl(var(--foreground))",
-                cursor: loading ? "wait" : "pointer",
-                display: "flex",
-                alignItems: "center",
-                gap: 4
-            }}
-        >
-            {loading ? "🔄" : "🔁"} {msg || "Sync Roles"}
-        </button>
-    );
-};

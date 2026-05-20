@@ -3,3 +3,5 @@ export { Leaderboard } from "./Leaderboard";
 export { TransferForm } from "./TransferForm";
 export { PepIcon, PepAmount } from "./PepIcon";
 export { TransactionHistory } from "./TransactionHistory";
+export { SendPepModal } from "./SendPepModal";
+export type { SendPepModalProps } from "./SendPepModal";
