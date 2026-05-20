@@ -43,6 +43,11 @@ vi.mock("@/app/lib/session", () => ({
     getSession: vi.fn(),
 }));
 
+// PR4 — composer now reads tagline from MemberProfileExtras (Postgres).
+vi.mock("@/app/api/profile-extras/[id]/route", () => ({
+    getMemberTagline: vi.fn(),
+}));
+
 // Stub fs to avoid touching disk during pfp resolution.
 vi.mock("fs", async () => {
     const actual = await vi.importActual<typeof import("fs")>("fs");
@@ -59,6 +64,7 @@ import { getMafiaRank } from "@/app/lib/mafia-points";
 import { getVouchCounts } from "@/app/lib/vouches";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { prisma } from "@/app/lib/db";
+import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 
 const memberRow: Record<string, unknown> = {
     discordId: "discord-69",
@@ -114,6 +120,8 @@ function setupHappyPath() {
         ],
         cached: false,
     });
+    // Default: no Postgres tagline → composer falls back to the sheet column.
+    (getMemberTagline as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 }
 
 describe("composeProfileSummary", () => {
@@ -253,6 +261,53 @@ describe("composeProfileSummary", () => {
             viewerMemberId: null,
         });
         expect(summary!.about.xAccount).toEqual({ connected: false });
+    });
+
+    // ---- PR4 — tagline precedence -----------------------------------------
+
+    it("prefers MemberProfileExtras.tagline over the sheet 'Tagline' column", async () => {
+        (getMemberTagline as ReturnType<typeof vi.fn>).mockResolvedValueOnce(
+            "DB wins — Postgres tagline"
+        );
+        const summary = await composeProfileSummary({
+            memberId: "69",
+            viewerMemberId: null,
+        });
+        // The sheet row's "Tagline" is "Pizza maker extraordinaire" — DB
+        // must win.
+        expect(summary!.hero.tagline).toBe("DB wins — Postgres tagline");
+    });
+
+    it("falls back to the sheet 'Tagline' column when Postgres has no row", async () => {
+        // getMemberTagline returns null (default from setupHappyPath).
+        const summary = await composeProfileSummary({
+            memberId: "69",
+            viewerMemberId: null,
+        });
+        expect(summary!.hero.tagline).toBe("Pizza maker extraordinaire");
+    });
+
+    it("treats an empty/whitespace Postgres tagline as no value (falls back to sheet)", async () => {
+        (getMemberTagline as ReturnType<typeof vi.fn>).mockResolvedValueOnce("   ");
+        const summary = await composeProfileSummary({
+            memberId: "69",
+            viewerMemberId: null,
+        });
+        // Whitespace-only DB tagline shouldn't override a real sheet value.
+        expect(summary!.hero.tagline).toBe("Pizza maker extraordinaire");
+    });
+
+    it("returns empty tagline when neither Postgres nor sheet has one", async () => {
+        (fetchMemberById as ReturnType<typeof vi.fn>).mockResolvedValueOnce({
+            ...memberRow,
+            Tagline: "",
+        });
+        (getMemberTagline as ReturnType<typeof vi.fn>).mockResolvedValueOnce(null);
+        const summary = await composeProfileSummary({
+            memberId: "69",
+            viewerMemberId: null,
+        });
+        expect(summary!.hero.tagline).toBe("");
     });
 
     it("degrades gracefully when supplementary calls reject", async () => {

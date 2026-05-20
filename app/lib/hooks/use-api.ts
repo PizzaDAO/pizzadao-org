@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 // ============ Auth ============
 
@@ -454,3 +454,69 @@ export function useProfileSummary(memberId: string | undefined) {
     retry: false,
   })
 }
+
+// ============ Profile Extras (Tagline) ============
+//
+// Appended at the end of the file (per plan note in PR4 — burrata-13316) to
+// minimize merge friction with sibling profile/dashboard PRs.
+
+export interface ProfileExtras {
+  tagline: string | null
+}
+
+/**
+ * Read the member's editable profile-extras row (tagline only for now).
+ * Public — anyone can read; owner-only writes go through `useUpdateTagline`.
+ */
+export function useProfileExtras(memberId: string | undefined) {
+  return useQuery<ProfileExtras>({
+    queryKey: ['profile-extras', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile-extras/${memberId}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Failed to load profile extras')
+      }
+      return res.json()
+    },
+    enabled: !!memberId,
+    staleTime: 60_000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}
+
+/**
+ * Owner-only tagline write. Optimistically updates the profile-extras +
+ * profile-summary caches so the hero re-renders without waiting for a
+ * round-trip.
+ */
+export function useUpdateTagline(memberId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation<ProfileExtras, Error, string>({
+    mutationFn: async (tagline: string) => {
+      const res = await fetch(`/api/profile-extras/${memberId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagline }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Failed to save tagline')
+      }
+      return res.json()
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(['profile-extras', memberId], data)
+      // Patch the cached profile-summary so the hero updates immediately.
+      qc.setQueryData<ProfileSummaryData | undefined>(
+        ['profile-summary', memberId],
+        (prev) =>
+          prev
+            ? { ...prev, hero: { ...prev.hero, tagline: data.tagline ?? '' } }
+            : prev,
+      )
+    },
+  })
+}
+
