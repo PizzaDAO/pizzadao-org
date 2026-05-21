@@ -189,7 +189,9 @@ export default function CrewMembersPage() {
           <h1
             style={{
               margin: "12px 0 6px 0",
-              fontSize: 48,
+              // sicilian-41551: scale 32→48 so the header doesn't dominate
+              // the 375px viewport.
+              fontSize: "clamp(2rem, 8vw, 3rem)",
               lineHeight: 1.05,
               fontWeight: 800,
               letterSpacing: "-0.01em",
@@ -220,13 +222,20 @@ export default function CrewMembersPage() {
             gap: 12,
           }}
         >
-          <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: 8 }}>
+          {/*
+            sicilian-41551: input takes the full first line on phones; the
+            buttons wrap to a second line so neither gets crushed below 44px.
+          */}
+          <form
+            onSubmit={handleSearchSubmit}
+            style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+          >
             <input
               type="text"
               placeholder="Search name, city, orgs, or skills..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              style={{ ...input(), flex: 1 }}
+              style={{ ...input(), flex: "1 1 100%", minWidth: 0 }}
             />
             <button type="submit" style={btn("secondary")}>
               Search
@@ -357,8 +366,10 @@ export default function CrewMembersPage() {
                 setPage(1);
               }}
               style={{
-                padding: "6px 10px",
-                fontSize: 13,
+                // sicilian-41551: 44px touch target.
+                minHeight: 44,
+                padding: "8px 12px",
+                fontSize: 14,
                 border: "1px solid hsl(var(--rule) / 0.22)",
                 borderRadius: "var(--radius)",
                 background: "hsl(var(--card))",
@@ -396,7 +407,9 @@ export default function CrewMembersPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              // sicilian-41551: floor 240→260 via min(...,100%) so 320px
+              // viewports collapse to one column instead of horizontal overflow.
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))",
               gap: 12,
             }}
           >
@@ -470,7 +483,9 @@ export default function CrewMembersPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              // sicilian-41551: floor 240→260 via min(...,100%) so 320px
+              // viewports collapse to one column instead of horizontal overflow.
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))",
               gap: 12,
             }}
           >
@@ -546,7 +561,12 @@ function FilterChip({
       type="button"
       onClick={onClick}
       style={{
-        padding: "6px 12px",
+        // sicilian-41551: filter chips touched far more on mobile than
+        // desktop. 36px tall is the compromise — visible pill, comfortable
+        // hit area, the row of chips already wraps so the height bump only
+        // adds vertical space.
+        minHeight: 36,
+        padding: "8px 14px",
         fontSize: 13,
         fontWeight: 600,
         borderRadius: 999,
@@ -560,6 +580,8 @@ function FilterChip({
           ? "hsl(var(--tomato))"
           : "hsl(var(--foreground))",
         cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
         transition: "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
       }}
     >

@@ -100,6 +100,10 @@ export function VouchCard({
               color: "hsl(var(--foreground))",
               textDecoration: "none",
               letterSpacing: "-0.005em",
+              // sicilian-41551: long single-word mafia names shouldn't shove
+              // the source badge off the right edge of a 240-px card.
+              overflowWrap: "anywhere",
+              wordBreak: "break-word",
             }}
             onMouseEnter={(e) => {
               e.currentTarget.style.color = "hsl(var(--tomato))";
@@ -166,7 +170,13 @@ export function VouchCard({
             background: "none",
             border: "none",
             cursor: "pointer",
-            padding: 0,
+            // sicilian-41551: bump tap area to 44px tall while keeping the
+            // visual look (negative inset margin so layout doesn't shift).
+            padding: "10px 12px",
+            margin: "-10px -12px",
+            minHeight: 44,
+            display: "inline-flex",
+            alignItems: "center",
             fontFamily: "inherit",
             transition: "color 150ms ease",
           }}

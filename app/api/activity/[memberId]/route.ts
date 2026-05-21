@@ -9,25 +9,23 @@
 // same memberId being requested. Matches the policy used by
 // /api/dashboard-summary.
 //
-// Sources wired in this PR:
-//   - vouches received       (Prisma: Vouch where followeeId = memberId)
-//   - mission approved       (Prisma: MissionCompletion where status=APPROVED)
-//   - mission rejected       (Prisma: MissionCompletion where status=REJECTED)
-//   - unlock ticket added    (Prisma: UnlockTicketClaim.connectedAt)
-//   - notifications          (Prisma: Notification for recipientId=discordId)
+// Sources wired:
+//   - vouch_received    (Prisma: Vouch where followeeId = memberId)
+//   - mission_approved  (Prisma: MissionCompletion where status=APPROVED)
+//   - mission_rejected  (Prisma: MissionCompletion where status=REJECTED)
+//   - ticket_added      (Prisma: UnlockTicketClaim.connectedAt)
+//   - notification      (Prisma: Notification for recipientId=discordId)
+//   - task_claimed      (Prisma: TaskClaimEvent — written by /api/claim-task)
+//   - poap_received     (Prisma: PoapFirstSeen — written by /api/poaps/[memberId])
+//   - role_granted      (Prisma: RoleGrantEvent — written by /api/discord/sync-to-sheet)
 //
-// Sources deferred:
-//   - task_claimed: Google Sheets does not store a per-claim timestamp, so we
-//     have no reliable "when did this claim happen" event. Leaving for a
-//     future PR that can either ingest sheet claims into a DB log or rely on
-//     a sheet revision feed.
-//   - poap_received: POAPs are read live from the public POAP API
-//     (/api/poaps/[memberId]) — we don't cache per-member firstSeenAt, so we
-//     cannot derive a "received at" event without first persisting them.
-//   - role_granted: there is no Discord role audit log in this codebase.
-//     Role state is read live from the guild; transitions are not tracked.
+// The latter three were added in stuffed-crust-39669 (see plan). Each table
+// captures the first observation of an event (no historical backfill); the
+// feed reads them like any other source.
 //
-// Plan: plans/garlic-96648-dashboard-redesign.md §6.3, PR3.
+// Plans:
+//   - plans/garlic-96648-dashboard-redesign.md §6.3 (original wiring)
+//   - plans/stuffed-crust-39669-activity-completeness.md (completeness pass)
 
 import { NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
@@ -210,6 +208,93 @@ export async function GET(
                 title: n.title,
                 href: n.linkUrl,
                 at: toISO(n.createdAt),
+            });
+        }
+
+        // --- Task claims (TaskClaimEvent — written by /api/claim-task) ---
+        const taskClaims = await safe(
+            prisma.taskClaimEvent.findMany({
+                where: { memberId },
+                orderBy: { claimedAt: "desc" },
+                take: PER_SOURCE_LIMIT,
+                select: {
+                    id: true,
+                    taskName: true,
+                    sheetUrl: true,
+                    claimedAt: true,
+                },
+            }),
+            [] as Array<{
+                id: number;
+                taskName: string;
+                sheetUrl: string | null;
+                claimedAt: Date;
+            }>,
+        );
+
+        for (const c of taskClaims) {
+            events.push({
+                id: makeId("task_claimed", c.id),
+                kind: "task_claimed",
+                title: `Claimed task: ${c.taskName}`,
+                href: c.sheetUrl,
+                at: toISO(c.claimedAt),
+            });
+        }
+
+        // --- POAPs first-seen (PoapFirstSeen — written by /api/poaps/[memberId]) ---
+        const poaps = await safe(
+            prisma.poapFirstSeen.findMany({
+                where: { memberId },
+                orderBy: { firstSeenAt: "desc" },
+                take: PER_SOURCE_LIMIT,
+                select: {
+                    id: true,
+                    title: true,
+                    poapEventId: true,
+                    firstSeenAt: true,
+                },
+            }),
+            [] as Array<{
+                id: number;
+                title: string | null;
+                poapEventId: string;
+                firstSeenAt: Date;
+            }>,
+        );
+
+        for (const p of poaps) {
+            events.push({
+                id: makeId("poap_received", p.id),
+                kind: "poap_received",
+                title: p.title ? `POAP: ${p.title}` : "POAP received",
+                href: `/profile/${memberId}`,
+                at: toISO(p.firstSeenAt),
+            });
+        }
+
+        // --- Role grants (RoleGrantEvent — written by /api/discord/sync-to-sheet) ---
+        const grants = await safe(
+            prisma.roleGrantEvent.findMany({
+                where: { discordId },
+                orderBy: { grantedAt: "desc" },
+                take: PER_SOURCE_LIMIT,
+                select: {
+                    id: true,
+                    roleName: true,
+                    grantedAt: true,
+                },
+            }),
+            [] as Array<{ id: number; roleName: string; grantedAt: Date }>,
+        );
+
+        for (const g of grants) {
+            events.push({
+                id: makeId("role_granted", g.id),
+                kind: "role_granted",
+                title: `Discord role granted: ${g.roleName}`,
+                href: null,
+                at: toISO(g.grantedAt),
             });
         }
 

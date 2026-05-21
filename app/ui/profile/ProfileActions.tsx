@@ -89,8 +89,10 @@ export function ProfileActions({
     let primary: React.ReactNode = null;
     const isOwner = mode === "owner-readonly" || mode === "owner-edit";
     const isSelf = !!viewerId && viewerId === memberId;
+    // sicilian-41551: `min-h-11` bumps the CTA to the 44px tap-target floor
+    // without changing visual size on desktop (padding stays the same).
     const ctaBase =
-        "inline-flex items-center gap-1.5 px-4 py-2 rounded-[--radius] text-sm font-semibold font-display transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink";
+        "inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-11 rounded-[--radius] text-sm font-semibold font-display transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink";
 
     if (isOwner) {
         primary = (
@@ -132,7 +134,7 @@ export function ProfileActions({
                     aria-haspopup="menu"
                     aria-expanded={menuOpen}
                     onClick={() => setMenuOpen((v) => !v)}
-                    className="inline-flex h-9 w-9 items-center justify-center rounded-[--radius] border border-cream/25 bg-transparent text-cream/85 hover:bg-cream/10 hover:text-cream transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink cursor-pointer"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-[--radius] border border-cream/25 bg-transparent text-cream/85 hover:bg-cream/10 hover:text-cream transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink cursor-pointer"
                 >
                     <svg
                         width="16"
@@ -160,7 +162,7 @@ export function ProfileActions({
                             type="button"
                             role="menuitem"
                             onClick={handleShare}
-                            className="block w-full text-left px-3 py-2 text-sm hover:bg-tomato/10 cursor-pointer"
+                            className="block w-full text-left px-3 py-3 min-h-11 text-sm hover:bg-tomato/10 cursor-pointer"
                         >
                             Share
                         </button>
@@ -168,7 +170,7 @@ export function ProfileActions({
                             type="button"
                             role="menuitem"
                             onClick={handleCopy}
-                            className="block w-full text-left px-3 py-2 text-sm hover:bg-tomato/10 cursor-pointer"
+                            className="block w-full text-left px-3 py-3 min-h-11 text-sm hover:bg-tomato/10 cursor-pointer"
                         >
                             {copied ? "Copied!" : "Copy link"}
                         </button>
@@ -180,7 +182,7 @@ export function ProfileActions({
                                     setMenuOpen(false);
                                     setPepOpen(true);
                                 }}
-                                className="block w-full text-left px-3 py-2 text-sm hover:bg-tomato/10 cursor-pointer"
+                                className="block w-full text-left px-3 py-3 min-h-11 text-sm hover:bg-tomato/10 cursor-pointer"
                             >
                                 Send PEP
                             </button>

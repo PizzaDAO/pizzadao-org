@@ -53,8 +53,9 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
 
       <button
         onClick={onMagicLogin}
-        className="text-muted-foreground/80 hover:text-foreground text-sm underline underline-offset-4 cursor-pointer transition-colors mx-auto"
-        style={{ background: "none", border: "none", padding: 4 }}
+        /* sicilian-41551: 44-px tap target on the tertiary link. */
+        className="inline-flex items-center justify-center min-h-11 text-muted-foreground/80 hover:text-foreground text-sm underline underline-offset-4 cursor-pointer transition-colors mx-auto"
+        style={{ background: "none", border: "none", padding: "8px 12px" }}
       >
         {t("magicLoginButton")}
       </button>

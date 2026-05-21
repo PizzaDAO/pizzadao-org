@@ -18,8 +18,11 @@ function bellButton(hasUnread: boolean): React.CSSProperties {
     background: "none",
     border: "none",
     cursor: "pointer",
+    // sicilian-41551: 44x44 tap target.
+    width: 44,
+    height: 44,
     padding: 6,
-    display: "flex",
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
     borderRadius: "calc(var(--radius) - 4px)",
@@ -57,7 +60,10 @@ function dropdown(): React.CSSProperties {
     top: "100%",
     right: 0,
     marginTop: 8,
+    // sicilian-41551: 320px would clip on narrow viewports. Cap to viewport
+    // minus a small gutter so the dropdown never overflows the screen.
     width: 320,
+    maxWidth: "calc(100vw - 24px)",
     maxHeight: 400,
     overflowY: "auto",
     background: "hsl(var(--popover))",

@@ -108,7 +108,7 @@ export default function ArticlesListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-5 py-10">
+    <div className="min-h-screen bg-background text-foreground px-4 sm:px-5 py-10">
       <div className="mx-auto max-w-[1100px]">
         {/* Header */}
         <div className="mb-6">
@@ -133,7 +133,7 @@ export default function ArticlesListPage() {
             {canAuthor && (
               <Link
                 href="/articles/new"
-                className="inline-flex items-center font-display font-bold text-sm px-4 py-2.5 rounded-[--radius] bg-tomato text-cream border border-tomato hover:bg-[hsl(var(--tomato-deep))] hover:border-[hsl(var(--tomato-deep))] transition-colors"
+                className="inline-flex items-center justify-center min-h-11 font-display font-bold text-sm px-4 py-2.5 rounded-[--radius] bg-tomato text-cream border border-tomato hover:bg-[hsl(var(--tomato-deep))] hover:border-[hsl(var(--tomato-deep))] transition-colors"
               >
                 + New article
               </Link>
@@ -143,17 +143,22 @@ export default function ArticlesListPage() {
 
         {/* Search and filters */}
         <div className="mb-6 flex flex-col gap-3">
-          <form onSubmit={handleSearchSubmit} className="flex gap-2">
+          {/*
+            sicilian-41551: search row wraps to 2 lines on phones (the 16-px
+            input fills line 1, the buttons drop to line 2). The min-h-11
+            keeps controls at the 44 px tap-target floor.
+          */}
+          <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-2">
             <input
               type="text"
               placeholder="Search articles..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              className="flex-1 px-4 py-3 text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule)/0.22)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
+              className="basis-full sm:basis-0 sm:flex-1 min-h-11 px-4 py-3 text-base sm:text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule)/0.22)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
             />
             <button
               type="submit"
-              className="px-5 py-2.5 text-sm font-semibold rounded-[--radius] bg-secondary text-secondary-foreground border border-[hsl(var(--rule)/0.22)] hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center min-h-11 px-5 py-2.5 text-sm font-semibold rounded-[--radius] bg-secondary text-secondary-foreground border border-[hsl(var(--rule)/0.22)] hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
             >
               Search
             </button>
@@ -161,7 +166,7 @@ export default function ArticlesListPage() {
               <button
                 type="button"
                 onClick={clearFilters}
-                className="px-4 py-2.5 text-sm font-semibold rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-transparent text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
+                className="inline-flex items-center justify-center min-h-11 px-4 py-2.5 text-sm font-semibold rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-transparent text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
               >
                 Clear
               </button>
@@ -197,7 +202,10 @@ export default function ArticlesListPage() {
             </h2>
             <div
               className="grid gap-4"
-              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(300px, 1fr))" }}
+              // sicilian-41551: was minmax(300px,1fr) which forced sub-page
+              // horizontal scroll at 320–360px viewports. 240px floor fits a
+              // 375-px screen with 20-px gutters and still pairs up at >=640px.
+              style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))" }}
             >
               {drafts.map((d) => (
                 <Link
@@ -244,20 +252,21 @@ export default function ArticlesListPage() {
           </div>
         )}
 
-        {/* View toggle */}
+        {/* View toggle — sicilian-41551: bumped from 36x32 to 44x44 tap target. */}
         <div className="mb-4 flex justify-end">
           <div className="inline-flex rounded-[--radius] border border-[hsl(var(--rule)/0.22)] overflow-hidden">
             <button
               type="button"
               onClick={() => handleViewModeChange("gallery")}
+              aria-label="Gallery view"
               title="Gallery view"
-              className={`flex items-center justify-center w-9 h-8 cursor-pointer transition-colors ${
+              className={`flex items-center justify-center w-11 h-11 cursor-pointer transition-colors ${
                 viewMode === "gallery"
                   ? "bg-primary text-primary-foreground"
                   : "bg-card text-muted-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
               }`}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                 <rect x="1" y="1" width="6" height="6" rx="1" fill="currentColor" />
                 <rect x="9" y="1" width="6" height="6" rx="1" fill="currentColor" />
                 <rect x="1" y="9" width="6" height="6" rx="1" fill="currentColor" />
@@ -267,14 +276,15 @@ export default function ArticlesListPage() {
             <button
               type="button"
               onClick={() => handleViewModeChange("list")}
+              aria-label="List view"
               title="List view"
-              className={`flex items-center justify-center w-9 h-8 cursor-pointer border-l border-[hsl(var(--rule)/0.22)] transition-colors ${
+              className={`flex items-center justify-center w-11 h-11 cursor-pointer border-l border-[hsl(var(--rule)/0.22)] transition-colors ${
                 viewMode === "list"
                   ? "bg-primary text-primary-foreground"
                   : "bg-card text-muted-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
               }`}
             >
-              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg">
+              <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
                 <rect x="1" y="1" width="14" height="3" rx="1" fill="currentColor" />
                 <rect x="1" y="6.5" width="14" height="3" rx="1" fill="currentColor" />
                 <rect x="1" y="12" width="14" height="3" rx="1" fill="currentColor" />
@@ -299,7 +309,7 @@ export default function ArticlesListPage() {
               type="button"
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page <= 1}
-              className="px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center min-h-11 px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               ← Prev
             </button>
@@ -310,7 +320,7 @@ export default function ArticlesListPage() {
               type="button"
               onClick={() => setPage(Math.min(pagination.totalPages, page + 1))}
               disabled={page >= pagination.totalPages}
-              className="px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="inline-flex items-center justify-center min-h-11 px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
             >
               Next →
             </button>
