@@ -130,7 +130,9 @@ export default function ArticleList({
     return (
       <div
         className="grid gap-5"
-        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))" }}
+        // sicilian-41551: min(280px, 100%) so cards collapse to a single
+        // column on narrow viewports instead of overflowing.
+        style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(280px, 100%), 1fr))" }}
       >
         {[1, 2, 3, 4, 5, 6].map((i) => (
           <SkeletonCard key={i} />

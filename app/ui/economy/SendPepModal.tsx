@@ -26,7 +26,11 @@ function card(): React.CSSProperties {
 
 function btn(kind: "primary" | "secondary" | "accent"): React.CSSProperties {
     const base: React.CSSProperties = {
-        display: "inline-block",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        // sicilian-41551: 44px mobile touch-target floor.
+        minHeight: 44,
         padding: "10px 16px",
         borderRadius: "var(--radius)",
         border: '1px solid transparent',
@@ -104,10 +108,13 @@ export function SendPepModal({ open, onClose, currentMemberId: _currentMemberId 
 
     const inputStyle: React.CSSProperties = {
         width: "100%",
+        // sicilian-41551: 44px min-height + 16px font to clear the iOS Safari
+        // zoom-on-focus threshold.
+        minHeight: 44,
         padding: "10px 12px",
         borderRadius: 10,
         border: '1px solid hsl(var(--rule) / 0.22)',
-        fontSize: 14,
+        fontSize: 16,
         outline: "none",
         boxSizing: "border-box" as const,
     };
@@ -123,9 +130,11 @@ export function SendPepModal({ open, onClose, currentMemberId: _currentMemberId 
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
+            // sicilian-41551: gutter so the modal never goes edge-to-edge.
+            padding: 16,
             zIndex: 1000,
         }} onClick={onClose}>
-            <div style={{ ...card(), maxWidth: 400, width: "90%" }} onClick={e => e.stopPropagation()}>
+            <div style={{ ...card(), maxWidth: 400, width: "100%" }} onClick={e => e.stopPropagation()}>
                 <h2 style={{ fontSize: 22, fontWeight: 800, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em", marginTop: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
                     Send <PepIcon size={20} />
                 </h2>

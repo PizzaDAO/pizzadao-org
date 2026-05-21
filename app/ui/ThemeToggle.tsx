@@ -27,8 +27,9 @@ export function ThemeToggle() {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
-        width: 34,
-        height: 34,
+        // sicilian-41551: 44x44 tap target (visual icon stays 18px).
+        width: 44,
+        height: 44,
         padding: 0,
         borderRadius: "calc(var(--radius) - 4px)",
         border: "none",

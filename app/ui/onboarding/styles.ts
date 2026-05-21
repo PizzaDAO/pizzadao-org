@@ -33,10 +33,12 @@ export function card(): CSSProperties {
 export function input(): CSSProperties {
   return {
     width: "100%",
+    minHeight: 44, // sicilian-41551: mobile touch-target floor
     padding: "10px 12px",
     borderRadius: "var(--radius)",
     border: "1px solid hsl(var(--rule) / 0.22)",
-    fontSize: 14,
+    // sicilian-41551: 16px prevents iOS Safari zoom-on-focus
+    fontSize: 16,
     outline: "none",
     boxSizing: "border-box",
     background: "hsl(var(--background))",
@@ -55,6 +57,10 @@ export function btn(
   disabled?: boolean,
 ): CSSProperties {
   const base: CSSProperties = {
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44, // sicilian-41551: mobile touch-target floor (WCAG 2.5.5)
     padding: "10px 14px",
     borderRadius: "var(--radius)",
     border: "1px solid transparent",
