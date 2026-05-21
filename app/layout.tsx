@@ -1,5 +1,7 @@
 import type { Metadata } from "next";
 import { Asap, Asap_Condensed, Geist_Mono } from "next/font/google";
+import { NextIntlClientProvider } from "next-intl";
+import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import { Providers } from "./providers";
 
@@ -30,17 +32,23 @@ export const metadata: Metadata = {
   description: "The world's largest pizza co-op.",
 };
 
-export default function RootLayout({
+export default async function RootLayout({
   children,
 }: Readonly<{
   children: React.ReactNode;
 }>) {
+  // Resolved by app/lib/i18n/request.ts (cookie → Accept-Language → default).
+  const locale = await getLocale();
+  const messages = await getMessages();
+
   return (
-    <html lang="en" suppressHydrationWarning>
+    <html lang={locale} suppressHydrationWarning>
       <body
         className={`${asapSans.variable} ${asapDisplay.variable} ${geistMono.variable} antialiased`}
       >
-        <Providers>{children}</Providers>
+        <NextIntlClientProvider locale={locale} messages={messages}>
+          <Providers>{children}</Providers>
+        </NextIntlClientProvider>
         {/* GitHub and Google Sheets Links - Fixed Bottom Right */}
         <div className="fixed bottom-4 right-4 flex items-center gap-2">
           {/* Google Sheets Link */}
