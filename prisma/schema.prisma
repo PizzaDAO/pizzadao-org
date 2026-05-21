@@ -242,6 +242,7 @@ enum NotificationType {
   MISSION_REJECTED   // A mission submission was rejected
   LEVEL_COMPLETED    // All missions in a level completed, reward paid
   VOUCH_ADDED @map("FRIEND_ADDED") // Someone vouched for you
+  ARTICLE_COMMENT    // New comment on your article
 }
 
 model Notification {
@@ -284,7 +285,27 @@ model Article {
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
+  comments              ArticleComment[]
+
   @@index([status, publishedAt])
+  @@index([authorId])
+}
+
+// Comments on articles. Flat list in v1 — `replyToId` reserved for future
+// threading. Soft-deleted via `deletedAt` (body cleared on delete).
+model ArticleComment {
+  id         Int       @id @default(autoincrement())
+  articleId  Int
+  authorId   String    // Discord ID of commenter
+  authorName String?   // Cached display name
+  body       String    // Markdown, capped at 500 chars (server-validated)
+  replyToId  Int?      // Reserved for future threading; not used in v1 UI
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime? // Soft-delete; UI shows "[deleted]" placeholder
+  article    Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, createdAt])
   @@index([authorId])
 }
 

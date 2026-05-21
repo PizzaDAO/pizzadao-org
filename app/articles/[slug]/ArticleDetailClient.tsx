@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArticleRenderer, TagBadge } from "@/app/ui/articles";
+import { ArticleRenderer, TagBadge, CommentList } from "@/app/ui/articles";
 
 interface Article {
   id: number;
@@ -39,6 +39,8 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [canEdit, setCanEdit] = useState(false);
+  const [currentUserDiscordId, setCurrentUserDiscordId] = useState<string | null>(null);
+  const [isAdmin, setIsAdmin] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -54,13 +56,28 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
         const data = await res.json();
         if (!cancelled) setArticle(data.article);
 
-        // Also check if current viewer can edit (author or admin)
+        // Look up the current viewer's discordId and admin flag in parallel.
+        // Both are non-fatal; comments still render for logged-out viewers.
         try {
-          const meRes = await fetch("/api/me");
+          const [meRes, adminRes] = await Promise.all([
+            fetch("/api/me"),
+            fetch("/api/me/admin"),
+          ]);
           if (meRes.ok) {
             const me = await meRes.json();
-            if (me?.discordId && me.discordId === data.article.authorId) {
-              if (!cancelled) setCanEdit(true);
+            if (me?.discordId && !cancelled) {
+              setCurrentUserDiscordId(me.discordId);
+              if (me.discordId === data.article.authorId) {
+                setCanEdit(true);
+              }
+            }
+          }
+          if (adminRes.ok) {
+            const adminData = await adminRes.json();
+            if (!cancelled && adminData?.isAdmin) {
+              setIsAdmin(true);
+              // Admins can also edit articles
+              setCanEdit(true);
             }
           }
         } catch {
@@ -213,6 +230,14 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
             </div>
           )}
         </article>
+
+        {article.status === "PUBLISHED" && (
+          <CommentList
+            slug={article.slug}
+            currentUserDiscordId={currentUserDiscordId}
+            isAdmin={isAdmin}
+          />
+        )}
       </div>
     </div>
   );
