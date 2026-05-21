@@ -22,6 +22,9 @@ vi.mock("@/app/lib/db", () => ({
         missionCompletion: { findMany: vi.fn() },
         unlockTicketClaim: { findMany: vi.fn() },
         notification: { findMany: vi.fn() },
+        taskClaimEvent: { findMany: vi.fn() },
+        poapFirstSeen: { findMany: vi.fn() },
+        roleGrantEvent: { findMany: vi.fn() },
     },
 }));
 
@@ -123,6 +126,38 @@ describe("GET /api/activity/[memberId]", () => {
                     createdAt: new Date(now - 7000),
                 },
             ]);
+        (prisma.taskClaimEvent.findMany as ReturnType<typeof vi.fn>)
+            .mockResolvedValue([
+                {
+                    id: 30,
+                    taskName: "Wire up the toaster",
+                    sheetUrl: "https://docs.google.com/spreadsheets/d/abc",
+                    claimedAt: new Date(now - 1500),
+                },
+            ]);
+        (prisma.poapFirstSeen.findMany as ReturnType<typeof vi.fn>)
+            .mockResolvedValue([
+                {
+                    id: 40,
+                    title: "Pizza Party 2024",
+                    poapEventId: "12345",
+                    firstSeenAt: new Date(now - 2500),
+                },
+                {
+                    id: 41,
+                    title: null,
+                    poapEventId: "12346",
+                    firstSeenAt: new Date(now - 8500),
+                },
+            ]);
+        (prisma.roleGrantEvent.findMany as ReturnType<typeof vi.fn>)
+            .mockResolvedValue([
+                {
+                    id: 50,
+                    roleName: "Tech",
+                    grantedAt: new Date(now - 3500),
+                },
+            ]);
 
         const { request, params } = makeReq("42");
         const res = await GET(request, { params });
@@ -139,8 +174,9 @@ describe("GET /api/activity/[memberId]", () => {
             expect(ev.href === null || typeof ev.href === "string").toBe(true);
         }
 
-        // Total = 2 vouches + 2 missions + 1 ticket + 1 notification = 6
-        expect(body.events.length).toBe(6);
+        // Total = 2 vouches + 2 missions + 1 ticket + 1 notification
+        //       + 1 task_claim + 2 poaps + 1 role_grant = 10
+        expect(body.events.length).toBe(10);
 
         // Descending by `at`
         const ats = body.events.map((e: { at: string }) => Date.parse(e.at));
@@ -152,12 +188,44 @@ describe("GET /api/activity/[memberId]", () => {
         expect(body.events[0].kind).toBe("vouch_received");
         expect(body.events[0].title).toContain("LasagnaLisa");
 
-        // Includes mission_rejected variant
+        // Covers every wired kind, including the three added in
+        // stuffed-crust-39669.
         const kinds = body.events.map((e: { kind: string }) => e.kind);
         expect(kinds).toContain("mission_approved");
         expect(kinds).toContain("mission_rejected");
         expect(kinds).toContain("ticket_added");
         expect(kinds).toContain("notification");
+        expect(kinds).toContain("task_claimed");
+        expect(kinds).toContain("poap_received");
+        expect(kinds).toContain("role_granted");
+
+        // Task claim renders the human-readable task name and deep-links
+        // back to the source sheet.
+        const claim = body.events.find(
+            (e: { kind: string }) => e.kind === "task_claimed",
+        );
+        expect(claim.title).toContain("Wire up the toaster");
+        expect(claim.href).toBe("https://docs.google.com/spreadsheets/d/abc");
+
+        // POAP without a title falls back to a generic label, with a title
+        // it gets prefixed.
+        const poapsOut = body.events.filter(
+            (e: { kind: string }) => e.kind === "poap_received",
+        );
+        expect(poapsOut).toHaveLength(2);
+        expect(poapsOut.some((p: { title: string }) =>
+            p.title === "POAP: Pizza Party 2024",
+        )).toBe(true);
+        expect(poapsOut.some((p: { title: string }) =>
+            p.title === "POAP received",
+        )).toBe(true);
+
+        // Role grant has no href and renders the role name in the title.
+        const role = body.events.find(
+            (e: { kind: string }) => e.kind === "role_granted",
+        );
+        expect(role.title).toContain("Tech");
+        expect(role.href).toBeNull();
 
         // Avoid unused-var lint hint
         void iso;
@@ -201,6 +269,14 @@ describe("GET /api/activity/[memberId]", () => {
                     createdAt: new Date(now - (i + 20) * 1000),
                 })),
             );
+        // Explicitly empty for the new sources — keeps the cap test focused
+        // on the original sources while exercising the new findMany calls.
+        (prisma.taskClaimEvent.findMany as ReturnType<typeof vi.fn>)
+            .mockResolvedValue([]);
+        (prisma.poapFirstSeen.findMany as ReturnType<typeof vi.fn>)
+            .mockResolvedValue([]);
+        (prisma.roleGrantEvent.findMany as ReturnType<typeof vi.fn>)
+            .mockResolvedValue([]);
 
         const { request, params } = makeReq("42");
         const res = await GET(request, { params });
