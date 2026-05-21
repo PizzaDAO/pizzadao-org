@@ -490,13 +490,15 @@ model UnlockTicketRecord {
 
 // ===== MEMBER PROFILE EXTRAS =====
 //
-// Free-form profile fields owned by the member (not from the sheet). Today
-// just `tagline`; will expand as we add member-editable bio fields.
+// Free-form profile fields owned by the member (not from the sheet). Today:
+// `tagline` (one-line public bio) + `locale` (i18n preference, added by
+// anchovy-65959). Will expand as we add more member-editable fields.
 //
-// Plan: truffle-91035 (PR4 — burrata-13316).
+// Plans: truffle-91035 (tagline), anchovy-65959 (locale).
 model MemberProfileExtras {
   memberId  String   @id // Member ID from Google Sheets (not Discord ID)
   tagline   String?  @db.VarChar(140)
+  locale    String   @default("en") // ISO 639-1, one of SUPPORTED_LOCALES
   updatedAt DateTime @updatedAt
   createdAt DateTime @default(now())
 }

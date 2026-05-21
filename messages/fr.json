@@ -1,0 +1,30 @@
+{
+  "common": {
+    "save": "Enregistrer",
+    "cancel": "Annuler",
+    "back": "Retour",
+    "loading": "Chargement…",
+    "saved": "Enregistré !"
+  },
+  "language": {
+    "sectionTitle": "Langue",
+    "description": "Choisis la langue dans laquelle l'application s'adresse à toi.",
+    "selectLabel": "Langue d'affichage",
+    "saveButton": "Enregistrer la langue",
+    "saveError": "Impossible d'enregistrer ta langue. Réessayer ?",
+    "names": {
+      "en": "English",
+      "es": "Español",
+      "fr": "Français"
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "heading": "Rejoins la mafia de la pizza",
+      "tagline": "Nous sommes une coopérative internationale de pizza qui organise chaque année une Fête Mondiale de la Pizza.",
+      "joinButton": "Rejoindre PizzaDAO",
+      "loginButton": "Déjà sur notre Discord ? Connecte-toi",
+      "magicLoginButton": "Connexion impossible ? Essaie le MP Discord"
+    }
+  }
+}

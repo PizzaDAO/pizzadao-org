@@ -1,0 +1,30 @@
+{
+  "common": {
+    "save": "Save",
+    "cancel": "Cancel",
+    "back": "Back",
+    "loading": "Loading…",
+    "saved": "Saved!"
+  },
+  "language": {
+    "sectionTitle": "Language",
+    "description": "Choose the language the app uses to talk to you.",
+    "selectLabel": "Display language",
+    "saveButton": "Save language",
+    "saveError": "Couldn't save your language. Try again?",
+    "names": {
+      "en": "English",
+      "es": "Español",
+      "fr": "Français"
+    }
+  },
+  "onboarding": {
+    "welcome": {
+      "heading": "Join the pizza mafia",
+      "tagline": "We're an international pizza co-op that throws a Global Pizza Party every year.",
+      "joinButton": "Join PizzaDAO",
+      "loginButton": "Already in our Discord? Login",
+      "magicLoginButton": "Can't log in? Try Discord DM"
+    }
+  }
+}
