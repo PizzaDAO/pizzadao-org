@@ -33,7 +33,10 @@ export function btn(
   disabled?: boolean,
 ): CSSProperties {
   const base: CSSProperties = {
-    display: "inline-block",
+    display: "inline-flex",
+    alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44, // sicilian-41551: mobile touch-target floor (WCAG 2.5.5)
     padding: "10px 16px",
     borderRadius: "var(--radius)",
     fontWeight: 600,
@@ -73,10 +76,12 @@ export function btn(
 export function input(): CSSProperties {
   return {
     width: "100%",
+    minHeight: 44, // sicilian-41551: mobile touch-target floor
     padding: "10px 12px",
     borderRadius: "var(--radius)",
     border: "1px solid hsl(var(--rule) / 0.22)",
-    fontSize: 14,
+    // sicilian-41551: 16px prevents iOS Safari from zooming on focus
+    fontSize: 16,
     outline: "none",
     boxSizing: "border-box",
     background: "hsl(var(--background))",
@@ -92,7 +97,10 @@ export function pageContainer(fontFamily?: string): CSSProperties {
     background: "hsl(var(--background))",
     color: "hsl(var(--foreground))",
     fontFamily: fontFamily || "var(--font-sans), system-ui, sans-serif",
-    padding: "40px 20px",
+    // sicilian-41551: shrink horizontal padding on narrow viewports so the
+    // 16px inner content keeps useful width on 375px screens. clamp() picks
+    // 16px at <=375px and ramps up to 20px around 480px+.
+    padding: "clamp(24px, 6vw, 40px) clamp(16px, 4vw, 20px)",
   };
 }
 
@@ -122,6 +130,8 @@ export function overlay(): CSSProperties {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
+    // sicilian-41551: gutter so modals never touch the viewport edges.
+    padding: 16,
     zIndex: 1000,
   };
 }
@@ -142,6 +152,8 @@ export function navBtn(): CSSProperties {
   return {
     display: "inline-flex",
     alignItems: "center",
+    justifyContent: "center",
+    minHeight: 44, // sicilian-41551: mobile touch-target floor
     gap: 6,
     padding: "8px 14px",
     background: "hsl(var(--card))",

@@ -113,7 +113,8 @@ export function YourCrews({ crewOptions, userCrews, myTasks, doneCounts, hydrate
                     View all crews →
                 </Link>
             </div>
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
+            {/* sicilian-41551: collapse to single column at 320–375px viewports. */}
+            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 10 }}>
                 {allDisplayIds.map((cid) => {
                     // Find rich crew definition
                     const c = crewOptions.find(opt => opt.id.toLowerCase() === cid.toLowerCase() || opt.label.toLowerCase() === cid.toLowerCase());

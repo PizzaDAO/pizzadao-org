@@ -152,26 +152,36 @@ export function HeroBlock({
                             background: "none",
                             border: "none",
                             cursor: "pointer",
-                            padding: 2,
-                            display: "flex",
+                            // sicilian-41551: bump tap area to 44x44; visual size
+                            // unchanged (SVG stays 14px, padding does the work).
+                            padding: 15,
+                            margin: -13, // pull layout back so visual gap reads the same
+                            display: "inline-flex",
                             alignItems: "center",
+                            justifyContent: "center",
                             color: "hsl(var(--muted-foreground))",
                         }}
+                        aria-label="Send PEP"
                         title="Send PEP"
                     >
-                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
                             <path d="M22 2L11 13" />
                             <path d="M22 2L15 22L11 13L2 9L22 2Z" />
                         </svg>
                     </button>
                 </div>
             </div>
-            <div style={{ display: "flex", alignItems: "center", gap: 8, flexShrink: 0, flexWrap: "wrap" }}>
+            {/* sicilian-41551: actions row wraps to a full-width second line on
+                phones so the hero PFP+name can keep their share of width.
+                `w-full sm:w-auto` swaps full-width-on-mobile for compact desktop. */}
+            <div className="flex items-center gap-2 flex-shrink-0 flex-wrap w-full sm:w-auto sm:justify-end justify-between">
                 <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 4 }}>
                     <Link href={`/profile/${idValue}/edit`} style={{
                         ...btn("primary"),
                         fontSize: 13,
-                        padding: "6px 12px",
+                        // sicilian-41551: meet 44px touch target on phones
+                        minHeight: 44,
+                        padding: "8px 14px",
                         textDecoration: "none",
                     }}>
                         Edit Profile
@@ -184,6 +194,11 @@ export function HeroBlock({
                             textDecoration: "none",
                             fontFamily: FONT_DISPLAY,
                             fontWeight: 600,
+                            // sicilian-41551: secondary text-link still needs an
+                            // adequate tap area when it's the actionable item.
+                            display: "inline-flex",
+                            alignItems: "center",
+                            minHeight: 28,
                         }}
                     >
                         Manage wallets →

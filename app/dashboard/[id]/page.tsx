@@ -237,7 +237,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
             background: "hsl(var(--background))",
             color: "hsl(var(--foreground))",
             fontFamily: FONT_SANS,
-            padding: "40px 20px"
+            // sicilian-41551: shrink horizontal gutter on small screens so the
+            // 24px card padding inside doesn't eat too much usable width at 375px.
+            padding: "clamp(24px, 6vw, 40px) clamp(12px, 4vw, 20px)",
         }}>
             <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
                 {/* Main Card */}
@@ -356,7 +358,9 @@ function card(): React.CSSProperties {
     return {
         border: '1px solid hsl(var(--rule) / 0.12)',
         borderRadius: "var(--radius)",
-        padding: 24,
+        // sicilian-41551: shrink card padding on phones so the inner content
+        // keeps ~320px usable at the 375px viewport.
+        padding: "clamp(16px, 4vw, 24px)",
         boxShadow: '0 8px 30px hsl(var(--ink) / 0.06)',
         background: 'hsl(var(--card))',
         color: 'hsl(var(--card-foreground))',
@@ -367,7 +371,11 @@ function card(): React.CSSProperties {
 
 function btn(kind: "primary" | "secondary" | "accent"): React.CSSProperties {
     const base: React.CSSProperties = {
-        display: "inline-block",
+        display: "inline-flex",
+        alignItems: "center",
+        justifyContent: "center",
+        // sicilian-41551: 44px mobile touch-target floor.
+        minHeight: 44,
         padding: "10px 16px",
         borderRadius: "var(--radius)",
         border: '1px solid transparent',

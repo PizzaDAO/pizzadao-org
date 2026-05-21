@@ -249,7 +249,9 @@ export default function VouchesPage() {
     <div
       style={{
         display: "grid",
-        gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
+        // sicilian-41551: floor lowered + `min(…, 100%)` so a 320px viewport
+        // can't force the cards to overflow horizontally.
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))",
         gap: 12,
       }}
     >
@@ -298,7 +300,8 @@ export default function VouchesPage() {
             style={{
               marginTop: 0,
               fontFamily: displayFont,
-              fontSize: 44,
+              // sicilian-41551: scale 32→44 across viewport widths.
+              fontSize: "clamp(2rem, 7vw, 2.75rem)",
               marginBottom: 8,
               fontWeight: 800,
               letterSpacing: "-0.01em",

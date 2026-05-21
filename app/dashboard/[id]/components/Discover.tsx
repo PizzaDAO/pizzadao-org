@@ -71,7 +71,9 @@ function chip(active: boolean): React.CSSProperties {
     return {
         display: "inline-flex",
         alignItems: "center",
-        padding: "6px 12px",
+        // sicilian-41551: 36-px chip so mobile users can tap reliably.
+        minHeight: 36,
+        padding: "8px 14px",
         borderRadius: 999,
         fontSize: 13,
         fontWeight: 600,

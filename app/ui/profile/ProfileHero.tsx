@@ -115,7 +115,8 @@ export function ProfileHero({
                         type="button"
                         onClick={dismissBanner}
                         aria-label="Dismiss"
-                        className="text-ink/60 hover:text-ink cursor-pointer text-base leading-none"
+                        /* sicilian-41551: 44x44 tap target. */
+                        className="inline-flex h-11 w-11 -m-2 items-center justify-center text-ink/60 hover:text-ink cursor-pointer text-base leading-none"
                     >
                         ×
                     </button>
@@ -123,7 +124,16 @@ export function ProfileHero({
             )}
 
             <section className="rounded-[--radius] bg-ink text-cream border border-cream/15 shadow-sm overflow-hidden">
-                <div className="p-5 sm:p-6 flex items-start gap-4">
+                {/*
+                  sicilian-41551 mobile layout:
+                  • <sm: actions wrap to a second row below the name so the
+                    Vouch CTA isn't squeezed between an 80px PFP and a kebab
+                    at 375px viewports.
+                  • Name uses `break-words` + `[overflow-wrap:anywhere]` so long
+                    mafia names like "Pepperoni-Pesto-Provolone Pancetta"
+                    don't break the layout.
+                */}
+                <div className="p-5 sm:p-6 flex items-start gap-4 flex-wrap sm:flex-nowrap">
                     {pfpUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -142,7 +152,10 @@ export function ProfileHero({
                     )}
 
                     <div className="flex-1 min-w-0">
-                        <h1 className="m-0 font-display font-bold text-3xl sm:text-4xl text-cream [text-wrap:balance] break-words leading-[1.05]">
+                        <h1
+                            className="m-0 font-display font-bold text-3xl sm:text-4xl text-cream [text-wrap:balance] break-words leading-[1.05]"
+                            style={{ overflowWrap: "anywhere" }}
+                        >
                             {name}
                         </h1>
 
@@ -164,11 +177,14 @@ export function ProfileHero({
                         )}
                     </div>
 
-                    <ProfileActions
-                        memberId={memberId}
-                        mode={mode}
-                        viewerId={viewerId}
-                    />
+                    {/* Wraps full-width below the name on phones, sits inline on >= sm. */}
+                    <div className="w-full sm:w-auto sm:shrink-0 flex sm:justify-end">
+                        <ProfileActions
+                            memberId={memberId}
+                            mode={mode}
+                            viewerId={viewerId}
+                        />
+                    </div>
                 </div>
             </section>
         </div>

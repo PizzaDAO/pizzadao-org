@@ -199,7 +199,9 @@ export default function MissionsPage() {
             <h1
               style={{
                 margin: 0,
-                fontSize: 44,
+                // sicilian-41551: scale 32→44 so "Missions" doesn't dominate
+                // the 375-px viewport above the fold.
+                fontSize: "clamp(2rem, 7vw, 2.75rem)",
                 lineHeight: 1.05,
                 letterSpacing: "-0.01em",
                 fontFamily: DISPLAY_FONT,
@@ -275,7 +277,8 @@ export default function MissionsPage() {
             </div>
             <div
               style={{
-                fontSize: 56,
+                // sicilian-41551: 56 → clamp so "MAX" doesn't overflow at 320–375px.
+                fontSize: "clamp(2.5rem, 10vw, 3.5rem)",
                 fontWeight: 800,
                 margin: 0,
                 lineHeight: 1,
@@ -357,7 +360,8 @@ export default function MissionsPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  padding: "18px 22px",
+                  // sicilian-41551: slimmer horizontal padding on phones.
+                  padding: "16px clamp(14px, 4vw, 22px)",
                   background: "transparent",
                   border: "none",
                   cursor: "pointer",

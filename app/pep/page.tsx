@@ -106,7 +106,9 @@ function SendModal({ type, itemName, itemId, maxQuantity, onClose, onSuccess }: 
   return (
     <div style={overlay()} onClick={onClose}>
       <div
-        style={{ ...card(), maxWidth: 420, width: "90%" }}
+        // sicilian-41551: overlay() now provides 16px gutter so the modal
+        // can be `width: "100%"` (capped by maxWidth) without going edge-to-edge.
+        style={{ ...card(), maxWidth: 420, width: "100%" }}
         onClick={(e) => e.stopPropagation()}
       >
         <h2
@@ -486,13 +488,16 @@ export default function PepDashboard() {
               alignItems: "flex-start",
               gap: 16,
               marginBottom: 8,
+              flexWrap: "wrap", // sicilian-41551: actions drop below on phones
             }}
           >
             <div style={{ minWidth: 0 }}>
               <h1
                 style={{
                   fontFamily: DISPLAY_FONT,
-                  fontSize: 56,
+                  // sicilian-41551: was 56px — scaled to fit a 375px viewport
+                  // without "economy" wrapping mid-word. Stays huge on desktop.
+                  fontSize: "clamp(2.25rem, 9vw, 3.5rem)",
                   lineHeight: 1,
                   fontWeight: 800,
                   letterSpacing: "-0.03em",
@@ -501,6 +506,7 @@ export default function PepDashboard() {
                   alignItems: "center",
                   gap: 12,
                   color: "hsl(var(--foreground))",
+                  overflowWrap: "anywhere",
                 }}
               >
                 <PepIcon size={44} /> PEP economy
@@ -549,8 +555,14 @@ export default function PepDashboard() {
           </span>
         </div>
 
-        {/* Two column layout - Jobs left, everything else right */}
-        <div style={{ display: "grid", gridTemplateColumns: "1.2fr 1fr", gap: 20 }}>
+        {/*
+          sicilian-41551: was a fixed two-column grid (1.2fr 1fr) which forced
+          two columns to share ~155px each at 375px wide and broke. The
+          className uses Tailwind to stack on mobile (<lg) and run side-by-side
+          on >=lg. The nested 1fr-1fr leaderboard/wallet row gets the same
+          treatment.
+        */}
+        <div className="grid gap-5 lg:grid-cols-[1.2fr_1fr]">
           {/* Left: Jobs and Bounties */}
           <div>
             <JobBoard onJobCompleted={refreshWallet} />
@@ -562,8 +574,8 @@ export default function PepDashboard() {
 
           {/* Right: Leaderboard, Balance, Inventory, Shop stacked */}
           <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
-            {/* Top row: Leaderboard and Balance side by side */}
-            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 20 }}>
+            {/* Top row: Leaderboard and Balance side by side on >=sm */}
+            <div className="grid gap-5 sm:grid-cols-2">
               <Leaderboard />
               <div style={{ display: "grid", gap: 20, alignContent: "start" }}>
                 <WalletWithSend
