@@ -7,11 +7,14 @@
 //
 // MissionsProgress.tsx is OUT OF SCOPE here — Phase 3b already migrated it.
 
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { card, btn, pageContainer, loadingSpinner } from "../ui/shared-styles";
 import { MissionCard } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
+import { MissionCompleteCelebration } from "../ui/missions/MissionCompleteCelebration";
+import { LevelUpModal } from "../ui/missions/LevelUpModal";
+import { VouchPromptCard } from "../ui/missions/VouchPromptCard";
 
 type MissionData = {
   id: number;
@@ -36,6 +39,17 @@ type MissionsResponse = {
   isAuthenticated: boolean;
 };
 
+type CelebrationState = {
+  memberId: string | null;
+  lastCelebratedLevel: number;
+  firstMissionCelebratedAt: string | null;
+  vouchPromptShownAt: string | null;
+};
+
+type Celebration =
+  | { kind: "firstMission"; level: number; reward: number; levelTitle: string | null }
+  | { kind: "levelUp"; level: number; reward: number; levelTitle: string | null };
+
 const LEVEL_TITLES: Record<number, string> = {
   1: "Pizza Trainee",
   2: "Pizza Noob",
@@ -53,26 +67,154 @@ export default function MissionsPage() {
   const [error, setError] = useState<string | null>(null);
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set());
 
+  // Celebration loop (diavola-40350)
+  const [celebrationState, setCelebrationState] =
+    useState<CelebrationState | null>(null);
+  const [activeCelebration, setActiveCelebration] =
+    useState<Celebration | null>(null);
+  const [showVouchPrompt, setShowVouchPrompt] = useState(false);
+  // Last seen counts to detect a freshly approved mission after submit/refresh.
+  const lastApprovedCountRef = useRef<number | null>(null);
+
   useEffect(() => {
     fetchMissions();
+    fetchCelebrationState();
   }, []);
 
   async function fetchMissions() {
     try {
       const res = await fetch("/api/missions", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load missions");
-      const json = await res.json();
+      const json: MissionsResponse = await res.json();
+
+      // Snapshot approved-count BEFORE setData so the celebration trigger can
+      // compare prev vs next.
+      const prevApproved = lastApprovedCountRef.current;
+      const nextApproved = countApproved(json);
+
       setData(json);
+      lastApprovedCountRef.current = nextApproved;
 
       // Auto-expand current level
       if (json.currentLevel) {
         setExpandedLevels(new Set([json.currentLevel]));
       }
+
+      // Trigger celebrations if conditions met
+      maybeTriggerCelebration(json, prevApproved, nextApproved);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
     }
+  }
+
+  async function fetchCelebrationState() {
+    try {
+      const res = await fetch("/api/missions/celebration", {
+        cache: "no-store",
+      });
+      if (!res.ok) return; // unauthenticated → no celebration state
+      const json: CelebrationState = await res.json();
+      setCelebrationState(json);
+    } catch {
+      // Silent failure — celebration is non-essential
+    }
+  }
+
+  function countApproved(snapshot: MissionsResponse): number {
+    let n = 0;
+    for (const level of snapshot.levels) {
+      for (const m of level.missions) {
+        if (m.progress?.status === "APPROVED") n += 1;
+      }
+    }
+    return n;
+  }
+
+  function maybeTriggerCelebration(
+    snapshot: MissionsResponse,
+    prevApproved: number | null,
+    nextApproved: number,
+  ) {
+    // Need celebration state loaded and user authenticated with a member row.
+    if (!snapshot.isAuthenticated) return;
+    if (!celebrationState || !celebrationState.memberId) return;
+    if (activeCelebration) return; // already showing one
+
+    const justGainedAnApproval =
+      prevApproved !== null && nextApproved > prevApproved;
+    const isInitialLoad = prevApproved === null;
+
+    // Find the currently celebrated level data so we can show reward + title.
+    const currentLevelData =
+      snapshot.levels.find((l) => l.level === snapshot.currentLevel) ||
+      snapshot.levels[snapshot.levels.length - 1];
+
+    // CASE 1: First-ever mission completion (never celebrated before).
+    if (
+      !celebrationState.firstMissionCelebratedAt &&
+      nextApproved > 0 &&
+      (justGainedAnApproval || (isInitialLoad && nextApproved === 1))
+    ) {
+      setActiveCelebration({
+        kind: "firstMission",
+        level: snapshot.currentLevel,
+        reward: currentLevelData?.reward ?? 0,
+        levelTitle: currentLevelData?.title ?? snapshot.levelTitle ?? null,
+      });
+      // Persist server-side. Also bump lastCelebratedLevel so the level-up
+      // modal does not fire on the same approval.
+      persistCelebration({
+        firstMissionCelebrated: true,
+        lastCelebratedLevel: snapshot.currentLevel,
+      });
+      // Vouch prompt only shows once, after first mission, if not yet dismissed.
+      if (!celebrationState.vouchPromptShownAt) {
+        setShowVouchPrompt(true);
+      }
+      return;
+    }
+
+    // CASE 2: Level-up — currentLevel exceeds last celebrated level.
+    if (snapshot.currentLevel > celebrationState.lastCelebratedLevel && justGainedAnApproval) {
+      setActiveCelebration({
+        kind: "levelUp",
+        level: snapshot.currentLevel,
+        reward: currentLevelData?.reward ?? 0,
+        levelTitle: currentLevelData?.title ?? snapshot.levelTitle ?? null,
+      });
+      persistCelebration({ lastCelebratedLevel: snapshot.currentLevel });
+    }
+  }
+
+  async function persistCelebration(patch: {
+    lastCelebratedLevel?: number;
+    firstMissionCelebrated?: boolean;
+    vouchPromptDismissed?: boolean;
+  }) {
+    try {
+      const res = await fetch("/api/missions/celebration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(patch),
+      });
+      if (res.ok) {
+        const json: CelebrationState = await res.json();
+        setCelebrationState(json);
+      }
+    } catch {
+      // Non-essential
+    }
+  }
+
+  function handleCelebrationDismiss() {
+    setActiveCelebration(null);
+  }
+
+  function handleVouchDismiss() {
+    setShowVouchPrompt(false);
+    persistCelebration({ vouchPromptDismissed: true });
   }
 
   function toggleLevel(level: number) {
@@ -308,6 +450,11 @@ export default function MissionsPage() {
           </div>
         )}
 
+        {/* Vouch prompt — shown once after first-ever mission completion */}
+        {isAuthenticated && showVouchPrompt && (
+          <VouchPromptCard onDismiss={handleVouchDismiss} />
+        )}
+
         {/* Admin Review Panel */}
         {isAuthenticated && <MissionReviewPanel />}
 
@@ -509,6 +656,24 @@ export default function MissionsPage() {
           PizzaDAO
         </div>
       </div>
+
+      {/* ===== Celebration loop (diavola-40350) =====
+          Mounted last so the overlay/modal sits above all page content. */}
+      {activeCelebration?.kind === "firstMission" && (
+        <MissionCompleteCelebration
+          title="Mission Complete!"
+          subtitle="Your first mission is in the books."
+          onDismiss={handleCelebrationDismiss}
+        />
+      )}
+      {activeCelebration?.kind === "levelUp" && (
+        <LevelUpModal
+          level={activeCelebration.level}
+          levelTitle={activeCelebration.levelTitle}
+          reward={activeCelebration.reward}
+          onDismiss={handleCelebrationDismiss}
+        />
+      )}
     </div>
   );
 }
