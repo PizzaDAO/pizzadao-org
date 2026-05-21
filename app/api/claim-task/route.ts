@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import path from 'path'
+import { prisma } from '@/app/lib/db'
 
 // Initialize Google Sheets API client with write access
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -170,6 +171,32 @@ export async function POST(req: Request) {
         values: [[newValue]],
       },
     })
+
+    // Log the claim into TaskClaimEvent so it surfaces in the dashboard
+    // activity feed. Idempotent — re-claiming the same task is a no-op.
+    // We intentionally don't delete on `giveup`: the historical event is
+    // still a true thing that happened.
+    if (action === 'claim' && memberId) {
+      const taskKey = `${sheetId}::${taskName.trim()}`
+      try {
+        await prisma.taskClaimEvent.upsert({
+          where: { memberId_taskKey: { memberId, taskKey } },
+          update: {},
+          create: {
+            memberId,
+            taskKey,
+            taskName: taskName.trim(),
+            sheetUrl: sheetUrl ?? null,
+          },
+        })
+      } catch (err) {
+        // Don't break the user-facing claim flow on a DB hiccup.
+        console.error(
+          '[claim-task] failed to log TaskClaimEvent (non-blocking):',
+          err,
+        )
+      }
+    }
 
     return NextResponse.json({ success: true, action })
   } catch (e: unknown) {

@@ -518,3 +518,57 @@ model MemberWallet {
   @@index([memberId])
   @@index([walletAddress])
 }
+
+// ===== ACTIVITY FEED EVENTS =====
+//
+// Persisted timestamps for activity-feed event kinds that don't have a
+// canonical source. Each table is written at the point of observation
+// (claim API, POAP fetch, Discord role sync) and queried by
+// /api/activity/[memberId]. No backfill — ledgers start at deploy time.
+//
+// Plan: plans/stuffed-crust-39669-activity-completeness.md.
+
+// One row per (member, sheet-task). The first claim writes the timestamp;
+// re-claims are idempotent. Unclaim does not delete — the historical event
+// is still a true thing that happened.
+model TaskClaimEvent {
+  id        Int      @id @default(autoincrement())
+  memberId  String   // Member ID from Google Sheets (not Discord ID)
+  taskKey   String   // `${sheetId}::${taskName}` — disambiguates per-sheet
+  taskName  String   // Denormalized for display
+  sheetUrl  String?  // Optional deep-link back to the sheet
+  claimedAt DateTime @default(now())
+
+  @@unique([memberId, taskKey])
+  @@index([memberId, claimedAt])
+}
+
+// One row per (member, POAP event). First observation per member wins;
+// subsequent fetches are no-ops thanks to the unique constraint.
+model PoapFirstSeen {
+  id          Int      @id @default(autoincrement())
+  memberId    String
+  poapEventId String   // POAP drop/event id (not token id)
+  poapTokenId String   // First token id observed (display only)
+  title       String?
+  imageUrl    String?
+  firstSeenAt DateTime @default(now())
+
+  @@unique([memberId, poapEventId])
+  @@index([memberId, firstSeenAt])
+}
+
+// One row per (discordId, roleId). Logged by the discord sync endpoint
+// when a role appears that wasn't in the previous User.roles snapshot.
+model RoleGrantEvent {
+  id        Int      @id @default(autoincrement())
+  memberId  String?  // Best-effort; null if unresolvable at write time
+  discordId String
+  roleId    String
+  roleName  String   // Resolved at write time so feed reads need no Discord API call
+  grantedAt DateTime @default(now())
+
+  @@unique([discordId, roleId])
+  @@index([discordId, grantedAt])
+  @@index([memberId, grantedAt])
+}
