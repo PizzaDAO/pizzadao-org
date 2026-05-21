@@ -32,7 +32,19 @@ import {
 // Main Component
 // ============================================================================
 
-export function OnboardingWizard() {
+export type OnboardingWizardProps = {
+  /**
+   * Deep-link entry point. When set, skips the session check and URL-param
+   * negotiation and starts the wizard in this flow state. Used by `/login`
+   * (magic_login) and `/join` (wizard step 1 / NameStep).
+   *
+   * URL params still win for explicit redirects: ?loginError=... will force
+   * magic_login regardless of initialFlow.
+   */
+  initialFlow?: FlowState;
+};
+
+export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   const router = useRouter();
   const hasProcessedParams = useRef(false);
 
@@ -153,9 +165,18 @@ export function OnboardingWizard() {
       return;
     }
 
+    // Deep-link entry: /login and /join pass an initialFlow so the wizard
+    // skips the session check and URL-param negotiation. URL params above
+    // still win — explicit redirects (?loginError=...) override this.
+    if (initialFlow) {
+      hasProcessedParams.current = true;
+      setFlow(initialFlow);
+      return;
+    }
+
     // Check if user is already logged in
     checkSession();
-  }, []);
+  }, [initialFlow]);
 
   // --- Check existing session ---
   async function checkSession() {
