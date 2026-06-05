@@ -1,9 +1,13 @@
 // app/ui/onboarding/steps/CityStep.tsx
+//
+// mozzarella-41832 — Editorial restyle.
+// Visual rewrite. The Props interface, API calls (/api/city-autocomplete,
+// /api/city-region, /api/city-telegram), state, and callbacks are unchanged.
 "use client";
 
 import { useEffect, useRef, useState } from "react";
-import { btn, input } from "../styles";
-import { Field } from "../Field";
+import type { CSSProperties } from "react";
+import { ArrowLeft, ArrowUpRight, MapPin, Sparkles } from "lucide-react";
 import type { CityPrediction } from "../types";
 
 type TelegramMatch = {
@@ -22,6 +26,11 @@ type Props = {
   onBack: () => void;
 };
 
+const HERO_SPOTLIGHT: CSSProperties = {
+  background:
+    "radial-gradient(80% 60% at 20% 0%, hsl(46 100% 62% / 0.22), transparent 60%), radial-gradient(70% 60% at 95% 10%, hsl(0 93% 60% / 0.10), transparent 65%)",
+};
+
 export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: Props) {
   const canProceed = city.trim().length > 0;
   const [telegramMatch, setTelegramMatch] = useState<TelegramMatch | null>(null);
@@ -31,17 +40,13 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
   // Fire-and-forget Telegram group lookup when city changes
   useEffect(() => {
     const trimmed = city.trim();
-
-    // Don't re-lookup the same city
     if (trimmed === lastLookupRef.current) return;
 
-    // Need at least 3 chars to attempt a match
     if (trimmed.length < 3) {
       setTelegramMatch(null);
       return;
     }
 
-    // Debounce the lookup — wait for user to settle on a city
     const timer = window.setTimeout(async () => {
       lastLookupRef.current = trimmed;
       setTelegramLoading(true);
@@ -58,7 +63,6 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
           setTelegramMatch(null);
         }
       } catch {
-        // Non-blocking — silently ignore errors
         setTelegramMatch(null);
       } finally {
         setTelegramLoading(false);
@@ -69,94 +73,92 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
   }, [city]);
 
   return (
-    <div className="grid gap-3">
-      <Field label="City">
-        <CityAutocomplete value={city} onChange={onChange} onRegionResolved={onRegionResolved} />
-      </Field>
+    <div className="relative grid gap-10 fade-up">
+      {/* ─── Hero spotlight backdrop ─────────────────────────────── */}
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[40svh] opacity-60"
+        style={HERO_SPOTLIGHT}
+      />
 
-      {/* Telegram group invite prompt */}
-      {telegramMatch?.found && telegramMatch.chatUrl && (
-        <TelegramInvite
-          chapterCity={telegramMatch.city || ""}
-          country={telegramMatch.country || ""}
-          chatUrl={telegramMatch.chatUrl}
+      {/* ─── Headline ────────────────────────────────────────────── */}
+      <header className="relative">
+        <p className="overline text-tomato">§ 02 · Your block</p>
+        <h2
+          className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
+          style={{
+            fontSize: "clamp(2rem, 5.2vw, 3.6rem)",
+            lineHeight: 0.95,
+            textWrap: "balance",
+          }}
+        >
+          Where's your <span className="text-tomato">corner</span>?
+        </h2>
+        <p
+          className="mt-4 max-w-xl text-foreground/70"
+          style={{ fontSize: "16px", lineHeight: 1.55 }}
+        >
+          Tell us your city. We'll point you at the nearest chapter, the nearest
+          oven, the nearest people.
+        </p>
+      </header>
+
+      {/* ─── City autocomplete card ─────────────────────────────── */}
+      <section className="grid gap-4">
+        <p className="overline text-tomato">§ 02 · City</p>
+        <CityAutocomplete
+          value={city}
+          onChange={onChange}
+          onRegionResolved={onRegionResolved}
         />
-      )}
 
-      {telegramLoading && (
-        <div className="text-xs text-muted-foreground/70">
-          Looking for a local PizzaDAO chapter...
-        </div>
-      )}
+        {telegramLoading && (
+          <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/45">
+            Looking for a local PizzaDAO chapter…
+          </p>
+        )}
 
-      <div className="flex gap-2.5">
-        <button onClick={onBack} style={btn("secondary")}>
+        {telegramMatch?.found && telegramMatch.chatUrl && (
+          <TelegramInvite
+            chapterCity={telegramMatch.city || ""}
+            country={telegramMatch.country || ""}
+            chatUrl={telegramMatch.chatUrl}
+          />
+        )}
+      </section>
+
+      {/* ─── Actions ────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-between gap-4">
+        <button
+          type="button"
+          onClick={onBack}
+          className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+        >
+          <ArrowLeft className="h-3 w-3" />
           Back
         </button>
         <button
+          type="button"
           onClick={onNext}
           disabled={!canProceed}
-          style={btn("accent", !canProceed)}
+          className="btn-pill-lg group"
+          style={{
+            background: "hsl(var(--tomato))",
+            color: "hsl(var(--cream))",
+            boxShadow: "var(--shadow-soft)",
+          }}
         >
           Next
+          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>
     </div>
   );
 }
 
-// ============================================================================
-// Telegram Invite Card
-// ============================================================================
-
-function TelegramInvite({
-  chapterCity,
-  country,
-  chatUrl,
-}: {
-  chapterCity: string;
-  country: string;
-  chatUrl: string;
-}) {
-  const location = country ? `${chapterCity}, ${country}` : chapterCity;
-
-  return (
-    <div className="p-3.5 rounded-[--radius] border border-rule bg-secondary grid gap-2">
-      <div className="font-[family-name:var(--font-display)] font-bold text-base text-foreground">
-        PizzaDAO {chapterCity} Chapter
-      </div>
-      <div className="text-sm text-muted-foreground">
-        There&apos;s a local PizzaDAO community in {location}! Join the group chat to
-        connect with pizza fam near you.
-      </div>
-      <a
-        href={chatUrl}
-        target="_blank"
-        rel="noopener noreferrer"
-        className="inline-flex items-center gap-1.5 rounded-[--radius] no-underline cursor-pointer w-fit text-sm font-semibold text-cream"
-        style={{
-          background: "#0088cc",
-          padding: "8px 14px",
-        }}
-      >
-        <TelegramIcon />
-        Join Telegram Group
-      </a>
-    </div>
-  );
-}
-
-function TelegramIcon() {
-  return (
-    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor">
-      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
-    </svg>
-  );
-}
-
-// ============================================================================
-// City Autocomplete
-// ============================================================================
+/* ──────────────────────────────────────────────────────────────────────────
+   CinematicInput-style city autocomplete
+   ────────────────────────────────────────────────────────────────────────── */
 
 function CityAutocomplete({
   value,
@@ -171,13 +173,11 @@ function CityAutocomplete({
   const [items, setItems] = useState<CityPrediction[]>([]);
   const [loading, setLoading] = useState(false);
 
-  // If the user picked an item, we don't want the effect to re-open for that exact value.
   const suppressForValueRef = useRef<string>(value);
 
   useEffect(() => {
     const q = value.trim();
 
-    // If this value was just selected from the dropdown, suppress fetching + reopening.
     if (q && q === suppressForValueRef.current) {
       setOpen(false);
       setItems([]);
@@ -203,7 +203,7 @@ function CityAutocomplete({
         setItems(Array.isArray(data?.predictions) ? data.predictions : []);
         setOpen(true);
       } catch {
-        // ignore UI errors; user can still type manually
+        /* ignore — user can still type manually */
       } finally {
         setLoading(false);
       }
@@ -212,7 +212,6 @@ function CityAutocomplete({
     return () => window.clearTimeout(t);
   }, [value]);
 
-  /** Fire-and-forget: resolve region from a place_id */
   function resolveRegion(placeId: string) {
     if (!onRegionResolved) return;
     fetch("/api/city-region", {
@@ -225,34 +224,75 @@ function CityAutocomplete({
         onRegionResolved(data?.region ?? null, data?.countryCode ?? null);
       })
       .catch(() => {
-        // Non-blocking: if region resolution fails, just skip it
+        /* non-blocking */
       });
   }
 
   return (
-    <div style={{ position: "relative" }}>
-      <input
-        value={value}
-        onChange={(e) => {
-          // user is typing again; allow future autocompletes
-          suppressForValueRef.current = "";
-          onChange(e.target.value);
+    <div className="relative">
+      <div
+        className="relative overflow-hidden rounded-[24px] transition-shadow"
+        style={{
+          background: "hsl(var(--cream))",
+          border: "1px solid hsl(var(--rule-warm) / 0.6)",
+          boxShadow: "0 30px 60px -40px hsl(46 100% 50% / 0.35)",
         }}
-        onFocus={() => value.trim().length >= 2 && items.length > 0 && setOpen(true)}
-        onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-        placeholder="New York, NY"
-        style={input()}
-        autoComplete="off"
-      />
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            background:
+              "radial-gradient(120% 80% at 0% 0%, hsl(46 100% 62% / 0.14), transparent 60%), radial-gradient(80% 60% at 100% 100%, hsl(0 93% 60% / 0.06), transparent 70%)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="grain pointer-events-none absolute inset-0 opacity-40"
+        />
+        <label className="relative flex items-center gap-3 px-4 py-4 md:gap-4 md:px-6 md:py-5">
+          <MapPin
+            className="h-5 w-5 shrink-0 text-foreground/35 md:h-6 md:w-6"
+            aria-hidden
+          />
+          <input
+            type="text"
+            value={value}
+            onChange={(e) => {
+              suppressForValueRef.current = "";
+              onChange(e.target.value);
+            }}
+            onFocus={() =>
+              value.trim().length >= 2 && items.length > 0 && setOpen(true)
+            }
+            onBlur={() => window.setTimeout(() => setOpen(false), 120)}
+            placeholder="New York, NY"
+            autoComplete="off"
+            aria-label="City"
+            className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
+            style={{
+              fontSize: "clamp(1.3rem, 3vw, 2.1rem)",
+              color: "hsl(var(--foreground))",
+            }}
+          />
+          {loading && (
+            <Sparkles
+              className="h-4 w-4 shrink-0 animate-pulse text-tomato/70"
+              aria-hidden
+            />
+          )}
+        </label>
+      </div>
 
-      {loading && (
-        <div className="absolute right-2.5 top-2.5 text-xs text-muted-foreground/70">...</div>
-      )}
-
+      {/* Suggestions dropdown */}
       {open && items.length > 0 && (
         <div
-          className="absolute left-0 right-0 top-full mt-1.5 rounded-[--radius] border border-rule bg-card overflow-hidden z-50"
-          style={{ boxShadow: "0 10px 30px hsl(var(--ink) / 0.08)" }}
+          className="paper-soft absolute left-0 right-0 top-full mt-2 z-50 overflow-hidden rounded-[20px] border"
+          style={{
+            background: "hsl(var(--cream))",
+            borderColor: "hsl(var(--rule-warm) / 0.55)",
+            boxShadow: "var(--shadow-lifted)",
+          }}
         >
           {items.slice(0, 8).map((it) => (
             <button
@@ -266,7 +306,8 @@ function CityAutocomplete({
                 setOpen(false);
                 setItems([]);
               }}
-              className="w-full text-left px-3 py-2.5 border-0 bg-card text-card-foreground hover:bg-secondary cursor-pointer"
+              className="relative w-full cursor-pointer border-0 bg-transparent px-5 py-3 text-left text-foreground transition-colors hover:bg-tomato/10"
+              style={{ fontSize: "15px" }}
             >
               {it.description}
             </button>
@@ -274,5 +315,70 @@ function CityAutocomplete({
         </div>
       )}
     </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Telegram chapter invite (tomato chip)
+   ────────────────────────────────────────────────────────────────────────── */
+
+function TelegramInvite({
+  chapterCity,
+  country,
+  chatUrl,
+}: {
+  chapterCity: string;
+  country: string;
+  chatUrl: string;
+}) {
+  const location = country ? `${chapterCity}, ${country}` : chapterCity;
+
+  return (
+    <div
+      className="paper-soft relative overflow-hidden rounded-[20px] border p-5"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--rule-warm) / 0.55)",
+        boxShadow: "var(--shadow-soft)",
+      }}
+    >
+      <div className="relative">
+        <p className="overline text-tomato">§ Chapter found</p>
+        <h3
+          className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.01em] text-foreground"
+          style={{ fontSize: "clamp(1.1rem, 2.4vw, 1.5rem)", lineHeight: 1.1 }}
+        >
+          PizzaDAO {chapterCity} Chapter
+        </h3>
+        <p className="mt-2 text-sm leading-relaxed text-foreground/70">
+          There&apos;s a local PizzaDAO community in{" "}
+          <b className="text-foreground">{location}</b>. Join the group chat to
+          connect with pizza fam near you.
+        </p>
+        <a
+          href={chatUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          className="btn-pill group mt-4 inline-flex no-underline"
+          style={{
+            background: "hsl(var(--tomato))",
+            color: "hsl(var(--cream))",
+            boxShadow: "var(--shadow-soft)",
+          }}
+        >
+          <TelegramIcon />
+          Join Telegram Group
+          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+        </a>
+      </div>
+    </div>
+  );
+}
+
+function TelegramIcon() {
+  return (
+    <svg width="16" height="16" viewBox="0 0 24 24" fill="currentColor" aria-hidden>
+      <path d="M11.944 0A12 12 0 0 0 0 12a12 12 0 0 0 12 12 12 12 0 0 0 12-12A12 12 0 0 0 12 0a12 12 0 0 0-.056 0zm4.962 7.224c.1-.002.321.023.465.14a.506.506 0 0 1 .171.325c.016.093.036.306.02.472-.18 1.898-.962 6.502-1.36 8.627-.168.9-.499 1.201-.82 1.23-.696.065-1.225-.46-1.9-.902-1.056-.693-1.653-1.124-2.678-1.8-1.185-.78-.417-1.21.258-1.91.177-.184 3.247-2.977 3.307-3.23.007-.032.014-.15-.056-.212s-.174-.041-.249-.024c-.106.024-1.793 1.14-5.061 3.345-.48.33-.913.49-1.302.48-.428-.008-1.252-.241-1.865-.44-.752-.245-1.349-.374-1.297-.789.027-.216.325-.437.893-.663 3.498-1.524 5.83-2.529 6.998-3.014 3.332-1.386 4.025-1.627 4.476-1.635z" />
+    </svg>
   );
 }

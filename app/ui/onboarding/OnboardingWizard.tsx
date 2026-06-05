@@ -16,7 +16,8 @@ import { MemberIdStep } from "./steps/MemberIdStep";
 import { CrewsStep } from "./steps/CrewsStep";
 import { ReviewStep } from "./steps/ReviewStep";
 
-import { card, btn, alert } from "./styles";
+// mozzarella-41832: card/btn/alert primitives replaced by editorial
+// utilities (.paper-soft, .btn-pill-lg, .overline) inline in the JSX.
 import {
   FlowState,
   WizardData,
@@ -472,13 +473,14 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // Magic login flow
   if (flow.type === "magic_login") {
     return (
-      <div style={card()}>
-        <h2
-          className="font-[family-name:var(--font-display)] uppercase tracking-tight text-3xl sm:text-4xl font-extrabold text-foreground m-0"
-          style={{ textWrap: "balance" } as React.CSSProperties}
-        >
-          Login via Discord DM
-        </h2>
+      <div
+        className="paper-soft relative overflow-hidden rounded-[28px] border p-6 md:p-9"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--rule-warm) / 0.55)",
+          boxShadow: "var(--shadow-lifted)",
+        }}
+      >
         <MagicLoginFlow
           onBack={() => {
             setLoginError(null);
@@ -509,20 +511,46 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // Error state
   if (flow.type === "error") {
     return (
-      <div style={card()}>
-        <div style={alert("error")}>
-          <div className="font-[family-name:var(--font-display)] text-xl font-extrabold">
+      <div
+        className="paper-soft relative overflow-hidden rounded-[28px] border p-6 md:p-9 grid gap-5 fade-up"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--rule-warm) / 0.55)",
+          boxShadow: "var(--shadow-soft)",
+        }}
+      >
+        <p className="overline text-tomato">§ ··· Something snapped</p>
+        <div
+          className="relative paper-soft overflow-hidden rounded-[18px] border p-4"
+          style={{
+            background: "hsl(var(--destructive) / 0.08)",
+            borderColor: "hsl(var(--destructive) / 0.3)",
+          }}
+        >
+          <div
+            className="font-[family-name:var(--font-display)] text-xl font-black tracking-tight"
+            style={{ color: "hsl(var(--destructive))" }}
+          >
             {flow.message}
           </div>
           {flow.details && (
-            <details style={{ marginTop: 8 }}>
-              <summary>Details</summary>
-              <pre style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{flow.details}</pre>
+            <details className="mt-2">
+              <summary className="text-xs text-foreground/55 cursor-pointer">Details</summary>
+              <pre className="text-xs whitespace-pre-wrap text-foreground/65 mt-1">{flow.details}</pre>
             </details>
           )}
         </div>
-        <button onClick={() => setFlow({ type: "wizard", step: 0, isUpdate: false })} style={btn("secondary")}>
-          Start Over
+        <button
+          onClick={() => setFlow({ type: "wizard", step: 0, isUpdate: false })}
+          className="btn-pill-lg"
+          style={{
+            background: "transparent",
+            color: "hsl(var(--foreground))",
+            border: "1px solid hsl(var(--foreground) / 0.25)",
+            alignSelf: "start",
+          }}
+        >
+          Start over
         </button>
       </div>
     );
@@ -531,8 +559,21 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // Success state
   if (flow.type === "success") {
     return (
-      <div style={card()}>
-        <div style={alert("success")}>Profile saved successfully!</div>
+      <div
+        className="paper-soft relative overflow-hidden rounded-[28px] border p-6 md:p-9 grid gap-3 fade-up"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--rule-warm) / 0.55)",
+          boxShadow: "var(--shadow-soft)",
+        }}
+      >
+        <p className="overline text-tomato">§ ··· Filed</p>
+        <p
+          className="font-[family-name:var(--font-display)] font-black text-foreground"
+          style={{ fontSize: "clamp(1.4rem, 3.4vw, 2.1rem)", lineHeight: 1 }}
+        >
+          Profile saved successfully.
+        </p>
       </div>
     );
   }
@@ -562,73 +603,111 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     const progress = Math.min(100, Math.round((currentIndex / totalSteps) * 100));
 
     return (
-      <div style={card()}>
-        {/* Progress */}
-        <div className="grid gap-2">
-          <div className="flex items-center justify-between text-xs uppercase tracking-wide text-muted-foreground font-semibold">
-            <span>Step {currentIndex} of {totalSteps}</span>
-            <span>{progress}%</span>
+      <div
+        className="paper-soft relative overflow-hidden rounded-[28px] border p-5 md:p-8 grid gap-7"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--rule-warm) / 0.55)",
+          boxShadow: "var(--shadow-lifted)",
+        }}
+      >
+        {/* Progress — editorial overline + thick tomato bar */}
+        <div className="relative grid gap-2.5">
+          <div className="flex items-center justify-between">
+            <p className="overline text-tomato/85">
+              § Step {currentIndex} · of {totalSteps}
+            </p>
+            <p className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/55">
+              {progress}%
+            </p>
           </div>
-          <div className="h-1.5 w-full rounded-full bg-rule overflow-hidden">
+          <div
+            className="relative h-2 w-full overflow-hidden rounded-full"
+            style={{ background: "hsl(var(--rule-warm) / 0.35)" }}
+          >
             <div
-              className="h-full bg-tomato transition-all duration-300 ease-out"
-              style={{ width: `${progress}%` }}
+              className="h-full transition-all duration-500 ease-out"
+              style={{
+                width: `${progress}%`,
+                background: "hsl(var(--tomato))",
+                boxShadow: "0 0 14px hsl(var(--tomato) / 0.4)",
+              }}
             />
           </div>
         </div>
 
-        {/* Summary bar */}
+        {/* Summary bar — hand-stamped dossier strip */}
         {(data.mafiaName || data.city || data.turtles.length > 0) && (
-          <div className="flex flex-wrap gap-x-3 gap-y-1 text-sm text-muted-foreground border-b border-rule pb-2">
+          <div
+            className="relative grid grid-cols-1 gap-3 pb-4 sm:grid-cols-3"
+            style={{
+              borderBottom: "1px dashed hsl(var(--rule-warm) / 0.7)",
+            }}
+          >
             {data.mafiaName && (
-              <span>
-                Name: <b className="text-foreground">{data.mafiaName}</b>
-              </span>
+              <SummaryStamp label="Name" value={data.mafiaName} />
             )}
-            {data.city && (
-              <span>
-                City: <b className="text-foreground">{data.city}</b>
-              </span>
-            )}
+            {data.city && <SummaryStamp label="City" value={data.city} />}
             {data.turtles.length > 0 && (
-              <span>
-                Roles: <b className="text-foreground">{data.turtles.join(", ")}</b>
-              </span>
+              <SummaryStamp label="Turtles" value={data.turtles.join(", ")} />
             )}
           </div>
         )}
 
-        {/* Header */}
-        <div className="flex justify-between gap-3 items-center">
-          <h2
-            className="font-[family-name:var(--font-display)] tracking-tight text-3xl sm:text-4xl font-extrabold text-foreground m-0"
-            style={{ textWrap: "balance" } as React.CSSProperties}
-          >
-            {stepTitle}
-          </h2>
+        {/* Header — editorial overline + display headline + tiny reset link */}
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          <div className="flex-1 min-w-0">
+            <p className="overline text-tomato">§ Chapter {currentIndex}</p>
+            <h2
+              className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
+              style={{
+                fontSize: "clamp(1.6rem, 4vw, 2.8rem)",
+                lineHeight: 0.95,
+                textWrap: "balance",
+              }}
+            >
+              {stepTitle}
+            </h2>
+          </div>
           <button
+            type="button"
             onClick={() => {
               localStorage.removeItem(LS_KEY);
               localStorage.removeItem(PENDING_CLAIM_KEY);
               setData({ ...initialWizardData, sessionId: uuidLike() });
               setFlow({ type: "wizard", step: 1, isUpdate: false });
             }}
-            style={btn("secondary")}
+            className="ui inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.28em] text-foreground/45 transition-colors hover:text-tomato min-h-11"
+            style={{ background: "none", border: "none" }}
           >
+            <span aria-hidden>×</span>
             Reset
           </button>
         </div>
 
         {/* Error display */}
         {error && (
-          <div style={alert("error")}>
-            <div className="font-[family-name:var(--font-display)] text-lg font-extrabold">
+          <div
+            className="relative paper-soft overflow-hidden rounded-[18px] border p-4"
+            style={{
+              background: "hsl(var(--destructive) / 0.08)",
+              borderColor: "hsl(var(--destructive) / 0.3)",
+            }}
+          >
+            <p
+              className="font-[family-name:var(--font-display)] text-lg font-black tracking-tight"
+              style={{ color: "hsl(var(--destructive))" }}
+            >
               {error}
-            </div>
+            </p>
             {errorDetails && (
-              <details style={{ marginTop: 8 }}>
-                <summary>Details</summary>
-                <pre style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{errorDetails}</pre>
+              <details className="mt-2">
+                <summary className="text-xs text-foreground/55 cursor-pointer">
+                  Details
+                </summary>
+                <pre className="text-xs whitespace-pre-wrap text-foreground/65 mt-1">
+                  {errorDetails}
+                </pre>
               </details>
             )}
           </div>
@@ -778,4 +857,25 @@ function parseList(val: any): string[] {
 function mergeSeen(prevSeen: string[], newNames: string[]): string[] {
   const cleaned = newNames.map((x) => String(x ?? "").trim()).filter(Boolean);
   return Array.from(new Set([...(prevSeen ?? []), ...cleaned]));
+}
+
+// ============================================================================
+// SummaryStamp — hand-stamped dossier strip cell for the wizard summary bar
+// ============================================================================
+
+function SummaryStamp({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="ui text-[9px] uppercase tracking-[0.3em] text-foreground/45">
+        {label}
+      </p>
+      <p
+        className="font-[family-name:var(--font-display)] mt-0.5 truncate font-black tracking-tight text-foreground"
+        style={{ fontSize: "14px", lineHeight: 1.2 }}
+        title={value}
+      >
+        {value}
+      </p>
+    </div>
+  );
 }

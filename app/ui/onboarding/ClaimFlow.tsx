@@ -1,9 +1,15 @@
 // app/ui/onboarding/ClaimFlow.tsx
+//
+// mozzarella-41832 — Editorial restyle.
+// Visual rewrite of the existing-account claim flow. Props, internal step
+// state, and API calls (/api/user-data/[id], /api/claim-member) are
+// unchanged. The flow still routes to /dashboard/{memberId} on success.
 "use client";
 
 import { useState } from "react";
+import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
-import { card, btn, input as inputStyle, alert } from "./styles";
+import { ArrowLeft, ArrowUpRight, Hash, Lock } from "lucide-react";
 
 type ClaimStep = "ask" | "input-id" | "input-pass" | "processing";
 
@@ -13,7 +19,16 @@ type Props = {
   onStartRegistration: () => void;
 };
 
-export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props) {
+const PAGE_SPOTLIGHT: CSSProperties = {
+  background:
+    "radial-gradient(80% 60% at 25% 0%, hsl(46 100% 62% / 0.22), transparent 60%), radial-gradient(70% 60% at 100% 12%, hsl(0 93% 60% / 0.10), transparent 65%)",
+};
+
+export function ClaimFlow({
+  discordId,
+  discordNick: _discordNick,
+  onStartRegistration,
+}: Props) {
   const router = useRouter();
   const [step, setStep] = useState<ClaimStep>("ask");
   const [memberId, setMemberId] = useState("");
@@ -51,11 +66,7 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
       const res = await fetch("/api/claim-member", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          memberId,
-          discordId,
-          password,
-        }),
+        body: JSON.stringify({ memberId, discordId, password }),
       });
       const json = await res.json();
       if (res.ok) {
@@ -71,122 +82,295 @@ export function ClaimFlow({ discordId, discordNick, onStartRegistration }: Props
   }
 
   return (
-    <div className="min-h-screen bg-background flex items-center justify-center p-5">
-      <div style={card()} className="w-full max-w-lg">
-        {step === "ask" && (
-          <>
-            <h2
-              className="font-[family-name:var(--font-display)] uppercase tracking-tight text-3xl sm:text-4xl font-extrabold text-foreground mb-2"
-              style={{ textWrap: "balance" } as React.CSSProperties}
-            >
-              Welcome, Pizza Chef!
-            </h2>
-            <p className="mb-6 leading-relaxed text-muted-foreground">
-              We authenticated your Discord, but we couldn&apos;t automatically find your Profile.
-              <br />
-              <br />
-              <strong className="text-foreground">
-                Do you already have a PizzaDAO Member ID?
-              </strong>
-            </p>
-            <div className="flex gap-3">
-              <button onClick={() => setStep("input-id")} style={btn("accent")}>
-                Yes, I have an ID
-              </button>
-              <button onClick={onStartRegistration} style={btn("secondary")}>
-                No, I&apos;m new
-              </button>
-            </div>
-          </>
-        )}
+    <div className="relative min-h-screen bg-background">
+      <div
+        aria-hidden
+        className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60svh] opacity-60"
+        style={PAGE_SPOTLIGHT}
+      />
 
-        {step === "input-id" && (
-          <>
-            <h2 className="font-[family-name:var(--font-display)] text-2xl font-extrabold text-foreground mb-3">
-              Find Your Profile
-            </h2>
-            <p className="mb-3 text-sm text-muted-foreground">
-              Please enter your numeric Member ID.
-            </p>
-            <input
-              type="text"
-              placeholder="e.g. 60"
-              value={memberId}
-              onChange={(e) => setMemberId(e.target.value)}
-              style={{ ...inputStyle(), marginBottom: 16 }}
-            />
-            {error && (
-              <div style={alert("error")} className="mb-3">
-                {error}
-              </div>
-            )}
-            <div className="flex gap-3">
-              <button onClick={checkMemberId} style={btn("accent")}>
-                Search ID
-              </button>
-              <button
-                onClick={() => {
-                  setStep("ask");
-                  setError(null);
-                }}
-                style={btn("secondary")}
+      <div className="flex min-h-screen items-center justify-center p-5">
+        <div
+          className="paper-soft relative w-full max-w-lg overflow-hidden rounded-[28px] border p-6 md:p-9"
+          style={{
+            background: "hsl(var(--card))",
+            borderColor: "hsl(var(--rule-warm) / 0.55)",
+            boxShadow: "var(--shadow-lifted)",
+          }}
+        >
+          {step === "ask" && (
+            <div className="relative grid gap-6 fade-up">
+              <header>
+                <p className="overline text-tomato">§ ··· Welcome back</p>
+                <h2
+                  className="font-[family-name:var(--font-display)] mt-3 max-w-[14ch] font-black tracking-[-0.015em] text-foreground"
+                  style={{
+                    fontSize: "clamp(1.8rem, 5vw, 2.8rem)",
+                    lineHeight: 0.95,
+                    textWrap: "balance",
+                  }}
+                >
+                  Welcome, <span className="text-tomato">Pizza Chef</span>.
+                </h2>
+              </header>
+
+              <p
+                className="text-foreground/75"
+                style={{ fontSize: "15px", lineHeight: 1.55 }}
               >
-                Back
-              </button>
-            </div>
-          </>
-        )}
+                We authenticated your Discord, but we couldn&apos;t
+                automatically find your profile.
+              </p>
+              <p className="font-[family-name:var(--font-display)] font-black text-foreground">
+                Do you already have a PizzaDAO Member ID?
+              </p>
 
-        {step === "input-pass" && (
-          <>
-            <h2 className="font-[family-name:var(--font-display)] text-2xl font-extrabold text-foreground mb-3">
-              Claim Profile: {foundName}
-            </h2>
-            <p className="mb-3 text-sm text-muted-foreground">
-              To verify this is you, please enter the claim password.
-            </p>
+              <div className="grid gap-3 sm:grid-cols-2">
+                <button
+                  type="button"
+                  onClick={() => setStep("input-id")}
+                  className="btn-pill-lg group"
+                  style={{
+                    background: "hsl(var(--tomato))",
+                    color: "hsl(var(--cream))",
+                    boxShadow: "var(--shadow-soft)",
+                  }}
+                >
+                  Yes, I have an ID
+                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                </button>
+                <button
+                  type="button"
+                  onClick={onStartRegistration}
+                  className="btn-pill-lg"
+                  style={{
+                    background: "transparent",
+                    color: "hsl(var(--foreground))",
+                    border: "1px solid hsl(var(--foreground) / 0.25)",
+                  }}
+                >
+                  No, I&apos;m new
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "input-id" && (
+            <div className="relative grid gap-5 fade-up">
+              <header>
+                <p className="overline text-tomato">§ ··· Find your file</p>
+                <h2
+                  className="font-[family-name:var(--font-display)] mt-3 font-black tracking-[-0.015em] text-foreground"
+                  style={{
+                    fontSize: "clamp(1.5rem, 4vw, 2rem)",
+                    lineHeight: 0.95,
+                  }}
+                >
+                  Enter your Member ID.
+                </h2>
+                <p className="mt-3 text-sm text-foreground/65">
+                  The numeric ID we have on file (e.g. 60).
+                </p>
+              </header>
+
+              <CinematicField
+                icon={<Hash className="h-5 w-5 shrink-0 text-foreground/35" />}
+              >
+                <input
+                  type="text"
+                  placeholder="60"
+                  value={memberId}
+                  onChange={(e) => setMemberId(e.target.value)}
+                  aria-label="Member ID"
+                  className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
+                  style={{
+                    fontSize: "clamp(1.2rem, 2.4vw, 1.7rem)",
+                    color: "hsl(var(--foreground))",
+                  }}
+                />
+              </CinematicField>
+
+              {error && <InlineError message={error} />}
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
+                <button
+                  type="button"
+                  onClick={() => {
+                    setStep("ask");
+                    setError(null);
+                  }}
+                  className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato min-h-11"
+                >
+                  <ArrowLeft className="h-3 w-3" />
+                  Back
+                </button>
+                <button
+                  type="button"
+                  onClick={checkMemberId}
+                  className="btn-pill-lg group"
+                  style={{
+                    background: "hsl(var(--tomato))",
+                    color: "hsl(var(--cream))",
+                    boxShadow: "var(--shadow-soft)",
+                  }}
+                >
+                  Search ID
+                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                </button>
+              </div>
+            </div>
+          )}
+
+          {step === "input-pass" && (
             <form
+              className="relative grid gap-5 fade-up"
               onSubmit={(e) => {
                 e.preventDefault();
                 const fd = new FormData(e.currentTarget);
                 submitClaim(String(fd.get("password")));
               }}
             >
-              <input
-                name="password"
-                type="password"
-                placeholder="Password"
-                autoFocus
-                style={{ ...inputStyle(), marginBottom: 16 }}
-              />
-              {error && (
-                <div style={alert("error")} className="mb-3">
-                  {error}
-                </div>
-              )}
-              <div className="flex gap-3">
-                <button type="submit" style={btn("accent")}>
-                  Claim Profile
-                </button>
+              <header>
+                <p className="overline text-tomato">§ ··· Confirm it&apos;s you</p>
+                <h2
+                  className="font-[family-name:var(--font-display)] mt-3 font-black tracking-[-0.015em] text-foreground"
+                  style={{
+                    fontSize: "clamp(1.5rem, 4vw, 2rem)",
+                    lineHeight: 0.95,
+                  }}
+                >
+                  Claim profile · <span className="text-tomato">{foundName}</span>
+                </h2>
+                <p className="mt-3 text-sm text-foreground/65">
+                  Enter the claim password to verify this is you.
+                </p>
+              </header>
+
+              <CinematicField
+                icon={<Lock className="h-5 w-5 shrink-0 text-foreground/35" />}
+              >
+                <input
+                  name="password"
+                  type="password"
+                  placeholder="Password"
+                  autoFocus
+                  aria-label="Claim password"
+                  className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
+                  style={{
+                    fontSize: "clamp(1.2rem, 2.4vw, 1.7rem)",
+                    color: "hsl(var(--foreground))",
+                  }}
+                />
+              </CinematicField>
+
+              {error && <InlineError message={error} />}
+
+              <div className="flex flex-wrap items-center justify-between gap-3">
                 <button
                   type="button"
                   onClick={() => {
                     setStep("input-id");
                     setError(null);
                   }}
-                  style={btn("secondary")}
+                  className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato min-h-11"
                 >
+                  <ArrowLeft className="h-3 w-3" />
                   Back
+                </button>
+                <button
+                  type="submit"
+                  className="btn-pill-lg group"
+                  style={{
+                    background: "hsl(var(--tomato))",
+                    color: "hsl(var(--cream))",
+                    boxShadow: "var(--shadow-soft)",
+                  }}
+                >
+                  Claim profile
+                  <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </button>
               </div>
             </form>
-          </>
-        )}
+          )}
 
-        {step === "processing" && (
-          <div className="text-center py-5 text-muted-foreground">Checking...</div>
-        )}
+          {step === "processing" && (
+            <div className="relative grid place-items-center gap-3 py-10 fade-up">
+              <p className="overline text-tomato/70">§ ··· Checking the books</p>
+              <div className="flex gap-1.5">
+                <span
+                  className="h-2 w-2 animate-pulse rounded-full"
+                  style={{ background: "hsl(var(--tomato))" }}
+                />
+                <span
+                  className="h-2 w-2 animate-pulse rounded-full"
+                  style={{
+                    background: "hsl(var(--tomato))",
+                    animationDelay: "120ms",
+                  }}
+                />
+                <span
+                  className="h-2 w-2 animate-pulse rounded-full"
+                  style={{
+                    background: "hsl(var(--tomato))",
+                    animationDelay: "240ms",
+                  }}
+                />
+              </div>
+            </div>
+          )}
+        </div>
       </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   Helpers
+   ────────────────────────────────────────────────────────────────────────── */
+
+function CinematicField({
+  icon,
+  children,
+}: {
+  icon: React.ReactNode;
+  children: React.ReactNode;
+}) {
+  return (
+    <div
+      className="relative overflow-hidden rounded-[20px]"
+      style={{
+        background: "hsl(var(--cream))",
+        border: "1px solid hsl(var(--rule-warm) / 0.6)",
+        boxShadow: "0 20px 40px -32px hsl(46 100% 50% / 0.3)",
+      }}
+    >
+      <div
+        aria-hidden
+        className="grain pointer-events-none absolute inset-0 opacity-40"
+      />
+      <div className="relative flex items-center gap-3 px-4 py-3.5 md:gap-4 md:px-5 md:py-4">
+        {icon}
+        {children}
+      </div>
+    </div>
+  );
+}
+
+function InlineError({ message }: { message: string }) {
+  return (
+    <div
+      className="paper-soft relative overflow-hidden rounded-[14px] border px-4 py-3"
+      style={{
+        background: "hsl(var(--destructive) / 0.08)",
+        borderColor: "hsl(var(--destructive) / 0.3)",
+      }}
+    >
+      <p
+        className="relative ui text-[12px] uppercase tracking-[0.22em] font-bold"
+        style={{ color: "hsl(var(--destructive))" }}
+      >
+        {message}
+      </p>
     </div>
   );
 }
