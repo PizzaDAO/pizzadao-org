@@ -654,21 +654,28 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           </div>
         )}
 
-        {/* Header — editorial overline + display headline + tiny reset link */}
+        {/* Header — editorial overline + display headline + tiny reset link.
+            sicilian-99996: when stepTitle is empty (NameStep, which owns its
+            own large hero), drop the chapter heading entirely but keep the
+            reset link in the chrome. */}
         <div className="relative flex flex-wrap items-start justify-between gap-3">
-          <div className="flex-1 min-w-0">
-            <p className="overline text-tomato">§ Chapter {currentIndex}</p>
-            <h2
-              className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
-              style={{
-                fontSize: "clamp(1.6rem, 4vw, 2.8rem)",
-                lineHeight: 0.95,
-                textWrap: "balance",
-              }}
-            >
-              {stepTitle}
-            </h2>
-          </div>
+          {stepTitle ? (
+            <div className="flex-1 min-w-0">
+              <p className="overline text-tomato">§ Chapter {currentIndex}</p>
+              <h2
+                className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
+                style={{
+                  fontSize: "clamp(1.6rem, 4vw, 2.8rem)",
+                  lineHeight: 0.95,
+                  textWrap: "balance",
+                }}
+              >
+                {stepTitle}
+              </h2>
+            </div>
+          ) : (
+            <div className="flex-1 min-w-0" />
+          )}
           <button
             type="button"
             onClick={() => {
@@ -828,7 +835,10 @@ function getStepTitle(step: number, isUpdate: boolean): string {
     case 0:
       return "";
     case 1:
-      return "Pick your mafia name";
+      // sicilian-99996: NameStep has its own large headline ("Claim your
+      // mafia name."), so the wizard chrome no longer adds a redundant
+      // section title above it. Other steps still render theirs.
+      return "";
     case 2:
       return "What city are you in?";
     case 3:

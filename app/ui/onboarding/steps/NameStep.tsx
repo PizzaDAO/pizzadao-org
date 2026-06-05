@@ -21,11 +21,14 @@ import {
   ArrowUpRight,
   Copy,
   RefreshCw,
+  Search,
   Sparkles,
   X,
 } from "lucide-react";
 
 import { btn } from "../styles";
+import { MAFIA_FILMS, type MafiaFilm } from "@/app/lib/mafia-films";
+import { FilmPoster } from "@/app/ui/onboarding/FilmPoster";
 
 type Props = {
   // Form data
@@ -303,7 +306,6 @@ export function NameStep({
       {/* ─── Hero — shown until suggestions arrive ───────────────── */}
       {!suggestions && !submitting && (
         <header className="relative">
-          <p className="overline text-tomato">§ 01 · PizzaDAO</p>
           <h1
             className="font-[family-name:var(--font-display)] mt-4 max-w-[14ch] font-black tracking-[-0.015em] text-foreground"
             style={{
@@ -327,7 +329,7 @@ export function NameStep({
       {!suggestions && (
         <section className="grid gap-10">
           <CinematicInput
-            label="§ 02 · Your topping"
+            label="§ 01 · Your topping"
             placeholder="What's your topping?"
             value={topping}
             onChange={(v) => onChange({ topping: v })}
@@ -341,17 +343,10 @@ export function NameStep({
             }
           />
 
-          <CinematicInput
-            label="§ 03 · Your mafia movie"
-            placeholder="Goodfellas, The Sopranos…"
+          <FilmPicker
+            label="§ 02 · Your mafia movie"
             value={mafiaMovieTitle}
             onChange={(v) => onChange({ mafiaMovieTitle: v })}
-            size="small"
-            footer={
-              <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/40">
-                Tone reference only — flavors the cadence of your name.
-              </p>
-            }
           />
 
           <div className="flex flex-wrap items-center gap-4">
@@ -975,5 +970,209 @@ function FamilyFileCard({
         {persona.margin}
       </span>
     </button>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   FilmPicker — sicilian-99996
+   Replaces the free-text movie input with a search field + poster grid.
+   When the user picks a film, the value is set to `film.title` (the rest of
+   the wizard still uses just the title string against /api/namegen). Free
+   text typed but unmatched is accepted as a custom entry — the input stays
+   editable so the existing behavior (free-text fallback) is preserved.
+   ────────────────────────────────────────────────────────────────────────── */
+
+function FilmPicker({
+  label,
+  value,
+  onChange,
+}: {
+  label: string;
+  value: string;
+  onChange: (v: string) => void;
+}) {
+  const [open, setOpen] = useState(false);
+  const [query, setQuery] = useState("");
+  const inputRef = useRef<HTMLInputElement | null>(null);
+
+  // What we filter against — when the user has already picked something,
+  // typing replaces the picked title; otherwise the query box is empty.
+  const effectiveQuery = (open ? query : value).trim().toLowerCase();
+
+  const filteredFilms = useMemo(() => {
+    if (!effectiveQuery) return MAFIA_FILMS.slice(0, 24);
+    return MAFIA_FILMS.filter(
+      (f) =>
+        f.title.toLowerCase().includes(effectiveQuery) ||
+        f.country.toLowerCase().includes(effectiveQuery),
+    );
+  }, [effectiveQuery]);
+
+  // Find the canonical film matching the current value (if any).
+  const matchedFilm = useMemo(
+    () =>
+      value
+        ? MAFIA_FILMS.find(
+            (f) => f.title.toLowerCase() === value.trim().toLowerCase(),
+          )
+        : undefined,
+    [value],
+  );
+
+  const handlePick = (f: MafiaFilm) => {
+    onChange(f.title);
+    setQuery("");
+    setOpen(false);
+  };
+
+  return (
+    <div className="relative">
+      <p className="overline text-tomato">{label}</p>
+      <div
+        className="relative mt-4 overflow-hidden rounded-[28px] transition-shadow"
+        style={{
+          background: "hsl(var(--cream))",
+          border: "1px solid hsl(var(--rule-warm) / 0.6)",
+          boxShadow: "0 30px 60px -40px hsl(46 100% 50% / 0.35)",
+        }}
+      >
+        <div
+          aria-hidden
+          className="pointer-events-none absolute inset-0 opacity-60"
+          style={{
+            background:
+              "radial-gradient(120% 80% at 0% 0%, hsl(46 100% 62% / 0.14), transparent 60%), radial-gradient(80% 60% at 100% 100%, hsl(0 93% 60% / 0.06), transparent 70%)",
+          }}
+        />
+        <div
+          aria-hidden
+          className="grain pointer-events-none absolute inset-0 opacity-40"
+        />
+        <label className="relative flex items-center gap-3 px-4 py-3.5 md:gap-4 md:px-6 md:py-4">
+          <Search
+            className="h-4 w-4 shrink-0 text-foreground/35 md:h-5 md:w-5"
+            aria-hidden
+          />
+          <input
+            ref={inputRef}
+            type="text"
+            value={open ? query : value}
+            onFocus={() => {
+              setQuery(value);
+              setOpen(true);
+            }}
+            onChange={(e) => {
+              setOpen(true);
+              setQuery(e.target.value);
+              onChange(e.target.value);
+            }}
+            placeholder="Pick a movie."
+            className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
+            style={{
+              fontSize: "clamp(1.05rem, 2.2vw, 1.6rem)",
+              color: "hsl(var(--foreground))",
+            }}
+            aria-label="Your mafia movie"
+          />
+          {open && (
+            <button
+              type="button"
+              onClick={() => {
+                setOpen(false);
+                setQuery("");
+              }}
+              className="ui hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:border-tomato hover:text-tomato md:inline-flex"
+            >
+              Close
+            </button>
+          )}
+        </label>
+      </div>
+
+      {/* Selected confirmation footer — appears when a canonical film is locked in. */}
+      {matchedFilm && !open && (
+        <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/45">
+          {matchedFilm.year} · {matchedFilm.country}
+        </p>
+      )}
+      {!matchedFilm && (
+        <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/40">
+          Tone reference only — flavors the cadence of your name.
+        </p>
+      )}
+
+      {/* Contextual drawer — poster grid */}
+      <div
+        className={`overflow-hidden transition-[max-height,opacity,margin] duration-500 ease-[cubic-bezier(0.2,0.9,0.3,1)] ${
+          open ? "mt-5 max-h-[78vh] opacity-100" : "mt-0 max-h-0 opacity-0"
+        }`}
+      >
+        <div
+          className="max-h-[74vh] overflow-y-auto overscroll-contain rounded-[24px] border p-4 md:p-6"
+          style={{
+            background: "hsl(var(--card) / 0.6)",
+            borderColor: "hsl(var(--rule-warm) / 0.55)",
+            backdropFilter: "blur(8px)",
+          }}
+        >
+          <p className="ui text-[10px] uppercase tracking-[0.28em] text-foreground/45">
+            {effectiveQuery ? "Matches" : "Recently respected"}
+          </p>
+          <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
+            {filteredFilms.map((f) => (
+              <button
+                key={f.id}
+                type="button"
+                onClick={() => handlePick(f)}
+                className="group relative flex aspect-[2/3] w-full overflow-hidden rounded-xl border text-left transition-all hover:-translate-y-0.5"
+                style={{
+                  background: "hsl(var(--ink))",
+                  borderColor: "hsl(var(--foreground) / 0.1)",
+                  boxShadow: "0 14px 24px -16px hsl(20 30% 15% / 0.45)",
+                }}
+              >
+                <FilmPoster film={f} index={MAFIA_FILMS.indexOf(f)} />
+                <span
+                  className="pointer-events-none absolute inset-0 rounded-xl transition-shadow group-hover:shadow-[inset_0_0_0_2px_hsl(var(--tomato)/0.6)]"
+                />
+              </button>
+            ))}
+
+            {effectiveQuery &&
+              filteredFilms.every(
+                (f) => f.title.toLowerCase() !== effectiveQuery,
+              ) && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    onChange(query.trim() || value.trim());
+                    setOpen(false);
+                  }}
+                  className="group flex aspect-[2/3] w-full flex-col items-center justify-center gap-2 rounded-xl border-2 border-dashed p-3 text-center transition-colors"
+                  style={{
+                    borderColor: "hsl(var(--tomato) / 0.4)",
+                    background: "hsl(var(--tomato) / 0.05)",
+                    color: "hsl(var(--tomato))",
+                  }}
+                >
+                  <Sparkles className="h-5 w-5" />
+                  <span className="font-[family-name:var(--font-display)] text-sm font-black leading-tight">
+                    Use &ldquo;{(query || value).trim()}&rdquo;
+                  </span>
+                  <span
+                    className="ui text-[9px] uppercase tracking-[0.22em]"
+                    style={{ color: "hsl(var(--tomato) / 0.7)" }}
+                  >
+                    Off canon
+                  </span>
+                </button>
+              )}
+          </div>
+          <p className="ui mt-4 text-[10px] uppercase tracking-[0.24em] text-foreground/35">
+            Pick a poster · or keep typing
+          </p>
+        </div>
+      </div>
+    </div>
   );
 }

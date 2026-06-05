@@ -68,10 +68,11 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
           {t("tagline")}
         </p>
 
-        {/* Handwritten margin annotation */}
+        {/* Handwritten margin annotation — tucked beside the headline,
+            well below the centered 64-px logo so the wordmark stays clear. */}
         <span
           aria-hidden
-          className="handwritten pointer-events-none absolute right-[6%] top-[12%] hidden rotate-[8deg] text-[18px] text-tomato md:block"
+          className="handwritten pointer-events-none absolute right-[2%] top-[42%] hidden rotate-[8deg] text-[18px] text-tomato md:block lg:right-[-2%]"
           style={{ opacity: 0.85 }}
         >
           come in, the door's open
