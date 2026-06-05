@@ -39,9 +39,25 @@
   --card-foreground:        var(--ink);
   --popover:                var(--cream);
   --popover-foreground:     var(--ink);
-  --border:                 var(--ink);
-  --input:                  var(--ink);
+  /* anchovy-28942: warm institutional gray border replaces harsh near-black */
+  --border:                 30 12% 78%;
+  --input:                  30 12% 78%;
   --ring:                   var(--tomato);
+
+  /* ---------------------------------------------------------------------------
+     anchovy-28942 — Editorial foundation tokens (motion + elevation).
+     Used by the editorial utilities below (.btn-pill, .surface-editorial, etc.)
+     and by the restyled NameStep. Additive — no existing token is removed.
+     See plans/anchovy-28942-editorial-restyle.md.
+  --------------------------------------------------------------------------- */
+  --rule-warm: 30 14% 70%;
+  --ease-editorial: cubic-bezier(0.22, 0.61, 0.24, 1);
+  --ease-filmic:    cubic-bezier(0.16, 0.84, 0.32, 1);
+  --dur-fast: 280ms;
+  --dur-base: 520ms;
+  --dur-slow: 900ms;
+  --shadow-soft:   0 1px 2px hsl(30 20% 12% / 0.04), 0 8px 28px -18px hsl(30 20% 12% / 0.18);
+  --shadow-lifted: 0 2px 4px hsl(30 20% 12% / 0.05), 0 18px 48px -24px hsl(30 20% 12% / 0.22);
 
   /* ---------------------------------------------------------------------------
      Back-compat aliases — kept through Phase 2 because page-level files still
@@ -176,9 +192,11 @@
   --color-ring:                   hsl(var(--ring));
 
   /* Fonts */
-  --font-sans:    var(--font-sans-asap);
-  --font-display: var(--font-display-asap-condensed);
-  --font-mono:    var(--font-geist-mono);
+  --font-sans:        var(--font-sans-asap);
+  --font-display:     var(--font-display-asap-condensed);
+  --font-mono:        var(--font-geist-mono);
+  /* anchovy-28942: Rock Salt handwritten accent — see app/layout.tsx */
+  --font-handwritten: var(--font-handwritten-rock-salt);
 }
 
 body {
@@ -190,4 +208,283 @@ body {
 /* Dark mode: invert icons that use black color */
 [data-theme="dark"] .google-sheets-link img {
   filter: invert(1);
+}
+
+/* ============================================================================
+   anchovy-28942 — Editorial utility classes.
+   Ported from the Lovable mockup (src/index.css). Additive; nothing here
+   overrides existing primitives. Used by the restyled NameStep and reserved
+   for follow-up step restyles. Plain CSS — no @apply, Tailwind v4-friendly.
+   See plans/anchovy-28942-editorial-restyle.md.
+   ============================================================================ */
+
+/* Cinematic transition defaults on interactive elements */
+a, button, [role="button"] {
+  transition-timing-function: var(--ease-editorial);
+  transition-duration: var(--dur-fast);
+}
+
+/* Tomato selection highlight */
+::selection {
+  background: hsl(var(--tomato));
+  color: hsl(var(--cream));
+}
+
+/* Body-wide ultra-faint paper grain — printed institution, not pattern */
+body::before {
+  content: "";
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 1;
+  opacity: 0.035;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='280' height='280'><filter id='gn'><feTurbulence type='fractalNoise' baseFrequency='1.1' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.55 0'/></filter><rect width='100%25' height='100%25' filter='url(%23gn)'/></svg>");
+}
+@media (prefers-reduced-motion: no-preference) {
+  body::before {
+    animation: bodyGrainDrift 38s linear infinite;
+  }
+}
+@keyframes bodyGrainDrift {
+  0%   { background-position: 0 0; }
+  100% { background-position: 280px 0; }
+}
+
+/* Editorial overline label */
+.overline {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.18em;
+  font-size: 11px;
+  font-weight: 600;
+}
+
+/* Hairline rules */
+.rule       { border-top: 1px solid hsl(var(--foreground) / 0.15); }
+.rule-thick { border-top: 2px solid hsl(var(--foreground)); }
+.rule-warm  { border-top: 1px solid hsl(var(--rule-warm) / 0.55); }
+
+/* Pill CTAs — friendly, confident */
+.btn-pill {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  border-radius: 9999px;
+  padding: 0.75rem 1.5rem;
+  font-size: 0.875rem;
+  font-weight: 600;
+  transition: all var(--dur-fast) var(--ease-editorial);
+  cursor: pointer;
+}
+.btn-pill-lg {
+  font-family: var(--font-sans), system-ui, sans-serif;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  white-space: nowrap;
+  border-radius: 9999px;
+  padding: 1rem 1.75rem;
+  font-size: 1rem;
+  font-weight: 600;
+  transition: all var(--dur-fast) var(--ease-editorial);
+  cursor: pointer;
+}
+.btn-pill:disabled,
+.btn-pill-lg:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Fade-up reveal */
+@keyframes fadeUp {
+  from { opacity: 0; transform: translateY(14px); }
+  to   { opacity: 1; transform: translateY(0); }
+}
+.fade-up {
+  animation: fadeUp 0.9s cubic-bezier(0.2, 0.7, 0.2, 1) both;
+}
+
+/* Handwritten accent — Rock Salt loaded in app/layout.tsx */
+.handwritten {
+  font-family: var(--font-handwritten), "Asap", cursive;
+  font-weight: 400;
+  letter-spacing: 0;
+  line-height: 1.1;
+}
+@media (min-width: 768px) and (max-width: 1023px) {
+  .handwritten {
+    font-size: 0.94em;
+    letter-spacing: -0.01em;
+  }
+}
+
+/* Vertical infinite scroll (deferred — ship for follow-up steps) */
+@keyframes scrollY {
+  from { transform: translateY(0); }
+  to   { transform: translateY(-50%); }
+}
+.scroll-y-track {
+  animation: scrollY 60s linear infinite;
+  will-change: transform;
+}
+.mask-fade-y {
+  -webkit-mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+          mask-image: linear-gradient(to bottom, transparent, black 10%, black 90%, transparent);
+}
+
+/* Marquee tape (deferred — ship for follow-up steps) */
+@keyframes marquee {
+  from { transform: translateX(0); }
+  to   { transform: translateX(-50%); }
+}
+.marquee-track {
+  animation: marquee 40s linear infinite;
+  will-change: transform;
+}
+
+/* Hand-drawn underline */
+.underline-scribble {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 12' preserveAspectRatio='none'><path d='M2 7 Q 50 1 100 6 T 198 5' fill='none' stroke='%23F83A3A' stroke-width='2.5' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: 0 100%;
+  background-size: 100% 0.4em;
+  padding-bottom: 0.15em;
+}
+
+/* Hand-drawn circle wrap */
+.circle-scribble {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80' preserveAspectRatio='none'><path d='M100 6 C 40 6 6 22 6 40 C 6 60 50 74 100 74 C 160 74 194 58 194 40 C 194 22 150 6 100 6 Z' fill='none' stroke='%23F83A3A' stroke-width='2.5' stroke-linecap='round'/></svg>");
+  background-repeat: no-repeat;
+  background-position: center;
+  background-size: 115% 130%;
+  padding: 0.05em 0.5em;
+}
+
+/* Newspaper grain overlay (applied to relative parent) */
+.grain {
+  position: relative;
+}
+.grain::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  opacity: 0.06;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
+}
+
+/* Soft tactile paper noise — for cards/containers */
+.paper-soft {
+  position: relative;
+  isolation: isolate;
+}
+.paper-soft::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.17;
+  mix-blend-mode: multiply;
+  border-radius: inherit;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='p'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0.24  0 0 0 0 0.14  0 0 0 0 0.02  0 0 0 0.78 0'/></filter><rect width='100%25' height='100%25' filter='url(%23p)'/></svg>");
+}
+.paper-soft::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  border-radius: inherit;
+  background:
+    radial-gradient(120% 80% at 18% 12%, hsl(var(--cream) / 0.35), transparent 55%),
+    radial-gradient(120% 90% at 88% 92%, hsl(var(--tomato) / 0.05), transparent 60%);
+  mix-blend-mode: multiply;
+  opacity: 0.85;
+}
+/* Inverse for dark surfaces — warm light grain over ink */
+.paper-soft-dark::before {
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='320' height='320'><filter id='pd'><feTurbulence type='fractalNoise' baseFrequency='0.65' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 1  0 0 0 0 0.92  0 0 0 0 0.78  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23pd)'/></svg>");
+  mix-blend-mode: screen;
+  opacity: 0.11;
+}
+.paper-soft-dark::after { display: none; }
+.paper-soft > * { position: relative; z-index: 1; }
+
+/* Ultra-light photocopy toner-fleck noise */
+.print-noise {
+  position: relative;
+  isolation: isolate;
+}
+.print-noise::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.05;
+  mix-blend-mode: multiply;
+  background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='pn'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23pn)'/></svg>");
+}
+.print-noise > * { position: relative; z-index: 1; }
+
+/* Soft halftone dot field */
+.halftone-soft {
+  position: relative;
+  isolation: isolate;
+}
+.halftone-soft::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.045;
+  mix-blend-mode: multiply;
+  background-image: radial-gradient(hsl(var(--ink)) 0.6px, transparent 1.1px);
+  background-size: 6px 6px;
+}
+.halftone-soft > * { position: relative; z-index: 1; }
+
+/* Soft ink-bleed gradient on edges of dark blocks */
+.ink-spread {
+  position: relative;
+  isolation: isolate;
+}
+.ink-spread::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  z-index: 0;
+  opacity: 0.55;
+  background:
+    radial-gradient(120% 80% at 10% 0%, hsl(var(--tomato) / 0.06), transparent 55%),
+    radial-gradient(110% 70% at 90% 100%, hsl(var(--butter) / 0.05), transparent 55%);
+}
+.ink-spread > * { position: relative; z-index: 1; }
+
+/* Cycling reveal helper used by NameStep CyclingStage */
+@keyframes cycleBlurIn {
+  from { filter: blur(8px); opacity: 0; transform: translateY(8px); }
+  to   { filter: blur(0);   opacity: 1; transform: translateY(0); }
+}
+.cycle-in {
+  animation: cycleBlurIn 0.18s ease-out both;
+}
+
+/* Reduced-motion override for the editorial animations */
+@media (prefers-reduced-motion: reduce) {
+  .fade-up,
+  .cycle-in,
+  .scroll-y-track,
+  .marquee-track {
+    animation: none !important;
+  }
 }

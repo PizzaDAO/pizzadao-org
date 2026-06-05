@@ -1,5 +1,5 @@
 import type { Metadata } from "next";
-import { Asap, Asap_Condensed, Geist_Mono } from "next/font/google";
+import { Asap, Asap_Condensed, Geist_Mono, Rock_Salt } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
@@ -18,6 +18,16 @@ const asapDisplay = Asap_Condensed({
   variable: "--font-display-asap-condensed",
   subsets: ["latin"],
   weight: ["500", "600", "700", "800"],
+  display: "swap",
+});
+
+// anchovy-28942: Rock Salt — handwritten editorial accent. Used by the
+// `.handwritten` utility in globals.css and the restyled NameStep margin
+// annotations. Single weight, swap display so we never block render.
+const rockSalt = Rock_Salt({
+  variable: "--font-handwritten-rock-salt",
+  subsets: ["latin"],
+  weight: "400",
   display: "swap",
 });
 
@@ -44,7 +54,7 @@ export default async function RootLayout({
   return (
     <html lang={locale} suppressHydrationWarning>
       <body
-        className={`${asapSans.variable} ${asapDisplay.variable} ${geistMono.variable} antialiased`}
+        className={`${asapSans.variable} ${asapDisplay.variable} ${rockSalt.variable} ${geistMono.variable} antialiased`}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>{children}</Providers>
