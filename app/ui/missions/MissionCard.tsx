@@ -1,13 +1,18 @@
 "use client";
 
-// garlic-68749 (Restyle Phase 4b): MissionCard adopts the pizzadao.org tokens
-// — card surface, Asap Condensed title, body Asap copy, status pills in
-// butter (pending) / emerald (approved) / tomato (rejected), locked state
-// is opacity-60 with a muted lock icon. Submit CTA = `btn("accent")` so the
-// loud tomato action draws the eye.
+// capricciosa-10448 — Editorial restyle of /missions.
+//
+// Mission cards adopt the dossier vocabulary from the editorial system
+// (NameStep/WelcomeStep precedent): paper-soft surface with hand-stamped
+// file-number aesthetic, each card slightly rotated for the dossier-on-a-desk
+// feel, handwritten "approved" / "pending" / "complete" margin stamps on
+// completed/pending missions, btn-pill CTAs in tomato (Submit) or ink
+// (Complete). No state/API/i18n changes — pure visual layer.
+//
+// Prior history: garlic-68749 (Phase 4b token migration).
 
 import { useState } from "react";
-import { btn, input } from "../shared-styles";
+import { input } from "../shared-styles";
 
 type MissionProgress = {
   status: string;
@@ -37,15 +42,15 @@ type StatusVariant = "approved" | "pending" | "rejected" | "locked" | "open";
 
 function statusPillStyle(variant: StatusVariant) {
   const base = {
-    display: "inline-flex",
-    alignItems: "center",
+    display: "inline-flex" as const,
+    alignItems: "center" as const,
     gap: 6,
     padding: "3px 10px",
     borderRadius: 999,
-    fontSize: 12,
+    fontSize: 11,
     fontWeight: 700,
     fontFamily: DISPLAY_FONT,
-    letterSpacing: 0.3,
+    letterSpacing: "0.18em",
     textTransform: "uppercase" as const,
     border: "1px solid transparent",
   };
@@ -140,55 +145,110 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
     }
   }
 
+  // capricciosa-10448: file-number badge — like a case-file id on a folder tab.
+  const fileNumber = `M-${String(mission.index).padStart(2, "0")}`;
+
+  // Deterministic rotation per mission so the dossier-on-a-desk feel doesn't
+  // jitter on every render. index parity decides the tilt direction.
+  const tilt = isLocked
+    ? 0
+    : ((mission.id % 2 === 0 ? -1 : 1) * (0.4 + (mission.id % 3) * 0.15)).toFixed(2);
+
   return (
     <div
+      className={isLocked ? "" : "paper-soft"}
       style={{
-        padding: "14px 16px",
+        position: "relative",
+        padding: "18px 18px 16px",
         borderRadius: "var(--radius)",
         border: isCompleted
-          ? "1px solid rgba(16, 185, 129, 0.30)"
-          : "1px solid hsl(var(--rule) / 0.12)",
+          ? "1px solid rgba(16, 185, 129, 0.32)"
+          : isRejected
+            ? "1px solid hsl(var(--tomato) / 0.30)"
+            : "1px solid hsl(var(--rule-warm) / 0.55)",
         background: isCompleted
-          ? "rgba(16, 185, 129, 0.05)"
-          : "hsl(var(--card))",
+          ? "rgba(16, 185, 129, 0.06)"
+          : "hsl(var(--cream))",
         color: "hsl(var(--card-foreground))",
-        opacity: isLocked ? 0.6 : 1,
-        transition: "background-color 150ms ease, border-color 150ms ease",
+        opacity: isLocked ? 0.55 : 1,
+        boxShadow: isLocked ? "none" : "var(--shadow-soft)",
+        transform: `rotate(${tilt}deg)`,
+        transition:
+          "transform 220ms var(--ease-editorial), box-shadow 220ms var(--ease-editorial)",
       }}
     >
-      <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
+      {/* Approved / Pending margin stamp — handwritten editorial mark */}
+      {(isCompleted || isPending || isRejected) && (
+        <span
+          aria-hidden
+          className="handwritten"
+          style={{
+            position: "absolute",
+            top: 8,
+            right: 12,
+            fontSize: 14,
+            transform: "rotate(-8deg)",
+            color: isCompleted
+              ? "rgb(4, 120, 87)"
+              : isRejected
+                ? "hsl(var(--tomato-deep))"
+                : "hsl(var(--ink) / 0.6)",
+            opacity: 0.7,
+            pointerEvents: "none",
+            whiteSpace: "nowrap",
+          }}
+        >
+          {isCompleted ? "approved" : isPending ? "pending" : "needs work"}
+        </span>
+      )}
+
+      <div style={{ display: "flex", alignItems: "flex-start", gap: 14 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
+          {/* File-number overline + status pill */}
           <div
             style={{
               display: "flex",
               alignItems: "center",
-              gap: 8,
+              gap: 10,
               flexWrap: "wrap",
+              marginBottom: 6,
             }}
           >
-            <div
+            <span
+              className="overline"
               style={{
-                fontFamily: DISPLAY_FONT,
-                fontWeight: 700,
-                fontSize: 17,
-                lineHeight: 1.25,
-                color: "hsl(var(--foreground))",
+                color: "hsl(var(--muted-foreground))",
+                fontFeatureSettings: "'tnum' 1",
               }}
             >
-              {mission.title}
-            </div>
+              § FILE {fileNumber}
+            </span>
             <span style={statusPillStyle(pillVariant)}>
               {pillIcon && <span aria-hidden>{pillIcon}</span>}
               {pillLabel}
             </span>
           </div>
+
+          <div
+            style={{
+              fontFamily: DISPLAY_FONT,
+              fontWeight: 700,
+              fontSize: "clamp(1.05rem, 2.2vw, 1.2rem)",
+              lineHeight: 1.2,
+              letterSpacing: "-0.01em",
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            {mission.title}
+          </div>
+
           {mission.description && (
             <div
               style={{
                 fontSize: 14,
                 color: "hsl(var(--muted-foreground))",
-                marginTop: 6,
-                lineHeight: 1.5,
+                marginTop: 8,
+                lineHeight: 1.55,
               }}
             >
               {mission.description}
@@ -199,10 +259,14 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
               style={{
                 fontSize: 12,
                 color: "hsl(var(--muted-foreground))",
-                marginTop: 6,
+                marginTop: 8,
                 fontStyle: "italic",
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
               }}
             >
+              <span aria-hidden style={{ opacity: 0.7 }}>↻</span>
               Auto-verified on submit
             </div>
           )}
@@ -211,22 +275,45 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
               style={{
                 fontSize: 13,
                 color: "hsl(var(--tomato-deep))",
-                marginTop: 6,
+                marginTop: 8,
                 fontWeight: 500,
+                padding: "8px 10px",
+                background: "hsl(var(--tomato) / 0.05)",
+                borderLeft: "2px solid hsl(var(--tomato))",
+                borderRadius: 4,
               }}
             >
-              Reviewer note: {mission.progress.reviewNote}
+              <span
+                className="overline"
+                style={{ display: "block", marginBottom: 2, color: "hsl(var(--tomato-deep))" }}
+              >
+                § Reviewer note
+              </span>
+              {mission.progress.reviewNote}
             </div>
           )}
         </div>
         {canSubmit && (
           <button
             onClick={() => setExpanded(!expanded)}
+            className="btn-pill"
             style={{
-              ...btn(mission.autoVerify ? "accent" : "primary"),
               fontSize: 13,
-              padding: "8px 14px",
+              padding: "0.55rem 1.15rem",
+              background: expanded
+                ? "transparent"
+                : mission.autoVerify
+                  ? "hsl(var(--tomato))"
+                  : "hsl(var(--ink))",
+              color: expanded
+                ? "hsl(var(--foreground))"
+                : "hsl(var(--cream))",
+              border: expanded
+                ? "1px solid hsl(var(--rule-warm) / 0.55)"
+                : "1px solid transparent",
+              boxShadow: expanded ? "none" : "var(--shadow-soft)",
               whiteSpace: "nowrap",
+              flexShrink: 0,
             }}
           >
             {expanded ? "Cancel" : mission.autoVerify ? "Complete" : "Submit"}
@@ -237,27 +324,23 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
       {expanded && canSubmit && (
         <div
           style={{
-            marginTop: 14,
-            paddingTop: 14,
-            borderTop: "1px solid hsl(var(--rule) / 0.12)",
+            marginTop: 16,
+            paddingTop: 16,
+            borderTop: "1px dashed hsl(var(--rule-warm) / 0.55)",
             display: "grid",
-            gap: 10,
+            gap: 12,
           }}
         >
           <div>
             <label
+              className="overline"
               style={{
-                fontSize: 12,
-                fontWeight: 700,
-                fontFamily: DISPLAY_FONT,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
                 display: "block",
-                marginBottom: 4,
+                marginBottom: 6,
                 color: "hsl(var(--foreground))",
               }}
             >
-              Evidence (optional)
+              § Evidence (optional)
             </label>
             <input
               type="text"
@@ -269,18 +352,14 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
           </div>
           <div>
             <label
+              className="overline"
               style={{
-                fontSize: 12,
-                fontWeight: 700,
-                fontFamily: DISPLAY_FONT,
-                textTransform: "uppercase",
-                letterSpacing: 0.5,
                 display: "block",
-                marginBottom: 4,
+                marginBottom: 6,
                 color: "hsl(var(--foreground))",
               }}
             >
-              Notes (optional)
+              § Notes (optional)
             </label>
             <input
               type="text"
@@ -293,10 +372,16 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
           <button
             onClick={handleSubmit}
             disabled={submitting}
+            className="btn-pill"
             style={{
-              ...btn("accent", submitting),
               fontSize: 13,
               justifySelf: "start",
+              background: "hsl(var(--tomato))",
+              color: "hsl(var(--cream))",
+              border: "1px solid transparent",
+              boxShadow: "var(--shadow-soft)",
+              opacity: submitting ? 0.6 : 1,
+              cursor: submitting ? "not-allowed" : "pointer",
             }}
           >
             {submitting ? "Submitting..." : "Submit for review"}

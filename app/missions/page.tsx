@@ -1,15 +1,21 @@
 "use client";
 
-// garlic-68749 (Restyle Phase 4b): /missions migrated onto the pizzadao.org
-// design system — cream background, Asap Condensed display headings, butter
-// level pills, tomato PEP accents, emerald/butter/tomato status states.
-// See plans/site-restyle-pizzadao-org.md (Phase 4).
+// capricciosa-10448 — Editorial restyle of /missions.
 //
-// MissionsProgress.tsx is OUT OF SCOPE here — Phase 3b already migrated it.
+// Dossier-style page: § overline anchors, display-font level headlines with
+// clamp(), butter pill for current level, paper-soft level groups with a
+// halftone tint, "Filed under" wayfinding hint, handwritten margin notes on
+// completed levels. Celebration loop components (MissionCompleteCelebration,
+// LevelUpModal, VouchPromptCard) are touched only enough to align with the
+// new dossier voice — their state machines / props are untouched.
+//
+// Prior history:
+// - garlic-68749 (Phase 4b token migration)
+// - sicilian-41551 (mobile typography clamps)
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import { card, btn, pageContainer, loadingSpinner } from "../ui/shared-styles";
+import { pageContainer, loadingSpinner } from "../ui/shared-styles";
 import { MissionCard } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
 import { MissionCompleteCelebration } from "../ui/missions/MissionCompleteCelebration";
@@ -277,8 +283,11 @@ export default function MissionsPage() {
       >
         <div style={{ textAlign: "center" }}>
           <div style={loadingSpinner()} />
-          <p style={{ fontSize: 18, color: "hsl(var(--muted-foreground))" }}>
-            Loading missions...
+          <p
+            className="overline"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            § Loading dossier…
           </p>
           <style jsx>{`
             @keyframes spin {
@@ -299,21 +308,47 @@ export default function MissionsPage() {
     return (
       <div style={pageContainer()}>
         <div style={{ maxWidth: 800, margin: "0 auto" }}>
-          <div style={card()}>
+          <div
+            className="paper-soft"
+            style={{
+              borderRadius: "var(--radius)",
+              border: "1px solid hsl(var(--rule-warm) / 0.55)",
+              padding: 28,
+              background: "hsl(var(--cream))",
+              boxShadow: "var(--shadow-soft)",
+              display: "grid",
+              gap: 12,
+            }}
+          >
+            <span className="overline" style={{ color: "hsl(var(--tomato))" }}>
+              § Error
+            </span>
             <h1
               style={{
                 margin: 0,
-                fontSize: 28,
+                fontSize: "clamp(1.75rem, 5vw, 2.25rem)",
                 fontFamily: DISPLAY_FONT,
-                fontWeight: 700,
+                fontWeight: 800,
+                letterSpacing: "-0.01em",
+                lineHeight: 1.05,
               }}
             >
-              Error
+              The file went missing.
             </h1>
-            <p style={{ color: "hsl(var(--muted-foreground))" }}>
+            <p style={{ color: "hsl(var(--muted-foreground))", margin: 0 }}>
               {error || "Failed to load missions"}
             </p>
-            <button onClick={() => window.location.reload()} style={btn("primary")}>
+            <button
+              onClick={() => window.location.reload()}
+              className="btn-pill"
+              style={{
+                background: "hsl(var(--ink))",
+                color: "hsl(var(--cream))",
+                border: "1px solid transparent",
+                boxShadow: "var(--shadow-soft)",
+                justifySelf: "start",
+              }}
+            >
               Retry
             </button>
           </div>
@@ -326,66 +361,115 @@ export default function MissionsPage() {
 
   return (
     <div style={pageContainer()}>
-      <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
-        {/* Header */}
-        <div
+      <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 24 }}>
+        {/* ─── Editorial header ──────────────────────────────────── */}
+        <header
+          className="fade-up"
           style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-end",
-            flexWrap: "wrap",
-            gap: 12,
+            display: "grid",
+            gap: 14,
+            position: "relative",
           }}
         >
-          <div>
-            <h1
-              style={{
-                margin: 0,
-                // sicilian-41551: scale 32→44 so "Missions" doesn't dominate
-                // the 375-px viewport above the fold.
-                fontSize: "clamp(2rem, 7vw, 2.75rem)",
-                lineHeight: 1.05,
-                letterSpacing: "-0.01em",
-                fontFamily: DISPLAY_FONT,
-                fontWeight: 800,
-                color: "hsl(var(--foreground))",
-              }}
-            >
-              Missions
-            </h1>
-            <p
-              style={{
-                margin: "6px 0 0",
-                fontSize: 16,
-                color: "hsl(var(--muted-foreground))",
-              }}
-            >
-              Complete missions to level up and earn $PEP rewards
-            </p>
-          </div>
-          <Link
-            href="/"
+          <div
             style={{
-              ...btn("secondary"),
-              fontSize: 14,
-              textDecoration: "none",
+              display: "flex",
+              justifyContent: "space-between",
+              alignItems: "flex-start",
+              gap: 12,
+              flexWrap: "wrap",
             }}
           >
-            &larr; Home
-          </Link>
-        </div>
+            <span
+              className="overline"
+              style={{ color: "hsl(var(--tomato))" }}
+            >
+              § The Dossier · Missions
+            </span>
+            <Link
+              href="/"
+              className="overline"
+              style={{
+                color: "hsl(var(--muted-foreground))",
+                textDecoration: "none",
+                transition: "color 150ms ease",
+              }}
+            >
+              ← Home
+            </Link>
+          </div>
 
-        {/* Login prompt */}
+          <h1
+            style={{
+              margin: 0,
+              // sicilian-41551 clamp preserved, slightly tighter for editorial.
+              fontSize: "clamp(2.5rem, 9vw, 4.5rem)",
+              lineHeight: 0.92,
+              letterSpacing: "-0.02em",
+              fontFamily: DISPLAY_FONT,
+              fontWeight: 900,
+              color: "hsl(var(--foreground))",
+              textWrap: "balance",
+            }}
+          >
+            <span className="underline-scribble">Missions</span>{" "}
+            <span style={{ color: "hsl(var(--muted-foreground))", fontWeight: 600 }}>
+              on file
+            </span>
+          </h1>
+
+          <p
+            style={{
+              margin: 0,
+              maxWidth: "44ch",
+              fontSize: 16,
+              lineHeight: 1.55,
+              color: "hsl(var(--foreground) / 0.75)",
+            }}
+          >
+            Complete missions to level up and earn{" "}
+            <span style={{ color: "hsl(var(--tomato))", fontWeight: 700 }}>$PEP</span>{" "}
+            rewards. Each one is its own little case file.
+          </p>
+
+          {/* Handwritten margin scribble — flavor, hidden on small screens. */}
+          <span
+            aria-hidden
+            className="handwritten"
+            style={{
+              position: "absolute",
+              right: -6,
+              bottom: -18,
+              transform: "rotate(-4deg)",
+              fontSize: 16,
+              color: "hsl(var(--tomato) / 0.8)",
+              pointerEvents: "none",
+              display: "none",
+            }}
+          />
+        </header>
+
+        {/* ─── Login prompt ──────────────────────────────────────── */}
         {!isAuthenticated && (
-          <div style={{ ...card(), textAlign: "center" }}>
-            <p style={{ margin: 0, fontSize: 15 }}>
+          <div
+            className="paper-soft"
+            style={{
+              borderRadius: "var(--radius)",
+              border: "1px dashed hsl(var(--rule-warm) / 0.7)",
+              padding: 20,
+              background: "hsl(var(--cream))",
+              textAlign: "center",
+            }}
+          >
+            <p style={{ margin: 0, fontSize: 15, color: "hsl(var(--foreground))" }}>
               <a
                 href="/api/auth/discord"
                 style={{
                   color: "hsl(var(--tomato))",
                   fontWeight: 700,
-                  textDecoration: "underline",
+                  textDecoration: "none",
                 }}
+                className="underline-scribble"
               >
                 Log in with Discord
               </a>{" "}
@@ -394,57 +478,73 @@ export default function MissionsPage() {
           </div>
         )}
 
-        {/* Current Level Banner */}
+        {/* ─── Current Level masthead ────────────────────────────── */}
         {isAuthenticated && (
           <div
+            className="paper-soft halftone-soft fade-up"
             style={{
-              ...card(),
+              position: "relative",
+              borderRadius: "var(--radius)",
+              border: "1px solid hsl(var(--rule-warm) / 0.55)",
+              padding: "28px 24px",
               background:
-                "linear-gradient(135deg, hsl(var(--cream-warm)) 0%, hsl(var(--butter) / 0.25) 100%)",
+                "linear-gradient(135deg, hsl(var(--cream-warm)) 0%, hsl(var(--butter) / 0.30) 100%)",
+              boxShadow: "var(--shadow-lifted)",
               textAlign: "center",
-              padding: 24,
-              gap: 6,
+              display: "grid",
+              gap: 8,
             }}
           >
-            <div
-              style={{
-                fontSize: 12,
-                color: "hsl(var(--muted-foreground))",
-                textTransform: "uppercase",
-                letterSpacing: 1.5,
-                fontWeight: 600,
-              }}
+            <span
+              className="overline"
+              style={{ color: "hsl(var(--ink) / 0.7)" }}
             >
-              Current Level
-            </div>
+              § Current Level
+            </span>
             <div
               style={{
-                // sicilian-41551: 56 → clamp so "MAX" doesn't overflow at 320–375px.
-                fontSize: "clamp(2.5rem, 10vw, 3.5rem)",
-                fontWeight: 800,
+                fontSize: "clamp(3rem, 12vw, 4.5rem)",
+                fontWeight: 900,
                 margin: 0,
-                lineHeight: 1,
+                lineHeight: 0.9,
+                letterSpacing: "-0.03em",
                 fontFamily: DISPLAY_FONT,
                 color: "hsl(var(--tomato))",
               }}
             >
-              {currentLevel > 8 ? "MAX" : currentLevel}
+              {currentLevel > 8 ? "MAX" : (
+                <>
+                  <span style={{ color: "hsl(var(--foreground) / 0.35)", fontWeight: 700 }}>
+                    Lv.
+                  </span>
+                  {currentLevel}
+                </>
+              )}
             </div>
             {data.levelTitle && (
               <div
                 style={{
-                  fontSize: 18,
+                  fontSize: "clamp(1.05rem, 2.6vw, 1.35rem)",
                   fontFamily: DISPLAY_FONT,
-                  fontWeight: 600,
+                  fontWeight: 700,
+                  letterSpacing: "-0.01em",
                   color: "hsl(var(--foreground))",
                 }}
               >
-                {data.levelTitle}
+                <span className="circle-scribble">{data.levelTitle}</span>
               </div>
             )}
             {currentLevel > 8 && (
-              <div style={{ fontSize: 14, color: "hsl(var(--muted-foreground))" }}>
-                All levels complete! You are a true Pizza Don.
+              <div
+                className="handwritten"
+                style={{
+                  fontSize: 16,
+                  color: "hsl(var(--ink) / 0.7)",
+                  transform: "rotate(-1deg)",
+                  marginTop: 8,
+                }}
+              >
+                All levels complete — you are a true Pizza Don.
               </div>
             )}
           </div>
@@ -458,8 +558,9 @@ export default function MissionsPage() {
         {/* Admin Review Panel */}
         {isAuthenticated && <MissionReviewPanel />}
 
-        {/* Level Accordion */}
-        {levels.map((levelData) => {
+        {/* ─── Level Accordion ────────────────────────────────────
+            Each level group is a "§ NN · Level X" file folder. */}
+        {levels.map((levelData, idx) => {
           const isExpanded = expandedLevels.has(levelData.level);
           const isCurrentLevel = levelData.level === currentLevel;
           const isUnlocked = levelData.level <= currentLevel;
@@ -473,7 +574,7 @@ export default function MissionsPage() {
 
           const title = levelData.title || LEVEL_TITLES[levelData.level] || null;
 
-          // Butter pill for level number; emerald when complete; ink ring on current.
+          // Butter pill for current level; emerald complete; muted otherwise.
           const pillBg = isComplete
             ? "rgb(16, 185, 129)"
             : isCurrentLevel
@@ -482,24 +583,33 @@ export default function MissionsPage() {
           const pillColor = isComplete
             ? "hsl(var(--cream))"
             : "hsl(var(--ink))";
-          const pillBorder = isCurrentLevel && !isComplete
-            ? "2px solid hsl(var(--ink))"
-            : "1px solid hsl(var(--rule) / 0.22)";
+          const pillBorder =
+            isCurrentLevel && !isComplete
+              ? "2px solid hsl(var(--ink))"
+              : "1px solid hsl(var(--rule-warm) / 0.55)";
+
+          const sectionNumber = `§ ${String(idx + 1).padStart(2, "0")}`;
 
           return (
             <div
               key={levelData.level}
+              className={`paper-soft ${isCurrentLevel ? "fade-up" : ""}`}
               style={{
-                ...card(),
-                padding: 0,
-                gap: 0,
-                overflow: "hidden",
+                position: "relative",
+                borderRadius: "var(--radius)",
+                border: isCurrentLevel
+                  ? "1px solid hsl(var(--ink) / 0.18)"
+                  : "1px solid hsl(var(--rule-warm) / 0.55)",
                 background: isCurrentLevel
                   ? "hsl(var(--cream-warm))"
-                  : "hsl(var(--card))",
+                  : "hsl(var(--cream))",
+                boxShadow: isCurrentLevel
+                  ? "var(--shadow-lifted)"
+                  : "var(--shadow-soft)",
+                overflow: "hidden",
               }}
             >
-              {/* Level Header */}
+              {/* Folder-tab header */}
               <button
                 onClick={() => toggleLevel(levelData.level)}
                 style={{
@@ -507,83 +617,120 @@ export default function MissionsPage() {
                   display: "flex",
                   alignItems: "center",
                   justifyContent: "space-between",
-                  // sicilian-41551: slimmer horizontal padding on phones.
-                  padding: "16px clamp(14px, 4vw, 22px)",
+                  padding: "18px clamp(16px, 4vw, 24px)",
                   background: "transparent",
                   border: "none",
                   cursor: "pointer",
                   fontFamily: "inherit",
                   color: "inherit",
                   textAlign: "left",
-                  gap: 12,
+                  gap: 14,
                 }}
+                aria-expanded={isExpanded}
               >
-                <div style={{ display: "flex", alignItems: "center", gap: 14 }}>
+                <div
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 16,
+                    minWidth: 0,
+                  }}
+                >
                   <div
                     style={{
-                      width: 42,
-                      height: 42,
+                      width: 48,
+                      height: 48,
                       borderRadius: 999,
                       display: "flex",
                       alignItems: "center",
                       justifyContent: "center",
                       fontWeight: 800,
-                      fontSize: 18,
+                      fontSize: 19,
                       fontFamily: DISPLAY_FONT,
                       background: pillBg,
                       color: pillColor,
                       border: pillBorder,
                       flexShrink: 0,
+                      boxShadow:
+                        isCurrentLevel && !isComplete
+                          ? "var(--shadow-soft)"
+                          : "none",
                     }}
+                    aria-hidden
                   >
                     {isComplete ? "✓" : levelData.level}
                   </div>
-                  <div>
+                  <div style={{ minWidth: 0 }}>
+                    <span
+                      className="overline"
+                      style={{
+                        color: isCurrentLevel
+                          ? "hsl(var(--tomato))"
+                          : "hsl(var(--muted-foreground))",
+                        display: "block",
+                        marginBottom: 2,
+                      }}
+                    >
+                      {sectionNumber} · Level {levelData.level}
+                    </span>
                     <div
                       style={{
                         fontFamily: DISPLAY_FONT,
-                        fontWeight: 700,
-                        fontSize: 20,
-                        lineHeight: 1.15,
+                        fontWeight: 800,
+                        fontSize: "clamp(1.15rem, 3vw, 1.5rem)",
+                        lineHeight: 1.1,
+                        letterSpacing: "-0.015em",
                         color: "hsl(var(--foreground))",
                       }}
                     >
-                      Level {levelData.level}
-                      {title && (
-                        <span
-                          style={{
-                            fontWeight: 500,
-                            color: "hsl(var(--muted-foreground))",
-                            marginLeft: 8,
-                          }}
-                        >
-                          {title}
-                        </span>
-                      )}
+                      {title ?? `Level ${levelData.level}`}
                     </div>
                     <div
                       style={{
                         fontSize: 13,
                         color: "hsl(var(--muted-foreground))",
-                        marginTop: 2,
+                        marginTop: 4,
                       }}
                     >
-                      {completedCount}/{levelData.missions.length} missions &middot;{" "}
+                      {completedCount}/{levelData.missions.length} missions ·{" "}
                       <span style={{ color: "hsl(var(--tomato))", fontWeight: 700 }}>
                         {levelData.reward.toLocaleString()} $PEP
                       </span>
                     </div>
                   </div>
                 </div>
+
+                {/* Handwritten "complete" stamp for finished levels */}
+                {isComplete && (
+                  <span
+                    aria-hidden
+                    className="handwritten"
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      right: 56,
+                      transform: "rotate(-9deg)",
+                      fontSize: 18,
+                      color: "rgb(4, 120, 87)",
+                      opacity: 0.85,
+                      pointerEvents: "none",
+                    }}
+                  >
+                    complete
+                  </span>
+                )}
+
                 <span
+                  aria-hidden
                   style={{
-                    fontSize: 16,
+                    fontSize: 14,
                     color: "hsl(var(--muted-foreground))",
-                    transition: "transform 200ms ease",
+                    transition: "transform 220ms var(--ease-editorial)",
                     transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
+                    flexShrink: 0,
                   }}
                 >
-                  &#9660;
+                  ▼
                 </span>
               </button>
 
@@ -591,23 +738,29 @@ export default function MissionsPage() {
               {isExpanded && (
                 <div
                   style={{
-                    padding: "4px 22px 20px",
+                    padding: "6px clamp(16px, 4vw, 24px) 22px",
                     display: "grid",
-                    gap: 10,
-                    borderTop: "1px solid hsl(var(--rule) / 0.12)",
+                    gap: 14,
+                    borderTop: "1px dashed hsl(var(--rule-warm) / 0.55)",
                   }}
                 >
                   {!isUnlocked && (
                     <div
                       style={{
                         textAlign: "center",
-                        padding: 16,
-                        fontSize: 13,
+                        padding: "18px 14px",
+                        fontSize: 14,
                         color: "hsl(var(--muted-foreground))",
                         fontStyle: "italic",
                       }}
                     >
-                      Complete Level {levelData.level - 1} to unlock these missions
+                      <div
+                        className="overline"
+                        style={{ color: "hsl(var(--muted-foreground))", marginBottom: 6 }}
+                      >
+                        § Sealed
+                      </div>
+                      Complete Level {levelData.level - 1} to unlock these missions.
                     </div>
                   )}
                   {levelData.missions.map((mission) => (
@@ -621,10 +774,9 @@ export default function MissionsPage() {
                   {isComplete && (
                     <div
                       style={{
+                        position: "relative",
                         textAlign: "center",
-                        padding: "12px 16px",
-                        fontSize: 14,
-                        fontWeight: 700,
+                        padding: "16px 16px",
                         fontFamily: DISPLAY_FONT,
                         color: "rgb(4, 120, 87)",
                         background: "rgba(16, 185, 129, 0.10)",
@@ -632,7 +784,15 @@ export default function MissionsPage() {
                         borderRadius: "var(--radius)",
                       }}
                     >
-                      Level Complete! +{levelData.reward.toLocaleString()} $PEP earned
+                      <div
+                        className="overline"
+                        style={{ color: "rgb(4, 120, 87)", marginBottom: 4 }}
+                      >
+                        § Closed
+                      </div>
+                      <div style={{ fontWeight: 800, fontSize: 16 }}>
+                        Level Complete! +{levelData.reward.toLocaleString()} $PEP earned
+                      </div>
                     </div>
                   )}
                 </div>
@@ -641,24 +801,37 @@ export default function MissionsPage() {
           );
         })}
 
-        {/* Footer */}
+        {/* ─── Editorial Footer ──────────────────────────────────── */}
         <div
           style={{
             textAlign: "center",
-            color: "hsl(var(--muted-foreground))",
-            fontSize: 13,
             marginTop: 20,
-            fontFamily: DISPLAY_FONT,
-            fontWeight: 600,
-            letterSpacing: 0.5,
+            display: "grid",
+            gap: 6,
+            justifyItems: "center",
           }}
         >
-          PizzaDAO
+          <div
+            className="rule-warm"
+            style={{ width: 64, height: 0 }}
+            aria-hidden
+          />
+          <span
+            className="overline"
+            style={{
+              color: "hsl(var(--muted-foreground))",
+              fontFamily: DISPLAY_FONT,
+              letterSpacing: "0.32em",
+            }}
+          >
+            § PizzaDAO Dossier
+          </span>
         </div>
       </div>
 
       {/* ===== Celebration loop (diavola-40350) =====
-          Mounted last so the overlay/modal sits above all page content. */}
+          Mounted last so the overlay/modal sits above all page content.
+          Editorial-ish styling lives inside the components themselves. */}
       {activeCelebration?.kind === "firstMission" && (
         <MissionCompleteCelebration
           title="Mission Complete!"

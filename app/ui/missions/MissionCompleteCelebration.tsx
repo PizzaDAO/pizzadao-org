@@ -1,7 +1,13 @@
 "use client";
 
+// capricciosa-10448 — Light editorial polish on the celebration overlay so
+// it doesn't visually clash with the new dossier mission cards. Props,
+// auto-dismiss timer, data-testid, and string text ("Mission Complete!",
+// "Nice!") are unchanged — tests rely on them.
+//
+// Prior history: diavola-40350 — first-mission celebration overlay.
+
 import { useEffect, useMemo, useState } from "react";
-import { btn } from "../shared-styles";
 
 type Props = {
   /** Optional title override (default: "Mission Complete!") */
@@ -19,6 +25,9 @@ type Props = {
 
 const CONFETTI_PIECES = 16;
 const EMOJI_POOL = ["🍕", "🍅", "✨"]; // pizza, tomato, sparkle
+
+const DISPLAY_FONT =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 type Piece = {
   emoji: string;
@@ -80,13 +89,14 @@ export function MissionCompleteCelebration({
         position: "fixed",
         inset: 0,
         zIndex: 2000,
-        background: "rgba(0,0,0,0.55)",
+        background: "hsl(var(--ink) / 0.65)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
         overflow: "hidden",
         opacity: closing ? 0 : 1,
         transition: "opacity 300ms ease",
+        padding: 16,
       }}
     >
       {/* Falling confetti layer */}
@@ -113,25 +123,45 @@ export function MissionCompleteCelebration({
         ))}
       </div>
 
-      {/* Centered content card */}
+      {/* Centered content card — paper-soft dossier */}
       <div
         onClick={(e) => e.stopPropagation()}
+        className="paper-soft halftone-soft"
         style={{
           position: "relative",
-          maxWidth: 440,
+          maxWidth: 460,
           width: "calc(100% - 32px)",
-          padding: "32px 28px",
-          borderRadius: 18,
-          background: "var(--color-surface)",
-          color: "var(--color-text)",
-          boxShadow: "var(--shadow-elevated)",
+          padding: "36px 30px 30px",
+          borderRadius: "var(--radius)",
+          border: "1px solid hsl(var(--rule-warm) / 0.55)",
+          background: "hsl(var(--cream))",
+          color: "hsl(var(--foreground))",
+          boxShadow: "var(--shadow-lifted)",
           textAlign: "center",
           animation: "diavola-pop 420ms cubic-bezier(0.2, 1, 0.3, 1)",
         }}
       >
+        {/* Handwritten "approved" stamp */}
+        <span
+          aria-hidden
+          className="handwritten"
+          style={{
+            position: "absolute",
+            top: 14,
+            right: 20,
+            fontSize: 18,
+            transform: "rotate(-8deg)",
+            color: "rgb(4, 120, 87)",
+            opacity: 0.8,
+            pointerEvents: "none",
+          }}
+        >
+          approved
+        </span>
+
         <div
           style={{
-            fontSize: 56,
+            fontSize: 60,
             lineHeight: 1,
             marginBottom: 12,
           }}
@@ -139,27 +169,51 @@ export function MissionCompleteCelebration({
         >
           {"🍕"}
         </div>
+        <span
+          className="overline"
+          style={{
+            color: "hsl(var(--tomato))",
+            display: "block",
+            marginBottom: 6,
+          }}
+        >
+          § Filed
+        </span>
         <h2
           style={{
             margin: 0,
-            fontSize: 26,
-            fontWeight: 800,
-            color: "var(--color-accent)",
+            fontSize: "clamp(1.5rem, 5vw, 1.85rem)",
+            fontFamily: DISPLAY_FONT,
+            fontWeight: 900,
+            letterSpacing: "-0.015em",
+            lineHeight: 1.05,
+            color: "hsl(var(--foreground))",
           }}
         >
           {title}
         </h2>
         {subtitle && (
-          <p style={{ margin: "8px 0 0", fontSize: 14, opacity: 0.75 }}>
+          <p
+            style={{
+              margin: "10px 0 0",
+              fontSize: 14,
+              color: "hsl(var(--muted-foreground))",
+              lineHeight: 1.5,
+            }}
+          >
             {subtitle}
           </p>
         )}
         <button
           onClick={handleDismiss}
+          className="btn-pill"
           style={{
-            ...btn("primary"),
-            marginTop: 20,
+            marginTop: 22,
             minWidth: 140,
+            background: "hsl(var(--ink))",
+            color: "hsl(var(--cream))",
+            border: "1px solid transparent",
+            boxShadow: "var(--shadow-soft)",
           }}
         >
           Nice!
