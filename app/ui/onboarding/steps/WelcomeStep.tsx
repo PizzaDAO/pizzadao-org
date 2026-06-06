@@ -41,7 +41,7 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
       <header className="relative text-center">
         <div className="flex justify-center mb-6">
           <img
-            src="https://i.imgur.com/lRq8iK7.png"
+            src="/brand-kit/molto-benny/molto-benny-color.svg"
             alt="PizzaDAO"
             className="h-16 w-auto max-w-full object-contain"
             style={{ transform: "rotate(-2deg)" }}
