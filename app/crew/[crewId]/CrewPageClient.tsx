@@ -437,7 +437,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
     return (
       <div style={pageContainer()}>
-        <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
+        <div className="fade-up" style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
           {/* Navigation */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
             <Link href="/" style={navBtn()}>← Home</Link>
@@ -450,8 +450,14 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             )}
           </div>
 
-          {/* Hero */}
-          <header style={{ textAlign: 'center', marginBottom: 8 }}>
+          {/* onion-15370: editorial visitor hero — overline + display crew name + emoji */}
+          <header style={{ textAlign: 'center', marginBottom: 8, position: 'relative' }}>
+            <p
+              className="overline"
+              style={{ color: 'hsl(var(--tomato))', marginBottom: 14 }}
+            >
+              § ··· The Crew
+            </p>
             <div style={{ fontSize: 'clamp(2.5rem, 12vw, 56px)', marginBottom: 8, lineHeight: 1 }}>
               {crew.emoji || '🍕'}
             </div>
@@ -510,7 +516,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               {crew.channel && <span style={badge()}>💬 #{crew.channel}</span>}
             </div>
 
-            {/* Visitor CTAs: Join + Share */}
+            {/* Visitor CTAs: Join + Share — onion-15370 editorial pill CTAs */}
             <div
               style={{
                 marginTop: 22,
@@ -519,32 +525,80 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 justifyContent: 'center',
                 flexWrap: 'wrap',
                 alignItems: 'center',
+                position: 'relative',
               }}
             >
+              {/* handwritten margin annotation near the Join CTA */}
+              <span
+                aria-hidden
+                className="handwritten onion-join-margin"
+                style={{
+                  position: 'absolute',
+                  left: '50%',
+                  transform: 'translate(-145px, -28px) rotate(-8deg)',
+                  fontSize: 18,
+                  color: 'hsl(var(--tomato))',
+                  pointerEvents: 'none',
+                  whiteSpace: 'nowrap',
+                }}
+              >
+                join us →
+              </span>
               {user ? (
                 <button
                   onClick={handleJoinCrew}
                   disabled={joining}
-                  style={btn('accent', joining)}
+                  className="btn-pill-lg"
+                  style={{
+                    background: 'hsl(var(--tomato))',
+                    color: 'hsl(var(--cream))',
+                    border: '1px solid hsl(var(--tomato))',
+                    boxShadow: 'var(--shadow-soft)',
+                    minHeight: 44,
+                  }}
                 >
                   {joining ? 'Joining...' : 'Join This Crew'}
                 </button>
               ) : (
-                <Link href="/" style={btn('accent')}>
+                <Link
+                  href="/"
+                  className="btn-pill-lg"
+                  style={{
+                    background: 'hsl(var(--tomato))',
+                    color: 'hsl(var(--cream))',
+                    border: '1px solid hsl(var(--tomato))',
+                    textDecoration: 'none',
+                    boxShadow: 'var(--shadow-soft)',
+                    minHeight: 44,
+                  }}
+                >
                   Log in to join
                 </Link>
               )}
               <button
                 onClick={handleShare}
-                style={{ ...btn('secondary'), cursor: 'pointer' }}
+                className="btn-pill"
+                style={{
+                  background: 'hsl(var(--secondary))',
+                  color: 'hsl(var(--secondary-foreground))',
+                  border: '1px solid hsl(var(--rule-warm) / 0.55)',
+                  cursor: 'pointer',
+                  minHeight: 44,
+                }}
                 aria-label="Copy link to this crew page"
               >
                 {shareCopied ? '✓ Link copied' : '🔗 Share'}
               </button>
+              <style>{`
+                .onion-join-margin { display: none; }
+                @media (min-width: 640px) {
+                  .onion-join-margin { display: inline-block; }
+                }
+              `}</style>
             </div>
           </header>
 
-          {/* Member roster (visitor-facing: read-only grid) */}
+          {/* Member roster (visitor-facing: editorial paper-soft gallery) */}
           {visibleRoster.length > 0 && (
             <div style={card()}>
               <h2 style={sectionTitle()}>Members ({visibleRoster.length})</h2>
@@ -554,19 +608,35 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   // quattro-formaggi-54080: min(220px, 100%) so 375px
                   // viewports collapse to one column without overflow.
                   gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))',
-                  gap: 12,
+                  gap: 14,
                 }}
               >
                 {visibleRoster.map((member, i) => (
                   <Link
                     key={member.id || i}
                     href={`/profile/${member.id}`}
+                    className="paper-soft"
                     style={{
                       ...memberCard(),
                       display: 'block',
                       textDecoration: 'none',
                       color: 'hsl(var(--foreground))',
                       minHeight: 44,
+                      // onion-15370: subtle alternating rotation for gallery feel
+                      transform: `rotate(${(i % 3 === 0 ? -0.6 : i % 3 === 1 ? 0.5 : -0.2).toFixed(2)}deg)`,
+                      borderColor: 'hsl(var(--rule-warm) / 0.55)',
+                      boxShadow: 'var(--shadow-soft)',
+                      transition: 'transform 240ms var(--ease-editorial), box-shadow 240ms var(--ease-editorial), border-color 240ms var(--ease-editorial)',
+                    }}
+                    onMouseEnter={(e) => {
+                      e.currentTarget.style.transform = 'rotate(0deg) translateY(-3px)';
+                      e.currentTarget.style.boxShadow = 'var(--shadow-lifted)';
+                      e.currentTarget.style.borderColor = 'hsl(var(--tomato) / 0.5)';
+                    }}
+                    onMouseLeave={(e) => {
+                      e.currentTarget.style.transform = `rotate(${(i % 3 === 0 ? -0.6 : i % 3 === 1 ? 0.5 : -0.2).toFixed(2)}deg)`;
+                      e.currentTarget.style.boxShadow = 'var(--shadow-soft)';
+                      e.currentTarget.style.borderColor = 'hsl(var(--rule-warm) / 0.55)';
                     }}
                   >
                     <div
@@ -672,26 +742,32 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             </div>
           )}
 
-          {/* Footer CTA — repeated join button for long pages */}
+          {/* Footer CTA — repeated join button for long pages (onion-15370 editorial) */}
           <div
+            className="paper-soft"
             style={{
               textAlign: 'center',
               marginTop: 8,
               // quattro-formaggi-54080: clamp padding so the CTA card
               // doesn't crowd a 375px viewport.
-              padding: 'clamp(16px, 5vw, 24px)',
+              padding: 'clamp(16px, 5vw, 28px)',
               borderRadius: 'var(--radius)',
-              background: 'hsl(var(--muted) / 0.5)',
+              background: 'hsl(var(--card))',
+              border: '1px solid hsl(var(--rule-warm) / 0.55)',
+              boxShadow: 'var(--shadow-soft)',
             }}
           >
+            <p className="overline" style={{ color: 'hsl(var(--tomato))', marginBottom: 10 }}>
+              § ··· An invitation
+            </p>
             <h3
               style={{
                 margin: 0,
                 marginBottom: 8,
                 fontFamily: DISPLAY_FONT,
-                fontSize: 22,
-                fontWeight: 700,
-                letterSpacing: '-0.01em',
+                fontSize: 'clamp(1.4rem, 4vw, 1.75rem)',
+                fontWeight: 800,
+                letterSpacing: '-0.015em',
               }}
             >
               Like what you see?
@@ -699,7 +775,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             <p
               style={{
                 margin: 0,
-                marginBottom: 14,
+                marginBottom: 18,
                 color: 'hsl(var(--muted-foreground))',
               }}
             >
@@ -709,12 +785,29 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               <button
                 onClick={handleJoinCrew}
                 disabled={joining}
-                style={btn('accent', joining)}
+                className="btn-pill-lg"
+                style={{
+                  background: 'hsl(var(--tomato))',
+                  color: 'hsl(var(--cream))',
+                  border: '1px solid hsl(var(--tomato))',
+                  opacity: joining ? 0.5 : 1,
+                  minHeight: 44,
+                }}
               >
                 {joining ? 'Joining...' : 'Join This Crew'}
               </button>
             ) : (
-              <Link href="/" style={btn('accent')}>
+              <Link
+                href="/"
+                className="btn-pill-lg"
+                style={{
+                  background: 'hsl(var(--tomato))',
+                  color: 'hsl(var(--cream))',
+                  border: '1px solid hsl(var(--tomato))',
+                  textDecoration: 'none',
+                  minHeight: 44,
+                }}
+              >
                 Log in to join
               </Link>
             )}
@@ -731,7 +824,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
   return (
     <div style={pageContainer()}>
-      <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
+      <div className="fade-up" style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
           <Link href="/" style={navBtn()}>← Home</Link>
@@ -760,8 +853,11 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           )}
         </div>
 
-        {/* Header */}
+        {/* onion-15370: editorial member-view header — dossier overline + display name */}
         <header style={{ textAlign: 'center', marginBottom: 8 }}>
+          <p className="overline" style={{ color: 'hsl(var(--tomato))', marginBottom: 14 }}>
+            § ··· Your crew
+          </p>
           <div style={{ fontSize: 'clamp(2.5rem, 12vw, 56px)', marginBottom: 8, lineHeight: 1 }}>{crew.emoji || '🍕'}</div>
           <h1 style={{
             // quattro-formaggi-54080: clamp so the title scales from 32px
@@ -807,7 +903,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             )}
           </div>
 
-          {/* Join/Leave Crew Button */}
+          {/* Join/Leave Crew Button — onion-15370 editorial pill styling */}
           <div style={{ marginTop: 20 }}>
             {user ? (
               isInCrew ? (
@@ -826,11 +922,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   <button
                     onClick={handleLeaveCrew}
                     disabled={leaving}
+                    className="btn-pill"
                     style={{
-                      ...btn('secondary', leaving),
-                      borderColor: 'hsl(var(--tomato) / 0.35)',
-                      color: 'hsl(var(--tomato))',
                       background: 'transparent',
+                      borderColor: 'hsl(var(--tomato) / 0.35)',
+                      border: '1px solid hsl(var(--tomato) / 0.35)',
+                      color: 'hsl(var(--tomato))',
+                      minHeight: 44,
+                      opacity: leaving ? 0.5 : 1,
+                      cursor: leaving ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {leaving ? 'Leaving...' : 'Leave Crew'}
@@ -840,7 +940,16 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 <button
                   onClick={handleJoinCrew}
                   disabled={joining}
-                  style={btn('accent', joining)}
+                  className="btn-pill-lg"
+                  style={{
+                    background: 'hsl(var(--tomato))',
+                    color: 'hsl(var(--cream))',
+                    border: '1px solid hsl(var(--tomato))',
+                    minHeight: 44,
+                    boxShadow: 'var(--shadow-soft)',
+                    opacity: joining ? 0.5 : 1,
+                    cursor: joining ? 'not-allowed' : 'pointer',
+                  }}
                 >
                   {joining ? 'Joining...' : 'Join This Crew'}
                 </button>
@@ -863,9 +972,12 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           </div>
         </header>
 
-        {/* Agenda */}
+        {/* Agenda — onion-15370: dossier-style overline above heading */}
         {agenda.length > 0 && (
           <div style={card()}>
+            <p className="overline" style={{ color: 'hsl(var(--tomato))', margin: 0, marginBottom: 6 }}>
+              § ··· Dossier · meeting
+            </p>
             <h2
               onClick={() => toggleSection('agenda')}
               style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
@@ -931,7 +1043,16 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           const otherMembers = visibleRoster.filter(m => !isActive(m.status) && !isBench(m.status))
 
           const renderMemberCard = (member: typeof roster[0], i: number) => (
-            <div key={i} style={memberCard()}>
+            // onion-15370: paper-soft tactile noise for editorial dossier feel
+            <div
+              key={i}
+              className="paper-soft"
+              style={{
+                ...memberCard(),
+                borderColor: 'hsl(var(--rule-warm) / 0.55)',
+                boxShadow: 'var(--shadow-soft)',
+              }}
+            >
               <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
                 <div style={{ minWidth: 0, flex: '1 1 60%' }}>
                   <Link
@@ -1154,16 +1275,57 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           const renderTaskCard = (task: typeof tasks[0], i: number) => {
             const taskNeedsLead = needsLead(task)
             const isClaiming = claimingTask === task.task
+            // onion-15370: file number for dossier feel (FILE 01, 02, 03 …)
+            const fileNo = String(i + 1).padStart(2, '0')
 
             return (
-              <div key={i} style={{
-                ...itemCard(),
-                ...(taskNeedsLead ? {
-                  background: 'hsl(var(--butter) / 0.15)',
-                  borderColor: 'hsl(var(--butter))',
-                  borderWidth: 2,
-                } : {}),
-              }}>
+              <div
+                key={i}
+                className="paper-soft"
+                style={{
+                  ...itemCard(),
+                  position: 'relative',
+                  borderColor: 'hsl(var(--rule-warm) / 0.55)',
+                  boxShadow: 'var(--shadow-soft)',
+                  ...(taskNeedsLead ? {
+                    background: 'hsl(var(--butter) / 0.15)',
+                    borderColor: 'hsl(var(--butter))',
+                    borderWidth: 2,
+                  } : {}),
+                }}
+              >
+                {/* onion-15370: editorial file number — dossier accent */}
+                <p
+                  className="overline"
+                  style={{
+                    margin: 0,
+                    marginBottom: 6,
+                    color: 'hsl(var(--foreground) / 0.5)',
+                    fontSize: 10,
+                    letterSpacing: '0.28em',
+                  }}
+                >
+                  FILE · {fileNo}
+                </p>
+                {/* onion-15370: handwritten "claimed" / "open" stamp */}
+                <span
+                  aria-hidden
+                  className="handwritten"
+                  style={{
+                    position: 'absolute',
+                    top: 10,
+                    right: 10,
+                    transform: 'rotate(-7deg)',
+                    fontSize: 14,
+                    color: taskNeedsLead
+                      ? 'hsl(var(--tomato))'
+                      : 'hsl(142 71% 30%)',
+                    opacity: 0.85,
+                    pointerEvents: 'none',
+                  }}
+                >
+                  {taskNeedsLead ? 'open' : 'claimed'}
+                </span>
                 <div style={{ display: 'flex', gap: 8, alignItems: 'center', flexWrap: 'wrap' }}>
                   {task.priority && <span style={priorityBadge(task.priority)}>{task.priority}</span>}
                   {task.stage && <span style={stageBadge(task.stage)}>{task.stage}</span>}
@@ -1225,13 +1387,19 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   <button
                     onClick={() => handleClaimTask(task.task)}
                     disabled={isClaiming}
+                    className="btn-pill"
                     style={{
-                      ...btn('accent', isClaiming),
                       marginTop: 10,
+                      background: 'hsl(var(--tomato))',
+                      color: 'hsl(var(--cream))',
+                      border: '1px solid hsl(var(--tomato))',
                       // quattro-formaggi-54080: keep btn() minHeight 44 and
                       // bump font 12→14 so the button is readable on phones.
-                      padding: '8px 14px',
+                      minHeight: 44,
+                      padding: '8px 18px',
                       fontSize: 14,
+                      opacity: isClaiming ? 0.5 : 1,
+                      cursor: isClaiming ? 'not-allowed' : 'pointer',
                     }}
                   >
                     {isClaiming ? 'Claiming...' : 'Claim Task'}
