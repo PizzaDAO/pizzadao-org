@@ -1,8 +1,11 @@
 // app/ui/onboarding/OnboardingWizard.tsx
+// arugula-30866 — i18n via next-intl. Chrome strings (progress, summary,
+// chapter titles, reset, error/success screens) live under onboarding.chrome.*.
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { TURTLES } from "../constants";
 
 import { LoadingScreen } from "./LoadingScreen";
@@ -47,6 +50,7 @@ export type OnboardingWizardProps = {
 };
 
 export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
+  const t = useTranslations("onboarding.chrome");
   const router = useRouter();
   const hasProcessedParams = useRef(false);
 
@@ -283,7 +287,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     try {
       const res = await fetch(`/api/verify-edit?memberId=${memberId}`, { credentials: "include" });
       if (!res.ok) {
-        setError("Not authorized to edit this profile");
+        setError(t("errorNotAuthorized"));
         setFlow({ type: "wizard", step: 0, isUpdate: false });
         return;
       }
@@ -308,7 +312,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       }
       setFlow({ type: "wizard", step: 1, isUpdate: true });
     } catch {
-      setError("Failed to load profile for editing");
+      setError(t("errorLoadProfile"));
       setFlow({ type: "wizard", step: 0, isUpdate: false });
     }
   }
@@ -341,7 +345,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       });
 
       const result = (await res.json()) as NamegenResponse | any;
-      if (!res.ok) throw new Error(result?.error || "Failed to generate names");
+      if (!res.ok) throw new Error(result?.error || t("errorGenerateNames"));
 
       setData((p) => ({
         ...p,
@@ -355,7 +359,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
       setLastGenParams(currentParams);
     } catch (e: unknown) {
-      setError((e as any)?.message || "Failed to generate names");
+      setError((e as any)?.message || t("errorGenerateNames"));
     } finally {
       setGeneratingNames(false);
     }
@@ -400,7 +404,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result?.error || "Failed to save profile");
+        throw new Error(result?.error || t("errorSaveProfile"));
       }
 
       // pizzaiolo-35410 — Don't redirect immediately. Play the finale ceremony
@@ -412,7 +416,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       setFlow({ type: "success", redirectTo });
     } catch (e: unknown) {
       setIsSubmitting(false);
-      setError((e as any)?.message || "Failed to save");
+      setError((e as any)?.message || t("errorSaveGeneric"));
       setErrorDetails((e as any)?.details);
       setFlow({
         type: "wizard",
@@ -519,7 +523,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           boxShadow: "var(--shadow-soft)",
         }}
       >
-        <p className="overline text-tomato">§ ··· Something snapped</p>
+        <p className="overline text-tomato">{t("errorSomethingSnapped")}</p>
         <div
           className="relative paper-soft overflow-hidden rounded-[18px] border p-4"
           style={{
@@ -535,7 +539,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           </div>
           {flow.details && (
             <details className="mt-2">
-              <summary className="text-xs text-foreground/55 cursor-pointer">Details</summary>
+              <summary className="text-xs text-foreground/55 cursor-pointer">{t("errorDetails")}</summary>
               <pre className="text-xs whitespace-pre-wrap text-foreground/65 mt-1">{flow.details}</pre>
             </details>
           )}
@@ -550,7 +554,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             alignSelf: "start",
           }}
         >
-          Start over
+          {t("errorStartOver")}
         </button>
       </div>
     );
@@ -567,12 +571,13 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         memberId={data.memberId}
         dashboardHref={flow.redirectTo}
       />
+
     );
   }
 
   // Wizard
   if (flow.type === "wizard") {
-    const stepTitle = getStepTitle(flow.step, flow.isUpdate);
+    const stepTitle = getStepTitle(flow.step, flow.isUpdate, t);
 
     // Welcome step (step 0) renders without the card chrome so the hero can
     // breathe like the marketing site.
@@ -607,7 +612,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         <div className="relative grid gap-2.5">
           <div className="flex items-center justify-between">
             <p className="overline text-tomato/85">
-              § Step {currentIndex} · of {totalSteps}
+              {t("stepOf", { current: currentIndex, total: totalSteps })}
             </p>
             <p className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/55">
               {progress}%
@@ -637,11 +642,11 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             }}
           >
             {data.mafiaName && (
-              <SummaryStamp label="Name" value={data.mafiaName} />
+              <SummaryStamp label={t("summaryName")} value={data.mafiaName} />
             )}
-            {data.city && <SummaryStamp label="City" value={data.city} />}
+            {data.city && <SummaryStamp label={t("summaryCity")} value={data.city} />}
             {data.turtles.length > 0 && (
-              <SummaryStamp label="Turtles" value={data.turtles.join(", ")} />
+              <SummaryStamp label={t("summaryTurtles")} value={data.turtles.join(", ")} />
             )}
           </div>
         )}
@@ -653,7 +658,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           {stepTitle ? (
             <div className="flex-1 min-w-0">
-              <p className="overline text-tomato">§ Chapter {currentIndex}</p>
+              <p className="overline text-tomato">{t("chapter", { current: currentIndex })}</p>
               <h2
                 className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                 style={{
@@ -680,7 +685,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             style={{ background: "none", border: "none" }}
           >
             <span aria-hidden>×</span>
-            Reset
+            {t("reset")}
           </button>
         </div>
 
@@ -822,7 +827,11 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 // Helpers
 // ============================================================================
 
-function getStepTitle(step: number, isUpdate: boolean): string {
+function getStepTitle(
+  step: number,
+  _isUpdate: boolean,
+  t: (key: string) => string,
+): string {
   switch (step) {
     case 0:
       return "";
@@ -832,15 +841,15 @@ function getStepTitle(step: number, isUpdate: boolean): string {
       // section title above it. Other steps still render theirs.
       return "";
     case 2:
-      return "What city are you in?";
+      return t("stepTitleCity");
     case 3:
-      return "What roles do you play?";
+      return t("stepTitleRoles");
     case 4:
-      return "Pick your Member ID";
+      return t("stepTitleMemberId");
     case 5:
-      return "Join some crews";
+      return t("stepTitleCrews");
     case 6:
-      return "Review Changes";
+      return t("stepTitleReview");
     default:
       return "";
   }

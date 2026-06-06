@@ -3,11 +3,13 @@
 // mozzarella-41832 — Editorial restyle.
 // Visual rewrite. The Props interface, API calls (/api/city-autocomplete,
 // /api/city-region, /api/city-telegram), state, and callbacks are unchanged.
+// arugula-30866 — i18n via next-intl (onboarding.city.*).
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, MapPin, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { CityPrediction } from "../types";
 
 type TelegramMatch = {
@@ -32,6 +34,7 @@ const HERO_SPOTLIGHT: CSSProperties = {
 };
 
 export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: Props) {
+  const t = useTranslations("onboarding.city");
   const canProceed = city.trim().length > 0;
   const [telegramMatch, setTelegramMatch] = useState<TelegramMatch | null>(null);
   const [telegramLoading, setTelegramLoading] = useState(false);
@@ -83,7 +86,7 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">§ 02 · Your block</p>
+        <p className="overline text-tomato">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -92,29 +95,30 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
             textWrap: "balance",
           }}
         >
-          Where's your <span className="text-tomato">corner</span>?
+          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
           style={{ fontSize: "16px", lineHeight: 1.55 }}
         >
-          Tell us your city. We'll point you at the nearest chapter, the nearest
-          oven, the nearest people.
+          {t("tagline")}
         </p>
       </header>
 
       {/* ─── City autocomplete card ─────────────────────────────── */}
       <section className="grid gap-4">
-        <p className="overline text-tomato">§ 02 · City</p>
+        <p className="overline text-tomato">{t("fieldLabel")}</p>
         <CityAutocomplete
           value={city}
           onChange={onChange}
           onRegionResolved={onRegionResolved}
+          placeholder={t("inputPlaceholder")}
+          ariaLabel={t("inputAriaLabel")}
         />
 
         {telegramLoading && (
           <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/45">
-            Looking for a local PizzaDAO chapter…
+            {t("lookingForChapter")}
           </p>
         )}
 
@@ -135,7 +139,7 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
           className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
         >
           <ArrowLeft className="h-3 w-3" />
-          Back
+          {t("back")}
         </button>
         <button
           type="button"
@@ -148,7 +152,7 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          Next
+          {t("next")}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>
@@ -164,10 +168,14 @@ function CityAutocomplete({
   value,
   onChange,
   onRegionResolved,
+  placeholder,
+  ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   onRegionResolved?: (region: string | null, countryCode: string | null) => void;
+  placeholder: string;
+  ariaLabel: string;
 }) {
   const [open, setOpen] = useState(false);
   const [items, setItems] = useState<CityPrediction[]>([]);
@@ -266,9 +274,9 @@ function CityAutocomplete({
               value.trim().length >= 2 && items.length > 0 && setOpen(true)
             }
             onBlur={() => window.setTimeout(() => setOpen(false), 120)}
-            placeholder="New York, NY"
+            placeholder={placeholder}
             autoComplete="off"
-            aria-label="City"
+            aria-label={ariaLabel}
             className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
             style={{
               fontSize: "clamp(1.3rem, 3vw, 2.1rem)",
@@ -331,6 +339,7 @@ function TelegramInvite({
   country: string;
   chatUrl: string;
 }) {
+  const t = useTranslations("onboarding.city");
   const location = country ? `${chapterCity}, ${country}` : chapterCity;
 
   return (
@@ -343,17 +352,18 @@ function TelegramInvite({
       }}
     >
       <div className="relative">
-        <p className="overline text-tomato">§ Chapter found</p>
+        <p className="overline text-tomato">{t("telegramOverline")}</p>
         <h3
           className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.01em] text-foreground"
           style={{ fontSize: "clamp(1.1rem, 2.4vw, 1.5rem)", lineHeight: 1.1 }}
         >
-          PizzaDAO {chapterCity} Chapter
+          {t("telegramChapterTitle", { city: chapterCity })}
         </h3>
         <p className="mt-2 text-sm leading-relaxed text-foreground/70">
-          There&apos;s a local PizzaDAO community in{" "}
-          <b className="text-foreground">{location}</b>. Join the group chat to
-          connect with pizza fam near you.
+          {t.rich("telegramDescription", {
+            location,
+            b: (chunks) => <b className="text-foreground">{chunks}</b>,
+          })}
         </p>
         <a
           href={chatUrl}
@@ -367,7 +377,7 @@ function TelegramInvite({
           }}
         >
           <TelegramIcon />
-          Join Telegram Group
+          {t("telegramCta")}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </a>
       </div>

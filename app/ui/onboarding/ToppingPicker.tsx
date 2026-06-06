@@ -20,9 +20,13 @@
 
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Search, Sparkles, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 
-import { PIZZA_TOPPINGS, TOPPING_EMOJI } from "@/app/lib/mafia-films";
-import { toppingImageFor } from "@/app/lib/topping-images";
+import {
+  PIZZA_TOPPINGS,
+  TOPPING_EMOJI,
+  toppingImageFor,
+} from "@/app/lib/topping-images";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Featured set + flavor labels — visual only.
@@ -122,6 +126,7 @@ type Props = {
 };
 
 export function ToppingPicker({ label, value, onChange }: Props) {
+  const t = useTranslations("onboarding.topping");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -199,7 +204,7 @@ export function ToppingPicker({ label, value, onChange }: Props) {
               setQuery(e.target.value);
               onChange(e.target.value);
             }}
-            placeholder="What's your topping?"
+            placeholder={t("placeholder")}
             className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
             style={{
               fontSize: "clamp(1.4rem, 3.2vw, 2.4rem)",
@@ -216,7 +221,7 @@ export function ToppingPicker({ label, value, onChange }: Props) {
               }}
               className="ui hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:border-tomato hover:text-tomato md:inline-flex"
             >
-              <X className="mr-1 h-3 w-3" aria-hidden /> Close
+              <X className="mr-1 h-3 w-3" aria-hidden /> {t("close")}
             </button>
           )}
         </label>
@@ -230,7 +235,7 @@ export function ToppingPicker({ label, value, onChange }: Props) {
       )}
       {!open && !value.trim() && (
         <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/40">
-          Pick a topping — or type your own.
+          {t("hint")}
         </p>
       )}
 
@@ -272,6 +277,7 @@ function SelectedToppingCard({
   topping: string;
   onChange: () => void;
 }) {
+  const t = useTranslations("onboarding.topping");
   const img = toppingImageFor(topping);
   return (
     <div className="relative">
@@ -325,7 +331,7 @@ function SelectedToppingCard({
           onClick={onChange}
           className="ui relative shrink-0 rounded-full border border-foreground/20 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-foreground/60 transition-colors hover:border-tomato hover:text-tomato"
         >
-          Change
+          {t("change")}
         </button>
       </div>
     </div>
@@ -348,30 +354,31 @@ function ToppingDrawer({
   query: string;
   onPick: (t: string) => void;
 }) {
+  const t = useTranslations("onboarding.topping");
   const q = query.trim().toLowerCase();
-  const featured = FEATURED_TOPPINGS.filter((t) => toppings.includes(t));
+  const featured = FEATURED_TOPPINGS.filter((top) => toppings.includes(top));
   const supporting = toppings.filter(
-    (t) => !FEATURED_TOPPINGS.includes(t as (typeof FEATURED_TOPPINGS)[number]),
+    (top) => !FEATURED_TOPPINGS.includes(top as (typeof FEATURED_TOPPINGS)[number]),
   );
 
   return (
     <div className="relative">
       <p className="ui relative text-[10px] uppercase tracking-[0.28em] text-foreground/45">
-        {q ? "Matches" : "The headliners"}
+        {q ? t("matches") : t("headliners")}
       </p>
 
       {/* FEATURED — large character-portrait cards */}
       {featured.length > 0 && (
         <div className="relative mt-6 grid grid-cols-2 gap-4 sm:grid-cols-3 md:grid-cols-4">
-          {featured.map((t, i) => {
-            const img = toppingImageFor(t);
-            const annotation = TOPPING_ANNOTATION[t] ?? "respect";
+          {featured.map((top, i) => {
+            const img = toppingImageFor(top);
+            const annotation = TOPPING_ANNOTATION[top] ?? "respect";
             const rot = (((i * 7) % 5) - 2) * 0.25;
             return (
               <button
-                key={t}
+                key={top}
                 type="button"
-                onClick={() => onPick(t)}
+                onClick={() => onPick(top)}
                 style={{
                   transform: `rotate(${rot}deg)`,
                   background: "hsl(var(--cream))",
@@ -402,7 +409,7 @@ function ToppingDrawer({
                     />
                   ) : (
                     <span className="grid h-full w-full place-items-center text-5xl">
-                      {TOPPING_EMOJI[t] ?? "🍕"}
+                      {TOPPING_EMOJI[top] ?? "🍕"}
                     </span>
                   )}
                   <span
@@ -426,10 +433,10 @@ function ToppingDrawer({
                 </span>
                 <span className="flex flex-col gap-0.5 px-3 py-3">
                   <span className="font-[family-name:var(--font-display)] text-[16px] font-black leading-tight tracking-tight text-foreground">
-                    {t}
+                    {top}
                   </span>
                   <span className="ui text-[9.5px] uppercase tracking-[0.18em] text-foreground/45">
-                    {toppingDescriptor(t)}
+                    {toppingDescriptor(top)}
                   </span>
                 </span>
               </button>
@@ -442,16 +449,16 @@ function ToppingDrawer({
       {supporting.length > 0 && (
         <>
           <p className="ui relative mt-10 text-[10px] uppercase tracking-[0.28em] text-foreground/40">
-            From the back of the kitchen
+            {t("supporting")}
           </p>
           <div className="relative mt-4 flex flex-wrap gap-2.5">
-            {supporting.map((t, i) => {
+            {supporting.map((top, i) => {
               const rot = (((i * 11) % 5) - 2) * 0.2;
               return (
                 <button
-                  key={t}
+                  key={top}
                   type="button"
-                  onClick={() => onPick(t)}
+                  onClick={() => onPick(top)}
                   style={{
                     transform: `rotate(${rot}deg)`,
                     background: "hsl(var(--cream) / 0.8)",
@@ -461,10 +468,10 @@ function ToppingDrawer({
                   className="group inline-flex items-center gap-2 rounded-full border px-3.5 py-1.5 text-left transition-all hover:-translate-y-0.5 hover:rotate-0 hover:border-tomato/60"
                 >
                   <span className="text-sm leading-none">
-                    {TOPPING_EMOJI[t] ?? "·"}
+                    {TOPPING_EMOJI[top] ?? "·"}
                   </span>
                   <span className="font-[family-name:var(--font-display)] text-[13.5px] font-bold tracking-tight text-foreground/85">
-                    {t}
+                    {top}
                   </span>
                 </button>
               );
@@ -474,7 +481,7 @@ function ToppingDrawer({
       )}
 
       {/* Off-canon CTA — present free-text as a viable option */}
-      {q && !toppings.some((t) => t.toLowerCase() === q) && (
+      {q && !toppings.some((top) => top.toLowerCase() === q) && (
         <button
           type="button"
           onClick={() => onPick(query.trim())}
@@ -487,19 +494,19 @@ function ToppingDrawer({
         >
           <Sparkles className="h-4 w-4" aria-hidden />
           <span className="font-[family-name:var(--font-display)] text-[16px] font-black">
-            Use &ldquo;{query.trim()}&rdquo;
+            {t("useCustom", { query: query.trim() })}
           </span>
           <span
             className="ui text-[9px] uppercase tracking-[0.22em]"
             style={{ color: "hsl(var(--tomato) / 0.7)" }}
           >
-            Off canon
+            {t("offCanon")}
           </span>
         </button>
       )}
 
       <p className="ui relative mt-8 text-[10px] uppercase tracking-[0.24em] text-foreground/35">
-        Tap to choose · or type your own
+        {t("footer")}
       </p>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ArticleRenderer, TagBadge, CommentList } from "@/app/ui/articles";
+import { ArticleRenderer, TagBadge, CommentList, ArticleReactions } from "@/app/ui/articles";
 
 interface Article {
   id: number;
@@ -232,11 +232,17 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
         </article>
 
         {article.status === "PUBLISHED" && (
-          <CommentList
-            slug={article.slug}
-            currentUserDiscordId={currentUserDiscordId}
-            isAdmin={isAdmin}
-          />
+          <>
+            <ArticleReactions
+              slug={article.slug}
+              currentUserDiscordId={currentUserDiscordId}
+            />
+            <CommentList
+              slug={article.slug}
+              currentUserDiscordId={currentUserDiscordId}
+              isAdmin={isAdmin}
+            />
+          </>
         )}
       </div>
     </div>

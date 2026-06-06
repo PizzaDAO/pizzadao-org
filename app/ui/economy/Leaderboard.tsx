@@ -15,6 +15,10 @@ import { card } from "../shared-styles";
 type LeaderboardEntry = {
   rank: number;
   userId: string;
+  // spinach-65462: server-resolved sheet member ID (small integer string)
+  // used for the /profile/{memberId} link. Null when no matching sheet row
+  // exists for the Discord ID.
+  memberId: string | null;
   balance: number;
   formatted: string;
 };
@@ -189,6 +193,7 @@ export function Leaderboard() {
                   </span>
                   <UserLink
                     discordId={entry.userId}
+                    memberId={entry.memberId}
                     style={{
                       fontSize: 14,
                       color: "hsl(var(--foreground))",
