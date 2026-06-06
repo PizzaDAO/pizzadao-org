@@ -8,3 +8,4 @@ export type { ArticleEditorValue } from "./ArticleEditor";
 export { default as TagBadge } from "./TagBadge";
 export { default as CommentList } from "./CommentList";
 export { default as CommentComposer } from "./CommentComposer";
+export { default as ArticleReactions } from "./ArticleReactions";
