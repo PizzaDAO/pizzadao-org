@@ -1,6 +1,11 @@
 "use client";
 
-import { btn } from "../shared-styles";
+// capricciosa-10448 — Light editorial polish on the level-up modal so it
+// reads as a "promotion notice" stamped into the dossier. Props, text
+// ("Level X", "Continue", "Final Level Reached", "Pizza Don", "+$PEP"), and
+// data-testid are unchanged — tests rely on them.
+//
+// Prior: diavola-40350 — level-up modal.
 
 type Props = {
   level: number;
@@ -8,6 +13,9 @@ type Props = {
   reward: number;
   onDismiss: () => void;
 };
+
+const DISPLAY_FONT =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
   const isFinalLevel = level >= 8;
@@ -23,7 +31,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
         position: "fixed",
         inset: 0,
         zIndex: 1900,
-        background: "var(--color-overlay)",
+        background: "hsl(var(--ink) / 0.6)",
         display: "flex",
         alignItems: "center",
         justifyContent: "center",
@@ -33,45 +41,68 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
     >
       <div
         onClick={(e) => e.stopPropagation()}
+        className="paper-soft halftone-soft"
         style={{
-          maxWidth: 420,
+          position: "relative",
+          maxWidth: 440,
           width: "100%",
-          padding: "28px 24px",
-          borderRadius: 16,
-          background: "var(--color-surface)",
-          color: "var(--color-text)",
-          boxShadow: "var(--shadow-elevated)",
+          padding: "30px 26px",
+          borderRadius: "var(--radius)",
+          border: "1px solid hsl(var(--rule-warm) / 0.55)",
+          background: "hsl(var(--cream))",
+          color: "hsl(var(--foreground))",
+          boxShadow: "var(--shadow-lifted)",
           textAlign: "center",
           display: "grid",
           gap: 14,
         }}
       >
-        <div
+        {/* Handwritten "promoted" stamp */}
+        <span
+          aria-hidden
+          className="handwritten"
           style={{
-            fontSize: 13,
-            opacity: 0.6,
-            textTransform: "uppercase",
-            letterSpacing: 1.2,
+            position: "absolute",
+            top: 12,
+            right: 18,
+            fontSize: 17,
+            transform: "rotate(-7deg)",
+            color: "hsl(var(--tomato))",
+            opacity: 0.8,
+            pointerEvents: "none",
           }}
         >
-          {isFinalLevel ? "Final Level Reached" : "Level Up!"}
-        </div>
+          {isFinalLevel ? "the top" : "promoted"}
+        </span>
+
+        <span
+          className="overline"
+          style={{
+            color: "hsl(var(--tomato))",
+            display: "block",
+          }}
+        >
+          {isFinalLevel ? "§ Final Level Reached" : "§ Level Up!"}
+        </span>
 
         <div
           style={{
             margin: "0 auto",
-            width: 84,
-            height: 84,
+            width: 92,
+            height: 92,
             borderRadius: "50%",
             background:
-              "linear-gradient(135deg, var(--color-accent) 0%, #ff7a3a 100%)",
-            color: "#fff",
+              "linear-gradient(135deg, hsl(var(--tomato)) 0%, hsl(var(--butter)) 100%)",
+            color: "hsl(var(--cream))",
             display: "flex",
             alignItems: "center",
             justifyContent: "center",
-            fontSize: 38,
-            fontWeight: 800,
-            boxShadow: "var(--shadow-card)",
+            fontSize: 42,
+            fontWeight: 900,
+            fontFamily: DISPLAY_FONT,
+            letterSpacing: "-0.02em",
+            boxShadow: "var(--shadow-lifted)",
+            border: "3px solid hsl(var(--cream))",
           }}
           aria-hidden="true"
         >
@@ -79,12 +110,30 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
         </div>
 
         <div>
-          <h2 style={{ margin: 0, fontSize: 24, fontWeight: 800 }}>
+          <h2
+            style={{
+              margin: 0,
+              fontSize: "clamp(1.65rem, 5vw, 2rem)",
+              fontFamily: DISPLAY_FONT,
+              fontWeight: 900,
+              letterSpacing: "-0.015em",
+              lineHeight: 1.05,
+              color: "hsl(var(--foreground))",
+            }}
+          >
             Level {level}
           </h2>
           {levelTitle && (
-            <p style={{ margin: "4px 0 0", fontSize: 15, opacity: 0.7 }}>
-              {levelTitle}
+            <p
+              style={{
+                margin: "6px 0 0",
+                fontSize: 15,
+                fontFamily: DISPLAY_FONT,
+                fontWeight: 600,
+                color: "hsl(var(--foreground))",
+              }}
+            >
+              <span className="circle-scribble">{levelTitle}</span>
             </p>
           )}
         </div>
@@ -92,11 +141,15 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
         {reward > 0 && (
           <div
             style={{
-              padding: "10px 14px",
-              borderRadius: 10,
-              background: "var(--color-surface-hover)",
+              padding: "12px 16px",
+              borderRadius: "var(--radius)",
+              background: "hsl(var(--butter) / 0.25)",
+              border: "1px solid hsl(var(--butter))",
               fontSize: 15,
-              fontWeight: 700,
+              fontWeight: 800,
+              fontFamily: DISPLAY_FONT,
+              color: "hsl(var(--ink))",
+              letterSpacing: "-0.01em",
             }}
           >
             +{reward.toLocaleString()} $PEP earned
@@ -104,17 +157,28 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
         )}
 
         {isFinalLevel && (
-          <p style={{ margin: 0, fontSize: 13, opacity: 0.7 }}>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: "hsl(var(--muted-foreground))",
+              lineHeight: 1.5,
+            }}
+          >
             You reached the top. You are a true Pizza Don.
           </p>
         )}
 
         <button
           onClick={onDismiss}
+          className="btn-pill"
           style={{
-            ...btn("primary"),
             justifySelf: "stretch",
             marginTop: 4,
+            background: "hsl(var(--ink))",
+            color: "hsl(var(--cream))",
+            border: "1px solid transparent",
+            boxShadow: "var(--shadow-soft)",
           }}
         >
           Continue
