@@ -1,5 +1,9 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the comment composer.
+// Paper-soft form, overline label, handwritten "your two cents" margin
+// annotation. POST flow + char cap behavior unchanged.
+
 import { useState } from "react";
 
 export interface PostedComment {
@@ -24,10 +28,6 @@ const MAX = 500;
 
 /**
  * Textarea + submit for posting a new comment.
- *
- * Mirrors the 500-char server cap with a live counter. Submits via the
- * `/api/articles/{slug}/comments` POST endpoint and surfaces validation +
- * rate-limit errors inline.
  */
 export default function CommentComposer({ slug, disabled, onPosted }: Props) {
   const [body, setBody] = useState("");
@@ -36,8 +36,8 @@ export default function CommentComposer({ slug, disabled, onPosted }: Props) {
 
   const trimmedLen = body.trim().length;
   const tooLong = body.length > MAX;
-  const counterColor = body.length > 480 ? "var(--color-tomato)" : "var(--color-text-secondary)";
   const canSubmit = !submitting && !disabled && trimmedLen > 0 && !tooLong;
+  const counterClass = body.length > 480 ? "text-tomato" : "text-foreground/55";
 
   async function handleSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -67,24 +67,18 @@ export default function CommentComposer({ slug, disabled, onPosted }: Props) {
   return (
     <form
       onSubmit={handleSubmit}
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        gap: 8,
-        padding: 16,
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 10,
-      }}
+      className="paper-soft print-noise relative flex flex-col gap-2 p-4 sm:p-5 bg-card border border-[hsl(var(--rule-warm)/0.55)] rounded-[--radius]"
     >
-      <label
-        htmlFor="comment-body"
-        style={{
-          fontSize: 13,
-          fontWeight: 600,
-          color: "var(--color-text-primary, var(--color-text))",
-        }}
+      {/* Handwritten margin annotation — desktop only, doesn't crowd mobile */}
+      <span
+        aria-hidden
+        className="handwritten pointer-events-none absolute -top-3 right-3 rotate-[-4deg] text-tomato hidden md:inline-block"
+        style={{ fontSize: 15 }}
       >
+        your two cents ↓
+      </span>
+
+      <label htmlFor="comment-body" className="overline text-foreground/55">
         Add a comment
       </label>
       <textarea
@@ -94,56 +88,33 @@ export default function CommentComposer({ slug, disabled, onPosted }: Props) {
         disabled={submitting || disabled}
         rows={4}
         placeholder="Share your thoughts… markdown supported."
-        style={{
-          width: "100%",
-          minHeight: 88,
-          padding: 10,
-          fontFamily: "inherit",
-          fontSize: 15,
-          lineHeight: 1.5,
-          color: "var(--color-text)",
-          background: "var(--color-page-bg)",
-          border: `1px solid ${tooLong ? "var(--color-tomato)" : "var(--color-border)"}`,
-          borderRadius: 8,
-          resize: "vertical",
-          boxSizing: "border-box",
-        }}
+        className={`w-full min-h-[88px] p-2.5 text-[15px] leading-relaxed rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-background text-foreground border outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.25)] transition-colors resize-y box-border ${
+          tooLong ? "border-[hsl(var(--tomato))]" : "border-[hsl(var(--rule-warm)/0.65)]"
+        }`}
+        style={{ fontFamily: "inherit" }}
       />
-      <div
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-        }}
-      >
-        <span
-          style={{
-            fontSize: 12,
-            color: "var(--color-text-secondary, var(--color-text))",
-            opacity: 0.8,
-          }}
-        >
+      <div className="flex items-center justify-between gap-3 flex-wrap">
+        <span className="overline text-foreground/55">
           Markdown supported. Be kind.
         </span>
-        <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-          <span style={{ fontSize: 12, color: counterColor, fontVariantNumeric: "tabular-nums" }}>
+        <div className="flex items-center gap-3">
+          <span
+            className={`overline ${counterClass}`}
+            style={{ fontVariantNumeric: "tabular-nums" }}
+          >
             {body.length}/{MAX}
           </span>
           <button
             type="submit"
             disabled={!canSubmit}
+            className="btn-pill"
             style={{
-              padding: "8px 16px",
-              borderRadius: 6,
-              border: "1px solid var(--color-border-strong, var(--color-border))",
-              background: canSubmit ? "var(--color-tomato)" : "var(--color-surface)",
-              color: canSubmit ? "white" : "var(--color-text-secondary, var(--color-text))",
-              fontSize: 14,
-              fontWeight: 600,
+              background: canSubmit ? "hsl(var(--tomato))" : "hsl(var(--foreground) / 0.10)",
+              color: canSubmit ? "hsl(var(--cream))" : "hsl(var(--foreground) / 0.55)",
+              boxShadow: canSubmit ? "var(--shadow-soft)" : "none",
               cursor: canSubmit ? "pointer" : "not-allowed",
-              minHeight: 36,
+              padding: "0.5rem 1.15rem",
+              fontSize: "0.8rem",
             }}
           >
             {submitting ? "Posting…" : "Post comment"}
@@ -153,15 +124,7 @@ export default function CommentComposer({ slug, disabled, onPosted }: Props) {
       {error && (
         <div
           role="alert"
-          style={{
-            marginTop: 4,
-            padding: "8px 10px",
-            background: "rgba(220, 38, 38, 0.08)",
-            border: "1px solid rgba(220, 38, 38, 0.35)",
-            color: "var(--color-tomato-deep, #b91c1c)",
-            borderRadius: 6,
-            fontSize: 13,
-          }}
+          className="mt-1 px-2.5 py-2 rounded-md text-[13px] font-semibold bg-[hsl(var(--destructive)/0.10)] border border-[hsl(var(--destructive)/0.35)] text-[hsl(var(--destructive))]"
         >
           {error}
         </div>

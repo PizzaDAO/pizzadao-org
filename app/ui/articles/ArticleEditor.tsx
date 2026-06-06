@@ -1,5 +1,11 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the article editor.
+// Form fields read like manuscript markings: overline labels above each
+// input, paper-soft cream surfaces with warm rule borders, tomato focus
+// rings, and pill-shaped action buttons. Functionality (drag/drop, paste,
+// keyboard shortcuts, cheat sheet, preview) is preserved verbatim.
+
 import { useState, useEffect, useRef } from "react";
 import ArticleRenderer from "./ArticleRenderer";
 import TagBadge from "./TagBadge";
@@ -55,15 +61,16 @@ interface ArticleEditorProps {
   canPublish?: boolean;
 }
 
-// Shared input classes — cream surface, ink-soft border, tomato focus ring.
+// Shared input — cream surface, warm rule border, tomato focus ring.
 const inputClass =
-  "w-full px-3 py-2.5 text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule)/0.22)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors box-border";
+  "w-full px-3 py-2.5 text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule-warm)/0.65)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.25)] transition-colors box-border";
 
-const labelClass = "block text-[13px] font-display font-semibold mb-1.5 text-foreground";
+// Editorial overline labels above fields.
+const labelClass = "overline block mb-1.5 text-foreground/55";
 
 // Small toolbar buttons (insert image, markdown help, preview toggle).
 const toolbarBtnClass =
-  "px-2.5 py-1 text-xs font-semibold rounded-md border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-colors";
+  "overline px-2.5 py-1.5 rounded-full border border-[hsl(var(--foreground)/0.20)] bg-card text-foreground/70 hover:bg-[hsl(var(--ink)/0.06)] hover:text-foreground dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-colors";
 
 export default function ArticleEditor({
   initialValue,
@@ -243,7 +250,7 @@ export default function ArticleEditor({
   }
 
   return (
-    <div className="flex flex-col gap-4">
+    <div className="paper-soft print-noise relative rounded-[--radius] border border-[hsl(var(--rule-warm)/0.55)] p-5 sm:p-7 flex flex-col gap-5">
       {error && (
         <div
           role="alert"
@@ -271,19 +278,19 @@ export default function ArticleEditor({
       )}
 
       <div>
-        <label className={labelClass}>Title *</label>
+        <label className={labelClass}>Headline *</label>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="A great article title"
-          className={inputClass}
+          className={`${inputClass} font-display font-bold text-lg tracking-tight`}
           maxLength={200}
         />
       </div>
 
       <div>
-        <label className={labelClass}>Excerpt (optional, shown on list page)</label>
+        <label className={labelClass}>Deck / lede (optional)</label>
         <textarea
           value={excerpt}
           onChange={(e) => setExcerpt(e.target.value)}
@@ -292,13 +299,13 @@ export default function ArticleEditor({
           style={{ fontFamily: "inherit" }}
           maxLength={500}
         />
-        <div className="text-right text-[11px] text-muted-foreground mt-1">
+        <div className="text-right text-[11px] text-foreground/50 mt-1 font-variant-numeric tabular-nums">
           {excerpt.length}/500
         </div>
       </div>
 
       <div>
-        <label className={labelClass}>Cover image URL (optional)</label>
+        <label className={labelClass}>Cover photograph (optional)</label>
         <div className="flex gap-2">
           <input
             type="url"
@@ -311,7 +318,12 @@ export default function ArticleEditor({
             type="button"
             onClick={() => coverInputRef.current?.click()}
             disabled={uploading === "cover"}
-            className="px-4 py-2.5 rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-60 disabled:cursor-not-allowed whitespace-nowrap transition-colors"
+            className="btn-pill"
+            style={{
+              background: "transparent",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.25)",
+            }}
           >
             {uploading === "cover" ? "Uploading…" : "Upload"}
           </button>
@@ -333,7 +345,7 @@ export default function ArticleEditor({
             <img
               src={coverImage}
               alt="Cover preview"
-              className="max-w-full max-h-[200px] rounded-[--radius] border border-[hsl(var(--rule)/0.22)]"
+              className="max-w-full max-h-[200px] rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)]"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
@@ -343,7 +355,7 @@ export default function ArticleEditor({
       </div>
 
       <div>
-        <label className={labelClass}>Tags (up to 10)</label>
+        <label className={labelClass}>Filed under (up to 10 tags)</label>
         <div className="flex gap-2 mb-2">
           <input
             type="text"
@@ -362,7 +374,12 @@ export default function ArticleEditor({
           <button
             type="button"
             onClick={addTag}
-            className="px-4 py-2.5 rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-secondary text-secondary-foreground text-sm font-semibold cursor-pointer hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors"
+            className="btn-pill"
+            style={{
+              background: "transparent",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.25)",
+            }}
           >
             Add
           </button>
@@ -376,7 +393,7 @@ export default function ArticleEditor({
                   type="button"
                   onClick={() => removeTag(tag)}
                   aria-label={`Remove ${tag}`}
-                  className="bg-transparent border-0 text-muted-foreground hover:text-[hsl(var(--tomato))] cursor-pointer text-sm p-0 transition-colors"
+                  className="bg-transparent border-0 text-foreground/45 hover:text-[hsl(var(--tomato))] cursor-pointer text-base leading-none p-0 transition-colors"
                 >
                   ×
                 </button>
@@ -387,9 +404,11 @@ export default function ArticleEditor({
       </div>
 
       <div>
-        <div className="flex justify-between items-center mb-1.5">
-          <label className={labelClass}>Content (Markdown) *</label>
-          <div className="flex gap-2">
+        <div className="flex justify-between items-center mb-1.5 flex-wrap gap-2">
+          <label className={labelClass} style={{ marginBottom: 0 }}>
+            Manuscript (Markdown) *
+          </label>
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => imageInputRef.current?.click()}
@@ -414,7 +433,7 @@ export default function ArticleEditor({
               onClick={() => setShowCheatSheet(!showCheatSheet)}
               className={
                 showCheatSheet
-                  ? "px-2.5 py-1 text-xs font-semibold rounded-md border border-[hsl(var(--ink))] bg-primary text-primary-foreground cursor-pointer transition-colors"
+                  ? "overline px-2.5 py-1.5 rounded-full border border-[hsl(var(--foreground))] bg-foreground text-background cursor-pointer transition-colors"
                   : toolbarBtnClass
               }
             >
@@ -431,7 +450,7 @@ export default function ArticleEditor({
         </div>
         {showCheatSheet && (
           <div
-            className="mb-2 p-3 rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-card-foreground text-[13px] leading-normal"
+            className="mb-2 p-3 rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)] bg-[hsl(var(--cream))] dark:bg-card text-card-foreground text-[13px] leading-normal"
             style={{
               fontFamily: "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               display: "grid",
@@ -475,14 +494,14 @@ export default function ArticleEditor({
           />
           {showPreview && (
             <div
-              className="rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card p-4 overflow-auto"
+              className="rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)] bg-[hsl(var(--cream))] dark:bg-card p-5 overflow-auto"
               style={{ minHeight: 400, maxHeight: 600 }}
             >
               {content.trim() ? (
                 <ArticleRenderer content={content} />
               ) : (
-                <p className="text-muted-foreground m-0">
-                  Preview will appear here…
+                <p className="text-foreground/55 m-0 overline">
+                  Preview appears here…
                 </p>
               )}
             </div>
@@ -490,12 +509,16 @@ export default function ArticleEditor({
         </div>
       </div>
 
-      <div className="flex flex-wrap gap-3 mt-2">
+      <div className="flex flex-wrap gap-3 mt-2 pt-4 border-t border-[hsl(var(--rule-warm)/0.55)]">
         <button
           type="button"
           onClick={() => onSaveDraft(currentValue())}
           disabled={submitting || !title.trim() || !content.trim()}
-          className="px-4 py-2.5 rounded-[--radius] border border-[hsl(var(--primary))] bg-primary text-primary-foreground text-sm font-display font-semibold cursor-pointer hover:opacity-90 disabled:opacity-60 disabled:cursor-not-allowed transition-opacity"
+          className="btn-pill"
+          style={{
+            background: "hsl(var(--foreground))",
+            color: "hsl(var(--background))",
+          }}
         >
           {submitting ? "Saving…" : mode === "edit" ? "Save changes" : "Save draft"}
         </button>
@@ -505,7 +528,12 @@ export default function ArticleEditor({
             type="button"
             onClick={() => onPublish(currentValue())}
             disabled={submitting || !title.trim() || !content.trim()}
-            className="px-4 py-2.5 rounded-[--radius] border border-[hsl(var(--tomato))] bg-tomato text-cream text-sm font-display font-bold cursor-pointer hover:bg-[hsl(var(--tomato-deep))] hover:border-[hsl(var(--tomato-deep))] disabled:opacity-60 disabled:cursor-not-allowed transition-colors"
+            className="btn-pill"
+            style={{
+              background: "hsl(var(--tomato))",
+              color: "hsl(var(--cream))",
+              boxShadow: "var(--shadow-soft)",
+            }}
           >
             {status === "PUBLISHED" ? "Update published" : "Publish"}
           </button>
@@ -516,7 +544,12 @@ export default function ArticleEditor({
             type="button"
             onClick={onCancel}
             disabled={submitting}
-            className="ml-auto px-4 py-2.5 rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-transparent text-foreground text-sm font-semibold cursor-pointer hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:cursor-not-allowed transition-colors"
+            className="btn-pill ml-auto"
+            style={{
+              background: "transparent",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.20)",
+            }}
           >
             Cancel
           </button>

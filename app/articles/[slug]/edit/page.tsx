@@ -1,5 +1,9 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the /articles/[slug]/edit page.
+// Newsroom-redesk feel: overline, display headline + handwritten note,
+// archive button styled as a quieter ghost pill. All API calls preserved.
+
 import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -67,7 +71,6 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
     setError(null);
     setSuccessMessage(null);
 
-    // Clear any pending success timeout
     if (successTimeoutRef.current) {
       clearTimeout(successTimeoutRef.current);
       successTimeoutRef.current = null;
@@ -95,17 +98,14 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
       const data = await patchRes.json();
       const updated = data.article;
 
-      // Update local article state with server response
       setArticle(updated);
 
-      // Show success toast
       setSuccessMessage(publish ? "Article published!" : "Changes saved.");
       successTimeoutRef.current = setTimeout(() => {
         setSuccessMessage(null);
         successTimeoutRef.current = null;
       }, 3000);
 
-      // If slug changed (draft title change), update URL without navigation
       if (updated.slug !== article.slug) {
         router.replace(`/articles/${updated.slug}/edit`);
       }
@@ -138,7 +138,7 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
   if (loading) {
     return (
       <div className="min-h-screen bg-background text-foreground py-14 px-5 text-center">
-        <p className="text-muted-foreground">Loading…</p>
+        <p className="overline text-foreground/55">Pulling the galley proof…</p>
       </div>
     );
   }
@@ -146,11 +146,22 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
   if (loadError || !article) {
     return (
       <div className="min-h-screen bg-background text-foreground px-5 py-14">
-        <div className="mx-auto max-w-[600px] text-center">
-          <h1 className="font-display text-3xl font-bold text-foreground">{loadError || "Not found"}</h1>
+        <div className="mx-auto max-w-[600px] text-center fade-up">
+          <p className="overline text-tomato">Stop the presses</p>
+          <h1
+            className="font-display font-black tracking-tight text-foreground mt-3"
+            style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1.02, textWrap: "balance" }}
+          >
+            {loadError || "Not found"}
+          </h1>
           <Link
             href="/articles"
-            className="inline-block mt-4 px-5 py-2.5 rounded-[--radius] bg-primary text-primary-foreground font-display font-semibold hover:opacity-90 transition-opacity no-underline"
+            className="btn-pill-lg mt-6"
+            style={{
+              background: "hsl(var(--tomato))",
+              color: "hsl(var(--cream))",
+              boxShadow: "var(--shadow-soft)",
+            }}
           >
             Back to articles
           </Link>
@@ -164,22 +175,37 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
       <div className="mx-auto max-w-[1100px]">
         <Link
           href={`/articles/${article.slug}`}
-          className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors no-underline"
+          className="overline inline-flex min-h-11 items-center text-foreground/55 hover:text-tomato transition-colors no-underline"
         >
-          ← Cancel
+          <span aria-hidden className="mr-2">←</span> Cancel
         </Link>
-        <div className="flex flex-wrap items-center justify-between gap-3 mt-2 mb-5">
-          <h1
-            className="font-display text-3xl md:text-4xl font-extrabold tracking-tight text-foreground m-0"
-            style={{ textWrap: "balance" }}
-          >
-            Edit article
-          </h1>
+        <div className="relative mt-3 mb-7 flex flex-wrap items-end justify-between gap-3 fade-up">
+          <div>
+            <p className="overline text-tomato">
+              <span aria-hidden>§</span>
+              <span aria-hidden className="mx-2 opacity-50">···</span>
+              Editorial desk
+            </p>
+            <h1
+              className="font-display font-black tracking-[-0.015em] text-foreground mt-3 leading-[1]"
+              style={{
+                fontSize: "clamp(2rem, 5vw, 3.4rem)",
+                textWrap: "balance",
+              }}
+            >
+              Edit your <span className="text-tomato underline-scribble">piece</span>
+            </h1>
+          </div>
           <button
             type="button"
             onClick={handleArchive}
             disabled={submitting}
-            className="px-3.5 py-2 rounded-[--radius] border border-[hsl(var(--destructive)/0.40)] bg-transparent text-[hsl(var(--destructive))] text-xs font-semibold cursor-pointer hover:bg-[hsl(var(--destructive)/0.10)] disabled:cursor-not-allowed disabled:opacity-60 transition-colors"
+            className="btn-pill"
+            style={{
+              background: "transparent",
+              color: "hsl(var(--destructive))",
+              border: "1px solid hsl(var(--destructive) / 0.45)",
+            }}
           >
             Archive
           </button>

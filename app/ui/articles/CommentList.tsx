@@ -1,5 +1,10 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the comments thread.
+// Section gets a § ··· "Letters to the editor" overline + display heading
+// rule. Each comment card sits on a paper-soft surface with warm rule
+// borders. Edit/delete actions become quiet pill buttons.
+
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import ArticleRenderer from "./ArticleRenderer";
@@ -128,48 +133,30 @@ function CommentRow({
   const authorEl = comment.authorMemberId ? (
     <Link
       href={`/profile/${comment.authorMemberId}`}
-      style={{ color: "var(--color-tomato, #2563eb)", textDecoration: "none", fontWeight: 600 }}
+      className="text-tomato hover:text-[hsl(var(--tomato-deep))] transition-colors no-underline font-semibold"
     >
       {comment.authorName || "Anonymous"}
     </Link>
   ) : (
-    <span style={{ fontWeight: 600 }}>{comment.authorName || "Anonymous"}</span>
+    <span className="font-semibold">{comment.authorName || "Anonymous"}</span>
   );
 
   return (
-    <article
-      style={{
-        padding: "14px 16px",
-        background: "var(--color-surface)",
-        border: "1px solid var(--color-border)",
-        borderRadius: 10,
-      }}
-    >
-      <header
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 12,
-          flexWrap: "wrap",
-          marginBottom: 8,
-        }}
-      >
-        <div style={{ fontSize: 14, color: "var(--color-text-primary, var(--color-text))" }}>
+    <article className="paper-soft px-4 py-4 sm:px-5 sm:py-4 bg-card text-card-foreground border border-[hsl(var(--rule-warm)/0.55)] rounded-[--radius]">
+      <header className="flex items-center justify-between gap-3 flex-wrap mb-2">
+        <div className="text-sm text-foreground/85">
           {authorEl}{" "}
           <span
             title={formatAbsolute(comment.createdAt)}
-            style={{
-              color: "var(--color-text-secondary, var(--color-text))",
-              fontSize: 13,
-            }}
+            className="overline ml-1 text-foreground/50"
           >
-            · {formatRelative(comment.createdAt)}
+            <span aria-hidden className="mr-1.5 opacity-50">·</span>
+            {formatRelative(comment.createdAt)}
             {comment.updatedAt !== comment.createdAt && !comment.isDeleted ? " (edited)" : ""}
           </span>
         </div>
         {(canEdit || canDelete) && !editing && (
-          <div style={{ display: "flex", gap: 6 }}>
+          <div className="flex gap-1.5">
             {canEdit && (
               <button
                 type="button"
@@ -178,16 +165,7 @@ function CommentRow({
                   setEditing(true);
                   setError(null);
                 }}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--color-border-strong, var(--color-border))",
-                  background: "transparent",
-                  color: "var(--color-text-secondary, var(--color-text))",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: "pointer",
-                }}
+                className="overline px-2.5 py-1 rounded-full border border-[hsl(var(--foreground)/0.20)] bg-transparent text-foreground/60 hover:bg-[hsl(var(--ink)/0.06)] hover:text-foreground dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
               >
                 Edit
               </button>
@@ -197,16 +175,7 @@ function CommentRow({
                 type="button"
                 onClick={handleDelete}
                 disabled={saving}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: "1px solid rgba(220, 38, 38, 0.35)",
-                  background: "transparent",
-                  color: "var(--color-tomato-deep, #b91c1c)",
-                  fontSize: 12,
-                  fontWeight: 600,
-                  cursor: saving ? "not-allowed" : "pointer",
-                }}
+                className="overline px-2.5 py-1 rounded-full border border-[hsl(var(--destructive)/0.40)] bg-transparent text-[hsl(var(--destructive))] hover:bg-[hsl(var(--destructive)/0.10)] disabled:cursor-not-allowed disabled:opacity-60 transition-colors cursor-pointer"
               >
                 Delete
               </button>
@@ -216,45 +185,21 @@ function CommentRow({
       </header>
 
       {comment.isDeleted ? (
-        <p
-          style={{
-            margin: 0,
-            fontStyle: "italic",
-            color: "var(--color-text-secondary, var(--color-text))",
-            opacity: 0.7,
-          }}
-        >
-          [deleted]
-        </p>
+        <p className="italic text-foreground/50 m-0">[deleted]</p>
       ) : editing ? (
-        <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
+        <div className="flex flex-col gap-2">
           <textarea
             value={draft}
             onChange={(e) => setDraft(e.target.value)}
             disabled={saving}
             rows={3}
-            style={{
-              width: "100%",
-              padding: 10,
-              fontFamily: "inherit",
-              fontSize: 15,
-              lineHeight: 1.5,
-              color: "var(--color-text)",
-              background: "var(--color-page-bg)",
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              resize: "vertical",
-              boxSizing: "border-box",
-            }}
+            className="w-full p-2.5 text-[15px] leading-relaxed rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-background text-foreground border border-[hsl(var(--rule-warm)/0.65)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.25)] transition-colors resize-y box-border"
+            style={{ fontFamily: "inherit" }}
           />
-          <div style={{ display: "flex", alignItems: "center", gap: 8, justifyContent: "flex-end" }}>
+          <div className="flex items-center gap-2 justify-end flex-wrap">
             <span
-              style={{
-                fontSize: 12,
-                color: draft.length > 480 ? "var(--color-tomato)" : "var(--color-text-secondary)",
-                fontVariantNumeric: "tabular-nums",
-                marginRight: "auto",
-              }}
+              className={`overline mr-auto ${draft.length > 480 ? "text-tomato" : "text-foreground/50"}`}
+              style={{ fontVariantNumeric: "tabular-nums" }}
             >
               {draft.length}/{MAX}
             </span>
@@ -265,15 +210,13 @@ function CommentRow({
                 setError(null);
               }}
               disabled={saving}
+              className="btn-pill"
               style={{
-                padding: "6px 12px",
-                borderRadius: 6,
-                border: "1px solid var(--color-border-strong, var(--color-border))",
                 background: "transparent",
-                color: "var(--color-text)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: saving ? "not-allowed" : "pointer",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.20)",
+                padding: "0.45rem 1rem",
+                fontSize: "0.8rem",
               }}
             >
               Cancel
@@ -282,15 +225,12 @@ function CommentRow({
               type="button"
               onClick={handleSave}
               disabled={saving}
+              className="btn-pill"
               style={{
-                padding: "6px 14px",
-                borderRadius: 6,
-                border: "1px solid var(--color-border-strong, var(--color-border))",
-                background: "var(--color-tomato)",
-                color: "white",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: saving ? "not-allowed" : "pointer",
+                background: "hsl(var(--tomato))",
+                color: "hsl(var(--cream))",
+                padding: "0.45rem 1.15rem",
+                fontSize: "0.8rem",
               }}
             >
               {saving ? "Saving…" : "Save"}
@@ -298,7 +238,11 @@ function CommentRow({
           </div>
         </div>
       ) : (
-        <div style={{ fontSize: 15, lineHeight: 1.55 }}>
+        <div className="text-[15px] leading-relaxed">
+          {/* Note: ArticleRenderer drops a first-paragraph drop cap globally; comments
+              are short enough that we deliberately let it render plainly here — the
+              cap targets `.article-content > p:first-child` which is fine because
+              this nested instance still scopes to its own .article-content wrapper. */}
           <ArticleRenderer content={comment.body} />
         </div>
       )}
@@ -306,15 +250,7 @@ function CommentRow({
       {error && (
         <div
           role="alert"
-          style={{
-            marginTop: 8,
-            padding: "6px 10px",
-            background: "rgba(220, 38, 38, 0.08)",
-            border: "1px solid rgba(220, 38, 38, 0.35)",
-            color: "var(--color-tomato-deep, #b91c1c)",
-            borderRadius: 6,
-            fontSize: 12,
-          }}
+          className="mt-2 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-[hsl(var(--destructive)/0.10)] border border-[hsl(var(--destructive)/0.35)] text-[hsl(var(--destructive))]"
         >
           {error}
         </div>
@@ -363,45 +299,33 @@ export default function CommentList({ slug, currentUserDiscordId, isAdmin }: Pro
   };
 
   return (
-    <section
-      aria-label="Comments"
-      style={{
-        marginTop: 48,
-        paddingTop: 32,
-        borderTop: "1px solid var(--color-border)",
-      }}
-    >
-      <h2
-        style={{
-          margin: "0 0 16px 0",
-          fontSize: 22,
-          fontWeight: 700,
-          color: "var(--color-text-primary, var(--color-text))",
-        }}
-      >
-        Comments{!loading && ` (${comments.length})`}
-      </h2>
+    <section aria-label="Comments" className="mt-12 pt-8">
+      <div className="rule-thick mb-4" />
+      <div className="flex items-end justify-between gap-3 mb-5">
+        <div>
+          <p className="overline text-tomato">
+            <span aria-hidden>§</span>
+            <span aria-hidden className="mx-2 opacity-50">···</span>
+            Letters to the editor
+          </p>
+          <h2 className="font-display text-2xl md:text-3xl font-black tracking-tight text-foreground mt-2 mb-0">
+            Comments
+            {!loading && (
+              <span className="ml-2 align-middle text-foreground/45 text-xl font-bold">
+                {comments.length}
+              </span>
+            )}
+          </h2>
+        </div>
+      </div>
 
       {currentUserDiscordId ? (
         <CommentComposer slug={slug} onPosted={handlePosted} />
       ) : (
-        <div
-          style={{
-            padding: 16,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-            borderRadius: 10,
-            fontSize: 14,
-            color: "var(--color-text-secondary, var(--color-text))",
-          }}
-        >
+        <div className="paper-soft px-4 py-4 bg-card border border-[hsl(var(--rule-warm)/0.55)] rounded-[--radius] text-sm text-foreground/75">
           <a
             href="/api/auth/discord"
-            style={{
-              color: "var(--color-tomato, #2563eb)",
-              fontWeight: 600,
-              textDecoration: "none",
-            }}
+            className="text-tomato hover:text-[hsl(var(--tomato-deep))] font-semibold no-underline transition-colors"
           >
             Sign in
           </a>{" "}
@@ -409,19 +333,14 @@ export default function CommentList({ slug, currentUserDiscordId, isAdmin }: Pro
         </div>
       )}
 
-      <div style={{ display: "flex", flexDirection: "column", gap: 12, marginTop: 20 }}>
+      <div className="flex flex-col gap-3 mt-5">
         {loading && (
           <>
             {[0, 1, 2].map((i) => (
               <div
                 key={i}
-                style={{
-                  height: 80,
-                  background: "var(--color-surface)",
-                  border: "1px solid var(--color-border)",
-                  borderRadius: 10,
-                  animation: "pulse 1.5s infinite",
-                }}
+                className="paper-soft h-20 bg-card border border-[hsl(var(--rule-warm)/0.55)] rounded-[--radius]"
+                style={{ animation: "pulse 1.5s infinite" }}
               />
             ))}
           </>
@@ -430,33 +349,13 @@ export default function CommentList({ slug, currentUserDiscordId, isAdmin }: Pro
         {!loading && error && (
           <div
             role="alert"
-            style={{
-              padding: 12,
-              background: "rgba(220, 38, 38, 0.08)",
-              border: "1px solid rgba(220, 38, 38, 0.35)",
-              color: "var(--color-tomato-deep, #b91c1c)",
-              borderRadius: 8,
-              fontSize: 14,
-              display: "flex",
-              justifyContent: "space-between",
-              gap: 8,
-              alignItems: "center",
-            }}
+            className="px-3 py-2.5 rounded-[--radius] text-sm bg-[hsl(var(--destructive)/0.10)] border border-[hsl(var(--destructive)/0.35)] text-[hsl(var(--destructive))] flex justify-between gap-2 items-center"
           >
             <span>{error}</span>
             <button
               type="button"
               onClick={load}
-              style={{
-                padding: "4px 10px",
-                borderRadius: 6,
-                border: "1px solid rgba(220, 38, 38, 0.35)",
-                background: "transparent",
-                color: "var(--color-tomato-deep, #b91c1c)",
-                fontSize: 12,
-                fontWeight: 600,
-                cursor: "pointer",
-              }}
+              className="overline px-2.5 py-1 rounded-full border border-[hsl(var(--destructive)/0.40)] bg-transparent text-[hsl(var(--destructive))] cursor-pointer"
             >
               Retry
             </button>
@@ -464,16 +363,8 @@ export default function CommentList({ slug, currentUserDiscordId, isAdmin }: Pro
         )}
 
         {!loading && !error && comments.length === 0 && (
-          <p
-            style={{
-              margin: 0,
-              padding: "16px 4px",
-              color: "var(--color-text-secondary, var(--color-text))",
-              fontSize: 14,
-              fontStyle: "italic",
-            }}
-          >
-            No comments yet — be the first to share your thoughts.
+          <p className="m-0 py-4 text-foreground/55 italic" style={{ fontSize: 14 }}>
+            No letters yet — be the first to share your two cents.
           </p>
         )}
 
@@ -494,12 +385,8 @@ export default function CommentList({ slug, currentUserDiscordId, isAdmin }: Pro
       <style jsx>{`
         @keyframes pulse {
           0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
+          100% { opacity: 1; }
+          50% { opacity: 0.5; }
         }
       `}</style>
     </section>

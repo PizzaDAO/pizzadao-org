@@ -1,5 +1,11 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the reactions row.
+// Replaces the inline-styled CSS-var pills with editorial primitives:
+// overline section label, hairline rule, btn-pill-shaped reaction
+// buttons that fill tomato when active. Reaction logic + API calls
+// preserved verbatim.
+
 import { useCallback, useEffect, useState } from "react";
 
 // Glyphs in the order they render. The API speaks glyphs back to us, so
@@ -25,10 +31,6 @@ function isEmoji(v: unknown): v is Emoji {
   return typeof v === "string" && (EMOJIS as readonly string[]).includes(v);
 }
 
-/**
- * Normalize whatever the server sends into a fully-populated counts record
- * (server might omit zero buckets in older clients; we tolerate that).
- */
 function readCounts(raw: unknown): Record<Emoji, number> {
   const out = emptyCounts();
   if (raw && typeof raw === "object") {
@@ -41,11 +43,6 @@ function readCounts(raw: unknown): Record<Emoji, number> {
   return out;
 }
 
-/**
- * Three-emoji reaction row, rendered below the article body. Logged-out
- * viewers see read-only counts. Logged-in members can toggle their pick
- * (same-emoji click clears it, different emoji swaps).
- */
 export default function ArticleReactions({ slug, currentUserDiscordId }: Props) {
   const [state, setState] = useState<ReactionState>({
     counts: emptyCounts(),
@@ -82,7 +79,6 @@ export default function ArticleReactions({ slug, currentUserDiscordId }: Props) 
 
     const isClearing = state.myReaction === emoji;
 
-    // Optimistic update so the click feels instant.
     const prevState = state;
     const optimisticCounts = { ...state.counts };
     if (state.myReaction) optimisticCounts[state.myReaction] = Math.max(0, optimisticCounts[state.myReaction] - 1);
@@ -112,7 +108,6 @@ export default function ArticleReactions({ slug, currentUserDiscordId }: Props) 
         myReaction: isEmoji(data?.myReaction) ? data.myReaction : null,
       });
     } catch (err) {
-      // Roll back to whatever the server last told us was true.
       setState(prevState);
       setError(err instanceof Error ? err.message : "Failed to update reaction");
     } finally {
@@ -121,23 +116,13 @@ export default function ArticleReactions({ slug, currentUserDiscordId }: Props) 
   }
 
   return (
-    <section
-      aria-label="Reactions"
-      style={{
-        marginTop: 32,
-        paddingTop: 24,
-        borderTop: "1px solid var(--color-border)",
-      }}
-    >
+    <section aria-label="Reactions" className="mt-10 pt-7">
+      <div className="rule mb-5" />
+      <p className="overline text-foreground/55 mb-3">React to this piece</p>
       <div
         role="group"
         aria-label="React to this article"
-        style={{
-          display: "flex",
-          flexWrap: "wrap",
-          gap: 8,
-          alignItems: "center",
-        }}
+        className="flex flex-wrap gap-2 items-center"
       >
         {EMOJIS.map((emoji) => {
           const active = state.myReaction === emoji;
@@ -166,50 +151,34 @@ export default function ArticleReactions({ slug, currentUserDiscordId }: Props) 
                     : `React with ${emoji}`
                   : "Sign in to react"
               }
+              className="btn-pill"
               style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                minHeight: 36,
-                padding: "6px 12px",
-                borderRadius: 999,
-                fontSize: 16,
-                fontWeight: 600,
+                background: active ? "hsl(var(--tomato))" : "transparent",
+                color: active ? "hsl(var(--cream))" : "hsl(var(--foreground))",
+                border: active
+                  ? "1px solid hsl(var(--tomato))"
+                  : "1px solid hsl(var(--foreground) / 0.20)",
+                boxShadow: active ? "var(--shadow-soft)" : "none",
+                cursor: disabled ? "not-allowed" : "pointer",
+                opacity: disabled && !active ? 0.55 : 1,
+                transform: isPending ? "scale(0.97)" : "none",
+                padding: "0.5rem 1rem",
                 fontVariantNumeric: "tabular-nums",
                 lineHeight: 1,
-                cursor: disabled ? "not-allowed" : "pointer",
-                opacity: disabled && !active ? 0.6 : 1,
-                background: active ? "var(--color-tomato, #b91c1c)" : "var(--color-surface)",
-                color: active ? "white" : "var(--color-text, inherit)",
-                border: active
-                  ? "1px solid var(--color-tomato, #b91c1c)"
-                  : "1px solid var(--color-border)",
-                transition: "background 120ms ease, border-color 120ms ease, transform 80ms ease",
-                transform: isPending ? "scale(0.97)" : "none",
               }}
             >
-              <span style={{ fontSize: 18 }} aria-hidden="true">
+              <span style={{ fontSize: 18 }} aria-hidden>
                 {emoji}
               </span>
-              <span style={{ fontSize: 13 }}>{count}</span>
+              <span style={{ fontSize: 13, fontWeight: 700 }}>{count}</span>
             </button>
           );
         })}
         {!currentUserDiscordId && (
-          <span
-            style={{
-              fontSize: 12,
-              color: "var(--color-text-secondary, var(--color-text))",
-              marginLeft: 4,
-            }}
-          >
+          <span className="overline ml-1 text-foreground/55">
             <a
               href="/api/auth/discord"
-              style={{
-                color: "var(--color-tomato, #b91c1c)",
-                fontWeight: 600,
-                textDecoration: "none",
-              }}
+              className="text-tomato hover:text-[hsl(var(--tomato-deep))] no-underline transition-colors font-semibold"
             >
               Sign in
             </a>{" "}
@@ -221,15 +190,7 @@ export default function ArticleReactions({ slug, currentUserDiscordId }: Props) 
       {error && (
         <div
           role="alert"
-          style={{
-            marginTop: 8,
-            padding: "6px 10px",
-            background: "rgba(220, 38, 38, 0.08)",
-            border: "1px solid rgba(220, 38, 38, 0.35)",
-            color: "var(--color-tomato-deep, #b91c1c)",
-            borderRadius: 6,
-            fontSize: 12,
-          }}
+          className="mt-3 px-2.5 py-1.5 rounded-md text-xs font-semibold bg-[hsl(var(--destructive)/0.10)] border border-[hsl(var(--destructive)/0.35)] text-[hsl(var(--destructive))]"
         >
           {error}
         </div>

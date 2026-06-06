@@ -1,5 +1,15 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the article detail page.
+//
+// Treats the page as a newspaper feature: § ··· The Articles overline,
+// large display headline with clamp() sizing, byline + dateline in
+// uppercase micro-type, optional cover photo framed as a press print, and
+// a paper-soft footer with reactions + comments.
+//
+// All data shapes, API endpoints, and component contracts (ArticleRenderer,
+// ArticleReactions, CommentList, TagBadge) are untouched.
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { ArticleRenderer, TagBadge, CommentList, ArticleReactions } from "@/app/ui/articles";
@@ -101,7 +111,15 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
       <div className="min-h-screen bg-background text-foreground px-5 py-14">
         <div className="mx-auto max-w-[760px]">
           <div
-            className="h-8 w-3/5 mb-4 rounded-md bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
+            className="h-3 w-24 mb-6 rounded-md bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
+            style={{ animation: "pulse 1.5s infinite" }}
+          />
+          <div
+            className="h-10 w-4/5 mb-3 rounded-md bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
+            style={{ animation: "pulse 1.5s infinite" }}
+          />
+          <div
+            className="h-10 w-2/3 mb-6 rounded-md bg-[hsl(var(--ink)/0.06)] dark:bg-[hsl(var(--cream)/0.06)]"
             style={{ animation: "pulse 1.5s infinite" }}
           />
           <div
@@ -116,12 +134,8 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
         <style jsx>{`
           @keyframes pulse {
             0%,
-            100% {
-              opacity: 1;
-            }
-            50% {
-              opacity: 0.5;
-            }
+            100% { opacity: 1; }
+            50% { opacity: 0.5; }
           }
         `}</style>
       </div>
@@ -131,15 +145,28 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
   if (error || !article) {
     return (
       <div className="min-h-screen bg-background text-foreground px-5 py-14">
-        <div className="mx-auto max-w-[760px] text-center">
-          <h1 className="font-display text-3xl font-bold text-foreground">
+        <div className="mx-auto max-w-[760px] text-center fade-up">
+          <p className="overline text-tomato">Stop the presses</p>
+          <h1
+            className="font-display font-black tracking-[-0.015em] text-foreground mt-3"
+            style={{
+              fontSize: "clamp(2rem, 5vw, 3.4rem)",
+              lineHeight: 1,
+              textWrap: "balance",
+            }}
+          >
             {error || "Article not found"}
           </h1>
           <Link
             href="/articles"
-            className="inline-block mt-4 px-5 py-2.5 rounded-[--radius] bg-primary text-primary-foreground font-display font-semibold hover:opacity-90 transition-opacity no-underline"
+            className="btn-pill-lg mt-6"
+            style={{
+              background: "hsl(var(--tomato))",
+              color: "hsl(var(--cream))",
+              boxShadow: "var(--shadow-soft)",
+            }}
           >
-            Back to articles
+            Back to the desk
           </Link>
         </div>
       </div>
@@ -149,86 +176,148 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
   const displayDate = formatDate(article.publishedAt || article.createdAt);
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-5 pt-10 pb-20">
+    <div className="relative min-h-screen bg-background text-foreground px-5 pt-10 pb-20">
       <div className="mx-auto max-w-[760px]">
+        {/* Quiet back link */}
         <Link
           href="/articles"
-          className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors no-underline"
+          className="overline inline-flex min-h-11 items-center text-foreground/55 hover:text-tomato transition-colors no-underline"
         >
-          ← All articles
+          <span aria-hidden className="mr-2">←</span> All dispatches
         </Link>
 
+        {/* Draft / archived banner — handwritten margin note style */}
         {article.status !== "PUBLISHED" && (
-          <div className="mt-3 px-3 py-2 rounded-[--radius] text-sm font-semibold bg-[hsl(var(--butter)/0.20)] border border-[hsl(var(--butter)/0.50)] text-[hsl(var(--ink))]">
-            This article is {article.status.toLowerCase()} and is only visible to you and admins.
+          <div
+            className="paper-soft mt-4 px-4 py-3 rounded-[--radius] border border-[hsl(var(--butter)/0.55)] bg-[hsl(var(--butter)/0.15)] text-foreground"
+            style={{ fontSize: 14 }}
+          >
+            <span className="overline text-foreground/55 mr-2">Not for press</span>
+            <span>
+              This article is <strong className="font-bold">{article.status.toLowerCase()}</strong> — only you and admins can see it.
+            </span>
           </div>
         )}
 
-        <article className="mt-5">
-          {article.coverImage && (
-            <div className="mb-6">
-              {/* eslint-disable-next-line @next/next/no-img-element */}
-              <img
-                src={article.coverImage}
-                alt=""
-                className="w-full max-h-[420px] object-cover rounded-[--radius] border border-[hsl(var(--rule)/0.22)]"
-                onError={(e) => {
-                  (e.target as HTMLImageElement).style.display = "none";
-                }}
-              />
-            </div>
-          )}
+        {/* ─── MASTHEAD ─────────────────────────────────────────── */}
+        <article className="mt-6 fade-up">
+          <p className="overline text-tomato">
+            <span aria-hidden>§</span>
+            <span aria-hidden className="mx-2 opacity-50">···</span>
+            The Articles
+            {article.tags && article.tags[0] && (
+              <span className="ml-2 text-foreground/55">/ {article.tags[0]}</span>
+            )}
+          </p>
 
           <h1
-            className="font-display text-4xl md:text-5xl font-extrabold leading-[1.1] tracking-tight text-foreground my-3"
-            style={{ textWrap: "balance" }}
+            className="font-display font-black tracking-[-0.02em] text-foreground mt-4 mb-0 leading-[0.95]"
+            style={{
+              fontSize: "clamp(2.4rem, 6.5vw, 4.6rem)",
+              textWrap: "balance",
+            }}
           >
             {article.title}
           </h1>
 
           {article.excerpt && (
             <p
-              className="text-lg leading-relaxed text-muted-foreground mt-0 mb-5"
-              style={{ textWrap: "pretty" }}
+              className="mt-5 mb-0 text-foreground/75"
+              style={{
+                fontSize: "clamp(1.05rem, 1.7vw, 1.25rem)",
+                lineHeight: 1.5,
+                textWrap: "pretty",
+              }}
             >
               {article.excerpt}
             </p>
           )}
 
-          <div className="flex flex-wrap items-center justify-between gap-3 py-3 mb-6 border-t border-b border-[hsl(var(--rule)/0.12)] text-sm text-muted-foreground">
-            <div>
-              {article.authorName && (
-                <span>
-                  by{" "}
+          {/* Byline + dateline — uppercase micro-type between hairlines */}
+          <div className="rule-thick mt-7" />
+          <div className="flex flex-wrap items-center justify-between gap-3 py-3">
+            <p className="overline m-0 text-foreground/65">
+              {article.authorName ? (
+                <>
+                  By{" "}
                   <Link
                     href={article.authorMemberId ? `/profile/${article.authorMemberId}` : "#"}
-                    className="font-semibold text-[hsl(var(--tomato))] hover:text-[hsl(var(--tomato-deep))] transition-colors no-underline"
+                    className="text-tomato hover:text-[hsl(var(--tomato-deep))] transition-colors no-underline"
                   >
                     {article.authorName}
                   </Link>
-                </span>
+                </>
+              ) : (
+                "By a friend of the family"
               )}
-              {displayDate && <span> · {displayDate}</span>}
-            </div>
+              {displayDate && (
+                <>
+                  <span aria-hidden className="mx-2 opacity-50">···</span>
+                  {displayDate}
+                </>
+              )}
+            </p>
             {canEdit && (
               <Link
                 href={`/articles/${article.slug}/edit`}
-                className="px-3 py-1.5 rounded-md border border-[hsl(var(--rule)/0.22)] bg-card text-foreground text-xs font-semibold hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors no-underline"
+                className="overline inline-flex items-center justify-center min-h-9 px-3 py-1.5 rounded-full border border-[hsl(var(--foreground)/0.20)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors no-underline"
               >
                 Edit
               </Link>
             )}
           </div>
+          <div className="rule" />
 
-          <ArticleRenderer content={article.content} />
+          {/* Cover photo — framed as a press print */}
+          {article.coverImage && (
+            <figure className="relative mt-7 mb-2">
+              <div
+                className="paper-soft relative overflow-hidden rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)]"
+                style={{ boxShadow: "var(--shadow-lifted)" }}
+              >
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src={article.coverImage}
+                  alt=""
+                  className="w-full max-h-[460px] object-cover block"
+                  onError={(e) => {
+                    (e.target as HTMLImageElement).style.display = "none";
+                  }}
+                />
+              </div>
+              <span
+                aria-hidden
+                className="handwritten pointer-events-none absolute -bottom-6 right-2 rotate-[-3deg] text-foreground/50 hidden sm:block"
+                style={{ fontSize: 14 }}
+              >
+                cover photograph
+              </span>
+            </figure>
+          )}
 
+          {/* ─── BODY ────────────────────────────────────────────── */}
+          <div className="mt-10">
+            <ArticleRenderer content={article.content} />
+          </div>
+
+          {/* Tags — filed under */}
           {article.tags && article.tags.length > 0 && (
-            <div className="mt-10 pt-5 border-t border-[hsl(var(--rule)/0.12)] flex flex-wrap gap-2">
-              {article.tags.map((tag) => (
-                <TagBadge key={tag} tag={tag} href={`/articles?tag=${encodeURIComponent(tag)}`} />
-              ))}
+            <div className="mt-12 pt-5 border-t border-[hsl(var(--rule)/0.18)]">
+              <p className="overline text-foreground/45 mb-2">Filed under</p>
+              <div className="flex flex-wrap gap-2">
+                {article.tags.map((tag) => (
+                  <TagBadge key={tag} tag={tag} href={`/articles?tag=${encodeURIComponent(tag)}`} />
+                ))}
+              </div>
             </div>
           )}
+
+          {/* Editorial sign-off — finis */}
+          <div className="mt-12 flex items-center justify-center gap-3" aria-hidden>
+            <span className="rule-warm flex-1 max-w-[80px]" />
+            <span className="overline text-foreground/40">— 30 —</span>
+            <span className="rule-warm flex-1 max-w-[80px]" />
+          </div>
         </article>
 
         {article.status === "PUBLISHED" && (

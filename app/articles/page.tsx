@@ -1,5 +1,17 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the /articles index.
+//
+// Reframes the list as the front page of a small newspaper:
+//   • § ··· The Articles overline
+//   • Display-font masthead with a tomato underline-scribble accent
+//   • Paper-soft search/filter bar with hand-drawn focus ring
+//   • Toolbar buttons reworked as btn-pill primitives
+//   • Handwritten margin annotation when a viewer can author
+//
+// Wiring (fetch, search, tag filter, drafts, view-mode toggle, pagination)
+// is unchanged — this is a pure visual rewrite.
+
 import { useEffect, useState, useCallback } from "react";
 import Link from "next/link";
 import { ArticleList, TagBadge, type ArticleCardData, type ViewMode } from "@/app/ui/articles";
@@ -108,130 +120,189 @@ export default function ArticlesListPage() {
   }
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-4 sm:px-5 py-10">
+    <div className="relative min-h-screen bg-background text-foreground px-4 sm:px-5 py-10">
       <div className="mx-auto max-w-[1100px]">
-        {/* Header */}
-        <div className="mb-6">
-          <Link
-            href="/"
-            className="inline-flex min-h-11 items-center text-sm text-muted-foreground hover:text-foreground transition-colors mb-2"
-          >
-            ← Back to Home
-          </Link>
-          <div className="flex flex-wrap items-start justify-between gap-4">
-            <div>
+        {/* Back link — quiet upper-left */}
+        <Link
+          href="/"
+          className="overline inline-flex min-h-11 items-center text-foreground/55 hover:text-tomato transition-colors no-underline mb-3"
+        >
+          <span aria-hidden className="mr-2">←</span> Back to home
+        </Link>
+
+        {/* Masthead — overline · display headline · tagline */}
+        <header className="relative fade-up mb-8">
+          <p className="overline text-tomato">
+            <span aria-hidden>§</span>
+            <span aria-hidden className="mx-2 opacity-50">···</span>
+            The Articles
+          </p>
+          <div className="mt-3 flex flex-wrap items-end justify-between gap-5">
+            <div className="min-w-0">
               <h1
-                className="font-display text-4xl md:text-5xl font-extrabold leading-tight tracking-tight text-foreground my-1"
-                style={{ textWrap: "balance" }}
+                className="font-display font-black tracking-[-0.015em] text-foreground leading-[0.95] m-0"
+                style={{
+                  fontSize: "clamp(2.6rem, 7vw, 5.2rem)",
+                  textWrap: "balance",
+                }}
               >
-                Articles
+                Dispatches from <span className="text-tomato underline-scribble">the kitchen</span>
               </h1>
-              <p className="m-0 text-base text-muted-foreground">
-                Stories, updates, and deep dives from PizzaDAO
+              <p
+                className="mt-4 max-w-xl text-foreground/70"
+                style={{ fontSize: "15px", lineHeight: 1.55 }}
+              >
+                Stories, updates, and deep dives from PizzaDAO — filed by your friendly neighborhood scribes.
               </p>
             </div>
             {canAuthor && (
-              <Link
-                href="/articles/new"
-                className="inline-flex items-center justify-center min-h-11 font-display font-bold text-sm px-4 py-2.5 rounded-[--radius] bg-tomato text-cream border border-tomato hover:bg-[hsl(var(--tomato-deep))] hover:border-[hsl(var(--tomato-deep))] transition-colors"
+              <div className="relative shrink-0">
+                <Link
+                  href="/articles/new"
+                  className="btn-pill-lg"
+                  style={{
+                    background: "hsl(var(--tomato))",
+                    color: "hsl(var(--cream))",
+                    boxShadow: "var(--shadow-soft)",
+                  }}
+                >
+                  + File a new piece
+                </Link>
+                <span
+                  aria-hidden
+                  className="handwritten pointer-events-none absolute -bottom-7 right-1 rotate-[-4deg] text-foreground/55 hidden sm:block"
+                  style={{ fontSize: 14 }}
+                >
+                  press-pass holders only
+                </span>
+              </div>
+            )}
+          </div>
+
+          {/* hairline rule under the masthead */}
+          <div className="rule-thick mt-8" />
+          <div className="rule mt-1" />
+        </header>
+
+        {/* Search and filters — paper-soft strip */}
+        <div className="paper-soft print-noise mb-8 rounded-[--radius] border border-[hsl(var(--rule-warm)/0.55)] p-4 sm:p-5">
+          <div className="relative flex flex-col gap-3">
+            <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-2">
+              <div className="relative basis-full sm:basis-0 sm:flex-1">
+                <span
+                  aria-hidden
+                  className="overline absolute left-3 top-2 text-foreground/40"
+                  style={{ fontSize: 9 }}
+                >
+                  Search
+                </span>
+                <input
+                  type="text"
+                  placeholder="Find an article…"
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
+                  className="w-full min-h-11 pt-6 pb-2 px-3 text-base sm:text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule-warm)/0.55)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
+                />
+              </div>
+              <button
+                type="submit"
+                className="btn-pill"
+                style={{
+                  background: "hsl(var(--foreground))",
+                  color: "hsl(var(--background))",
+                }}
               >
-                + New article
-              </Link>
+                Search
+              </button>
+              {(search || activeTag) && (
+                <button
+                  type="button"
+                  onClick={clearFilters}
+                  className="btn-pill"
+                  style={{
+                    background: "transparent",
+                    color: "hsl(var(--foreground))",
+                    border: "1px solid hsl(var(--foreground) / 0.25)",
+                  }}
+                >
+                  Clear
+                </button>
+              )}
+            </form>
+
+            {availableTags.length > 0 && (
+              <div className="flex flex-wrap items-center gap-1.5 pt-1">
+                <span className="overline text-foreground/45 mr-1">Filed under</span>
+                {availableTags.map((tag) => (
+                  <TagBadge
+                    key={tag}
+                    tag={tag}
+                    active={activeTag === tag}
+                    onClick={() => {
+                      setActiveTag(activeTag === tag ? null : tag);
+                      setPage(1);
+                    }}
+                  />
+                ))}
+              </div>
             )}
           </div>
         </div>
 
-        {/* Search and filters */}
-        <div className="mb-6 flex flex-col gap-3">
-          {/*
-            sicilian-41551: search row wraps to 2 lines on phones (the 16-px
-            input fills line 1, the buttons drop to line 2). The min-h-11
-            keeps controls at the 44 px tap-target floor.
-          */}
-          <form onSubmit={handleSearchSubmit} className="flex flex-wrap gap-2">
-            <input
-              type="text"
-              placeholder="Search articles..."
-              value={searchInput}
-              onChange={(e) => setSearchInput(e.target.value)}
-              className="basis-full sm:basis-0 sm:flex-1 min-h-11 px-4 py-3 text-base sm:text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule)/0.22)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
-            />
-            <button
-              type="submit"
-              className="inline-flex items-center justify-center min-h-11 px-5 py-2.5 text-sm font-semibold rounded-[--radius] bg-secondary text-secondary-foreground border border-[hsl(var(--rule)/0.22)] hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
-            >
-              Search
-            </button>
-            {(search || activeTag) && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                className="inline-flex items-center justify-center min-h-11 px-4 py-2.5 text-sm font-semibold rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-transparent text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] transition-colors cursor-pointer"
-              >
-                Clear
-              </button>
-            )}
-          </form>
-
-          {availableTags.length > 0 && (
-            <div className="flex flex-wrap items-center gap-1.5">
-              <span className="self-center text-xs text-muted-foreground mr-1">Tags:</span>
-              {availableTags.map((tag) => (
-                <TagBadge
-                  key={tag}
-                  tag={tag}
-                  active={activeTag === tag}
-                  onClick={() => {
-                    setActiveTag(activeTag === tag ? null : tag);
-                    setPage(1);
-                  }}
-                />
-              ))}
-            </div>
-          )}
-        </div>
-
-        {/* My Drafts section */}
+        {/* My Drafts — clipboard pile */}
         {drafts.length > 0 && (
-          <div className="mb-8">
-            <h2 className="font-display text-2xl font-bold text-foreground mb-3 flex items-center gap-2">
-              My Drafts
-              <span className="text-[11px] font-semibold uppercase tracking-wide px-2 py-0.5 rounded-md bg-[hsl(var(--butter)/0.30)] text-[hsl(var(--ink))]">
-                {drafts.length}
+          <section className="mb-10 fade-up">
+            <div className="flex items-end justify-between gap-3 mb-3">
+              <div>
+                <p className="overline text-foreground/45">In the typewriter</p>
+                <h2 className="font-display text-2xl md:text-3xl font-black tracking-tight text-foreground mt-1 mb-0">
+                  My drafts
+                  <span className="ml-2 align-middle inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[hsl(var(--butter)/0.35)] text-foreground text-[11px] font-bold">
+                    {drafts.length}
+                  </span>
+                </h2>
+              </div>
+              <span
+                aria-hidden
+                className="handwritten hidden sm:inline-block rotate-[-3deg] text-foreground/50"
+                style={{ fontSize: 14 }}
+              >
+                not for press yet
               </span>
-            </h2>
+            </div>
             <div
               className="grid gap-4"
-              // sicilian-41551: was minmax(300px,1fr) which forced sub-page
-              // horizontal scroll at 320–360px viewports. 240px floor fits a
-              // 375-px screen with 20-px gutters and still pairs up at >=640px.
               style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))" }}
             >
               {drafts.map((d) => (
                 <Link
                   key={d.slug}
                   href={`/articles/${d.slug}/edit`}
-                  className="block p-4 rounded-[--radius] border border-dashed border-[hsl(var(--rule)/0.30)] bg-card text-card-foreground hover:bg-[hsl(var(--ink)/0.04)] dark:hover:bg-[hsl(var(--cream)/0.04)] hover:border-[hsl(var(--tomato)/0.50)] transition-colors no-underline"
+                  className="paper-soft print-noise block p-4 rounded-[--radius] border-2 border-dashed border-[hsl(var(--rule-warm)/0.65)] bg-card text-card-foreground hover:border-[hsl(var(--tomato)/0.60)] transition-colors no-underline"
                 >
                   <div className="flex items-center gap-2 mb-1.5">
                     <span
-                      className={`text-[10px] font-bold uppercase tracking-wide px-1.5 py-0.5 rounded-md ${
+                      className={`overline px-1.5 py-0.5 rounded-md ${
                         d.status === "DRAFT"
-                          ? "bg-[hsl(var(--butter)/0.30)] text-[hsl(var(--ink))]"
+                          ? "bg-[hsl(var(--butter)/0.35)] text-[hsl(var(--ink))]"
                           : "bg-[hsl(142_71%_45%/0.18)] text-[hsl(142_71%_25%)] dark:text-[hsl(142_71%_60%)]"
                       }`}
+                      style={{ fontSize: 10 }}
                     >
                       {d.status || "DRAFT"}
                     </span>
                   </div>
-                  <div className="font-display font-bold text-base text-foreground">{d.title}</div>
+                  <div className="font-display font-black text-lg leading-tight text-foreground tracking-tight">
+                    {d.title || "(untitled)"}
+                  </div>
                   {d.excerpt && (
                     <div
-                      className="text-sm text-muted-foreground mt-1 overflow-hidden"
+                      className="text-sm text-muted-foreground mt-1.5 overflow-hidden"
                       style={{
                         display: "-webkit-box",
                         WebkitLineClamp: 2,
                         WebkitBoxOrient: "vertical",
+                        textWrap: "pretty",
                       }}
                     >
                       {d.excerpt}
@@ -240,7 +311,7 @@ export default function ArticlesListPage() {
                 </Link>
               ))}
             </div>
-          </div>
+          </section>
         )}
 
         {error && (
@@ -252,9 +323,15 @@ export default function ArticlesListPage() {
           </div>
         )}
 
-        {/* View toggle — sicilian-41551: bumped from 36x32 to 44x44 tap target. */}
-        <div className="mb-4 flex justify-end">
-          <div className="inline-flex rounded-[--radius] border border-[hsl(var(--rule)/0.22)] overflow-hidden">
+        {/* Section label + view toggle */}
+        <div className="flex items-end justify-between gap-3 mb-4">
+          <div>
+            <p className="overline text-foreground/45">The latest</p>
+            <h2 className="font-display text-xl md:text-2xl font-black tracking-tight text-foreground mt-1 mb-0">
+              {search || activeTag ? "Filtered dispatches" : "All dispatches"}
+            </h2>
+          </div>
+          <div className="inline-flex rounded-full border border-[hsl(var(--foreground)/0.20)] overflow-hidden bg-card">
             <button
               type="button"
               onClick={() => handleViewModeChange("gallery")}
@@ -262,8 +339,8 @@ export default function ArticlesListPage() {
               title="Gallery view"
               className={`flex items-center justify-center w-11 h-11 cursor-pointer transition-colors ${
                 viewMode === "gallery"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
+                  ? "bg-foreground text-background"
+                  : "text-foreground/60 hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
               }`}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -278,10 +355,10 @@ export default function ArticlesListPage() {
               onClick={() => handleViewModeChange("list")}
               aria-label="List view"
               title="List view"
-              className={`flex items-center justify-center w-11 h-11 cursor-pointer border-l border-[hsl(var(--rule)/0.22)] transition-colors ${
+              className={`flex items-center justify-center w-11 h-11 cursor-pointer border-l border-[hsl(var(--foreground)/0.20)] transition-colors ${
                 viewMode === "list"
-                  ? "bg-primary text-primary-foreground"
-                  : "bg-card text-muted-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
+                  ? "bg-foreground text-background"
+                  : "text-foreground/60 hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)]"
               }`}
             >
               <svg width="16" height="16" viewBox="0 0 16 16" fill="none" xmlns="http://www.w3.org/2000/svg" aria-hidden>
@@ -298,29 +375,39 @@ export default function ArticlesListPage() {
           loading={loading}
           viewMode={viewMode}
           emptyMessage={
-            search || activeTag ? "No articles match your filters." : "No articles published yet."
+            search || activeTag ? "No dispatches match your filters." : "No articles in print yet."
           }
         />
 
         {/* Pagination */}
         {!loading && pagination.totalPages > 1 && (
-          <div className="mt-8 flex items-center justify-center gap-3">
+          <div className="mt-10 flex items-center justify-center gap-3">
             <button
               type="button"
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page <= 1}
-              className="inline-flex items-center justify-center min-h-11 px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="btn-pill"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
             >
               ← Prev
             </button>
-            <span className="text-sm text-muted-foreground">
+            <span className="overline text-foreground/55">
               Page {pagination.page} of {pagination.totalPages}
             </span>
             <button
               type="button"
               onClick={() => setPage(Math.min(pagination.totalPages, page + 1))}
               disabled={page >= pagination.totalPages}
-              className="inline-flex items-center justify-center min-h-11 px-3.5 py-2 text-sm rounded-[--radius] border border-[hsl(var(--rule)/0.22)] bg-card text-foreground hover:bg-[hsl(var(--ink)/0.06)] dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-50 disabled:cursor-not-allowed transition-colors cursor-pointer"
+              className="btn-pill"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
             >
               Next →
             </button>
