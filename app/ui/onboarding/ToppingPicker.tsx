@@ -25,6 +25,7 @@ import { useTranslations } from "next-intl";
 import {
   PIZZA_TOPPINGS,
   TOPPING_EMOJI,
+  toppingDescriptorFor,
   toppingImageFor,
 } from "@/app/lib/topping-images";
 
@@ -55,44 +56,6 @@ const TOPPING_ANNOTATION: Record<string, string> = {
   Pineapple: "brave",
   Truffle: "good choice",
 };
-
-const TOPPING_DESCRIPTOR: Record<string, string> = {
-  Pepperoni: "loud · classic · respected",
-  Mushroom: "earthy · quiet · dangerous",
-  Basil: "green · honest · sicilian",
-  Mozzarella: "soft · loyal · everywhere",
-  Anchovy: "salty · brutal · old-school",
-  Sausage: "heavy · brooklyn · proud",
-  "Hot honey": "sweet · chaotic · respected",
-  Ricotta: "creamy · gentle · holy",
-  Garlic: "sharp · unforgettable · armed",
-  Onion: "tearful · loyal · stubborn",
-  Olives: "bitter · sicilian · patient",
-  Prosciutto: "elegant · cured · expensive",
-  Pineapple: "controversial · sunlit · brave",
-  "Jalapeño": "hot · quick · unpredictable",
-  "Banana peppers": "tangy · cheerful · sneaky",
-  Soppressata: "spicy · cured · feared",
-  Meatball: "round · familiar · violent",
-  "Roasted red pepper": "sweet · smoky · charming",
-  Truffle: "rare · expensive · whispered",
-  Artichoke: "armored · roman · stubborn",
-  Eggplant: "deep · sicilian · velvet",
-  "Broccoli rabe": "bitter · green · honest",
-  "Chili crisp": "loud · oily · modern",
-  Burrata: "soft · luxurious · creamy",
-  Oregano: "dry · grandmotherly · sicilian",
-  Parmesan: "sharp · aged · proud",
-  Tomato: "red · the beginning · everything",
-  "Spicy salami": "hot · cured · dangerous",
-};
-
-function toppingDescriptor(t: string): string {
-  const key = Object.keys(TOPPING_DESCRIPTOR).find(
-    (k) => k.toLowerCase() === t.trim().toLowerCase(),
-  );
-  return (key && TOPPING_DESCRIPTOR[key]) || "off-canon · your call · respected";
-}
 
 /* ──────────────────────────────────────────────────────────────────────────
    Reused surfaces — match `FilmPicker`'s editorial vocabulary.
@@ -230,7 +193,7 @@ export function ToppingPicker({ label, value, onChange }: Props) {
       {/* Descriptor / hint footer when the field shows free text */}
       {!open && value.trim() && !matchedTopping && (
         <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/45">
-          {toppingDescriptor(value)}
+          {toppingDescriptorFor(value)}
         </p>
       )}
       {!open && !value.trim() && (
@@ -322,7 +285,7 @@ function SelectedToppingCard({
               {topping}
             </h3>
             <p className="ui mt-2 text-[11px] uppercase tracking-[0.22em] text-foreground/50">
-              {toppingDescriptor(topping)}
+              {toppingDescriptorFor(topping)}
             </p>
           </div>
         </div>
@@ -436,7 +399,7 @@ function ToppingDrawer({
                     {top}
                   </span>
                   <span className="ui text-[9.5px] uppercase tracking-[0.18em] text-foreground/45">
-                    {toppingDescriptor(top)}
+                    {toppingDescriptorFor(top)}
                   </span>
                 </span>
               </button>

@@ -33,6 +33,7 @@ import { useTranslations } from "next-intl";
 
 import { btn } from "../styles";
 import { MAFIA_FILMS, type MafiaFilm } from "@/app/lib/mafia-films";
+import { toppingDescriptorFor } from "@/app/lib/topping-images";
 import { FilmPoster } from "@/app/ui/onboarding/FilmPoster";
 import { ToppingPicker } from "@/app/ui/onboarding/ToppingPicker";
 
@@ -71,10 +72,11 @@ type Props = {
 /* ──────────────────────────────────────────────────────────────────────────
    Personality + topping flavor (visual only — no behavioral effect)
 
-   NOTE: Persona margin notes ("trusted", "dangerous", "real earner") and the
-   TOPPING_DESCRIPTOR map below are intentionally kept in English for v1 of
-   i18n. They're editorial flavor that loses too much in machine translation.
-   A future PR can localize these.
+   NOTE: Persona margin notes ("trusted", "dangerous", "real earner") are
+   intentionally kept in English for v1 of i18n — editorial flavor that
+   loses too much in machine translation. The 3-word `TOPPING_DESCRIPTOR`
+   phrases live in `app/lib/topping-images.ts` (the source of truth) and
+   are reached here via `toppingDescriptorFor()`.
    ────────────────────────────────────────────────────────────────────────── */
 
 type Persona = {
@@ -89,45 +91,6 @@ const CARD_PERSONALITIES: Persona[] = [
   { margin: "dangerous",   fileNo: "02", rotation:  0.9, yOffset: "lg:translate-y-6" },
   { margin: "real earner", fileNo: "03", rotation: -0.6, yOffset: "lg:translate-y-2" },
 ];
-
-const TOPPING_DESCRIPTOR: Record<string, string> = {
-  Pepperoni: "loud · classic · respected",
-  Mushroom: "earthy · quiet · dangerous",
-  Basil: "green · honest · sicilian",
-  Mozzarella: "soft · loyal · everywhere",
-  Anchovy: "salty · brutal · old-school",
-  Sausage: "heavy · brooklyn · proud",
-  "Hot honey": "sweet · chaotic · respected",
-  Ricotta: "creamy · gentle · holy",
-  Garlic: "sharp · unforgettable · armed",
-  Onion: "tearful · loyal · stubborn",
-  Olives: "bitter · sicilian · patient",
-  Prosciutto: "elegant · cured · expensive",
-  Pineapple: "controversial · sunlit · brave",
-  "Jalapeño": "hot · quick · unpredictable",
-  "Banana peppers": "tangy · cheerful · sneaky",
-  Soppressata: "spicy · cured · feared",
-  Meatball: "round · familiar · violent",
-  "Roasted red pepper": "sweet · smoky · charming",
-  Truffle: "rare · expensive · whispered",
-  Artichoke: "armored · roman · stubborn",
-  Eggplant: "deep · sicilian · velvet",
-  "Broccoli rabe": "bitter · green · honest",
-  "Chili crisp": "loud · oily · modern",
-  Burrata: "soft · luxurious · creamy",
-  Oregano: "dry · grandmotherly · sicilian",
-  Parmesan: "sharp · aged · proud",
-  Tomato: "red · the beginning · everything",
-  "Spicy salami": "hot · cured · dangerous",
-};
-
-function toppingDescriptor(t: string): string {
-  // Case-insensitive match against the canonical key
-  const key = Object.keys(TOPPING_DESCRIPTOR).find(
-    (k) => k.toLowerCase() === t.trim().toLowerCase(),
-  );
-  return (key && TOPPING_DESCRIPTOR[key]) || "off-canon · your call · respected";
-}
 
 // CYCLE_POOL — pseudo-mafia-name flicker shown while waiting for the API.
 // Pure flavor; not translated for v1.
@@ -776,7 +739,7 @@ function FamilyFileCard({
 }) {
   const dimmed = anySelected && !isSelected;
   const initials = initialsOf(name);
-  const flavor = topping.trim() ? toppingDescriptor(topping) : "";
+  const flavor = topping.trim() ? toppingDescriptorFor(topping) : "";
 
   return (
     <button
