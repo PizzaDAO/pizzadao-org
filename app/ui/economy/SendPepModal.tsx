@@ -1,69 +1,15 @@
 // app/ui/economy/SendPepModal.tsx
+//
+// capricciosa-35929 — Editorial restyle. Paper-soft modal surface, overline
+// section label, btn-pill-lg accent CTA. API contract unchanged — still
+// POSTs /api/economy/transfer with { toUserId, amount } and invalidates the
+// 'my-balance' React Query key on success.
 "use client";
 
 import { useState } from "react";
 import { useQueryClient } from "@tanstack/react-query";
+import { ArrowUpRight } from "lucide-react";
 import { PepIcon } from "./PepIcon";
-
-// Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
-// --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
-const FONT_DISPLAY = "var(--font-display), var(--font-sans), system-ui, sans-serif";
-
-// Local style helpers — kept identical to the dashboard's local helpers so the
-// modal renders pixel-for-pixel the same as before the extraction.
-function card(): React.CSSProperties {
-    return {
-        border: '1px solid hsl(var(--rule) / 0.12)',
-        borderRadius: "var(--radius)",
-        padding: 24,
-        boxShadow: '0 8px 30px hsl(var(--ink) / 0.06)',
-        background: 'hsl(var(--card))',
-        color: 'hsl(var(--card-foreground))',
-        display: "grid",
-        gap: 14,
-    };
-}
-
-function btn(kind: "primary" | "secondary" | "accent"): React.CSSProperties {
-    const base: React.CSSProperties = {
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        // sicilian-41551: 44px mobile touch-target floor.
-        minHeight: 44,
-        padding: "10px 16px",
-        borderRadius: "var(--radius)",
-        border: '1px solid transparent',
-        fontWeight: 600,
-        fontFamily: FONT_DISPLAY,
-        cursor: "pointer",
-        textDecoration: "none",
-        textAlign: "center",
-        transition: "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
-    };
-    if (kind === "primary") {
-        return {
-            ...base,
-            background: 'hsl(var(--primary))',
-            color: 'hsl(var(--primary-foreground))',
-            borderColor: 'hsl(var(--primary))',
-        };
-    }
-    if (kind === "accent") {
-        return {
-            ...base,
-            background: 'hsl(var(--tomato))',
-            color: 'hsl(var(--cream))',
-            borderColor: 'hsl(var(--tomato))',
-        };
-    }
-    return {
-        ...base,
-        background: 'hsl(var(--secondary))',
-        color: 'hsl(var(--secondary-foreground))',
-        borderColor: 'hsl(var(--rule) / 0.22)',
-    };
-}
 
 export type SendPepModalProps = {
     open: boolean;
@@ -96,7 +42,6 @@ export function SendPepModal({ open, onClose, currentMemberId: _currentMemberId 
             });
             const data = await res.json();
             if (!res.ok) throw new Error(data.error);
-            // Refresh balance via React Query (matches previous dashboard behavior)
             queryClient.invalidateQueries({ queryKey: ['my-balance'] });
             onClose();
         } catch (err) {
@@ -108,46 +53,87 @@ export function SendPepModal({ open, onClose, currentMemberId: _currentMemberId 
 
     const inputStyle: React.CSSProperties = {
         width: "100%",
-        // sicilian-41551: 44px min-height + 16px font to clear the iOS Safari
-        // zoom-on-focus threshold.
         minHeight: 44,
         padding: "10px 12px",
         borderRadius: 10,
-        border: '1px solid hsl(var(--rule) / 0.22)',
+        border: '1px solid hsl(var(--rule-warm) / 0.55)',
         fontSize: 16,
         outline: "none",
         boxSizing: "border-box" as const,
+        background: "hsl(var(--cream))",
+        color: "hsl(var(--foreground))",
     };
 
+    const disabled = loading || !memberId || !amount;
+
     return (
-        <div style={{
-            position: "fixed",
-            top: 0,
-            left: 0,
-            right: 0,
-            bottom: 0,
-            background: 'hsl(var(--ink) / 0.5)',
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "center",
-            // sicilian-41551: gutter so the modal never goes edge-to-edge.
-            padding: 16,
-            zIndex: 1000,
-        }} onClick={onClose}>
-            <div style={{ ...card(), maxWidth: 400, width: "100%" }} onClick={e => e.stopPropagation()}>
-                <h2 style={{ fontSize: 22, fontWeight: 800, fontFamily: FONT_DISPLAY, letterSpacing: "-0.01em", marginTop: 0, marginBottom: 16, display: "flex", alignItems: "center", gap: 8 }}>
-                    Send <PepIcon size={20} />
+        <div
+            style={{
+                position: "fixed",
+                top: 0,
+                left: 0,
+                right: 0,
+                bottom: 0,
+                background: 'hsl(var(--ink) / 0.55)',
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                padding: 16,
+                zIndex: 1000,
+            }}
+            onClick={onClose}
+        >
+            <div
+                className="paper-soft fade-up relative overflow-hidden rounded-[24px] border"
+                style={{
+                    maxWidth: 420,
+                    width: "100%",
+                    background: "hsl(var(--card))",
+                    borderColor: "hsl(var(--rule-warm) / 0.55)",
+                    boxShadow: "var(--shadow-lifted)",
+                    padding: 24,
+                }}
+                onClick={e => e.stopPropagation()}
+            >
+                <div className="relative flex items-start justify-between gap-4">
+                    <p className="overline text-tomato">§ ··· Send</p>
+                    <span
+                        className="handwritten -rotate-[6deg]"
+                        style={{ fontSize: 14, color: "hsl(var(--foreground) / 0.55)" }}
+                    >
+                        on the books
+                    </span>
+                </div>
+
+                <h2
+                    className="font-[family-name:var(--font-display)] relative mt-2 flex items-center gap-2 font-black tracking-[-0.02em] text-foreground"
+                    style={{
+                        fontSize: "clamp(1.6rem, 4vw, 2rem)",
+                        lineHeight: 0.95,
+                    }}
+                >
+                    Move <PepIcon size={26} />
                 </h2>
 
                 {error && (
-                    <div style={{ marginBottom: 16, padding: 12, background: "hsl(var(--tomato) / 0.08)", border: "1px solid hsl(var(--tomato) / 0.30)", borderRadius: "var(--radius)", color: "hsl(var(--tomato-deep))", fontSize: 14 }}>
+                    <div
+                        className="relative mt-4"
+                        style={{
+                            padding: 12,
+                            background: "hsl(var(--tomato) / 0.08)",
+                            border: "1px solid hsl(var(--tomato) / 0.30)",
+                            borderRadius: "var(--radius)",
+                            color: "hsl(var(--tomato-deep))",
+                            fontSize: 14,
+                        }}
+                    >
                         {error}
                     </div>
                 )}
 
-                <form onSubmit={handleSend} style={{ display: "grid", gap: 16 }}>
+                <form onSubmit={handleSend} className="relative mt-5 grid gap-4">
                     <div>
-                        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                        <label className="overline mb-2 block text-foreground/55">
                             Recipient Member ID
                         </label>
                         <input
@@ -160,8 +146,10 @@ export function SendPepModal({ open, onClose, currentMemberId: _currentMemberId 
                         />
                     </div>
 
+                    <div className="rule-warm" />
+
                     <div>
-                        <label style={{ display: "block", fontSize: 13, opacity: 0.6, marginBottom: 6 }}>
+                        <label className="overline mb-2 block text-foreground/55">
                             Amount
                         </label>
                         <input
@@ -175,16 +163,36 @@ export function SendPepModal({ open, onClose, currentMemberId: _currentMemberId 
                         />
                     </div>
 
-                    <div style={{ display: "flex", gap: 10 }}>
-                        <button type="button" onClick={onClose} style={{ ...btn("secondary"), flex: 1, fontFamily: "inherit" }}>
+                    <div className="mt-2 flex gap-3">
+                        <button
+                            type="button"
+                            onClick={onClose}
+                            className="btn-pill flex-1"
+                            style={{
+                                background: "hsl(var(--secondary))",
+                                color: "hsl(var(--secondary-foreground))",
+                                border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                            }}
+                        >
                             Cancel
                         </button>
                         <button
                             type="submit"
-                            disabled={loading || !memberId || !amount}
-                            style={{ ...btn("primary"), flex: 1, fontFamily: "inherit", opacity: loading || !memberId || !amount ? 0.5 : 1 }}
+                            disabled={disabled}
+                            className="btn-pill-lg group flex-1"
+                            style={{
+                                background: "hsl(var(--tomato))",
+                                color: "hsl(var(--cream))",
+                                border: "1px solid hsl(var(--tomato))",
+                                boxShadow: disabled ? "none" : "var(--shadow-soft)",
+                            }}
                         >
-                            {loading ? "Sending..." : "Send"}
+                            {loading ? "Sending..." : (
+                                <>
+                                    Send
+                                    <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                                </>
+                            )}
                         </button>
                     </div>
                 </form>
