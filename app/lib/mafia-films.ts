@@ -124,30 +124,3 @@ export const FILM_WIKI_SLUG: Record<string, string> = {
   "raid-2": "The_Raid_2",
   "pope-greenwich": "The_Pope_of_Greenwich_Village",
 };
-
-// ──────────────────────────────────────────────────────────────────────────
-// quattro-formaggi-54456 — Pizza topping catalog used by the NameStep
-// topping picker. Mirrors the Lovable mockup's `PIZZA_TOPPINGS` /
-// `TOPPING_EMOJI` exports. The catalog is the canonical, ordered list
-// shown in the picker drawer; the emoji map provides the small visual
-// glyph used as a fallback when no image asset exists for a topping
-// (see `app/lib/topping-images.ts`).
-// ──────────────────────────────────────────────────────────────────────────
-
-export const PIZZA_TOPPINGS = [
-  "Pepperoni", "Mushroom", "Basil", "Mozzarella", "Anchovy", "Sausage",
-  "Hot honey", "Ricotta", "Garlic", "Onion", "Olives", "Prosciutto",
-  "Pineapple", "Jalapeño", "Banana peppers", "Soppressata", "Meatball",
-  "Roasted red pepper", "Truffle", "Artichoke", "Eggplant", "Broccoli rabe",
-  "Chili crisp", "Burrata", "Oregano", "Parmesan", "Tomato", "Spicy salami",
-];
-
-export const TOPPING_EMOJI: Record<string, string> = {
-  Pepperoni: "🍕", Mushroom: "🍄", Basil: "🌿", Mozzarella: "🧀", Anchovy: "🐟",
-  Sausage: "🌭", "Hot honey": "🍯", Ricotta: "🥛", Garlic: "🧄", Onion: "🧅",
-  Olives: "🫒", Prosciutto: "🥓", Pineapple: "🍍", "Jalapeño": "🌶️",
-  "Banana peppers": "🌶️", Soppressata: "🥩", Meatball: "🍖",
-  "Roasted red pepper": "🫑", Truffle: "🍄‍🟫", Artichoke: "🌱",
-  Eggplant: "🍆", "Broccoli rabe": "🥦", "Chili crisp": "🌶️",
-  Burrata: "🧀", Oregano: "🌿", Parmesan: "🧀", Tomato: "🍅", "Spicy salami": "🥩",
-};
