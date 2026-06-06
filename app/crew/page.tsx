@@ -170,9 +170,9 @@ export default function CrewMembersPage() {
 
   return (
     <div style={pageContainer()}>
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: 28 }}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }} className="fade-up">
+        {/* onion-15370: editorial header — overline + display headline + tagline */}
+        <div style={{ marginBottom: 28, position: "relative" }}>
           <Link
             href="/"
             style={{
@@ -186,15 +186,25 @@ export default function CrewMembersPage() {
           >
             ← Back to Home
           </Link>
+          <p
+            className="overline"
+            style={{
+              marginTop: 14,
+              marginBottom: 10,
+              color: "hsl(var(--tomato))",
+            }}
+          >
+            § ··· The Family
+          </p>
           <h1
             style={{
-              margin: "12px 0 6px 0",
+              margin: "0 0 6px 0",
               // sicilian-41551: scale 32→48 so the header doesn't dominate
               // the 375px viewport.
               fontSize: "clamp(2rem, 8vw, 3rem)",
               lineHeight: 1.05,
               fontWeight: 800,
-              letterSpacing: "-0.01em",
+              letterSpacing: "-0.015em",
               fontFamily:
                 "var(--font-display), var(--font-sans), system-ui, sans-serif",
               color: "hsl(var(--foreground))",
@@ -211,7 +221,29 @@ export default function CrewMembersPage() {
           >
             All PizzaDAO members who have signed up
           </p>
+          <span
+            aria-hidden
+            className="handwritten onion-crew-margin-note"
+            style={{
+              position: "absolute",
+              right: 4,
+              top: 28,
+              transform: "rotate(-5deg)",
+              fontSize: 16,
+              color: "hsl(var(--tomato) / 0.75)",
+              pointerEvents: "none",
+            }}
+          >
+            the whole roster
+          </span>
+          <style>{`
+            .onion-crew-margin-note { display: none; }
+            @media (min-width: 768px) {
+              .onion-crew-margin-note { display: inline-block; }
+            }
+          `}</style>
         </div>
+        <hr className="rule-warm" style={{ marginBottom: 20, border: 0, borderTop: "1px solid hsl(var(--rule-warm) / 0.55)" }} />
 
         {/* Search + clear */}
         <div
@@ -597,6 +629,8 @@ function MemberCardItem({
   member: PublicMember;
   pfpUrl?: string;
 }) {
+  // onion-15370: editorial paper-soft tile — preserves all existing data,
+  // only adds tactile noise + restful resting state.
   return (
     <Link
       href={`/profile/${member.id}`}
@@ -606,26 +640,27 @@ function MemberCardItem({
       }}
     >
       <div
+        className="paper-soft"
         style={{
           padding: 14,
           borderRadius: "var(--radius)",
-          border: "1px solid hsl(var(--rule) / 0.12)",
+          border: "1px solid hsl(var(--rule-warm) / 0.55)",
           background: "hsl(var(--card))",
           color: "hsl(var(--card-foreground))",
           transition:
-            "transform 150ms ease, box-shadow 150ms ease, border-color 150ms ease",
+            "transform 220ms var(--ease-editorial), box-shadow 220ms var(--ease-editorial), border-color 220ms var(--ease-editorial)",
           height: "100%",
+          boxShadow: "var(--shadow-soft)",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow =
-            "0 8px 30px hsl(var(--ink) / 0.06)";
+          e.currentTarget.style.transform = "translateY(-3px) rotate(-0.4deg)";
+          e.currentTarget.style.boxShadow = "var(--shadow-lifted)";
           e.currentTarget.style.borderColor = "hsl(var(--tomato) / 0.5)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "none";
-          e.currentTarget.style.boxShadow = "none";
-          e.currentTarget.style.borderColor = "hsl(var(--rule) / 0.12)";
+          e.currentTarget.style.boxShadow = "var(--shadow-soft)";
+          e.currentTarget.style.borderColor = "hsl(var(--rule-warm) / 0.55)";
         }}
       >
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
