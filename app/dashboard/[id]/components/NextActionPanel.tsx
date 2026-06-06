@@ -11,9 +11,11 @@
 // independently — escalations (e.g. join_crew → connect_wallet) are not
 // suppressed by an unrelated snooze.
 //
-// Visual treatment is intentionally minimal: existing tokens + the shared
-// `btn("accent")` primitive. PR6 (designer port-back) replaces these styles
-// with the Lovable mocks.
+// tomato-30368 — Editorial restyle. Now an ink-bottom CTA dock: dark slab,
+// cream type, butter overline, paper grain, pill CTAs. The headline still
+// renders as <h2>, the primary CTA still uses primaryCta.label / .href, the
+// secondary link is unchanged, and the snooze button's aria-label still
+// matches /Snooze next action/i for tests.
 //
 // Plan: plans/garlic-96648-dashboard-redesign.md §4–§6, PR3.
 
@@ -21,11 +23,9 @@
 
 import Link from "next/link";
 import { useEffect, useState } from "react";
-import { btn } from "../../../ui/shared-styles";
+import { ArrowUpRight } from "lucide-react";
 import type { NextAction, NextActionKind } from "../lib/next-action";
 
-const FONT_DISPLAY =
-    "var(--font-display), var(--font-sans), system-ui, sans-serif";
 const SNOOZE_KEY_PREFIX = "dashboard-next-action-snooze-";
 const DEFAULT_SNOOZE_MS = 24 * 60 * 60 * 1000; // 24h
 
@@ -96,9 +96,9 @@ export function NextActionPanel({
     if (hydrated && isSnoozed) {
         return (
             <div
+                className="rule-warm"
                 style={{
-                    paddingTop: 10,
-                    borderTop: "1px solid hsl(var(--rule) / 0.12)",
+                    paddingTop: 12,
                     textAlign: "right",
                 }}
             >
@@ -107,14 +107,13 @@ export function NextActionPanel({
                         clearSnooze(nextAction.kind);
                         setSnoozedUntil(null);
                     }}
+                    className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
                     style={{
                         background: "transparent",
                         border: "none",
                         cursor: "pointer",
-                        fontSize: 12,
-                        fontFamily: "inherit",
-                        color: "hsl(var(--muted-foreground))",
                         textDecoration: "underline",
+                        textUnderlineOffset: 3,
                         padding: 0,
                     }}
                 >
@@ -127,97 +126,118 @@ export function NextActionPanel({
     const { headline, body, primaryCta, secondary, kind } = nextAction;
 
     return (
-        <div
+        <section
             data-testid="next-action-panel"
             data-kind={kind}
+            className="fade-up relative my-2 overflow-hidden rounded-[28px]"
             style={{
-                paddingTop: 12,
-                paddingBottom: 12,
-                borderTop: "1px solid hsl(var(--rule) / 0.12)",
-                display: "flex",
-                flexDirection: "column",
-                gap: 10,
+                background: "hsl(var(--ink) / 0.96)",
+                color: "hsl(var(--cream))",
+                border: "1px solid hsl(var(--cream) / 0.10)",
+                boxShadow:
+                    "0 28px 56px -28px hsl(0 93% 60% / 0.30), var(--shadow-lifted)",
             }}
         >
-            <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-                <h2
-                    style={{
-                        margin: 0,
-                        fontSize: 22,
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: 800,
-                        letterSpacing: "-0.01em",
-                        color: "hsl(var(--foreground))",
-                    }}
-                >
-                    {headline}
-                </h2>
-                {body && (
-                    <p
-                        style={{
-                            margin: 0,
-                            fontSize: 14,
-                            color: "hsl(var(--muted-foreground))",
-                            lineHeight: 1.4,
-                        }}
-                    >
-                        {body}
-                    </p>
-                )}
-            </div>
+            {/* Dark-paper grain */}
+            <span
+                aria-hidden
+                className="paper-soft-dark pointer-events-none absolute inset-0 rounded-[28px]"
+            />
+            {/* Radial spotlight */}
             <div
+                aria-hidden
+                className="pointer-events-none absolute inset-0 opacity-80"
                 style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                    flexWrap: "wrap",
+                    background:
+                        "radial-gradient(60% 80% at 20% 0%, hsl(46 100% 62% / 0.18), transparent 70%), radial-gradient(60% 80% at 100% 100%, hsl(0 93% 60% / 0.16), transparent 70%)",
                 }}
-            >
-                <Link
-                    href={primaryCta.href}
-                    style={{
-                        ...btn("accent"),
-                        fontSize: 14,
-                        padding: "8px 16px",
-                    }}
+            />
+
+            <div className="relative grid gap-5 p-6 md:p-8">
+                <p
+                    className="overline"
+                    style={{ color: "hsl(var(--butter))" }}
                 >
-                    {primaryCta.label}
-                </Link>
-                {secondary && (
-                    <Link
-                        href={secondary.href}
+                    § 02 · your next move
+                </p>
+
+                <div className="grid gap-3">
+                    <h2
+                        className="font-[family-name:var(--font-display)] m-0 font-black tracking-[-0.015em]"
                         style={{
-                            fontSize: 13,
-                            color: "hsl(var(--muted-foreground))",
-                            textDecoration: "underline",
+                            fontSize: "clamp(1.5rem, 3.2vw, 2.1rem)",
+                            lineHeight: 1,
+                            textWrap: "balance",
+                            color: "hsl(var(--cream))",
                         }}
                     >
-                        {secondary.label}
+                        {headline}
+                    </h2>
+                    {body && (
+                        <p
+                            className="m-0 max-w-prose"
+                            style={{
+                                fontSize: 15,
+                                lineHeight: 1.5,
+                                color: "hsl(var(--cream) / 0.78)",
+                            }}
+                        >
+                            {body}
+                        </p>
+                    )}
+                </div>
+
+                <div className="flex flex-wrap items-center gap-3">
+                    <Link
+                        href={primaryCta.href}
+                        className="btn-pill group"
+                        style={{
+                            background: "hsl(var(--tomato))",
+                            color: "hsl(var(--cream))",
+                            boxShadow: "var(--shadow-soft)",
+                            textDecoration: "none",
+                        }}
+                    >
+                        {primaryCta.label}
+                        <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                     </Link>
-                )}
-                <button
-                    onClick={() => {
-                        const until = Date.now() + snoozeDurationMs;
-                        writeSnooze(kind, until);
-                        setSnoozedUntil(until);
-                    }}
-                    style={{
-                        background: "transparent",
-                        border: "none",
-                        cursor: "pointer",
-                        fontSize: 12,
-                        fontFamily: "inherit",
-                        color: "hsl(var(--muted-foreground))",
-                        textDecoration: "underline",
-                        padding: 0,
-                        marginLeft: "auto",
-                    }}
-                    title="Hide for 24 hours"
-                    aria-label="Snooze next action"
-                >
-                    Not now
-                </button>
+                    {secondary && (
+                        <Link
+                            href={secondary.href}
+                            className="ui inline-flex items-center gap-1 text-[12px] uppercase tracking-[0.22em] transition-colors"
+                            style={{
+                                color: "hsl(var(--cream) / 0.75)",
+                                textDecoration: "underline",
+                                textUnderlineOffset: 3,
+                            }}
+                        >
+                            {secondary.label}
+                        </Link>
+                    )}
+                    <button
+                        onClick={() => {
+                            const until = Date.now() + snoozeDurationMs;
+                            writeSnooze(kind, until);
+                            setSnoozedUntil(until);
+                        }}
+                        className="ui text-[11px] uppercase tracking-[0.22em] transition-colors hover:text-tomato"
+                        style={{
+                            background: "transparent",
+                            border: "none",
+                            cursor: "pointer",
+                            color: "hsl(var(--cream) / 0.55)",
+                            textDecoration: "underline",
+                            textUnderlineOffset: 3,
+                            padding: 0,
+                            marginLeft: "auto",
+                        }}
+                        title="Hide for 24 hours"
+                        aria-label="Snooze next action"
+                    >
+                        Not now
+                    </button>
+                </div>
             </div>
-        </div>
+        </section>
     );
 }

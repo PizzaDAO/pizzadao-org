@@ -1,6 +1,10 @@
 // app/dashboard/[id]/page.tsx
 //
 // Plan: plans/garlic-96648-dashboard-redesign.md — PR5 (slice-61816).
+// tomato-30368 — Editorial restyle. Composition is unchanged (same hooks,
+// same five sections, same modal); the chrome now follows the wizard's
+// print-shop vocabulary — paper grain, warm rule dividers, fade-up
+// entrance, overline section labels through the child components.
 //
 // After this PR the dashboard is *activity-only*. Identity-editing surfaces
 // (orgs/skills/X/socials/links) live on /profile/[id]/edit; wallet management
@@ -14,7 +18,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CREWS } from "../../ui/constants";
-import { PepIcon, SendPepModal } from "../../ui/economy";
+import { SendPepModal } from "../../ui/economy";
 import { MissionsProgress } from "../../ui/missions";
 import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
 import {
@@ -37,7 +41,6 @@ import { Discover } from "./components/Discover";
 // Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
 // --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
 const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
-const FONT_DISPLAY = "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 function norm(s: unknown) {
     return String(s ?? "")
@@ -60,9 +63,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const router = useRouter();
 
     // --- React Query hooks for data fetching ---
-    // The BFF (`useDashboardSummary`) collapses the previous 8 child queries
-    // into one request. The individual hooks below remain as a fallback while
-    // the summary is loading or if it errors — same data, just slower.
     const { data: summary } = useDashboardSummary(id);
     const { data: activity } = useActivity(id);
     const { data: userData, isLoading: userDataLoading, error: userDataError } = useUserData(id);
@@ -70,13 +70,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const { data: crewMappingsData } = useCrewMappings();
     const { data: tasksData } = useMyTasks(id);
     const { data: balanceData } = useMyBalance();
-    // Shared cache with MissionsProgress — no double-fetch.
     const { data: missionsData } = useMissions();
-    // PR4 — Discover section (replaces the slim nav row). Single hook,
-    // parallel fetches with per-source fallbacks; safe to render any time.
     const { data: discoverData } = useDiscover();
 
-    // Derive auth/loading/error from the useUserData hook
     const loading = userDataLoading;
     const authError = userDataError?.message === '__AUTH_401__'
         ? "Please log in to view your dashboard"
@@ -85,29 +81,23 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         : null;
     const error = userDataError && !authError ? userDataError.message : null;
 
-    // Local mutable state for data (save handlers update it optimistically)
     const [data, setData] = useState<any>(null);
     useEffect(() => {
         if (userData) setData(userData);
     }, [userData]);
 
-    // Derived data — prefer the summary payload when present, fall back to
-    // the individual hooks. Visual output is identical either way.
     const pfpUrl = summary?.member?.pfpUrl ?? pfpData?.url ?? null;
     const pepBalance = summary?.pep?.balance ?? balanceData?.balance ?? null;
     const myTasks = tasksData?.tasksByCrew ?? {};
     const doneCounts = tasksData?.doneCountsByCrew ?? {};
     const hydratedCrews = summary?.crewsHydrated;
 
-    // Mission level for hero header — sourced from the BFF summary when
-    // available, otherwise from the shared `useMissions` query.
     const missionLevel = summary?.level?.current != null
         ? { level: summary.level.current as number, title: (summary.level.title as string) || "" }
         : missionsData?.currentLevel != null
             ? { level: missionsData.currentLevel as number, title: (missionsData.levelTitle as string) || "" }
             : null;
 
-    // Crew options: derived from hook data with fallback to static CREWS
     const crewOptions: CrewOption[] = (() => {
         const crews = crewMappingsData?.crews;
         if (Array.isArray(crews) && crews.length > 0) {
@@ -129,7 +119,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                 }))
                 .filter((c: CrewOption) => c.id && c.label);
         }
-        // Fallback to static CREWS
         return (CREWS ?? []).map((c: any) => ({
             id: String(c.id),
             label: String(c.label ?? c.id),
@@ -137,82 +126,57 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         }));
     })();
 
-    // --- UI-only state ---
-    // Editing surfaces (orgs/skills/X) moved to /profile/[id]/edit in PR5.
-    // Wallets moved to /me/wallets. Only `showSendModal` remains here.
     const [showSendModal, setShowSendModal] = useState(false);
 
+    // ── Loading state ────────────────────────────────────────────────
     if (loading) {
         return (
-            <div style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "hsl(var(--background))",
-                color: "hsl(var(--foreground))",
-                fontFamily: FONT_SANS,
-            }}>
-                <div style={{ textAlign: "center" }}>
-                    <div className="spinner" style={{
-                        width: 50,
-                        height: 50,
-                        border: '4px solid hsl(var(--ink) / 0.10)',
-                        borderTop: '4px solid hsl(var(--tomato))',
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite",
-                        margin: "0 auto 20px"
-                    }} />
-                    <p style={{ fontSize: 18, color: "hsl(var(--muted-foreground))", fontFamily: FONT_DISPLAY, fontWeight: 600 }}>Loading your Mafia stats...</p>
-                    <style jsx>{`
-            @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-          `}</style>
+            <div className="relative grid min-h-screen place-items-center"
+                style={{ background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontFamily: FONT_SANS, padding: "clamp(24px, 6vw, 40px)" }}>
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60svh] opacity-60"
+                    style={{ background: "radial-gradient(80% 60% at 20% 0%, hsl(46 100% 62% / 0.18), transparent 60%)" }}
+                />
+                <div className="fade-up text-center">
+                    <p className="overline text-tomato">§ 00 · loading the file</p>
+                    <div style={{ width: 50, height: 50, border: '3px solid hsl(var(--ink) / 0.10)', borderTop: '3px solid hsl(var(--tomato))', borderRadius: "50%", animation: "spin 1s linear infinite", margin: "20px auto" }} />
+                    <p className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em]" style={{ fontSize: "clamp(1.5rem, 4vw, 2.2rem)", lineHeight: 1 }}>
+                        Pulling the ledger&hellip;
+                    </p>
+                    <style jsx>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
                 </div>
             </div>
         );
     }
 
-    if (authError) {
+    // ── Error states ────────────────────────────────────────────────
+    if (authError || error || !data) {
+        const isAuth = !!authError;
+        const headline = isAuth ? "Access denied" : "Something's off";
+        const overline = isAuth ? "§ 00 · the door's locked" : "§ 00 · misfile";
+        const body = isAuth ? authError : (error || "We couldn't find your file. Are you sure you're in the Family yet?");
         return (
-            <div style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "hsl(var(--background))",
-                color: "hsl(var(--foreground))",
-                fontFamily: FONT_SANS,
-                padding: 20
-            }}>
-                <div style={card()}>
-                    <h1 style={{ fontSize: 28, marginBottom: 16, fontFamily: FONT_DISPLAY, fontWeight: 800, letterSpacing: "-0.01em" }}>Access Denied</h1>
-                    <p style={{ color: "hsl(var(--muted-foreground))", marginBottom: 32 }}>{authError}</p>
-                    <Link href="/" style={btn("primary")}>
-                        Back to Home
-                    </Link>
-                </div>
-            </div>
-        );
-    }
-
-    if (error || !data) {
-        return (
-            <div style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "hsl(var(--background))",
-                color: "hsl(var(--foreground))",
-                fontFamily: FONT_SANS,
-                padding: 20
-            }}>
-                <div style={card()}>
-                    <h1 style={{ fontSize: 28, marginBottom: 16, fontFamily: FONT_DISPLAY, fontWeight: 800, letterSpacing: "-0.01em" }}>Oops!</h1>
-                    <p style={{ color: "hsl(var(--muted-foreground))", marginBottom: 32 }}>{error || "We couldn't find your data. Are you sure you're in the Crew yet?"}</p>
-                    <Link href="/" style={btn("primary")}>
-                        Back to Home
-                    </Link>
+            <div className="relative grid min-h-screen place-items-center"
+                style={{ background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontFamily: FONT_SANS, padding: "clamp(24px, 6vw, 40px) clamp(16px, 4vw, 20px)" }}>
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[60svh] opacity-60"
+                    style={{ background: "radial-gradient(70% 60% at 50% 0%, hsl(0 93% 60% / 0.10), transparent 65%)" }}
+                />
+                <div className="paper-soft fade-up relative w-full max-w-lg rounded-[24px] border p-7 text-center md:p-10"
+                    style={{ borderColor: "hsl(var(--rule-warm) / 0.55)", background: "hsl(var(--card))", boxShadow: "var(--shadow-soft)" }}>
+                    <p className="overline relative text-tomato">{overline}</p>
+                    <h1 className="font-[family-name:var(--font-display)] relative mt-3 font-black tracking-[-0.015em] text-foreground"
+                        style={{ fontSize: "clamp(1.8rem, 4vw, 2.6rem)", lineHeight: 1 }}>
+                        {headline}
+                    </h1>
+                    <p className="relative mt-4 text-foreground/70" style={{ fontSize: 15, lineHeight: 1.55 }}>{body}</p>
+                    <div className="relative mt-6">
+                        <Link href="/" className="btn-pill" style={{ background: "hsl(var(--tomato))", color: "hsl(var(--cream))", textDecoration: "none" }}>
+                            Back to home
+                        </Link>
+                    </div>
                 </div>
             </div>
         );
@@ -222,8 +186,6 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const city = data["City"] || "Worldwide";
     const idValue = data["ID"] || data["Crew ID"] || id;
     const crewsStr = data["Crews"] || "None";
-
-    // Parse users crews
     const userCrews = (crewsStr !== "None" ? crewsStr.split(",").map((c: string) => c.trim()).filter(Boolean) : []) as string[];
 
     // Suppress the unused-data setter warning. `setData` is still imported
@@ -232,19 +194,37 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     void setData;
 
     return (
-        <div style={{
+        <div className="relative" style={{
             minHeight: "100vh",
             background: "hsl(var(--background))",
             color: "hsl(var(--foreground))",
             fontFamily: FONT_SANS,
-            // sicilian-41551: shrink horizontal gutter on small screens so the
-            // 24px card padding inside doesn't eat too much usable width at 375px.
             padding: "clamp(24px, 6vw, 40px) clamp(12px, 4vw, 20px)",
         }}>
-            <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
-                {/* Main Card */}
-                <div style={card()}>
+            {/* Page-wide warm spotlight */}
+            <div
+                aria-hidden
+                className="pointer-events-none absolute inset-x-0 top-0 -z-10 h-[70svh] opacity-50"
+                style={{
+                    background:
+                        "radial-gradient(60% 50% at 15% 0%, hsl(46 100% 62% / 0.16), transparent 60%), radial-gradient(60% 60% at 95% 8%, hsl(0 93% 60% / 0.06), transparent 65%)",
+                }}
+            />
 
+            <div style={{ maxWidth: 880, margin: "0 auto", display: "grid", gap: 24 }}>
+                {/* Main editorial surface */}
+                <div
+                    className="paper-soft fade-up relative overflow-hidden rounded-[28px] border"
+                    style={{
+                        borderColor: "hsl(var(--rule-warm) / 0.55)",
+                        background: "hsl(var(--card))",
+                        color: "hsl(var(--card-foreground))",
+                        boxShadow: "var(--shadow-soft)",
+                        padding: "clamp(20px, 4vw, 36px)",
+                        display: "grid",
+                        gap: 6,
+                    }}
+                >
                     {/* ── 1. Compact Hero Header ── */}
                     <HeroBlock
                         name={name}
@@ -257,12 +237,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         onSendPep={() => setShowSendModal(true)}
                     />
 
-                    {/* ── 1.5. Next Action (PR3 — above the fold) ── */}
+                    {/* ── 1.5. Next Action ── */}
                     {summary?.nextAction && (
                         <NextActionPanel nextAction={summary.nextAction} />
                     )}
 
-                    {/* ── 2. Discover (PR4 — replaces slim nav) ── */}
+                    {/* ── 2. Discover ── */}
                     <Discover
                         bounties={discoverData?.bounties}
                         jobs={discoverData?.jobs}
@@ -271,7 +251,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     />
 
                     {/* ── 3. Missions Progress ── */}
-                    <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
+                    <div className="rule-warm" style={{ paddingTop: 24 }}>
                         <MissionsProgress summary={missionsData} />
                     </div>
 
@@ -285,62 +265,49 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         hydratedCrews={hydratedCrews}
                     />
 
-                    {/* ── 4.5. Recent Activity (PR3 — last 5 events) ── */}
+                    {/* ── 4.5. Recent Activity ── */}
                     <RecentActivity events={(activity?.events ?? []).slice(0, 5)} />
 
                     {/* ── 5. Vouches Widget ── */}
-                    <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
+                    <div className="rule-warm" style={{ paddingTop: 24 }}>
                         <VouchesWidget memberId={idValue} />
                     </div>
 
-                    {/* Identity (Profile Details) + Collections moved out in PR5:
-                          - /profile/[id]/edit   (orgs, skills, X, socials, links, tagline)
-                          - /me/wallets         (wallet management) */}
-
                     {/* ── 6. Logout ── */}
-                    <div style={{ paddingTop: 16, borderTop: '1px solid hsl(var(--rule) / 0.12)', textAlign: "center" }}>
+                    <div className="rule-warm" style={{ paddingTop: 24, textAlign: "center" }}>
                         <button
                             onClick={async () => {
                                 try {
-                                    // Clear localStorage
                                     localStorage.removeItem("mob_pizza_onboarding_v3");
                                     localStorage.removeItem("mob_pizza_onboarding_pending_claim_v1");
                                 } catch { }
                                 try {
-                                    // Clear session cookie via API
                                     await fetch("/api/logout", { method: "POST" });
                                 } catch { }
-                                // Redirect to home
                                 router.push("/");
                             }}
+                            className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
                             style={{
-                                ...btn("secondary"),
-                                fontFamily: "inherit",
-                                fontSize: 16
+                                background: "transparent",
+                                border: "none",
+                                cursor: "pointer",
+                                textDecoration: "underline",
+                                textUnderlineOffset: 4,
+                                padding: 8,
                             }}
                         >
-                            Logout
+                            Step out · log out
                         </button>
                     </div>
                 </div>
 
-                {/* Footer info */}
-                <div style={{
-                    textAlign: "center",
-                    marginTop: 40,
-                    fontSize: 12,
-                    fontFamily: FONT_DISPLAY,
-                    fontWeight: 700,
-                    letterSpacing: "0.12em",
-                    textTransform: "uppercase",
-                    color: "hsl(var(--muted-foreground))",
-                    opacity: 0.7,
-                }}>
-                    PizzaDAO
+                {/* Footer mark */}
+                <div className="text-center">
+                    <p className="overline text-foreground/40">§ pizzadao · est. 2021</p>
                 </div>
             </div>
 
-            {/* Send PEP Modal — extracted to app/ui/economy/SendPepModal.tsx */}
+            {/* Send PEP Modal */}
             <SendPepModal
                 open={showSendModal}
                 onClose={() => setShowSendModal(false)}
@@ -348,64 +315,4 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
             />
         </div>
     );
-}
-
-// --- Local style helpers — consume Phase 1 HSL tokens directly. ---
-// (Kept local rather than imported from shared-styles to preserve the slightly
-// tighter card padding/radius this page has used historically.)
-
-function card(): React.CSSProperties {
-    return {
-        border: '1px solid hsl(var(--rule) / 0.12)',
-        borderRadius: "var(--radius)",
-        // sicilian-41551: shrink card padding on phones so the inner content
-        // keeps ~320px usable at the 375px viewport.
-        padding: "clamp(16px, 4vw, 24px)",
-        boxShadow: '0 8px 30px hsl(var(--ink) / 0.06)',
-        background: 'hsl(var(--card))',
-        color: 'hsl(var(--card-foreground))',
-        display: "grid",
-        gap: 14,
-    };
-}
-
-function btn(kind: "primary" | "secondary" | "accent"): React.CSSProperties {
-    const base: React.CSSProperties = {
-        display: "inline-flex",
-        alignItems: "center",
-        justifyContent: "center",
-        // sicilian-41551: 44px mobile touch-target floor.
-        minHeight: 44,
-        padding: "10px 16px",
-        borderRadius: "var(--radius)",
-        border: '1px solid transparent',
-        fontWeight: 600,
-        fontFamily: FONT_DISPLAY,
-        cursor: "pointer",
-        textDecoration: "none",
-        textAlign: "center",
-        transition: "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
-    };
-    if (kind === "primary") {
-        return {
-            ...base,
-            background: 'hsl(var(--primary))',
-            color: 'hsl(var(--primary-foreground))',
-            borderColor: 'hsl(var(--primary))',
-        };
-    }
-    if (kind === "accent") {
-        return {
-            ...base,
-            background: 'hsl(var(--tomato))',
-            color: 'hsl(var(--cream))',
-            borderColor: 'hsl(var(--tomato))',
-        };
-    }
-    return {
-        ...base,
-        background: 'hsl(var(--secondary))',
-        color: 'hsl(var(--secondary-foreground))',
-        borderColor: 'hsl(var(--rule) / 0.22)',
-    };
 }
