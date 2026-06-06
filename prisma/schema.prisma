@@ -286,6 +286,7 @@ model Article {
   updatedAt             DateTime      @updatedAt
 
   comments              ArticleComment[]
+  reactions             ArticleReaction[]
 
   @@index([status, publishedAt])
   @@index([authorId])
@@ -307,6 +308,21 @@ model ArticleComment {
 
   @@index([articleId, createdAt])
   @@index([authorId])
+}
+
+// One emoji reaction per (member, article). Re-posting the same emoji
+// clears the row (toggle off); a different emoji updates in place.
+// `memberId` is the Discord ID of the reactor (matches Article.authorId).
+model ArticleReaction {
+  id        Int      @id @default(autoincrement())
+  articleId Int
+  memberId  String   // Discord ID of the reactor
+  emoji     String   // One of: "thumbs", "heart", "pizza"
+  createdAt DateTime @default(now())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, memberId]) // One reaction per member per article
+  @@index([articleId])
 }
 
 // ===== MISSIONS / LEVELING SYSTEM =====

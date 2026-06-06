@@ -656,3 +656,79 @@ export function useDiscover() {
     gcTime: 10 * 60 * 1000,
   })
 }
+
+// ============ Article Reactions (bellpepper-72784) ============
+
+export type ArticleReactionEmoji = '👍' | '❤️' | '🍕'
+
+export interface ArticleReactionsPayload {
+  counts: Record<ArticleReactionEmoji, number>
+  myReaction: ArticleReactionEmoji | null
+}
+
+const REACTION_EMOJIS: readonly ArticleReactionEmoji[] = ['👍', '❤️', '🍕']
+
+function normaliseReactionsPayload(raw: unknown): ArticleReactionsPayload {
+  const counts: Record<ArticleReactionEmoji, number> = { '👍': 0, '❤️': 0, '🍕': 0 }
+  let myReaction: ArticleReactionEmoji | null = null
+  if (raw && typeof raw === 'object') {
+    const obj = raw as { counts?: unknown; myReaction?: unknown }
+    if (obj.counts && typeof obj.counts === 'object') {
+      const c = obj.counts as Record<string, unknown>
+      for (const e of REACTION_EMOJIS) {
+        const v = c[e]
+        if (typeof v === 'number' && Number.isFinite(v)) counts[e] = v
+      }
+    }
+    if (typeof obj.myReaction === 'string' && (REACTION_EMOJIS as readonly string[]).includes(obj.myReaction)) {
+      myReaction = obj.myReaction as ArticleReactionEmoji
+    }
+  }
+  return { counts, myReaction }
+}
+
+/**
+ * Read + mutate the 3-emoji reaction strip on an article. Returns the
+ * counts/myReaction tuple plus a `toggle(emoji)` mutator that POSTs (or
+ * DELETEs when the click clears) and re-syncs React Query cache.
+ */
+export function useArticleReactions(slug: string | undefined) {
+  const queryClient = useQueryClient()
+  const queryKey = ['article-reactions', slug] as const
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async (): Promise<ArticleReactionsPayload> => {
+      const res = await fetch(`/api/articles/${slug}/reactions`)
+      if (!res.ok) throw new Error('Failed to load reactions')
+      return normaliseReactionsPayload(await res.json())
+    },
+    enabled: !!slug,
+    staleTime: 30 * 1000,
+  })
+
+  const toggle = useMutation({
+    mutationFn: async (emoji: ArticleReactionEmoji): Promise<ArticleReactionsPayload> => {
+      const current = queryClient.getQueryData<ArticleReactionsPayload>(queryKey)
+      const isClearing = current?.myReaction === emoji
+      const res = isClearing
+        ? await fetch(`/api/articles/${slug}/reactions`, { method: 'DELETE' })
+        : await fetch(`/api/articles/${slug}/reactions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ emoji }),
+          })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to update reaction')
+      }
+      return normaliseReactionsPayload(await res.json())
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKey, data)
+    },
+  })
+
+  return { ...query, toggle }
+}
+
