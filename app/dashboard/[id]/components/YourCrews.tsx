@@ -1,10 +1,14 @@
 // app/dashboard/[id]/components/YourCrews.tsx
+//
+// tomato-30368 — Editorial restyle. Crew cards now read like index cards:
+// paper-soft surface, dashed-circle crew emoji medallion, handwritten margin
+// note for closed-tasks count, pill chip for "your tasks" vs "top tasks",
+// btn-pill view-link footer. Logic, data flow, and HydratedCrew/CrewOption
+// props are untouched.
 "use client";
 
 import Link from "next/link";
-
-// Tokens: see app/globals.css.
-const FONT_DISPLAY = "var(--font-display), var(--font-sans), system-ui, sans-serif";
+import { ArrowUpRight } from "lucide-react";
 
 export type CrewOption = {
     id: string;
@@ -22,21 +26,6 @@ export type CrewOption = {
 };
 
 export type CrewTask = { label: string; url?: string };
-
-// Local crewCard helper — kept identical to the original dashboard helper.
-function crewCard(): React.CSSProperties {
-    return {
-        display: "flex",
-        gap: 10,
-        alignItems: "flex-start",
-        padding: 12,
-        borderRadius: "var(--radius)",
-        border: '1px solid hsl(var(--rule) / 0.12)',
-        background: 'hsl(var(--cream-warm))',
-        color: 'hsl(var(--foreground))',
-        transition: "border-color 150ms ease, box-shadow 150ms ease",
-    };
-}
 
 export type HydratedCrew = {
     id: string;
@@ -66,7 +55,13 @@ export type YourCrewsProps = {
     hydratedCrews?: HydratedCrew[];
 };
 
-export function YourCrews({ crewOptions, userCrews, myTasks, doneCounts, hydratedCrews }: YourCrewsProps) {
+export function YourCrews({
+    crewOptions,
+    userCrews,
+    myTasks,
+    doneCounts,
+    hydratedCrews,
+}: YourCrewsProps) {
     // Prefer the server-hydrated crew list when available. The visual output
     // is identical — same card layout, call times, top-tasks etc. — but the
     // crew IDs come from the BFF instead of being re-derived on the client.
@@ -82,8 +77,12 @@ export function YourCrews({ crewOptions, userCrews, myTasks, doneCounts, hydrate
         }
     } else {
         // Normalize userCrews to IDs where possible
-        const userCrewIds = userCrews.map(name => {
-            const found = crewOptions.find(opt => opt.label.toLowerCase() === name.toLowerCase() || opt.id.toLowerCase() === name.toLowerCase());
+        const userCrewIds = userCrews.map((name) => {
+            const found = crewOptions.find(
+                (opt) =>
+                    opt.label.toLowerCase() === name.toLowerCase() ||
+                    opt.id.toLowerCase() === name.toLowerCase(),
+            );
             return found ? found.id : name;
         });
 
@@ -95,179 +94,309 @@ export function YourCrews({ crewOptions, userCrews, myTasks, doneCounts, hydrate
     if (allDisplayIds.length === 0) return null;
 
     return (
-        <div style={{ paddingTop: 10, borderTop: '1px solid hsl(var(--rule) / 0.12)' }}>
-            <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
-                <h3 style={{ margin: 0, fontSize: 20, fontFamily: FONT_DISPLAY, fontWeight: 700, letterSpacing: "-0.01em" }}>Your Crews</h3>
+        <section className="rule-warm relative pt-6">
+            <div
+                style={{
+                    display: "flex",
+                    justifyContent: "space-between",
+                    alignItems: "flex-end",
+                    gap: 12,
+                    flexWrap: "wrap",
+                    marginBottom: 18,
+                }}
+            >
+                <div>
+                    <p className="overline text-tomato">§ 04 · your crews</p>
+                    <h3
+                        className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
+                        style={{
+                            margin: 0,
+                            fontSize: "clamp(1.5rem, 3vw, 2rem)",
+                            lineHeight: 1,
+                        }}
+                    >
+                        The families you ride with
+                    </h3>
+                </div>
                 <Link
                     href="/crew"
-                    style={{
-                        fontSize: 13,
-                        fontWeight: 600,
-                        color: "hsl(var(--tomato))",
-                        textDecorationColor: "hsl(var(--tomato))",
-                        textDecoration: "none",
-                    }}
-                    onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                    onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
+                    className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+                    style={{ textDecoration: "none", fontWeight: 600 }}
                 >
-                    View all crews →
+                    View all crews
+                    <ArrowUpRight className="h-3 w-3" />
                 </Link>
             </div>
-            {/* sicilian-41551: collapse to single column at 320–375px viewports. */}
-            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(min(260px, 100%), 1fr))", gap: 10 }}>
-                {allDisplayIds.map((cid) => {
-                    // Find rich crew definition
-                    const c = crewOptions.find(opt => opt.id.toLowerCase() === cid.toLowerCase() || opt.label.toLowerCase() === cid.toLowerCase());
 
-                    // If not found, use a basic fallback
+            <div
+                style={{
+                    display: "grid",
+                    gridTemplateColumns:
+                        "repeat(auto-fit, minmax(min(260px, 100%), 1fr))",
+                    gap: 14,
+                }}
+            >
+                {allDisplayIds.map((cid) => {
+                    const c = crewOptions.find(
+                        (opt) =>
+                            opt.id.toLowerCase() === cid.toLowerCase() ||
+                            opt.label.toLowerCase() === cid.toLowerCase(),
+                    );
+
                     const label = c?.label || cid;
                     const emoji = c?.emoji || "🍕";
+                    const currentCid = String(c?.id || cid).toLowerCase();
+                    const doneCount = effectiveDoneCounts[currentCid] || 0;
+                    const personalTasks = myTasks[currentCid] || [];
+                    const topTasks = c?.tasks || [];
+                    const hasPersonal =
+                        personalTasks && personalTasks.length > 0;
+
+                    let displayTasks = [...personalTasks];
+                    if (displayTasks.length < 3) {
+                        const remaining = 3 - displayTasks.length;
+                        const personalLabels = new Set(
+                            displayTasks.map((t) => t.label.toLowerCase()),
+                        );
+                        const additional = topTasks
+                            .filter(
+                                (t) =>
+                                    !personalLabels.has(t.label.toLowerCase()),
+                            )
+                            .slice(0, remaining);
+                        displayTasks = [...displayTasks, ...additional];
+                    }
 
                     return (
-                        <div key={cid} style={crewCard()}>
-                            <div style={{ display: "grid", gap: 4 }}>
-                                <div style={{ display: "flex", gap: 8, alignItems: "baseline", flexWrap: "wrap" }}>
-                                    <span style={{ fontWeight: 700 }}>
-                                        {emoji ? `${emoji} ` : ""}
-                                        {label}
-                                    </span>
-                                </div>
-
-                                {(c?.callTime || c?.callLength) && (
-                                    <div style={{ opacity: 0.7, fontSize: 13 }}>
-                                        {c.callTime ? (
-                                            c.callTimeUrl ? (
-                                                <a href={c.callTimeUrl} target="_blank" rel="noreferrer" style={{ color: "inherit", textDecoration: "underline" }}>
-                                                    {c.callTime}
-                                                </a>
-                                            ) : c.callTime
-                                        ) : ""}
-                                        {c.callTime && c.callLength ? " • " : ""}
-                                        {c.callLength ? c.callLength : ""}
-                                    </div>
-                                )}
-
-                                {(() => {
-                                    const currentCid = String(c?.id || cid).toLowerCase();
-                                    const doneCount = effectiveDoneCounts[currentCid] || 0;
-                                    const personalTasks = myTasks[currentCid] || [];
-                                    const topTasks = c?.tasks || [];
-                                    const hasPersonal = personalTasks && personalTasks.length > 0;
-
-                                    // Merge: Personal first, then Top Tasks to fill up to 3
-                                    let displayTasks = [...personalTasks];
-                                    if (displayTasks.length < 3) {
-                                        const remaining = 3 - displayTasks.length;
-                                        // Filter out top tasks that are already in personal tasks (by label)
-                                        const personalLabels = new Set(displayTasks.map(t => t.label.toLowerCase()));
-                                        const additional = topTasks
-                                            .filter(t => !personalLabels.has(t.label.toLowerCase()))
-                                            .slice(0, remaining);
-                                        displayTasks = [...displayTasks, ...additional];
-                                    }
-                                    if (displayTasks.length === 0 && doneCount === 0) return null;
-
-                                    return (
-                                        <div style={{ marginTop: 6, display: "grid", gap: 3 }}>
-                                            {doneCount > 0 && (
-                                                <div style={{
-                                                    fontSize: 11,
-                                                    fontWeight: 700,
-                                                    fontFamily: FONT_DISPLAY,
-                                                    textTransform: "uppercase",
-                                                    letterSpacing: 0.5,
-                                                    color: "hsl(142 60% 32%)",
-                                                    marginBottom: 2
-                                                }}>
-                                                    Closed: {doneCount}
-                                                </div>
-                                            )}
-                                            {displayTasks.length > 0 && (
-                                                <>
-                                                    <div style={{
-                                                        fontSize: 11,
-                                                        fontWeight: 700,
-                                                        fontFamily: FONT_DISPLAY,
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: 0.5,
-                                                        color: hasPersonal ? "hsl(var(--tomato))" : "hsl(var(--muted-foreground))"
-                                                    }}>
-                                                        {hasPersonal ? "Your Tasks" : "Top Tasks"}
-                                                    </div>
-                                                    {displayTasks.map((t, idx) => {
-                                                        const isPersonal = personalTasks?.some((pt: { label: string }) => pt.label === t.label);
-                                                        return (
-                                                            <div key={idx} style={{
-                                                                fontSize: 12,
-                                                                color: isPersonal ? "hsl(var(--foreground))" : "hsl(var(--muted-foreground))",
-                                                                fontWeight: isPersonal ? 600 : 400,
-                                                                display: "flex",
-                                                                alignItems: "baseline",
-                                                                gap: 4,
-                                                                minWidth: 0
-                                                            }}>
-                                                                <span style={{ flexShrink: 0, color: isPersonal ? "hsl(var(--tomato))" : "inherit" }}>•</span>
-                                                                <div style={{ overflow: "hidden", textOverflow: "ellipsis", whiteSpace: "nowrap" }}>
-                                                                    {t.url ? (
-                                                                        <a
-                                                                            href={t.url}
-                                                                            target="_blank"
-                                                                            rel="noreferrer"
-                                                                            onClick={(e) => e.stopPropagation()}
-                                                                            style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
-                                                                        >
-                                                                            {t.label}
-                                                                        </a>
-                                                                    ) : (
-                                                                        <span>{t.label}</span>
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        );
-                                                    })}
-                                                </>
-                                            )}
-                                        </div>
-                                    );
-                                })()}
-
-                                <div style={{ marginTop: 8, display: "flex", gap: 12, flexWrap: "wrap" }}>
-                                    <Link
-                                        href={`/crew/${c?.id || cid}`}
+                        <article
+                            key={cid}
+                            className="paper-soft relative overflow-hidden rounded-2xl"
+                            style={{
+                                border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                                background: "hsl(var(--cream))",
+                                boxShadow: "var(--shadow-soft)",
+                                padding: 16,
+                                display: "grid",
+                                gap: 10,
+                                color: "hsl(var(--foreground))",
+                            }}
+                        >
+                            {/* Header row: medallion + label */}
+                            <div className="relative flex items-start gap-3">
+                                <span
+                                    aria-hidden
+                                    className="relative grid h-11 w-11 shrink-0 place-items-center rounded-full"
+                                    style={{
+                                        border:
+                                            "1.5px dashed hsl(var(--foreground) / 0.3)",
+                                        background: "hsl(var(--cream) / 0.6)",
+                                        fontSize: 20,
+                                        transform: "rotate(-4deg)",
+                                    }}
+                                >
+                                    {emoji}
+                                </span>
+                                <div className="min-w-0 flex-1">
+                                    <h4
+                                        className="font-[family-name:var(--font-display)] m-0 font-black tracking-[-0.01em]"
                                         style={{
-                                            fontSize: 13,
-                                            fontWeight: 600,
-                                            color: "hsl(var(--tomato))",
-                                            textDecoration: "none",
+                                            fontSize: 18,
+                                            lineHeight: 1.1,
+                                            color: "hsl(var(--foreground))",
                                         }}
-                                        onMouseEnter={(e) => (e.currentTarget.style.textDecoration = "underline")}
-                                        onMouseLeave={(e) => (e.currentTarget.style.textDecoration = "none")}
                                     >
-                                        View crew page →
-                                    </Link>
-                                    {c?.sheet && (
-                                        <a
-                                            href={c.sheet}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            onClick={(e) => e.stopPropagation()}
+                                        {label}
+                                    </h4>
+                                    {(c?.callTime || c?.callLength) && (
+                                        <div
+                                            className="ui mt-1"
                                             style={{
-                                                fontSize: 13,
-                                                fontWeight: 600,
-                                                color: "hsl(var(--muted-foreground))",
-                                                textDecoration: "none",
+                                                fontSize: 10,
+                                                textTransform: "uppercase",
+                                                letterSpacing: "0.22em",
+                                                color: "hsl(var(--foreground) / 0.55)",
                                             }}
-                                            title={c.sheet}
                                         >
-                                            Open sheet ↗
-                                        </a>
+                                            {c?.callTime
+                                                ? c.callTimeUrl
+                                                    ? (
+                                                        <a
+                                                            href={c.callTimeUrl}
+                                                            target="_blank"
+                                                            rel="noreferrer"
+                                                            style={{
+                                                                color: "inherit",
+                                                                textDecoration:
+                                                                    "underline",
+                                                                textUnderlineOffset: 2,
+                                                            }}
+                                                        >
+                                                            {c.callTime}
+                                                        </a>
+                                                    )
+                                                    : c.callTime
+                                                : ""}
+                                            {c?.callTime && c?.callLength
+                                                ? " · "
+                                                : ""}
+                                            {c?.callLength ? c.callLength : ""}
+                                        </div>
                                     )}
                                 </div>
+                                {doneCount > 0 && (
+                                    <span
+                                        aria-hidden
+                                        className="handwritten absolute -top-1 right-0 rotate-[6deg]"
+                                        style={{
+                                            color: "hsl(142 60% 32%)",
+                                            fontSize: 14,
+                                        }}
+                                    >
+                                        {doneCount} closed
+                                    </span>
+                                )}
                             </div>
-                        </div>
+
+                            {displayTasks.length > 0 && (
+                                <div className="grid gap-1.5">
+                                    <p
+                                        className="overline m-0"
+                                        style={{
+                                            color: hasPersonal
+                                                ? "hsl(var(--tomato))"
+                                                : "hsl(var(--foreground) / 0.4)",
+                                            fontSize: 10,
+                                            letterSpacing: "0.22em",
+                                        }}
+                                    >
+                                        {hasPersonal
+                                            ? "§ your tasks"
+                                            : "§ top tasks"}
+                                    </p>
+                                    <ul
+                                        style={{
+                                            listStyle: "none",
+                                            margin: 0,
+                                            padding: 0,
+                                            display: "grid",
+                                            gap: 4,
+                                        }}
+                                    >
+                                        {displayTasks.map((t, idx) => {
+                                            const isPersonal = personalTasks?.some(
+                                                (pt: { label: string }) =>
+                                                    pt.label === t.label,
+                                            );
+                                            return (
+                                                <li
+                                                    key={idx}
+                                                    style={{
+                                                        fontSize: 12,
+                                                        color: isPersonal
+                                                            ? "hsl(var(--foreground))"
+                                                            : "hsl(var(--foreground) / 0.6)",
+                                                        fontWeight: isPersonal
+                                                            ? 600
+                                                            : 400,
+                                                        display: "flex",
+                                                        alignItems: "baseline",
+                                                        gap: 6,
+                                                        minWidth: 0,
+                                                    }}
+                                                >
+                                                    <span
+                                                        style={{
+                                                            flexShrink: 0,
+                                                            color: isPersonal
+                                                                ? "hsl(var(--tomato))"
+                                                                : "hsl(var(--foreground) / 0.35)",
+                                                            fontWeight: 700,
+                                                        }}
+                                                    >
+                                                        ›
+                                                    </span>
+                                                    <span
+                                                        style={{
+                                                            overflow: "hidden",
+                                                            textOverflow:
+                                                                "ellipsis",
+                                                            whiteSpace: "nowrap",
+                                                            minWidth: 0,
+                                                            flex: 1,
+                                                        }}
+                                                    >
+                                                        {t.url ? (
+                                                            <a
+                                                                href={t.url}
+                                                                target="_blank"
+                                                                rel="noreferrer"
+                                                                onClick={(e) =>
+                                                                    e.stopPropagation()
+                                                                }
+                                                                style={{
+                                                                    color: "inherit",
+                                                                    textDecoration:
+                                                                        "underline",
+                                                                    textUnderlineOffset: 2,
+                                                                }}
+                                                            >
+                                                                {t.label}
+                                                            </a>
+                                                        ) : (
+                                                            <span>{t.label}</span>
+                                                        )}
+                                                    </span>
+                                                </li>
+                                            );
+                                        })}
+                                    </ul>
+                                </div>
+                            )}
+
+                            {/* Footer actions */}
+                            <div
+                                className="rule-warm"
+                                style={{
+                                    paddingTop: 10,
+                                    marginTop: "auto",
+                                    display: "flex",
+                                    gap: 12,
+                                    flexWrap: "wrap",
+                                }}
+                            >
+                                <Link
+                                    href={`/crew/${c?.id || cid}`}
+                                    className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-tomato transition-colors hover:text-tomato/80"
+                                    style={{
+                                        fontWeight: 700,
+                                        textDecoration: "none",
+                                    }}
+                                >
+                                    Open crew
+                                    <ArrowUpRight className="h-3 w-3" />
+                                </Link>
+                                {c?.sheet && (
+                                    <a
+                                        href={c.sheet}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        onClick={(e) => e.stopPropagation()}
+                                        className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+                                        style={{
+                                            fontWeight: 600,
+                                            textDecoration: "none",
+                                        }}
+                                        title={c.sheet}
+                                    >
+                                        Open sheet
+                                        <ArrowUpRight className="h-3 w-3" />
+                                    </a>
+                                )}
+                            </div>
+                        </article>
                     );
                 })}
             </div>
-        </div>
+        </section>
     );
 }
