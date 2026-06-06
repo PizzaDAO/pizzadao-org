@@ -2,10 +2,12 @@
 //
 // mozzarella-41832 — Editorial restyle.
 // Cinematic / cycling loader treatment. Props (message?, flow?) unchanged.
+// arugula-30866 — i18n via next-intl (onboarding.loading.*).
 "use client";
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
+import { useTranslations } from "next-intl";
 import type { FlowState } from "./types";
 
 type Props = {
@@ -13,56 +15,59 @@ type Props = {
   flow?: FlowState;
 };
 
-function getMessageFromFlow(flow: FlowState): string {
-  switch (flow.type) {
-    case "initializing":
-      return "Loading…";
-    case "checking_session":
-      return "Checking session…";
-    case "looking_up_member":
-      return "Verifying member status…";
-    case "submitting":
-      return "Saving your profile…";
-    case "success":
-      return "Redirecting…";
-    default:
-      return "Loading…";
-  }
-}
-
-function getOverlineFromFlow(flow?: FlowState): string {
-  if (!flow) return "§ ··· One moment";
-  switch (flow.type) {
-    case "initializing":
-      return "§ ··· Pulling up your file";
-    case "checking_session":
-      return "§ ··· Checking the door";
-    case "looking_up_member":
-      return "§ ··· Verifying the family record";
-    case "submitting":
-      return "§ ··· Filing the paperwork";
-    case "success":
-      return "§ ··· Welcome in";
-    default:
-      return "§ ··· One moment";
-  }
-}
-
 const SPOTLIGHT: CSSProperties = {
   background:
     "radial-gradient(60% 60% at 50% 30%, hsl(46 100% 62% / 0.20), transparent 65%), radial-gradient(70% 60% at 50% 100%, hsl(0 93% 60% / 0.10), transparent 70%)",
 };
 
-const SCRIBBLES = [
+// Stable ordered list of scribble keys so adjacent slots show different text.
+const SCRIBBLE_KEYS = [
   "almost",
-  "easy now",
-  "give it a sec",
-  "warming up the oven",
-  "checking the books",
-];
+  "easyNow",
+  "giveItASec",
+  "warmingOven",
+  "checkingBooks",
+] as const;
 
 export function LoadingScreen({ message, flow }: Props) {
-  const displayMessage = message ?? (flow ? getMessageFromFlow(flow) : "Loading…");
+  const t = useTranslations("onboarding.loading");
+
+  function getMessageFromFlow(f: FlowState): string {
+    switch (f.type) {
+      case "initializing":
+        return t("defaultMessage");
+      case "checking_session":
+        return t("checkingSession");
+      case "looking_up_member":
+        return t("lookingUpMember");
+      case "submitting":
+        return t("submitting");
+      case "success":
+        return t("redirecting");
+      default:
+        return t("defaultMessage");
+    }
+  }
+
+  function getOverlineFromFlow(f?: FlowState): string {
+    if (!f) return t("defaultOverline");
+    switch (f.type) {
+      case "initializing":
+        return t("initializingOverline");
+      case "checking_session":
+        return t("checkingSessionOverline");
+      case "looking_up_member":
+        return t("lookingUpMemberOverline");
+      case "submitting":
+        return t("submittingOverline");
+      case "success":
+        return t("successOverline");
+      default:
+        return t("defaultOverline");
+    }
+  }
+
+  const displayMessage = message ?? (flow ? getMessageFromFlow(flow) : t("defaultMessage"));
   const overline = getOverlineFromFlow(flow);
   const [tick, setTick] = useState(0);
 
@@ -71,7 +76,10 @@ export function LoadingScreen({ message, flow }: Props) {
     return () => window.clearInterval(id);
   }, []);
 
-  const scribble = SCRIBBLES[tick % SCRIBBLES.length];
+  const scribble = t(`scribbles.${SCRIBBLE_KEYS[tick % SCRIBBLE_KEYS.length]}`);
+  const scribbleAlt = t(
+    `scribbles.${SCRIBBLE_KEYS[(tick + 2) % SCRIBBLE_KEYS.length]}`,
+  );
 
   return (
     <div
@@ -132,7 +140,7 @@ export function LoadingScreen({ message, flow }: Props) {
           aria-hidden
           className="handwritten pointer-events-none absolute right-[10%] bottom-[18%] hidden rotate-[6deg] text-[16px] text-tomato/70 md:block"
         >
-          {SCRIBBLES[(tick + 2) % SCRIBBLES.length]}
+          {scribbleAlt}
         </span>
       </div>
     </div>
