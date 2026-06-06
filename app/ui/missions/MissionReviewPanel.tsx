@@ -93,10 +93,10 @@ export function MissionReviewPanel() {
     }
   }
 
-  // Don't render anything if not admin
+  // Hide entirely for non-admins (API 403).
   if (error === "admin-only") return null;
+  // No flash of empty state during the initial fetch.
   if (loading) return null;
-  if (submissions.length === 0) return null;
 
   return (
     <div
@@ -169,6 +169,66 @@ export function MissionReviewPanel() {
         </div>
       </div>
 
+      {submissions.length === 0 ? (
+        <div
+          style={{
+            position: "relative",
+            padding: "28px clamp(18px, 4vw, 26px)",
+            borderRadius: "var(--radius)",
+            border: "1px dashed hsl(var(--rule-warm) / 0.75)",
+            background: "hsl(var(--cream))",
+            display: "grid",
+            gap: 8,
+            placeItems: "center",
+            textAlign: "center",
+          }}
+        >
+          <span
+            aria-hidden
+            className="handwritten"
+            style={{
+              position: "absolute",
+              top: 4,
+              right: 14,
+              fontSize: 13,
+              transform: "rotate(-7deg)",
+              color: "hsl(var(--tomato) / 0.75)",
+              pointerEvents: "none",
+            }}
+          >
+            the kitchen is quiet
+          </span>
+          <span
+            className="overline"
+            style={{ color: "hsl(var(--muted-foreground))" }}
+          >
+            § Empty queue
+          </span>
+          <p
+            style={{
+              margin: 0,
+              fontFamily: DISPLAY_FONT,
+              fontWeight: 800,
+              fontSize: "clamp(1.15rem, 2.6vw, 1.4rem)",
+              lineHeight: 1.1,
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            All caught up.
+          </p>
+          <p
+            style={{
+              margin: 0,
+              fontSize: 13,
+              color: "hsl(var(--muted-foreground))",
+              maxWidth: "44ch",
+            }}
+          >
+            No pending submissions on the desk. Check back later when members
+            file new dossiers for review.
+          </p>
+        </div>
+      ) : (
       <div style={{ display: "grid", gap: 14 }}>
         {submissions.map((sub, idx) => {
           // Mild deterministic tilt per submission, like loose pages on a desk.
@@ -383,6 +443,7 @@ export function MissionReviewPanel() {
           );
         })}
       </div>
+      )}
     </div>
   );
 }
