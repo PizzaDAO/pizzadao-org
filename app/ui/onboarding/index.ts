@@ -4,6 +4,7 @@
 export { OnboardingWizard } from "./OnboardingWizard";
 export { LoadingScreen } from "./LoadingScreen";
 export { ClaimFlow } from "./ClaimFlow";
+export { FinaleScene } from "./FinaleScene";
 export { Field } from "./Field";
 
 // Steps

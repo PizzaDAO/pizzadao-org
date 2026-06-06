@@ -8,6 +8,7 @@ import { TURTLES } from "../constants";
 import { LoadingScreen } from "./LoadingScreen";
 import { ClaimFlow } from "./ClaimFlow";
 import { MagicLoginFlow } from "./MagicLoginFlow";
+import { FinaleScene } from "./FinaleScene";
 import { WelcomeStep } from "./steps/WelcomeStep";
 import { NameStep } from "./steps/NameStep";
 import { CityStep } from "./steps/CityStep";
@@ -402,14 +403,13 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         throw new Error(result?.error || "Failed to save profile");
       }
 
-      // Success - redirect to dashboard
+      // pizzaiolo-35410 — Don't redirect immediately. Play the finale ceremony
+      // first; FinaleScene's "Continue to dashboard" CTA (and the auto-redirect
+      // fallback below) handles the navigation.
       const memberId = data.memberId || result?.sheets?.memberId || data.discordId;
-      if (memberId) {
-        localStorage.removeItem(LS_KEY);
-        router.push(`/dashboard/${memberId}`);
-      } else {
-        setFlow({ type: "success", redirectTo: "/" });
-      }
+      localStorage.removeItem(LS_KEY);
+      const redirectTo = memberId ? `/dashboard/${memberId}` : "/";
+      setFlow({ type: "success", redirectTo });
     } catch (e: unknown) {
       setIsSubmitting(false);
       setError((e as any)?.message || "Failed to save");
@@ -556,25 +556,17 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     );
   }
 
-  // Success state
+  // Success state — pizzaiolo-35410 finale ceremony.
+  // FinaleScene paints over the wizard chrome and plays the 6-phase reveal.
+  // The "Continue to dashboard" CTA inside the scene routes when the user
+  // is ready; we don't auto-redirect because the animation IS the reward.
   if (flow.type === "success") {
     return (
-      <div
-        className="paper-soft relative overflow-hidden rounded-[28px] border p-6 md:p-9 grid gap-3 fade-up"
-        style={{
-          background: "hsl(var(--card))",
-          borderColor: "hsl(var(--rule-warm) / 0.55)",
-          boxShadow: "var(--shadow-soft)",
-        }}
-      >
-        <p className="overline text-tomato">§ ··· Filed</p>
-        <p
-          className="font-[family-name:var(--font-display)] font-black text-foreground"
-          style={{ fontSize: "clamp(1.4rem, 3.4vw, 2.1rem)", lineHeight: 1 }}
-        >
-          Profile saved successfully.
-        </p>
-      </div>
+      <FinaleScene
+        mafiaName={data.mafiaName || data.discordNick || "Made"}
+        memberId={data.memberId}
+        dashboardHref={flow.redirectTo}
+      />
     );
   }
 
