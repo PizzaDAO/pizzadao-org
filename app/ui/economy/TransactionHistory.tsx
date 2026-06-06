@@ -2,14 +2,16 @@
 
 // app/ui/economy/TransactionHistory.tsx
 //
-// anchovy-67435 (Restyle Phase 4d): migrated off legacy `--color-*` aliases
-// onto the new semantic HSL tokens + shared `card()` primitive. Credit (incoming)
-// rows use butter/emerald accent; debit (outgoing) use ink/muted. Rows are
-// clickable to expand full details. See plans/site-restyle-pizzadao-org.md.
+// capricciosa-35929 — Editorial restyle. Dossier-style ledger with overline
+// date headers, hairline rules between rows, and a hand-stamped "SENT" seal
+// on outgoing transfers. API contract unchanged — still calls GET
+// /api/economy/history with the same pagination params; rows still expand
+// to show type + balance details. Credit/debit logic preserved.
+//
+// anchovy-67435 (Restyle Phase 4d): semantic HSL tokens.
 
 import React, { useEffect, useState, useCallback } from "react";
 import { PepIcon } from "./PepIcon";
-import { card } from "../shared-styles";
 
 type TransactionData = {
   id: number;
@@ -19,9 +21,6 @@ type TransactionData = {
   description: string;
   createdAt: string;
 };
-
-const DISPLAY_FONT =
-  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 const CREDIT_COLOR = "hsl(142 71% 32%)";   // emerald, used for incoming
 const DEBIT_COLOR = "hsl(var(--ink-soft))"; // muted ink for outgoing
@@ -48,8 +47,31 @@ function formatAbsoluteTime(dateStr: string): string {
   return date.toLocaleString();
 }
 
+function formatDateHeader(dateStr: string): string {
+  const date = new Date(dateStr);
+  const now = new Date();
+  const today = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+  const yesterday = new Date(today);
+  yesterday.setDate(yesterday.getDate() - 1);
+  const dDay = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+
+  if (dDay.getTime() === today.getTime()) return "Today";
+  if (dDay.getTime() === yesterday.getTime()) return "Yesterday";
+  return date.toLocaleDateString(undefined, {
+    weekday: "long",
+    month: "short",
+    day: "numeric",
+    year:
+      date.getFullYear() === now.getFullYear() ? undefined : "numeric",
+  });
+}
+
+function dateKey(dateStr: string): string {
+  const d = new Date(dateStr);
+  return `${d.getFullYear()}-${d.getMonth()}-${d.getDate()}`;
+}
+
 function getTypeIcon(type: string, isCredit: boolean): React.ReactNode {
-  // Color is set by the wrapper; SVG paints with currentColor.
   switch (type) {
     case "TRANSFER_SENT":
     case "TRANSFER_RECEIVED":
@@ -91,7 +113,6 @@ function getTypeIcon(type: string, isCredit: boolean): React.ReactNode {
         </svg>
       );
   }
-  // (isCredit reserved for future variants)
   void isCredit;
 }
 
@@ -133,16 +154,52 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
 
   const hasMore = transactions.length < total;
 
+  // Group transactions by date for the editorial dossier headers
+  const grouped = (() => {
+    const groups: { key: string; label: string; rows: TransactionData[] }[] = [];
+    let lastKey = "";
+    for (const tx of transactions) {
+      const k = dateKey(tx.createdAt);
+      if (k !== lastKey) {
+        groups.push({
+          key: k,
+          label: formatDateHeader(tx.createdAt),
+          rows: [],
+        });
+        lastKey = k;
+      }
+      groups[groups.length - 1]!.rows.push(tx);
+    }
+    return groups;
+  })();
+
   return (
-    <div style={card()}>
+    <div
+      className="paper-soft relative overflow-hidden rounded-[24px] border p-6 md:p-7"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--rule-warm) / 0.55)",
+        boxShadow: "var(--shadow-soft)",
+      }}
+    >
+      <div className="relative flex items-start justify-between gap-4">
+        <p className="overline text-tomato">§ ··· Dossier</p>
+        <span
+          className="handwritten -rotate-[5deg]"
+          style={{
+            fontSize: 14,
+            color: "hsl(var(--foreground) / 0.5)",
+          }}
+        >
+          every move logged
+        </span>
+      </div>
+
       <h2
+        className="font-[family-name:var(--font-display)] relative mt-2 font-black tracking-[-0.02em] text-foreground"
         style={{
-          fontFamily: DISPLAY_FONT,
-          fontSize: 22,
-          fontWeight: 700,
-          letterSpacing: "-0.01em",
-          margin: 0,
-          color: "hsl(var(--foreground))",
+          fontSize: "clamp(1.6rem, 3.5vw, 2.25rem)",
+          lineHeight: 0.95,
         }}
       >
         Transaction history
@@ -150,6 +207,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
 
       {loading ? (
         <div
+          className="relative mt-5"
           style={{
             height: 96,
             background: "hsl(var(--muted))",
@@ -158,143 +216,177 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
         />
       ) : transactions.length === 0 ? (
         <p
+          className="relative mt-6 text-center"
           style={{
             color: "hsl(var(--muted-foreground))",
-            textAlign: "center",
             padding: "24px 0",
             margin: 0,
           }}
         >
-          No transactions yet. Earn, spend, or transfer some <PepIcon size={14} /> to see your history here.
+          No transactions yet. Earn, spend, or transfer some{" "}
+          <PepIcon size={14} /> to see your history here.
         </p>
       ) : (
         <>
-          <div style={{ display: "grid", gap: 0 }}>
-            {transactions.map((tx) => {
-              const isCredit = tx.amount > 0;
-              const accentColor = isCredit ? CREDIT_COLOR : DEBIT_COLOR;
-              const isOpen = expandedId === tx.id;
+          <div className="rule-warm relative mt-5" />
 
-              return (
-                <div
-                  key={tx.id}
-                  onClick={() => setExpandedId(isOpen ? null : tx.id)}
-                  style={{
-                    display: "grid",
-                    gridTemplateColumns: "30px 1fr auto",
-                    columnGap: 10,
-                    alignItems: "center",
-                    padding: "12px 4px",
-                    borderBottom: "1px solid hsl(var(--rule) / 0.10)",
-                    cursor: "pointer",
-                    transition: "background-color 150ms ease",
-                  }}
-                  onMouseEnter={(e) => {
-                    e.currentTarget.style.background = "hsl(var(--ink) / 0.04)";
-                  }}
-                  onMouseLeave={(e) => {
-                    e.currentTarget.style.background = "transparent";
-                  }}
+          <div className="relative mt-2 grid gap-0">
+            {grouped.map((group) => (
+              <div key={group.key} className="relative">
+                <p
+                  className="overline mt-4 mb-2 text-foreground/55"
+                  style={{ paddingLeft: 4 }}
                 >
-                  <div
-                    style={{
-                      width: 30,
-                      height: 30,
-                      display: "flex",
-                      alignItems: "center",
-                      justifyContent: "center",
-                      borderRadius: "50%",
-                      background: isCredit
-                        ? "hsl(142 71% 32% / 0.12)"
-                        : "hsl(var(--ink) / 0.06)",
-                      color: accentColor,
-                    }}
-                  >
-                    {getTypeIcon(tx.type, isCredit)}
-                  </div>
+                  {group.label}
+                </p>
+                <div className="grid">
+                  {group.rows.map((tx) => {
+                    const isCredit = tx.amount > 0;
+                    const accentColor = isCredit ? CREDIT_COLOR : DEBIT_COLOR;
+                    const isOpen = expandedId === tx.id;
+                    const isOutgoing = tx.type === "TRANSFER_SENT";
 
-                  <div style={{ minWidth: 0 }}>
-                    <div
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        color: "hsl(var(--foreground))",
-                        overflow: "hidden",
-                        textOverflow: "ellipsis",
-                        whiteSpace: isOpen ? "normal" : "nowrap",
-                      }}
-                    >
-                      {tx.description}
-                    </div>
-                    <div
-                      style={{
-                        fontSize: 11,
-                        color: "hsl(var(--muted-foreground))",
-                        marginTop: 2,
-                      }}
-                    >
-                      {isOpen ? formatAbsoluteTime(tx.createdAt) : formatRelativeTime(tx.createdAt)}
-                    </div>
-                    {isOpen && (
+                    return (
                       <div
+                        key={tx.id}
+                        onClick={() => setExpandedId(isOpen ? null : tx.id)}
+                        className="relative cursor-pointer transition-colors"
                         style={{
-                          marginTop: 6,
-                          fontSize: 12,
-                          color: "hsl(var(--muted-foreground))",
                           display: "grid",
-                          gap: 2,
+                          gridTemplateColumns: "30px 1fr auto",
+                          columnGap: 12,
+                          alignItems: "center",
+                          padding: "12px 4px",
+                          borderBottom:
+                            "1px dashed hsl(var(--rule-warm) / 0.55)",
+                        }}
+                        onMouseEnter={(e) => {
+                          e.currentTarget.style.background =
+                            "hsl(var(--ink) / 0.03)";
+                        }}
+                        onMouseLeave={(e) => {
+                          e.currentTarget.style.background = "transparent";
                         }}
                       >
-                        <div>
-                          <span style={{ fontWeight: 600 }}>Type:</span> {tx.type}
+                        <div
+                          style={{
+                            width: 30,
+                            height: 30,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "center",
+                            borderRadius: "50%",
+                            background: isCredit
+                              ? "hsl(142 71% 32% / 0.12)"
+                              : "hsl(var(--ink) / 0.06)",
+                            color: accentColor,
+                          }}
+                        >
+                          {getTypeIcon(tx.type, isCredit)}
                         </div>
-                        <div>
-                          <span style={{ fontWeight: 600 }}>Balance after:</span>{" "}
-                          {tx.balance.toLocaleString()} PEP
+
+                        <div style={{ minWidth: 0 }}>
+                          <div
+                            className="font-[family-name:var(--font-display)] font-black tracking-tight"
+                            style={{
+                              fontSize: 15,
+                              color: "hsl(var(--foreground))",
+                              overflow: "hidden",
+                              textOverflow: "ellipsis",
+                              whiteSpace: isOpen ? "normal" : "nowrap",
+                              lineHeight: 1.15,
+                            }}
+                          >
+                            {tx.description}
+                          </div>
+                          <div
+                            className="ui mt-1 text-[10px] uppercase tracking-[0.22em]"
+                            style={{
+                              color: "hsl(var(--muted-foreground))",
+                            }}
+                          >
+                            {isOpen
+                              ? formatAbsoluteTime(tx.createdAt)
+                              : formatRelativeTime(tx.createdAt)}
+                          </div>
+                          {isOpen && (
+                            <div
+                              className="mt-2 grid gap-1 text-[12px]"
+                              style={{
+                                color: "hsl(var(--muted-foreground))",
+                              }}
+                            >
+                              <div>
+                                <span style={{ fontWeight: 600 }}>Type:</span>{" "}
+                                {tx.type}
+                              </div>
+                              <div>
+                                <span style={{ fontWeight: 600 }}>
+                                  Balance after:
+                                </span>{" "}
+                                {tx.balance.toLocaleString()} PEP
+                              </div>
+                            </div>
+                          )}
+                        </div>
+
+                        <div className="relative flex items-center gap-2">
+                          {isOutgoing && (
+                            <span
+                              aria-hidden
+                              className="ui hidden md:inline-flex"
+                              style={{
+                                transform: "rotate(-8deg)",
+                                border: "1.5px solid hsl(var(--tomato) / 0.75)",
+                                color: "hsl(var(--tomato))",
+                                background: "hsl(var(--tomato) / 0.06)",
+                                padding: "2px 7px",
+                                borderRadius: 4,
+                                fontSize: 10,
+                                fontWeight: 700,
+                                letterSpacing: "0.22em",
+                                textTransform: "uppercase",
+                                opacity: 0.85,
+                              }}
+                            >
+                              Sent
+                            </span>
+                          )}
+                          <span
+                            className="font-[family-name:var(--font-display)] font-black tracking-tight whitespace-nowrap"
+                            style={{
+                              fontSize: 17,
+                              color: accentColor,
+                              display: "flex",
+                              alignItems: "center",
+                              gap: 4,
+                            }}
+                          >
+                            {isCredit ? "+" : ""}
+                            {tx.amount.toLocaleString()}
+                            <PepIcon size={13} />
+                          </span>
                         </div>
                       </div>
-                    )}
-                  </div>
-
-                  <div
-                    style={{
-                      fontFamily: DISPLAY_FONT,
-                      fontSize: 16,
-                      fontWeight: 700,
-                      color: accentColor,
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 4,
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {isCredit ? "+" : ""}
-                    {tx.amount.toLocaleString()}
-                    <PepIcon size={13} />
-                  </div>
+                    );
+                  })}
                 </div>
-              );
-            })}
+              </div>
+            ))}
           </div>
 
           {hasMore && (
             <button
               onClick={handleLoadMore}
               disabled={loadingMore}
+              className="btn-pill mt-5"
               style={{
-                display: "block",
-                width: "100%",
-                marginTop: 12,
-                padding: "10px 0",
                 background: "hsl(var(--secondary))",
                 color: "hsl(var(--secondary-foreground))",
-                border: "1px solid hsl(var(--rule) / 0.22)",
-                borderRadius: "var(--radius)",
-                fontSize: 13,
-                fontWeight: 600,
-                cursor: loadingMore ? "default" : "pointer",
+                border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                width: "100%",
                 opacity: loadingMore ? 0.5 : 1,
-                fontFamily: DISPLAY_FONT,
+                cursor: loadingMore ? "default" : "pointer",
               }}
             >
               {loadingMore ? "Loading..." : "Load more"}

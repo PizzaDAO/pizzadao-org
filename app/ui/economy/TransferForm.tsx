@@ -2,26 +2,24 @@
 
 // app/ui/economy/TransferForm.tsx
 //
-// anchovy-67435 (Restyle Phase 4d): migrated off legacy `--color-*` aliases
-// onto the shared `card()`, `btn("accent")`, and `input()` primitives + the
-// shared `Field` label so the form matches the pizzadao.org look (cream bg,
-// tomato focus ring, tomato CTA). See plans/site-restyle-pizzadao-org.md.
+// capricciosa-35929 — Editorial restyle. Paper-soft surface with handwritten
+// margin annotation, hairline rules between fields, `btn-pill-lg` accent
+// send button. API contract unchanged — still POSTs /api/economy/transfer
+// with the same { toUserId, amount } shape.
+//
+// anchovy-67435 (Restyle Phase 4d): semantic HSL tokens.
 
 import React, { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { PepIcon } from "./PepIcon";
-import { card, btn, input } from "../shared-styles";
+import { input } from "../shared-styles";
 import { Field } from "../onboarding/Field";
 
 type TransferFormProps = {
   onSuccess?: () => void;
 };
 
-const DISPLAY_FONT =
-  "var(--font-display), var(--font-sans), system-ui, sans-serif";
-
 function focusableInputProps() {
-  // Add the tomato focus ring on focus / remove on blur. We can't use
-  // pseudo-classes from inline styles, so wire it via onFocus/onBlur.
   return {
     onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
       e.currentTarget.style.borderColor = "hsl(var(--ring))";
@@ -76,25 +74,40 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
   const disabled = loading || !toUserId || !amount;
 
   return (
-    <div style={card()}>
+    <div
+      className="paper-soft relative overflow-hidden rounded-[24px] border p-6 md:p-7"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--rule-warm) / 0.55)",
+        boxShadow: "var(--shadow-soft)",
+      }}
+    >
+      <div className="relative flex items-start justify-between gap-4">
+        <p className="overline text-tomato">§ ··· Send</p>
+        <span
+          className="handwritten -rotate-[6deg]"
+          style={{
+            fontSize: 15,
+            color: "hsl(var(--foreground) / 0.55)",
+          }}
+        >
+          on the books
+        </span>
+      </div>
+
       <h2
+        className="font-[family-name:var(--font-display)] relative mt-2 flex items-center gap-2 font-black tracking-[-0.02em] text-foreground"
         style={{
-          fontFamily: DISPLAY_FONT,
-          fontSize: 22,
-          fontWeight: 700,
-          letterSpacing: "-0.01em",
-          margin: 0,
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
-          color: "hsl(var(--foreground))",
+          fontSize: "clamp(1.6rem, 3.5vw, 2.25rem)",
+          lineHeight: 0.95,
         }}
       >
-        Send <PepIcon size={20} />
+        Move <PepIcon size={28} />
       </h2>
 
       {error && (
         <div
+          className="relative mt-4"
           style={{
             padding: 12,
             background: "hsl(var(--tomato) / 0.08)",
@@ -110,6 +123,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
 
       {success && (
         <div
+          className="relative mt-4"
           style={{
             padding: 12,
             background: "hsl(142 71% 35% / 0.10)",
@@ -123,7 +137,7 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         </div>
       )}
 
-      <form onSubmit={handleTransfer} style={{ display: "grid", gap: 16 }}>
+      <form onSubmit={handleTransfer} className="relative mt-5 grid gap-4">
         <Field label="Recipient Discord ID">
           <input
             type="text"
@@ -135,6 +149,8 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
             {...focusableInputProps()}
           />
         </Field>
+
+        <div className="rule-warm" />
 
         <Field label="Amount">
           <input
@@ -152,14 +168,21 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
         <button
           type="submit"
           disabled={disabled}
-          style={{ ...btn("accent", disabled), width: "100%", padding: "12px 16px" }}
+          className="btn-pill-lg group mt-2 w-full"
+          style={{
+            background: "hsl(var(--tomato))",
+            color: "hsl(var(--cream))",
+            border: "1px solid hsl(var(--tomato))",
+            boxShadow: disabled ? "none" : "var(--shadow-soft)",
+          }}
         >
           {loading ? (
             "Sending..."
           ) : (
-            <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>
+            <>
               Send <PepIcon size={14} />
-            </span>
+              <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </>
           )}
         </button>
       </form>
