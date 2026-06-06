@@ -29,6 +29,7 @@ import {
 import { btn } from "../styles";
 import { MAFIA_FILMS, type MafiaFilm } from "@/app/lib/mafia-films";
 import { FilmPoster } from "@/app/ui/onboarding/FilmPoster";
+import { ToppingPicker } from "@/app/ui/onboarding/ToppingPicker";
 
 type Props = {
   // Form data
@@ -328,19 +329,10 @@ export function NameStep({
       {/* ─── Input phase — shown until suggestions arrive ────────── */}
       {!suggestions && (
         <section className="grid gap-10">
-          <CinematicInput
+          <ToppingPicker
             label="§ 01 · Your topping"
-            placeholder="What's your topping?"
             value={topping}
             onChange={(v) => onChange({ topping: v })}
-            size="large"
-            footer={
-              topping.trim() && (
-                <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/45">
-                  {toppingDescriptor(topping)}
-                </p>
-              )
-            }
           />
 
           <FilmPicker
@@ -665,88 +657,6 @@ function KeepBlock({
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>
-    </div>
-  );
-}
-
-function CinematicInput({
-  label,
-  placeholder,
-  value,
-  onChange,
-  size,
-  footer,
-}: {
-  label: string;
-  placeholder: string;
-  value: string;
-  onChange: (v: string) => void;
-  size: "large" | "small";
-  footer?: React.ReactNode;
-}) {
-  const inputClass =
-    size === "small"
-      ? "font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
-      : "font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none";
-  const inputStyle: CSSProperties =
-    size === "small"
-      ? {
-          fontSize: "clamp(1.05rem, 2.2vw, 1.6rem)",
-          color: "hsl(var(--foreground))",
-        }
-      : {
-          fontSize: "clamp(1.4rem, 3.2vw, 2.4rem)",
-          color: "hsl(var(--foreground))",
-        };
-  const padClass =
-    size === "small"
-      ? "relative flex items-center gap-3 px-4 py-3.5 md:gap-4 md:px-6 md:py-4"
-      : "relative flex items-center gap-4 px-5 py-5 md:gap-6 md:px-8 md:py-7";
-
-  return (
-    <div className="relative">
-      <p className="overline text-tomato">{label}</p>
-      <div
-        className="relative mt-4 overflow-hidden rounded-[28px] transition-shadow"
-        style={{
-          background: "hsl(var(--cream))",
-          border: "1px solid hsl(var(--rule-warm) / 0.6)",
-          boxShadow: "0 30px 60px -40px hsl(46 100% 50% / 0.35)",
-        }}
-      >
-        <div
-          aria-hidden
-          className="pointer-events-none absolute inset-0 opacity-60"
-          style={{
-            background:
-              "radial-gradient(120% 80% at 0% 0%, hsl(46 100% 62% / 0.14), transparent 60%), radial-gradient(80% 60% at 100% 100%, hsl(0 93% 60% / 0.06), transparent 70%)",
-          }}
-        />
-        <div
-          aria-hidden
-          className="grain pointer-events-none absolute inset-0 opacity-40"
-        />
-        <label className={padClass}>
-          <Sparkles
-            className={
-              size === "small"
-                ? "h-4 w-4 shrink-0 text-foreground/35 md:h-5 md:w-5"
-                : "h-5 w-5 shrink-0 text-foreground/35 md:h-6 md:w-6"
-            }
-            aria-hidden
-          />
-          <input
-            type="text"
-            value={value}
-            onChange={(e) => onChange(e.target.value)}
-            placeholder={placeholder}
-            className={inputClass}
-            style={inputStyle}
-            aria-label={label.replace(/^§ \d+ · /, "")}
-          />
-        </label>
-      </div>
-      {footer}
     </div>
   );
 }
