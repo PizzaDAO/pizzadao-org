@@ -13,6 +13,11 @@
 // `TOPPING_EMOJI` provides the small visual glyph used as a fallback when
 // no image asset exists for a topping (e.g., free-text custom entries).
 // `TOPPING_IMAGE` maps the canonical topping name to a public URL.
+// `TOPPING_DESCRIPTOR` is the 3-word editorial phrase shown beneath the
+// topping name in the picker drawer and selected-card summary (e.g.,
+// "loud · classic · respected" for Pepperoni). Ported from
+// `MafiaNamePage.tsx` in the mockup — dough-83017 made this the source of
+// truth so the picker UI no longer ships its own copy.
 
 export const PIZZA_TOPPINGS = [
   "Pepperoni", "Mushroom", "Basil", "Mozzarella", "Anchovy", "Sausage",
@@ -63,6 +68,37 @@ export const TOPPING_IMAGE: Record<string, string> = {
   "Spicy salami": "/toppings/spicy-salami.jpg",
 };
 
+export const TOPPING_DESCRIPTOR: Record<string, string> = {
+  Pepperoni: "loud · classic · respected",
+  Mushroom: "earthy · quiet · dangerous",
+  Basil: "green · honest · sicilian",
+  Mozzarella: "soft · loyal · everywhere",
+  Anchovy: "salty · brutal · old-school",
+  Sausage: "heavy · brooklyn · proud",
+  "Hot honey": "sweet · chaotic · respected",
+  Ricotta: "creamy · gentle · holy",
+  Garlic: "sharp · unforgettable · armed",
+  Onion: "tearful · loyal · stubborn",
+  Olives: "bitter · sicilian · patient",
+  Prosciutto: "elegant · cured · expensive",
+  Pineapple: "controversial · sunlit · brave",
+  "Jalapeño": "hot · quick · unpredictable",
+  "Banana peppers": "tangy · cheerful · sneaky",
+  Soppressata: "spicy · cured · feared",
+  Meatball: "round · familiar · violent",
+  "Roasted red pepper": "sweet · smoky · charming",
+  Truffle: "rare · expensive · whispered",
+  Artichoke: "armored · roman · stubborn",
+  Eggplant: "deep · sicilian · velvet",
+  "Broccoli rabe": "bitter · green · honest",
+  "Chili crisp": "loud · oily · modern",
+  Burrata: "soft · luxurious · creamy",
+  Oregano: "dry · grandmotherly · sicilian",
+  Parmesan: "sharp · aged · proud",
+  Tomato: "red · the beginning · everything",
+  "Spicy salami": "hot · cured · dangerous",
+};
+
 /**
  * Case-insensitive image lookup. Returns `undefined` if no image exists
  * for the given topping (e.g., a free-text custom entry). Callers should
@@ -77,4 +113,22 @@ export function toppingImageFor(topping: string): string | undefined {
     (k) => k.toLowerCase() === lower,
   );
   return matchedKey ? TOPPING_IMAGE[matchedKey] : undefined;
+}
+
+/**
+ * Case-insensitive descriptor lookup. Returns the 3-word editorial phrase
+ * for the given topping, falling back to `"off-canon · your call · respected"`
+ * for free-text / custom entries that aren't in the canonical catalog.
+ */
+export function toppingDescriptorFor(topping: string): string {
+  const trimmed = topping.trim();
+  if (!trimmed) return "off-canon · your call · respected";
+  if (TOPPING_DESCRIPTOR[trimmed]) return TOPPING_DESCRIPTOR[trimmed];
+  const lower = trimmed.toLowerCase();
+  const matchedKey = Object.keys(TOPPING_DESCRIPTOR).find(
+    (k) => k.toLowerCase() === lower,
+  );
+  return matchedKey
+    ? TOPPING_DESCRIPTOR[matchedKey]
+    : "off-canon · your call · respected";
 }
