@@ -8,8 +8,13 @@
 // nothing for the profile owner and only a vouch button for visitors.
 // This component renders the role-appropriate primary CTA plus a kebab
 // for Share / Copy link / Send PEP — matching the IA tree in §4 of the
-// plan. Visual treatment stays on current cream/ink/tomato/butter
-// tokens; a Lovable port-back may re-skin later (PR5).
+// plan.
+//
+// onion-47612: editorial restyle. Visitor sign-in CTA uses .btn-pill;
+// the owner-mode inline CTA is suppressed because /profile/[id]'s sticky
+// bottom dock now carries the "Edit on dashboard" affordance (avoids two
+// copies in the hero). Vouch button is sourced from AddVouchButton —
+// left untouched (lives across owner & visitor flows).
 
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
@@ -89,20 +94,12 @@ export function ProfileActions({
     let primary: React.ReactNode = null;
     const isOwner = mode === "owner-readonly" || mode === "owner-edit";
     const isSelf = !!viewerId && viewerId === memberId;
-    // sicilian-41551: `min-h-11` bumps the CTA to the 44px tap-target floor
-    // without changing visual size on desktop (padding stays the same).
-    const ctaBase =
-        "inline-flex items-center justify-center gap-1.5 px-4 py-2 min-h-11 rounded-[--radius] text-sm font-semibold font-display transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink";
 
     if (isOwner) {
-        primary = (
-            <Link
-                href={`/dashboard/${memberId}`}
-                className={`${ctaBase} bg-transparent border border-cream/30 text-cream hover:bg-cream/10`}
-            >
-                Edit on dashboard →
-            </Link>
-        );
+        // onion-47612: the sticky editorial bottom dock on /profile/[id]
+        // carries the "Edit on dashboard" CTA, so we suppress the inline
+        // hero copy. The kebab still shows for Share/Copy.
+        primary = null;
     } else if (viewerId && !isSelf) {
         primary = (
             <AddVouchButton
@@ -115,7 +112,11 @@ export function ProfileActions({
         primary = (
             <a
                 href={`/api/discord/login?returnTo=${returnTo}`}
-                className={`${ctaBase} bg-tomato text-cream border border-tomato hover:bg-tomato-deep hover:border-tomato-deep`}
+                className="btn-pill"
+                style={{
+                    background: "hsl(var(--tomato))",
+                    color: "hsl(var(--cream))",
+                }}
             >
                 Sign in to vouch
             </a>
@@ -126,7 +127,7 @@ export function ProfileActions({
         <div className="flex items-center gap-2 shrink-0" ref={menuRef}>
             {primary}
 
-            {/* Kebab */}
+            {/* Kebab — pill-shaped to match the editorial vocabulary */}
             <div className="relative">
                 <button
                     type="button"
@@ -134,7 +135,12 @@ export function ProfileActions({
                     aria-haspopup="menu"
                     aria-expanded={menuOpen}
                     onClick={() => setMenuOpen((v) => !v)}
-                    className="inline-flex h-11 w-11 items-center justify-center rounded-[--radius] border border-cream/25 bg-transparent text-cream/85 hover:bg-cream/10 hover:text-cream transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink cursor-pointer"
+                    className="inline-flex h-11 w-11 items-center justify-center rounded-full transition-colors cursor-pointer focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink"
+                    style={{
+                        background: "transparent",
+                        color: "hsl(var(--cream) / 0.85)",
+                        border: "1px solid hsl(var(--cream) / 0.28)",
+                    }}
                 >
                     <svg
                         width="16"
@@ -152,12 +158,19 @@ export function ProfileActions({
                 {menuOpen && (
                     <div
                         role="menu"
-                        className="absolute right-0 mt-2 z-20 min-w-[180px] rounded-[--radius] border border-rule shadow-lg overflow-hidden"
+                        className="paper-soft absolute right-0 mt-2 z-20 min-w-[200px] rounded-[16px] border shadow-lg overflow-hidden"
                         style={{
                             background: "hsl(var(--card))",
                             color: "hsl(var(--card-foreground))",
+                            borderColor: "hsl(var(--rule-warm) / 0.55)",
                         }}
                     >
+                        <p
+                            className="overline px-3 pt-3 pb-1 text-foreground/55"
+                            aria-hidden
+                        >
+                            § More
+                        </p>
                         <button
                             type="button"
                             role="menuitem"
@@ -186,6 +199,16 @@ export function ProfileActions({
                             >
                                 Send PEP
                             </button>
+                        )}
+                        {isOwner && (
+                            <Link
+                                href={`/dashboard/${memberId}`}
+                                role="menuitem"
+                                className="block w-full text-left px-3 py-3 min-h-11 text-sm hover:bg-tomato/10 cursor-pointer no-underline text-foreground"
+                                onClick={() => setMenuOpen(false)}
+                            >
+                                Edit on dashboard →
+                            </Link>
                         )}
                     </div>
                 )}

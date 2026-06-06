@@ -20,6 +20,11 @@
 //   * Validation: trim + 500-char cap (matches the server route).
 //   * Loading spinners on save buttons.
 //   * Inline success confirmation (1.5s flash on Save).
+//
+// onion-47612: editorial dossier framing — paper-soft section cards,
+// "§ NN · …" overlines + display-font subheads, handwritten "draft" /
+// "live" annotations. Underlying validation, endpoints, hooks, and form
+// state are unchanged — strictly a visual restyle.
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
@@ -43,65 +48,115 @@ const FONT_DISPLAY =
 const MAX_LEN = 500;
 
 // ---------------------------------------------------------------------------
-// Local style helpers — mirrors the dashboard's previous local helpers so the
-// visual language stays identical post-move. No new design tokens.
+// Editorial section card. paper-soft + halftone over the warm cream
+// surface, with the "§ NN · …" overline rendered above an optional
+// display-font subhead.
 // ---------------------------------------------------------------------------
 
-function card(): React.CSSProperties {
-    return {
-        border: "1px solid hsl(var(--rule) / 0.12)",
-        borderRadius: "var(--radius)",
-        padding: 24,
-        boxShadow: "0 8px 30px hsl(var(--ink) / 0.06)",
-        background: "hsl(var(--card))",
-        color: "hsl(var(--card-foreground))",
-        display: "grid",
-        gap: 14,
-    };
+interface EditorialSectionProps {
+    overline: string;
+    title: string;
+    description?: string;
+    children: React.ReactNode;
+    /** Optional handwritten margin annotation (e.g. "draft", "live"). */
+    annotation?: string;
 }
 
+function EditorialSection({
+    overline,
+    title,
+    description,
+    children,
+    annotation,
+}: EditorialSectionProps) {
+    return (
+        <section
+            className="paper-soft halftone-soft relative rounded-[24px] border p-5 sm:p-6 grid gap-4 fade-up"
+            style={{
+                background: "hsl(var(--card))",
+                color: "hsl(var(--card-foreground))",
+                borderColor: "hsl(var(--rule-warm) / 0.55)",
+                boxShadow: "var(--shadow-soft, 0 8px 30px hsl(var(--ink) / 0.06))",
+            }}
+        >
+            <header className="grid gap-1 relative">
+                <p className="overline text-tomato">{overline}</p>
+                <h2
+                    className="font-[family-name:var(--font-display)] m-0 font-bold tracking-[-0.01em] text-foreground"
+                    style={{ fontSize: "clamp(1.2rem, 2.4vw, 1.5rem)" }}
+                >
+                    {title}
+                </h2>
+                {description && (
+                    <p className="m-0 text-foreground/65" style={{ fontSize: 13.5 }}>
+                        {description}
+                    </p>
+                )}
+                {annotation && (
+                    <span
+                        aria-hidden
+                        className="handwritten pointer-events-none hidden md:block absolute right-0 top-0 rotate-[-4deg]"
+                        style={{
+                            color: "hsl(var(--tomato))",
+                            fontSize: 18,
+                            opacity: 0.7,
+                        }}
+                    >
+                        {annotation}
+                    </span>
+                )}
+            </header>
+            <div className="grid gap-3">{children}</div>
+        </section>
+    );
+}
+
+// ---------------------------------------------------------------------------
+// Button shim — keeps the existing `btn()` signature for inner editors so we
+// don't have to change every save button. Now renders to the editorial
+// pill vocabulary.
+// ---------------------------------------------------------------------------
+
 function btn(kind: "primary" | "secondary"): React.CSSProperties {
-    const base: React.CSSProperties = {
+    if (kind === "primary") {
+        return {
+            display: "inline-flex",
+            alignItems: "center",
+            justifyContent: "center",
+            gap: 6,
+            padding: "10px 20px",
+            borderRadius: 9999,
+            background: "hsl(var(--ink))",
+            color: "hsl(var(--cream))",
+            border: "1px solid hsl(var(--ink))",
+            fontWeight: 600,
+            fontFamily: FONT_SANS,
+            fontSize: 13.5,
+            cursor: "pointer",
+            textDecoration: "none",
+            textAlign: "center",
+            transition:
+                "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
+        };
+    }
+    return {
         display: "inline-flex",
         alignItems: "center",
         justifyContent: "center",
         gap: 6,
-        padding: "8px 14px",
-        borderRadius: "var(--radius)",
-        border: "1px solid transparent",
+        padding: "10px 20px",
+        borderRadius: 9999,
+        background: "hsl(var(--cream))",
+        color: "hsl(var(--ink))",
+        border: "1px solid hsl(var(--rule-warm) / 0.55)",
         fontWeight: 600,
-        fontFamily: FONT_DISPLAY,
+        fontFamily: FONT_SANS,
+        fontSize: 13.5,
         cursor: "pointer",
         textDecoration: "none",
         textAlign: "center",
-        fontSize: 13,
         transition:
             "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
-    };
-    if (kind === "primary") {
-        return {
-            ...base,
-            background: "hsl(var(--primary))",
-            color: "hsl(var(--primary-foreground))",
-            borderColor: "hsl(var(--primary))",
-        };
-    }
-    return {
-        ...base,
-        background: "hsl(var(--secondary))",
-        color: "hsl(var(--secondary-foreground))",
-        borderColor: "hsl(var(--rule) / 0.22)",
-    };
-}
-
-function sectionTitle(): React.CSSProperties {
-    return {
-        margin: 0,
-        fontSize: 18,
-        fontWeight: 700,
-        fontFamily: FONT_DISPLAY,
-        letterSpacing: "-0.01em",
-        color: "hsl(var(--foreground))",
     };
 }
 
@@ -113,8 +168,8 @@ function Spinner({ size = 12 }: { size?: number }) {
                 display: "inline-block",
                 width: size,
                 height: size,
-                border: "2px solid hsl(var(--primary-foreground) / 0.35)",
-                borderTopColor: "hsl(var(--primary-foreground))",
+                border: "2px solid hsl(var(--cream) / 0.35)",
+                borderTopColor: "hsl(var(--cream))",
                 borderRadius: "50%",
                 animation: "spin 1s linear infinite",
             }}
@@ -215,10 +270,10 @@ function TextEditor({
                     placeholder={placeholder}
                     rows={3}
                     style={{
-                        padding: 10,
-                        borderRadius: 8,
-                        border: "1px solid hsl(var(--rule) / 0.22)",
-                        background: "hsl(var(--background))",
+                        padding: 12,
+                        borderRadius: 12,
+                        border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                        background: "hsl(var(--cream) / 0.4)",
                         color: "hsl(var(--foreground))",
                         fontSize: 14,
                         fontFamily: FONT_SANS,
@@ -250,12 +305,10 @@ function TextEditor({
                     {savedAt && !error ? (
                         <span
                             role="status"
-                            style={{
-                                fontSize: 13,
-                                color: "hsl(var(--muted-foreground))",
-                            }}
+                            className="overline"
+                            style={{ color: "hsl(var(--ink) / 0.55)" }}
                         >
-                            Saved
+                            § Saved
                         </span>
                     ) : null}
                 </div>
@@ -311,10 +364,10 @@ function XAccountEditor({ memberId }: { memberId: string }) {
     return (
         <div
             style={{
-                padding: 16,
-                borderRadius: 12,
-                border: "1px solid hsl(var(--rule) / 0.12)",
-                background: "hsl(var(--card))",
+                padding: 14,
+                borderRadius: 16,
+                border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                background: "hsl(var(--cream) / 0.4)",
                 display: "flex",
                 alignItems: "center",
                 gap: 12,
@@ -357,13 +410,13 @@ function XAccountEditor({ memberId }: { memberId: string }) {
                                 @{account.username}
                             </a>
                             <div
+                                className="overline"
                                 style={{
-                                    fontSize: 12,
-                                    color: "hsl(var(--muted-foreground))",
+                                    color: "hsl(var(--ink) / 0.55)",
                                     marginTop: 2,
                                 }}
                             >
-                                Connected
+                                § Connected
                             </div>
                         </div>
                         <button
@@ -393,7 +446,7 @@ function XAccountEditor({ memberId }: { memberId: string }) {
                         <span
                             style={{
                                 fontSize: 14,
-                                color: "hsl(var(--muted-foreground))",
+                                color: "hsl(var(--ink) / 0.7)",
                             }}
                         >
                             Connect your X account
@@ -519,10 +572,10 @@ function LanguageEditor({ memberId }: { memberId: string }) {
                 onChange={(e) => setLocale(e.target.value as SupportedLocale)}
                 disabled={loadingInitial || saving}
                 style={{
-                    padding: 10,
-                    borderRadius: 8,
-                    border: "1px solid hsl(var(--rule) / 0.22)",
-                    background: "hsl(var(--background))",
+                    padding: 12,
+                    borderRadius: 12,
+                    border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                    background: "hsl(var(--cream) / 0.4)",
                     color: "hsl(var(--foreground))",
                     fontSize: 14,
                     fontFamily: FONT_SANS,
@@ -560,12 +613,10 @@ function LanguageEditor({ memberId }: { memberId: string }) {
                 {savedAt && !error ? (
                     <span
                         role="status"
-                        style={{
-                            fontSize: 13,
-                            color: "hsl(var(--muted-foreground))",
-                        }}
+                        className="overline"
+                        style={{ color: "hsl(var(--ink) / 0.55)" }}
                     >
-                        {tCommon("saved")}
+                        § {tCommon("saved")}
                     </span>
                 ) : null}
             </div>
@@ -588,19 +639,13 @@ function LanguageEditor({ memberId }: { memberId: string }) {
 function LanguageSection({ memberId }: { memberId: string }) {
     const t = useTranslations("language");
     return (
-        <section style={card()}>
-            <h2 style={sectionTitle()}>{t("sectionTitle")}</h2>
-            <p
-                style={{
-                    margin: 0,
-                    fontSize: 13,
-                    color: "hsl(var(--muted-foreground))",
-                }}
-            >
-                {t("description")}
-            </p>
+        <EditorialSection
+            overline="§ 06 · Language"
+            title={t("sectionTitle")}
+            description={t("description")}
+        >
             <LanguageEditor memberId={memberId} />
-        </section>
+        </EditorialSection>
     );
 }
 
@@ -627,15 +672,8 @@ export function EditClient({ memberId }: { memberId: string }) {
     if (isLoading) {
         return (
             <div
-                style={{
-                    minHeight: "100vh",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "hsl(var(--background))",
-                    color: "hsl(var(--foreground))",
-                    fontFamily: FONT_SANS,
-                }}
+                className="min-h-screen bg-background text-foreground flex items-center justify-center"
+                style={{ fontFamily: FONT_SANS }}
             >
                 <div style={{ textAlign: "center" }}>
                     <div
@@ -649,9 +687,7 @@ export function EditClient({ memberId }: { memberId: string }) {
                             margin: "0 auto 20px",
                         }}
                     />
-                    <p style={{ color: "hsl(var(--muted-foreground))" }}>
-                        Loading your profile…
-                    </p>
+                    <p className="overline text-foreground/55">§ Pulling your dossier</p>
                     <style jsx>{`
                         @keyframes spin {
                             0% { transform: rotate(0deg); }
@@ -666,36 +702,38 @@ export function EditClient({ memberId }: { memberId: string }) {
     if (error || !userData) {
         return (
             <div
-                style={{
-                    minHeight: "100vh",
-                    display: "flex",
-                    alignItems: "center",
-                    justifyContent: "center",
-                    background: "hsl(var(--background))",
-                    color: "hsl(var(--foreground))",
-                    fontFamily: FONT_SANS,
-                    padding: 20,
-                }}
+                className="min-h-screen bg-background text-foreground flex items-center justify-center p-5"
+                style={{ fontFamily: FONT_SANS }}
             >
-                <div style={card()}>
+                <div
+                    className="paper-soft halftone-soft grid gap-3 rounded-[28px] border p-7 max-w-md w-full"
+                    style={{
+                        background: "hsl(var(--card))",
+                        color: "hsl(var(--card-foreground))",
+                        borderColor: "hsl(var(--rule-warm) / 0.55)",
+                        boxShadow: "var(--shadow-soft, 0 8px 30px hsl(var(--ink) / 0.06))",
+                    }}
+                >
+                    <p className="overline text-tomato">§ Something stalled</p>
                     <h1
-                        style={{
-                            margin: 0,
-                            fontSize: 24,
-                            fontFamily: FONT_DISPLAY,
-                            fontWeight: 800,
-                        }}
+                        className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em] text-foreground m-0"
+                        style={{ fontSize: "clamp(1.5rem, 3.6vw, 2rem)", lineHeight: 1.0 }}
                     >
                         Couldn't load your profile
                     </h1>
-                    <p style={{ color: "hsl(var(--muted-foreground))", margin: 0 }}>
+                    <p className="text-foreground/70 m-0">
                         {error instanceof Error
                             ? error.message
                             : "Please try again in a moment."}
                     </p>
                     <Link
                         href={`/dashboard/${memberId}`}
-                        style={btn("secondary")}
+                        className="btn-pill self-start"
+                        style={{
+                            background: "hsl(var(--cream))",
+                            color: "hsl(var(--ink))",
+                            border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                        }}
                     >
                         ← Back to dashboard
                     </Link>
@@ -706,93 +744,75 @@ export function EditClient({ memberId }: { memberId: string }) {
 
     return (
         <div
-            style={{
-                minHeight: "100vh",
-                background: "hsl(var(--background))",
-                color: "hsl(var(--foreground))",
-                fontFamily: FONT_SANS,
-                padding: "40px 20px",
-            }}
+            className="min-h-screen bg-background text-foreground"
+            style={{ fontFamily: FONT_SANS }}
         >
-            <div
-                style={{
-                    maxWidth: 800,
-                    margin: "0 auto",
-                    display: "grid",
-                    gap: 20,
-                }}
-            >
-                {/* Top nav: back + heading */}
-                <div
-                    style={{
-                        display: "flex",
-                        alignItems: "center",
-                        justifyContent: "space-between",
-                        gap: 12,
-                        flexWrap: "wrap",
-                    }}
-                >
-                    <div>
+            <div className="mx-auto max-w-3xl px-5 py-8 sm:py-10 grid gap-6 fade-up">
+                {/* Top nav: back link + heading + view-public link */}
+                <div className="flex items-center justify-between gap-3 flex-wrap">
+                    <div className="grid gap-2">
                         <Link
                             href={`/dashboard/${memberId}`}
-                            style={{
-                                fontSize: 14,
-                                color: "hsl(var(--muted-foreground))",
-                                textDecoration: "none",
-                            }}
+                            className="overline text-foreground/55 hover:text-tomato transition-colors no-underline"
                         >
                             ← Back to dashboard
                         </Link>
-                        <h1
-                            style={{
-                                margin: "4px 0 0",
-                                fontSize: 32,
-                                fontFamily: FONT_DISPLAY,
-                                fontWeight: 800,
-                                letterSpacing: "-0.01em",
-                            }}
-                        >
-                            Edit profile
-                        </h1>
+                        <div className="relative inline-block">
+                            <p className="overline text-tomato">§ The editorial desk</p>
+                            <h1
+                                className="font-[family-name:var(--font-display)] m-0 mt-2 font-black tracking-[-0.015em] text-foreground"
+                                style={{
+                                    fontSize: "clamp(2rem, 5.5vw, 3.25rem)",
+                                    lineHeight: 0.95,
+                                }}
+                            >
+                                Edit profile
+                            </h1>
+                            <span
+                                aria-hidden
+                                className="handwritten pointer-events-none hidden md:block absolute -top-2 right-[-110px] rotate-[-6deg]"
+                                style={{
+                                    color: "hsl(var(--tomato))",
+                                    fontSize: 18,
+                                    opacity: 0.8,
+                                }}
+                            >
+                                draft, then live
+                            </span>
+                        </div>
                     </div>
                     <Link
                         href={`/profile/${memberId}`}
-                        style={btn("secondary")}
+                        className="btn-pill self-end"
+                        style={{
+                            background: "hsl(var(--cream))",
+                            color: "hsl(var(--ink))",
+                            border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                        }}
                     >
-                        View public profile
+                        View public profile →
                     </Link>
                 </div>
 
                 {/* Tagline — single-line public bio */}
-                <section style={card()}>
-                    <h2 style={sectionTitle()}>Tagline</h2>
-                    <p
-                        style={{
-                            margin: 0,
-                            fontSize: 13,
-                            color: "hsl(var(--muted-foreground))",
-                        }}
-                    >
-                        One line. Shows under your name on your profile and in social previews.
-                    </p>
+                <EditorialSection
+                    overline="§ 01 · The byline"
+                    title="Tagline"
+                    description="One line. Shows under your name on your profile and in social previews."
+                    annotation="live"
+                >
                     <TaglineEditor
                         memberId={memberId}
                         initialTagline={taglineInitial}
                     />
-                </section>
+                </EditorialSection>
 
                 {/* Status / About */}
-                <section style={card()}>
-                    <h2 style={sectionTitle()}>About</h2>
-                    <p
-                        style={{
-                            margin: 0,
-                            fontSize: 13,
-                            color: "hsl(var(--muted-foreground))",
-                        }}
-                    >
-                        How you show up on your public profile.
-                    </p>
+                <EditorialSection
+                    overline="§ 02 · About"
+                    title="About"
+                    description="How you show up on your public profile."
+                >
                     <TextEditor
                         label="Orgs"
                         hint="Comma-separated. Companies, projects, DAOs you work with."
@@ -811,60 +831,53 @@ export function EditClient({ memberId }: { memberId: string }) {
                         fieldKey="skills"
                         placeholder="e.g. solidity, design, video editing"
                     />
-                </section>
+                </EditorialSection>
 
                 {/* Identity / Connections */}
-                <section style={card()}>
-                    <h2 style={sectionTitle()}>Connections</h2>
-                    <p
-                        style={{
-                            margin: 0,
-                            fontSize: 13,
-                            color: "hsl(var(--muted-foreground))",
-                        }}
-                    >
-                        Link your social accounts so the community can find and vouch for you.
-                    </p>
+                <EditorialSection
+                    overline="§ 03 · Connections"
+                    title="Connections"
+                    description="Link your social accounts so the community can find and vouch for you."
+                >
                     <XAccountEditor memberId={memberId} />
                     <SocialAccountLinker memberId={memberId} />
-                </section>
+                </EditorialSection>
 
                 {/* Profile links */}
-                <section style={card()}>
-                    <h2 style={sectionTitle()}>Profile links</h2>
-                    <p
-                        style={{
-                            margin: 0,
-                            fontSize: 13,
-                            color: "hsl(var(--muted-foreground))",
-                        }}
-                    >
-                        Add your website, portfolio, and other links.
-                    </p>
+                <EditorialSection
+                    overline="§ 04 · Links"
+                    title="Profile links"
+                    description="Add your website, portfolio, and other links."
+                >
                     <ProfileLinksEditor memberId={memberId} />
-                </section>
+                </EditorialSection>
 
                 {/* Language preference — wired via /api/profile-extras */}
                 <LanguageSection memberId={memberId} />
 
                 {/* Wallets pointer */}
-                <section style={card()}>
-                    <h2 style={sectionTitle()}>Wallets</h2>
-                    <p
-                        style={{
-                            margin: 0,
-                            fontSize: 13,
-                            color: "hsl(var(--muted-foreground))",
-                        }}
-                    >
-                        Wallet management has its own page now.
-                    </p>
+                <EditorialSection
+                    overline="§ 07 · Wallets"
+                    title="Wallets"
+                    description="Wallet management has its own page now."
+                >
                     <div>
-                        <Link href="/me/wallets" style={btn("primary")}>
+                        <Link
+                            href="/me/wallets"
+                            className="btn-pill"
+                            style={{
+                                background: "hsl(var(--ink))",
+                                color: "hsl(var(--cream))",
+                            }}
+                        >
                             Manage wallets →
                         </Link>
                     </div>
-                </section>
+                </EditorialSection>
+
+                <div className="text-center mt-2">
+                    <p className="overline text-foreground/35">§ End of the editorial desk</p>
+                </div>
             </div>
         </div>
     );
