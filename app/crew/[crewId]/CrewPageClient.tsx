@@ -452,18 +452,21 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
           {/* Hero */}
           <header style={{ textAlign: 'center', marginBottom: 8 }}>
-            <div style={{ fontSize: 56, marginBottom: 8, lineHeight: 1 }}>
+            <div style={{ fontSize: 'clamp(2.5rem, 12vw, 56px)', marginBottom: 8, lineHeight: 1 }}>
               {crew.emoji || '🍕'}
             </div>
             <h1
               style={{
-                fontSize: 56,
+                // quattro-formaggi-54080: clamp so the title scales from
+                // 32px on 375px viewports up to 56px on desktop.
+                fontSize: 'clamp(2rem, 8vw, 3.5rem)',
                 lineHeight: 1.02,
                 fontWeight: 800,
                 margin: 0,
                 letterSpacing: '-0.015em',
                 fontFamily: DISPLAY_FONT,
                 color: 'hsl(var(--foreground))',
+                overflowWrap: 'anywhere',
               }}
             >
               {crew.label}
@@ -548,7 +551,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               <div
                 style={{
                   display: 'grid',
-                  gridTemplateColumns: 'repeat(auto-fill, minmax(220px, 1fr))',
+                  // quattro-formaggi-54080: min(220px, 100%) so 375px
+                  // viewports collapse to one column without overflow.
+                  gridTemplateColumns: 'repeat(auto-fill, minmax(min(220px, 100%), 1fr))',
                   gap: 12,
                 }}
               >
@@ -561,6 +566,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                       display: 'block',
                       textDecoration: 'none',
                       color: 'hsl(var(--foreground))',
+                      minHeight: 44,
                     }}
                   >
                     <div
@@ -569,6 +575,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                         fontSize: 16,
                         fontFamily: DISPLAY_FONT,
                         letterSpacing: '-0.005em',
+                        overflowWrap: 'anywhere',
                       }}
                     >
                       {member.name}
@@ -634,16 +641,20 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                       display: 'flex',
                       gap: 10,
                       alignItems: 'center',
+                      // quattro-formaggi-54080: let long task / lead names
+                      // wrap to a second line on <sm rather than overflow.
+                      flexWrap: 'wrap',
                     }}
                   >
                     <span style={{ fontSize: 14 }}>✅</span>
-                    <span style={{ fontWeight: 600 }}>{t.task}</span>
+                    <span style={{ fontWeight: 600, overflowWrap: 'anywhere', minWidth: 0, flex: '1 1 auto' }}>{t.task}</span>
                     {t.lead && t.lead !== '#N/A' && (
                       <span
                         style={{
                           fontSize: 12,
                           color: 'hsl(var(--muted-foreground))',
                           marginLeft: 'auto',
+                          overflowWrap: 'anywhere',
                         }}
                       >
                         by {t.leadId ? (
@@ -666,7 +677,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             style={{
               textAlign: 'center',
               marginTop: 8,
-              padding: 24,
+              // quattro-formaggi-54080: clamp padding so the CTA card
+              // doesn't crowd a 375px viewport.
+              padding: 'clamp(16px, 5vw, 24px)',
               borderRadius: 'var(--radius)',
               background: 'hsl(var(--muted) / 0.5)',
             }}
@@ -749,15 +762,18 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
         {/* Header */}
         <header style={{ textAlign: 'center', marginBottom: 8 }}>
-          <div style={{ fontSize: 56, marginBottom: 8, lineHeight: 1 }}>{crew.emoji || '🍕'}</div>
+          <div style={{ fontSize: 'clamp(2.5rem, 12vw, 56px)', marginBottom: 8, lineHeight: 1 }}>{crew.emoji || '🍕'}</div>
           <h1 style={{
-            fontSize: 56,
+            // quattro-formaggi-54080: clamp so the title scales from 32px
+            // on 375px viewports up to 56px on desktop.
+            fontSize: 'clamp(2rem, 8vw, 3.5rem)',
             lineHeight: 1.02,
             fontWeight: 800,
             margin: 0,
             letterSpacing: '-0.015em',
             fontFamily: DISPLAY_FONT,
             color: 'hsl(var(--foreground))',
+            overflowWrap: 'anywhere',
           }}>
             {crew.label}
           </h1>
@@ -852,44 +868,48 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           <div style={card()}>
             <h2
               onClick={() => toggleSection('agenda')}
-              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
             >
               {collapsedSections.agenda ? '▶' : '▼'} Meeting Agenda ({agenda.length})
             </h2>
             {!collapsedSections.agenda && (
-              <table style={{ width: '100%', borderCollapse: 'collapse' }}>
-                <thead>
-                  <tr>
-                    <th style={th()}>Time</th>
-                    <th style={th()}>Lead</th>
-                    <th style={th()}>Step</th>
-                    <th style={th()}>Action</th>
-                  </tr>
-                </thead>
-                <tbody>
-                  {agenda.map((item, i) => (
-                    <tr key={i}>
-                      <td style={td()}>{item.time}</td>
-                      <td style={td()}>{item.lead}</td>
-                      <td style={td()}>
-                        {item.stepUrl ? (
-                          <a
-                            href={item.stepUrl}
-                            target="_blank"
-                            rel="noreferrer"
-                            style={inlineLink()}
-                          >
-                            {item.step}
-                          </a>
-                        ) : (
-                          item.step
-                        )}
-                      </td>
-                      <td style={td()}>{item.action}</td>
+              // quattro-formaggi-54080: 4-column table needs horizontal
+              // scroll on <sm viewports rather than overflowing the card.
+              <div style={{ overflowX: 'auto', maxWidth: '100%', WebkitOverflowScrolling: 'touch' }}>
+                <table style={{ width: '100%', borderCollapse: 'collapse', minWidth: 480 }}>
+                  <thead>
+                    <tr>
+                      <th style={th()}>Time</th>
+                      <th style={th()}>Lead</th>
+                      <th style={th()}>Step</th>
+                      <th style={th()}>Action</th>
                     </tr>
-                  ))}
-                </tbody>
-              </table>
+                  </thead>
+                  <tbody>
+                    {agenda.map((item, i) => (
+                      <tr key={i}>
+                        <td style={td()}>{item.time}</td>
+                        <td style={td()}>{item.lead}</td>
+                        <td style={td()}>
+                          {item.stepUrl ? (
+                            <a
+                              href={item.stepUrl}
+                              target="_blank"
+                              rel="noreferrer"
+                              style={inlineLink()}
+                            >
+                              {item.step}
+                            </a>
+                          ) : (
+                            item.step
+                          )}
+                        </td>
+                        <td style={td()}>{item.action}</td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
             )}
           </div>
         )}
@@ -912,8 +932,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
           const renderMemberCard = (member: typeof roster[0], i: number) => (
             <div key={i} style={memberCard()}>
-              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8 }}>
-                <div style={{ minWidth: 0 }}>
+              <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 8, flexWrap: 'wrap' }}>
+                <div style={{ minWidth: 0, flex: '1 1 60%' }}>
                   <Link
                     href={`/profile/${member.id}`}
                     style={{
@@ -924,6 +944,13 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                       fontFamily: DISPLAY_FONT,
                       letterSpacing: '-0.005em',
                       transition: 'color 150ms ease',
+                      // quattro-formaggi-54080: long pizza names (e.g.
+                      // "Bartholomew the Bell-Pepper Bandito") wrap rather
+                      // than overflow the card on phones.
+                      display: 'inline-block',
+                      overflowWrap: 'anywhere',
+                      minHeight: 44,
+                      lineHeight: 1.3,
                     }}
                     onMouseEnter={(e) => (e.currentTarget.style.color = 'hsl(var(--tomato))')}
                     onMouseLeave={(e) => (e.currentTarget.style.color = 'hsl(var(--foreground))')}
@@ -979,7 +1006,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             <div style={card()}>
               <h2
                 onClick={() => toggleSection('roster')}
-                style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+                style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
               >
                 {collapsedSections.roster ? '▶' : '▼'} Crew Roster ({visibleRoster.length} members)
               </h2>
@@ -989,7 +1016,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   <h3 style={subSectionTitle('hsl(142 71% 30%)')}>
                     Active ({activeMembers.length})
                   </h3>
-                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                  <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
                     {activeMembers.map(renderMemberCard)}
                   </div>
                 </>
@@ -1004,7 +1031,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                     <span>{collapsedSections.bench ? '▶' : '▼'} Bench ({benchMembers.length})</span>
                   </h3>
                   {!collapsedSections.bench && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
                       {benchMembers.map(renderMemberCard)}
                     </div>
                   )}
@@ -1020,7 +1047,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                     <span>{collapsedSections.other ? '▶' : '▼'} Other ({otherMembers.length})</span>
                   </h3>
                   {!collapsedSections.other && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
                       {otherMembers.map(renderMemberCard)}
                     </div>
                   )}
@@ -1035,12 +1062,12 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           <div style={card()}>
             <h2
               onClick={() => toggleSection('goals')}
-              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
             >
               {collapsedSections.goals ? '▶' : '▼'} Goals ({goals.length})
             </h2>
             {!collapsedSections.goals && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
                 {goals.map((goal, i) => (
                   <div key={i} style={itemCard(goal.priority)}>
                     {goal.priority && (
@@ -1151,6 +1178,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   fontSize: 16,
                   letterSpacing: '-0.005em',
                   color: 'hsl(var(--foreground))',
+                  // quattro-formaggi-54080: long task titles wrap rather
+                  // than push the card width past the viewport.
+                  overflowWrap: 'anywhere',
                 }}>
                   {task.url ? (
                     <a
@@ -1198,8 +1228,10 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                     style={{
                       ...btn('accent', isClaiming),
                       marginTop: 10,
-                      padding: '6px 12px',
-                      fontSize: 12,
+                      // quattro-formaggi-54080: keep btn() minHeight 44 and
+                      // bump font 12→14 so the button is readable on phones.
+                      padding: '8px 14px',
+                      fontSize: 14,
                     }}
                   >
                     {isClaiming ? 'Claiming...' : 'Claim Task'}
@@ -1212,8 +1244,10 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                     style={{
                       ...btn('secondary', isClaiming),
                       marginTop: 10,
-                      padding: '6px 12px',
-                      fontSize: 12,
+                      // quattro-formaggi-54080: keep btn() minHeight 44 and
+                      // bump font 12→14 so the button is readable on phones.
+                      padding: '8px 14px',
+                      fontSize: 14,
                       borderColor: 'hsl(var(--tomato) / 0.35)',
                       color: 'hsl(var(--tomato))',
                       background: 'transparent',
@@ -1239,12 +1273,14 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 const openCount = tasks.filter(needsLead).length
                 if (openCount === 0) return null
                 return (
-                  <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginBottom: 16, fontSize: 13, color: 'hsl(var(--muted-foreground))', cursor: 'pointer' }}>
+                  <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginBottom: 16, fontSize: 14, color: 'hsl(var(--muted-foreground))', cursor: 'pointer', minHeight: 44, padding: '8px 0' }}>
                     <input
                       type="checkbox"
                       checked={showOpenOnly}
                       onChange={(e) => setShowOpenOnly(e.target.checked)}
-                      style={{ cursor: 'pointer', accentColor: 'hsl(var(--tomato))' }}
+                      // quattro-formaggi-54080: bump checkbox to 20px so the
+                      // tap target on the input itself isn't sub-pinky.
+                      style={{ cursor: 'pointer', accentColor: 'hsl(var(--tomato))', width: 20, height: 20 }}
                     />
                     Show open tasks only ({openCount})
                   </label>
@@ -1260,7 +1296,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                     <span>{collapsedSections.myTasks ? '▶' : '▼'} My Tasks ({myTasks.length})</span>
                   </h3>
                   {!collapsedSections.myTasks && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
                       {myTasks.map(renderTaskCard)}
                     </div>
                   )}
@@ -1276,7 +1312,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                     <span>{collapsedSections.topTasks ? '▶' : '▼'} Top Tasks ({filteredTopTasks.length})</span>
                   </h3>
                   {!collapsedSections.topTasks && (
-                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                    <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
                       {filteredTopTasks.map(renderTaskCard)}
                     </div>
                   )}
@@ -1298,7 +1334,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                       <span>{isCollapsed ? '▶' : '▼'} {goalName} ({goalTasks.length})</span>
                     </h3>
                     {!isCollapsed && (
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12, marginBottom: 24 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
                         {goalTasks.map(renderTaskCard)}
                       </div>
                     )}
@@ -1316,17 +1352,19 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                   </h3>
                   {!collapsedSections.otherTasks && (
                     <>
-                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+                      <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
                         {filteredUngroupedTasks.map(renderTaskCard)}
                         {showLaterTasks && filteredLaterTasks.map(renderTaskCard)}
                       </div>
                       {filteredLaterTasks.length > 0 && (
-                        <label style={{ display: 'flex', alignItems: 'center', gap: 8, marginTop: 16, fontSize: 13, color: 'hsl(var(--muted-foreground))', cursor: 'pointer' }}>
+                        <label style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 16, fontSize: 14, color: 'hsl(var(--muted-foreground))', cursor: 'pointer', minHeight: 44, padding: '8px 0' }}>
                           <input
                             type="checkbox"
                             checked={showLaterTasks}
                             onChange={(e) => setShowLaterTasks(e.target.checked)}
-                            style={{ cursor: 'pointer', accentColor: 'hsl(var(--tomato))' }}
+                            // quattro-formaggi-54080: 20px checkbox so the
+                            // tap target on the input isn't sub-pinky.
+                            style={{ cursor: 'pointer', accentColor: 'hsl(var(--tomato))', width: 20, height: 20 }}
                           />
                           Show &quot;Later&quot; tasks ({filteredLaterTasks.length})
                         </label>
@@ -1344,12 +1382,12 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           <div style={card()}>
             <h2
               onClick={() => toggleSection('manuals')}
-              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none' }}
+              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
             >
               {collapsedSections.manuals ? '▶' : '▼'} Manuals ({manuals.length})
             </h2>
             {!collapsedSections.manuals && (
-              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(280px, 1fr))', gap: 12 }}>
+              <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
                 {manuals.map((manual, i) => (
                   <div key={i} style={itemCard(manual.status)}>
                     {manual.status && <span style={manualStatusBadge(manual.status)}>{manual.status}</span>}
@@ -1477,6 +1515,12 @@ function collapsibleHeader(color: string): React.CSSProperties {
     userSelect: 'none',
     textTransform: 'uppercase',
     letterSpacing: '0.06em',
+    // quattro-formaggi-54080: 44px tap-target floor (WCAG 2.5.5) for
+    // these collapsible h3 toggles. Padding + flex to align the chevron.
+    minHeight: 44,
+    display: 'flex',
+    alignItems: 'center',
+    padding: '8px 0',
   }
 }
 
