@@ -1,12 +1,36 @@
 // app/lib/topping-images.ts
 //
-// quattro-formaggi-54456 — Catalog of topping image assets used by the
-// NameStep topping picker. Maps the canonical topping name (matching
-// `PIZZA_TOPPINGS` in `mafia-films.ts`) to a public URL.
+// quattro-formaggi-54456 — Canonical catalog of pizza toppings used by the
+// NameStep topping picker, plus the image and emoji maps that decorate
+// each entry.
 //
-// Ported from the Lovable mockup (`src/data/topping-images.ts`). The
-// mockup bundled the JPGs through Vite imports; we instead serve them
-// from `public/toppings/*.jpg` as Next.js static assets.
+// Ported from the Lovable mockup (`src/data/topping-images.ts` +
+// `src/data/mafia-films.ts`). The mockup bundled the JPGs through Vite
+// imports; we instead serve them from `public/toppings/*.jpg` as Next.js
+// static assets.
+//
+// `PIZZA_TOPPINGS` is the ordered list shown in the picker drawer.
+// `TOPPING_EMOJI` provides the small visual glyph used as a fallback when
+// no image asset exists for a topping (e.g., free-text custom entries).
+// `TOPPING_IMAGE` maps the canonical topping name to a public URL.
+
+export const PIZZA_TOPPINGS = [
+  "Pepperoni", "Mushroom", "Basil", "Mozzarella", "Anchovy", "Sausage",
+  "Hot honey", "Ricotta", "Garlic", "Onion", "Olives", "Prosciutto",
+  "Pineapple", "Jalapeño", "Banana peppers", "Soppressata", "Meatball",
+  "Roasted red pepper", "Truffle", "Artichoke", "Eggplant", "Broccoli rabe",
+  "Chili crisp", "Burrata", "Oregano", "Parmesan", "Tomato", "Spicy salami",
+];
+
+export const TOPPING_EMOJI: Record<string, string> = {
+  Pepperoni: "🍕", Mushroom: "🍄", Basil: "🌿", Mozzarella: "🧀", Anchovy: "🐟",
+  Sausage: "🌭", "Hot honey": "🍯", Ricotta: "🥛", Garlic: "🧄", Onion: "🧅",
+  Olives: "🫒", Prosciutto: "🥓", Pineapple: "🍍", "Jalapeño": "🌶️",
+  "Banana peppers": "🌶️", Soppressata: "🥩", Meatball: "🍖",
+  "Roasted red pepper": "🫑", Truffle: "🍄‍🟫", Artichoke: "🌱",
+  Eggplant: "🍆", "Broccoli rabe": "🥦", "Chili crisp": "🌶️",
+  Burrata: "🧀", Oregano: "🌿", Parmesan: "🧀", Tomato: "🍅", "Spicy salami": "🥩",
+};
 
 export const TOPPING_IMAGE: Record<string, string> = {
   "Pepperoni": "/toppings/pepperoni.jpg",

@@ -21,8 +21,11 @@
 import { useMemo, useRef, useState, type CSSProperties } from "react";
 import { Search, Sparkles, X } from "lucide-react";
 
-import { PIZZA_TOPPINGS, TOPPING_EMOJI } from "@/app/lib/mafia-films";
-import { toppingImageFor } from "@/app/lib/topping-images";
+import {
+  PIZZA_TOPPINGS,
+  TOPPING_EMOJI,
+  toppingImageFor,
+} from "@/app/lib/topping-images";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Featured set + flavor labels — visual only.
