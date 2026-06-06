@@ -4,6 +4,12 @@ import React, { useState, useEffect } from "react";
 
 type UserLinkProps = {
   discordId: string;
+  // spinach-65462: if the parent already knows the sheet memberId (e.g. the
+  // server resolved it before sending the row), pass it in. We then link
+  // directly to /profile/{memberId} on first paint instead of waiting for
+  // the per-user `/api/member-lookup/{discordId}` round-trip, and we never
+  // fall back to /profile/{discordSnowflake}.
+  memberId?: string | null;
   style?: React.CSSProperties;
 };
 
@@ -16,15 +22,28 @@ const memberIdCache: Record<string, string> = {};
  * shifts to tomato on hover with a 2px underline offset to match the
  * pizzadao.org link treatment.
  */
-export function UserLink({ discordId, style }: UserLinkProps) {
+export function UserLink({ discordId, memberId: providedMemberId, style }: UserLinkProps) {
   const [name, setName] = useState<string | null>(nameCache[discordId] || null);
-  const [memberId, setMemberId] = useState<string | null>(memberIdCache[discordId] || null);
+  const [memberId, setMemberId] = useState<string | null>(
+    providedMemberId || memberIdCache[discordId] || null,
+  );
   const [loading, setLoading] = useState(!nameCache[discordId]);
+
+  // Seed the shared cache so other instances rendering the same Discord ID
+  // also pick up the server-provided memberId without a fetch.
+  useEffect(() => {
+    if (providedMemberId) {
+      memberIdCache[discordId] = providedMemberId;
+      setMemberId(providedMemberId);
+    }
+  }, [discordId, providedMemberId]);
 
   useEffect(() => {
     if (nameCache[discordId]) {
       setName(nameCache[discordId]);
-      setMemberId(memberIdCache[discordId] || null);
+      if (!providedMemberId) {
+        setMemberId(memberIdCache[discordId] || null);
+      }
       setLoading(false);
       return;
     }
@@ -38,7 +57,9 @@ export function UserLink({ discordId, style }: UserLinkProps) {
           setName(data.data.Name);
           if (data.memberId) {
             memberIdCache[discordId] = String(data.memberId);
-            setMemberId(String(data.memberId));
+            // Don't clobber an explicitly provided memberId — but if none
+            // was provided, populate from the lookup response.
+            if (!providedMemberId) setMemberId(String(data.memberId));
           }
         } else {
           // Fallback to truncated ID
@@ -52,11 +73,32 @@ export function UserLink({ discordId, style }: UserLinkProps) {
     };
 
     fetchName();
-  }, [discordId]);
+  }, [discordId, providedMemberId]);
 
   const displayName = loading ? discordId.slice(0, 8) + "..." : name;
-  // Use memberId for profile link if available, fall back to discordId
-  const profileId = memberId || discordId;
+  // spinach-65462: prefer the server-provided memberId, then the cached
+  // memberId resolved via /api/member-lookup. ONLY fall back to discordId
+  // when neither is known — and in that case, render a non-link span so we
+  // never produce a broken /profile/{discordSnowflake} URL.
+  const profileId = memberId;
+
+  // No resolved memberId yet — render plain text so we don't link to a
+  // broken /profile/{discordSnowflake} URL. The link will appear on the
+  // next render once the lookup completes (or immediately if the parent
+  // supplied a memberId).
+  if (!profileId) {
+    return (
+      <span
+        style={{
+          color: "hsl(var(--foreground))",
+          fontWeight: 600,
+          ...style,
+        }}
+      >
+        {displayName}
+      </span>
+    );
+  }
 
   return (
     <a
