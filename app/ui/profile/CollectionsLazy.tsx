@@ -8,6 +8,11 @@
 // defaultClosed so first paint isn't blocked, and children are only
 // mounted once the section opens OR scrolls into view — whichever comes
 // first.
+//
+// onion-47612: editorial restyle — paper-soft card wrapper with
+// "§ 06 · Collections" overline above the CollapsibleSection title. The
+// CollapsibleSection primitive itself is off-limits, so we layer
+// the overline above and leave the title control as-is.
 
 import { useEffect, useRef, useState } from "react";
 import { POAPCollection } from "../poap";
@@ -52,12 +57,15 @@ export function CollectionsLazy({ memberId }: CollectionsLazyProps) {
     return (
         <section
             ref={wrapperRef}
-            className="rounded-[--radius] border border-rule p-5 sm:p-6 shadow-sm"
+            className="paper-soft halftone-soft relative rounded-[24px] border p-5 sm:p-6"
             style={{
                 background: "hsl(var(--card))",
                 color: "hsl(var(--card-foreground))",
+                borderColor: "hsl(var(--rule-warm) / 0.55)",
+                boxShadow: "var(--shadow-soft, 0 8px 30px hsl(var(--ink) / 0.06))",
             }}
         >
+            <p className="overline text-tomato mb-3">§ 06 · Collections</p>
             <ToggleAndMount memberId={memberId} onOpenChange={setOpened} shouldMount={shouldMount} />
         </section>
     );

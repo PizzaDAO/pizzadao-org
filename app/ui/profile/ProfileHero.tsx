@@ -8,6 +8,11 @@
 // identity line (city · level · mafia rank), and the primary-action slot
 // (ProfileActions). Owner banner above the hero is rendered here too because
 // it's part of the hero visual rhythm.
+//
+// onion-47612: editorial restyle. The hero is now an "ink band" with
+// paper-soft + grain textures, "§ 01 · The dossier" overline, display-
+// font name with clamp(), and a handwritten margin annotation tucked
+// beside the level pill. Props are unchanged.
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
@@ -31,6 +36,12 @@ interface ProfileHeroProps {
 }
 
 const OWNER_BANNER_KEY = "profile-owner-banner-seen";
+
+// Light spotlight + warm ink-bleed behind the headline.
+const HERO_SPOTLIGHT_STYLE: React.CSSProperties = {
+    background:
+        "radial-gradient(80% 60% at 18% 0%, hsl(46 100% 62% / 0.18), transparent 60%), radial-gradient(70% 60% at 95% 12%, hsl(0 93% 60% / 0.16), transparent 65%)",
+};
 
 export function ProfileHero({
     memberId,
@@ -70,40 +81,21 @@ export function ProfileHero({
         }
     }
 
-    const identityParts: React.ReactNode[] = [];
-    if (city) identityParts.push(<span key="city">{city}</span>);
-    if (level !== null && level !== undefined && level !== "") {
-        identityParts.push(
-            <Link
-                key="level"
-                href="/missions"
-                className="text-cream/85 hover:text-cream transition-colors no-underline"
-            >
-                Lv. {level}
-                {levelTitle ? ` · ${levelTitle}` : ""}
-            </Link>,
-        );
-    }
-    if (mafiaRank) {
-        identityParts.push(
-            <span key="mafia" style={{ color: "hsl(var(--butter))" }}>
-                {mafiaRank}
-            </span>,
-        );
-    }
+    const hasLevel = level !== null && level !== undefined && level !== "";
 
     return (
         <div className="grid gap-3">
             {bannerVisible && (
                 <div
                     role="status"
-                    className="rounded-[--radius] border border-rule p-3 text-sm flex items-start gap-3"
+                    className="paper-soft rounded-[18px] border p-3 text-sm flex items-start gap-3"
                     style={{
-                        background: "hsl(var(--butter) / 0.20)",
+                        background: "hsl(var(--butter) / 0.22)",
                         color: "hsl(var(--ink))",
+                        borderColor: "hsl(var(--rule-warm) / 0.55)",
                     }}
                 >
-                    <span className="flex-1">
+                    <span className="flex-1 relative">
                         <strong className="font-display font-bold">This is your public profile</strong>
                         {" "}— visitors see this. Manage on{" "}
                         <Link href={`/dashboard/${memberId}`} className="underline underline-offset-2 hover:text-tomato">
@@ -116,24 +108,47 @@ export function ProfileHero({
                         onClick={dismissBanner}
                         aria-label="Dismiss"
                         /* sicilian-41551: 44x44 tap target. */
-                        className="inline-flex h-11 w-11 -m-2 items-center justify-center text-ink/60 hover:text-ink cursor-pointer text-base leading-none"
+                        className="relative inline-flex h-11 w-11 -m-2 items-center justify-center text-ink/60 hover:text-ink cursor-pointer text-base leading-none"
                     >
                         ×
                     </button>
                 </div>
             )}
 
-            <section className="rounded-[--radius] bg-ink text-cream border border-cream/15 shadow-sm overflow-hidden">
-                {/*
-                  sicilian-41551 mobile layout:
-                  • <sm: actions wrap to a second row below the name so the
-                    Vouch CTA isn't squeezed between an 80px PFP and a kebab
-                    at 375px viewports.
-                  • Name uses `break-words` + `[overflow-wrap:anywhere]` so long
-                    mafia names like "Pepperoni-Pesto-Provolone Pancetta"
-                    don't break the layout.
-                */}
-                <div className="p-5 sm:p-6 flex items-start gap-4 flex-wrap sm:flex-nowrap">
+            {/*
+              onion-47612 ink hero band.
+              Visually echoes the welcome-step CTA dock (paper-soft-dark
+              over ink) but carries the member's full identity.
+
+              sicilian-41551 mobile layout:
+              • <sm: actions wrap to a second row below the name so the
+                Vouch CTA isn't squeezed between an 80px PFP and a kebab
+                at 375px viewports.
+              • Name uses `break-words` + `[overflow-wrap:anywhere]` so long
+                mafia names like "Pepperoni-Pesto-Provolone Pancetta"
+                don't break the layout.
+            */}
+            <section
+                className="paper-soft-dark relative overflow-hidden rounded-[28px] border"
+                style={{
+                    background: "hsl(var(--ink) / 0.97)",
+                    color: "hsl(var(--cream))",
+                    borderColor: "hsl(var(--cream) / 0.15)",
+                    boxShadow:
+                        "0 30px 60px -30px hsl(0 93% 60% / 0.45), var(--shadow-lifted, 0 12px 40px hsl(var(--ink) / 0.2))",
+                }}
+            >
+                <div
+                    aria-hidden
+                    className="pointer-events-none absolute inset-0 opacity-80"
+                    style={HERO_SPOTLIGHT_STYLE}
+                />
+                <div
+                    aria-hidden
+                    className="grain pointer-events-none absolute inset-0 opacity-50"
+                />
+
+                <div className="relative p-5 sm:p-7 flex items-start gap-4 flex-wrap sm:flex-nowrap">
                     {pfpUrl && (
                         // eslint-disable-next-line @next/next/no-img-element
                         <img
@@ -143,7 +158,8 @@ export function ProfileHero({
                             style={{
                                 objectPosition: "top",
                                 border: "3px solid hsl(var(--cream))",
-                                boxShadow: "0 2px 12px hsl(0 0% 0% / 0.25)",
+                                boxShadow: "0 2px 12px hsl(0 0% 0% / 0.35)",
+                                transform: "rotate(-2deg)",
                             }}
                             onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = "none";
@@ -151,34 +167,85 @@ export function ProfileHero({
                         />
                     )}
 
-                    <div className="flex-1 min-w-0">
+                    <div className="flex-1 min-w-0 relative">
+                        <p
+                            className="overline"
+                            style={{ color: "hsl(var(--butter))" }}
+                        >
+                            § 01 · The dossier
+                        </p>
+
                         <h1
-                            className="m-0 font-display font-bold text-3xl sm:text-4xl text-cream [text-wrap:balance] break-words leading-[1.05]"
-                            style={{ overflowWrap: "anywhere" }}
+                            className="font-[family-name:var(--font-display)] m-0 mt-2 font-black tracking-[-0.015em] text-cream [text-wrap:balance] break-words"
+                            style={{
+                                fontSize: "clamp(2rem, 6.5vw, 3.75rem)",
+                                lineHeight: 0.95,
+                                overflowWrap: "anywhere",
+                            }}
                         >
                             {name}
                         </h1>
 
                         {tagline && tagline.trim().length > 0 && (
-                            <p className="mt-1.5 text-sm sm:text-base text-cream/85 m-0 [text-wrap:balance]">
+                            <p
+                                className="m-0 mt-3 text-cream/85 [text-wrap:balance]"
+                                style={{ fontSize: "15px", lineHeight: 1.55 }}
+                            >
                                 {tagline}
                             </p>
                         )}
 
-                        {identityParts.length > 0 && (
-                            <div className="mt-2 text-sm text-cream/70 flex flex-wrap items-center gap-x-2 gap-y-1">
-                                {identityParts.map((node, i) => (
-                                    <span key={i} className="flex items-center gap-2">
-                                        {i > 0 && <span aria-hidden className="text-cream/40">·</span>}
-                                        {node}
+                        {(city || hasLevel || mafiaRank) && (
+                            <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-cream/75 relative">
+                                {city && (
+                                    <span className="inline-flex items-center gap-2">
+                                        {city}
                                     </span>
-                                ))}
+                                )}
+                                {city && (hasLevel || mafiaRank) && (
+                                    <span aria-hidden className="text-cream/35">·</span>
+                                )}
+                                {hasLevel && (
+                                    <span className="inline-flex items-center gap-2 relative">
+                                        <Link
+                                            href="/missions"
+                                            className="inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-cream/90 hover:text-cream no-underline transition-colors"
+                                            style={{
+                                                background: "hsl(var(--cream) / 0.08)",
+                                                borderColor: "hsl(var(--cream) / 0.25)",
+                                            }}
+                                        >
+                                            Lv. {level}
+                                            {levelTitle ? ` · ${levelTitle}` : ""}
+                                        </Link>
+                                        {/* Handwritten margin annotation near the level pill */}
+                                        <span
+                                            aria-hidden
+                                            className="handwritten pointer-events-none hidden sm:inline-block absolute -top-3 left-[calc(100%+8px)] rotate-[-4deg] whitespace-nowrap"
+                                            style={{
+                                                color: "hsl(var(--butter))",
+                                                fontSize: 13,
+                                                opacity: 0.85,
+                                            }}
+                                        >
+                                            keep cooking
+                                        </span>
+                                    </span>
+                                )}
+                                {hasLevel && mafiaRank && (
+                                    <span aria-hidden className="text-cream/35">·</span>
+                                )}
+                                {mafiaRank && (
+                                    <span style={{ color: "hsl(var(--butter))" }}>
+                                        {mafiaRank}
+                                    </span>
+                                )}
                             </div>
                         )}
                     </div>
 
                     {/* Wraps full-width below the name on phones, sits inline on >= sm. */}
-                    <div className="w-full sm:w-auto sm:shrink-0 flex sm:justify-end">
+                    <div className="w-full sm:w-auto sm:shrink-0 flex sm:justify-end relative">
                         <ProfileActions
                             memberId={memberId}
                             mode={mode}

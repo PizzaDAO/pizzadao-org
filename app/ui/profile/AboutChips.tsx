@@ -8,6 +8,9 @@
 // list. ID was visitor-meaningless. Turtle imagery is preserved.
 // Profile links live in their own component (ProfileLinksDisplay) — passed
 // in via memberId because that component owns its own fetch.
+//
+// onion-47612: editorial restyle — paper-soft card, "§ 02 · About" overline,
+// chip group labels move to .overline, ink-toned chips. Logic unchanged.
 
 import Link from "next/link";
 import { TURTLES } from "../constants";
@@ -32,8 +35,11 @@ function splitList(s?: string): string[] {
 function Chip({ children }: { children: React.ReactNode }) {
     return (
         <span
-            className="inline-flex items-center px-2.5 py-1 rounded-full border border-rule text-sm font-medium text-foreground"
-            style={{ background: "hsl(var(--background))" }}
+            className="inline-flex items-center px-3 py-1 rounded-full text-sm font-medium text-foreground transition-colors"
+            style={{
+                background: "hsl(var(--cream) / 0.6)",
+                border: "1px solid hsl(var(--rule-warm) / 0.55)",
+            }}
         >
             {children}
         </span>
@@ -49,13 +55,21 @@ function ChipRow({
 }) {
     return (
         <div>
-            <h3 className="m-0 mb-2 text-xs uppercase tracking-wider font-bold text-muted-foreground">
+            <h3 className="overline m-0 mb-2 text-foreground/55">
                 {label}
             </h3>
             <div className="flex flex-wrap items-center gap-2">{children}</div>
         </div>
     );
 }
+
+const CARD_CLASS = "paper-soft halftone-soft relative rounded-[24px] border p-5 sm:p-6";
+const CARD_STYLE: React.CSSProperties = {
+    background: "hsl(var(--card))",
+    color: "hsl(var(--card-foreground))",
+    borderColor: "hsl(var(--rule-warm) / 0.55)",
+    boxShadow: "var(--shadow-soft, 0 8px 30px hsl(var(--ink) / 0.06))",
+};
 
 export function AboutChips({
     memberId,
@@ -77,26 +91,17 @@ export function AboutChips({
     if (!hasContent) {
         // Still render link display, which has its own loading + empty handling.
         return (
-            <section
-                className="rounded-[--radius] border border-rule p-5 sm:p-6 shadow-sm"
-                style={{
-                    background: "hsl(var(--card))",
-                    color: "hsl(var(--card-foreground))",
-                }}
-            >
+            <section className={CARD_CLASS} style={CARD_STYLE}>
+                <p className="overline text-tomato mb-3">§ 02 · About</p>
                 <ProfileLinksDisplay memberId={memberId} variant="inline" />
             </section>
         );
     }
 
     return (
-        <section
-            className="rounded-[--radius] border border-rule p-5 sm:p-6 shadow-sm grid gap-4"
-            style={{
-                background: "hsl(var(--card))",
-                color: "hsl(var(--card-foreground))",
-            }}
-        >
+        <section className={`${CARD_CLASS} grid gap-5`} style={CARD_STYLE}>
+            <p className="overline text-tomato">§ 02 · About</p>
+
             {skillList.length > 0 && (
                 <ChipRow label="Skills">
                     {skillList.map((s) => (
@@ -115,7 +120,7 @@ export function AboutChips({
 
             {turtleList.length > 0 && (
                 <div>
-                    <h3 className="m-0 mb-2 text-xs uppercase tracking-wider font-bold text-muted-foreground">
+                    <h3 className="overline m-0 mb-2 text-foreground/55">
                         Roles
                     </h3>
                     <div className="flex flex-wrap items-center gap-2">
@@ -155,8 +160,11 @@ export function AboutChips({
                             href={`https://x.com/${xAccount.username}`}
                             target="_blank"
                             rel="noreferrer"
-                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[--radius] border border-rule text-foreground no-underline text-sm font-medium transition-colors hover:border-tomato hover:text-tomato"
-                            style={{ background: "hsl(var(--background))" }}
+                            className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-foreground no-underline text-sm font-medium transition-colors hover:border-tomato hover:text-tomato"
+                            style={{
+                                background: "hsl(var(--cream) / 0.6)",
+                                border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                            }}
                         >
                             <span aria-hidden>𝕏</span>
                             <span>@{xAccount.username}</span>

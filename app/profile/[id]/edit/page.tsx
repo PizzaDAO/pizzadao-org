@@ -6,6 +6,9 @@
 //
 // Plan: plans/garlic-96648-dashboard-redesign.md §7 — PR5 (slice-61816).
 //
+// onion-47612: editorial restyle. The 403 forbidden state now mirrors
+// the public profile's error treatment — paper-soft + overline + btn-pill.
+//
 // Server component pattern (mirrors app/profile/[id]/page.tsx):
 //   - Verify ownership server-side. Non-owners get 403, never see the form.
 //   - Render <EditClient/> for interactivity.
@@ -25,9 +28,6 @@ export const metadata: Metadata = {
     robots: { index: false, follow: false },
 };
 
-const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
-const FONT_DISPLAY = "var(--font-display), var(--font-sans), system-ui, sans-serif";
-
 async function resolveViewerMemberId(): Promise<{ discordId: string | null; viewerMemberId: string | null }> {
     const session = await getSession();
     if (!session?.discordId) return { discordId: null, viewerMemberId: null };
@@ -41,59 +41,36 @@ async function resolveViewerMemberId(): Promise<{ discordId: string | null; view
 
 function Forbidden({ reason }: { reason: string }) {
     return (
-        <div
-            style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: "hsl(var(--background))",
-                color: "hsl(var(--foreground))",
-                fontFamily: FONT_SANS,
-                padding: 20,
-            }}
-        >
+        <div className="min-h-screen bg-background text-foreground flex items-center justify-center p-5">
             <div
+                className="paper-soft halftone-soft relative grid gap-4 rounded-[28px] border p-7 max-w-md w-full fade-up"
                 style={{
-                    border: "1px solid hsl(var(--rule) / 0.12)",
-                    borderRadius: "var(--radius)",
-                    padding: 24,
-                    boxShadow: "0 8px 30px hsl(var(--ink) / 0.06)",
                     background: "hsl(var(--card))",
                     color: "hsl(var(--card-foreground))",
-                    display: "grid",
-                    gap: 14,
-                    maxWidth: 420,
-                    width: "100%",
+                    borderColor: "hsl(var(--rule-warm) / 0.55)",
+                    boxShadow: "var(--shadow-soft, 0 8px 30px hsl(var(--ink) / 0.06))",
                 }}
             >
+                <p className="overline text-tomato">§ 403 · Off the record</p>
                 <h1
+                    className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em] text-foreground m-0"
                     style={{
-                        fontSize: 28,
-                        margin: 0,
-                        fontFamily: FONT_DISPLAY,
-                        fontWeight: 800,
-                        letterSpacing: "-0.01em",
+                        fontSize: "clamp(1.75rem, 4vw, 2.5rem)",
+                        lineHeight: 1.0,
                     }}
                 >
-                    403 — Forbidden
+                    Forbidden
                 </h1>
-                <p style={{ color: "hsl(var(--muted-foreground))", margin: 0 }}>{reason}</p>
+                <p className="m-0 text-foreground/70">{reason}</p>
                 <a
                     href="/"
+                    className="btn-pill self-start"
                     style={{
-                        display: "inline-block",
-                        padding: "10px 16px",
-                        borderRadius: "var(--radius)",
-                        background: "hsl(var(--primary))",
-                        color: "hsl(var(--primary-foreground))",
-                        textDecoration: "none",
-                        fontWeight: 600,
-                        fontFamily: FONT_DISPLAY,
-                        textAlign: "center",
+                        background: "hsl(var(--ink))",
+                        color: "hsl(var(--cream))",
                     }}
                 >
-                    Back to Home
+                    Back to home
                 </a>
             </div>
         </div>
