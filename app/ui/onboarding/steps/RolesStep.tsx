@@ -3,10 +3,12 @@
 // mozzarella-41832 — Editorial restyle.
 // Visual rewrite of the turtle / roles picker. The Props interface,
 // callbacks, and the underlying TURTLES data shape are unchanged.
+// arugula-30866 — i18n via next-intl (onboarding.roles.*).
 "use client";
 
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, Check } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { TURTLES } from "../../constants";
 
 type Props = {
@@ -25,20 +27,26 @@ const HERO_SPOTLIGHT: CSSProperties = {
 // Small visual personality per card — rotation only, no semantic effect.
 const CARD_TILTS = [-1.4, 0.9, -0.6, 1.1, -1.1, 0.7, -0.8, 1.2];
 
-// Hand-scrawled margin notes per turtle (visual flavor, no behavior).
-const TURTLE_NOTES: Record<string, string> = {
-  Leonardo: "calls the shots",
-  Donatello: "builds it",
-  Michelangelo: "draws it",
-  Raphael: "knows everyone",
-};
+// Turtle ids that have dedicated translated notes; all others fall through
+// to `notes.offCanon`.
+const KNOWN_TURTLE_KEYS = new Set([
+  "Leonardo",
+  "Donatello",
+  "Michelangelo",
+  "Raphael",
+]);
 
 export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpdate }: Props) {
+  const t = useTranslations("onboarding.roles");
   const canProceed = turtles.length > 0;
 
   function toggleTurtle(id: string) {
     const has = turtles.includes(id);
     onChange(has ? turtles.filter((x) => x !== id) : [...turtles, id]);
+  }
+
+  function noteFor(id: string): string {
+    return KNOWN_TURTLE_KEYS.has(id) ? t(`notes.${id}`) : t("notes.offCanon");
   }
 
   return (
@@ -52,7 +60,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">§ 03 · Your colors</p>
+        <p className="overline text-tomato">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -61,34 +69,34 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
             textWrap: "balance",
           }}
         >
-          Pick your <span className="text-tomato">turtles</span>.
+          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
           style={{ fontSize: "16px", lineHeight: 1.55 }}
         >
-          One or more. These are the roles you wear in the family.
+          {t("tagline")}
         </p>
       </header>
 
       {/* ─── Turtle cards ────────────────────────────────────────── */}
       <section className="grid grid-cols-1 gap-5 sm:grid-cols-2 sm:gap-6">
-        {TURTLES.map((t, i) => {
-          const selected = turtles.includes(t.id);
+        {TURTLES.map((turtle, i) => {
+          const selected = turtles.includes(turtle.id);
           const tilt = CARD_TILTS[i % CARD_TILTS.length]!;
-          const note = TURTLE_NOTES[t.id] ?? "off-canon";
+          const note = noteFor(turtle.id);
 
           return (
             <TurtleCard
-              key={t.id}
-              id={t.id}
-              label={t.label}
-              role={t.role}
-              image={t.image}
+              key={turtle.id}
+              id={turtle.id}
+              label={turtle.label}
+              role={turtle.role}
+              image={turtle.image}
               note={note}
               tilt={tilt}
               selected={selected}
-              onToggle={() => toggleTurtle(t.id)}
+              onToggle={() => toggleTurtle(turtle.id)}
             />
           );
         })}
@@ -96,9 +104,9 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
 
       {/* ─── Selected summary ────────────────────────────────────── */}
       <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/55">
-        Selected ·{" "}
+        {t("selectedLabel")}{" "}
         <b className="text-foreground">
-          {turtles.length ? turtles.join(", ") : "(none yet)"}
+          {turtles.length ? turtles.join(", ") : t("noneYet")}
         </b>
       </p>
 
@@ -110,7 +118,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
           className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
         >
           <ArrowLeft className="h-3 w-3" />
-          Back
+          {t("back")}
         </button>
         <button
           type="button"
@@ -123,7 +131,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          Next
+          {t("next")}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>

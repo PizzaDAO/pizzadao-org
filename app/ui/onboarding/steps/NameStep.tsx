@@ -6,6 +6,10 @@
 // contracts are UNCHANGED — the wizard still drives `/api/namegen` via
 // `onGenerate` and advances on `onPickName`. Only JSX + helpers changed.
 //
+// arugula-30866 — i18n via next-intl (onboarding.name.*). Editorial flavor
+// (CYCLE_POOL pseudo-names and TOPPING_DESCRIPTOR phrases) stays English
+// for v1 — those are deliberately not translated yet to avoid translator-loss.
+//
 // See plans/anchovy-28942-editorial-restyle.md for the foundation work.
 "use client";
 
@@ -25,6 +29,7 @@ import {
   Sparkles,
   X,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 import { btn } from "../styles";
 import { MAFIA_FILMS, type MafiaFilm } from "@/app/lib/mafia-films";
@@ -65,6 +70,11 @@ type Props = {
 
 /* ──────────────────────────────────────────────────────────────────────────
    Personality + topping flavor (visual only — no behavioral effect)
+
+   NOTE: Persona margin notes ("trusted", "dangerous", "real earner") and the
+   TOPPING_DESCRIPTOR map below are intentionally kept in English for v1 of
+   i18n. They're editorial flavor that loses too much in machine translation.
+   A future PR can localize these.
    ────────────────────────────────────────────────────────────────────────── */
 
 type Persona = {
@@ -119,6 +129,8 @@ function toppingDescriptor(t: string): string {
   return (key && TOPPING_DESCRIPTOR[key]) || "off-canon · your call · respected";
 }
 
+// CYCLE_POOL — pseudo-mafia-name flicker shown while waiting for the API.
+// Pure flavor; not translated for v1.
 const CYCLE_POOL = [
   "the Quiet", "the Hand", "the Oven", "Two Knives", "the Sicilian",
   "the Patient", "the Whisper", "the Last Call", "the Ledger", "Hot Sauce",
@@ -128,22 +140,6 @@ const CYCLE_POOL = [
   "Angelo the Truffle", "Big Vinnie", "Sonny Soppressata", "the Pepperoni",
   "the Patient One", "the Saucemaker", "Quiet Tony", "the Wednesday Man",
 ];
-
-const REGEN_LABEL = (attempts: number) =>
-  attempts <= 1
-    ? "Re-cast"
-    : attempts === 2
-      ? "Look deeper"
-      : "Pull another file";
-
-const CYCLE_OVERLINE = (attempts: number) =>
-  attempts <= 1
-    ? "The family is deliberating"
-    : attempts === 2
-      ? "Looking deeper…"
-      : attempts === 3
-        ? "Pulling another file…"
-        : "Found something stranger…";
 
 /* ──────────────────────────────────────────────────────────────────────────
    Helpers
@@ -161,7 +157,7 @@ const SPOTLIGHT_REVEAL: CSSProperties = {
 
 const SPOTLIGHT_DOCK: CSSProperties = {
   background:
-    "radial-gradient(60% 80% at 20% 0%, hsl(46 100% 62% / 0.18), transparent 70%), radial-gradient(60% 80% at 100% 100%, hsl(0 93% 60% / 0.18), transparent 70%)",
+    "radial-gradient(60% 80% at 20% 0%, hsl(46 100% 62% / 0.18), transparent 70%), radial-gradient(60% 80% at 100% 100%, hsl(46 100% 62% / 0.18), transparent 70%)",
 };
 
 const CARD_PAPER_GRADIENT: CSSProperties = {
@@ -205,6 +201,8 @@ export function NameStep({
   onKeepExisting,
   onBack,
 }: Props) {
+  const t = useTranslations("onboarding.name");
+
   /* Local-only UI state. Selection & inline editing live here because they
      don't need to persist past this step — the wizard advances as soon as
      onPickName fires. */
@@ -219,7 +217,7 @@ export function NameStep({
   // Cycling animation while loading
   useEffect(() => {
     if (!submitting) return;
-    const id = window.setInterval(() => setCycleTick((t) => t + 1), 80);
+    const id = window.setInterval(() => setCycleTick((tick) => tick + 1), 80);
     return () => window.clearInterval(id);
   }, [submitting]);
 
@@ -270,6 +268,12 @@ export function NameStep({
     }
   };
 
+  function regenLabel(attempts: number): string {
+    if (attempts <= 1) return t("regenReCast");
+    if (attempts === 2) return t("regenLookDeeper");
+    return t("regenPullAnother");
+  }
+
   return (
     <div className="relative grid gap-12 fade-up">
       {/* ─── Hero spotlight backdrop ─────────────────────────────── */}
@@ -282,25 +286,25 @@ export function NameStep({
       {/* ─── Keep-existing affordances (our flow, restyled) ──────── */}
       {showKeepExisting && (
         <KeepBlock
-          eyebrow="§ 00 · You're already made"
-          headline="Keep your current name?"
+          eyebrow={t("keepExistingEyebrow")}
+          headline={t("keepExistingHeadline")}
           name={existingName ?? ""}
-          ctaLabel="Keep it and continue"
+          ctaLabel={t("keepExistingCta")}
           onKeep={onKeepExisting}
         />
       )}
       {showKeepDiscord && (
         <KeepBlock
-          eyebrow="§ 00 · Discord nickname found"
-          headline="Use your Discord name?"
+          eyebrow={t("keepDiscordEyebrow")}
+          headline={t("keepDiscordHeadline")}
           name={discordNick ?? ""}
-          ctaLabel="Use it and continue"
+          ctaLabel={t("keepDiscordCta")}
           onKeep={onKeepExisting}
         />
       )}
       {(showKeepExisting || showKeepDiscord) && (
         <p className="ui text-center text-[11px] uppercase tracking-[0.28em] text-foreground/45">
-          — or generate a new name instead —
+          {t("orGenerateInstead")}
         </p>
       )}
 
@@ -315,13 +319,13 @@ export function NameStep({
               textWrap: "balance",
             }}
           >
-            Claim your <span className="text-tomato">mafia name.</span>
+            {t("heroPrefix")} <span className="text-tomato">{t("heroAccent")}</span>
           </h1>
           <p
             className="mt-5 max-w-xl text-foreground/75"
             style={{ fontSize: "17px", lineHeight: 1.55 }}
           >
-            Choose a topping. Choose a movie. The family handles the rest.
+            {t("heroTagline")}
           </p>
         </header>
       )}
@@ -330,13 +334,13 @@ export function NameStep({
       {!suggestions && (
         <section className="grid gap-10">
           <ToppingPicker
-            label="§ 01 · Your topping"
+            label={t("toppingLabel")}
             value={topping}
             onChange={(v) => onChange({ topping: v })}
           />
 
           <FilmPicker
-            label="§ 02 · Your mafia movie"
+            label={t("movieLabel")}
             value={mafiaMovieTitle}
             onChange={(v) => onChange({ mafiaMovieTitle: v })}
           />
@@ -353,23 +357,23 @@ export function NameStep({
                 boxShadow: "var(--shadow-soft)",
               }}
             >
-              {submitting ? "Generating…" : "Generate 3 names"}
+              {submitting ? t("generatingButton") : t("generateButton")}
               <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </button>
 
             {resolvedMovieTitle && (
               <span className="ui text-[12px] uppercase tracking-[0.22em] text-foreground/55">
-                Matched ·{" "}
+                {t("matchedLabel")}{" "}
                 <b className="text-foreground">{resolvedMovieTitle}</b>
                 {releaseDate ? ` (${releaseDate.slice(0, 4)})` : ""}
-                {mediaType === "tv" ? " · TV" : ""}
+                {mediaType === "tv" ? t("tvSuffix") : ""}
               </span>
             )}
           </div>
 
           {seenNames.length > 0 && (
             <p className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/45">
-              Seen this session ·{" "}
+              {t("seenLabel")}{" "}
               <b className="text-foreground">{seenNames.length}</b>
             </p>
           )}
@@ -398,7 +402,7 @@ export function NameStep({
               className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
             >
               <ArrowLeft className="h-3 w-3" />
-              {isUpdate ? "Cancel" : "Change inputs"}
+              {isUpdate ? t("cancel") : t("changeInputs")}
             </button>
             <button
               type="button"
@@ -409,12 +413,12 @@ export function NameStep({
               <RefreshCw
                 className={`h-3.5 w-3.5 ${submitting ? "animate-spin" : ""}`}
               />
-              {REGEN_LABEL(attemptsRef.current)}
+              {regenLabel(attemptsRef.current)}
             </button>
           </div>
 
           <div className="mt-10 text-center md:mt-14">
-            <p className="overline text-tomato">§ 04 · The naming</p>
+            <p className="overline text-tomato">{t("revealOverline")}</p>
             <h2
               className="font-[family-name:var(--font-display)] mx-auto mt-4 max-w-3xl font-black tracking-[-0.01em] text-foreground"
               style={{
@@ -422,10 +426,10 @@ export function NameStep({
                 lineHeight: 0.95,
               }}
             >
-              The pizza has spoken.
+              {t("revealHeading")}
             </h2>
             <p className="ui mt-4 text-[12px] uppercase tracking-[0.28em] text-foreground/45">
-              One of these belongs to you.
+              {t("revealSubhead")}
             </p>
           </div>
 
@@ -444,6 +448,7 @@ export function NameStep({
                   topping={topping}
                   isSelected={selectedIdx === i}
                   anySelected={selectedIdx !== null}
+                  fileLabel={t("familyFileLabel", { fileNo: CARD_PERSONALITIES[i]!.fileNo })}
                   onSelect={() => {
                     setSelectedIdx(i);
                     setEditedName(name);
@@ -455,7 +460,7 @@ export function NameStep({
           </div>
 
           <p className="ui mt-10 text-center text-[11px] uppercase tracking-[0.24em] text-foreground/45">
-            Tap a card to claim it.
+            {t("tapToClaim")}
           </p>
         </section>
       )}
@@ -467,7 +472,7 @@ export function NameStep({
           style={{ boxShadow: "var(--shadow-soft)" }}
         >
           <p className="text-foreground/70">
-            The kitchen's quiet. Try re-casting.
+            {t("emptyState")}
           </p>
         </div>
       )}
@@ -479,7 +484,7 @@ export function NameStep({
           onClick={onBack}
           style={btn("secondary")}
         >
-          {isUpdate ? "Cancel" : "Back"}
+          {isUpdate ? t("cancel") : t("back")}
         </button>
       </div>
 
@@ -514,7 +519,7 @@ export function NameStep({
                   className="overline"
                   style={{ color: "hsl(var(--butter))" }}
                 >
-                  Your name, your call
+                  {t("dockOverline")}
                 </p>
                 {editing ? (
                   <input
@@ -557,7 +562,7 @@ export function NameStep({
                     color: "hsl(var(--cream))",
                   }}
                 >
-                  {editing ? "Done" : "Edit"}
+                  {editing ? t("done") : t("edit")}
                 </button>
                 <button
                   type="button"
@@ -568,7 +573,7 @@ export function NameStep({
                     color: "hsl(var(--cream))",
                   }}
                 >
-                  <Copy className="h-3.5 w-3.5" /> Copy
+                  <Copy className="h-3.5 w-3.5" /> {t("copy")}
                 </button>
                 <button
                   type="button"
@@ -580,13 +585,13 @@ export function NameStep({
                     color: "hsl(var(--cream))",
                   }}
                 >
-                  Claim this name
+                  {t("claimThisName")}
                   <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </button>
                 <button
                   type="button"
                   onClick={() => setSelectedIdx(null)}
-                  aria-label="Dismiss selection"
+                  aria-label={t("dismissSelection")}
                   className="ui inline-flex items-center justify-center rounded-full p-2 transition-colors"
                   style={{
                     border: "1px solid hsl(var(--cream) / 0.18)",
@@ -662,23 +667,31 @@ function KeepBlock({
 }
 
 function CyclingStage({ tick, attempt }: { tick: number; attempt: number }) {
+  const t = useTranslations("onboarding.name");
   const current = CYCLE_POOL[tick % CYCLE_POOL.length];
-  const NOTES = [
+  const NOTE_KEYS = [
     "nah",
-    "too obvious",
-    "watch this guy",
-    "capo material",
-    "this one?",
+    "tooObvious",
+    "watchThisGuy",
+    "capoMaterial",
+    "thisOne",
     "earner",
-    "skip it",
-  ];
-  const note = NOTES[Math.floor(tick / 6) % NOTES.length];
+    "skipIt",
+  ] as const;
+  const note = t(`cycleNotes.${NOTE_KEYS[Math.floor(tick / 6) % NOTE_KEYS.length]}`);
   const crossed = CYCLE_POOL[(tick + 3) % CYCLE_POOL.length];
   const crossed2 = CYCLE_POOL[(tick + 7) % CYCLE_POOL.length];
 
+  function cycleOverline(att: number): string {
+    if (att <= 1) return t("cycleDeliberating");
+    if (att === 2) return t("cycleLookingDeeper");
+    if (att === 3) return t("cyclePullingAnother");
+    return t("cycleStranger");
+  }
+
   return (
     <div className="relative grid place-items-center py-20 md:py-28">
-      <p className="overline text-tomato/80">{CYCLE_OVERLINE(attempt)}</p>
+      <p className="overline text-tomato/80">{cycleOverline(attempt)}</p>
 
       <span className="handwritten pointer-events-none absolute left-[8%] top-[18%] hidden rotate-[-8deg] text-[18px] text-foreground/55 md:block">
         <span className="relative">
@@ -750,6 +763,7 @@ function FamilyFileCard({
   topping,
   isSelected,
   anySelected,
+  fileLabel,
   onSelect,
 }: {
   name: string;
@@ -757,6 +771,7 @@ function FamilyFileCard({
   topping: string;
   isSelected: boolean;
   anySelected: boolean;
+  fileLabel: string;
   onSelect: () => void;
 }) {
   const dimmed = anySelected && !isSelected;
@@ -812,7 +827,7 @@ function FamilyFileCard({
 
       <div className="relative">
         <p className="ui text-[10px] uppercase tracking-[0.28em] text-foreground/50">
-          § Family file no. {persona.fileNo}
+          {fileLabel}
         </p>
       </div>
 
@@ -901,6 +916,7 @@ function FilmPicker({
   value: string;
   onChange: (v: string) => void;
 }) {
+  const t = useTranslations("onboarding.name");
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState("");
   const inputRef = useRef<HTMLInputElement | null>(null);
@@ -976,13 +992,13 @@ function FilmPicker({
               setQuery(e.target.value);
               onChange(e.target.value);
             }}
-            placeholder="Pick a movie."
+            placeholder={t("filmPickerPlaceholder")}
             className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
             style={{
               fontSize: "clamp(1.05rem, 2.2vw, 1.6rem)",
               color: "hsl(var(--foreground))",
             }}
-            aria-label="Your mafia movie"
+            aria-label={t("filmPickerAriaLabel")}
           />
           {open && (
             <button
@@ -993,7 +1009,7 @@ function FilmPicker({
               }}
               className="ui hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:border-tomato hover:text-tomato md:inline-flex"
             >
-              Close
+              {t("filmPickerClose")}
             </button>
           )}
         </label>
@@ -1007,7 +1023,7 @@ function FilmPicker({
       )}
       {!matchedFilm && (
         <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/40">
-          Tone reference only — flavors the cadence of your name.
+          {t("filmPickerToneHint")}
         </p>
       )}
 
@@ -1026,7 +1042,7 @@ function FilmPicker({
           }}
         >
           <p className="ui text-[10px] uppercase tracking-[0.28em] text-foreground/45">
-            {effectiveQuery ? "Matches" : "Recently respected"}
+            {effectiveQuery ? t("filmPickerMatches") : t("filmPickerRecentlyRespected")}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
             {filteredFilms.map((f) => (
@@ -1067,19 +1083,19 @@ function FilmPicker({
                 >
                   <Sparkles className="h-5 w-5" />
                   <span className="font-[family-name:var(--font-display)] text-sm font-black leading-tight">
-                    Use &ldquo;{(query || value).trim()}&rdquo;
+                    {t("filmPickerUseCustom", { query: (query || value).trim() })}
                   </span>
                   <span
                     className="ui text-[9px] uppercase tracking-[0.22em]"
                     style={{ color: "hsl(var(--tomato) / 0.7)" }}
                   >
-                    Off canon
+                    {t("filmPickerOffCanon")}
                   </span>
                 </button>
               )}
           </div>
           <p className="ui mt-4 text-[10px] uppercase tracking-[0.24em] text-foreground/35">
-            Pick a poster · or keep typing
+            {t("filmPickerFooter")}
           </p>
         </div>
       </div>

@@ -4,12 +4,14 @@
 // Visual rewrite of the existing-account claim flow. Props, internal step
 // state, and API calls (/api/user-data/[id], /api/claim-member) are
 // unchanged. The flow still routes to /dashboard/{memberId} on success.
+// arugula-30866 — i18n via next-intl (onboarding.claim.*).
 "use client";
 
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { useRouter } from "next/navigation";
 import { ArrowLeft, ArrowUpRight, Hash, Lock } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type ClaimStep = "ask" | "input-id" | "input-pass" | "processing";
 
@@ -29,6 +31,7 @@ export function ClaimFlow({
   discordNick: _discordNick,
   onStartRegistration,
 }: Props) {
+  const t = useTranslations("onboarding.claim");
   const router = useRouter();
   const [step, setStep] = useState<ClaimStep>("ask");
   const [memberId, setMemberId] = useState("");
@@ -37,7 +40,7 @@ export function ClaimFlow({
 
   async function checkMemberId() {
     if (!memberId.trim()) {
-      setError("Please enter an ID");
+      setError(t("errorEnterId"));
       return;
     }
     setStep("processing");
@@ -46,15 +49,15 @@ export function ClaimFlow({
       const res = await fetch(`/api/user-data/${memberId}`);
       if (res.ok) {
         const data = await res.json();
-        const name = data["Name"] || data["Mafia Name"] || "Unknown";
+        const name = data["Name"] || data["Mafia Name"] || t("nameUnknown");
         setFoundName(name);
         setStep("input-pass");
       } else {
-        setError("ID not found in our records.");
+        setError(t("errorIdNotFound"));
         setStep("input-id");
       }
     } catch {
-      setError("Failed to check ID.");
+      setError(t("errorCheckId"));
       setStep("input-id");
     }
   }
@@ -72,11 +75,11 @@ export function ClaimFlow({
       if (res.ok) {
         router.push(`/dashboard/${memberId}`);
       } else {
-        setError(json.error || "Claim failed");
+        setError(json.error || t("errorClaimFailed"));
         setStep("input-pass");
       }
     } catch {
-      setError("Network error");
+      setError(t("errorNetwork"));
       setStep("input-pass");
     }
   }
@@ -101,7 +104,7 @@ export function ClaimFlow({
           {step === "ask" && (
             <div className="relative grid gap-6 fade-up">
               <header>
-                <p className="overline text-tomato">§ ··· Welcome back</p>
+                <p className="overline text-tomato">{t("askOverline")}</p>
                 <h2
                   className="font-[family-name:var(--font-display)] mt-3 max-w-[14ch] font-black tracking-[-0.015em] text-foreground"
                   style={{
@@ -110,7 +113,9 @@ export function ClaimFlow({
                     textWrap: "balance",
                   }}
                 >
-                  Welcome, <span className="text-tomato">Pizza Chef</span>.
+                  {t("askHeadlinePrefix")}{" "}
+                  <span className="text-tomato">{t("askHeadlineAccent")}</span>
+                  {t("askHeadlineSuffix")}
                 </h2>
               </header>
 
@@ -118,11 +123,10 @@ export function ClaimFlow({
                 className="text-foreground/75"
                 style={{ fontSize: "15px", lineHeight: 1.55 }}
               >
-                We authenticated your Discord, but we couldn&apos;t
-                automatically find your profile.
+                {t("askIntro")}
               </p>
               <p className="font-[family-name:var(--font-display)] font-black text-foreground">
-                Do you already have a PizzaDAO Member ID?
+                {t("askPrompt")}
               </p>
 
               <div className="grid gap-3 sm:grid-cols-2">
@@ -136,7 +140,7 @@ export function ClaimFlow({
                     boxShadow: "var(--shadow-soft)",
                   }}
                 >
-                  Yes, I have an ID
+                  {t("askYes")}
                   <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </button>
                 <button
@@ -149,7 +153,7 @@ export function ClaimFlow({
                     border: "1px solid hsl(var(--foreground) / 0.25)",
                   }}
                 >
-                  No, I&apos;m new
+                  {t("askNo")}
                 </button>
               </div>
             </div>
@@ -158,7 +162,7 @@ export function ClaimFlow({
           {step === "input-id" && (
             <div className="relative grid gap-5 fade-up">
               <header>
-                <p className="overline text-tomato">§ ··· Find your file</p>
+                <p className="overline text-tomato">{t("inputIdOverline")}</p>
                 <h2
                   className="font-[family-name:var(--font-display)] mt-3 font-black tracking-[-0.015em] text-foreground"
                   style={{
@@ -166,10 +170,10 @@ export function ClaimFlow({
                     lineHeight: 0.95,
                   }}
                 >
-                  Enter your Member ID.
+                  {t("inputIdHeadline")}
                 </h2>
                 <p className="mt-3 text-sm text-foreground/65">
-                  The numeric ID we have on file (e.g. 60).
+                  {t("inputIdHint")}
                 </p>
               </header>
 
@@ -178,10 +182,10 @@ export function ClaimFlow({
               >
                 <input
                   type="text"
-                  placeholder="60"
+                  placeholder={t("inputIdPlaceholder")}
                   value={memberId}
                   onChange={(e) => setMemberId(e.target.value)}
-                  aria-label="Member ID"
+                  aria-label={t("inputIdAriaLabel")}
                   className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
                   style={{
                     fontSize: "clamp(1.2rem, 2.4vw, 1.7rem)",
@@ -202,7 +206,7 @@ export function ClaimFlow({
                   className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato min-h-11"
                 >
                   <ArrowLeft className="h-3 w-3" />
-                  Back
+                  {t("back")}
                 </button>
                 <button
                   type="button"
@@ -214,7 +218,7 @@ export function ClaimFlow({
                     boxShadow: "var(--shadow-soft)",
                   }}
                 >
-                  Search ID
+                  {t("inputIdSearch")}
                   <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </button>
               </div>
@@ -231,7 +235,7 @@ export function ClaimFlow({
               }}
             >
               <header>
-                <p className="overline text-tomato">§ ··· Confirm it&apos;s you</p>
+                <p className="overline text-tomato">{t("inputPassOverline")}</p>
                 <h2
                   className="font-[family-name:var(--font-display)] mt-3 font-black tracking-[-0.015em] text-foreground"
                   style={{
@@ -239,10 +243,11 @@ export function ClaimFlow({
                     lineHeight: 0.95,
                   }}
                 >
-                  Claim profile · <span className="text-tomato">{foundName}</span>
+                  {t("inputPassHeadingPrefix")}{" "}
+                  <span className="text-tomato">{foundName}</span>
                 </h2>
                 <p className="mt-3 text-sm text-foreground/65">
-                  Enter the claim password to verify this is you.
+                  {t("inputPassHint")}
                 </p>
               </header>
 
@@ -252,9 +257,9 @@ export function ClaimFlow({
                 <input
                   name="password"
                   type="password"
-                  placeholder="Password"
+                  placeholder={t("inputPassPlaceholder")}
                   autoFocus
-                  aria-label="Claim password"
+                  aria-label={t("inputPassAriaLabel")}
                   className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
                   style={{
                     fontSize: "clamp(1.2rem, 2.4vw, 1.7rem)",
@@ -275,7 +280,7 @@ export function ClaimFlow({
                   className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato min-h-11"
                 >
                   <ArrowLeft className="h-3 w-3" />
-                  Back
+                  {t("back")}
                 </button>
                 <button
                   type="submit"
@@ -286,7 +291,7 @@ export function ClaimFlow({
                     boxShadow: "var(--shadow-soft)",
                   }}
                 >
-                  Claim profile
+                  {t("inputPassSubmit")}
                   <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </button>
               </div>
@@ -295,7 +300,7 @@ export function ClaimFlow({
 
           {step === "processing" && (
             <div className="relative grid place-items-center gap-3 py-10 fade-up">
-              <p className="overline text-tomato/70">§ ··· Checking the books</p>
+              <p className="overline text-tomato/70">{t("processingOverline")}</p>
               <div className="flex gap-1.5">
                 <span
                   className="h-2 w-2 animate-pulse rounded-full"

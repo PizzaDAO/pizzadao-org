@@ -4,10 +4,12 @@
 // Visual rewrite modelled on the Lovable mockup's `FinaleScene`. Props,
 // callbacks, and submission contract are unchanged — this is purely the
 // confirm-or-cancel surface for an update review.
+// arugula-30866 — i18n via next-intl (onboarding.review.*).
 "use client";
 
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { CrewOption } from "../types";
 
 type Props = {
@@ -66,23 +68,26 @@ export function ReviewStep({
   onSubmit,
   onCancel,
 }: Props) {
+  const t = useTranslations("onboarding.review");
+
   const crewLabels = crews
     .map((id) => crewOptions.find((c) => c.id === id)?.label || id)
     .join(", ");
   const existingCrewLabels = (existingData?.crews ?? []).join(", ");
+  const empty = t("emptyValue");
 
   const fields: { label: string; value: string; old: string }[] = [
-    { label: "Name", value: mafiaName || "—", old: existingData?.mafiaName || "—" },
-    { label: "City", value: city || "—", old: existingData?.city || "—" },
+    { label: t("labelName"), value: mafiaName || empty, old: existingData?.mafiaName || empty },
+    { label: t("labelCity"), value: city || empty, old: existingData?.city || empty },
     {
-      label: "Turtles",
-      value: turtles.length ? turtles.join(", ") : "—",
-      old: existingData?.turtles?.length ? existingData.turtles.join(", ") : "—",
+      label: t("labelTurtles"),
+      value: turtles.length ? turtles.join(", ") : empty,
+      old: existingData?.turtles?.length ? existingData.turtles.join(", ") : empty,
     },
     {
-      label: "Crews",
-      value: crewLabels || "—",
-      old: existingCrewLabels || "—",
+      label: t("labelCrews"),
+      value: crewLabels || empty,
+      old: existingCrewLabels || empty,
     },
   ];
 
@@ -101,7 +106,7 @@ export function ReviewStep({
 
       {/* ─── Ceremony headline ──────────────────────────────────── */}
       <header className="relative text-center">
-        <p className="overline text-tomato">§ 06 · The dossier</p>
+        <p className="overline text-tomato">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mx-auto mt-4 max-w-[14ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -110,14 +115,13 @@ export function ReviewStep({
             textWrap: "balance",
           }}
         >
-          One last <span className="text-tomato">look</span>.
+          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mx-auto mt-4 max-w-md text-foreground/70"
           style={{ fontSize: "15px", lineHeight: 1.55 }}
         >
-          Confirm the file before it goes in the cabinet. Modified fields are
-          marked.
+          {t("tagline")}
         </p>
       </header>
 
@@ -168,10 +172,10 @@ export function ReviewStep({
                 }}
               />
               <p className="ui flex-1 truncate text-[10px] uppercase tracking-[0.32em] text-foreground/55">
-                PizzaDAO · Family Record
+                {t("recordLabel")}
               </p>
               <p className="ui shrink-0 text-[10px] uppercase tracking-[0.32em] text-foreground/50">
-                № {archive}
+                {t("archiveLabel", { archive })}
               </p>
             </div>
             <div
@@ -182,7 +186,7 @@ export function ReviewStep({
             {/* Big alias display */}
             <div className="relative mt-5 grid gap-1.5">
               <p className="ui text-[9.5px] uppercase tracking-[0.32em] text-tomato">
-                Status · Made
+                {t("statusMade")}
               </p>
               <h3
                 className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em] text-foreground"
@@ -191,13 +195,13 @@ export function ReviewStep({
                   lineHeight: 0.95,
                 }}
               >
-                {mafiaName || "—"}
+                {mafiaName || empty}
               </h3>
               <span
                 aria-hidden
                 className="handwritten mt-1 inline-block rotate-[-3deg] text-[15px] text-tomato"
               >
-                approved — Benny
+                {t("approvedNote")}
               </span>
             </div>
 
@@ -217,6 +221,8 @@ export function ReviewStep({
                     value={f.value}
                     oldValue={existingData ? f.old : undefined}
                     changed={changed && Boolean(existingData)}
+                    wasLabel={t("wasLabel")}
+                    modifiedTitle={t("modifiedTitle")}
                   />
                 );
               })}
@@ -257,13 +263,13 @@ export function ReviewStep({
                 />
                 <div className="relative text-center leading-tight">
                   <div className="font-[family-name:var(--font-display)] text-[10px] font-black uppercase tracking-[0.18em] md:text-[11.5px]">
-                    Officially
+                    {t("stampOfficially")}
                   </div>
                   <div className="font-[family-name:var(--font-display)] text-[14px] font-black uppercase tracking-[0.14em] md:text-[17px]">
-                    Made
+                    {t("stampMade")}
                   </div>
                   <div className="ui mt-0.5 text-[7.5px] uppercase tracking-[0.32em] opacity-80">
-                    PizzaDAO
+                    {t("stampPizzaDao")}
                   </div>
                 </div>
               </span>
@@ -275,7 +281,7 @@ export function ReviewStep({
             aria-hidden
             className="handwritten pointer-events-none absolute -left-2 top-[-18px] hidden rotate-[-6deg] text-[16px] text-foreground/55 md:block"
           >
-            file under: {(mafiaName || "—").toLowerCase()}
+            {t("fileUnder", { name: (mafiaName || empty).toLowerCase() })}
           </span>
         </div>
       </div>
@@ -294,7 +300,7 @@ export function ReviewStep({
           }}
         >
           <ArrowLeft className="h-4 w-4" />
-          Don&apos;t update
+          {t("dontUpdate")}
         </button>
         <button
           type="button"
@@ -307,7 +313,7 @@ export function ReviewStep({
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          {submitting ? "Updating profile…" : "Yes, update my profile"}
+          {submitting ? t("updating") : t("confirmUpdate")}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>
@@ -324,11 +330,15 @@ function DossierField({
   value,
   oldValue,
   changed,
+  wasLabel,
+  modifiedTitle,
 }: {
   label: string;
   value: string;
   oldValue?: string;
   changed: boolean;
+  wasLabel: string;
+  modifiedTitle: string;
 }) {
   return (
     <div>
@@ -339,7 +349,7 @@ function DossierField({
             aria-hidden
             className="inline-block h-1 w-1 rounded-full"
             style={{ background: "hsl(var(--tomato))" }}
-            title="Modified"
+            title={modifiedTitle}
           />
         )}
       </p>
@@ -353,7 +363,7 @@ function DossierField({
       </p>
       {oldValue && changed && (
         <p className="ui mt-0.5 text-[10px] uppercase tracking-[0.22em] text-foreground/40">
-          was · {oldValue}
+          {wasLabel} {oldValue}
         </p>
       )}
     </div>

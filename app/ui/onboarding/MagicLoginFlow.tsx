@@ -3,11 +3,13 @@
 // mozzarella-41832 — Editorial restyle.
 // Visual rewrite of the "DM me a login link" form. Props, state machine,
 // and API call (POST /api/auth/magic-login/request) are unchanged.
+// arugula-30866 — i18n via next-intl (onboarding.magicLogin.*).
 "use client";
 
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, Sparkles } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 const DISCORD_INVITE =
   process.env.NEXT_PUBLIC_DISCORD_INVITE || "https://discord.gg/pizzadao";
@@ -29,6 +31,7 @@ const HERO_SPOTLIGHT: CSSProperties = {
 };
 
 export function MagicLoginFlow({ onBack, loginError }: Props) {
+  const t = useTranslations("onboarding.magicLogin");
   const [username, setUsername] = useState("");
   const [state, setState] = useState<State>({ step: "form" });
 
@@ -55,14 +58,14 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       setState({
         step: "error",
         code: data.status || "unknown",
-        message: data.error || "Something went wrong",
+        message: data.error || t("errorSomethingWrong"),
         username: name,
       });
     } catch {
       setState({
         step: "error",
         code: "network",
-        message: "Network error. Please check your connection and try again.",
+        message: t("errorNetwork"),
         username: name,
       });
     }
@@ -71,23 +74,23 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
   // ─── Login error from redirect ──────────────────────────────
   if (loginError) {
     const errorMessages: Record<string, string> = {
-      invalid_token: "That login link is invalid.",
-      link_expired: "That login link has expired. Request a new one.",
-      link_already_used: "That login link has already been used. Request a new one.",
-      missing_token: "No login token provided.",
+      invalid_token: t("errorInvalidToken"),
+      link_expired: t("errorLinkExpired"),
+      link_already_used: t("errorLinkAlreadyUsed"),
+      missing_token: t("errorMissingToken"),
     };
 
     return (
       <Shell>
         <EditorialHeader
-          overline="§ ··· Login via Discord DM"
-          headline="Try again."
+          overline={t("overline")}
+          headline={t("tryAgainHeadline")}
         />
         <EditorialNotice
           tone="error"
-          message={errorMessages[loginError] || "Login failed. Please try again."}
+          message={errorMessages[loginError] || t("errorGeneric")}
         />
-        <BackLink onBack={onBack} />
+        <BackLink onBack={onBack} label={t("back")} />
       </Shell>
     );
   }
@@ -97,18 +100,15 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
     return (
       <Shell>
         <EditorialHeader
-          overline="§ ··· Login via Discord DM"
-          headline="Check your DMs."
+          overline={t("overline")}
+          headline={t("checkDmsHeadline")}
         />
         <EditorialNotice
           tone="success"
-          message={
-            <>
-              We sent a login link to{" "}
-              <strong className="text-foreground">{state.username}</strong> on
-              Discord. The link expires in 10 minutes.
-            </>
-          }
+          message={t.rich("sentMessage", {
+            username: state.username,
+            b: (chunks) => <strong className="text-foreground">{chunks}</strong>,
+          })}
         />
         <div className="grid gap-3">
           <button
@@ -121,9 +121,9 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
               border: "1px solid hsl(var(--foreground) / 0.25)",
             }}
           >
-            Resend
+            {t("resendButton")}
           </button>
-          <BackLink onBack={onBack} />
+          <BackLink onBack={onBack} label={t("back")} />
         </div>
       </Shell>
     );
@@ -135,12 +135,12 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       return (
         <Shell>
           <EditorialHeader
-            overline="§ ··· Login via Discord DM"
-            headline="Join first."
+            overline={t("overline")}
+            headline={t("joinFirstHeadline")}
           />
           <EditorialNotice
             tone="info"
-            message="You need to be in the PizzaDAO Discord to use this. Our bot can only DM members of the server."
+            message={t("joinFirstMessage")}
           />
           <div className="grid gap-3">
             <a
@@ -154,7 +154,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
                 boxShadow: "var(--shadow-soft)",
               }}
             >
-              Join PizzaDAO Discord
+              {t("joinDiscordButton")}
               <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </a>
             <button
@@ -167,9 +167,9 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
                 border: "1px solid hsl(var(--foreground) / 0.25)",
               }}
             >
-              I&apos;ve joined, try again
+              {t("joinedTryAgainButton")}
             </button>
-            <BackLink onBack={onBack} />
+            <BackLink onBack={onBack} label={t("back")} />
           </div>
         </Shell>
       );
@@ -179,20 +179,20 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       return (
         <Shell>
           <EditorialHeader
-            overline="§ ··· Login via Discord DM"
-            headline="Open your DMs."
+            overline={t("overline")}
+            headline={t("openDmsHeadline")}
           />
           <EditorialNotice
             tone="error"
-            message="Couldn't send you a DM. To receive the login link, enable DMs from server members:"
+            message={t("openDmsMessage")}
           />
           <ol
             className="ml-5 grid gap-2 text-[14px] leading-relaxed text-foreground/80"
             style={{ listStyleType: "decimal" }}
           >
-            <li>Open Discord and go to the PizzaDAO server</li>
-            <li>Click the server name at the top</li>
-            <li>Privacy Settings → Enable &quot;Direct Messages&quot;</li>
+            <li>{t("openDmsStep1")}</li>
+            <li>{t("openDmsStep2")}</li>
+            <li>{t("openDmsStep3")}</li>
           </ol>
           <div className="grid gap-3">
             <button
@@ -204,10 +204,10 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
                 color: "hsl(var(--cream))",
               }}
             >
-              Try again
+              {t("tryAgainButton")}
               <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </button>
-            <BackLink onBack={onBack} />
+            <BackLink onBack={onBack} label={t("back")} />
           </div>
         </Shell>
       );
@@ -217,14 +217,14 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       return (
         <Shell>
           <EditorialHeader
-            overline="§ ··· Login via Discord DM"
-            headline="Slow down."
+            overline={t("overline")}
+            headline={t("slowDownHeadline")}
           />
           <EditorialNotice
             tone="error"
-            message="Too many requests. Please try again in a few minutes."
+            message={t("rateLimitedMessage")}
           />
-          <BackLink onBack={onBack} />
+          <BackLink onBack={onBack} label={t("back")} />
         </Shell>
       );
     }
@@ -233,8 +233,8 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
     return (
       <Shell>
         <EditorialHeader
-          overline="§ ··· Login via Discord DM"
-          headline="Something snapped."
+          overline={t("overline")}
+          headline={t("snappedHeadline")}
         />
         <EditorialNotice tone="error" message={state.message} />
         <div className="grid gap-3">
@@ -247,10 +247,10 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
               color: "hsl(var(--cream))",
             }}
           >
-            Try again
+            {t("tryAgainButton")}
             <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
           </button>
-          <BackLink onBack={onBack} />
+          <BackLink onBack={onBack} label={t("back")} />
         </div>
       </Shell>
     );
@@ -265,15 +265,14 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
         style={HERO_SPOTLIGHT}
       />
       <EditorialHeader
-        overline="§ ··· Login via Discord DM"
-        headline="DM me a link."
+        overline={t("overline")}
+        headline={t("dmMeHeadline")}
       />
       <p
         className="max-w-md text-foreground/70"
         style={{ fontSize: "15px", lineHeight: 1.55 }}
       >
-        Enter your Discord username and we&apos;ll DM you a magic login link
-        that&apos;s good for 10 minutes.
+        {t("tagline")}
       </p>
 
       <div
@@ -298,10 +297,10 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             value={username}
             onChange={(e) => setUsername(e.target.value)}
             onKeyDown={(e) => e.key === "Enter" && handleSubmit()}
-            placeholder="Discord username"
+            placeholder={t("usernamePlaceholder")}
             autoFocus
             disabled={state.step === "sending"}
-            aria-label="Discord username"
+            aria-label={t("usernameAriaLabel")}
             className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none disabled:opacity-50"
             style={{
               fontSize: "clamp(1.1rem, 2.2vw, 1.5rem)",
@@ -323,10 +322,10 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          {state.step === "sending" ? "Sending…" : "Send login link"}
+          {state.step === "sending" ? t("sendingButton") : t("sendButton")}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
-        <BackLink onBack={onBack} />
+        <BackLink onBack={onBack} label={t("back")} />
       </div>
     </Shell>
   );
@@ -411,7 +410,7 @@ function EditorialNotice({
   );
 }
 
-function BackLink({ onBack }: { onBack: () => void }) {
+function BackLink({ onBack, label }: { onBack: () => void; label: string }) {
   return (
     <button
       type="button"
@@ -420,7 +419,7 @@ function BackLink({ onBack }: { onBack: () => void }) {
       style={{ background: "none", border: "none" }}
     >
       <ArrowLeft className="h-3 w-3" />
-      Back
+      {label}
     </button>
   );
 }

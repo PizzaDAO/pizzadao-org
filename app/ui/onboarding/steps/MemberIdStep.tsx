@@ -3,11 +3,13 @@
 // mozzarella-41832 — Editorial restyle.
 // Visual rewrite of the member-ID entry / lookup. Props, API calls
 // (/api/member-id, /api/member-id?check=...) and all state are unchanged.
+// arugula-30866 — i18n via next-intl (onboarding.memberId.*).
 "use client";
 
 import { useEffect, useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, Hash } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 type Props = {
   value: string;
@@ -22,6 +24,7 @@ const HERO_SPOTLIGHT: CSSProperties = {
 };
 
 export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
+  const t = useTranslations("onboarding.memberId");
   const [suggestions, setSuggestions] = useState<number[]>([]);
   const [checking, setChecking] = useState(false);
   const [availability, setAvailability] = useState<{
@@ -80,7 +83,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">§ 04 · Family number</p>
+        <p className="overline text-tomato">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -89,14 +92,13 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
             textWrap: "balance",
           }}
         >
-          Pick your <span className="text-tomato">Member ID</span>.
+          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
           style={{ fontSize: "16px", lineHeight: 1.55 }}
         >
-          A small number that belongs to you forever. Take one of the next
-          available, or claim a specific number.
+          {t("tagline")}
         </p>
       </header>
 
@@ -109,11 +111,11 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           boxShadow: "var(--shadow-soft)",
         }}
       >
-        <p className="relative overline text-tomato">§ Next available</p>
+        <p className="relative overline text-tomato">{t("nextAvailable")}</p>
 
         {loadingSuggestions ? (
           <p className="relative mt-3 ui text-[12px] uppercase tracking-[0.24em] text-foreground/50">
-            Pulling fresh numbers from the ledger…
+            {t("pullingNumbers")}
           </p>
         ) : (
           <div className="relative mt-4 flex flex-wrap gap-2.5">
@@ -157,7 +159,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           boxShadow: "var(--shadow-soft)",
         }}
       >
-        <p className="relative overline text-tomato">§ Or claim a specific number</p>
+        <p className="relative overline text-tomato">{t("claimSpecific")}</p>
 
         <div
           className="relative mt-4 overflow-hidden rounded-[18px]"
@@ -183,8 +185,8 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
               onChange={(e) =>
                 setAvailability({ id: e.target.value, status: null })
               }
-              placeholder="Enter ID"
-              aria-label="Enter Member ID to check"
+              placeholder={t("enterIdPlaceholder")}
+              aria-label={t("enterIdAriaLabel")}
               className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none"
               style={{
                 fontSize: "clamp(1.1rem, 2.2vw, 1.6rem)",
@@ -202,7 +204,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
                 background: "transparent",
               }}
             >
-              {checking ? "Checking…" : "Check"}
+              {checking ? t("checking") : t("check")}
             </button>
           </label>
         </div>
@@ -217,7 +219,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
                     className="h-1.5 w-1.5 rounded-full"
                     style={{ background: "hsl(var(--tomato))" }}
                   />
-                  ID {availability.id} is available
+                  {t("available", { id: availability.id })}
                 </span>
                 <button
                   type="button"
@@ -228,19 +230,19 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
                     color: "hsl(var(--cream))",
                   }}
                 >
-                  Pick this
+                  {t("pickThis")}
                   <ArrowUpRight className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </button>
               </div>
             )}
             {availability.status === "taken" && (
               <p className="ui text-[12px] uppercase tracking-[0.24em] text-destructive">
-                ID {availability.id} is already taken.
+                {t("taken", { id: availability.id })}
               </p>
             )}
             {availability.status === "invalid" && (
               <p className="ui text-[12px] uppercase tracking-[0.24em] text-tomato">
-                Invalid ID.
+                {t("invalid")}
               </p>
             )}
           </div>
@@ -249,8 +251,8 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
 
       {/* ─── Selected summary ──────────────────────────────────── */}
       <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/55">
-        Selected Member ID ·{" "}
-        <b className="text-foreground">{value || "(none)"}</b>
+        {t("selectedLabel")}{" "}
+        <b className="text-foreground">{value || t("none")}</b>
       </p>
 
       {/* ─── Actions ───────────────────────────────────────────── */}
@@ -261,7 +263,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
         >
           <ArrowLeft className="h-3 w-3" />
-          Back
+          {t("back")}
         </button>
         <button
           type="button"
@@ -274,7 +276,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          Next
+          {t("next")}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>

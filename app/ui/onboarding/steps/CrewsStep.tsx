@@ -4,11 +4,13 @@
 // Visual rewrite of the multi-select crews step. Props (including the
 // success/successData shape used by the wizard for the inline summary),
 // state and callbacks are unchanged.
+// arugula-30866 — i18n via next-intl (onboarding.crews.*).
 "use client";
 
 import { useMemo } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, Check, Clock, ExternalLink } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { TURTLES } from "../../constants";
 import type { CrewOption } from "../types";
 import { normKey, splitTurtlesCell } from "../types";
@@ -56,12 +58,14 @@ export function CrewsStep({
   success,
   successData,
 }: Props) {
+  const t = useTranslations("onboarding.crews");
+
   const turtleIdToLabel = useMemo(() => {
     const m: Record<string, string> = {};
-    for (const t of TURTLES as unknown as any[]) {
-      if (!t) continue;
-      const id = String(t.id ?? "").trim();
-      const label = String(t.label ?? "").trim();
+    for (const turtle of TURTLES as unknown as any[]) {
+      if (!turtle) continue;
+      const id = String(turtle.id ?? "").trim();
+      const label = String(turtle.label ?? "").trim();
       if (id) m[id] = label || id;
     }
     return m;
@@ -96,6 +100,14 @@ export function CrewsStep({
     onChange(has ? crews.filter((x) => x !== id) : [...crews, id]);
   }
 
+  const submitLabel = submitting
+    ? isUpdate
+      ? t("submitUpdating")
+      : t("submitClaiming")
+    : isUpdate
+      ? t("submitUpdate")
+      : t("submitClaim");
+
   return (
     <div className="relative grid gap-10 fade-up">
       {/* ─── Hero spotlight backdrop ─────────────────────────────── */}
@@ -107,7 +119,7 @@ export function CrewsStep({
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">§ 05 · Your crews</p>
+        <p className="overline text-tomato">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -116,19 +128,18 @@ export function CrewsStep({
             textWrap: "balance",
           }}
         >
-          Join some <span className="text-tomato">crews</span>.
+          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
           style={{ fontSize: "16px", lineHeight: 1.55 }}
         >
-          The crews you join decide which calls you sit in on and which work
-          ends up at your door. Pick any that look like you.
+          {t("tagline")}
         </p>
 
         {crewsLoading && (
           <p className="ui mt-4 text-[11px] uppercase tracking-[0.24em] text-foreground/50">
-            Loading crews…
+            {t("loading")}
           </p>
         )}
       </header>
@@ -162,7 +173,7 @@ export function CrewsStep({
           className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
         >
           <ArrowLeft className="h-3 w-3" />
-          Back
+          {t("back")}
         </button>
         <button
           type="button"
@@ -175,13 +186,7 @@ export function CrewsStep({
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          {submitting
-            ? isUpdate
-              ? "Updating…"
-              : "Claiming…"
-            : isUpdate
-              ? "Update Profile"
-              : "Claim Discord Roles"}
+          {submitLabel}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>
@@ -214,6 +219,8 @@ function CrewCard({
   tilt: number;
   onToggle: () => void;
 }) {
+  const t = useTranslations("onboarding.crews");
+
   return (
     <label
       style={{
@@ -258,7 +265,7 @@ function CrewCard({
         checked={checked}
         onChange={onToggle}
         className="sr-only"
-        aria-label={`Toggle ${crew.label}`}
+        aria-label={t("toggleAria", { crew: crew.label })}
       />
 
       <div className="relative flex items-start gap-3">
@@ -293,7 +300,7 @@ function CrewCard({
             >
               <div className="flex items-center">
                 {recommended.map((tId, idx) => {
-                  const img = TURTLES.find((t) => t.id === tId)?.image;
+                  const img = TURTLES.find((tu) => tu.id === tId)?.image;
                   if (!img) return null;
                   return (
                     <img
@@ -311,7 +318,7 @@ function CrewCard({
                   );
                 })}
               </div>
-              Recommended
+              {t("recommended")}
             </div>
           )}
         </div>
@@ -344,9 +351,9 @@ function CrewCard({
       {crew.tasks && crew.tasks.length > 0 && (
         <div className="relative grid gap-1">
           <div className="ui text-[9px] font-bold uppercase tracking-[0.28em] text-foreground/45">
-            Top tasks
+            {t("topTasks")}
           </div>
-          {crew.tasks.map((t, idx) => (
+          {crew.tasks.map((task, idx) => (
             <div
               key={idx}
               className="flex min-w-0 items-baseline gap-1.5 text-[12.5px] text-foreground/80"
@@ -359,18 +366,18 @@ function CrewCard({
                 ·
               </span>
               <div className="overflow-hidden text-ellipsis whitespace-nowrap">
-                {t.url ? (
+                {task.url ? (
                   <a
-                    href={t.url}
+                    href={task.url}
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
                     className="text-inherit underline underline-offset-2 hover:text-tomato"
                   >
-                    {t.label}
+                    {task.label}
                   </a>
                 ) : (
-                  <span>{t.label}</span>
+                  <span>{task.label}</span>
                 )}
               </div>
             </div>
@@ -388,7 +395,7 @@ function CrewCard({
           title={crew.sheet}
         >
           <ExternalLink className="h-3 w-3" />
-          Open crew sheet
+          {t("openCrewSheet")}
         </a>
       )}
     </label>
@@ -406,6 +413,7 @@ function SuccessSummary({
   successData: NonNullable<Props["successData"]>;
   crewOptions: CrewOption[];
 }) {
+  const t = useTranslations("onboarding.crews");
   return (
     <div
       className="paper-soft relative overflow-hidden rounded-[24px] border p-5 md:p-6"
@@ -415,22 +423,27 @@ function SuccessSummary({
         boxShadow: "var(--shadow-soft)",
       }}
     >
-      <p className="relative overline text-tomato">§ Made</p>
+      <p className="relative overline text-tomato">{t("successOverline")}</p>
       <h3
         className="font-[family-name:var(--font-display)] relative mt-2 font-black tracking-[-0.01em] text-foreground"
         style={{ fontSize: "clamp(1.4rem, 3vw, 2rem)", lineHeight: 1 }}
       >
-        You&apos;re officially <span className="text-tomato">{successData.mafiaName}</span>.
+        {t("successHeadingPrefix")}{" "}
+        <span className="text-tomato">{successData.mafiaName}</span>.
       </h3>
 
       <div className="relative mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
-        <SummaryLine label="City" value={successData.city} />
+        <SummaryLine label={t("summaryCity")} value={successData.city} />
         <SummaryLine
-          label="Turtles"
-          value={successData.turtles.length ? successData.turtles.join(", ") : "(none)"}
+          label={t("summaryTurtles")}
+          value={
+            successData.turtles.length
+              ? successData.turtles.join(", ")
+              : t("summaryNone")
+          }
         />
         <SummaryLine
-          label="Crews"
+          label={t("summaryCrews")}
           value={
             successData.crews.length
               ? successData.crews
@@ -442,17 +455,17 @@ function SuccessSummary({
                       .join(" ");
                   })
                   .join(", ")
-              : "(none)"
+              : t("summaryNone")
           }
         />
         <SummaryLine
-          label="Movie"
+          label={t("summaryMovie")}
           value={successData.resolvedMovieTitle ?? successData.mafiaMovieTitle}
         />
         {successData.discordId && (
           <SummaryLine
-            label="Discord"
-            value={`${successData.discordJoined ? "Joined" : "Linked"} · ${successData.discordId}`}
+            label={t("summaryDiscord")}
+            value={`${successData.discordJoined ? t("summaryJoined") : t("summaryLinked")} · ${successData.discordId}`}
           />
         )}
       </div>
