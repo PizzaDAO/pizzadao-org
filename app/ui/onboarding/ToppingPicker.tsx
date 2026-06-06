@@ -101,6 +101,21 @@ export function ToppingPicker({ label, value, onChange }: Props) {
     return PIZZA_TOPPINGS.find((t) => t.toLowerCase() === v);
   }, [value]);
 
+  // calzone-65503 — Hooks Rules: all hooks below MUST run on every render.
+  // Previously this component early-returned the `SelectedToppingCard`
+  // *after* `matchedTopping`'s useMemo but *before* `filteredToppings`'s,
+  // so picking a topping changed the hook count between renders and the
+  // app crashed with React minified error #300 ("Rendered fewer hooks
+  // than expected"). The early-return now lives below the hook block.
+  const effectiveQuery = (open ? query : value).trim().toLowerCase();
+
+  const filteredToppings = useMemo(() => {
+    if (!effectiveQuery) return PIZZA_TOPPINGS;
+    return PIZZA_TOPPINGS.filter((t) =>
+      t.toLowerCase().includes(effectiveQuery),
+    );
+  }, [effectiveQuery]);
+
   // When picker is closed and we have a canonical match, render the
   // SelectedToppingCard summary instead of the input field.
   if (matchedTopping && !open) {
@@ -117,15 +132,6 @@ export function ToppingPicker({ label, value, onChange }: Props) {
       />
     );
   }
-
-  const effectiveQuery = (open ? query : value).trim().toLowerCase();
-
-  const filteredToppings = useMemo(() => {
-    if (!effectiveQuery) return PIZZA_TOPPINGS;
-    return PIZZA_TOPPINGS.filter((t) =>
-      t.toLowerCase().includes(effectiveQuery),
-    );
-  }, [effectiveQuery]);
 
   const handlePick = (t: string) => {
     onChange(t);

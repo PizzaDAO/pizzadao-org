@@ -21,9 +21,8 @@ import {
   type CSSProperties,
 } from "react";
 import {
-  ArrowLeft,
+  ArrowUp,
   ArrowUpRight,
-  Copy,
   RefreshCw,
   Search,
   Sparkles,
@@ -67,6 +66,10 @@ type Props = {
   onPickName: (name: string) => void;
   onKeepExisting: () => void;
   onBack: () => void;
+  // calzone-65503 — "Change picks" jumps back to the inputs phase while
+  // preserving the user's topping + film selections (only suggestion-side
+  // state is cleared, so both pickers remain editable side-by-side).
+  onChangeInputs: () => void;
 };
 
 /* ──────────────────────────────────────────────────────────────────────────
@@ -163,15 +166,15 @@ export function NameStep({
   onPickName,
   onKeepExisting,
   onBack,
+  onChangeInputs,
 }: Props) {
   const t = useTranslations("onboarding.name");
 
-  /* Local-only UI state. Selection & inline editing live here because they
-     don't need to persist past this step — the wizard advances as soon as
-     onPickName fires. */
+  /* Local-only UI state. Selection lives here because it doesn't need to
+     persist past this step — the wizard advances as soon as onPickName fires.
+     calzone-65503 — Inline-edit state was removed; users now stay with one
+     of the three offered names (no free-text editing in the dock). */
   const [selectedIdx, setSelectedIdx] = useState<number | null>(null);
-  const [editing, setEditing] = useState(false);
-  const [editedName, setEditedName] = useState<string>("");
   const [cycleTick, setCycleTick] = useState(0);
 
   // Track regenerate attempts purely for the escalating overline copy.
@@ -184,11 +187,9 @@ export function NameStep({
     return () => window.clearInterval(id);
   }, [submitting]);
 
-  // Reset local UI state whenever a fresh batch of suggestions arrives.
+  // Reset selection whenever a fresh batch of suggestions arrives.
   useEffect(() => {
     setSelectedIdx(null);
-    setEditing(false);
-    setEditedName("");
   }, [suggestions]);
 
   const canGenerate =
@@ -205,11 +206,7 @@ export function NameStep({
   );
 
   const finalName =
-    selectedIdx === null
-      ? ""
-      : editing
-        ? editedName
-        : (topThree[selectedIdx] ?? "");
+    selectedIdx === null ? "" : (topThree[selectedIdx] ?? "");
 
   const handleGenerate = (force: boolean) => {
     attemptsRef.current += 1;
@@ -220,15 +217,6 @@ export function NameStep({
     const name = finalName.trim();
     if (!name) return;
     onPickName(name);
-  };
-
-  const copyName = async () => {
-    if (!finalName) return;
-    try {
-      await navigator.clipboard.writeText(finalName);
-    } catch {
-      /* clipboard unsupported — silent */
-    }
   };
 
   function regenLabel(attempts: number): string {
@@ -358,29 +346,7 @@ export function NameStep({
       {/* ─── Reveal stage ────────────────────────────────────────── */}
       {!submitting && topThree.length > 0 && (
         <section className="relative">
-          <div className="flex flex-wrap items-center justify-between gap-4">
-            <button
-              type="button"
-              onClick={onBack}
-              className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
-            >
-              <ArrowLeft className="h-3 w-3" />
-              {isUpdate ? t("cancel") : t("changeInputs")}
-            </button>
-            <button
-              type="button"
-              onClick={() => handleGenerate(true)}
-              disabled={submitting}
-              className="ui inline-flex items-center gap-2 text-[12px] uppercase tracking-[0.22em] text-foreground/65 transition-colors hover:text-tomato disabled:opacity-40"
-            >
-              <RefreshCw
-                className={`h-3.5 w-3.5 ${submitting ? "animate-spin" : ""}`}
-              />
-              {regenLabel(attemptsRef.current)}
-            </button>
-          </div>
-
-          <div className="mt-10 text-center md:mt-14">
+          <div className="text-center md:mt-2">
             <p className="overline text-tomato">{t("revealOverline")}</p>
             <h2
               className="font-[family-name:var(--font-display)] mx-auto mt-4 max-w-3xl font-black tracking-[-0.01em] text-foreground"
@@ -396,7 +362,43 @@ export function NameStep({
             </p>
           </div>
 
-          <div className="relative mt-12 md:mt-16">
+          {/* calzone-65503 — Reroll controls live ABOVE the cards so they
+              feel attached to the offered names. "Change picks" jumps back
+              to the inputs phase (preserving topping + film); "Re-cast"
+              pulls another batch keeping the same inputs. */}
+          <div className="mt-10 flex flex-wrap items-center justify-center gap-3 md:mt-14">
+            <button
+              type="button"
+              onClick={isUpdate ? onBack : onChangeInputs}
+              className="btn-pill group"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              <ArrowUp className="h-3.5 w-3.5 transition-transform group-hover:-translate-y-0.5" />
+              {isUpdate ? t("cancel") : t("changeInputs")}
+            </button>
+            <button
+              type="button"
+              onClick={() => handleGenerate(true)}
+              disabled={submitting}
+              className="btn-pill group"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              <RefreshCw
+                className={`h-3.5 w-3.5 ${submitting ? "animate-spin" : "transition-transform group-hover:rotate-180"}`}
+              />
+              {regenLabel(attemptsRef.current)}
+            </button>
+          </div>
+
+          <div className="relative mt-8 md:mt-10">
             <div
               aria-hidden
               className="pointer-events-none absolute inset-0 -z-10"
@@ -412,11 +414,7 @@ export function NameStep({
                   isSelected={selectedIdx === i}
                   anySelected={selectedIdx !== null}
                   fileLabel={t("familyFileLabel", { fileNo: CARD_PERSONALITIES[i]!.fileNo })}
-                  onSelect={() => {
-                    setSelectedIdx(i);
-                    setEditedName(name);
-                    setEditing(false);
-                  }}
+                  onSelect={() => setSelectedIdx(i)}
                 />
               ))}
             </div>
@@ -476,7 +474,24 @@ export function NameStep({
               className="pointer-events-none absolute inset-0 opacity-80"
               style={SPOTLIGHT_DOCK}
             />
-            <div className="relative flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+
+            {/* calzone-65503 — Standalone close button at the dock's
+                top-right corner (12px from each edge). Replaces the inline
+                X that used to sit in the action row. */}
+            <button
+              type="button"
+              onClick={() => setSelectedIdx(null)}
+              aria-label={t("dismissSelection")}
+              className="ui absolute right-3 top-3 z-10 inline-flex items-center justify-center rounded-full p-1.5 transition-colors hover:bg-cream/10"
+              style={{
+                border: "1px solid hsl(var(--cream) / 0.22)",
+                color: "hsl(var(--cream) / 0.75)",
+              }}
+            >
+              <X className="h-3.5 w-3.5" />
+            </button>
+
+            <div className="relative flex flex-col gap-4 pr-10 md:flex-row md:items-center md:justify-between md:pr-12">
               <div className="min-w-0">
                 <p
                   className="overline"
@@ -484,60 +499,14 @@ export function NameStep({
                 >
                   {t("dockOverline")}
                 </p>
-                {editing ? (
-                  <input
-                    value={editedName}
-                    onChange={(e) => setEditedName(e.target.value)}
-                    maxLength={120}
-                    autoFocus
-                    className="font-[family-name:var(--font-display)] mt-2 w-full rounded-xl bg-transparent px-3 py-2 font-black leading-tight tracking-tight focus:outline-none"
-                    style={{
-                      border: "1px solid hsl(var(--cream) / 0.25)",
-                      color: "hsl(var(--cream))",
-                      fontSize: "clamp(1.3rem, 2.2vw, 1.8rem)",
-                    }}
-                  />
-                ) : (
-                  <h3
-                    className="font-[family-name:var(--font-display)] mt-2 truncate font-black leading-tight tracking-tight"
-                    style={{ fontSize: "clamp(1.4rem, 2.6vw, 2.1rem)" }}
-                  >
-                    {finalName}
-                  </h3>
-                )}
+                <h3
+                  className="font-[family-name:var(--font-display)] mt-2 truncate font-black leading-tight tracking-tight"
+                  style={{ fontSize: "clamp(1.4rem, 2.6vw, 2.1rem)" }}
+                >
+                  {finalName}
+                </h3>
               </div>
-              <div className="flex flex-wrap items-center gap-2">
-                <button
-                  type="button"
-                  onClick={() => {
-                    if (editing) {
-                      setEditing(false);
-                    } else {
-                      setEditing(true);
-                      if (selectedIdx !== null) {
-                        setEditedName(topThree[selectedIdx] ?? "");
-                      }
-                    }
-                  }}
-                  className="ui rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.22em] transition-colors"
-                  style={{
-                    border: "1px solid hsl(var(--cream) / 0.22)",
-                    color: "hsl(var(--cream))",
-                  }}
-                >
-                  {editing ? t("done") : t("edit")}
-                </button>
-                <button
-                  type="button"
-                  onClick={copyName}
-                  className="ui inline-flex items-center gap-1.5 rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.22em] transition-colors"
-                  style={{
-                    border: "1px solid hsl(var(--cream) / 0.22)",
-                    color: "hsl(var(--cream))",
-                  }}
-                >
-                  <Copy className="h-3.5 w-3.5" /> {t("copy")}
-                </button>
+              <div className="flex items-center">
                 <button
                   type="button"
                   onClick={handleClaim}
@@ -550,18 +519,6 @@ export function NameStep({
                 >
                   {t("claimThisName")}
                   <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
-                </button>
-                <button
-                  type="button"
-                  onClick={() => setSelectedIdx(null)}
-                  aria-label={t("dismissSelection")}
-                  className="ui inline-flex items-center justify-center rounded-full p-2 transition-colors"
-                  style={{
-                    border: "1px solid hsl(var(--cream) / 0.18)",
-                    color: "hsl(var(--cream) / 0.7)",
-                  }}
-                >
-                  <X className="h-3.5 w-3.5" />
                 </button>
               </div>
             </div>

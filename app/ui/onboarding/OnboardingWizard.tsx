@@ -751,6 +751,22 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 goToStep(0);
               }
             }}
+            // calzone-65503 — "Change picks" returns the user to the
+            // inputs phase of NameStep (where both ToppingPicker and
+            // FilmPicker are visible side-by-side) by clearing the
+            // suggestion-side state while preserving topping + film
+            // selections so they can tap to swap either one.
+            onChangeInputs={() =>
+              setData((p) => ({
+                ...p,
+                suggestions: undefined,
+                resolvedMovieTitle: undefined,
+                tmdbMovieId: undefined,
+                releaseDate: undefined,
+                mediaType: undefined,
+                mafiaName: undefined,
+              }))
+            }
           />
         )}
 
