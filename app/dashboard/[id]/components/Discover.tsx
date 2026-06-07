@@ -63,7 +63,7 @@ const TABS: Array<{ key: TabKey; label: string; viewAllHref: string }> = [
     { key: "bounties", label: "Bounties", viewAllHref: "/pep" },
     { key: "jobs", label: "Jobs", viewAllHref: "/pep" },
     { key: "articles", label: "Articles", viewAllHref: "/articles" },
-    { key: "calls", label: "Calls", viewAllHref: "/calls" },
+    { key: "calls", label: "Calls", viewAllHref: "/crews" },
 ];
 
 // ── Style helpers ────────────────────────────────────────────────────────
@@ -305,7 +305,7 @@ function CallItem({ c }: { c: DiscoverCall }) {
     })();
     return (
         <Link
-            href={`/calls`}
+            href={`/crews`}
             style={previewCard()}
             aria-label={`Call: ${c.crewLabel} on ${dateLabel}`}
             className="paper-soft group"
