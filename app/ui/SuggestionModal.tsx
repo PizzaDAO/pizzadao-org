@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, type ChangeEvent } from "react";
 import { createPortal } from "react-dom";
 import { X, Loader2, ImagePlus, Lightbulb, User, Mail } from "lucide-react";
 
@@ -57,7 +57,7 @@ export default function SuggestionModal({ open, onClose }: SuggestionModalProps)
 
   if (!open) return null;
 
-  const handleFilePick = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleFilePick = (e: ChangeEvent<HTMLInputElement>) => {
     setError(null);
     const file = e.target.files?.[0];
     // Allow re-picking the same file later.
