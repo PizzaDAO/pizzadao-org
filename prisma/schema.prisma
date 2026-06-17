@@ -505,3 +505,19 @@ model MemberWallet {
   @@index([memberId])
   @@index([walletAddress])
 }
+
+// Site improvement suggestions submitted via the corner pencil button.
+// Auth is optional — anyone can submit.
+model Suggestion {
+  id        Int      @id @default(autoincrement())
+  body      String
+  name      String?
+  email     String?
+  imageUrl  String?
+  pageUrl   String?
+  discordId String? // from session if logged in
+  memberId  String? // from session if available
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+}
