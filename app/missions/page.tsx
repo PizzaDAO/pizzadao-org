@@ -463,7 +463,7 @@ export default function MissionsPage() {
           >
             <p style={{ margin: 0, fontSize: 15, color: "hsl(var(--foreground))" }}>
               <a
-                href="/api/auth/discord"
+                href="/api/discord/login"
                 style={{
                   color: "hsl(var(--tomato))",
                   fontWeight: 700,
