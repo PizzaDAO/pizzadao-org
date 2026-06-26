@@ -1,7 +1,7 @@
 import React, { Suspense } from 'react'
 import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
-import CrewPage from '../[crewId]/page'
+import CrewPage from '../[crewId]/CrewPageClient'
 
 // Mock next/font/google - must be before component import is evaluated
 vi.mock('next/font/google', () => ({
@@ -133,10 +133,15 @@ function mockFetchResponses(crewData: CrewData, user: { memberId: string; name: 
   })
 }
 
+// Default test user: a tech-crew member, so existing tests render the
+// member (insider) view of the crew page. To test the visitor view,
+// pass `user: null` explicitly.
+const DEFAULT_TEST_USER = { memberId: '42', name: 'TestUser' }
+
 // Helper to render the crew page with Suspense boundary (needed for React 19 use() hook)
 async function renderCrewPage(
   crewData: CrewData,
-  user: { memberId: string; name: string } | null = null
+  user: { memberId: string; name: string } | null = DEFAULT_TEST_USER
 ) {
   mockFetchResponses(crewData, user)
 

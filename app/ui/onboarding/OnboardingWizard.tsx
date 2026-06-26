@@ -1,13 +1,17 @@
 // app/ui/onboarding/OnboardingWizard.tsx
+// arugula-30866 — i18n via next-intl. Chrome strings (progress, summary,
+// chapter titles, reset, error/success screens) live under onboarding.chrome.*.
 "use client";
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useTranslations } from "next-intl";
 import { TURTLES } from "../constants";
 
 import { LoadingScreen } from "./LoadingScreen";
 import { ClaimFlow } from "./ClaimFlow";
 import { MagicLoginFlow } from "./MagicLoginFlow";
+import { FinaleScene } from "./FinaleScene";
 import { WelcomeStep } from "./steps/WelcomeStep";
 import { NameStep } from "./steps/NameStep";
 import { CityStep } from "./steps/CityStep";
@@ -16,7 +20,8 @@ import { MemberIdStep } from "./steps/MemberIdStep";
 import { CrewsStep } from "./steps/CrewsStep";
 import { ReviewStep } from "./steps/ReviewStep";
 
-import { card, btn, alert } from "./styles";
+// mozzarella-41832: card/btn/alert primitives replaced by editorial
+// utilities (.paper-soft, .btn-pill-lg, .overline) inline in the JSX.
 import {
   FlowState,
   WizardData,
@@ -32,7 +37,20 @@ import {
 // Main Component
 // ============================================================================
 
-export function OnboardingWizard() {
+export type OnboardingWizardProps = {
+  /**
+   * Deep-link entry point. When set, skips the session check and URL-param
+   * negotiation and starts the wizard in this flow state. Used by `/login`
+   * (magic_login) and `/join` (wizard step 1 / NameStep).
+   *
+   * URL params still win for explicit redirects: ?loginError=... will force
+   * magic_login regardless of initialFlow.
+   */
+  initialFlow?: FlowState;
+};
+
+export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
+  const t = useTranslations("onboarding.chrome");
   const router = useRouter();
   const hasProcessedParams = useRef(false);
 
@@ -153,9 +171,18 @@ export function OnboardingWizard() {
       return;
     }
 
+    // Deep-link entry: /login and /join pass an initialFlow so the wizard
+    // skips the session check and URL-param negotiation. URL params above
+    // still win — explicit redirects (?loginError=...) override this.
+    if (initialFlow) {
+      hasProcessedParams.current = true;
+      setFlow(initialFlow);
+      return;
+    }
+
     // Check if user is already logged in
     checkSession();
-  }, []);
+  }, [initialFlow]);
 
   // --- Check existing session ---
   async function checkSession() {
@@ -260,7 +287,7 @@ export function OnboardingWizard() {
     try {
       const res = await fetch(`/api/verify-edit?memberId=${memberId}`, { credentials: "include" });
       if (!res.ok) {
-        setError("Not authorized to edit this profile");
+        setError(t("errorNotAuthorized"));
         setFlow({ type: "wizard", step: 0, isUpdate: false });
         return;
       }
@@ -285,7 +312,7 @@ export function OnboardingWizard() {
       }
       setFlow({ type: "wizard", step: 1, isUpdate: true });
     } catch {
-      setError("Failed to load profile for editing");
+      setError(t("errorLoadProfile"));
       setFlow({ type: "wizard", step: 0, isUpdate: false });
     }
   }
@@ -318,7 +345,7 @@ export function OnboardingWizard() {
       });
 
       const result = (await res.json()) as NamegenResponse | any;
-      if (!res.ok) throw new Error(result?.error || "Failed to generate names");
+      if (!res.ok) throw new Error(result?.error || t("errorGenerateNames"));
 
       setData((p) => ({
         ...p,
@@ -332,7 +359,7 @@ export function OnboardingWizard() {
 
       setLastGenParams(currentParams);
     } catch (e: unknown) {
-      setError((e as any)?.message || "Failed to generate names");
+      setError((e as any)?.message || t("errorGenerateNames"));
     } finally {
       setGeneratingNames(false);
     }
@@ -377,20 +404,19 @@ export function OnboardingWizard() {
       const result = await res.json();
 
       if (!res.ok) {
-        throw new Error(result?.error || "Failed to save profile");
+        throw new Error(result?.error || t("errorSaveProfile"));
       }
 
-      // Success - redirect to dashboard
+      // pizzaiolo-35410 — Don't redirect immediately. Play the finale ceremony
+      // first; FinaleScene's "Continue to dashboard" CTA (and the auto-redirect
+      // fallback below) handles the navigation.
       const memberId = data.memberId || result?.sheets?.memberId || data.discordId;
-      if (memberId) {
-        localStorage.removeItem(LS_KEY);
-        router.push(`/dashboard/${memberId}`);
-      } else {
-        setFlow({ type: "success", redirectTo: "/" });
-      }
+      localStorage.removeItem(LS_KEY);
+      const redirectTo = memberId ? `/dashboard/${memberId}` : "/";
+      setFlow({ type: "success", redirectTo });
     } catch (e: unknown) {
       setIsSubmitting(false);
-      setError((e as any)?.message || "Failed to save");
+      setError((e as any)?.message || t("errorSaveGeneric"));
       setErrorDetails((e as any)?.details);
       setFlow({
         type: "wizard",
@@ -451,8 +477,14 @@ export function OnboardingWizard() {
   // Magic login flow
   if (flow.type === "magic_login") {
     return (
-      <div style={card()}>
-        <h2 style={{ margin: 0, fontWeight: 800 }}>Login via Discord DM</h2>
+      <div
+        className="paper-soft relative overflow-hidden rounded-[28px] border p-6 md:p-9"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--rule-warm) / 0.55)",
+          boxShadow: "var(--shadow-lifted)",
+        }}
+      >
         <MagicLoginFlow
           onBack={() => {
             setLoginError(null);
@@ -483,115 +515,209 @@ export function OnboardingWizard() {
   // Error state
   if (flow.type === "error") {
     return (
-      <div style={card()}>
-        <div style={alert("error")}>
-          <div style={{ fontWeight: 800 }}>{flow.message}</div>
+      <div
+        className="paper-soft relative overflow-hidden rounded-[28px] border p-6 md:p-9 grid gap-5 fade-up"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--rule-warm) / 0.55)",
+          boxShadow: "var(--shadow-soft)",
+        }}
+      >
+        <p className="overline text-tomato">{t("errorSomethingSnapped")}</p>
+        <div
+          className="relative paper-soft overflow-hidden rounded-[18px] border p-4"
+          style={{
+            background: "hsl(var(--destructive) / 0.08)",
+            borderColor: "hsl(var(--destructive) / 0.3)",
+          }}
+        >
+          <div
+            className="font-[family-name:var(--font-display)] text-xl font-black tracking-tight"
+            style={{ color: "hsl(var(--destructive))" }}
+          >
+            {flow.message}
+          </div>
           {flow.details && (
-            <details style={{ marginTop: 8 }}>
-              <summary>Details</summary>
-              <pre style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{flow.details}</pre>
+            <details className="mt-2">
+              <summary className="text-xs text-foreground/55 cursor-pointer">{t("errorDetails")}</summary>
+              <pre className="text-xs whitespace-pre-wrap text-foreground/65 mt-1">{flow.details}</pre>
             </details>
           )}
         </div>
-        <button onClick={() => setFlow({ type: "wizard", step: 0, isUpdate: false })} style={btn("secondary")}>
-          Start Over
+        <button
+          onClick={() => setFlow({ type: "wizard", step: 0, isUpdate: false })}
+          className="btn-pill-lg"
+          style={{
+            background: "transparent",
+            color: "hsl(var(--foreground))",
+            border: "1px solid hsl(var(--foreground) / 0.25)",
+            alignSelf: "start",
+          }}
+        >
+          {t("errorStartOver")}
         </button>
       </div>
     );
   }
 
-  // Success state
+  // Success state — pizzaiolo-35410 finale ceremony.
+  // FinaleScene paints over the wizard chrome and plays the 6-phase reveal.
+  // The "Continue to dashboard" CTA inside the scene routes when the user
+  // is ready; we don't auto-redirect because the animation IS the reward.
   if (flow.type === "success") {
     return (
-      <div style={card()}>
-        <div style={alert("success")}>Profile saved successfully!</div>
-      </div>
+      <FinaleScene
+        mafiaName={data.mafiaName || data.discordNick || "Made"}
+        memberId={data.memberId}
+        dashboardHref={flow.redirectTo}
+      />
+
     );
   }
 
   // Wizard
   if (flow.type === "wizard") {
-    const stepTitle = getStepTitle(flow.step, flow.isUpdate);
+    const stepTitle = getStepTitle(flow.step, flow.isUpdate, t);
+
+    // Welcome step (step 0) renders without the card chrome so the hero can
+    // breathe like the marketing site.
+    if (flow.step === 0) {
+      return (
+        <WelcomeStep
+          onJoin={() => goToStep(1)}
+          onLogin={() => {
+            const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
+            (window.top || window).location.href = loginUrl;
+          }}
+          onMagicLogin={() => setFlow({ type: "magic_login" })}
+        />
+      );
+    }
+
+    // Progress (steps 1..6 = 6 visible steps)
+    const totalSteps = 6;
+    const currentIndex = Math.max(1, flow.step);
+    const progress = Math.min(100, Math.round((currentIndex / totalSteps) * 100));
 
     return (
-      <div style={card()}>
-        {/* Summary bar */}
+      <div
+        className="paper-soft relative overflow-hidden rounded-[28px] border p-5 md:p-8 grid gap-7"
+        style={{
+          background: "hsl(var(--card))",
+          borderColor: "hsl(var(--rule-warm) / 0.55)",
+          boxShadow: "var(--shadow-lifted)",
+        }}
+      >
+        {/* Progress — editorial overline + thick tomato bar */}
+        <div className="relative grid gap-2.5">
+          <div className="flex items-center justify-between">
+            <p className="overline text-tomato/85">
+              {t("stepOf", { current: currentIndex, total: totalSteps })}
+            </p>
+            <p className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/55">
+              {progress}%
+            </p>
+          </div>
+          <div
+            className="relative h-2 w-full overflow-hidden rounded-full"
+            style={{ background: "hsl(var(--rule-warm) / 0.35)" }}
+          >
+            <div
+              className="h-full transition-all duration-500 ease-out"
+              style={{
+                width: `${progress}%`,
+                background: "hsl(var(--tomato))",
+                boxShadow: "0 0 14px hsl(var(--tomato) / 0.4)",
+              }}
+            />
+          </div>
+        </div>
+
+        {/* Summary bar — hand-stamped dossier strip */}
         {(data.mafiaName || data.city || data.turtles.length > 0) && (
           <div
+            className="relative grid grid-cols-1 gap-3 pb-4 sm:grid-cols-3"
             style={{
-              opacity: 0.9,
-              fontSize: 16,
-              borderBottom: '1px solid var(--color-divider)',
-              paddingBottom: 8,
-              marginBottom: 12,
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 10,
+              borderBottom: "1px dashed hsl(var(--rule-warm) / 0.7)",
             }}
           >
             {data.mafiaName && (
-              <span>
-                Name: <b>{data.mafiaName}</b>
-              </span>
+              <SummaryStamp label={t("summaryName")} value={data.mafiaName} />
             )}
-            {data.city && (
-              <span>
-                {" "}
-                - City: <b>{data.city}</b>
-              </span>
-            )}
+            {data.city && <SummaryStamp label={t("summaryCity")} value={data.city} />}
             {data.turtles.length > 0 && (
-              <span>
-                {" "}
-                - Roles: <b>{data.turtles.join(", ")}</b>
-              </span>
+              <SummaryStamp label={t("summaryTurtles")} value={data.turtles.join(", ")} />
             )}
           </div>
         )}
 
-        {/* Header */}
-        <div style={{ display: "flex", justifyContent: "space-between", gap: 12, alignItems: "center" }}>
-          {flow.step > 0 && <h2 style={{ margin: 0, fontWeight: 800 }}>{stepTitle}</h2>}
-          {flow.step > 0 && (
-            <button
-              onClick={() => {
-                localStorage.removeItem(LS_KEY);
-                localStorage.removeItem(PENDING_CLAIM_KEY);
-                setData({ ...initialWizardData, sessionId: uuidLike() });
-                setFlow({ type: "wizard", step: 1, isUpdate: false });
-              }}
-              style={btn("secondary")}
-            >
-              Reset
-            </button>
+        {/* Header — editorial overline + display headline + tiny reset link.
+            sicilian-99996: when stepTitle is empty (NameStep, which owns its
+            own large hero), drop the chapter heading entirely but keep the
+            reset link in the chrome. */}
+        <div className="relative flex flex-wrap items-start justify-between gap-3">
+          {stepTitle ? (
+            <div className="flex-1 min-w-0">
+              <p className="overline text-tomato">{t("chapter", { current: currentIndex })}</p>
+              <h2
+                className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
+                style={{
+                  fontSize: "clamp(1.6rem, 4vw, 2.8rem)",
+                  lineHeight: 0.95,
+                  textWrap: "balance",
+                }}
+              >
+                {stepTitle}
+              </h2>
+            </div>
+          ) : (
+            <div className="flex-1 min-w-0" />
           )}
+          <button
+            type="button"
+            onClick={() => {
+              localStorage.removeItem(LS_KEY);
+              localStorage.removeItem(PENDING_CLAIM_KEY);
+              setData({ ...initialWizardData, sessionId: uuidLike() });
+              setFlow({ type: "wizard", step: 1, isUpdate: false });
+            }}
+            className="ui inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.28em] text-foreground/45 transition-colors hover:text-tomato min-h-11"
+            style={{ background: "none", border: "none" }}
+          >
+            <span aria-hidden>×</span>
+            {t("reset")}
+          </button>
         </div>
 
         {/* Error display */}
         {error && (
-          <div style={alert("error")}>
-            <div style={{ fontWeight: 800 }}>{error}</div>
+          <div
+            className="relative paper-soft overflow-hidden rounded-[18px] border p-4"
+            style={{
+              background: "hsl(var(--destructive) / 0.08)",
+              borderColor: "hsl(var(--destructive) / 0.3)",
+            }}
+          >
+            <p
+              className="font-[family-name:var(--font-display)] text-lg font-black tracking-tight"
+              style={{ color: "hsl(var(--destructive))" }}
+            >
+              {error}
+            </p>
             {errorDetails && (
-              <details style={{ marginTop: 8 }}>
-                <summary>Details</summary>
-                <pre style={{ fontSize: 12, whiteSpace: "pre-wrap" }}>{errorDetails}</pre>
+              <details className="mt-2">
+                <summary className="text-xs text-foreground/55 cursor-pointer">
+                  Details
+                </summary>
+                <pre className="text-xs whitespace-pre-wrap text-foreground/65 mt-1">
+                  {errorDetails}
+                </pre>
               </details>
             )}
           </div>
         )}
 
         {/* Step content */}
-        {flow.step === 0 && (
-          <WelcomeStep
-            onJoin={() => goToStep(1)}
-            onLogin={() => {
-              const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
-              (window.top || window).location.href = loginUrl;
-            }}
-            onMagicLogin={() => setFlow({ type: "magic_login" })}
-          />
-        )}
-
         {flow.step === 1 && (
           <NameStep
             topping={data.topping}
@@ -625,6 +751,22 @@ export function OnboardingWizard() {
                 goToStep(0);
               }
             }}
+            // calzone-65503 — "Change picks" returns the user to the
+            // inputs phase of NameStep (where both ToppingPicker and
+            // FilmPicker are visible side-by-side) by clearing the
+            // suggestion-side state while preserving topping + film
+            // selections so they can tap to swap either one.
+            onChangeInputs={() =>
+              setData((p) => ({
+                ...p,
+                suggestions: undefined,
+                resolvedMovieTitle: undefined,
+                tmdbMovieId: undefined,
+                releaseDate: undefined,
+                mediaType: undefined,
+                mafiaName: undefined,
+              }))
+            }
           />
         )}
 
@@ -701,22 +843,29 @@ export function OnboardingWizard() {
 // Helpers
 // ============================================================================
 
-function getStepTitle(step: number, isUpdate: boolean): string {
+function getStepTitle(
+  step: number,
+  _isUpdate: boolean,
+  t: (key: string) => string,
+): string {
   switch (step) {
     case 0:
       return "";
     case 1:
-      return "Pick your mafia name";
+      // sicilian-99996: NameStep has its own large headline ("Claim your
+      // mafia name."), so the wizard chrome no longer adds a redundant
+      // section title above it. Other steps still render theirs.
+      return "";
     case 2:
-      return "What city are you in?";
+      return t("stepTitleCity");
     case 3:
-      return "What roles do you play?";
+      return t("stepTitleRoles");
     case 4:
-      return "Pick your Member ID";
+      return t("stepTitleMemberId");
     case 5:
-      return "Join some crews";
+      return t("stepTitleCrews");
     case 6:
-      return "Review Changes";
+      return t("stepTitleReview");
     default:
       return "";
   }
@@ -735,4 +884,25 @@ function parseList(val: any): string[] {
 function mergeSeen(prevSeen: string[], newNames: string[]): string[] {
   const cleaned = newNames.map((x) => String(x ?? "").trim()).filter(Boolean);
   return Array.from(new Set([...(prevSeen ?? []), ...cleaned]));
+}
+
+// ============================================================================
+// SummaryStamp — hand-stamped dossier strip cell for the wizard summary bar
+// ============================================================================
+
+function SummaryStamp({ label, value }: { label: string; value: string }) {
+  return (
+    <div className="min-w-0">
+      <p className="ui text-[9px] uppercase tracking-[0.3em] text-foreground/45">
+        {label}
+      </p>
+      <p
+        className="font-[family-name:var(--font-display)] mt-0.5 truncate font-black tracking-tight text-foreground"
+        style={{ fontSize: "14px", lineHeight: 1.2 }}
+        title={value}
+      >
+        {value}
+      </p>
+    </div>
+  );
 }

@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { AddVouchButton } from "./AddVouchButton";
 import Link from "next/link";
+import { btn, loadingSpinner } from "../shared-styles";
 
 type PizzaDAOMember = {
   fid: number;
@@ -23,6 +24,35 @@ type FarcasterProfile = {
 };
 
 type DiscoveryState = "idle" | "loading" | "results" | "error";
+
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
+
+function sectionLabel(): React.CSSProperties {
+  return {
+    fontFamily: displayFont,
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "hsl(var(--muted-foreground))",
+    margin: 0,
+    fontWeight: 700,
+  };
+}
+
+function ghostBtn(): React.CSSProperties {
+  return {
+    padding: "4px 10px",
+    borderRadius: 999,
+    border: "1px solid hsl(var(--rule) / 0.22)",
+    background: "transparent",
+    color: "hsl(var(--muted-foreground))",
+    fontSize: 12,
+    cursor: "pointer",
+    fontFamily: "inherit",
+    transition: "background-color 150ms ease, border-color 150ms ease",
+  };
+}
 
 export function FarcasterDiscovery({
   currentMemberId,
@@ -73,7 +103,7 @@ export function FarcasterDiscovery({
 
   const openInvite = () => {
     const usernames = Array.from(selected);
-    const baseText = "Join the party on PizzaDAO! \uD83C\uDF55 pizzadao.org";
+    const baseText = "Join the party on PizzaDAO! 🍕 app.pizzadao.org";
 
     // Batch into casts that fit within ~900 chars
     const batches: string[][] = [];
@@ -107,41 +137,19 @@ export function FarcasterDiscovery({
   if (state === "idle") {
     return (
       <div style={{ textAlign: "center" }}>
-        <h3
-          style={{
-            fontSize: 12,
-            textTransform: "uppercase",
-            letterSpacing: "1px",
-            opacity: 0.5,
-            margin: "0 0 12px",
-            fontWeight: 700,
-          }}
-        >
+        <h3 style={{ ...sectionLabel(), margin: "0 0 12px" }}>
           Farcaster Discovery
         </h3>
         <p
           style={{
             fontSize: 14,
-            color: "var(--color-text-secondary)",
+            color: "hsl(var(--muted-foreground))",
             margin: "0 0 16px",
           }}
         >
           Find which of your Farcaster followees are on PizzaDAO.
         </p>
-        <button
-          onClick={discover}
-          style={{
-            padding: "10px 20px",
-            borderRadius: 10,
-            border: "1px solid var(--color-btn-primary-border)",
-            background: "var(--color-btn-primary-bg)",
-            color: "var(--color-btn-primary-text)",
-            fontSize: 14,
-            fontWeight: 650,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
+        <button onClick={discover} style={btn("primary")}>
           Discover Farcaster Vouches
         </button>
       </div>
@@ -152,19 +160,14 @@ export function FarcasterDiscovery({
   if (state === "loading") {
     return (
       <div style={{ textAlign: "center", padding: 20 }}>
-        <div
+        <div style={{ ...loadingSpinner(), width: 36, height: 36, borderWidth: 3 }} />
+        <p
           style={{
-            width: 36,
-            height: 36,
-            border: "3px solid var(--color-spinner-track)",
-            borderTop: "3px solid var(--color-spinner-active)",
-            borderRadius: "50%",
-            animation: "spin 1s linear infinite",
-            margin: "0 auto 12px",
+            fontSize: 14,
+            color: "hsl(var(--muted-foreground))",
           }}
-        />
-        <p style={{ fontSize: 14, opacity: 0.7 }}>
-          Scanning your Farcaster following list...
+        >
+          Scanning your Farcaster following list…
         </p>
         <style jsx>{`
           @keyframes spin {
@@ -184,24 +187,16 @@ export function FarcasterDiscovery({
   if (state === "error") {
     return (
       <div style={{ textAlign: "center" }}>
-        <h3
-          style={{
-            fontSize: 12,
-            textTransform: "uppercase",
-            letterSpacing: "1px",
-            opacity: 0.5,
-            margin: "0 0 12px",
-            fontWeight: 700,
-          }}
-        >
+        <h3 style={{ ...sectionLabel(), margin: "0 0 12px" }}>
           Farcaster Discovery
         </h3>
         <div
           style={{
             padding: 12,
-            background: "rgba(255,0,0,0.05)",
-            borderRadius: 10,
-            color: "var(--color-danger)",
+            background: "hsl(var(--tomato) / 0.08)",
+            border: "1px solid hsl(var(--tomato) / 0.30)",
+            borderRadius: "var(--radius)",
+            color: "hsl(var(--tomato))",
             fontSize: 14,
             marginBottom: 12,
           }}
@@ -210,17 +205,7 @@ export function FarcasterDiscovery({
         </div>
         <button
           onClick={discover}
-          style={{
-            padding: "8px 16px",
-            borderRadius: 10,
-            border: "1px solid var(--color-btn-primary-border)",
-            background: "var(--color-btn-primary-bg)",
-            color: "var(--color-btn-primary-text)",
-            fontSize: 13,
-            fontWeight: 650,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
+          style={{ ...btn("primary"), padding: "8px 16px", fontSize: 13 }}
         >
           Retry
         </button>
@@ -241,31 +226,8 @@ export function FarcasterDiscovery({
           marginBottom: 16,
         }}
       >
-        <h3
-          style={{
-            fontSize: 12,
-            textTransform: "uppercase",
-            letterSpacing: "1px",
-            opacity: 0.5,
-            margin: 0,
-            fontWeight: 700,
-          }}
-        >
-          Farcaster Discovery
-        </h3>
-        <button
-          onClick={discover}
-          style={{
-            padding: "4px 10px",
-            borderRadius: 6,
-            border: "1px solid var(--color-border)",
-            background: "transparent",
-            color: "var(--color-text-muted)",
-            fontSize: 12,
-            cursor: "pointer",
-            fontFamily: "inherit",
-          }}
-        >
+        <h3 style={sectionLabel()}>Farcaster Discovery</h3>
+        <button onClick={discover} style={ghostBtn()}>
           Refresh
         </button>
       </div>
@@ -274,15 +236,16 @@ export function FarcasterDiscovery({
         <div
           style={{
             padding: 24,
-            borderRadius: 10,
-            border: "1px dashed var(--color-border)",
+            borderRadius: "var(--radius)",
+            border: "1px dashed hsl(var(--rule) / 0.22)",
+            background: "hsl(var(--card))",
             textAlign: "center",
           }}
         >
           <p
             style={{
               fontSize: 14,
-              color: "var(--color-text-muted)",
+              color: "hsl(var(--muted-foreground))",
               margin: 0,
             }}
           >
@@ -296,10 +259,11 @@ export function FarcasterDiscovery({
         <div style={{ marginBottom: notOnPizzaDAO.length > 0 ? 20 : 0 }}>
           <h4
             style={{
+              fontFamily: displayFont,
               fontSize: 14,
-              fontWeight: 650,
+              fontWeight: 700,
               margin: "0 0 10px",
-              color: "var(--color-text-primary)",
+              color: "hsl(var(--foreground))",
             }}
           >
             On PizzaDAO ({onPizzaDAO.length})
@@ -316,9 +280,10 @@ export function FarcasterDiscovery({
                 key={m.memberId}
                 style={{
                   padding: 14,
-                  borderRadius: 12,
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid hsl(var(--rule) / 0.12)",
+                  background: "hsl(var(--card))",
+                  color: "hsl(var(--card-foreground))",
                   display: "grid",
                   gap: 6,
                 }}
@@ -328,23 +293,28 @@ export function FarcasterDiscovery({
                     display: "flex",
                     justifyContent: "space-between",
                     alignItems: "flex-start",
+                    gap: 8,
                   }}
                 >
                   <div style={{ minWidth: 0 }}>
                     <Link
                       href={`/profile/${m.memberId}`}
                       style={{
+                        fontFamily: displayFont,
                         fontSize: 15,
-                        fontWeight: 650,
-                        color: "var(--color-text-primary)",
+                        fontWeight: 700,
+                        color: "hsl(var(--foreground))",
                         textDecoration: "none",
                       }}
-                      onMouseEnter={(e) =>
-                        (e.currentTarget.style.textDecoration = "underline")
-                      }
-                      onMouseLeave={(e) =>
-                        (e.currentTarget.style.textDecoration = "none")
-                      }
+                      onMouseEnter={(e) => {
+                        e.currentTarget.style.color = "hsl(var(--tomato))";
+                        e.currentTarget.style.textDecoration = "underline";
+                        e.currentTarget.style.textUnderlineOffset = "2px";
+                      }}
+                      onMouseLeave={(e) => {
+                        e.currentTarget.style.color = "hsl(var(--foreground))";
+                        e.currentTarget.style.textDecoration = "none";
+                      }}
                     >
                       {m.memberName}
                     </Link>
@@ -352,7 +322,7 @@ export function FarcasterDiscovery({
                       <p
                         style={{
                           fontSize: 12,
-                          color: "var(--color-text-secondary)",
+                          color: "hsl(var(--muted-foreground))",
                           margin: "2px 0 0",
                         }}
                       >
@@ -362,7 +332,7 @@ export function FarcasterDiscovery({
                     <p
                       style={{
                         fontSize: 12,
-                        color: "#8A63D2",
+                        color: "hsl(var(--muted-foreground))",
                         margin: "2px 0 0",
                       }}
                     >
@@ -378,7 +348,7 @@ export function FarcasterDiscovery({
                   <p
                     style={{
                       fontSize: 12,
-                      color: "var(--color-text-muted)",
+                      color: "hsl(var(--muted-foreground))",
                       margin: 0,
                       overflow: "hidden",
                       textOverflow: "ellipsis",
@@ -407,28 +377,17 @@ export function FarcasterDiscovery({
           >
             <h4
               style={{
+                fontFamily: displayFont,
                 fontSize: 14,
-                fontWeight: 650,
+                fontWeight: 700,
                 margin: 0,
-                color: "var(--color-text-primary)",
+                color: "hsl(var(--foreground))",
               }}
             >
               Not on PizzaDAO ({notOnPizzaDAO.length})
             </h4>
             <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              <button
-                onClick={toggleAll}
-                style={{
-                  padding: "4px 10px",
-                  borderRadius: 6,
-                  border: "1px solid var(--color-border)",
-                  background: "transparent",
-                  color: "var(--color-text-muted)",
-                  fontSize: 12,
-                  cursor: "pointer",
-                  fontFamily: "inherit",
-                }}
-              >
+              <button onClick={toggleAll} style={ghostBtn()}>
                 {selected.size === notOnPizzaDAO.length
                   ? "Deselect All"
                   : "Select All"}
@@ -437,15 +396,9 @@ export function FarcasterDiscovery({
                 <button
                   onClick={openInvite}
                   style={{
+                    ...btn("accent"),
                     padding: "6px 14px",
-                    borderRadius: 8,
-                    border: "1px solid var(--color-btn-primary-border)",
-                    background: "var(--color-btn-primary-bg)",
-                    color: "var(--color-btn-primary-text)",
                     fontSize: 13,
-                    fontWeight: 650,
-                    cursor: "pointer",
-                    fontFamily: "inherit",
                   }}
                 >
                   Invite Selected ({selected.size})
@@ -456,84 +409,89 @@ export function FarcasterDiscovery({
 
           <div
             style={{
-              borderRadius: 10,
-              border: "1px solid var(--color-border)",
+              borderRadius: "var(--radius)",
+              border: "1px solid hsl(var(--rule) / 0.12)",
+              background: "hsl(var(--card))",
               overflow: "hidden",
             }}
           >
-            {notOnPizzaDAO.map((u, i) => (
-              <div
-                key={u.fid}
-                onClick={() => toggleSelect(u.username)}
-                style={{
-                  display: "flex",
-                  alignItems: "center",
-                  gap: 10,
-                  padding: "8px 12px",
-                  cursor: "pointer",
-                  background: selected.has(u.username)
-                    ? "var(--color-btn-primary-bg)10"
-                    : "transparent",
-                  borderBottom:
-                    i < notOnPizzaDAO.length - 1
-                      ? "1px solid var(--color-border)"
-                      : "none",
-                  transition: "background 0.1s",
-                }}
-              >
-                <input
-                  type="checkbox"
-                  checked={selected.has(u.username)}
-                  onChange={() => toggleSelect(u.username)}
-                  style={{ flexShrink: 0, cursor: "pointer" }}
-                />
-                {u.pfpUrl ? (
-                  <img
-                    src={u.pfpUrl}
-                    alt=""
-                    width={32}
-                    height={32}
-                    style={{
-                      borderRadius: "50%",
-                      flexShrink: 0,
-                      objectFit: "cover",
-                    }}
+            {notOnPizzaDAO.map((u, i) => {
+              const isSelected = selected.has(u.username);
+              return (
+                <div
+                  key={u.fid}
+                  onClick={() => toggleSelect(u.username)}
+                  style={{
+                    display: "flex",
+                    alignItems: "center",
+                    gap: 10,
+                    padding: "8px 12px",
+                    cursor: "pointer",
+                    background: isSelected
+                      ? "hsl(var(--tomato) / 0.08)"
+                      : "transparent",
+                    borderBottom:
+                      i < notOnPizzaDAO.length - 1
+                        ? "1px solid hsl(var(--rule) / 0.12)"
+                        : "none",
+                    transition: "background-color 150ms ease",
+                  }}
+                >
+                  <input
+                    type="checkbox"
+                    checked={isSelected}
+                    onChange={() => toggleSelect(u.username)}
+                    style={{ flexShrink: 0, cursor: "pointer" }}
                   />
-                ) : (
-                  <div
-                    style={{
-                      width: 32,
-                      height: 32,
-                      borderRadius: "50%",
-                      background: "var(--color-border)",
-                      flexShrink: 0,
-                    }}
-                  />
-                )}
-                <div style={{ minWidth: 0, flex: 1 }}>
-                  <div
-                    style={{
-                      fontSize: 14,
-                      fontWeight: 600,
-                      color: "var(--color-text-primary)",
-                      overflow: "hidden",
-                      textOverflow: "ellipsis",
-                      whiteSpace: "nowrap",
-                    }}
-                  >
-                    {u.displayName}
-                  </div>
-                  <div
-                    style={{
-                      fontSize: 12,
-                      color: "var(--color-text-muted)",
-                    }}
-                  >
-                    @{u.username}
+                  {u.pfpUrl ? (
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={u.pfpUrl}
+                      alt=""
+                      width={32}
+                      height={32}
+                      style={{
+                        borderRadius: "50%",
+                        flexShrink: 0,
+                        objectFit: "cover",
+                      }}
+                    />
+                  ) : (
+                    <div
+                      style={{
+                        width: 32,
+                        height: 32,
+                        borderRadius: "50%",
+                        background: "hsl(var(--muted))",
+                        flexShrink: 0,
+                      }}
+                    />
+                  )}
+                  <div style={{ minWidth: 0, flex: 1 }}>
+                    <div
+                      style={{
+                        fontSize: 14,
+                        fontWeight: 600,
+                        color: "hsl(var(--foreground))",
+                        overflow: "hidden",
+                        textOverflow: "ellipsis",
+                        whiteSpace: "nowrap",
+                      }}
+                    >
+                      {u.displayName}
+                    </div>
+                    <div
+                      style={{
+                        fontSize: 12,
+                        color: "hsl(var(--muted-foreground))",
+                      }}
+                    >
+                      @{u.username}
+                    </div>
                   </div>
                 </div>
-              </div>
-            ))}
+              );
+            })}
           </div>
         </div>
       )}

@@ -1,5 +1,11 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the article editor.
+// Form fields read like manuscript markings: overline labels above each
+// input, paper-soft cream surfaces with warm rule borders, tomato focus
+// rings, and pill-shaped action buttons. Functionality (drag/drop, paste,
+// keyboard shortcuts, cheat sheet, preview) is preserved verbatim.
+
 import { useState, useEffect, useRef } from "react";
 import ArticleRenderer from "./ArticleRenderer";
 import TagBadge from "./TagBadge";
@@ -55,25 +61,16 @@ interface ArticleEditorProps {
   canPublish?: boolean;
 }
 
-const inputStyle = {
-  width: "100%",
-  padding: "10px 12px",
-  fontSize: 14,
-  border: "1px solid var(--color-border)",
-  borderRadius: 8,
-  outline: "none",
-  background: "var(--color-surface)",
-  color: "var(--color-text)",
-  boxSizing: "border-box" as const,
-};
+// Shared input — cream surface, warm rule border, tomato focus ring.
+const inputClass =
+  "w-full px-3 py-2.5 text-sm rounded-[--radius] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule-warm)/0.65)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.25)] transition-colors box-border";
 
-const labelStyle = {
-  display: "block",
-  fontSize: 13,
-  fontWeight: 600,
-  marginBottom: 6,
-  color: "var(--color-text-primary, var(--color-text))",
-};
+// Editorial overline labels above fields.
+const labelClass = "overline block mb-1.5 text-foreground/55";
+
+// Small toolbar buttons (insert image, markdown help, preview toggle).
+const toolbarBtnClass =
+  "overline px-2.5 py-1.5 rounded-full border border-[hsl(var(--foreground)/0.20)] bg-card text-foreground/70 hover:bg-[hsl(var(--ink)/0.06)] hover:text-foreground dark:hover:bg-[hsl(var(--cream)/0.06)] disabled:opacity-60 disabled:cursor-not-allowed cursor-pointer transition-colors";
 
 export default function ArticleEditor({
   initialValue,
@@ -253,17 +250,11 @@ export default function ArticleEditor({
   }
 
   return (
-    <div style={{ display: "flex", flexDirection: "column", gap: 16 }}>
+    <div className="paper-soft print-noise relative rounded-[--radius] border border-[hsl(var(--rule-warm)/0.55)] p-5 sm:p-7 flex flex-col gap-5">
       {error && (
         <div
-          style={{
-            padding: 12,
-            background: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
-            color: "#c00",
-            borderRadius: 8,
-            fontSize: 14,
-          }}
+          role="alert"
+          className="px-3 py-3 rounded-[--radius] text-sm font-semibold border bg-[hsl(var(--destructive)/0.10)] border-[hsl(var(--destructive)/0.30)] text-[hsl(var(--destructive))]"
         >
           {error}
         </div>
@@ -271,34 +262,15 @@ export default function ArticleEditor({
 
       {uploadError && (
         <div
-          style={{
-            padding: 12,
-            background: "rgba(239, 68, 68, 0.1)",
-            border: "1px solid rgba(239, 68, 68, 0.3)",
-            color: "#c00",
-            borderRadius: 8,
-            fontSize: 14,
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            gap: 12,
-          }}
           role="alert"
+          className="px-3 py-3 rounded-[--radius] text-sm font-semibold border bg-[hsl(var(--destructive)/0.10)] border-[hsl(var(--destructive)/0.30)] text-[hsl(var(--destructive))] flex items-center justify-between gap-3"
         >
           <span>Image upload failed: {uploadError}</span>
           <button
             type="button"
             onClick={() => setUploadError(null)}
             aria-label="Dismiss upload error"
-            style={{
-              background: "transparent",
-              border: "none",
-              color: "#c00",
-              cursor: "pointer",
-              fontSize: 18,
-              padding: 0,
-              lineHeight: 1,
-            }}
+            className="bg-transparent border-0 text-[hsl(var(--destructive))] cursor-pointer text-lg leading-none p-0"
           >
             ×
           </button>
@@ -306,56 +278,51 @@ export default function ArticleEditor({
       )}
 
       <div>
-        <label style={labelStyle}>Title *</label>
+        <label className={labelClass}>Headline *</label>
         <input
           type="text"
           value={title}
           onChange={(e) => setTitle(e.target.value)}
           placeholder="A great article title"
-          style={inputStyle}
+          className={`${inputClass} font-display font-bold text-lg tracking-tight`}
           maxLength={200}
         />
       </div>
 
       <div>
-        <label style={labelStyle}>Excerpt (optional, shown on list page)</label>
+        <label className={labelClass}>Deck / lede (optional)</label>
         <textarea
           value={excerpt}
           onChange={(e) => setExcerpt(e.target.value)}
           placeholder="A brief 1-2 sentence summary"
-          style={{ ...inputStyle, minHeight: 60, fontFamily: "inherit", resize: "vertical" }}
+          className={`${inputClass} min-h-[60px] resize-y`}
+          style={{ fontFamily: "inherit" }}
           maxLength={500}
         />
-        <div style={{ textAlign: "right", fontSize: 11, color: "var(--color-text-secondary, var(--color-text))", opacity: 0.6 }}>
+        <div className="text-right text-[11px] text-foreground/50 mt-1 font-variant-numeric tabular-nums">
           {excerpt.length}/500
         </div>
       </div>
 
       <div>
-        <label style={labelStyle}>Cover image URL (optional)</label>
-        <div style={{ display: "flex", gap: 8 }}>
+        <label className={labelClass}>Cover photograph (optional)</label>
+        <div className="flex gap-2">
           <input
             type="url"
             value={coverImage}
             onChange={(e) => setCoverImage(e.target.value)}
             placeholder="https://example.com/image.jpg"
-            style={{ ...inputStyle, flex: 1 }}
+            className={`${inputClass} flex-1`}
           />
           <button
             type="button"
             onClick={() => coverInputRef.current?.click()}
             disabled={uploading === "cover"}
+            className="btn-pill"
             style={{
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border-strong, var(--color-border))",
-              background: "var(--color-surface)",
-              color: "var(--color-text)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: uploading === "cover" ? "not-allowed" : "pointer",
-              opacity: uploading === "cover" ? 0.6 : 1,
-              whiteSpace: "nowrap",
+              background: "transparent",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.25)",
             }}
           >
             {uploading === "cover" ? "Uploading…" : "Upload"}
@@ -373,12 +340,12 @@ export default function ArticleEditor({
           />
         </div>
         {coverImage && (
-          <div style={{ marginTop: 8 }}>
+          <div className="mt-2">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={coverImage}
               alt="Cover preview"
-              style={{ maxWidth: "100%", maxHeight: 200, borderRadius: 8, border: "1px solid var(--color-border)" }}
+              className="max-w-full max-h-[200px] rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)]"
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
               }}
@@ -388,8 +355,8 @@ export default function ArticleEditor({
       </div>
 
       <div>
-        <label style={labelStyle}>Tags (up to 10)</label>
-        <div style={{ display: "flex", gap: 8, marginBottom: 8 }}>
+        <label className={labelClass}>Filed under (up to 10 tags)</label>
+        <div className="flex gap-2 mb-2">
           <input
             type="text"
             value={tagInput}
@@ -401,50 +368,32 @@ export default function ArticleEditor({
               }
             }}
             placeholder="pizza, dao, community..."
-            style={{ ...inputStyle, flex: 1 }}
+            className={`${inputClass} flex-1`}
             maxLength={32}
           />
           <button
             type="button"
             onClick={addTag}
+            className="btn-pill"
             style={{
-              padding: "10px 16px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border-strong, var(--color-border))",
-              background: "var(--color-surface)",
-              color: "var(--color-text)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: "pointer",
+              background: "transparent",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.25)",
             }}
           >
             Add
           </button>
         </div>
         {tags.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
+          <div className="flex flex-wrap gap-1.5">
             {tags.map((tag) => (
-              <span
-                key={tag}
-                style={{
-                  display: "inline-flex",
-                  alignItems: "center",
-                  gap: 4,
-                }}
-              >
+              <span key={tag} className="inline-flex items-center gap-1">
                 <TagBadge tag={tag} size="sm" />
                 <button
                   type="button"
                   onClick={() => removeTag(tag)}
                   aria-label={`Remove ${tag}`}
-                  style={{
-                    background: "transparent",
-                    border: "none",
-                    color: "var(--color-text-secondary, var(--color-text))",
-                    cursor: "pointer",
-                    fontSize: 14,
-                    padding: 0,
-                  }}
+                  className="bg-transparent border-0 text-foreground/45 hover:text-[hsl(var(--tomato))] cursor-pointer text-base leading-none p-0 transition-colors"
                 >
                   ×
                 </button>
@@ -455,24 +404,16 @@ export default function ArticleEditor({
       </div>
 
       <div>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
-          <label style={labelStyle}>Content (Markdown) *</label>
-          <div style={{ display: "flex", gap: 8 }}>
+        <div className="flex justify-between items-center mb-1.5 flex-wrap gap-2">
+          <label className={labelClass} style={{ marginBottom: 0 }}>
+            Manuscript (Markdown) *
+          </label>
+          <div className="flex flex-wrap gap-2">
             <button
               type="button"
               onClick={() => imageInputRef.current?.click()}
               disabled={uploading === "content"}
-              style={{
-                padding: "4px 10px",
-                fontSize: 12,
-                borderRadius: 6,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor: uploading === "content" ? "not-allowed" : "pointer",
-                opacity: uploading === "content" ? 0.6 : 1,
-                fontWeight: 600,
-              }}
+              className={toolbarBtnClass}
             >
               {uploading === "content" ? "Uploading…" : "Insert image"}
             </button>
@@ -490,32 +431,18 @@ export default function ArticleEditor({
             <button
               type="button"
               onClick={() => setShowCheatSheet(!showCheatSheet)}
-              style={{
-                padding: "4px 10px",
-                fontSize: 12,
-                borderRadius: 6,
-                border: "1px solid var(--color-border)",
-                background: showCheatSheet ? "var(--color-text)" : "var(--color-surface)",
-                color: showCheatSheet ? "var(--color-surface)" : "var(--color-text)",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
+              className={
+                showCheatSheet
+                  ? "overline px-2.5 py-1.5 rounded-full border border-[hsl(var(--foreground))] bg-foreground text-background cursor-pointer transition-colors"
+                  : toolbarBtnClass
+              }
             >
               Markdown help
             </button>
             <button
               type="button"
               onClick={() => setShowPreview(!showPreview)}
-              style={{
-                padding: "4px 10px",
-                fontSize: 12,
-                borderRadius: 6,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor: "pointer",
-                fontWeight: 600,
-              }}
+              className={toolbarBtnClass}
             >
               {showPreview ? "Hide preview" : "Show preview"}
             </button>
@@ -523,43 +450,33 @@ export default function ArticleEditor({
         </div>
         {showCheatSheet && (
           <div
+            className="mb-2 p-3 rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)] bg-[hsl(var(--cream))] dark:bg-card text-card-foreground text-[13px] leading-normal"
             style={{
-              marginBottom: 8,
-              padding: 12,
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              background: "var(--color-surface)",
-              fontSize: 13,
-              lineHeight: 1.5,
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
+              fontFamily: "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
               display: "grid",
               gridTemplateColumns: "1fr 1fr",
               gap: "4px 24px",
-              color: "var(--color-text)",
             }}
           >
             <div><strong style={{ fontFamily: "inherit" }}># Heading 1</strong></div>
             <div><strong style={{ fontFamily: "inherit" }}>## Heading 2</strong></div>
-            <div>**bold** &rarr; <strong>bold</strong> <span style={{ opacity: 0.5 }}>(Ctrl+B)</span></div>
-            <div>*italic* &rarr; <em>italic</em> <span style={{ opacity: 0.5 }}>(Ctrl+I)</span></div>
+            <div>**bold** &rarr; <strong>bold</strong> <span className="opacity-50">(Ctrl+B)</span></div>
+            <div>*italic* &rarr; <em>italic</em> <span className="opacity-50">(Ctrl+I)</span></div>
             <div>~~strikethrough~~ &rarr; <s>strikethrough</s></div>
-            <div>[link text](url) &rarr; link <span style={{ opacity: 0.5 }}>(Ctrl+K)</span></div>
+            <div>[link text](url) &rarr; link <span className="opacity-50">(Ctrl+K)</span></div>
             <div>![alt](url &quot;caption&quot;) &rarr; image with caption</div>
             <div>&gt; blockquote</div>
             <div>- bullet list</div>
             <div>1. numbered list</div>
-            <div>`inline code` <span style={{ opacity: 0.5 }}>(Ctrl+E)</span></div>
+            <div>`inline code` <span className="opacity-50">(Ctrl+E)</span></div>
             <div>```language &hellip; ``` &rarr; code block</div>
             <div>--- &rarr; horizontal rule</div>
             <div>| col | col | &rarr; table</div>
           </div>
         )}
         <div
-          style={{
-            display: "grid",
-            gridTemplateColumns: showPreview ? "1fr 1fr" : "1fr",
-            gap: 16,
-          }}
+          className="grid gap-4"
+          style={{ gridTemplateColumns: showPreview ? "1fr 1fr" : "1fr" }}
         >
           <textarea
             ref={contentRef}
@@ -569,32 +486,22 @@ export default function ArticleEditor({
             onPaste={onContentPaste}
             onDrop={onContentDrop}
             onDragOver={onContentDragOver}
-            placeholder="Write your article in Markdown... (paste or drop images to upload!)"
+            placeholder="Write your article in Markdown… (paste or drop images to upload!)"
+            className={`${inputClass} min-h-[400px] resize-y text-sm`}
             style={{
-              ...inputStyle,
-              minHeight: 400,
-              fontFamily: "ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
-              fontSize: 14,
-              resize: "vertical",
+              fontFamily: "var(--font-mono), ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace",
             }}
           />
           {showPreview && (
             <div
-              style={{
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                padding: 16,
-                background: "var(--color-surface)",
-                minHeight: 400,
-                overflow: "auto",
-                maxHeight: 600,
-              }}
+              className="rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)] bg-[hsl(var(--cream))] dark:bg-card p-5 overflow-auto"
+              style={{ minHeight: 400, maxHeight: 600 }}
             >
               {content.trim() ? (
                 <ArticleRenderer content={content} />
               ) : (
-                <p style={{ color: "var(--color-text-secondary, var(--color-text))", opacity: 0.6, margin: 0 }}>
-                  Preview will appear here…
+                <p className="text-foreground/55 m-0 overline">
+                  Preview appears here…
                 </p>
               )}
             </div>
@@ -602,24 +509,18 @@ export default function ArticleEditor({
         </div>
       </div>
 
-      <div style={{ display: "flex", gap: 12, flexWrap: "wrap", marginTop: 8 }}>
+      <div className="flex flex-wrap gap-3 mt-2 pt-4 border-t border-[hsl(var(--rule-warm)/0.55)]">
         <button
           type="button"
           onClick={() => onSaveDraft(currentValue())}
           disabled={submitting || !title.trim() || !content.trim()}
+          className="btn-pill"
           style={{
-            padding: "10px 18px",
-            borderRadius: 8,
-            border: "1px solid var(--color-border-strong, var(--color-border))",
-            background: "var(--color-surface)",
-            color: "var(--color-text)",
-            fontSize: 14,
-            fontWeight: 600,
-            cursor: submitting ? "not-allowed" : "pointer",
-            opacity: submitting ? 0.6 : 1,
+            background: "hsl(var(--foreground))",
+            color: "hsl(var(--background))",
           }}
         >
-          {submitting ? "Saving..." : mode === "edit" ? "Save changes" : "Save draft"}
+          {submitting ? "Saving…" : mode === "edit" ? "Save changes" : "Save draft"}
         </button>
 
         {canPublish && onPublish && (
@@ -627,16 +528,11 @@ export default function ArticleEditor({
             type="button"
             onClick={() => onPublish(currentValue())}
             disabled={submitting || !title.trim() || !content.trim()}
+            className="btn-pill"
             style={{
-              padding: "10px 18px",
-              borderRadius: 8,
-              border: "1px solid var(--color-btn-primary-border, #22c55e)",
-              background: "var(--color-btn-primary-bg, #22c55e)",
-              color: "var(--color-btn-primary-text, white)",
-              fontSize: 14,
-              fontWeight: 700,
-              cursor: submitting ? "not-allowed" : "pointer",
-              opacity: submitting ? 0.6 : 1,
+              background: "hsl(var(--tomato))",
+              color: "hsl(var(--cream))",
+              boxShadow: "var(--shadow-soft)",
             }}
           >
             {status === "PUBLISHED" ? "Update published" : "Publish"}
@@ -648,16 +544,11 @@ export default function ArticleEditor({
             type="button"
             onClick={onCancel}
             disabled={submitting}
+            className="btn-pill ml-auto"
             style={{
-              padding: "10px 18px",
-              borderRadius: 8,
-              border: "1px solid var(--color-border)",
               background: "transparent",
-              color: "var(--color-text)",
-              fontSize: 14,
-              fontWeight: 600,
-              cursor: submitting ? "not-allowed" : "pointer",
-              marginLeft: "auto",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.20)",
             }}
           >
             Cancel

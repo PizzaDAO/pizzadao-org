@@ -1,6 +1,6 @@
 'use client'
 
-import { useQuery } from '@tanstack/react-query'
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 // ============ Auth ============
 
@@ -140,13 +140,17 @@ export function usePOAPs(memberId: string | undefined) {
 
 // ============ Vouches ============
 
-export function useVouches(memberId: string | undefined, options?: { limit?: number; source?: string }) {
+export function useVouches(
+  memberId: string | undefined,
+  options?: { limit?: number; source?: string; direction?: 'in' | 'out' }
+) {
   return useQuery({
     queryKey: ['vouches', memberId, options],
     queryFn: async () => {
       const params = new URLSearchParams({ memberId: memberId! })
       if (options?.limit) params.set('limit', String(options.limit))
       if (options?.source) params.set('source', options.source)
+      if (options?.direction) params.set('direction', options.direction)
       const res = await fetch(`/api/vouches?${params}`)
       if (!res.ok) throw new Error('Failed to load vouches')
       return res.json()
@@ -339,3 +343,392 @@ export function useMemberLookup(discordId: string | undefined) {
     staleTime: 10 * 60 * 1000,
   })
 }
+
+// ============ Dashboard Summary (BFF) ============
+
+/**
+ * Fetch the consolidated dashboard payload from /api/dashboard-summary.
+ * Replaces the ~8 concurrent client fetches the dashboard previously did
+ * (user-data, missions, balance, my-tasks, vouches, wallets, x, notifications).
+ *
+ * Plan: plans/garlic-96648-dashboard-redesign.md §6.3
+ */
+export function useDashboardSummary(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ['dashboard-summary', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/dashboard-summary?memberId=${encodeURIComponent(memberId!)}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to load dashboard summary')
+      }
+      return res.json()
+    },
+    enabled: !!memberId,
+    staleTime: 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}
+
+// ============ Activity Feed ============
+
+/**
+ * Recent-activity feed for the dashboard. Backs the `RecentActivity`
+ * component on /dashboard/[id]. Aggregated server-side over Prisma sources
+ * (vouches, mission completions, unlock tickets, notifications); the page
+ * surfaces the top 5 of the returned (max 20) events.
+ *
+ * Plan: plans/garlic-96648-dashboard-redesign.md §6.3, PR3.
+ */
+export function useActivity(memberId: string | undefined) {
+  return useQuery({
+    queryKey: ['activity', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/activity/${memberId}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to load activity')
+      }
+      return res.json() as Promise<{ events: import('../../dashboard/[id]/lib/activity-types').ActivityEvent[] }>
+    },
+    enabled: !!memberId,
+    staleTime: 30 * 1000,
+    retry: false,
+  })
+}
+
+// ============ Profile Summary (BFF aggregator) ============
+
+/**
+ * Public shape of the /api/profile-summary/[id] response. Mirrors the
+ * `ProfileSummary` interface declared in the route handler — kept in sync
+ * by tests in `app/api/profile-summary/[id]/__tests__/route.test.ts`.
+ *
+ * Plan: plans/truffle-91035-profile-redesign.md §6.3 — PR3 (capricciosa-16483).
+ */
+export interface ProfileSummaryData {
+  hero: {
+    name: string
+    pfpUrl: string | null
+    tagline: string
+    city: string
+    level: number | string | null
+    levelTitle: string
+    mafiaRank: { rank: number; tier: string } | null
+    vouchInCount: number
+  }
+  about: {
+    skills: string
+    orgs: string
+    turtles: string[]
+    xAccount: { connected: boolean; username?: string } | null
+  }
+  crewIds: string[]
+  crewOptions: unknown[]
+  viewerId: string | null
+  isOwner: boolean
+}
+
+/**
+ * Profile-summary aggregator hook — Plan: truffle-91035 (PR3 — capricciosa-16483).
+ *
+ * Single network round-trip via `/api/profile-summary/[id]`. The endpoint
+ * composes profile sheet read + pfp + X account + mission progress + mafia
+ * rank + vouch counts + crew mappings server-side, replacing the ~8
+ * concurrent client fetches that PR2 did via composition.
+ *
+ * External shape is identical to the PR2 hook so the profile page composition
+ * is untouched.
+ */
+export function useProfileSummary(memberId: string | undefined) {
+  return useQuery<ProfileSummaryData>({
+    queryKey: ['profile-summary', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile-summary/${memberId}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Failed to load profile')
+      }
+      return res.json()
+    },
+    enabled: !!memberId,
+    staleTime: 60_000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}
+
+// ============ Profile Extras (Tagline) ============
+//
+// Appended at the end of the file (per plan note in PR4 — burrata-13316) to
+// minimize merge friction with sibling profile/dashboard PRs.
+
+export interface ProfileExtras {
+  tagline: string | null
+}
+
+/**
+ * Read the member's editable profile-extras row (tagline only for now).
+ * Public — anyone can read; owner-only writes go through `useUpdateTagline`.
+ */
+export function useProfileExtras(memberId: string | undefined) {
+  return useQuery<ProfileExtras>({
+    queryKey: ['profile-extras', memberId],
+    queryFn: async () => {
+      const res = await fetch(`/api/profile-extras/${memberId}`)
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Failed to load profile extras')
+      }
+      return res.json()
+    },
+    enabled: !!memberId,
+    staleTime: 60_000,
+    gcTime: 10 * 60 * 1000,
+    retry: false,
+  })
+}
+
+/**
+ * Owner-only tagline write. Optimistically updates the profile-extras +
+ * profile-summary caches so the hero re-renders without waiting for a
+ * round-trip.
+ */
+export function useUpdateTagline(memberId: string | undefined) {
+  const qc = useQueryClient()
+  return useMutation<ProfileExtras, Error, string>({
+    mutationFn: async (tagline: string) => {
+      const res = await fetch(`/api/profile-extras/${memberId}`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ tagline }),
+      })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error((err as { error?: string }).error || 'Failed to save tagline')
+      }
+      return res.json()
+    },
+    onSuccess: (data) => {
+      qc.setQueryData(['profile-extras', memberId], data)
+      // Patch the cached profile-summary so the hero updates immediately.
+      qc.setQueryData<ProfileSummaryData | undefined>(
+        ['profile-summary', memberId],
+        (prev) =>
+          prev
+            ? { ...prev, hero: { ...prev.hero, tagline: data.tagline ?? '' } }
+            : prev,
+      )
+    },
+  })
+}
+
+// ============ Discover (Dashboard PR4 — diavola-58369) ============
+
+/**
+ * Shape of the data fed to the `<Discover />` component on /dashboard/[id].
+ * Mirrors the item types declared in
+ * `app/dashboard/[id]/components/Discover.tsx`. Each list is already capped at
+ * 3 items by this hook so the component can render them as-is.
+ *
+ * Plan: plans/garlic-96648-dashboard-redesign.md §4 + §7 (PR4).
+ */
+export interface DiscoverData {
+  bounties: Array<{
+    id: number
+    description: string
+    reward: number
+    status: 'OPEN' | 'CLAIMED'
+  }>
+  jobs: Array<{
+    id: number
+    description: string
+    crew?: string | null
+    completed?: boolean
+  }>
+  articles: Array<{
+    id: number
+    slug: string
+    title: string
+    authorName?: string | null
+    publishedAt?: string | null
+  }>
+  calls: Array<{
+    crewId: string
+    crewLabel: string
+    date: string
+  }>
+}
+
+/**
+ * Fetches the "Discover" preview lists for /dashboard/[id]. Calls each
+ * upstream endpoint in parallel, tolerates per-source failures (a single 500
+ * does not collapse the section — the failing tab just falls back to an
+ * empty state), and slices the result to 3 items per category.
+ *
+ * The `/api/articles` endpoint accepts a `limit` query param; `/api/calls`
+ * does too. `/api/bounties` and `/api/jobs` don't paginate server-side, so
+ * the hook fetches the full list and slices client-side.
+ */
+export function useDiscover() {
+  return useQuery<DiscoverData>({
+    queryKey: ['discover'],
+    queryFn: async () => {
+      type RawArticle = {
+        id: number
+        slug: string
+        title: string
+        authorName?: string | null
+        publishedAt?: string | null
+      }
+      type RawCall = { crewId: string; crewLabel: string; date: string }
+
+      const safeJson = async <T,>(p: Promise<Response>, fallback: T): Promise<T> => {
+        try {
+          const res = await p
+          if (!res.ok) return fallback
+          return (await res.json()) as T
+        } catch {
+          return fallback
+        }
+      }
+
+      const [bountiesRes, jobsRes, articlesRes, callsRes] = await Promise.all([
+        safeJson<{ bounties?: DiscoverData['bounties'] }>(
+          fetch('/api/bounties'),
+          {},
+        ),
+        safeJson<{ jobs?: Array<{ id: number; description: string; type?: string; completed?: boolean }> }>(
+          fetch('/api/jobs'),
+          {},
+        ),
+        safeJson<{ articles?: RawArticle[] }>(
+          fetch('/api/articles?limit=3'),
+          {},
+        ),
+        safeJson<{ calls?: RawCall[] }>(
+          fetch('/api/calls?limit=3&sort=newest'),
+          {},
+        ),
+      ])
+
+      const bounties: DiscoverData['bounties'] = (bountiesRes.bounties ?? [])
+        .filter((b) => b.status === 'OPEN')
+        .slice(0, 3)
+        .map((b) => ({
+          id: b.id,
+          description: b.description,
+          reward: b.reward,
+          status: b.status,
+        }))
+
+      const jobs: DiscoverData['jobs'] = (jobsRes.jobs ?? [])
+        .slice(0, 3)
+        .map((j) => ({
+          id: j.id,
+          description: j.description,
+          crew: j.type ?? null,
+          completed: j.completed,
+        }))
+
+      const articles: DiscoverData['articles'] = (articlesRes.articles ?? [])
+        .slice(0, 3)
+        .map((a) => ({
+          id: a.id,
+          slug: a.slug,
+          title: a.title,
+          authorName: a.authorName ?? null,
+          publishedAt: a.publishedAt ?? null,
+        }))
+
+      const calls: DiscoverData['calls'] = (callsRes.calls ?? [])
+        .slice(0, 3)
+        .map((c) => ({
+          crewId: c.crewId,
+          crewLabel: c.crewLabel,
+          date: c.date,
+        }))
+
+      return { bounties, jobs, articles, calls }
+    },
+    staleTime: 5 * 60 * 1000,
+    gcTime: 10 * 60 * 1000,
+  })
+}
+
+// ============ Article Reactions (bellpepper-72784) ============
+
+export type ArticleReactionEmoji = '👍' | '❤️' | '🍕'
+
+export interface ArticleReactionsPayload {
+  counts: Record<ArticleReactionEmoji, number>
+  myReaction: ArticleReactionEmoji | null
+}
+
+const REACTION_EMOJIS: readonly ArticleReactionEmoji[] = ['👍', '❤️', '🍕']
+
+function normaliseReactionsPayload(raw: unknown): ArticleReactionsPayload {
+  const counts: Record<ArticleReactionEmoji, number> = { '👍': 0, '❤️': 0, '🍕': 0 }
+  let myReaction: ArticleReactionEmoji | null = null
+  if (raw && typeof raw === 'object') {
+    const obj = raw as { counts?: unknown; myReaction?: unknown }
+    if (obj.counts && typeof obj.counts === 'object') {
+      const c = obj.counts as Record<string, unknown>
+      for (const e of REACTION_EMOJIS) {
+        const v = c[e]
+        if (typeof v === 'number' && Number.isFinite(v)) counts[e] = v
+      }
+    }
+    if (typeof obj.myReaction === 'string' && (REACTION_EMOJIS as readonly string[]).includes(obj.myReaction)) {
+      myReaction = obj.myReaction as ArticleReactionEmoji
+    }
+  }
+  return { counts, myReaction }
+}
+
+/**
+ * Read + mutate the 3-emoji reaction strip on an article. Returns the
+ * counts/myReaction tuple plus a `toggle(emoji)` mutator that POSTs (or
+ * DELETEs when the click clears) and re-syncs React Query cache.
+ */
+export function useArticleReactions(slug: string | undefined) {
+  const queryClient = useQueryClient()
+  const queryKey = ['article-reactions', slug] as const
+
+  const query = useQuery({
+    queryKey,
+    queryFn: async (): Promise<ArticleReactionsPayload> => {
+      const res = await fetch(`/api/articles/${slug}/reactions`)
+      if (!res.ok) throw new Error('Failed to load reactions')
+      return normaliseReactionsPayload(await res.json())
+    },
+    enabled: !!slug,
+    staleTime: 30 * 1000,
+  })
+
+  const toggle = useMutation({
+    mutationFn: async (emoji: ArticleReactionEmoji): Promise<ArticleReactionsPayload> => {
+      const current = queryClient.getQueryData<ArticleReactionsPayload>(queryKey)
+      const isClearing = current?.myReaction === emoji
+      const res = isClearing
+        ? await fetch(`/api/articles/${slug}/reactions`, { method: 'DELETE' })
+        : await fetch(`/api/articles/${slug}/reactions`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ emoji }),
+          })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.error || 'Failed to update reaction')
+      }
+      return normaliseReactionsPayload(await res.json())
+    },
+    onSuccess: (data) => {
+      queryClient.setQueryData(queryKey, data)
+    },
+  })
+
+  return { ...query, toggle }
+}
+

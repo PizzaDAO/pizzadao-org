@@ -12,15 +12,40 @@ type ProfileLink = {
 /**
  * Read-only display of profile links on the public profile page.
  * Shows emoji + link in a clean horizontal/wrap layout.
+ *
+ * Phase 3c restyle: subtle ink chips on cream-warm background that
+ * shift to tomato on hover, matching the pizzadao.org accent style.
+ *
+ * Layout-leak fix (truffle-91035 PR1): the component used to own its
+ * outer `sm:col-span-2` wrapper, which forced it to span two columns
+ * of its parent grid regardless of where it was placed. The `variant`
+ * prop now decouples that. `"standalone"` (default) preserves the
+ * outer wrapper — keeping all current call sites visually identical
+ * to main. `"inline"` drops the wrapper so the parent owns layout.
  */
-export function ProfileLinksDisplay({ memberId }: { memberId: string }) {
+export function ProfileLinksDisplay({
+  memberId,
+  variant = "standalone",
+}: {
+  memberId: string;
+  /**
+   * Visual variant.
+   * - `"standalone"` (default): renders inside an `sm:col-span-2` wrapper,
+   *   identical to the pre-refactor behavior.
+   * - `"inline"`: renders without the outer grid-spanning wrapper. Use when
+   *   the parent owns the section layout.
+   */
+  variant?: "standalone" | "inline";
+}) {
   const [links, setLinks] = useState<ProfileLink[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/profile-links?memberId=${encodeURIComponent(memberId)}`);
+        const res = await fetch(
+          `/api/profile-links?memberId=${encodeURIComponent(memberId)}`,
+        );
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.links)) {
@@ -37,22 +62,12 @@ export function ProfileLinksDisplay({ memberId }: { memberId: string }) {
 
   if (loading || links.length === 0) return null;
 
-  return (
-    <div style={{ gridColumn: "1 / -1" }}>
-      <h3
-        style={{
-          fontSize: 12,
-          textTransform: "uppercase",
-          letterSpacing: "1px",
-          opacity: 0.5,
-          marginTop: 0,
-          marginBottom: 8,
-          fontWeight: 700,
-        }}
-      >
+  const body = (
+    <>
+      <h3 className="m-0 mb-2 text-xs uppercase tracking-wider font-bold text-muted-foreground">
         Links
       </h3>
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 8 }}>
+      <div className="flex flex-wrap gap-2">
         {links.map((link) => {
           // Derive display text: use label if set, otherwise show the hostname
           let displayText = link.label;
@@ -70,35 +85,21 @@ export function ProfileLinksDisplay({ memberId }: { memberId: string }) {
               href={link.url}
               target="_blank"
               rel="noopener noreferrer"
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-                padding: "6px 12px",
-                borderRadius: 10,
-                border: '1px solid var(--color-border)',
-                background: 'var(--color-surface)',
-                color: 'var(--color-text-primary)',
-                textDecoration: "none",
-                fontSize: 14,
-                fontWeight: 500,
-                transition: "border-color 0.15s, box-shadow 0.15s",
-              }}
-              onMouseEnter={(e) => {
-                e.currentTarget.style.borderColor = "rgba(0,0,0,0.3)";
-                e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
-              }}
-              onMouseLeave={(e) => {
-                e.currentTarget.style.borderColor = "rgba(0,0,0,0.12)";
-                e.currentTarget.style.boxShadow = "none";
-              }}
+              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-[--radius] border border-rule text-foreground no-underline text-sm font-medium transition-colors hover:border-tomato hover:text-tomato focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+              style={{ background: "hsl(var(--background))" }}
             >
-              <span style={{ fontSize: 16 }}>{link.emoji}</span>
+              <span className="text-base">{link.emoji}</span>
               <span>{displayText}</span>
             </a>
           );
         })}
       </div>
-    </div>
+    </>
   );
+
+  if (variant === "inline") {
+    return body;
+  }
+
+  return <div className="sm:col-span-2">{body}</div>;
 }

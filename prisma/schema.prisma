@@ -242,6 +242,7 @@ enum NotificationType {
   MISSION_REJECTED   // A mission submission was rejected
   LEVEL_COMPLETED    // All missions in a level completed, reward paid
   VOUCH_ADDED @map("FRIEND_ADDED") // Someone vouched for you
+  ARTICLE_COMMENT    // New comment on your article
 }
 
 model Notification {
@@ -284,8 +285,44 @@ model Article {
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
+  comments              ArticleComment[]
+  reactions             ArticleReaction[]
+
   @@index([status, publishedAt])
   @@index([authorId])
+}
+
+// Comments on articles. Flat list in v1 — `replyToId` reserved for future
+// threading. Soft-deleted via `deletedAt` (body cleared on delete).
+model ArticleComment {
+  id         Int       @id @default(autoincrement())
+  articleId  Int
+  authorId   String    // Discord ID of commenter
+  authorName String?   // Cached display name
+  body       String    // Markdown, capped at 500 chars (server-validated)
+  replyToId  Int?      // Reserved for future threading; not used in v1 UI
+  createdAt  DateTime  @default(now())
+  updatedAt  DateTime  @updatedAt
+  deletedAt  DateTime? // Soft-delete; UI shows "[deleted]" placeholder
+  article    Article   @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@index([articleId, createdAt])
+  @@index([authorId])
+}
+
+// One emoji reaction per (member, article). Re-posting the same emoji
+// clears the row (toggle off); a different emoji updates in place.
+// `memberId` is the Discord ID of the reactor (matches Article.authorId).
+model ArticleReaction {
+  id        Int      @id @default(autoincrement())
+  articleId Int
+  memberId  String   // Discord ID of the reactor
+  emoji     String   // One of: "thumbs", "heart", "pizza"
+  createdAt DateTime @default(now())
+  article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
+
+  @@unique([articleId, memberId]) // One reaction per member per article
+  @@index([articleId])
 }
 
 // ===== MISSIONS / LEVELING SYSTEM =====
@@ -488,6 +525,25 @@ model UnlockTicketRecord {
   @@unique([lockAddress, tokenId, networkId])
 }
 
+// ===== MEMBER PROFILE EXTRAS =====
+//
+// Free-form profile fields owned by the member (not from the sheet). Today:
+// `tagline` (one-line public bio) + `locale` (i18n preference, added by
+// anchovy-65959). Will expand as we add more member-editable fields.
+//
+// Plans: truffle-91035 (tagline), anchovy-65959 (locale).
+model MemberProfileExtras {
+  memberId                 String    @id // Member ID from Google Sheets (not Discord ID)
+  tagline                  String?   @db.VarChar(140)
+  locale                   String    @default("en") // ISO 639-1, one of SUPPORTED_LOCALES (anchovy-65959)
+  // ===== Celebration loop (diavola-40350) =====
+  lastCelebratedLevel      Int       @default(0)    // highest level whose celebration has fired
+  firstMissionCelebratedAt DateTime?                 // first-ever mission completion celebration
+  vouchPromptShownAt       DateTime?                 // dismissed by user (null = not yet shown)
+  updatedAt                DateTime  @updatedAt
+  createdAt                DateTime  @default(now())
+}
+
 // Multi-wallet: each member can have multiple wallets (EVM, Solana, etc.)
 model MemberWallet {
   id            Int      @id @default(autoincrement())
@@ -520,4 +576,58 @@ model Suggestion {
   createdAt DateTime @default(now())
 
   @@index([createdAt])
+}
+
+// ===== ACTIVITY FEED EVENTS =====
+//
+// Persisted timestamps for activity-feed event kinds that don't have a
+// canonical source. Each table is written at the point of observation
+// (claim API, POAP fetch, Discord role sync) and queried by
+// /api/activity/[memberId]. No backfill — ledgers start at deploy time.
+//
+// Plan: plans/stuffed-crust-39669-activity-completeness.md.
+
+// One row per (member, sheet-task). The first claim writes the timestamp;
+// re-claims are idempotent. Unclaim does not delete — the historical event
+// is still a true thing that happened.
+model TaskClaimEvent {
+  id        Int      @id @default(autoincrement())
+  memberId  String   // Member ID from Google Sheets (not Discord ID)
+  taskKey   String   // `${sheetId}::${taskName}` — disambiguates per-sheet
+  taskName  String   // Denormalized for display
+  sheetUrl  String?  // Optional deep-link back to the sheet
+  claimedAt DateTime @default(now())
+
+  @@unique([memberId, taskKey])
+  @@index([memberId, claimedAt])
+}
+
+// One row per (member, POAP event). First observation per member wins;
+// subsequent fetches are no-ops thanks to the unique constraint.
+model PoapFirstSeen {
+  id          Int      @id @default(autoincrement())
+  memberId    String
+  poapEventId String   // POAP drop/event id (not token id)
+  poapTokenId String   // First token id observed (display only)
+  title       String?
+  imageUrl    String?
+  firstSeenAt DateTime @default(now())
+
+  @@unique([memberId, poapEventId])
+  @@index([memberId, firstSeenAt])
+}
+
+// One row per (discordId, roleId). Logged by the discord sync endpoint
+// when a role appears that wasn't in the previous User.roles snapshot.
+model RoleGrantEvent {
+  id        Int      @id @default(autoincrement())
+  memberId  String?  // Best-effort; null if unresolvable at write time
+  discordId String
+  roleId    String
+  roleName  String   // Resolved at write time so feed reads need no Discord API call
+  grantedAt DateTime @default(now())
+
+  @@unique([discordId, roleId])
+  @@index([discordId, grantedAt])
+  @@index([memberId, grantedAt])
 }

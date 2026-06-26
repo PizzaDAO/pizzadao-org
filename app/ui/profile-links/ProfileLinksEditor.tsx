@@ -1,7 +1,8 @@
 "use client";
 
 import { useEffect, useState, useRef } from "react";
-import { Pencil, Plus, Trash2, GripVertical, X, Check } from "lucide-react";
+import { Pencil, Plus, Trash2, X, Check } from "lucide-react";
+import { btn, input as inputStyle } from "../shared-styles";
 
 type ProfileLink = {
   emoji: string;
@@ -10,6 +11,9 @@ type ProfileLink = {
 };
 
 const MAX_LINKS = 8;
+
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 // Common emojis grouped by category for quick picking
 const EMOJI_GRID = [
@@ -26,6 +30,18 @@ const EMOJI_GRID = [
   // More
   "❤️", "🌟", "📌", "🎯", "🏠",
 ];
+
+function sectionLabel(): React.CSSProperties {
+  return {
+    fontFamily: displayFont,
+    fontSize: 12,
+    textTransform: "uppercase",
+    letterSpacing: "0.08em",
+    color: "hsl(var(--muted-foreground))",
+    margin: 0,
+    fontWeight: 700,
+  };
+}
 
 function EmojiPicker({
   value,
@@ -58,10 +74,11 @@ function EmojiPicker({
         top: "100%",
         left: 0,
         zIndex: 100,
-        background: 'var(--color-surface)',
-        border: '1px solid var(--color-border-strong)',
-        borderRadius: 12,
-        boxShadow: "0 8px 30px rgba(0,0,0,0.12)",
+        background: "hsl(var(--popover))",
+        color: "hsl(var(--popover-foreground))",
+        border: "1px solid hsl(var(--rule) / 0.22)",
+        borderRadius: "var(--radius)",
+        boxShadow: "0 8px 30px hsl(var(--ink) / 0.12)",
         padding: 12,
         width: 240,
         marginTop: 4,
@@ -75,32 +92,55 @@ function EmojiPicker({
           marginBottom: 8,
         }}
       >
-        {EMOJI_GRID.map((emoji) => (
-          <button
-            key={emoji}
-            type="button"
-            onClick={() => {
-              onChange(emoji);
-              onClose();
-            }}
-            style={{
-              fontSize: 20,
-              padding: 6,
-              border: value === emoji ? "2px solid #111" : "2px solid transparent",
-              borderRadius: 8,
-              background: value === emoji ? "rgba(0,0,0,0.05)" : "transparent",
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-            }}
-          >
-            {emoji}
-          </button>
-        ))}
+        {EMOJI_GRID.map((emoji) => {
+          const selected = value === emoji;
+          return (
+            <button
+              key={emoji}
+              type="button"
+              onClick={() => {
+                onChange(emoji);
+                onClose();
+              }}
+              style={{
+                fontSize: 20,
+                padding: 6,
+                border: selected
+                  ? "2px solid hsl(var(--tomato))"
+                  : "2px solid transparent",
+                borderRadius: "calc(var(--radius) - 6px)",
+                background: selected
+                  ? "hsl(var(--tomato) / 0.08)"
+                  : "transparent",
+                cursor: "pointer",
+                display: "flex",
+                alignItems: "center",
+                justifyContent: "center",
+                transition: "background-color 150ms ease, border-color 150ms ease",
+              }}
+            >
+              {emoji}
+            </button>
+          );
+        })}
       </div>
-      <div style={{ borderTop: "1px solid rgba(0,0,0,0.08)", paddingTop: 8 }}>
-        <div style={{ fontSize: 11, opacity: 0.5, marginBottom: 4, fontWeight: 600, textTransform: "uppercase", letterSpacing: 0.5 }}>
+      <div
+        style={{
+          borderTop: "1px solid hsl(var(--rule) / 0.12)",
+          paddingTop: 8,
+        }}
+      >
+        <div
+          style={{
+            fontFamily: displayFont,
+            fontSize: 11,
+            color: "hsl(var(--muted-foreground))",
+            marginBottom: 4,
+            fontWeight: 700,
+            textTransform: "uppercase",
+            letterSpacing: "0.05em",
+          }}
+        >
           Or type any emoji
         </div>
         <div style={{ display: "flex", gap: 4 }}>
@@ -108,17 +148,13 @@ function EmojiPicker({
             type="text"
             value={customEmoji}
             onChange={(e) => setCustomEmoji(e.target.value)}
-            placeholder="Paste emoji..."
+            placeholder="Paste emoji…"
             maxLength={10}
             style={{
-              flex: 1,
-              padding: "6px 8px",
-              borderRadius: 6,
-              border: '1px solid var(--color-border-strong)',
+              ...inputStyle(),
+              padding: "6px 10px",
               fontSize: 16,
-              outline: "none",
               textAlign: "center",
-              width: "100%",
             }}
           />
           <button
@@ -131,14 +167,9 @@ function EmojiPicker({
             }}
             disabled={!customEmoji.trim()}
             style={{
-              padding: "6px 10px",
-              borderRadius: 6,
-              border: '1px solid var(--color-border-strong)',
-              background: customEmoji.trim() ? "#111" : "rgba(0,0,0,0.05)",
-              color: customEmoji.trim() ? "white" : "rgba(0,0,0,0.3)",
-              cursor: customEmoji.trim() ? "pointer" : "not-allowed",
+              ...btn("primary", !customEmoji.trim()),
+              padding: "6px 12px",
               fontSize: 12,
-              fontWeight: 600,
             }}
           >
             Use
@@ -168,7 +199,9 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
   useEffect(() => {
     (async () => {
       try {
-        const res = await fetch(`/api/profile-links?memberId=${encodeURIComponent(memberId)}`);
+        const res = await fetch(
+          `/api/profile-links?memberId=${encodeURIComponent(memberId)}`
+        );
         if (res.ok) {
           const data = await res.json();
           if (Array.isArray(data.links)) {
@@ -292,29 +325,32 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
   if (!editing) {
     return (
       <div style={{ gridColumn: "1 / -1" }}>
-        <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 8 }}>
-          <h3
-            style={{
-              fontSize: 12,
-              textTransform: "uppercase",
-              letterSpacing: "1px",
-              opacity: 0.5,
-              margin: 0,
-              fontWeight: 700,
-            }}
-          >
-            Links
-          </h3>
+        <div
+          style={{
+            display: "flex",
+            alignItems: "center",
+            gap: 8,
+            marginBottom: 8,
+          }}
+        >
+          <h3 style={sectionLabel()}>Links</h3>
           <button
             onClick={startEditing}
             style={{
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              opacity: 0.4,
+              color: "hsl(var(--muted-foreground))",
               padding: 0,
               display: "flex",
               alignItems: "center",
+              transition: "color 150ms ease",
+            }}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.color = "hsl(var(--tomato))";
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.color = "hsl(var(--muted-foreground))";
             }}
             title="Edit links"
           >
@@ -327,7 +363,10 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
               let displayText = link.label;
               if (!displayText) {
                 try {
-                  displayText = new URL(link.url).hostname.replace(/^www\./, "");
+                  displayText = new URL(link.url).hostname.replace(
+                    /^www\./,
+                    ""
+                  );
                 } catch {
                   displayText = link.url;
                 }
@@ -343,21 +382,24 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
                     alignItems: "center",
                     gap: 6,
                     padding: "6px 12px",
-                    borderRadius: 10,
-                    border: '1px solid var(--color-border)',
-                    background: 'var(--color-surface)',
-                    color: 'var(--color-text-primary)',
+                    borderRadius: "var(--radius)",
+                    border: "1px solid hsl(var(--rule) / 0.12)",
+                    background: "hsl(var(--card))",
+                    color: "hsl(var(--foreground))",
                     textDecoration: "none",
                     fontSize: 14,
                     fontWeight: 500,
-                    transition: "border-color 0.15s, box-shadow 0.15s",
+                    transition: "border-color 150ms ease, box-shadow 150ms ease",
                   }}
                   onMouseEnter={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.3)";
-                    e.currentTarget.style.boxShadow = "0 2px 8px rgba(0,0,0,0.08)";
+                    e.currentTarget.style.borderColor =
+                      "hsl(var(--rule) / 0.22)";
+                    e.currentTarget.style.boxShadow =
+                      "0 8px 30px hsl(var(--ink) / 0.06)";
                   }}
                   onMouseLeave={(e) => {
-                    e.currentTarget.style.borderColor = "rgba(0,0,0,0.12)";
+                    e.currentTarget.style.borderColor =
+                      "hsl(var(--rule) / 0.12)";
                     e.currentTarget.style.boxShadow = "none";
                   }}
                 >
@@ -371,7 +413,7 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
           <p
             style={{
               fontSize: 14,
-              opacity: 0.5,
+              color: "hsl(var(--muted-foreground))",
               margin: 0,
             }}
           >
@@ -385,19 +427,15 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
   // Edit mode
   return (
     <div style={{ gridColumn: "1 / -1" }}>
-      <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 12 }}>
-        <h3
-          style={{
-            fontSize: 12,
-            textTransform: "uppercase",
-            letterSpacing: "1px",
-            opacity: 0.5,
-            margin: 0,
-            fontWeight: 700,
-          }}
-        >
-          Edit Links
-        </h3>
+      <div
+        style={{
+          display: "flex",
+          alignItems: "center",
+          gap: 8,
+          marginBottom: 12,
+        }}
+      >
+        <h3 style={sectionLabel()}>Edit Links</h3>
       </div>
 
       {error && (
@@ -405,9 +443,10 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
           style={{
             marginBottom: 12,
             padding: 10,
-            background: "rgba(255,0,0,0.05)",
-            borderRadius: 8,
-            color: "#c00",
+            background: "hsl(var(--tomato) / 0.08)",
+            border: "1px solid hsl(var(--tomato) / 0.30)",
+            borderRadius: "var(--radius)",
+            color: "hsl(var(--tomato))",
             fontSize: 13,
           }}
         >
@@ -424,9 +463,9 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
               gap: 8,
               alignItems: "center",
               padding: 8,
-              borderRadius: 10,
-              border: '1px solid var(--color-border)',
-              background: "rgba(0,0,0,0.02)",
+              borderRadius: "var(--radius)",
+              border: "1px solid hsl(var(--rule) / 0.12)",
+              background: "hsl(var(--card))",
             }}
           >
             {/* Reorder buttons */}
@@ -439,7 +478,8 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
                   background: "none",
                   border: "none",
                   cursor: idx === 0 ? "default" : "pointer",
-                  opacity: idx === 0 ? 0.2 : 0.5,
+                  opacity: idx === 0 ? 0.2 : 0.6,
+                  color: "hsl(var(--muted-foreground))",
                   padding: 0,
                   fontSize: 10,
                   lineHeight: 1,
@@ -456,7 +496,8 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
                   background: "none",
                   border: "none",
                   cursor: idx === links.length - 1 ? "default" : "pointer",
-                  opacity: idx === links.length - 1 ? 0.2 : 0.5,
+                  opacity: idx === links.length - 1 ? 0.2 : 0.6,
+                  color: "hsl(var(--muted-foreground))",
                   padding: 0,
                   fontSize: 10,
                   lineHeight: 1,
@@ -471,13 +512,16 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
             <div style={{ position: "relative" }}>
               <button
                 type="button"
-                onClick={() => setEmojiPickerIdx(emojiPickerIdx === idx ? null : idx)}
+                onClick={() =>
+                  setEmojiPickerIdx(emojiPickerIdx === idx ? null : idx)
+                }
                 style={{
                   fontSize: 20,
                   padding: "4px 8px",
-                  borderRadius: 8,
-                  border: '1px solid var(--color-border-strong)',
-                  background: 'var(--color-surface)',
+                  borderRadius: "calc(var(--radius) - 6px)",
+                  border: "1px solid hsl(var(--rule) / 0.22)",
+                  background: "hsl(var(--background))",
+                  color: "hsl(var(--foreground))",
                   cursor: "pointer",
                   minWidth: 44,
                   display: "flex",
@@ -503,16 +547,11 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
                 type="url"
                 value={link.url}
                 onChange={(e) => updateLink(idx, "url", e.target.value)}
-                placeholder="https://..."
+                placeholder="https://…"
                 style={{
+                  ...inputStyle(),
                   padding: "6px 10px",
-                  borderRadius: 6,
-                  border: '1px solid var(--color-border-strong)',
                   fontSize: 13,
-                  outline: "none",
-                  width: "100%",
-                  boxSizing: "border-box",
-                  fontFamily: "inherit",
                 }}
               />
               <input
@@ -522,15 +561,10 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
                 placeholder="Label (optional)"
                 maxLength={50}
                 style={{
+                  ...inputStyle(),
                   padding: "4px 10px",
-                  borderRadius: 6,
-                  border: '1px solid var(--color-border)',
                   fontSize: 12,
-                  outline: "none",
-                  width: "100%",
-                  boxSizing: "border-box",
-                  fontFamily: "inherit",
-                  opacity: 0.8,
+                  opacity: 0.85,
                 }}
               />
             </div>
@@ -543,10 +577,17 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
                 background: "none",
                 border: "none",
                 cursor: "pointer",
-                opacity: 0.4,
+                color: "hsl(var(--muted-foreground))",
                 padding: 4,
                 display: "flex",
                 alignItems: "center",
+                transition: "color 150ms ease",
+              }}
+              onMouseEnter={(e) => {
+                e.currentTarget.style.color = "hsl(var(--tomato))";
+              }}
+              onMouseLeave={(e) => {
+                e.currentTarget.style.color = "hsl(var(--muted-foreground))";
               }}
               title="Remove link"
             >
@@ -566,15 +607,24 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
             alignItems: "center",
             gap: 6,
             padding: "8px 14px",
-            borderRadius: 8,
-            border: "1px dashed rgba(0,0,0,0.2)",
+            borderRadius: "var(--radius)",
+            border: "1px dashed hsl(var(--rule) / 0.22)",
             background: "transparent",
             cursor: "pointer",
             fontSize: 13,
             fontWeight: 600,
-            color: "#555",
+            color: "hsl(var(--muted-foreground))",
             marginBottom: 12,
             fontFamily: "inherit",
+            transition: "border-color 150ms ease, color 150ms ease",
+          }}
+          onMouseEnter={(e) => {
+            e.currentTarget.style.borderColor = "hsl(var(--tomato) / 0.50)";
+            e.currentTarget.style.color = "hsl(var(--tomato))";
+          }}
+          onMouseLeave={(e) => {
+            e.currentTarget.style.borderColor = "hsl(var(--rule) / 0.22)";
+            e.currentTarget.style.color = "hsl(var(--muted-foreground))";
           }}
         >
           <Plus size={14} /> Add Link
@@ -587,40 +637,25 @@ export function ProfileLinksEditor({ memberId }: { memberId: string }) {
           onClick={saveLinks}
           disabled={saving}
           style={{
+            ...btn("primary", saving),
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            padding: "8px 16px",
-            borderRadius: 10,
-            border: "1px solid black",
-            background: 'var(--color-btn-primary-bg)',
-            color: 'var(--color-btn-primary-text)',
-            fontWeight: 650,
-            cursor: saving ? "wait" : "pointer",
             fontSize: 13,
-            fontFamily: "inherit",
-            opacity: saving ? 0.6 : 1,
           }}
         >
           <Check size={14} />
-          {saving ? "Saving..." : "Save Links"}
+          {saving ? "Saving…" : "Save Links"}
         </button>
         <button
           onClick={cancelEditing}
           disabled={saving}
           style={{
+            ...btn("secondary"),
             display: "inline-flex",
             alignItems: "center",
             gap: 6,
-            padding: "8px 16px",
-            borderRadius: 10,
-            border: '1px solid var(--color-border-strong)',
-            background: 'var(--color-surface)',
-            color: 'var(--color-text)',
-            fontWeight: 650,
-            cursor: "pointer",
             fontSize: 13,
-            fontFamily: "inherit",
           }}
         >
           <X size={14} />

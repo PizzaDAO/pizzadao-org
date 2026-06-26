@@ -11,6 +11,7 @@ function createModelMock() {
     upsert: vi.fn(),
     delete: vi.fn(),
     count: vi.fn(),
+    groupBy: vi.fn(),
   }
 }
 
@@ -24,5 +25,6 @@ export const prisma = {
   job: createModelMock(),
   jobAssignment: createModelMock(),
   jobCycle: createModelMock(),
+  articleReaction: createModelMock(),
   $transaction: vi.fn(),
 }

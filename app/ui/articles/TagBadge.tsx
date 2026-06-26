@@ -1,5 +1,9 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle. Tags read like editorial pills:
+// uppercase micro-type, warm rule border, tomato accent on the active
+// state. # prefix retained for "filed under" semantics.
+
 import Link from "next/link";
 import type { CSSProperties } from "react";
 
@@ -13,21 +17,26 @@ interface TagBadgeProps {
 
 export default function TagBadge({ tag, href, onClick, size = "md", active = false }: TagBadgeProps) {
   const style: CSSProperties = {
-    display: "inline-block",
-    padding: size === "sm" ? "2px 8px" : "4px 10px",
+    display: "inline-flex",
+    alignItems: "center",
+    padding: size === "sm" ? "2px 9px" : "4px 11px",
     borderRadius: 999,
-    fontSize: size === "sm" ? 11 : 12,
+    fontSize: size === "sm" ? 10 : 11,
     fontWeight: 600,
+    letterSpacing: "0.14em",
+    textTransform: "uppercase",
     background: active
-      ? "var(--color-btn-primary-bg)"
-      : "var(--color-surface-hover, rgba(0,0,0,0.04))",
+      ? "hsl(var(--tomato) / 0.12)"
+      : "transparent",
     color: active
-      ? "var(--color-btn-primary-text)"
-      : "var(--color-text-secondary, var(--color-text))",
-    border: `1px solid ${active ? "var(--color-btn-primary-border)" : "var(--color-border)"}`,
+      ? "hsl(var(--tomato))"
+      : "hsl(var(--foreground) / 0.75)",
+    border: `1px solid ${active ? "hsl(var(--tomato) / 0.55)" : "hsl(var(--rule-warm) / 0.7)"}`,
     textDecoration: "none",
     cursor: href || onClick ? "pointer" : "default",
     whiteSpace: "nowrap",
+    transition: "background-color 180ms ease, border-color 180ms ease, color 180ms ease",
+    lineHeight: 1.5,
   };
 
   if (href) {
