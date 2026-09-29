@@ -97,6 +97,8 @@ function upsertToCrew_(ss, raw, nowIso) {
     const source = String(raw.source ?? "").trim();
 
     const isClaim = source === "onboarding_claim";
+    // Only the onboarding claim flows may (re)assign a row's DiscordId.
+    const mayReassignDiscord = isClaim || source === "onboarding_auto_claim";
 
     // ✅ Claim mode requires memberId to be present.
     if (isClaim && !memberId) {
@@ -167,6 +169,20 @@ function upsertToCrew_(ss, raw, nowIso) {
       targetRow = lastR + 1;
       if (targetRow < dataStartRow) targetRow = dataStartRow;
       action = "inserted";
+    }
+
+    // Never overwrite an existing, different DiscordId outside the claim flows.
+    // This stops a buggy or abused caller from re-pointing someone else's row to
+    // a different Discord account by sending their memberId. Refuse the whole write
+    // so no other fields land on the wrong row either.
+    if (action !== "inserted" && raw.discordId !== undefined && !mayReassignDiscord) {
+      const colDiscordCheck = getCol_(headerMap, "DiscordId");
+      if (colDiscordCheck) {
+        const currentDiscord = String(crewSheet.getRange(targetRow, colDiscordCheck).getValue() || "").trim();
+        if (currentDiscord && currentDiscord !== discordId) {
+          return { ok: false, error: "DiscordId conflict: row is linked to a different Discord account." };
+        }
+      }
     }
 
     const mapping = {

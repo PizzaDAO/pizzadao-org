@@ -2,6 +2,9 @@ import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import path from 'path'
 import { prisma } from '@/app/lib/db'
+import { requireSession } from '@/app/lib/auth-guards'
+import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
+import { getCrewMappings } from '@/app/lib/crew-mappings'
 
 // Initialize Google Sheets API client with write access
 const SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
@@ -28,21 +31,41 @@ function extractSheetId(url: string): string | null {
   return match ? match[1] : null
 }
 
-export async function POST(req: Request) {
-  try {
-    const { sheetUrl, taskName, memberId, action = 'claim' } = await req.json()
+// Only crew sheets listed in the Crew Mappings config may be written to.
+async function getAllowedCrewSheetIds(): Promise<Set<string>> {
+  const { crews } = await getCrewMappings()
+  const ids = new Set<string>()
+  for (const crew of crews) {
+    const id = crew.sheet ? extractSheetId(crew.sheet) : null
+    if (id) ids.add(id)
+  }
+  return ids
+}
 
-    if (!sheetUrl || !taskName) {
+export async function POST(req: Request) {
+  const auth = await requireSession()
+  if (!auth.ok) return auth.response
+
+  try {
+    // memberId in the body is ignored: it is always derived from the session.
+    const { sheetUrl, taskName, action = 'claim' } = await req.json()
+
+    if (typeof sheetUrl !== 'string' || typeof taskName !== 'string' || !sheetUrl || !taskName.trim()) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    if (action === 'claim' && !memberId) {
+    if (action !== 'claim' && action !== 'giveup') {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    const memberId = await fetchMemberIdByDiscordId(auth.session.discordId)
+    if (!memberId) {
       return NextResponse.json(
-        { error: 'Member ID required to claim task' },
-        { status: 400 }
+        { error: 'No member profile is linked to your Discord account' },
+        { status: 403 }
       )
     }
 
@@ -51,6 +74,14 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Invalid sheet URL' },
         { status: 400 }
+      )
+    }
+
+    const allowedSheetIds = await getAllowedCrewSheetIds()
+    if (!allowedSheetIds.has(sheetId)) {
+      return NextResponse.json(
+        { error: 'Sheet is not a configured crew sheet' },
+        { status: 403 }
       )
     }
 
@@ -71,6 +102,7 @@ export async function POST(req: Request) {
 
     // Find the Tasks section and the task row
     let taskRowIdx = -1
+    let taskRowCells: Array<{ userEnteredValue?: { stringValue?: string | null; numberValue?: number | null } | null; formattedValue?: string | null }> = []
     let leadColIdx = -1
     let leadIdColIdx = -1
     let tasksHeaderRowIdx = -1
@@ -130,6 +162,7 @@ export async function POST(req: Request) {
 
         if (cellVal.trim() === taskName.trim()) {
           taskRowIdx = r
+          taskRowCells = cells
           break
         }
       }
@@ -153,6 +186,28 @@ export async function POST(req: Request) {
       return NextResponse.json(
         { error: 'Lead ID column not found in sheet' },
         { status: 500 }
+      )
+    }
+
+    // Ownership: read the current Lead ID of the task row.
+    const leadIdCellData = taskRowCells[leadIdColIdx]
+    const currentLeadId = String(
+      leadIdCellData?.userEnteredValue?.stringValue ??
+      leadIdCellData?.userEnteredValue?.numberValue ??
+      leadIdCellData?.formattedValue ??
+      ''
+    ).trim()
+
+    if (action === 'giveup' && currentLeadId !== String(memberId)) {
+      return NextResponse.json(
+        { error: 'You can only give up tasks you lead' },
+        { status: 403 }
+      )
+    }
+    if (action === 'claim' && currentLeadId && currentLeadId !== String(memberId)) {
+      return NextResponse.json(
+        { error: 'Task is already claimed by another member' },
+        { status: 409 }
       )
     }
 

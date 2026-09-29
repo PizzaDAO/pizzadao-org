@@ -5,6 +5,7 @@ import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
 import { invalidateProgressCache } from '@/app/lib/mission-cache'
+import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 
 export const runtime = 'nodejs'
 
@@ -19,7 +20,10 @@ const POST_HANDLER = async (request: NextRequest) => {
   await requireOnboarded(session.discordId)
 
   const body = await request.json()
-  const { missionId, evidence, notes, memberId } = body
+  // memberId is derived from the session, never from the body (it drives
+  // auto-verification against the member's sheet data).
+  const { missionId, evidence, notes } = body
+  const memberId = (await fetchMemberIdByDiscordId(session.discordId).catch(() => null)) ?? undefined
 
   if (!missionId || typeof missionId !== 'number') {
     throw new ValidationError('Valid mission ID required')

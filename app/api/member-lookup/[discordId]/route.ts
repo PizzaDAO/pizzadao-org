@@ -1,5 +1,11 @@
 // app/api/member-lookup/[discordId]/route.ts
+//
+// Public callers get only { found, memberId, memberName }.
+// The full sheet row (`data`) and the unlinked-row name-search fallback
+// (?searchName=) are only available to the owner — the signed-in user whose
+// session Discord ID matches the requested one.
 import { getSheetData } from "@/app/lib/sheets/member-repository";
+import { getSession } from "@/app/lib/session";
 import { NextResponse } from "next/server";
 
 export const runtime = "nodejs";
@@ -12,8 +18,12 @@ export async function GET(
         const { discordId } = await params;
         if (!discordId) return NextResponse.json({ error: "Missing Discord ID" }, { status: 400 });
 
+        const session = await getSession();
+        const isOwner = !!session?.discordId && session.discordId === discordId;
+
         const searchParams = new URL(request.url).searchParams;
-        const searchName = (searchParams.get("searchName") || "").trim().toLowerCase();
+        // Name-search fallback enumerates unlinked rows, so only the owner may use it.
+        const searchName = isOwner ? (searchParams.get("searchName") || "").trim().toLowerCase() : "";
 
         const cache = await getSheetData();
 
@@ -22,7 +32,7 @@ export async function GET(
         let foundMethod = "discord_id";
         let memberData = memberId != null ? cache.rows[cache.memberToIdx.get(memberId)!] : undefined;
 
-        // 2. Fallback: Search by Name (if provided and Discord ID not found)
+        // 2. Fallback: Search by Name (owner only, if Discord ID not found)
         if (!memberData && searchName) {
             for (let idx = 0; idx < cache.rows.length; idx++) {
                 const row = cache.rows[idx];
@@ -32,7 +42,6 @@ export async function GET(
                 const name = String(row["Name"] || row["Mafia Name"] || row["Real Name"] || "").trim().toLowerCase();
                 if (name === searchName) {
                     memberData = row;
-                    // Find memberId from memberToIdx (reverse lookup)
                     for (const [mid, i] of cache.memberToIdx) {
                         if (i === idx) { memberId = mid; break; }
                     }
@@ -43,23 +52,31 @@ export async function GET(
         }
 
         if (!memberData || !memberId) {
-            return NextResponse.json({
-                error: `Member not found for Discord ID '${discordId}' (or name '${searchName}').`,
-                status: 404
-            }, { status: 404 });
+            return NextResponse.json({ found: false, error: "Member not found" }, { status: 404 });
         }
 
-        // Build data with standardized aliases
-        const data: Record<string, any> = { ...memberData };
+        const memberName = String(memberData["Name"] || memberData["Mafia Name"] || "");
+
+        if (!isOwner) {
+            return NextResponse.json(
+                { found: true, memberId, memberName },
+                { headers: { "Cache-Control": "private, no-store" } },
+            );
+        }
+
+        // Owner: full row with standardized aliases
+        const data: Record<string, unknown> = { ...memberData };
         data["Status"] = data["Status"] || data["Frequency"];
         data["Orgs"] = data["Orgs"] || data["Affiliation"];
         data["Skills"] = data["Skills"] || data["Specialties"];
         data["DiscordID"] = data["DiscordID"] || data["Discord"];
 
-        const memberName = data["Name"] || data["Mafia Name"] || "";
-
-        return NextResponse.json({ found: true, memberId, memberName, data, method: foundMethod });
-    } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return NextResponse.json(
+            { found: true, memberId, memberName, data, method: foundMethod },
+            { headers: { "Cache-Control": "private, no-store" } },
+        );
+    } catch (err: unknown) {
+        console.error("[member-lookup] failed:", err);
+        return NextResponse.json({ error: "Lookup failed" }, { status: 500 });
     }
 }

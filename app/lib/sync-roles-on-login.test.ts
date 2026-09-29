@@ -1,106 +1,37 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const mockSync = vi.fn();
+vi.mock("./discord-sheet-sync", () => ({
+  syncDiscordRolesToSheet: (...args: unknown[]) => mockSync(...args),
+}));
+
 import { syncRolesOnLogin } from "./sync-roles-on-login";
 
 describe("syncRolesOnLogin", () => {
   beforeEach(() => {
     vi.restoreAllMocks();
-    global.fetch = vi.fn();
+    mockSync.mockReset();
   });
 
-  it("calls /api/discord/sync-to-sheet with discordId, memberId, and name", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      text: async () => "{}",
-    });
-
-    await syncRolesOnLogin("https://pizzadao.org", "12345", "100", "TestUser");
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      "https://pizzadao.org/api/discord/sync-to-sheet",
-      expect.objectContaining({
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          discordId: "12345",
-          memberId: "100",
-          mafiaName: "TestUser",
-        }),
-      })
-    );
+  it("calls the sync library with discordId and name", async () => {
+    mockSync.mockResolvedValue({ ok: true });
+    await syncRolesOnLogin("12345", "TestUser");
+    expect(mockSync).toHaveBeenCalledWith("12345", "TestUser");
   });
 
-  it("calls /api/discord/sync-to-sheet without optional params", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: true,
-      text: async () => "{}",
-    });
-
-    await syncRolesOnLogin("https://pizzadao.org", "12345");
-
-    expect(global.fetch).toHaveBeenCalledWith(
-      "https://pizzadao.org/api/discord/sync-to-sheet",
-      expect.objectContaining({
-        method: "POST",
-        body: JSON.stringify({
-          discordId: "12345",
-          memberId: undefined,
-          mafiaName: undefined,
-        }),
-      })
-    );
+  it("calls the sync library without the optional name", async () => {
+    mockSync.mockResolvedValue({ ok: true });
+    await syncRolesOnLogin("12345");
+    expect(mockSync).toHaveBeenCalledWith("12345", undefined);
   });
 
-  it("does not throw when fetch rejects (network error)", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("Network failure")
-    );
-
-    // Should resolve without throwing
-    await expect(
-      syncRolesOnLogin("https://pizzadao.org", "12345")
-    ).resolves.toBeUndefined();
-  });
-
-  it("does not throw when the API returns an error status", async () => {
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => '{"error":"Internal Server Error"}',
-    });
-
-    await expect(
-      syncRolesOnLogin("https://pizzadao.org", "12345")
-    ).resolves.toBeUndefined();
-  });
-
-  it("logs an error when the API returns an error status", async () => {
+  it("does not throw and logs when the sync fails", async () => {
     const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    (global.fetch as ReturnType<typeof vi.fn>).mockResolvedValue({
-      ok: false,
-      status: 500,
-      text: async () => '{"error":"boom"}',
-    });
-
-    await syncRolesOnLogin("https://pizzadao.org", "12345");
-
-    expect(consoleErrorSpy).toHaveBeenCalledWith(
-      expect.stringContaining("[syncRolesOnLogin]")
-    );
-  });
-
-  it("logs an error when fetch throws", async () => {
-    const consoleErrorSpy = vi.spyOn(console, "error").mockImplementation(() => {});
-
-    (global.fetch as ReturnType<typeof vi.fn>).mockRejectedValue(
-      new Error("Network failure")
-    );
-
-    await syncRolesOnLogin("https://pizzadao.org", "12345");
-
+    mockSync.mockRejectedValue(new Error("boom"));
+    await expect(syncRolesOnLogin("12345")).resolves.toBeUndefined();
     expect(consoleErrorSpy).toHaveBeenCalledWith(
       expect.stringContaining("[syncRolesOnLogin]"),
-      expect.any(Error)
+      expect.any(Error),
     );
   });
 });

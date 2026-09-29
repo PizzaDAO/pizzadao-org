@@ -3,6 +3,7 @@ import { cookies } from "next/headers";
 import { verifyXState, encryptToken } from "@/app/lib/x-oauth";
 import { prisma } from "@/app/lib/db";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
@@ -78,6 +79,11 @@ export async function GET(req: Request) {
     // Fetch X user info
     const xUser = await fetchXUser(tokenData.access_token);
 
+    // Resolve memberId server-side from the signed discordId. Never trust a
+    // client-supplied memberId (it previously let a user write their X handle
+    // into another member's sheet row).
+    const resolvedMemberId = await fetchMemberIdByDiscordId(stateData.discordId).catch(() => null);
+
     // Upsert XAccount
     await (prisma as any).xAccount.upsert({
       where: { discordId: stateData.discordId },
@@ -88,11 +94,11 @@ export async function GET(req: Request) {
         xProfileImageUrl: xUser.profile_image_url || null,
         accessToken: encryptToken(tokenData.access_token),
         refreshToken: tokenData.refresh_token ? encryptToken(tokenData.refresh_token) : null,
-        memberId: stateData.memberId || null,
+        memberId: resolvedMemberId || null,
       },
       create: {
         discordId: stateData.discordId,
-        memberId: stateData.memberId || null,
+        memberId: resolvedMemberId || null,
         xId: xUser.id,
         xUsername: xUser.username,
         xDisplayName: xUser.name,
@@ -105,12 +111,12 @@ export async function GET(req: Request) {
     // Write X username to Google Sheet
     const sheetsUrl = process.env.GOOGLE_SHEETS_WEBAPP_URL;
     const sheetsSecret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-    if (sheetsUrl && sheetsSecret && stateData.memberId) {
+    if (sheetsUrl && sheetsSecret && resolvedMemberId) {
       try {
         await fetchWithRedirect(sheetsUrl, {
           secret: sheetsSecret,
           source: "x-connect",
-          memberId: stateData.memberId,
+          memberId: resolvedMemberId,
           discordId: stateData.discordId,
           x: xUser.username,
         });
@@ -121,12 +127,12 @@ export async function GET(req: Request) {
       console.warn("X sheet write skipped — missing:", {
         sheetsUrl: !!sheetsUrl,
         sheetsSecret: !!sheetsSecret,
-        memberId: stateData.memberId,
+        memberId: resolvedMemberId,
       });
     }
 
     // Clear PKCE cookie and redirect to dashboard
-    const memberId = stateData.memberId;
+    const memberId = resolvedMemberId;
     const redirectTo = memberId ? `/dashboard/${memberId}?x_connected=1` : `/?x_connected=1`;
 
     const res = NextResponse.redirect(new URL(redirectTo, url.origin).toString());

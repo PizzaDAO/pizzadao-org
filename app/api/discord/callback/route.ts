@@ -3,6 +3,7 @@ import { NextResponse } from "next/server";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
 import { decodeOAuthState, validateReturnTo, createTransferToken } from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
+import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
@@ -91,14 +92,12 @@ async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
   return await r.json();
 }
 
-// Check if user already has a member ID in the sheet (via member-lookup)
-async function checkExistingMember(discordId: string, origin: string): Promise<{ memberId?: string; name?: string } | null> {
+// Check if user already has a member ID in the sheet (direct lib call, by Discord ID only)
+async function checkExistingMember(discordId: string): Promise<{ memberId?: string; name?: string } | null> {
   try {
-    const res = await fetch(`${origin}/api/member-lookup/${discordId}`, { cache: "no-store" });
-    if (!res.ok) return null;
-    const data = await res.json();
-    if (data?.memberId) {
-      return { memberId: data.memberId, name: data.name };
+    const found = await fetchMemberByDiscordId(discordId);
+    if (found?.memberId) {
+      return { memberId: found.memberId, name: found.name || undefined };
     }
     return null;
   } catch {
@@ -164,16 +163,11 @@ export async function GET(req: Request) {
     });
 
     // Check if user already has a member record
-    const existingMember = await checkExistingMember(me.id, url.origin);
+    const existingMember = await checkExistingMember(me.id);
 
     // Fire-and-forget: sync Discord roles to the sheet on every login.
     // This is intentionally not awaited so it never blocks the redirect.
-    syncRolesOnLogin(
-      url.origin,
-      me.id,
-      existingMember?.memberId,
-      existingMember?.name ?? nick,
-    ).catch(() => {}); // extra safety net
+    syncRolesOnLogin(me.id, existingMember?.name ?? nick).catch(() => {}); // extra safety net
 
     // Build redirect URL
     let redirectUrl: URL;
