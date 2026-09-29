@@ -1,9 +1,15 @@
 // @vitest-environment node
-import { describe, it, expect, vi, afterEach } from "vitest";
+import { describe, it, expect, vi, afterEach, beforeAll } from "vitest";
 import fs from "fs";
 import path from "path";
 
-const DEFAULT_MEMBERS = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
+// Loaded with no overrides so the literal ID lives only in config.ts.
+let DEFAULT_MEMBERS = "";
+
+beforeAll(async () => {
+  vi.resetModules();
+  DEFAULT_MEMBERS = (await import("./config")).SHEET_IDS.members;
+});
 
 afterEach(() => {
   vi.unstubAllEnvs();
@@ -22,6 +28,7 @@ describe("SHEET_IDS", () => {
       expect(id, key).toMatch(/^[A-Za-z0-9_-]{20,}$/);
     }
     expect(SHEET_IDS.members).toBe(DEFAULT_MEMBERS);
+    // announce defaults to the production members sheet
     expect(SHEET_IDS.announce).toBe(DEFAULT_MEMBERS);
   });
 
