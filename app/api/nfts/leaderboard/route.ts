@@ -1,15 +1,19 @@
 // NFT Leaderboard API - Aggregates NFT holdings by collection across all members
-import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getNFTContracts, ALCHEMY_CHAIN_URLS } from "@/app/lib/nft-config";
 import { NFTContract } from "@/app/lib/nft-types";
 import { cacheGet, cacheSet } from "../../lib/cache";
 import { getAllMemberWallets } from "@/app/lib/wallet-lookup";
+import {
+  cellText,
+  getMembersSheet,
+  memberIdColumn,
+  membersColumn,
+  type MembersTable,
+} from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
-const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const TAB_NAME = "Crew";
 const CACHE_KEY = "nft-leaderboard:v1";
 const CACHE_TTL = 3600; // 1 hour in seconds
 
@@ -56,52 +60,26 @@ interface LeaderboardResponse {
 async function fetchMemberDetails(): Promise<
   Map<string, { name: string; turtles: string[] }>
 > {
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${TAB_NAME}&tqx=out:json&headers=0`;
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) return new Map();
-
-  const text = await res.text();
-  const gviz = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
-
-  // Find header row
-  let headerRowIdx = -1;
-  let headerVals: string[] = [];
-
-  for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-    const rowCells = rows[ri]?.c || [];
-    const rowValsLower = rowCells.map((c: { v?: unknown; f?: unknown }) =>
-      String(c?.v || c?.f || "").trim().toLowerCase()
-    );
-    const hasName = rowValsLower.includes("name");
-    const hasStatus = rowValsLower.includes("status") || rowValsLower.includes("frequency");
-    if (hasName && hasStatus) {
-      headerRowIdx = ri;
-      headerVals = rowCells.map((c: { v?: unknown; f?: unknown }) =>
-        String(c?.v || c?.f || "").trim().toLowerCase()
-      );
-      break;
-    }
+  // Served from the members data cache (tag "members").
+  let sheet: MembersTable;
+  try {
+    sheet = await getMembersSheet();
+  } catch {
+    return new Map();
   }
 
-  if (headerRowIdx === -1) return new Map();
-
   // Find column indices
-  let idxId = headerVals.findIndex((h) =>
-    ["id", "crewid", "memberid"].includes(h.replace(/[#\s\-_]/g, ""))
-  );
-  if (idxId === -1) idxId = 0;
-
-  const idxName = headerVals.findIndex((h) => h === "name");
-  const idxTurtles = headerVals.findIndex((h) => h === "turtles" || h === "roles");
+  const idxId = memberIdColumn(sheet);
+  const idxName = membersColumn(sheet, ["name"]);
+  const idxTurtles = membersColumn(sheet, ["turtles", "roles"]);
 
   const details = new Map<string, { name: string; turtles: string[] }>();
 
-  for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || [];
-    const id = String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim();
-    const name = idxName >= 0 ? String(cells[idxName]?.v ?? cells[idxName]?.f ?? "").trim() : "";
-    const turtlesRaw = idxTurtles >= 0 ? String(cells[idxTurtles]?.v ?? cells[idxTurtles]?.f ?? "") : "";
+  for (const row of sheet.rows) {
+    const cells = row?.c || [];
+    const id = cellText(cells[idxId]);
+    const name = idxName != null ? cellText(cells[idxName]) : "";
+    const turtlesRaw = idxTurtles != null ? String(cells[idxTurtles]?.v ?? cells[idxTurtles]?.f ?? "") : "";
 
     if (id) {
       const turtles = turtlesRaw
