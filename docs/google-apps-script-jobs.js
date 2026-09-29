@@ -17,7 +17,8 @@ const CONFIG = {
   WEBHOOK_URL: 'https://your-app.vercel.app/api/jobs/sync',
 
   // Must match JOB_SYNC_SECRET in your .env.local
-  SYNC_SECRET: 'pep_jobs_sync_7d3f9a2c1b8e',
+  // Set Script Properties > JOB_SYNC_SECRET (never commit the value).
+  SYNC_SECRET: PropertiesService.getScriptProperties().getProperty('JOB_SYNC_SECRET') || '',
 
   // Column mapping (0-indexed)
   TYPE_COLUMN: 0,      // Column A: Job Type
