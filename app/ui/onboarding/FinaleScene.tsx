@@ -365,7 +365,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
                   opacity: phase >= 5 ? 1 : 0,
                 }}
               >
-                "You've been made. The record is sealed."
+                &quot;You&apos;ve been made. The record is sealed.&quot;
               </p>
             </div>
           </div>

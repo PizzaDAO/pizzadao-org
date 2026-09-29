@@ -45,7 +45,7 @@ describe("/profile/[id]/edit (owner-only access gate)", () => {
 
         await renderPage("69");
 
-        expect(screen.getByText(/403 — Forbidden/)).toBeInTheDocument();
+        expect(screen.getByText(/§ 403/)).toBeInTheDocument();
         expect(screen.queryByTestId("edit-client")).not.toBeInTheDocument();
     });
 
@@ -57,7 +57,7 @@ describe("/profile/[id]/edit (owner-only access gate)", () => {
 
         await renderPage("69");
 
-        expect(screen.getByText(/403 — Forbidden/)).toBeInTheDocument();
+        expect(screen.getByText(/§ 403/)).toBeInTheDocument();
         expect(
             screen.getByText(/You can only edit your own profile/i),
         ).toBeInTheDocument();
@@ -72,7 +72,7 @@ describe("/profile/[id]/edit (owner-only access gate)", () => {
 
         await renderPage("69");
 
-        expect(screen.queryByText(/403 — Forbidden/)).not.toBeInTheDocument();
+        expect(screen.queryByText(/§ 403/)).not.toBeInTheDocument();
         expect(screen.getByTestId("edit-client")).toHaveTextContent(
             "EDIT_CLIENT_FOR:69",
         );
@@ -86,6 +86,6 @@ describe("/profile/[id]/edit (owner-only access gate)", () => {
 
         await renderPage("69");
 
-        expect(screen.getByText(/403 — Forbidden/)).toBeInTheDocument();
+        expect(screen.getByText(/§ 403/)).toBeInTheDocument();
     });
 });

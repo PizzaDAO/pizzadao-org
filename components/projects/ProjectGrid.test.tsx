@@ -21,6 +21,7 @@ const mockProjects: Project[] = [
     openIssues: 5,
     contributors: [],
     recentCommits: [],
+    recentPRs: [],
   },
   {
     name: 'rsv-pizza',
@@ -39,6 +40,7 @@ const mockProjects: Project[] = [
     openIssues: 2,
     contributors: [],
     recentCommits: [],
+    recentPRs: [],
   },
   {
     name: 'smart-contracts',
@@ -56,6 +58,7 @@ const mockProjects: Project[] = [
     openIssues: 1,
     contributors: [],
     recentCommits: [],
+    recentPRs: [],
   },
 ]
 
