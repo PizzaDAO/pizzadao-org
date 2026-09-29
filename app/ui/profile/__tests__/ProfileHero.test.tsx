@@ -43,7 +43,10 @@ describe("ProfileHero", () => {
         }
     });
 
-    it("owner-readonly mode renders 'Edit on dashboard' CTA", () => {
+    // onion-47612 moved the "Edit on dashboard" CTA out of the hero into the
+    // sticky bottom dock; the hero now links to the dashboard from the owner
+    // "This is your public profile" banner.
+    it("owner-readonly mode links to the owner's dashboard", () => {
         render(
             <ProfileHero
                 {...base}
@@ -51,7 +54,7 @@ describe("ProfileHero", () => {
                 viewerId="14071"
             />,
         );
-        const editLink = screen.getByRole("link", { name: /edit on dashboard/i });
+        const editLink = screen.getByRole("link", { name: /^dashboard$/i });
         expect(editLink).toBeTruthy();
         expect(editLink.getAttribute("href")).toBe("/dashboard/14071");
         // No vouch button when viewing as owner.

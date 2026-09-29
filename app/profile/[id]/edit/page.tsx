@@ -15,6 +15,7 @@
 //   - Page-level metadata is private (noindex) since edit surfaces are
 //     owner-only.
 
+import Link from "next/link";
 import type { Metadata } from "next";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
@@ -62,7 +63,7 @@ function Forbidden({ reason }: { reason: string }) {
                     Forbidden
                 </h1>
                 <p className="m-0 text-foreground/70">{reason}</p>
-                <a
+                <Link
                     href="/"
                     className="btn-pill self-start"
                     style={{
@@ -71,7 +72,7 @@ function Forbidden({ reason }: { reason: string }) {
                     }}
                 >
                     Back to home
-                </a>
+                </Link>
             </div>
         </div>
     );

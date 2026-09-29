@@ -62,21 +62,21 @@ describe("GET /api/profile-extras/[id]", () => {
         const res = await GET(new Request("http://x/") as never, paramsFor("69"));
         expect(res.status).toBe(200);
         const json = await res.json();
-        expect(json).toEqual({ tagline: "Hello, pizza." });
+        expect(json).toEqual({ tagline: "Hello, pizza.", locale: "en" });
     });
 
     it("returns { tagline: null } when no row exists", async () => {
         extras().findUnique.mockResolvedValueOnce(null);
         const res = await GET(new Request("http://x/") as never, paramsFor("404"));
         expect(res.status).toBe(200);
-        expect(await res.json()).toEqual({ tagline: null });
+        expect(await res.json()).toEqual({ tagline: null, locale: "en" });
     });
 
     it("returns { tagline: null } when the prisma call throws (table missing, etc.)", async () => {
         extras().findUnique.mockRejectedValueOnce(new Error("relation does not exist"));
         const res = await GET(new Request("http://x/") as never, paramsFor("69"));
         expect(res.status).toBe(200);
-        expect(await res.json()).toEqual({ tagline: null });
+        expect(await res.json()).toEqual({ tagline: null, locale: "en" });
     });
 });
 
@@ -126,7 +126,7 @@ describe("POST /api/profile-extras/[id] — owner-only", () => {
             paramsFor("69")
         );
         expect(res.status).toBe(200);
-        expect(await res.json()).toEqual({ tagline: "Saved value" });
+        expect(await res.json()).toEqual({ tagline: "Saved value", locale: "en" });
 
         expect(extras().upsert).toHaveBeenCalledWith(
             expect.objectContaining({
@@ -151,7 +151,7 @@ describe("POST /api/profile-extras/[id] — owner-only", () => {
             paramsFor("69")
         );
         expect(res.status).toBe(200);
-        expect(await res.json()).toEqual({ tagline: null });
+        expect(await res.json()).toEqual({ tagline: null, locale: "en" });
         expect(extras().upsert).toHaveBeenCalledWith(
             expect.objectContaining({
                 create: { memberId: "69", tagline: null },

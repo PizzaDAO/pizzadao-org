@@ -12,6 +12,18 @@ import type { GitHubRepo, GitHubPullRequest, GitHubContributor, GitHubCommit } f
 const mockFetch = vi.fn()
 global.fetch = mockFetch
 
+// Minimal Response-like object: github.ts reads bodies via response.text()
+function mockJsonResponse(body: unknown) {
+  return {
+    ok: true,
+    status: 200,
+    statusText: 'OK',
+    headers: new Headers(),
+    text: () => Promise.resolve(JSON.stringify(body)),
+    json: () => Promise.resolve(body),
+  }
+}
+
 describe('GitHub API Integration', () => {
   beforeEach(() => {
     vi.clearAllMocks()
@@ -26,6 +38,7 @@ describe('GitHub API Integration', () => {
           full_name: 'PizzaDAO/onboarding',
           description: 'PizzaDAO onboarding app',
           html_url: 'https://github.com/PizzaDAO/onboarding',
+          homepage: null,
           default_branch: 'main',
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2024-01-15T00:00:00Z',
@@ -42,6 +55,7 @@ describe('GitHub API Integration', () => {
           full_name: 'PizzaDAO/rsv-pizza',
           description: 'Pizza party RSVP app',
           html_url: 'https://github.com/PizzaDAO/rsv-pizza',
+          homepage: null,
           default_branch: 'main',
           created_at: '2023-06-01T00:00:00Z',
           updated_at: '2024-01-10T00:00:00Z',
@@ -54,10 +68,7 @@ describe('GitHub API Integration', () => {
         },
       ]
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockRepos),
-      })
+      mockFetch.mockResolvedValueOnce(mockJsonResponse(mockRepos))
 
       const repos = await fetchPizzaDAORepos()
 
@@ -75,6 +86,7 @@ describe('GitHub API Integration', () => {
           full_name: 'PizzaDAO/onboarding',
           description: 'PizzaDAO onboarding app',
           html_url: 'https://github.com/PizzaDAO/onboarding',
+          homepage: null,
           default_branch: 'main',
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2024-01-15T00:00:00Z',
@@ -91,6 +103,7 @@ describe('GitHub API Integration', () => {
           full_name: 'PizzaDAO/forked-repo',
           description: 'A forked repo',
           html_url: 'https://github.com/PizzaDAO/forked-repo',
+          homepage: null,
           default_branch: 'main',
           created_at: '2023-01-01T00:00:00Z',
           updated_at: '2024-01-01T00:00:00Z',
@@ -103,10 +116,7 @@ describe('GitHub API Integration', () => {
         },
       ]
 
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockRepos),
-      })
+      mockFetch.mockResolvedValueOnce(mockJsonResponse(mockRepos))
 
       const repos = await fetchPizzaDAORepos()
 
@@ -119,9 +129,10 @@ describe('GitHub API Integration', () => {
         ok: false,
         status: 403,
         statusText: 'Forbidden',
+        headers: new Headers(),
       })
 
-      await expect(fetchPizzaDAORepos()).rejects.toThrow('GitHub API error: 403 Forbidden')
+      await expect(fetchPizzaDAORepos()).rejects.toThrow('GitHub API error (fetching repos): 403 Forbidden')
     })
   })
 
@@ -135,6 +146,7 @@ describe('GitHub API Integration', () => {
           state: 'open',
           html_url: 'https://github.com/PizzaDAO/onboarding/pull/42',
           user: { login: 'contributor1', avatar_url: 'https://avatar.com/1' },
+          head: { ref: 'feature/new-thing' },
           created_at: '2024-01-10T00:00:00Z',
           updated_at: '2024-01-12T00:00:00Z',
         },
@@ -162,20 +174,11 @@ describe('GitHub API Integration', () => {
       ]
 
       // Mock for PRs
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockPRs),
-      })
+      mockFetch.mockResolvedValueOnce(mockJsonResponse(mockPRs))
       // Mock for contributors
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockContributors),
-      })
+      mockFetch.mockResolvedValueOnce(mockJsonResponse(mockContributors))
       // Mock for commits
-      mockFetch.mockResolvedValueOnce({
-        ok: true,
-        json: () => Promise.resolve(mockCommits),
-      })
+      mockFetch.mockResolvedValueOnce(mockJsonResponse(mockCommits))
 
       const details = await fetchRepoDetails('onboarding')
 
@@ -195,6 +198,7 @@ describe('GitHub API Integration', () => {
         full_name: 'PizzaDAO/test-repo',
         description: null,
         html_url: 'https://github.com/PizzaDAO/test-repo',
+        homepage: null,
         default_branch: 'main',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2024-01-15T00:00:00Z',
@@ -219,6 +223,7 @@ describe('GitHub API Integration', () => {
         full_name: 'PizzaDAO/smart-contract',
         description: null,
         html_url: 'https://github.com/PizzaDAO/smart-contract',
+        homepage: null,
         default_branch: 'main',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2024-01-15T00:00:00Z',
@@ -244,6 +249,7 @@ describe('GitHub API Integration', () => {
         full_name: 'PizzaDAO/docs-only',
         description: null,
         html_url: 'https://github.com/PizzaDAO/docs-only',
+        homepage: null,
         default_branch: 'main',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2024-01-15T00:00:00Z',
@@ -298,6 +304,7 @@ describe('GitHub API Integration', () => {
         full_name: 'PizzaDAO/onboarding',
         description: 'PizzaDAO onboarding app',
         html_url: 'https://github.com/PizzaDAO/onboarding',
+        homepage: null,
         default_branch: 'main',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2024-01-15T00:00:00Z',
@@ -327,13 +334,38 @@ describe('GitHub API Integration', () => {
       expect(project.techStack).toContain('Next.js')
     })
 
-    it('should default status to "active" for non-archived repos without config', () => {
+    it('should default status to "planning" for non-archived repos without a live URL', () => {
       const repo: GitHubRepo = {
         id: 1,
         name: 'new-repo',
         full_name: 'PizzaDAO/new-repo',
         description: null,
         html_url: 'https://github.com/PizzaDAO/new-repo',
+        homepage: null,
+        default_branch: 'main',
+        created_at: '2023-01-01T00:00:00Z',
+        updated_at: '2024-01-15T00:00:00Z',
+        pushed_at: '2024-01-15T00:00:00Z',
+        open_issues_count: 0,
+        language: null,
+        topics: [],
+        archived: false,
+        fork: false,
+      }
+
+      const project = transformGitHubRepo(repo)
+
+      expect(project.status).toBe('planning')
+    })
+
+    it('should default status to "active" when the repo has a homepage', () => {
+      const repo: GitHubRepo = {
+        id: 1,
+        name: 'live-repo',
+        full_name: 'PizzaDAO/live-repo',
+        description: null,
+        html_url: 'https://github.com/PizzaDAO/live-repo',
+        homepage: 'https://live.pizzadao.org',
         default_branch: 'main',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2024-01-15T00:00:00Z',
@@ -348,6 +380,7 @@ describe('GitHub API Integration', () => {
       const project = transformGitHubRepo(repo)
 
       expect(project.status).toBe('active')
+      expect(project.liveUrl).toBe('https://live.pizzadao.org')
     })
 
     it('should set status to "archived" for archived repos', () => {
@@ -357,6 +390,7 @@ describe('GitHub API Integration', () => {
         full_name: 'PizzaDAO/old-repo',
         description: null,
         html_url: 'https://github.com/PizzaDAO/old-repo',
+        homepage: null,
         default_branch: 'main',
         created_at: '2023-01-01T00:00:00Z',
         updated_at: '2023-01-15T00:00:00Z',

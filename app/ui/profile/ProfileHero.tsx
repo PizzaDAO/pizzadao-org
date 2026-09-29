@@ -3,8 +3,8 @@
 // app/ui/profile/ProfileHero.tsx
 //
 // Shared hero for /profile/[id]. Plan: truffle-91035 (PR2 — pepperoni-77692).
-// Owns: PFP, name h1, tagline placeholder (the actual tagline DB field lands
-// in PR4 — for now the prop is accepted but rendered blank when empty), the
+// Owns: PFP, name h1, tagline (from the profile tagline DB field; rendered
+// blank when empty), the
 // identity line (city · level · mafia rank), and the primary-action slot
 // (ProfileActions). Owner banner above the hero is rendered here too because
 // it's part of the hero visual rhythm.
@@ -22,7 +22,7 @@ interface ProfileHeroProps {
     memberId: string;
     name: string;
     pfpUrl?: string | null;
-    /** Free-form one-liner. PR4 wires this to a DB field; pass "" or undefined for now. */
+    /** Free-form one-liner from the member's profile; "" or undefined renders nothing. */
     tagline?: string | null;
     city?: string | null;
     /** Numeric mission level (1–8), "MAX" for >8, or null if no level. */

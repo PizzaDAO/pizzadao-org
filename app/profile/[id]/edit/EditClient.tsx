@@ -554,7 +554,7 @@ export function EditClient({ memberId }: { memberId: string }) {
                         className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em] text-foreground m-0"
                         style={{ fontSize: "clamp(1.5rem, 3.6vw, 2rem)", lineHeight: 1.0 }}
                     >
-                        Couldn't load your profile
+                        Couldn&apos;t load your profile
                     </h1>
                     <p className="text-foreground/70 m-0">
                         {error instanceof Error

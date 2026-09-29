@@ -18,7 +18,7 @@ type Manual = {
 function statusBadge(status: string) {
   const s = status.toLowerCase();
   let bg = "#888";
-  let color = "white";
+  const color = "white";
 
   if (s === "complete" || s === "completed") {
     bg = "#22c55e";

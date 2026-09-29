@@ -1755,7 +1755,7 @@ function collapsibleHeader(color: string): React.CSSProperties {
 
 function itemCard(priority?: string): React.CSSProperties {
   const lower = priority?.toLowerCase() || ''
-  let borderColor = 'hsl(var(--rule) / 0.12)'
+  const borderColor = 'hsl(var(--rule) / 0.12)'
   let accent: string | null = null
 
   if (lower.includes('top') || lower.includes('high') || lower.includes('0.') || lower.includes('1.')) {

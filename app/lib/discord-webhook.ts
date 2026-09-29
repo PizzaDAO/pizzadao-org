@@ -68,8 +68,8 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
         const headers = rows[0].map((h: string) => String(h || "").toLowerCase().trim());
 
         // Find column indices
-        let channelColIdx = headers.findIndex((h: string) => h === "channel" || h === "crew");
-        let webhookColIdx = headers.findIndex((h: string) => h === "webhook" || h === "webhook url" || h === "webhookurl");
+        const channelColIdx = headers.findIndex((h: string) => h === "channel" || h === "crew");
+        const webhookColIdx = headers.findIndex((h: string) => h === "webhook" || h === "webhook url" || h === "webhookurl");
 
         if (channelColIdx === -1 || webhookColIdx === -1) {
             return null;

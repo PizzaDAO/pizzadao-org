@@ -9,7 +9,8 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./vitest.setup.ts'],
     include: ['**/*.test.{ts,tsx}'],
-    exclude: ['node_modules', '.next'],
+    // Playwright specs (e2e/) and nested agent worktrees are not vitest suites.
+    exclude: ['node_modules/**', '.next/**', 'e2e/**', '.claude/**', '.backup/**'],
   },
   resolve: {
     alias: {

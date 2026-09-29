@@ -1,5 +1,6 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
 import { useToast } from '@/app/ui/shared/Toast'
 import { TURTLE_ROLE_IDS, ROLE_ID_TO_TURTLE } from '@/app/ui/constants'
@@ -143,9 +144,9 @@ export default function AdminPollsPage() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-6 rounded-lg shadow">
           <p className="text-red-600">{error}</p>
-          <a href="/" className="text-blue-600 hover:underline mt-2 block">
+          <Link href="/" className="text-blue-600 hover:underline mt-2 block">
             Go to home page
-          </a>
+          </Link>
         </div>
       </div>
     )
