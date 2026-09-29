@@ -1,5 +1,8 @@
 // app/api/discord/sync-roles/route.ts
-import { TURTLE_ROLE_IDS } from "@/app/ui/constants"; // adjust path if needed
+// NOTE: not called anywhere in the app today. Locked down anyway: only the
+// user themself (discordId === session.discordId) or an admin may change roles.
+import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
+import { requireSession, isAdminDiscordId } from "@/app/lib/auth-guards";
 
 const API_BASE = "https://discord.com/api/v10";
 
@@ -38,6 +41,9 @@ async function discordFetch(path: string, init: RequestInit = {}) {
 }
 
 export async function POST(req: Request) {
+  const auth = await requireSession();
+  if (!auth.ok) return auth.response;
+
   try {
     const { discordId, turtleKeys, mode } = (await req.json()) as {
       discordId: string;
@@ -46,7 +52,12 @@ export async function POST(req: Request) {
       mode?: "add-only" | "replace";
     };
 
-    if (!discordId) return Response.json({ error: "Missing discordId" }, { status: 400 });
+    if (!discordId || typeof discordId !== "string") {
+      return Response.json({ error: "Missing discordId" }, { status: 400 });
+    }
+    if (discordId !== auth.session.discordId && !(await isAdminDiscordId(auth.session.discordId))) {
+      return Response.json({ error: "Forbidden" }, { status: 403 });
+    }
     const guildId = mustEnv("DISCORD_GUILD_ID");
 
     const selectedRoleIds = new Set(
