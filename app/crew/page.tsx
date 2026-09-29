@@ -173,19 +173,6 @@ export default function CrewMembersPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto" }} className="fade-up">
         {/* onion-15370: editorial header — overline + display headline + tagline */}
         <div style={{ marginBottom: 28, position: "relative" }}>
-          <Link
-            href="/"
-            style={{
-              fontSize: 14,
-              color: "hsl(var(--muted-foreground))",
-              textDecoration: "none",
-              display: "inline-flex",
-              alignItems: "center",
-              minHeight: 32,
-            }}
-          >
-            ← Back to Home
-          </Link>
           <p
             className="overline"
             style={{

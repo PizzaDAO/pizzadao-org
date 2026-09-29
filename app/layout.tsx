@@ -5,6 +5,7 @@ import { getLocale, getMessages } from "next-intl/server";
 import "./globals.css";
 import { Providers } from "./providers";
 import CornerLinks from "@/app/ui/CornerLinks";
+import SiteHeader from "@/app/ui/SiteHeader";
 
 // Body / UI sans — matches pizzadao.org marketing site.
 const asapSans = Asap({
@@ -58,7 +59,10 @@ export default async function RootLayout({
         className={`${asapSans.variable} ${asapDisplay.variable} ${rockSalt.variable} ${geistMono.variable} antialiased`}
       >
         <NextIntlClientProvider locale={locale} messages={messages}>
-          <Providers>{children}</Providers>
+          <Providers>
+            <SiteHeader />
+            <div id="main-content">{children}</div>
+          </Providers>
         </NextIntlClientProvider>
         {/* Suggestion + GitHub links - Fixed Bottom Right */}
         <CornerLinks />

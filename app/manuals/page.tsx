@@ -177,21 +177,6 @@ export default function ManualsPage() {
       <div style={{ maxWidth: 800, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
-          <Link
-            href="/"
-            style={{
-              fontSize: 14,
-              color: 'hsl(var(--muted-foreground))',
-              textDecoration: "none",
-              marginBottom: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              minHeight: 44,
-              transition: "color 200ms ease-out",
-            }}
-          >
-            ← Back to Home
-          </Link>
           <h1
             style={{
               margin: "8px 0 4px 0",

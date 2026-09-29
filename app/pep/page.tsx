@@ -12,8 +12,7 @@
 // sicilian-41551: mobile-first layout (single column under lg).
 
 import React, { useEffect, useState } from "react";
-import Link from "next/link";
-import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { ArrowUpRight } from "lucide-react";
 import { Leaderboard, PepIcon, PepAmount, TransactionHistory } from "../ui/economy";
 import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
@@ -630,18 +629,6 @@ export default function PepDashboard() {
 
             <div className="flex shrink-0 items-center gap-2 pt-2">
               <NotificationBell />
-              <Link
-                href="/"
-                className="btn-pill"
-                style={{
-                  background: "hsl(var(--secondary))",
-                  color: "hsl(var(--secondary-foreground))",
-                  border: "1px solid hsl(var(--rule-warm) / 0.55)",
-                  textDecoration: "none",
-                }}
-              >
-                <ArrowLeft className="h-4 w-4" /> Home
-              </Link>
             </div>
           </div>
 

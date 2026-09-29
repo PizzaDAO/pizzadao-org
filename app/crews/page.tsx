@@ -131,7 +131,7 @@ export default function AllCrewsPage() {
       } : null)
 
     } catch (e: unknown) {
-      toast.error((e as any)?.message || 'Something went wrong')
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setJoining(null)
     }
@@ -158,7 +158,7 @@ export default function AllCrewsPage() {
       } : null)
 
     } catch (e: unknown) {
-      toast.error((e as any)?.message || 'Something went wrong')
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setLeaving(null)
     }
@@ -265,19 +265,6 @@ export default function AllCrewsPage() {
                 {isJoining ? 'Joining...' : 'Join Crew'}
               </button>
             )
-          )}
-          {!user && (
-            <Link
-              href="/login"
-              style={{
-                ...btn('primary'),
-                flex: 1,
-                textAlign: 'center',
-                fontSize: 14,
-              }}
-            >
-              Log in to join
-            </Link>
           )}
         </div>
         {loginPromptFor === crew.id && (
@@ -410,9 +397,6 @@ export default function AllCrewsPage() {
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/" style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
-            ← Home
-          </Link>
           {user && (
             <Link href={`/dashboard/${user.memberId}`} style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
               My Dashboard
@@ -535,8 +519,8 @@ export default function AllCrewsPage() {
             <p style={{ fontSize: 16, marginBottom: 16 }}>
               Log in with Discord to join crews
             </p>
-            <Link href="/" style={btn('primary')}>
-              Go to Home
+            <Link href="/login" style={btn('primary')}>
+              Log in
             </Link>
           </div>
         )}

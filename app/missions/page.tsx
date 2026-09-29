@@ -15,7 +15,6 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/app/ui/shared/Toast";
-import Link from "next/link";
 import { pageContainer, loadingSpinner } from "../ui/shared-styles";
 import { MissionCard } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
@@ -388,17 +387,6 @@ export default function MissionsPage() {
             >
               § The Dossier · Missions
             </span>
-            <Link
-              href="/"
-              className="overline"
-              style={{
-                color: "hsl(var(--muted-foreground))",
-                textDecoration: "none",
-                transition: "color 150ms ease",
-              }}
-            >
-              ← Home
-            </Link>
           </div>
 
           <h1

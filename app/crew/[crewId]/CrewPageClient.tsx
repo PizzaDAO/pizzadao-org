@@ -230,7 +230,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
       if (!res.ok) throw new Error(result.error || 'Failed to join crew')
       setUser(prev => prev ? { ...prev, crews: [...prev.crews, crewId.toLowerCase()] } : null)
     } catch (e: unknown) {
-      toast.error((e as any)?.message || 'Something went wrong')
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setJoining(false)
     }
@@ -249,7 +249,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
       if (!res.ok) throw new Error(result.error || 'Failed to leave crew')
       setUser(prev => prev ? { ...prev, crews: prev.crews.filter(c => c.toLowerCase() !== crewId.toLowerCase()) } : null)
     } catch (e: unknown) {
-      toast.error((e as any)?.message || 'Something went wrong')
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setLeaving(false)
     }
@@ -302,7 +302,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         }
       })
     } catch (e: unknown) {
-      toast.error((e as any)?.message || 'Something went wrong')
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setClaimingTask(null)
     }
@@ -338,7 +338,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         }
       })
     } catch (e: unknown) {
-      toast.error((e as any)?.message || 'Something went wrong')
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setClaimingTask(null)
     }
@@ -444,7 +444,6 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         <div className="fade-up" style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
           {/* Navigation */}
           <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-            <Link href="/" style={navBtn()}>← Home</Link>
             <Link href="/crews" style={navBtn()}>All Crews</Link>
             <Link href="/crew" style={navBtn()}>All Members</Link>
             {user && (
@@ -833,7 +832,6 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
       <div className="fade-up" style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/" style={navBtn()}>← Home</Link>
           <Link href="/crews" style={navBtn()}>All Crews</Link>
           <Link href="/crew" style={navBtn()}>← All Members</Link>
           {crewId.toLowerCase() === 'tech' && (
@@ -1645,11 +1643,6 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             )}
           </div>
         )}
-
-        {/* Back link */}
-        <div style={{ textAlign: 'center', marginTop: 20 }}>
-          <Link href="/" style={btn('secondary')}>← Back to Home</Link>
-        </div>
       </div>
     </div>
   )

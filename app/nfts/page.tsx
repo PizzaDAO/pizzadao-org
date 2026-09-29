@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 import { CollectionCard } from "../ui/nft/CollectionCard";
 
 interface Holder {
@@ -84,12 +83,6 @@ export default function NFTsPage() {
         {/* Header */}
         <div className="flex justify-between items-start mb-8 flex-wrap gap-4">
           <div>
-            <Link
-              href="/"
-              className="text-sm text-muted-foreground hover:text-tomato no-underline inline-flex items-center min-h-[44px] transition-colors"
-            >
-              &larr; Back to Home
-            </Link>
             <h1 className="font-display mt-2 mb-1 text-4xl font-extrabold tracking-tight text-foreground">
               NFTs
             </h1>
