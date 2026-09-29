@@ -18,6 +18,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { CREWS } from "../../ui/constants";
+import { norm } from "../../lib/strings";
 import { SendPepModal } from "../../ui/economy";
 import { MissionsProgress } from "../../ui/missions";
 import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
@@ -42,11 +43,6 @@ import { Discover } from "./components/Discover";
 // --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
 const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
 
-function norm(s: unknown) {
-    return String(s ?? "")
-        .trim()
-        .replace(/\s+/g, " ");
-}
 
 function splitTurtlesCell(v: unknown): string[] {
     if (Array.isArray(v)) return v.map(norm).filter(Boolean);

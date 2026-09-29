@@ -4,17 +4,20 @@
  * avoiding Vercel deployment protection issues with internal API calls.
  */
 
-import { parseGvizJson } from "@/app/lib/gviz-parser";
+import type { GvizResponse } from "@/app/lib/gviz-parser";
 import { getTaskLinks, getColumnHyperlinks } from "@/app/api/lib/google-sheets";
 import { cacheGet, cacheSet, cacheDel, CACHE_TTL } from "@/app/api/lib/cache";
+import { fetchGviz, buildGvizUrl, GvizFetchError } from "@/app/lib/sheets/gviz";
+import { SHEET_IDS, SHEET_TABS } from "@/app/lib/sheets/config";
+import { norm as normalizeSpaces } from "@/app/lib/strings";
 import promiseLimit from "promise-limit";
 
-const SHEET_ID = "19itGq86BRQTVehKhtRFKwK8gZqjsUQ_bG5cuVmem9HU";
-const TAB_NAME = "Crew Mappings";
+const SHEET_ID = SHEET_IDS.crewMappings;
+const TAB_NAME = SHEET_TABS.crewMappings;
 
-function normalizeSpaces(s: unknown) {
-  return String(s ?? "").trim().replace(/\s+/g, " ");
-}
+/** Read-only config sheets (the mappings tab and each crew's task sheet). */
+const CONFIG_REVALIDATE_SECONDS = 300;
+const GVIZ_HEADERS = { "User-Agent": "Mozilla/5.0", Accept: "text/plain,*/*" };
 
 function slugify(s: unknown) {
   return normalizeSpaces(s)
@@ -52,14 +55,6 @@ export type CrewOption = {
   taskCount?: number; // Total active tasks (including hidden ones)
 };
 
-function gvizUrl(sheetId: string, tabName?: string) {
-  const url = new URL(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`);
-  url.searchParams.set("tqx", "out:json");
-  if (tabName) url.searchParams.set("sheet", tabName);
-  url.searchParams.set("headers", "1");
-  return url.toString();
-}
-
 function extractSheetId(url: string) {
   const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
   return match ? match[1] : null;
@@ -85,11 +80,14 @@ async function fetchCrewTasks(sheetUrl: string, forceRefresh = false): Promise<{
   }
 
   try {
-    const url = gvizUrl(id);
-    const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 300 } });
-    if (!res.ok) return { tasks: [], totalCount: 0 };
-    const text = await res.text();
-    const gviz = parseGvizJson(text);
+    // Throws on a non-2xx response; the catch below returns the empty result.
+    const gviz = await fetchGviz(
+      id,
+      { headers: 1 },
+      forceRefresh
+        ? { fresh: true, headers: GVIZ_HEADERS }
+        : { revalidate: CONFIG_REVALIDATE_SECONDS, headers: GVIZ_HEADERS },
+    );
     const rows = gviz?.table?.rows || [];
 
     let tasksRowIdx = -1;
@@ -215,38 +213,25 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
     }
   }
 
-  const gvizEndpoint = gvizUrl(SHEET_ID, TAB_NAME);
+  const gvizEndpoint = buildGvizUrl(SHEET_ID, { tab: TAB_NAME, headers: 1 });
 
-  const res = await fetch(gvizEndpoint, {
-    headers: {
-      "User-Agent": "Mozilla/5.0",
-      Accept: "text/plain,*/*",
-    },
-    cache: "no-store",
-    redirect: "follow",
-  });
-
-  const contentType = res.headers.get("content-type") || "";
-  const raw = await res.text();
-
-  if (!res.ok) {
-    const preview = raw.slice(0, 240);
+  let gviz: GvizResponse;
+  try {
+    gviz = await fetchGviz(
+      SHEET_ID,
+      { tab: TAB_NAME, headers: 1 },
+      forceRefresh
+        ? { fresh: true, headers: GVIZ_HEADERS }
+        : { revalidate: CONFIG_REVALIDATE_SECONDS, headers: GVIZ_HEADERS },
+    );
+  } catch (e) {
+    const status = e instanceof GvizFetchError ? e.status : "unknown";
     throw new Error(
-      `Failed to fetch sheet via GViz. status=${res.status} content-type=${contentType} url=${gvizEndpoint} preview=${JSON.stringify(
-        preview
-      )}`
+      `Failed to fetch sheet via GViz. status=${status} url=${gvizEndpoint} error=${
+        e instanceof Error ? e.message : String(e)
+      }`
     );
   }
-
-  if (raw.toLowerCase().includes("<html") || raw.toLowerCase().includes("<!doctype html")) {
-    const preview = raw.slice(0, 260);
-    throw new Error(
-      `GViz returned HTML (not JSON). This usually means the sheet/tab isn't accessible via GViz.
-content-type=${contentType} url=${gvizEndpoint} preview=${JSON.stringify(preview)}`
-    );
-  }
-
-  const gviz = parseGvizJson(raw);
 
   const table = gviz?.table;
   const cols: any[] = Array.isArray(table?.cols) ? table.cols : [];

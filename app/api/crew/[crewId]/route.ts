@@ -1,16 +1,19 @@
-import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from 'next/server'
 import { getTaskLinks, getTaskLinksDebug, getAgendaStepLinks, getAgendaStepLinksDebug, getMemberTurtlesMap, TaskLinksDebugResult, AgendaLinksDebugResult } from '@/app/api/lib/google-sheets'
-import { getCachedSheetData, setCachedSheetData } from '@/app/api/lib/sheet-cache'
 import { cacheDel } from '@/app/api/lib/cache'
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { fetchGviz } from '@/app/lib/sheets/gviz'
+import { norm } from '@/app/lib/strings'
+
+/**
+ * Crew sheets are edited during calls, so they get a shorter data-cache window
+ * than config sheets. The response itself is also CDN-cached (s-maxage=300).
+ * ?fresh=1 bypasses the data cache.
+ */
+const CREW_SHEET_REVALIDATE_SECONDS = 60
 
 type Params = { params: Promise<{ crewId: string }> }
 
-// Helper to normalize strings
-function norm(s: unknown): string {
-  return String(s ?? '').trim().replace(/\s+/g, ' ')
-}
 
 // Extract sheet ID from Google Sheets URL
 function extractSheetId(url: string): string | null {
@@ -294,26 +297,16 @@ export async function GET(req: Request, { params }: Params) {
       ])
     }
 
-    // Try to get cached data first (unless force refresh)
     type CrewSheetData = { roster: any[]; goals: any[]; tasks: any[]; agenda: any[]; callInfo: any }
-    let sheetData: CrewSheetData | null = null
-
-    if (!forceRefresh) {
-      sheetData = await getCachedSheetData<CrewSheetData>(crew.sheet)
-      if (sheetData) {
-      }
-    }
+    let sheetData: CrewSheetData
 
     // Debug info to track link extraction
     let taskDebugInfo: TaskLinksDebugResult | null = null
     let agendaDebugInfo: AgendaLinksDebugResult | null = null
 
-    // If no cached data, fetch fresh
-    if (!sheetData) {
-
-      // Fetch spreadsheet data via GViz API and HTML links in parallel
-      const gvizUrl = `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq?tqx=out:json&headers=0`
-
+    // Sheet data comes from Next's data cache (see CREW_SHEET_REVALIDATE_SECONDS) and
+    // the hyperlink maps from KV, so parsing on every request is cheap.
+    {
       // Use debug version when debug mode is enabled
       let htmlLinkMap: Record<string, string>
       let agendaLinkMap: Record<string, string>
@@ -333,13 +326,13 @@ export async function GET(req: Request, { params }: Params) {
         ])
       }
 
-      const sheetRes = await fetch(gvizUrl, { cache: 'no-store' })
-      if (!sheetRes.ok) {
+      const gviz = await fetchGviz(
+        sheetId,
+        { headers: 0 },
+        forceRefresh ? { fresh: true } : { revalidate: CREW_SHEET_REVALIDATE_SECONDS },
+      ).catch(() => {
         throw new Error('Failed to fetch crew spreadsheet')
-      }
-
-      const text = await sheetRes.text()
-      const gviz = parseGvizJson(text)
+      })
       const rows = gviz?.table?.rows || []
 
       // Parse sections by detecting header rows
@@ -402,9 +395,6 @@ export async function GET(req: Request, { params }: Params) {
       }
 
       sheetData = { roster, goals, tasks, agenda, callInfo }
-
-      // Cache the parsed data
-      await setCachedSheetData(crew.sheet, sheetData)
     }
 
     return NextResponse.json({

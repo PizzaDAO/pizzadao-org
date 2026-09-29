@@ -2,11 +2,12 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { ANNOUNCE_ALLOWED_DISCORD_IDS } from "@/app/ui/constants";
+import { SHEET_IDS } from "@/app/lib/sheets/config";
 
 export const runtime = "nodejs";
 
 // The single announcement this endpoint is scoped to fire (romana-35249).
-const ANNOUNCE_SPREADSHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
+const ANNOUNCE_SPREADSHEET_ID = SHEET_IDS.announce;
 
 // POST /api/announce - Fire the "PizzaDAO Crew" announcement via SecretService.
 // Discord login required + allowlist enforced server-side.
