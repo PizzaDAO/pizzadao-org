@@ -38,7 +38,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const { pattern, keys } = body as { pattern?: string; keys?: string[] };
 
-    let deletedKeys: string[] = [];
+    const deletedKeys: string[] = [];
 
     if (keys && Array.isArray(keys)) {
       // Delete specific keys

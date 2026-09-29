@@ -1,3 +1,4 @@
+import Link from 'next/link'
 import AnonymousVote from '@/components/AnonymousVote'
 
 type Props = {
@@ -11,9 +12,9 @@ export default async function VotePage({ params }: Props) {
     <div className="min-h-screen bg-gray-100 py-8">
       <div className="max-w-lg mx-auto px-4">
         <div className="mb-6">
-          <a href="/" className="text-blue-600 hover:underline text-sm">
+          <Link href="/" className="text-blue-600 hover:underline text-sm">
             &larr; Back to home
-          </a>
+          </Link>
         </div>
         <AnonymousVote pollId={pollId} />
       </div>

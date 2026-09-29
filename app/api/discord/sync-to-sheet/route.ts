@@ -56,7 +56,7 @@ export async function POST(req: Request) {
         // We need to fetch ALL guild roles to get names for "Other Roles"
         // Optimization: Only fetch guild roles if we have unmapped roles? 
         // Yes, let's fetch guild roles to get names.
-        let guildRolesMap = new Map<string, string>(); // ID -> Name
+        const guildRolesMap = new Map<string, string>(); // ID -> Name
         try {
             const rolesRes = await fetch(`${BASE_DISCORD_API}/guilds/${guildId}/roles`, {
                 headers: { Authorization: `Bot ${botToken}` },

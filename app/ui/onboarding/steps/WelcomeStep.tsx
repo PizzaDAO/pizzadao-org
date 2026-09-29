@@ -75,7 +75,7 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
           className="handwritten pointer-events-none absolute right-[2%] top-[42%] hidden rotate-[8deg] text-[18px] text-tomato md:block lg:right-[-2%]"
           style={{ opacity: 0.85 }}
         >
-          come in, the door's open
+          come in, the door&apos;s open
         </span>
         <span
           aria-hidden

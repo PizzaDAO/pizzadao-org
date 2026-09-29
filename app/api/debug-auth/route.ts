@@ -4,7 +4,7 @@ export const dynamic = 'force-dynamic';
 
 export async function GET() {
     const envVar = process.env.GOOGLE_SERVICE_ACCOUNT_JSON;
-    let authStatus = {
+    const authStatus = {
         hasEnvVar: !!envVar,
         envVarLength: envVar?.length,
         parsed: false,
