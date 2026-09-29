@@ -1,5 +1,10 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the gallery article card.
+// Each card reads like a press clipping: paper-soft tactile noise, an
+// overline category label, a display-font headline with hover scribble,
+// and a byline rendered in uppercase micro-type. Data shape unchanged.
+
 import Link from "next/link";
 import TagBadge from "./TagBadge";
 
@@ -32,25 +37,17 @@ export function formatDate(iso?: string | null) {
   }
 }
 
-function statusBadge(status: string) {
+function statusBadgeClass(status: string) {
   const s = status.toUpperCase();
-  const colors: Record<string, { bg: string; color: string }> = {
-    DRAFT: { bg: "#f59e0b", color: "white" },
-    PUBLISHED: { bg: "#22c55e", color: "white" },
-    ARCHIVED: { bg: "#6b7280", color: "white" },
-  };
-  const c = colors[s] || colors.DRAFT;
-  return {
-    display: "inline-block",
-    padding: "2px 8px",
-    borderRadius: 4,
-    fontSize: 11,
-    fontWeight: 600,
-    background: c.bg,
-    color: c.color,
-    textTransform: "uppercase" as const,
-    letterSpacing: 0.3,
-  };
+  switch (s) {
+    case "PUBLISHED":
+      return "bg-[hsl(142_71%_45%/0.18)] text-[hsl(142_71%_25%)] dark:text-[hsl(142_71%_70%)]";
+    case "ARCHIVED":
+      return "bg-[hsl(var(--ink)/0.10)] text-[hsl(var(--ink-soft))] dark:bg-[hsl(var(--cream)/0.10)] dark:text-[hsl(var(--cream))]";
+    case "DRAFT":
+    default:
+      return "bg-[hsl(var(--butter)/0.35)] text-[hsl(var(--ink))]";
+  }
 }
 
 interface ArticleCardProps {
@@ -61,104 +58,81 @@ interface ArticleCardProps {
 export default function ArticleCard({ article, showStatus = false }: ArticleCardProps) {
   const displayDate = formatDate(article.publishedAt || article.createdAt);
   const imageUrl = article.coverImage || article.thumbnail;
+  const primaryTag = article.tags?.[0];
 
   return (
     <Link
       href={`/articles/${article.slug}`}
-      className="article-card"
-      style={{
-        display: "flex",
-        flexDirection: "column",
-        background: "var(--color-surface)",
-        borderRadius: 12,
-        border: "1px solid var(--color-border)",
-        textDecoration: "none",
-        color: "inherit",
-        overflow: "hidden",
-        transition: "all 0.2s ease",
-      }}
+      className="article-card paper-soft print-noise group flex flex-col bg-card text-card-foreground rounded-[--radius] border border-[hsl(var(--rule-warm)/0.55)] overflow-hidden no-underline transition-all duration-300 hover:border-[hsl(var(--tomato)/0.65)] hover:-translate-y-0.5"
+      style={{ boxShadow: "var(--shadow-soft)" }}
     >
       {imageUrl && (
         <div
-          style={{
-            width: "100%",
-            aspectRatio: "16 / 9",
-            background: "var(--color-surface-hover, rgba(0,0,0,0.04))",
-            overflow: "hidden",
-          }}
+          className="w-full bg-[hsl(var(--ink)/0.04)] dark:bg-[hsl(var(--cream)/0.04)] overflow-hidden border-b border-[hsl(var(--rule-warm)/0.45)]"
+          style={{ aspectRatio: "16 / 9" }}
         >
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img
             src={imageUrl}
             alt=""
-            style={{
-              width: "100%",
-              height: "100%",
-              objectFit: "cover",
-              display: "block",
-            }}
+            className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-[1.04]"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}
           />
         </div>
       )}
-      <div style={{ padding: 16, display: "flex", flexDirection: "column", gap: 8, flex: 1 }}>
-        <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 8 }}>
-          <h3
-            style={{
-              margin: 0,
-              fontSize: 17,
-              fontWeight: 700,
-              color: "var(--color-text-primary, var(--color-text))",
-              lineHeight: 1.3,
-            }}
-          >
-            {article.title}
-          </h3>
-          {showStatus && <span style={statusBadge(article.status)}>{article.status}</span>}
+      <div className="p-4 sm:p-5 flex flex-col gap-2 flex-1">
+        <div className="flex items-start justify-between gap-2 min-h-[14px]">
+          <span className="overline text-tomato truncate">
+            {primaryTag ? primaryTag : "Dispatch"}
+          </span>
+          {showStatus && (
+            <span
+              className={`overline px-1.5 py-0.5 rounded-md shrink-0 ${statusBadgeClass(article.status)}`}
+              style={{ fontSize: 10 }}
+            >
+              {article.status}
+            </span>
+          )}
         </div>
+
+        <h3
+          className="font-display text-xl sm:text-[1.35rem] font-black leading-[1.05] tracking-tight text-foreground m-0 group-hover:text-tomato transition-colors"
+          style={{ textWrap: "balance" }}
+        >
+          {article.title}
+        </h3>
 
         {article.excerpt && (
           <p
+            className="text-sm leading-relaxed text-foreground/65 m-0 overflow-hidden"
             style={{
-              margin: 0,
-              fontSize: 14,
-              lineHeight: 1.5,
-              color: "var(--color-text-secondary, var(--color-text))",
-              opacity: 0.85,
               display: "-webkit-box",
               WebkitLineClamp: 3,
               WebkitBoxOrient: "vertical",
-              overflow: "hidden",
+              textWrap: "pretty",
             }}
           >
             {article.excerpt}
           </p>
         )}
 
-        <div
-          style={{
-            marginTop: "auto",
-            display: "flex",
-            alignItems: "center",
-            justifyContent: "space-between",
-            gap: 8,
-            fontSize: 12,
-            color: "var(--color-text-secondary, var(--color-text))",
-            opacity: 0.8,
-            paddingTop: 8,
-          }}
-        >
-          <span>
-            {article.authorName ? `by ${article.authorName}` : ""}
-            {displayDate ? ` · ${displayDate}` : ""}
-          </span>
+        <div className="mt-auto pt-3 flex items-center justify-between gap-2 border-t border-[hsl(var(--rule-warm)/0.45)]">
+          <p className="overline m-0 text-foreground/55 truncate">
+            {article.authorName ? `By ${article.authorName}` : "—"}
+            {displayDate ? (
+              <>
+                <span aria-hidden className="mx-1.5 opacity-50">·</span>
+                {displayDate}
+              </>
+            ) : null}
+          </p>
         </div>
 
-        {article.tags && article.tags.length > 0 && (
-          <div style={{ display: "flex", flexWrap: "wrap", gap: 6 }}>
-            {article.tags.slice(0, 4).map((tag) => (
+        {article.tags && article.tags.length > 1 && (
+          <div className="flex flex-wrap gap-1.5">
+            {article.tags.slice(1, 4).map((tag) => (
               <TagBadge key={tag} tag={tag} size="sm" />
             ))}
           </div>

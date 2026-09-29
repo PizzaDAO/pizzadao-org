@@ -1,9 +1,10 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, type CSSProperties } from "react";
 import { PepAmount } from "../economy/PepIcon";
 import { UserLink } from "../UserLink";
 import { BountyComments } from "./BountyComments";
+import { card as cardBase, btn, badge } from "../shared-styles";
 
 type Bounty = {
   id: number;
@@ -22,29 +23,41 @@ type BountyCardProps = {
   onAction?: () => void;
 };
 
-function card(status: "OPEN" | "CLAIMED"): React.CSSProperties {
-  return {
-    border: status === "CLAIMED" ? "1px solid rgba(234,179,8,0.3)" : "1px solid var(--color-border)",
-    borderRadius: 14,
-    padding: 16,
-    boxShadow: 'var(--shadow-card)',
-    background: status === "CLAIMED" ? "rgba(234,179,8,0.05)" : "var(--color-surface)",
-  };
+function cardStyle(status: "OPEN" | "CLAIMED"): CSSProperties {
+  const base = cardBase();
+  if (status === "CLAIMED") {
+    return {
+      ...base,
+      padding: 18,
+      gap: 0,
+      borderColor: "hsl(var(--butter) / 0.50)",
+      background: "hsl(var(--butter) / 0.08)",
+    };
+  }
+  return { ...base, padding: 18, gap: 0 };
 }
 
-function btn(variant: "primary" | "secondary" | "danger"): React.CSSProperties {
-  const base: React.CSSProperties = {
-    padding: "6px 12px",
-    borderRadius: 6,
-    border: "none",
-    fontWeight: 650,
-    cursor: "pointer",
-    fontSize: 12,
-    whiteSpace: "nowrap" as const,
+// Status pill colors per spec:
+//   open = emerald
+//   in-progress (CLAIMED) = butter
+//   closed = muted
+//   expired = tomato
+function statusBadge(status: "OPEN" | "CLAIMED"): CSSProperties {
+  const base = badge("default");
+  if (status === "CLAIMED") {
+    return {
+      ...base,
+      background: "hsl(var(--butter) / 0.20)",
+      color: "hsl(38 90% 28%)",
+      borderColor: "hsl(var(--butter) / 0.55)",
+    };
+  }
+  return {
+    ...base,
+    background: "hsl(142 71% 35% / 0.12)",
+    color: "hsl(142 71% 28%)",
+    borderColor: "hsl(142 71% 35% / 0.35)",
   };
-  if (variant === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)' };
-  if (variant === "danger") return { ...base, background: "#dc2626", color: 'var(--color-btn-primary-text)' };
-  return { ...base, background: "var(--color-surface-hover)", color: 'var(--color-text)' };
 }
 
 export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps) {
@@ -56,11 +69,11 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
   const isClaimer = bounty.claimedBy === currentUserId;
   const canComment = isCreator || isClaimer;
 
-  const handleClaim = async () => {
+  const post = async (path: string) => {
     setLoading(true);
     setError(null);
     try {
-      const res = await fetch("/api/bounties/claim", {
+      const res = await fetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ bountyId: bounty.id }),
@@ -69,100 +82,46 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
       if (!res.ok) throw new Error(data.error);
       onAction?.();
     } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to claim bounty");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleGiveUp = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/bounties/giveup", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bountyId: bounty.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      onAction?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to give up bounty");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleComplete = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/bounties/complete", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bountyId: bounty.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      onAction?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to complete bounty");
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  const handleCancel = async () => {
-    setLoading(true);
-    setError(null);
-    try {
-      const res = await fetch("/api/bounties/cancel", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bountyId: bounty.id }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      onAction?.();
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Failed to cancel bounty");
+      setError(err instanceof Error ? err.message : "Action failed");
     } finally {
       setLoading(false);
     }
   };
 
   return (
-    <div style={card(bounty.status)}>
+    <div style={cardStyle(bounty.status)}>
       <div style={{ display: "flex", alignItems: "flex-start", gap: 12 }}>
         {/* Left side - content */}
         <div style={{ flex: 1, minWidth: 0 }}>
-          <div style={{ display: "flex", alignItems: "center", gap: 8, marginBottom: 4 }}>
-            <span style={{
-              fontSize: 10,
-              fontWeight: 600,
-              padding: "3px 6px",
-              background: bounty.status === "CLAIMED" ? "rgba(234,179,8,0.1)" : "rgba(139,92,246,0.1)",
-              color: bounty.status === "CLAIMED" ? "#ca8a04" : "#8b5cf6",
-              borderRadius: 4,
-            }}>
+          <div
+            style={{
+              display: "flex",
+              alignItems: "center",
+              gap: 8,
+              marginBottom: 6,
+              flexWrap: "wrap",
+            }}
+          >
+            <span style={statusBadge(bounty.status)}>
               {bounty.status === "CLAIMED" ? "In Progress" : "Open"}
             </span>
-            <span style={{ fontSize: 10, color: "var(--color-text-muted)" }}>#{bounty.id}</span>
+            <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}>
+              #{bounty.id}
+            </span>
             {isCreator && (
-              <span style={{
-                fontSize: 10,
-                fontWeight: 600,
-                padding: "3px 6px",
-                background: "rgba(37,99,235,0.1)",
-                color: "#2563eb",
-                borderRadius: 4,
-              }}>
-                Your Bounty
-              </span>
+              <span style={badge("accent")}>Your Bounty</span>
             )}
           </div>
-          <p style={{ fontSize: 13, margin: 0, lineHeight: 1.4 }}>{bounty.description}</p>
+          <p
+            style={{
+              fontSize: 14,
+              margin: 0,
+              lineHeight: 1.45,
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            {bounty.description}
+          </p>
           {bounty.link && (
             <a
               href={bounty.link}
@@ -174,11 +133,20 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
                 gap: 4,
                 marginTop: 6,
                 fontSize: 12,
-                color: "#2563eb",
+                color: "hsl(var(--tomato))",
                 textDecoration: "none",
               }}
             >
-              <svg width={12} height={12} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+              <svg
+                width={12}
+                height={12}
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth="2"
+                strokeLinecap="round"
+                strokeLinejoin="round"
+              >
                 <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
                 <polyline points="15 3 21 3 21 9" />
                 <line x1="10" y1="14" x2="21" y2="3" />
@@ -186,51 +154,93 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
               View details
             </a>
           )}
-          <div style={{ marginTop: 6, fontSize: 11, color: 'var(--color-text-secondary)' }}>
+          <div
+            style={{
+              marginTop: 8,
+              fontSize: 12,
+              color: "hsl(var(--muted-foreground))",
+            }}
+          >
             Posted by <UserLink discordId={bounty.createdBy} />
           </div>
           {bounty.status === "CLAIMED" && bounty.claimedBy && (
-            <div style={{
-              marginTop: 8,
-              padding: "6px 10px",
-              background: "rgba(234,179,8,0.1)",
-              borderRadius: 6,
-              fontSize: 12,
-              display: "flex",
-              alignItems: "center",
-              gap: 6
-            }}>
-              <span style={{ color: 'var(--color-text-secondary)' }}>Claimed by:</span>
+            <div
+              style={{
+                marginTop: 8,
+                padding: "6px 10px",
+                background: "hsl(var(--butter) / 0.15)",
+                border: "1px solid hsl(var(--butter) / 0.40)",
+                borderRadius: "var(--radius)",
+                fontSize: 12,
+                display: "flex",
+                alignItems: "center",
+                gap: 6,
+                flexWrap: "wrap",
+              }}
+            >
+              <span style={{ color: "hsl(var(--muted-foreground))" }}>
+                Claimed by:
+              </span>
               <UserLink discordId={bounty.claimedBy} />
-              {isClaimer && <span style={{ color: "#16a34a", fontWeight: 600 }}>(You)</span>}
+              {isClaimer && (
+                <span style={{ color: "hsl(142 71% 30%)", fontWeight: 600 }}>
+                  (You)
+                </span>
+              )}
             </div>
           )}
           {error && (
-            <div style={{ marginTop: 8, padding: 6, background: "rgba(255,0,0,0.05)", borderRadius: 4, color: "#c00", fontSize: 11 }}>
+            <div
+              style={{
+                marginTop: 8,
+                padding: 8,
+                background: "hsl(var(--tomato) / 0.06)",
+                border: "1px solid hsl(var(--tomato) / 0.30)",
+                borderRadius: "var(--radius)",
+                color: "hsl(var(--tomato))",
+                fontSize: 12,
+              }}
+            >
               {error}
             </div>
           )}
         </div>
 
         {/* Right side - reward and actions */}
-        <div style={{ flexShrink: 0, display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 8 }}>
-          <div style={{
-            padding: "6px 10px",
-            background: "rgba(139,92,246,0.1)",
-            borderRadius: 6,
-            color: "#8b5cf6",
-            fontWeight: 700,
-            fontSize: 12,
-          }}>
-            <PepAmount amount={bounty.reward} size={12} />
+        <div
+          style={{
+            flexShrink: 0,
+            display: "flex",
+            flexDirection: "column",
+            alignItems: "flex-end",
+            gap: 10,
+          }}
+        >
+          <div
+            style={{
+              fontSize: 24,
+              fontWeight: 700,
+              color: "hsl(var(--tomato))",
+              fontFamily:
+                "var(--font-display), var(--font-sans), system-ui, sans-serif",
+              letterSpacing: "-0.01em",
+              display: "flex",
+              alignItems: "center",
+            }}
+          >
+            <PepAmount amount={bounty.reward} size={20} />
           </div>
 
           {/* Action buttons */}
           {bounty.status === "OPEN" && !isCreator && (
             <button
-              onClick={handleClaim}
+              onClick={() => post("/api/bounties/claim")}
               disabled={loading}
-              style={{ ...btn("primary"), opacity: loading ? 0.5 : 1 }}
+              style={{
+                ...btn("accent", loading),
+                padding: "6px 14px",
+                fontSize: 13,
+              }}
             >
               {loading ? "..." : "Claim"}
             </button>
@@ -238,9 +248,15 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
 
           {bounty.status === "OPEN" && isCreator && (
             <button
-              onClick={handleCancel}
+              onClick={() => post("/api/bounties/cancel")}
               disabled={loading}
-              style={{ ...btn("danger"), opacity: loading ? 0.5 : 1 }}
+              style={{
+                ...btn("secondary", loading),
+                padding: "6px 14px",
+                fontSize: 13,
+                color: "hsl(var(--tomato))",
+                borderColor: "hsl(var(--tomato) / 0.40)",
+              }}
             >
               {loading ? "..." : "Cancel"}
             </button>
@@ -248,9 +264,13 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
 
           {bounty.status === "CLAIMED" && isClaimer && (
             <button
-              onClick={handleGiveUp}
+              onClick={() => post("/api/bounties/giveup")}
               disabled={loading}
-              style={{ ...btn("secondary"), opacity: loading ? 0.5 : 1 }}
+              style={{
+                ...btn("secondary", loading),
+                padding: "6px 14px",
+                fontSize: 13,
+              }}
             >
               {loading ? "..." : "Give Up"}
             </button>
@@ -259,16 +279,26 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
           {bounty.status === "CLAIMED" && isCreator && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <button
-                onClick={handleComplete}
+                onClick={() => post("/api/bounties/complete")}
                 disabled={loading}
-                style={{ ...btn("primary"), opacity: loading ? 0.5 : 1, background: "#16a34a" }}
+                style={{
+                  ...btn("accent", loading),
+                  padding: "6px 14px",
+                  fontSize: 13,
+                }}
               >
                 {loading ? "..." : "Approve"}
               </button>
               <button
-                onClick={handleCancel}
+                onClick={() => post("/api/bounties/cancel")}
                 disabled={loading}
-                style={{ ...btn("danger"), opacity: loading ? 0.5 : 1, fontSize: 10, padding: "4px 8px" }}
+                style={{
+                  ...btn("secondary", loading),
+                  padding: "4px 12px",
+                  fontSize: 11,
+                  color: "hsl(var(--tomato))",
+                  borderColor: "hsl(var(--tomato) / 0.40)",
+                }}
               >
                 {loading ? "..." : "Cancel"}
               </button>
@@ -278,7 +308,13 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
       </div>
 
       {/* Comments toggle and section */}
-      <div style={{ marginTop: 10, borderTop: '1px solid var(--color-divider)', paddingTop: 8 }}>
+      <div
+        style={{
+          marginTop: 12,
+          borderTop: "1px solid hsl(var(--rule) / 0.12)",
+          paddingTop: 10,
+        }}
+      >
         <button
           onClick={() => setShowComments(!showComments)}
           style={{
@@ -286,27 +322,35 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
             border: "none",
             cursor: "pointer",
             fontSize: 12,
-            color: 'var(--color-text-secondary)',
+            color: "hsl(var(--muted-foreground))",
             padding: 0,
             display: "flex",
             alignItems: "center",
             gap: 4,
-            fontWeight: 500,
+            fontWeight: 600,
           }}
         >
-          <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <svg
+            width={14}
+            height={14}
+            viewBox="0 0 24 24"
+            fill="none"
+            stroke="currentColor"
+            strokeWidth="2"
+            strokeLinecap="round"
+            strokeLinejoin="round"
+          >
             <path d="M21 15a2 2 0 0 1-2 2H7l-4 4V5a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2z" />
           </svg>
           {showComments ? "Hide" : "Updates"}
           {(bounty.commentCount ?? 0) > 0 && (
-            <span style={{
-              background: "rgba(139,92,246,0.1)",
-              color: "#8b5cf6",
-              padding: "1px 6px",
-              borderRadius: 10,
-              fontSize: 10,
-              fontWeight: 700,
-            }}>
+            <span
+              style={{
+                ...badge("accent"),
+                padding: "1px 8px",
+                fontSize: 10,
+              }}
+            >
               {bounty.commentCount}
             </span>
           )}

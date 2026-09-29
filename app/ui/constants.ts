@@ -85,3 +85,8 @@ export const ARTICLE_AUTHOR_ROLE_IDS = [
   TURTLE_ROLE_IDS.APRIL, // April role
   "812131585327235113", // Dread Pizza Roberts
 ] as const;
+
+// Discord IDs allowed to fire the /announce "PizzaDAO Crew" trigger (romana-35249).
+export const ANNOUNCE_ALLOWED_DISCORD_IDS: string[] = [
+  "581986678923853836", // shaun@sparkable.com
+];

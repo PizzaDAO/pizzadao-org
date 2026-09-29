@@ -2,6 +2,33 @@ import { NextResponse } from 'next/server';
 import { fetchFilteredPOAPs } from '@/app/lib/poap';
 import { POAPCollectionResponse, POAPDisplayItem } from '@/app/lib/poap-types';
 import { getEvmWalletsForMember, getWalletForMember } from '@/app/lib/wallet-lookup';
+import { prisma } from '@/app/lib/db';
+
+/**
+ * Fire-and-forget: persist a "first seen" timestamp for each POAP we
+ * observe for this member. Idempotent via the unique (memberId, poapEventId)
+ * constraint. Feeds the dashboard activity feed (poap_received kind).
+ * Errors are swallowed so the GET response is never delayed or broken.
+ */
+function recordPoapFirstSeen(memberId: string, poaps: POAPDisplayItem[]): void {
+  if (poaps.length === 0) return;
+  const writes = poaps.map((p) =>
+    prisma.poapFirstSeen.upsert({
+      where: {
+        memberId_poapEventId: { memberId, poapEventId: p.eventId },
+      },
+      update: {}, // first observation wins
+      create: {
+        memberId,
+        poapEventId: p.eventId,
+        poapTokenId: p.tokenId,
+        title: p.title ?? null,
+        imageUrl: p.imageUrl ?? null,
+      },
+    }),
+  );
+  Promise.allSettled(writes).catch(() => {});
+}
 
 /**
  * GET /api/poaps/[memberId]
@@ -70,6 +97,10 @@ export async function GET(
 
     // Sort by tokenId descending (newest first)
     allPoaps.sort((a, b) => parseInt(b.tokenId) - parseInt(a.tokenId));
+
+    // Persist first-seen timestamps so the activity feed can surface
+    // poap_received events. Fire-and-forget — does not block the response.
+    recordPoapFirstSeen(memberId, allPoaps);
 
     const totalCount = allPoaps.length;
     const primaryWallet = walletAddresses[0];

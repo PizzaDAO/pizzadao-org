@@ -1,5 +1,6 @@
 "use client";
 
+import { card } from "../shared-styles";
 import { HolderLeaderboard } from "./HolderLeaderboard";
 
 interface Holder {
@@ -33,42 +34,12 @@ function getOpenSeaUrl(contractAddress: string, chain: string): string {
   return `https://opensea.io/assets/${chainSlug}/${contractAddress}`;
 }
 
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  };
-}
-
-function chainBadge(chain: string): React.CSSProperties {
-  const colors: Record<string, { bg: string; text: string }> = {
-    ethereum: { bg: "#627EEA20", text: "#627EEA" },
-    base: { bg: "#0052FF20", text: "#0052FF" },
-    polygon: { bg: "#8247E520", text: "#8247E5" },
-    zora: { bg: "#00000010", text: "#000" },
-    optimism: { bg: "#FF042020", text: "#FF0420" },
-  };
-
-  const { bg, text } = colors[chain.toLowerCase()] || {
-    bg: "#00000010",
-    text: "#666",
-  };
-
-  return {
-    display: "inline-block",
-    padding: "4px 10px",
-    fontSize: 12,
-    fontWeight: 600,
-    color: text,
-    background: bg,
-    borderRadius: 6,
-    textTransform: "capitalize" as const,
-  };
-}
-
+/**
+ * CollectionCard — capers-48272 (Phase 4e restyle)
+ * Uses shared `card()` primitive (cream surface, ink-tinted border, radius).
+ * Chain badge is an ink pill on muted bg (drops the per-chain brand colors
+ * for visual consistency with the cream/ink/tomato palette).
+ */
 export function CollectionCard({
   contractAddress,
   contractName,
@@ -83,60 +54,35 @@ export function CollectionCard({
   return (
     <div style={card()}>
       {/* Header */}
-      <div
-        style={{
-          display: "flex",
-          justifyContent: "space-between",
-          alignItems: "flex-start",
-          marginBottom: 12,
-        }}
-      >
+      <div className="flex justify-between items-start gap-3 flex-wrap">
         <a
           href={openSeaUrl}
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            margin: 0,
-            fontSize: 18,
-            fontWeight: 600,
-            color: 'var(--color-text-primary)',
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: 44,
-          }}
+          className="font-display text-lg font-semibold text-foreground hover:text-tomato no-underline inline-flex items-center min-h-[44px] transition-colors"
         >
           {contractName} ↗
         </a>
-        <span style={chainBadge(chain)}>{chain}</span>
+        <span className="inline-block px-2.5 py-1 text-xs font-semibold font-display uppercase tracking-wide rounded bg-ink/85 text-cream">
+          {chain}
+        </span>
       </div>
 
       {/* Description */}
       {description && (
-        <p
-          style={{
-            margin: "0 0 16px 0",
-            fontSize: 14,
-            color: 'var(--color-text-secondary)',
-            lineHeight: 1.5,
-          }}
-        >
+        <p className="m-0 text-sm text-muted-foreground leading-relaxed">
           {description}
         </p>
       )}
 
-      {/* Stats */}
-      <div
-        style={{
-          display: "flex",
-          gap: 16,
-          marginBottom: 16,
-          fontSize: 14,
-          color: 'var(--color-text-secondary)',
-        }}
-      >
-        <span>{totalHolders} holders</span>
-        <span>{totalNFTs} NFTs</span>
+      {/* Stats — Asap Condensed counts */}
+      <div className="flex gap-4 text-sm text-muted-foreground">
+        <span>
+          <span className="font-display font-semibold text-foreground">{totalHolders}</span> holders
+        </span>
+        <span>
+          <span className="font-display font-semibold text-foreground">{totalNFTs}</span> NFTs
+        </span>
       </div>
 
       {/* Leaderboard */}

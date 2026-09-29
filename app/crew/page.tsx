@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
 import { CREWS, TURTLES } from "@/app/ui/constants";
+import { badge, btn, card, input, pageContainer } from "@/app/ui/shared-styles";
 
 interface PublicMember {
   id: string;
@@ -168,51 +169,81 @@ export default function CrewMembersPage() {
   const hasActiveFilters = !!(search || crewFilter || turtleFilter || sort !== "name_asc");
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        color: "var(--color-text)",
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
+    <div style={pageContainer()}>
+      <div style={{ maxWidth: 1200, margin: "0 auto" }} className="fade-up">
+        {/* onion-15370: editorial header — overline + display headline + tagline */}
+        <div style={{ marginBottom: 28, position: "relative" }}>
           <Link
             href="/"
             style={{
               fontSize: 14,
-              color: "var(--color-text-secondary, var(--color-text))",
+              color: "hsl(var(--muted-foreground))",
               textDecoration: "none",
               display: "inline-flex",
               alignItems: "center",
-              minHeight: 44,
+              minHeight: 32,
             }}
           >
             ← Back to Home
           </Link>
-          <h1
+          <p
+            className="overline"
             style={{
-              margin: "8px 0 4px 0",
-              fontSize: 32,
-              fontWeight: 800,
-              color: "var(--color-text-primary, var(--color-text))",
+              marginTop: 14,
+              marginBottom: 10,
+              color: "hsl(var(--tomato))",
             }}
           >
-            Crew
+            § ··· The Family
+          </p>
+          <h1
+            style={{
+              margin: "0 0 6px 0",
+              // sicilian-41551: scale 32→48 so the header doesn't dominate
+              // the 375px viewport.
+              fontSize: "clamp(2rem, 8vw, 3rem)",
+              lineHeight: 1.05,
+              fontWeight: 800,
+              letterSpacing: "-0.015em",
+              fontFamily:
+                "var(--font-display), var(--font-sans), system-ui, sans-serif",
+              color: "hsl(var(--foreground))",
+            }}
+          >
+            Crew members
           </h1>
           <p
             style={{
               margin: 0,
-              fontSize: 15,
-              color: "var(--color-text-secondary, var(--color-text))",
-              opacity: 0.8,
+              fontSize: 16,
+              color: "hsl(var(--muted-foreground))",
             }}
           >
             All PizzaDAO members who have signed up
           </p>
+          <span
+            aria-hidden
+            className="handwritten onion-crew-margin-note"
+            style={{
+              position: "absolute",
+              right: 4,
+              top: 28,
+              transform: "rotate(-5deg)",
+              fontSize: 16,
+              color: "hsl(var(--tomato) / 0.75)",
+              pointerEvents: "none",
+            }}
+          >
+            the whole roster
+          </span>
+          <style>{`
+            .onion-crew-margin-note { display: none; }
+            @media (min-width: 768px) {
+              .onion-crew-margin-note { display: inline-block; }
+            }
+          `}</style>
         </div>
+        <hr className="rule-warm" style={{ marginBottom: 20, border: 0, borderTop: "1px solid hsl(var(--rule-warm) / 0.55)" }} />
 
         {/* Search + clear */}
         <div
@@ -223,37 +254,22 @@ export default function CrewMembersPage() {
             gap: 12,
           }}
         >
-          <form onSubmit={handleSearchSubmit} style={{ display: "flex", gap: 8 }}>
+          {/*
+            sicilian-41551: input takes the full first line on phones; the
+            buttons wrap to a second line so neither gets crushed below 44px.
+          */}
+          <form
+            onSubmit={handleSearchSubmit}
+            style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
+          >
             <input
               type="text"
               placeholder="Search name, city, orgs, or skills..."
               value={searchInput}
               onChange={(e) => setSearchInput(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "12px 16px",
-                fontSize: 14,
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                outline: "none",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-              }}
+              style={{ ...input(), flex: "1 1 100%", minWidth: 0 }}
             />
-            <button
-              type="submit"
-              style={{
-                padding: "10px 20px",
-                fontSize: 14,
-                fontWeight: 600,
-                borderRadius: 8,
-                border:
-                  "1px solid var(--color-border-strong, var(--color-border))",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor: "pointer",
-              }}
-            >
+            <button type="submit" style={btn("secondary")}>
               Search
             </button>
             {hasActiveFilters && (
@@ -261,14 +277,8 @@ export default function CrewMembersPage() {
                 type="button"
                 onClick={clearFilters}
                 style={{
-                  padding: "10px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
+                  ...btn("secondary"),
                   background: "transparent",
-                  color: "var(--color-text)",
-                  cursor: "pointer",
                 }}
               >
                 Clear
@@ -288,7 +298,7 @@ export default function CrewMembersPage() {
             <span
               style={{
                 fontSize: 12,
-                opacity: 0.7,
+                color: "hsl(var(--muted-foreground))",
                 marginRight: 4,
               }}
             >
@@ -330,7 +340,7 @@ export default function CrewMembersPage() {
             <span
               style={{
                 fontSize: 12,
-                opacity: 0.7,
+                color: "hsl(var(--muted-foreground))",
                 marginRight: 4,
               }}
             >
@@ -367,7 +377,7 @@ export default function CrewMembersPage() {
           <div
             style={{
               fontSize: 13,
-              opacity: 0.7,
+              color: "hsl(var(--muted-foreground))",
               marginBottom: 12,
               display: "flex",
               justifyContent: "space-between",
@@ -388,12 +398,14 @@ export default function CrewMembersPage() {
                 setPage(1);
               }}
               style={{
-                padding: "6px 10px",
-                fontSize: 13,
-                border: "1px solid var(--color-border)",
-                borderRadius: 8,
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
+                // sicilian-41551: 44px touch target.
+                minHeight: 44,
+                padding: "8px 12px",
+                fontSize: 14,
+                border: "1px solid hsl(var(--rule) / 0.22)",
+                borderRadius: "var(--radius)",
+                background: "hsl(var(--card))",
+                color: "hsl(var(--foreground))",
                 cursor: "pointer",
                 outline: "none",
               }}
@@ -410,10 +422,10 @@ export default function CrewMembersPage() {
           <div
             style={{
               padding: 16,
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "#c00",
-              borderRadius: 8,
+              background: "hsl(var(--tomato) / 0.08)",
+              border: "1px solid hsl(var(--tomato) / 0.30)",
+              color: "hsl(var(--tomato-deep))",
+              borderRadius: "var(--radius)",
               marginBottom: 16,
               fontSize: 14,
             }}
@@ -427,7 +439,9 @@ export default function CrewMembersPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              // sicilian-41551: floor 240→260 via min(...,100%) so 320px
+              // viewports collapse to one column instead of horizontal overflow.
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))",
               gap: 12,
             }}
           >
@@ -436,9 +450,9 @@ export default function CrewMembersPage() {
                 key={i}
                 style={{
                   padding: 14,
-                  borderRadius: 10,
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
+                  borderRadius: "var(--radius)",
+                  border: "1px solid hsl(var(--rule) / 0.12)",
+                  background: "hsl(var(--card))",
                   height: 110,
                   opacity: 0.5,
                   animation: "pulse 1.6s ease-in-out infinite",
@@ -465,12 +479,19 @@ export default function CrewMembersPage() {
             style={{
               padding: 40,
               textAlign: "center",
-              border: "1px solid var(--color-border)",
-              borderRadius: 12,
-              background: "var(--color-surface)",
+              border: "1px solid hsl(var(--rule) / 0.12)",
+              borderRadius: "var(--radius)",
+              background: "hsl(var(--card))",
             }}
           >
-            <p style={{ margin: 0, fontSize: 16, opacity: 0.7 }}>
+            <p
+              style={{
+                margin: 0,
+                fontSize: 15,
+                fontStyle: "italic",
+                color: "hsl(var(--muted-foreground))",
+              }}
+            >
               No members match your filters.
             </p>
             {hasActiveFilters && (
@@ -478,15 +499,9 @@ export default function CrewMembersPage() {
                 type="button"
                 onClick={clearFilters}
                 style={{
+                  ...btn("secondary"),
                   marginTop: 16,
-                  padding: "10px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  borderRadius: 8,
-                  border: "1px solid var(--color-border)",
                   background: "transparent",
-                  color: "var(--color-text)",
-                  cursor: "pointer",
                 }}
               >
                 Clear filters
@@ -500,7 +515,9 @@ export default function CrewMembersPage() {
           <div
             style={{
               display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(260px, 1fr))",
+              // sicilian-41551: floor 240→260 via min(...,100%) so 320px
+              // viewports collapse to one column instead of horizontal overflow.
+              gridTemplateColumns: "repeat(auto-fill, minmax(min(260px, 100%), 1fr))",
               gap: 12,
             }}
           >
@@ -530,14 +547,8 @@ export default function CrewMembersPage() {
               onClick={() => setPage(Math.max(1, page - 1))}
               disabled={page <= 1}
               style={{
+                ...btn("secondary", page <= 1),
                 padding: "8px 14px",
-                fontSize: 14,
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor: page <= 1 ? "not-allowed" : "pointer",
-                opacity: page <= 1 ? 0.5 : 1,
               }}
             >
               ← Prev
@@ -545,7 +556,7 @@ export default function CrewMembersPage() {
             <span
               style={{
                 fontSize: 14,
-                color: "var(--color-text-secondary, var(--color-text))",
+                color: "hsl(var(--muted-foreground))",
               }}
             >
               Page {pagination.page} of {pagination.totalPages}
@@ -555,15 +566,8 @@ export default function CrewMembersPage() {
               onClick={() => setPage(Math.min(pagination.totalPages, page + 1))}
               disabled={page >= pagination.totalPages}
               style={{
+                ...btn("secondary", page >= pagination.totalPages),
                 padding: "8px 14px",
-                fontSize: 14,
-                borderRadius: 8,
-                border: "1px solid var(--color-border)",
-                background: "var(--color-surface)",
-                color: "var(--color-text)",
-                cursor:
-                  page >= pagination.totalPages ? "not-allowed" : "pointer",
-                opacity: page >= pagination.totalPages ? 0.5 : 1,
               }}
             >
               Next →
@@ -589,20 +593,28 @@ function FilterChip({
       type="button"
       onClick={onClick}
       style={{
-        padding: "6px 12px",
+        // sicilian-41551: filter chips touched far more on mobile than
+        // desktop. 36px tall is the compromise — visible pill, comfortable
+        // hit area, the row of chips already wraps so the height bump only
+        // adds vertical space.
+        minHeight: 36,
+        padding: "8px 14px",
         fontSize: 13,
         fontWeight: 600,
         borderRadius: 999,
         border: active
-          ? "1px solid var(--color-btn-primary-border, #ff4d4d)"
-          : "1px solid var(--color-border)",
+          ? "1px solid hsl(var(--tomato))"
+          : "1px solid hsl(var(--rule) / 0.22)",
         background: active
-          ? "var(--color-btn-primary-bg, rgba(255,77,77,0.15))"
-          : "var(--color-surface)",
+          ? "hsl(var(--tomato) / 0.10)"
+          : "hsl(var(--card))",
         color: active
-          ? "var(--color-btn-primary-text, #ff4d4d)"
-          : "var(--color-text)",
+          ? "hsl(var(--tomato))"
+          : "hsl(var(--foreground))",
         cursor: "pointer",
+        display: "inline-flex",
+        alignItems: "center",
+        transition: "background-color 150ms ease, color 150ms ease, border-color 150ms ease",
       }}
     >
       {label}
@@ -617,6 +629,8 @@ function MemberCardItem({
   member: PublicMember;
   pfpUrl?: string;
 }) {
+  // onion-15370: editorial paper-soft tile — preserves all existing data,
+  // only adds tactile noise + restful resting state.
   return (
     <Link
       href={`/profile/${member.id}`}
@@ -626,21 +640,27 @@ function MemberCardItem({
       }}
     >
       <div
+        className="paper-soft"
         style={{
           padding: 14,
-          borderRadius: 10,
-          border: "1px solid var(--color-border)",
-          background: "var(--color-surface)",
-          transition: "transform 0.15s ease, box-shadow 0.15s ease",
+          borderRadius: "var(--radius)",
+          border: "1px solid hsl(var(--rule-warm) / 0.55)",
+          background: "hsl(var(--card))",
+          color: "hsl(var(--card-foreground))",
+          transition:
+            "transform 220ms var(--ease-editorial), box-shadow 220ms var(--ease-editorial), border-color 220ms var(--ease-editorial)",
           height: "100%",
+          boxShadow: "var(--shadow-soft)",
         }}
         onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "var(--shadow-card)";
+          e.currentTarget.style.transform = "translateY(-3px) rotate(-0.4deg)";
+          e.currentTarget.style.boxShadow = "var(--shadow-lifted)";
+          e.currentTarget.style.borderColor = "hsl(var(--tomato) / 0.5)";
         }}
         onMouseLeave={(e) => {
           e.currentTarget.style.transform = "none";
-          e.currentTarget.style.boxShadow = "none";
+          e.currentTarget.style.boxShadow = "var(--shadow-soft)";
+          e.currentTarget.style.borderColor = "hsl(var(--rule-warm) / 0.55)";
         }}
       >
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
@@ -655,7 +675,7 @@ function MemberCardItem({
                 objectFit: "cover",
                 objectPosition: "top",
                 flexShrink: 0,
-                border: "2px solid #fafafa",
+                border: "2px solid hsl(var(--cream))",
               }}
               onError={(e) => {
                 (e.target as HTMLImageElement).style.display = "none";
@@ -667,13 +687,16 @@ function MemberCardItem({
                 width: 44,
                 height: 44,
                 borderRadius: "50%",
-                background: "rgba(0,0,0,0.06)",
+                background: "hsl(var(--muted))",
+                color: "hsl(var(--foreground))",
                 display: "flex",
                 alignItems: "center",
                 justifyContent: "center",
                 fontSize: 18,
                 fontWeight: 700,
                 flexShrink: 0,
+                fontFamily:
+                  "var(--font-display), var(--font-sans), system-ui, sans-serif",
               }}
             >
               {member.name.charAt(0).toUpperCase()}
@@ -683,11 +706,15 @@ function MemberCardItem({
           <div style={{ flex: 1, minWidth: 0 }}>
             <div
               style={{
+                fontFamily:
+                  "var(--font-display), var(--font-sans), system-ui, sans-serif",
                 fontWeight: 700,
-                fontSize: 16,
+                fontSize: 18,
+                letterSpacing: "-0.005em",
                 overflow: "hidden",
                 textOverflow: "ellipsis",
                 whiteSpace: "nowrap",
+                color: "hsl(var(--foreground))",
               }}
             >
               {member.name}
@@ -696,7 +723,7 @@ function MemberCardItem({
               <div
                 style={{
                   fontSize: 13,
-                  opacity: 0.7,
+                  color: "hsl(var(--muted-foreground))",
                   marginTop: 2,
                   overflow: "hidden",
                   textOverflow: "ellipsis",
@@ -712,7 +739,7 @@ function MemberCardItem({
               <div
                 style={{
                   fontSize: 12,
-                  opacity: 0.6,
+                  color: "hsl(var(--muted-foreground))",
                   marginTop: 2,
                 }}
               >
@@ -747,12 +774,9 @@ function MemberCardItem({
                     <span
                       key={crewId}
                       style={{
+                        ...badge(),
                         fontSize: 11,
-                        fontWeight: 600,
                         padding: "2px 7px",
-                        borderRadius: 10,
-                        background: "rgba(91,156,255,0.12)",
-                        color: "#5b9cff",
                         textTransform: "capitalize",
                       }}
                     >
@@ -765,7 +789,8 @@ function MemberCardItem({
                     style={{
                       fontSize: 11,
                       fontWeight: 600,
-                      opacity: 0.6,
+                      color: "hsl(var(--muted-foreground))",
+                      alignSelf: "center",
                     }}
                   >
                     +{member.crews.length - 3}

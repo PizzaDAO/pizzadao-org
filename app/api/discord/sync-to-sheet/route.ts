@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { ROLE_ID_TO_TURTLE } from "@/app/ui/constants";
 import { writeToSheet } from "@/app/api/profile/route";
+import { prisma } from "@/app/lib/db";
 
 export const runtime = "nodejs";
 
@@ -124,6 +125,61 @@ export async function POST(req: Request) {
         };
 
         const writeRes = await writeToSheet(payload);
+
+        // --- Activity feed: log role grants ---
+        // Diff the freshly-pulled Discord role set against our last-known
+        // snapshot in User.roles. Any role id that wasn't in the previous
+        // snapshot is logged as a `role_granted` event (idempotent via the
+        // unique constraint on (discordId, roleId)). Then we refresh the
+        // snapshot so the next sync only sees genuinely-new roles.
+        //
+        // First-ever sync per user is the bootstrap case: every current
+        // role looks "new" relative to the empty snapshot. That's the
+        // intended behavior — we have no Discord audit log, so the earliest
+        // observable timestamp is the first sync after deploy.
+        try {
+            const existing = await prisma.user.findUnique({
+                where: { id: discordId },
+                select: { roles: true },
+            });
+            const previousRoles = new Set(existing?.roles ?? []);
+            const newRoleIds = discordRoleIds.filter(
+                (r) => !previousRoles.has(r),
+            );
+
+            if (newRoleIds.length > 0) {
+                await Promise.allSettled(
+                    newRoleIds.map((roleId) => {
+                        const roleName =
+                            guildRolesMap.get(roleId) ?? roleId;
+                        return prisma.roleGrantEvent.upsert({
+                            where: {
+                                discordId_roleId: { discordId, roleId },
+                            },
+                            update: {},
+                            create: {
+                                discordId,
+                                memberId: finalMemberId ?? null,
+                                roleId,
+                                roleName,
+                            },
+                        });
+                    }),
+                );
+            }
+
+            // Refresh the snapshot for next diff.
+            await prisma.user.upsert({
+                where: { id: discordId },
+                update: { roles: discordRoleIds },
+                create: { id: discordId, roles: discordRoleIds },
+            });
+        } catch (err) {
+            console.error(
+                "[sync-to-sheet] failed to log role grants (non-blocking):",
+                err,
+            );
+        }
 
         return NextResponse.json({
             ok: true,

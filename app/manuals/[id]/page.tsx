@@ -92,7 +92,8 @@ export default function ManualDetailPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: 'var(--color-page-bg)',
+        background: 'hsl(var(--background))',
+        color: 'hsl(var(--foreground))',
         padding: "40px 20px",
       }}
     >
@@ -103,12 +104,13 @@ export default function ManualDetailPage() {
             href="/manuals"
             style={{
               fontSize: 14,
-              color: 'var(--color-text-secondary)',
+              color: 'hsl(var(--muted-foreground))',
               textDecoration: "none",
               marginBottom: 8,
               display: "inline-flex",
               alignItems: "center",
               minHeight: 44,
+              transition: "color 200ms ease-out",
             }}
           >
             &#8592; Back to Manuals
@@ -119,9 +121,9 @@ export default function ManualDetailPage() {
         {loading && (
           <div
             style={{
-              background: 'var(--color-surface)',
-              borderRadius: 12,
-              border: '1px solid var(--color-border)',
+              background: 'hsl(var(--card))',
+              borderRadius: 'var(--radius)',
+              border: '1px solid hsl(var(--rule) / 0.12)',
               padding: 24,
             }}
           >
@@ -129,7 +131,7 @@ export default function ManualDetailPage() {
               style={{
                 height: 32,
                 width: "60%",
-                background: "#eee",
+                background: "hsl(var(--ink) / 0.08)",
                 borderRadius: 4,
                 marginBottom: 16,
                 animation: "pulse 1.5s infinite",
@@ -138,7 +140,7 @@ export default function ManualDetailPage() {
             <div
               style={{
                 height: 200,
-                background: "#eee",
+                background: "hsl(var(--ink) / 0.08)",
                 borderRadius: 4,
                 animation: "pulse 1.5s infinite",
               }}
@@ -152,12 +154,12 @@ export default function ManualDetailPage() {
             style={{
               padding: 40,
               textAlign: "center",
-              background: 'var(--color-surface)',
-              borderRadius: 12,
-              border: '1px solid var(--color-border)',
+              background: 'hsl(var(--card))',
+              borderRadius: 'var(--radius)',
+              border: '1px solid hsl(var(--rule) / 0.12)',
             }}
           >
-            <p style={{ fontSize: 16, color: "#c00", marginBottom: 16 }}>
+            <p style={{ fontSize: 16, color: "hsl(var(--destructive))", marginBottom: 16 }}>
               {error}
             </p>
             <Link
@@ -168,11 +170,12 @@ export default function ManualDetailPage() {
                 minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
-                color: 'var(--color-btn-primary-text)',
-                background: 'var(--color-btn-primary-bg)',
+                color: 'hsl(var(--primary-foreground))',
+                background: 'hsl(var(--primary))',
                 border: "none",
-                borderRadius: 8,
+                borderRadius: 'var(--radius)',
                 textDecoration: "none",
+                transition: "background-color 200ms ease-out",
               }}
             >
               Back to Manuals
@@ -184,9 +187,9 @@ export default function ManualDetailPage() {
         {!loading && !error && manual && (
           <div
             style={{
-              background: 'var(--color-surface)',
-              borderRadius: 12,
-              border: '1px solid var(--color-border)',
+              background: 'hsl(var(--card))',
+              borderRadius: 'var(--radius)',
+              border: '1px solid hsl(var(--rule) / 0.12)',
               overflow: "hidden",
             }}
           >
@@ -194,7 +197,7 @@ export default function ManualDetailPage() {
             <div
               style={{
                 padding: 24,
-                borderBottom: '1px solid var(--color-divider)',
+                borderBottom: '1px solid hsl(var(--rule) / 0.10)',
               }}
             >
               <div
@@ -206,18 +209,26 @@ export default function ManualDetailPage() {
                   marginBottom: 12,
                 }}
               >
-                <h1 style={{ margin: 0, fontSize: 24, fontWeight: 700, color: 'var(--color-text-primary)' }}>
+                <h1
+                  style={{
+                    margin: 0,
+                    fontSize: 24,
+                    fontWeight: 700,
+                    color: 'hsl(var(--foreground))',
+                    textWrap: 'balance',
+                  } as React.CSSProperties}
+                >
                   {manual.title}
                 </h1>
                 {manual.status && (
                   <span style={statusBadge(manual.status)}>{manual.status}</span>
                 )}
               </div>
-              <div style={{ fontSize: 14, color: 'var(--color-text-secondary)', display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
+              <div style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))', display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
                 {manual.crew && (
                   <Link
                     href={`/crew/${manual.crewId}`}
-                    style={{ color: "#2563eb", textDecoration: "none" }}
+                    style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
                   >
                     {manual.crew}
                   </Link>
@@ -227,7 +238,7 @@ export default function ManualDetailPage() {
                     by{" "}
                     <Link
                       href={`/profile/${manual.authorId}`}
-                      style={{ color: "#2563eb", textDecoration: "none" }}
+                      style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
                     >
                       {manual.author}
                     </Link>
@@ -244,7 +255,7 @@ export default function ManualDetailPage() {
                     rel="noopener noreferrer"
                     style={{
                       fontSize: 13,
-                      color: "#2563eb",
+                      color: "hsl(var(--tomato))",
                       textDecoration: "none",
                     }}
                   >
@@ -266,12 +277,12 @@ export default function ManualDetailPage() {
                           style={{
                             textAlign: "center",
                             padding: "12px 16px",
-                            borderBottom: '2px solid var(--color-divider)',
+                            borderBottom: '2px solid hsl(var(--rule) / 0.10)',
                             fontSize: 12,
                             fontWeight: 700,
                             textTransform: "uppercase",
                             letterSpacing: 0.5,
-                            background: 'var(--color-page-bg)',
+                            background: 'hsl(var(--background))',
                             whiteSpace: "nowrap",
                             width: 50,
                           }}
@@ -284,12 +295,12 @@ export default function ManualDetailPage() {
                             style={{
                               textAlign: "left",
                               padding: "12px 16px",
-                              borderBottom: '2px solid var(--color-divider)',
+                              borderBottom: '2px solid hsl(var(--rule) / 0.10)',
                               fontSize: 12,
                               fontWeight: 700,
                               textTransform: "uppercase",
                               letterSpacing: 0.5,
-                              background: 'var(--color-page-bg)',
+                              background: 'hsl(var(--background))',
                               whiteSpace: "nowrap",
                             }}
                           >
@@ -305,12 +316,12 @@ export default function ManualDetailPage() {
                           <td
                             style={{
                               padding: "12px 16px",
-                              borderBottom: '1px solid var(--color-divider)',
+                              borderBottom: '1px solid hsl(var(--rule) / 0.10)',
                               fontSize: 14,
                               verticalAlign: "top",
                               textAlign: "center",
                               fontWeight: 600,
-                              color: 'var(--color-text-secondary)',
+                              color: 'hsl(var(--muted-foreground))',
                             }}
                           >
                             {rowIndex + 1}
@@ -320,7 +331,7 @@ export default function ManualDetailPage() {
                               key={cellIndex}
                               style={{
                                 padding: "12px 16px",
-                                borderBottom: '1px solid var(--color-divider)',
+                                borderBottom: '1px solid hsl(var(--rule) / 0.10)',
                                 fontSize: 14,
                                 verticalAlign: "top",
                               }}
@@ -330,7 +341,7 @@ export default function ManualDetailPage() {
                                   href={cell.url}
                                   target="_blank"
                                   rel="noopener noreferrer"
-                                  style={{ color: "#2563eb", textDecoration: "none" }}
+                                  style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
                                 >
                                   {cell.value}
                                 </a>
@@ -349,9 +360,9 @@ export default function ManualDetailPage() {
                   style={{
                     padding: 40,
                     textAlign: "center",
-                    color: 'var(--color-text-secondary)',
-                    background: 'var(--color-page-bg)',
-                    borderRadius: 8,
+                    color: 'hsl(var(--muted-foreground))',
+                    background: 'hsl(var(--background))',
+                    borderRadius: 'var(--radius)',
                   }}
                 >
                   <div style={{
@@ -363,13 +374,21 @@ export default function ManualDetailPage() {
                      contentError?.includes('not found') ? '\uD83D\uDD0D' :
                      contentError?.includes('No Google Sheet link') ? '\uD83D\uDCCB' : '\u26A0\uFE0F'}
                   </div>
-                  <p style={{ marginBottom: 8, fontWeight: 500, color: 'var(--color-text-primary)' }}>
+                  <p style={{ marginBottom: 8, fontWeight: 500, color: 'hsl(var(--foreground))' }}>
                     {contentError?.includes('private') ? 'Private Sheet' :
                      contentError?.includes('not found') ? 'Sheet Not Found' :
                      contentError?.includes('No Google Sheet link') ? 'No Sheet Link' :
                      'Unable to Load Content'}
                   </p>
-                  <p style={{ marginBottom: 20, fontSize: 14, maxWidth: 400, margin: "0 auto 20px" }}>
+                  <p
+                    style={{
+                      marginBottom: 20,
+                      fontSize: 14,
+                      maxWidth: 400,
+                      margin: "0 auto 20px",
+                      textWrap: 'pretty',
+                    } as React.CSSProperties}
+                  >
                     {contentError || "The sheet content could not be loaded."}
                   </p>
                   {manual.url && (
@@ -382,17 +401,18 @@ export default function ManualDetailPage() {
                         padding: "12px 20px",
                         fontSize: 14,
                         fontWeight: 500,
-                        color: 'var(--color-btn-primary-text)',
-                        background: 'var(--color-btn-primary-bg)',
-                        borderRadius: 8,
+                        color: 'hsl(var(--primary-foreground))',
+                        background: 'hsl(var(--primary))',
+                        borderRadius: 'var(--radius)',
                         textDecoration: "none",
+                        transition: "background-color 200ms ease-out",
                       }}
                     >
                       Open in Google Sheets
                     </a>
                   )}
                   {!manual.url && manual.status?.toLowerCase() === 'needed' && (
-                    <p style={{ fontSize: 13, color: 'var(--color-text-secondary)', marginTop: 12 }}>
+                    <p style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))', marginTop: 12 }}>
                       This manual needs to be written. Check with the crew lead.
                     </p>
                   )}

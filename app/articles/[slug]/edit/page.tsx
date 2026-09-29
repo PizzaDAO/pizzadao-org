@@ -1,5 +1,9 @@
 "use client";
 
+// napoletana-41544 — Editorial restyle of the /articles/[slug]/edit page.
+// Newsroom-redesk feel: overline, display headline + handwritten note,
+// archive button styled as a quieter ghost pill. All API calls preserved.
+
 import { useEffect, useState, useRef, use } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
@@ -67,7 +71,6 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
     setError(null);
     setSuccessMessage(null);
 
-    // Clear any pending success timeout
     if (successTimeoutRef.current) {
       clearTimeout(successTimeoutRef.current);
       successTimeoutRef.current = null;
@@ -95,17 +98,14 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
       const data = await patchRes.json();
       const updated = data.article;
 
-      // Update local article state with server response
       setArticle(updated);
 
-      // Show success toast
       setSuccessMessage(publish ? "Article published!" : "Changes saved.");
       successTimeoutRef.current = setTimeout(() => {
         setSuccessMessage(null);
         successTimeoutRef.current = null;
       }, 3000);
 
-      // If slug changed (draft title change), update URL without navigation
       if (updated.slug !== article.slug) {
         router.replace(`/articles/${updated.slug}/edit`);
       }
@@ -137,28 +137,30 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
 
   if (loading) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-page-bg)", padding: 60, textAlign: "center" }}>
-        <p style={{ color: "var(--color-text-secondary, var(--color-text))" }}>Loading...</p>
+      <div className="min-h-screen bg-background text-foreground py-14 px-5 text-center">
+        <p className="overline text-foreground/55">Pulling the galley proof…</p>
       </div>
     );
   }
 
   if (loadError || !article) {
     return (
-      <div style={{ minHeight: "100vh", background: "var(--color-page-bg)", padding: "60px 20px" }}>
-        <div style={{ maxWidth: 600, margin: "0 auto", textAlign: "center" }}>
-          <h1 style={{ color: "var(--color-text-primary, var(--color-text))" }}>{loadError || "Not found"}</h1>
+      <div className="min-h-screen bg-background text-foreground px-5 py-14">
+        <div className="mx-auto max-w-[600px] text-center fade-up">
+          <p className="overline text-tomato">Stop the presses</p>
+          <h1
+            className="font-display font-black tracking-tight text-foreground mt-3"
+            style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1.02, textWrap: "balance" }}
+          >
+            {loadError || "Not found"}
+          </h1>
           <Link
             href="/articles"
+            className="btn-pill-lg mt-6"
             style={{
-              display: "inline-block",
-              marginTop: 16,
-              padding: "10px 18px",
-              borderRadius: 8,
-              background: "var(--color-btn-primary-bg)",
-              color: "var(--color-btn-primary-text)",
-              textDecoration: "none",
-              fontWeight: 600,
+              background: "hsl(var(--tomato))",
+              color: "hsl(var(--cream))",
+              boxShadow: "var(--shadow-soft)",
             }}
           >
             Back to articles
@@ -169,60 +171,40 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        padding: "40px 20px 80px",
-      }}
-    >
-      <div style={{ maxWidth: 1100, margin: "0 auto" }}>
+    <div className="min-h-screen bg-background text-foreground px-5 pt-10 pb-20">
+      <div className="mx-auto max-w-[1100px]">
         <Link
           href={`/articles/${article.slug}`}
-          style={{
-            fontSize: 14,
-            color: "var(--color-text-secondary, var(--color-text))",
-            textDecoration: "none",
-            display: "inline-flex",
-            alignItems: "center",
-            minHeight: 44,
-          }}
+          className="overline inline-flex min-h-11 items-center text-foreground/55 hover:text-tomato transition-colors no-underline"
         >
-          ← Cancel
+          <span aria-hidden className="mr-2">←</span> Cancel
         </Link>
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "center",
-            flexWrap: "wrap",
-            gap: 12,
-            margin: "8px 0 20px 0",
-          }}
-        >
-          <h1
-            style={{
-              margin: 0,
-              fontSize: 28,
-              fontWeight: 800,
-              color: "var(--color-text-primary, var(--color-text))",
-            }}
-          >
-            Edit article
-          </h1>
+        <div className="relative mt-3 mb-7 flex flex-wrap items-end justify-between gap-3 fade-up">
+          <div>
+            <p className="overline text-tomato">
+              <span aria-hidden>§</span>
+              <span aria-hidden className="mx-2 opacity-50">···</span>
+              Editorial desk
+            </p>
+            <h1
+              className="font-display font-black tracking-[-0.015em] text-foreground mt-3 leading-[1]"
+              style={{
+                fontSize: "clamp(2rem, 5vw, 3.4rem)",
+                textWrap: "balance",
+              }}
+            >
+              Edit your <span className="text-tomato underline-scribble">piece</span>
+            </h1>
+          </div>
           <button
             type="button"
             onClick={handleArchive}
             disabled={submitting}
+            className="btn-pill"
             style={{
-              padding: "8px 14px",
-              borderRadius: 8,
-              border: "1px solid rgba(239, 68, 68, 0.4)",
               background: "transparent",
-              color: "#ef4444",
-              fontSize: 13,
-              fontWeight: 600,
-              cursor: submitting ? "not-allowed" : "pointer",
+              color: "hsl(var(--destructive))",
+              border: "1px solid hsl(var(--destructive) / 0.45)",
             }}
           >
             Archive
@@ -231,16 +213,8 @@ export default function EditArticlePage({ params }: { params: Promise<{ slug: st
 
         {successMessage && (
           <div
-            style={{
-              padding: "12px 16px",
-              background: "rgba(34, 197, 94, 0.1)",
-              border: "1px solid rgba(34, 197, 94, 0.3)",
-              color: "#15803d",
-              borderRadius: 8,
-              marginBottom: 16,
-              fontSize: 14,
-              fontWeight: 600,
-            }}
+            role="status"
+            className="px-4 py-3 mb-4 rounded-[--radius] text-sm font-semibold border bg-[hsl(142_71%_45%/0.10)] border-[hsl(142_71%_45%/0.30)] text-[hsl(142_71%_25%)] dark:text-[hsl(142_71%_60%)]"
           >
             {successMessage}
           </div>

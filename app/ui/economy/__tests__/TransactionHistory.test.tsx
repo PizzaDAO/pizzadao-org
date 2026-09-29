@@ -134,7 +134,7 @@ describe('TransactionHistory', () => {
         expect(screen.getByText('Created bounty: "Fix the homepage"')).toBeInTheDocument()
       })
 
-      expect(screen.getByText('Transaction History')).toBeInTheDocument()
+      expect(screen.getByText('Transaction history')).toBeInTheDocument()
       expect(screen.getByText('Bounty approved: "Update docs"')).toBeInTheDocument()
       expect(screen.getByText('Bought Pizza Hat x1')).toBeInTheDocument()
       expect(screen.getByText('Sent to @user123')).toBeInTheDocument()
@@ -171,7 +171,7 @@ describe('TransactionHistory', () => {
       expect(svgs.length).toBe(7)
     })
 
-    it('shows positive amounts in green with "+" prefix for credits', async () => {
+    it('shows positive amounts with "+" prefix for credits (emerald/credit accent)', async () => {
       const credits = [
         makeTx({ id: 1, type: 'BOUNTY_REWARD', amount: 100, description: 'Reward' }),
         makeTx({ id: 2, type: 'BOUNTY_REFUND', amount: 50, description: 'Refund' }),
@@ -185,25 +185,30 @@ describe('TransactionHistory', () => {
         expect(screen.getByText('Reward')).toBeInTheDocument()
       })
 
-      // The component uses #16a34a which is rgb(22, 163, 74)
-      // Find amount divs by their green color and bold weight
+      // Post-restyle (anchovy-67435): credit amount uses the emerald HSL token.
+      // jsdom may not normalize hsl() syntax, so we match either the legacy
+      // rgb form or the new hsl form, plus the "+" prefix in the text.
       const amountDivs = document.querySelectorAll('div[style]')
-      const greenAmounts: HTMLElement[] = []
+      const creditAmounts: HTMLElement[] = []
       amountDivs.forEach((div) => {
         const el = div as HTMLElement
-        if (el.style.color === 'rgb(22, 163, 74)' && el.style.fontWeight === '700') {
-          greenAmounts.push(el)
+        const color = el.style.color
+        const isCreditColor =
+          color === 'rgb(22, 163, 74)' ||
+          color.includes('142') ||
+          color === 'hsl(142 71% 32%)'
+        if (isCreditColor && el.style.fontWeight === '700') {
+          creditAmounts.push(el)
         }
       })
-      expect(greenAmounts.length).toBe(4)
+      expect(creditAmounts.length).toBe(4)
 
-      // Check that each green amount has "+" in its text content
-      for (const el of greenAmounts) {
+      for (const el of creditAmounts) {
         expect(el.textContent).toMatch(/^\+/)
       }
     })
 
-    it('shows negative amounts in red without "+" prefix for debits', async () => {
+    it('shows negative amounts without "+" prefix for debits (ink/muted accent)', async () => {
       const debits = [
         makeTx({ id: 1, type: 'BOUNTY_ESCROW', amount: -50, description: 'Escrow' }),
         makeTx({ id: 2, type: 'SHOP_PURCHASE', amount: -25, description: 'Purchase' }),
@@ -216,19 +221,25 @@ describe('TransactionHistory', () => {
         expect(screen.getByText('Escrow')).toBeInTheDocument()
       })
 
-      // Find red-colored amount divs
+      // Post-restyle (anchovy-67435): debit amount uses the ink-soft HSL token
+      // instead of bright red. Match either the legacy rgb red or the new hsl
+      // var reference.
       const amountDivs = document.querySelectorAll('div[style]')
-      const redAmounts: HTMLElement[] = []
+      const debitAmounts: HTMLElement[] = []
       amountDivs.forEach((div) => {
         const el = div as HTMLElement
-        if (el.style.color === 'rgb(220, 38, 38)' && el.style.fontWeight === '700') {
-          redAmounts.push(el)
+        const color = el.style.color
+        const isDebitColor =
+          color === 'rgb(220, 38, 38)' ||
+          color.includes('--ink-soft') ||
+          color.includes('var(--ink-soft)')
+        if (isDebitColor && el.style.fontWeight === '700') {
+          debitAmounts.push(el)
         }
       })
-      expect(redAmounts.length).toBe(3)
+      expect(debitAmounts.length).toBe(3)
 
-      // Check that none have "+" prefix and all have "-" (from toLocaleString on negative numbers)
-      for (const el of redAmounts) {
+      for (const el of debitAmounts) {
         expect(el.textContent).not.toMatch(/^\+/)
         expect(el.textContent).toMatch(/^-/)
       }
@@ -431,7 +442,7 @@ describe('TransactionHistory', () => {
         expect(screen.getByText(/No transactions yet/)).toBeInTheDocument()
       })
 
-      expect(screen.getByText('Transaction History')).toBeInTheDocument()
+      expect(screen.getByText('Transaction history')).toBeInTheDocument()
     })
 
     it('handles unauthenticated state gracefully', async () => {
@@ -444,7 +455,7 @@ describe('TransactionHistory', () => {
         expect(screen.getByText(/No transactions yet/)).toBeInTheDocument()
       })
 
-      expect(screen.getByText('Transaction History')).toBeInTheDocument()
+      expect(screen.getByText('Transaction history')).toBeInTheDocument()
     })
   })
 })

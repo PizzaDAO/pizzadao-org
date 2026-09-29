@@ -1,595 +1,84 @@
 // app/profile/[id]/page.tsx
-"use client";
+//
+// Plan: truffle-91035 (PR3 — capricciosa-16483).
+//
+// Server-component wrapper. Its only job is to export generateMetadata so
+// /profile/[id] renders rich OpenGraph + Twitter previews when shared into
+// Discord / X / Telegram. All interactivity (React Query, ?as=visitor
+// handling, owner banner, etc.) lives in <ProfileClient/>.
 
-import { use, useState } from "react";
-import Link from "next/link";
-import { useRouter } from "next/navigation";
-import { Inter } from "next/font/google";
-import { TURTLES, CREWS } from "../../ui/constants";
-import { NFTCollection } from "../../ui/nft";
-import { POAPCollection } from "../../ui/poap";
-import { ProfileLinksDisplay } from "../../ui/profile-links";
-import { AttendanceCard } from "../../ui/attendance-card";
-import { MafiaRankBadge } from "../../ui/mafia-points/MafiaRankBadge";
-import { UnlockTicketCard } from "../../ui/unlock-ticket-card";
-import { AddVouchButton } from "../../ui/vouches/AddVouchButton";
-import { useProfile, usePfp, useXAccount, useArticlesByMember, useMissionProgress, useMe, useCrewMappings, useMyTasks } from "../../lib/hooks/use-api";
+import type { Metadata } from "next";
+import { composeProfileSummary } from "@/app/api/profile-summary/[id]/route";
+import { ProfileClient } from "./ProfileClient";
 
-const inter = Inter({ subsets: ["latin"] });
+export const runtime = "nodejs";
 
-type CrewOption = {
-    id: string;
-    label: string;
-    turtles?: string[] | string;
-    emoji?: string;
-    callTime?: string;
-    callTimeUrl?: string;
-    callLength?: string;
-};
-
-function norm(s: unknown) {
-    return String(s ?? "").trim().replace(/\s+/g, " ");
+// Pull the same in-memory cache the API route uses by calling the composer
+// directly. That avoids a self-HTTP round-trip during SSR and keeps the
+// metadata path resilient to upstream sheet flakiness.
+async function loadHero(id: string) {
+    try {
+        return await composeProfileSummary({ memberId: id, viewerMemberId: null });
+    } catch {
+        return null;
+    }
 }
 
-function splitTurtlesCell(v: unknown): string[] {
-    if (Array.isArray(v)) return v.map(norm).filter(Boolean);
-    const s = norm(v);
-    if (!s) return [];
-    return s.split(/[,/|]+/).map((x) => norm(x)).filter(Boolean);
+function absoluteUrl(pathOrUrl: string | null): string | undefined {
+    if (!pathOrUrl) return undefined;
+    if (/^https?:\/\//.test(pathOrUrl)) return pathOrUrl;
+    const base =
+        process.env.NEXT_PUBLIC_APP_URL ||
+        process.env.NEXT_PUBLIC_SITE_URL ||
+        (process.env.VERCEL_URL ? `https://${process.env.VERCEL_URL}` : "");
+    if (!base) return pathOrUrl; // relative path is fine for in-app browsers
+    return `${base.replace(/\/$/, "")}${pathOrUrl}`;
 }
 
-function CollapsibleSection({ title, defaultOpen = false, children }: { title: string; defaultOpen?: boolean; children: React.ReactNode }) {
-    const [open, setOpen] = useState(defaultOpen);
-    return (
-        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
-            <button
-                onClick={() => setOpen(!open)}
-                style={{
-                    background: "none",
-                    border: "none",
-                    cursor: "pointer",
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 8,
-                    padding: 0,
-                    width: "100%",
-                    textAlign: "left",
-                    fontFamily: "inherit",
-                    fontSize: 18,
-                    fontWeight: 600,
-                    color: 'var(--color-text)',
-                }}
-            >
-                <span style={{
-                    display: "inline-block",
-                    transition: "transform 0.2s",
-                    transform: open ? "rotate(90deg)" : "rotate(0deg)",
-                    fontSize: 12,
-                }}>
-                    ▶
-                </span>
-                {title}
-            </button>
-            {open && <div style={{ marginTop: 12 }}>{children}</div>}
-        </div>
-    );
-}
+export async function generateMetadata({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}): Promise<Metadata> {
+    const { id } = await params;
+    const summary = await loadHero(id);
 
-export default function ProfilePage({ params }: { params: Promise<{ id: string }> }) {
-    const { id } = use(params);
-    const router = useRouter();
-
-    const { data, isLoading: loading, error } = useProfile(id);
-    const { data: pfpData } = usePfp(id);
-    const { data: xAccount } = useXAccount(id);
-    const { data: articlesData } = useArticlesByMember(id);
-    const { data: missionProgress } = useMissionProgress(id);
-    const { data: meData } = useMe();
-    const { data: crewData } = useCrewMappings();
-    const { data: tasksData } = useMyTasks(id);
-
-    const pfpUrl = pfpData?.url ?? null;
-    const articles: { slug: string; title: string; excerpt?: string; publishedAt?: string }[] = articlesData?.articles ?? [];
-    const missionLevel = missionProgress?.currentLevel ? missionProgress : null;
-    const currentMemberId = meData?.memberId ?? null;
-    const crewOptions: CrewOption[] = (crewData?.crews ?? []).map((c: any) => ({
-        id: String(c?.id ?? ""),
-        label: norm(c?.label ?? ""),
-        turtles: splitTurtlesCell(c?.turtles),
-        emoji: norm(c?.emoji) || undefined,
-        callTime: norm(c?.callTime) || undefined,
-        callTimeUrl: norm(c?.callTimeUrl) || undefined,
-        callLength: norm(c?.callLength) || undefined,
-    }));
-    const myTasks: Record<string, { label: string; url?: string }[]> = tasksData?.tasksByCrew ?? {};
-    const doneCounts = tasksData?.doneCountsByCrew ?? {};
-
-    if (loading) {
-        return (
-            <div style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: 'var(--color-page-bg)',
-                color: 'var(--color-text)',
-                fontFamily: inter.style.fontFamily
-            }}>
-                <div style={{ textAlign: "center" }}>
-                    <div style={{
-                        width: 50,
-                        height: 50,
-                        border: '4px solid var(--color-spinner-track)',
-                        borderTop: '4px solid var(--color-spinner-active)',
-                        borderRadius: "50%",
-                        animation: "spin 1s linear infinite",
-                        margin: "0 auto 20px"
-                    }} />
-                    <p style={{ fontSize: 18, opacity: 0.8 }}>Loading profile...</p>
-                    <style jsx>{`
-                        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-                    `}</style>
-                </div>
-            </div>
-        );
+    if (!summary) {
+        return {
+            title: "Profile · PizzaDAO",
+            description: "PizzaDAO member profile",
+        };
     }
 
-    if (error || !data) {
-        return (
-            <div style={{
-                minHeight: "100vh",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                background: 'var(--color-page-bg)',
-                color: 'var(--color-text)',
-                fontFamily: inter.style.fontFamily,
-                padding: 20
-            }}>
-                <div style={card()}>
-                    <h1 style={{ fontSize: 24, marginBottom: 16 }}>Profile Not Found</h1>
-                    <p style={{ opacity: 0.7, marginBottom: 32 }}>{error?.message || "This member doesn't exist."}</p>
-                    <button onClick={() => router.back()} style={btn("primary")}>
-                        ← Go Back
-                    </button>
-                </div>
-            </div>
-        );
-    }
+    const name = summary.hero.name || "PizzaDAO member";
+    const tagline = summary.hero.tagline?.trim();
+    const description = tagline || `${name} · PizzaDAO member`;
+    const ogImage = absoluteUrl(summary.hero.pfpUrl);
 
-    const name = data["Name"] || data["Mafia Name"] || "Anonymous Pizza Maker";
-    const city = data["City"] || "Worldwide";
-    const idValue = data["ID"] || data["Crew ID"] || id;
-    const crewsStr = data["Crews"] || "None";
-    const status = data["Status"] || data["Frequency"] || "";
-    const orgs = data["Affiliation"] || data["Orgs"] || "";
-    const skills = data["Specialties"] || data["Skills"] || "";
-
-    const rawTurtles = data["Turtles"] || data["Roles"] || [];
-    const turtleList = (Array.isArray(rawTurtles) ? rawTurtles : String(rawTurtles).split(",").map(t => t.trim())).filter(Boolean);
-
-    const userCrews = (crewsStr !== "None" ? crewsStr.split(",").map((c: string) => c.trim()).filter(Boolean) : []) as string[];
-
-    const levelStr = missionLevel && missionLevel.approvedCount > 0
-        ? `Lv.${missionLevel.currentLevel > 8 ? "MAX" : missionLevel.currentLevel} ${missionLevel.levelTitle || ""}`
-        : null;
-
-    return (
-        <div style={{
-            minHeight: "100vh",
-            background: 'var(--color-page-bg)',
-            color: 'var(--color-text)',
-            fontFamily: inter.style.fontFamily,
-            padding: "40px 20px"
-        }}>
-            <div style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}>
-                {/* Back Button */}
-                <div>
-                    <button
-                        onClick={() => router.back()}
-                        style={{
-                            background: "transparent",
-                            border: "none",
-                            cursor: "pointer",
-                            fontSize: 16,
-                            fontWeight: 600,
-                            color: 'var(--color-text-secondary)',
-                            padding: 0,
-                            fontFamily: "inherit"
-                        }}
-                    >
-                        ← Back
-                    </button>
-                </div>
-
-                {/* Main Card */}
-                <div style={card()}>
-                    {/* Compact Hero */}
-                    <div style={{ display: "flex", alignItems: "center", gap: 16 }}>
-                        {pfpUrl && (
-                            <img
-                                src={pfpUrl}
-                                alt={`${name}'s profile`}
-                                style={{
-                                    width: 80,
-                                    height: 80,
-                                    borderRadius: "50%",
-                                    objectFit: "cover",
-                                    objectPosition: "top",
-                                    border: "3px solid #fafafa",
-                                    boxShadow: "0 2px 12px rgba(0,0,0,0.12)",
-                                    flexShrink: 0,
-                                }}
-                                onError={(e) => {
-                                    (e.target as HTMLImageElement).style.display = "none";
-                                }}
-                            />
-                        )}
-                        <div style={{ flex: 1, minWidth: 0 }}>
-                            <div style={{ display: "flex", alignItems: "center", gap: 8, flexWrap: "wrap" }}>
-                                <h1 style={{
-                                    fontSize: 22,
-                                    fontWeight: 700,
-                                    margin: 0,
-                                    wordBreak: "break-word",
-                                }}>
-                                    {name}
-                                </h1>
-                                <MafiaRankBadge memberId={idValue} />
-                            </div>
-                            <div style={{ fontSize: 14, opacity: 0.6, marginTop: 4 }}>
-                                {levelStr && (
-                                    <Link href="/missions" style={{ color: "inherit", textDecoration: "none" }}>
-                                        {levelStr}
-                                    </Link>
-                                )}
-                                {levelStr && " · "}
-                                {city}
-                            </div>
-                        </div>
-                        <div style={{ flexShrink: 0 }}>
-                            <AddVouchButton
-                                targetMemberId={idValue}
-                                currentMemberId={currentMemberId}
-                            />
-                        </div>
-                    </div>
-
-                    {/* Crews Section */}
-                    {userCrews.length > 0 && (
-                        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
-                            <h3 style={{ marginTop: 0, marginBottom: 12, fontSize: 18, fontWeight: 600 }}>Crews</h3>
-                            <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(280px, 1fr))", gap: 10 }}>
-                                {userCrews.map((crewName) => {
-                                    const c = crewOptions.find(opt =>
-                                        opt.label.toLowerCase() === crewName.toLowerCase() ||
-                                        opt.id.toLowerCase() === crewName.toLowerCase()
-                                    );
-                                    const label = c?.label || crewName;
-                                    const emoji = c?.emoji || "🍕";
-                                    const crewId = (c?.id || crewName).toLowerCase();
-                                    const tasks = myTasks[crewId] || [];
-                                    const doneCount = doneCounts[crewId] || 0;
-
-                                    return (
-                                        <div
-                                            key={crewName}
-                                            style={{
-                                                padding: 12,
-                                                borderRadius: 12,
-                                                border: '1px solid var(--color-border)',
-                                                background: 'var(--color-surface)',
-                                            }}
-                                        >
-                                            <Link
-                                                href={`/crew/${c?.id || crewName.toLowerCase().replace(/\s+/g, "_")}`}
-                                                style={{
-                                                    fontWeight: 600,
-                                                    textDecoration: "none",
-                                                    color: "inherit"
-                                                }}
-                                            >
-                                                {emoji} {label}
-                                            </Link>
-
-                                            {/* Closed count */}
-                                            {doneCount > 0 && (
-                                                <div style={{
-                                                    marginTop: 8,
-                                                    fontSize: 11,
-                                                    fontWeight: 700,
-                                                    textTransform: "uppercase",
-                                                    letterSpacing: 0.5,
-                                                    color: "#10b981"
-                                                }}>
-                                                    Closed: {doneCount}
-                                                </div>
-                                            )}
-
-                                            {/* Claimed tasks */}
-                                            {tasks.length > 0 && (
-                                                <div style={{ marginTop: 8 }}>
-                                                    <div style={{
-                                                        fontSize: 11,
-                                                        fontWeight: 700,
-                                                        textTransform: "uppercase",
-                                                        letterSpacing: 0.5,
-                                                        color: "#ff4d4d",
-                                                        marginBottom: 4
-                                                    }}>
-                                                        Claimed Tasks
-                                                    </div>
-                                                    {tasks.slice(0, 3).map((t, idx) => (
-                                                        <div key={idx} style={{
-                                                            fontSize: 12,
-                                                            display: "flex",
-                                                            alignItems: "baseline",
-                                                            gap: 4,
-                                                            marginTop: 2
-                                                        }}>
-                                                            <span style={{ color: "#ff4d4d" }}>•</span>
-                                                            {t.url ? (
-                                                                <a
-                                                                    href={t.url}
-                                                                    target="_blank"
-                                                                    rel="noreferrer"
-                                                                    style={{ color: "inherit", textDecoration: "underline", textUnderlineOffset: "2px" }}
-                                                                >
-                                                                    {t.label}
-                                                                </a>
-                                                            ) : (
-                                                                <span>{t.label}</span>
-                                                            )}
-                                                        </div>
-                                                    ))}
-                                                </div>
-                                            )}
-                                        </div>
-                                    );
-                                })}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Articles */}
-                    {articles.length > 0 && (
-                        <div style={{ borderTop: '1px solid var(--color-divider)', paddingTop: 16 }}>
-                            <h3 style={{
-                                fontSize: 18,
-                                fontWeight: 600,
-                                marginTop: 0,
-                                marginBottom: 12,
-                            }}>
-                                Articles
-                            </h3>
-                            <div style={{ display: "grid", gap: 8 }}>
-                                {articles.map((a) => (
-                                    <Link
-                                        key={a.slug}
-                                        href={`/articles/${a.slug}`}
-                                        style={{
-                                            display: "block",
-                                            padding: 12,
-                                            borderRadius: 10,
-                                            border: '1px solid var(--color-border)',
-                                            background: 'var(--color-surface)',
-                                            textDecoration: "none",
-                                            color: "inherit",
-                                        }}
-                                    >
-                                        <div style={{ fontWeight: 600, fontSize: 15 }}>{a.title}</div>
-                                        {a.excerpt && (
-                                            <div style={{ fontSize: 13, opacity: 0.6, marginTop: 4 }}>
-                                                {a.excerpt}
-                                            </div>
-                                        )}
-                                        {a.publishedAt && (
-                                            <div style={{ fontSize: 11, opacity: 0.4, marginTop: 4 }}>
-                                                {new Date(a.publishedAt).toLocaleDateString('en-US', {
-                                                    year: 'numeric', month: 'short', day: 'numeric'
-                                                })}
-                                            </div>
-                                        )}
-                                    </Link>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-
-                    {/* Attendance Card */}
-                    <AttendanceCard memberId={idValue} />
-
-                    {/* Collapsible About */}
-                    <CollapsibleSection title="About" defaultOpen={false}>
-                        <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 24 }}>
-                            <StatItem label="Status" value={status || "—"} />
-                            <StatItem label="ID" value={`#${idValue}`} />
-                            {orgs && <StatItem label="Orgs" value={orgs} />}
-                            {skills && <StatItem label="Skills" value={skills} />}
-
-                            {/* X Account */}
-                            {xAccount?.connected && (
-                                <div>
-                                    <h3 style={{
-                                        fontSize: 12,
-                                        textTransform: "uppercase",
-                                        letterSpacing: "1px",
-                                        opacity: 0.5,
-                                        marginTop: 0,
-                                        marginBottom: 6,
-                                        fontWeight: 700
-                                    }}>
-                                        X
-                                    </h3>
-                                    <a
-                                        href={`https://x.com/${xAccount.username}`}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        style={{
-                                            fontSize: 18,
-                                            fontWeight: 500,
-                                            color: 'var(--color-text-primary)',
-                                            textDecoration: "none",
-                                            display: "inline-flex",
-                                            alignItems: "center",
-                                            gap: 6,
-                                        }}
-                                        onMouseEnter={(e) => e.currentTarget.style.textDecoration = "underline"}
-                                        onMouseLeave={(e) => e.currentTarget.style.textDecoration = "none"}
-                                    >
-                                        @{xAccount.username}
-                                        <svg width={14} height={14} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" style={{ opacity: 0.4 }}>
-                                            <path d="M18 13v6a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V8a2 2 0 0 1 2-2h6" />
-                                            <polyline points="15 3 21 3 21 9" />
-                                            <line x1="10" y1="14" x2="21" y2="3" />
-                                        </svg>
-                                    </a>
-                                </div>
-                            )}
-
-                            {/* Roles */}
-                            <div style={{ gridColumn: "1 / -1" }}>
-                                <h3 style={{
-                                    fontSize: 12,
-                                    textTransform: "uppercase",
-                                    letterSpacing: "1px",
-                                    opacity: 0.5,
-                                    marginTop: 0,
-                                    marginBottom: 6,
-                                    fontWeight: 700
-                                }}>
-                                    Roles
-                                </h3>
-                                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
-                                    {turtleList.length > 0 ? (
-                                        turtleList.map((tName: string) => {
-                                            const tDef = TURTLES.find(t => t.id.toLowerCase() === tName.toLowerCase() || t.label.toLowerCase() === tName.toLowerCase());
-                                            if (!tDef) return null;
-                                            return (
-                                                <Link
-                                                    key={tDef.id}
-                                                    href={`/turtles/${encodeURIComponent(tDef.id)}`}
-                                                    title={`View all ${tDef.label} members`}
-                                                >
-                                                    <img
-                                                        src={tDef.image}
-                                                        alt={tDef.label}
-                                                        style={{ width: 40, height: 40, objectFit: "contain" }}
-                                                    />
-                                                </Link>
-                                            );
-                                        })
-                                    ) : (
-                                        <span style={{ fontSize: 18, fontWeight: 500, opacity: 0.5 }}>None</span>
-                                    )}
-                                </div>
-
-                                {(() => {
-                                    const hiddenRoles = new Set([
-                                        "pockets checked",
-                                        "verified",
-                                        "server booster",
-                                        "nitro booster",
-                                        "@everyone",
-                                        "everyone",
-                                        "member",
-                                        "new member",
-                                        "pizza noob",
-                                    ]);
-                                    const otherRoles = turtleList.filter((tName: string) => {
-                                        const nameLower = tName.toLowerCase();
-                                        if (TURTLES.find(t => t.id.toLowerCase() === nameLower || t.label.toLowerCase() === nameLower)) {
-                                            return false;
-                                        }
-                                        if (hiddenRoles.has(nameLower)) {
-                                            return false;
-                                        }
-                                        return true;
-                                    });
-                                    if (otherRoles.length === 0) return null;
-                                    return (
-                                        <div style={{ marginTop: 8, fontSize: 14, opacity: 0.8 }}>
-                                            <strong>Other Roles:</strong> {otherRoles.join(", ")}
-                                        </div>
-                                    );
-                                })()}
-                            </div>
-
-                            {/* Profile Links */}
-                            <ProfileLinksDisplay memberId={idValue} />
-                        </div>
-                    </CollapsibleSection>
-
-                    {/* Collapsible Collections */}
-                    <CollapsibleSection title="Collections" defaultOpen={false}>
-                        <div style={{ display: "grid", gap: 16 }}>
-                            <POAPCollection memberId={idValue} />
-                            <NFTCollection memberId={idValue} showConnectPrompt={false} />
-                            <UnlockTicketCard memberId={idValue} />
-                        </div>
-                    </CollapsibleSection>
-                </div>
-
-                {/* Footer */}
-                <div style={{ textAlign: "center", marginTop: 40, opacity: 0.4, fontSize: 13 }}>
-                    PizzaDAO
-                </div>
-            </div>
-        </div>
-    );
-}
-
-function StatItem({ label, value }: { label: string; value: string }) {
-    return (
-        <div>
-            <h3 style={{
-                fontSize: 12,
-                textTransform: "uppercase",
-                letterSpacing: "1px",
-                opacity: 0.5,
-                marginTop: 0,
-                marginBottom: 6,
-                fontWeight: 700
-            }}>
-                {label}
-            </h3>
-            <p style={{
-                fontSize: 18,
-                fontWeight: 500,
-                color: 'var(--color-text-primary)',
-                margin: 0,
-                wordBreak: "break-word"
-            }}>
-                {value}
-            </p>
-        </div>
-    );
-}
-
-function card(): React.CSSProperties {
     return {
-        border: '1px solid var(--color-border)',
-        borderRadius: 14,
-        padding: 24,
-        boxShadow: 'var(--shadow-card)',
-        background: 'var(--color-surface)',
-        display: "grid",
-        gap: 14,
+        title: `${name} · PizzaDAO`,
+        description,
+        openGraph: {
+            title: name,
+            description,
+            type: "profile",
+            url: `/profile/${id}`,
+            images: ogImage ? [{ url: ogImage, alt: `${name}'s profile picture` }] : undefined,
+        },
+        twitter: {
+            card: "summary_large_image",
+            title: name,
+            description,
+            images: ogImage ? [ogImage] : undefined,
+        },
     };
 }
 
-function btn(kind: "primary" | "secondary"): React.CSSProperties {
-    const base: React.CSSProperties = {
-        display: "inline-block",
-        padding: "10px 16px",
-        borderRadius: 10,
-        border: '1px solid var(--color-border-strong)',
-        fontWeight: 650,
-        cursor: "pointer",
-        textDecoration: "none",
-        textAlign: "center",
-        fontFamily: "inherit"
-    };
-    if (kind === "primary") return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' };
-    return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' };
+export default async function ProfilePage({
+    params,
+}: {
+    params: Promise<{ id: string }>;
+}) {
+    const { id } = await params;
+    return <ProfileClient id={id} />;
 }

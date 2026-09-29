@@ -9,19 +9,27 @@ type NotificationBellProps = {
   pollInterval?: number;
 };
 
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
+
 function bellButton(hasUnread: boolean): React.CSSProperties {
   return {
     position: "relative",
     background: "none",
     border: "none",
     cursor: "pointer",
+    // sicilian-41551: 44x44 tap target.
+    width: 44,
+    height: 44,
     padding: 6,
-    display: "flex",
+    display: "inline-flex",
     alignItems: "center",
     justifyContent: "center",
-    borderRadius: 8,
-    transition: "background 0.15s",
-    color: hasUnread ? "#2563eb" : "var(--color-text-secondary)",
+    borderRadius: "calc(var(--radius) - 4px)",
+    transition: "background-color 150ms ease, color 150ms ease",
+    color: hasUnread
+      ? "hsl(var(--tomato))"
+      : "hsl(var(--muted-foreground))",
   };
 }
 
@@ -33,15 +41,16 @@ function badge(): React.CSSProperties {
     minWidth: 16,
     height: 16,
     padding: "0 4px",
-    borderRadius: 8,
-    background: "#dc2626",
-    color: 'var(--color-btn-primary-text)',
+    borderRadius: 999,
+    background: "hsl(var(--tomato))",
+    color: "hsl(var(--cream))",
     fontSize: 10,
     fontWeight: 700,
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
     transform: "translate(25%, -25%)",
+    fontFamily: displayFont,
   };
 }
 
@@ -51,13 +60,17 @@ function dropdown(): React.CSSProperties {
     top: "100%",
     right: 0,
     marginTop: 8,
+    // sicilian-41551: 320px would clip on narrow viewports. Cap to viewport
+    // minus a small gutter so the dropdown never overflows the screen.
     width: 320,
+    maxWidth: "calc(100vw - 24px)",
     maxHeight: 400,
     overflowY: "auto",
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border)',
-    borderRadius: 12,
-    boxShadow: "var(--shadow-elevated)",
+    background: "hsl(var(--popover))",
+    color: "hsl(var(--popover-foreground))",
+    border: "1px solid hsl(var(--rule) / 0.12)",
+    borderRadius: "var(--radius)",
+    boxShadow: "0 8px 30px hsl(var(--ink) / 0.12)",
     zIndex: 1000,
   };
 }
@@ -68,27 +81,31 @@ function header(): React.CSSProperties {
     alignItems: "center",
     justifyContent: "space-between",
     padding: "12px 14px",
-    borderBottom: '1px solid var(--color-divider)',
+    borderBottom: "1px solid hsl(var(--rule) / 0.12)",
   };
 }
 
 function headerTitle(): React.CSSProperties {
   return {
+    fontFamily: displayFont,
     fontSize: 14,
     fontWeight: 700,
     margin: 0,
+    letterSpacing: "-0.005em",
+    color: "hsl(var(--foreground))",
   };
 }
 
 function markAllBtn(): React.CSSProperties {
   return {
+    fontFamily: displayFont,
     fontSize: 11,
-    color: "#2563eb",
+    color: "hsl(var(--tomato))",
     background: "none",
     border: "none",
     cursor: "pointer",
     padding: 0,
-    fontWeight: 600,
+    fontWeight: 700,
   };
 }
 
@@ -96,7 +113,7 @@ function emptyState(): React.CSSProperties {
   return {
     padding: 24,
     textAlign: "center",
-    color: 'var(--color-text-secondary)',
+    color: "hsl(var(--muted-foreground))",
     fontSize: 13,
   };
 }
@@ -203,10 +220,10 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
         onClick={handleToggle}
         style={bellButton(unreadCount > 0)}
         onMouseEnter={(e) => {
-          e.currentTarget.style.background = "var(--color-surface-hover)";
+          e.currentTarget.style.background = "hsl(var(--muted))";
         }}
         onMouseLeave={(e) => {
-          e.currentTarget.style.background = "none";
+          e.currentTarget.style.background = "transparent";
         }}
         title="Notifications"
         aria-label={`Notifications${unreadCount > 0 ? ` (${unreadCount} unread)` : ""}`}
@@ -239,7 +256,7 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
                 style={markAllBtn()}
                 disabled={loading}
               >
-                {loading ? "..." : "Mark all as read"}
+                {loading ? "…" : "Mark all as read"}
               </button>
             )}
           </div>

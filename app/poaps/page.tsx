@@ -31,93 +31,56 @@ function formatDate(dateStr: string): string {
   });
 }
 
+/**
+ * POAPEventCard — capers-48272 (Phase 4e restyle)
+ * Single POAP row with circular thumbnail, title, date, expandable info.
+ * Tomato hover ring matches the rest of the collection cards.
+ */
 function POAPEventCard({ event }: { event: POAPEvent }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div
-      style={{
-        padding: 12,
-        background: 'var(--color-surface)',
-        borderRadius: 12,
-        border: '1px solid var(--color-border)',
-        transition: "all 0.2s ease",
-      }}
-      className="poap-card"
-    >
-      <div style={{ display: "flex", gap: 12, alignItems: "center" }}>
+    <div className="p-3 bg-card rounded-[var(--radius)] border border-rule hover:border-tomato hover:shadow-md transition-all duration-200">
+      <div className="flex gap-3 items-center">
         {/* POAP Image - links to gallery */}
         <a
           href={`https://poap.gallery/event/${event.id}`}
           target="_blank"
           rel="noopener noreferrer"
-          style={{
-            width: 56,
-            height: 56,
-            borderRadius: "50%",
-            overflow: "hidden",
-            flexShrink: 0,
-            background: "#f5f5f5",
-            display: "block",
-          }}
+          className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-muted block border border-rule"
         >
           {event.imageUrl ? (
             <img
               src={event.imageUrl}
               alt={event.name}
-              style={{
-                width: "100%",
-                height: "100%",
-                objectFit: "cover",
-              }}
+              className="w-full h-full object-cover"
             />
           ) : (
-            <div
-              style={{
-                width: "100%",
-                height: "100%",
-                display: "flex",
-                alignItems: "center",
-                justifyContent: "center",
-                color: 'var(--color-text-secondary)',
-                fontSize: 10,
-              }}
-            >
+            <div className="w-full h-full flex items-center justify-center text-muted-foreground text-[10px] italic">
               No Image
             </div>
           )}
         </a>
 
         {/* Event Details */}
-        <div style={{ flex: 1, minWidth: 0 }}>
+        <div className="flex-1 min-w-0">
           <a
             href={`https://poap.gallery/event/${event.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            style={{
-              margin: 0,
-              fontSize: 15,
-              fontWeight: 600,
-              color: 'var(--color-text-primary)',
-              textDecoration: "none",
-              display: "-webkit-box",
-              WebkitLineClamp: 2,
-              WebkitBoxOrient: "vertical",
-              overflow: "hidden",
-              lineHeight: 1.3,
-            }}
+            className="font-display text-base font-semibold text-foreground hover:text-tomato no-underline transition-colors line-clamp-2 leading-tight"
           >
             {event.name}
           </a>
 
-          <div
-            style={{
-              marginTop: 4,
-              fontSize: 13,
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            {event.startDate && <span>📅 {formatDate(event.startDate)}</span>}
+          <div className="mt-1 text-[13px] text-muted-foreground">
+            {event.startDate && <span>{formatDate(event.startDate)}</span>}
+            {event.city && (
+              <span className="ml-2">
+                · {event.city}
+                {event.country ? `, ${event.country}` : ""}
+              </span>
+            )}
           </div>
         </div>
 
@@ -125,20 +88,9 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
         {event.description && (
           <button
             onClick={() => setExpanded(!expanded)}
-            style={{
-              width: 36,
-              height: 36,
-              borderRadius: "50%",
-              border: '1px solid var(--color-border)',
-              background: expanded ? "#f0f0f0" : "white",
-              color: 'var(--color-text-secondary)',
-              fontSize: 16,
-              cursor: "pointer",
-              display: "flex",
-              alignItems: "center",
-              justifyContent: "center",
-              flexShrink: 0,
-            }}
+            className={`w-9 h-9 rounded-full border border-rule text-muted-foreground hover:border-tomato hover:text-tomato text-base cursor-pointer flex items-center justify-center flex-shrink-0 transition-colors font-display font-semibold ${
+              expanded ? "bg-muted" : "bg-background"
+            }`}
             aria-label={expanded ? "Hide description" : "Show description"}
           >
             {expanded ? "−" : "i"}
@@ -148,16 +100,7 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
 
       {/* Expanded description */}
       {expanded && event.description && (
-        <p
-          style={{
-            margin: "12px 0 0 0",
-            padding: "12px 0 0 0",
-            borderTop: '1px solid var(--color-divider)',
-            fontSize: 14,
-            color: "#555",
-            lineHeight: 1.5,
-          }}
-        >
+        <p className="mt-3 pt-3 border-t border-rule text-sm text-muted-foreground leading-relaxed">
           {event.description}
         </p>
       )}
@@ -201,74 +144,44 @@ export default function POAPsPage() {
   });
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: 'var(--color-page-bg)',
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 800, margin: "0 auto" }}>
+    <div className="min-h-screen bg-background text-foreground px-5 py-10">
+      <div className="max-w-3xl mx-auto">
         {/* Header */}
-        <div style={{ marginBottom: 24 }}>
+        <div className="mb-6">
           <Link
             href="/"
-            style={{
-              fontSize: 14,
-              color: 'var(--color-text-secondary)',
-              textDecoration: "none",
-              marginBottom: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              minHeight: 44,
-            }}
+            className="text-sm text-muted-foreground hover:text-tomato no-underline inline-flex items-center min-h-[44px] transition-colors"
           >
             ← Back to Home
           </Link>
-          <h1
-            style={{
-              margin: "8px 0 4px 0",
-              fontSize: 28,
-              fontWeight: 700,
-              color: 'var(--color-text-primary)',
-            }}
-          >
-            PizzaDAO POAPs
+          <h1 className="font-display mt-2 mb-1 text-4xl font-extrabold tracking-tight text-foreground">
+            POAPs
           </h1>
+          {!loading && data && (
+            <p className="m-0 text-sm text-muted-foreground">
+              {data.totalCount} whitelisted event{data.totalCount === 1 ? "" : "s"}
+            </p>
+          )}
         </div>
 
         {/* Search */}
-        <div style={{ marginBottom: 24 }}>
+        <div className="mb-6">
           <input
             type="text"
             placeholder="Search POAPs..."
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              fontSize: 14,
-              border: '1px solid var(--color-border)',
-              borderRadius: 8,
-              outline: "none",
-              background: 'var(--color-surface)',
-            }}
+            className="w-full px-4 py-3 text-sm rounded-[var(--radius)] border border-rule bg-card text-foreground outline-none focus:border-tomato focus:shadow-[0_0_0_3px_hsl(var(--tomato)/0.15)] transition-all"
           />
         </div>
 
         {/* Loading state */}
         {loading && (
-          <div style={{ display: "grid", gap: 12 }}>
+          <div className="grid gap-3">
             {[1, 2, 3, 4, 5].map((i) => (
               <div
                 key={i}
-                style={{
-                  height: 112,
-                  background: 'var(--color-surface)',
-                  borderRadius: 12,
-                  border: '1px solid var(--color-border)',
-                  animation: "pulse 1.5s infinite",
-                }}
+                className="h-[88px] rounded-[var(--radius)] border border-rule bg-card animate-pulse"
               />
             ))}
           </div>
@@ -276,31 +189,11 @@ export default function POAPsPage() {
 
         {/* Error state */}
         {!loading && error && (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              background: 'var(--color-surface)',
-              borderRadius: 12,
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <p style={{ fontSize: 16, color: "#c00", marginBottom: 16 }}>
-              {error}
-            </p>
+          <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
+            <p className="text-base text-destructive italic mb-4">{error}</p>
             <button
               onClick={() => window.location.reload()}
-              style={{
-                padding: "12px 20px",
-                minHeight: 44,
-                fontSize: 14,
-                fontWeight: 500,
-                color: 'var(--color-btn-primary-text)',
-                background: 'var(--color-btn-primary-bg)',
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
+              className="px-5 py-3 min-h-[44px] text-sm font-display font-semibold rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-tomato hover:text-cream border-0 cursor-pointer transition-colors"
             >
               Try Again
             </button>
@@ -311,23 +204,15 @@ export default function POAPsPage() {
         {!loading && !error && data && (
           <>
             {filteredEvents && filteredEvents.length === 0 ? (
-              <div
-                style={{
-                  padding: 40,
-                  textAlign: "center",
-                  background: 'var(--color-surface)',
-                  borderRadius: 12,
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <p style={{ fontSize: 16, color: 'var(--color-text-secondary)' }}>
+              <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
+                <p className="text-base text-muted-foreground italic">
                   {searchQuery
                     ? "No POAPs match your search."
                     : "No whitelisted POAPs found."}
                 </p>
               </div>
             ) : (
-              <div style={{ display: "grid", gap: 12 }}>
+              <div className="grid gap-3">
                 {filteredEvents?.map((event) => (
                   <POAPEventCard key={event.id} event={event} />
                 ))}
@@ -335,39 +220,13 @@ export default function POAPsPage() {
             )}
 
             {searchQuery && filteredEvents && filteredEvents.length > 0 && (
-              <p
-                style={{
-                  marginTop: 16,
-                  textAlign: "center",
-                  fontSize: 13,
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
+              <p className="mt-4 text-center text-[13px] text-muted-foreground italic">
                 Showing {filteredEvents.length} of {data.totalCount} POAPs
               </p>
             )}
           </>
         )}
       </div>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
-
-      <style jsx global>{`
-        .poap-card:hover {
-          border-color: rgba(234, 179, 8, 0.5) !important;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
-        }
-      `}</style>
     </div>
   );
 }

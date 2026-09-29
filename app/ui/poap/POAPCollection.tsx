@@ -8,6 +8,11 @@ interface POAPCollectionProps {
   memberId: string;
 }
 
+/**
+ * POAPCollection — capers-48272 (Phase 4e restyle)
+ * Inline POAP strip used on dashboard + profile pages. Links to /poaps and
+ * paints each POAP via POAPCard. Tokens consumed via Tailwind utilities.
+ */
 export function POAPCollection({ memberId }: POAPCollectionProps) {
   const [data, setData] = useState<POAPCollectionResponse | null>(null);
   const [fullData, setFullData] = useState<POAPCollectionResponse | null>(null);
@@ -92,7 +97,7 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
     <div className="mt-4">
       <a
         href="/poaps"
-        className="text-sm font-medium text-gray-500 hover:text-yellow-600 mb-2 inline-block transition-colors"
+        className="font-display text-sm font-semibold text-muted-foreground hover:text-tomato mb-2 inline-block transition-colors"
       >
         POAPs {data && `(${data.totalCount})`} →
       </a>
@@ -103,7 +108,7 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
           {Array.from({ length: 8 }).map((_, i) => (
             <div
               key={i}
-              className="w-10 h-10 rounded-full bg-gray-200 animate-pulse flex-shrink-0"
+              className="w-10 h-10 rounded-full bg-muted animate-pulse flex-shrink-0"
             />
           ))}
         </div>
@@ -119,10 +124,10 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
             {hasHidden && !expanded && (
               <button
                 onClick={handleExpand}
-                className="w-10 h-10 rounded-full border-2 border-dashed border-gray-300 hover:border-yellow-400 flex items-center justify-center bg-gray-50 hover:bg-yellow-50 flex-shrink-0 transition-colors cursor-pointer"
+                className="w-10 h-10 rounded-full border border-dashed border-rule hover:border-tomato flex items-center justify-center bg-muted hover:bg-tomato/10 flex-shrink-0 transition-colors cursor-pointer"
                 title={`Show ${hiddenCount} more POAPs`}
               >
-                <span className="text-xs font-bold text-gray-500">+{hiddenCount}</span>
+                <span className="text-xs font-bold text-muted-foreground font-display">+{hiddenCount}</span>
               </button>
             )}
 
@@ -130,7 +135,7 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
             {expanded && expandLoading && Array.from({ length: Math.min(hiddenCount, 12) }).map((_, i) => (
               <div
                 key={`shimmer-${i}`}
-                className="w-10 h-10 rounded-full bg-gray-200 animate-pulse flex-shrink-0"
+                className="w-10 h-10 rounded-full bg-muted animate-pulse flex-shrink-0"
               />
             ))}
 
@@ -148,10 +153,10 @@ export function POAPCollection({ memberId }: POAPCollectionProps) {
             {expanded && hasHidden && (
               <button
                 onClick={() => setExpanded(false)}
-                className="w-10 h-10 rounded-full border-2 border-gray-300 hover:border-gray-400 flex items-center justify-center bg-gray-100 hover:bg-gray-200 flex-shrink-0 transition-colors cursor-pointer"
+                className="w-10 h-10 rounded-full border border-rule hover:border-ink flex items-center justify-center bg-muted hover:bg-muted/80 flex-shrink-0 transition-colors cursor-pointer"
                 title="Show less"
               >
-                <span className="text-xs font-bold text-gray-500">−</span>
+                <span className="text-xs font-bold text-muted-foreground font-display">−</span>
               </button>
             )}
           </div>

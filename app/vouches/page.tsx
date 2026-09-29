@@ -3,13 +3,15 @@
 import { useEffect, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
-import { Inter } from "next/font/google";
 import { VouchCard } from "../ui/vouches/VouchCard";
-import { SocialAccountLinker } from "../ui/vouches/SocialAccountLinker";
-import { FarcasterDiscovery } from "../ui/vouches/FarcasterDiscovery";
 import { useMe, useVouches } from "../lib/hooks/use-api";
-
-const inter = Inter({ subsets: ["latin"] });
+import {
+  btn,
+  card,
+  input as inputStyle,
+  loadingSpinner,
+  pageContainer,
+} from "../ui/shared-styles";
 
 type VouchData = {
   memberId: string;
@@ -19,7 +21,8 @@ type VouchData = {
   source: "PIZZADAO" | "TWITTER" | "FARCASTER";
 };
 
-type FilterTab = "ALL" | "PIZZADAO" | "FARCASTER" | "TWITTER";
+const displayFont =
+  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export default function VouchesPage() {
   const router = useRouter();
@@ -27,45 +30,50 @@ export default function VouchesPage() {
   // --- React Query hooks ---
   const { data: meData, isLoading: meLoading, error: meError } = useMe();
   const memberId = meData?.memberId ?? null;
-  const { data: vouchesData, isLoading: vouchesLoading } = useVouches(memberId, { limit: 200 });
+  // Outbound: people I'm vouching for. Internal PIZZADAO only.
+  const { data: outboundData, isLoading: outboundLoading } = useVouches(
+    memberId,
+    { limit: 200, source: "PIZZADAO", direction: "out" },
+  );
+  // Inbound: people vouching for me. Internal PIZZADAO only.
+  const { data: inboundData, isLoading: inboundLoading } = useVouches(
+    memberId,
+    { limit: 200, source: "PIZZADAO", direction: "in" },
+  );
 
-  const loading = meLoading || (!!memberId && vouchesLoading);
+  const loading =
+    meLoading || (!!memberId && (outboundLoading || inboundLoading));
   const authError = meError
     ? "Please log in to view your vouches"
     : meData && !memberId
     ? "Could not find your member profile"
     : null;
 
-  // Local state for vouches/counts (mutated optimistically on remove)
-  const [vouches, setVouches] = useState<VouchData[]>([]);
+  // Local state — mutated optimistically on outbound remove.
+  const [outbound, setOutbound] = useState<VouchData[]>([]);
+  const [inbound, setInbound] = useState<VouchData[]>([]);
   const [counts, setCounts] = useState({
-    total: 0,
     pizzadao: 0,
-    farcaster: 0,
-    twitter: 0,
-    followers: 0,
+    pizzadaoFollowers: 0,
   });
 
-  // Sync hook data to local state
+  // Sync hook data to local state. Counts come from the outbound payload
+  // (the API returns the same counts shape regardless of direction).
   useEffect(() => {
-    if (vouchesData) {
-      setVouches(vouchesData.vouches || []);
-      setCounts(
-        vouchesData.counts || {
-          total: 0,
-          pizzadao: 0,
-          farcaster: 0,
-          twitter: 0,
-          followers: 0,
-        }
-      );
+    if (outboundData) {
+      setOutbound(outboundData.vouches || []);
+      setCounts({
+        pizzadao: outboundData.counts?.pizzadao ?? 0,
+        pizzadaoFollowers: outboundData.counts?.pizzadaoFollowers ?? 0,
+      });
     }
-  }, [vouchesData]);
+  }, [outboundData]);
+  useEffect(() => {
+    if (inboundData) setInbound(inboundData.vouches || []);
+  }, [inboundData]);
 
-  const [activeTab, setActiveTab] = useState<FilterTab>("ALL");
   const [searchQuery, setSearchQuery] = useState("");
   const [removingId, setRemovingId] = useState<string | null>(null);
-  const [hasFarcaster, setHasFarcaster] = useState(false);
 
   const handleRemove = async (targetMemberId: string) => {
     setRemovingId(targetMemberId);
@@ -78,12 +86,9 @@ export default function VouchesPage() {
       });
 
       if (res.ok) {
-        setVouches((prev) =>
-          prev.filter((v) => v.memberId !== targetMemberId)
-        );
+        setOutbound((prev) => prev.filter((v) => v.memberId !== targetMemberId));
         setCounts((prev) => ({
           ...prev,
-          total: Math.max(0, prev.total - 1),
           pizzadao: Math.max(0, prev.pizzadao - 1),
         }));
       }
@@ -94,46 +99,38 @@ export default function VouchesPage() {
     }
   };
 
-  // Filter vouches
-  const filteredVouches = vouches.filter((v) => {
-    if (activeTab !== "ALL" && v.source !== activeTab) return false;
-    if (searchQuery) {
-      const q = searchQuery.toLowerCase();
-      return (
-        v.name.toLowerCase().includes(q) ||
-        v.city.toLowerCase().includes(q) ||
-        v.crews.toLowerCase().includes(q)
-      );
-    }
-    return true;
-  });
+  const matchesSearch = (v: VouchData) => {
+    if (!searchQuery) return true;
+    const q = searchQuery.toLowerCase();
+    return (
+      v.name.toLowerCase().includes(q) ||
+      v.city.toLowerCase().includes(q) ||
+      v.crews.toLowerCase().includes(q)
+    );
+  };
+  const filteredOutbound = outbound.filter(matchesSearch);
+  const filteredInbound = inbound.filter(matchesSearch);
 
   if (loading) {
     return (
       <div
         style={{
-          minHeight: "100vh",
+          ...pageContainer(),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--color-page-bg)",
-          color: "var(--color-text)",
-          fontFamily: inter.style.fontFamily,
         }}
       >
         <div style={{ textAlign: "center" }}>
-          <div
+          <div style={loadingSpinner()} />
+          <p
             style={{
-              width: 50,
-              height: 50,
-              border: "4px solid var(--color-spinner-track)",
-              borderTop: "4px solid var(--color-spinner-active)",
-              borderRadius: "50%",
-              animation: "spin 1s linear infinite",
-              margin: "0 auto 20px",
+              fontSize: 18,
+              color: "hsl(var(--muted-foreground))",
             }}
-          />
-          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading vouches...</p>
+          >
+            Loading vouches…
+          </p>
           <style jsx>{`
             @keyframes spin {
               0% {
@@ -153,22 +150,33 @@ export default function VouchesPage() {
     return (
       <div
         style={{
-          minHeight: "100vh",
+          ...pageContainer(),
           display: "flex",
           alignItems: "center",
           justifyContent: "center",
-          background: "var(--color-page-bg)",
-          color: "var(--color-text)",
-          fontFamily: inter.style.fontFamily,
-          padding: 20,
         }}
       >
-        <div style={cardStyle()}>
-          <h1 style={{ fontSize: 24, marginBottom: 16 }}>
+        <div style={card()}>
+          <h1
+            style={{
+              fontFamily: displayFont,
+              fontSize: 32,
+              fontWeight: 800,
+              margin: 0,
+              letterSpacing: "-0.01em",
+            }}
+          >
             Vouches
           </h1>
-          <p style={{ opacity: 0.7, marginBottom: 32 }}>{authError}</p>
-          <Link href="/" style={btnStyle("primary")}>
+          <p
+            style={{
+              color: "hsl(var(--muted-foreground))",
+              margin: 0,
+            }}
+          >
+            {authError}
+          </p>
+          <Link href="/" style={btn("primary")}>
             Back to Home
           </Link>
         </div>
@@ -176,23 +184,94 @@ export default function VouchesPage() {
     );
   }
 
-  const tabs: { id: FilterTab; label: string; count: number }[] = [
-    { id: "ALL", label: "All", count: counts.total },
-    { id: "PIZZADAO", label: "PizzaDAO", count: counts.pizzadao },
-    { id: "FARCASTER", label: "Farcaster", count: counts.farcaster },
-    { id: "TWITTER", label: "X", count: counts.twitter },
-  ];
-
-  return (
-    <div
+  const sectionHeading = (label: string, count: number) => (
+    <h2
       style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        color: "var(--color-text)",
-        fontFamily: inter.style.fontFamily,
-        padding: "40px 20px",
+        margin: "0 0 8px",
+        fontFamily: displayFont,
+        fontSize: 20,
+        fontWeight: 800,
+        letterSpacing: "-0.01em",
+        color: "hsl(var(--foreground))",
       }}
     >
+      {label}
+      <span
+        style={{
+          marginLeft: 8,
+          fontSize: 16,
+          fontWeight: 700,
+          color: "hsl(var(--muted-foreground))",
+          fontVariantNumeric: "tabular-nums",
+        }}
+      >
+        {count}
+      </span>
+    </h2>
+  );
+
+  const emptyState = (msg: string, sub?: string) => (
+    <div
+      style={{
+        padding: 32,
+        borderRadius: "var(--radius)",
+        border: "1px dashed hsl(var(--rule) / 0.22)",
+        background: "hsl(var(--card))",
+        textAlign: "center",
+      }}
+    >
+      <p
+        style={{
+          fontFamily: displayFont,
+          fontSize: 16,
+          fontWeight: 700,
+          margin: 0,
+          color: "hsl(var(--foreground))",
+        }}
+      >
+        {msg}
+      </p>
+      {sub && (
+        <p
+          style={{
+            fontSize: 14,
+            color: "hsl(var(--muted-foreground))",
+            margin: "6px 0 0",
+          }}
+        >
+          {sub}
+        </p>
+      )}
+    </div>
+  );
+
+  const grid = (items: VouchData[], showRemove: boolean) => (
+    <div
+      style={{
+        display: "grid",
+        // sicilian-41551: floor lowered + `min(…, 100%)` so a 320px viewport
+        // can't force the cards to overflow horizontally.
+        gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))",
+        gap: 12,
+      }}
+    >
+      {items.map((v) => (
+        <VouchCard
+          key={v.memberId}
+          memberId={v.memberId}
+          name={v.name}
+          city={v.city}
+          crews={v.crews}
+          source={v.source}
+          isOwnList={showRemove}
+          onRemove={showRemove ? handleRemove : undefined}
+        />
+      ))}
+    </div>
+  );
+
+  return (
+    <div style={pageContainer()}>
       <div
         style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}
       >
@@ -204,9 +283,9 @@ export default function VouchesPage() {
               background: "transparent",
               border: "none",
               cursor: "pointer",
-              fontSize: 16,
+              fontSize: 15,
               fontWeight: 600,
-              color: "var(--color-text-secondary)",
+              color: "hsl(var(--muted-foreground))",
               padding: 0,
               fontFamily: "inherit",
             }}
@@ -220,9 +299,13 @@ export default function VouchesPage() {
           <h1
             style={{
               marginTop: 0,
-              fontSize: 32,
+              fontFamily: displayFont,
+              // sicilian-41551: scale 32→44 across viewport widths.
+              fontSize: "clamp(2rem, 7vw, 2.75rem)",
               marginBottom: 8,
               fontWeight: 800,
+              letterSpacing: "-0.01em",
+              textWrap: "balance",
             }}
           >
             Vouches
@@ -230,174 +313,58 @@ export default function VouchesPage() {
           <p
             style={{
               fontSize: 16,
-              color: "var(--color-text-secondary)",
+              color: "hsl(var(--muted-foreground))",
               margin: 0,
             }}
           >
-            {counts.total} vouching for &middot; {counts.followers} vouchers
+            {counts.pizzadao} vouching for · {counts.pizzadaoFollowers} vouchers
           </p>
         </header>
-
-        {/* Social Account Linking */}
-        {memberId && (
-          <div style={cardStyle()}>
-            <SocialAccountLinker
-              memberId={memberId}
-              onAccountChange={(accounts) => {
-                setHasFarcaster(
-                  accounts.some((a) => a.platform === "FARCASTER")
-                );
-              }}
-            />
-          </div>
-        )}
-
-        {/* Farcaster Discovery */}
-        {memberId && hasFarcaster && (
-          <div style={cardStyle()}>
-            <FarcasterDiscovery currentMemberId={memberId} />
-          </div>
-        )}
-
-        {/* Filter Tabs */}
-        <div
-          style={{
-            display: "flex",
-            gap: 4,
-            padding: 4,
-            borderRadius: 12,
-            background: "var(--color-surface)",
-            border: "1px solid var(--color-border)",
-          }}
-        >
-          {tabs.map((tab) => (
-            <button
-              key={tab.id}
-              onClick={() => setActiveTab(tab.id)}
-              style={{
-                flex: 1,
-                padding: "8px 12px",
-                borderRadius: 8,
-                border: "none",
-                background:
-                  activeTab === tab.id
-                    ? "var(--color-btn-primary-bg)"
-                    : "transparent",
-                color:
-                  activeTab === tab.id
-                    ? "var(--color-btn-primary-text)"
-                    : "var(--color-text-secondary)",
-                fontSize: 13,
-                fontWeight: 650,
-                cursor: "pointer",
-                fontFamily: "inherit",
-                transition: "all 0.15s",
-              }}
-            >
-              {tab.label}
-              {tab.count > 0 && (
-                <span style={{ marginLeft: 4, opacity: 0.7 }}>
-                  {tab.count}
-                </span>
-              )}
-            </button>
-          ))}
-        </div>
 
         {/* Search */}
         <input
           type="text"
           value={searchQuery}
           onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search vouches by name, city, or crew..."
-          style={{
-            width: "100%",
-            padding: "12px 16px",
-            borderRadius: 12,
-            border: "1px solid var(--color-input-border)",
-            fontSize: 14,
-            outline: "none",
-            boxSizing: "border-box",
-            background: "var(--color-input-bg)",
-            color: "var(--color-input-text)",
-            fontFamily: "inherit",
-          }}
+          placeholder="Search vouches by name, city, or crew…"
+          style={inputStyle()}
         />
 
-        {/* Vouches Grid */}
-        {filteredVouches.length > 0 ? (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(280px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {filteredVouches.map((v) => (
-              <VouchCard
-                key={v.memberId}
-                memberId={v.memberId}
-                name={v.name}
-                city={v.city}
-                crews={v.crews}
-                source={v.source}
-                isOwnList={true}
-                onRemove={handleRemove}
-              />
-            ))}
-          </div>
-        ) : (
-          <div
-            style={{
-              padding: 40,
-              borderRadius: 14,
-              border: "1px dashed var(--color-border)",
-              textAlign: "center",
-            }}
-          >
-            {vouches.length === 0 ? (
-              <>
-                <p
-                  style={{
-                    fontSize: 18,
-                    fontWeight: 600,
-                    marginBottom: 8,
-                    color: "var(--color-text-primary)",
-                  }}
-                >
-                  No vouches yet
-                </p>
-                <p
-                  style={{
-                    fontSize: 14,
-                    color: "var(--color-text-muted)",
-                    marginBottom: 16,
-                  }}
-                >
-                  Visit member profiles to vouch for them, or link your social
-                  accounts to discover vouches.
-                </p>
-              </>
-            ) : (
-              <p
-                style={{
-                  fontSize: 14,
-                  color: "var(--color-text-muted)",
-                }}
-              >
-                No vouches match your search.
-              </p>
-            )}
-          </div>
-        )}
+        {/* Vouching for you (inbound) */}
+        <section>
+          {sectionHeading("Vouching for you", counts.pizzadaoFollowers)}
+          {filteredInbound.length > 0
+            ? grid(filteredInbound, false)
+            : inbound.length === 0
+            ? emptyState(
+                "Nobody has vouched for you yet",
+                "Build your reputation — ask a few members to vouch for you on their profile.",
+              )
+            : emptyState("No vouchers match your search.")}
+        </section>
+
+        {/* You vouch for (outbound) */}
+        <section>
+          {sectionHeading("You vouch for", counts.pizzadao)}
+          {filteredOutbound.length > 0
+            ? grid(filteredOutbound, true)
+            : outbound.length === 0
+            ? emptyState(
+                "You haven't vouched for anyone yet",
+                "Visit a member profile and tap “+ Vouch” to add one.",
+              )
+            : emptyState("No vouches match your search.")}
+        </section>
 
         {/* Footer */}
         <div
           style={{
             textAlign: "center",
             marginTop: 40,
-            opacity: 0.4,
+            color: "hsl(var(--muted-foreground))",
+            fontFamily: displayFont,
             fontSize: 13,
+            opacity: 0.6,
           }}
         >
           PizzaDAO
@@ -405,42 +372,4 @@ export default function VouchesPage() {
       </div>
     </div>
   );
-}
-
-function cardStyle(): React.CSSProperties {
-  return {
-    border: "1px solid var(--color-border)",
-    borderRadius: 14,
-    padding: 24,
-    boxShadow: "var(--shadow-card)",
-    background: "var(--color-surface)",
-    display: "grid",
-    gap: 14,
-  };
-}
-
-function btnStyle(kind: "primary" | "secondary"): React.CSSProperties {
-  const base: React.CSSProperties = {
-    display: "inline-block",
-    padding: "10px 16px",
-    borderRadius: 10,
-    border: "1px solid var(--color-border-strong)",
-    fontWeight: 650,
-    cursor: "pointer",
-    textDecoration: "none",
-    textAlign: "center",
-    fontFamily: "inherit",
-  };
-  if (kind === "primary")
-    return {
-      ...base,
-      background: "var(--color-btn-primary-bg)",
-      color: "var(--color-btn-primary-text)",
-      borderColor: "var(--color-btn-primary-border)",
-    };
-  return {
-    ...base,
-    background: "var(--color-surface)",
-    color: "var(--color-text)",
-  };
 }

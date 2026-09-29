@@ -152,6 +152,25 @@ async function safeParseJson<T>(response: Response, fallback: T): Promise<T> {
 }
 
 /**
+ * Retry a fetch without the Authorization header when the token causes a 403.
+ * Public endpoints work unauthenticated (60 req/hr) so this is a safe fallback.
+ */
+async function fetchWithTokenFallback(url: string, headers: HeadersInit): Promise<Response> {
+  const response = await fetch(url, { headers })
+
+  if (response.status === 403 && process.env.GITHUB_TOKEN) {
+    const rateLimitRemaining = response.headers.get('x-ratelimit-remaining')
+    if (rateLimitRemaining !== '0') {
+      console.warn('[GitHub API] 403 with token — retrying without auth (token may be invalid)')
+      const { Authorization: _, ...headersWithoutAuth } = headers as Record<string, string>
+      return fetch(url, { headers: headersWithoutAuth })
+    }
+  }
+
+  return response
+}
+
+/**
  * Fetch all public repositories from PizzaDAO organization
  */
 export async function fetchPizzaDAORepos(): Promise<GitHubRepo[]> {
@@ -159,7 +178,7 @@ export async function fetchPizzaDAORepos(): Promise<GitHubRepo[]> {
   console.log('[GitHub API] Fetching repos from:', url)
   console.log('[GitHub API] Token configured:', !!process.env.GITHUB_TOKEN)
 
-  const response = await fetch(url, { headers: getHeaders() })
+  const response = await fetchWithTokenFallback(url, getHeaders())
 
   console.log('[GitHub API] Response status:', response.status, response.statusText)
 
@@ -183,15 +202,9 @@ export async function fetchRepoDetails(slug: string, vercelProject?: string): Pr
 
   // Fetch all details in parallel
   const [prsResponse, contributorsResponse, commitsResponse] = await Promise.all([
-    fetch(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/pulls?state=open&per_page=10`, {
-      headers,
-    }),
-    fetch(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/contributors?per_page=10`, {
-      headers,
-    }),
-    fetch(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/commits?per_page=10`, {
-      headers,
-    }),
+    fetchWithTokenFallback(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/pulls?state=open&per_page=10`, headers),
+    fetchWithTokenFallback(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/contributors?per_page=10`, headers),
+    fetchWithTokenFallback(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/commits?per_page=10`, headers),
   ])
 
   const prs = await safeParseJson<GitHubPullRequest[]>(prsResponse, [])
@@ -247,9 +260,9 @@ export async function fetchRepoDetails(slug: string, vercelProject?: string): Pr
  * Fetch open issues for a repository (excluding PRs)
  */
 export async function fetchRepoIssues(slug: string): Promise<Issue[]> {
-  const response = await fetch(
+  const response = await fetchWithTokenFallback(
     `${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/issues?state=open&per_page=100`,
-    { headers: getHeaders() }
+    getHeaders()
   )
   const issues = await handleGitHubResponse<GitHubIssue[]>(response, `issues for ${slug}`)
 
@@ -276,9 +289,9 @@ export async function fetchProjectDetail(
   config?: ProjectConfig
 ): Promise<ProjectDetail | null> {
   // Fetch repo info
-  const response = await fetch(
+  const response = await fetchWithTokenFallback(
     `${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}`,
-    { headers: getHeaders() }
+    getHeaders()
   )
   if (!response.ok) return null
 
@@ -289,9 +302,7 @@ export async function fetchProjectDetail(
   const [details, issues, allPRsResponse] = await Promise.all([
     fetchRepoDetails(slug, config?.vercelProject),
     fetchRepoIssues(slug),
-    fetch(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/pulls?state=open&per_page=100`, {
-      headers: getHeaders(),
-    }),
+    fetchWithTokenFallback(`${GITHUB_API_BASE}/repos/${ORG_NAME}/${slug}/pulls?state=open&per_page=100`, getHeaders()),
   ])
 
   const allPRsData = await safeParseJson<GitHubPullRequest[]>(allPRsResponse, [])

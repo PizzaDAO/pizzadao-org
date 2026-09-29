@@ -116,7 +116,7 @@ export async function sendWelcomeMessage(opts: {
         }
 
         const { discordId, memberId, city, topping, mafiaMovie, mediaType, turtles, crews, isNewSignup = true } = opts;
-        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://pizzadao.org";
+        const baseUrl = process.env.NEXT_PUBLIC_BASE_URL || "https://app.pizzadao.org";
         const profileUrl = `${baseUrl}/profile/${memberId}`;
 
         // Build the message with different greeting for new vs returning members

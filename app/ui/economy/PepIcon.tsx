@@ -1,5 +1,12 @@
 "use client";
 
+// app/ui/economy/PepIcon.tsx
+//
+// anchovy-67435 (Restyle Phase 4d): PepIcon is a raster (PNG) Next.js
+// <Image>, so there are no fills to theme via currentColor. Kept unchanged
+// functionally; this comment is for traceability with the Phase 4d PR.
+// See plans/site-restyle-pizzadao-org.md.
+
 import React from "react";
 import Image from "next/image";
 

@@ -35,6 +35,11 @@ function formatTimestamp(ts: number): string {
   return date.toLocaleString();
 }
 
+/**
+ * NFTsPage — capers-48272 (Phase 4e restyle)
+ * Cream-on-cream collections gallery with Asap Condensed h1.
+ * Refresh button uses the secondary outline style; cards use shared `card()`.
+ */
 export default function NFTsPage() {
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
@@ -62,7 +67,8 @@ export default function NFTsPage() {
       await fetch("/api/nfts/leaderboard/refresh", { method: "POST" });
       // Fetch fresh data
       await fetchData();
-    } catch (err) {
+    } catch {
+      // ignore — error state will surface on next fetch
     } finally {
       setRefreshing(false);
     }
@@ -73,61 +79,37 @@ export default function NFTsPage() {
   }, []);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: 'var(--color-page-bg)',
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
+    <div className="min-h-screen bg-background text-foreground px-5 py-10">
+      <div className="max-w-6xl mx-auto">
         {/* Header */}
-        <div
-          style={{
-            display: "flex",
-            justifyContent: "space-between",
-            alignItems: "flex-start",
-            marginBottom: 32,
-            flexWrap: "wrap",
-            gap: 16,
-          }}
-        >
+        <div className="flex justify-between items-start mb-8 flex-wrap gap-4">
           <div>
             <Link
               href="/"
-              style={{
-                fontSize: 14,
-                color: 'var(--color-text-secondary)',
-                textDecoration: "none",
-                marginBottom: 8,
-                display: "inline-flex",
-                alignItems: "center",
-                minHeight: 44,
-              }}
+              className="text-sm text-muted-foreground hover:text-tomato no-underline inline-flex items-center min-h-[44px] transition-colors"
             >
               &larr; Back to Home
             </Link>
-            <h1
-              style={{
-                margin: "8px 0 4px 0",
-                fontSize: 28,
-                fontWeight: 700,
-                color: 'var(--color-text-primary)',
-              }}
-            >
-              PizzaDAO NFTs
+            <h1 className="font-display mt-2 mb-1 text-4xl font-extrabold tracking-tight text-foreground">
+              NFTs
             </h1>
+            {!loading && data && data.memberCount !== undefined && (
+              <p className="m-0 text-sm text-muted-foreground">
+                Scanning {data.memberCount} member wallet{data.memberCount === 1 ? "" : "s"}
+                {data.collections.length > 0 && (
+                  <>
+                    {" · "}
+                    {data.collections.length} collection
+                    {data.collections.length === 1 ? "" : "s"}
+                  </>
+                )}
+              </p>
+            )}
           </div>
 
-          <div style={{ textAlign: "right" }}>
+          <div className="text-right">
             {data?.lastUpdated && (
-              <p
-                style={{
-                  margin: "0 0 8px 0",
-                  fontSize: 12,
-                  color: 'var(--color-text-secondary)',
-                }}
-              >
+              <p className="m-0 mb-2 text-xs text-muted-foreground italic">
                 Last updated: {formatTimestamp(data.lastUpdated)}
                 {data.cached && " (cached)"}
               </p>
@@ -135,17 +117,11 @@ export default function NFTsPage() {
             <button
               onClick={handleRefresh}
               disabled={refreshing || loading}
-              style={{
-                padding: "10px 16px",
-                minHeight: 44,
-                fontSize: 14,
-                fontWeight: 500,
-                color: refreshing ? "#999" : "#333",
-                background: 'var(--color-surface)',
-                border: '1px solid var(--color-border)',
-                borderRadius: 8,
-                cursor: refreshing || loading ? "not-allowed" : "pointer",
-              }}
+              className={`px-4 py-3 min-h-[44px] text-sm font-display font-semibold rounded-[var(--radius)] border border-rule bg-card text-foreground hover:bg-muted transition-colors ${
+                refreshing || loading
+                  ? "opacity-50 cursor-not-allowed"
+                  : "cursor-pointer"
+              }`}
             >
               {refreshing ? "Refreshing..." : "Refresh Data"}
             </button>
@@ -154,17 +130,11 @@ export default function NFTsPage() {
 
         {/* Loading state */}
         {loading && (
-          <div style={{ display: "grid", gap: 24 }}>
+          <div className="grid gap-6">
             {[1, 2, 3].map((i) => (
               <div
                 key={i}
-                style={{
-                  height: 300,
-                  background: 'var(--color-surface)',
-                  borderRadius: 14,
-                  border: '1px solid var(--color-border)',
-                  animation: "pulse 1.5s infinite",
-                }}
+                className="h-[300px] rounded-[var(--radius)] border border-rule bg-card animate-pulse"
               />
             ))}
           </div>
@@ -172,31 +142,11 @@ export default function NFTsPage() {
 
         {/* Error state */}
         {!loading && error && (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              background: 'var(--color-surface)',
-              borderRadius: 14,
-              border: '1px solid var(--color-border)',
-            }}
-          >
-            <p style={{ fontSize: 16, color: "#c00", marginBottom: 16 }}>
-              {error}
-            </p>
+          <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
+            <p className="text-base text-destructive italic mb-4">{error}</p>
             <button
               onClick={fetchData}
-              style={{
-                padding: "12px 20px",
-                minHeight: 44,
-                fontSize: 14,
-                fontWeight: 500,
-                color: 'var(--color-btn-primary-text)',
-                background: 'var(--color-btn-primary-bg)',
-                border: "none",
-                borderRadius: 8,
-                cursor: "pointer",
-              }}
+              className="px-5 py-3 min-h-[44px] text-sm font-display font-semibold rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-tomato hover:text-cream border-0 cursor-pointer transition-colors"
             >
               Try Again
             </button>
@@ -207,26 +157,18 @@ export default function NFTsPage() {
         {!loading && !error && data && (
           <>
             {data.collections.length === 0 ? (
-              <div
-                style={{
-                  padding: 40,
-                  textAlign: "center",
-                  background: 'var(--color-surface)',
-                  borderRadius: 14,
-                  border: '1px solid var(--color-border)',
-                }}
-              >
-                <p style={{ fontSize: 16, color: 'var(--color-text-secondary)' }}>
+              <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
+                <p className="text-base text-muted-foreground italic">
                   No collections with member holders found.
                 </p>
-                <p style={{ fontSize: 14, color: 'var(--color-text-secondary)', marginTop: 8 }}>
+                <p className="mt-2 text-sm text-muted-foreground italic">
                   {data.memberCount === 0
                     ? "No members have connected wallets yet."
                     : "Members may not hold any of the tracked collections."}
                 </p>
               </div>
             ) : (
-              <div style={{ display: "grid", gap: 24 }}>
+              <div className="grid gap-6">
                 {data.collections.map((collection) => (
                   <CollectionCard
                     key={collection.contractAddress}
@@ -243,33 +185,7 @@ export default function NFTsPage() {
             )}
           </>
         )}
-
-        {/* Footer info */}
-        {!loading && data && data.memberCount !== undefined && (
-          <p
-            style={{
-              marginTop: 32,
-              textAlign: "center",
-              fontSize: 12,
-              color: 'var(--color-text-secondary)',
-            }}
-          >
-            Scanning {data.memberCount} member wallets
-          </p>
-        )}
       </div>
-
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
     </div>
   );
 }

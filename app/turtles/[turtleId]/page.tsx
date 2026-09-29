@@ -4,6 +4,13 @@ import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
 import { TURTLES } from '@/app/ui/constants'
+import {
+  btn,
+  card,
+  loadingSpinner,
+  navBtn,
+  pageContainer,
+} from '@/app/ui/shared-styles'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -90,19 +97,11 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-page-bg)',
+        background: 'hsl(var(--background))',
         fontFamily: inter.style.fontFamily,
       }}>
         <div style={{ textAlign: 'center' }}>
-          <div style={{
-            width: 50,
-            height: 50,
-            border: '4px solid var(--color-spinner-track)',
-            borderTop: '4px solid var(--color-spinner-active)',
-            borderRadius: '50%',
-            animation: 'spin 1s linear infinite',
-            margin: '0 auto 20px',
-          }} />
+          <div style={loadingSpinner()} />
           <p style={{ fontSize: 18, opacity: 0.8 }}>Loading turtle members...</p>
           <style jsx>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
         </div>
@@ -117,12 +116,21 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
-        background: 'var(--color-page-bg)',
+        background: 'hsl(var(--background))',
+        color: 'hsl(var(--foreground))',
         fontFamily: inter.style.fontFamily,
         padding: 20,
       }}>
         <div style={card()}>
-          <h1 style={{ fontSize: 24, marginBottom: 16 }}>Turtle Not Found</h1>
+          <h1
+            style={{
+              fontSize: 24,
+              marginBottom: 16,
+              textWrap: 'balance',
+            } as React.CSSProperties}
+          >
+            Turtle Not Found
+          </h1>
           <p style={{ opacity: 0.7, marginBottom: 32 }}>{error || 'Could not load turtle data'}</p>
           <Link href="/turtles" style={btn('primary')}>Back to Turtles</Link>
         </div>
@@ -133,13 +141,7 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
   const { turtle, members } = data
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'var(--color-page-bg)',
-      color: 'var(--color-text)',
-      fontFamily: inter.style.fontFamily,
-      padding: '40px 20px',
-    }}>
+    <div style={pageContainer(inter.style.fontFamily)}>
       <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -164,7 +166,14 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
               display: 'block',
             }}
           />
-          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>
+          <h1
+            style={{
+              fontSize: 36,
+              fontWeight: 800,
+              margin: 0,
+              textWrap: 'balance',
+            } as React.CSSProperties}
+          >
             {turtle.label}
           </h1>
           <p style={{ fontSize: 18, opacity: 0.6, marginTop: 8 }}>
@@ -175,8 +184,8 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
             marginTop: 12,
             padding: '6px 16px',
             borderRadius: 20,
-            background: 'rgba(255,77,77,0.1)',
-            color: '#ff4d4d',
+            background: 'hsl(var(--tomato) / 0.1)',
+            color: 'hsl(var(--tomato))',
             fontSize: 14,
             fontWeight: 600,
           }}>
@@ -206,7 +215,7 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
                         objectFit: 'cover',
                         objectPosition: 'top',
                         flexShrink: 0,
-                        border: '2px solid #fafafa',
+                        border: '2px solid hsl(var(--background))',
                       }}
                       onError={(e) => {
                         (e.target as HTMLImageElement).style.display = 'none'
@@ -217,7 +226,7 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
                       width: 44,
                       height: 44,
                       borderRadius: '50%',
-                      background: 'rgba(0,0,0,0.06)',
+                      background: 'hsl(var(--ink) / 0.06)',
                       display: 'flex',
                       alignItems: 'center',
                       justifyContent: 'center',
@@ -237,6 +246,7 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
                           fontSize: 16,
                           color: 'inherit',
                           textDecoration: 'none',
+                          transition: 'color 200ms ease-out',
                         }}
                         onMouseEnter={(e) => e.currentTarget.style.textDecoration = 'underline'}
                         onMouseLeave={(e) => e.currentTarget.style.textDecoration = 'none'}
@@ -310,65 +320,24 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
   )
 }
 
-// Styles
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 24,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  }
-}
-
-function navBtn(): React.CSSProperties {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 14px',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border-strong)',
-    borderRadius: 8,
-    color: 'var(--color-text)',
-    textDecoration: 'none',
-    fontSize: 14,
-    fontWeight: 600,
-  }
-}
-
-function btn(kind: 'primary' | 'secondary'): React.CSSProperties {
-  const base: React.CSSProperties = {
-    display: 'inline-block',
-    padding: '10px 16px',
-    borderRadius: 10,
-    border: '1px solid var(--color-border-strong)',
-    fontWeight: 650,
-    cursor: 'pointer',
-    textDecoration: 'none',
-    textAlign: 'center',
-  }
-  if (kind === 'primary') return { ...base, background: 'var(--color-btn-primary-bg)', color: 'var(--color-btn-primary-text)', borderColor: 'var(--color-btn-primary-border)' }
-  return { ...base, background: 'var(--color-surface)', color: 'var(--color-text)' }
-}
-
 function memberCard(): React.CSSProperties {
   return {
     padding: 14,
-    borderRadius: 10,
-    border: '1px solid var(--color-border)',
-    background: 'var(--color-surface)',
+    borderRadius: 'var(--radius)',
+    border: '1px solid hsl(var(--rule) / 0.12)',
+    background: 'hsl(var(--card))',
+    color: 'hsl(var(--card-foreground))',
   }
 }
 
 function statusBadge(status: string): React.CSSProperties {
   const lower = status.toLowerCase()
-  let bg = 'rgba(0,0,0,0.1)'
-  let color = '#333'
+  let bg = 'hsl(var(--ink) / 0.08)'
+  let color = 'hsl(var(--foreground))'
 
   if (lower.includes('lead') || lower.includes('capo')) {
-    bg = 'rgba(255,77,77,0.15)'
-    color = '#d32f2f'
+    bg = 'hsl(var(--tomato) / 0.15)'
+    color = 'hsl(var(--tomato))'
   } else if (lower.includes('hot') || lower.includes('active') || lower.includes('daily')) {
     bg = 'rgba(76,175,80,0.15)'
     color = '#2e7d32'
@@ -376,8 +345,8 @@ function statusBadge(status: string): React.CSSProperties {
     bg = 'rgba(33,150,243,0.15)'
     color = '#1565c0'
   } else if (lower.includes('cool') || lower.includes('cold')) {
-    bg = 'rgba(158,158,158,0.15)'
-    color = '#757575'
+    bg = 'hsl(var(--ink) / 0.08)'
+    color = 'hsl(var(--muted-foreground))'
   }
 
   return {

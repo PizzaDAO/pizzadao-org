@@ -48,25 +48,25 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
       style={{
         display: "block",
         padding: 16,
-        background: 'var(--color-surface)',
-        borderRadius: 12,
-        border: '1px solid var(--color-border)',
+        background: 'hsl(var(--card))',
+        borderRadius: 'var(--radius)',
+        border: '1px solid hsl(var(--rule) / 0.12)',
         textDecoration: "none",
         color: "inherit",
-        transition: "all 0.2s ease",
+        transition: "border-color 200ms ease-out, box-shadow 200ms ease-out",
       }}
       className="manual-card"
     >
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
         <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'var(--color-text-primary)' }}>
+          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'hsl(var(--foreground))' }}>
             {manual.title}
           </h3>
-          <div style={{ marginTop: 6, fontSize: 13, color: 'var(--color-text-secondary)' }}>
+          <div style={{ marginTop: 6, fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>
             {manual.crew && (
               <Link
                 href={`/crew/${manual.crewId}`}
-                style={{ marginRight: 12, color: "#2563eb", textDecoration: "none" }}
+                style={{ marginRight: 12, color: "hsl(var(--tomato))", textDecoration: "none" }}
                 onClick={(e) => e.stopPropagation()}
               >
                 {manual.crew}
@@ -77,7 +77,7 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
                 by{" "}
                 <Link
                   href={`/profile/${manual.authorId}`}
-                  style={{ color: "#2563eb", textDecoration: "none" }}
+                  style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
                   onClick={(e) => e.stopPropagation()}
                 >
                   {manual.author}
@@ -87,7 +87,7 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
             {manual.author && !manual.authorId && <span>by {manual.author}</span>}
           </div>
           {manual.lastUpdated && (
-            <div style={{ marginTop: 4, fontSize: 12, color: 'var(--color-text-secondary)' }}>
+            <div style={{ marginTop: 4, fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>
               Updated: {manual.lastUpdated}
             </div>
           )}
@@ -169,7 +169,8 @@ export default function ManualsPage() {
     <div
       style={{
         minHeight: "100vh",
-        background: 'var(--color-page-bg)',
+        background: 'hsl(var(--background))',
+        color: 'hsl(var(--foreground))',
         padding: "40px 20px",
       }}
     >
@@ -180,12 +181,13 @@ export default function ManualsPage() {
             href="/"
             style={{
               fontSize: 14,
-              color: 'var(--color-text-secondary)',
+              color: 'hsl(var(--muted-foreground))',
               textDecoration: "none",
               marginBottom: 8,
               display: "inline-flex",
               alignItems: "center",
               minHeight: 44,
+              transition: "color 200ms ease-out",
             }}
           >
             ← Back to Home
@@ -195,12 +197,13 @@ export default function ManualsPage() {
               margin: "8px 0 4px 0",
               fontSize: 28,
               fontWeight: 700,
-              color: 'var(--color-text-primary)',
-            }}
+              color: 'hsl(var(--foreground))',
+              textWrap: 'balance',
+            } as React.CSSProperties}
           >
             PizzaDAO Manuals
           </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'var(--color-text-secondary)' }}>
+          <p style={{ margin: 0, fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>
             Operating manuals and documentation for PizzaDAO crews
           </p>
         </div>
@@ -216,10 +219,11 @@ export default function ManualsPage() {
               width: "100%",
               padding: "12px 16px",
               fontSize: 14,
-              border: '1px solid var(--color-border)',
-              borderRadius: 8,
+              border: '1px solid hsl(var(--rule) / 0.22)',
+              borderRadius: 'var(--radius)',
               outline: "none",
-              background: 'var(--color-surface)',
+              background: 'hsl(var(--background))',
+              color: 'hsl(var(--foreground))',
             }}
           />
           <div style={{ display: "flex", gap: 12 }}>
@@ -230,10 +234,11 @@ export default function ManualsPage() {
                 flex: 1,
                 padding: "10px 28px 10px 12px",
                 fontSize: 14,
-                border: '1px solid var(--color-border)',
-                borderRadius: 8,
+                border: '1px solid hsl(var(--rule) / 0.22)',
+                borderRadius: 'var(--radius)',
                 outline: "none",
-                background: 'var(--color-surface)',
+                background: 'hsl(var(--background))',
+                color: 'hsl(var(--foreground))',
                 cursor: "pointer",
                 appearance: "none",
                 backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
@@ -257,16 +262,18 @@ export default function ManualsPage() {
                   width: "100%",
                   padding: "10px 28px 10px 12px",
                   fontSize: 14,
-                  border: '1px solid var(--color-border)',
-                  borderRadius: 8,
+                  border: '1px solid hsl(var(--rule) / 0.22)',
+                  borderRadius: 'var(--radius)',
                   outline: "none",
-                  background: 'var(--color-surface)',
+                  background: 'hsl(var(--background))',
+                  color: 'hsl(var(--foreground))',
                   cursor: "pointer",
                   textAlign: "left",
                   appearance: "none",
                   backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
                   backgroundRepeat: "no-repeat",
                   backgroundPosition: "right 12px center",
+                  transition: "border-color 200ms ease-out",
                 }}
               >
                 {statusFilters.length === 0
@@ -282,10 +289,10 @@ export default function ManualsPage() {
                     top: "calc(100% + 4px)",
                     left: 0,
                     right: 0,
-                    background: 'var(--color-surface)',
-                    border: '1px solid var(--color-border)',
-                    borderRadius: 8,
-                    boxShadow: 'var(--shadow-elevated)',
+                    background: 'hsl(var(--card))',
+                    border: '1px solid hsl(var(--rule) / 0.12)',
+                    borderRadius: 'var(--radius)',
+                    boxShadow: '0 8px 30px hsl(var(--ink) / 0.12)',
                     zIndex: 10,
                     padding: "8px 0",
                   }}
@@ -297,7 +304,7 @@ export default function ManualsPage() {
                       padding: "8px 12px",
                       cursor: "pointer",
                       fontSize: 14,
-                      borderBottom: '1px solid var(--color-divider)',
+                      borderBottom: '1px solid hsl(var(--rule) / 0.10)',
                     }}
                   >
                     <input
@@ -348,9 +355,9 @@ export default function ManualsPage() {
                 key={i}
                 style={{
                   height: 80,
-                  background: 'var(--color-surface)',
-                  borderRadius: 12,
-                  border: '1px solid var(--color-border)',
+                  background: 'hsl(var(--card))',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid hsl(var(--rule) / 0.12)',
                   animation: "pulse 1.5s infinite",
                 }}
               />
@@ -364,12 +371,12 @@ export default function ManualsPage() {
             style={{
               padding: 40,
               textAlign: "center",
-              background: 'var(--color-surface)',
-              borderRadius: 12,
-              border: '1px solid var(--color-border)',
+              background: 'hsl(var(--card))',
+              borderRadius: 'var(--radius)',
+              border: '1px solid hsl(var(--rule) / 0.12)',
             }}
           >
-            <p style={{ fontSize: 16, color: "#c00", marginBottom: 16 }}>
+            <p style={{ fontSize: 16, color: "hsl(var(--destructive))", marginBottom: 16 }}>
               {error}
             </p>
             <button
@@ -379,11 +386,12 @@ export default function ManualsPage() {
                 minHeight: 44,
                 fontSize: 14,
                 fontWeight: 500,
-                color: 'var(--color-btn-primary-text)',
-                background: 'var(--color-btn-primary-bg)',
+                color: 'hsl(var(--primary-foreground))',
+                background: 'hsl(var(--primary))',
                 border: "none",
-                borderRadius: 8,
+                borderRadius: 'var(--radius)',
                 cursor: "pointer",
+                transition: "background-color 200ms ease-out",
               }}
             >
               Try Again
@@ -399,12 +407,12 @@ export default function ManualsPage() {
                 style={{
                   padding: 40,
                   textAlign: "center",
-                  background: 'var(--color-surface)',
-                  borderRadius: 12,
-                  border: '1px solid var(--color-border)',
+                  background: 'hsl(var(--card))',
+                  borderRadius: 'var(--radius)',
+                  border: '1px solid hsl(var(--rule) / 0.12)',
                 }}
               >
-                <p style={{ fontSize: 16, color: 'var(--color-text-secondary)' }}>
+                <p style={{ fontSize: 16, color: 'hsl(var(--muted-foreground))' }}>
                   {searchQuery || crewFilter || statusFilters.length > 0
                     ? "No manuals match your filters."
                     : "No manuals found."}
@@ -435,7 +443,7 @@ export default function ManualsPage() {
                     marginTop: 16,
                     textAlign: "center",
                     fontSize: 13,
-                    color: 'var(--color-text-secondary)',
+                    color: 'hsl(var(--muted-foreground))',
                   }}
                 >
                   Showing {filteredManuals.length} of {manuals.length} manuals
@@ -459,8 +467,8 @@ export default function ManualsPage() {
 
       <style jsx global>{`
         .manual-card:hover {
-          border-color: rgba(234, 179, 8, 0.5) !important;
-          box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+          border-color: hsl(var(--tomato) / 0.5) !important;
+          box-shadow: 0 2px 8px hsl(var(--ink) / 0.05);
         }
       `}</style>
     </div>

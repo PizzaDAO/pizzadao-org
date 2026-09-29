@@ -7,6 +7,14 @@ type AddVouchButtonProps = {
   currentMemberId?: string | null;
 };
 
+/**
+ * Profile hero CTA: "+ Vouch" / "Vouched" toggle.
+ *
+ * Phase 3c restyle: tomato accent button when not vouched (the loud brand
+ * CTA), outlined cream-pill when already vouched. Reads correctly on the
+ * ink hero — both states use cream/tomato that pop against dark ink.
+ * Hover-on-vouched turns destructive-red and swaps the label to "Unvouch".
+ */
 export function AddVouchButton({
   targetMemberId,
   currentMemberId,
@@ -27,12 +35,12 @@ export function AddVouchButton({
     (async () => {
       try {
         const res = await fetch(
-          `/api/vouches?memberId=${encodeURIComponent(currentMemberId!)}&limit=200`
+          `/api/vouches?memberId=${encodeURIComponent(currentMemberId!)}&limit=200`,
         );
         if (res.ok) {
           const data = await res.json();
           const vouched = data.vouches?.some(
-            (v: any) => v.memberId === targetMemberId
+            (v: any) => v.memberId === targetMemberId,
           );
           setIsVouched(!!vouched);
         }
@@ -78,52 +86,36 @@ export function AddVouchButton({
     }
   };
 
+  // Vouched state: outlined cream pill on dark hero
+  // Not-vouched state: solid tomato CTA
+  const baseClass =
+    "inline-flex items-center gap-1.5 px-4 py-2 rounded-[--radius] text-sm font-semibold font-display transition-colors focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-ink";
+
+  if (isVouched) {
+    return (
+      <button
+        onClick={handleToggle}
+        disabled={actionLoading}
+        className={`${baseClass} bg-transparent border border-cream/30 text-cream hover:border-tomato hover:bg-tomato hover:text-cream cursor-pointer disabled:cursor-wait disabled:opacity-60`}
+        onMouseEnter={(e) => {
+          if (!actionLoading) e.currentTarget.textContent = "Unvouch";
+        }}
+        onMouseLeave={(e) => {
+          if (!actionLoading) e.currentTarget.textContent = "Vouched";
+        }}
+      >
+        {actionLoading ? "..." : "Vouched"}
+      </button>
+    );
+  }
+
   return (
     <button
       onClick={handleToggle}
       disabled={actionLoading}
-      style={{
-        display: "inline-flex",
-        alignItems: "center",
-        gap: 6,
-        padding: "8px 16px",
-        borderRadius: 10,
-        border: isVouched
-          ? "1px solid var(--color-border-strong)"
-          : "1px solid var(--color-btn-primary-border)",
-        background: isVouched
-          ? "var(--color-surface)"
-          : "var(--color-btn-primary-bg)",
-        color: isVouched
-          ? "var(--color-text)"
-          : "var(--color-btn-primary-text)",
-        fontWeight: 650,
-        cursor: actionLoading ? "wait" : "pointer",
-        fontSize: 13,
-        fontFamily: "inherit",
-        opacity: actionLoading ? 0.6 : 1,
-        transition: "all 0.15s",
-      }}
-      onMouseEnter={(e) => {
-        if (isVouched && !actionLoading) {
-          e.currentTarget.style.borderColor = "var(--color-danger)";
-          e.currentTarget.style.color = "var(--color-danger)";
-          e.currentTarget.textContent = "Unvouch";
-        }
-      }}
-      onMouseLeave={(e) => {
-        if (isVouched && !actionLoading) {
-          e.currentTarget.style.borderColor = "var(--color-border-strong)";
-          e.currentTarget.style.color = "var(--color-text)";
-          e.currentTarget.textContent = "Vouched";
-        }
-      }}
+      className={`${baseClass} bg-tomato text-cream border border-tomato hover:bg-tomato-deep hover:border-tomato-deep cursor-pointer disabled:cursor-wait disabled:opacity-60`}
     >
-      {actionLoading
-        ? "..."
-        : isVouched
-        ? "Vouched"
-        : "+ Vouch"}
+      {actionLoading ? "..." : "+ Vouch"}
     </button>
   );
 }

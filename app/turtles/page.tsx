@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
 import { TURTLES } from '@/app/ui/constants'
+import { card, navBtn, pageContainer } from '@/app/ui/shared-styles'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -42,13 +43,7 @@ export default function TurtlesIndexPage() {
   }, [])
 
   return (
-    <div style={{
-      minHeight: '100vh',
-      background: 'var(--color-page-bg)',
-      color: 'var(--color-text)',
-      fontFamily: inter.style.fontFamily,
-      padding: '40px 20px',
-    }}>
+    <div style={pageContainer(inter.style.fontFamily)}>
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
@@ -62,8 +57,24 @@ export default function TurtlesIndexPage() {
 
         {/* Header */}
         <header style={{ textAlign: 'center', marginBottom: 20 }}>
-          <h1 style={{ fontSize: 36, fontWeight: 800, margin: 0 }}>Turtle Roles</h1>
-          <p style={{ fontSize: 16, opacity: 0.6, marginTop: 8 }}>
+          <h1
+            style={{
+              fontSize: 36,
+              fontWeight: 800,
+              margin: 0,
+              textWrap: 'balance',
+            } as React.CSSProperties}
+          >
+            Turtle Roles
+          </h1>
+          <p
+            style={{
+              fontSize: 16,
+              opacity: 0.6,
+              marginTop: 8,
+              textWrap: 'pretty',
+            } as React.CSSProperties}
+          >
             Every PizzaDAO member identifies with one or more turtle roles.
             Click a role to see all members.
           </p>
@@ -83,18 +94,19 @@ export default function TurtlesIndexPage() {
                 href={`/turtles/${encodeURIComponent(t.id)}`}
                 style={{
                   ...card(),
+                  padding: 20,
                   textDecoration: 'none',
                   color: 'inherit',
-                  transition: 'transform 0.15s, box-shadow 0.15s',
+                  transition: 'transform 200ms ease-out, box-shadow 200ms ease-out',
                   cursor: 'pointer',
                 }}
                 onMouseEnter={(e) => {
                   e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 12px 40px rgba(0,0,0,0.1)'
+                  e.currentTarget.style.boxShadow = '0 12px 40px hsl(var(--ink) / 0.12)'
                 }}
                 onMouseLeave={(e) => {
                   e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 8px 30px rgba(0,0,0,0.06)'
+                  e.currentTarget.style.boxShadow = '0 8px 30px hsl(var(--ink) / 0.06)'
                 }}
               >
                 <div style={{
@@ -113,11 +125,14 @@ export default function TurtlesIndexPage() {
                     }}
                   />
                   <div style={{ flex: 1 }}>
-                    <h2 style={{
-                      fontSize: 20,
-                      fontWeight: 700,
-                      margin: 0,
-                    }}>
+                    <h2
+                      style={{
+                        fontSize: 20,
+                        fontWeight: 700,
+                        margin: 0,
+                        textWrap: 'balance',
+                      } as React.CSSProperties}
+                    >
                       {t.label}
                     </h2>
                     <p style={{
@@ -130,7 +145,7 @@ export default function TurtlesIndexPage() {
                     {!loading && count !== undefined && (
                       <p style={{
                         fontSize: 13,
-                        color: '#ff4d4d',
+                        color: 'hsl(var(--tomato))',
                         fontWeight: 600,
                         margin: '6px 0 0',
                       }}>
@@ -167,31 +182,4 @@ export default function TurtlesIndexPage() {
       </div>
     </div>
   )
-}
-
-// Styles
-function card(): React.CSSProperties {
-  return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  }
-}
-
-function navBtn(): React.CSSProperties {
-  return {
-    display: 'inline-flex',
-    alignItems: 'center',
-    gap: 6,
-    padding: '8px 14px',
-    background: 'var(--color-surface)',
-    border: '1px solid var(--color-border-strong)',
-    borderRadius: 8,
-    color: 'var(--color-text)',
-    textDecoration: 'none',
-    fontSize: 14,
-    fontWeight: 600,
-  }
 }

@@ -1,45 +1,34 @@
 "use client";
 
+// app/ui/economy/TransferForm.tsx
+//
+// capricciosa-35929 — Editorial restyle. Paper-soft surface with handwritten
+// margin annotation, hairline rules between fields, `btn-pill-lg` accent
+// send button. API contract unchanged — still POSTs /api/economy/transfer
+// with the same { toUserId, amount } shape.
+//
+// anchovy-67435 (Restyle Phase 4d): semantic HSL tokens.
+
 import React, { useState } from "react";
+import { ArrowUpRight } from "lucide-react";
 import { PepIcon } from "./PepIcon";
+import { input } from "../shared-styles";
+import { Field } from "../onboarding/Field";
 
 type TransferFormProps = {
   onSuccess?: () => void;
 };
 
-function card(): React.CSSProperties {
+function focusableInputProps() {
   return {
-    border: '1px solid var(--color-border)',
-    borderRadius: 14,
-    padding: 20,
-    boxShadow: 'var(--shadow-card)',
-    background: 'var(--color-surface)',
-  };
-}
-
-function input(): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "10px 12px",
-    borderRadius: 10,
-    border: '1px solid var(--color-border-strong)',
-    fontSize: 14,
-    outline: "none",
-    boxSizing: "border-box",
-  };
-}
-
-function btn(disabled?: boolean): React.CSSProperties {
-  return {
-    width: "100%",
-    padding: "12px 16px",
-    borderRadius: 10,
-    border: "none",
-    fontWeight: 650,
-    cursor: disabled ? "not-allowed" : "pointer",
-    opacity: disabled ? 0.5 : 1,
-    background: 'var(--color-btn-primary-bg)',
-    color: 'var(--color-btn-primary-text)',
+    onFocus: (e: React.FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.style.borderColor = "hsl(var(--ring))";
+      e.currentTarget.style.boxShadow = "0 0 0 3px hsl(var(--ring) / 0.20)";
+    },
+    onBlur: (e: React.FocusEvent<HTMLInputElement>) => {
+      e.currentTarget.style.borderColor = "hsl(var(--rule) / 0.22)";
+      e.currentTarget.style.boxShadow = "none";
+    },
   };
 }
 
@@ -82,27 +71,74 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
     }
   };
 
+  const disabled = loading || !toUserId || !amount;
+
   return (
-    <div style={card()}>
-      <h2 style={{ fontSize: 18, fontWeight: 700, marginBottom: 16, marginTop: 0, display: "flex", alignItems: "center", gap: 6 }}>Send <PepIcon size={18} /></h2>
+    <div
+      className="paper-soft relative overflow-hidden rounded-[24px] border p-6 md:p-7"
+      style={{
+        background: "hsl(var(--card))",
+        borderColor: "hsl(var(--rule-warm) / 0.55)",
+        boxShadow: "var(--shadow-soft)",
+      }}
+    >
+      <div className="relative flex items-start justify-between gap-4">
+        <p className="overline text-tomato">§ ··· Send</p>
+        <span
+          className="handwritten -rotate-[6deg]"
+          style={{
+            fontSize: 15,
+            color: "hsl(var(--foreground) / 0.55)",
+          }}
+        >
+          on the books
+        </span>
+      </div>
+
+      <h2
+        className="font-[family-name:var(--font-display)] relative mt-2 flex items-center gap-2 font-black tracking-[-0.02em] text-foreground"
+        style={{
+          fontSize: "clamp(1.6rem, 3.5vw, 2.25rem)",
+          lineHeight: 0.95,
+        }}
+      >
+        Move <PepIcon size={28} />
+      </h2>
 
       {error && (
-        <div style={{ marginBottom: 16, padding: 12, background: "rgba(255,0,0,0.05)", borderRadius: 8, color: "#c00", fontSize: 14 }}>
+        <div
+          className="relative mt-4"
+          style={{
+            padding: 12,
+            background: "hsl(var(--tomato) / 0.08)",
+            border: "1px solid hsl(var(--tomato) / 0.30)",
+            borderRadius: "var(--radius)",
+            color: "hsl(var(--tomato))",
+            fontSize: 14,
+          }}
+        >
           {error}
         </div>
       )}
 
       {success && (
-        <div style={{ marginBottom: 16, padding: 12, background: "rgba(0,200,0,0.08)", borderRadius: 8, color: "#16a34a", fontSize: 14 }}>
+        <div
+          className="relative mt-4"
+          style={{
+            padding: 12,
+            background: "hsl(142 71% 35% / 0.10)",
+            border: "1px solid hsl(142 71% 35% / 0.30)",
+            borderRadius: "var(--radius)",
+            color: "hsl(142 71% 28%)",
+            fontSize: 14,
+          }}
+        >
           {success}
         </div>
       )}
 
-      <form onSubmit={handleTransfer} style={{ display: "grid", gap: 16 }}>
-        <div>
-          <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>
-            Recipient Discord ID
-          </label>
+      <form onSubmit={handleTransfer} className="relative mt-5 grid gap-4">
+        <Field label="Recipient Discord ID">
           <input
             type="text"
             placeholder="Enter Discord user ID"
@@ -110,11 +146,13 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
             onChange={(e) => setToUserId(e.target.value)}
             style={input()}
             disabled={loading}
+            {...focusableInputProps()}
           />
-        </div>
+        </Field>
 
-        <div>
-          <label style={{ display: "block", fontSize: 13, color: 'var(--color-text-secondary)', marginBottom: 6 }}>Amount</label>
+        <div className="rule-warm" />
+
+        <Field label="Amount">
           <input
             type="number"
             placeholder="Amount to send"
@@ -123,15 +161,29 @@ export function TransferForm({ onSuccess }: TransferFormProps) {
             style={input()}
             disabled={loading}
             min="1"
+            {...focusableInputProps()}
           />
-        </div>
+        </Field>
 
         <button
           type="submit"
-          disabled={loading || !toUserId || !amount}
-          style={btn(loading || !toUserId || !amount)}
+          disabled={disabled}
+          className="btn-pill-lg group mt-2 w-full"
+          style={{
+            background: "hsl(var(--tomato))",
+            color: "hsl(var(--cream))",
+            border: "1px solid hsl(var(--tomato))",
+            boxShadow: disabled ? "none" : "var(--shadow-soft)",
+          }}
         >
-          {loading ? "Sending..." : <span style={{ display: "inline-flex", alignItems: "center", gap: 6 }}>Send <PepIcon size={14} /></span>}
+          {loading ? (
+            "Sending..."
+          ) : (
+            <>
+              Send <PepIcon size={14} />
+              <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </>
+          )}
         </button>
       </form>
     </div>

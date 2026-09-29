@@ -1,7 +1,15 @@
 // app/ui/onboarding/steps/ReviewStep.tsx
+//
+// mozzarella-41832 — Editorial restyle (dossier treatment).
+// Visual rewrite modelled on the Lovable mockup's `FinaleScene`. Props,
+// callbacks, and submission contract are unchanged — this is purely the
+// confirm-or-cancel surface for an update review.
+// arugula-30866 — i18n via next-intl (onboarding.review.*).
 "use client";
 
-import { btn } from "../styles";
+import type { CSSProperties } from "react";
+import { ArrowLeft, ArrowUpRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { CrewOption } from "../types";
 
 type Props = {
@@ -30,6 +38,25 @@ type Props = {
   onCancel: () => void;
 };
 
+const VIGNETTE: CSSProperties = {
+  background:
+    "radial-gradient(70% 60% at 50% 30%, transparent 30%, hsl(20 25% 8% / 0.18) 100%)",
+};
+
+const DOSSIER_GRADIENT: CSSProperties = {
+  backgroundImage:
+    "radial-gradient(120% 70% at 50% 0%, hsl(46 100% 62% / 0.13), transparent 60%), radial-gradient(80% 60% at 100% 100%, hsl(20 40% 25% / 0.08), transparent 70%)",
+};
+
+function familyArchiveNo(seed: string): string {
+  let h = 0;
+  for (let i = 0; i < seed.length; i++) {
+    h = (h * 31 + seed.charCodeAt(i)) >>> 0;
+  }
+  const n = (h % 89999) + 10000; // 5-digit
+  return String(n);
+}
+
 export function ReviewStep({
   mafiaName,
   city,
@@ -41,104 +68,304 @@ export function ReviewStep({
   onSubmit,
   onCancel,
 }: Props) {
-  const rows = [
-    { label: "Name", new: mafiaName, old: existingData?.mafiaName },
-    { label: "City", new: city, old: existingData?.city },
-    { label: "Roles", new: turtles.join(", "), old: (existingData?.turtles ?? []).join(", ") },
+  const t = useTranslations("onboarding.review");
+
+  const crewLabels = crews
+    .map((id) => crewOptions.find((c) => c.id === id)?.label || id)
+    .join(", ");
+  const existingCrewLabels = (existingData?.crews ?? []).join(", ");
+  const empty = t("emptyValue");
+
+  const fields: { label: string; value: string; old: string }[] = [
+    { label: t("labelName"), value: mafiaName || empty, old: existingData?.mafiaName || empty },
+    { label: t("labelCity"), value: city || empty, old: existingData?.city || empty },
     {
-      label: "Crews",
-      new: crews.map((id) => crewOptions.find((c) => c.id === id)?.label || id).join(", "),
-      old: (existingData?.crews ?? []).join(", "),
+      label: t("labelTurtles"),
+      value: turtles.length ? turtles.join(", ") : empty,
+      old: existingData?.turtles?.length ? existingData.turtles.join(", ") : empty,
+    },
+    {
+      label: t("labelCrews"),
+      value: crewLabels || empty,
+      old: existingCrewLabels || empty,
     },
   ];
 
+  const archive = familyArchiveNo(
+    `${mafiaName ?? ""}|${city}|${turtles.join(",")}|${crews.join(",")}`,
+  );
+
   return (
-    <div style={{ display: "grid", gap: 16 }}>
+    <div className="relative grid gap-10 fade-up">
+      {/* ─── Vignette ────────────────────────────────────────────── */}
       <div
-        style={{
-          display: "grid",
-          gap: 0,
-          border: '1px solid var(--color-border)',
-          borderRadius: 10,
-          overflow: "hidden",
-        }}
-      >
-        {/* Header */}
-        <div
+        aria-hidden
+        className="pointer-events-none absolute inset-0 -z-10"
+        style={VIGNETTE}
+      />
+
+      {/* ─── Ceremony headline ──────────────────────────────────── */}
+      <header className="relative text-center">
+        <p className="overline text-tomato">{t("overline")}</p>
+        <h2
+          className="font-[family-name:var(--font-display)] mx-auto mt-4 max-w-[14ch] font-black tracking-[-0.015em] text-foreground"
           style={{
-            display: "grid",
-            gridTemplateColumns: "100px 1fr 1fr",
-            gap: 10,
-            background: "rgba(0,0,0,0.06)",
-            padding: "12px 16px",
-            fontWeight: 750,
-            fontSize: 13,
-            textTransform: "uppercase",
-            letterSpacing: 0.6,
+            fontSize: "clamp(2.2rem, 6vw, 4.2rem)",
+            lineHeight: 0.95,
+            textWrap: "balance",
           }}
         >
-          <div>Field</div>
-          <div>New (Entered)</div>
-          <div>Existing (In Sheet)</div>
-        </div>
+          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
+        </h2>
+        <p
+          className="mx-auto mt-4 max-w-md text-foreground/70"
+          style={{ fontSize: "15px", lineHeight: 1.55 }}
+        >
+          {t("tagline")}
+        </p>
+      </header>
 
-        {rows.map((row, i) => {
-          const hasChange =
-            String(row.new || "")
-              .trim()
-              .toLowerCase() !==
-            String(row.old || "")
-              .trim()
-              .toLowerCase();
-          return (
+      {/* ─── Dossier paper ──────────────────────────────────────── */}
+      <div className="relative">
+        <div
+          className="relative mx-auto max-w-2xl"
+          style={{ transform: "rotate(-0.4deg)" }}
+        >
+          <div
+            className="paper-soft relative overflow-hidden rounded-[18px] border p-5 md:p-7"
+            style={{
+              background: "hsl(40 38% 94%)",
+              borderColor: "hsl(var(--rule-warm) / 0.7)",
+              boxShadow:
+                "0 50px 90px -40px hsl(20 30% 8% / 0.45), var(--shadow-lifted)",
+              ...DOSSIER_GRADIENT,
+            }}
+          >
+            {/* Edge wear */}
             <div
-              key={i}
+              aria-hidden
+              className="pointer-events-none absolute inset-0 rounded-[18px]"
               style={{
-                display: "grid",
-                gridTemplateColumns: "100px 1fr 1fr",
-                gap: 10,
-                padding: "12px 16px",
-                background: i % 2 === 1 ? "rgba(0,0,0,0.01)" : "white",
-                borderTop: "1px solid rgba(0,0,0,0.05)",
+                boxShadow:
+                  "inset 0 0 0 1px hsl(28 25% 18% / 0.05), inset 0 -22px 28px -24px hsl(28 30% 18% / 0.25), inset 0 22px 28px -28px hsl(40 35% 95% / 0.6)",
               }}
-            >
-              <div style={{ fontWeight: 600, fontSize: 14, color: "rgba(0,0,0,0.5)" }}>{row.label}</div>
-              <div
+            />
+            {/* Coffee stain */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute -right-6 top-12 h-24 w-24 rounded-full opacity-[0.10]"
+              style={{
+                background:
+                  "radial-gradient(circle, hsl(20 50% 20%) 0%, transparent 70%)",
+              }}
+            />
+
+            {/* TOP ROW: paperclip + record label + archive # */}
+            <div className="relative flex items-center gap-3 pb-2.5">
+              <span
+                aria-hidden
+                className="inline-block h-5 w-3 shrink-0 rounded-full"
                 style={{
-                  fontWeight: hasChange ? 750 : 400,
-                  color: hasChange ? "#000" : "#777",
-                  fontSize: 14,
+                  border: "2px solid hsl(var(--foreground) / 0.45)",
+                  borderBottomColor: "transparent",
+                  transform: "rotate(-12deg)",
+                }}
+              />
+              <p className="ui flex-1 truncate text-[10px] uppercase tracking-[0.32em] text-foreground/55">
+                {t("recordLabel")}
+              </p>
+              <p className="ui shrink-0 text-[10px] uppercase tracking-[0.32em] text-foreground/50">
+                {t("archiveLabel", { archive })}
+              </p>
+            </div>
+            <div
+              className="relative h-px"
+              style={{ background: "hsl(var(--foreground) / 0.2)" }}
+            />
+
+            {/* Big alias display */}
+            <div className="relative mt-5 grid gap-1.5">
+              <p className="ui text-[9.5px] uppercase tracking-[0.32em] text-tomato">
+                {t("statusMade")}
+              </p>
+              <h3
+                className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em] text-foreground"
+                style={{
+                  fontSize: "clamp(1.6rem, 4.4vw, 2.8rem)",
+                  lineHeight: 0.95,
                 }}
               >
-                {row.new || "-"}
-                {hasChange && (
-                  <span style={{ marginLeft: 6, color: "#10b981", fontSize: 16 }} title="Modified">
-                    *
-                  </span>
-                )}
-              </div>
-              <div style={{ opacity: 0.6, fontSize: 14 }}>{row.old || "-"}</div>
+                {mafiaName || empty}
+              </h3>
+              <span
+                aria-hidden
+                className="handwritten mt-1 inline-block rotate-[-3deg] text-[15px] text-tomato"
+              >
+                {t("approvedNote")}
+              </span>
             </div>
-          );
-        })}
+
+            {/* Dossier fields grid */}
+            <div
+              className="relative mt-5 grid grid-cols-2 gap-x-5 gap-y-3 pt-4 md:grid-cols-2"
+              style={{ borderTop: "1px solid hsl(var(--foreground) / 0.15)" }}
+            >
+              {fields.map((f) => {
+                const changed =
+                  String(f.value).trim().toLowerCase() !==
+                  String(f.old).trim().toLowerCase();
+                return (
+                  <DossierField
+                    key={f.label}
+                    label={f.label}
+                    value={f.value}
+                    oldValue={existingData ? f.old : undefined}
+                    changed={changed && Boolean(existingData)}
+                    wasLabel={t("wasLabel")}
+                    modifiedTitle={t("modifiedTitle")}
+                  />
+                );
+              })}
+            </div>
+
+            {/* Stamped "made" seal */}
+            <span
+              aria-hidden
+              className="pointer-events-none absolute right-2 top-[55%] z-20 md:right-5 md:top-[34%]"
+              style={{ transform: "rotate(-11deg)" }}
+            >
+              <span
+                aria-hidden
+                className="absolute inset-0 -m-2 rounded-full"
+                style={{ background: "hsl(var(--tomato) / 0.15)" }}
+              />
+              <span
+                className="relative grid h-[68px] w-[68px] place-items-center sm:h-[78px] sm:w-[78px] md:h-[96px] md:w-[96px]"
+                style={{
+                  color: "hsl(var(--tomato))",
+                  backgroundImage:
+                    "radial-gradient(60% 60% at 32% 28%, hsl(0 93% 60% / 0.18), transparent 70%), radial-gradient(40% 40% at 75% 75%, hsl(0 93% 40% / 0.12), transparent 70%)",
+                  border: "3px solid hsl(0 93% 45% / 0.82)",
+                  boxShadow:
+                    "inset 0 0 0 2px hsl(0 93% 45% / 0.28), inset 0 6px 14px -6px hsl(0 93% 30% / 0.5), inset 0 -4px 10px -6px hsl(40 35% 95% / 0.35), 0 6px 12px -8px hsl(20 40% 10% / 0.4)",
+                  borderRadius: "48% 52% 53% 47% / 51% 48% 52% 49%",
+                  filter: "contrast(1.06) saturate(1.04)",
+                }}
+              >
+                <span
+                  aria-hidden
+                  className="pointer-events-none absolute inset-0 grain"
+                  style={{
+                    borderRadius: "inherit",
+                    mixBlendMode: "multiply",
+                    opacity: 0.65,
+                  }}
+                />
+                <div className="relative text-center leading-tight">
+                  <div className="font-[family-name:var(--font-display)] text-[10px] font-black uppercase tracking-[0.18em] md:text-[11.5px]">
+                    {t("stampOfficially")}
+                  </div>
+                  <div className="font-[family-name:var(--font-display)] text-[14px] font-black uppercase tracking-[0.14em] md:text-[17px]">
+                    {t("stampMade")}
+                  </div>
+                  <div className="ui mt-0.5 text-[7.5px] uppercase tracking-[0.32em] opacity-80">
+                    {t("stampPizzaDao")}
+                  </div>
+                </div>
+              </span>
+            </span>
+          </div>
+
+          {/* Margin scribbles */}
+          <span
+            aria-hidden
+            className="handwritten pointer-events-none absolute -left-2 top-[-18px] hidden rotate-[-6deg] text-[16px] text-foreground/55 md:block"
+          >
+            {t("fileUnder", { name: (mafiaName || empty).toLowerCase() })}
+          </span>
+        </div>
       </div>
 
-      <div style={{ display: "flex", flexWrap: "wrap", gap: 12, marginTop: 8 }}>
+      {/* ─── Actions ─────────────────────────────────────────────── */}
+      <div className="flex flex-wrap items-center justify-center gap-3">
         <button
-          onClick={onSubmit}
-          disabled={submitting}
-          style={{ ...btn("primary", submitting), flex: 1 }}
-        >
-          {submitting ? "Updating Profile..." : "Yes, Update My Profile"}
-        </button>
-        <button
+          type="button"
           onClick={onCancel}
           disabled={submitting}
-          style={{ ...btn("secondary"), flex: 1 }}
+          className="btn-pill-lg group"
+          style={{
+            background: "transparent",
+            color: "hsl(var(--foreground))",
+            border: "1px solid hsl(var(--foreground) / 0.3)",
+          }}
         >
-          Don't Update
+          <ArrowLeft className="h-4 w-4" />
+          {t("dontUpdate")}
+        </button>
+        <button
+          type="button"
+          onClick={onSubmit}
+          disabled={submitting}
+          className="btn-pill-lg group"
+          style={{
+            background: "hsl(var(--tomato))",
+            color: "hsl(var(--cream))",
+            boxShadow: "var(--shadow-soft)",
+          }}
+        >
+          {submitting ? t("updating") : t("confirmUpdate")}
+          <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>
+    </div>
+  );
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+   DossierField — stamped index-card style field display
+   ────────────────────────────────────────────────────────────────────────── */
+
+function DossierField({
+  label,
+  value,
+  oldValue,
+  changed,
+  wasLabel,
+  modifiedTitle,
+}: {
+  label: string;
+  value: string;
+  oldValue?: string;
+  changed: boolean;
+  wasLabel: string;
+  modifiedTitle: string;
+}) {
+  return (
+    <div>
+      <p className="ui flex items-center gap-1.5 text-[9px] uppercase tracking-[0.3em] text-foreground/45">
+        {label}
+        {changed && (
+          <span
+            aria-hidden
+            className="inline-block h-1 w-1 rounded-full"
+            style={{ background: "hsl(var(--tomato))" }}
+            title={modifiedTitle}
+          />
+        )}
+      </p>
+      <p
+        className={`font-[family-name:var(--font-display)] mt-1.5 leading-tight tracking-tight text-foreground ${
+          changed ? "font-black" : "font-bold"
+        }`}
+        style={{ fontSize: "15px" }}
+      >
+        {value}
+      </p>
+      {oldValue && changed && (
+        <p className="ui mt-0.5 text-[10px] uppercase tracking-[0.22em] text-foreground/40">
+          {wasLabel} {oldValue}
+        </p>
+      )}
     </div>
   );
 }
