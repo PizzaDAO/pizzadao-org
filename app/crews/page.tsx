@@ -430,10 +430,11 @@ export default function AllCrewsPage() {
               textWrap: 'balance',
             } as React.CSSProperties}
           >
-            All Crews
+            Crews
           </h1>
           <p style={{ fontSize: 16, opacity: 0.6, marginTop: 8 }}>
-            {user ? `Welcome, ${user.name}! Join crews to get involved.` : 'Log in to join crews'}
+            Working groups that meet on a regular call.{' '}
+            {user ? `Welcome, ${user.name}! Join crews to get involved.` : 'Log in to join crews.'}
           </p>
         </header>
 

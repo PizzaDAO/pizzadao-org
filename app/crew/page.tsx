@@ -197,7 +197,7 @@ export default function CrewMembersPage() {
               color: "hsl(var(--foreground))",
             }}
           >
-            Crew members
+            Members
           </h1>
           <p
             style={{
@@ -206,7 +206,12 @@ export default function CrewMembersPage() {
               color: "hsl(var(--muted-foreground))",
             }}
           >
-            All PizzaDAO members who have signed up
+            Every PizzaDAO member who has signed up. Looking for working
+            groups?{" "}
+            <Link href="/crews" style={{ color: "hsl(var(--tomato))", fontWeight: 600 }}>
+              Browse crews
+            </Link>
+            .
           </p>
           <span
             aria-hidden
