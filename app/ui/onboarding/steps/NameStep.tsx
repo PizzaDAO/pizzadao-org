@@ -35,6 +35,7 @@ import { MAFIA_FILMS, type MafiaFilm } from "@/app/lib/mafia-films";
 import { toppingDescriptorFor } from "@/app/lib/topping-images";
 import { FilmPoster } from "@/app/ui/onboarding/FilmPoster";
 import { ToppingPicker } from "@/app/ui/onboarding/ToppingPicker";
+import { sanitizeDisplayName } from "@/app/lib/display-name";
 
 type Props = {
   // Form data
@@ -196,8 +197,13 @@ export function NameStep({
     topping.trim().length > 0 && mafiaMovieTitle.trim().length > 0;
 
   const showKeepExisting = Boolean(isUpdate && existingName);
+  // Discord nicks often carry emoji / decorations; offer the normalised
+  // form, and only when something usable survives sanitisation.
+  const keepableDiscordNick = sanitizeDisplayName(discordNick);
   const showKeepDiscord = Boolean(
-    !isUpdate && discordNick && (_mafiaName === discordNick || !_mafiaName),
+    !isUpdate &&
+      keepableDiscordNick &&
+      (_mafiaName === discordNick || _mafiaName === keepableDiscordNick || !_mafiaName),
   );
 
   const topThree = useMemo(
@@ -214,7 +220,8 @@ export function NameStep({
   };
 
   const handleClaim = () => {
-    const name = finalName.trim();
+    // Same normalisation the server applies (app/lib/display-name.ts).
+    const name = sanitizeDisplayName(finalName);
     if (!name) return;
     onPickName(name);
   };
@@ -248,7 +255,7 @@ export function NameStep({
         <KeepBlock
           eyebrow={t("keepDiscordEyebrow")}
           headline={t("keepDiscordHeadline")}
-          name={discordNick ?? ""}
+          name={keepableDiscordNick}
           ctaLabel={t("keepDiscordCta")}
           onKeep={onKeepExisting}
         />

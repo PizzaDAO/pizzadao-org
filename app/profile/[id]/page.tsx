@@ -45,7 +45,7 @@ export async function generateMetadata({
 
     if (!summary) {
         return {
-            title: "Profile · PizzaDAO",
+            title: "Profile",
             description: "PizzaDAO member profile",
         };
     }
@@ -56,7 +56,7 @@ export async function generateMetadata({
     const ogImage = absoluteUrl(summary.hero.pfpUrl);
 
     return {
-        title: `${name} · PizzaDAO`,
+        title: name,
         description,
         openGraph: {
             title: name,

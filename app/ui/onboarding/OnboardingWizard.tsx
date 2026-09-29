@@ -7,6 +7,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { TURTLES } from "../constants";
+import { sanitizeDisplayName } from "@/app/lib/display-name";
 
 import { LoadingScreen } from "./LoadingScreen";
 import { ClaimFlow } from "./ClaimFlow";
@@ -382,7 +383,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         body: JSON.stringify({
           source: "web",
           sessionId: data.sessionId,
-          mafiaName: data.mafiaName,
+          mafiaName: sanitizeDisplayName(data.mafiaName),
           topping: data.topping,
           mafiaMovieTitle: data.mafiaMovieTitle,
           resolvedMovieTitle: data.resolvedMovieTitle,
@@ -504,7 +505,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         discordNick={data.discordNick}
         onStartRegistration={() => {
           if (data.discordNick) {
-            setData((p) => ({ ...p, mafiaName: p.discordNick }));
+            setData((p) => ({ ...p, mafiaName: sanitizeDisplayName(p.discordNick) || undefined }));
           }
           setFlow({ type: "wizard", step: 1, isUpdate: false });
         }}
@@ -740,7 +741,10 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
               goToStep(2);
             }}
             onKeepExisting={() => {
-              const nameToKeep = flow.isUpdate ? data.existingData?.mafiaName : data.discordNick;
+              const nameToKeep = sanitizeDisplayName(
+                flow.isUpdate ? data.existingData?.mafiaName : data.discordNick,
+              );
+              if (!nameToKeep) return;
               setData((p) => ({ ...p, mafiaName: nameToKeep }));
               goToStep(2);
             }}

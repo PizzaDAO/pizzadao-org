@@ -1,4 +1,9 @@
+import type { Metadata } from "next";
 import { OnboardingWizard } from "./ui/onboarding";
+
+export const metadata: Metadata = {
+  title: { absolute: "Join PizzaDAO" },
+};
 
 export default function Page() {
   return (

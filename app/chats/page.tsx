@@ -139,19 +139,6 @@ export default function ChatsPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto" }}>
         {/* Header */}
         <div style={{ marginBottom: 24 }}>
-          <Link
-            href="/"
-            style={{
-              fontSize: 14,
-              color: "var(--color-text-secondary, var(--color-text))",
-              textDecoration: "none",
-              display: "inline-flex",
-              alignItems: "center",
-              minHeight: 44,
-            }}
-          >
-            ← Back to Home
-          </Link>
           <h1
             style={{
               margin: "8px 0 4px 0",

@@ -47,9 +47,6 @@ export default function TurtlesIndexPage() {
       <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/" style={navBtn()}>
-            &larr; Home
-          </Link>
           <Link href="/crews" style={navBtn()}>
             All Crews
           </Link>

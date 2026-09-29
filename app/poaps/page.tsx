@@ -1,7 +1,6 @@
 "use client";
 
 import { useEffect, useState } from "react";
-import Link from "next/link";
 
 interface POAPEvent {
   id: string;
@@ -148,12 +147,6 @@ export default function POAPsPage() {
       <div className="max-w-3xl mx-auto">
         {/* Header */}
         <div className="mb-6">
-          <Link
-            href="/"
-            className="text-sm text-muted-foreground hover:text-tomato no-underline inline-flex items-center min-h-[44px] transition-colors"
-          >
-            ← Back to Home
-          </Link>
           <h1 className="font-display mt-2 mb-1 text-4xl font-extrabold tracking-tight text-foreground">
             POAPs
           </h1>

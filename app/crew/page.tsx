@@ -173,19 +173,6 @@ export default function CrewMembersPage() {
       <div style={{ maxWidth: 1200, margin: "0 auto" }} className="fade-up">
         {/* onion-15370: editorial header — overline + display headline + tagline */}
         <div style={{ marginBottom: 28, position: "relative" }}>
-          <Link
-            href="/"
-            style={{
-              fontSize: 14,
-              color: "hsl(var(--muted-foreground))",
-              textDecoration: "none",
-              display: "inline-flex",
-              alignItems: "center",
-              minHeight: 32,
-            }}
-          >
-            ← Back to Home
-          </Link>
           <p
             className="overline"
             style={{
@@ -210,7 +197,7 @@ export default function CrewMembersPage() {
               color: "hsl(var(--foreground))",
             }}
           >
-            Crew members
+            Members
           </h1>
           <p
             style={{
@@ -219,7 +206,12 @@ export default function CrewMembersPage() {
               color: "hsl(var(--muted-foreground))",
             }}
           >
-            All PizzaDAO members who have signed up
+            Every PizzaDAO member who has signed up. Looking for working
+            groups?{" "}
+            <Link href="/crews" style={{ color: "hsl(var(--tomato))", fontWeight: 600 }}>
+              Browse crews
+            </Link>
+            .
           </p>
           <span
             aria-hidden

@@ -24,7 +24,7 @@ import { EditClient } from "./EditClient";
 export const runtime = "nodejs";
 
 export const metadata: Metadata = {
-    title: "Edit profile · PizzaDAO",
+    title: "Edit profile",
     description: "Edit your PizzaDAO profile",
     robots: { index: false, follow: false },
 };

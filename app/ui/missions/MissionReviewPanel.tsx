@@ -10,6 +10,7 @@
 // Prior: garlic-68749 (Phase 4b token migration).
 
 import { useState, useEffect } from "react";
+import { useToast } from "@/app/ui/shared/Toast";
 import { input } from "../shared-styles";
 
 type Submission = {
@@ -34,6 +35,7 @@ const DISPLAY_FONT =
 
 export function MissionReviewPanel() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<number, string>>({});
@@ -78,7 +80,7 @@ export function MissionReviewPanel() {
 
       if (!res.ok) {
         const json = await res.json();
-        alert(json.error || "Review failed");
+        toast.error(json.error || "Review failed");
         return;
       }
 

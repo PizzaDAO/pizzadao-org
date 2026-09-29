@@ -247,11 +247,21 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                     const isOutgoing = tx.type === "TRANSFER_SENT";
 
                     return (
-                      <div
+                      <button
+                        type="button"
                         key={tx.id}
                         onClick={() => setExpandedId(isOpen ? null : tx.id)}
+                        aria-expanded={isOpen}
                         className="relative cursor-pointer transition-colors"
                         style={{
+                          width: "100%",
+                          textAlign: "left",
+                          background: "transparent",
+                          borderTop: "none",
+                          borderLeft: "none",
+                          borderRight: "none",
+                          font: "inherit",
+                          color: "inherit",
                           display: "grid",
                           gridTemplateColumns: "30px 1fr auto",
                           columnGap: 12,
@@ -268,7 +278,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                           e.currentTarget.style.background = "transparent";
                         }}
                       >
-                        <div
+                        <span
                           style={{
                             width: 30,
                             height: 30,
@@ -283,11 +293,11 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                           }}
                         >
                           {getTypeIcon(tx.type, isCredit)}
-                        </div>
+                        </span>
 
-                        <div style={{ minWidth: 0 }}>
-                          <div
-                            className="font-[family-name:var(--font-display)] font-black tracking-tight"
+                        <span style={{ minWidth: 0, display: "block" }}>
+                          <span
+                            className="block font-[family-name:var(--font-display)] font-black tracking-tight"
                             style={{
                               fontSize: 15,
                               color: "hsl(var(--foreground))",
@@ -298,9 +308,9 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                             }}
                           >
                             {tx.description}
-                          </div>
-                          <div
-                            className="ui mt-1 text-[10px] uppercase tracking-[0.22em]"
+                          </span>
+                          <span
+                            className="ui mt-1 block text-[10px] uppercase tracking-[0.22em]"
                             style={{
                               color: "hsl(var(--muted-foreground))",
                             }}
@@ -308,29 +318,29 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                             {isOpen
                               ? formatAbsoluteTime(tx.createdAt)
                               : formatRelativeTime(tx.createdAt)}
-                          </div>
+                          </span>
                           {isOpen && (
-                            <div
+                            <span
                               className="mt-2 grid gap-1 text-[12px]"
                               style={{
                                 color: "hsl(var(--muted-foreground))",
                               }}
                             >
-                              <div>
+                              <span className="block">
                                 <span style={{ fontWeight: 600 }}>Type:</span>{" "}
                                 {tx.type}
-                              </div>
-                              <div>
+                              </span>
+                              <span className="block">
                                 <span style={{ fontWeight: 600 }}>
                                   Balance after:
                                 </span>{" "}
                                 {tx.balance.toLocaleString()} PEP
-                              </div>
-                            </div>
+                              </span>
+                            </span>
                           )}
-                        </div>
+                        </span>
 
-                        <div className="relative flex items-center gap-2">
+                        <span className="relative flex items-center gap-2">
                           {isOutgoing && (
                             <span
                               aria-hidden
@@ -366,8 +376,8 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                             {tx.amount.toLocaleString()}
                             <PepIcon size={13} />
                           </span>
-                        </div>
-                      </div>
+                        </span>
+                      </button>
                     );
                   })}
                 </div>

@@ -9,10 +9,10 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
   const article = await getArticleBySlug(slug);
 
   if (!article || article.status !== "PUBLISHED") {
-    return { title: "Article | PizzaDAO" };
+    return { title: "Article" };
   }
 
-  const title = `${article.title} | PizzaDAO`;
+  const title = article.title;
   const description = article.excerpt || `By ${article.authorName || "PizzaDAO"}`;
 
   return {

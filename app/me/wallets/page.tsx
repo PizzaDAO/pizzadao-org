@@ -18,7 +18,7 @@ import { WalletsClient } from "./WalletsClient";
 export const runtime = "nodejs";
 
 export const metadata: Metadata = {
-    title: "Wallets · PizzaDAO",
+    title: "Wallets",
     description: "Manage your linked wallets",
     robots: { index: false, follow: false },
 };
