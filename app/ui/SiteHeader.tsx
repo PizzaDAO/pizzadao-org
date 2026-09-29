@@ -177,7 +177,7 @@ export default function SiteHeader() {
             {moreOpen && (
               <ul
                 id="site-nav-more"
-                className="paper-soft absolute right-0 top-full m-0 mt-1 min-w-[200px] list-none overflow-hidden rounded-2xl border p-2"
+                className="absolute right-0 top-full z-10 m-0 mt-1 min-w-[200px] list-none overflow-hidden rounded-2xl border p-2"
                 style={{
                   borderColor: "hsl(var(--rule-warm) / 0.55)",
                   background: "hsl(var(--card))",
