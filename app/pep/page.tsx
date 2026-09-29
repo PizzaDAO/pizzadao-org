@@ -635,23 +635,6 @@ export default function PepDashboard() {
           <div className="rule-warm mt-6" />
         </header>
 
-        {/* Under construction notice — paper-soft butter card */}
-        <div
-          className="paper-soft relative mb-7 flex items-center gap-3 overflow-hidden rounded-[20px] border"
-          style={{
-            padding: "12px 16px",
-            border: "1px solid hsl(var(--butter) / 0.55)",
-            background: "hsl(var(--butter) / 0.22)",
-            color: "hsl(var(--ink))",
-            fontSize: 14,
-            fontWeight: 500,
-          }}
-        >
-          <span style={{ fontSize: 20 }}>🚧</span>
-          <span className="relative">
-            This page is under construction. Features may be incomplete or change without notice.
-          </span>
-        </div>
 
         {/*
           sicilian-41551: stacks under lg, side-by-side from lg up.
