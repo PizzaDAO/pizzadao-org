@@ -1,13 +1,16 @@
 // app/api/verify-edit/route.ts
-import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
+import {
+    MEMBER_COLUMNS,
+    cellText,
+    findMemberRow,
+    getMembersTable,
+    membersColumn,
+    rowToRecord,
+} from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
-
-const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const TAB_NAME = "Crew";
-
 
 /**
  * Verifies that the current session owns a specific member ID.
@@ -28,82 +31,44 @@ export async function GET(req: Request) {
     }
 
     try {
-        // headers=0 ensures the header row is included in the response
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(TAB_NAME)}&tqx=out:json&headers=0`;
-        const res = await fetch(gvizUrl, { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed to fetch sheet");
+        // Uncached on purpose: this is the ownership gate in front of the edit
+        // flow, so it must see the row's current Discord ID.
+        const sheet = await getMembersTable({ fresh: true }).catch(() => {
+            throw new Error("Failed to fetch sheet");
+        });
 
-        const text = await res.text();
-        const gviz = parseGvizJson(text);
-        const rows = gviz?.table?.rows || [];
-
-        // Find header row (same logic as member-lookup)
-        let headerRowIdx = -1;
-        let headerVals: string[] = [];
-        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-            const rowCells = rows[ri]?.c || [];
-            const rowValsLower = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
-            const hasName = rowValsLower.includes("name");
-            const hasStatus = rowValsLower.includes("status") || rowValsLower.includes("frequency");
-            const hasCity = rowValsLower.includes("city") || rowValsLower.includes("crews");
-            if (hasName && (hasStatus || hasCity)) {
-                headerRowIdx = ri;
-                headerVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
-                break;
-            }
-        }
-
-        if (headerRowIdx === -1) {
+        if (sheet.headerRowIndex === -1) {
             return NextResponse.json({ error: "Header row not found" }, { status: 500 });
         }
 
-        const headerMap = new Map<string, number>();
-        headerVals.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
+        const idxDiscord = membersColumn(sheet, MEMBER_COLUMNS.discordId);
 
-        // Find ID column, fallback to column 0 if not found (matches member-lookup behavior)
-        let idxId = headerMap.get("id") ?? headerMap.get("member id") ?? headerMap.get("memberid");
-        if (idxId == null) idxId = 0; // fallback to column A
-        const idxDiscord = headerMap.get("discordid") ?? headerMap.get("discord id") ?? headerMap.get("discord");
+        // Find the row with matching memberId (exact text match on the ID cell)
+        const row = findMemberRow(sheet, memberId, "exact");
+        if (row) {
+            const cells = row.c || [];
+            const discordVal = idxDiscord != null ? cellText(cells[idxDiscord]) : "";
 
-        // Find the row with matching memberId
-        for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-            const cells = rows[ri]?.c || [];
-            const idVal = String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim();
-
-            if (idVal === memberId) {
-                const discordVal = idxDiscord != null
-                    ? String(cells[idxDiscord]?.v ?? cells[idxDiscord]?.f ?? "").trim()
-                    : "";
-
-                // Check ownership
-                if (!discordVal) {
-                    return NextResponse.json({
-                        error: "This member has not been claimed yet",
-                        canEdit: false
-                    }, { status: 403 });
-                }
-
-                if (discordVal !== session.discordId) {
-                    return NextResponse.json({
-                        error: "You don't have permission to edit this member",
-                        canEdit: false
-                    }, { status: 403 });
-                }
-
-                // Build the member data object
-                const data: Record<string, any> = {};
-                headerVals.forEach((key, idx) => {
-                    if (!key) return;
-                    const val = cells[idx]?.v ?? cells[idx]?.f;
-                    data[key] = val;
-                });
-
+            // Check ownership
+            if (!discordVal) {
                 return NextResponse.json({
-                    canEdit: true,
-                    memberId,
-                    data
-                });
+                    error: "This member has not been claimed yet",
+                    canEdit: false
+                }, { status: 403 });
             }
+
+            if (discordVal !== session.discordId) {
+                return NextResponse.json({
+                    error: "You don't have permission to edit this member",
+                    canEdit: false
+                }, { status: 403 });
+            }
+
+            return NextResponse.json({
+                canEdit: true,
+                memberId,
+                data: rowToRecord(sheet, row)
+            });
         }
 
         return NextResponse.json({ error: "Member not found" }, { status: 404 });

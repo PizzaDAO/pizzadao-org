@@ -34,7 +34,8 @@ async function verifyOwnership(
   session: { discordId: string },
   memberId: string
 ): Promise<{ ok: true; memberId: string; discordId: string } | NextResponse> {
-  const member = await fetchMemberById(memberId);
+  // Uncached on purpose: this ownership check guards a write.
+  const member = await fetchMemberById(memberId, { fresh: true });
   if (!member) {
     return NextResponse.json({ error: "Member not found" }, { status: 404 });
   }
