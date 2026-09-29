@@ -188,16 +188,18 @@ describe('TransactionHistory', () => {
       // Post-restyle (anchovy-67435): credit amount uses the emerald HSL token.
       // jsdom may not normalize hsl() syntax, so we match either the legacy
       // rgb form or the new hsl form, plus the "+" prefix in the text.
-      const amountDivs = document.querySelectorAll('div[style]')
+      // Amounts render in a 17px display-font <span> (weight via font-black class).
+      const amountDivs = document.querySelectorAll('span[style]')
       const creditAmounts: HTMLElement[] = []
       amountDivs.forEach((div) => {
         const el = div as HTMLElement
         const color = el.style.color
         const isCreditColor =
           color === 'rgb(22, 163, 74)' ||
+          color === 'rgb(24, 140, 66)' || // jsdom-normalized hsl(142 71% 32%)
           color.includes('142') ||
           color === 'hsl(142 71% 32%)'
-        if (isCreditColor && el.style.fontWeight === '700') {
+        if (isCreditColor && el.style.fontSize === '17px') {
           creditAmounts.push(el)
         }
       })
@@ -224,7 +226,8 @@ describe('TransactionHistory', () => {
       // Post-restyle (anchovy-67435): debit amount uses the ink-soft HSL token
       // instead of bright red. Match either the legacy rgb red or the new hsl
       // var reference.
-      const amountDivs = document.querySelectorAll('div[style]')
+      // Amounts render in a 17px display-font <span> (weight via font-black class).
+      const amountDivs = document.querySelectorAll('span[style]')
       const debitAmounts: HTMLElement[] = []
       amountDivs.forEach((div) => {
         const el = div as HTMLElement
@@ -233,7 +236,7 @@ describe('TransactionHistory', () => {
           color === 'rgb(220, 38, 38)' ||
           color.includes('--ink-soft') ||
           color.includes('var(--ink-soft)')
-        if (isDebitColor && el.style.fontWeight === '700') {
+        if (isDebitColor && el.style.fontSize === '17px') {
           debitAmounts.push(el)
         }
       })
