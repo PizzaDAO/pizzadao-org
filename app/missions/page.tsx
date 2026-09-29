@@ -14,6 +14,7 @@
 // - sicilian-41551 (mobile typography clamps)
 
 import { useEffect, useRef, useState } from "react";
+import { useToast } from "@/app/ui/shared/Toast";
 import Link from "next/link";
 import { pageContainer, loadingSpinner } from "../ui/shared-styles";
 import { MissionCard } from "../ui/missions/MissionCard";
@@ -69,6 +70,7 @@ const DISPLAY_FONT =
 
 export default function MissionsPage() {
   const [data, setData] = useState<MissionsResponse | null>(null);
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set());
@@ -244,7 +246,7 @@ export default function MissionsPage() {
 
     if (!res.ok) {
       const json = await res.json();
-      alert(json.error || "Submission failed");
+      toast.error(json.error || "Submission failed");
       throw new Error(json.error);
     }
 

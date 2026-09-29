@@ -3,6 +3,8 @@
 import { use, useEffect, useState } from 'react'
 import Link from 'next/link'
 import { TURTLES } from '@/app/ui/constants'
+import { useToast } from '@/app/ui/shared/Toast'
+import { LoginPrompt } from '@/app/ui/shared/LoginPrompt'
 import {
   badge,
   btn,
@@ -126,6 +128,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
   const [showLaterTasks, setShowLaterTasks] = useState(false)
   const [showOpenOnly, setShowOpenOnly] = useState(false)
   const [claimingTask, setClaimingTask] = useState<string | null>(null)
+  const [loginPrompt, setLoginPrompt] = useState<string | null>(null)
+  const toast = useToast()
 
   const toggleSection = (section: string) => {
     setCollapsedSections(prev => {
@@ -212,7 +216,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
   const handleJoinCrew = async () => {
     if (!user) {
-      alert('Please log in to join this crew')
+      setLoginPrompt('Please log in to join this crew.')
       return
     }
     setJoining(true)
@@ -226,7 +230,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
       if (!res.ok) throw new Error(result.error || 'Failed to join crew')
       setUser(prev => prev ? { ...prev, crews: [...prev.crews, crewId.toLowerCase()] } : null)
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error((e as any)?.message || 'Something went wrong')
     } finally {
       setJoining(false)
     }
@@ -245,7 +249,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
       if (!res.ok) throw new Error(result.error || 'Failed to leave crew')
       setUser(prev => prev ? { ...prev, crews: prev.crews.filter(c => c.toLowerCase() !== crewId.toLowerCase()) } : null)
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error((e as any)?.message || 'Something went wrong')
     } finally {
       setLeaving(false)
     }
@@ -266,11 +270,11 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
   const handleClaimTask = async (taskName: string) => {
     if (!user) {
-      alert('Please log in to claim this task')
+      setLoginPrompt('Please log in to claim this task.')
       return
     }
     if (!data?.crew.sheet) {
-      alert('No sheet configured for this crew')
+      toast.error('No sheet configured for this crew')
       return
     }
     setClaimingTask(taskName)
@@ -298,7 +302,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         }
       })
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error((e as any)?.message || 'Something went wrong')
     } finally {
       setClaimingTask(null)
     }
@@ -307,7 +311,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
   const handleGiveUpTask = async (taskName: string) => {
     if (!user) return
     if (!data?.crew.sheet) {
-      alert('No sheet configured for this crew')
+      toast.error('No sheet configured for this crew')
       return
     }
     setClaimingTask(taskName)
@@ -334,7 +338,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         }
       })
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error((e as any)?.message || 'Something went wrong')
     } finally {
       setClaimingTask(null)
     }
@@ -561,7 +565,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 </button>
               ) : (
                 <Link
-                  href="/"
+                  href="/login"
                   className="btn-pill-lg"
                   style={{
                     background: 'hsl(var(--tomato))',
@@ -597,6 +601,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               `}</style>
             </div>
           </header>
+
+          {loginPrompt && <LoginPrompt message={loginPrompt} onDismiss={() => setLoginPrompt(null)} />}
 
           {/* Member roster (visitor-facing: editorial paper-soft gallery) */}
           {visibleRoster.length > 0 && (
@@ -798,7 +804,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               </button>
             ) : (
               <Link
-                href="/"
+                href="/login"
                 className="btn-pill-lg"
                 style={{
                   background: 'hsl(var(--tomato))',
@@ -957,7 +963,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             ) : (
               <p style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>
                 <Link
-                  href="/"
+                  href="/login"
                   style={{
                     color: 'hsl(var(--tomato))',
                     textDecoration: 'none',
@@ -972,17 +978,23 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           </div>
         </header>
 
+        {loginPrompt && <LoginPrompt message={loginPrompt} onDismiss={() => setLoginPrompt(null)} />}
+
         {/* Agenda — onion-15370: dossier-style overline above heading */}
         {agenda.length > 0 && (
           <div style={card()}>
             <p className="overline" style={{ color: 'hsl(var(--tomato))', margin: 0, marginBottom: 6 }}>
               § ··· Dossier · meeting
             </p>
-            <h2
-              onClick={() => toggleSection('agenda')}
-              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
-            >
-              {collapsedSections.agenda ? '▶' : '▼'} Meeting Agenda ({agenda.length})
+            <h2 style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('agenda')}
+                aria-expanded={!collapsedSections['agenda']}
+                style={sectionToggleButton()}
+              >
+                {collapsedSections.agenda ? '▶' : '▼'} Meeting Agenda ({agenda.length})
+              </button>
             </h2>
             {!collapsedSections.agenda && (
               // quattro-formaggi-54080: 4-column table needs horizontal
@@ -1125,11 +1137,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
           return (
             <div style={card()}>
-              <h2
-                onClick={() => toggleSection('roster')}
-                style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
-              >
-                {collapsedSections.roster ? '▶' : '▼'} Crew Roster ({visibleRoster.length} members)
+              <h2 style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}>
+                <button
+                  type="button"
+                  onClick={() => toggleSection('roster')}
+                  aria-expanded={!collapsedSections['roster']}
+                  style={sectionToggleButton()}
+                >
+                  {collapsedSections.roster ? '▶' : '▼'} Crew Roster ({visibleRoster.length} members)
+                </button>
               </h2>
 
               {!collapsedSections.roster && activeMembers.length > 0 && (
@@ -1145,11 +1161,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
               {!collapsedSections.roster && benchMembers.length > 0 && (
                 <>
-                  <h3
-                    onClick={() => toggleSection('bench')}
-                    style={collapsibleHeader('hsl(var(--ink-soft))')}
-                  >
-                    <span>{collapsedSections.bench ? '▶' : '▼'} Bench ({benchMembers.length})</span>
+                  <h3 style={collapsibleHeader('hsl(var(--ink-soft))')}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('bench')}
+                      aria-expanded={!collapsedSections['bench']}
+                      style={sectionToggleButton()}
+                    >
+                      <span>{collapsedSections.bench ? '▶' : '▼'} Bench ({benchMembers.length})</span>
+                    </button>
                   </h3>
                   {!collapsedSections.bench && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
@@ -1161,11 +1181,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
               {!collapsedSections.roster && otherMembers.length > 0 && (
                 <>
-                  <h3
-                    onClick={() => toggleSection('other')}
-                    style={collapsibleHeader('hsl(var(--muted-foreground))')}
-                  >
-                    <span>{collapsedSections.other ? '▶' : '▼'} Other ({otherMembers.length})</span>
+                  <h3 style={collapsibleHeader('hsl(var(--muted-foreground))')}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('other')}
+                      aria-expanded={!collapsedSections['other']}
+                      style={sectionToggleButton()}
+                    >
+                      <span>{collapsedSections.other ? '▶' : '▼'} Other ({otherMembers.length})</span>
+                    </button>
                   </h3>
                   {!collapsedSections.other && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
@@ -1181,11 +1205,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         {/* Goals */}
         {goals.length > 0 && (
           <div style={card()}>
-            <h2
-              onClick={() => toggleSection('goals')}
-              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
-            >
-              {collapsedSections.goals ? '▶' : '▼'} Goals ({goals.length})
+            <h2 style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('goals')}
+                aria-expanded={!collapsedSections['goals']}
+                style={sectionToggleButton()}
+              >
+                {collapsedSections.goals ? '▶' : '▼'} Goals ({goals.length})
+              </button>
             </h2>
             {!collapsedSections.goals && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
@@ -1457,11 +1485,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
               {myTasks.length > 0 && (
                 <>
-                  <h3
-                    onClick={() => toggleSection('myTasks')}
-                    style={collapsibleHeader('hsl(142 71% 30%)')}
-                  >
-                    <span>{collapsedSections.myTasks ? '▶' : '▼'} My Tasks ({myTasks.length})</span>
+                  <h3 style={collapsibleHeader('hsl(142 71% 30%)')}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('myTasks')}
+                      aria-expanded={!collapsedSections['myTasks']}
+                      style={sectionToggleButton()}
+                    >
+                      <span>{collapsedSections.myTasks ? '▶' : '▼'} My Tasks ({myTasks.length})</span>
+                    </button>
                   </h3>
                   {!collapsedSections.myTasks && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
@@ -1473,11 +1505,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
               {filteredTopTasks.length > 0 && (
                 <>
-                  <h3
-                    onClick={() => toggleSection('topTasks')}
-                    style={collapsibleHeader('hsl(var(--tomato))')}
-                  >
-                    <span>{collapsedSections.topTasks ? '▶' : '▼'} Top Tasks ({filteredTopTasks.length})</span>
+                  <h3 style={collapsibleHeader('hsl(var(--tomato))')}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('topTasks')}
+                      aria-expanded={!collapsedSections['topTasks']}
+                      style={sectionToggleButton()}
+                    >
+                      <span>{collapsedSections.topTasks ? '▶' : '▼'} Top Tasks ({filteredTopTasks.length})</span>
+                    </button>
                   </h3>
                   {!collapsedSections.topTasks && (
                     <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
@@ -1495,11 +1531,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
                 return (
                   <div key={goalName}>
-                    <h3
-                      onClick={() => toggleSection(sectionKey)}
-                      style={collapsibleHeader('hsl(var(--foreground))')}
-                    >
-                      <span>{isCollapsed ? '▶' : '▼'} {goalName} ({goalTasks.length})</span>
+                    <h3 style={collapsibleHeader('hsl(var(--foreground))')}>
+                      <button
+                        type="button"
+                        onClick={() => toggleSection(sectionKey)}
+                        aria-expanded={!isCollapsed}
+                        style={sectionToggleButton()}
+                      >
+                        <span>{isCollapsed ? '▶' : '▼'} {goalName} ({goalTasks.length})</span>
+                      </button>
                     </h3>
                     {!isCollapsed && (
                       <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12, marginBottom: 24 }}>
@@ -1512,11 +1552,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
               {(filteredUngroupedTasks.length > 0 || filteredLaterTasks.length > 0) && (
                 <>
-                  <h3
-                    onClick={() => toggleSection('otherTasks')}
-                    style={collapsibleHeader('hsl(var(--muted-foreground))')}
-                  >
-                    <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({filteredUngroupedTasks.length + (showLaterTasks ? filteredLaterTasks.length : 0)})</span>
+                  <h3 style={collapsibleHeader('hsl(var(--muted-foreground))')}>
+                    <button
+                      type="button"
+                      onClick={() => toggleSection('otherTasks')}
+                      aria-expanded={!collapsedSections['otherTasks']}
+                      style={sectionToggleButton()}
+                    >
+                      <span>{collapsedSections.otherTasks ? '▶' : '▼'} Other Tasks ({filteredUngroupedTasks.length + (showLaterTasks ? filteredLaterTasks.length : 0)})</span>
+                    </button>
                   </h3>
                   {!collapsedSections.otherTasks && (
                     <>
@@ -1548,11 +1592,15 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         {/* Manuals */}
         {manuals.length > 0 && (
           <div style={card()}>
-            <h2
-              onClick={() => toggleSection('manuals')}
-              style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}
-            >
-              {collapsedSections.manuals ? '▶' : '▼'} Manuals ({manuals.length})
+            <h2 style={{ ...sectionTitle(), cursor: 'pointer', userSelect: 'none', minHeight: 44, display: 'flex', alignItems: 'center' }}>
+              <button
+                type="button"
+                onClick={() => toggleSection('manuals')}
+                aria-expanded={!collapsedSections['manuals']}
+                style={sectionToggleButton()}
+              >
+                {collapsedSections.manuals ? '▶' : '▼'} Manuals ({manuals.length})
+              </button>
             </h2>
             {!collapsedSections.manuals && (
               <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(min(280px, 100%), 1fr))', gap: 12 }}>
@@ -1612,6 +1660,26 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 // (card / btn / badge / navBtn / pageContainer / loadingSpinner) come from
 // @/app/ui/shared-styles so they stay in sync with the Phase 2 token system.
 // ---------------------------------------------------------------------------
+
+/** Resets a <button> nested in a collapsible heading so it inherits the heading's look. */
+function sectionToggleButton(): React.CSSProperties {
+  return {
+    background: 'transparent',
+    border: 'none',
+    padding: 0,
+    margin: 0,
+    font: 'inherit',
+    color: 'inherit',
+    letterSpacing: 'inherit',
+    cursor: 'pointer',
+    width: '100%',
+    minHeight: 44,
+    textAlign: 'left',
+    display: 'flex',
+    alignItems: 'center',
+    gap: 6,
+  }
+}
 
 function sectionTitle(): React.CSSProperties {
   return {

@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
 import { groupCrewsByDay } from '@/app/lib/crew-schedule'
+import { useToast } from '@/app/ui/shared/Toast'
+import { LoginPrompt } from '@/app/ui/shared/LoginPrompt'
 import {
   btn,
   card,
@@ -48,6 +50,8 @@ export default function AllCrewsPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [joining, setJoining] = useState<string | null>(null)
   const [leaving, setLeaving] = useState<string | null>(null)
+  const [loginPromptFor, setLoginPromptFor] = useState<string | null>(null)
+  const toast = useToast()
   const [isMobile, setIsMobile] = useState(false)
 
   // Detect mobile viewport
@@ -105,7 +109,7 @@ export default function AllCrewsPage() {
 
   const handleJoinCrew = async (crewId: string) => {
     if (!user) {
-      alert('Please log in to join a crew')
+      setLoginPromptFor(crewId)
       return
     }
 
@@ -127,7 +131,7 @@ export default function AllCrewsPage() {
       } : null)
 
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error((e as any)?.message || 'Something went wrong')
     } finally {
       setJoining(null)
     }
@@ -154,7 +158,7 @@ export default function AllCrewsPage() {
       } : null)
 
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error((e as any)?.message || 'Something went wrong')
     } finally {
       setLeaving(null)
     }
@@ -262,7 +266,25 @@ export default function AllCrewsPage() {
               </button>
             )
           )}
+          {!user && (
+            <Link
+              href="/login"
+              style={{
+                ...btn('primary'),
+                flex: 1,
+                textAlign: 'center',
+                fontSize: 14,
+              }}
+            >
+              Log in to join
+            </Link>
+          )}
         </div>
+        {loginPromptFor === crew.id && (
+          <div style={{ marginTop: 12 }}>
+            <LoginPrompt message="Please log in to join a crew." onDismiss={() => setLoginPromptFor(null)} />
+          </div>
+        )}
 
         {/* Tasks Section */}
         {crew.tasks && crew.tasks.length > 0 && (
