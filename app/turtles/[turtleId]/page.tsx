@@ -116,9 +116,6 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
       <div style={{ maxWidth: 1000, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/" style={navBtn()}>
-            &larr; Home
-          </Link>
           <Link href="/turtles" style={navBtn()}>
             All Turtles
           </Link>

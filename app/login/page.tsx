@@ -10,7 +10,7 @@ import { OnboardingWizard } from "../ui/onboarding";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Login · PizzaDAO",
+  title: "Log in",
   description: "Login via Discord DM.",
 };
 

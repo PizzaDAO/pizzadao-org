@@ -17,11 +17,14 @@
 import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import { useTranslations } from "next-intl";
 import { CREWS } from "../../ui/constants";
 import { norm } from "../../lib/strings";
 import { SendPepModal } from "../../ui/economy";
 import { MissionsProgress } from "../../ui/missions";
 import { VouchesWidget } from "../../ui/vouches/VouchesWidget";
+import { LanguageEditor } from "../../ui/profile/LanguageEditor";
 import {
     useUserData,
     usePfp,
@@ -57,6 +60,8 @@ function splitTurtlesCell(v: unknown): string[] {
 export default function Dashboard({ params }: { params: Promise<{ id: string }> }) {
     const { id } = use(params);
     const router = useRouter();
+    const queryClient = useQueryClient();
+    const tLanguage = useTranslations("language");
 
     // --- React Query hooks for data fetching ---
     const { data: summary } = useDashboardSummary(id);
@@ -269,6 +274,22 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         <VouchesWidget memberId={idValue} />
                     </div>
 
+                    {/* ── 5.5. Language preference ── */}
+                    <section className="rule-warm" style={{ paddingTop: 24 }} aria-labelledby="dash-language-heading">
+                        <p className="overline text-tomato" style={{ margin: 0 }}>§ · Settings</p>
+                        <h2
+                            id="dash-language-heading"
+                            className="font-[family-name:var(--font-display)] font-bold tracking-[-0.01em] text-foreground"
+                            style={{ fontSize: "clamp(1.2rem, 2.4vw, 1.5rem)", margin: "4px 0 2px" }}
+                        >
+                            {tLanguage("sectionTitle")}
+                        </h2>
+                        <p className="text-foreground/65" style={{ fontSize: 13.5, margin: "0 0 12px" }}>
+                            {tLanguage("description")}
+                        </p>
+                        <LanguageEditor memberId={id} inline />
+                    </section>
+
                     {/* ── 6. Logout ── */}
                     <div className="rule-warm" style={{ paddingTop: 24, textAlign: "center" }}>
                         <button
@@ -280,6 +301,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 try {
                                     await fetch("/api/logout", { method: "POST" });
                                 } catch { }
+                                // Drop the cached session so the site header flips to Log in / Join.
+                                queryClient.removeQueries({ queryKey: ["session"] });
                                 router.push("/");
                             }}
                             className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"

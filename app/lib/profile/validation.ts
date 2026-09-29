@@ -1,3 +1,7 @@
+import { sanitizeDisplayName } from "../display-name";
+
+export { sanitizeDisplayName, validateDisplayName } from "../display-name";
+
 export interface ProfilePayload {
   memberId: string;
   mafiaName: string;
@@ -38,7 +42,9 @@ export function validateProfilePayload(body: any): ProfilePayload {
 
   return {
     memberId: clampStr(body.memberId ?? "", 20),
-    mafiaName: clampStr(body.mafiaName, 64),
+    // Display names go through the shared sanitizer (NFKC, strip invisible /
+    // disallowed chars, 64-char cap). Empty result = invalid; callers reject.
+    mafiaName: sanitizeDisplayName(body.mafiaName),
     city: clampStr(body.city, 120),
     topping: clampStr(body.topping, 50),
     crews: crewsArr,

@@ -14,7 +14,7 @@
 // - sicilian-41551 (mobile typography clamps)
 
 import { useEffect, useRef, useState } from "react";
-import Link from "next/link";
+import { useToast } from "@/app/ui/shared/Toast";
 import { pageContainer, loadingSpinner } from "../ui/shared-styles";
 import { MissionCard } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
@@ -69,6 +69,7 @@ const DISPLAY_FONT =
 
 export default function MissionsPage() {
   const [data, setData] = useState<MissionsResponse | null>(null);
+  const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [expandedLevels, setExpandedLevels] = useState<Set<number>>(new Set());
@@ -244,7 +245,7 @@ export default function MissionsPage() {
 
     if (!res.ok) {
       const json = await res.json();
-      alert(json.error || "Submission failed");
+      toast.error(json.error || "Submission failed");
       throw new Error(json.error);
     }
 
@@ -386,17 +387,6 @@ export default function MissionsPage() {
             >
               § The Dossier · Missions
             </span>
-            <Link
-              href="/"
-              className="overline"
-              style={{
-                color: "hsl(var(--muted-foreground))",
-                textDecoration: "none",
-                transition: "color 150ms ease",
-              }}
-            >
-              ← Home
-            </Link>
           </div>
 
           <h1
