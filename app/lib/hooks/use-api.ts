@@ -39,9 +39,11 @@ export function usePfp(memberId: string | undefined) {
   return useQuery({
     queryKey: ['pfp', memberId],
     queryFn: async () => {
-      const res = await fetch(`/api/pfp/${memberId}`)
+      // Batch endpoint (same one list views can use); returns { urls: { [id]: url } }
+      const res = await fetch(`/api/pfp?ids=${encodeURIComponent(memberId!)}`)
       if (!res.ok) return { url: null }
-      return res.json()
+      const json = await res.json()
+      return { url: (json?.urls?.[memberId!] as string | null | undefined) ?? null }
     },
     enabled: !!memberId,
     staleTime: 30 * 60 * 1000,

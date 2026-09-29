@@ -28,6 +28,7 @@ import { fetchMyTasksForCrew } from "@/app/lib/my-tasks";
 import { resolveNextAction, type NextAction } from "@/app/dashboard/[id]/lib/next-action";
 import { hasAnyRole } from "@/app/lib/discord";
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
+import { resolvePfpUrl } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -252,25 +253,8 @@ export async function GET(request: NextRequest) {
         );
         const memberCity = String(member?.["City"] || "Worldwide");
 
-        // PFP — synchronous fs.exists, but cheap. Mirror /api/pfp/[memberId].
-        let pfpUrl: string | null = null;
-        try {
-            const fs = await import("fs");
-            const path = await import("path");
-            const pfpDir = path.join(process.cwd(), "public", "pfp");
-            const jpgPath = path.join(pfpDir, `${memberId}.jpg`);
-            const pngPath = path.join(pfpDir, `${memberId}.png`);
-            if (fs.existsSync(jpgPath)) pfpUrl = `/pfp/${memberId}.jpg`;
-            else if (fs.existsSync(pngPath)) pfpUrl = `/pfp/${memberId}.png`;
-            else {
-                const defaultJpg = path.join(pfpDir, "default.jpg");
-                const defaultPng = path.join(pfpDir, "default.png");
-                if (fs.existsSync(defaultJpg)) pfpUrl = `/pfp/default.jpg`;
-                else if (fs.existsSync(defaultPng)) pfpUrl = `/pfp/default.png`;
-            }
-        } catch {
-            pfpUrl = null;
-        }
+        // PFP — same resolution as /api/pfp/[memberId].
+        const pfpUrl = resolvePfpUrl(memberId);
 
         // --- Wallets ---
         const wallets = {
