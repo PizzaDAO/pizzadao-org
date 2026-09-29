@@ -21,6 +21,7 @@ interface DebugInfo {
 
 test.describe('Complete Manuals Sheet Content Verification', () => {
   test('All Complete manuals should display sheet content', async ({ page }) => {
+    test.setTimeout(180000); // checks many manual pages
     // Step 1: Navigate to manuals list page
     console.log('\n--- Step 1: Navigating to manuals list page ---');
     await page.goto('/manuals');

@@ -143,7 +143,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
               color: "hsl(var(--foreground))",
             }}
           >
-            Today's Jobs
+            Today&apos;s Jobs
           </h2>
           <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
             <div

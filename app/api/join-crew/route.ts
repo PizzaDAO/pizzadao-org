@@ -43,7 +43,7 @@ async function fetchMemberByDiscordId(discordId: string) {
   headerVals.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
 
   // Find columns
-  let idxId = headerMap.get("id") ?? headerMap.get("member id") ?? 0;
+  const idxId = headerMap.get("id") ?? headerMap.get("member id") ?? 0;
   const idxDiscord = headerMap.get("discordid") ?? headerMap.get("discord id") ?? headerMap.get("discord");
   const idxName = headerMap.get("name") ?? -1;
   const idxCrews = headerMap.get("crews") ?? -1;
