@@ -28,7 +28,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
     // Best-effort: fall through to defaults if crew mappings can't be fetched.
   }
 
-  const title = `${emoji ? emoji + ' ' : ''}${label} Crew | PizzaDAO`
+  const title = `${emoji ? emoji + ' ' : ''}${label} Crew`
   const description = fallbackMission(crewId, label)
 
   return {

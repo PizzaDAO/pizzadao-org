@@ -6,6 +6,7 @@ import "./globals.css";
 import { Providers } from "./providers";
 import CornerLinks from "@/app/ui/CornerLinks";
 import SiteHeader from "@/app/ui/SiteHeader";
+import { SITE_URL } from "@/app/lib/site-url";
 
 // Body / UI sans — matches pizzadao.org marketing site.
 const asapSans = Asap({
@@ -40,8 +41,16 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Join PizzaDAO",
+  metadataBase: new URL(SITE_URL),
+  title: {
+    default: "PizzaDAO",
+    template: "%s · PizzaDAO",
+  },
   description: "The world's largest pizza co-op.",
+  openGraph: {
+    siteName: "PizzaDAO",
+    type: "website",
+  },
 };
 
 export default async function RootLayout({

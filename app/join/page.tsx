@@ -9,7 +9,7 @@ import { OnboardingWizard } from "../ui/onboarding";
 import type { Metadata } from "next";
 
 export const metadata: Metadata = {
-  title: "Join PizzaDAO",
+  title: { absolute: "Join PizzaDAO" },
   description: "Pick your mafia name and join the international pizza co-op.",
 };
 
