@@ -1,29 +1,17 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import path from 'path'
 import { prisma } from '@/app/lib/db'
+import { getGoogleAuth, GOOGLE_SCOPES } from '@/app/lib/google-auth'
 import { requireSession } from '@/app/lib/auth-guards'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 
-// Initialize Google Sheets API client with write access
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-
-let credentials
-try {
-  credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
-    : undefined
-} catch (error) {
+// Google Sheets API client with write access, created on first use so a
+// malformed GOOGLE_SERVICE_ACCOUNT_JSON surfaces as a request error rather
+// than a module-load crash.
+function getSheetsClient() {
+  return google.sheets({ version: 'v4', auth: getGoogleAuth([GOOGLE_SCOPES.sheets]) })
 }
-
-const auth = new google.auth.GoogleAuth({
-  credentials,
-  keyFile: !credentials ? path.join(process.cwd(), 'service-account.json') : undefined,
-  scopes: SCOPES,
-})
-
-const sheets = google.sheets({ version: 'v4', auth })
 
 // Extract sheet ID from Google Sheets URL
 function extractSheetId(url: string): string | null {
@@ -86,7 +74,7 @@ export async function POST(req: Request) {
     }
 
     // Get the spreadsheet to find the Tasks section
-    const res = await sheets.spreadsheets.get({
+    const res = await getSheetsClient().spreadsheets.get({
       spreadsheetId: sheetId,
       includeGridData: true,
       fields: 'sheets(properties,data(rowData(values(userEnteredValue,formattedValue))))',
@@ -218,7 +206,7 @@ export async function POST(req: Request) {
     const leadIdCell = `'${sheetName}'!${columnToLetter(leadIdColIdx)}${taskRowIdx + 1}`
     const newValue = action === 'giveup' ? '' : memberId
 
-    await sheets.spreadsheets.values.update({
+    await getSheetsClient().spreadsheets.values.update({
       spreadsheetId: sheetId,
       range: leadIdCell,
       valueInputOption: 'RAW',
