@@ -15,6 +15,8 @@ export type CelebrationState = {
   lastCelebratedLevel: number
   firstMissionCelebratedAt: string | null
   vouchPromptShownAt: string | null
+  /** jalapeno-34126 — profile-complete celebration shown (null = not yet). */
+  profileCompletedCelebratedAt: string | null
 }
 
 /**
@@ -33,6 +35,7 @@ export async function getCelebrationState(memberId: string): Promise<Celebration
       lastCelebratedLevel: true,
       firstMissionCelebratedAt: true,
       vouchPromptShownAt: true,
+      profileCompletedCelebratedAt: true,
     },
   })
 
@@ -42,6 +45,7 @@ export async function getCelebrationState(memberId: string): Promise<Celebration
       lastCelebratedLevel: existing.lastCelebratedLevel,
       firstMissionCelebratedAt: existing.firstMissionCelebratedAt?.toISOString() ?? null,
       vouchPromptShownAt: existing.vouchPromptShownAt?.toISOString() ?? null,
+      profileCompletedCelebratedAt: existing.profileCompletedCelebratedAt?.toISOString() ?? null,
     }
   }
 
@@ -54,6 +58,7 @@ export async function getCelebrationState(memberId: string): Promise<Celebration
       lastCelebratedLevel: true,
       firstMissionCelebratedAt: true,
       vouchPromptShownAt: true,
+      profileCompletedCelebratedAt: true,
     },
   })
 
@@ -62,6 +67,7 @@ export async function getCelebrationState(memberId: string): Promise<Celebration
     lastCelebratedLevel: created.lastCelebratedLevel,
     firstMissionCelebratedAt: created.firstMissionCelebratedAt?.toISOString() ?? null,
     vouchPromptShownAt: created.vouchPromptShownAt?.toISOString() ?? null,
+    profileCompletedCelebratedAt: created.profileCompletedCelebratedAt?.toISOString() ?? null,
   }
 }
 
@@ -128,6 +134,7 @@ export async function updateCelebrationState(
       lastCelebratedLevel: true,
       firstMissionCelebratedAt: true,
       vouchPromptShownAt: true,
+      profileCompletedCelebratedAt: true,
     },
   })
 
@@ -136,5 +143,28 @@ export async function updateCelebrationState(
     lastCelebratedLevel: updated.lastCelebratedLevel,
     firstMissionCelebratedAt: updated.firstMissionCelebratedAt?.toISOString() ?? null,
     vouchPromptShownAt: updated.vouchPromptShownAt?.toISOString() ?? null,
+    profileCompletedCelebratedAt: updated.profileCompletedCelebratedAt?.toISOString() ?? null,
   }
+}
+
+/**
+ * jalapeno-34126 — atomically claim the one-shot "profile complete"
+ * celebration. Returns true only for the single call that flips
+ * `profileCompletedCelebratedAt` from null to now(); every later call (other
+ * tabs, reloads, retries) gets false. The client shows the pop-up only when
+ * this returns true, so it can never fire twice.
+ */
+export async function claimProfileCompletedCelebration(memberId: string): Promise<boolean> {
+  if (!memberId) {
+    throw new Error('memberId required')
+  }
+
+  // Ensure the row exists (lazy-created elsewhere too).
+  await getCelebrationState(memberId)
+
+  const { count } = await prisma.memberProfileExtras.updateMany({
+    where: { memberId, profileCompletedCelebratedAt: null },
+    data: { profileCompletedCelebratedAt: new Date() },
+  })
+  return count === 1
 }

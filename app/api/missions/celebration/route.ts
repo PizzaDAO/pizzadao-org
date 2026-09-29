@@ -1,7 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
-import { getCelebrationState, updateCelebrationState } from '@/app/lib/celebration'
+import {
+  getCelebrationState,
+  updateCelebrationState,
+  claimProfileCompletedCelebration,
+} from '@/app/lib/celebration'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -28,6 +32,7 @@ const GET_HANDLER = async () => {
       lastCelebratedLevel: 0,
       firstMissionCelebratedAt: null,
       vouchPromptShownAt: null,
+      profileCompletedCelebratedAt: null,
     }, {
       headers: { 'Cache-Control': 'private, no-store' },
     })
@@ -43,10 +48,15 @@ const GET_HANDLER = async () => {
  * POST /api/missions/celebration
  *
  * Body: { lastCelebratedLevel?: number, firstMissionCelebrated?: boolean,
- *         vouchPromptDismissed?: boolean }
+ *         vouchPromptDismissed?: boolean, profileCompleted?: boolean }
  *
  * Idempotent — `lastCelebratedLevel` is monotonic and the boolean fields
  * only flip null -> timestamp once.
+ *
+ * `profileCompleted: true` (jalapeno-34126) atomically claims the one-shot
+ * profile-complete celebration. The response then carries
+ * `profileCompletedClaimed: boolean` — true only for the single request that
+ * flipped the flag, so the client shows the pop-up at most once ever.
  */
 const POST_HANDLER = async (request: NextRequest) => {
   const session = await getSession()
@@ -90,9 +100,16 @@ const POST_HANDLER = async (request: NextRequest) => {
     }
     patch.vouchPromptDismissed = body.vouchPromptDismissed
   }
+  if (body.profileCompleted !== undefined && typeof body.profileCompleted !== 'boolean') {
+    throw new ValidationError('profileCompleted must be a boolean')
+  }
+  const profileCompletedClaimed =
+    body.profileCompleted === true ? await claimProfileCompletedCelebration(memberId) : undefined
 
   const state = await updateCelebrationState(memberId, patch)
-  return NextResponse.json(state, {
+  const payload =
+    profileCompletedClaimed === undefined ? state : { ...state, profileCompletedClaimed }
+  return NextResponse.json(payload, {
     headers: { 'Cache-Control': 'private, no-store' },
   })
 }

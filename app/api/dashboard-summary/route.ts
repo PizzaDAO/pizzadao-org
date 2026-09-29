@@ -26,6 +26,10 @@ import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { fetchMyTasksForCrew } from "@/app/lib/my-tasks";
 import { resolveNextAction, type NextAction } from "@/app/dashboard/[id]/lib/next-action";
+import {
+    getProfileCompletion,
+    type ProfileCompletion,
+} from "@/app/dashboard/[id]/lib/profile-completion";
 import { hasAnyRole } from "@/app/lib/discord";
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
 
@@ -76,6 +80,8 @@ export interface DashboardSummary {
         }>;
     };
     nextAction: NextAction;
+    /** jalapeno-34126 — setup checklist backing the hero completion meter. */
+    profileCompletion: ProfileCompletion;
 }
 
 // ---------------------------------------------------------------------------
@@ -356,6 +362,12 @@ export async function GET(request: NextRequest) {
             isReviewer,
         });
 
+        const profileCompletion = getProfileCompletion({
+            member: { id: memberId, crews: memberCrews },
+            wallets: { count: wallets.count },
+            x: { connected: x.connected },
+        });
+
         const summary: DashboardSummary = {
             member: {
                 id: memberId,
@@ -381,6 +393,7 @@ export async function GET(request: NextRequest) {
             crewsHydrated,
             notifications: { unread: unreadCount, top: topNotifications },
             nextAction,
+            profileCompletion,
         };
 
         CACHE.set(memberId, { time: Date.now(), data: summary });
