@@ -40,6 +40,52 @@ export async function hasCompletedJobToday(userId: string, jobId: number): Promi
 }
 
 /**
+ * Atomically record today's completion of a daily job and pay the reward.
+ *
+ * Idempotent per (user, job, UTC day) without a schema change: the existing
+ * @@unique([jobId, userId]) row is either created (a concurrent duplicate
+ * create hits the unique constraint) or conditionally moved forward from a
+ * previous day (a concurrent duplicate update matches 0 rows). Only the
+ * winner credits the wallet, inside the same transaction.
+ *
+ * Returns false if the job was already completed today.
+ */
+export async function recordDailyJobCompletion(
+  userId: string,
+  jobId: number,
+  reward: number,
+  description: string,
+): Promise<boolean> {
+  const dayStart = getDayStart()
+  try {
+    return await prisma.$transaction(async (tx) => {
+      const moved = await tx.jobAssignment.updateMany({
+        where: { jobId, userId, assignedAt: { lt: dayStart } },
+        data: { assignedAt: new Date() },
+      })
+      if (moved.count !== 1) {
+        const existing = await tx.jobAssignment.findUnique({
+          where: { jobId_userId: { jobId, userId } },
+        })
+        if (existing) return false // already completed today
+        await tx.jobAssignment.create({ data: { jobId, userId } })
+      }
+
+      await tx.economy.update({
+        where: { id: userId },
+        data: { wallet: { increment: reward } },
+      })
+      await logTransaction(tx, userId, 'JOB_REWARD', reward, description, { jobId })
+      return true
+    })
+  } catch (e: unknown) {
+    // Concurrent first-ever completion lost the race on the unique constraint
+    if ((e as { code?: string })?.code === 'P2002') return false
+    throw e
+  }
+}
+
+/**
  * Get all job IDs the user has completed today
  */
 export async function getCompletedJobsToday(userId: string): Promise<number[]> {

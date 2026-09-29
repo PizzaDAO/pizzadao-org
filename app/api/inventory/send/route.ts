@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/app/lib/session'
+import { requireSession } from '@/app/lib/auth-guards'
 import { prisma } from '@/app/lib/db'
 import { getOrCreateEconomy } from '@/app/lib/economy'
 
@@ -7,11 +7,9 @@ export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession()
-
-    if (!session?.discordId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
+    const auth = await requireSession()
+    if (!auth.ok) return auth.response
+    const { session } = auth
 
     const body = await request.json()
     const { toUserId, itemId, quantity } = body
@@ -24,7 +22,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Item ID required' }, { status: 400 })
     }
 
-    if (!quantity || typeof quantity !== 'number' || quantity <= 0) {
+    if (typeof quantity !== 'number' || !Number.isInteger(quantity) || quantity <= 0) {
       return NextResponse.json({ error: 'Valid quantity required' }, { status: 400 })
     }
 
@@ -49,21 +47,19 @@ export async function POST(request: NextRequest) {
 
     // Transfer the item
     await prisma.$transaction(async (tx: any) => {
-      // Decrement or remove from sender
-      if (senderInventory.quantity === quantity) {
-        await tx.inventory.delete({
-          where: {
-            userId_itemId: { userId: session.discordId, itemId }
-          }
-        })
-      } else {
-        await tx.inventory.update({
-          where: {
-            userId_itemId: { userId: session.discordId, itemId }
-          },
-          data: { quantity: { decrement: quantity } }
-        })
+      // Atomically decrement the sender only if they still hold enough.
+      // (Prevents concurrent sends from duplicating items.)
+      const debit = await tx.inventory.updateMany({
+        where: { userId: session.discordId, itemId, quantity: { gte: quantity } },
+        data: { quantity: { decrement: quantity } }
+      })
+      if (debit.count !== 1) {
+        throw new Error('Insufficient items in inventory')
       }
+      // Remove the row if it hit zero
+      await tx.inventory.deleteMany({
+        where: { userId: session.discordId, itemId, quantity: { lte: 0 } }
+      })
 
       // Add to recipient (upsert)
       await tx.inventory.upsert({

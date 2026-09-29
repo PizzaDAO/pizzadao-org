@@ -34,6 +34,7 @@ describe('transfer', () => {
       const txClient = {
         economy: {
           update: vi.fn().mockResolvedValue({}),
+          updateMany: vi.fn().mockResolvedValue({ count: 1 }),
         },
       }
       await fn(txClient)
@@ -79,5 +80,29 @@ describe('transfer', () => {
       .mockResolvedValueOnce({ id: 'recipient-1', wallet: 100 }) // recipient
 
     await expect(transfer('sender-1', 'recipient-1', 100)).rejects.toThrow('Insufficient funds')
+  })
+
+  it('should reject non-integer amounts', async () => {
+    await expect(transfer('sender-1', 'recipient-1', 1.5)).rejects.toThrow('Amount must be positive')
+    await expect(transfer('sender-1', 'recipient-1', NaN)).rejects.toThrow('Amount must be positive')
+  })
+
+  it('debits atomically and fails if a concurrent transfer drained the wallet', async () => {
+    ;(prisma.economy.findUnique as ReturnType<typeof vi.fn>)
+      .mockResolvedValueOnce({ id: 'sender-1', wallet: 500 }) // stale read passes the pre-check
+      .mockResolvedValueOnce({ id: 'recipient-1', wallet: 100 })
+
+    const updateMany = vi.fn().mockResolvedValue({ count: 0 }) // conditional debit matched no row
+    const update = vi.fn().mockResolvedValue({})
+    ;(prisma.$transaction as ReturnType<typeof vi.fn>).mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
+      await fn({ economy: { update, updateMany } })
+    })
+
+    await expect(transfer('sender-1', 'recipient-1', 100)).rejects.toThrow('Insufficient funds')
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { id: 'sender-1', wallet: { gte: 100 } },
+      data: { wallet: { decrement: 100 } },
+    })
+    expect(update).not.toHaveBeenCalled() // recipient never credited
   })
 })
