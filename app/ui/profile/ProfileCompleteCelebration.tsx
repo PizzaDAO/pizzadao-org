@@ -14,7 +14,7 @@
 // Gating (show once, ever) lives in the caller: see ProfileCompleteCelebrationGate.
 
 import Link from "next/link";
-import { useCallback, useEffect, useId, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useId, useMemo, useRef, useSyncExternalStore } from "react";
 
 export type ProfileCompleteCelebrationProps = {
   /** Steps shown as a ticked checklist, e.g. ["Join a crew", "Connect a wallet", "Connect X"]. */
@@ -31,9 +31,23 @@ const EMOJI_POOL = ["🍕", "🍅", "✨"];
 const FOCUSABLE =
   'a[href], button:not([disabled]), textarea, input, select, [tabindex]:not([tabindex="-1"])';
 
-function prefersReducedMotion(): boolean {
+const REDUCED_MOTION_QUERY = "(prefers-reduced-motion: reduce)";
+
+function subscribeReducedMotion(onChange: () => void) {
+  if (typeof window === "undefined" || typeof window.matchMedia !== "function") return () => {};
+  const mql = window.matchMedia(REDUCED_MOTION_QUERY);
+  mql.addEventListener?.("change", onChange);
+  return () => mql.removeEventListener?.("change", onChange);
+}
+
+function getReducedMotion(): boolean {
   if (typeof window === "undefined" || typeof window.matchMedia !== "function") return false;
-  return window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  return window.matchMedia(REDUCED_MOTION_QUERY).matches;
+}
+
+/** SSR-safe (server snapshot = false; the CSS media query covers that frame). */
+function usePrefersReducedMotion(): boolean {
+  return useSyncExternalStore(subscribeReducedMotion, getReducedMotion, () => false);
 }
 
 function buildPieces(count: number) {
@@ -55,7 +69,7 @@ export function ProfileCompleteCelebration({
   const descId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
   const primaryRef = useRef<HTMLButtonElement>(null);
-  const [reducedMotion] = useState(prefersReducedMotion);
+  const reducedMotion = usePrefersReducedMotion();
   const pieces = useMemo(() => (reducedMotion ? [] : buildPieces(CONFETTI_PIECES)), [reducedMotion]);
 
   // Keep the latest onDismiss without re-running the mount effect.
