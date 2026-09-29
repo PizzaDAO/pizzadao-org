@@ -26,6 +26,16 @@ const TAB_NAME = "Crew";
 const MIN_CALLS = 3;
 const INACTIVE_MONTHS = 6;
 
+// Must match normalizeCrewId in app/lib/crew-id.ts (and slugify in crew-mappings.ts)
+function normalizeCrewId(raw) {
+  return String(raw ?? "")
+    .trim()
+    .replace(/\s+/g, " ")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "_")
+    .replace(/^_+|_+$/g, "");
+}
+
 async function fetchMembers() {
   const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?tqx=out:json&sheet=${encodeURIComponent(TAB_NAME)}&headers=0`;
   const res = await fetch(url);
@@ -95,9 +105,11 @@ async function main() {
   // Build lookup maps
   const byDiscordId = new Map();
   const byMemberId = new Map();
+  const trackedCrewIds = new Set();
   for (const s of summaries) {
     if (s.discordId.startsWith("UNRESOLVED:")) continue;
-    if (s.crewBreakdown) {
+    if (s.crewBreakdown && typeof s.crewBreakdown === "object") {
+      for (const k of Object.keys(s.crewBreakdown)) trackedCrewIds.add(k);
       byDiscordId.set(s.discordId, s.crewBreakdown);
       if (s.memberId) byMemberId.set(s.memberId, s.crewBreakdown);
     }
@@ -110,12 +122,13 @@ async function main() {
   const missing = [];
   const inactive = [];
   let healthyCount = 0;
+  let untrackedCount = 0;
 
   for (const member of members) {
     if (!member.discordId) continue;
 
     const breakdown = byDiscordId.get(member.discordId) || byMemberId.get(member.id) || {};
-    const claimedCrews = new Set(member.crews.map(c => c.toLowerCase().replace(/\s+/g, "_")));
+    const claimedCrews = new Set(member.crews.map(normalizeCrewId).filter(Boolean));
     const attendedCrews = new Set(Object.keys(breakdown));
 
     // Check claimed crews
@@ -124,6 +137,11 @@ async function main() {
       const entry = breakdown[crewId];
 
       if (!entry || entry.count === 0) {
+        // No attendance tracking exists for this crew at all: don't flag it.
+        if (!trackedCrewIds.has(crewId)) {
+          untrackedCount++;
+          continue;
+        }
         inactive.push({
           memberId: member.id,
           name: member.name,
@@ -221,6 +239,7 @@ async function main() {
   console.log(`  Healthy:  ${healthyCount}`);
   console.log(`  Missing:  ${missing.length} (should be added to roster)`);
   console.log(`  Inactive: ${inactive.length} (should be removed or flagged)`);
+  console.log(`  Untracked crew claims (no attendance data, not flagged): ${untrackedCount}`);
   console.log();
 }
 
