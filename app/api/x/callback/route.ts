@@ -3,7 +3,7 @@ import { cookies } from "next/headers";
 import { verifyXState, encryptToken } from "@/app/lib/x-oauth";
 import { prisma } from "@/app/lib/db";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
-import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
@@ -120,6 +120,7 @@ export async function GET(req: Request) {
           discordId: stateData.discordId,
           x: xUser.username,
         });
+        invalidateMembersCache();
       } catch (sheetErr) {
         console.error("X sheet write failed:", sheetErr);
       }

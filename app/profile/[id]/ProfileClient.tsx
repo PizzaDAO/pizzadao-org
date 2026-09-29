@@ -26,10 +26,8 @@ import { ContributionsBlock } from "../../ui/profile/ContributionsBlock";
 import { CollectionsLazy } from "../../ui/profile/CollectionsLazy";
 import { AttendanceCard } from "../../ui/attendance-card";
 import { useProfileSummary } from "../../lib/hooks/use-api";
+import { norm } from "../../lib/strings";
 
-function norm(s: unknown) {
-    return String(s ?? "").trim().replace(/\s+/g, " ");
-}
 
 interface ProfileClientProps {
     id: string;

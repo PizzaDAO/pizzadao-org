@@ -1,6 +1,6 @@
-import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { findColumnIndex } from "@/app/lib/sheet-utils";
-import type { GvizCell, GvizResponse } from "@/app/lib/types/gviz";
+import type { GvizCell } from "@/app/lib/types/gviz";
+import { getMembersSheet, type MembersTable } from "@/app/lib/sheets/member-repository";
 
 /**
  * Shared helper for fetching the full list of public members from the
@@ -10,11 +10,10 @@ import type { GvizCell, GvizResponse } from "@/app/lib/types/gviz";
  * `PublicMember` are extracted from the sheet. Discord ID, email, telegram,
  * wallet, phone and any other columns the sheet gains in the future are
  * never read.
+ *
+ * The sheet is read through the members repository (Next data cache, tag
+ * "members"); the derived lists are memoized per parsed table.
  */
-
-const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const TAB_NAME = "Crew";
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
 
 export interface PublicMember {
   id: string;
@@ -37,22 +36,10 @@ export interface FetchMembersOptions {
   forceRefresh?: boolean;
 }
 
-type CacheEntry = {
-  time: number;
-  data: (PublicMember | InternalMember)[];
-};
-
-const CACHE = new Map<string, CacheEntry>();
-
-function gvizUrl(sheetId: string, tabName?: string): string {
-  const url = new URL(
-    `https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`
-  );
-  url.searchParams.set("tqx", "out:json");
-  if (tabName) url.searchParams.set("sheet", tabName);
-  url.searchParams.set("headers", "0");
-  return url.toString();
-}
+// Derived member lists keyed by option flags, per parsed members table. The
+// table object is replaced whenever the sheet content changes, so this can
+// never outlive the underlying data.
+const DERIVED = new WeakMap<MembersTable, Map<string, (PublicMember | InternalMember)[]>>();
 
 function cellString(cell: GvizCell | undefined): string {
   if (!cell) return "";
@@ -92,9 +79,8 @@ function isOnboarded(
 /**
  * Fetch and parse the entire public member list.
  *
- * Results are cached for 5 minutes in-memory, keyed on the
- * `includeUnonboarded` and `includeDiscordId` flags.
- * Pass `forceRefresh: true` to bypass.
+ * The sheet comes from the members repository's data cache (tag "members").
+ * Pass `forceRefresh: true` to bypass it.
  */
 export async function fetchAllMembers(
   opts: FetchMembersOptions & { includeDiscordId: true }
@@ -111,45 +97,28 @@ export async function fetchAllMembers(
     (includeUnonboarded ? "all" : "onboarded") +
     (includeDiscordId ? "_with_discord" : "");
 
-  if (!opts.forceRefresh) {
-    const cached = CACHE.get(cacheKey);
-    if (cached && Date.now() - cached.time < CACHE_TTL) {
-      return cached.data;
-    }
-  }
-
-  const res = await fetch(gvizUrl(SHEET_ID, TAB_NAME), { cache: "no-store" });
-  if (!res.ok) {
-    throw new Error(`Failed to fetch Crew sheet: ${res.status}`);
-  }
-  const text = await res.text();
-  const gviz: GvizResponse = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
-
-  // Find header row
-  let headerRowIdx = -1;
-  let headerRowVals: string[] = [];
-
-  for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-    const rowCells = rows[ri]?.c || [];
-    const rowVals = rowCells.map((c: GvizCell) =>
-      cellString(c).toLowerCase()
+  let table: MembersTable;
+  try {
+    table = await getMembersSheet({ fresh: !!opts.forceRefresh });
+  } catch (e) {
+    const msg = e instanceof Error ? e.message : String(e);
+    throw new Error(
+      msg === "Header row not found"
+        ? "Could not find header row in Crew sheet"
+        : `Failed to fetch Crew sheet: ${msg}`
     );
-    const hasName = rowVals.includes("name");
-    const hasStatus =
-      rowVals.includes("status") || rowVals.includes("frequency");
-    const hasCity = rowVals.includes("city") || rowVals.includes("crews");
-
-    if (hasName && (hasStatus || hasCity)) {
-      headerRowIdx = ri;
-      headerRowVals = rowCells.map((c: GvizCell) => cellString(c));
-      break;
-    }
   }
 
-  if (headerRowIdx === -1) {
-    throw new Error("Could not find header row in Crew sheet");
+  let derived = DERIVED.get(table);
+  if (!derived) {
+    derived = new Map();
+    DERIVED.set(table, derived);
   }
+  const memoized = derived.get(cacheKey);
+  if (memoized) return memoized;
+
+  const rows = table.rows;
+  const headerRowVals = table.headers;
 
   // Column indices (allow-list: only what PublicMember needs + optional discordId)
   const idColIdx =
@@ -180,10 +149,9 @@ export async function fetchAllMembers(
     throw new Error("Could not find required Name column in Crew sheet");
   }
 
-  const dataStartIdx = headerRowIdx + 1;
   const members: (PublicMember | InternalMember)[] = [];
 
-  for (let ri = dataStartIdx; ri < rows.length; ri++) {
+  for (let ri = 0; ri < rows.length; ri++) {
     const cells = rows[ri]?.c || [];
 
     const name = cellString(cells[nameColIdx]);
@@ -231,11 +199,6 @@ export async function fetchAllMembers(
     members.push(member);
   }
 
-  CACHE.set(cacheKey, { time: Date.now(), data: members });
+  derived.set(cacheKey, members);
   return members;
-}
-
-/** Exposed for tests. */
-export function __clearMembersCache(): void {
-  CACHE.clear();
 }

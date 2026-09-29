@@ -1,8 +1,15 @@
 // app/api/auto-claim/route.ts
 // Handles auto-claiming when Discord nickname matches a member name
 // No password required since we verify via session + name match
-import { parseGvizJson } from "@/app/lib/gviz-parser";
-import { fetchWithRedirect, findColumnIndex } from "@/app/lib/sheet-utils";
+import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import {
+    MEMBER_COLUMNS,
+    cellText,
+    findMemberRow,
+    getMembersTable,
+    invalidateMembersCache,
+    membersColumn,
+} from "@/app/lib/sheets/member-repository";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
@@ -10,15 +17,6 @@ import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 
 export const runtime = "nodejs";
-
-/**
- * Fetch with redirect handling for Apps Script.
- * Apps Script returns 302 redirects that need to be followed manually for POST requests.
- * The redirect URL should be fetched with GET to retrieve the response.
- */
-
-const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const TAB_NAME = "Crew";
 
 /**
  * Resolve turtle name to Discord role ID.
@@ -60,170 +58,148 @@ export async function POST(req: Request) {
             return NextResponse.json({ error: "Missing memberId" }, { status: 400 });
         }
 
-        // Fetch the member data to verify name match
-        const gvizUrl = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(TAB_NAME)}&tqx=out:json`;
-        const res = await fetch(gvizUrl, { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed to fetch sheet");
+        // Fetch the member data to verify name match. Uncached on purpose: the
+        // "already claimed?" check below must see the row's current Discord ID
+        // before we write to it.
+        const sheet = await getMembersTable({ fresh: true }).catch(() => {
+            throw new Error("Failed to fetch sheet");
+        });
 
-        const text = await res.text();
-        const gviz = parseGvizJson(text);
-        const rows = gviz?.table?.rows || [];
-
-        // Find header row
-        let headerRowIdx = -1;
-        let headerVals: string[] = [];
-        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-            const rowCells = rows[ri]?.c || [];
-            const rowValsLower = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
-            const hasName = rowValsLower.includes("name");
-            const hasStatus = rowValsLower.includes("status") || rowValsLower.includes("frequency");
-            if (hasName && hasStatus) {
-                headerRowIdx = ri;
-                headerVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
-                break;
-            }
-        }
-
-        if (headerRowIdx === -1) {
+        if (sheet.headerRowIndex === -1) {
             return NextResponse.json({ error: "Header row not found" }, { status: 500 });
         }
 
-        const idxId = findColumnIndex(headerVals, ["id", "member id", "memberid"], 0) ?? 0;
-        const idxName = findColumnIndex(headerVals, ["name", "mafia name"]);
-        const idxDiscord = findColumnIndex(headerVals, ["discordid", "discord id", "discord"]);
-        const idxTurtles = findColumnIndex(headerVals, ["turtles", "roles"]);
+        const idxName = membersColumn(sheet, MEMBER_COLUMNS.name);
+        const idxDiscord = membersColumn(sheet, MEMBER_COLUMNS.discordId);
+        const idxTurtles = membersColumn(sheet, ["turtles", "roles"]);
 
         if (idxName == null) {
             return NextResponse.json({ error: "Name column not found" }, { status: 500 });
         }
 
         // Find the member row
-        const targetId = parseInt(String(memberId), 10);
-        for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-            const cells = rows[ri]?.c || [];
-            const idVal = cells[idxId]?.v;
-            const rowId = typeof idVal === "number" ? idVal : parseInt(String(idVal), 10);
+        const row = findMemberRow(sheet, String(memberId));
+        if (row) {
+            const cells = row.c || [];
+            const memberName = cellText(cells[idxName]);
+            const existingDiscord = idxDiscord != null ? cellText(cells[idxDiscord]) : "";
 
-            if (rowId === targetId) {
-                const memberName = String(cells[idxName]?.v ?? cells[idxName]?.f ?? "").trim();
-                const existingDiscord = idxDiscord != null
-                    ? String(cells[idxDiscord]?.v ?? cells[idxDiscord]?.f ?? "").trim()
-                    : "";
+            // Verify name match (case-insensitive)
+            if (!expectedName || memberName.toLowerCase() !== expectedName.toLowerCase()) {
+                return NextResponse.json({
+                    error: "Name mismatch - cannot auto-claim",
+                    canAutoClaim: false
+                }, { status: 403 });
+            }
 
-                // Verify name match (case-insensitive)
-                if (!expectedName || memberName.toLowerCase() !== expectedName.toLowerCase()) {
-                    return NextResponse.json({
-                        error: "Name mismatch - cannot auto-claim",
-                        canAutoClaim: false
-                    }, { status: 403 });
-                }
+            // Check if already claimed by someone else
+            if (existingDiscord && existingDiscord !== sessionDiscordId) {
+                return NextResponse.json({
+                    error: "This member is already claimed by another Discord account",
+                    canAutoClaim: false
+                }, { status: 409 });
+            }
 
-                // Check if already claimed by someone else
-                if (existingDiscord && existingDiscord !== sessionDiscordId) {
-                    return NextResponse.json({
-                        error: "This member is already claimed by another Discord account",
-                        canAutoClaim: false
-                    }, { status: 409 });
-                }
+            // If already claimed by same user, return success
+            if (existingDiscord === sessionDiscordId) {
+                return NextResponse.json({ ok: true, alreadyClaimed: true });
+            }
 
-                // If already claimed by same user, return success
-                if (existingDiscord === sessionDiscordId) {
-                    return NextResponse.json({ ok: true, alreadyClaimed: true });
-                }
+            // Fetch existing turtles and merge with Discord roles
+            const existingTurtlesRaw = idxTurtles != null
+                ? String(cells[idxTurtles]?.v ?? cells[idxTurtles]?.f ?? "")
+                : "";
+            const existingTurtles = parseTurtlesFromSheet(existingTurtlesRaw);
+            const discordTurtles = await getDiscordTurtleRoles(sessionDiscordId);
+            const mergedTurtles = mergeTurtles(existingTurtles, discordTurtles);
 
-                // Fetch existing turtles and merge with Discord roles
-                const existingTurtlesRaw = idxTurtles != null
-                    ? String(cells[idxTurtles]?.v ?? cells[idxTurtles]?.f ?? "")
-                    : "";
-                const existingTurtles = parseTurtlesFromSheet(existingTurtlesRaw);
-                const discordTurtles = await getDiscordTurtleRoles(sessionDiscordId);
-                const mergedTurtles = mergeTurtles(existingTurtles, discordTurtles);
+            // Proceed with claim via Google Sheets Web App
+            const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
+            const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
+            if (!url || !secret) {
+                return NextResponse.json({ error: "Missing Sheets env vars" }, { status: 500 });
+            }
 
-                // Proceed with claim via Google Sheets Web App
-                const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
-                const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-                if (!url || !secret) {
-                    return NextResponse.json({ error: "Missing Sheets env vars" }, { status: 500 });
-                }
-
-                // Match the profile route's payload structure - fields at top level AND in raw
-                const payload = {
-                    secret,
+            // Match the profile route's payload structure - fields at top level AND in raw
+            const payload = {
+                secret,
+                source: "onboarding_auto_claim",
+                memberId: String(memberId),
+                discordId: sessionDiscordId,
+                discordJoined: true,
+                turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
+                raw: {
                     source: "onboarding_auto_claim",
                     memberId: String(memberId),
                     discordId: sessionDiscordId,
                     discordJoined: true,
                     turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
-                    raw: {
-                        source: "onboarding_auto_claim",
-                        memberId: String(memberId),
-                        discordId: sessionDiscordId,
-                        discordJoined: true,
-                        turtles: mergedTurtles.length > 0 ? mergedTurtles.join(", ") : undefined,
-                    },
-                };
+                },
+            };
 
-                const { status: sheetStatus, text: sheetText } = await fetchWithRedirect(url, payload);
+            const { status: sheetStatus, text: sheetText } = await fetchWithRedirect(url, payload);
 
-                let parsed: any = null;
-                try {
-                    parsed = JSON.parse(sheetText);
-                } catch { }
+            let parsed: any = null;
+            try {
+                parsed = JSON.parse(sheetText);
+            } catch { }
 
-                if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
-                    return NextResponse.json({
-                        error: "Failed to update sheet",
-                        details: parsed?.crewSync?.error ?? parsed?.error ?? sheetText,
-                    }, { status: 502 });
-                }
-
-                // Sync turtle roles to Discord
-                let discordResult: unknown = null;
-                const guildId = process.env.DISCORD_GUILD_ID;
-                const botToken = process.env.DISCORD_BOT_TOKEN;
-
-                if (guildId && botToken && sessionDiscordId) {
-                    const turtleRoleIds = mergedTurtles
-                        .map((t) => resolveTurtleRoleId(t))
-                        .filter(Boolean) as string[];
-
-                    try {
-                        discordResult = await syncDiscordMember({
-                            guildId,
-                            botToken,
-                            userId: sessionDiscordId,
-                            turtleRoleIds,
-                            crewRoleIds: [], // Auto-claim doesn't set crews
-                        });
-                    } catch (e: unknown) {
-                        // Log but don't fail - sheet update succeeded
-                        console.error("Discord sync failed:", (e as any)?.message);
-                        discordResult = { ok: false, error: (e as any)?.message };
-                    }
-                }
-
-                // Create voting identity for the user (fire-and-forget, don't block on failure)
-                try {
-                    const governanceUrl = process.env.GOVERNANCE_API_URL || 'http://localhost:3003';
-                    fetch(`${governanceUrl}/api/governance/create-identity`, {
-                        method: 'POST',
-                        headers: { 'Content-Type': 'application/json' },
-                        body: JSON.stringify({
-                            discordId: sessionDiscordId,
-                            secret,
-                        }),
-                    }).then(res => {
-                        if (res.ok) {
-                        } else {
-                        }
-                    }).catch(err => {
-                    });
-                } catch (err) {
-                    // Don't fail the claim if identity creation fails
-                }
-
-                return NextResponse.json({ ok: true, discord: discordResult });
+            if (sheetStatus < 200 || sheetStatus >= 300 || parsed?.ok === false) {
+                return NextResponse.json({
+                    error: "Failed to update sheet",
+                    details: parsed?.crewSync?.error ?? parsed?.error ?? sheetText,
+                }, { status: 502 });
             }
+
+            // The row now carries this Discord ID: expire cached members-sheet reads.
+            invalidateMembersCache();
+
+            // Sync turtle roles to Discord
+            let discordResult: unknown = null;
+            const guildId = process.env.DISCORD_GUILD_ID;
+            const botToken = process.env.DISCORD_BOT_TOKEN;
+
+            if (guildId && botToken && sessionDiscordId) {
+                const turtleRoleIds = mergedTurtles
+                    .map((t) => resolveTurtleRoleId(t))
+                    .filter(Boolean) as string[];
+
+                try {
+                    discordResult = await syncDiscordMember({
+                        guildId,
+                        botToken,
+                        userId: sessionDiscordId,
+                        turtleRoleIds,
+                        crewRoleIds: [], // Auto-claim doesn't set crews
+                    });
+                } catch (e: unknown) {
+                    // Log but don't fail - sheet update succeeded
+                    console.error("Discord sync failed:", (e as any)?.message);
+                    discordResult = { ok: false, error: (e as any)?.message };
+                }
+            }
+
+            // Create voting identity for the user (fire-and-forget, don't block on failure)
+            try {
+                const governanceUrl = process.env.GOVERNANCE_API_URL || 'http://localhost:3003';
+                fetch(`${governanceUrl}/api/governance/create-identity`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        discordId: sessionDiscordId,
+                        secret,
+                    }),
+                }).then(res => {
+                    if (res.ok) {
+                    } else {
+                    }
+                }).catch(err => {
+                });
+            } catch (err) {
+                // Don't fail the claim if identity creation fails
+            }
+
+            return NextResponse.json({ ok: true, discord: discordResult });
         }
 
         return NextResponse.json({ error: `Member ID ${memberId} not found` }, { status: 404 });

@@ -20,6 +20,8 @@ type TurtleMember = {
   city: string
   status: string
   turtles: string
+  /** Resolved server-side by /api/turtles/[turtleId]. */
+  pfpUrl?: string | null
 }
 
 type TurtleData = {
@@ -38,7 +40,6 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
   const [data, setData] = useState<TurtleData | null>(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
-  const [pfpUrls, setPfpUrls] = useState<Record<string, string>>({})
 
   // Fetch turtle data
   useEffect(() => {
@@ -59,36 +60,6 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
     }
     fetchTurtle()
   }, [turtleId])
-
-  // Fetch profile pictures for all members
-  useEffect(() => {
-    if (!data?.members?.length) return
-
-    async function fetchPfps() {
-      const urls: Record<string, string> = {}
-      // Fetch in batches to avoid too many concurrent requests
-      const batchSize = 10
-      for (let i = 0; i < data!.members.length; i += batchSize) {
-        const batch = data!.members.slice(i, i + batchSize)
-        const results = await Promise.allSettled(
-          batch.map(async (m) => {
-            if (!m.id) return null
-            const res = await fetch(`/api/pfp/${m.id}`)
-            if (!res.ok) return null
-            const json = await res.json()
-            return { id: m.id, url: json.url }
-          })
-        )
-        for (const result of results) {
-          if (result.status === 'fulfilled' && result.value?.url) {
-            urls[result.value.id] = result.value.url
-          }
-        }
-      }
-      setPfpUrls(urls)
-    }
-    fetchPfps()
-  }, [data])
 
   if (loading) {
     return (
@@ -201,9 +172,9 @@ export default function TurtleDetailPage({ params }: { params: Promise<{ turtleI
               <div key={member.id || i} style={memberCard()}>
                 <div style={{ display: 'flex', gap: 12, alignItems: 'flex-start' }}>
                   {/* Profile Picture */}
-                  {pfpUrls[member.id] ? (
+                  {member.pfpUrl ? (
                     <img
-                      src={pfpUrls[member.id]}
+                      src={member.pfpUrl}
                       alt={member.name}
                       style={{
                         width: 44,

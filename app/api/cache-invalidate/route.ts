@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import { checkSecret } from "@/app/lib/auth-guards";
+import { invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
@@ -19,6 +20,7 @@ export const runtime = "nodejs";
  * Patterns:
  * - "crew-mappings" - Invalidate crew mappings cache
  * - "task-links" - Invalidate all task links
+ * - "members" / "member-turtles" - Expire the members-sheet data cache (tag "members")
  * - "all" - Invalidate everything
  */
 export async function POST(req: Request) {
@@ -46,6 +48,11 @@ export async function POST(req: Request) {
         deletedKeys.push(key);
       }
     } else if (pattern) {
+      // Members-sheet reads live in Next's data cache, not KV.
+      if (pattern === "members" || pattern === "member-turtles" || pattern === "all") {
+        invalidateMembersCache();
+      }
+
       // Delete keys matching pattern
       const allKeys = await kv.keys("*");
 

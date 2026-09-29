@@ -51,10 +51,8 @@ vi.mock("@/app/api/profile-extras/[id]/route", () => ({
 // Stub fs to avoid touching disk during pfp resolution.
 vi.mock("fs", async () => {
     const actual = await vi.importActual<typeof import("fs")>("fs");
-    return {
-        ...actual,
-        existsSync: () => false,
-    };
+    const mocked = { ...actual, existsSync: () => false };
+    return { ...mocked, default: mocked };
 });
 
 import { composeProfileSummary, SENSITIVE_SHEET_KEYS } from "./route";

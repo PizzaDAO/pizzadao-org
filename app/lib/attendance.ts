@@ -14,15 +14,17 @@
 import { prisma } from "@/app/lib/db";
 import { sheetsClient } from "@/app/api/lib/google-sheets";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
-import { parseGvizJson, getCellValue } from "@/app/lib/gviz-parser";
-import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { getCellValue } from "@/app/lib/gviz-parser";
+import { fetchGviz } from "@/app/lib/sheets/gviz";
+import { SHEET_IDS } from "@/app/lib/sheets/config";
+import { getSheetData } from "@/app/lib/sheets/member-repository";
 import promiseLimit from "promise-limit";
 
 // ---------------------------------------------------------------------------
 // Constants
 // ---------------------------------------------------------------------------
 
-const COMMUNITY_CALL_SHEET_ID = "1S7WGjHpMcxw8erA3cBevoGlVX_G253AMGg1kNAU_53o";
+const COMMUNITY_CALL_SHEET_ID = SHEET_IDS.communityCall;
 const COMMUNITY_CALL_CREW_ID = "community_call";
 const COMMUNITY_CALL_LABEL = "Community Call";
 
@@ -187,32 +189,20 @@ async function readAttendanceTab(
 async function fetchDailySheet(
   dailySheetId: string
 ): Promise<Attendee[]> {
-  const url = `https://docs.google.com/spreadsheets/d/${dailySheetId}/gviz/tq?tqx=out:json&headers=1`;
-
-  const res = await fetch(url, {
-    headers: { "User-Agent": "Mozilla/5.0" },
-    cache: "no-store",
-  });
-
-  if (!res.ok) {
+  // Sync job: always read fresh. fetchGviz throws on a non-2xx status or an
+  // HTML error page (sheet deleted/unshared).
+  let gviz;
+  try {
+    gviz = await fetchGviz(
+      dailySheetId,
+      { headers: 1 },
+      { fresh: true, headers: { "User-Agent": "Mozilla/5.0" } },
+    );
+  } catch (e) {
     throw new Error(
-      `GViz fetch failed for ${dailySheetId}: ${res.status}`
+      `GViz fetch failed for ${dailySheetId}: ${e instanceof Error ? e.message : String(e)}`
     );
   }
-
-  const text = await res.text();
-
-  // Check for HTML error page (sheet may be deleted/unshared)
-  if (
-    text.toLowerCase().includes("<html") ||
-    text.toLowerCase().includes("<!doctype")
-  ) {
-    throw new Error(
-      `GViz returned HTML for ${dailySheetId} — sheet may be deleted or unshared`
-    );
-  }
-
-  const gviz = parseGvizJson(text);
   const allRows = gviz?.table?.rows || [];
   if (allRows.length === 0) return [];
 
@@ -607,12 +597,14 @@ export async function rebuildAttendanceSummaries(
 
   let upserted = 0;
 
+  // Resolve discordId → memberId from one members-sheet read for the whole batch.
+  const { discordToMember } = await getSheetData();
+
   for (const discordId of ids) {
     // Aggregate from raw records (reuse existing logic)
     const result = await getAttendanceForMember(discordId);
 
-    // Resolve discordId → memberId (first call fetches sheet, rest use cache)
-    const memberId = await fetchMemberIdByDiscordId(discordId);
+    const memberId = discordToMember.get(discordId) ?? null;
 
     await prisma.attendanceSummary.upsert({
       where: { discordId },

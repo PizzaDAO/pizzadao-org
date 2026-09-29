@@ -22,10 +22,12 @@ async function fetchDiscordMember(guildId: string, userId: string, botToken: str
   return res.json();
 }
 
+// Uncached on purpose: the row's existing turtles are merged and written back,
+// so a stale read could drop roles added in the sheet since the last cache fill.
 async function findSheetRowByDiscordId(
   discordId: string,
 ): Promise<{ memberId: string; row: MemberSheetData } | null> {
-  const cache = await getSheetData();
+  const cache = await getSheetData({ fresh: true });
   const memberId = cache.discordToMember.get(discordId);
   if (!memberId) return null;
   const idx = cache.memberToIdx.get(memberId);

@@ -20,6 +20,7 @@ import { getVouchCounts } from "@/app/lib/vouches";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
+import { resolvePfpUrl } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -115,29 +116,6 @@ function parseTurtles(raw: unknown): string[] {
 }
 
 /**
- * Resolve a profile-picture URL the same way /api/pfp/[memberId] does, but
- * without going through HTTP. Mirrors dashboard-summary's inline pfp logic.
- */
-async function resolvePfpUrl(memberId: string): Promise<string | null> {
-    try {
-        const fs = await import("fs");
-        const path = await import("path");
-        const pfpDir = path.join(process.cwd(), "public", "pfp");
-        const jpg = path.join(pfpDir, `${memberId}.jpg`);
-        const png = path.join(pfpDir, `${memberId}.png`);
-        if (fs.existsSync(jpg)) return `/pfp/${memberId}.jpg`;
-        if (fs.existsSync(png)) return `/pfp/${memberId}.png`;
-        const dJpg = path.join(pfpDir, "default.jpg");
-        const dPng = path.join(pfpDir, "default.png");
-        if (fs.existsSync(dJpg)) return `/pfp/default.jpg`;
-        if (fs.existsSync(dPng)) return `/pfp/default.png`;
-        return null;
-    } catch {
-        return null;
-    }
-}
-
-/**
  * Build the public-safe view of the member row, dropping any sensitive sheet
  * columns. The keys we never want to leak into the BFF payload:
  *
@@ -182,7 +160,7 @@ export async function composeProfileSummary(
 
     // Pull supplementary data in parallel.
     const [pfpUrl, mission, mafia, vouchCounts, xRow, crewMappings, dbTagline] = await Promise.all([
-        safe(resolvePfpUrl(memberId), null as string | null),
+        safe(Promise.resolve(resolvePfpUrl(memberId)), null as string | null),
         memberDiscordId
             ? safe(getUserProgressSummary(memberDiscordId), null as Awaited<
                 ReturnType<typeof getUserProgressSummary>

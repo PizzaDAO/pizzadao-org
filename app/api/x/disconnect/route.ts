@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { prisma } from "@/app/lib/db";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
@@ -36,7 +37,9 @@ export async function DELETE() {
       memberId: existing.memberId,
       discordId: session.discordId,
       x: "",
-    }).catch(() => {});
+    })
+      .then(() => invalidateMembersCache())
+      .catch(() => {});
   }
 
   return NextResponse.json({ success: true });

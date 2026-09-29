@@ -1,10 +1,12 @@
 // PizzaDAO NFT Collection Configuration
 // Contract addresses are loaded from Google Sheets for easy management
 
-import { parseGvizJson } from "@/app/lib/gviz-parser";
+import { fetchGviz } from "@/app/lib/sheets/gviz";
+import { SHEET_IDS } from "@/app/lib/sheets/config";
+import { findColumnIndex } from "@/app/lib/sheet-utils";
 import { NFTContract } from "./nft-types";
 
-const NFT_CONTRACTS_SHEET_ID = "1I9Sjj5kNQOushVbYGSnG668tMOAz0SJ3L8StaCG5r0I";
+const NFT_CONTRACTS_SHEET_ID = SHEET_IDS.nftContracts;
 
 // Alchemy API endpoints by chain
 export const ALCHEMY_CHAIN_URLS: Record<string, string> = {
@@ -15,45 +17,32 @@ export const ALCHEMY_CHAIN_URLS: Record<string, string> = {
   optimism: "https://opt-mainnet.g.alchemy.com/nft/v3",
 };
 
-// Cache for NFT contracts
-let contractsCache: { contracts: NFTContract[]; fetchedAt: number } | null = null;
-const CACHE_TTL = 5 * 60 * 1000; // 5 minutes
-
+/** Read-only config sheet: served from Next's data cache for 5 minutes. */
+const NFT_CONTRACTS_REVALIDATE_SECONDS = 300;
 
 /**
  * Fetch NFT contract addresses from the Google Sheet
  */
 export async function getNFTContracts(): Promise<NFTContract[]> {
-  // Check cache
-  if (contractsCache && Date.now() - contractsCache.fetchedAt < CACHE_TTL) {
-    return contractsCache.contracts;
-  }
-
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${NFT_CONTRACTS_SHEET_ID}/gviz/tq?tqx=out:json&headers=1`;
-    const res = await fetch(url, { cache: "no-store" });
-
-    if (!res.ok) {
-      return contractsCache?.contracts || [];
-    }
-
-    const text = await res.text();
-    const gviz = parseGvizJson(text);
+    const gviz = await fetchGviz(
+      NFT_CONTRACTS_SHEET_ID,
+      { headers: 1 },
+      { revalidate: NFT_CONTRACTS_REVALIDATE_SECONDS },
+    );
     const cols = gviz?.table?.cols || [];
     const rows = gviz?.table?.rows || [];
 
     // Find column indices
-    const headers = cols.map((c: { label?: string }) =>
-      String(c?.label || "").trim().toLowerCase()
-    );
-    const chainIdx = headers.findIndex((h: string) => h === "chain");
-    const contractIdx = headers.findIndex((h: string) => h === "contract");
-    const nameIdx = headers.findIndex((h: string) => h === "name");
-    const orderIdx = headers.findIndex((h: string) => h === "order");
-    const detailsIdx = headers.findIndex((h: string) => h === "details");
+    const headers = cols.map((c: { label?: string }) => String(c?.label || "").trim());
+    const chainIdx = findColumnIndex(headers, ["chain"], -1) ?? -1;
+    const contractIdx = findColumnIndex(headers, ["contract"], -1) ?? -1;
+    const nameIdx = findColumnIndex(headers, ["name"], -1) ?? -1;
+    const orderIdx = findColumnIndex(headers, ["order"], -1) ?? -1;
+    const detailsIdx = findColumnIndex(headers, ["details"], -1) ?? -1;
 
     if (chainIdx === -1 || contractIdx === -1) {
-      return contractsCache?.contracts || [];
+      return [];
     }
 
     const contracts: NFTContract[] = [];
@@ -79,12 +68,9 @@ export async function getNFTContracts(): Promise<NFTContract[]> {
       }
     }
 
-    // Update cache
-    contractsCache = { contracts, fetchedAt: Date.now() };
-
     return contracts;
   } catch (error) {
-    return contractsCache?.contracts || [];
+    return [];
   }
 }
 

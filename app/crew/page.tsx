@@ -16,6 +16,8 @@ interface PublicMember {
   status: string;
   totalCalls: number;
   lastCallDate: string | null;
+  /** Resolved server-side by /api/crew/members. */
+  pfpUrl?: string | null;
 }
 
 interface Pagination {
@@ -65,7 +67,6 @@ export default function CrewMembersPage() {
   const [turtleFilter, setTurtleFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState("name_asc");
-  const [pfpUrls, setPfpUrls] = useState<Record<string, string>>({});
 
   const fetchMembers = useCallback(async () => {
     setLoading(true);
@@ -112,44 +113,6 @@ export default function CrewMembersPage() {
     }, 350);
     return () => clearTimeout(handle);
   }, [searchInput, search]);
-
-  // Fetch profile pictures for visible members in batches of 10
-  useEffect(() => {
-    if (!members.length) {
-      setPfpUrls({});
-      return;
-    }
-    let cancelled = false;
-
-    async function fetchPfps() {
-      const urls: Record<string, string> = {};
-      const batchSize = 10;
-      for (let i = 0; i < members.length; i += batchSize) {
-        if (cancelled) return;
-        const batch = members.slice(i, i + batchSize);
-        const results = await Promise.allSettled(
-          batch.map(async (m) => {
-            if (!m.id) return null;
-            const res = await fetch(`/api/pfp/${m.id}`);
-            if (!res.ok) return null;
-            const json = await res.json();
-            return { id: m.id, url: json.url as string | undefined };
-          })
-        );
-        for (const result of results) {
-          if (result.status === "fulfilled" && result.value?.url) {
-            urls[result.value.id] = result.value.url;
-          }
-        }
-      }
-      if (!cancelled) setPfpUrls(urls);
-    }
-
-    fetchPfps();
-    return () => {
-      cancelled = true;
-    };
-  }, [members]);
 
   function handleSearchSubmit(e: React.FormEvent) {
     e.preventDefault();
@@ -517,7 +480,7 @@ export default function CrewMembersPage() {
               <MemberCardItem
                 key={member.id}
                 member={member}
-                pfpUrl={pfpUrls[member.id]}
+                pfpUrl={member.pfpUrl ?? undefined}
               />
             ))}
           </div>
