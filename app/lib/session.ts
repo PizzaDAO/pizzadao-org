@@ -5,6 +5,9 @@ import { createHmac } from "crypto";
 
 const COOKIE_NAME = "pizzadao_session";
 
+/** Session lifetime in seconds. Shared by the cookie maxAge and token verification. */
+export const SESSION_MAX_AGE_SECONDS = 60 * 60 * 24 * 30; // 30 days
+
 if (!process.env.SESSION_SECRET) {
     throw new Error("SESSION_SECRET environment variable is required but not set");
 }
@@ -59,6 +62,14 @@ export function verifySession(token: string | undefined): Session | null {
     try {
         const decoded = JSON.parse(Buffer.from(payload, "base64url").toString("utf-8"));
         if (!decoded.discordId) return null;
+        // Reject tokens older than the cookie lifetime (or with no/invalid createdAt).
+        // A stolen token must not remain valid forever just because the cookie expired.
+        const createdAt = Number(decoded.createdAt);
+        if (!Number.isFinite(createdAt) || createdAt <= 0) return null;
+        const now = Date.now();
+        if (now - createdAt > SESSION_MAX_AGE_SECONDS * 1000) return null;
+        // Allow small clock skew but reject tokens "from the future".
+        if (createdAt - now > 5 * 60 * 1000) return null;
         return decoded as Session;
     } catch {
         return null;
@@ -89,7 +100,7 @@ export function getSessionCookieOptions(req?: Request) {
         secure: isSecure,
         sameSite: "lax" as const,
         path: "/",
-        maxAge: 60 * 60 * 24 * 30, // 30 days
+        maxAge: SESSION_MAX_AGE_SECONDS,
     };
 }
 
