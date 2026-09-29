@@ -13,15 +13,15 @@ export async function GET(req: Request) {
 
   const url = new URL(req.url);
 
-  // Look up memberId from query param
-  const memberId = url.searchParams.get("memberId") || "";
+  // The memberId is never taken from the client (?memberId= is ignored);
+  // the callback resolves it from the Crew sheet by the signed discordId.
 
   // Generate PKCE
   const codeVerifier = generateCodeVerifier();
   const codeChallenge = generateCodeChallenge(codeVerifier);
 
   // Sign state for CSRF
-  const state = signXState({ discordId: session.discordId, memberId });
+  const state = signXState({ discordId: session.discordId });
 
   // Build X OAuth URL
   const clientId = process.env.X_CLIENT_ID!;
