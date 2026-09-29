@@ -15,10 +15,10 @@
 // `NextActionPanel` that renders it. Until that lands, the value is opaque
 // to the dashboard page.
 
+import { PROFILE_STEPS, type ProfileStepKey } from "./profile-completion";
+
 export type NextActionKind =
-  | "join_crew"
-  | "connect_wallet"
-  | "connect_x"
+  | ProfileStepKey
   | "submit_mission"
   | "awaiting_review"
   | "get_vouches"
@@ -72,9 +72,8 @@ export interface NextActionInput {
  * Resolve the single next action for the dashboard.
  *
  * Priority order (plan §5):
- *   1. Just-onboarded (no crews) → join a crew
- *   2. Has crews, no wallet → connect wallet
- *   3. Has wallet, no X → connect X
+ *   1–3. Profile setup steps, in PROFILE_STEPS order (./profile-completion.ts):
+ *        no crews → join a crew; no wallet → connect wallet; no X → connect X
  *   4. Has next mission to submit → submit mission
  *   5. All level missions submitted, awaiting review → check progress
  *   6. < 3 vouches → get vouches
@@ -82,35 +81,20 @@ export interface NextActionInput {
  *   8. Power user fallback → review (admin) or discover bounties
  */
 export function resolveNextAction(input: NextActionInput): NextAction {
-  const { member, level, vouches, wallets, x, notifications, isReviewer } = input;
+  const { member, level, vouches, notifications, isReviewer } = input;
 
-  // 1. Just-onboarded
-  if (!member.crews || member.crews.length === 0) {
+  // 1–3. Profile setup (join crew → connect wallet → connect X). The step
+  //      definitions and copy live in ./profile-completion.ts so the
+  //      dashboard's completion meter shares this exact ordering.
+  const setupStep = PROFILE_STEPS.find((step) => !step.isDone(input));
+  if (setupStep) {
     return {
-      kind: "join_crew",
-      headline: "Welcome — pick a crew to get started",
-      body: "Crews are how members coordinate work across the DAO.",
-      primaryCta: { label: "Join your first crew", href: "/crew" },
-    };
-  }
-
-  // 2. No wallet
-  if (wallets.count === 0) {
-    return {
-      kind: "connect_wallet",
-      headline: "Link a wallet to display your PizzaDAO POAPs and NFTs",
-      primaryCta: { label: "Connect a wallet", href: `/profile/${member.id}` },
-    };
-  }
-
-  // 3. No X account connected
-  if (!x.connected) {
-    return {
-      kind: "connect_x",
-      headline: "Connect X so the community can vouch for you",
+      kind: setupStep.key,
+      headline: setupStep.nextAction.headline,
+      ...(setupStep.nextAction.body ? { body: setupStep.nextAction.body } : {}),
       primaryCta: {
-        label: "Connect X",
-        href: `/api/x/login?memberId=${encodeURIComponent(member.id)}`,
+        label: setupStep.nextAction.ctaLabel,
+        href: setupStep.href(member.id),
       },
     };
   }

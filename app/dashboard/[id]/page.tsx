@@ -41,6 +41,7 @@ import { YourCrews, type CrewOption } from "./components/YourCrews";
 import { NextActionPanel } from "./components/NextActionPanel";
 import { RecentActivity } from "./components/RecentActivity";
 import { Discover } from "./components/Discover";
+import { ProfileCompleteCelebrationGate } from "./components/ProfileCompleteCelebrationGate";
 
 // Tokens: see app/globals.css. Body uses --font-sans (Asap), headings use
 // --font-display (Asap Condensed). Colors via hsl(var(--<token>)).
@@ -236,6 +237,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         idValue={idValue}
                         missionLevel={missionLevel}
                         onSendPep={() => setShowSendModal(true)}
+                        profileCompletion={summary?.profileCompletion}
                     />
 
                     {/* ── 1.5. Next Action ── */}
@@ -325,6 +327,12 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     <p className="overline text-foreground/40">§ pizzadao · est. 2021</p>
                 </div>
             </div>
+
+            {/* One-time "profile complete" celebration (jalapeno-34126) */}
+            <ProfileCompleteCelebrationGate
+                memberId={idValue}
+                completion={summary?.profileCompletion}
+            />
 
             {/* Send PEP Modal */}
             <SendPepModal
