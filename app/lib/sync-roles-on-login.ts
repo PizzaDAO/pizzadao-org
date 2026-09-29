@@ -1,39 +1,22 @@
 // app/lib/sync-roles-on-login.ts
-// Fire-and-forget role sync that runs after Discord OAuth login.
-// Calls the internal /api/discord/sync-to-sheet endpoint to pull
-// the user's Discord roles into the Google Sheet.
+// Fire-and-forget role sync that runs after login.
+// Calls the role-sync library directly (no internal HTTP round-trip) to pull
+// the user's Discord roles into their already-linked Google Sheet row.
+import { syncDiscordRolesToSheet } from "./discord-sheet-sync";
 
 /**
- * Trigger a role sync for the given user. This calls our own
- * sync-to-sheet API endpoint internally. Errors are caught and
- * logged so they never block the login flow.
+ * Trigger a role sync for the given (already authenticated) user. Errors are
+ * caught and logged so they never block the login flow.
  *
- * @param origin  - The base URL of the app (e.g. "https://pizzadao.org")
- * @param discordId - The user's Discord ID
- * @param memberId  - The user's member ID from the sheet (optional)
- * @param name      - The user's display name (optional)
+ * The target sheet row is resolved from the sheet by `discordId` only; this
+ * function never links a Discord account to a new row.
+ *
+ * @param discordId - The authenticated user's Discord ID
+ * @param name      - Display name fallback if the row has no Name (optional)
  */
-export async function syncRolesOnLogin(
-  origin: string,
-  discordId: string,
-  memberId?: string,
-  name?: string,
-): Promise<void> {
+export async function syncRolesOnLogin(discordId: string, name?: string): Promise<void> {
   try {
-    const res = await fetch(`${origin}/api/discord/sync-to-sheet`, {
-      method: "POST",
-      headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({
-        discordId,
-        memberId: memberId ?? undefined,
-        mafiaName: name ?? undefined,
-      }),
-    });
-
-    if (!res.ok) {
-      const body = await res.text();
-      console.error(`[syncRolesOnLogin] sync-to-sheet returned ${res.status}: ${body}`);
-    }
+    await syncDiscordRolesToSheet(discordId, name);
   } catch (err) {
     // Intentionally swallowed - role sync must never break login
     console.error("[syncRolesOnLogin] failed (non-blocking):", err);
