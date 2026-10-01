@@ -196,6 +196,7 @@ function upsertToCrew_(ss, raw, nowIso) {
       DiscordJoined: getCol_(headerMap, "DiscordJoined"),
       Notes: getCol_(headerMap, "Notes"),
       Wallet: getCol_(headerMap, "Wallet"),
+      X: getCol_(headerMap, "X"),
     };
 
     const name = String(raw.mafiaName ?? raw.name ?? "").trim();
@@ -257,6 +258,11 @@ function upsertToCrew_(ss, raw, nowIso) {
     // Write Wallet if provided
     if (mapping.Wallet && raw.wallet !== undefined) {
       crewSheet.getRange(targetRow, mapping.Wallet).setValue(String(raw.wallet || ""));
+    }
+
+    // Write X (Twitter/X username) if provided
+    if (mapping.X && raw.x !== undefined) {
+      crewSheet.getRange(targetRow, mapping.X).setValue(String(raw.x || ""));
     }
 
     if (mapping.Notes) {
