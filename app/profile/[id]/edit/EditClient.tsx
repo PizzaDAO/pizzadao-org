@@ -29,17 +29,13 @@
 
 import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { Field } from "../../../ui/onboarding/Field";
 import { ProfileLinksEditor } from "../../../ui/profile-links";
 import { SocialAccountLinker } from "../../../ui/vouches/SocialAccountLinker";
 import { TaglineEditor } from "../../../dashboard/[id]/components/TaglineEditor";
 import { useUserData, useXAccount } from "../../../lib/hooks/use-api";
-import {
-    SUPPORTED_LOCALES,
-    type SupportedLocale,
-} from "../../../lib/i18n/locales";
+import { LanguageEditor } from "../../../ui/profile/LanguageEditor";
 
 const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
 const FONT_DISPLAY =
@@ -475,167 +471,6 @@ function XAccountEditor({ memberId }: { memberId: string }) {
     );
 }
 
-// ---------------------------------------------------------------------------
-// Language editor (i18n) — anchovy-65959 scaffold.
-// Reads + writes /api/profile-extras/[id]. On success the server sets
-// the NEXT_LOCALE cookie so the next render uses the new catalog.
-// ---------------------------------------------------------------------------
-
-function LanguageEditor({ memberId }: { memberId: string }) {
-    const router = useRouter();
-    const t = useTranslations("language");
-    const tCommon = useTranslations("common");
-
-    const [locale, setLocale] = useState<SupportedLocale>("en");
-    const [initialLocale, setInitialLocale] = useState<SupportedLocale>("en");
-    const [loadingInitial, setLoadingInitial] = useState(true);
-    const [saving, setSaving] = useState(false);
-    const [savedAt, setSavedAt] = useState<number | null>(null);
-    const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        let alive = true;
-        (async () => {
-            try {
-                const res = await fetch(`/api/profile-extras/${memberId}`, {
-                    credentials: "include",
-                });
-                if (!alive) return;
-                if (res.ok) {
-                    const json = await res.json();
-                    const loaded = (SUPPORTED_LOCALES as readonly string[]).includes(
-                        json?.locale
-                    )
-                        ? (json.locale as SupportedLocale)
-                        : "en";
-                    setLocale(loaded);
-                    setInitialLocale(loaded);
-                }
-            } catch {
-                // best-effort — stay on default
-            } finally {
-                if (alive) setLoadingInitial(false);
-            }
-        })();
-        return () => {
-            alive = false;
-        };
-    }, [memberId]);
-
-    useEffect(() => {
-        if (savedAt == null) return;
-        const handle = setTimeout(() => setSavedAt(null), 1500);
-        return () => clearTimeout(handle);
-    }, [savedAt]);
-
-    const dirty = locale !== initialLocale;
-
-    const onSave = async () => {
-        setError(null);
-        setSaving(true);
-        try {
-            const res = await fetch(`/api/profile-extras/${memberId}`, {
-                method: "POST",
-                credentials: "include",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ locale }),
-            });
-            if (!res.ok) {
-                let msg = t("saveError");
-                try {
-                    const body = await res.json();
-                    if (body?.error) msg = String(body.error);
-                } catch {
-                    /* swallow */
-                }
-                setError(msg);
-                return;
-            }
-            setInitialLocale(locale);
-            setSavedAt(Date.now());
-            // RSC re-render picks up the new NEXT_LOCALE cookie that the server
-            // just set, so any in-tree server components flip to the new
-            // catalog on the next navigation.
-            router.refresh();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : t("saveError"));
-        } finally {
-            setSaving(false);
-        }
-    };
-
-    return (
-        <div style={{ display: "grid", gap: 8 }}>
-            <select
-                aria-label={t("selectLabel")}
-                value={locale}
-                onChange={(e) => setLocale(e.target.value as SupportedLocale)}
-                disabled={loadingInitial || saving}
-                style={{
-                    padding: 12,
-                    borderRadius: 12,
-                    border: "1px solid hsl(var(--rule-warm) / 0.55)",
-                    background: "hsl(var(--cream) / 0.4)",
-                    color: "hsl(var(--foreground))",
-                    fontSize: 14,
-                    fontFamily: FONT_SANS,
-                    appearance: "auto",
-                }}
-            >
-                {SUPPORTED_LOCALES.map((code) => (
-                    <option key={code} value={code}>
-                        {t(`names.${code}`)}
-                    </option>
-                ))}
-            </select>
-
-            <div
-                style={{
-                    display: "flex",
-                    alignItems: "center",
-                    gap: 12,
-                }}
-            >
-                <button
-                    type="button"
-                    onClick={onSave}
-                    disabled={saving || !dirty || loadingInitial}
-                    style={{
-                        ...btn("primary"),
-                        opacity: saving || !dirty || loadingInitial ? 0.5 : 1,
-                        cursor:
-                            saving || !dirty || loadingInitial ? "not-allowed" : "pointer",
-                    }}
-                >
-                    {saving ? <Spinner /> : null}
-                    {saving ? tCommon("loading") : t("saveButton")}
-                </button>
-                {savedAt && !error ? (
-                    <span
-                        role="status"
-                        className="overline"
-                        style={{ color: "hsl(var(--ink) / 0.55)" }}
-                    >
-                        § {tCommon("saved")}
-                    </span>
-                ) : null}
-            </div>
-
-            {error ? (
-                <div
-                    role="alert"
-                    style={{
-                        fontSize: 13,
-                        color: "hsl(var(--destructive))",
-                    }}
-                >
-                    {error}
-                </div>
-            ) : null}
-        </div>
-    );
-}
-
 function LanguageSection({ memberId }: { memberId: string }) {
     const t = useTranslations("language");
     return (
@@ -719,7 +554,7 @@ export function EditClient({ memberId }: { memberId: string }) {
                         className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em] text-foreground m-0"
                         style={{ fontSize: "clamp(1.5rem, 3.6vw, 2rem)", lineHeight: 1.0 }}
                     >
-                        Couldn't load your profile
+                        Couldn&apos;t load your profile
                     </h1>
                     <p className="text-foreground/70 m-0">
                         {error instanceof Error

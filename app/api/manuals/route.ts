@@ -1,4 +1,5 @@
-import { parseGvizJson } from "@/app/lib/gviz-parser";
+import { fetchGviz, type GvizCacheOptions } from "@/app/lib/sheets/gviz";
+import { SHEET_IDS } from "@/app/lib/sheets/config";
 import {
   TableConfig,
   parseTable,
@@ -10,7 +11,10 @@ import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/a
 import { cacheDel } from '@/app/api/lib/cache'
 import { GvizRow, GvizTable } from "@/app/lib/types/gviz";
 
-const MANUALS_SHEET_ID = '1KDAzz8qQubCaFiplWaUFBgCZlHR_mIA0IJHKNqgK5hg'
+const MANUALS_SHEET_ID = SHEET_IDS.manuals
+
+/** Read-only config sheet: 5-minute data cache unless ?fresh=1. */
+const MANUALS_REVALIDATE_SECONDS = 300
 
 /**
  * Manual table parsing configuration
@@ -100,26 +104,26 @@ export async function GET(req: Request) {
 
     // Fetch spreadsheet data via GViz API and hyperlinks via Sheets API in parallel
     // Note: headers=1 tells GViz to treat first row as headers (but Tables mode ignores this)
-    const gvizUrl = `https://docs.google.com/spreadsheets/d/${MANUALS_SHEET_ID}/gviz/tq?tqx=out:json&headers=1`
+    const cacheOpts: GvizCacheOptions = forceRefresh
+      ? { fresh: true }
+      : { revalidate: MANUALS_REVALIDATE_SECONDS }
+    const loadManualsSheet = () =>
+      fetchGviz(MANUALS_SHEET_ID, { headers: 1 }, cacheOpts).catch(() => {
+        throw new Error('Failed to fetch manuals spreadsheet')
+      })
 
     // Use debug version when debug mode is enabled
     let linkMap: Record<string, string>
     let debugInfo: ManualLinksDebugResult | null = null
 
     if (debugMode) {
-      const [sheetRes, debugResult] = await Promise.all([
-        fetch(gvizUrl, { cache: 'no-store' }),
+      const [gviz, debugResult] = await Promise.all([
+        loadManualsSheet(),
         getManualLinksDebug(MANUALS_SHEET_ID),
       ])
       debugInfo = debugResult
       linkMap = debugResult.linkMap
 
-      if (!sheetRes.ok) {
-        throw new Error('Failed to fetch manuals spreadsheet')
-      }
-
-      const text = await sheetRes.text()
-      const gviz = parseGvizJson(text)
       const table = gviz?.table as GvizTable
 
       if (!table) {
@@ -143,18 +147,12 @@ export async function GET(req: Request) {
       })
     }
 
-    const [sheetRes, linkMapResult] = await Promise.all([
-      fetch(gvizUrl, { cache: 'no-store' }),
+    const [gviz, linkMapResult] = await Promise.all([
+      loadManualsSheet(),
       getManualLinks(MANUALS_SHEET_ID),
     ])
     linkMap = linkMapResult
 
-    if (!sheetRes.ok) {
-      throw new Error('Failed to fetch manuals spreadsheet')
-    }
-
-    const text = await sheetRes.text()
-    const gviz = parseGvizJson(text)
     const table = gviz?.table as GvizTable
 
     if (!table) {

@@ -1,10 +1,12 @@
 import { prisma } from "@/app/lib/db";
-import { parseGvizJson } from "@/app/lib/gviz-parser";
-import { findColumnIndex } from "@/app/lib/sheet-utils";
-import { GvizResponse, GvizCell } from "@/app/lib/types/gviz";
-
-const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const TAB_NAME = "Crew";
+import {
+  MEMBER_COLUMNS,
+  cellText,
+  findMemberRow,
+  getMembersSheet,
+  memberIdColumn,
+  membersColumn,
+} from "@/app/lib/sheets/member-repository";
 
 // ---------------------------------------------------------------------------
 // Public types
@@ -228,81 +230,23 @@ export async function setPrimaryWallet(
 // ---------------------------------------------------------------------------
 
 /**
- * Fetch wallet for a single member from the Crew Google Sheet (GViz API).
- * Extracted from the original inline logic in the NFT/POAP routes.
+ * Fetch wallet for a single member from the Crew Google Sheet.
+ * Reads through the members repository (Next data cache, tag "members").
  */
 async function fetchWalletFromSheet(
   memberId: string
 ): Promise<string | null> {
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-      TAB_NAME
-    )}&tqx=out:json&headers=0`;
+    const sheet = await getMembersSheet();
 
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) return null;
-
-    const text = await res.text();
-    const gviz: GvizResponse = parseGvizJson(text);
-    const rows = gviz?.table?.rows || [];
-
-    // Find header row (same logic as member-repository.ts)
-    let headerRowIdx = -1;
-    let headerVals: string[] = [];
-
-    for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-      const rowCells = rows[ri]?.c || [];
-      const rowVals = rowCells.map((c: GvizCell) =>
-        String(c?.v || c?.f || "").trim().toLowerCase()
-      );
-      const hasName = rowVals.includes("name");
-      const hasStatus =
-        rowVals.includes("status") || rowVals.includes("frequency");
-      const hasCity =
-        rowVals.includes("city") || rowVals.includes("crews");
-
-      if (hasName && (hasStatus || hasCity)) {
-        headerRowIdx = ri;
-        headerVals = rowCells.map((c: GvizCell) =>
-          String(c?.v || c?.f || "").trim()
-        );
-        break;
-      }
-    }
-
-    if (headerRowIdx === -1) return null;
-
-    // Find ID and Wallet columns
-    const idxId =
-      findColumnIndex(headerVals, ["id", "member id", "memberid"], 0) ?? 0;
-    const idxWallet = findColumnIndex(headerVals, [
-      "wallet",
-      "wallet address",
-      "eth address",
-      "address",
-    ]);
-
+    const idxWallet = membersColumn(sheet, MEMBER_COLUMNS.wallet);
     if (idxWallet == null) return null;
 
-    // Find member row
-    const targetId = parseInt(memberId, 10);
-    for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-      const cells = rows[ri]?.c || [];
-      const idVal = cells[idxId]?.v;
-      const numericId =
-        typeof idVal === "number"
-          ? idVal
-          : parseInt(String(idVal ?? ""), 10);
+    const row = findMemberRow(sheet, memberId);
+    if (!row) return null;
 
-      if (numericId === targetId) {
-        const walletVal = String(
-          cells[idxWallet]?.v ?? cells[idxWallet]?.f ?? ""
-        ).trim();
-        return walletVal && walletVal.startsWith("0x") ? walletVal : null;
-      }
-    }
-
-    return null;
+    const walletVal = cellText(row.c?.[idxWallet]);
+    return walletVal && walletVal.startsWith("0x") ? walletVal : null;
   } catch (error) {
     console.error("Error fetching wallet from sheet:", error);
     return null;
@@ -310,54 +254,22 @@ async function fetchWalletFromSheet(
 }
 
 /**
- * Fetch all member wallets from the Crew Google Sheet (GViz API).
- * Extracted from the original fetchMembersWithWallets() in the leaderboard route.
+ * Fetch all member wallets from the Crew Google Sheet.
+ * Reads through the members repository (Next data cache, tag "members").
  */
 async function fetchAllWalletsFromSheet(): Promise<
   Array<{ memberId: string; walletAddress: string }>
 > {
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${TAB_NAME}&tqx=out:json&headers=0`;
-    const res = await fetch(url, { cache: "no-store" });
-    if (!res.ok) return [];
+    const sheet = await getMembersSheet();
 
-    const text = await res.text();
-    const gviz = parseGvizJson(text);
-    const rows = gviz?.table?.rows || [];
+    const idxId = memberIdColumn(sheet);
 
-    // Find header row
-    let headerRowIdx = -1;
-    let headerVals: string[] = [];
-
-    for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-      const rowCells = rows[ri]?.c || [];
-      const rowValsLower = rowCells.map((c: GvizCell) =>
-        String(c?.v || c?.f || "").trim().toLowerCase()
-      );
-      const hasName = rowValsLower.includes("name");
-      const hasStatus =
-        rowValsLower.includes("status") ||
-        rowValsLower.includes("frequency");
-      if (hasName && hasStatus) {
-        headerRowIdx = ri;
-        headerVals = rowCells.map((c: GvizCell) =>
-          String(c?.v || c?.f || "").trim().toLowerCase()
-        );
-        break;
-      }
-    }
-
-    if (headerRowIdx === -1) return [];
-
-    // Find column indices
-    let idxId = headerVals.findIndex((h) =>
-      ["id", "crewid", "memberid"].includes(h.replace(/[#\s\-_]/g, ""))
-    );
-    if (idxId === -1) idxId = 0;
-
-    let idxWallet = headerVals.findIndex((h) => h === "wallet");
+    // Exact "wallet" header first, then "address" or anything containing "wallet".
+    const lowerHeaders = sheet.headers.map((h) => h.toLowerCase());
+    let idxWallet = lowerHeaders.findIndex((h) => h === "wallet");
     if (idxWallet === -1) {
-      idxWallet = headerVals.findIndex(
+      idxWallet = lowerHeaders.findIndex(
         (h) => h === "address" || h.includes("wallet")
       );
     }
@@ -366,12 +278,10 @@ async function fetchAllWalletsFromSheet(): Promise<
 
     const results: Array<{ memberId: string; walletAddress: string }> = [];
 
-    for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-      const cells = rows[ri]?.c || [];
-      const id = String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim();
-      const wallet = String(
-        cells[idxWallet]?.v ?? cells[idxWallet]?.f ?? ""
-      ).trim();
+    for (const row of sheet.rows) {
+      const cells = row?.c || [];
+      const id = cellText(cells[idxId]);
+      const wallet = cellText(cells[idxWallet]);
 
       if (
         id &&

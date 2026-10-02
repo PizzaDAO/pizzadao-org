@@ -26,6 +26,7 @@ const mockProject: Project = {
       profileUrl: 'https://github.com/contributor1',
     },
   ],
+  recentPRs: [],
   recentCommits: [
     {
       sha: 'abc123',

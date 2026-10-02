@@ -1,19 +1,15 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getSession } from '@/app/lib/session'
-import { getJob, JOB_REWARD_AMOUNT, hasCompletedJobToday } from '@/app/lib/jobs'
-import { requireOnboarded, updateBalance, formatCurrency } from '@/app/lib/economy'
-import { logTransaction } from '@/app/lib/transactions'
-import { prisma } from '@/app/lib/db'
+import { requireSession } from '@/app/lib/auth-guards'
+import { getJob, JOB_REWARD_AMOUNT, hasCompletedJobToday, recordDailyJobCompletion } from '@/app/lib/jobs'
+import { requireOnboarded, getOrCreateEconomy, formatCurrency } from '@/app/lib/economy'
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    const session = await getSession()
-
-    if (!session?.discordId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
+    const auth = await requireSession()
+    if (!auth.ok) return auth.response
+    const { session } = auth
 
     await requireOnboarded(session.discordId)
 
@@ -30,34 +26,19 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
     }
 
-    // Check if already completed today
+    // Fast path for a friendly error; the atomic check below is authoritative.
     const alreadyCompleted = await hasCompletedJobToday(session.discordId, jobId)
     if (alreadyCompleted) {
       return NextResponse.json({ error: 'You have already completed this job today' }, { status: 400 })
     }
 
-    // Record the job completion (upsert to handle re-completing jobs on different days)
-    await prisma.jobAssignment.upsert({
-      where: {
-        jobId_userId: {
-          jobId,
-          userId: session.discordId
-        }
-      },
-      update: {
-        assignedAt: new Date()
-      },
-      create: {
-        jobId,
-        userId: session.discordId
-      }
-    })
-
-    // Award the $PEP immediately
-    await updateBalance(session.discordId, JOB_REWARD_AMOUNT)
-
-    // Log the transaction (fire and forget)
-    logTransaction(prisma, session.discordId, 'JOB_REWARD', JOB_REWARD_AMOUNT, `Daily job: ${job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())}`, { jobId: job.id }).catch(() => {})
+    // Ensure the wallet row exists, then record completion + pay reward atomically.
+    await getOrCreateEconomy(session.discordId)
+    const description = `Daily job: ${job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())}`
+    const awarded = await recordDailyJobCompletion(session.discordId, jobId, JOB_REWARD_AMOUNT, description)
+    if (!awarded) {
+      return NextResponse.json({ error: 'You have already completed this job today' }, { status: 400 })
+    }
 
     return NextResponse.json({
       success: true,

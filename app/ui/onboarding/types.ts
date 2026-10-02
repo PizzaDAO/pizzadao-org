@@ -1,3 +1,4 @@
+import { norm } from "@/app/lib/strings";
 // app/ui/onboarding/types.ts
 // Shared types for the onboarding wizard
 
@@ -140,11 +141,7 @@ export function uuidLike() {
   return `sess_${Math.random().toString(16).slice(2)}_${Date.now().toString(16)}`;
 }
 
-export function norm(s: unknown) {
-  return String(s ?? "")
-    .trim()
-    .replace(/\s+/g, " ");
-}
+export { norm };
 
 export function normKey(s: unknown) {
   return norm(s).toLowerCase();

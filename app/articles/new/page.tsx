@@ -132,7 +132,7 @@ export default function NewArticlePage() {
     return (
       <div className="min-h-screen bg-background text-foreground px-5 py-14">
         <div className="mx-auto max-w-[600px] text-center fade-up">
-          <p className="overline text-tomato">Editor's note</p>
+          <p className="overline text-tomato">Editor&apos;s note</p>
           <h1
             className="font-display font-black tracking-tight text-foreground mt-3"
             style={{ fontSize: "clamp(2rem, 5vw, 3rem)", lineHeight: 1.02, textWrap: "balance" }}

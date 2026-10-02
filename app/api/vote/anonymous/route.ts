@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { prisma } from '@/app/lib/db'
-import { importPublicKey, verify, fromBase64, hashToken } from '@/utils/blindRsa'
+import { importPublicKey, fromBase64, toBase64, hashToken } from '@/utils/blindRsa'
+import { validateVoteTokenBinding } from '@/utils/voteToken'
 
 // POST /api/vote/anonymous - Submit an anonymous vote
 // No authentication required - the valid signature IS the authentication
@@ -40,9 +41,22 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid option' }, { status: 400 })
   }
 
-  // Verify token is for this poll
-  if (!token.startsWith(`poll-${pollId}-`)) {
-    return NextResponse.json({ error: 'Token is not for this poll' }, { status: 400 })
+  // Decode once; used for binding, verification and dedupe
+  let signatureBytes: Uint8Array
+  let preparedBytes: Uint8Array
+  try {
+    signatureBytes = fromBase64(signature)
+    preparedBytes = fromBase64(preparedMessage)
+  } catch {
+    return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
+  }
+
+  // Verify the token is for this poll AND that the signed prepared message
+  // actually encodes this token (32-byte random prefix || UTF-8(token)).
+  // Without this, one signature could be replayed with unlimited fresh tokens.
+  const bindingError = validateVoteTokenBinding(token, pollId, preparedBytes)
+  if (bindingError) {
+    return NextResponse.json({ error: bindingError }, { status: 400 })
   }
 
   // Verify signature
@@ -53,8 +67,6 @@ export async function POST(req: Request) {
 
   try {
     const publicKey = await importPublicKey(publicKeyPem)
-    const signatureBytes = fromBase64(signature)
-    const preparedBytes = fromBase64(preparedMessage)
 
 
     // Verify signature against prepared message using Web Crypto directly
@@ -74,41 +86,50 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: 'Invalid signature' }, { status: 401 })
   }
 
-  // Check if token has already been used (double-vote prevention)
+  // Double-vote prevention: dedupe on the token AND on the signed prepared
+  // message and signature, so a signature can never be counted twice.
   const tokenHashValue = await hashToken(token)
+  const preparedHashValue = 'prepared:' + (await hashToken(toBase64(preparedBytes)))
+  const signatureHashValue = 'sig:' + (await hashToken(toBase64(signatureBytes)))
+  const dedupeKeys = [tokenHashValue, preparedHashValue, signatureHashValue]
 
-  const existingVote = await prisma.consumedToken.findUnique({
-    where: { tokenHash: tokenHashValue },
+  const existingVote = await prisma.consumedToken.findFirst({
+    where: { tokenHash: { in: dedupeKeys } },
   })
 
   if (existingVote) {
     return NextResponse.json({ error: 'You have already voted' }, { status: 403 })
   }
 
-  // Record vote and mark token as consumed in a transaction
-  await prisma.$transaction([
-    // Upsert poll result (increment tally)
-    prisma.pollResult.upsert({
-      where: {
-        pollId_optionId: { pollId, optionId },
-      },
-      update: {
-        tally: { increment: 1 },
-      },
-      create: {
-        pollId,
-        optionId,
-        tally: 1,
-      },
-    }),
-    // Mark token as consumed
-    prisma.consumedToken.create({
-      data: {
-        tokenHash: tokenHashValue,
-        pollId,
-      },
-    }),
-  ])
+  // Record vote and mark token/message/signature consumed in one transaction.
+  // The primary-key constraint on tokenHash makes concurrent replays fail here.
+  try {
+    await prisma.$transaction([
+      // Upsert poll result (increment tally)
+      prisma.pollResult.upsert({
+        where: {
+          pollId_optionId: { pollId, optionId },
+        },
+        update: {
+          tally: { increment: 1 },
+        },
+        create: {
+          pollId,
+          optionId,
+          tally: 1,
+        },
+      }),
+      // Mark token, prepared message and signature as consumed
+      prisma.consumedToken.createMany({
+        data: dedupeKeys.map((tokenHash) => ({ tokenHash, pollId })),
+      }),
+    ])
+  } catch (e: unknown) {
+    if ((e as { code?: string })?.code === 'P2002') {
+      return NextResponse.json({ error: 'You have already voted' }, { status: 403 })
+    }
+    throw e
+  }
 
   return NextResponse.json({ success: true })
 }

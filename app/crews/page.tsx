@@ -4,6 +4,8 @@ import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
 import { Inter } from 'next/font/google'
 import { groupCrewsByDay } from '@/app/lib/crew-schedule'
+import { useToast } from '@/app/ui/shared/Toast'
+import { LoginPrompt } from '@/app/ui/shared/LoginPrompt'
 import {
   btn,
   card,
@@ -48,6 +50,8 @@ export default function AllCrewsPage() {
   const [user, setUser] = useState<UserData | null>(null)
   const [joining, setJoining] = useState<string | null>(null)
   const [leaving, setLeaving] = useState<string | null>(null)
+  const [loginPromptFor, setLoginPromptFor] = useState<string | null>(null)
+  const toast = useToast()
   const [isMobile, setIsMobile] = useState(false)
 
   // Detect mobile viewport
@@ -105,7 +109,7 @@ export default function AllCrewsPage() {
 
   const handleJoinCrew = async (crewId: string) => {
     if (!user) {
-      alert('Please log in to join a crew')
+      setLoginPromptFor(crewId)
       return
     }
 
@@ -127,7 +131,7 @@ export default function AllCrewsPage() {
       } : null)
 
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setJoining(null)
     }
@@ -154,7 +158,7 @@ export default function AllCrewsPage() {
       } : null)
 
     } catch (e: unknown) {
-      alert((e as any)?.message)
+      toast.error(e instanceof Error ? e.message : 'Something went wrong')
     } finally {
       setLeaving(null)
     }
@@ -263,6 +267,11 @@ export default function AllCrewsPage() {
             )
           )}
         </div>
+        {loginPromptFor === crew.id && (
+          <div style={{ marginTop: 12 }}>
+            <LoginPrompt message="Please log in to join a crew." onDismiss={() => setLoginPromptFor(null)} />
+          </div>
+        )}
 
         {/* Tasks Section */}
         {crew.tasks && crew.tasks.length > 0 && (
@@ -388,9 +397,6 @@ export default function AllCrewsPage() {
       <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: 24 }}>
         {/* Navigation */}
         <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/" style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
-            ← Home
-          </Link>
           {user && (
             <Link href={`/dashboard/${user.memberId}`} style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
               My Dashboard
@@ -424,10 +430,11 @@ export default function AllCrewsPage() {
               textWrap: 'balance',
             } as React.CSSProperties}
           >
-            All Crews
+            Crews
           </h1>
           <p style={{ fontSize: 16, opacity: 0.6, marginTop: 8 }}>
-            {user ? `Welcome, ${user.name}! Join crews to get involved.` : 'Log in to join crews'}
+            Working groups that meet on a regular call.{' '}
+            {user ? `Welcome, ${user.name}! Join crews to get involved.` : 'Log in to join crews.'}
           </p>
         </header>
 
@@ -513,8 +520,8 @@ export default function AllCrewsPage() {
             <p style={{ fontSize: 16, marginBottom: 16 }}>
               Log in with Discord to join crews
             </p>
-            <Link href="/" style={btn('primary')}>
-              Go to Home
+            <Link href="/login" style={btn('primary')}>
+              Log in
             </Link>
           </div>
         )}

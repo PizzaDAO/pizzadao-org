@@ -1,4 +1,4 @@
-import { parseGvizJson } from "@/app/lib/gviz-parser";
+import { fetchGviz } from "@/app/lib/sheets/gviz";
 import { NextResponse } from "next/server";
 import { getTaskLinks } from "../../lib/google-sheets";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
@@ -14,15 +14,6 @@ export const runtime = "nodejs";
 function extractSheetId(url: string) {
     const match = url.match(/\/d\/([a-zA-Z0-9-_]+)/);
     return match ? match[1] : null;
-}
-
-// Helper to construct GViz URL (copied from crew-mappings/route.ts)
-function gvizUrl(sheetId: string, tabName?: string) {
-    const url = new URL(`https://docs.google.com/spreadsheets/d/${sheetId}/gviz/tq`);
-    url.searchParams.set("tqx", "out:json");
-    if (tabName) url.searchParams.set("sheet", tabName);
-    url.searchParams.set("headers", "1");
-    return url.toString();
 }
 
 function extractUrlFromText(text: string): string | undefined {
@@ -128,12 +119,11 @@ async function fetchMyTasksForCrew(sheetUrl: string, memberId: string): Promise<
     if (!id) return { active: [], doneCount: 0 };
 
     try {
-        const url = gvizUrl(id); // default tab
-        const res = await fetch(url, { headers: { "User-Agent": "Mozilla/5.0" }, next: { revalidate: 300 } });
-        if (!res.ok) return { active: [], doneCount: 0 };
-
-        const text = await res.text();
-        const gviz = parseGvizJson(text);
+        // Default tab. Throws on a non-2xx response; the catch below returns the empty result.
+        const gviz = await fetchGviz(id, { headers: 1 }, {
+            revalidate: 300,
+            headers: { "User-Agent": "Mozilla/5.0" },
+        });
         const rows = gviz?.table?.rows || [];
 
         const debugLog: string[] = [];

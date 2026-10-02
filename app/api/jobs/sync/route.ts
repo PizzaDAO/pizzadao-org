@@ -1,22 +1,18 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { checkSecret } from '@/app/lib/auth-guards'
 import { syncJobsFromSheet, fullRefreshJobs, syncJobsFromData } from '@/app/lib/jobs'
-
-const JOB_SYNC_SECRET = process.env.JOB_SYNC_SECRET
 
 export const runtime = 'nodejs'
 
 export async function POST(request: NextRequest) {
   try {
-    // Verify authorization if secret is configured
-    if (JOB_SYNC_SECRET) {
-      const authHeader = request.headers.get('authorization')
-      const syncSecretHeader = request.headers.get('x-sync-secret')
-      const token = syncSecretHeader || authHeader?.replace('Bearer ', '')
-
-      if (token !== JOB_SYNC_SECRET) {
-        return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
-      }
-    }
+    // Always require the shared secret. If JOB_SYNC_SECRET is unset the
+    // endpoint is disabled (503) rather than open to everyone.
+    const authHeader = request.headers.get('authorization')
+    const syncSecretHeader = request.headers.get('x-sync-secret')
+    const token = syncSecretHeader || authHeader?.replace(/^Bearer\s+/i, '')
+    const denied = checkSecret(token, 'JOB_SYNC_SECRET')
+    if (denied) return denied
 
     // Parse request body
     const body = await request.json().catch(() => ({}))
@@ -61,7 +57,6 @@ export async function GET() {
 
     return NextResponse.json({
       configured: true,
-      sheetId: process.env.JOBS_SHEET_ID,
       message: 'Job sync endpoint ready. POST to trigger sync.'
     })
   } catch (error) {

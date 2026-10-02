@@ -23,13 +23,15 @@ export default function CornerLinks() {
 
         {/* GitHub Link */}
         <a
-          href="https://github.com/PizzaDAO/onboarding"
+          href="https://github.com/PizzaDAO/pizzadao-org"
           target="_blank"
           rel="noopener noreferrer"
           className="github-link min-w-[44px] min-h-[44px] flex items-center justify-center"
           title="View on GitHub"
+          aria-label="View source on GitHub (opens in a new tab)"
         >
           <svg
+            aria-hidden="true"
             width="24"
             height="24"
             viewBox="0 0 24 24"

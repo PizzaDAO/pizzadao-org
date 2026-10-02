@@ -52,9 +52,11 @@ export function UserLink({ discordId, memberId: providedMemberId, style }: UserL
       try {
         const res = await fetch(`/api/member-lookup/${discordId}`);
         const data = await res.json();
-        if (res.ok && data.data?.Name) {
-          nameCache[discordId] = data.data.Name;
-          setName(data.data.Name);
+        // Public lookup returns only { found, memberId, memberName }
+        const lookedUpName: string | undefined = data.memberName || data.data?.Name;
+        if (res.ok && lookedUpName) {
+          nameCache[discordId] = lookedUpName;
+          setName(lookedUpName);
           if (data.memberId) {
             memberIdCache[discordId] = String(data.memberId);
             // Don't clobber an explicitly provided memberId — but if none

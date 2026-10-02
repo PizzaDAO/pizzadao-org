@@ -1,16 +1,16 @@
 import { AlchemyPOAP, POAPDisplayItem } from './poap-types';
-import { parseGvizJson } from './gviz-parser';
-import { findColumnIndex } from './sheet-utils';
 import { GvizResponse, GvizCell } from './types/gviz';
-import { cacheGet, cacheSet, cacheGetOrSet } from '../api/lib/cache';
+import { cacheGet, cacheSet } from '../api/lib/cache';
+import { fetchGviz } from './sheets/gviz';
+import { SHEET_IDS } from './sheets/config';
 
 // POAP service layer - fetches and filters POAPs from POAP Compass API and Google Sheets
 
 const POAP_CONTRACT = '0x22C1f6050E56d2876009903609a2cC3fEf83B415';
-const POAP_WHITELIST_SHEET_ID = '1UsQA1Jqm4gCb1qMwWf7i_k0eNsi5EofyOjijmGig3Jc';
+const POAP_WHITELIST_SHEET_ID = SHEET_IDS.poapWhitelist;
 
 // Cache TTLs (in seconds)
-const POAP_WHITELIST_TTL = 60 * 60 * 24 * 7; // 7 days - whitelist rarely changes
+const POAP_WHITELIST_REVALIDATE = 60 * 5; // Next data cache for the whitelist sheet
 const POAP_USER_TTL = 0; // No expiry — POAPs are immutable, only new ones are fetched incrementally
 
 // Cache structure for user POAPs
@@ -26,25 +26,24 @@ interface POAPCache {
  * Fetch allowed POAP event IDs from Google Sheets whitelist
  * Returns Set of event IDs (not token IDs - POAP events have multiple tokens)
  *
- * Sheet: https://docs.google.com/spreadsheets/d/1UsQA1Jqm4gCb1qMwWf7i_k0eNsi5EofyOjijmGig3Jc
+ * Sheet: SHEET_IDS.poapWhitelist
  * Column: "POAP ID" or numeric column with POAP event IDs
+ *
+ * Cached for 5 minutes in Next's data cache; pass `{ fresh: true }` to bypass.
  */
-export async function fetchAllowedPOAPIds(): Promise<Set<string>> {
-  // Check persistent cache first
-  const cached = await cacheGet<string[]>('poap-whitelist-ids');
-  if (cached) return new Set(cached);
-
+export async function fetchAllowedPOAPIds(opts: { fresh?: boolean } = {}): Promise<Set<string>> {
   try {
-    const url = `https://docs.google.com/spreadsheets/d/${POAP_WHITELIST_SHEET_ID}/gviz/tq?tqx=out:json&headers=0`;
-    const res = await fetch(url, { cache: 'no-store' });
-
-    if (!res.ok) {
-      console.error(`POAP whitelist fetch failed: ${res.status}`);
+    let gviz: GvizResponse;
+    try {
+      gviz = await fetchGviz(
+        POAP_WHITELIST_SHEET_ID,
+        { headers: 0 },
+        opts.fresh ? { fresh: true } : { revalidate: POAP_WHITELIST_REVALIDATE },
+      );
+    } catch (e) {
+      console.error(`POAP whitelist fetch failed: ${e instanceof Error ? e.message : String(e)}`);
       return new Set();
     }
-
-    const text = await res.text();
-    const gviz: GvizResponse = parseGvizJson(text);
     const rows = gviz?.table?.rows || [];
     const cols = gviz?.table?.cols || [];
 
@@ -109,8 +108,6 @@ export async function fetchAllowedPOAPIds(): Promise<Set<string>> {
       }
     }
 
-    // Cache the result (store as array since Set doesn't serialize well)
-    await cacheSet('poap-whitelist-ids', Array.from(allowedIds), POAP_WHITELIST_TTL);
     return allowedIds;
 
   } catch (error) {

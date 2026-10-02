@@ -2,25 +2,16 @@
 
 import { google } from "googleapis";
 import { getCrewMappings } from "./crew-mappings";
+import { SHEET_IDS } from "./sheets/config";
+import { getGoogleAuth, GOOGLE_SCOPES, hasServiceAccountCredentials } from "./google-auth";
 
-const WEBHOOK_SHEET_ID = "1bSLN2mL1K-qr3nLiURVjhm31Zxn0J3ta1Pq0txlXsPI";
+const WEBHOOK_SHEET_ID = SHEET_IDS.discordWebhooks;
 
-// Initialize Google Sheets API client with service account
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
-
-let credentials;
-try {
-    credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-        ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
-        : undefined;
-} catch (error) {
-}
-
-const auth = credentials
-    ? new google.auth.GoogleAuth({ credentials, scopes: SCOPES })
+// Google Sheets API client with the shared service account. Webhooks are
+// optional: without valid credentials getWebhookUrl() returns null.
+const sheets = hasServiceAccountCredentials()
+    ? google.sheets({ version: "v4", auth: getGoogleAuth([GOOGLE_SCOPES.sheetsReadonly]) })
     : null;
-
-const sheets = auth ? google.sheets({ version: "v4", auth }) : null;
 
 // Cache for webhook URLs (5 minute TTL)
 const webhookCache = new Map<string, { url: string; time: number }>();
@@ -68,8 +59,8 @@ export async function getWebhookUrl(channelName: string): Promise<string | null>
         const headers = rows[0].map((h: string) => String(h || "").toLowerCase().trim());
 
         // Find column indices
-        let channelColIdx = headers.findIndex((h: string) => h === "channel" || h === "crew");
-        let webhookColIdx = headers.findIndex((h: string) => h === "webhook" || h === "webhook url" || h === "webhookurl");
+        const channelColIdx = headers.findIndex((h: string) => h === "channel" || h === "crew");
+        const webhookColIdx = headers.findIndex((h: string) => h === "webhook" || h === "webhook url" || h === "webhookurl");
 
         if (channelColIdx === -1 || webhookColIdx === -1) {
             return null;

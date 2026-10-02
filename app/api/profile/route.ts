@@ -9,9 +9,9 @@ import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { GvizCell } from "@/app/lib/types/gviz";
 import { withErrorHandling } from "@/app/lib/errors/error-response";
 import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
-import { fetchMemberById } from "@/app/lib/sheets/member-repository";
+import { fetchMemberById, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
-import { validateProfilePayload } from "@/app/lib/profile/validation";
+import { validateProfilePayload, sanitizeDisplayName } from "@/app/lib/profile/validation";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { getRegionRoleId, ALL_REGION_ROLE_IDS } from "@/app/lib/region-mapping";
 import { crewIdToLabel } from "@/app/lib/crew-labels";
@@ -76,6 +76,10 @@ export async function writeToSheet(payload: unknown) {
   if (sheetStatus < 200 || sheetStatus >= 300 || (parsed as any)?.ok === false || ((parsed as any)?.crewSync && (parsed as any).crewSync.ok === false)) {
     throw new Error(JSON.stringify((parsed as any)?.crewSync?.error ?? (parsed as any)?.details ?? parsed ?? text));
   }
+
+  // Every members-sheet write funnels through here (profile, wallet, Discord
+  // role sync): expire cached members-sheet reads.
+  invalidateMembersCache();
   return parsed;
 }
 
@@ -149,7 +153,7 @@ const POST_HANDLER = async (req: Request) => {
     source: clampStr(body.source ?? "web", 20),
     sessionId: clampStr(body.sessionId ?? "", 80),
 
-    mafiaName: clampStr(body.mafiaName, 64),
+    mafiaName: sanitizeDisplayName(body.mafiaName),
     topping: clampStr(body.topping, 50),
 
     mafiaMovieTitle: clampStr(body.mafiaMovieTitle, 120),
@@ -176,7 +180,7 @@ const POST_HANDLER = async (req: Request) => {
     raw: {
       source: clampStr(body.source ?? "web", 20),
       sessionId: clampStr(body.sessionId ?? "", 80),
-      mafiaName: clampStr(body.mafiaName, 64),
+      mafiaName: sanitizeDisplayName(body.mafiaName),
       topping: clampStr(body.topping, 50),
       mafiaMovieTitle: clampStr(body.mafiaMovieTitle, 120),
       resolvedMovieTitle: clampStr(body.resolvedMovieTitle, 120),
@@ -207,7 +211,8 @@ const POST_HANDLER = async (req: Request) => {
    */
   let isNewSignup = true; // Track if this is a new signup (for welcome message)
   if (payload.memberId) {
-    const row = await fetchMemberById(payload.memberId);
+    // Uncached on purpose: this ownership check guards the write below.
+    const row = await fetchMemberById(payload.memberId, { fresh: true });
 
     if (row) {
       // Row exists - this is an UPDATE, verify ownership

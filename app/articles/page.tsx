@@ -122,13 +122,6 @@ export default function ArticlesListPage() {
   return (
     <div className="relative min-h-screen bg-background text-foreground px-4 sm:px-5 py-10">
       <div className="mx-auto max-w-[1100px]">
-        {/* Back link — quiet upper-left */}
-        <Link
-          href="/"
-          className="overline inline-flex min-h-11 items-center text-foreground/55 hover:text-tomato transition-colors no-underline mb-3"
-        >
-          <span aria-hidden className="mr-2">←</span> Back to home
-        </Link>
 
         {/* Masthead — overline · display headline · tagline */}
         <header className="relative fade-up mb-8">

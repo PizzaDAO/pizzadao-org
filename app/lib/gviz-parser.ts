@@ -87,7 +87,11 @@ export function normalizeString(s: string): string {
  * Checks if the row contains enough of the expected header values
  */
 export function isHeaderRow(row: GvizRow, expectedHeaders: string[]): boolean {
-  const rowValues = (row.c || []).map(cell => normalizeString(getCellValue(cell)));
+  // Empty cells are ignored: "" is a substring of every header and would
+  // otherwise make any row with a blank cell look like a header row.
+  const rowValues = (row.c || [])
+    .map(cell => normalizeString(getCellValue(cell)))
+    .filter(Boolean);
   const lowerExpected = expectedHeaders.map(h => h.toLowerCase());
 
   // Check if this row contains expected header values
@@ -100,17 +104,33 @@ export function isHeaderRow(row: GvizRow, expectedHeaders: string[]): boolean {
 }
 
 /**
- * Find the header row index in a table by searching for expected headers
- * Searches the first N rows (default 10)
+ * Predicate form of a header matcher: receives the row's cell values
+ * normalized with `normalizeString` (lowercased, trimmed, whitespace collapsed).
+ */
+export type HeaderRowPredicate = (normalizedValues: string[]) => boolean;
+
+/**
+ * Find the header row index in a table.
+ *
+ * `expected` is either a list of header names (fuzzy: more than half must
+ * appear, see `isHeaderRow`) or a predicate over the row's normalized values
+ * for exact rules such as "has `name` and one of `status`/`city`".
+ * Searches the first N rows (default 10). Returns -1 when none matches.
  */
 export function findHeaderRowIndex(
   table: GvizTable,
-  expectedHeaders: string[],
+  expected: string[] | HeaderRowPredicate,
   maxRowsToSearch: number = 10
 ): number {
   const rows = table.rows || [];
   for (let i = 0; i < Math.min(maxRowsToSearch, rows.length); i++) {
-    if (isHeaderRow(rows[i], expectedHeaders)) {
+    const row = rows[i];
+    if (!row) continue;
+    const matches =
+      typeof expected === 'function'
+        ? expected((row.c || []).map(cell => normalizeString(getCellValue(cell))))
+        : isHeaderRow(row, expected);
+    if (matches) {
       return i;
     }
   }

@@ -7,6 +7,7 @@ import {
 } from "@/app/lib/sheets/members-list";
 import { getBatchAttendanceSummary } from "@/app/lib/attendance";
 import { CREWS, TURTLES } from "@/app/ui/constants";
+import { resolvePfpUrl } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -24,6 +25,8 @@ interface TurtleFilterCount {
 type MemberWithAttendance = PublicMember & {
   totalCalls: number;
   lastCallDate: string | null;
+  /** Profile picture, resolved here so the directory needs no per-member /api/pfp calls. */
+  pfpUrl?: string | null;
 };
 
 const VALID_SORTS = new Set(["name_asc", "name_desc", "most_calls", "recent_call"]);
@@ -147,7 +150,9 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * limit;
-  const pageSlice = enriched.slice(start, start + limit);
+  const pageSlice = enriched
+    .slice(start, start + limit)
+    .map((m) => ({ ...m, pfpUrl: resolvePfpUrl(m.id) }));
 
   // Per-crew and per-turtle counts from the UNFILTERED result (v1 simple)
   const crewCounts = CREWS.map((c) => ({

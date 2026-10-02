@@ -26,8 +26,13 @@ import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { fetchMyTasksForCrew } from "@/app/lib/my-tasks";
 import { resolveNextAction, type NextAction } from "@/app/dashboard/[id]/lib/next-action";
+import {
+    getProfileCompletion,
+    type ProfileCompletion,
+} from "@/app/dashboard/[id]/lib/profile-completion";
 import { hasAnyRole } from "@/app/lib/discord";
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
+import { resolvePfpUrl } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -76,6 +81,8 @@ export interface DashboardSummary {
         }>;
     };
     nextAction: NextAction;
+    /** jalapeno-34126 — setup checklist backing the hero completion meter. */
+    profileCompletion: ProfileCompletion;
 }
 
 // ---------------------------------------------------------------------------
@@ -252,25 +259,8 @@ export async function GET(request: NextRequest) {
         );
         const memberCity = String(member?.["City"] || "Worldwide");
 
-        // PFP — synchronous fs.exists, but cheap. Mirror /api/pfp/[memberId].
-        let pfpUrl: string | null = null;
-        try {
-            const fs = await import("fs");
-            const path = await import("path");
-            const pfpDir = path.join(process.cwd(), "public", "pfp");
-            const jpgPath = path.join(pfpDir, `${memberId}.jpg`);
-            const pngPath = path.join(pfpDir, `${memberId}.png`);
-            if (fs.existsSync(jpgPath)) pfpUrl = `/pfp/${memberId}.jpg`;
-            else if (fs.existsSync(pngPath)) pfpUrl = `/pfp/${memberId}.png`;
-            else {
-                const defaultJpg = path.join(pfpDir, "default.jpg");
-                const defaultPng = path.join(pfpDir, "default.png");
-                if (fs.existsSync(defaultJpg)) pfpUrl = `/pfp/default.jpg`;
-                else if (fs.existsSync(defaultPng)) pfpUrl = `/pfp/default.png`;
-            }
-        } catch {
-            pfpUrl = null;
-        }
+        // PFP — same resolution as /api/pfp/[memberId].
+        const pfpUrl = resolvePfpUrl(memberId);
 
         // --- Wallets ---
         const wallets = {
@@ -356,6 +346,12 @@ export async function GET(request: NextRequest) {
             isReviewer,
         });
 
+        const profileCompletion = getProfileCompletion({
+            member: { id: memberId, crews: memberCrews },
+            wallets: { count: wallets.count },
+            x: { connected: x.connected },
+        });
+
         const summary: DashboardSummary = {
             member: {
                 id: memberId,
@@ -381,6 +377,7 @@ export async function GET(request: NextRequest) {
             crewsHydrated,
             notifications: { unread: unreadCount, top: topNotifications },
             nextAction,
+            profileCompletion,
         };
 
         CACHE.set(memberId, { time: Date.now(), data: summary });

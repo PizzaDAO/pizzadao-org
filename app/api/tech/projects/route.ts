@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { fetchAllProjects } from '@/app/lib/projects/github'
+import { requireAdmin } from '@/app/lib/auth-guards'
 import { getCached, setCache, getCacheMetadata, clearCache, CACHE_KEYS } from '@/app/lib/projects/cache'
 import type { Project, ProjectsConfig } from '@/app/lib/projects/types'
 import projectsConfigJson from '@/data/projects-config.json'
@@ -12,7 +13,8 @@ const projectsConfig = projectsConfigJson as ProjectsConfig
  */
 export async function GET(request: Request) {
   const { searchParams } = new URL(request.url)
-  const forceRefresh = searchParams.get('refresh') === 'true'
+  // Only admins may bypass the cache (a refresh fans out to the GitHub API)
+  const forceRefresh = searchParams.get('refresh') === 'true' && (await requireAdmin()).ok
 
   try {
     // Check cache first (unless force refresh)
@@ -81,6 +83,10 @@ export async function GET(request: Request) {
  * Force refresh the cache
  */
 export async function POST() {
+  // Admin only: a forced refresh fans out to the GitHub API.
+  const admin = await requireAdmin()
+  if (!admin.ok) return admin.response
+
   try {
     // Clear the cache
     clearCache(CACHE_KEYS.ALL_PROJECTS)

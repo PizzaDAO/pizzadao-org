@@ -1,6 +1,8 @@
 'use client'
 
+import Link from 'next/link'
 import { useState, useEffect } from 'react'
+import { useToast } from '@/app/ui/shared/Toast'
 import { TURTLE_ROLE_IDS, ROLE_ID_TO_TURTLE } from '@/app/ui/constants'
 
 type PollOption = { id: string; label: string }
@@ -17,6 +19,7 @@ type Poll = {
 
 export default function AdminPollsPage() {
   const [polls, setPolls] = useState<Poll[]>([])
+  const toast = useToast()
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState<string | null>(null)
   const [isAdmin, setIsAdmin] = useState(false)
@@ -87,7 +90,7 @@ export default function AdminPollsPage() {
       setQuestion('')
       setOptions(['', ''])
     } catch (e: unknown) {
-      alert(e instanceof Error ? (e as any)?.message : 'An error occurred')
+      toast.error(e instanceof Error ? e.message : 'An error occurred')
     } finally {
       setCreating(false)
     }
@@ -109,7 +112,7 @@ export default function AdminPollsPage() {
       const updated = await res.json()
       setPolls(polls.map(p => (p.id === pollId ? { ...p, ...updated } : p)))
     } catch (e: unknown) {
-      alert(e instanceof Error ? (e as any)?.message : 'An error occurred')
+      toast.error(e instanceof Error ? e.message : 'An error occurred')
     }
   }
 
@@ -124,7 +127,7 @@ export default function AdminPollsPage() {
       }
       setPolls(polls.filter(p => p.id !== pollId))
     } catch (e: unknown) {
-      alert(e instanceof Error ? (e as any)?.message : 'An error occurred')
+      toast.error(e instanceof Error ? e.message : 'An error occurred')
     }
   }
 
@@ -141,9 +144,9 @@ export default function AdminPollsPage() {
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-6 rounded-lg shadow">
           <p className="text-red-600">{error}</p>
-          <a href="/" className="text-blue-600 hover:underline mt-2 block">
+          <Link href="/" className="text-blue-600 hover:underline mt-2 block">
             Go to home page
-          </a>
+          </Link>
         </div>
       </div>
     )

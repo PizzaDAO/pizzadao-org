@@ -13,6 +13,8 @@ import { ArrowUpRight, Send } from "lucide-react";
 import { PepAmount } from "../../../ui/economy";
 import { NotificationBell } from "../../../ui/notifications";
 import { ThemeToggle } from "../../../ui/ThemeToggle";
+import type { ProfileCompletion } from "../lib/profile-completion";
+import { ProfileCompletionMeter } from "./ProfileCompletionMeter";
 
 export type HeroBlockProps = {
     name: string;
@@ -29,6 +31,8 @@ export type HeroBlockProps = {
      * Link navigates to `/profile/{idValue}/edit` (the new owner-only edit
      * route introduced in PR5 slice-61816). */
     onOpenEditProfile?: () => void;
+    /** jalapeno-34126 — setup checklist; the meter hides itself when complete. */
+    profileCompletion?: ProfileCompletion | null;
 };
 
 function initialsOf(name: string): string {
@@ -52,6 +56,7 @@ export function HeroBlock({
     idValue,
     missionLevel,
     onSendPep,
+    profileCompletion,
 }: HeroBlockProps) {
     // Either prop name works; prefer levelBadge if both supplied.
     const badge = levelBadge ?? missionLevel ?? null;
@@ -220,6 +225,9 @@ export function HeroBlock({
                     <ArrowUpRight className="h-3 w-3" />
                 </Link>
             </div>
+
+            {/* ── Profile setup meter (hidden once complete) */}
+            <ProfileCompletionMeter completion={profileCompletion} />
         </header>
     );
 }

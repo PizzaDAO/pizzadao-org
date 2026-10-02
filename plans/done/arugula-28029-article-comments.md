@@ -1,6 +1,6 @@
 # arugula-28029 — Article Comments + Reactions
 
-**Status:** Implementation in progress.
+**Status:** Shipped.
 **Date:** 2026-05-21
 **Author:** Snax (planning agent: Claude)
 **Depends on:** Articles feature (PR #28), Notifications (truffle-41395)

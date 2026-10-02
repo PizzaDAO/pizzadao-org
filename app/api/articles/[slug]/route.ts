@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
+import { revalidatePath } from 'next/cache'
 import { getSession } from '@/app/lib/session'
 import { hasAnyRole } from '@/app/lib/discord'
 import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
@@ -18,6 +19,17 @@ import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 export const runtime = 'nodejs'
 
 type Params = { params: Promise<{ slug: string }> }
+
+// Best-effort invalidation of Next's cache for the article after a change.
+function revalidateArticle(slug: string) {
+  try {
+    revalidatePath(`/api/articles/${slug}`)
+    revalidatePath(`/articles/${slug}`)
+    revalidatePath('/articles')
+  } catch {
+    // revalidation is best-effort
+  }
+}
 
 // GET /api/articles/[slug] - Read a single article.
 // Published articles are public. Drafts require author, collaborator, or admin.
@@ -46,8 +58,15 @@ const GET_HANDLER = async (_req: NextRequest, { params }: Params) => {
 
   const authorMemberId = await fetchMemberIdByDiscordId(article.authorId).catch(() => null)
 
+  // Only published articles may be cached by shared caches/CDN. Drafts must
+  // never be stored publicly (the CDN key ignores the viewer's session).
+  // Published TTL is short so edits/unpublishes propagate quickly.
+  const cacheControl = article.status === 'PUBLISHED'
+    ? 'public, s-maxage=60, stale-while-revalidate=300'
+    : 'private, no-store'
+
   return NextResponse.json({ article: { ...article, authorMemberId } }, {
-    headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
+    headers: { 'Cache-Control': cacheControl }
   })
 }
 
@@ -89,7 +108,8 @@ const PATCH_HANDLER = async (request: NextRequest, { params }: Params) => {
     status,
   })
 
-  return NextResponse.json({ article: updated })
+  revalidateArticle(slug)
+  return NextResponse.json({ article: updated }, { headers: { 'Cache-Control': 'private, no-store' } })
 }
 
 // DELETE /api/articles/[slug] - Archive (soft delete). Admins only.
@@ -109,6 +129,7 @@ const DELETE_HANDLER = async (_req: NextRequest, { params }: Params) => {
   if (!existing) throw new NotFoundError('Article')
 
   const archived = await archiveArticle(slug)
+  revalidateArticle(slug)
   return NextResponse.json({ success: true, article: archived })
 }
 

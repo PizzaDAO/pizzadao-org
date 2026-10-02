@@ -65,7 +65,8 @@ export async function POST(req: NextRequest) {
     }
 
     // Verify ownership: the logged-in user must own this memberId
-    const member = await fetchMemberById(memberId);
+    // Uncached on purpose: ownership check guarding a write.
+    const member = await fetchMemberById(memberId, { fresh: true });
     if (!member) {
       return NextResponse.json({ error: "Member not found" }, { status: 404 });
     }

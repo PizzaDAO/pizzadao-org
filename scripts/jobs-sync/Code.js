@@ -9,7 +9,8 @@ const CONFIG = {
   BASE_URL: 'https://nonprolifically-flourishing-edgardo.ngrok-free.dev',
 
   // Must match JOB_SYNC_SECRET in your .env.local
-  SYNC_SECRET: 'pep_jobs_sync_7d3f9a2c1b8e',
+  // Set Script Properties > JOB_SYNC_SECRET (never commit the value).
+  SYNC_SECRET: PropertiesService.getScriptProperties().getProperty('JOB_SYNC_SECRET') || '',
 
   // Sheet names
   JOBS_SHEET: 'Jobs',

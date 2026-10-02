@@ -1,26 +1,17 @@
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
-import path from 'path'
 import { prisma } from '@/app/lib/db'
+import { getGoogleAuth, GOOGLE_SCOPES } from '@/app/lib/google-auth'
+import { requireSession } from '@/app/lib/auth-guards'
+import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
+import { getCrewMappings } from '@/app/lib/crew-mappings'
 
-// Initialize Google Sheets API client with write access
-const SCOPES = ['https://www.googleapis.com/auth/spreadsheets']
-
-let credentials
-try {
-  credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-    ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
-    : undefined
-} catch (error) {
+// Google Sheets API client with write access, created on first use so a
+// malformed GOOGLE_SERVICE_ACCOUNT_JSON surfaces as a request error rather
+// than a module-load crash.
+function getSheetsClient() {
+  return google.sheets({ version: 'v4', auth: getGoogleAuth([GOOGLE_SCOPES.sheets]) })
 }
-
-const auth = new google.auth.GoogleAuth({
-  credentials,
-  keyFile: !credentials ? path.join(process.cwd(), 'service-account.json') : undefined,
-  scopes: SCOPES,
-})
-
-const sheets = google.sheets({ version: 'v4', auth })
 
 // Extract sheet ID from Google Sheets URL
 function extractSheetId(url: string): string | null {
@@ -28,21 +19,41 @@ function extractSheetId(url: string): string | null {
   return match ? match[1] : null
 }
 
-export async function POST(req: Request) {
-  try {
-    const { sheetUrl, taskName, memberId, action = 'claim' } = await req.json()
+// Only crew sheets listed in the Crew Mappings config may be written to.
+async function getAllowedCrewSheetIds(): Promise<Set<string>> {
+  const { crews } = await getCrewMappings()
+  const ids = new Set<string>()
+  for (const crew of crews) {
+    const id = crew.sheet ? extractSheetId(crew.sheet) : null
+    if (id) ids.add(id)
+  }
+  return ids
+}
 
-    if (!sheetUrl || !taskName) {
+export async function POST(req: Request) {
+  const auth = await requireSession()
+  if (!auth.ok) return auth.response
+
+  try {
+    // memberId in the body is ignored: it is always derived from the session.
+    const { sheetUrl, taskName, action = 'claim' } = await req.json()
+
+    if (typeof sheetUrl !== 'string' || typeof taskName !== 'string' || !sheetUrl || !taskName.trim()) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
     }
 
-    if (action === 'claim' && !memberId) {
+    if (action !== 'claim' && action !== 'giveup') {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    const memberId = await fetchMemberIdByDiscordId(auth.session.discordId)
+    if (!memberId) {
       return NextResponse.json(
-        { error: 'Member ID required to claim task' },
-        { status: 400 }
+        { error: 'No member profile is linked to your Discord account' },
+        { status: 403 }
       )
     }
 
@@ -54,8 +65,16 @@ export async function POST(req: Request) {
       )
     }
 
+    const allowedSheetIds = await getAllowedCrewSheetIds()
+    if (!allowedSheetIds.has(sheetId)) {
+      return NextResponse.json(
+        { error: 'Sheet is not a configured crew sheet' },
+        { status: 403 }
+      )
+    }
+
     // Get the spreadsheet to find the Tasks section
-    const res = await sheets.spreadsheets.get({
+    const res = await getSheetsClient().spreadsheets.get({
       spreadsheetId: sheetId,
       includeGridData: true,
       fields: 'sheets(properties,data(rowData(values(userEnteredValue,formattedValue))))',
@@ -71,6 +90,7 @@ export async function POST(req: Request) {
 
     // Find the Tasks section and the task row
     let taskRowIdx = -1
+    let taskRowCells: Array<{ userEnteredValue?: { stringValue?: string | null; numberValue?: number | null } | null; formattedValue?: string | null }> = []
     let leadColIdx = -1
     let leadIdColIdx = -1
     let tasksHeaderRowIdx = -1
@@ -130,6 +150,7 @@ export async function POST(req: Request) {
 
         if (cellVal.trim() === taskName.trim()) {
           taskRowIdx = r
+          taskRowCells = cells
           break
         }
       }
@@ -156,6 +177,28 @@ export async function POST(req: Request) {
       )
     }
 
+    // Ownership: read the current Lead ID of the task row.
+    const leadIdCellData = taskRowCells[leadIdColIdx]
+    const currentLeadId = String(
+      leadIdCellData?.userEnteredValue?.stringValue ??
+      leadIdCellData?.userEnteredValue?.numberValue ??
+      leadIdCellData?.formattedValue ??
+      ''
+    ).trim()
+
+    if (action === 'giveup' && currentLeadId !== String(memberId)) {
+      return NextResponse.json(
+        { error: 'You can only give up tasks you lead' },
+        { status: 403 }
+      )
+    }
+    if (action === 'claim' && currentLeadId && currentLeadId !== String(memberId)) {
+      return NextResponse.json(
+        { error: 'Task is already claimed by another member' },
+        { status: 409 }
+      )
+    }
+
     // Get the sheet name (default to first sheet)
     const sheetName = sheetData.properties?.title || 'Sheet1'
 
@@ -163,7 +206,7 @@ export async function POST(req: Request) {
     const leadIdCell = `'${sheetName}'!${columnToLetter(leadIdColIdx)}${taskRowIdx + 1}`
     const newValue = action === 'giveup' ? '' : memberId
 
-    await sheets.spreadsheets.values.update({
+    await getSheetsClient().spreadsheets.values.update({
       spreadsheetId: sheetId,
       range: leadIdCell,
       valueInputOption: 'RAW',

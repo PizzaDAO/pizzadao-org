@@ -69,10 +69,12 @@ export async function POST(req: Request, { params }: Params) {
 
     const blindSig = await blindSign(privateKey, blindedBytes)
 
-    // Ensure user exists in our database
+    // Ensure user exists in our database. Do NOT touch roles on update:
+    // User.roles is the role snapshot used for admin checks and role-grant
+    // activity; clobbering it would re-log every role as newly granted.
     await prisma.user.upsert({
       where: { id: session.discordId },
-      update: { roles: [] }, // We'll update roles separately if needed
+      update: {},
       create: { id: session.discordId, roles: [] },
     })
 

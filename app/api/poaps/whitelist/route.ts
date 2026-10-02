@@ -109,10 +109,10 @@ export async function GET(req: Request): Promise<NextResponse<WhitelistResponse>
   const url = new URL(req.url);
   const forceRefresh = url.searchParams.get('fresh') === '1';
 
-  // Clear caches if force refresh
+  // Clear caches if force refresh (the whitelist IDs themselves are read
+  // fresh below via fetchAllowedPOAPIds({ fresh: true }))
   if (forceRefresh) {
     await cacheDel('poap-whitelist-details');
-    await cacheDel('poap-whitelist-ids');
   }
 
   // Check cache first (unless force refresh)
@@ -124,8 +124,8 @@ export async function GET(req: Request): Promise<NextResponse<WhitelistResponse>
   }
 
   try {
-    // Get whitelist IDs (will fetch fresh since we cleared the cache)
-    const allowedIds = await fetchAllowedPOAPIds();
+    // Get whitelist IDs (bypasses the data cache on ?fresh=1)
+    const allowedIds = await fetchAllowedPOAPIds({ fresh: forceRefresh });
     const eventIds = Array.from(allowedIds);
 
     // Debug: show first few IDs

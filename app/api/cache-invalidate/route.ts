@@ -1,10 +1,12 @@
 import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
+import { checkSecret } from "@/app/lib/auth-guards";
+import { invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
-// Secret key for authorization (set in Vercel env vars)
-const CACHE_SECRET = process.env.CACHE_INVALIDATE_SECRET;
+// Secret key for authorization: CACHE_INVALIDATE_SECRET (set in Vercel env vars).
+// The GET ?secret= variant was removed (secrets in URLs leak via logs/history).
 
 /**
  * Cache invalidation endpoint
@@ -18,17 +20,16 @@ const CACHE_SECRET = process.env.CACHE_INVALIDATE_SECRET;
  * Patterns:
  * - "crew-mappings" - Invalidate crew mappings cache
  * - "task-links" - Invalidate all task links
+ * - "members" / "member-turtles" - Expire the members-sheet data cache (tag "members")
  * - "all" - Invalidate everything
  */
 export async function POST(req: Request) {
   try {
-    // Check authorization
+    // Check authorization (constant-time; 503 if the secret is not configured)
     const authHeader = req.headers.get("Authorization");
-    const token = authHeader?.replace("Bearer ", "");
-
-    if (!CACHE_SECRET || token !== CACHE_SECRET) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-    }
+    const token = authHeader?.replace(/^Bearer\s+/i, "");
+    const denied = checkSecret(token, "CACHE_INVALIDATE_SECRET");
+    if (denied) return denied;
 
     // Check if KV is configured
     if (!process.env.KV_REST_API_URL || !process.env.KV_REST_API_TOKEN) {
@@ -38,7 +39,7 @@ export async function POST(req: Request) {
     const body = await req.json().catch(() => ({}));
     const { pattern, keys } = body as { pattern?: string; keys?: string[] };
 
-    let deletedKeys: string[] = [];
+    const deletedKeys: string[] = [];
 
     if (keys && Array.isArray(keys)) {
       // Delete specific keys
@@ -47,6 +48,11 @@ export async function POST(req: Request) {
         deletedKeys.push(key);
       }
     } else if (pattern) {
+      // Members-sheet reads live in Next's data cache, not KV.
+      if (pattern === "members" || pattern === "member-turtles" || pattern === "all") {
+        invalidateMembersCache();
+      }
+
       // Delete keys matching pattern
       const allKeys = await kv.keys("*");
 
@@ -86,23 +92,4 @@ export async function POST(req: Request) {
   } catch (err: any) {
     return NextResponse.json({ error: String(err?.message ?? "Unknown error") }, { status: 500 });
   }
-}
-
-// Also support GET for simple invalidation (with secret in query param)
-export async function GET(req: Request) {
-  const url = new URL(req.url);
-  const secret = url.searchParams.get("secret");
-  const pattern = url.searchParams.get("pattern") || "all";
-
-  if (!CACHE_SECRET || secret !== CACHE_SECRET) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Forward to POST handler
-  const fakeReq = {
-    headers: new Headers({ "Authorization": `Bearer ${secret}` }),
-    json: async () => ({ pattern }),
-  } as Request;
-
-  return POST(fakeReq);
 }

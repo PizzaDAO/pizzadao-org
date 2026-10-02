@@ -1,5 +1,5 @@
 import { NextResponse } from 'next/server'
-import { getSession } from '@/app/lib/session'
+import { requireAdmin } from '@/app/lib/auth-guards'
 import { prisma } from '@/app/lib/db'
 
 export const runtime = 'nodejs'
@@ -7,11 +7,9 @@ export const runtime = 'nodejs'
 // Admin-only endpoint to reset today's jobs
 export async function POST() {
   try {
-    const session = await getSession()
-
-    if (!session?.discordId) {
-      return NextResponse.json({ error: 'Not authenticated' }, { status: 401 })
-    }
+    // Admin only: resetting lets members re-complete (and be re-paid for) jobs.
+    const admin = await requireAdmin()
+    if (!admin.ok) return admin.response
 
     // Get start of current UTC day
     const now = new Date()

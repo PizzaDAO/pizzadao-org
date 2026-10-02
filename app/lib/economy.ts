@@ -47,16 +47,25 @@ export async function getBalance(userId: string) {
  * Add or subtract from user's balance
  */
 export async function updateBalance(userId: string, amount: number) {
-  const economy = await getOrCreateEconomy(userId)
+  await getOrCreateEconomy(userId)
 
-  if (economy.wallet + amount < 0) {
-    throw new ValidationError('Insufficient funds')
+  // Atomic in the database: no read-modify-write of an absolute value (which
+  // could lose concurrent updates), and debits only apply if funds suffice.
+  if (amount >= 0) {
+    return prisma.economy.update({
+      where: { id: userId },
+      data: { wallet: { increment: amount } }
+    })
   }
 
-  return prisma.economy.update({
-    where: { id: userId },
-    data: { wallet: economy.wallet + amount }
+  const debit = await prisma.economy.updateMany({
+    where: { id: userId, wallet: { gte: -amount } },
+    data: { wallet: { increment: amount } }
   })
+  if (debit.count !== 1) {
+    throw new ValidationError('Insufficient funds')
+  }
+  return prisma.economy.findUniqueOrThrow({ where: { id: userId } })
 }
 
 // Alias for backward compatibility
@@ -66,8 +75,8 @@ export const updateWallet = updateBalance
  * Transfer currency between users
  */
 export async function transfer(fromId: string, toId: string, amount: number) {
-  if (amount <= 0) {
-    throw new ValidationError('Amount must be positive')
+  if (!Number.isInteger(amount) || amount <= 0) {
+    throw new ValidationError('Amount must be positive and a whole number')
   }
 
   if (fromId === toId) {
@@ -81,12 +90,17 @@ export async function transfer(fromId: string, toId: string, amount: number) {
     throw new ValidationError('Insufficient funds')
   }
 
-  // Use interactive transaction to ensure atomicity and log both sides
+  // Use interactive transaction to ensure atomicity and log both sides.
+  // The debit is a conditional update (wallet >= amount) so two concurrent
+  // transfers can't both pass the balance check above and overdraw.
   await prisma.$transaction(async (tx: any) => {
-    await tx.economy.update({
-      where: { id: fromId },
+    const debit = await tx.economy.updateMany({
+      where: { id: fromId, wallet: { gte: amount } },
       data: { wallet: { decrement: amount } }
     })
+    if (debit.count !== 1) {
+      throw new ValidationError('Insufficient funds')
+    }
     await tx.economy.update({
       where: { id: toId },
       data: { wallet: { increment: amount } }

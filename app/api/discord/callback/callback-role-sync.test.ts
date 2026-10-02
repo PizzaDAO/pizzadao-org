@@ -6,6 +6,12 @@ vi.mock("@/app/lib/sync-roles-on-login", () => ({
   syncRolesOnLogin: mockSyncRolesOnLogin,
 }));
 
+// Existing-member lookup is a direct lib call (no internal HTTP round-trip)
+const mockFetchMemberByDiscordId = vi.fn();
+vi.mock("@/app/lib/sheets/member-repository", () => ({
+  fetchMemberByDiscordId: (...a: unknown[]) => mockFetchMemberByDiscordId(...a),
+}));
+
 // Mock the session module
 vi.mock("@/app/lib/session", () => ({
   createSessionToken: vi.fn().mockReturnValue("mock-session-token"),
@@ -83,14 +89,8 @@ describe("Discord callback route - role sync integration", () => {
       }),
     });
 
-    // 5. checkExistingMember - GET /api/member-lookup
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        memberId: "42",
-        name: "Test User",
-      }),
-    });
+    // 5. checkExistingMember - direct sheet lookup
+    mockFetchMemberByDiscordId.mockResolvedValueOnce({ memberId: "42", name: "Test User" });
 
     global.fetch = fetchMock;
 
@@ -106,12 +106,8 @@ describe("Discord callback route - role sync integration", () => {
 
     // syncRolesOnLogin should have been called with the user's info
     expect(mockSyncRolesOnLogin).toHaveBeenCalledTimes(1);
-    expect(mockSyncRolesOnLogin).toHaveBeenCalledWith(
-      "http://localhost:3000",
-      "discord-123",
-      "42",
-      "Test User",
-    );
+    expect(mockFetchMemberByDiscordId).toHaveBeenCalledWith("discord-123");
+    expect(mockSyncRolesOnLogin).toHaveBeenCalledWith("discord-123", "Test User");
   });
 
   it("syncRolesOnLogin is called for new users (no existing member)", async () => {
@@ -150,10 +146,7 @@ describe("Discord callback route - role sync integration", () => {
     });
 
     // No existing member
-    fetchMock.mockResolvedValueOnce({
-      ok: false,
-      json: async () => ({}),
-    });
+    mockFetchMemberByDiscordId.mockResolvedValueOnce(null);
 
     global.fetch = fetchMock;
 
@@ -165,14 +158,9 @@ describe("Discord callback route - role sync integration", () => {
 
     expect(response.status).toBe(307);
 
-    // Even for new users, sync is called (with undefined memberId)
+    // Even for new users, sync is called (it resolves the row by discordId itself)
     expect(mockSyncRolesOnLogin).toHaveBeenCalledTimes(1);
-    expect(mockSyncRolesOnLogin).toHaveBeenCalledWith(
-      "http://localhost:3000",
-      "discord-456",
-      undefined,
-      "New User",
-    );
+    expect(mockSyncRolesOnLogin).toHaveBeenCalledWith("discord-456", "New User");
   });
 
   it("login succeeds even if syncRolesOnLogin rejects", async () => {
@@ -212,13 +200,7 @@ describe("Discord callback route - role sync integration", () => {
       }),
     });
 
-    fetchMock.mockResolvedValueOnce({
-      ok: true,
-      json: async () => ({
-        memberId: "99",
-        name: "Error User",
-      }),
-    });
+    mockFetchMemberByDiscordId.mockResolvedValueOnce({ memberId: "99", name: "Error User" });
 
     global.fetch = fetchMock;
 

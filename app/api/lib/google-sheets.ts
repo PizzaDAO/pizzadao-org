@@ -1,34 +1,19 @@
 import { google } from "googleapis";
-import path from "path";
 import { cacheGet, cacheSet, CACHE_TTL } from "./cache";
-import { GvizCell } from "@/app/lib/types/gviz";
+import { getGoogleAuth, GOOGLE_SCOPES } from "@/app/lib/google-auth";
+import { norm as normalizeKey } from "@/app/lib/strings";
+import {
+    cellText,
+    getMembersSheet,
+    membersColumn,
+} from "@/app/lib/sheets/member-repository";
 
-// Initialize Google Sheets API client
-const SCOPES = ["https://www.googleapis.com/auth/spreadsheets.readonly"];
-
-// Check for env var credentials first (preferred for production)
-let credentials;
-try {
-    credentials = process.env.GOOGLE_SERVICE_ACCOUNT_JSON
-        ? JSON.parse(process.env.GOOGLE_SERVICE_ACCOUNT_JSON)
-        : undefined;
-} catch (error) {
-    throw new Error("GOOGLE_SERVICE_ACCOUNT_JSON is not valid JSON. Please ensure it is the full object starting with '{' and ending with '}'.");
-}
-
-const auth = new google.auth.GoogleAuth({
-    credentials,
-    keyFile: !credentials ? path.join(process.cwd(), "service-account.json") : undefined,
-    scopes: SCOPES,
+// Read-only Google Sheets API client (shared service-account auth)
+const sheets = google.sheets({
+    version: "v4",
+    auth: getGoogleAuth([GOOGLE_SCOPES.sheetsReadonly]),
 });
-
-const sheets = google.sheets({ version: "v4", auth });
 export { sheets as sheetsClient };
-
-// Normalize string same way as crew route's cellVal/norm
-function normalizeKey(s: string): string {
-    return String(s ?? '').trim().replace(/\s+/g, ' ');
-}
 
 // Debug result type
 export interface TaskLinksDebugResult {
@@ -898,13 +883,6 @@ export async function getManualLinksDebug(sheetId: string): Promise<ManualLinksD
     return result;
 }
 
-// Member turtles cache TTL
-const MEMBER_TURTLES_CACHE_TTL = 60 * 10; // 10 minutes in seconds
-
-// Main members database sheet
-const MEMBERS_SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-const MEMBERS_TAB_NAME = "Crew";
-
 // Core TMNT turtle roles to display on crew cards
 const CORE_TURTLE_ROLES = new Set([
     "leonardo",
@@ -927,66 +905,29 @@ function filterCoreTurtles(turtlesStr: string): string {
 }
 
 /**
- * Fetch member name → turtles mapping from the main members database
- * Uses GViz for public read access (doesn't require service account permissions on this sheet)
+ * Fetch member name → turtles mapping from the main members database.
+ * Reads through the members repository (public GViz, Next data cache tagged
+ * "members"), so no separate KV copy is kept.
  */
 export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
-    // Check persistent cache
-    const cacheKey = "member-turtles-map";
-    const cached = await cacheGet<Record<string, string>>(cacheKey);
-    if (cached) {
-        return new Map(Object.entries(cached));
-    }
-
     const turtlesMap = new Map<string, string>();
 
     try {
-        const url = `https://docs.google.com/spreadsheets/d/${MEMBERS_SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(MEMBERS_TAB_NAME)}&tqx=out:json&headers=0`;
-        const res = await fetch(url, { cache: "no-store" });
-        if (!res.ok) throw new Error("Failed to fetch members sheet");
-
-        const text = await res.text();
-        const cleaned = text.replace(/^\s*\/\*O_o\*\/\s*/m, "").trim();
-        const start = cleaned.indexOf("{");
-        const end = cleaned.lastIndexOf("}");
-        if (start === -1 || end === -1 || end <= start) throw new Error("GViz parse error");
-
-        const gviz = JSON.parse(cleaned.slice(start, end + 1));
-        const rows = gviz?.table?.rows || [];
-
-        // Find header row
-        let headerRowIdx = -1;
-        let headerRowVals: string[] = [];
-
-        for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-            const rowCells = rows[ri]?.c || [];
-            const rowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
-            if (rowVals.includes("name") && (rowVals.includes("turtles") || rowVals.includes("turtle"))) {
-                headerRowIdx = ri;
-                headerRowVals = rowCells.map((c: GvizCell) => String(c?.v || c?.f || "").trim().toLowerCase());
-                break;
-            }
-        }
-
-        if (headerRowIdx === -1) {
-            return turtlesMap;
-        }
+        const sheet = await getMembersSheet();
 
         // Find column indices
-        const nameIdx = headerRowVals.indexOf("name");
-        const turtlesIdx = headerRowVals.includes("turtles")
-            ? headerRowVals.indexOf("turtles")
-            : headerRowVals.indexOf("turtle");
+        const nameIdx = membersColumn(sheet, ["name"]);
+        const turtlesIdx = membersColumn(sheet, ["turtles", "turtle"]);
 
-        if (nameIdx === -1 || turtlesIdx === -1) {
+        if (nameIdx == null || turtlesIdx == null) {
             return turtlesMap;
         }
 
         // Extract name → turtles mapping (filtered to core TMNT roles only)
-        for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-            const cells = rows[ri]?.c || [];
-            const name = String(cells[nameIdx]?.v ?? cells[nameIdx]?.f ?? "").trim();
-            const turtlesRaw = String(cells[turtlesIdx]?.v ?? cells[turtlesIdx]?.f ?? "").trim();
+        for (const row of sheet.rows) {
+            const cells = row?.c || [];
+            const name = cellText(cells[nameIdx]);
+            const turtlesRaw = cellText(cells[turtlesIdx]);
             const turtles = filterCoreTurtles(turtlesRaw);
 
             if (name && turtles) {
@@ -995,10 +936,8 @@ export async function getMemberTurtlesMap(): Promise<Map<string, string>> {
                 turtlesMap.set(normalizedName, turtles);
             }
         }
-
-        // Cache as plain object (Maps don't serialize to JSON well)
-        await cacheSet(cacheKey, Object.fromEntries(turtlesMap), MEMBER_TURTLES_CACHE_TTL);
-    } catch (error: unknown) {
+    } catch {
+        // Enrichment only: an unreadable members sheet yields an empty map.
     }
 
     return turtlesMap;

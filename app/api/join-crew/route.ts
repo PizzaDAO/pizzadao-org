@@ -1,5 +1,11 @@
-import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import {
+  cellText,
+  getMembersSheet,
+  invalidateMembersCache,
+  memberIdColumn,
+  membersColumn,
+} from "@/app/lib/sheets/member-repository";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
@@ -8,58 +14,27 @@ import { crewIdToLabel, normalizeCrewId } from "@/app/lib/crew-labels";
 export const runtime = "nodejs";
 
 // --- Fetch member data by Discord ID ---
+// Uncached on purpose: the current crew list read here is rewritten below
+// (join/leave), so a stale row could silently drop a crew.
 async function fetchMemberByDiscordId(discordId: string) {
-  const SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
-  const TAB_NAME = "Crew";
+  const sheet = await getMembersSheet({ fresh: true });
 
-
-  const url = `https://docs.google.com/spreadsheets/d/${SHEET_ID}/gviz/tq?sheet=${encodeURIComponent(
-    TAB_NAME
-  )}&tqx=out:json&headers=0`;
-
-  const res = await fetch(url, { cache: "no-store" });
-  if (!res.ok) throw new Error("Failed to fetch sheet");
-  const text = await res.text();
-  const gviz = parseGvizJson(text);
-  const rows = gviz?.table?.rows || [];
-
-  // Find header row
-  let headerRowIdx = -1;
-  let headerVals: string[] = [];
-  for (let ri = 0; ri < Math.min(rows.length, 100); ri++) {
-    const rowCells = rows[ri]?.c || [];
-    const rowVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim().toLowerCase());
-    const hasName = rowVals.includes("name");
-    const hasStatus = rowVals.includes("status") || rowVals.includes("frequency");
-    if (hasName && hasStatus) {
-      headerRowIdx = ri;
-      headerVals = rowCells.map((c: any) => String(c?.v || c?.f || "").trim());
-      break;
-    }
-  }
-  if (headerRowIdx === -1) throw new Error("Header row not found");
-
-  const headerMap = new Map<string, number>();
-  headerVals.forEach((h, i) => headerMap.set(h.trim().toLowerCase(), i));
-
-  // Find columns
-  let idxId = headerMap.get("id") ?? headerMap.get("member id") ?? 0;
-  const idxDiscord = headerMap.get("discordid") ?? headerMap.get("discord id") ?? headerMap.get("discord");
-  const idxName = headerMap.get("name") ?? -1;
-  const idxCrews = headerMap.get("crews") ?? -1;
-  const idxTurtles = headerMap.get("turtles") ?? headerMap.get("turtle") ?? -1;
+  const idxId = memberIdColumn(sheet);
+  const idxDiscord = membersColumn(sheet, ["discordid", "discord id", "discord"]);
+  const idxName = membersColumn(sheet, ["name"]);
+  const idxCrews = membersColumn(sheet, ["crews"]);
+  const idxTurtles = membersColumn(sheet, ["turtles", "turtle"]);
 
   if (idxDiscord == null) return null;
 
-  for (let ri = headerRowIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || [];
-    const rowDiscord = String(cells[idxDiscord]?.v ?? cells[idxDiscord]?.f ?? "").trim();
-    if (rowDiscord === discordId) {
+  for (const row of sheet.rows) {
+    const cells = row?.c || [];
+    if (cellText(cells[idxDiscord]) === discordId) {
       return {
-        memberId: String(cells[idxId]?.v ?? cells[idxId]?.f ?? "").trim(),
-        name: idxName >= 0 ? String(cells[idxName]?.v ?? cells[idxName]?.f ?? "").trim() : "",
-        crews: idxCrews >= 0 ? String(cells[idxCrews]?.v ?? cells[idxCrews]?.f ?? "").trim() : "",
-        turtles: idxTurtles >= 0 ? String(cells[idxTurtles]?.v ?? cells[idxTurtles]?.f ?? "").trim() : "",
+        memberId: cellText(cells[idxId]),
+        name: idxName != null ? cellText(cells[idxName]) : "",
+        crews: idxCrews != null ? cellText(cells[idxCrews]) : "",
+        turtles: idxTurtles != null ? cellText(cells[idxTurtles]) : "",
       };
     }
   }
@@ -166,6 +141,9 @@ async function updateCrewsInSheet(memberId: string, crews: string[]) {
   if (status < 200 || status >= 300) {
     throw new Error(`Sheet update failed: ${text}`);
   }
+
+  // The member's crews changed: expire cached members-sheet reads.
+  invalidateMembersCache();
 
   try {
     return JSON.parse(text);
