@@ -165,3 +165,21 @@ describe("<Discover />", () => {
         expect(screen.queryByText("Bounty 4")).not.toBeInTheDocument();
     });
 });
+
+// jalapeno-82565 — crew bounties carry a crew tag, like jobs do.
+describe("<Discover /> crew bounty tag", () => {
+    it("shows the crew tag on crew bounties only", () => {
+        renderWithIntl(
+            <Discover
+                bounties={[
+                    { id: 1, description: "Run the ops call", reward: 100, status: "OPEN", crew: "Ops" },
+                    { id: 2, description: "General task", reward: 50, status: "OPEN" },
+                ]}
+            />,
+        );
+        const crewCard = screen.getByLabelText("Bounty: Run the ops call");
+        expect(crewCard).toHaveTextContent("Ops");
+        const generalCard = screen.getByLabelText("Bounty: General task");
+        expect(generalCard).not.toHaveTextContent("Ops");
+    });
+});

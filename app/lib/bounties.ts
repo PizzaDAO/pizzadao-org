@@ -3,11 +3,67 @@ import { getOrCreateEconomy, updateBalance } from './economy'
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from './errors/api-errors'
 import { notifyBountyClaimed, notifyBountyCompleted, notifyBountyComment } from './notifications'
 import { logTransaction } from './transactions'
+import { getCrewMappings } from './crew-mappings'
+import { CREW_ID_PATTERN, normalizeCrewId } from './crew-id'
 
 /**
- * Create a bounty with escrowed reward
+ * Resolve an optional crew tag for a bounty (jalapeno-82565).
+ *
+ * Returns the crew-mappings slug, or null for a general bounty. Throws a
+ * ValidationError when a crew is given but doesn't match a known crew.
  */
-export async function createBounty(creatorId: string, description: string, reward: number, link?: string) {
+export async function resolveBountyCrewId(raw: unknown): Promise<string | null> {
+  if (raw === undefined || raw === null || raw === '') return null
+  if (typeof raw !== 'string') {
+    throw new ValidationError('crewId must be a string')
+  }
+  const crewId = normalizeCrewId(raw)
+  if (!crewId || !CREW_ID_PATTERN.test(crewId)) {
+    throw new ValidationError('Invalid crewId')
+  }
+  const { crews } = await getCrewMappings()
+  if (!crews.some((c) => c.id === crewId)) {
+    throw new ValidationError(`Unknown crew: ${crewId}`)
+  }
+  return crewId
+}
+
+/**
+ * Map crew IDs to their display labels. Fails soft (empty map) so a
+ * crew-mappings outage never breaks bounty listings.
+ */
+export async function getCrewLabelMap(): Promise<Map<string, string>> {
+  try {
+    const { crews } = await getCrewMappings()
+    return new Map(crews.map((c) => [c.id, c.label]))
+  } catch {
+    return new Map()
+  }
+}
+
+export type BountyListFilter = {
+  /** Only return bounties tagged with this crew (crew-mappings slug). */
+  crewId?: string | null
+}
+
+function crewWhere(filter?: BountyListFilter) {
+  const crewId = filter?.crewId ? normalizeCrewId(filter.crewId) : ''
+  return crewId ? { crewId } : {}
+}
+
+/**
+ * Create a bounty with escrowed reward.
+ *
+ * Anyone who can post a bounty can tag it for a crew (crew leads included);
+ * `crewId` must already be resolved via `resolveBountyCrewId`.
+ */
+export async function createBounty(
+  creatorId: string,
+  description: string,
+  reward: number,
+  link?: string,
+  crewId?: string | null,
+) {
   if (reward <= 0) {
     throw new ValidationError('Reward must be positive')
   }
@@ -32,7 +88,8 @@ export async function createBounty(creatorId: string, description: string, rewar
       link: link?.trim() || null,
       reward,
       createdBy: creatorId,
-      status: 'OPEN'
+      status: 'OPEN',
+      crewId: crewId || null
     }
   })
 
@@ -45,9 +102,9 @@ export async function createBounty(creatorId: string, description: string, rewar
 /**
  * Get all open bounties
  */
-export async function getOpenBounties() {
+export async function getOpenBounties(filter?: BountyListFilter) {
   return prisma.bounty.findMany({
-    where: { status: 'OPEN' },
+    where: { status: 'OPEN', ...crewWhere(filter) },
     orderBy: { createdAt: 'desc' }
   })
 }
@@ -226,10 +283,11 @@ export async function getBounty(bountyId: number) {
 /**
  * Get all bounties (for listing) with comment counts
  */
-export async function getAllBounties() {
+export async function getAllBounties(filter?: BountyListFilter) {
   return prisma.bounty.findMany({
     where: {
-      status: { in: ['OPEN', 'CLAIMED'] }
+      status: { in: ['OPEN', 'CLAIMED'] },
+      ...crewWhere(filter)
     },
     orderBy: { createdAt: 'desc' },
     include: {

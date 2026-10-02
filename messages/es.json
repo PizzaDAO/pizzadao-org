@@ -92,6 +92,7 @@
       "inputPlaceholder": "Madrid, España",
       "inputAriaLabel": "Ciudad",
       "lookingForChapter": "Buscando un capítulo local de PizzaDAO…",
+      "timezoneDetected": "Zona horaria: {timezone}",
       "back": "Atrás",
       "next": "Siguiente",
       "telegramOverline": "§ Capítulo encontrado",

@@ -15,6 +15,8 @@ type Bounty = {
   claimedBy: string | null;
   status: "OPEN" | "CLAIMED";
   commentCount?: number;
+  crewId?: string | null;
+  crewLabel?: string | null;
 };
 
 type BountyCardProps = {
@@ -108,6 +110,15 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
             <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}>
               #{bounty.id}
             </span>
+            {bounty.crewId && (
+              <a
+                href={`/crew/${bounty.crewId}`}
+                style={{ ...badge(), textDecoration: "none" }}
+                data-testid="bounty-crew-tag"
+              >
+                {bounty.crewLabel || bounty.crewId}
+              </a>
+            )}
             {isCreator && (
               <span style={badge("accent")}>Your Bounty</span>
             )}

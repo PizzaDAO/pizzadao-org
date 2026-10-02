@@ -55,6 +55,8 @@ export type WizardData = {
   city: string;
   cityRegion?: string;
   cityCountryCode?: string;
+  timezone?: string; // IANA ID resolved from the city, e.g. "America/New_York" (pizzaiolo-13628)
+  timezoneLabel?: string; // display only, e.g. "EDT (UTC-4)"
 
   // Step 3: Roles (turtles)
   turtles: string[];
