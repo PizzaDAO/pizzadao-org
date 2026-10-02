@@ -31,7 +31,8 @@ type NavLabelKey =
   | "techProjects"
   | "nfts"
   | "poaps"
-  | "print";
+  | "print"
+  | "support";
 
 type NavItem = {
   href: string;
@@ -64,6 +65,7 @@ const MORE: NavItem[] = [
   { href: "/nfts", labelKey: "nfts" },
   { href: "/poaps", labelKey: "poaps" },
   { href: "/print", labelKey: "print" },
+  { href: "/support", labelKey: "support" },
 ];
 
 /** Routes where the onboarding wizard is full-screen and owns the chrome. */

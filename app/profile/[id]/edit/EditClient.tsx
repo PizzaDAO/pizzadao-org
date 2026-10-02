@@ -33,6 +33,7 @@ import { useTranslations } from "next-intl";
 import { Field } from "../../../ui/onboarding/Field";
 import { ProfileLinksEditor } from "../../../ui/profile-links";
 import { SocialAccountLinker } from "../../../ui/vouches/SocialAccountLinker";
+import { TelegramLinker } from "../../../ui/telegram/TelegramLinker";
 import { TaglineEditor } from "../../../dashboard/[id]/components/TaglineEditor";
 import { useUserData, useXAccount } from "../../../lib/hooks/use-api";
 import { LanguageEditor } from "../../../ui/profile/LanguageEditor";
@@ -675,6 +676,7 @@ export function EditClient({ memberId }: { memberId: string }) {
                     description="Link your social accounts so the community can find and vouch for you."
                 >
                     <XAccountEditor memberId={memberId} />
+                    <TelegramLinker />
                     <SocialAccountLinker memberId={memberId} />
                 </EditorialSection>
 
