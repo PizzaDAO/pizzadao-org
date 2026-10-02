@@ -47,6 +47,7 @@ const MORE: NavItem[] = [
   { href: "/nfts", label: "NFTs" },
   { href: "/poaps", label: "POAPs" },
   { href: "/print", label: "Print Materials" },
+  { href: "/support", label: "Support" },
 ];
 
 /** Routes where the onboarding wizard is full-screen and owns the chrome. */

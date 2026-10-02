@@ -633,3 +633,54 @@ model RoleGrantEvent {
   @@index([discordId, grantedAt])
   @@index([memberId, grantedAt])
 }
+
+// ===== TELEGRAM ACCOUNT LINKING =====
+//
+// Telegram identity linked via the official Telegram Login Widget. The widget
+// payload is HMAC-verified server-side (app/lib/telegram-auth.ts) before a row
+// is written. Keyed by discordId like XAccount (sessions are Discord-only).
+// telegramId is unique so one Telegram account maps to at most one member,
+// a prerequisite for "log in with Telegram" (plans/calzone-93434-telegram-login.md).
+model TelegramAccount {
+  id         Int      @id @default(autoincrement())
+  discordId  String   @unique
+  memberId   String?
+  telegramId String   @unique // Telegram user id (up to 52 bits; stored as text)
+  username   String?
+  firstName  String?
+  lastName   String?
+  photoUrl   String?
+  authDate   DateTime // auth_date of the most recent verified widget login
+  linkedAt   DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([memberId])
+}
+
+// ===== SUPPORT TICKETS =====
+//
+// Member-submitted support requests (/support), triaged by admins at
+// /admin/support. adminNotes are internal and never returned to members.
+
+enum SupportTicketStatus {
+  OPEN
+  IN_PROGRESS
+  CLOSED
+}
+
+model SupportTicket {
+  id          Int                 @id @default(autoincrement())
+  discordId   String // ticket owner (session key)
+  memberId    String? // Google Sheets member id, best-effort at creation
+  displayName String? // snapshot of the submitter's Discord nick/username
+  subject     String
+  body        String
+  status      SupportTicketStatus @default(OPEN)
+  adminNotes  String?
+  createdAt   DateTime            @default(now())
+  updatedAt   DateTime            @updatedAt
+  closedAt    DateTime?
+
+  @@index([discordId, createdAt])
+  @@index([status, createdAt])
+}
