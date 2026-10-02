@@ -20,6 +20,26 @@ You can start editing the page by modifying `app/page.tsx`. The page auto-update
 
 This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
 
+## Logged-in E2E smoke test (fully local)
+
+```bash
+npm run e2e:local            # needs Docker running
+npm run e2e:local -- --serve # same setup, but just serve http://localhost:3100 for manual poking
+```
+
+`e2e/local/run.mjs` starts a throwaway Postgres in Docker (tmpfs, port 54329), creates the
+schema with `prisma db push`, seeds two synthetic members (`990001` with an incomplete profile,
+`990002` with a complete one), mints their `pizzadao_session` cookies with the app's own
+`createSessionToken`, and runs `e2e/logged-in.local.spec.ts` at 1280px and 390px against
+`next dev` on port 3100. Screenshots land in `e2e/.local/shots/` (override with `E2E_SHOTS_DIR`).
+
+Nothing touches production. The run uses only dummy and local env values, and it refuses to
+start if a real `.env`/`.env.local` exists. Google ADC is disabled. `e2e/local/preload.cjs`
+routes the Neon driver to the local Postgres, serves the members sheet as the public GViz
+data plus the synthetic rows, and blocks Discord and every non-GET request to external hosts.
+Blocked calls are listed at the end of the run. Other options: `E2E_DATABASE_URL`
+(an existing localhost Postgres with password auth), `E2E_KEEP_DB=1`, `E2E_PORT`, `E2E_PG_PORT`.
+
 ## Learn More
 
 To learn more about Next.js, take a look at the following resources:
