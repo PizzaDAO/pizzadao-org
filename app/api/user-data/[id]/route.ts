@@ -7,6 +7,7 @@ import {
     memberIdColumn,
     rowToRecord,
 } from "@/app/lib/sheets/member-repository";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -62,6 +63,6 @@ export async function GET(
 
         return NextResponse.json(data);
     } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return internalError(err, "user-data", "Failed to load member data");
     }
 }

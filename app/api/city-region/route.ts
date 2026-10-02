@@ -1,6 +1,7 @@
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { resolveRegionFromCountryCode, getRegionRoleId } from "@/app/lib/region-mapping";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -36,10 +37,8 @@ export async function POST(req: Request) {
     const data = await res.json();
 
     if (data.status !== "OK" || !data.results?.length) {
-      return NextResponse.json(
-        { error: `Geocoding failed: ${data.status}`, details: data.error_message ?? null },
-        { status: 502 }
-      );
+      console.error("[city-region] Geocoding error:", data.status, data.error_message);
+      return NextResponse.json({ error: "Region lookup is unavailable right now" }, { status: 502 });
     }
 
     // Extract country code from address_components
@@ -69,9 +68,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ region, regionRoleId, countryCode });
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: (e as any)?.message ?? "Unknown error" },
-      { status: 500 }
-    );
+    return internalError(e, "city-region", "Region lookup failed");
   }
 }

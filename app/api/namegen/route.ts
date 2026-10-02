@@ -3,6 +3,7 @@
 
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -509,9 +510,6 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json(
-      { error: String(err?.message ?? "Unknown error") },
-      { status: 500 }
-    );
+    return internalError(err, "namegen", "Name generation failed");
   }
 }

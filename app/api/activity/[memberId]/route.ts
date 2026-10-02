@@ -32,6 +32,7 @@ import { getSession } from "@/app/lib/session";
 import { prisma } from "@/app/lib/db";
 import { fetchMemberIdByDiscordId, fetchMemberById } from "@/app/lib/sheets/member-repository";
 import type { ActivityEvent, ActivityKind } from "@/app/dashboard/[id]/lib/activity-types";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -311,8 +312,6 @@ export async function GET(
             },
         );
     } catch (error) {
-        const message =
-            error instanceof Error ? error.message : "Failed to load activity";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return internalError(error, "activity", "Failed to load activity");
     }
 }

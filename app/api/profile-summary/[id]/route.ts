@@ -21,6 +21,7 @@ import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
 import { resolvePfpUrl } from "@/app/lib/pfp";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -317,8 +318,6 @@ export async function GET(
 
         return NextResponse.json(summary, { headers: cacheHeaders });
     } catch (error) {
-        const message =
-            error instanceof Error ? error.message : "Failed to load profile summary";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return internalError(error, "profile-summary", "Failed to load profile summary");
     }
 }

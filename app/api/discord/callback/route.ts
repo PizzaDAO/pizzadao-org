@@ -13,6 +13,7 @@ import {
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 import { lookupGuildMembership } from "@/app/lib/discord";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -216,6 +217,6 @@ export async function GET(req: Request) {
 
     return clearOAuthState(req, res);
   } catch (e: unknown) {
-    return NextResponse.json({ error: (e as any)?.message || "Discord callback failed" }, { status: 500 });
+    return internalError(e, "discord/callback", "Discord login failed. Please try again.");
   }
 }

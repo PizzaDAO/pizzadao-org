@@ -3,6 +3,7 @@ import { getSession } from "@/app/lib/session";
 import { hasAnyRole } from "@/app/lib/discord";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 import { syncAllCrewAttendance } from "@/app/lib/attendance";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export async function POST(request: NextRequest) {
   // Auth: either Discord admin session OR CRON_SECRET bearer token
@@ -27,10 +28,6 @@ export async function POST(request: NextRequest) {
     const stats = await syncAllCrewAttendance();
     return NextResponse.json(stats);
   } catch (err) {
-    console.error("[attendance] Sync error:", err);
-    return NextResponse.json(
-      { error: "Sync failed", details: err instanceof Error ? err.message : String(err) },
-      { status: 500 }
-    );
+    return internalError(err, "attendance/sync", "Sync failed");
   }
 }

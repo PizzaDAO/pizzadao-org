@@ -30,6 +30,7 @@ import {
     isSupportedLocale,
 } from "@/app/lib/i18n/locales";
 import { LOCALE_COOKIE } from "@/app/lib/i18n/get-locale";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -137,8 +138,7 @@ export async function GET(
             }
         );
     } catch (err) {
-        const message = err instanceof Error ? err.message : "Internal error";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return internalError(err, "profile-extras");
     }
 }
 
@@ -257,7 +257,6 @@ export async function POST(
         }
         return res;
     } catch (err) {
-        const message = err instanceof Error ? err.message : "Internal error";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return internalError(err, "profile-extras");
     }
 }

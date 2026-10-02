@@ -132,7 +132,6 @@ export async function GET(
       totalCount: 0,
       walletAddress: walletAddresses[0],
       fromCache: false,
-      debug: { error: String(error) },
     });
   }
 }

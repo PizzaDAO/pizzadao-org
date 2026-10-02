@@ -1,5 +1,6 @@
 import { NextResponse } from "next/server";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -14,6 +15,6 @@ export async function GET(req: Request) {
       headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
     });
   } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message ?? "Unknown error") }, { status: 500 });
+    return internalError(err, "crew-mappings", "Failed to load crew mappings");
   }
 }

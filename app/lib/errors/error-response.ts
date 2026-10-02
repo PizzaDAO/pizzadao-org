@@ -21,8 +21,12 @@ export function handleApiError(error: unknown): NextResponse<ErrorResponse> {
     );
   }
 
-  // Handle generic Error instances
-  if (error instanceof Error) {
+  console.error('[api] unhandled error:', error);
+
+  // Generic Error instances. Some lib functions (e.g. shop) still throw plain
+  // Errors with user-facing messages, so those pass through, but database
+  // errors can contain query/schema details and are never echoed.
+  if (error instanceof Error && !error.name.startsWith('Prisma')) {
     return NextResponse.json(
       { error: error.message },
       { status: 500 }
@@ -34,6 +38,21 @@ export function handleApiError(error: unknown): NextResponse<ErrorResponse> {
     { error: 'An unexpected error occurred' },
     { status: 500 }
   );
+}
+
+/**
+ * Log an unexpected error server-side and return a generic JSON error.
+ * Use this instead of echoing `e.message` (which can leak Discord / Google /
+ * database internals) to the client.
+ */
+export function internalError(
+  error: unknown,
+  context: string,
+  message = 'Internal server error',
+  status = 500
+): NextResponse<ErrorResponse> {
+  console.error(`[${context}]`, error);
+  return NextResponse.json({ error: message }, { status });
 }
 
 /**

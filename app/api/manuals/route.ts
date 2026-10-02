@@ -10,6 +10,7 @@ import { NextResponse } from 'next/server'
 import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
 import { GvizRow, GvizTable } from "@/app/lib/types/gviz";
+import { internalError } from "@/app/lib/errors/error-response";
 
 const MANUALS_SHEET_ID = SHEET_IDS.manuals
 
@@ -183,9 +184,6 @@ export async function GET(req: Request) {
       headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to load manuals' },
-      { status: 500 }
-    )
+    return internalError(e, 'manuals', 'Failed to load manuals')
   }
 }
