@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 type VouchSummary = {
   memberId: string;
@@ -17,6 +18,7 @@ const displayFont =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export function VouchesWidget({ memberId }: VouchesWidgetProps) {
+  const t = useTranslations("dashboard.vouches");
   const [vouches, setVouches] = useState<VouchSummary[]>([]);
   const [total, setTotal] = useState(0);
   const [loaded, setLoaded] = useState(false);
@@ -32,7 +34,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
           setVouches(
             (data.vouches || []).map((v: any) => ({
               memberId: v.memberId,
-              name: v.name || "Unknown",
+              name: v.name || "",
               city: v.city || "",
             }))
           );
@@ -77,7 +79,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
             gap: 8,
           }}
         >
-          Vouches
+          {t("title")}
           {total > 0 && (
             <span
               style={{
@@ -117,7 +119,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
               e.currentTarget.style.textDecoration = "none";
             }}
           >
-            View All
+            {t("viewAll")}
           </Link>
         )}
       </div>
@@ -156,7 +158,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
                   color: "hsl(var(--foreground))",
                 }}
               >
-                {v.name}
+                {v.name || t("unknownName")}
               </span>
               {v.city && (
                 <span
@@ -188,7 +190,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
               margin: 0,
             }}
           >
-            No vouches yet. Visit member profiles to vouch for them!
+            {t("empty")}
           </p>
           <Link
             href="/vouches"
@@ -209,7 +211,7 @@ export function VouchesWidget({ memberId }: VouchesWidgetProps) {
               e.currentTarget.style.textDecoration = "none";
             }}
           >
-            Find Vouches
+            {t("find")}
           </Link>
         </div>
       )}

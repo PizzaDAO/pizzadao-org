@@ -7,6 +7,8 @@
 //
 // Prior: diavola-40350 — level-up modal.
 
+import { useTranslations } from "next-intl";
+
 type Props = {
   level: number;
   levelTitle: string | null;
@@ -18,13 +20,14 @@ const DISPLAY_FONT =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
+  const t = useTranslations("dashboard.celebrations.levelUp");
   const isFinalLevel = level >= 8;
 
   return (
     <div
       role="dialog"
       aria-modal="true"
-      aria-label={`Reached level ${level}`}
+      aria-label={t("ariaLabel", { level })}
       onClick={onDismiss}
       data-testid="level-up-modal"
       style={{
@@ -72,7 +75,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
             pointerEvents: "none",
           }}
         >
-          {isFinalLevel ? "the top" : "promoted"}
+          {isFinalLevel ? t("stampFinal") : t("stamp")}
         </span>
 
         <span
@@ -82,7 +85,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
             display: "block",
           }}
         >
-          {isFinalLevel ? "§ Final Level Reached" : "§ Level Up!"}
+          {isFinalLevel ? t("overlineFinal") : t("overline")}
         </span>
 
         <div
@@ -121,7 +124,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
               color: "hsl(var(--foreground))",
             }}
           >
-            Level {level}
+            {t("heading", { level })}
           </h2>
           {levelTitle && (
             <p
@@ -152,7 +155,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
               letterSpacing: "-0.01em",
             }}
           >
-            +{reward.toLocaleString()} $PEP earned
+            {t("reward", { amount: reward })}
           </div>
         )}
 
@@ -165,7 +168,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
               lineHeight: 1.5,
             }}
           >
-            You reached the top. You are a true Pizza Don.
+            {t("finalBody")}
           </p>
         )}
 
@@ -181,7 +184,7 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          Continue
+          {t("continue")}
         </button>
       </div>
 

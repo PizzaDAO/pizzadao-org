@@ -36,6 +36,12 @@ export interface NextAction {
   primaryCta: { label: string; href: string };
   /** Optional snooze / dismiss target. */
   secondary?: { label: string; href: string };
+  /**
+   * Mission level referenced by the copy (submit_mission / awaiting_review).
+   * Lets the client re-render the English server copy in the viewer's locale
+   * via the `dashboard.nextAction.*` catalog without parsing strings.
+   */
+  level?: number;
 }
 
 // ---------------------------------------------------------------------------
@@ -103,6 +109,7 @@ export function resolveNextAction(input: NextActionInput): NextAction {
   if (level.nextMission) {
     return {
       kind: "submit_mission",
+      level: level.current,
       headline: "Your next mission is ready",
       body: level.nextMission.title,
       primaryCta: {
@@ -116,6 +123,7 @@ export function resolveNextAction(input: NextActionInput): NextAction {
   if (level.awaitingReview) {
     return {
       kind: "awaiting_review",
+      level: level.current,
       headline: "Waiting on review — keep building",
       body: `Level ${level.current} missions submitted.`,
       primaryCta: { label: `Check Level ${level.current} progress`, href: "/missions" },

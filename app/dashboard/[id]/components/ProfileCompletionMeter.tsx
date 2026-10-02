@@ -8,6 +8,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import type { ProfileCompletion } from "../lib/profile-completion";
 
 const RING_SIZE = 44;
@@ -19,11 +20,18 @@ const NEXT_LINK_CLASS =
 const NEXT_LINK_STYLE = { textDecoration: "none", minHeight: 44 } as const;
 
 export function ProfileCompletionMeter({ completion }: { completion: ProfileCompletion | null | undefined }) {
+    const t = useTranslations("dashboard.completion");
+    const tSteps = useTranslations("dashboard.steps");
+    const format = useFormatter();
     if (!completion || completion.isComplete || completion.total === 0) return null;
 
     const { completed, total, percent, next, steps } = completion;
     const dashOffset = CIRCUMFERENCE * (1 - percent / 100);
-    const remaining = steps.filter((s) => !s.done).map((s) => s.label).join(", ");
+    const remaining = format.list(
+        steps.filter((s) => !s.done).map((s) => tSteps(`${s.key}.label`)),
+        { type: "conjunction" },
+    );
+    const nextLabel = next ? tSteps(`${next.key}.label`) : "";
 
     return (
         <div
@@ -36,11 +44,11 @@ export function ProfileCompletionMeter({ completion }: { completion: ProfileComp
         >
             <div
                 role="progressbar"
-                aria-label="Profile setup"
+                aria-label={t("ariaLabel")}
                 aria-valuemin={0}
                 aria-valuemax={total}
                 aria-valuenow={completed}
-                aria-valuetext={`${completed} of ${total} steps complete`}
+                aria-valuetext={t("valueText", { completed, total })}
                 className="relative shrink-0"
                 style={{ width: RING_SIZE, height: RING_SIZE }}
             >
@@ -76,13 +84,13 @@ export function ProfileCompletionMeter({ completion }: { completion: ProfileComp
             </div>
 
             <div className="min-w-0 flex-1">
-                <p className="overline m-0 text-tomato">§ profile setup</p>
+                <p className="overline m-0 text-tomato">{t("overline")}</p>
                 <p
                     className="m-0 font-[family-name:var(--font-display)] font-bold tracking-[-0.01em] text-foreground"
                     style={{ fontSize: 16, lineHeight: 1.2 }}
                 >
-                    {completed} of {total} done
-                    <span className="sr-only"> — remaining: {remaining}</span>
+                    {t("done", { completed, total })}
+                    <span className="sr-only">{t("remaining", { steps: remaining })}</span>
                 </p>
             </div>
 
@@ -92,12 +100,12 @@ export function ProfileCompletionMeter({ completion }: { completion: ProfileComp
                 // try to prefetch/soft-navigate them.
                 (next.href.startsWith("/api/") ? (
                     <a href={next.href} className={NEXT_LINK_CLASS} style={NEXT_LINK_STYLE}>
-                        Next: {next.label}
+                        {t("next", { step: nextLabel })}
                         <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
                     </a>
                 ) : (
                     <Link href={next.href} className={NEXT_LINK_CLASS} style={NEXT_LINK_STYLE}>
-                        Next: {next.label}
+                        {t("next", { step: nextLabel })}
                         <ArrowUpRight className="h-3.5 w-3.5" aria-hidden />
                     </Link>
                 ))}
