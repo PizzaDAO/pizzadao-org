@@ -1,5 +1,6 @@
 import type { NextConfig } from "next";
 import createNextIntlPlugin from "next-intl/plugin";
+import { REMOTE_IMAGE_PATTERNS } from "./app/lib/image-hosts";
 
 // Points next-intl at the request-config module that resolves locale + loads
 // the messages catalog on every request.
@@ -72,6 +73,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  images: {
+    remotePatterns: REMOTE_IMAGE_PATTERNS,
+  },
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },

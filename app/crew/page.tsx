@@ -1,7 +1,9 @@
 "use client";
 
 import { useCallback, useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { CREWS, TURTLES } from "@/app/ui/constants";
 import { badge, btn, card, input, pageContainer } from "@/app/ui/shared-styles";
 
@@ -620,9 +622,13 @@ function MemberCardItem({
       >
         <div style={{ display: "flex", gap: 12, alignItems: "flex-start" }}>
           {pfpUrl ? (
-            <img
+            <Image
               src={pfpUrl}
               alt={member.name}
+              width={44}
+              height={44}
+              sizes="44px"
+              unoptimized={!isOptimizableImage(pfpUrl)}
               style={{
                 width: 44,
                 height: 44,
@@ -772,11 +778,13 @@ function MemberCardItem({
                   );
                   if (!tDef) return null;
                   return (
-                    <img
+                    <Image
                       key={tDef.id}
                       src={tDef.image}
                       alt={tDef.label}
                       title={tDef.label}
+                      width={22}
+                      height={22}
                       style={{
                         width: 22,
                         height: 22,

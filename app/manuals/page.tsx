@@ -1,7 +1,18 @@
 "use client";
 
+// Editorial restyle: § overline masthead, paper-soft filter strip and
+// press-clipping manual cards. Fetching, search, crew filter and the status
+// multi-select are unchanged.
+
 import { useEffect, useState, useRef } from "react";
 import Link from "next/link";
+import {
+  EditorialMasthead,
+  EditorialPage,
+  EmptyState,
+  paperCard,
+  pillInk,
+} from "@/app/ui/shared/Editorial";
 
 type Manual = {
   title: string;
@@ -15,61 +26,54 @@ type Manual = {
   notes: string;
 };
 
-function statusBadge(status: string) {
+function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
-  let bg = "#888";
-  const color = "white";
-
   if (s === "complete" || s === "completed") {
-    bg = "#22c55e";
-  } else if (s === "draft") {
-    bg = "#f97316";
-  } else if (s === "needed") {
-    bg = "#ef4444";
-  } else if (s === "backlog") {
-    bg = "#8b5cf6";
+    return "bg-[hsl(142_71%_45%/0.18)] text-[hsl(142_71%_25%)] dark:text-[hsl(142_71%_65%)]";
   }
-
-  return {
-    display: "inline-block",
-    padding: "2px 8px",
-    borderRadius: 4,
-    fontSize: 12,
-    fontWeight: 500,
-    background: bg,
-    color,
-  };
+  if (s === "draft") {
+    return "bg-[hsl(var(--butter)/0.35)] text-[hsl(var(--ink))] dark:text-[hsl(var(--butter))]";
+  }
+  if (s === "needed") {
+    return "bg-[hsl(var(--tomato)/0.15)] text-tomato";
+  }
+  if (s === "backlog") {
+    return "bg-[hsl(258_90%_66%/0.15)] text-[hsl(262_60%_45%)] dark:text-[hsl(258_90%_75%)]";
+  }
+  return "bg-[hsl(var(--ink)/0.08)] text-muted-foreground";
 }
+
+const fieldClass =
+  "w-full min-h-11 px-3 text-base sm:text-sm rounded-[var(--radius)] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule-warm)/0.55)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors";
+
+const CARET_BG = {
+  appearance: "none" as const,
+  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23888' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
+  backgroundRepeat: "no-repeat",
+  backgroundPosition: "right 12px center",
+};
 
 function ManualCard({ manual, index }: { manual: Manual; index: number }) {
   return (
     <Link
       href={`/manuals/${index}`}
-      style={{
-        display: "block",
-        padding: 16,
-        background: 'hsl(var(--card))',
-        borderRadius: 'var(--radius)',
-        border: '1px solid hsl(var(--rule) / 0.12)',
-        textDecoration: "none",
-        color: "inherit",
-        transition: "border-color 200ms ease-out, box-shadow 200ms ease-out",
-      }}
-      className="manual-card"
+      className={`${paperCard} group block p-4 sm:p-5 no-underline text-inherit transition-all duration-200 hover:border-[hsl(var(--tomato)/0.6)] hover:-translate-y-px`}
+      style={{ boxShadow: "var(--shadow-soft)" }}
     >
-      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "flex-start", gap: 12 }}>
-        <div style={{ flex: 1, minWidth: 0 }}>
-          <h3 style={{ margin: 0, fontSize: 16, fontWeight: 600, color: 'hsl(var(--foreground))' }}>
+      <div className="flex justify-between items-start gap-3">
+        <div className="flex-1 min-w-0">
+          {manual.crew && <p className="overline text-tomato m-0 mb-1 truncate">{manual.crew}</p>}
+          <h3 className="font-display text-lg font-black tracking-tight leading-snug text-foreground m-0 group-hover:text-tomato transition-colors">
             {manual.title}
           </h3>
-          <div style={{ marginTop: 6, fontSize: 13, color: 'hsl(var(--muted-foreground))' }}>
+          <div className="mt-1.5 text-[13px] text-muted-foreground">
             {manual.crew && (
               <Link
                 href={`/crew/${manual.crewId}`}
-                style={{ marginRight: 12, color: "hsl(var(--tomato))", textDecoration: "none" }}
+                className="mr-3 text-tomato no-underline hover:underline"
                 onClick={(e) => e.stopPropagation()}
               >
-                {manual.crew}
+                {manual.crew} crew
               </Link>
             )}
             {manual.author && manual.authorId && (
@@ -77,7 +81,7 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
                 by{" "}
                 <Link
                   href={`/profile/${manual.authorId}`}
-                  style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
+                  className="text-tomato no-underline hover:underline"
                   onClick={(e) => e.stopPropagation()}
                 >
                   {manual.author}
@@ -87,13 +91,18 @@ function ManualCard({ manual, index }: { manual: Manual; index: number }) {
             {manual.author && !manual.authorId && <span>by {manual.author}</span>}
           </div>
           {manual.lastUpdated && (
-            <div style={{ marginTop: 4, fontSize: 12, color: 'hsl(var(--muted-foreground))' }}>
-              Updated: {manual.lastUpdated}
-            </div>
+            <p className="overline text-foreground/45 mt-2 mb-0" style={{ fontSize: 10 }}>
+              Updated {manual.lastUpdated}
+            </p>
           )}
         </div>
         {manual.status && (
-          <span style={statusBadge(manual.status)}>{manual.status}</span>
+          <span
+            className={`overline shrink-0 px-2 py-1 rounded-md ${statusBadgeClass(manual.status)}`}
+            style={{ fontSize: 10 }}
+          >
+            {manual.status}
+          </span>
         )}
       </div>
     </Link>
@@ -166,70 +175,39 @@ export default function ManualsPage() {
   });
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: 'hsl(var(--background))',
-        color: 'hsl(var(--foreground))',
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 800, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1
-            style={{
-              margin: "8px 0 4px 0",
-              fontSize: 28,
-              fontWeight: 700,
-              color: 'hsl(var(--foreground))',
-              textWrap: 'balance',
-            } as React.CSSProperties}
-          >
-            PizzaDAO Manuals
-          </h1>
-          <p style={{ margin: 0, fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>
-            Operating manuals and documentation for PizzaDAO crews
-          </p>
-        </div>
+    <EditorialPage width="max-w-[860px]">
+      <EditorialMasthead
+        overline="The Manuals"
+        title={
+          <>
+            PizzaDAO <span className="text-tomato underline-scribble">manuals</span>
+          </>
+        }
+        dek="Operating manuals and documentation for PizzaDAO crews."
+      />
 
-        {/* Search and Filters */}
-        <div style={{ marginBottom: 24, display: "flex", flexDirection: "column", gap: 12 }}>
-          <input
-            type="text"
-            placeholder="Search manuals..."
-            value={searchQuery}
-            onChange={(e) => setSearchQuery(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              fontSize: 14,
-              border: '1px solid hsl(var(--rule) / 0.22)',
-              borderRadius: 'var(--radius)',
-              outline: "none",
-              background: 'hsl(var(--background))',
-              color: 'hsl(var(--foreground))',
-            }}
-          />
-          <div style={{ display: "flex", gap: 12 }}>
+      {/* Search and Filters */}
+      <div className={`${paperCard} print-noise mb-8 p-4 sm:p-5`}>
+        <div className="relative flex flex-col gap-3">
+          <div className="relative">
+            <span aria-hidden className="overline absolute left-3 top-2 text-foreground/40" style={{ fontSize: 9 }}>
+              Search
+            </span>
+            <input
+              type="text"
+              placeholder="Search manuals…"
+              value={searchQuery}
+              onChange={(e) => setSearchQuery(e.target.value)}
+              className={`${fieldClass} pt-6 pb-2`}
+            />
+          </div>
+          <div className="flex flex-col sm:flex-row gap-3">
             <select
               value={crewFilter}
               onChange={(e) => setCrewFilter(e.target.value)}
-              style={{
-                flex: 1,
-                padding: "10px 28px 10px 12px",
-                fontSize: 14,
-                border: '1px solid hsl(var(--rule) / 0.22)',
-                borderRadius: 'var(--radius)',
-                outline: "none",
-                background: 'hsl(var(--background))',
-                color: 'hsl(var(--foreground))',
-                cursor: "pointer",
-                appearance: "none",
-                backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-                backgroundRepeat: "no-repeat",
-                backgroundPosition: "right 12px center",
-              }}
+              aria-label="Filter by crew"
+              className={`${fieldClass} flex-1 pr-8 cursor-pointer`}
+              style={CARET_BG}
             >
               <option value="">All Crews</option>
               {uniqueCrews.map((crew) => (
@@ -239,27 +217,13 @@ export default function ManualsPage() {
               ))}
             </select>
             {/* Status multi-select dropdown */}
-            <div ref={statusDropdownRef} style={{ flex: 1, position: "relative" }}>
+            <div ref={statusDropdownRef} className="flex-1 relative">
               <button
                 type="button"
                 onClick={() => setStatusDropdownOpen(!statusDropdownOpen)}
-                style={{
-                  width: "100%",
-                  padding: "10px 28px 10px 12px",
-                  fontSize: 14,
-                  border: '1px solid hsl(var(--rule) / 0.22)',
-                  borderRadius: 'var(--radius)',
-                  outline: "none",
-                  background: 'hsl(var(--background))',
-                  color: 'hsl(var(--foreground))',
-                  cursor: "pointer",
-                  textAlign: "left",
-                  appearance: "none",
-                  backgroundImage: `url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 12 12'%3E%3Cpath fill='%23666' d='M6 8L1 3h10z'/%3E%3C/svg%3E")`,
-                  backgroundRepeat: "no-repeat",
-                  backgroundPosition: "right 12px center",
-                  transition: "border-color 200ms ease-out",
-                }}
+                aria-expanded={statusDropdownOpen}
+                className={`${fieldClass} pr-8 text-left cursor-pointer`}
+                style={CARET_BG}
               >
                 {statusFilters.length === 0
                   ? "All Statuses"
@@ -269,29 +233,10 @@ export default function ManualsPage() {
               </button>
               {statusDropdownOpen && (
                 <div
-                  style={{
-                    position: "absolute",
-                    top: "calc(100% + 4px)",
-                    left: 0,
-                    right: 0,
-                    background: 'hsl(var(--card))',
-                    border: '1px solid hsl(var(--rule) / 0.12)',
-                    borderRadius: 'var(--radius)',
-                    boxShadow: '0 8px 30px hsl(var(--ink) / 0.12)',
-                    zIndex: 10,
-                    padding: "8px 0",
-                  }}
+                  className="absolute left-0 right-0 top-[calc(100%+4px)] z-10 py-2 rounded-[var(--radius)] border border-[hsl(var(--rule-warm)/0.55)] bg-card"
+                  style={{ boxShadow: "var(--shadow-lifted, 0 8px 30px hsl(var(--ink) / 0.12))" }}
                 >
-                  <label
-                    style={{
-                      display: "flex",
-                      alignItems: "center",
-                      padding: "8px 12px",
-                      cursor: "pointer",
-                      fontSize: 14,
-                      borderBottom: '1px solid hsl(var(--rule) / 0.10)',
-                    }}
-                  >
+                  <label className="flex items-center px-3 py-2 cursor-pointer text-sm border-b border-[hsl(var(--rule-warm)/0.45)]">
                     <input
                       type="checkbox"
                       checked={statusFilters.length === 0 || statusFilters.length === uniqueStatuses.length}
@@ -302,26 +247,17 @@ export default function ManualsPage() {
                           setStatusFilters([...uniqueStatuses]);
                         }
                       }}
-                      style={{ marginRight: 8, width: 16, height: 16 }}
+                      className="mr-2 w-4 h-4 accent-[hsl(var(--tomato))]"
                     />
                     All Statuses
                   </label>
                   {uniqueStatuses.map((status) => (
-                    <label
-                      key={status}
-                      style={{
-                        display: "flex",
-                        alignItems: "center",
-                        padding: "8px 12px",
-                        cursor: "pointer",
-                        fontSize: 14,
-                      }}
-                    >
+                    <label key={status} className="flex items-center px-3 py-2 cursor-pointer text-sm">
                       <input
                         type="checkbox"
                         checked={statusFilters.includes(status)}
                         onChange={() => toggleStatusFilter(status)}
-                        style={{ marginRight: 8, width: 16, height: 16 }}
+                        className="mr-2 w-4 h-4 accent-[hsl(var(--tomato))]"
                       />
                       {status}
                     </label>
@@ -331,131 +267,72 @@ export default function ManualsPage() {
             </div>
           </div>
         </div>
-
-        {/* Loading state */}
-        {loading && (
-          <div style={{ display: "grid", gap: 12 }}>
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                style={{
-                  height: 80,
-                  background: 'hsl(var(--card))',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid hsl(var(--rule) / 0.12)',
-                  animation: "pulse 1.5s infinite",
-                }}
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Error state */}
-        {!loading && error && (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              background: 'hsl(var(--card))',
-              borderRadius: 'var(--radius)',
-              border: '1px solid hsl(var(--rule) / 0.12)',
-            }}
-          >
-            <p style={{ fontSize: 16, color: "hsl(var(--destructive))", marginBottom: 16 }}>
-              {error}
-            </p>
-            <button
-              onClick={() => window.location.reload()}
-              style={{
-                padding: "12px 20px",
-                minHeight: 44,
-                fontSize: 14,
-                fontWeight: 500,
-                color: 'hsl(var(--primary-foreground))',
-                background: 'hsl(var(--primary))',
-                border: "none",
-                borderRadius: 'var(--radius)',
-                cursor: "pointer",
-                transition: "background-color 200ms ease-out",
-              }}
-            >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {/* Manuals list */}
-        {!loading && !error && (
-          <>
-            {filteredManuals.length === 0 ? (
-              <div
-                style={{
-                  padding: 40,
-                  textAlign: "center",
-                  background: 'hsl(var(--card))',
-                  borderRadius: 'var(--radius)',
-                  border: '1px solid hsl(var(--rule) / 0.12)',
-                }}
-              >
-                <p style={{ fontSize: 16, color: 'hsl(var(--muted-foreground))' }}>
-                  {searchQuery || crewFilter || statusFilters.length > 0
-                    ? "No manuals match your filters."
-                    : "No manuals found."}
-                </p>
-              </div>
-            ) : (
-              <div style={{ display: "grid", gap: 12 }}>
-                {filteredManuals.map((manual, index) => {
-                  // Find original index for the link
-                  const originalIndex = manuals.findIndex(
-                    (m) => m.title === manual.title && m.crew === manual.crew
-                  );
-                  return (
-                    <ManualCard
-                      key={`${manual.title}-${manual.crew}`}
-                      manual={manual}
-                      index={originalIndex}
-                    />
-                  );
-                })}
-              </div>
-            )}
-
-            {(searchQuery || crewFilter || (statusFilters.length > 0 && statusFilters.length < uniqueStatuses.length)) &&
-              filteredManuals.length > 0 && (
-                <p
-                  style={{
-                    marginTop: 16,
-                    textAlign: "center",
-                    fontSize: 13,
-                    color: 'hsl(var(--muted-foreground))',
-                  }}
-                >
-                  Showing {filteredManuals.length} of {manuals.length} manuals
-                </p>
-              )}
-          </>
-        )}
       </div>
 
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
+      {/* Loading state */}
+      {loading && (
+        <div className="grid gap-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className={`${paperCard} h-20 animate-pulse`} />
+          ))}
+        </div>
+      )}
 
-      <style jsx global>{`
-        .manual-card:hover {
-          border-color: hsl(var(--tomato) / 0.5) !important;
-          box-shadow: 0 2px 8px hsl(var(--ink) / 0.05);
-        }
-      `}</style>
-    </div>
+      {/* Error state */}
+      {!loading && error && (
+        <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
+          <p className="text-base text-destructive m-0">{error}</p>
+          <button type="button" onClick={() => window.location.reload()} className={pillInk}>
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Manuals list */}
+      {!loading && !error && (
+        <>
+          <div className="flex items-end justify-between gap-3 mb-4">
+            <div>
+              <p className="overline text-foreground/45 m-0">On the shelf</p>
+              <h2 className="font-display text-xl md:text-2xl font-black tracking-tight text-foreground mt-1 mb-0">
+                {searchQuery || crewFilter ? "Filtered manuals" : "All manuals"}
+              </h2>
+            </div>
+          </div>
+          {filteredManuals.length === 0 ? (
+            <EmptyState
+              title={
+                searchQuery || crewFilter || statusFilters.length > 0
+                  ? "No manuals match your filters."
+                  : "No manuals found."
+              }
+            />
+          ) : (
+            <div className="grid gap-3">
+              {filteredManuals.map((manual) => {
+                // Find original index for the link
+                const originalIndex = manuals.findIndex(
+                  (m) => m.title === manual.title && m.crew === manual.crew
+                );
+                return (
+                  <ManualCard
+                    key={`${manual.title}-${manual.crew}`}
+                    manual={manual}
+                    index={originalIndex}
+                  />
+                );
+              })}
+            </div>
+          )}
+
+          {(searchQuery || crewFilter || (statusFilters.length > 0 && statusFilters.length < uniqueStatuses.length)) &&
+            filteredManuals.length > 0 && (
+              <p className="overline mt-6 text-center text-foreground/55">
+                Showing {filteredManuals.length} of {manuals.length} manuals
+              </p>
+            )}
+        </>
+      )}
+    </EditorialPage>
   );
 }

@@ -1,5 +1,6 @@
 "use client";
 
+import Image from "next/image";
 import Link from "next/link";
 import { TURTLES } from "../constants";
 
@@ -51,11 +52,13 @@ export function HolderRow({
       {/* Turtle badges */}
       <div className="flex gap-1">
         {turtleImages.map((t) => (
-          <img
+          <Image
             key={t.id}
             src={t.image}
             alt={t.id}
             title={t.id}
+            width={24}
+            height={24}
             className="w-6 h-6 rounded-full border border-rule"
           />
         ))}
