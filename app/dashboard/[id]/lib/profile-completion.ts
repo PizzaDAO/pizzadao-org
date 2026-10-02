@@ -45,7 +45,7 @@ export const PROFILE_STEPS: readonly ProfileStepDefinition[] = [
         key: "join_crew",
         label: "Join a crew",
         isDone: ({ member }) => Array.isArray(member.crews) && member.crews.length > 0,
-        href: () => "/crew",
+        href: () => "/crews",
         nextAction: {
             headline: "Welcome — pick a crew to get started",
             body: "Crews are how members coordinate work across the DAO.",

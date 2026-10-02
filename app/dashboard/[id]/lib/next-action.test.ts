@@ -29,7 +29,7 @@ describe("resolveNextAction", () => {
         input.member.crews = [];
         const action = resolveNextAction(input);
         expect(action.kind).toBe("join_crew");
-        expect(action.primaryCta.href).toBe("/crew");
+        expect(action.primaryCta.href).toBe("/crews");
     });
 
     it("returns connect_wallet when member has crews but no wallet", () => {
