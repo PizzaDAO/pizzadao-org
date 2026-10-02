@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { unstable_cache } from "next/cache";
 import { getPublishedArticles, extractFirstImage } from "@/app/lib/articles";
 import type { ArticleCardData } from "@/app/ui/articles";
 import ArticlesClient, { type ArticlesPage } from "./ArticlesClient";
@@ -14,19 +15,17 @@ export const metadata: Metadata = {
   },
 };
 
-// The first page of published articles is rendered on the server and
-// regenerated at most every 5 minutes (same window as the /api/articles
-// CDN cache). Search, tag filters, pagination and drafts still run in the
-// client against /api/articles.
-export const revalidate = 300;
-
 const PAGE_LIMIT = 12;
 
-async function loadFirstPage(): Promise<ArticlesPage | null> {
-  try {
+/** Cache tag for the server-rendered first page of /articles (revalidateTag-able). */
+const ARTICLES_LIST_CACHE_TAG = "articles-list";
+
+// First page of published articles in the list shape GET /api/articles
+// returns (thumbnail computed, content stripped, Dates as ISO strings).
+// Cached for 5 minutes, the same window as the /api/articles CDN cache.
+const getFirstPage = unstable_cache(
+  async (): Promise<ArticlesPage> => {
     const result = await getPublishedArticles({ page: 1, limit: PAGE_LIMIT });
-    // Same list shape as GET /api/articles: thumbnail computed, content
-    // stripped, and Dates serialized to ISO strings.
     const articles = result.articles.map(({ content, ...rest }) => ({
       ...rest,
       thumbnail: rest.coverImage || extractFirstImage(content) || null,
@@ -35,13 +34,18 @@ async function loadFirstPage(): Promise<ArticlesPage | null> {
       articles: ArticleCardData[];
       pagination: ArticlesPage["pagination"];
     };
-  } catch {
-    // DB unavailable (e.g. at build time): the client fetches on mount instead.
-    return null;
-  }
-}
+  },
+  ["articles-first-page", String(PAGE_LIMIT)],
+  { revalidate: 300, tags: [ARTICLES_LIST_CACHE_TAG] },
+);
 
-export default async function ArticlesPage() {
-  const initial = await loadFirstPage();
+export default async function ArticlesIndexPage() {
+  let initial: ArticlesPage | null = null;
+  try {
+    initial = await getFirstPage();
+  } catch {
+    // DB unavailable: the client fetches /api/articles on mount instead.
+  }
+  // Search, tag filters, pagination and drafts stay client-side.
   return <ArticlesClient initial={initial} />;
 }

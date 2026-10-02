@@ -13,10 +13,9 @@ export const metadata: Metadata = {
   },
 };
 
-// Crew mappings come from public sheets through getCrewMappings() (KV cache +
-// Next data cache, 5 min). Regenerate the page on the same cadence; the
-// viewer's own crews and join/leave still load in the client.
-export const revalidate = 300;
+// Crew mappings come from public sheets through getCrewMappings(), which is
+// already cached (KV + Next data cache, 5 min), so rendering per request is
+// cheap. The viewer's own crews and join/leave still load in the client.
 
 export default async function CrewsPage() {
   let crews = null;
