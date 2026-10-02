@@ -4,6 +4,7 @@ import { SHEET_IDS } from '@/app/lib/sheets/config'
 import { norm } from '@/app/lib/strings'
 import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
+import { internalError } from '@/app/lib/errors/error-response'
 
 const MANUALS_SHEET_ID = SHEET_IDS.manuals
 
@@ -230,9 +231,6 @@ export async function GET(
       headers: { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' }
     })
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: e instanceof Error ? e.message : 'Failed to load manual' },
-      { status: 500 }
-    )
+    return internalError(e, 'manuals/[id]', 'Failed to load manual')
   }
 }

@@ -31,24 +31,41 @@ export async function requireSession(): Promise<GuardResult> {
 
 /** Whether the given Discord user holds an admin role in the guild. */
 export async function isAdminDiscordId(discordId: string): Promise<boolean> {
+  return hasAnyRoleSafe(discordId, ADMIN_ROLE_IDS);
+}
+
+/** Whether the Discord user holds any of `roleIds` in the guild (false on lookup errors). */
+export async function hasAnyRoleSafe(discordId: string, roleIds: readonly string[]): Promise<boolean> {
+  if (roleIds.length === 0) return false;
   try {
-    return await hasAnyRole(discordId, ADMIN_ROLE_IDS);
+    return await hasAnyRole(discordId, roleIds);
   } catch {
     return false;
   }
 }
 
-/** Require a session belonging to a guild admin. 401 if no session, 403 if not admin. */
-export async function requireAdmin(): Promise<GuardResult> {
+/**
+ * Require a session whose user holds one of `roleIds` (fails closed on lookup
+ * errors). 401 if no session, 403 otherwise.
+ */
+export async function requireAnyRole(
+  roleIds: readonly string[],
+  forbiddenMessage = "Forbidden",
+): Promise<GuardResult> {
   const auth = await requireSession();
   if (!auth.ok) return auth;
-  if (!(await isAdminDiscordId(auth.session.discordId))) {
+  if (!(await hasAnyRoleSafe(auth.session.discordId, roleIds))) {
     return {
       ok: false,
-      response: NextResponse.json({ error: "Admin access required" }, { status: 403 }),
+      response: NextResponse.json({ error: forbiddenMessage }, { status: 403 }),
     };
   }
   return auth;
+}
+
+/** Require a session belonging to a guild admin. 401 if no session, 403 if not admin. */
+export async function requireAdmin(): Promise<GuardResult> {
+  return requireAnyRole(ADMIN_ROLE_IDS, "Admin access required");
 }
 
 /** Constant-time string comparison (false on any length mismatch or missing value). */

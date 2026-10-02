@@ -1,7 +1,8 @@
 // app/dashboard/[id]/components/Discover.test.tsx
 import React from "react";
 import { describe, it, expect, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act } from "@testing-library/react";
+import { renderWithIntl } from "@/app/lib/i18n/test-utils";
 
 // Render next/link as a plain anchor so href shows up in the DOM.
 vi.mock("next/link", () => ({
@@ -49,7 +50,7 @@ const CALLS: DiscoverCall[] = [
 
 describe("<Discover />", () => {
     it("defaults to the Bounties tab and shows top 3 bounty previews", () => {
-        render(
+        renderWithIntl(
             <Discover
                 bounties={BOUNTIES}
                 jobs={JOBS}
@@ -71,7 +72,7 @@ describe("<Discover />", () => {
     });
 
     it("switches to the Jobs tab and renders job previews", async () => {
-        render(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
+        renderWithIntl(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
         await act(async () => {
             fireEvent.click(screen.getByRole("tab", { name: /Jobs/ }));
         });
@@ -86,7 +87,7 @@ describe("<Discover />", () => {
     });
 
     it("switches to the Articles tab and links to the article slug", async () => {
-        render(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
+        renderWithIntl(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
         await act(async () => {
             fireEvent.click(screen.getByRole("tab", { name: /Articles/ }));
         });
@@ -98,7 +99,7 @@ describe("<Discover />", () => {
     });
 
     it("switches to the Calls tab and renders crew + date", async () => {
-        render(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
+        renderWithIntl(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
         await act(async () => {
             fireEvent.click(screen.getByRole("tab", { name: /Calls/ }));
         });
@@ -109,7 +110,7 @@ describe("<Discover />", () => {
     });
 
     it("shows an empty state when a tab has zero items", async () => {
-        render(<Discover bounties={[]} jobs={[]} articles={[]} calls={[]} />);
+        renderWithIntl(<Discover bounties={[]} jobs={[]} articles={[]} calls={[]} />);
         // Bounties (default) empty state
         expect(
             screen.getByText(/No open bounties right now/i),
@@ -132,7 +133,7 @@ describe("<Discover />", () => {
     });
 
     it("renders a 'View all' link that targets the active tab's listing page", async () => {
-        render(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
+        renderWithIntl(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
         // Default tab: bounties → /pep
         let viewAll = screen.getByRole("link", { name: /View all/ });
         expect(viewAll).toHaveAttribute("href", "/pep");
@@ -157,7 +158,7 @@ describe("<Discover />", () => {
             reward: 100,
             status: "OPEN" as const,
         }));
-        render(<Discover bounties={many} />);
+        renderWithIntl(<Discover bounties={many} />);
         expect(screen.getByText("Bounty 1")).toBeInTheDocument();
         expect(screen.getByText("Bounty 2")).toBeInTheDocument();
         expect(screen.getByText("Bounty 3")).toBeInTheDocument();

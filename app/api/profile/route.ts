@@ -242,7 +242,8 @@ const POST_HANDLER = async (req: Request) => {
   try {
     parsed = await writeToSheet(payload);
   } catch (e: unknown) {
-    throw new ExternalServiceError('Google Sheets', (e as any)?.message);
+    console.error('[profile] sheet write failed:', e);
+    throw new ExternalServiceError('Google Sheets');
   }
 
   // 1b) Timezone (pizzaiolo-13628). The Crew sheet has no Timezone column, so
@@ -273,7 +274,8 @@ const POST_HANDLER = async (req: Request) => {
         crewRoleIds = await fetchCrewRoleIds(payload.crews);
       } catch (e: unknown) {
         crewRoleIds = [];
-        crewLookupError = `Crew role lookup failed: ${(e as any)?.message ?? "unknown"}`;
+        console.error("[profile] crew role lookup failed:", e);
+        crewLookupError = "Crew role lookup failed";
       }
 
       // Region role ID from city selection
@@ -301,7 +303,7 @@ const POST_HANDLER = async (req: Request) => {
       } catch (e: unknown) {
         discordResult = {
           ok: false,
-          error: (e as any)?.message ?? "Discord sync failed",
+          error: "Discord sync failed",
           turtleRoleIds,
           crewRoleIds,
           regionRoleId,

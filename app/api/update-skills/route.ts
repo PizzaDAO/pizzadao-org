@@ -9,6 +9,7 @@ import {
     invalidateMembersCache,
     membersColumn,
 } from "@/app/lib/sheets/member-repository";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -83,6 +84,6 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ ok: true, skills: payload.skills });
     } catch (err: any) {
-        return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
+        return internalError(err, "update-skills", "Failed to update skills");
     }
 }

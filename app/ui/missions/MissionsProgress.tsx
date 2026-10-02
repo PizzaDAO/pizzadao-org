@@ -10,6 +10,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
+import { useTranslations } from "next-intl";
 
 type LevelData = {
   level: number;
@@ -39,6 +40,7 @@ const DISPLAY_FONT =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
+  const t = useTranslations("dashboard.missions");
   const [fetched, setFetched] = useState<MissionsSummary | null>(null);
   const [loading, setLoading] = useState(summary === undefined);
 
@@ -125,7 +127,7 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
               marginBottom: 2,
             }}
           >
-            § Dossier
+            {t("overline")}
           </span>
           <h3
             style={{
@@ -138,7 +140,7 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
               color: "hsl(var(--foreground))",
             }}
           >
-            Missions
+            {t("title")}
           </h3>
         </div>
         <Link
@@ -151,7 +153,7 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
             whiteSpace: "nowrap",
           }}
         >
-          View All →
+          {t("viewAll")}
         </Link>
       </div>
 
@@ -174,10 +176,10 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
             color: "hsl(var(--tomato))",
           }}
         >
-          {allDone ? "MAX" : (
+          {allDone ? t("maxLevel") : (
             <>
               <span style={{ color: "hsl(var(--foreground) / 0.35)", fontWeight: 700 }}>
-                Lv.
+                {t("levelPrefix")}
               </span>
               {currentLevel}
             </>
@@ -205,7 +207,7 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
               display: "inline-block",
             }}
           >
-            All levels complete!
+            {t("allComplete")}
           </span>
         )}
       </div>
@@ -228,10 +230,10 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
               }}
             >
               <span>
-                {completedCount}/{totalCount} on file
+                {t("onFile", { completed: completedCount, total: totalCount })}
               </span>
               <span style={{ color: "hsl(var(--tomato))" }}>
-                +{currentLevelData.reward.toLocaleString()} $PEP
+                {t("reward", { amount: currentLevelData.reward })}
               </span>
             </div>
             <div
@@ -328,7 +330,7 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
           paddingTop: 10,
         }}
       >
-        § Overall · {totalCompleted}/{totalMissions} closed
+        {t("overall", { completed: totalCompleted, total: totalMissions })}
       </div>
     </div>
   );

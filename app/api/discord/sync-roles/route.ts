@@ -3,6 +3,7 @@
 // user themself (discordId === session.discordId) or an admin may change roles.
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { requireSession, isAdminDiscordId } from "@/app/lib/auth-guards";
+import { internalError } from "@/app/lib/errors/error-response";
 
 const API_BASE = "https://discord.com/api/v10";
 
@@ -86,6 +87,6 @@ export async function POST(req: Request) {
 
     return Response.json({ ok: true, added: Array.from(selectedRoleIds) });
   } catch (e: unknown) {
-    return Response.json({ error: (e as any)?.message || "Failed to sync roles" }, { status: 500 });
+    return internalError(e, "discord/sync-roles", "Failed to sync roles");
   }
 }

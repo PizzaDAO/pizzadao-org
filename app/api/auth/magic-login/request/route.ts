@@ -1,9 +1,13 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { requestMagicLogin } from "@/app/lib/magic-login";
 
 export const runtime = "nodejs";
 
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(req, "magic-login");
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const username = String(body?.username ?? "").trim();

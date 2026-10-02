@@ -10,6 +10,7 @@ import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { crewIdToLabel, normalizeCrewId } from "@/app/lib/crew-labels";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -214,7 +215,8 @@ export async function POST(req: Request) {
           });
           discordResult = { ok: true, roleId };
         } catch (e: unknown) {
-          discordResult = { ok: false, error: (e as any)?.message };
+          console.error("[join-crew] Discord role sync failed:", e);
+          discordResult = { ok: false, error: "Discord role sync failed" };
         }
       } else {
         discordResult = { ok: true, note: "No Discord role for this crew" };
@@ -229,6 +231,6 @@ export async function POST(req: Request) {
       discord: discordResult,
     });
   } catch (err: any) {
-    return NextResponse.json({ error: err?.message ?? "Unknown error" }, { status: 500 });
+    return internalError(err, "join-crew", "Failed to update crew");
   }
 }

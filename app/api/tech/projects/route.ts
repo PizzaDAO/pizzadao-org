@@ -4,6 +4,7 @@ import { requireAdmin } from '@/app/lib/auth-guards'
 import { getCached, setCache, getCacheMetadata, clearCache, CACHE_KEYS } from '@/app/lib/projects/cache'
 import type { Project, ProjectsConfig } from '@/app/lib/projects/types'
 import projectsConfigJson from '@/data/projects-config.json'
+import { internalError } from '@/app/lib/errors/error-response'
 
 const projectsConfig = projectsConfigJson as ProjectsConfig
 
@@ -71,10 +72,7 @@ export async function GET(request: Request) {
       })
     }
 
-    return NextResponse.json(
-      { error: 'Failed to fetch projects', message: (error as Error).message },
-      { status: 500 }
-    )
+    return internalError(error, 'tech/projects', 'Failed to fetch projects')
   }
 }
 
@@ -112,10 +110,6 @@ export async function POST() {
       ...metadata,
     })
   } catch (error) {
-    console.error('Error refreshing projects:', error)
-    return NextResponse.json(
-      { error: 'Failed to refresh projects', message: (error as Error).message },
-      { status: 500 }
-    )
+    return internalError(error, 'tech/projects refresh', 'Failed to refresh projects')
   }
 }

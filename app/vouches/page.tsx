@@ -6,12 +6,18 @@ import Link from "next/link";
 import { VouchCard } from "../ui/vouches/VouchCard";
 import { useMe, useVouches } from "../lib/hooks/use-api";
 import {
-  btn,
-  card,
-  input as inputStyle,
-  loadingSpinner,
-  pageContainer,
-} from "../ui/shared-styles";
+  EditorialMasthead,
+  EditorialPage,
+  EmptyState,
+  LoadingLine,
+  SectionHeading,
+  paperCard,
+  pillInk,
+} from "../ui/shared/Editorial";
+
+// Editorial restyle: § masthead, paper-soft search strip, overline section
+// headings and dashed empty states. Hooks, optimistic remove and search
+// unchanged.
 
 type VouchData = {
   memberId: string;
@@ -20,9 +26,6 @@ type VouchData = {
   crews: string;
   source: "PIZZADAO" | "TWITTER" | "FARCASTER";
 };
-
-const displayFont =
-  "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
 export default function VouchesPage() {
   const router = useRouter();
@@ -113,147 +116,38 @@ export default function VouchesPage() {
 
   if (loading) {
     return (
-      <div
-        style={{
-          ...pageContainer(),
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div style={{ textAlign: "center" }}>
-          <div style={loadingSpinner()} />
-          <p
-            style={{
-              fontSize: 18,
-              color: "hsl(var(--muted-foreground))",
-            }}
-          >
-            Loading vouches…
-          </p>
-          <style jsx>{`
-            @keyframes spin {
-              0% {
-                transform: rotate(0deg);
-              }
-              100% {
-                transform: rotate(360deg);
-              }
-            }
-          `}</style>
-        </div>
-      </div>
+      <EditorialPage width="max-w-[800px]">
+        <LoadingLine label="Loading vouches…" />
+      </EditorialPage>
     );
   }
 
   if (authError) {
     return (
-      <div
-        style={{
-          ...pageContainer(),
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-        }}
-      >
-        <div style={card()}>
+      <EditorialPage width="max-w-[640px]">
+        <div className={`${paperCard} p-7 grid gap-3`} style={{ boxShadow: "var(--shadow-soft)" }}>
+          <p className="overline text-tomato m-0">§ The Vouches</p>
           <h1
-            style={{
-              fontFamily: displayFont,
-              fontSize: 32,
-              fontWeight: 800,
-              margin: 0,
-              letterSpacing: "-0.01em",
-            }}
+            className="font-display font-black tracking-tight text-foreground m-0"
+            style={{ fontSize: "clamp(1.9rem, 5vw, 2.6rem)", lineHeight: 1 }}
           >
             Vouches
           </h1>
-          <p
-            style={{
-              color: "hsl(var(--muted-foreground))",
-              margin: 0,
-            }}
-          >
-            {authError}
-          </p>
-          <Link href="/" style={btn("primary")}>
+          <p className="text-muted-foreground m-0">{authError}</p>
+          <Link href="/" className={`${pillInk} justify-self-start`}>
             Back to Home
           </Link>
         </div>
-      </div>
+      </EditorialPage>
     );
   }
 
-  const sectionHeading = (label: string, count: number) => (
-    <h2
-      style={{
-        margin: "0 0 8px",
-        fontFamily: displayFont,
-        fontSize: 20,
-        fontWeight: 800,
-        letterSpacing: "-0.01em",
-        color: "hsl(var(--foreground))",
-      }}
-    >
-      {label}
-      <span
-        style={{
-          marginLeft: 8,
-          fontSize: 16,
-          fontWeight: 700,
-          color: "hsl(var(--muted-foreground))",
-          fontVariantNumeric: "tabular-nums",
-        }}
-      >
-        {count}
-      </span>
-    </h2>
-  );
-
-  const emptyState = (msg: string, sub?: string) => (
-    <div
-      style={{
-        padding: 32,
-        borderRadius: "var(--radius)",
-        border: "1px dashed hsl(var(--rule) / 0.22)",
-        background: "hsl(var(--card))",
-        textAlign: "center",
-      }}
-    >
-      <p
-        style={{
-          fontFamily: displayFont,
-          fontSize: 16,
-          fontWeight: 700,
-          margin: 0,
-          color: "hsl(var(--foreground))",
-        }}
-      >
-        {msg}
-      </p>
-      {sub && (
-        <p
-          style={{
-            fontSize: 14,
-            color: "hsl(var(--muted-foreground))",
-            margin: "6px 0 0",
-          }}
-        >
-          {sub}
-        </p>
-      )}
-    </div>
-  );
-
   const grid = (items: VouchData[], showRemove: boolean) => (
     <div
-      style={{
-        display: "grid",
-        // sicilian-41551: floor lowered + `min(…, 100%)` so a 320px viewport
-        // can't force the cards to overflow horizontally.
-        gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))",
-        gap: 12,
-      }}
+      className="grid gap-3"
+      // sicilian-41551: floor lowered + `min(…, 100%)` so a 320px viewport
+      // can't force the cards to overflow horizontally.
+      style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))" }}
     >
       {items.map((v) => (
         <VouchCard
@@ -271,105 +165,83 @@ export default function VouchesPage() {
   );
 
   return (
-    <div style={pageContainer()}>
-      <div
-        style={{ maxWidth: 800, margin: "0 auto", display: "grid", gap: 20 }}
+    <EditorialPage width="max-w-[800px]">
+      {/* Back Button */}
+      <button
+        type="button"
+        onClick={() => router.back()}
+        className="overline mb-6 min-h-11 bg-transparent border-0 p-0 cursor-pointer text-muted-foreground hover:text-tomato"
       >
-        {/* Back Button */}
-        <div>
-          <button
-            onClick={() => router.back()}
-            style={{
-              background: "transparent",
-              border: "none",
-              cursor: "pointer",
-              fontSize: 15,
-              fontWeight: 600,
-              color: "hsl(var(--muted-foreground))",
-              padding: 0,
-              fontFamily: "inherit",
-            }}
-          >
-            ← Back
-          </button>
-        </div>
+        ← Back
+      </button>
 
-        {/* Header */}
-        <header style={{ textAlign: "center", marginBottom: 10 }}>
-          <h1
-            style={{
-              marginTop: 0,
-              fontFamily: displayFont,
-              // sicilian-41551: scale 32→44 across viewport widths.
-              fontSize: "clamp(2rem, 7vw, 2.75rem)",
-              marginBottom: 8,
-              fontWeight: 800,
-              letterSpacing: "-0.01em",
-              textWrap: "balance",
-            }}
-          >
-            Vouches
-          </h1>
-          <p
-            style={{
-              fontSize: 16,
-              color: "hsl(var(--muted-foreground))",
-              margin: 0,
-            }}
-          >
+      <EditorialMasthead
+        overline="The Vouches"
+        title={
+          <>
+            Who&apos;s got <span className="text-tomato underline-scribble">your back</span>
+          </>
+        }
+        dek={
+          <span className="tabular-nums">
             {counts.pizzadao} vouching for · {counts.pizzadaoFollowers} vouchers
-          </p>
-        </header>
+          </span>
+        }
+      />
 
-        {/* Search */}
-        <input
-          type="text"
-          value={searchQuery}
-          onChange={(e) => setSearchQuery(e.target.value)}
-          placeholder="Search vouches by name, city, or crew…"
-          style={inputStyle()}
-        />
-
-        {/* Vouching for you (inbound) */}
-        <section>
-          {sectionHeading("Vouching for you", counts.pizzadaoFollowers)}
-          {filteredInbound.length > 0
-            ? grid(filteredInbound, false)
-            : inbound.length === 0
-            ? emptyState(
-                "Nobody has vouched for you yet",
-                "Build your reputation — ask a few members to vouch for you on their profile.",
-              )
-            : emptyState("No vouchers match your search.")}
-        </section>
-
-        {/* You vouch for (outbound) */}
-        <section>
-          {sectionHeading("You vouch for", counts.pizzadao)}
-          {filteredOutbound.length > 0
-            ? grid(filteredOutbound, true)
-            : outbound.length === 0
-            ? emptyState(
-                "You haven't vouched for anyone yet",
-                "Visit a member profile and tap “+ Vouch” to add one.",
-              )
-            : emptyState("No vouches match your search.")}
-        </section>
-
-        {/* Footer */}
-        <div
-          style={{
-            textAlign: "center",
-            marginTop: 40,
-            color: "hsl(var(--muted-foreground))",
-            fontFamily: displayFont,
-            fontSize: 13,
-            opacity: 0.6,
-          }}
-        >
-          PizzaDAO
+      {/* Search */}
+      <div className={`${paperCard} print-noise mb-8 p-4 sm:p-5`}>
+        <div className="relative">
+          <span
+            aria-hidden
+            className="overline absolute left-3 top-2 text-foreground/40"
+            style={{ fontSize: 9 }}
+          >
+            Search
+          </span>
+          <input
+            type="text"
+            value={searchQuery}
+            onChange={(e) => setSearchQuery(e.target.value)}
+            placeholder="Search vouches by name, city, or crew…"
+            aria-label="Search vouches"
+            className="w-full min-h-11 pt-6 pb-2 px-3 text-base sm:text-sm rounded-[var(--radius)] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule-warm)/0.55)] outline-none focus:border-tomato focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
+          />
         </div>
       </div>
-    </div>
+
+      {/* Vouching for you (inbound) */}
+      <section className="mb-10">
+        <SectionHeading overline="Inbound" title="Vouching for you" count={counts.pizzadaoFollowers} />
+        {filteredInbound.length > 0
+          ? grid(filteredInbound, false)
+          : inbound.length === 0
+          ? (
+            <EmptyState title="Nobody has vouched for you yet">
+              Build your reputation — ask a few members to vouch for you on their profile.
+            </EmptyState>
+          )
+          : <EmptyState title="No vouchers match your search." />}
+      </section>
+
+      {/* You vouch for (outbound) */}
+      <section>
+        <SectionHeading overline="Outbound" title="You vouch for" count={counts.pizzadao} />
+        {filteredOutbound.length > 0
+          ? grid(filteredOutbound, true)
+          : outbound.length === 0
+          ? (
+            <EmptyState title="You haven't vouched for anyone yet">
+              Visit a member profile and tap “+ Vouch” to add one.
+            </EmptyState>
+          )
+          : <EmptyState title="No vouches match your search." />}
+      </section>
+
+      {/* Footer */}
+      <div className="rule-warm mt-12 pt-4 text-center">
+        <p className="overline m-0 text-foreground/40">§ pizzadao · est. 2021</p>
+      </div>
+    </EditorialPage>
   );
 }

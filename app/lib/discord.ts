@@ -16,6 +16,35 @@ export async function fetchGuildMember(userId: string) {
   }
 }
 
+export type GuildMembership =
+  | { status: "member"; member: NonNullable<Awaited<ReturnType<typeof fetchGuildMember>>> }
+  | { status: "not_member" }
+  | { status: "unknown" }
+
+/**
+ * Uncached guild-membership check via the bot (used at login, where a stale
+ * cached "not a member" would send people through the join step needlessly).
+ * "unknown" means the Discord API call itself failed (not a 404).
+ */
+export async function lookupGuildMembership(userId: string): Promise<GuildMembership> {
+  const guildId = process.env.DISCORD_GUILD_ID!
+  const botToken = process.env.DISCORD_BOT_TOKEN!
+  try {
+    const r = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+      headers: { Authorization: `Bot ${botToken}` },
+      cache: "no-store",
+    })
+    if (r.ok) {
+      const member = await r.json() as NonNullable<Awaited<ReturnType<typeof fetchGuildMember>>>
+      return { status: "member", member }
+    }
+    if (r.status === 404) return { status: "not_member" }
+    return { status: "unknown" }
+  } catch {
+    return { status: "unknown" }
+  }
+}
+
 // Check if user has any of the specified roles
 export async function hasAnyRole(userId: string, roleIds: readonly string[]): Promise<boolean> {
   const member = await fetchGuildMember(userId)

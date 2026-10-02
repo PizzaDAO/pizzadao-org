@@ -15,11 +15,28 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
+import { useTranslations } from "next-intl";
 import { useSession } from "@/app/lib/hooks/use-session";
+
+type NavLabelKey =
+  | "crews"
+  | "members"
+  | "missions"
+  | "pep"
+  | "articles"
+  | "calls"
+  | "chats"
+  | "manuals"
+  | "turtles"
+  | "techProjects"
+  | "nfts"
+  | "poaps"
+  | "print";
 
 type NavItem = {
   href: string;
-  label: string;
+  /** Key into the `nav` messages namespace. */
+  labelKey: NavLabelKey;
   /** Custom active-state matcher; defaults to exact-or-prefix match. */
   match?: (pathname: string) => boolean;
   membersOnly?: boolean;
@@ -28,25 +45,25 @@ type NavItem = {
 const PRIMARY: NavItem[] = [
   {
     href: "/crews",
-    label: "Crews",
+    labelKey: "crews",
     // /crew/[crewId] is an individual crew page — it belongs under Crews.
     match: (p) => p === "/crews" || p.startsWith("/crew/"),
   },
-  { href: "/crew", label: "Members", match: (p) => p === "/crew" },
-  { href: "/missions", label: "Missions" },
-  { href: "/pep", label: "PEP" },
-  { href: "/articles", label: "Articles" },
-  { href: "/calls", label: "Calls" },
-  { href: "/chats", label: "Chats", membersOnly: true },
+  { href: "/crew", labelKey: "members", match: (p) => p === "/crew" },
+  { href: "/missions", labelKey: "missions" },
+  { href: "/pep", labelKey: "pep" },
+  { href: "/articles", labelKey: "articles" },
+  { href: "/calls", labelKey: "calls" },
+  { href: "/chats", labelKey: "chats", membersOnly: true },
 ];
 
 const MORE: NavItem[] = [
-  { href: "/manuals", label: "Manuals" },
-  { href: "/turtles", label: "Turtles" },
-  { href: "/tech/projects", label: "Tech Projects" },
-  { href: "/nfts", label: "NFTs" },
-  { href: "/poaps", label: "POAPs" },
-  { href: "/print", label: "Print Materials" },
+  { href: "/manuals", labelKey: "manuals" },
+  { href: "/turtles", labelKey: "turtles" },
+  { href: "/tech/projects", labelKey: "techProjects" },
+  { href: "/nfts", labelKey: "nfts" },
+  { href: "/poaps", labelKey: "poaps" },
+  { href: "/print", labelKey: "print" },
 ];
 
 /** Routes where the onboarding wizard is full-screen and owns the chrome. */
@@ -61,6 +78,7 @@ const DISPLAY_FONT = "var(--font-display), var(--font-sans), system-ui, sans-ser
 
 export default function SiteHeader() {
   const pathname = usePathname() || "/";
+  const t = useTranslations("nav");
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -119,17 +137,17 @@ export default function SiteHeader() {
         href="#main-content"
         className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-[60] focus:rounded-full focus:bg-foreground focus:px-4 focus:py-2 focus:text-background"
       >
-        Skip to content
+        {t("skipToContent")}
       </a>
       <nav
-        aria-label="Main"
+        aria-label={t("mainAriaLabel")}
         className="mx-auto flex h-14 max-w-[1200px] items-center gap-2 px-4 sm:px-6"
       >
         {/* Masthead */}
         <Link
           href={loggedIn ? dashboardHref : "/"}
           className="mr-2 inline-flex items-baseline gap-1.5 no-underline text-foreground"
-          aria-label="PizzaDAO home"
+          aria-label={t("homeAriaLabel")}
         >
           <span aria-hidden className="text-tomato" style={{ fontFamily: DISPLAY_FONT, fontWeight: 800 }}>
             §
@@ -158,7 +176,7 @@ export default function SiteHeader() {
                   className={linkClass(active)}
                   aria-current={active ? "page" : undefined}
                 >
-                  {item.label}
+                  {t(item.labelKey)}
                 </Link>
               </li>
             );
@@ -172,7 +190,7 @@ export default function SiteHeader() {
               aria-controls="site-nav-more"
               onClick={() => setMoreOpen((o) => !o)}
             >
-              More
+              {t("more")}
               <ChevronDown size={14} aria-hidden className={moreOpen ? "rotate-180 transition-transform" : "transition-transform"} />
             </button>
             {moreOpen && (
@@ -196,7 +214,7 @@ export default function SiteHeader() {
                           active ? "text-tomato font-semibold" : "text-foreground"
                         }`}
                       >
-                        {item.label}
+                        {t(item.labelKey)}
                       </Link>
                     </li>
                   );
@@ -220,12 +238,12 @@ export default function SiteHeader() {
                   color: dashboardActive ? "hsl(var(--cream))" : "hsl(var(--background))",
                 }}
               >
-                Dashboard
+                {t("dashboard")}
               </Link>
             ) : session ? (
               <>
                 <Link href="/login" className={linkClass(false)}>
-                  Log in
+                  {t("logIn")}
                 </Link>
                 <Link
                   href="/join"
@@ -236,7 +254,7 @@ export default function SiteHeader() {
                     color: "hsl(var(--cream))",
                   }}
                 >
-                  Join
+                  {t("join")}
                 </Link>
               </>
             ) : null}
@@ -249,7 +267,7 @@ export default function SiteHeader() {
             style={{ borderColor: "hsl(var(--rule-warm) / 0.55)", cursor: "pointer" }}
             aria-expanded={mobileOpen}
             aria-controls="site-nav-mobile"
-            aria-label={mobileOpen ? "Close menu" : "Open menu"}
+            aria-label={mobileOpen ? t("closeMenu") : t("openMenu")}
             onClick={() => setMobileOpen((o) => !o)}
           >
             {mobileOpen ? <X size={20} aria-hidden /> : <Menu size={20} aria-hidden />}
@@ -276,7 +294,7 @@ export default function SiteHeader() {
                   className="btn-pill flex-1 no-underline"
                   style={{ background: "hsl(var(--foreground))", color: "hsl(var(--background))" }}
                 >
-                  Dashboard
+                  {t("dashboard")}
                 </Link>
               ) : (
                 <>
@@ -285,20 +303,20 @@ export default function SiteHeader() {
                     className="btn-pill flex-1 border no-underline"
                     style={{ borderColor: "hsl(var(--rule-warm))", color: "hsl(var(--foreground))" }}
                   >
-                    Log in
+                    {t("logIn")}
                   </Link>
                   <Link
                     href="/join"
                     className="btn-pill flex-1 no-underline"
                     style={{ background: "hsl(var(--tomato))", color: "hsl(var(--cream))" }}
                   >
-                    Join
+                    {t("join")}
                   </Link>
                 </>
               )}
             </div>
 
-            <p className="overline m-0 mb-1 text-tomato">§ Explore</p>
+            <p className="overline m-0 mb-1 text-tomato">{t("explore")}</p>
             <ul className="m-0 grid list-none grid-cols-2 gap-x-4 p-0">
               {primary.map((item) => {
                 const active = isActive(item, pathname);
@@ -312,7 +330,7 @@ export default function SiteHeader() {
                       }`}
                       style={{ fontFamily: DISPLAY_FONT, fontWeight: 700 }}
                     >
-                      {item.label}
+                      {t(item.labelKey)}
                     </Link>
                   </li>
                 );
@@ -320,7 +338,7 @@ export default function SiteHeader() {
             </ul>
 
             <div className="rule-warm my-3" />
-            <p className="overline m-0 mb-1 text-foreground/55">More</p>
+            <p className="overline m-0 mb-1 text-foreground/55">{t("more")}</p>
             <ul className="m-0 grid list-none grid-cols-2 gap-x-4 p-0">
               {MORE.map((item) => {
                 const active = isActive(item, pathname);
@@ -333,7 +351,7 @@ export default function SiteHeader() {
                         active ? "text-tomato font-semibold" : "text-foreground/80"
                       }`}
                     >
-                      {item.label}
+                      {t(item.labelKey)}
                     </Link>
                   </li>
                 );

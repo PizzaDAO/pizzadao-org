@@ -11,7 +11,9 @@
 // ArticleReactions, CommentList, TagBadge) are untouched.
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { ArticleRenderer, TagBadge, CommentList, ArticleReactions } from "@/app/ui/articles";
 
 interface Article {
@@ -275,11 +277,15 @@ export default function ArticleDetailClient({ slug }: { slug: string }) {
                 className="paper-soft relative overflow-hidden rounded-[--radius] border border-[hsl(var(--rule-warm)/0.65)]"
                 style={{ boxShadow: "var(--shadow-lifted)" }}
               >
-                {/* eslint-disable-next-line @next/next/no-img-element */}
-                <img
+                <Image
                   src={article.coverImage}
                   alt=""
-                  className="w-full max-h-[460px] object-cover block"
+                  width={1520}
+                  height={920}
+                  sizes="(max-width: 800px) 100vw, 760px"
+                  preload
+                  unoptimized={!isOptimizableImage(article.coverImage)}
+                  className="w-full h-auto max-h-[460px] object-cover block"
                   onError={(e) => {
                     (e.target as HTMLImageElement).style.display = "none";
                   }}
