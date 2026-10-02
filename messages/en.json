@@ -335,7 +335,8 @@
     "logIn": "Log in",
     "join": "Join",
     "openMenu": "Open menu",
-    "closeMenu": "Close menu"
+    "closeMenu": "Close menu",
+    "support": "Support"
   },
   "dashboard": {
     "loading": {

@@ -335,7 +335,8 @@
     "logIn": "Se connecter",
     "join": "Rejoindre",
     "openMenu": "Ouvrir le menu",
-    "closeMenu": "Fermer le menu"
+    "closeMenu": "Fermer le menu",
+    "support": "Assistance"
   },
   "dashboard": {
     "loading": {
