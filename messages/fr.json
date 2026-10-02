@@ -92,6 +92,7 @@
       "inputPlaceholder": "Paris, France",
       "inputAriaLabel": "Ville",
       "lookingForChapter": "Recherche d'un chapitre PizzaDAO local…",
+      "timezoneDetected": "Fuseau horaire : {timezone}",
       "back": "Retour",
       "next": "Suivant",
       "telegramOverline": "§ Chapitre trouvé",

@@ -92,6 +92,7 @@
       "inputPlaceholder": "New York, NY",
       "inputAriaLabel": "City",
       "lookingForChapter": "Looking for a local PizzaDAO chapter…",
+      "timezoneDetected": "Timezone: {timezone}",
       "back": "Back",
       "next": "Next",
       "telegramOverline": "§ Chapter found",
