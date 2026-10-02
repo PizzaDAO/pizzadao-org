@@ -24,7 +24,88 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { NextAction, NextActionKind } from "../lib/next-action";
+
+type Translator = ReturnType<typeof useTranslations<"dashboard">>;
+
+/**
+ * The server (/api/dashboard-summary → resolveNextAction) returns English
+ * copy. Re-render it in the viewer's locale from the `dashboard` catalog,
+ * keyed by `kind`. Data-derived text (mission titles, notification titles)
+ * and anything we can't parameterize (no `level` on older payloads) falls
+ * back to the server string.
+ */
+export function localizeNextAction(a: NextAction, t: Translator): NextAction {
+    const level = a.level;
+    const hasLevel = typeof level === "number";
+    switch (a.kind) {
+        case "join_crew":
+            return {
+                ...a,
+                headline: t("steps.join_crew.headline"),
+                body: t("steps.join_crew.body"),
+                primaryCta: { ...a.primaryCta, label: t("steps.join_crew.cta") },
+            };
+        case "connect_wallet":
+        case "connect_x":
+            return {
+                ...a,
+                headline: t(`steps.${a.kind}.headline`),
+                primaryCta: { ...a.primaryCta, label: t(`steps.${a.kind}.cta`) },
+            };
+        case "submit_mission":
+            // body = the mission's title (data) — left as-is.
+            return {
+                ...a,
+                headline: t("nextAction.submit_mission.headline"),
+                primaryCta: hasLevel
+                    ? { ...a.primaryCta, label: t("nextAction.submit_mission.cta", { level }) }
+                    : a.primaryCta,
+            };
+        case "awaiting_review":
+            return {
+                ...a,
+                headline: t("nextAction.awaiting_review.headline"),
+                ...(hasLevel
+                    ? {
+                          body: t("nextAction.awaiting_review.body", { level }),
+                          primaryCta: {
+                              ...a.primaryCta,
+                              label: t("nextAction.awaiting_review.cta", { level }),
+                          },
+                      }
+                    : {}),
+            };
+        case "get_vouches":
+            return {
+                ...a,
+                headline: t("nextAction.get_vouches.headline"),
+                primaryCta: { ...a.primaryCta, label: t("nextAction.get_vouches.cta") },
+            };
+        case "review_notification":
+            // headline = the notification's own title (data) — left as-is.
+            return {
+                ...a,
+                primaryCta: { ...a.primaryCta, label: t("nextAction.review_notification.cta") },
+            };
+        case "power_user_review":
+            return {
+                ...a,
+                headline: t("nextAction.power_user_review.headline"),
+                body: t("nextAction.power_user_review.body"),
+                primaryCta: { ...a.primaryCta, label: t("nextAction.power_user_review.cta") },
+            };
+        case "power_user_discover":
+            return {
+                ...a,
+                headline: t("nextAction.power_user_discover.headline"),
+                primaryCta: { ...a.primaryCta, label: t("nextAction.power_user_discover.cta") },
+            };
+        default:
+            return a;
+    }
+}
 
 const SNOOZE_KEY_PREFIX = "dashboard-next-action-snooze-";
 const DEFAULT_SNOOZE_MS = 24 * 60 * 60 * 1000; // 24h
@@ -83,6 +164,7 @@ export function NextActionPanel({
     // owner-only logged-in page).
     const [snoozedUntil, setSnoozedUntil] = useState<number | null>(null);
     const [hydrated, setHydrated] = useState(false);
+    const t = useTranslations("dashboard");
 
     useEffect(() => {
         setSnoozedUntil(readSnooze(nextAction.kind));
@@ -117,13 +199,13 @@ export function NextActionPanel({
                         padding: 0,
                     }}
                 >
-                    Show next action again
+                    {t("nextAction.showAgain")}
                 </button>
             </div>
         );
     }
 
-    const { headline, body, primaryCta, secondary, kind } = nextAction;
+    const { headline, body, primaryCta, secondary, kind } = localizeNextAction(nextAction, t);
 
     return (
         <section
@@ -158,7 +240,7 @@ export function NextActionPanel({
                     className="overline"
                     style={{ color: "hsl(var(--butter))" }}
                 >
-                    § 02 · your next move
+                    {t("nextAction.overline")}
                 </p>
 
                 <div className="grid gap-3">
@@ -231,10 +313,10 @@ export function NextActionPanel({
                             padding: 0,
                             marginLeft: "auto",
                         }}
-                        title="Hide for 24 hours"
-                        aria-label="Snooze next action"
+                        title={t("nextAction.snoozeTitle")}
+                        aria-label={t("nextAction.snoozeAriaLabel")}
                     >
-                        Not now
+                        {t("nextAction.notNow")}
                     </button>
                 </div>
             </div>

@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { render, screen, fireEvent, cleanup } from '@testing-library/react'
+import { screen, fireEvent, cleanup } from '@testing-library/react'
+import { renderWithIntl } from '@/app/lib/i18n/test-utils'
 import { LevelUpModal } from '../LevelUpModal'
 
 describe('LevelUpModal', () => {
@@ -9,7 +10,7 @@ describe('LevelUpModal', () => {
   })
 
   it('shows the level number and title', () => {
-    render(
+    renderWithIntl(
       <LevelUpModal
         level={2}
         levelTitle="Pizza Noob"
@@ -23,7 +24,7 @@ describe('LevelUpModal', () => {
   })
 
   it('shows the reward when greater than zero', () => {
-    render(
+    renderWithIntl(
       <LevelUpModal
         level={3}
         levelTitle={null}
@@ -35,14 +36,14 @@ describe('LevelUpModal', () => {
   })
 
   it('hides the reward block when reward is zero', () => {
-    render(
+    renderWithIntl(
       <LevelUpModal level={3} levelTitle={null} reward={0} onDismiss={() => {}} />,
     )
     expect(screen.queryByText(/\$PEP/i)).toBeNull()
   })
 
   it('uses "Final Level Reached" copy on level 8', () => {
-    render(
+    renderWithIntl(
       <LevelUpModal
         level={8}
         levelTitle="Don of Dons"
@@ -56,7 +57,7 @@ describe('LevelUpModal', () => {
 
   it('calls onDismiss when "Continue" is clicked', () => {
     const onDismiss = vi.fn()
-    render(
+    renderWithIntl(
       <LevelUpModal
         level={2}
         levelTitle="Pizza Noob"
@@ -70,7 +71,7 @@ describe('LevelUpModal', () => {
 
   it('calls onDismiss when the backdrop is clicked', () => {
     const onDismiss = vi.fn()
-    render(
+    renderWithIntl(
       <LevelUpModal
         level={2}
         levelTitle="Pizza Noob"

@@ -4,7 +4,10 @@
 // onboarding wizard's print-shop chrome: paper grain, radial cream spotlight,
 // overline label, and a tomato accent spinner. Functional shape is unchanged
 // (a centered viewport-height block with a CSS-driven spinner).
+import { useTranslations } from "next-intl";
+
 export default function DashboardLoading() {
+  const t = useTranslations("dashboard.loading");
   return (
     <div
       className="relative grid min-h-screen place-items-center"
@@ -26,7 +29,7 @@ export default function DashboardLoading() {
       />
 
       <div className="fade-up grid place-items-center text-center">
-        <p className="overline text-tomato">§ 00 · loading the file</p>
+        <p className="overline text-tomato">{t("overline")}</p>
 
         <div
           className="mt-6 grid h-14 w-14 place-items-center rounded-full"
@@ -55,10 +58,10 @@ export default function DashboardLoading() {
             textWrap: "balance",
           }}
         >
-          Pulling the ledger&hellip;
+          {t("headline")}
         </h1>
         <p className="ui mt-3 text-[12px] uppercase tracking-[0.24em] text-foreground/55">
-          The Family is gathering your record
+          {t("subline")}
         </p>
 
         <style>{`@keyframes dashSpin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>

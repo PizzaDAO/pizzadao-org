@@ -16,6 +16,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 import { ProfileCompleteCelebration } from "../../../ui/profile/ProfileCompleteCelebration";
 import type { ProfileCompletion } from "../lib/profile-completion";
 
@@ -45,6 +46,7 @@ export function ProfileCompleteCelebrationGate({
     completion: ProfileCompletion | null | undefined;
 }) {
     const [open, setOpen] = useState(false);
+    const tSteps = useTranslations("dashboard.steps");
     const attempted = useRef(false);
     const isComplete = !!completion?.isComplete;
 
@@ -83,7 +85,7 @@ export function ProfileCompleteCelebrationGate({
     if (!open || !completion) return null;
     return (
         <ProfileCompleteCelebration
-            stepLabels={completion.steps.map((s) => s.label)}
+            stepLabels={completion.steps.map((s) => tSteps(`${s.key}.label`))}
             profileHref={`/profile/${memberId}`}
             onDismiss={handleDismiss}
         />

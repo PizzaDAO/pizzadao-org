@@ -15,6 +15,7 @@
 
 import Link from "next/link";
 import { useCallback, useEffect, useId, useMemo, useRef, useSyncExternalStore } from "react";
+import { useTranslations } from "next-intl";
 
 export type ProfileCompleteCelebrationProps = {
   /** Steps shown as a ticked checklist, e.g. ["Join a crew", "Connect a wallet", "Connect X"]. */
@@ -65,6 +66,7 @@ export function ProfileCompleteCelebration({
   profileHref,
   onDismiss,
 }: ProfileCompleteCelebrationProps) {
+  const t = useTranslations("dashboard.celebrations.profile");
   const titleId = useId();
   const descId = useId();
   const cardRef = useRef<HTMLDivElement>(null);
@@ -202,7 +204,7 @@ export function ProfileCompleteCelebration({
             pointerEvents: "none",
           }}
         >
-          on file
+          {t("stamp")}
         </span>
 
         <div aria-hidden="true" style={{ fontSize: 56, lineHeight: 1, marginBottom: 10 }}>
@@ -212,7 +214,7 @@ export function ProfileCompleteCelebration({
           className="overline"
           style={{ color: "hsl(var(--tomato))", display: "block", marginBottom: 6 }}
         >
-          § Profile complete
+          {t("overline")}
         </span>
         <h2
           id={titleId}
@@ -226,7 +228,7 @@ export function ProfileCompleteCelebration({
             color: "hsl(var(--foreground))",
           }}
         >
-          You&rsquo;re all set up!
+          {t("headline")}
         </h2>
         <p
           id={descId}
@@ -237,12 +239,12 @@ export function ProfileCompleteCelebration({
             lineHeight: 1.5,
           }}
         >
-          Your file is complete — the Family can find you, vouch for you, and see your collection.
+          {t("body")}
         </p>
 
         {stepLabels.length > 0 && (
           <ul
-            aria-label="Completed steps"
+            aria-label={t("stepsAriaLabel")}
             style={{
               listStyle: "none",
               margin: "16px auto 0",
@@ -300,7 +302,7 @@ export function ProfileCompleteCelebration({
               boxShadow: "var(--shadow-soft)",
             }}
           >
-            Nice!
+            {t("nice")}
           </button>
           {profileHref && (
             <Link
@@ -309,7 +311,7 @@ export function ProfileCompleteCelebration({
               className="ui text-[12px] uppercase tracking-[0.22em] text-foreground/65 hover:text-tomato"
               style={{ textDecoration: "underline", textUnderlineOffset: 4, padding: 10 }}
             >
-              View your profile
+              {t("viewProfile")}
             </Link>
           )}
         </div>
