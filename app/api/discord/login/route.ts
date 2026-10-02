@@ -15,12 +15,16 @@ export async function GET(req: Request) {
   const url = new URL(req.url);
   const state = url.searchParams.get("state") || "";
   const returnTo = url.searchParams.get("return_to") || "";
+  // join=1 is the explicit second step for people who are NOT yet in the
+  // PizzaDAO Discord: only then do we ask Discord for guilds.join.
+  const join = url.searchParams.get("join") === "1";
 
   // Preview detection: redirect to production login
   if (isPreviewEnvironment() && !returnTo) {
     const productionLogin = new URL("/api/discord/login", getProductionOrigin());
     productionLogin.searchParams.set("return_to", url.origin);
     if (state) productionLogin.searchParams.set("state", state);
+    if (join) productionLogin.searchParams.set("join", "1");
     return NextResponse.redirect(productionLogin.toString());
   }
 
@@ -48,10 +52,13 @@ export async function GET(req: Request) {
   auth.searchParams.set("client_id", clientId);
   auth.searchParams.set("redirect_uri", redirectUri);
   auth.searchParams.set("response_type", "code");
-  auth.searchParams.set("scope", "identify guilds.join");
+  // Default login only identifies the user. guilds.join ("join servers for
+  // you") is requested only on the explicit join step.
+  auth.searchParams.set("scope", join ? "identify guilds.join" : "identify");
+  if (join) auth.searchParams.set("prompt", "consent");
   auth.searchParams.set(
     "state",
-    encodeOAuthState({ sessionId: state, return_to: returnTo || undefined, nonce }),
+    encodeOAuthState({ sessionId: state, return_to: returnTo || undefined, nonce, join }),
   );
 
   const res = NextResponse.redirect(auth.toString());

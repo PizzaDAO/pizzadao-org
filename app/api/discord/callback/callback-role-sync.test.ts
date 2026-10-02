@@ -42,7 +42,7 @@ function callbackRequest(url: string, cookie = "oauth_state=test-nonce") {
 }
 
 // We need to mock the fetch calls that the callback route makes internally
-// (exchangeCodeForToken, fetchDiscordMe, addUserToGuild, fetchGuildMember, checkExistingMember)
+// (exchangeCodeForToken, fetchDiscordMe, lookupGuildMembership, checkExistingMember)
 // Since these are internal to the route module, we mock global.fetch
 
 describe("Discord callback route - role sync integration", () => {
@@ -68,7 +68,7 @@ describe("Discord callback route - role sync integration", () => {
       json: async () => ({
         access_token: "mock-access-token",
         token_type: "Bearer",
-        scope: "identify guilds.join",
+        scope: "identify",
         expires_in: 604800,
       }),
     });
@@ -83,13 +83,7 @@ describe("Discord callback route - role sync integration", () => {
       }),
     });
 
-    // 3. addUserToGuild - PUT to guild members
-    fetchMock.mockResolvedValueOnce({
-      status: 204,
-      ok: true,
-    });
-
-    // 4. fetchGuildMember - GET guild member
+    // 3. lookupGuildMembership - GET guild member (already in the guild)
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -98,7 +92,7 @@ describe("Discord callback route - role sync integration", () => {
       }),
     });
 
-    // 5. checkExistingMember - direct sheet lookup
+    // 4. checkExistingMember - direct sheet lookup
     mockFetchMemberByDiscordId.mockResolvedValueOnce({ memberId: "42", name: "Test User" });
 
     global.fetch = fetchMock;
@@ -127,7 +121,7 @@ describe("Discord callback route - role sync integration", () => {
       json: async () => ({
         access_token: "mock-access-token",
         token_type: "Bearer",
-        scope: "identify guilds.join",
+        scope: "identify",
         expires_in: 604800,
       }),
     });
@@ -139,11 +133,6 @@ describe("Discord callback route - role sync integration", () => {
         username: "newuser",
         global_name: "New User",
       }),
-    });
-
-    fetchMock.mockResolvedValueOnce({
-      status: 204,
-      ok: true,
     });
 
     fetchMock.mockResolvedValueOnce({
@@ -183,7 +172,7 @@ describe("Discord callback route - role sync integration", () => {
       json: async () => ({
         access_token: "mock-access-token",
         token_type: "Bearer",
-        scope: "identify guilds.join",
+        scope: "identify",
         expires_in: 604800,
       }),
     });
@@ -194,11 +183,6 @@ describe("Discord callback route - role sync integration", () => {
         id: "discord-789",
         username: "erroruser",
       }),
-    });
-
-    fetchMock.mockResolvedValueOnce({
-      status: 204,
-      ok: true,
     });
 
     fetchMock.mockResolvedValueOnce({

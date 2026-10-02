@@ -104,6 +104,8 @@ export function verifyTransferToken(token: string): TransferPayload | null {
 //   - return_to: preview origin for the OAuth proxy flow (optional)
 //   - nonce:     random value that must match the httpOnly `oauth_state`
 //                cookie set by /api/discord/login (login-CSRF protection)
+//   - join:      true on the explicit "join the Discord" authorize request
+//                (the one that asks for the guilds.join scope)
 //
 // In the preview proxy flow both /api/discord/login?return_to=... and the
 // callback run on the production host, so the cookie is set and checked on
@@ -116,6 +118,7 @@ export interface OAuthState {
   sessionId: string;
   return_to?: string;
   nonce?: string;
+  join?: boolean;
 }
 
 export function generateOAuthNonce(): string {
@@ -138,6 +141,7 @@ export function encodeOAuthState(state: OAuthState): string {
   const payload: OAuthState = { sessionId: state.sessionId || "" };
   if (state.return_to) payload.return_to = state.return_to;
   if (state.nonce) payload.nonce = state.nonce;
+  if (state.join) payload.join = true;
   return Buffer.from(JSON.stringify(payload)).toString("base64url");
 }
 
@@ -150,6 +154,7 @@ export function decodeOAuthState(state: string): OAuthState {
         sessionId: String(decoded.sessionId ?? ""),
         return_to: typeof decoded.return_to === "string" ? decoded.return_to : undefined,
         nonce: typeof decoded.nonce === "string" ? decoded.nonce : undefined,
+        ...(decoded.join === true ? { join: true } : {}),
       };
     }
   } catch {

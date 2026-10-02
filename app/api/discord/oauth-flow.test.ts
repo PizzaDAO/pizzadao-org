@@ -153,3 +153,91 @@ describe("/api/discord/callback oauth_state verification", () => {
     expect(loc.searchParams.get("token")).toBeTruthy();
   });
 });
+
+describe("guild join flow (zucchini-21674)", () => {
+  function cb(state: Parameters<typeof encodeOAuthState>[0]) {
+    const encoded = encodeOAuthState({ ...state, nonce: "n1" });
+    const url = `${ORIGIN}/api/discord/callback?code=c&state=${encodeURIComponent(encoded)}`;
+    return callback(new Request(url, { headers: { cookie: "oauth_state=n1" } }));
+  }
+
+  it("default login requests only the identify scope", async () => {
+    const res = await login(new Request(`${ORIGIN}/api/discord/login`));
+    const auth = new URL(res.headers.get("location")!);
+    expect(auth.searchParams.get("scope")).toBe("identify");
+    expect(decodeOAuthState(auth.searchParams.get("state")!).join).toBeUndefined();
+  });
+
+  it("join=1 requests guilds.join explicitly and marks the state", async () => {
+    const res = await login(new Request(`${ORIGIN}/api/discord/login?join=1&state=sess`));
+    const auth = new URL(res.headers.get("location")!);
+    expect(auth.searchParams.get("scope")).toBe("identify guilds.join");
+    expect(auth.searchParams.get("prompt")).toBe("consent");
+    const state = decodeOAuthState(auth.searchParams.get("state")!);
+    expect(state.join).toBe(true);
+    expect(state.sessionId).toBe("sess");
+  });
+
+  it("existing guild members are logged in without any join step or PUT", async () => {
+    const calls = mockDiscord({ inGuild: true, scope: "identify" });
+    const res = await cb({ sessionId: "" });
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/dashboard/42`);
+    expect(calls.some((c) => c.startsWith("PUT "))).toBe(false);
+  });
+
+  it("non-members are sent to the explicit join step (no session yet)", async () => {
+    mockFetchMemberByDiscordId.mockResolvedValue(null);
+    const calls = mockDiscord({ inGuild: false, scope: "identify" });
+    const res = await cb({ sessionId: "sess-9" });
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.origin + loc.pathname).toBe(`${ORIGIN}/api/discord/login`);
+    expect(loc.searchParams.get("join")).toBe("1");
+    expect(loc.searchParams.get("state")).toBe("sess-9");
+    expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+    expect(calls.some((c) => c.startsWith("PUT "))).toBe(false);
+  });
+
+  it("join step keeps return_to for the preview proxy flow", async () => {
+    mockDiscord({ inGuild: false, scope: "identify" });
+    const returnTo = "https://onboarding-abc123xyz-pizza-dao.vercel.app";
+    const res = await cb({ sessionId: "", return_to: returnTo });
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.searchParams.get("join")).toBe("1");
+    expect(loc.searchParams.get("return_to")).toBe(returnTo);
+  });
+
+  it("join step with guilds.join adds the new member to the guild (onboarding)", async () => {
+    mockFetchMemberByDiscordId.mockResolvedValue(null);
+    let joined = false;
+    global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const u = String(input);
+      const method = init?.method ?? "GET";
+      if (u.endsWith("/oauth2/token")) return jsonRes({ access_token: "at", scope: "identify guilds.join" });
+      if (u.endsWith("/users/@me")) return jsonRes({ id: "u1", username: "user1" });
+      if (method === "PUT") {
+        expect(JSON.parse(String(init?.body))).toEqual({ access_token: "at" });
+        joined = true;
+        return { ok: true, status: 201, text: async (): Promise<string> => "" };
+      }
+      return joined ? jsonRes({ nick: "Fresh", roles: [] }) : jsonRes({ message: "Unknown Member" }, 404);
+    }) as unknown as typeof fetch;
+
+    const res = await cb({ sessionId: "sess-9", join: true });
+    expect(joined).toBe(true);
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.pathname).toBe("/");
+    expect(loc.searchParams.get("discordJoined")).toBe("1");
+    expect(loc.searchParams.get("discordNick")).toBe("Fresh");
+    expect(loc.searchParams.get("sessionId")).toBe("sess-9");
+    expect(cookieFrom(res, "pizzadao_session")).toBe("mock-session-token");
+  });
+
+  it("does not loop if the join step returns without guilds.join", async () => {
+    mockFetchMemberByDiscordId.mockResolvedValue(null);
+    mockDiscord({ inGuild: false, scope: "identify" });
+    const res = await cb({ sessionId: "", join: true });
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.pathname).toBe("/");
+    expect(loc.searchParams.get("discordJoined")).toBe("0");
+  });
+});

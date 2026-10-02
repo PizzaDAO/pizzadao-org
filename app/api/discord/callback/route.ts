@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
+import { lookupGuildMembership } from "@/app/lib/discord";
 
 export const runtime = "nodejs";
 
@@ -82,24 +83,6 @@ async function addUserToGuild(discordUserId: string, userAccessToken: string) {
 }
 
 
-interface GuildMember {
-  nick?: string;
-  user?: {
-    global_name?: string;
-    username: string;
-  };
-}
-
-async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
-  const guildId = process.env.DISCORD_GUILD_ID!;
-  const botToken = process.env.DISCORD_BOT_TOKEN!;
-  const r = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-    headers: { Authorization: `Bot ${botToken}` },
-  });
-  if (!r.ok) return null;
-  return await r.json();
-}
-
 // Check if user already has a member ID in the sheet (direct lib call, by Discord ID only)
 async function checkExistingMember(discordId: string): Promise<{ memberId?: string; name?: string } | null> {
   try {
@@ -123,7 +106,7 @@ export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const rawState = url.searchParams.get("state") || "";
-    const { return_to } = decodeOAuthState(rawState);
+    const { return_to, join: isJoinStep } = decodeOAuthState(rawState);
 
     // Handle OAuth errors (e.g. user clicked "Cancel" on Discord authorization screen)
     const oauthError = url.searchParams.get("error");
@@ -157,9 +140,29 @@ export async function GET(req: Request) {
     const token = await exchangeCodeForToken(code, redirectUri);
     const me = await fetchDiscordMe(token.access_token);
 
-    const joinResult = await addUserToGuild(me.id, token.access_token);
-    const guildMember = await fetchGuildMember(me.id);
+    // Guild membership. Login only asks for `identify`; people already in the
+    // PizzaDAO Discord are never asked to grant guilds.join. Non-members are
+    // sent through a second, explicit authorize step that requests it.
+    let membership = await lookupGuildMembership(me.id);
+    const grantedJoin = token.scope?.split(" ").includes("guilds.join");
 
+    let addedToGuild = false;
+    if (membership.status !== "member" && grantedJoin) {
+      addedToGuild = (await addUserToGuild(me.id, token.access_token)).joined;
+      membership = await lookupGuildMembership(me.id);
+    } else if (membership.status === "not_member") {
+      if (!isJoinStep) {
+        const joinUrl = new URL("/api/discord/login", url.origin);
+        joinUrl.searchParams.set("join", "1");
+        if (state) joinUrl.searchParams.set("state", state);
+        if (return_to && validateReturnTo(return_to)) joinUrl.searchParams.set("return_to", return_to);
+        return clearOAuthState(req, NextResponse.redirect(joinUrl.toString()));
+      }
+      // Join step came back without guilds.join: log in, but not joined.
+    }
+
+    const joined = membership.status === "member" || addedToGuild;
+    const guildMember = membership.status === "member" ? membership.member : null;
     const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
 
     // If this is a proxy flow (return_to exists), create transfer token
@@ -202,7 +205,7 @@ export async function GET(req: Request) {
       redirectUrl = new URL("/", url.origin);
       redirectUrl.searchParams.set("discordId", me.id);
       if (state) redirectUrl.searchParams.set("sessionId", state);
-      redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
+      redirectUrl.searchParams.set("discordJoined", joined ? "1" : "0");
       if (nick) redirectUrl.searchParams.set("discordNick", nick);
     }
 
