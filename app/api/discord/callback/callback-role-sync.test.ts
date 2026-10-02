@@ -26,11 +26,20 @@ vi.mock("@/app/lib/session", () => ({
 }));
 
 // Mock the oauth-proxy module
-vi.mock("@/app/lib/oauth-proxy", () => ({
-  decodeOAuthState: vi.fn().mockReturnValue({ sessionId: "", return_to: "" }),
-  validateReturnTo: vi.fn().mockReturnValue(false),
-  createTransferToken: vi.fn().mockReturnValue("mock-transfer-token"),
-}));
+vi.mock("@/app/lib/oauth-proxy", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/app/lib/oauth-proxy")>();
+  return {
+    ...actual,
+    decodeOAuthState: vi.fn().mockReturnValue({ sessionId: "", return_to: "", nonce: "test-nonce" }),
+    validateReturnTo: vi.fn().mockReturnValue(false),
+    createTransferToken: vi.fn().mockReturnValue("mock-transfer-token"),
+  };
+});
+
+// Callback requests carry the oauth_state cookie set by /api/discord/login.
+function callbackRequest(url: string, cookie = "oauth_state=test-nonce") {
+  return new Request(url, { headers: { cookie } });
+}
 
 // We need to mock the fetch calls that the callback route makes internally
 // (exchangeCodeForToken, fetchDiscordMe, addUserToGuild, fetchGuildMember, checkExistingMember)
@@ -98,7 +107,7 @@ describe("Discord callback route - role sync integration", () => {
     const { GET } = await import("./route");
 
     const url = "http://localhost:3000/api/discord/callback?code=test-code&state=test-state";
-    const req = new Request(url);
+    const req = callbackRequest(url);
     const response = await GET(req);
 
     // The response should be a redirect (302)
@@ -153,7 +162,7 @@ describe("Discord callback route - role sync integration", () => {
     const { GET } = await import("./route");
 
     const url = "http://localhost:3000/api/discord/callback?code=test-code&state=test-state";
-    const req = new Request(url);
+    const req = callbackRequest(url);
     const response = await GET(req);
 
     expect(response.status).toBe(307);
@@ -207,7 +216,7 @@ describe("Discord callback route - role sync integration", () => {
     const { GET } = await import("./route");
 
     const url = "http://localhost:3000/api/discord/callback?code=test-code&state=test-state";
-    const req = new Request(url);
+    const req = callbackRequest(url);
     const response = await GET(req);
 
     // Login should still succeed (redirect)

@@ -1,7 +1,15 @@
 // app/api/discord/callback/route.ts
 import { NextResponse } from "next/server";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
-import { decodeOAuthState, validateReturnTo, createTransferToken } from "@/app/lib/oauth-proxy";
+import {
+  decodeOAuthState,
+  validateReturnTo,
+  createTransferToken,
+  readCookie,
+  verifyOAuthNonce,
+  OAUTH_STATE_COOKIE,
+  oauthStateCookieOptions,
+} from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 
@@ -105,6 +113,12 @@ async function checkExistingMember(discordId: string): Promise<{ memberId?: stri
   }
 }
 
+/** The oauth_state nonce is single-use: expire it once the callback consumes it. */
+function clearOAuthState(req: Request, res: NextResponse): NextResponse {
+  res.cookies.set(OAUTH_STATE_COOKIE, "", { ...oauthStateCookieOptions(req), maxAge: 0 });
+  return res;
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
@@ -123,11 +137,20 @@ export async function GET(req: Request) {
     }
 
     const code = url.searchParams.get("code");
-    const { sessionId: state } = decodeOAuthState(rawState);
+    const { sessionId: state, nonce } = decodeOAuthState(rawState);
 
     // No code and no error — something unexpected; redirect home gracefully
     if (!code) {
       return NextResponse.redirect(new URL("/", url.origin).toString());
+    }
+
+    // Login-CSRF protection: the nonce in `state` must match the httpOnly
+    // cookie that /api/discord/login set in this browser.
+    if (!verifyOAuthNonce(readCookie(req, OAUTH_STATE_COOKIE), nonce)) {
+      return NextResponse.json(
+        { error: "Login session expired or invalid. Please try logging in again." },
+        { status: 400 }
+      );
     }
 
     const redirectUri = process.env.DISCORD_REDIRECT_URI || `${url.origin}/api/discord/callback`;
@@ -151,7 +174,7 @@ export async function GET(req: Request) {
 
       const transferUrl = new URL("/api/auth/session-transfer", return_to);
       transferUrl.searchParams.set("token", transferToken);
-      return NextResponse.redirect(transferUrl.toString());
+      return clearOAuthState(req, NextResponse.redirect(transferUrl.toString()));
     }
 
     // Create session token
@@ -188,7 +211,7 @@ export async function GET(req: Request) {
     const cookieOpts = getSessionCookieOptions(req);
     res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
 
-    return res;
+    return clearOAuthState(req, res);
   } catch (e: unknown) {
     return NextResponse.json({ error: (e as any)?.message || "Discord callback failed" }, { status: 500 });
   }
