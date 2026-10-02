@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { kv } from "@vercel/kv";
 import { checkSecret } from "@/app/lib/auth-guards";
 import { invalidateMembersCache } from "@/app/lib/sheets/member-repository";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -90,6 +91,6 @@ export async function POST(req: Request) {
       keys: deletedKeys
     });
   } catch (err: any) {
-    return NextResponse.json({ error: String(err?.message ?? "Unknown error") }, { status: 500 });
+    return internalError(err, "cache-invalidate", "Cache invalidation failed");
   }
 }

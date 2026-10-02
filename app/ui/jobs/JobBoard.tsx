@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { JobCard } from "./JobCard";
 import { card, btn } from "../shared-styles";
+import { useSession } from "@/app/lib/hooks/use-session";
 
 type Job = {
   id: number;
@@ -32,6 +33,9 @@ type JobBoardProps = {
 };
 
 export function JobBoard({ onJobCompleted }: JobBoardProps) {
+  // Reset is admin-only server-side; only show the button to admins.
+  const { data: session } = useSession();
+  const isAdmin = session?.isAdmin === true;
   const [jobs, setJobs] = useState<Job[]>([]);
   const [resetAt, setResetAt] = useState<Date | null>(null);
   const [countdown, setCountdown] = useState<string>("");
@@ -171,6 +175,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
                 {countdown}
               </span>
             </div>
+            {isAdmin && (
             <button
               onClick={async () => {
                 if (!confirm("Reset all job completions for today?")) return;
@@ -191,6 +196,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
             >
               ↻
             </button>
+            )}
           </div>
         </div>
 

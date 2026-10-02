@@ -7,7 +7,9 @@
 //   • Empty state uses display heading + handwritten margin note
 // Same props, same data shape, same view-mode toggle.
 
+import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import ArticleCard, { type ArticleCardData, formatDate } from "./ArticleCard";
 import TagBadge from "./TagBadge";
 
@@ -68,12 +70,14 @@ function ArticleListRow({ article }: { article: ArticleCardData }) {
       style={{ boxShadow: "var(--shadow-soft)" }}
     >
       {imageUrl && (
-        <div className="w-20 h-14 rounded-md overflow-hidden flex-shrink-0 bg-[hsl(var(--ink)/0.04)] dark:bg-[hsl(var(--cream)/0.04)] border border-[hsl(var(--rule-warm)/0.45)]">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+        <div className="relative w-20 h-14 rounded-md overflow-hidden flex-shrink-0 bg-[hsl(var(--ink)/0.04)] dark:bg-[hsl(var(--cream)/0.04)] border border-[hsl(var(--rule-warm)/0.45)]">
+          <Image
             src={imageUrl}
             alt=""
-            className="w-full h-full object-cover block"
+            fill
+            sizes="80px"
+            unoptimized={!isOptimizableImage(imageUrl)}
+            className="object-cover block"
             onError={(e) => {
               (e.target as HTMLImageElement).parentElement!.style.display = "none";
             }}

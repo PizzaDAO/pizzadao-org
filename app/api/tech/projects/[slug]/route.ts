@@ -3,6 +3,7 @@ import { fetchProjectDetail } from '@/app/lib/projects/github'
 import { getCached, setCache, getCacheMetadata, CACHE_KEYS } from '@/app/lib/projects/cache'
 import type { ProjectDetail, ProjectsConfig } from '@/app/lib/projects/types'
 import projectsConfigJson from '@/data/projects-config.json'
+import { internalError } from '@/app/lib/errors/error-response'
 
 const projectsConfig = projectsConfigJson as ProjectsConfig
 
@@ -82,9 +83,6 @@ export async function GET(
       })
     }
 
-    return NextResponse.json(
-      { error: 'Failed to fetch project', message: (error as Error).message },
-      { status: 500 }
-    )
+    return internalError(error, 'tech/projects/[slug]', 'Failed to fetch project')
   }
 }

@@ -19,6 +19,7 @@
 import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
+import { useLocale, useTranslations } from "next-intl";
 
 // ── Item shapes ──────────────────────────────────────────────────────────
 
@@ -27,6 +28,7 @@ export type DiscoverBounty = {
     description: string;
     reward: number;
     status: "OPEN" | "CLAIMED";
+    crew?: string | null;
 };
 
 export type DiscoverJob = {
@@ -59,11 +61,12 @@ export type DiscoverProps = {
 
 type TabKey = "bounties" | "jobs" | "articles" | "calls";
 
-const TABS: Array<{ key: TabKey; label: string; viewAllHref: string }> = [
-    { key: "bounties", label: "Bounties", viewAllHref: "/pep" },
-    { key: "jobs", label: "Jobs", viewAllHref: "/pep" },
-    { key: "articles", label: "Articles", viewAllHref: "/articles" },
-    { key: "calls", label: "Calls", viewAllHref: "/calls" },
+// Tab labels come from the `dashboard.discover.tabs.<key>` catalog.
+const TABS: Array<{ key: TabKey; viewAllHref: string }> = [
+    { key: "bounties", viewAllHref: "/pep" },
+    { key: "jobs", viewAllHref: "/pep" },
+    { key: "articles", viewAllHref: "/articles" },
+    { key: "calls", viewAllHref: "/calls" },
 ];
 
 // ── Style helpers ────────────────────────────────────────────────────────
@@ -140,14 +143,15 @@ function pill(kind: "open" | "claimed"): React.CSSProperties {
 // ── Item renderers ───────────────────────────────────────────────────────
 
 function BountyItem({ b }: { b: DiscoverBounty }) {
+    const t = useTranslations("dashboard.discover");
     const isOpen = b.status === "OPEN";
     const pillStyle = isOpen ? pill("open") : pill("claimed");
-    const pillLabel = isOpen ? "Open" : "Claimed";
+    const pillLabel = isOpen ? t("status.open") : t("status.claimed");
     return (
         <Link
             href={`/pep`}
             style={previewCard()}
-            aria-label={`Bounty: ${b.description}`}
+            aria-label={t("bountyAriaLabel", { description: b.description })}
             className="paper-soft group"
         >
             <div
@@ -183,20 +187,34 @@ function BountyItem({ b }: { b: DiscoverBounty }) {
                     letterSpacing: "-0.01em",
                 }}
             >
-                {b.reward.toLocaleString()} PEP
+                {t("reward", { amount: b.reward })}
             </div>
+            {b.crew && (
+                <div
+                    className="ui"
+                    style={{
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.22em",
+                        color: "hsl(var(--muted-foreground))",
+                    }}
+                >
+                    {b.crew}
+                </div>
+            )}
         </Link>
     );
 }
 
 function JobItem({ j }: { j: DiscoverJob }) {
+    const t = useTranslations("dashboard.discover");
     const pillStyle = j.completed ? pill("claimed") : pill("open");
-    const pillLabel = j.completed ? "Done" : "Open";
+    const pillLabel = j.completed ? t("status.done") : t("status.open");
     return (
         <Link
             href={`/pep`}
             style={previewCard()}
-            aria-label={`Job: ${j.description}`}
+            aria-label={t("jobAriaLabel", { description: j.description })}
             className="paper-soft group"
         >
             <div
@@ -241,8 +259,10 @@ function JobItem({ j }: { j: DiscoverJob }) {
 }
 
 function ArticleItem({ a }: { a: DiscoverArticle }) {
+    const t = useTranslations("dashboard.discover");
+    const locale = useLocale();
     const publishedLabel = a.publishedAt
-        ? new Date(a.publishedAt).toLocaleDateString(undefined, {
+        ? new Date(a.publishedAt).toLocaleDateString(locale, {
               month: "short",
               day: "numeric",
               year: "numeric",
@@ -252,7 +272,7 @@ function ArticleItem({ a }: { a: DiscoverArticle }) {
         <Link
             href={`/articles/${a.slug}`}
             style={previewCard()}
-            aria-label={`Article: ${a.title}`}
+            aria-label={t("articleAriaLabel", { title: a.title })}
             className="paper-soft group"
         >
             <div
@@ -283,7 +303,7 @@ function ArticleItem({ a }: { a: DiscoverArticle }) {
                     letterSpacing: "0.22em",
                 }}
             >
-                {a.authorName && <span>by {a.authorName}</span>}
+                {a.authorName && <span>{t("byAuthor", { author: a.authorName })}</span>}
                 {a.authorName && publishedLabel && <span aria-hidden>·</span>}
                 {publishedLabel && <span>{publishedLabel}</span>}
             </div>
@@ -292,12 +312,17 @@ function ArticleItem({ a }: { a: DiscoverArticle }) {
 }
 
 function CallItem({ c }: { c: DiscoverCall }) {
+    const t = useTranslations("dashboard.discover");
+    const locale = useLocale();
     const dateLabel = (() => {
         try {
-            return new Date(`${c.date}T00:00:00Z`).toLocaleDateString(undefined, {
+            // `date` is a calendar date (YYYY-MM-DD) — format it in UTC so
+            // viewers west of Greenwich don't see the previous day.
+            return new Date(`${c.date}T00:00:00Z`).toLocaleDateString(locale, {
                 weekday: "short",
                 month: "short",
                 day: "numeric",
+                timeZone: "UTC",
             });
         } catch {
             return c.date;
@@ -307,7 +332,7 @@ function CallItem({ c }: { c: DiscoverCall }) {
         <Link
             href={`/crews`}
             style={previewCard()}
-            aria-label={`Call: ${c.crewLabel} on ${dateLabel}`}
+            aria-label={t("callAriaLabel", { crew: c.crewLabel, date: dateLabel })}
             className="paper-soft group"
         >
             <div
@@ -339,12 +364,7 @@ function CallItem({ c }: { c: DiscoverCall }) {
 // ── Empty state ──────────────────────────────────────────────────────────
 
 function EmptyState({ kind }: { kind: TabKey }) {
-    const copy: Record<TabKey, string> = {
-        bounties: "No open bounties right now. Check back soon.",
-        jobs: "No jobs available today. Reset is daily.",
-        articles: "No published articles yet.",
-        calls: "No upcoming calls this week.",
-    };
+    const t = useTranslations("dashboard.discover");
     return (
         <div
             className="paper-soft relative rounded-2xl border px-5 py-6 text-center"
@@ -355,13 +375,13 @@ function EmptyState({ kind }: { kind: TabKey }) {
             }}
         >
             <span className="handwritten text-tomato" style={{ fontSize: 17 }}>
-                — empty —
+                {t("emptyMark")}
             </span>
             <p
                 className="ui relative mt-2 text-[11px] uppercase tracking-[0.22em]"
                 style={{ margin: 0, color: "hsl(var(--foreground) / 0.55)" }}
             >
-                {copy[kind]}
+                {t(`empty.${kind}`)}
             </p>
         </div>
     );
@@ -375,6 +395,7 @@ export function Discover({
     articles = [],
     calls = [],
 }: DiscoverProps) {
+    const t = useTranslations("dashboard.discover");
     const [active, setActive] = useState<TabKey>("bounties");
 
     const counts: Record<TabKey, number> = {
@@ -385,13 +406,13 @@ export function Discover({
     };
 
     const viewAllHref =
-        TABS.find((t) => t.key === active)?.viewAllHref ?? "/pep";
+        TABS.find((tab) => tab.key === active)?.viewAllHref ?? "/pep";
 
     return (
         <section
             data-testid="discover"
             data-active={active}
-            aria-label="Discover"
+            aria-label={t("ariaLabel")}
             className="rule-warm relative pt-6"
             style={{
                 display: "flex",
@@ -409,7 +430,7 @@ export function Discover({
                 }}
             >
                 <div>
-                    <p className="overline text-tomato">§ 03 · discover</p>
+                    <p className="overline text-tomato">{t("overline")}</p>
                     <h3
                         className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                         style={{
@@ -418,7 +439,7 @@ export function Discover({
                             lineHeight: 1,
                         }}
                     >
-                        What&apos;s on the wall
+                        {t("headline")}
                     </h3>
                 </div>
                 <Link
@@ -426,7 +447,7 @@ export function Discover({
                     className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
                     style={{ textDecoration: "none", fontWeight: 600 }}
                 >
-                    View all
+                    {t("viewAll")}
                     <ArrowUpRight className="h-3 w-3" />
                 </Link>
             </div>
@@ -434,21 +455,21 @@ export function Discover({
             {/* Chips */}
             <div
                 role="tablist"
-                aria-label="Discover categories"
+                aria-label={t("tablistAriaLabel")}
                 style={{ display: "flex", flexWrap: "wrap", gap: 8 }}
             >
-                {TABS.map((t) => {
-                    const isActive = active === t.key;
+                {TABS.map((tab) => {
+                    const isActive = active === tab.key;
                     return (
                         <button
-                            key={t.key}
+                            key={tab.key}
                             role="tab"
                             aria-selected={isActive}
-                            aria-controls={`discover-panel-${t.key}`}
-                            onClick={() => setActive(t.key)}
+                            aria-controls={`discover-panel-${tab.key}`}
+                            onClick={() => setActive(tab.key)}
                             style={chip(isActive)}
                         >
-                            {t.label}
+                            {t(`tabs.${tab.key}`)}
                             <span
                                 style={{
                                     opacity: 0.7,
@@ -456,7 +477,7 @@ export function Discover({
                                     letterSpacing: "normal",
                                 }}
                             >
-                                {counts[t.key]}
+                                {counts[tab.key]}
                             </span>
                         </button>
                     );

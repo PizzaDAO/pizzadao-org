@@ -273,12 +273,13 @@ export async function GET() {
 
     return NextResponse.json(data, { headers: cacheHeaders });
   } catch (error) {
+    console.error("[nfts/leaderboard]", error);
     return NextResponse.json(
       {
         collections: [],
         lastUpdated: Date.now(),
         cached: false,
-        error: error instanceof Error ? error.message : "Unknown error",
+        error: "Failed to load NFT leaderboard",
       },
       { status: 500 }
     );

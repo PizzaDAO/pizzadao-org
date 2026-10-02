@@ -4,6 +4,7 @@ import { cacheDel } from '@/app/api/lib/cache'
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { fetchGviz } from '@/app/lib/sheets/gviz'
 import { norm } from '@/app/lib/strings'
+import { internalError } from '@/app/lib/errors/error-response'
 
 /**
  * Crew sheets are edited during calls, so they get a shorter data-cache window
@@ -413,9 +414,6 @@ export async function GET(req: Request, { params }: Params) {
       ...(taskDebugInfo || agendaDebugInfo ? { _debug: { tasks: taskDebugInfo, agenda: agendaDebugInfo } } : {}),
     }, { headers: cacheHeaders })
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: e instanceof Error ? (e as any)?.message : 'Failed to load crew data' },
-      { status: 500 }
-    )
+    return internalError(e, 'crew', 'Failed to load crew data')
   }
 }

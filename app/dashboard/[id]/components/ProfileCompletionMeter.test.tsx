@@ -1,7 +1,8 @@
 // app/dashboard/[id]/components/ProfileCompletionMeter.test.tsx
 import React from "react";
 import { describe, it, expect, afterEach } from "vitest";
-import { render, screen, cleanup } from "@testing-library/react";
+import { screen, cleanup } from "@testing-library/react";
+import { renderWithIntl } from "@/app/lib/i18n/test-utils";
 import { ProfileCompletionMeter } from "./ProfileCompletionMeter";
 import { getProfileCompletion } from "../lib/profile-completion";
 
@@ -14,7 +15,7 @@ describe("ProfileCompletionMeter", () => {
             wallets: { count: 0 },
             x: { connected: false },
         });
-        render(<ProfileCompletionMeter completion={completion} />);
+        renderWithIntl(<ProfileCompletionMeter completion={completion} />);
         expect(screen.getByText(/1 of 3 done/)).toBeTruthy();
         const bar = screen.getByRole("progressbar", { name: "Profile setup" });
         expect(bar.getAttribute("aria-valuenow")).toBe("1");
@@ -29,7 +30,7 @@ describe("ProfileCompletionMeter", () => {
             wallets: { count: 1 },
             x: { connected: false },
         });
-        render(<ProfileCompletionMeter completion={completion} />);
+        renderWithIntl(<ProfileCompletionMeter completion={completion} />);
         const link = screen.getByRole("link", { name: /Next: Connect X/ });
         expect(link.getAttribute("href")).toBe("/api/x/login?memberId=42");
     });
@@ -40,12 +41,12 @@ describe("ProfileCompletionMeter", () => {
             wallets: { count: 1 },
             x: { connected: true },
         });
-        const { container } = render(<ProfileCompletionMeter completion={completion} />);
+        const { container } = renderWithIntl(<ProfileCompletionMeter completion={completion} />);
         expect(container.innerHTML).toBe("");
     });
 
     it("renders nothing while the summary is loading", () => {
-        const { container } = render(<ProfileCompletionMeter completion={undefined} />);
+        const { container } = renderWithIntl(<ProfileCompletionMeter completion={undefined} />);
         expect(container.innerHTML).toBe("");
     });
 });

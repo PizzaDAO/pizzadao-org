@@ -393,6 +393,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           city: data.city,
           cityRegion: data.cityRegion,
           cityCountryCode: data.cityCountryCode,
+          timezone: data.timezone,
           turtle: data.turtles.join(", "),
           turtles: data.turtles,
           crews: data.crews,
@@ -783,6 +784,14 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 ...p,
                 cityRegion: region ?? undefined,
                 cityCountryCode: countryCode ?? undefined,
+              }))
+            }
+            timezoneLabel={data.timezoneLabel}
+            onTimezoneResolved={(timezone, timezoneLabel) =>
+              setData((p) => ({
+                ...p,
+                timezone: timezone ?? undefined,
+                timezoneLabel: timezoneLabel ?? undefined,
               }))
             }
             onNext={() => goToStep(3)}

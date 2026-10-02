@@ -24,6 +24,7 @@ import {
     XCircle,
     type LucideIcon,
 } from "lucide-react";
+import { useTranslations } from "next-intl";
 import type { ActivityEvent, ActivityKind } from "../lib/activity-types";
 
 const ICONS: Record<ActivityKind, LucideIcon> = {
@@ -37,25 +38,29 @@ const ICONS: Record<ActivityKind, LucideIcon> = {
     notification: Bell,
 };
 
+type TimeTranslator = ReturnType<typeof useTranslations<"dashboard.activity.time">>;
+
 // Tiny relative-time formatter — avoids pulling in date-fns just for this.
-function relativeTime(iso: string, now = Date.now()): string {
-    const t = Date.parse(iso);
-    if (Number.isNaN(t)) return "";
-    const delta = Math.max(0, now - t);
+// Keeps the compact "5m ago" look; the per-locale wording lives in the
+// `dashboard.activity.time` catalog.
+function relativeTime(iso: string, tTime: TimeTranslator, now = Date.now()): string {
+    const at = Date.parse(iso);
+    if (Number.isNaN(at)) return "";
+    const delta = Math.max(0, now - at);
     const minutes = Math.floor(delta / 60_000);
-    if (minutes < 1) return "just now";
-    if (minutes < 60) return `${minutes}m ago`;
+    if (minutes < 1) return tTime("justNow");
+    if (minutes < 60) return tTime("minutes", { count: minutes });
     const hours = Math.floor(minutes / 60);
-    if (hours < 24) return `${hours}h ago`;
+    if (hours < 24) return tTime("hours", { count: hours });
     const days = Math.floor(hours / 24);
-    if (days === 1) return "yesterday";
-    if (days < 7) return `${days}d ago`;
+    if (days === 1) return tTime("yesterday");
+    if (days < 7) return tTime("days", { count: days });
     const weeks = Math.floor(days / 7);
-    if (weeks < 4) return `${weeks}w ago`;
+    if (weeks < 4) return tTime("weeks", { count: weeks });
     const months = Math.floor(days / 30);
-    if (months < 12) return `${months}mo ago`;
+    if (months < 12) return tTime("months", { count: months });
     const years = Math.floor(days / 365);
-    return `${years}y ago`;
+    return tTime("years", { count: years });
 }
 
 export type RecentActivityProps = {
@@ -63,9 +68,11 @@ export type RecentActivityProps = {
 };
 
 export function RecentActivity({ events }: RecentActivityProps) {
+    const t = useTranslations("dashboard.activity");
+    const tTime = useTranslations("dashboard.activity.time");
     return (
         <section className="rule-warm relative pt-6">
-            <p className="overline text-tomato">§ 05 · the ledger</p>
+            <p className="overline text-tomato">{t("overline")}</p>
             <h3
                 className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                 style={{
@@ -74,7 +81,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
                     lineHeight: 1,
                 }}
             >
-                What changed since you stepped out
+                {t("headline")}
             </h3>
 
             {events.length === 0 ? (
@@ -89,7 +96,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
                         className="handwritten text-tomato"
                         style={{ fontSize: 17 }}
                     >
-                        — quiet for now —
+                        {t("emptyMark")}
                     </span>
                     <p
                         className="ui mt-2"
@@ -101,7 +108,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
                             color: "hsl(var(--foreground) / 0.55)",
                         }}
                     >
-                        Activity will show up here as you participate.
+                        {t("empty")}
                     </p>
                 </div>
             ) : (
@@ -195,7 +202,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
                                         }}
                                         title={event.at}
                                     >
-                                        {relativeTime(event.at)}
+                                        {relativeTime(event.at, tTime)}
                                     </span>
                                 </div>
                             </li>

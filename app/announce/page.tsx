@@ -1,11 +1,22 @@
 "use client";
 
 import { useState } from "react";
+import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/app/lib/hooks/use-session";
-import { ANNOUNCE_ALLOWED_DISCORD_IDS } from "@/app/ui/constants";
 
 export default function AnnouncePage() {
   const { data: session, isLoading } = useSession();
+  // Access is decided server-side (Discord role check); the page only asks.
+  const { data: access, isLoading: accessLoading } = useQuery<{ allowed: boolean }>({
+    queryKey: ["announce-access", session?.discordId],
+    enabled: Boolean(session?.authenticated),
+    queryFn: async () => {
+      const res = await fetch("/api/announce");
+      if (!res.ok) return { allowed: false };
+      return res.json();
+    },
+    retry: false,
+  });
 
   const [confirming, setConfirming] = useState(false);
   const [firing, setFiring] = useState(false);
@@ -32,7 +43,7 @@ export default function AnnouncePage() {
     }
   }
 
-  if (isLoading) {
+  if (isLoading || (session?.authenticated && accessLoading)) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <p className="text-gray-600">Loading...</p>
@@ -62,9 +73,8 @@ export default function AnnouncePage() {
     );
   }
 
-  // Logged in but not allowlisted (UI convenience; the route re-checks).
-  const allowed = ANNOUNCE_ALLOWED_DISCORD_IDS.includes(session.discordId);
-  if (!allowed) {
+  // Logged in but without an announce role (the POST route re-checks).
+  if (!access?.allowed) {
     return (
       <div className="min-h-screen bg-gray-100 flex items-center justify-center">
         <div className="bg-white p-6 rounded-lg shadow max-w-md text-center">
@@ -88,13 +98,14 @@ export default function AnnouncePage() {
             Fire PizzaDAO Crew Announcement
           </h1>
           <p className="text-gray-600 mb-2">
-            This fires the full PizzaDAO Crew announcement. When you click, it will:
+            This sends the Community Call announcement built from the
+            &quot;Sunday&apos;s Specials&quot; (To Do / Redo rows) on the Crew
+            sheet. When you click, it will:
           </p>
           <ul className="list-disc list-inside text-sm text-gray-600 mb-6 space-y-1">
-            <li>Post to Discord #general, #band, and #crew</li>
-            <li>Start the Discord event</li>
-            <li>Post the tweet</li>
-            <li>Take attendance</li>
+            <li>Post to the Discord announcements channel (@everyone)</li>
+            <li>Post to Telegram, if configured</li>
+            <li>Update Announce? / Last Sent / Last Error on the sheet</li>
           </ul>
 
           {success ? (

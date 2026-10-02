@@ -1,6 +1,18 @@
 "use client";
 
+// Editorial restyle: § overline masthead, paper-soft search strip and
+// press-clipping event rows. Fetching and search are unchanged.
+
 import { useEffect, useState } from "react";
+import Image from "next/image";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
+import {
+  EditorialMasthead,
+  EditorialPage,
+  EmptyState,
+  paperCard,
+  pillInk,
+} from "@/app/ui/shared/Editorial";
 
 interface POAPEvent {
   id: string;
@@ -39,19 +51,26 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
   const [expanded, setExpanded] = useState(false);
 
   return (
-    <div className="p-3 bg-card rounded-[var(--radius)] border border-rule hover:border-tomato hover:shadow-md transition-all duration-200">
+    <div
+      className={`${paperCard} p-3 sm:p-4 hover:border-[hsl(var(--tomato)/0.6)] transition-colors duration-200`}
+      style={{ boxShadow: "var(--shadow-soft)" }}
+    >
       <div className="flex gap-3 items-center">
         {/* POAP Image - links to gallery */}
         <a
           href={`https://poap.gallery/event/${event.id}`}
           target="_blank"
           rel="noopener noreferrer"
-          className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-muted block border border-rule"
+          className="w-14 h-14 rounded-full overflow-hidden flex-shrink-0 bg-muted block border border-[hsl(var(--rule-warm)/0.65)]"
         >
           {event.imageUrl ? (
-            <img
+            <Image
               src={event.imageUrl}
               alt={event.name}
+              width={56}
+              height={56}
+              sizes="56px"
+              unoptimized={!isOptimizableImage(event.imageUrl)}
               className="w-full h-full object-cover"
             />
           ) : (
@@ -67,12 +86,12 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
             href={`https://poap.gallery/event/${event.id}`}
             target="_blank"
             rel="noopener noreferrer"
-            className="font-display text-base font-semibold text-foreground hover:text-tomato no-underline transition-colors line-clamp-2 leading-tight"
+            className="font-display text-base sm:text-lg font-black tracking-tight text-foreground hover:text-tomato no-underline transition-colors line-clamp-2 leading-tight"
           >
             {event.name}
           </a>
 
-          <div className="mt-1 text-[13px] text-muted-foreground">
+          <div className="overline mt-1.5 text-foreground/55" style={{ fontSize: 10 }}>
             {event.startDate && <span>{formatDate(event.startDate)}</span>}
             {event.city && (
               <span className="ml-2">
@@ -87,7 +106,7 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
         {event.description && (
           <button
             onClick={() => setExpanded(!expanded)}
-            className={`w-9 h-9 rounded-full border border-rule text-muted-foreground hover:border-tomato hover:text-tomato text-base cursor-pointer flex items-center justify-center flex-shrink-0 transition-colors font-display font-semibold ${
+            className={`w-9 h-9 rounded-full border border-[hsl(var(--rule-warm)/0.65)] text-muted-foreground hover:border-tomato hover:text-tomato text-base cursor-pointer flex items-center justify-center flex-shrink-0 transition-colors font-display font-semibold ${
               expanded ? "bg-muted" : "bg-background"
             }`}
             aria-label={expanded ? "Hide description" : "Show description"}
@@ -99,7 +118,7 @@ function POAPEventCard({ event }: { event: POAPEvent }) {
 
       {/* Expanded description */}
       {expanded && event.description && (
-        <p className="mt-3 pt-3 border-t border-rule text-sm text-muted-foreground leading-relaxed">
+        <p className="rule-warm mt-3 mb-0 pt-3 text-sm text-foreground/70 leading-relaxed">
           {event.description}
         </p>
       )}
@@ -143,83 +162,78 @@ export default function POAPsPage() {
   });
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-5 py-10">
-      <div className="max-w-3xl mx-auto">
-        {/* Header */}
-        <div className="mb-6">
-          <h1 className="font-display mt-2 mb-1 text-4xl font-extrabold tracking-tight text-foreground">
-            POAPs
-          </h1>
-          {!loading && data && (
-            <p className="m-0 text-sm text-muted-foreground">
-              {data.totalCount} whitelisted event{data.totalCount === 1 ? "" : "s"}
-            </p>
-          )}
-        </div>
+    <EditorialPage width="max-w-3xl">
+      <EditorialMasthead
+        overline="The POAPs"
+        title={
+          <>
+            Proof we <span className="text-tomato underline-scribble">showed up</span>
+          </>
+        }
+        dek={
+          !loading && data
+            ? `${data.totalCount} whitelisted event${data.totalCount === 1 ? "" : "s"}.`
+            : "Whitelisted PizzaDAO POAP events."
+        }
+      />
 
-        {/* Search */}
-        <div className="mb-6">
+      {/* Search */}
+      <div className={`${paperCard} print-noise mb-8 p-4 sm:p-5`}>
+        <div className="relative">
+          <span aria-hidden className="overline absolute left-3 top-2 text-foreground/40" style={{ fontSize: 9 }}>
+            Search
+          </span>
           <input
             type="text"
-            placeholder="Search POAPs..."
+            placeholder="Find a POAP…"
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
-            className="w-full px-4 py-3 text-sm rounded-[var(--radius)] border border-rule bg-card text-foreground outline-none focus:border-tomato focus:shadow-[0_0_0_3px_hsl(var(--tomato)/0.15)] transition-all"
+            className="w-full min-h-11 pt-6 pb-2 px-3 text-base sm:text-sm rounded-[var(--radius)] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule-warm)/0.55)] outline-none focus:border-[hsl(var(--tomato))] focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
           />
         </div>
-
-        {/* Loading state */}
-        {loading && (
-          <div className="grid gap-3">
-            {[1, 2, 3, 4, 5].map((i) => (
-              <div
-                key={i}
-                className="h-[88px] rounded-[var(--radius)] border border-rule bg-card animate-pulse"
-              />
-            ))}
-          </div>
-        )}
-
-        {/* Error state */}
-        {!loading && error && (
-          <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
-            <p className="text-base text-destructive italic mb-4">{error}</p>
-            <button
-              onClick={() => window.location.reload()}
-              className="px-5 py-3 min-h-[44px] text-sm font-display font-semibold rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-tomato hover:text-cream border-0 cursor-pointer transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {/* Events list */}
-        {!loading && !error && data && (
-          <>
-            {filteredEvents && filteredEvents.length === 0 ? (
-              <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
-                <p className="text-base text-muted-foreground italic">
-                  {searchQuery
-                    ? "No POAPs match your search."
-                    : "No whitelisted POAPs found."}
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-3">
-                {filteredEvents?.map((event) => (
-                  <POAPEventCard key={event.id} event={event} />
-                ))}
-              </div>
-            )}
-
-            {searchQuery && filteredEvents && filteredEvents.length > 0 && (
-              <p className="mt-4 text-center text-[13px] text-muted-foreground italic">
-                Showing {filteredEvents.length} of {data.totalCount} POAPs
-              </p>
-            )}
-          </>
-        )}
       </div>
-    </div>
+
+      {/* Loading state */}
+      {loading && (
+        <div className="grid gap-3">
+          {[1, 2, 3, 4, 5].map((i) => (
+            <div key={i} className={`${paperCard} h-[88px] animate-pulse`} />
+          ))}
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
+          <p className="text-base text-destructive m-0">{error}</p>
+          <button type="button" onClick={() => window.location.reload()} className={pillInk}>
+            Try again
+          </button>
+        </div>
+      )}
+
+      {/* Events list */}
+      {!loading && !error && data && (
+        <>
+          {filteredEvents && filteredEvents.length === 0 ? (
+            <EmptyState
+              title={searchQuery ? "No POAPs match your search." : "No whitelisted POAPs found."}
+            />
+          ) : (
+            <div className="grid gap-3">
+              {filteredEvents?.map((event) => (
+                <POAPEventCard key={event.id} event={event} />
+              ))}
+            </div>
+          )}
+
+          {searchQuery && filteredEvents && filteredEvents.length > 0 && (
+            <p className="overline mt-6 text-center text-foreground/55">
+              Showing {filteredEvents.length} of {data.totalCount} POAPs
+            </p>
+          )}
+        </>
+      )}
+    </EditorialPage>
   );
 }

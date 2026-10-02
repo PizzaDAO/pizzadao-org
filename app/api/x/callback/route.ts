@@ -4,6 +4,7 @@ import { verifyXState, encryptToken } from "@/app/lib/x-oauth";
 import { prisma } from "@/app/lib/db";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -140,7 +141,6 @@ export async function GET(req: Request) {
     res.cookies.delete("x_pkce_verifier");
     return res;
   } catch (e: unknown) {
-    console.error("X OAuth callback error:", e);
-    return NextResponse.json({ error: (e as any)?.message || "X OAuth failed" }, { status: 500 });
+    return internalError(e, "x/callback", "X account linking failed. Please try again.");
   }
 }

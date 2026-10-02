@@ -4,6 +4,18 @@ import { useEffect, useMemo, useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { useSession } from "@/app/lib/hooks/use-session";
+import {
+  EditorialMasthead,
+  EditorialPage,
+  EmptyState,
+  FilterChip,
+  LoadingLine,
+  paperCard,
+} from "@/app/ui/shared/Editorial";
+
+// Editorial restyle: § masthead, paper-soft search strip and city cards on
+// the semantic HSL tokens (was legacy --color-* vars). Auth gate, search
+// debounce and region filter unchanged.
 
 interface CityChatListItem {
   slug: string;
@@ -106,20 +118,9 @@ export default function ChatsPage() {
   // While checking auth, show a loading state. Render nothing if unauthenticated.
   if (isLoading) {
     return (
-      <div
-        style={{
-          minHeight: "100vh",
-          background: "var(--color-page-bg)",
-          color: "var(--color-text)",
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "center",
-          fontSize: 15,
-          opacity: 0.7,
-        }}
-      >
-        Loading…
-      </div>
+      <EditorialPage width="max-w-[1200px]">
+        <LoadingLine label="Loading…" />
+      </EditorialPage>
     );
   }
 
@@ -128,227 +129,103 @@ export default function ChatsPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "var(--color-page-bg)",
-        color: "var(--color-text)",
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 1200, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1
-            style={{
-              margin: "8px 0 4px 0",
-              fontSize: 32,
-              fontWeight: 800,
-              color: "var(--color-text-primary, var(--color-text))",
-            }}
-          >
-            Find your city&apos;s Pizza Party chat
-          </h1>
-          <p
-            style={{
-              margin: 0,
-              fontSize: 15,
-              color: "var(--color-text-secondary, var(--color-text))",
-              opacity: 0.8,
-            }}
-          >
-            Join the Telegram group for your local Global Pizza Party city.
-          </p>
-        </div>
+    <EditorialPage width="max-w-[1200px]">
+      <EditorialMasthead
+        overline="The Party Lines"
+        title={
+          <>
+            Find your city&apos;s <span className="text-tomato underline-scribble">Pizza Party</span> chat
+          </>
+        }
+        dek="Join the Telegram group for your local Global Pizza Party city."
+      />
 
-        {/* Search + region chips */}
-        <div
-          style={{
-            marginBottom: 16,
-            display: "flex",
-            flexDirection: "column",
-            gap: 12,
-          }}
-        >
-          <input
-            type="text"
-            placeholder="Search for your city..."
-            value={searchInput}
-            onChange={(e) => setSearchInput(e.target.value)}
-            style={{
-              width: "100%",
-              padding: "12px 16px",
-              fontSize: 14,
-              border: "1px solid var(--color-border)",
-              borderRadius: 8,
-              outline: "none",
-              background: "var(--color-surface)",
-              color: "var(--color-text)",
-            }}
-          />
+      {/* Search + region chips */}
+      <div className={`${paperCard} print-noise mb-6 p-4 sm:p-5`}>
+        <div className="flex flex-col gap-3">
+          <div className="relative">
+            <span
+              aria-hidden
+              className="overline absolute left-3 top-2 text-foreground/40"
+              style={{ fontSize: 9 }}
+            >
+              Search
+            </span>
+            <input
+              type="text"
+              placeholder="Search for your city..."
+              aria-label="Search for your city"
+              value={searchInput}
+              onChange={(e) => setSearchInput(e.target.value)}
+              className="w-full min-h-11 pt-6 pb-2 px-3 text-base sm:text-sm rounded-[var(--radius)] bg-[hsl(var(--cream))] dark:bg-card text-foreground border border-[hsl(var(--rule-warm)/0.55)] outline-none focus:border-tomato focus:ring-2 focus:ring-[hsl(var(--tomato)/0.30)] transition-colors"
+            />
+          </div>
 
           {/* Region chips */}
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-              alignItems: "center",
-            }}
-          >
-            <span style={{ fontSize: 12, opacity: 0.7, marginRight: 4 }}>
-              Regions:
-            </span>
-            <FilterChip
-              label="All"
-              active={!regionFilter}
-              onClick={() => setRegionFilter(null)}
-            />
+          <div className="flex flex-wrap gap-1.5 items-center">
+            <span className="overline text-foreground/45 mr-1">Regions</span>
+            <FilterChip label="All" active={!regionFilter} onClick={() => setRegionFilter(null)} />
             {regions.map((r) => (
               <FilterChip
                 key={r.id}
                 label={`${regionLabel(r.id)} (${r.count})`}
                 active={regionFilter === r.id}
-                onClick={() =>
-                  setRegionFilter(regionFilter === r.id ? null : r.id)
-                }
+                onClick={() => setRegionFilter(regionFilter === r.id ? null : r.id)}
               />
             ))}
           </div>
         </div>
+      </div>
 
-        {/* Count */}
-        {!loading && !error && (
-          <div style={{ fontSize: 13, opacity: 0.7, marginBottom: 12 }}>
+      {/* Count */}
+      {!loading && !error && (
+        <div className="mb-4">
+          <p className="overline text-foreground/45 m-0">The directory</p>
+          <p className="font-display text-lg font-black tracking-tight text-foreground m-0 mt-1">
             {filtered.length === 0
               ? "No cities match your search"
-              : `Showing ${filtered.length} of ${cities.length} cit${
-                  cities.length === 1 ? "y" : "ies"
-                }`}
-          </div>
-        )}
+              : `Showing ${filtered.length} of ${cities.length} cit${cities.length === 1 ? "y" : "ies"}`}
+          </p>
+        </div>
+      )}
 
-        {error && (
-          <div
-            style={{
-              padding: 16,
-              background: "rgba(239, 68, 68, 0.1)",
-              border: "1px solid rgba(239, 68, 68, 0.3)",
-              color: "#c00",
-              borderRadius: 8,
-              marginBottom: 16,
-              fontSize: 14,
-            }}
-          >
-            {error}
-          </div>
-        )}
+      {error && (
+        <div
+          role="alert"
+          className="p-4 mb-4 rounded-[var(--radius)] text-sm font-semibold border bg-[hsl(var(--destructive)/0.10)] border-[hsl(var(--destructive)/0.30)] text-destructive"
+        >
+          {error}
+        </div>
+      )}
 
-        {/* Loading skeleton */}
-        {loading && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {Array.from({ length: 12 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: 14,
-                  borderRadius: 10,
-                  border: "1px solid var(--color-border)",
-                  background: "var(--color-surface)",
-                  height: 72,
-                  opacity: 0.5,
-                  animation: "pulse 1.6s ease-in-out infinite",
-                }}
-              />
-            ))}
-            <style jsx>{`
-              @keyframes pulse {
-                0%,
-                100% {
-                  opacity: 0.4;
-                }
-                50% {
-                  opacity: 0.8;
-                }
-              }
-            `}</style>
-          </div>
-        )}
+      {/* Loading skeleton */}
+      {loading && (
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))" }}
+          aria-busy="true"
+        >
+          {Array.from({ length: 12 }).map((_, i) => (
+            <div key={i} className={`${paperCard} h-[84px] animate-pulse opacity-60`} />
+          ))}
+        </div>
+      )}
 
-        {/* Empty state */}
-        {!loading && !error && filtered.length === 0 && (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              border: "1px solid var(--color-border)",
-              borderRadius: 12,
-              background: "var(--color-surface)",
-            }}
-          >
-            <p style={{ margin: 0, fontSize: 16, opacity: 0.7 }}>
-              No cities match your search.
-            </p>
-          </div>
-        )}
+      {/* Empty state */}
+      {!loading && !error && filtered.length === 0 && <EmptyState title="No cities match your search." />}
 
-        {/* Grid */}
-        {!loading && !error && filtered.length > 0 && (
-          <div
-            style={{
-              display: "grid",
-              gridTemplateColumns: "repeat(auto-fill, minmax(240px, 1fr))",
-              gap: 12,
-            }}
-          >
-            {filtered.map((city) => (
-              <CityCard key={city.slug} city={city} />
-            ))}
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: "6px 12px",
-        fontSize: 13,
-        fontWeight: 600,
-        borderRadius: 999,
-        border: active
-          ? "1px solid var(--color-btn-primary-border, #ff4d4d)"
-          : "1px solid var(--color-border)",
-        background: active
-          ? "var(--color-btn-primary-bg, rgba(255,77,77,0.15))"
-          : "var(--color-surface)",
-        color: active
-          ? "var(--color-btn-primary-text, #ff4d4d)"
-          : "var(--color-text)",
-        cursor: "pointer",
-      }}
-    >
-      {label}
-    </button>
+      {/* Grid */}
+      {!loading && !error && filtered.length > 0 && (
+        <div
+          className="grid gap-3"
+          style={{ gridTemplateColumns: "repeat(auto-fill, minmax(min(240px, 100%), 1fr))" }}
+        >
+          {filtered.map((city) => (
+            <CityCard key={city.slug} city={city} />
+          ))}
+        </div>
+      )}
+    </EditorialPage>
   );
 }
 
@@ -365,83 +242,23 @@ function CityCard({ city }: { city: CityChatListItem }) {
       href={`/chats/${city.slug}`}
       target="_blank"
       rel="noopener noreferrer"
-      style={{ textDecoration: "none", color: "inherit" }}
+      className={`${paperCard} group block h-full p-4 no-underline text-inherit transition-all duration-200 hover:-translate-y-0.5 hover:border-[hsl(var(--tomato)/0.6)]`}
+      style={{ boxShadow: "var(--shadow-soft)" }}
     >
-      <div
-        style={{
-          padding: 14,
-          borderRadius: 10,
-          border: "1px solid var(--color-border)",
-          background: "var(--color-surface)",
-          transition: "transform 0.15s ease, box-shadow 0.15s ease",
-          height: "100%",
-        }}
-        onMouseEnter={(e) => {
-          e.currentTarget.style.transform = "translateY(-2px)";
-          e.currentTarget.style.boxShadow = "var(--shadow-card)";
-        }}
-        onMouseLeave={(e) => {
-          e.currentTarget.style.transform = "none";
-          e.currentTarget.style.boxShadow = "none";
-        }}
-      >
-        <div
-          style={{
-            fontWeight: 700,
-            fontSize: 16,
-            overflow: "hidden",
-            textOverflow: "ellipsis",
-            whiteSpace: "nowrap",
-          }}
-        >
-          {city.name}
-        </div>
-        {subtitle && (
-          <div
-            style={{
-              fontSize: 13,
-              opacity: 0.7,
-              marginTop: 2,
-              overflow: "hidden",
-              textOverflow: "ellipsis",
-              whiteSpace: "nowrap",
-            }}
-          >
-            {subtitle}
-          </div>
-        )}
-        <div
-          style={{
-            marginTop: 8,
-            display: "flex",
-            alignItems: "center",
-            gap: 8,
-          }}
-        >
+      <div className="font-display text-lg font-black tracking-tight text-foreground truncate group-hover:text-tomato transition-colors">
+        {city.name}
+      </div>
+      {subtitle && <div className="overline text-foreground/50 mt-1 truncate">{subtitle}</div>}
+      <div className="mt-3 flex items-center gap-2">
+        <span className="text-xs font-semibold text-tomato">Open Telegram →</span>
+        {city.isSupergroup && (
           <span
-            style={{
-              fontSize: 12,
-              fontWeight: 600,
-              color: "var(--color-accent, #5b9cff)",
-            }}
+            className="overline px-1.5 py-0.5 rounded-md bg-[hsl(var(--butter)/0.35)] text-ink"
+            style={{ fontSize: 9.5 }}
           >
-            Open Telegram →
+            Supergroup
           </span>
-          {city.isSupergroup && (
-            <span
-              style={{
-                fontSize: 11,
-                fontWeight: 600,
-                padding: "2px 7px",
-                borderRadius: 10,
-                background: "rgba(91,156,255,0.12)",
-                color: "#5b9cff",
-              }}
-            >
-              Supergroup
-            </span>
-          )}
-        </div>
+        )}
       </div>
     </Link>
   );

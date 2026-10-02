@@ -2,6 +2,17 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import {
+  EditorialMasthead,
+  EditorialPage,
+  EmptyState,
+  FilterChip,
+  paperCard,
+  pillOutline,
+} from "@/app/ui/shared/Editorial";
+
+// Editorial restyle: § masthead, paper-soft filter strip and call rows,
+// pill pagination. Fetching, filters, sort and attendee expansion unchanged.
 
 interface CallEntry {
   date: string;
@@ -140,468 +151,225 @@ export default function CallsPage() {
   }
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: "hsl(var(--background))",
-        color: "hsl(var(--foreground))",
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 900, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <h1
-            style={{
-              margin: "8px 0 4px 0",
-              fontSize: 32,
-              fontWeight: 800,
-              color: "hsl(var(--foreground))",
-              textWrap: 'balance',
-            } as React.CSSProperties}
-          >
-            Call History
-          </h1>
-          {!loading && !error && (
-            <p
-              style={{
-                margin: 0,
-                fontSize: 15,
-                color: "hsl(var(--muted-foreground))",
-                opacity: 0.8,
-              }}
-            >
-              {pagination.total} crew call{pagination.total === 1 ? "" : "s"} recorded
-            </p>
-          )}
-        </div>
+    <EditorialPage width="max-w-[900px]">
+      <EditorialMasthead
+        overline="The Call Log"
+        title={
+          <>
+            Call <span className="text-tomato underline-scribble">history</span>
+          </>
+        }
+        dek={
+          !loading && !error
+            ? `${pagination.total} crew call${pagination.total === 1 ? "" : "s"} recorded — tap a call to see who showed up.`
+            : "Every crew call on the books, with who showed up."
+        }
+      />
 
-        {/* Crew filter chips */}
-        <div style={{ marginBottom: 16 }}>
-          <div
-            style={{
-              display: "flex",
-              flexWrap: "wrap",
-              gap: 6,
-              alignItems: "center",
+      {/* Crew filter chips */}
+      <div className={`${paperCard} print-noise mb-6 p-4 sm:p-5`}>
+        <div className="flex flex-wrap gap-1.5 items-center">
+          <span className="overline text-foreground/45 mr-1">Filed under</span>
+          <FilterChip
+            label="All"
+            active={crewFilter.length === 0}
+            onClick={() => {
+              setCrewFilter([]);
+              setPage(1);
+              setExpandedKey(null);
             }}
-          >
-            <span style={{ fontSize: 12, opacity: 0.7, marginRight: 4 }}>
-              Crews:
-            </span>
+          />
+          {crewCounts.map((c) => (
             <FilterChip
-              label="All"
-              active={crewFilter.length === 0}
-              onClick={() => {
-                setCrewFilter([]);
-                setPage(1);
-                setExpandedKey(null);
-              }}
+              key={c.id}
+              label={`${c.label} (${c.count})`}
+              active={crewFilter.includes(c.id)}
+              onClick={() => toggleCrew(c.id)}
             />
-            {crewCounts.map((c) => (
-              <FilterChip
-                key={c.id}
-                label={`${c.label} (${c.count})`}
-                active={crewFilter.includes(c.id)}
-                onClick={() => toggleCrew(c.id)}
-              />
-            ))}
-          </div>
+          ))}
         </div>
+      </div>
 
-        {/* Count + Sort */}
-        {!loading && !error && (
-          <div
-            style={{
-              fontSize: 13,
-              opacity: 0.7,
-              marginBottom: 12,
-              display: "flex",
-              justifyContent: "space-between",
-              alignItems: "center",
-            }}
-          >
-            <span>
+      {/* Count + Sort */}
+      {!loading && !error && (
+        <div className="flex flex-wrap justify-between items-end gap-3 mb-4">
+          <div>
+            <p className="overline text-foreground/45 m-0">The ledger</p>
+            <p className="font-display text-lg font-black tracking-tight text-foreground m-0 mt-1">
               {pagination.total === 0
                 ? "No calls match your filters"
                 : `Showing ${calls.length} of ${pagination.total} call${
                     pagination.total === 1 ? "" : "s"
                   }`}
-            </span>
-            <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
-              {hasActiveFilters && (
-                <button
-                  type="button"
-                  onClick={clearFilters}
-                  style={{
-                    padding: "4px 10px",
-                    fontSize: 12,
-                    fontWeight: 600,
-                    borderRadius: 8,
-                    border: "1px solid hsl(var(--rule) / 0.12)",
-                    background: "transparent",
-                    color: "hsl(var(--foreground))",
-                    cursor: "pointer",
-                    transition: "background-color 200ms ease-out, border-color 200ms ease-out",
-                  }}
-                >
-                  Clear filters
-                </button>
-              )}
-              <select
-                value={sort}
-                onChange={(e) => {
-                  setSort(e.target.value);
-                  setPage(1);
-                }}
-                style={{
-                  padding: "6px 10px",
-                  fontSize: 13,
-                  border: "1px solid hsl(var(--rule) / 0.12)",
-                  borderRadius: 8,
-                  background: "hsl(var(--card))",
-                  color: "hsl(var(--foreground))",
-                  cursor: "pointer",
-                  outline: "none",
-                }}
-              >
-                <option value="newest">Newest first</option>
-                <option value="oldest">Oldest first</option>
-              </select>
-            </div>
-          </div>
-        )}
-
-        {/* Error */}
-        {error && (
-          <div
-            style={{
-              padding: 16,
-              background: "hsl(var(--destructive) / 0.10)",
-              border: "1px solid hsl(var(--destructive) / 0.30)",
-              color: "hsl(var(--destructive))",
-              borderRadius: 8,
-              marginBottom: 16,
-              fontSize: 14,
-            }}
-          >
-            {error}
-          </div>
-        )}
-
-        {/* Loading skeleton */}
-        {loading && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 8 }}>
-            {Array.from({ length: 8 }).map((_, i) => (
-              <div
-                key={i}
-                style={{
-                  padding: 16,
-                  borderRadius: 10,
-                  border: "1px solid hsl(var(--rule) / 0.12)",
-                  background: "hsl(var(--card))",
-                  height: 56,
-                  opacity: 0.5,
-                  animation: "pulse 1.6s ease-in-out infinite",
-                }}
-              />
-            ))}
-            <style jsx>{`
-              @keyframes pulse {
-                0%,
-                100% {
-                  opacity: 0.4;
-                }
-                50% {
-                  opacity: 0.8;
-                }
-              }
-            `}</style>
-          </div>
-        )}
-
-        {/* Empty state */}
-        {!loading && !error && calls.length === 0 && (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              border: "1px solid hsl(var(--rule) / 0.12)",
-              borderRadius: 'var(--radius)',
-              background: "hsl(var(--card))",
-            }}
-          >
-            <p style={{ margin: 0, fontSize: 16, opacity: 0.7 }}>
-              No calls found.
             </p>
+          </div>
+          <div className="flex gap-2 items-center">
             {hasActiveFilters && (
-              <button
-                type="button"
-                onClick={clearFilters}
-                style={{
-                  marginTop: 16,
-                  padding: "10px 16px",
-                  fontSize: 14,
-                  fontWeight: 600,
-                  borderRadius: 8,
-                  border: "1px solid hsl(var(--rule) / 0.12)",
-                  background: "transparent",
-                  color: "hsl(var(--foreground))",
-                  cursor: "pointer",
-                  transition: "background-color 200ms ease-out",
-                }}
-              >
+              <button type="button" onClick={clearFilters} className={pillOutline}>
                 Clear filters
               </button>
             )}
+            <label className="sr-only" htmlFor="calls-sort">
+              Sort calls
+            </label>
+            <select
+              id="calls-sort"
+              value={sort}
+              onChange={(e) => {
+                setSort(e.target.value);
+                setPage(1);
+              }}
+              className="min-h-11 px-4 rounded-full text-sm font-semibold bg-card text-foreground border border-[hsl(var(--rule-warm)/0.65)] cursor-pointer outline-none focus:border-tomato focus:ring-2 focus:ring-[hsl(var(--tomato)/0.3)]"
+            >
+              <option value="newest">Newest first</option>
+              <option value="oldest">Oldest first</option>
+            </select>
           </div>
-        )}
+        </div>
+      )}
 
-        {/* Call list */}
-        {!loading && !error && calls.length > 0 && (
-          <div style={{ display: "flex", flexDirection: "column", gap: 4 }}>
-            {calls.map((call) => {
-              const key = `${call.crewId}:${call.date}`;
-              const isExpanded = expandedKey === key;
-              return (
-                <div key={key}>
-                  <button
-                    type="button"
-                    onClick={() => toggleExpand(call.crewId, call.date)}
-                    style={{
-                      width: "100%",
-                      padding: "12px 16px",
-                      borderRadius: isExpanded ? "10px 10px 0 0" : 10,
-                      border: "1px solid hsl(var(--rule) / 0.12)",
-                      borderBottom: "1px solid hsl(var(--rule) / 0.12)",
-                      background: "hsl(var(--card))",
-                      color: "hsl(var(--foreground))",
-                      cursor: "pointer",
-                      textAlign: "left",
-                      display: "flex",
-                      alignItems: "center",
-                      gap: 12,
-                      transition: "background-color 200ms ease-out, border-color 200ms ease-out",
-                    }}
+      {/* Error */}
+      {error && (
+        <div
+          role="alert"
+          className="p-4 mb-4 rounded-[var(--radius)] text-sm font-semibold border bg-[hsl(var(--destructive)/0.10)] border-[hsl(var(--destructive)/0.30)] text-destructive"
+        >
+          {error}
+        </div>
+      )}
+
+      {/* Loading skeleton */}
+      {loading && (
+        <div className="flex flex-col gap-2" aria-busy="true">
+          {Array.from({ length: 8 }).map((_, i) => (
+            <div key={i} className={`${paperCard} h-14 animate-pulse opacity-60`} />
+          ))}
+        </div>
+      )}
+
+      {/* Empty state */}
+      {!loading && !error && calls.length === 0 && (
+        <EmptyState title="No calls found.">
+          {hasActiveFilters && (
+            <button type="button" onClick={clearFilters} className={`${pillOutline} mt-3`}>
+              Clear filters
+            </button>
+          )}
+        </EmptyState>
+      )}
+
+      {/* Call list */}
+      {!loading && !error && calls.length > 0 && (
+        <ol className="m-0 p-0 list-none flex flex-col gap-2">
+          {calls.map((call) => {
+            const key = `${call.crewId}:${call.date}`;
+            const isExpanded = expandedKey === key;
+            return (
+              <li
+                key={key}
+                className={`${paperCard} overflow-hidden transition-colors ${
+                  isExpanded ? "border-[hsl(var(--tomato)/0.6)]" : "hover:border-[hsl(var(--tomato)/0.45)]"
+                }`}
+                style={{ boxShadow: "var(--shadow-soft)" }}
+              >
+                <button
+                  type="button"
+                  onClick={() => toggleExpand(call.crewId, call.date)}
+                  aria-expanded={isExpanded}
+                  className="w-full min-h-14 px-4 py-3 bg-transparent border-0 text-foreground cursor-pointer text-left flex items-center gap-3 flex-wrap sm:flex-nowrap"
+                >
+                  <span className="font-display text-base font-black tracking-tight min-w-[112px]">
+                    {formatDate(call.date)}
+                  </span>
+                  <span
+                    className="overline px-2 py-1 rounded-full bg-[hsl(var(--tomato)/0.12)] text-tomato whitespace-nowrap"
+                    style={{ fontSize: 10 }}
                   >
-                    <span
-                      style={{
-                        fontSize: 14,
-                        fontWeight: 600,
-                        minWidth: 120,
-                        color: "hsl(var(--foreground))",
-                      }}
-                    >
-                      {formatDate(call.date)}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        fontWeight: 600,
-                        padding: "2px 8px",
-                        borderRadius: 10,
-                        background: "hsl(var(--tomato) / 0.12)",
-                        color: "hsl(var(--tomato))",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {call.crewLabel}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 13,
-                        opacity: 0.6,
-                        marginLeft: "auto",
-                        whiteSpace: "nowrap",
-                      }}
-                    >
-                      {call.attendeeCount} attendee{call.attendeeCount === 1 ? "" : "s"}
-                    </span>
-                    <span
-                      style={{
-                        fontSize: 12,
-                        opacity: 0.4,
-                        transition: "transform 0.2s",
-                        transform: isExpanded ? "rotate(180deg)" : "rotate(0deg)",
-                      }}
-                    >
-                      &#9660;
-                    </span>
-                  </button>
+                    {call.crewLabel}
+                  </span>
+                  <span className="ml-auto text-sm text-muted-foreground whitespace-nowrap tabular-nums">
+                    {call.attendeeCount} attendee{call.attendeeCount === 1 ? "" : "s"}
+                  </span>
+                  <span
+                    aria-hidden
+                    className={`text-xs text-foreground/40 transition-transform duration-200 ${
+                      isExpanded ? "rotate-180" : ""
+                    }`}
+                  >
+                    &#9660;
+                  </span>
+                </button>
 
-                  {/* Expanded attendee list */}
-                  {isExpanded && (
-                    <div
-                      style={{
-                        padding: "12px 16px",
-                        borderRadius: "0 0 10px 10px",
-                        border: "1px solid hsl(var(--rule) / 0.12)",
-                        borderTop: "none",
-                        background: "hsl(var(--card))",
-                      }}
-                    >
-                      {detailLoading && (
-                        <p style={{ margin: 0, fontSize: 13, opacity: 0.6 }}>
-                          Loading attendees...
-                        </p>
-                      )}
-                      {!detailLoading && !detail && (
-                        <p style={{ margin: 0, fontSize: 13, opacity: 0.6 }}>
-                          Failed to load attendees.
-                        </p>
-                      )}
-                      {!detailLoading && detail && (
-                        <div
-                          style={{
-                            display: "flex",
-                            flexWrap: "wrap",
-                            gap: 6,
-                          }}
-                        >
-                          {detail.attendees.map((a) =>
-                            a.memberId ? (
-                              <Link
-                                key={a.discordId}
-                                href={`/profile/${a.memberId}`}
-                                style={{
-                                  fontSize: 13,
-                                  padding: "4px 10px",
-                                  borderRadius: 8,
-                                  background: "hsl(var(--tomato) / 0.08)",
-                                  color: "hsl(var(--tomato))",
-                                  textDecoration: "none",
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {a.displayName}
-                              </Link>
-                            ) : (
-                              <span
-                                key={a.discordId}
-                                style={{
-                                  fontSize: 13,
-                                  padding: "4px 10px",
-                                  borderRadius: 8,
-                                  background: "hsl(var(--ink) / 0.06)",
-                                  color: "hsl(var(--foreground))",
-                                  opacity: 0.7,
-                                  whiteSpace: "nowrap",
-                                }}
-                              >
-                                {a.displayName}
-                              </span>
-                            )
-                          )}
-                        </div>
-                      )}
-                    </div>
-                  )}
-                </div>
-              );
-            })}
-          </div>
-        )}
+                {/* Expanded attendee list */}
+                {isExpanded && (
+                  <div className="rule-warm px-4 py-3">
+                    <p className="overline text-foreground/45 mt-0 mb-2">In the room</p>
+                    {detailLoading && (
+                      <p className="m-0 text-sm text-muted-foreground italic">Loading attendees...</p>
+                    )}
+                    {!detailLoading && !detail && (
+                      <p className="m-0 text-sm text-muted-foreground italic">Failed to load attendees.</p>
+                    )}
+                    {!detailLoading && detail && (
+                      <div className="flex flex-wrap gap-1.5">
+                        {detail.attendees.map((a) =>
+                          a.memberId ? (
+                            <Link
+                              key={a.discordId}
+                              href={`/profile/${a.memberId}`}
+                              className="text-[13px] px-2.5 py-1 rounded-full bg-[hsl(var(--tomato)/0.08)] text-tomato no-underline whitespace-nowrap hover:bg-[hsl(var(--tomato)/0.16)]"
+                            >
+                              {a.displayName}
+                            </Link>
+                          ) : (
+                            <span
+                              key={a.discordId}
+                              className="text-[13px] px-2.5 py-1 rounded-full bg-[hsl(var(--ink)/0.06)] text-foreground/70 whitespace-nowrap"
+                            >
+                              {a.displayName}
+                            </span>
+                          )
+                        )}
+                      </div>
+                    )}
+                  </div>
+                )}
+              </li>
+            );
+          })}
+        </ol>
+      )}
 
-        {/* Pagination */}
-        {!loading && pagination.totalPages > 1 && (
-          <div
-            style={{
-              marginTop: 32,
-              display: "flex",
-              justifyContent: "center",
-              alignItems: "center",
-              gap: 12,
+      {/* Pagination */}
+      {!loading && pagination.totalPages > 1 && (
+        <div className="mt-10 flex items-center justify-center gap-3">
+          <button
+            type="button"
+            onClick={() => {
+              setPage(Math.max(1, page - 1));
+              setExpandedKey(null);
             }}
+            disabled={page <= 1}
+            className={pillOutline}
           >
-            <button
-              type="button"
-              onClick={() => {
-                setPage(Math.max(1, page - 1));
-                setExpandedKey(null);
-              }}
-              disabled={page <= 1}
-              style={{
-                padding: "8px 14px",
-                fontSize: 14,
-                borderRadius: 8,
-                border: "1px solid hsl(var(--rule) / 0.12)",
-                background: "hsl(var(--card))",
-                color: "hsl(var(--foreground))",
-                cursor: page <= 1 ? "not-allowed" : "pointer",
-                opacity: page <= 1 ? 0.5 : 1,
-                transition: "background-color 200ms ease-out",
-              }}
-            >
-              &larr; Prev
-            </button>
-            <span
-              style={{
-                fontSize: 14,
-                color: "hsl(var(--muted-foreground))",
-              }}
-            >
-              Page {pagination.page} of {pagination.totalPages}
-            </span>
-            <button
-              type="button"
-              onClick={() => {
-                setPage(Math.min(pagination.totalPages, page + 1));
-                setExpandedKey(null);
-              }}
-              disabled={page >= pagination.totalPages}
-              style={{
-                padding: "8px 14px",
-                fontSize: 14,
-                borderRadius: 8,
-                border: "1px solid hsl(var(--rule) / 0.12)",
-                background: "hsl(var(--card))",
-                color: "hsl(var(--foreground))",
-                cursor: page >= pagination.totalPages ? "not-allowed" : "pointer",
-                opacity: page >= pagination.totalPages ? 0.5 : 1,
-                transition: "background-color 200ms ease-out",
-              }}
-            >
-              Next &rarr;
-            </button>
-          </div>
-        )}
-      </div>
-    </div>
-  );
-}
-
-function FilterChip({
-  label,
-  active,
-  onClick,
-}: {
-  label: string;
-  active: boolean;
-  onClick: () => void;
-}) {
-  return (
-    <button
-      type="button"
-      onClick={onClick}
-      style={{
-        padding: "6px 12px",
-        fontSize: 13,
-        fontWeight: 600,
-        borderRadius: 999,
-        border: active
-          ? "1px solid hsl(var(--tomato))"
-          : "1px solid hsl(var(--rule) / 0.12)",
-        background: active
-          ? "hsl(var(--tomato) / 0.15)"
-          : "hsl(var(--card))",
-        color: active
-          ? "hsl(var(--tomato))"
-          : "hsl(var(--foreground))",
-        cursor: "pointer",
-        transition: "background-color 200ms ease-out, border-color 200ms ease-out, color 200ms ease-out",
-      }}
-    >
-      {label}
-    </button>
+            &larr; Prev
+          </button>
+          <span className="overline text-foreground/55">
+            Page {pagination.page} of {pagination.totalPages}
+          </span>
+          <button
+            type="button"
+            onClick={() => {
+              setPage(Math.min(pagination.totalPages, page + 1));
+              setExpandedKey(null);
+            }}
+            disabled={page >= pagination.totalPages}
+            className={pillOutline}
+          >
+            Next &rarr;
+          </button>
+        </div>
+      )}
+    </EditorialPage>
   );
 }

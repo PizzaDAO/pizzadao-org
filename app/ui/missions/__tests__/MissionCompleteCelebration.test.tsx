@@ -1,6 +1,7 @@
 import React from 'react'
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, fireEvent, act, cleanup } from '@testing-library/react'
+import { screen, fireEvent, act, cleanup } from '@testing-library/react'
+import { renderWithIntl } from '@/app/lib/i18n/test-utils'
 import { MissionCompleteCelebration } from '../MissionCompleteCelebration'
 
 describe('MissionCompleteCelebration', () => {
@@ -13,12 +14,12 @@ describe('MissionCompleteCelebration', () => {
   })
 
   it('renders the default headline', () => {
-    render(<MissionCompleteCelebration onDismiss={() => {}} autoDismissMs={0} />)
+    renderWithIntl(<MissionCompleteCelebration onDismiss={() => {}} autoDismissMs={0} />)
     expect(screen.getByText(/mission complete/i)).toBeTruthy()
   })
 
   it('shows custom title + subtitle when provided', () => {
-    render(
+    renderWithIntl(
       <MissionCompleteCelebration
         title="You did it!"
         subtitle="Level 1, mission 1"
@@ -32,7 +33,7 @@ describe('MissionCompleteCelebration', () => {
 
   it('calls onDismiss when "Nice!" button is clicked', () => {
     const onDismiss = vi.fn()
-    render(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={0} />)
+    renderWithIntl(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={0} />)
     fireEvent.click(screen.getByRole('button', { name: /nice/i }))
     // Fade-out delay is ~200ms before onDismiss fires
     act(() => {
@@ -43,7 +44,7 @@ describe('MissionCompleteCelebration', () => {
 
   it('calls onDismiss when the backdrop is clicked', () => {
     const onDismiss = vi.fn()
-    render(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={0} />)
+    renderWithIntl(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={0} />)
     fireEvent.click(screen.getByTestId('mission-celebration-overlay'))
     act(() => {
       vi.advanceTimersByTime(250)
@@ -53,7 +54,7 @@ describe('MissionCompleteCelebration', () => {
 
   it('auto-dismisses after the configured delay', () => {
     const onDismiss = vi.fn()
-    render(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={1000} />)
+    renderWithIntl(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={1000} />)
     expect(onDismiss).not.toHaveBeenCalled()
     act(() => {
       vi.advanceTimersByTime(1000)
@@ -67,7 +68,7 @@ describe('MissionCompleteCelebration', () => {
 
   it('does not auto-dismiss when autoDismissMs is 0', () => {
     const onDismiss = vi.fn()
-    render(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={0} />)
+    renderWithIntl(<MissionCompleteCelebration onDismiss={onDismiss} autoDismissMs={0} />)
     act(() => {
       vi.advanceTimersByTime(10_000)
     })

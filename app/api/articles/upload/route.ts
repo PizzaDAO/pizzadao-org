@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import { getSession } from '@/app/lib/session'
 import { hasAnyRole } from '@/app/lib/discord'
 import { ARTICLE_AUTHOR_ROLE_IDS } from '@/app/ui/constants'
+import { sniffImageFile } from '@/app/lib/image-sniff'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import {
   UnauthorizedError,
@@ -15,14 +16,6 @@ export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
 const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-
-// Allow-list of MIME types. Deliberately excludes SVG to avoid script injection.
-const ALLOWED_MIME_TO_EXT: Record<string, string> = {
-  'image/png': 'png',
-  'image/jpeg': 'jpg',
-  'image/webp': 'webp',
-  'image/gif': 'gif',
-}
 
 function sanitizeBase(name: string): string {
   // Strip extension, replace disallowed chars, truncate, fallback to 'image'
@@ -53,15 +46,6 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   const file = fileField
 
-  // Server-side MIME allow-list (rechecks client)
-  const ext = ALLOWED_MIME_TO_EXT[file.type]
-  if (!ext) {
-    throw new ValidationError(
-      'Unsupported file type. Use PNG, JPEG, WebP, or GIF.',
-      'file'
-    )
-  }
-
   // Size limits
   if (file.size === 0) {
     throw new ValidationError('File is empty', 'file')
@@ -69,6 +53,17 @@ const POST_HANDLER = async (request: NextRequest) => {
   if (file.size > MAX_BYTES) {
     throw new ValidationError('File too large. Max 5 MB.', 'file')
   }
+
+  // Identify the image by its magic bytes, not the client-supplied file.type.
+  // Only PNG/JPEG/GIF/WebP are accepted (deliberately no SVG).
+  const sniffed = await sniffImageFile(file)
+  if (!sniffed) {
+    throw new ValidationError(
+      'Unsupported file type. Use PNG, JPEG, WebP, or GIF.',
+      'file'
+    )
+  }
+  const { ext, mime } = sniffed
 
   const safeBase = sanitizeBase(file.name || 'image')
   const timestamp = Date.now()
@@ -78,7 +73,7 @@ const POST_HANDLER = async (request: NextRequest) => {
   const blob = await put(key, file, {
     access: 'public',
     addRandomSuffix: false,
-    contentType: file.type,
+    contentType: mime,
   })
 
   return NextResponse.json({

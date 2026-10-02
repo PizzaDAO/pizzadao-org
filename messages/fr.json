@@ -92,6 +92,7 @@
       "inputPlaceholder": "Paris, France",
       "inputAriaLabel": "Ville",
       "lookingForChapter": "Recherche d'un chapitre PizzaDAO local…",
+      "timezoneDetected": "Fuseau horaire : {timezone}",
       "back": "Retour",
       "next": "Suivant",
       "telegramOverline": "§ Chapitre trouvé",
@@ -309,6 +310,227 @@
       "useCustom": "Utiliser « {query} »",
       "offCanon": "Hors canon",
       "footer": "Touche pour choisir · ou tape la tienne"
+    }
+  },
+  "nav": {
+    "mainAriaLabel": "Principale",
+    "skipToContent": "Aller au contenu",
+    "homeAriaLabel": "Accueil PizzaDAO",
+    "crews": "Crews",
+    "members": "Membres",
+    "missions": "Missions",
+    "pep": "PEP",
+    "articles": "Articles",
+    "calls": "Appels",
+    "chats": "Discussions",
+    "manuals": "Manuels",
+    "turtles": "Turtles",
+    "techProjects": "Projets tech",
+    "nfts": "NFT",
+    "poaps": "POAP",
+    "print": "Supports imprimés",
+    "more": "Plus",
+    "explore": "§ Explorer",
+    "dashboard": "Tableau de bord",
+    "logIn": "Se connecter",
+    "join": "Rejoindre",
+    "openMenu": "Ouvrir le menu",
+    "closeMenu": "Fermer le menu",
+    "support": "Assistance"
+  },
+  "dashboard": {
+    "loading": {
+      "overline": "§ 00 · ouverture du dossier",
+      "headline": "On sort le registre…",
+      "subline": "La Famille rassemble ton dossier"
+    },
+    "error": {
+      "authOverline": "§ 00 · la porte est verrouillée",
+      "authHeadline": "Accès refusé",
+      "loginRequired": "Connecte-toi pour voir ton tableau de bord",
+      "forbidden": "Tu n'as pas la permission de voir ce tableau de bord",
+      "overline": "§ 00 · dossier égaré",
+      "headline": "Quelque chose cloche",
+      "notFound": "Impossible de trouver ton dossier. Tu es sûr de faire déjà partie de la Famille ?",
+      "backHome": "Retour à l'accueil"
+    },
+    "page": {
+      "metaTitle": "Tableau de bord",
+      "anonymousName": "Pizzaïolo anonyme",
+      "worldwide": "Partout dans le monde",
+      "settingsOverline": "§ · Réglages",
+      "logOut": "S'éclipser · se déconnecter",
+      "footer": "§ pizzadao · depuis 2021"
+    },
+    "hero": {
+      "overline": "§ 01 · le dossier",
+      "pfpAlt": "Profil de {name}",
+      "levelBadge": "Niv.{level}",
+      "sendPep": "Envoyer des PEP",
+      "editProfile": "Modifier le profil",
+      "manageWallets": "Gérer les wallets"
+    },
+    "completion": {
+      "overline": "§ configuration du profil",
+      "ariaLabel": "Configuration du profil",
+      "valueText": "{completed} {total, plural, one {étape sur # terminée} other {étapes sur # terminées}}",
+      "done": "{completed, plural, one {# sur {total} terminée} other {# sur {total} terminées}}",
+      "remaining": " — reste : {steps}",
+      "next": "Suivant : {step}"
+    },
+    "steps": {
+      "join_crew": {
+        "label": "Rejoindre une crew",
+        "headline": "Bienvenue — choisis une crew pour commencer",
+        "body": "Les crews, c'est comme ça que les membres coordonnent le travail dans la DAO.",
+        "cta": "Rejoindre ta première crew"
+      },
+      "connect_wallet": {
+        "label": "Connecter un wallet",
+        "headline": "Relie un wallet pour afficher tes POAP et NFT PizzaDAO",
+        "cta": "Connecter un wallet"
+      },
+      "connect_x": {
+        "label": "Connecter X",
+        "headline": "Connecte X pour que la communauté puisse se porter garante de toi",
+        "cta": "Connecter X"
+      }
+    },
+    "nextAction": {
+      "overline": "§ 02 · ton prochain coup",
+      "showAgain": "Réafficher la prochaine action",
+      "notNow": "Pas maintenant",
+      "snoozeTitle": "Masquer pendant 24 heures",
+      "snoozeAriaLabel": "Reporter la prochaine action",
+      "submit_mission": {
+        "headline": "Ta prochaine mission t'attend",
+        "cta": "Soumettre la mission de niveau {level}"
+      },
+      "awaiting_review": {
+        "headline": "En attente de validation — continue sur ta lancée",
+        "body": "Missions de niveau {level} soumises.",
+        "cta": "Voir la progression du niveau {level}"
+      },
+      "get_vouches": {
+        "headline": "Bâtis ta réputation — demande à 3 membres de se porter garants de toi",
+        "cta": "Obtenir des garants"
+      },
+      "review_notification": {
+        "cta": "Voir la notification"
+      },
+      "power_user_review": {
+        "headline": "Tu es prêt. Renvoie l'ascenseur.",
+        "body": "Aide à valider les missions en attente.",
+        "cta": "Aider à valider les missions"
+      },
+      "power_user_discover": {
+        "headline": "Tu es prêt. Renvoie l'ascenseur.",
+        "cta": "Découvrir les primes"
+      }
+    },
+    "discover": {
+      "overline": "§ 03 · à découvrir",
+      "headline": "Ce qui est affiché au mur",
+      "ariaLabel": "À découvrir",
+      "tablistAriaLabel": "Catégories à découvrir",
+      "viewAll": "Tout voir",
+      "tabs": {
+        "bounties": "Primes",
+        "jobs": "Jobs",
+        "articles": "Articles",
+        "calls": "Appels"
+      },
+      "status": {
+        "open": "Ouverte",
+        "claimed": "Réclamée",
+        "done": "Fait"
+      },
+      "reward": "{amount, number} PEP",
+      "bountyAriaLabel": "Prime : {description}",
+      "jobAriaLabel": "Job : {description}",
+      "articleAriaLabel": "Article : {title}",
+      "callAriaLabel": "Appel : {crew} le {date}",
+      "byAuthor": "par {author}",
+      "emptyMark": "— vide —",
+      "empty": {
+        "bounties": "Aucune prime ouverte pour l'instant. Repasse bientôt.",
+        "jobs": "Aucun job disponible aujourd'hui. Ça se renouvelle chaque jour.",
+        "articles": "Aucun article publié pour l'instant.",
+        "calls": "Aucun appel prévu cette semaine."
+      }
+    },
+    "crews": {
+      "overline": "§ 04 · tes crews",
+      "headline": "Les familles avec qui tu roules",
+      "viewAll": "Voir toutes les crews",
+      "closed": "{count, plural, one {# bouclée} other {# bouclées}}",
+      "yourTasks": "§ tes tâches",
+      "topTasks": "§ tâches phares",
+      "openCrew": "Ouvrir la crew",
+      "openSheet": "Ouvrir la feuille"
+    },
+    "activity": {
+      "overline": "§ 05 · le registre",
+      "headline": "Ce qui a changé pendant ton absence",
+      "emptyMark": "— calme plat —",
+      "empty": "Ton activité s'affichera ici au fil de ta participation.",
+      "time": {
+        "justNow": "à l'instant",
+        "minutes": "il y a {count} min",
+        "hours": "il y a {count} h",
+        "yesterday": "hier",
+        "days": "{count, plural, one {il y a # jour} other {il y a # jours}}",
+        "weeks": "{count, plural, one {il y a # sem.} other {il y a # sem.}}",
+        "months": "il y a {count} mois",
+        "years": "{count, plural, one {il y a # an} other {il y a # ans}}"
+      }
+    },
+    "missions": {
+      "overline": "§ Dossier",
+      "title": "Missions",
+      "viewAll": "Tout voir →",
+      "maxLevel": "MAX",
+      "levelPrefix": "Niv.",
+      "allComplete": "Tous les niveaux terminés !",
+      "onFile": "{completed}/{total} au dossier",
+      "reward": "+{amount, number} $PEP",
+      "overall": "§ Global · {completed}/{total} bouclées"
+    },
+    "vouches": {
+      "title": "Garants",
+      "viewAll": "Tout voir",
+      "unknownName": "Inconnu",
+      "empty": "Personne ne s'est encore porté garant de toi. Visite les profils des membres pour te porter garant d'eux !",
+      "find": "Trouver des garants"
+    },
+    "celebrations": {
+      "profile": {
+        "stamp": "classé",
+        "overline": "§ Profil complet",
+        "headline": "Tout est en place !",
+        "body": "Ton dossier est complet — la Famille peut te trouver, se porter garante de toi et voir ta collection.",
+        "stepsAriaLabel": "Étapes terminées",
+        "nice": "Génial !",
+        "viewProfile": "Voir ton profil"
+      },
+      "mission": {
+        "ariaLabel": "Célébration de mission accomplie",
+        "stamp": "approuvée",
+        "overline": "§ Classée",
+        "title": "Mission accomplie !",
+        "nice": "Génial !"
+      },
+      "levelUp": {
+        "ariaLabel": "Niveau {level} atteint",
+        "stampFinal": "le sommet",
+        "stamp": "promu",
+        "overlineFinal": "§ Niveau final atteint",
+        "overline": "§ Niveau supérieur !",
+        "heading": "Niveau {level}",
+        "reward": "+{amount, number} $PEP gagnés",
+        "finalBody": "Tu as atteint le sommet. Tu es un vrai Pizza Don.",
+        "continue": "Continuer"
+      }
     }
   }
 }

@@ -8,6 +8,7 @@
 // Prior history: diavola-40350 — first-mission celebration overlay.
 
 import { useEffect, useMemo, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type Props = {
   /** Optional title override (default: "Mission Complete!") */
@@ -55,11 +56,12 @@ function buildPieces(count: number): Piece[] {
 }
 
 export function MissionCompleteCelebration({
-  title = "Mission Complete!",
+  title,
   subtitle,
   onDismiss,
   autoDismissMs = 4500,
 }: Props) {
+  const t = useTranslations("dashboard.celebrations.mission");
   const [closing, setClosing] = useState(false);
   const pieces = useMemo(() => buildPieces(CONFETTI_PIECES), []);
 
@@ -82,7 +84,7 @@ export function MissionCompleteCelebration({
     <div
       role="dialog"
       aria-modal="true"
-      aria-label="Mission complete celebration"
+      aria-label={t("ariaLabel")}
       onClick={handleDismiss}
       data-testid="mission-celebration-overlay"
       style={{
@@ -156,7 +158,7 @@ export function MissionCompleteCelebration({
             pointerEvents: "none",
           }}
         >
-          approved
+          {t("stamp")}
         </span>
 
         <div
@@ -177,7 +179,7 @@ export function MissionCompleteCelebration({
             marginBottom: 6,
           }}
         >
-          § Filed
+          {t("overline")}
         </span>
         <h2
           style={{
@@ -190,7 +192,7 @@ export function MissionCompleteCelebration({
             color: "hsl(var(--foreground))",
           }}
         >
-          {title}
+          {title ?? t("title")}
         </h2>
         {subtitle && (
           <p
@@ -216,7 +218,7 @@ export function MissionCompleteCelebration({
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          Nice!
+          {t("nice")}
         </button>
       </div>
 

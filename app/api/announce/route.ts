@@ -1,95 +1,42 @@
 import { NextResponse } from "next/server";
-import { getSession } from "@/app/lib/session";
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
-import { ANNOUNCE_ALLOWED_DISCORD_IDS } from "@/app/ui/constants";
-import { SHEET_IDS } from "@/app/lib/sheets/config";
+import { requireSession } from "@/app/lib/auth-guards";
+import { canAnnounce, requireAnnouncer } from "@/app/lib/announce/access";
+import { runAnnouncementFromEnv } from "@/app/lib/announce/run";
 
 export const runtime = "nodejs";
+export const dynamic = "force-dynamic";
 
-// The single announcement this endpoint is scoped to fire (romana-35249).
-const ANNOUNCE_SPREADSHEET_ID = SHEET_IDS.announce;
+// GET /api/announce - whether the logged-in user may fire the announcement.
+// Lets the page decide what to show without shipping the access list.
+export async function GET() {
+  const auth = await requireSession();
+  if (!auth.ok) return auth.response;
+  const allowed = await canAnnounce(auth.session.discordId);
+  return NextResponse.json({ allowed });
+}
 
-// POST /api/announce - Fire the "PizzaDAO Crew" announcement via SecretService.
-// Discord login required + allowlist enforced server-side.
+// POST /api/announce - fire the Community Call announcement.
+// Discord login + announce role enforced server-side; the Discord post and the
+// sheet status update both happen here (no Apps Script in the path).
 export async function POST() {
-  const session = await getSession();
-  if (!session?.discordId) {
-    return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
-  }
-
-  // Allowlist gate - the real access control (UI visibility is convenience only).
-  if (!ANNOUNCE_ALLOWED_DISCORD_IDS.includes(session.discordId)) {
-    return NextResponse.json(
-      { error: "Forbidden: you do not have access to fire announcements" },
-      { status: 403 },
-    );
-  }
-
-  const password = process.env.ANNOUNCE_PASSWORD;
-  const url = process.env.ANNOUNCE_WEBAPP_URL;
-  if (!password || !url) {
-    console.error(
-      "[announce] Missing announce config: ANNOUNCE_PASSWORD and/or ANNOUNCE_WEBAPP_URL not set",
-    );
-    return NextResponse.json(
-      { error: "Missing announce config" },
-      { status: 500 },
-    );
-  }
+  const auth = await requireAnnouncer();
+  if (!auth.ok) return auth.response;
 
   // Audit trail: who fired the blast.
   console.log(
-    `[announce] fired by discordId=${session.discordId} username=${
-      session.username ?? "unknown"
+    `[announce] fired by discordId=${auth.session.discordId} username=${
+      auth.session.username ?? "unknown"
     } at ${new Date().toISOString()}`,
   );
 
-  const payload = {
-    password,
-    spreadsheetId: ANNOUNCE_SPREADSHEET_ID,
-    action: "announce",
-    options: {
-      discordEvent: true,
-      tweet: true,
-      postGeneral: true,
-      postBand: true,
-      postCrew: true,
-      attendance: true,
-    },
-  };
-
-  let status: number;
-  let text: string;
   try {
-    ({ status, text } = await fetchWithRedirect(url, payload));
+    const result = await runAnnouncementFromEnv();
+    if (result.status >= 400) {
+      console.error(`[announce] failed (${result.status}): ${result.body.error ?? "unknown error"}`);
+    }
+    return NextResponse.json(result.body, { status: result.status });
   } catch (e: unknown) {
-    console.error("[announce] fetchWithRedirect failed", e);
-    return NextResponse.json(
-      { error: "Failed to reach announcement service" },
-      { status: 502 },
-    );
+    console.error("[announce] unexpected failure", e);
+    return NextResponse.json({ success: false, error: "Announcement failed unexpectedly" }, { status: 500 });
   }
-
-  // SecretService validates password + spreadsheetId + rate-limiting itself and
-  // replies with JSON. Parse defensively; surface its error string.
-  let parsed: { success?: boolean; error?: string };
-  try {
-    parsed = JSON.parse(text);
-  } catch {
-    console.error(
-      `[announce] Non-JSON response from SecretService (status ${status}): ${text.slice(
-        0,
-        500,
-      )}`,
-    );
-    return NextResponse.json(
-      { error: `Unexpected response from announcement service: ${text.trim().slice(0, 300)}` },
-      { status: 502 },
-    );
-  }
-
-  return NextResponse.json(
-    { success: parsed.success, error: parsed.error },
-    { status },
-  );
 }

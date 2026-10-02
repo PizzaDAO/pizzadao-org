@@ -13,6 +13,7 @@ import {
   navBtn,
   pageContainer,
 } from '@/app/ui/shared-styles'
+import { CrewBounties } from './CrewBounties'
 
 // Loading stages to show progress
 const LOADING_STAGES = [
@@ -699,6 +700,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               </div>
             </div>
           )}
+
+          {/* Crew bounties (jalapeno-82565) */}
+          <CrewBounties crewId={crew.id} crewLabel={crew.label} hideWhenEmpty />
 
           {/* Recent activity */}
           {recentTaskCloses.length > 0 && (
@@ -1586,6 +1590,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             </div>
           )
         })()}
+
+        {/* Crew bounties (jalapeno-82565) */}
+        <CrewBounties crewId={crew.id} crewLabel={crew.label} />
 
         {/* Manuals */}
         {manuals.length > 0 && (

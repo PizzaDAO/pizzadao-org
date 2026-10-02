@@ -63,6 +63,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     const router = useRouter();
     const queryClient = useQueryClient();
     const tLanguage = useTranslations("language");
+    const t = useTranslations("dashboard");
 
     // --- React Query hooks for data fetching ---
     const { data: summary } = useDashboardSummary(id);
@@ -77,9 +78,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
     const loading = userDataLoading;
     const authError = userDataError?.message === '__AUTH_401__'
-        ? "Please log in to view your dashboard"
+        ? t("error.loginRequired")
         : userDataError?.message === '__AUTH_403__'
-        ? "You don't have permission to view this dashboard"
+        ? t("error.forbidden")
         : null;
     const error = userDataError && !authError ? userDataError.message : null;
 
@@ -141,10 +142,10 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     style={{ background: "radial-gradient(80% 60% at 20% 0%, hsl(46 100% 62% / 0.18), transparent 60%)" }}
                 />
                 <div className="fade-up text-center">
-                    <p className="overline text-tomato">§ 00 · loading the file</p>
+                    <p className="overline text-tomato">{t("loading.overline")}</p>
                     <div style={{ width: 50, height: 50, border: '3px solid hsl(var(--ink) / 0.10)', borderTop: '3px solid hsl(var(--tomato))', borderRadius: "50%", animation: "spin 1s linear infinite", margin: "20px auto" }} />
                     <p className="font-[family-name:var(--font-display)] font-black tracking-[-0.015em]" style={{ fontSize: "clamp(1.5rem, 4vw, 2.2rem)", lineHeight: 1 }}>
-                        Pulling the ledger&hellip;
+                        {t("loading.headline")}
                     </p>
                     <style jsx>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
                 </div>
@@ -155,9 +156,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
     // ── Error states ────────────────────────────────────────────────
     if (authError || error || !data) {
         const isAuth = !!authError;
-        const headline = isAuth ? "Access denied" : "Something's off";
-        const overline = isAuth ? "§ 00 · the door's locked" : "§ 00 · misfile";
-        const body = isAuth ? authError : (error || "We couldn't find your file. Are you sure you're in the Family yet?");
+        const headline = isAuth ? t("error.authHeadline") : t("error.headline");
+        const overline = isAuth ? t("error.authOverline") : t("error.overline");
+        const body = isAuth ? authError : (error || t("error.notFound"));
         return (
             <div className="relative grid min-h-screen place-items-center"
                 style={{ background: "hsl(var(--background))", color: "hsl(var(--foreground))", fontFamily: FONT_SANS, padding: "clamp(24px, 6vw, 40px) clamp(16px, 4vw, 20px)" }}>
@@ -176,7 +177,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     <p className="relative mt-4 text-foreground/70" style={{ fontSize: 15, lineHeight: 1.55 }}>{body}</p>
                     <div className="relative mt-6">
                         <Link href="/" className="btn-pill" style={{ background: "hsl(var(--tomato))", color: "hsl(var(--cream))", textDecoration: "none" }}>
-                            Back to home
+                            {t("error.backHome")}
                         </Link>
                     </div>
                 </div>
@@ -184,8 +185,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
         );
     }
 
-    const name = data["Name"] || data["Mafia Name"] || "Anonymous Pizza Maker";
-    const city = data["City"] || "Worldwide";
+    const name = data["Name"] || data["Mafia Name"] || t("page.anonymousName");
+    const city = data["City"] || t("page.worldwide");
     const idValue = data["ID"] || data["Crew ID"] || id;
     const crewsStr = data["Crews"] || "None";
     const userCrews = (crewsStr !== "None" ? crewsStr.split(",").map((c: string) => c.trim()).filter(Boolean) : []) as string[];
@@ -278,7 +279,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     {/* ── 5.5. Language preference ── */}
                     <section className="rule-warm" style={{ paddingTop: 24 }} aria-labelledby="dash-language-heading">
-                        <p className="overline text-tomato" style={{ margin: 0 }}>§ · Settings</p>
+                        <p className="overline text-tomato" style={{ margin: 0 }}>{t("page.settingsOverline")}</p>
                         <h2
                             id="dash-language-heading"
                             className="font-[family-name:var(--font-display)] font-bold tracking-[-0.01em] text-foreground"
@@ -317,14 +318,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 padding: 8,
                             }}
                         >
-                            Step out · log out
+                            {t("page.logOut")}
                         </button>
                     </div>
                 </div>
 
                 {/* Footer mark */}
                 <div className="text-center">
-                    <p className="overline text-foreground/40">§ pizzadao · est. 2021</p>
+                    <p className="overline text-foreground/40">{t("page.footer")}</p>
                 </div>
             </div>
 
