@@ -23,12 +23,13 @@
  */
 
 import { google, type sheets_v4 } from "googleapis";
-import { __clearMembersCache } from "@/app/lib/sheets/members-list";
+import { invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { findColumnIndex } from "@/app/lib/sheet-utils";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { normalizeCrewId, splitCrewList, CREW_ID_PATTERN } from "@/app/lib/crew-id";
+import { SHEET_IDS } from "@/app/lib/sheets/config";
 
-export const ROSTER_SHEET_ID = "16BBOfasVwz8L6fPMungz_Y0EfF6Z9puskLAix3tCHzM";
+export const ROSTER_SHEET_ID = SHEET_IDS.members;
 export const ROSTER_TAB_NAME = "Crew";
 const HEADER_SCAN_ROWS = 100;
 
@@ -158,7 +159,7 @@ function defaultDeps(): WritebackDeps {
   return {
     values: getWriteClient().spreadsheets.values,
     resolveCrewLabel: defaultResolveCrewLabel,
-    clearCache: __clearMembersCache,
+    clearCache: invalidateMembersCache,
   };
 }
 

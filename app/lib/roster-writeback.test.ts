@@ -8,7 +8,7 @@ vi.mock("googleapis", () => ({
     sheets: (...args: unknown[]) => googleSheetsFactory(...args),
   },
 }));
-vi.mock("@/app/lib/sheets/members-list", () => ({ __clearMembersCache: vi.fn() }));
+vi.mock("@/app/lib/sheets/member-repository", () => ({ invalidateMembersCache: vi.fn() }));
 vi.mock("@/app/lib/crew-mappings", () => ({
   getCrewMappings: vi.fn(async () => ({
     crews: [
@@ -27,7 +27,7 @@ import {
   ROSTER_SHEET_ID,
   type WritebackDeps,
 } from "./roster-writeback";
-import { __clearMembersCache } from "@/app/lib/sheets/members-list";
+import { invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 
 // ---------------------------------------------------------------------------
 // In-memory fake of spreadsheets.values (get/update) over a 2D grid.
@@ -311,6 +311,6 @@ describe("updateMemberCrews", () => {
     const res = await updateMemberCrews({ memberId: "2", crewId: "biz_dev", action: "add", mode: "apply", expectedBefore: "" });
     expect(res).toMatchObject({ applied: true, after: "Biz Dev" });
     expect(googleSheetsFactory).toHaveBeenCalledWith(expect.objectContaining({ version: "v4" }));
-    expect(__clearMembersCache).toHaveBeenCalled();
+    expect(invalidateMembersCache).toHaveBeenCalled();
   });
 });
