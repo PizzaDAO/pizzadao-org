@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { BountyCard } from "./BountyCard";
 import { PepIcon } from "../economy/PepIcon";
 import { card, btn, input } from "../shared-styles";
+import { useCrewMappings } from "@/app/lib/hooks/use-api";
 
 type Bounty = {
   id: number;
@@ -15,6 +16,8 @@ type Bounty = {
   status: "OPEN" | "CLAIMED";
   createdAt: string;
   commentCount: number;
+  crewId?: string | null;
+  crewLabel?: string | null;
 };
 
 type BountyBoardProps = {
@@ -30,6 +33,13 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
   const [formDescription, setFormDescription] = useState("");
   const [formLink, setFormLink] = useState("");
   const [formReward, setFormReward] = useState("");
+  const [formCrewId, setFormCrewId] = useState("");
+  const { data: crewMappings } = useCrewMappings();
+  const crewOptions: Array<{ id: string; label: string }> = Array.isArray(
+    crewMappings?.crews,
+  )
+    ? crewMappings.crews
+    : [];
   const [formLoading, setFormLoading] = useState(false);
   const [formError, setFormError] = useState<string | null>(null);
 
@@ -65,6 +75,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
           description: formDescription.trim(),
           link: formLink.trim() || undefined,
           reward: Number(formReward),
+          crewId: formCrewId || undefined,
         }),
       });
       const data = await res.json();
@@ -74,6 +85,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
       setFormDescription("");
       setFormLink("");
       setFormReward("");
+      setFormCrewId("");
       setShowForm(false);
       fetchBounties();
       onBountyAction?.();
@@ -214,6 +226,35 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                   disabled={formLoading}
                 />
               </div>
+              {crewOptions.length > 0 && (
+                <div>
+                  <label
+                    htmlFor="bounty-crew"
+                    style={{
+                      display: "block",
+                      fontSize: 13,
+                      color: "hsl(var(--muted-foreground))",
+                      marginBottom: 6,
+                    }}
+                  >
+                    Crew (optional)
+                  </label>
+                  <select
+                    id="bounty-crew"
+                    value={formCrewId}
+                    onChange={(e) => setFormCrewId(e.target.value)}
+                    style={input()}
+                    disabled={formLoading}
+                  >
+                    <option value="">No crew (general bounty)</option>
+                    {crewOptions.map((c) => (
+                      <option key={c.id} value={c.id}>
+                        {c.label}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
               <div>
                 <label
                   style={{

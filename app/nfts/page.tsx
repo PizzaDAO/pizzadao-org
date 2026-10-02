@@ -2,6 +2,14 @@
 
 import { useEffect, useState } from "react";
 import { CollectionCard } from "../ui/nft/CollectionCard";
+import {
+  EditorialMasthead,
+  EditorialPage,
+  EmptyState,
+  paperCard,
+  pillInk,
+  pillOutline,
+} from "@/app/ui/shared/Editorial";
 import { useSession } from "@/app/lib/hooks/use-session";
 
 interface Holder {
@@ -36,9 +44,9 @@ function formatTimestamp(ts: number): string {
 }
 
 /**
- * NFTsPage — capers-48272 (Phase 4e restyle)
- * Cream-on-cream collections gallery with Asap Condensed h1.
- * Refresh button uses the secondary outline style; cards use shared `card()`.
+ * NFTsPage — editorial restyle: § overline masthead with the scan summary as
+ * the dek, refresh as an outline pill, paper-soft loading/empty/error states.
+ * Fetching and refresh behavior are unchanged.
  */
 export default function NFTsPage() {
   // Cache refresh is admin-only server-side; only show the button to admins.
@@ -82,109 +90,96 @@ export default function NFTsPage() {
   }, []);
 
   return (
-    <div className="min-h-screen bg-background text-foreground px-5 py-10">
-      <div className="max-w-6xl mx-auto">
-        {/* Header */}
-        <div className="flex justify-between items-start mb-8 flex-wrap gap-4">
-          <div>
-            <h1 className="font-display mt-2 mb-1 text-4xl font-extrabold tracking-tight text-foreground">
-              NFTs
-            </h1>
-            {!loading && data && data.memberCount !== undefined && (
-              <p className="m-0 text-sm text-muted-foreground">
-                Scanning {data.memberCount} member wallet{data.memberCount === 1 ? "" : "s"}
-                {data.collections.length > 0 && (
-                  <>
-                    {" · "}
-                    {data.collections.length} collection
-                    {data.collections.length === 1 ? "" : "s"}
-                  </>
-                )}
-              </p>
-            )}
-          </div>
-
-          <div className="text-right">
+    <EditorialPage width="max-w-6xl">
+      <EditorialMasthead
+        overline="The Collection"
+        title={
+          <>
+            Member <span className="text-tomato underline-scribble">NFTs</span>
+          </>
+        }
+        dek={
+          !loading && data && data.memberCount !== undefined ? (
+            <>
+              Scanning {data.memberCount} member wallet{data.memberCount === 1 ? "" : "s"}
+              {data.collections.length > 0 && (
+                <>
+                  {" · "}
+                  {data.collections.length} collection
+                  {data.collections.length === 1 ? "" : "s"}
+                </>
+              )}
+            </>
+          ) : undefined
+        }
+        aside={
+          <div className="flex flex-col items-start sm:items-end gap-2">
             {data?.lastUpdated && (
-              <p className="m-0 mb-2 text-xs text-muted-foreground italic">
+              <p className="overline m-0 text-foreground/45" style={{ fontSize: 10 }}>
                 Last updated: {formatTimestamp(data.lastUpdated)}
                 {data.cached && " (cached)"}
               </p>
             )}
             {isAdmin && (
             <button
+              type="button"
               onClick={handleRefresh}
               disabled={refreshing || loading}
-              className={`px-4 py-3 min-h-[44px] text-sm font-display font-semibold rounded-[var(--radius)] border border-rule bg-card text-foreground hover:bg-muted transition-colors ${
-                refreshing || loading
-                  ? "opacity-50 cursor-not-allowed"
-                  : "cursor-pointer"
-              }`}
+              className={pillOutline}
             >
-              {refreshing ? "Refreshing..." : "Refresh Data"}
+              {refreshing ? "Refreshing…" : "Refresh data"}
             </button>
             )}
           </div>
+        }
+      />
+
+      {/* Loading state */}
+      {loading && (
+        <div className="grid gap-6">
+          {[1, 2, 3].map((i) => (
+            <div key={i} className={`${paperCard} h-[300px] animate-pulse`} />
+          ))}
         </div>
+      )}
 
-        {/* Loading state */}
-        {loading && (
-          <div className="grid gap-6">
-            {[1, 2, 3].map((i) => (
-              <div
-                key={i}
-                className="h-[300px] rounded-[var(--radius)] border border-rule bg-card animate-pulse"
-              />
-            ))}
-          </div>
-        )}
+      {/* Error state */}
+      {!loading && error && (
+        <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
+          <p className="text-base text-destructive m-0">{error}</p>
+          <button type="button" onClick={fetchData} className={pillInk}>
+            Try again
+          </button>
+        </div>
+      )}
 
-        {/* Error state */}
-        {!loading && error && (
-          <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
-            <p className="text-base text-destructive italic mb-4">{error}</p>
-            <button
-              onClick={fetchData}
-              className="px-5 py-3 min-h-[44px] text-sm font-display font-semibold rounded-[var(--radius)] bg-primary text-primary-foreground hover:bg-tomato hover:text-cream border-0 cursor-pointer transition-colors"
-            >
-              Try Again
-            </button>
-          </div>
-        )}
-
-        {/* Collections grid */}
-        {!loading && !error && data && (
-          <>
-            {data.collections.length === 0 ? (
-              <div className="p-10 text-center rounded-[var(--radius)] border border-rule bg-card">
-                <p className="text-base text-muted-foreground italic">
-                  No collections with member holders found.
-                </p>
-                <p className="mt-2 text-sm text-muted-foreground italic">
-                  {data.memberCount === 0
-                    ? "No members have connected wallets yet."
-                    : "Members may not hold any of the tracked collections."}
-                </p>
-              </div>
-            ) : (
-              <div className="grid gap-6">
-                {data.collections.map((collection) => (
-                  <CollectionCard
-                    key={collection.contractAddress}
-                    contractAddress={collection.contractAddress}
-                    contractName={collection.contractName}
-                    chain={collection.chain}
-                    description={collection.description}
-                    totalHolders={collection.totalHolders}
-                    totalNFTs={collection.totalNFTs}
-                    holders={collection.holders}
-                  />
-                ))}
-              </div>
-            )}
-          </>
-        )}
-      </div>
-    </div>
+      {/* Collections grid */}
+      {!loading && !error && data && (
+        <>
+          {data.collections.length === 0 ? (
+            <EmptyState title="No collections with member holders found.">
+              {data.memberCount === 0
+                ? "No members have connected wallets yet."
+                : "Members may not hold any of the tracked collections."}
+            </EmptyState>
+          ) : (
+            <div className="grid gap-6">
+              {data.collections.map((collection) => (
+                <CollectionCard
+                  key={collection.contractAddress}
+                  contractAddress={collection.contractAddress}
+                  contractName={collection.contractName}
+                  chain={collection.chain}
+                  description={collection.description}
+                  totalHolders={collection.totalHolders}
+                  totalNFTs={collection.totalNFTs}
+                  holders={collection.holders}
+                />
+              ))}
+            </div>
+          )}
+        </>
+      )}
+    </EditorialPage>
   );
 }

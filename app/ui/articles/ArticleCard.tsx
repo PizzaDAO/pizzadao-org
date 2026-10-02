@@ -5,7 +5,9 @@
 // overline category label, a display-font headline with hover scribble,
 // and a byline rendered in uppercase micro-type. Data shape unchanged.
 
+import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import TagBadge from "./TagBadge";
 
 export interface ArticleCardData {
@@ -68,14 +70,16 @@ export default function ArticleCard({ article, showStatus = false }: ArticleCard
     >
       {imageUrl && (
         <div
-          className="w-full bg-[hsl(var(--ink)/0.04)] dark:bg-[hsl(var(--cream)/0.04)] overflow-hidden border-b border-[hsl(var(--rule-warm)/0.45)]"
+          className="relative w-full bg-[hsl(var(--ink)/0.04)] dark:bg-[hsl(var(--cream)/0.04)] overflow-hidden border-b border-[hsl(var(--rule-warm)/0.45)]"
           style={{ aspectRatio: "16 / 9" }}
         >
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
+          <Image
             src={imageUrl}
             alt=""
-            className="w-full h-full object-cover block transition-transform duration-500 group-hover:scale-[1.04]"
+            fill
+            sizes="(max-width: 640px) 100vw, (max-width: 1100px) 50vw, 360px"
+            unoptimized={!isOptimizableImage(imageUrl)}
+            className="object-cover block transition-transform duration-500 group-hover:scale-[1.04]"
             onError={(e) => {
               (e.target as HTMLImageElement).style.display = "none";
             }}

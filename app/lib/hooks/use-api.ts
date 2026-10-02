@@ -542,6 +542,7 @@ export interface DiscoverData {
     description: string
     reward: number
     status: 'OPEN' | 'CLAIMED'
+    crew?: string | null
   }>
   jobs: Array<{
     id: number
@@ -597,7 +598,7 @@ export function useDiscover() {
       }
 
       const [bountiesRes, jobsRes, articlesRes, callsRes] = await Promise.all([
-        safeJson<{ bounties?: DiscoverData['bounties'] }>(
+        safeJson<{ bounties?: Array<DiscoverData['bounties'][number] & { crewLabel?: string | null }> }>(
           fetch('/api/bounties'),
           {},
         ),
@@ -623,6 +624,7 @@ export function useDiscover() {
           description: b.description,
           reward: b.reward,
           status: b.status,
+          crew: b.crewLabel ?? null,
         }))
 
       const jobs: DiscoverData['jobs'] = (jobsRes.jobs ?? [])

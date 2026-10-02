@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { getSession } from "@/app/lib/session";
+import { saveMemberTimezone } from "@/app/lib/city-timezone";
 import { parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { sendWelcomeMessage } from "@/app/lib/discord-webhook";
 import { parseGvizJson } from "@/app/lib/gviz-parser";
@@ -243,6 +244,13 @@ const POST_HANDLER = async (req: Request) => {
   } catch (e: unknown) {
     console.error('[profile] sheet write failed:', e);
     throw new ExternalServiceError('Google Sheets');
+  }
+
+  // 1b) Timezone (pizzaiolo-13628). The Crew sheet has no Timezone column, so
+  // the zone resolved from the onboarding city lives in MemberProfileExtras.
+  // Best-effort: never fails the submit.
+  if (payload.memberId && body.timezone) {
+    await saveMemberTimezone(payload.memberId, body.timezone);
   }
 
   // 2) Sync Discord

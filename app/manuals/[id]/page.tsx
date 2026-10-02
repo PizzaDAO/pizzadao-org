@@ -1,8 +1,12 @@
 "use client";
 
+// Editorial restyle: § overline + display-font title, paper-soft content
+// sheet with an overline table header. Fetching and content are unchanged.
+
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { EditorialPage, paperCard, pillInk } from "@/app/ui/shared/Editorial";
 
 type Manual = {
   title: string;
@@ -26,30 +30,21 @@ type SheetContent = {
   rows: CellData[][];
 };
 
-function statusBadge(status: string) {
+function statusBadgeClass(status: string): string {
   const s = status.toLowerCase();
-  let bg = "#888";
-  const color = "white";
-
   if (s === "complete" || s === "completed") {
-    bg = "#22c55e";
-  } else if (s === "draft") {
-    bg = "#f97316";
-  } else if (s === "needed") {
-    bg = "#ef4444";
-  } else if (s === "backlog") {
-    bg = "#8b5cf6";
+    return "bg-[hsl(142_71%_45%/0.18)] text-[hsl(142_71%_25%)] dark:text-[hsl(142_71%_65%)]";
   }
-
-  return {
-    display: "inline-block",
-    padding: "4px 12px",
-    borderRadius: 4,
-    fontSize: 13,
-    fontWeight: 500,
-    background: bg,
-    color,
-  };
+  if (s === "draft") {
+    return "bg-[hsl(var(--butter)/0.35)] text-[hsl(var(--ink))] dark:text-[hsl(var(--butter))]";
+  }
+  if (s === "needed") {
+    return "bg-[hsl(var(--tomato)/0.15)] text-tomato";
+  }
+  if (s === "backlog") {
+    return "bg-[hsl(258_90%_66%/0.15)] text-[hsl(262_60%_45%)] dark:text-[hsl(258_90%_75%)]";
+  }
+  return "bg-[hsl(var(--ink)/0.08)] text-muted-foreground";
 }
 
 export default function ManualDetailPage() {
@@ -89,351 +84,175 @@ export default function ManualDetailPage() {
   }, [id]);
 
   return (
-    <div
-      style={{
-        minHeight: "100vh",
-        background: 'hsl(var(--background))',
-        color: 'hsl(var(--foreground))',
-        padding: "40px 20px",
-      }}
-    >
-      <div style={{ maxWidth: 1000, margin: "0 auto" }}>
-        {/* Header */}
-        <div style={{ marginBottom: 24 }}>
-          <Link
-            href="/manuals"
-            style={{
-              fontSize: 14,
-              color: 'hsl(var(--muted-foreground))',
-              textDecoration: "none",
-              marginBottom: 8,
-              display: "inline-flex",
-              alignItems: "center",
-              minHeight: 44,
-              transition: "color 200ms ease-out",
-            }}
-          >
-            &#8592; Back to Manuals
-          </Link>
-        </div>
-
-        {/* Loading state */}
-        {loading && (
-          <div
-            style={{
-              background: 'hsl(var(--card))',
-              borderRadius: 'var(--radius)',
-              border: '1px solid hsl(var(--rule) / 0.12)',
-              padding: 24,
-            }}
-          >
-            <div
-              style={{
-                height: 32,
-                width: "60%",
-                background: "hsl(var(--ink) / 0.08)",
-                borderRadius: 4,
-                marginBottom: 16,
-                animation: "pulse 1.5s infinite",
-              }}
-            />
-            <div
-              style={{
-                height: 200,
-                background: "hsl(var(--ink) / 0.08)",
-                borderRadius: 4,
-                animation: "pulse 1.5s infinite",
-              }}
-            />
-          </div>
-        )}
-
-        {/* Error state */}
-        {!loading && error && (
-          <div
-            style={{
-              padding: 40,
-              textAlign: "center",
-              background: 'hsl(var(--card))',
-              borderRadius: 'var(--radius)',
-              border: '1px solid hsl(var(--rule) / 0.12)',
-            }}
-          >
-            <p style={{ fontSize: 16, color: "hsl(var(--destructive))", marginBottom: 16 }}>
-              {error}
-            </p>
-            <Link
-              href="/manuals"
-              style={{
-                display: "inline-block",
-                padding: "12px 20px",
-                minHeight: 44,
-                fontSize: 14,
-                fontWeight: 500,
-                color: 'hsl(var(--primary-foreground))',
-                background: 'hsl(var(--primary))',
-                border: "none",
-                borderRadius: 'var(--radius)',
-                textDecoration: "none",
-                transition: "background-color 200ms ease-out",
-              }}
-            >
-              Back to Manuals
-            </Link>
-          </div>
-        )}
-
-        {/* Manual content */}
-        {!loading && !error && manual && (
-          <div
-            style={{
-              background: 'hsl(var(--card))',
-              borderRadius: 'var(--radius)',
-              border: '1px solid hsl(var(--rule) / 0.12)',
-              overflow: "hidden",
-            }}
-          >
-            {/* Manual header */}
-            <div
-              style={{
-                padding: 24,
-                borderBottom: '1px solid hsl(var(--rule) / 0.10)',
-              }}
-            >
-              <div
-                style={{
-                  display: "flex",
-                  justifyContent: "space-between",
-                  alignItems: "flex-start",
-                  gap: 16,
-                  marginBottom: 12,
-                }}
-              >
-                <h1
-                  style={{
-                    margin: 0,
-                    fontSize: 24,
-                    fontWeight: 700,
-                    color: 'hsl(var(--foreground))',
-                    textWrap: 'balance',
-                  } as React.CSSProperties}
-                >
-                  {manual.title}
-                </h1>
-                {manual.status && (
-                  <span style={statusBadge(manual.status)}>{manual.status}</span>
-                )}
-              </div>
-              <div style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))', display: "flex", flexWrap: "wrap", gap: "8px 16px" }}>
-                {manual.crew && (
-                  <Link
-                    href={`/crew/${manual.crewId}`}
-                    style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
-                  >
-                    {manual.crew}
-                  </Link>
-                )}
-                {manual.author && manual.authorId && (
-                  <span>
-                    by{" "}
-                    <Link
-                      href={`/profile/${manual.authorId}`}
-                      style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
-                    >
-                      {manual.author}
-                    </Link>
-                  </span>
-                )}
-                {manual.author && !manual.authorId && <span>by {manual.author}</span>}
-                {manual.lastUpdated && <span>Updated: {manual.lastUpdated}</span>}
-              </div>
-              {manual.url && (
-                <div style={{ marginTop: 12 }}>
-                  <a
-                    href={manual.url}
-                    target="_blank"
-                    rel="noopener noreferrer"
-                    style={{
-                      fontSize: 13,
-                      color: "hsl(var(--tomato))",
-                      textDecoration: "none",
-                    }}
-                  >
-                    Open in Google Sheets &#8594;
-                  </a>
-                </div>
-              )}
-            </div>
-
-            {/* Manual content - Sheet data displayed as table */}
-            <div style={{ padding: 24 }}>
-              {sheetContent && sheetContent.rows.length > 0 ? (
-                <div style={{ overflowX: "auto" }}>
-                  <table style={{ width: "100%", borderCollapse: "collapse" }}>
-                    <thead>
-                      <tr>
-                        {/* Step number column */}
-                        <th
-                          style={{
-                            textAlign: "center",
-                            padding: "12px 16px",
-                            borderBottom: '2px solid hsl(var(--rule) / 0.10)',
-                            fontSize: 12,
-                            fontWeight: 700,
-                            textTransform: "uppercase",
-                            letterSpacing: 0.5,
-                            background: 'hsl(var(--background))',
-                            whiteSpace: "nowrap",
-                            width: 50,
-                          }}
-                        >
-                          #
-                        </th>
-                        {sheetContent.headers.map((header, i) => (
-                          <th
-                            key={i}
-                            style={{
-                              textAlign: "left",
-                              padding: "12px 16px",
-                              borderBottom: '2px solid hsl(var(--rule) / 0.10)',
-                              fontSize: 12,
-                              fontWeight: 700,
-                              textTransform: "uppercase",
-                              letterSpacing: 0.5,
-                              background: 'hsl(var(--background))',
-                              whiteSpace: "nowrap",
-                            }}
-                          >
-                            {header}
-                          </th>
-                        ))}
-                      </tr>
-                    </thead>
-                    <tbody>
-                      {sheetContent.rows.map((row, rowIndex) => (
-                        <tr key={rowIndex}>
-                          {/* Step number cell */}
-                          <td
-                            style={{
-                              padding: "12px 16px",
-                              borderBottom: '1px solid hsl(var(--rule) / 0.10)',
-                              fontSize: 14,
-                              verticalAlign: "top",
-                              textAlign: "center",
-                              fontWeight: 600,
-                              color: 'hsl(var(--muted-foreground))',
-                            }}
-                          >
-                            {rowIndex + 1}
-                          </td>
-                          {row.map((cell, cellIndex) => (
-                            <td
-                              key={cellIndex}
-                              style={{
-                                padding: "12px 16px",
-                                borderBottom: '1px solid hsl(var(--rule) / 0.10)',
-                                fontSize: 14,
-                                verticalAlign: "top",
-                              }}
-                            >
-                              {cell.url ? (
-                                <a
-                                  href={cell.url}
-                                  target="_blank"
-                                  rel="noopener noreferrer"
-                                  style={{ color: "hsl(var(--tomato))", textDecoration: "none" }}
-                                >
-                                  {cell.value}
-                                </a>
-                              ) : (
-                                cell.value
-                              )}
-                            </td>
-                          ))}
-                        </tr>
-                      ))}
-                    </tbody>
-                  </table>
-                </div>
-              ) : (
-                <div
-                  style={{
-                    padding: 40,
-                    textAlign: "center",
-                    color: 'hsl(var(--muted-foreground))',
-                    background: 'hsl(var(--background))',
-                    borderRadius: 'var(--radius)',
-                  }}
-                >
-                  <div style={{
-                    fontSize: 48,
-                    marginBottom: 16,
-                    opacity: 0.5,
-                  }}>
-                    {contentError?.includes('private') ? '\uD83D\uDD12' :
-                     contentError?.includes('not found') ? '\uD83D\uDD0D' :
-                     contentError?.includes('No Google Sheet link') ? '\uD83D\uDCCB' : '\u26A0\uFE0F'}
-                  </div>
-                  <p style={{ marginBottom: 8, fontWeight: 500, color: 'hsl(var(--foreground))' }}>
-                    {contentError?.includes('private') ? 'Private Sheet' :
-                     contentError?.includes('not found') ? 'Sheet Not Found' :
-                     contentError?.includes('No Google Sheet link') ? 'No Sheet Link' :
-                     'Unable to Load Content'}
-                  </p>
-                  <p
-                    style={{
-                      marginBottom: 20,
-                      fontSize: 14,
-                      maxWidth: 400,
-                      margin: "0 auto 20px",
-                      textWrap: 'pretty',
-                    } as React.CSSProperties}
-                  >
-                    {contentError || "The sheet content could not be loaded."}
-                  </p>
-                  {manual.url && (
-                    <a
-                      href={manual.url}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      style={{
-                        display: "inline-block",
-                        padding: "12px 20px",
-                        fontSize: 14,
-                        fontWeight: 500,
-                        color: 'hsl(var(--primary-foreground))',
-                        background: 'hsl(var(--primary))',
-                        borderRadius: 'var(--radius)',
-                        textDecoration: "none",
-                        transition: "background-color 200ms ease-out",
-                      }}
-                    >
-                      Open in Google Sheets
-                    </a>
-                  )}
-                  {!manual.url && manual.status?.toLowerCase() === 'needed' && (
-                    <p style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))', marginTop: 12 }}>
-                      This manual needs to be written. Check with the crew lead.
-                    </p>
-                  )}
-                </div>
-              )}
-            </div>
-          </div>
-        )}
+    <EditorialPage width="max-w-[1000px]">
+      {/* Back link */}
+      <div className="mb-6">
+        <Link
+          href="/manuals"
+          className="overline inline-flex items-center min-h-11 text-foreground/55 no-underline hover:text-tomato transition-colors"
+        >
+          &#8592; Back to manuals
+        </Link>
       </div>
 
-      <style jsx>{`
-        @keyframes pulse {
-          0%,
-          100% {
-            opacity: 1;
-          }
-          50% {
-            opacity: 0.5;
-          }
-        }
-      `}</style>
-    </div>
+      {/* Loading state */}
+      {loading && (
+        <div className={`${paperCard} p-6`}>
+          <div className="h-8 w-3/5 mb-4 rounded-md bg-[hsl(var(--ink)/0.08)] animate-pulse" />
+          <div className="h-[200px] rounded-md bg-[hsl(var(--ink)/0.08)] animate-pulse" />
+        </div>
+      )}
+
+      {/* Error state */}
+      {!loading && error && (
+        <div className={`${paperCard} p-10 text-center grid justify-items-center gap-4`}>
+          <p className="text-base text-destructive m-0">{error}</p>
+          <Link href="/manuals" className={pillInk}>
+            Back to manuals
+          </Link>
+        </div>
+      )}
+
+      {/* Manual content */}
+      {!loading && !error && manual && (
+        <article>
+          {/* Manual header */}
+          <header className="fade-up mb-6">
+            <p className="overline text-tomato m-0">
+              <span aria-hidden>§</span>
+              <span aria-hidden className="mx-2 opacity-50">···</span>
+              {manual.crew ? `${manual.crew} · Manual` : "Manual"}
+            </p>
+            <div className="mt-3 flex flex-wrap items-start justify-between gap-4">
+              <h1
+                className="font-display font-black tracking-[-0.015em] text-foreground leading-[0.98] m-0 min-w-0"
+                style={{ fontSize: "clamp(2rem, 5.5vw, 3.4rem)", textWrap: "balance" }}
+              >
+                {manual.title}
+              </h1>
+              {manual.status && (
+                <span
+                  className={`overline shrink-0 px-2.5 py-1 rounded-md mt-2 ${statusBadgeClass(manual.status)}`}
+                  style={{ fontSize: 10.5 }}
+                >
+                  {manual.status}
+                </span>
+              )}
+            </div>
+            <div className="mt-4 flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
+              {manual.crew && (
+                <Link href={`/crew/${manual.crewId}`} className="text-tomato no-underline hover:underline">
+                  {manual.crew}
+                </Link>
+              )}
+              {manual.author && manual.authorId && (
+                <span>
+                  by{" "}
+                  <Link href={`/profile/${manual.authorId}`} className="text-tomato no-underline hover:underline">
+                    {manual.author}
+                  </Link>
+                </span>
+              )}
+              {manual.author && !manual.authorId && <span>by {manual.author}</span>}
+              {manual.lastUpdated && <span>Updated: {manual.lastUpdated}</span>}
+            </div>
+            {manual.url && (
+              <a
+                href={manual.url}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="overline mt-3 inline-flex items-center min-h-11 text-tomato no-underline hover:underline"
+              >
+                Open in Google Sheets &#8594;
+              </a>
+            )}
+            <div className="rule-thick mt-5" />
+            <div className="rule mt-1" />
+          </header>
+
+          {/* Manual content - Sheet data displayed as table */}
+          <div className={`${paperCard} overflow-hidden`} style={{ boxShadow: "var(--shadow-soft)" }}>
+            {sheetContent && sheetContent.rows.length > 0 ? (
+              <div className="overflow-x-auto">
+                <table className="w-full border-collapse">
+                  <thead>
+                    <tr>
+                      {/* Step number column */}
+                      <th className="overline text-center px-4 py-3 border-b-2 border-foreground/80 whitespace-nowrap w-[50px] text-foreground/60">
+                        #
+                      </th>
+                      {sheetContent.headers.map((header, i) => (
+                        <th
+                          key={i}
+                          className="overline text-left px-4 py-3 border-b-2 border-foreground/80 whitespace-nowrap text-foreground/60"
+                        >
+                          {header}
+                        </th>
+                      ))}
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {sheetContent.rows.map((row, rowIndex) => (
+                      <tr key={rowIndex} className="hover:bg-[hsl(var(--butter)/0.10)] transition-colors">
+                        {/* Step number cell */}
+                        <td className="px-4 py-3 border-b border-[hsl(var(--rule-warm)/0.45)] align-top text-center font-display font-black text-tomato">
+                          {rowIndex + 1}
+                        </td>
+                        {row.map((cell, cellIndex) => (
+                          <td
+                            key={cellIndex}
+                            className="px-4 py-3 border-b border-[hsl(var(--rule-warm)/0.45)] text-sm align-top"
+                          >
+                            {cell.url ? (
+                              <a
+                                href={cell.url}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-tomato no-underline hover:underline"
+                              >
+                                {cell.value}
+                              </a>
+                            ) : (
+                              cell.value
+                            )}
+                          </td>
+                        ))}
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+            ) : (
+              <div className="p-10 text-center text-muted-foreground">
+                <div aria-hidden className="text-5xl mb-4 opacity-50">
+                  {contentError?.includes('private') ? '🔒' :
+                   contentError?.includes('not found') ? '🔍' :
+                   contentError?.includes('No Google Sheet link') ? '📋' : '⚠️'}
+                </div>
+                <p className="font-display text-lg font-black text-foreground mb-2 mt-0">
+                  {contentError?.includes('private') ? 'Private Sheet' :
+                   contentError?.includes('not found') ? 'Sheet Not Found' :
+                   contentError?.includes('No Google Sheet link') ? 'No Sheet Link' :
+                   'Unable to Load Content'}
+                </p>
+                <p className="text-sm max-w-[400px] mx-auto mb-5 mt-0" style={{ textWrap: "pretty" }}>
+                  {contentError || "The sheet content could not be loaded."}
+                </p>
+                {manual.url && (
+                  <a href={manual.url} target="_blank" rel="noopener noreferrer" className={pillInk}>
+                    Open in Google Sheets
+                  </a>
+                )}
+                {!manual.url && manual.status?.toLowerCase() === 'needed' && (
+                  <p className="text-[13px] text-muted-foreground mt-3">
+                    This manual needs to be written. Check with the crew lead.
+                  </p>
+                )}
+              </div>
+            )}
+          </div>
+        </article>
+      )}
+    </EditorialPage>
   );
 }

@@ -4,11 +4,13 @@
 // Visual rewrite. The Props interface, API calls (/api/city-autocomplete,
 // /api/city-region, /api/city-telegram), state, and callbacks are unchanged.
 // arugula-30866 — i18n via next-intl (onboarding.city.*).
+// pizzaiolo-13628 — picking a suggestion also resolves the city's timezone
+// via /api/city-timezone (stored in MemberProfileExtras on submit).
 "use client";
 
 import { useEffect, useRef, useState } from "react";
 import type { CSSProperties } from "react";
-import { ArrowLeft, ArrowUpRight, MapPin, Sparkles } from "lucide-react";
+import { ArrowLeft, ArrowUpRight, Clock, MapPin, Sparkles } from "lucide-react";
 import { useTranslations } from "next-intl";
 import type { CityPrediction } from "../types";
 
@@ -24,6 +26,9 @@ type Props = {
   city: string;
   onChange: (city: string) => void;
   onRegionResolved?: (region: string | null, countryCode: string | null) => void;
+  /** Human-friendly label of the resolved timezone, e.g. "EDT (UTC-4)". */
+  timezoneLabel?: string;
+  onTimezoneResolved?: (timezoneId: string | null, timezoneLabel: string | null) => void;
   onNext: () => void;
   onBack: () => void;
 };
@@ -33,7 +38,15 @@ const HERO_SPOTLIGHT: CSSProperties = {
     "radial-gradient(80% 60% at 20% 0%, hsl(46 100% 62% / 0.22), transparent 60%), radial-gradient(70% 60% at 95% 10%, hsl(0 93% 60% / 0.10), transparent 65%)",
 };
 
-export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: Props) {
+export function CityStep({
+  city,
+  onChange,
+  onRegionResolved,
+  timezoneLabel,
+  onTimezoneResolved,
+  onNext,
+  onBack,
+}: Props) {
   const t = useTranslations("onboarding.city");
   const canProceed = city.trim().length > 0;
   const [telegramMatch, setTelegramMatch] = useState<TelegramMatch | null>(null);
@@ -112,9 +125,20 @@ export function CityStep({ city, onChange, onRegionResolved, onNext, onBack }: P
           value={city}
           onChange={onChange}
           onRegionResolved={onRegionResolved}
+          onTimezoneResolved={onTimezoneResolved}
           placeholder={t("inputPlaceholder")}
           ariaLabel={t("inputAriaLabel")}
         />
+
+        {timezoneLabel && (
+          <p
+            className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.24em] text-foreground/55"
+            data-testid="city-timezone"
+          >
+            <Clock className="h-3 w-3" aria-hidden />
+            {t("timezoneDetected", { timezone: timezoneLabel })}
+          </p>
+        )}
 
         {telegramLoading && (
           <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/45">
@@ -168,12 +192,14 @@ function CityAutocomplete({
   value,
   onChange,
   onRegionResolved,
+  onTimezoneResolved,
   placeholder,
   ariaLabel,
 }: {
   value: string;
   onChange: (v: string) => void;
   onRegionResolved?: (region: string | null, countryCode: string | null) => void;
+  onTimezoneResolved?: (timezoneId: string | null, timezoneLabel: string | null) => void;
   placeholder: string;
   ariaLabel: string;
 }) {
@@ -236,6 +262,22 @@ function CityAutocomplete({
       });
   }
 
+  function resolveTimezone(placeId: string) {
+    if (!onTimezoneResolved) return;
+    fetch("/api/city-timezone", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ place_id: placeId }),
+    })
+      .then((r) => (r.ok ? r.json() : null))
+      .then((data) => {
+        onTimezoneResolved(data?.timezoneId ?? null, data?.label ?? null);
+      })
+      .catch(() => {
+        /* non-blocking: timezone is optional */
+      });
+  }
+
   return (
     <div className="relative">
       <div
@@ -269,6 +311,8 @@ function CityAutocomplete({
             onChange={(e) => {
               suppressForValueRef.current = "";
               onChange(e.target.value);
+              // Typed text no longer matches the resolved place.
+              onTimezoneResolved?.(null, null);
             }}
             onFocus={() =>
               value.trim().length >= 2 && items.length > 0 && setOpen(true)
@@ -311,6 +355,7 @@ function CityAutocomplete({
                 suppressForValueRef.current = it.description;
                 onChange(it.description);
                 resolveRegion(it.place_id);
+                resolveTimezone(it.place_id);
                 setOpen(false);
                 setItems([]);
               }}

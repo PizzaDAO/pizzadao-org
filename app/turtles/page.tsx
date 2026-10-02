@@ -1,12 +1,13 @@
 'use client'
 
-import { useEffect, useState } from 'react'
-import Link from 'next/link'
-import { Inter } from 'next/font/google'
-import { TURTLES } from '@/app/ui/constants'
-import { card, navBtn, pageContainer } from '@/app/ui/shared-styles'
+// Editorial restyle: § overline masthead and paper-soft role cards.
+// Data loading (per-turtle member counts) is unchanged.
 
-const inter = Inter({ subsets: ['latin'] })
+import { useEffect, useState } from 'react'
+import Image from 'next/image'
+import Link from 'next/link'
+import { TURTLES } from '@/app/ui/constants'
+import { EditorialMasthead, EditorialPage, paperCard, pillOutline } from '@/app/ui/shared/Editorial'
 
 type TurtleCounts = Record<string, number>
 
@@ -33,7 +34,7 @@ export default function TurtlesIndexPage() {
           }
         }
         setCounts(newCounts)
-      } catch (e) {
+      } catch {
         // Counts are optional, continue without them
       } finally {
         setLoading(false)
@@ -43,140 +44,76 @@ export default function TurtlesIndexPage() {
   }, [])
 
   return (
-    <div style={pageContainer(inter.style.fontFamily)}>
-      <div style={{ maxWidth: 900, margin: '0 auto', display: 'grid', gap: 24 }}>
-        {/* Navigation */}
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          <Link href="/crews" style={navBtn()}>
-            All Crews
+    <EditorialPage width="max-w-[960px]">
+      <EditorialMasthead
+        overline="The Turtles"
+        title={
+          <>
+            Turtle <span className="text-tomato underline-scribble">roles</span>
+          </>
+        }
+        dek="Every PizzaDAO member identifies with one or more turtle roles. Click a role to see all members."
+      >
+        <nav aria-label="Turtle pages" className="flex flex-wrap gap-2.5">
+          <Link href="/crews" className={pillOutline}>
+            All crews
           </Link>
-        </div>
+        </nav>
+      </EditorialMasthead>
 
-        {/* Header */}
-        <header style={{ textAlign: 'center', marginBottom: 20 }}>
-          <h1
-            style={{
-              fontSize: 36,
-              fontWeight: 800,
-              margin: 0,
-              textWrap: 'balance',
-            } as React.CSSProperties}
-          >
-            Turtle Roles
-          </h1>
-          <p
-            style={{
-              fontSize: 16,
-              opacity: 0.6,
-              marginTop: 8,
-              textWrap: 'pretty',
-            } as React.CSSProperties}
-          >
-            Every PizzaDAO member identifies with one or more turtle roles.
-            Click a role to see all members.
-          </p>
-        </header>
-
-        {/* Turtle Grid */}
-        <div style={{
-          display: 'grid',
-          gridTemplateColumns: 'repeat(auto-fill, minmax(260px, 1fr))',
-          gap: 16,
-        }}>
-          {TURTLES.map((t) => {
-            const count = counts[t.id]
-            return (
-              <Link
-                key={t.id}
-                href={`/turtles/${encodeURIComponent(t.id)}`}
-                style={{
-                  ...card(),
-                  padding: 20,
-                  textDecoration: 'none',
-                  color: 'inherit',
-                  transition: 'transform 200ms ease-out, box-shadow 200ms ease-out',
-                  cursor: 'pointer',
-                }}
-                onMouseEnter={(e) => {
-                  e.currentTarget.style.transform = 'translateY(-2px)'
-                  e.currentTarget.style.boxShadow = '0 12px 40px hsl(var(--ink) / 0.12)'
-                }}
-                onMouseLeave={(e) => {
-                  e.currentTarget.style.transform = 'translateY(0)'
-                  e.currentTarget.style.boxShadow = '0 8px 30px hsl(var(--ink) / 0.06)'
-                }}
-              >
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: 16,
-                }}>
-                  <img
-                    src={t.image}
-                    alt={t.label}
-                    style={{
-                      width: 64,
-                      height: 64,
-                      objectFit: 'contain',
-                      flexShrink: 0,
-                    }}
-                  />
-                  <div style={{ flex: 1 }}>
-                    <h2
-                      style={{
-                        fontSize: 20,
-                        fontWeight: 700,
-                        margin: 0,
-                        textWrap: 'balance',
-                      } as React.CSSProperties}
-                    >
-                      {t.label}
-                    </h2>
-                    <p style={{
-                      fontSize: 14,
-                      opacity: 0.6,
-                      margin: '4px 0 0',
-                    }}>
-                      {t.role}
+      {/* Turtle Grid */}
+      <div
+        className="grid gap-4"
+        style={{ gridTemplateColumns: 'repeat(auto-fill, minmax(min(260px, 100%), 1fr))' }}
+      >
+        {TURTLES.map((t) => {
+          const count = counts[t.id]
+          return (
+            <Link
+              key={t.id}
+              href={`/turtles/${encodeURIComponent(t.id)}`}
+              className={`${paperCard} group p-5 no-underline text-inherit transition-all duration-200 hover:-translate-y-0.5 hover:border-[hsl(var(--tomato)/0.6)]`}
+              style={{ boxShadow: 'var(--shadow-soft)' }}
+            >
+              <div className="flex items-center gap-4">
+                <Image
+                  src={t.image}
+                  alt={t.label}
+                  width={64}
+                  height={64}
+                  sizes="64px"
+                  className="w-16 h-16 object-contain shrink-0"
+                />
+                <div className="flex-1 min-w-0">
+                  <h2
+                    className="font-display font-black tracking-tight text-foreground leading-tight m-0 group-hover:text-tomato transition-colors"
+                    style={{ fontSize: 'clamp(1.2rem, 2.2vw, 1.4rem)', textWrap: 'balance' }}
+                  >
+                    {t.label}
+                  </h2>
+                  <p className="text-sm text-foreground/60 mt-1 mb-0">{t.role}</p>
+                  {!loading && count !== undefined && (
+                    <p className="overline text-tomato mt-2 mb-0">
+                      {count} {count === 1 ? 'member' : 'members'}
                     </p>
-                    {!loading && count !== undefined && (
-                      <p style={{
-                        fontSize: 13,
-                        color: 'hsl(var(--tomato))',
-                        fontWeight: 600,
-                        margin: '6px 0 0',
-                      }}>
-                        {count} {count === 1 ? 'member' : 'members'}
-                      </p>
-                    )}
-                    {loading && (
-                      <p style={{
-                        fontSize: 13,
-                        opacity: 0.4,
-                        margin: '6px 0 0',
-                      }}>
-                        Loading...
-                      </p>
-                    )}
-                  </div>
-                  <span style={{
-                    fontSize: 20,
-                    opacity: 0.3,
-                    flexShrink: 0,
-                  }}>
-                    &rarr;
-                  </span>
+                  )}
+                  {loading && (
+                    <p className="overline text-foreground/40 mt-2 mb-0">Loading…</p>
+                  )}
                 </div>
-              </Link>
-            )
-          })}
-        </div>
-
-        {/* Footer */}
-        <div style={{ textAlign: 'center', marginTop: 40, opacity: 0.4, fontSize: 13 }}>
-          PizzaDAO
-        </div>
+                <span aria-hidden className="text-xl text-foreground/30 shrink-0 group-hover:text-tomato transition-colors">
+                  &rarr;
+                </span>
+              </div>
+            </Link>
+          )
+        })}
       </div>
-    </div>
+
+      {/* Footer */}
+      <div className="rule-warm mt-12 pt-4 text-center">
+        <p className="overline m-0 text-foreground/40">§ PizzaDAO</p>
+      </div>
+    </EditorialPage>
   )
 }
