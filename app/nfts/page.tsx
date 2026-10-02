@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { CollectionCard } from "../ui/nft/CollectionCard";
+import { useSession } from "@/app/lib/hooks/use-session";
 
 interface Holder {
   memberId: string;
@@ -40,6 +41,9 @@ function formatTimestamp(ts: number): string {
  * Refresh button uses the secondary outline style; cards use shared `card()`.
  */
 export default function NFTsPage() {
+  // Cache refresh is admin-only server-side; only show the button to admins.
+  const { data: session } = useSession();
+  const isAdmin = session?.isAdmin === true;
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -107,6 +111,7 @@ export default function NFTsPage() {
                 {data.cached && " (cached)"}
               </p>
             )}
+            {isAdmin && (
             <button
               onClick={handleRefresh}
               disabled={refreshing || loading}
@@ -118,6 +123,7 @@ export default function NFTsPage() {
             >
               {refreshing ? "Refreshing..." : "Refresh Data"}
             </button>
+            )}
           </div>
         </div>
 
