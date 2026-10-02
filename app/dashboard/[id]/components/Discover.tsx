@@ -27,6 +27,7 @@ export type DiscoverBounty = {
     description: string;
     reward: number;
     status: "OPEN" | "CLAIMED";
+    crew?: string | null;
 };
 
 export type DiscoverJob = {
@@ -185,6 +186,19 @@ function BountyItem({ b }: { b: DiscoverBounty }) {
             >
                 {b.reward.toLocaleString()} PEP
             </div>
+            {b.crew && (
+                <div
+                    className="ui"
+                    style={{
+                        fontSize: 10,
+                        textTransform: "uppercase",
+                        letterSpacing: "0.22em",
+                        color: "hsl(var(--muted-foreground))",
+                    }}
+                >
+                    {b.crew}
+                </div>
+            )}
         </Link>
     );
 }

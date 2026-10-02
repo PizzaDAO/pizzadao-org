@@ -89,9 +89,12 @@ model Bounty {
   createdBy   String           // Discord ID of poster
   claimedBy   String?          // Discord ID of claimer
   status      BountyStatus     @default(OPEN)
+  crewId      String?          // Crew-mappings slug (e.g. "ops"); null = general bounty (jalapeno-82565)
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   comments    BountyComment[]
+
+  @@index([crewId, status])
 }
 
 // Comments/updates on bounties
@@ -542,6 +545,8 @@ model MemberProfileExtras {
   vouchPromptShownAt       DateTime?                 // dismissed by user (null = not yet shown)
   // ===== Profile-complete celebration (jalapeno-34126) =====
   profileCompletedCelebratedAt DateTime?             // null = not yet shown; backfilled for already-complete members
+  // ===== Timezone (pizzaiolo-13628) — the Crew sheet has no Timezone column =====
+  timezone                 String?   @db.VarChar(64) // IANA ID resolved from the onboarding city, e.g. "America/New_York"
   updatedAt                DateTime  @updatedAt
   createdAt                DateTime  @default(now())
 }
