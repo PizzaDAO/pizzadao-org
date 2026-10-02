@@ -1,20 +1,25 @@
 'use client'
 
+// Editorial restyle: § overline masthead, display-font day columns and
+// paper-soft crew cards. Data loading, join/leave and login prompts are
+// unchanged; the mobile/desktop split is now CSS (md:) instead of a resize
+// listener, so the server-rendered markup matches on every viewport.
+
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
-import { Inter } from 'next/font/google'
 import { groupCrewsByDay } from '@/app/lib/crew-schedule'
 import { useToast } from '@/app/ui/shared/Toast'
 import { LoginPrompt } from '@/app/ui/shared/LoginPrompt'
 import {
-  btn,
-  card,
-  loadingSpinner,
-  navBtn,
-  pageContainer,
-} from '@/app/ui/shared-styles'
-
-const inter = Inter({ subsets: ['latin'] })
+  EditorialMasthead,
+  EditorialPage,
+  LoadingLine,
+  SectionHeading,
+  paperCard,
+  pillInk,
+  pillOutline,
+  pillTomato,
+} from '@/app/ui/shared/Editorial'
 
 type CrewTask = {
   label: string
@@ -58,15 +63,6 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
   const [leaving, setLeaving] = useState<string | null>(null)
   const [loginPromptFor, setLoginPromptFor] = useState<string | null>(null)
   const toast = useToast()
-  const [isMobile, setIsMobile] = useState(false)
-
-  // Detect mobile viewport
-  useEffect(() => {
-    const check = () => setIsMobile(window.innerWidth < 768)
-    check()
-    window.addEventListener('resize', check)
-    return () => window.removeEventListener('resize', check)
-  }, [])
 
   // Fetch crews and user data
   useEffect(() => {
@@ -102,7 +98,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
           }
         }
       } catch (e: unknown) {
-        setError((e as any)?.message)
+        setError(e instanceof Error ? e.message : String(e))
       } finally {
         setLoading(false)
         setUserLoading(false)
@@ -184,127 +180,94 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
     const isLeaving = leaving === crew.id
 
     return (
-      <div key={crew.id} style={{
-        ...card(),
-        padding: 20,
-        border: inCrew ? '2px solid hsl(var(--tomato))' : '1px solid hsl(var(--rule) / 0.12)',
-      }}>
-        <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start' }}>
-          <div>
-            <h2
-              style={{
-                fontSize: 20,
-                fontWeight: 700,
-                margin: 0,
-                textWrap: 'balance',
-              } as React.CSSProperties}
+      <article
+        key={crew.id}
+        className={`${paperCard} p-5 flex flex-col gap-4 transition-colors ${
+          inCrew ? 'border-2 border-tomato' : 'hover:border-[hsl(var(--tomato)/0.55)]'
+        }`}
+        style={{ boxShadow: 'var(--shadow-soft)' }}
+      >
+        <div className="flex items-start justify-between gap-3">
+          <div className="min-w-0">
+            <h3
+              className="font-display font-black tracking-tight text-foreground leading-tight m-0"
+              style={{ fontSize: 'clamp(1.2rem, 2.2vw, 1.4rem)', textWrap: 'balance' }}
             >
-              {crew.emoji && `${crew.emoji} `}{crew.label}
-            </h2>
+              {crew.emoji && <span aria-hidden className="mr-1.5">{crew.emoji}</span>}
+              {crew.label}
+            </h3>
             {(crew.callTime || crew.callLength) && (
-              <p style={{ fontSize: 14, opacity: 0.7, margin: '8px 0 0' }}>
+              <p className="overline text-foreground/55 mt-2 mb-0">
                 {crew.callTime && (
                   crew.callTimeUrl ? (
-                    <a href={crew.callTimeUrl} target="_blank" rel="noreferrer" style={{ color: 'inherit' }}>
+                    <a
+                      href={crew.callTimeUrl}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="text-inherit underline decoration-[hsl(var(--tomato)/0.5)] underline-offset-2 hover:text-tomato"
+                    >
                       {crew.callTime}
                     </a>
                   ) : crew.callTime
                 )}
-                {crew.callTime && crew.callLength && ' \u2022 '}
+                {crew.callTime && crew.callLength && <span aria-hidden className="mx-1.5 opacity-50">·</span>}
                 {crew.callLength}
               </p>
             )}
           </div>
           {inCrew && (
-            <span style={{
-              background: 'hsl(var(--tomato) / 0.12)',
-              color: 'hsl(var(--tomato))',
-              padding: '4px 10px',
-              borderRadius: 12,
-              fontSize: 12,
-              fontWeight: 600,
-            }}>
+            <span
+              className="overline shrink-0 px-2 py-1 rounded-full bg-[hsl(var(--tomato)/0.12)] text-tomato"
+              style={{ fontSize: 10 }}
+            >
               Joined
             </span>
           )}
         </div>
 
-        <div style={{ display: 'flex', gap: 10, marginTop: 16 }}>
-          <Link
-            href={`/crew/${crew.id}`}
-            style={{
-              ...btn('secondary'),
-              flex: 1,
-              textAlign: 'center',
-              fontSize: 14,
-            }}
-          >
-            View Crew
+        <div className="flex gap-2.5">
+          <Link href={`/crew/${crew.id}`} className={`${pillOutline} flex-1`}>
+            View crew
           </Link>
 
           {user && (
             inCrew ? (
               <button
+                type="button"
                 onClick={() => handleLeaveCrew(crew.id)}
                 disabled={isLeaving}
-                style={{
-                  ...btn('secondary'),
-                  flex: 1,
-                  fontSize: 14,
-                  opacity: isLeaving ? 0.6 : 1,
-                  cursor: isLeaving ? 'wait' : 'pointer',
-                  color: 'hsl(var(--destructive))',
-                  borderColor: 'hsl(var(--destructive) / 0.5)',
-                }}
+                className={`${pillOutline} flex-1 !text-destructive !border-[hsl(var(--destructive)/0.5)] ${isLeaving ? 'cursor-wait' : ''}`}
               >
-                {isLeaving ? 'Leaving...' : 'Leave Crew'}
+                {isLeaving ? 'Leaving…' : 'Leave crew'}
               </button>
             ) : (
               <button
+                type="button"
                 onClick={() => handleJoinCrew(crew.id)}
                 disabled={isJoining}
-                style={{
-                  ...btn('primary'),
-                  flex: 1,
-                  fontSize: 14,
-                  opacity: isJoining ? 0.6 : 1,
-                  cursor: isJoining ? 'wait' : 'pointer',
-                }}
+                className={`${pillInk} flex-1 ${isJoining ? 'cursor-wait' : ''}`}
               >
-                {isJoining ? 'Joining...' : 'Join Crew'}
+                {isJoining ? 'Joining…' : 'Join crew'}
               </button>
             )
           )}
         </div>
         {loginPromptFor === crew.id && (
-          <div style={{ marginTop: 12 }}>
-            <LoginPrompt message="Please log in to join a crew." onDismiss={() => setLoginPromptFor(null)} />
-          </div>
+          <LoginPrompt message="Please log in to join a crew." onDismiss={() => setLoginPromptFor(null)} />
         )}
 
         {/* Tasks Section */}
         {crew.tasks && crew.tasks.length > 0 && (
-          <div style={{ marginTop: 16, borderTop: '1px solid hsl(var(--rule) / 0.10)', paddingTop: 12 }}>
-            <div style={{ fontSize: 12, fontWeight: 600, color: 'hsl(var(--muted-foreground))', marginBottom: 8, textTransform: 'uppercase', letterSpacing: '0.5px' }}>
-              Top Tasks
-            </div>
-            <div style={{ display: 'flex', flexDirection: 'column', gap: 6 }}>
+          <div className="rule-warm pt-3">
+            <p className="overline text-foreground/45 mt-0 mb-2">Top tasks</p>
+            <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
               {crew.tasks.map((task, idx) => (
-                <div key={idx} style={{ display: 'flex', alignItems: 'flex-start', gap: 8 }}>
+                <li key={idx} className="flex items-start gap-2">
                   {task.priority && (
-                    <span style={{
-                      fontSize: 11,
-                      fontWeight: 600,
-                      padding: '3px 8px',
-                      borderRadius: 4,
-                      background: task.priority === 'Top' ? 'hsl(var(--tomato) / 0.15)' :
-                                 task.priority === 'High' ? 'rgba(255,167,38,0.15)' :
-                                 task.priority === 'Mid' ? 'rgba(33,150,243,0.15)' : 'hsl(var(--ink) / 0.06)',
-                      color: task.priority === 'Top' ? 'hsl(var(--tomato))' :
-                            task.priority === 'High' ? '#ef6c00' :
-                            task.priority === 'Mid' ? '#1565c0' : 'hsl(var(--muted-foreground))',
-                      flexShrink: 0,
-                    }}>
+                    <span
+                      className={`overline shrink-0 px-1.5 py-0.5 rounded-md mt-0.5 ${priorityClass(task.priority)}`}
+                      style={{ fontSize: 9.5, letterSpacing: '0.12em' }}
+                    >
                       {task.priority}
                     </span>
                   )}
@@ -313,20 +276,20 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
                       href={task.url}
                       target="_blank"
                       rel="noreferrer"
-                      style={{ fontSize: 14, color: 'hsl(var(--tomato))', textDecoration: 'none', lineHeight: 1.4, minHeight: 44, display: 'flex', alignItems: 'center' }}
+                      className="text-sm leading-snug text-foreground no-underline hover:text-tomato min-h-[28px] flex items-center"
                     >
                       {task.label}
                     </a>
                   ) : (
-                    <span style={{ fontSize: 14, color: 'hsl(var(--foreground))', lineHeight: 1.4 }}>{task.label}</span>
+                    <span className="text-sm leading-snug text-foreground">{task.label}</span>
                   )}
-                </div>
+                </li>
               ))}
-            </div>
+            </ul>
             {(crew.taskCount ?? 0) > 3 && (
-              <div style={{ fontSize: 13, color: 'hsl(var(--muted-foreground))', marginTop: 8 }}>
+              <p className="text-xs text-muted-foreground mt-2 mb-0 italic">
                 +{(crew.taskCount ?? 0) - 3} more tasks
-              </div>
+              </p>
             )}
           </div>
         )}
@@ -336,205 +299,125 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
             href={crew.sheet}
             target="_blank"
             rel="noreferrer"
-            style={{
-              display: 'inline-flex',
-              alignItems: 'center',
-              marginTop: 10,
-              fontSize: 14,
-              opacity: 0.6,
-              textDecoration: 'none',
-              minHeight: 44,
-            }}
+            className="overline mt-auto inline-flex items-center min-h-11 text-foreground/55 no-underline hover:text-tomato"
           >
             Open sheet ↗
           </a>
         )}
-      </div>
+      </article>
     )
   }
 
   if (loading) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'hsl(var(--background))',
-        fontFamily: inter.style.fontFamily,
-      }}>
-        <div style={{ textAlign: 'center' }}>
-          <div style={loadingSpinner()} />
-          <p style={{ fontSize: 18, opacity: 0.8 }}>Loading crews...</p>
-          <style jsx>{`@keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }`}</style>
-        </div>
-      </div>
+      <EditorialPage width="max-w-[1200px]">
+        <LoadingLine label="Loading crews…" />
+      </EditorialPage>
     )
   }
 
   if (error) {
     return (
-      <div style={{
-        minHeight: '100vh',
-        display: 'flex',
-        alignItems: 'center',
-        justifyContent: 'center',
-        background: 'hsl(var(--background))',
-        color: 'hsl(var(--foreground))',
-        fontFamily: inter.style.fontFamily,
-        padding: 20,
-      }}>
-        <div style={card()}>
+      <EditorialPage width="max-w-[640px]">
+        <div className={`${paperCard} p-7 grid gap-3`} style={{ boxShadow: 'var(--shadow-soft)' }}>
+          <p className="overline text-tomato m-0">§ Error</p>
           <h1
-            style={{
-              fontSize: 24,
-              marginBottom: 16,
-              textWrap: 'balance',
-            } as React.CSSProperties}
+            className="font-display font-black tracking-tight text-foreground m-0"
+            style={{ fontSize: 'clamp(1.75rem, 5vw, 2.25rem)', lineHeight: 1.05 }}
           >
-            Error
+            The crew roster went missing.
           </h1>
-          <p style={{ opacity: 0.7, marginBottom: 32 }}>{error}</p>
-          <Link href="/" style={btn('primary')}>Back to Home</Link>
+          <p className="text-muted-foreground m-0">{error}</p>
+          <Link href="/" className={`${pillInk} justify-self-start`}>Back to home</Link>
         </div>
-      </div>
+      </EditorialPage>
     )
   }
 
   return (
-    <div style={pageContainer(inter.style.fontFamily)}>
-      <div style={{ maxWidth: 1200, margin: '0 auto', display: 'grid', gap: 24 }}>
-        {/* Navigation */}
-        <div style={{ display: 'flex', gap: 12, flexWrap: 'wrap' }}>
-          {user && (
-            <Link href={`/dashboard/${user.memberId}`} style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
-              My Dashboard
-            </Link>
-          )}
-          <Link href="/crew" style={{ ...navBtn(), padding: '10px 16px', minHeight: 44 }}>
-            Browse Members
-          </Link>
-          <Link
-            href="/manuals"
-            style={{
-              ...navBtn(),
-              padding: '10px 16px',
-              minHeight: 44,
-              background: 'hsl(var(--butter))',
-              borderColor: 'hsl(var(--butter))',
-              color: 'hsl(var(--ink))',
-            }}
-          >
-            Browse All Manuals
-          </Link>
-        </div>
-
-        {/* Header */}
-        <header style={{ textAlign: 'center', marginBottom: 20 }}>
-          <h1
-            style={{
-              fontSize: 36,
-              fontWeight: 800,
-              margin: 0,
-              textWrap: 'balance',
-            } as React.CSSProperties}
-          >
-            Crews
-          </h1>
-          <p style={{ fontSize: 16, opacity: 0.6, marginTop: 8 }}>
+    <EditorialPage width="max-w-[1200px]">
+      <EditorialMasthead
+        overline="The Crews"
+        title={
+          <>
+            Pick a crew, <span className="text-tomato underline-scribble">join the call</span>
+          </>
+        }
+        dek={
+          <>
             Working groups that meet on a regular call.{' '}
             {user ? `Welcome, ${user.name}! Join crews to get involved.` : userLoading ? '' : 'Log in to join crews.'}
-          </p>
-        </header>
+          </>
+        }
+      >
+        <nav aria-label="Crew pages" className="flex flex-wrap gap-2.5">
+          {user && (
+            <Link href={`/dashboard/${user.memberId}`} className={pillOutline}>
+              My dashboard
+            </Link>
+          )}
+          <Link href="/crew" className={pillOutline}>
+            Browse members
+          </Link>
+          <Link href="/manuals" className="btn-pill min-h-11 no-underline bg-butter text-ink border border-transparent hover:opacity-90">
+            Browse all manuals
+          </Link>
+        </nav>
+      </EditorialMasthead>
 
-        {/* Crews by Day of Week */}
-        {isMobile ? (
-          /* Mobile: stacked day sections */
-          <div style={{ display: 'flex', flexDirection: 'column', gap: 24 }}>
-            {scheduledCrews.map(({ day, crews: dayCrews }) => (
-              <div key={day}>
-                <h3 style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  marginBottom: 12,
-                  color: 'hsl(var(--foreground))',
-                  borderBottom: '2px solid hsl(var(--rule) / 0.10)',
-                  paddingBottom: 8,
-                }}>
-                  {day}
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {dayCrews.map(crew => renderCrewCard(crew as CrewOption))}
-                </div>
-              </div>
-            ))}
-          </div>
-        ) : (
-          /* Desktop: side-by-side day columns */
-          <div style={{ display: 'flex', gap: 24, alignItems: 'flex-start' }}>
-            {scheduledCrews.map(({ day, crews: dayCrews }) => (
-              <div key={day} style={{ flex: 1, minWidth: 0 }}>
-                <h3 style={{
-                  fontSize: 16,
-                  fontWeight: 700,
-                  marginBottom: 12,
-                  color: 'hsl(var(--foreground))',
-                  borderBottom: '2px solid hsl(var(--rule) / 0.10)',
-                  paddingBottom: 8,
-                  textAlign: 'center',
-                }}>
-                  {day}
-                </h3>
-                <div style={{ display: 'flex', flexDirection: 'column', gap: 12 }}>
-                  {dayCrews.map(crew => renderCrewCard(crew as CrewOption))}
-                </div>
-              </div>
-            ))}
-          </div>
-        )}
-
-        {/* Other Crews Section */}
-        {otherCrews.length > 0 && (
-          <div style={{ marginTop: 16 }}>
-            <h2
-              style={{
-                fontSize: 24,
-                fontWeight: 700,
-                marginBottom: 16,
-                color: 'hsl(var(--foreground))',
-                borderBottom: '2px solid hsl(var(--rule) / 0.10)',
-                paddingBottom: 10,
-                textWrap: 'balance',
-              } as React.CSSProperties}
-            >
-              Other Crews
-            </h2>
-            <div style={{
-              display: 'grid',
-              gridTemplateColumns: isMobile ? '1fr' : 'repeat(3, 1fr)',
-              gap: 16,
-            }}>
-              {otherCrews.map(crew => renderCrewCard(crew as CrewOption))}
+      {/* Crews by day of week: stacked on mobile, side-by-side columns from md */}
+      <section aria-label="Weekly schedule" className="flex flex-col md:flex-row gap-6 md:items-start">
+        {scheduledCrews.map(({ day, crews: dayCrews }) => (
+          <div key={day} className="flex-1 min-w-0">
+            <div className="mb-3 pb-2 border-b-2 border-foreground md:text-center">
+              <p className="overline text-foreground/45 m-0">Every</p>
+              <h2 className="font-display text-xl font-black tracking-tight text-foreground m-0">{day}</h2>
+            </div>
+            <div className="flex flex-col gap-3">
+              {dayCrews.map(crew => renderCrewCard(crew as CrewOption))}
             </div>
           </div>
-        )}
+        ))}
+      </section>
 
-        {/* Not logged in message */}
-        {!user && !userLoading && (
-          <div style={{
-            ...card(),
-            textAlign: 'center',
-            marginTop: 20,
-          }}>
-            <p style={{ fontSize: 16, marginBottom: 16 }}>
-              Log in with Discord to join crews
-            </p>
-            <Link href="/login" style={btn('primary')}>
-              Log in
-            </Link>
+      {/* Other Crews Section */}
+      {otherCrews.length > 0 && (
+        <section className="mt-12">
+          <SectionHeading overline="Off the calendar" title="Other crews" count={otherCrews.length} />
+          <div className="rule-warm mb-4" />
+          <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
+            {otherCrews.map(crew => renderCrewCard(crew as CrewOption))}
           </div>
-        )}
-      </div>
-    </div>
+        </section>
+      )}
+
+      {/* Not logged in message */}
+      {!user && !userLoading && (
+        <div
+          className={`${paperCard} mt-10 p-6 text-center grid justify-items-center gap-3`}
+          style={{ boxShadow: 'var(--shadow-soft)' }}
+        >
+          <p className="font-display text-lg font-black text-foreground m-0">
+            Log in with Discord to join crews
+          </p>
+          <Link href="/login" className={pillTomato}>
+            Log in
+          </Link>
+        </div>
+      )}
+    </EditorialPage>
   )
+}
+
+function priorityClass(priority: string): string {
+  switch (priority) {
+    case 'Top':
+      return 'bg-[hsl(var(--tomato)/0.15)] text-tomato'
+    case 'High':
+      return 'bg-[hsl(32_95%_55%/0.16)] text-[hsl(28_90%_38%)] dark:text-[hsl(32_95%_65%)]'
+    case 'Mid':
+      return 'bg-[hsl(210_80%_55%/0.14)] text-[hsl(212_70%_38%)] dark:text-[hsl(210_80%_70%)]'
+    default:
+      return 'bg-[hsl(var(--ink)/0.06)] text-muted-foreground'
+  }
 }
