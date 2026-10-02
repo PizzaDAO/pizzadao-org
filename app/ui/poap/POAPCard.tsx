@@ -1,6 +1,8 @@
 'use client';
 
+import Image from 'next/image';
 import { POAPDisplayItem } from '@/app/lib/poap-types';
+import { isOptimizableImage } from '@/app/lib/image-hosts';
 
 interface POAPCardProps {
   poap: POAPDisplayItem;
@@ -23,11 +25,14 @@ export function POAPCard({ poap, size = 'large' }: POAPCardProps) {
         title={poap.title}
       >
         {poap.imageUrl ? (
-          <img
+          <Image
             src={poap.imageUrl}
             alt={poap.title}
+            width={40}
+            height={40}
+            sizes="40px"
+            unoptimized={!isOptimizableImage(poap.imageUrl)}
             className="w-full h-full object-cover"
-            loading="lazy"
           />
         ) : (
           <div className="w-full h-full bg-muted" />
@@ -45,11 +50,13 @@ export function POAPCard({ poap, size = 'large' }: POAPCardProps) {
       title={poap.title}
     >
       {poap.imageUrl ? (
-        <img
+        <Image
           src={poap.imageUrl}
           alt={poap.title}
-          className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-200"
-          loading="lazy"
+          fill
+          sizes="(max-width: 640px) 33vw, 180px"
+          unoptimized={!isOptimizableImage(poap.imageUrl)}
+          className="object-cover group-hover:scale-105 transition-transform duration-200"
         />
       ) : (
         <div className="w-full h-full bg-muted flex items-center justify-center">

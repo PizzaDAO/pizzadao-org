@@ -15,7 +15,9 @@
 // beside the level pill. Props are unchanged.
 
 import { useEffect, useState } from "react";
+import Image from "next/image";
 import Link from "next/link";
+import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { ProfileActions, type ProfileActionsMode } from "./ProfileActions";
 
 interface ProfileHeroProps {
@@ -150,10 +152,14 @@ export function ProfileHero({
 
                 <div className="relative p-5 sm:p-7 flex items-start gap-4 flex-wrap sm:flex-nowrap">
                     {pfpUrl && (
-                        // eslint-disable-next-line @next/next/no-img-element
-                        <img
+                        <Image
                             src={pfpUrl}
                             alt={`${name}'s profile`}
+                            width={96}
+                            height={96}
+                            sizes="(min-width: 640px) 96px, 80px"
+                            preload
+                            unoptimized={!isOptimizableImage(pfpUrl)}
                             className="h-20 w-20 sm:h-24 sm:w-24 rounded-full object-cover shrink-0"
                             style={{
                                 objectPosition: "top",

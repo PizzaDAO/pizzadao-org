@@ -12,6 +12,7 @@
 // onion-47612: editorial restyle — paper-soft card, "§ 02 · About" overline,
 // chip group labels move to .overline, ink-toned chips. Logic unchanged.
 
+import Image from "next/image";
 import Link from "next/link";
 import { TURTLES } from "../constants";
 import { ProfileLinksDisplay } from "../profile-links";
@@ -138,10 +139,11 @@ export function AboutChips({
                                     title={`View all ${tDef.label} members`}
                                     className="hover:opacity-80 transition-opacity"
                                 >
-                                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                                    <img
+                                    <Image
                                         src={tDef.image}
                                         alt={tDef.label}
+                                        width={40}
+                                        height={40}
                                         style={{ width: 40, height: 40, objectFit: "contain" }}
                                     />
                                 </Link>
