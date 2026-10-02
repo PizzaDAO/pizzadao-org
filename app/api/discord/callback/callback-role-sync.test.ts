@@ -26,14 +26,23 @@ vi.mock("@/app/lib/session", () => ({
 }));
 
 // Mock the oauth-proxy module
-vi.mock("@/app/lib/oauth-proxy", () => ({
-  decodeOAuthState: vi.fn().mockReturnValue({ sessionId: "", return_to: "" }),
-  validateReturnTo: vi.fn().mockReturnValue(false),
-  createTransferToken: vi.fn().mockReturnValue("mock-transfer-token"),
-}));
+vi.mock("@/app/lib/oauth-proxy", async (importOriginal) => {
+  const actual = await importOriginal<typeof import("@/app/lib/oauth-proxy")>();
+  return {
+    ...actual,
+    decodeOAuthState: vi.fn().mockReturnValue({ sessionId: "", return_to: "", nonce: "test-nonce" }),
+    validateReturnTo: vi.fn().mockReturnValue(false),
+    createTransferToken: vi.fn().mockReturnValue("mock-transfer-token"),
+  };
+});
+
+// Callback requests carry the oauth_state cookie set by /api/discord/login.
+function callbackRequest(url: string, cookie = "oauth_state=test-nonce") {
+  return new Request(url, { headers: { cookie } });
+}
 
 // We need to mock the fetch calls that the callback route makes internally
-// (exchangeCodeForToken, fetchDiscordMe, addUserToGuild, fetchGuildMember, checkExistingMember)
+// (exchangeCodeForToken, fetchDiscordMe, lookupGuildMembership, checkExistingMember)
 // Since these are internal to the route module, we mock global.fetch
 
 describe("Discord callback route - role sync integration", () => {
@@ -59,7 +68,7 @@ describe("Discord callback route - role sync integration", () => {
       json: async () => ({
         access_token: "mock-access-token",
         token_type: "Bearer",
-        scope: "identify guilds.join",
+        scope: "identify",
         expires_in: 604800,
       }),
     });
@@ -74,13 +83,7 @@ describe("Discord callback route - role sync integration", () => {
       }),
     });
 
-    // 3. addUserToGuild - PUT to guild members
-    fetchMock.mockResolvedValueOnce({
-      status: 204,
-      ok: true,
-    });
-
-    // 4. fetchGuildMember - GET guild member
+    // 3. lookupGuildMembership - GET guild member (already in the guild)
     fetchMock.mockResolvedValueOnce({
       ok: true,
       json: async () => ({
@@ -89,7 +92,7 @@ describe("Discord callback route - role sync integration", () => {
       }),
     });
 
-    // 5. checkExistingMember - direct sheet lookup
+    // 4. checkExistingMember - direct sheet lookup
     mockFetchMemberByDiscordId.mockResolvedValueOnce({ memberId: "42", name: "Test User" });
 
     global.fetch = fetchMock;
@@ -98,7 +101,7 @@ describe("Discord callback route - role sync integration", () => {
     const { GET } = await import("./route");
 
     const url = "http://localhost:3000/api/discord/callback?code=test-code&state=test-state";
-    const req = new Request(url);
+    const req = callbackRequest(url);
     const response = await GET(req);
 
     // The response should be a redirect (302)
@@ -118,7 +121,7 @@ describe("Discord callback route - role sync integration", () => {
       json: async () => ({
         access_token: "mock-access-token",
         token_type: "Bearer",
-        scope: "identify guilds.join",
+        scope: "identify",
         expires_in: 604800,
       }),
     });
@@ -130,11 +133,6 @@ describe("Discord callback route - role sync integration", () => {
         username: "newuser",
         global_name: "New User",
       }),
-    });
-
-    fetchMock.mockResolvedValueOnce({
-      status: 204,
-      ok: true,
     });
 
     fetchMock.mockResolvedValueOnce({
@@ -153,7 +151,7 @@ describe("Discord callback route - role sync integration", () => {
     const { GET } = await import("./route");
 
     const url = "http://localhost:3000/api/discord/callback?code=test-code&state=test-state";
-    const req = new Request(url);
+    const req = callbackRequest(url);
     const response = await GET(req);
 
     expect(response.status).toBe(307);
@@ -174,7 +172,7 @@ describe("Discord callback route - role sync integration", () => {
       json: async () => ({
         access_token: "mock-access-token",
         token_type: "Bearer",
-        scope: "identify guilds.join",
+        scope: "identify",
         expires_in: 604800,
       }),
     });
@@ -185,11 +183,6 @@ describe("Discord callback route - role sync integration", () => {
         id: "discord-789",
         username: "erroruser",
       }),
-    });
-
-    fetchMock.mockResolvedValueOnce({
-      status: 204,
-      ok: true,
     });
 
     fetchMock.mockResolvedValueOnce({
@@ -207,7 +200,7 @@ describe("Discord callback route - role sync integration", () => {
     const { GET } = await import("./route");
 
     const url = "http://localhost:3000/api/discord/callback?code=test-code&state=test-state";
-    const req = new Request(url);
+    const req = callbackRequest(url);
     const response = await GET(req);
 
     // Login should still succeed (redirect)

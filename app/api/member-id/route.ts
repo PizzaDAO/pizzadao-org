@@ -2,6 +2,7 @@
 import { NextResponse } from "next/server";
 import { getMembersTable, memberIdColumn } from "@/app/lib/sheets/member-repository";
 import type { GvizRow } from "@/app/lib/types/gviz";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -58,6 +59,6 @@ export async function GET(request: Request) {
 
         return NextResponse.json({ suggestions });
     } catch (err: any) {
-        return NextResponse.json({ error: err.message }, { status: 500 });
+        return internalError(err, "member-id", "Failed to look up member IDs");
     }
 }
