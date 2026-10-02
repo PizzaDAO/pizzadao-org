@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { resolveRegionFromCountryCode, getRegionRoleId } from "@/app/lib/region-mapping";
 
 export const runtime = "nodejs";
@@ -13,6 +14,9 @@ export const runtime = "nodejs";
  * Response: { region: string, regionRoleId: string, countryCode: string }
  */
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(req, "city-region");
+  if (limited) return limited;
+
   try {
     const body = await req.json();
     const placeId = String(body?.place_id ?? "").trim();

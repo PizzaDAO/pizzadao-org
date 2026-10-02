@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
 
 export const runtime = "nodejs";
 
@@ -8,6 +9,9 @@ type Prediction = {
 };
 
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(req, "city-autocomplete");
+  if (limited) return limited;
+
   try {
     const { input } = await req.json();
 

@@ -4,6 +4,7 @@ import { randomBytes } from 'crypto'
 import { getSession } from '@/app/lib/session'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
+import { enforceRateLimit } from '@/app/lib/rate-limit'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -28,6 +29,9 @@ function sanitizeBase(name: string): string {
 
 // POST /api/suggestions/upload - Upload an image for a suggestion (open to anyone)
 const POST_HANDLER = async (request: NextRequest) => {
+  const limited = await enforceRateLimit(request, 'suggestions-upload')
+  if (limited) return limited
+
   // Auth is optional — use the discordId in the blob key if present, else 'anon'.
   let owner = 'anon'
   try {
