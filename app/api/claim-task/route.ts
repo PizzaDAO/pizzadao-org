@@ -5,6 +5,7 @@ import { getGoogleAuth, GOOGLE_SCOPES } from '@/app/lib/google-auth'
 import { requireSession } from '@/app/lib/auth-guards'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
+import { internalError } from '@/app/lib/errors/error-response'
 
 // Google Sheets API client with write access, created on first use so a
 // malformed GOOGLE_SERVICE_ACCOUNT_JSON surfaces as a request error rather
@@ -243,10 +244,7 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ success: true, action })
   } catch (e: unknown) {
-    return NextResponse.json(
-      { error: e instanceof Error ? (e as any)?.message : 'Failed to claim task' },
-      { status: 500 }
-    )
+    return internalError(e, 'claim-task', 'Failed to claim task')
   }
 }
 

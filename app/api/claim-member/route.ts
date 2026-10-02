@@ -14,6 +14,7 @@ import { getSession } from "@/app/lib/session";
 import { getDiscordTurtleRoles, mergeTurtles, parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -197,7 +198,7 @@ export async function POST(req: Request) {
             } catch (e: unknown) {
                 // Log but don't fail - sheet update succeeded
                 console.error("Discord sync failed:", (e as any)?.message);
-                discordResult = { ok: false, error: (e as any)?.message };
+                discordResult = { ok: false, error: "Discord sync failed" };
             }
         }
 
@@ -223,6 +224,6 @@ export async function POST(req: Request) {
 
         return NextResponse.json({ ok: true, discord: discordResult });
     } catch (e: unknown) {
-        return NextResponse.json({ error: (e as any)?.message || "Unknown error" }, { status: 500 });
+        return internalError(e, "claim-member", "Failed to claim member");
     }
 }

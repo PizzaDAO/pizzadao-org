@@ -310,5 +310,225 @@
       "offCanon": "Off canon",
       "footer": "Tap to choose · or type your own"
     }
+  },
+  "nav": {
+    "mainAriaLabel": "Main",
+    "skipToContent": "Skip to content",
+    "homeAriaLabel": "PizzaDAO home",
+    "crews": "Crews",
+    "members": "Members",
+    "missions": "Missions",
+    "pep": "PEP",
+    "articles": "Articles",
+    "calls": "Calls",
+    "chats": "Chats",
+    "manuals": "Manuals",
+    "turtles": "Turtles",
+    "techProjects": "Tech Projects",
+    "nfts": "NFTs",
+    "poaps": "POAPs",
+    "print": "Print Materials",
+    "more": "More",
+    "explore": "§ Explore",
+    "dashboard": "Dashboard",
+    "logIn": "Log in",
+    "join": "Join",
+    "openMenu": "Open menu",
+    "closeMenu": "Close menu"
+  },
+  "dashboard": {
+    "loading": {
+      "overline": "§ 00 · loading the file",
+      "headline": "Pulling the ledger…",
+      "subline": "The Family is gathering your record"
+    },
+    "error": {
+      "authOverline": "§ 00 · the door's locked",
+      "authHeadline": "Access denied",
+      "loginRequired": "Please log in to view your dashboard",
+      "forbidden": "You don't have permission to view this dashboard",
+      "overline": "§ 00 · misfile",
+      "headline": "Something's off",
+      "notFound": "We couldn't find your file. Are you sure you're in the Family yet?",
+      "backHome": "Back to home"
+    },
+    "page": {
+      "metaTitle": "Dashboard",
+      "anonymousName": "Anonymous Pizza Maker",
+      "worldwide": "Worldwide",
+      "settingsOverline": "§ · Settings",
+      "logOut": "Step out · log out",
+      "footer": "§ pizzadao · est. 2021"
+    },
+    "hero": {
+      "overline": "§ 01 · the file",
+      "pfpAlt": "{name}'s profile",
+      "levelBadge": "Lv.{level}",
+      "sendPep": "Send PEP",
+      "editProfile": "Edit profile",
+      "manageWallets": "Manage wallets"
+    },
+    "completion": {
+      "overline": "§ profile setup",
+      "ariaLabel": "Profile setup",
+      "valueText": "{completed} of {total, plural, one {# step} other {# steps}} complete",
+      "done": "{completed} of {total} done",
+      "remaining": " — remaining: {steps}",
+      "next": "Next: {step}"
+    },
+    "steps": {
+      "join_crew": {
+        "label": "Join a crew",
+        "headline": "Welcome — pick a crew to get started",
+        "body": "Crews are how members coordinate work across the DAO.",
+        "cta": "Join your first crew"
+      },
+      "connect_wallet": {
+        "label": "Connect a wallet",
+        "headline": "Link a wallet to display your PizzaDAO POAPs and NFTs",
+        "cta": "Connect a wallet"
+      },
+      "connect_x": {
+        "label": "Connect X",
+        "headline": "Connect X so the community can vouch for you",
+        "cta": "Connect X"
+      }
+    },
+    "nextAction": {
+      "overline": "§ 02 · your next move",
+      "showAgain": "Show next action again",
+      "notNow": "Not now",
+      "snoozeTitle": "Hide for 24 hours",
+      "snoozeAriaLabel": "Snooze next action",
+      "submit_mission": {
+        "headline": "Your next mission is ready",
+        "cta": "Submit Level {level} mission"
+      },
+      "awaiting_review": {
+        "headline": "Waiting on review — keep building",
+        "body": "Level {level} missions submitted.",
+        "cta": "Check Level {level} progress"
+      },
+      "get_vouches": {
+        "headline": "Build your reputation — ask 3 members to vouch",
+        "cta": "Get vouches"
+      },
+      "review_notification": {
+        "cta": "Review notification"
+      },
+      "power_user_review": {
+        "headline": "You're set. Pay it forward.",
+        "body": "Help review pending missions.",
+        "cta": "Help review missions"
+      },
+      "power_user_discover": {
+        "headline": "You're set. Pay it forward.",
+        "cta": "Discover bounties"
+      }
+    },
+    "discover": {
+      "overline": "§ 03 · discover",
+      "headline": "What's on the wall",
+      "ariaLabel": "Discover",
+      "tablistAriaLabel": "Discover categories",
+      "viewAll": "View all",
+      "tabs": {
+        "bounties": "Bounties",
+        "jobs": "Jobs",
+        "articles": "Articles",
+        "calls": "Calls"
+      },
+      "status": {
+        "open": "Open",
+        "claimed": "Claimed",
+        "done": "Done"
+      },
+      "reward": "{amount, number} PEP",
+      "bountyAriaLabel": "Bounty: {description}",
+      "jobAriaLabel": "Job: {description}",
+      "articleAriaLabel": "Article: {title}",
+      "callAriaLabel": "Call: {crew} on {date}",
+      "byAuthor": "by {author}",
+      "emptyMark": "— empty —",
+      "empty": {
+        "bounties": "No open bounties right now. Check back soon.",
+        "jobs": "No jobs available today. Reset is daily.",
+        "articles": "No published articles yet.",
+        "calls": "No upcoming calls this week."
+      }
+    },
+    "crews": {
+      "overline": "§ 04 · your crews",
+      "headline": "The families you ride with",
+      "viewAll": "View all crews",
+      "closed": "{count} closed",
+      "yourTasks": "§ your tasks",
+      "topTasks": "§ top tasks",
+      "openCrew": "Open crew",
+      "openSheet": "Open sheet"
+    },
+    "activity": {
+      "overline": "§ 05 · the ledger",
+      "headline": "What changed since you stepped out",
+      "emptyMark": "— quiet for now —",
+      "empty": "Activity will show up here as you participate.",
+      "time": {
+        "justNow": "just now",
+        "minutes": "{count}m ago",
+        "hours": "{count}h ago",
+        "yesterday": "yesterday",
+        "days": "{count}d ago",
+        "weeks": "{count}w ago",
+        "months": "{count}mo ago",
+        "years": "{count}y ago"
+      }
+    },
+    "missions": {
+      "overline": "§ Dossier",
+      "title": "Missions",
+      "viewAll": "View All →",
+      "maxLevel": "MAX",
+      "levelPrefix": "Lv.",
+      "allComplete": "All levels complete!",
+      "onFile": "{completed}/{total} on file",
+      "reward": "+{amount, number} $PEP",
+      "overall": "§ Overall · {completed}/{total} closed"
+    },
+    "vouches": {
+      "title": "Vouches",
+      "viewAll": "View All",
+      "unknownName": "Unknown",
+      "empty": "No vouches yet. Visit member profiles to vouch for them!",
+      "find": "Find Vouches"
+    },
+    "celebrations": {
+      "profile": {
+        "stamp": "on file",
+        "overline": "§ Profile complete",
+        "headline": "You're all set up!",
+        "body": "Your file is complete — the Family can find you, vouch for you, and see your collection.",
+        "stepsAriaLabel": "Completed steps",
+        "nice": "Nice!",
+        "viewProfile": "View your profile"
+      },
+      "mission": {
+        "ariaLabel": "Mission complete celebration",
+        "stamp": "approved",
+        "overline": "§ Filed",
+        "title": "Mission Complete!",
+        "nice": "Nice!"
+      },
+      "levelUp": {
+        "ariaLabel": "Reached level {level}",
+        "stampFinal": "the top",
+        "stamp": "promoted",
+        "overlineFinal": "§ Final Level Reached",
+        "overline": "§ Level Up!",
+        "heading": "Level {level}",
+        "reward": "+{amount, number} $PEP earned",
+        "finalBody": "You reached the top. You are a true Pizza Don.",
+        "continue": "Continue"
+      }
+    }
   }
 }

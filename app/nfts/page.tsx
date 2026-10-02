@@ -10,6 +10,7 @@ import {
   pillInk,
   pillOutline,
 } from "@/app/ui/shared/Editorial";
+import { useSession } from "@/app/lib/hooks/use-session";
 
 interface Holder {
   memberId: string;
@@ -48,6 +49,9 @@ function formatTimestamp(ts: number): string {
  * Fetching and refresh behavior are unchanged.
  */
 export default function NFTsPage() {
+  // Cache refresh is admin-only server-side; only show the button to admins.
+  const { data: session } = useSession();
+  const isAdmin = session?.isAdmin === true;
   const [data, setData] = useState<LeaderboardData | null>(null);
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
@@ -116,6 +120,7 @@ export default function NFTsPage() {
                 {data.cached && " (cached)"}
               </p>
             )}
+            {isAdmin && (
             <button
               type="button"
               onClick={handleRefresh}
@@ -124,6 +129,7 @@ export default function NFTsPage() {
             >
               {refreshing ? "Refreshing…" : "Refresh data"}
             </button>
+            )}
           </div>
         }
       />

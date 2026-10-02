@@ -32,7 +32,8 @@ export const SHEET_IDS = {
   /** Discord webhook URLs keyed by channel name (read through the Sheets API). */
   discordWebhooks: envOr("DISCORD_WEBHOOKS_SHEET_ID", "1bSLN2mL1K-qr3nLiURVjhm31Zxn0J3ta1Pq0txlXsPI"),
   /**
-   * Spreadsheet the /api/announce endpoint asks SecretService to announce.
+   * Spreadsheet whose "Crews" tab holds the Community Call announcement block
+   * (Announce? / Last Sent: / Last Error: + Announcement table) used by /api/announce.
    * Defaults to the production members sheet (not to an overridden `members`
    * value) so a staging override never re-targets the real announcement.
    */

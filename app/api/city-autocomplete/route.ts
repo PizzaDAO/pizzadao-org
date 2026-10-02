@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -8,6 +10,9 @@ type Prediction = {
 };
 
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(req, "city-autocomplete");
+  if (limited) return limited;
+
   try {
     const { input } = await req.json();
 
@@ -29,10 +34,8 @@ export async function POST(req: Request) {
     const data = await res.json();
 
     if (data.status !== "OK" && data.status !== "ZERO_RESULTS") {
-      return NextResponse.json(
-        { error: `Places error: ${data.status}`, details: data.error_message ?? null },
-        { status: 502 }
-      );
+      console.error("[city-autocomplete] Places error:", data.status, data.error_message);
+      return NextResponse.json({ error: "City search is unavailable right now" }, { status: 502 });
     }
 
     const predictions: Prediction[] = (data.predictions ?? []).map((p: any) => ({
@@ -42,6 +45,6 @@ export async function POST(req: Request) {
 
     return NextResponse.json({ predictions });
   } catch (e: unknown) {
-    return NextResponse.json({ error: (e as any)?.message ?? "Unknown error" }, { status: 500 });
+    return internalError(e, "city-autocomplete", "City search failed");
   }
 }

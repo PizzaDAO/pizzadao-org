@@ -2,6 +2,8 @@
 // SIMPLIFIED: No OpenAI - pure algorithmic name generation for instant results
 
 import { NextResponse } from "next/server";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -303,6 +305,9 @@ function generateNames(
 }
 
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(req, "namegen");
+  if (limited) return limited;
+
   const abortController = new AbortController();
   const timeoutId = setTimeout(() => abortController.abort(), 8000); // 8s timeout
 
@@ -505,9 +510,6 @@ export async function POST(req: Request) {
       );
     }
 
-    return NextResponse.json(
-      { error: String(err?.message ?? "Unknown error") },
-      { status: 500 }
-    );
+    return internalError(err, "namegen", "Name generation failed");
   }
 }

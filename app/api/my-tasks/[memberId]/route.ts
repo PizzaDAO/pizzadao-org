@@ -2,6 +2,7 @@ import { fetchGviz } from "@/app/lib/sheets/gviz";
 import { NextResponse } from "next/server";
 import { getTaskLinks } from "../../lib/google-sheets";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { internalError } from "@/app/lib/errors/error-response";
 
 // Simplified types for the tasks API
 type Task = { label: string; url?: string };
@@ -395,6 +396,6 @@ export async function GET(req: Request, { params }: { params: Promise<{ memberId
             debug: debugLogs
         });
     } catch (err: any) {
-        return NextResponse.json({ error: String(err.message) }, { status: 500 });
+        return internalError(err, "my-tasks", "Failed to load tasks");
     }
 }

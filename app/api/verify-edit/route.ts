@@ -9,6 +9,7 @@ import {
     membersColumn,
     rowToRecord,
 } from "@/app/lib/sheets/member-repository";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -73,7 +74,6 @@ export async function GET(req: Request) {
 
         return NextResponse.json({ error: "Member not found" }, { status: 404 });
     } catch (e: unknown) {
-        const msg = e instanceof Error ? (e as any)?.message : "Failed to verify";
-        return NextResponse.json({ error: msg }, { status: 500 });
+        return internalError(e, "verify-edit", "Failed to verify");
     }
 }

@@ -1,9 +1,19 @@
 // app/api/discord/callback/route.ts
 import { NextResponse } from "next/server";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
-import { decodeOAuthState, validateReturnTo, createTransferToken } from "@/app/lib/oauth-proxy";
+import {
+  decodeOAuthState,
+  validateReturnTo,
+  createTransferToken,
+  readCookie,
+  verifyOAuthNonce,
+  OAUTH_STATE_COOKIE,
+  oauthStateCookieOptions,
+} from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
+import { lookupGuildMembership } from "@/app/lib/discord";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -74,24 +84,6 @@ async function addUserToGuild(discordUserId: string, userAccessToken: string) {
 }
 
 
-interface GuildMember {
-  nick?: string;
-  user?: {
-    global_name?: string;
-    username: string;
-  };
-}
-
-async function fetchGuildMember(userId: string): Promise<GuildMember | null> {
-  const guildId = process.env.DISCORD_GUILD_ID!;
-  const botToken = process.env.DISCORD_BOT_TOKEN!;
-  const r = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
-    headers: { Authorization: `Bot ${botToken}` },
-  });
-  if (!r.ok) return null;
-  return await r.json();
-}
-
 // Check if user already has a member ID in the sheet (direct lib call, by Discord ID only)
 async function checkExistingMember(discordId: string): Promise<{ memberId?: string; name?: string } | null> {
   try {
@@ -105,11 +97,17 @@ async function checkExistingMember(discordId: string): Promise<{ memberId?: stri
   }
 }
 
+/** The oauth_state nonce is single-use: expire it once the callback consumes it. */
+function clearOAuthState(req: Request, res: NextResponse): NextResponse {
+  res.cookies.set(OAUTH_STATE_COOKIE, "", { ...oauthStateCookieOptions(req), maxAge: 0 });
+  return res;
+}
+
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url);
     const rawState = url.searchParams.get("state") || "";
-    const { return_to } = decodeOAuthState(rawState);
+    const { return_to, join: isJoinStep } = decodeOAuthState(rawState);
 
     // Handle OAuth errors (e.g. user clicked "Cancel" on Discord authorization screen)
     const oauthError = url.searchParams.get("error");
@@ -123,20 +121,49 @@ export async function GET(req: Request) {
     }
 
     const code = url.searchParams.get("code");
-    const { sessionId: state } = decodeOAuthState(rawState);
+    const { sessionId: state, nonce } = decodeOAuthState(rawState);
 
     // No code and no error — something unexpected; redirect home gracefully
     if (!code) {
       return NextResponse.redirect(new URL("/", url.origin).toString());
     }
 
+    // Login-CSRF protection: the nonce in `state` must match the httpOnly
+    // cookie that /api/discord/login set in this browser.
+    if (!verifyOAuthNonce(readCookie(req, OAUTH_STATE_COOKIE), nonce)) {
+      return NextResponse.json(
+        { error: "Login session expired or invalid. Please try logging in again." },
+        { status: 400 }
+      );
+    }
+
     const redirectUri = process.env.DISCORD_REDIRECT_URI || `${url.origin}/api/discord/callback`;
     const token = await exchangeCodeForToken(code, redirectUri);
     const me = await fetchDiscordMe(token.access_token);
 
-    const joinResult = await addUserToGuild(me.id, token.access_token);
-    const guildMember = await fetchGuildMember(me.id);
+    // Guild membership. Login only asks for `identify`; people already in the
+    // PizzaDAO Discord are never asked to grant guilds.join. Non-members are
+    // sent through a second, explicit authorize step that requests it.
+    let membership = await lookupGuildMembership(me.id);
+    const grantedJoin = token.scope?.split(" ").includes("guilds.join");
 
+    let addedToGuild = false;
+    if (membership.status !== "member" && grantedJoin) {
+      addedToGuild = (await addUserToGuild(me.id, token.access_token)).joined;
+      membership = await lookupGuildMembership(me.id);
+    } else if (membership.status === "not_member") {
+      if (!isJoinStep) {
+        const joinUrl = new URL("/api/discord/login", url.origin);
+        joinUrl.searchParams.set("join", "1");
+        if (state) joinUrl.searchParams.set("state", state);
+        if (return_to && validateReturnTo(return_to)) joinUrl.searchParams.set("return_to", return_to);
+        return clearOAuthState(req, NextResponse.redirect(joinUrl.toString()));
+      }
+      // Join step came back without guilds.join: log in, but not joined.
+    }
+
+    const joined = membership.status === "member" || addedToGuild;
+    const guildMember = membership.status === "member" ? membership.member : null;
     const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
 
     // If this is a proxy flow (return_to exists), create transfer token
@@ -151,7 +178,7 @@ export async function GET(req: Request) {
 
       const transferUrl = new URL("/api/auth/session-transfer", return_to);
       transferUrl.searchParams.set("token", transferToken);
-      return NextResponse.redirect(transferUrl.toString());
+      return clearOAuthState(req, NextResponse.redirect(transferUrl.toString()));
     }
 
     // Create session token
@@ -179,7 +206,7 @@ export async function GET(req: Request) {
       redirectUrl = new URL("/", url.origin);
       redirectUrl.searchParams.set("discordId", me.id);
       if (state) redirectUrl.searchParams.set("sessionId", state);
-      redirectUrl.searchParams.set("discordJoined", joinResult.joined ? "1" : "0");
+      redirectUrl.searchParams.set("discordJoined", joined ? "1" : "0");
       if (nick) redirectUrl.searchParams.set("discordNick", nick);
     }
 
@@ -188,8 +215,8 @@ export async function GET(req: Request) {
     const cookieOpts = getSessionCookieOptions(req);
     res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
 
-    return res;
+    return clearOAuthState(req, res);
   } catch (e: unknown) {
-    return NextResponse.json({ error: (e as any)?.message || "Discord callback failed" }, { status: 500 });
+    return internalError(e, "discord/callback", "Discord login failed. Please try again.");
   }
 }

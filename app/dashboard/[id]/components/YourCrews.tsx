@@ -9,6 +9,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight } from "lucide-react";
+import { useTranslations } from "next-intl";
 
 export type CrewOption = {
     id: string;
@@ -62,6 +63,7 @@ export function YourCrews({
     doneCounts,
     hydratedCrews,
 }: YourCrewsProps) {
+    const t = useTranslations("dashboard.crews");
     // Prefer the server-hydrated crew list when available. The visual output
     // is identical — same card layout, call times, top-tasks etc. — but the
     // crew IDs come from the BFF instead of being re-derived on the client.
@@ -106,7 +108,7 @@ export function YourCrews({
                 }}
             >
                 <div>
-                    <p className="overline text-tomato">§ 04 · your crews</p>
+                    <p className="overline text-tomato">{t("overline")}</p>
                     <h3
                         className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                         style={{
@@ -115,7 +117,7 @@ export function YourCrews({
                             lineHeight: 1,
                         }}
                     >
-                        The families you ride with
+                        {t("headline")}
                     </h3>
                 </div>
                 <Link
@@ -123,7 +125,7 @@ export function YourCrews({
                     className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
                     style={{ textDecoration: "none", fontWeight: 600 }}
                 >
-                    View all crews
+                    {t("viewAll")}
                     <ArrowUpRight className="h-3 w-3" />
                 </Link>
             </div>
@@ -156,12 +158,12 @@ export function YourCrews({
                     if (displayTasks.length < 3) {
                         const remaining = 3 - displayTasks.length;
                         const personalLabels = new Set(
-                            displayTasks.map((t) => t.label.toLowerCase()),
+                            displayTasks.map((task) => task.label.toLowerCase()),
                         );
                         const additional = topTasks
                             .filter(
-                                (t) =>
-                                    !personalLabels.has(t.label.toLowerCase()),
+                                (task) =>
+                                    !personalLabels.has(task.label.toLowerCase()),
                             )
                             .slice(0, remaining);
                         displayTasks = [...displayTasks, ...additional];
@@ -252,7 +254,7 @@ export function YourCrews({
                                             fontSize: 14,
                                         }}
                                     >
-                                        {doneCount} closed
+                                        {t("closed", { count: doneCount })}
                                     </span>
                                 )}
                             </div>
@@ -270,8 +272,8 @@ export function YourCrews({
                                         }}
                                     >
                                         {hasPersonal
-                                            ? "§ your tasks"
-                                            : "§ top tasks"}
+                                            ? t("yourTasks")
+                                            : t("topTasks")}
                                     </p>
                                     <ul
                                         style={{
@@ -282,10 +284,10 @@ export function YourCrews({
                                             gap: 4,
                                         }}
                                     >
-                                        {displayTasks.map((t, idx) => {
+                                        {displayTasks.map((task, idx) => {
                                             const isPersonal = personalTasks?.some(
                                                 (pt: { label: string }) =>
-                                                    pt.label === t.label,
+                                                    pt.label === task.label,
                                             );
                                             return (
                                                 <li
@@ -325,9 +327,9 @@ export function YourCrews({
                                                             flex: 1,
                                                         }}
                                                     >
-                                                        {t.url ? (
+                                                        {task.url ? (
                                                             <a
-                                                                href={t.url}
+                                                                href={task.url}
                                                                 target="_blank"
                                                                 rel="noreferrer"
                                                                 onClick={(e) =>
@@ -340,10 +342,10 @@ export function YourCrews({
                                                                     textUnderlineOffset: 2,
                                                                 }}
                                                             >
-                                                                {t.label}
+                                                                {task.label}
                                                             </a>
                                                         ) : (
-                                                            <span>{t.label}</span>
+                                                            <span>{task.label}</span>
                                                         )}
                                                     </span>
                                                 </li>
@@ -372,7 +374,7 @@ export function YourCrews({
                                         textDecoration: "none",
                                     }}
                                 >
-                                    Open crew
+                                    {t("openCrew")}
                                     <ArrowUpRight className="h-3 w-3" />
                                 </Link>
                                 {c?.sheet && (
@@ -388,7 +390,7 @@ export function YourCrews({
                                         }}
                                         title={c.sheet}
                                     >
-                                        Open sheet
+                                        {t("openSheet")}
                                         <ArrowUpRight className="h-3 w-3" />
                                     </a>
                                 )}

@@ -1,7 +1,8 @@
 // app/dashboard/[id]/components/ProfileCompleteCelebrationGate.test.tsx
 import React from "react";
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
-import { render, screen, cleanup, waitFor } from "@testing-library/react";
+import { screen, cleanup, waitFor } from "@testing-library/react";
+import { renderWithIntl } from "@/app/lib/i18n/test-utils";
 import { ProfileCompleteCelebrationGate } from "./ProfileCompleteCelebrationGate";
 import { getProfileCompletion } from "../lib/profile-completion";
 
@@ -33,7 +34,7 @@ afterEach(() => {
 describe("ProfileCompleteCelebrationGate", () => {
     it("does nothing while the profile is incomplete", async () => {
         const fetchMock = mockFetch({ profileCompletedClaimed: true });
-        render(<ProfileCompleteCelebrationGate memberId="42" completion={incomplete} />);
+        renderWithIntl(<ProfileCompleteCelebrationGate memberId="42" completion={incomplete} />);
         await new Promise((r) => setTimeout(r, 10));
         expect(fetchMock).not.toHaveBeenCalled();
         expect(screen.queryByRole("dialog")).toBeNull();
@@ -44,7 +45,7 @@ describe("ProfileCompleteCelebrationGate", () => {
             profileCompletedClaimed: true,
             profileCompletedCelebratedAt: "2026-09-29T00:00:00.000Z",
         });
-        render(<ProfileCompleteCelebrationGate memberId="42" completion={complete} />);
+        renderWithIntl(<ProfileCompleteCelebrationGate memberId="42" completion={complete} />);
         expect(await screen.findByRole("dialog")).toBeTruthy();
         expect(fetchMock).toHaveBeenCalledTimes(1);
         const [url, init] = fetchMock.mock.calls[0];
@@ -58,7 +59,7 @@ describe("ProfileCompleteCelebrationGate", () => {
             profileCompletedClaimed: false,
             profileCompletedCelebratedAt: "2026-09-01T00:00:00.000Z",
         });
-        render(<ProfileCompleteCelebrationGate memberId="42" completion={complete} />);
+        renderWithIntl(<ProfileCompleteCelebrationGate memberId="42" completion={complete} />);
         await waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(1));
         await waitFor(() =>
             expect(window.localStorage.getItem("pizzadao:profile-complete-celebrated:42")).toBe("1"),
@@ -69,7 +70,7 @@ describe("ProfileCompleteCelebrationGate", () => {
     it("skips the request entirely when the browser memo is set", async () => {
         window.localStorage.setItem("pizzadao:profile-complete-celebrated:42", "1");
         const fetchMock = mockFetch({ profileCompletedClaimed: true });
-        render(<ProfileCompleteCelebrationGate memberId="42" completion={complete} />);
+        renderWithIntl(<ProfileCompleteCelebrationGate memberId="42" completion={complete} />);
         await new Promise((r) => setTimeout(r, 10));
         expect(fetchMock).not.toHaveBeenCalled();
     });

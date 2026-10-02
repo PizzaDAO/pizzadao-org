@@ -310,5 +310,225 @@
       "offCanon": "Fuera de canon",
       "footer": "Toca para elegir · o escribe el tuyo"
     }
+  },
+  "nav": {
+    "mainAriaLabel": "Principal",
+    "skipToContent": "Saltar al contenido",
+    "homeAriaLabel": "Inicio de PizzaDAO",
+    "crews": "Crews",
+    "members": "Miembros",
+    "missions": "Misiones",
+    "pep": "PEP",
+    "articles": "Artículos",
+    "calls": "Llamadas",
+    "chats": "Chats",
+    "manuals": "Manuales",
+    "turtles": "Turtles",
+    "techProjects": "Proyectos tech",
+    "nfts": "NFTs",
+    "poaps": "POAPs",
+    "print": "Material impreso",
+    "more": "Más",
+    "explore": "§ Explorar",
+    "dashboard": "Mi panel",
+    "logIn": "Entrar",
+    "join": "Únete",
+    "openMenu": "Abrir menú",
+    "closeMenu": "Cerrar menú"
+  },
+  "dashboard": {
+    "loading": {
+      "overline": "§ 00 · abriendo el expediente",
+      "headline": "Sacando el libro de cuentas…",
+      "subline": "La Familia está reuniendo tu historial"
+    },
+    "error": {
+      "authOverline": "§ 00 · la puerta está cerrada",
+      "authHeadline": "Acceso denegado",
+      "loginRequired": "Inicia sesión para ver tu panel",
+      "forbidden": "No tienes permiso para ver este panel",
+      "overline": "§ 00 · expediente extraviado",
+      "headline": "Algo no cuadra",
+      "notFound": "No encontramos tu expediente. ¿Seguro que ya eres de la Familia?",
+      "backHome": "Volver al inicio"
+    },
+    "page": {
+      "metaTitle": "Mi panel",
+      "anonymousName": "Pizzero anónimo",
+      "worldwide": "En todo el mundo",
+      "settingsOverline": "§ · Ajustes",
+      "logOut": "Salir un rato · cerrar sesión",
+      "footer": "§ pizzadao · desde 2021"
+    },
+    "hero": {
+      "overline": "§ 01 · el expediente",
+      "pfpAlt": "Perfil de {name}",
+      "levelBadge": "Nv.{level}",
+      "sendPep": "Enviar PEP",
+      "editProfile": "Editar perfil",
+      "manageWallets": "Gestionar wallets"
+    },
+    "completion": {
+      "overline": "§ configuración del perfil",
+      "ariaLabel": "Configuración del perfil",
+      "valueText": "{completed} de {total, plural, one {# paso completado} other {# pasos completados}}",
+      "done": "{completed, plural, one {# de {total} lista} other {# de {total} listas}}",
+      "remaining": " — falta: {steps}",
+      "next": "Siguiente: {step}"
+    },
+    "steps": {
+      "join_crew": {
+        "label": "Únete a una crew",
+        "headline": "Bienvenido — elige una crew para empezar",
+        "body": "Las crews son la forma en que los miembros coordinan el trabajo en la DAO.",
+        "cta": "Únete a tu primera crew"
+      },
+      "connect_wallet": {
+        "label": "Conecta una wallet",
+        "headline": "Vincula una wallet para lucir tus POAPs y NFTs de PizzaDAO",
+        "cta": "Conectar una wallet"
+      },
+      "connect_x": {
+        "label": "Conecta X",
+        "headline": "Conecta X para que la comunidad pueda avalarte",
+        "cta": "Conectar X"
+      }
+    },
+    "nextAction": {
+      "overline": "§ 02 · tu próxima jugada",
+      "showAgain": "Mostrar de nuevo la próxima acción",
+      "notNow": "Ahora no",
+      "snoozeTitle": "Ocultar durante 24 horas",
+      "snoozeAriaLabel": "Posponer la próxima acción",
+      "submit_mission": {
+        "headline": "Tu próxima misión está lista",
+        "cta": "Enviar misión de nivel {level}"
+      },
+      "awaiting_review": {
+        "headline": "Esperando revisión — sigue construyendo",
+        "body": "Misiones de nivel {level} enviadas.",
+        "cta": "Ver progreso del nivel {level}"
+      },
+      "get_vouches": {
+        "headline": "Gánate la reputación — pide a 3 miembros que te avalen",
+        "cta": "Conseguir avales"
+      },
+      "review_notification": {
+        "cta": "Ver notificación"
+      },
+      "power_user_review": {
+        "headline": "Ya estás listo. Devuelve el favor.",
+        "body": "Ayuda a revisar las misiones pendientes.",
+        "cta": "Ayudar a revisar misiones"
+      },
+      "power_user_discover": {
+        "headline": "Ya estás listo. Devuelve el favor.",
+        "cta": "Descubrir recompensas"
+      }
+    },
+    "discover": {
+      "overline": "§ 03 · descubre",
+      "headline": "Lo que hay en el tablón",
+      "ariaLabel": "Descubre",
+      "tablistAriaLabel": "Categorías para descubrir",
+      "viewAll": "Ver todo",
+      "tabs": {
+        "bounties": "Recompensas",
+        "jobs": "Trabajos",
+        "articles": "Artículos",
+        "calls": "Llamadas"
+      },
+      "status": {
+        "open": "Abierta",
+        "claimed": "Reclamada",
+        "done": "Hecho"
+      },
+      "reward": "{amount, number} PEP",
+      "bountyAriaLabel": "Recompensa: {description}",
+      "jobAriaLabel": "Trabajo: {description}",
+      "articleAriaLabel": "Artículo: {title}",
+      "callAriaLabel": "Llamada: {crew} el {date}",
+      "byAuthor": "por {author}",
+      "emptyMark": "— vacío —",
+      "empty": {
+        "bounties": "No hay recompensas abiertas ahora mismo. Vuelve pronto.",
+        "jobs": "Hoy no hay trabajos disponibles. Se renuevan cada día.",
+        "articles": "Todavía no hay artículos publicados.",
+        "calls": "No hay llamadas programadas esta semana."
+      }
+    },
+    "crews": {
+      "overline": "§ 04 · tus crews",
+      "headline": "Las familias con las que andas",
+      "viewAll": "Ver todas las crews",
+      "closed": "{count, plural, one {# cerrada} other {# cerradas}}",
+      "yourTasks": "§ tus tareas",
+      "topTasks": "§ tareas destacadas",
+      "openCrew": "Abrir crew",
+      "openSheet": "Abrir hoja"
+    },
+    "activity": {
+      "overline": "§ 05 · el libro de cuentas",
+      "headline": "Lo que cambió mientras no estabas",
+      "emptyMark": "— todo tranquilo —",
+      "empty": "Tu actividad aparecerá aquí a medida que participes.",
+      "time": {
+        "justNow": "ahora mismo",
+        "minutes": "hace {count} min",
+        "hours": "hace {count} h",
+        "yesterday": "ayer",
+        "days": "{count, plural, one {hace # día} other {hace # días}}",
+        "weeks": "{count, plural, one {hace # sem.} other {hace # sem.}}",
+        "months": "{count, plural, one {hace # mes} other {hace # meses}}",
+        "years": "{count, plural, one {hace # año} other {hace # años}}"
+      }
+    },
+    "missions": {
+      "overline": "§ Expediente",
+      "title": "Misiones",
+      "viewAll": "Ver todas →",
+      "maxLevel": "MÁX",
+      "levelPrefix": "Nv.",
+      "allComplete": "¡Todos los niveles completados!",
+      "onFile": "{completed}/{total} en el expediente",
+      "reward": "+{amount, number} $PEP",
+      "overall": "§ Total · {completed}/{total} cerradas"
+    },
+    "vouches": {
+      "title": "Avales",
+      "viewAll": "Ver todos",
+      "unknownName": "Desconocido",
+      "empty": "Aún no tienes avales. ¡Visita los perfiles de otros miembros para avalarlos!",
+      "find": "Buscar avales"
+    },
+    "celebrations": {
+      "profile": {
+        "stamp": "archivado",
+        "overline": "§ Perfil completo",
+        "headline": "¡Ya estás listo!",
+        "body": "Tu expediente está completo — la Familia puede encontrarte, avalarte y ver tu colección.",
+        "stepsAriaLabel": "Pasos completados",
+        "nice": "¡Genial!",
+        "viewProfile": "Ver tu perfil"
+      },
+      "mission": {
+        "ariaLabel": "Celebración de misión completada",
+        "stamp": "aprobada",
+        "overline": "§ Archivada",
+        "title": "¡Misión cumplida!",
+        "nice": "¡Genial!"
+      },
+      "levelUp": {
+        "ariaLabel": "Alcanzaste el nivel {level}",
+        "stampFinal": "la cima",
+        "stamp": "ascendido",
+        "overlineFinal": "§ Nivel final alcanzado",
+        "overline": "§ ¡Subiste de nivel!",
+        "heading": "Nivel {level}",
+        "reward": "+{amount, number} $PEP ganados",
+        "finalBody": "Llegaste a la cima. Eres un auténtico Pizza Don.",
+        "continue": "Continuar"
+      }
+    }
   }
 }

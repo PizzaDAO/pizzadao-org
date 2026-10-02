@@ -1,7 +1,8 @@
 // app/dashboard/[id]/components/NextActionPanel.test.tsx
 import React from "react";
 import { describe, it, expect, beforeEach, vi } from "vitest";
-import { render, screen, fireEvent, act } from "@testing-library/react";
+import { screen, fireEvent, act } from "@testing-library/react";
+import { renderWithIntl } from "@/app/lib/i18n/test-utils";
 
 // Render next/link as a plain anchor so href shows up in the DOM.
 vi.mock("next/link", () => ({
@@ -40,7 +41,7 @@ describe("<NextActionPanel />", () => {
             body: "Crews are how members coordinate work across the DAO.",
             primaryCta: { label: "Join your first crew", href: "/crew" },
         });
-        render(<NextActionPanel nextAction={a} />);
+        renderWithIntl(<NextActionPanel nextAction={a} />);
 
         expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
             "Welcome — pick a crew to get started",
@@ -60,7 +61,7 @@ describe("<NextActionPanel />", () => {
             body: undefined,
             primaryCta: { label: "Connect a wallet", href: "/profile/42" },
         });
-        render(<NextActionPanel nextAction={a} />);
+        renderWithIntl(<NextActionPanel nextAction={a} />);
         expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent(
             "Link a wallet to display your PizzaDAO POAPs and NFTs",
         );
@@ -69,7 +70,7 @@ describe("<NextActionPanel />", () => {
     });
 
     it("renders the submit_mission variant with body text", () => {
-        render(<NextActionPanel nextAction={makeAction()} />);
+        renderWithIntl(<NextActionPanel nextAction={makeAction()} />);
         expect(screen.getByText("Post your first vouch")).toBeInTheDocument();
         expect(screen.getByRole("link", { name: /Submit Level/ })).toHaveAttribute(
             "href",
@@ -84,7 +85,7 @@ describe("<NextActionPanel />", () => {
             body: "Help review pending missions.",
             primaryCta: { label: "Help review missions", href: "/missions" },
         });
-        render(<NextActionPanel nextAction={a} />);
+        renderWithIntl(<NextActionPanel nextAction={a} />);
         expect(screen.getByTestId("next-action-panel")).toHaveAttribute(
             "data-kind",
             "power_user_review",
@@ -97,7 +98,7 @@ describe("<NextActionPanel />", () => {
         const a = makeAction({
             secondary: { label: "Snooze for now", href: "/dashboard" },
         });
-        render(<NextActionPanel nextAction={a} />);
+        renderWithIntl(<NextActionPanel nextAction={a} />);
         expect(screen.getByRole("link", { name: "Snooze for now" })).toHaveAttribute(
             "href",
             "/dashboard",
@@ -105,7 +106,7 @@ describe("<NextActionPanel />", () => {
     });
 
     it("snoozes the panel for 24h and shows a recovery link", async () => {
-        render(<NextActionPanel nextAction={makeAction()} />);
+        renderWithIntl(<NextActionPanel nextAction={makeAction()} />);
 
         // The headline is initially visible.
         expect(screen.getByTestId("next-action-panel")).toBeInTheDocument();
@@ -133,7 +134,7 @@ describe("<NextActionPanel />", () => {
         const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
         window.localStorage.setItem(`${SNOOZE_PREFIX}submit_mission`, future);
 
-        render(<NextActionPanel nextAction={makeAction()} />);
+        renderWithIntl(<NextActionPanel nextAction={makeAction()} />);
 
         // Effect hydrates and removes the panel; recovery link appears.
         expect(screen.queryByTestId("next-action-panel")).not.toBeInTheDocument();
@@ -146,7 +147,7 @@ describe("<NextActionPanel />", () => {
         const past = new Date(Date.now() - 60 * 1000).toISOString();
         window.localStorage.setItem(`${SNOOZE_PREFIX}submit_mission`, past);
 
-        render(<NextActionPanel nextAction={makeAction()} />);
+        renderWithIntl(<NextActionPanel nextAction={makeAction()} />);
         // Expired snooze: panel renders normally.
         expect(screen.getByTestId("next-action-panel")).toBeInTheDocument();
     });
@@ -155,7 +156,7 @@ describe("<NextActionPanel />", () => {
         const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
         window.localStorage.setItem(`${SNOOZE_PREFIX}submit_mission`, future);
 
-        render(<NextActionPanel nextAction={makeAction()} />);
+        renderWithIntl(<NextActionPanel nextAction={makeAction()} />);
 
         await act(async () => {
             fireEvent.click(
@@ -175,7 +176,7 @@ describe("<NextActionPanel />", () => {
         const future = new Date(Date.now() + 60 * 60 * 1000).toISOString();
         window.localStorage.setItem(`${SNOOZE_PREFIX}connect_wallet`, future);
 
-        render(<NextActionPanel nextAction={makeAction({ kind: "connect_x" })} />);
+        renderWithIntl(<NextActionPanel nextAction={makeAction({ kind: "connect_x" })} />);
         const panel = screen.getByTestId("next-action-panel");
         expect(panel).toHaveAttribute("data-kind", "connect_x");
     });

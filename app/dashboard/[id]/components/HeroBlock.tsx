@@ -10,6 +10,7 @@
 
 import Link from "next/link";
 import { ArrowUpRight, Send } from "lucide-react";
+import { useFormatter, useTranslations } from "next-intl";
 import { PepAmount } from "../../../ui/economy";
 import { NotificationBell } from "../../../ui/notifications";
 import { ThemeToggle } from "../../../ui/ThemeToggle";
@@ -61,6 +62,8 @@ export function HeroBlock({
     // Either prop name works; prefer levelBadge if both supplied.
     const badge = levelBadge ?? missionLevel ?? null;
     const initials = initialsOf(name);
+    const t = useTranslations("dashboard.hero");
+    const format = useFormatter();
 
     return (
         <header className="relative fade-up">
@@ -76,7 +79,7 @@ export function HeroBlock({
 
             {/* ── Top utility row — chrome controls float free of the headline */}
             <div className="flex items-center justify-between gap-3">
-                <p className="overline text-tomato">§ 01 · the file</p>
+                <p className="overline text-tomato">{t("overline")}</p>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
                     <NotificationBell />
@@ -90,7 +93,7 @@ export function HeroBlock({
                     {pfpUrl ? (
                         <img
                             src={pfpUrl}
-                            alt={`${name}'s profile`}
+                            alt={t("pfpAlt", { name })}
                             className="grain relative h-[88px] w-[88px] rounded-full object-cover md:h-[104px] md:w-[104px]"
                             style={{
                                 objectPosition: "top",
@@ -152,7 +155,7 @@ export function HeroBlock({
                                     whiteSpace: "nowrap",
                                 }}
                             >
-                                Lv.{badge.level}
+                                {t("levelBadge", { level: badge.level })}
                                 {badge.title ? ` · ${badge.title}` : ""}
                             </span>
                         )}
@@ -170,15 +173,15 @@ export function HeroBlock({
                             style={{ fontSize: 14 }}
                         >
                             {pepBalance !== null ? (
-                                <PepAmount amount={pepBalance} size={14} />
+                                <PepAmount amount={format.number(pepBalance)} size={14} />
                             ) : (
                                 "—"
                             )}
                         </span>
                         <button
                             onClick={onSendPep}
-                            aria-label="Send PEP"
-                            title="Send PEP"
+                            aria-label={t("sendPep")}
+                            title={t("sendPep")}
                             className="ui inline-flex items-center justify-center rounded-full transition-colors hover:bg-tomato/10"
                             style={{
                                 // sicilian-41551: 44px tap target, smaller visual icon
@@ -210,7 +213,7 @@ export function HeroBlock({
                         textDecoration: "none",
                     }}
                 >
-                    Edit profile
+                    {t("editProfile")}
                     <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                 </Link>
                 <Link
@@ -221,7 +224,7 @@ export function HeroBlock({
                         minHeight: 32,
                     }}
                 >
-                    Manage wallets
+                    {t("manageWallets")}
                     <ArrowUpRight className="h-3 w-3" />
                 </Link>
             </div>

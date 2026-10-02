@@ -33,6 +33,7 @@ import {
 import { hasAnyRole } from "@/app/lib/discord";
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
 import { resolvePfpUrl } from "@/app/lib/pfp";
+import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
 
@@ -388,8 +389,6 @@ export async function GET(request: NextRequest) {
             },
         });
     } catch (error) {
-        const message =
-            error instanceof Error ? error.message : "Failed to load dashboard summary";
-        return NextResponse.json({ error: message }, { status: 500 });
+        return internalError(error, "dashboard-summary", "Failed to load dashboard summary");
     }
 }

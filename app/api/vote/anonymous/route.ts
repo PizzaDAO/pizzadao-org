@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+import { enforceRateLimit } from '@/app/lib/rate-limit'
 import { prisma } from '@/app/lib/db'
 import { importPublicKey, fromBase64, toBase64, hashToken } from '@/utils/blindRsa'
 import { validateVoteTokenBinding } from '@/utils/voteToken'
@@ -6,6 +7,10 @@ import { validateVoteTokenBinding } from '@/utils/voteToken'
 // POST /api/vote/anonymous - Submit an anonymous vote
 // No authentication required - the valid signature IS the authentication
 export async function POST(req: Request) {
+  // Per-IP throttle only; the IP is hashed and never linked to the vote itself.
+  const limited = await enforceRateLimit(req, 'vote-anonymous')
+  if (limited) return limited
+
   const body = await req.json()
   const { token, preparedMessage, signature, pollId, optionId } = body
 
