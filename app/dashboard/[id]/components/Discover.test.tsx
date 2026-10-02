@@ -169,7 +169,7 @@ describe("<Discover />", () => {
 // jalapeno-82565 — crew bounties carry a crew tag, like jobs do.
 describe("<Discover /> crew bounty tag", () => {
     it("shows the crew tag on crew bounties only", () => {
-        render(
+        renderWithIntl(
             <Discover
                 bounties={[
                     { id: 1, description: "Run the ops call", reward: 100, status: "OPEN", crew: "Ops" },
