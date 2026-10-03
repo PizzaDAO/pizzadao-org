@@ -119,6 +119,15 @@ export const PEP_COMMANDS = [
 export type PepCommandName = (typeof PEP_COMMANDS)[number]['name']
 
 // Interaction + response types (subset)
-export const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3, AUTOCOMPLETE: 4 } as const
-export const ResponseType = { PONG: 1, CHANNEL_MESSAGE: 4, DEFERRED_CHANNEL_MESSAGE: 5, UPDATE_MESSAGE: 7, AUTOCOMPLETE_RESULT: 8 } as const
+export const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3, AUTOCOMPLETE: 4, MODAL_SUBMIT: 5 } as const
+export const ResponseType = {
+  PONG: 1,
+  CHANNEL_MESSAGE: 4,
+  DEFERRED_CHANNEL_MESSAGE: 5,
+  /** Ack a component click / modal submit now and edit the message later. */
+  DEFERRED_UPDATE_MESSAGE: 6,
+  UPDATE_MESSAGE: 7,
+  AUTOCOMPLETE_RESULT: 8,
+  MODAL: 9,
+} as const
 export const EPHEMERAL = 64

@@ -12,6 +12,11 @@
 // Flags: PEP_GAMES_ENABLED=1 (games).
 // /missions: deferred reply, then the verifier run (dry run unless
 //      MISSION_VERIFIERS_ENABLED=1) is edited in via the interaction webhook.
+// Mission review cards (MISSION_REVIEW_CARDS_ENABLED=1): Approve / Release /
+//      Reject buttons on the #work cards and the Reject modal. Checked with
+//      canReviewMission(member.roles, level), never your own; deferred update,
+//      then approveMission / rejectMission in after(). See
+//      app/lib/discord-interactions/mission-review.ts.
 // Admin money (/add-money, /remove-money): holders of ADMIN_ROLE_IDS
 //      (app/ui/constants.ts) or of PEP_ADMIN_ROLE_IDS / PEP_ADMIN_ROLE_NAMES
 //      (default "Pepperoni Mafia"); optional ADMIN_GRANT_MAX (default 10000)
@@ -39,6 +44,12 @@ import { runMissionsCommand } from "@/app/lib/mission-verify/discord-command";
 import { announceMissionResults } from "@/app/lib/mission-verify/notify";
 import { getMissionsOverview } from "@/app/lib/missions-overview";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { approveMission, getCompletionForReview, rejectMission } from "@/app/lib/missions";
+import { canReviewMission } from "@/app/lib/mission-review-access";
+import { invalidateProgressCache } from "@/app/lib/mission-cache";
+import { reviewCardsEnabled, syncReviewCard } from "@/app/lib/mission-verify/review-cards";
+import { postEphemeralFollowup, runReviewDecision, type ReviewDecisionJob } from "@/app/lib/mission-verify/review-decision";
+import type { MissionReviewDeps } from "@/app/lib/discord-interactions/mission-review";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -89,6 +100,37 @@ function deferMissions(job: Parameters<NonNullable<HandlerDeps["missions"]>["def
   });
 }
 
+const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.pizzadao.org").replace(/\/$/, "");
+
+/**
+ * The decision behind a review-card button / the Reject modal, after the
+ * deferred update (type 6) has gone out: the same approveMission /
+ * rejectMission as the web panel (race-safe settle + payout, audited with via
+ * "discord"), then the card edit and level-up announcements.
+ */
+function decideReview(job: ReviewDecisionJob) {
+  after(async () => {
+    await runReviewDecision(job, {
+      approve: (reviewerId, id) => approveMission(reviewerId, id, undefined, "discord"),
+      reject: (reviewerId, id, reason) => rejectMission(reviewerId, id, reason, "discord"),
+      handledBy: getCompletionForReview,
+      syncCard: (id, card) => syncReviewCard(id, undefined, card),
+      announce: (discordId, levelsPaid) => announceMissionResults({ discordId, trigger: "review", approvedTitles: [], levelsPaid }),
+      invalidate: invalidateProgressCache,
+      followup: (applicationId, token, embed) => postEphemeralFollowup(applicationId, token, embed),
+    });
+  });
+}
+
+const missionReview: MissionReviewDeps = {
+  enabled: () => reviewCardsEnabled(),
+  target: getCompletionForReview,
+  canReview: (roles, level) => canReviewMission(roles, level),
+  decide: decideReview,
+  refresh: (id, card) => after(() => syncReviewCard(id, undefined, card).then(() => undefined)),
+  appUrl: appUrl(),
+};
+
 function deps(guildId: string | undefined): HandlerDeps {
   return {
     guildId,
@@ -116,6 +158,7 @@ function deps(guildId: string | undefined): HandlerDeps {
     removeMoney: adminRemoveMoney,
     logAdmin: logAdminGrant,
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
+    missionReview,
   };
 }
 
