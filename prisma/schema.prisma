@@ -183,6 +183,11 @@ enum TransactionType {
   BOUNTY_REWARD      // Earned $PEP from completing a bounty
   BOUNTY_REFUND      // Refunded $PEP from cancelling a bounty
   MISSION_REWARD     // Earned $PEP from completing all missions in a level
+  MIGRATION_CREDIT   // One-time credit migrated from another economy (UnbelievaBoat)
+  MIGRATION_REVERSAL // Rollback of a MIGRATION_CREDIT
+  WORK_REWARD        // Discord /work payout
+  CRIME_REWARD       // Web crime success
+  CRIME_FINE         // Web crime fine (negative)
 }
 
 model Transaction {
@@ -688,4 +693,51 @@ model SupportTicket {
 
   @@index([discordId, createdAt])
   @@index([status, createdAt])
+}
+
+// ===== ECONOMY MIGRATION (UnbelievaBoat -> $PEP) =====
+// See plans/unbelievaboat-replacement.md. One row per migrated Discord user.
+// `migrationKey` is unique, so re-running the import can never double-credit:
+// a claim moves PENDING -> CREDITED exactly once, inside the same DB
+// transaction that increments Economy.wallet and writes the ledger row.
+// Users who are not app members yet stay PENDING (held by discordId) and are
+// credited on first login.
+
+enum PepClaimStatus {
+  PENDING // staged, not yet in the wallet
+  CREDITED // added to Economy.wallet (transactionId set)
+  REVERSED // credited, then rolled back (MIGRATION_REVERSAL)
+  VOID // cancelled before crediting (rollback of a pending claim)
+}
+
+model PendingPepClaim {
+  id            Int            @id @default(autoincrement())
+  migrationKey  String         @unique // "<source>:<guildId>:<discordId>"
+  source        String // "unbelievaboat"
+  discordId     String
+  amount        Int // PEP to credit (after conversion rate)
+  sourceCash    BigInt // raw UnbelievaBoat cash at export
+  sourceBank    BigInt // raw UnbelievaBoat bank at export
+  snapshotSha   String // sha256 of the export snapshot this came from
+  status        PepClaimStatus @default(PENDING)
+  transactionId Int? // ledger Transaction.id of the credit
+  creditedAt    DateTime?
+  reversedAt    DateTime?
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+
+  @@index([discordId, status])
+  @@index([source, status])
+}
+
+// Per-user, per-action cooldown for earning commands (/work, crime, and later
+// /collect-income per role, e.g. action "income:<roleId>"). Claimed with a
+// conditional update / insert-on-conflict-do-nothing inside the payout
+// transaction, so concurrent invocations cannot both pay out.
+model EconomyCooldown {
+  discordId String
+  action    String
+  lastAt    DateTime
+
+  @@id([discordId, action])
 }

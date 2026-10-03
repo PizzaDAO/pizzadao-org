@@ -1,0 +1,3 @@
+# Snapshots and reports hold every member's Discord ID and balance.
+# Keep them out of the public repo; archive them privately (see plan).
+snapshots/
