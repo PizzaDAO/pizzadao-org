@@ -33,6 +33,9 @@ export interface Embed {
   description: string
   author?: EmbedAuthor
   fields?: EmbedField[]
+  /** A large image (e.g. an evidence screenshot on a mission review card). */
+  image?: { url: string }
+  footer?: { text: string }
 }
 
 /** The parts of an interaction's invoking member that the author line needs. */
@@ -83,6 +86,8 @@ export function makeEmbed(tone: Tone, headline: string, body?: string, extra: Pa
   const embed: Embed = { color: EMBED_COLOR[tone], description }
   if (extra.author) embed.author = extra.author
   if (extra.fields?.length) embed.fields = extra.fields
+  if (extra.image) embed.image = extra.image
+  if (extra.footer) embed.footer = extra.footer
   return embed
 }
 

@@ -20,7 +20,9 @@ export interface DiscordMessageBody {
   content: string;
   /** Rich embeds (e.g. the Pepperoni Bot style from discord-interactions/embeds.ts). */
   embeds?: unknown[];
-  allowed_mentions?: { parse?: Array<"everyone" | "roles" | "users">; users?: string[] };
+  /** Message components (button rows), e.g. the mission review card's Approve / Reject. */
+  components?: unknown[];
+  allowed_mentions?: { parse?: Array<"everyone" | "roles" | "users">; users?: string[]; roles?: string[] };
   flags?: number;
 }
 
@@ -171,5 +173,47 @@ export async function postDiscordMessage(
       /* keep raw text */
     }
     throw new DiscordPostError(`Discord API error ${res.status} posting to ${where}: ${detail}`, res.status);
+  }
+}
+
+/**
+ * Edit a bot message in place (PATCH /channels/{c}/messages/{m}), e.g. the
+ * mission review card after a decision. A short JSON 429 is waited out and
+ * retried (a 429 changed nothing); a Cloudflare block or any other error throws.
+ */
+export async function editDiscordMessage(
+  target: { channelId: string; messageId: string; botToken: string },
+  body: Partial<DiscordMessageBody>,
+  opts: DiscordPostOptions = {},
+): Promise<void> {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const maxWaitMs = opts.maxWaitMs ?? 15_000;
+  const sleep = opts.sleep ?? defaultSleep;
+  const doFetch = opts.fetchImpl ?? fetch;
+  const id = /^\d{5,25}$/;
+  if (!id.test(target.channelId) || !id.test(target.messageId)) {
+    throw new DiscordPostError("Bad channel or message id", 400);
+  }
+  const where = `message ${target.messageId} in channel ${target.channelId}`;
+  const init: RequestInit = {
+    method: "PATCH",
+    headers: { Authorization: `Bot ${target.botToken}`, "Content-Type": "application/json" },
+    body: JSON.stringify(body),
+    cache: "no-store",
+  };
+  for (let attempt = 1; ; attempt++) {
+    const res = await doFetch(`https://discord.com/api/v10/channels/${target.channelId}/messages/${target.messageId}`, init);
+    const text = await res.text();
+    if (res.ok) return;
+    if (res.status === 429) {
+      const { retryAfterMs, cloudflare } = parseRateLimit(res.headers, text);
+      const wait = retryAfterMs ?? 1000;
+      if (!cloudflare && attempt < maxAttempts && wait <= maxWaitMs) {
+        await sleep(wait + 250);
+        continue;
+      }
+      throw new DiscordPostError(`Discord rate limit editing ${where}`, 429, wait, cloudflare);
+    }
+    throw new DiscordPostError(`Discord API error ${res.status} editing ${where}: ${text.slice(0, 300)}`, res.status);
   }
 }

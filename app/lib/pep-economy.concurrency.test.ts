@@ -72,6 +72,9 @@ type Libs = {
   bulk: typeof import('./mission-verify/bulk')
   nightly: typeof import('./mission-verify/nightly')
   runs: typeof import('./mission-verify/runs')
+  reviewDecision: typeof import('./mission-verify/review-decision')
+  reviewCards: typeof import('./mission-verify/review-cards')
+  sla: typeof import('./mission-verify/sla')
 }
 let L: Libs
 const N = 20
@@ -146,6 +149,9 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       bulk: await import('./mission-verify/bulk'),
       nightly: await import('./mission-verify/nightly'),
       runs: await import('./mission-verify/runs'),
+      reviewDecision: await import('./mission-verify/review-decision'),
+      reviewCards: await import('./mission-verify/review-cards'),
+      sla: await import('./mission-verify/sla'),
     }
   }, 60_000)
 
@@ -517,6 +523,131 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     expect(statuses.every((s) => ['finished', 'busy', 'already_ran'].includes(s))).toBe(true)
     await deactivate([m.id])
   }, 120_000)
+
+  // ---- Mission verification Phase 3 (Discord review queue) ----
+
+  /** runReviewDecision wired like the interactions route, with Discord replaced by spies. */
+  const discordDecisionDeps = () => ({
+    approve: (reviewerId: string, id: number) => L.missions.approveMission(reviewerId, id, undefined, 'discord'),
+    reject: (reviewerId: string, id: number, reason: string) => L.missions.rejectMission(reviewerId, id, reason, 'discord'),
+    handledBy: (id: number) => L.missions.getCompletionForReview(id),
+    syncCard: vi.fn(async () => 'edited'),
+    announce: vi.fn(async () => undefined),
+    followup: vi.fn(async () => undefined),
+  })
+  const decisionJob = (action: 'approve' | 'release' | 'reject', completionId: number, reviewerId: string, reason?: string) => ({
+    action,
+    completionId,
+    reviewerId,
+    reason,
+    applicationId: 'app-it',
+    token: `tok-${reviewerId}`,
+  })
+
+  it(`${N} reviewers clicking Approve on one Discord card at once: one wins, the rest are told, the level pays once`, async () => {
+    const m = await missionAt(1, 'it discord approve', null, null, 69)
+    const user = await seedUser(0)
+    const c = await L.prisma.missionCompletion.create({ data: { missionId: m.id, discordId: user, status: 'PENDING' } })
+    const d = discordDecisionDeps()
+    const reviewers = Array.from({ length: N }, (_, i) => `rev-it-${i}`)
+    const results = await Promise.all(reviewers.map((r) => L.reviewDecision.runReviewDecision(decisionJob('approve', c.id, r), d)))
+    expect(results.filter((r) => r === 'approved')).toHaveLength(1)
+    expect(results.filter((r) => r === 'already_handled')).toHaveLength(N - 1)
+    await settle()
+    const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: c.id }, include: { events: true } })
+    const winner = reviewers[results.indexOf('approved')]
+    expect(row).toMatchObject({ status: 'APPROVED', reviewedBy: winner })
+    expect(row.events.filter((e: any) => e.action === 'APPROVED')).toEqual([expect.objectContaining({ actorId: winner, via: 'discord' })])
+    expect(d.followup).toHaveBeenCalledTimes(N - 1)
+    for (const call of d.followup.mock.calls as unknown as Array<[string, string, { description: string }]>) {
+      expect(call[2].description).toContain(`already approved by <@${winner}>`)
+    }
+    expect(d.announce).toHaveBeenCalledTimes(1)
+    expect(d.announce).toHaveBeenCalledWith(user, [1])
+    expect(await wallet(user)).toBe(69)
+    await expectLedgerConsistent(user)
+    await deactivate([m.id])
+  }, 60_000)
+
+  it('Discord Release racing a web approve and a Discord reject: exactly one decision, paid at most once', async () => {
+    const m = await missionAt(1, 'it discord release', 'x_linked', {}, 69)
+    const user = await seedUser(0)
+    const c = await L.prisma.missionCompletion.create({
+      data: { missionId: m.id, discordId: user, status: 'PENDING', source: 'AUTO', holdReason: 'NEW_ACCOUNT' },
+    })
+    const d = discordDecisionDeps()
+    const res = await Promise.allSettled([
+      ...Array.from({ length: N }, (_, i) => L.reviewDecision.runReviewDecision(decisionJob('release', c.id, `rel-it-${i}`), d)),
+      ...Array.from({ length: N }, (_, i) => L.reviewDecision.runReviewDecision(decisionJob('reject', c.id, `rej-it-${i}`, 'not yours'), d)),
+      ...Array.from({ length: N }, () => L.missions.approveMission('web-it', c.id)),
+    ])
+    await settle()
+    const decided = res.filter((r) => r.status === 'fulfilled' && (r.value === 'approved' || r.value === 'rejected' || typeof r.value === 'object'))
+    expect(decided).toHaveLength(1)
+    const events = await L.prisma.missionReviewEvent.findMany({ where: { completionId: c.id } })
+    expect(events.filter((e: any) => ['RELEASED', 'APPROVED', 'REJECTED'].includes(e.action))).toHaveLength(1)
+    const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: c.id } })
+    expect(await wallet(user)).toBe(row.status === 'APPROVED' ? 69 : 0)
+    await expectLedgerConsistent(user)
+    await deactivate([m.id])
+  }, 60_000)
+
+  it(`${N} concurrent card syncs for one submission post exactly one Discord card`, async () => {
+    const m = await missionAt(1, 'it card', null, null, 69)
+    const user = await seedUser(0)
+    const c = await L.prisma.missionCompletion.create({ data: { missionId: m.id, discordId: user, status: 'PENDING', evidence: 'https://x/1' } })
+    let n = 0
+    const post = vi.fn(async () => {
+      await new Promise((r) => setTimeout(r, 20))
+      return { id: `5${RUN}${String(++n).padStart(6, '0')}` }
+    })
+    const deps = {
+      ...L.reviewCards.defaultReviewCardDeps,
+      enabled: () => true,
+      resolveChannel: async () => '200000000000000001',
+      post,
+      edit: vi.fn(async () => undefined),
+    }
+    const out = await Promise.all(Array.from({ length: N }, () => L.reviewCards.syncReviewCard(c.id, deps)))
+    expect(out.filter((o) => o === 'posted')).toHaveLength(1)
+    expect(post).toHaveBeenCalledTimes(1)
+    const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: c.id } })
+    expect(row.reviewMsgId).toBe(`5${RUN}000001`)
+    expect(row.reviewChannelId).toBe('200000000000000001')
+    // A decision afterwards edits that card (never a second post).
+    await L.missions.rejectMission('rev-it', c.id, 'nope')
+    expect(await L.reviewCards.syncReviewCard(c.id, deps)).toBe('edited')
+    expect(post).toHaveBeenCalledTimes(1)
+    // A resubmission starts a new round: a fresh card.
+    await L.missions.submitMissionCompletion(user, m.id, 'https://x/2')
+    const resub = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: c.id } })
+    expect(resub).toMatchObject({ status: 'PENDING', reviewMsgId: null, reviewChannelId: null, reviewCardAt: null })
+    expect(resub.reviewQueuedAt).not.toBeNull()
+    expect(await L.reviewCards.syncReviewCard(c.id, deps)).toBe('posted')
+    expect(post).toHaveBeenCalledTimes(2)
+    await deactivate([m.id])
+  }, 60_000)
+
+  it(`${N} simultaneous SLA digest runs post once per day (MissionSlaDigest primary key)`, async () => {
+    const m = await missionAt(1, 'it sla', null, null, 69)
+    const user = await seedUser(0)
+    // Far-future "today", unique per run, so reruns against a kept DB don't collide.
+    const now = new Date(Date.UTC(2100, 0, 1) + (Number(RUN) % 30000) * 86_400_000)
+    const c = await L.prisma.missionCompletion.create({
+      data: { missionId: m.id, discordId: user, status: 'PENDING', reviewQueuedAt: new Date(now.getTime() - 72 * 3_600_000) },
+    })
+    const post = vi.fn(async () => ({ id: '400000000000000001' }))
+    const deps = { ...L.sla.defaultSlaDeps, enabled: () => true, resolveChannel: async () => '200000000000000001', post }
+    const res = await Promise.all(Array.from({ length: N }, () => L.sla.runSlaDigest(deps, now)))
+    expect(res.filter((r) => r.status === 'posted')).toHaveLength(1)
+    expect(res.filter((r) => r.status === 'already_sent')).toHaveLength(N - 1)
+    expect(post).toHaveBeenCalledTimes(1)
+    const day = await L.prisma.missionSlaDigest.findUniqueOrThrow({ where: { day: L.sla.dayKey(now) } })
+    expect(day.messageId).toBe('400000000000000001')
+    expect((await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: c.id } })).slaNotifiedAt).toEqual(now)
+    await L.prisma.missionCompletion.update({ where: { id: c.id }, data: { status: 'REJECTED' } })
+    await deactivate([m.id])
+  }, 60_000)
 
   it(`${N} parallel level-up claims (tabs, reloads) celebrate once`, async () => {
     const memberId = `it-${RUN}`

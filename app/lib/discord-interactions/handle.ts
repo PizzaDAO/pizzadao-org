@@ -1,6 +1,7 @@
 /**
- * Discord HTTP Interactions dispatch: slash commands, blackjack buttons and
- * /buy autocomplete. Pure apart from the injected economy calls (HandlerDeps),
+ * Discord HTTP Interactions dispatch: slash commands, blackjack buttons,
+ * /buy autocomplete, and the mission review card buttons + Reject modal
+ * (./mission-review.ts). Pure apart from the injected economy calls (HandlerDeps),
  * so it is unit-testable without Discord or a DB. The route wires the real
  * implementations in app/api/discord/interactions/route.ts.
  *
@@ -17,6 +18,7 @@ import type { BlackjackMove, BlackjackStart, BlackjackView } from '../pep-games/
 import { SLOT_EMOJI, type SlotSymbol } from '../pep-games/slots'
 import { EPHEMERAL, InteractionType, ResponseType } from './commands'
 import { authorFor, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
+import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
 
 type Option = { name: string; type: number; value: unknown; focused?: boolean }
 type DiscordUser = { id: string; username?: string; global_name?: string | null; avatar?: string | null; bot?: boolean }
@@ -27,11 +29,16 @@ export interface Interaction {
   application_id?: string
   token?: string
   guild_id?: string
+  channel_id?: string
+  /** The message a component (or a modal opened from one) belongs to. */
+  message?: { id: string; channel_id?: string }
   data?: {
     name?: string
     options?: Option[]
     custom_id?: string
     component_type?: number
+    /** Modal submit: action rows of text inputs. */
+    components?: Array<{ type: number; components?: Array<{ type: number; custom_id?: string; value?: string }> }>
     resolved?: {
       users?: Record<string, DiscordUser>
       members?: Record<string, { roles?: string[]; joined_at?: string; nick?: string | null }>
@@ -53,7 +60,12 @@ type MessageData = {
 
 export interface InteractionResponse {
   type: number
-  data?: Partial<MessageData> & { choices?: Array<{ name: string; value: string }> }
+  data?: Partial<MessageData> & {
+    choices?: Array<{ name: string; value: string }>
+    /** Modal (type 9). */
+    custom_id?: string
+    title?: string
+  }
 }
 
 type Spin<T> = Promise<({ ok: true; bet: number; balance: number; payout: number } & T) | { ok: false; reason: 'cooldown'; readyAt: Date }>
@@ -91,6 +103,8 @@ export interface HandlerDeps {
     rateLimit: (discordId: string) => Promise<Date | null>
     defer: (job: MissionsJob) => void
   }
+  /** Mission review card buttons and the Reject modal (./mission-review.ts). */
+  missionReview?: MissionReviewDeps
 }
 
 /** What the deferred /missions follow-up needs. */
@@ -158,7 +172,12 @@ const opt = (i: Interaction, name: string) => i.data?.options?.find((o) => o.nam
 export async function handleInteraction(i: Interaction, deps: HandlerDeps): Promise<InteractionResponse> {
   if (i.type === InteractionType.PING) return { type: ResponseType.PONG }
   const out = new Out(authorFor(i.member ? { ...i.member, guildId: i.guild_id } : i.user ? { user: i.user } : undefined))
-  const known: number[] = [InteractionType.APPLICATION_COMMAND, InteractionType.MESSAGE_COMPONENT, InteractionType.AUTOCOMPLETE]
+  const known: number[] = [
+    InteractionType.APPLICATION_COMMAND,
+    InteractionType.MESSAGE_COMPONENT,
+    InteractionType.AUTOCOMPLETE,
+    InteractionType.MODAL_SUBMIT,
+  ]
   if (!known.includes(i.type)) return out.error('Unsupported interaction.')
 
   if (!deps.guildId || i.guild_id !== deps.guildId) {
@@ -172,6 +191,10 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
   try {
     if (i.type === InteractionType.AUTOCOMPLETE) return await autocomplete(i, deps)
     if (i.type === InteractionType.MESSAGE_COMPONENT) return await component(i, userId, deps, cur, out)
+    if (i.type === InteractionType.MODAL_SUBMIT) {
+      if (!deps.missionReview) return out.error('Unknown form.')
+      return await handleReviewModal(i, userId, deps.missionReview, (h, b) => out.error(h, b))
+    }
     return await command(i, userId, deps, cur, out)
   } catch (err) {
     // Validation problems (bad amount, insufficient funds, out of stock...) are user errors.
@@ -338,7 +361,11 @@ async function adminMoney(i: Interaction, adminId: string, deps: HandlerDeps, cu
 }
 
 async function component(i: Interaction, userId: string, deps: HandlerDeps, cur: string, out: Out): Promise<InteractionResponse> {
-  const m = /^bj:(hit|stand):([a-z0-9]{10,40})$/.exec(i.data?.custom_id ?? '')
+  if ((i.data?.custom_id ?? '').startsWith('mr:')) {
+    if (!deps.missionReview) return out.error('Unknown button.')
+    return handleReviewButton(i, userId, deps.missionReview, (h, b) => out.error(h, b))
+  }
+  const m =/^bj:(hit|stand):([a-z0-9]{10,40})$/.exec(i.data?.custom_id ?? '')
   if (!m) return out.error('Unknown button.')
   if (!deps.gamesEnabled()) return out.error("Games aren't enabled right now.")
   const r = await deps.blackjackAction(userId, m[2], m[1] as 'hit' | 'stand')

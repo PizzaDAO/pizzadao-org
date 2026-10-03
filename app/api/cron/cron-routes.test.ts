@@ -13,10 +13,15 @@ vi.mock('@/app/lib/attendance', () => ({
   syncAllCrewAttendance: vi.fn(async () => ({ newCalls: 1, newRecords: 4, crews: ['Ops'], errors: [], affectedDiscordIds: ['1', '2'] })),
 }))
 vi.mock('@/app/lib/mission-verify/events', () => ({ emitMissionEventMany: vi.fn(async () => undefined) }))
+vi.mock('@/app/lib/mission-verify/sla', () => ({
+  runSlaDigest: vi.fn(async () => ({ status: 'posted', day: '2026-10-03', overdue: 2, messageId: '1', roles: [] })),
+}))
 
 import { after } from 'next/server'
 import { GET as missionsGET } from './missions/route'
 import { GET as attendanceGET } from './attendance/route'
+import { GET as missionSlaGET } from './mission-sla/route'
+import { runSlaDigest } from '@/app/lib/mission-verify/sla'
 import { runNightlyMissions } from '@/app/lib/mission-verify/nightly'
 import { syncAllCrewAttendance } from '@/app/lib/attendance'
 
@@ -37,6 +42,7 @@ afterEach(() => {
 describe.each([
   ['/api/cron/missions', missionsGET, () => runNightlyMissions],
   ['/api/cron/attendance', attendanceGET, () => syncAllCrewAttendance],
+  ['/api/cron/mission-sla', missionSlaGET, () => runSlaDigest],
 ] as const)('%s auth', (path, GET, work) => {
   it('401 without the bearer token, and does no work', async () => {
     const res = await GET(req(path))
@@ -82,6 +88,27 @@ describe('/api/cron/missions', () => {
     vi.mocked(runNightlyMissions).mockRejectedValueOnce(new Error('db down'))
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const res = await missionsGET(req('/api/cron/missions', 'Bearer cron-secret'))
+    expect(res.status).toBe(500)
+    spy.mockRestore()
+  })
+})
+
+describe('/api/cron/mission-sla', () => {
+  it('returns the digest result', async () => {
+    const res = await missionSlaGET(req('/api/cron/mission-sla', 'Bearer cron-secret'))
+    expect(await res.json()).toMatchObject({ status: 'posted', overdue: 2 })
+  })
+
+  it('is scheduled daily in vercel.json', async () => {
+    const { readFileSync } = await import('node:fs')
+    const crons = JSON.parse(readFileSync('vercel.json', 'utf8')).crons as Array<{ path: string; schedule: string }>
+    expect(crons.filter((c) => c.path === '/api/cron/mission-sla')).toEqual([{ path: '/api/cron/mission-sla', schedule: '0 15 * * *' }])
+  })
+
+  it('500 (logged) when the digest throws', async () => {
+    vi.mocked(runSlaDigest).mockRejectedValueOnce(new Error('Discord down'))
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await missionSlaGET(req('/api/cron/mission-sla', 'Bearer cron-secret'))
     expect(res.status).toBe(500)
     spy.mockRestore()
   })

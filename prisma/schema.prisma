@@ -423,6 +423,13 @@ model MissionCompletion {
   holdReason  MissionHold?  // set while an auto-verified completion awaits a human release
   flaggedAt   DateTime?     // underlying state lost later: flagged, never clawed back (D17)
   flagReason  String?
+  // Discord review queue (Phase 3): the card in #work, edited on every decision.
+  reviewMsgId     String?   // the card's message id
+  reviewChannelId String?   // the channel it was posted in
+  reviewCardAt    DateTime? // when the card was claimed / posted (one card per review round)
+  // SLA (48 h to a first decision, D13)
+  reviewQueuedAt  DateTime? // when it (re-)entered the human queue; null on older rows = submittedAt
+  slaNotifiedAt   DateTime? // last time the daily digest listed it as overdue
   updatedAt   DateTime      @default(now()) @updatedAt
   mission     Mission       @relation(fields: [missionId], references: [id])
   events      MissionReviewEvent[]
@@ -462,6 +469,16 @@ model VerifierRun {
   updatedAt  DateTime  @default(now()) @updatedAt
 
   @@index([kind, startedAt])
+}
+
+// One row per UTC day the mission SLA digest (/api/cron/mission-sla) was
+// posted: the primary key makes "at most once a day" race-safe.
+model MissionSlaDigest {
+  day       String   @id // YYYY-MM-DD (UTC)
+  postedAt  DateTime @default(now())
+  channelId String?
+  messageId String?
+  overdue   Int      @default(0)
 }
 
 // Duplicate-account signals (plans/mission-verification.md §6.2), recomputed

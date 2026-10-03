@@ -6,6 +6,7 @@ import { getMembersWithRoles } from './discord'
 import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
 import { DPR_ONLY_MIN_LEVEL, missionReviewerRoleIds } from './mission-review-access'
 import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
+import { NEW_REVIEW_ROUND } from './mission-verify/review-ids'
 
 // ===== QUERIES =====
 
@@ -231,6 +232,7 @@ export async function submitMissionCompletion(
             status: 'PENDING',
             evidence: evidence || null,
             notes: sanitizeMemberNotes(notes),
+            reviewQueuedAt: new Date(),
           },
           include: { mission: true },
         })
@@ -299,6 +301,8 @@ async function resubmitRejected(
         source: 'MANUAL',
         holdReason: null,
         checkResult: Prisma.DbNull,
+        // A new review round: a new Discord card and a fresh 48 h SLA clock.
+        ...NEW_REVIEW_ROUND(),
       },
     })
     if (updated.count !== 1) return false
@@ -687,9 +691,25 @@ export async function checkAndAwardLevelReward(discordId: string, level: number)
 export async function getCompletionForReview(completionId: number) {
   const row = await prisma.missionCompletion.findUnique({
     where: { id: completionId },
-    select: { discordId: true, status: true, mission: { select: { level: true } } },
+    select: {
+      discordId: true,
+      status: true,
+      holdReason: true,
+      reviewedBy: true,
+      reviewedAt: true,
+      mission: { select: { level: true } },
+    },
   })
-  return row ? { discordId: row.discordId, status: row.status, level: row.mission.level } : null
+  return row
+    ? {
+        discordId: row.discordId,
+        status: row.status,
+        level: row.mission.level,
+        holdReason: row.holdReason,
+        reviewedBy: row.reviewedBy,
+        reviewedAt: row.reviewedAt,
+      }
+    : null
 }
 
 /**

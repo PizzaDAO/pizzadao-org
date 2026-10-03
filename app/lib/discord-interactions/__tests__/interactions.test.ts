@@ -488,4 +488,97 @@ describe('POST /api/discord/interactions', () => {
     delete process.env.DISCORD_PUBLIC_KEY
     expect((await post({ type: 1 })).status).toBe(503)
   })
+
+  describe('mission review buttons and the Reject modal', () => {
+    const DPR = '812131585327235113'
+    const OTHER_ID = '100000000000000009'
+    const getCompletionForReview = vi.fn()
+    const approveMission = vi.fn()
+    const after = vi.fn()
+    const button = (customId: string, roles = [DPR]) => ({
+      type: 3,
+      application_id: 'app-1',
+      token: 'tok-1',
+      guild_id: GUILD,
+      message: { id: '300000000000000001', channel_id: '200000000000000001' },
+      member: { user: { id: USER }, roles },
+      data: { custom_id: customId, component_type: 2 },
+    })
+    const modalSubmit = {
+      type: 5,
+      application_id: 'app-1',
+      token: 'tok-1',
+      guild_id: GUILD,
+      member: { user: { id: USER }, roles: [DPR] },
+      data: { custom_id: 'mr:reject-modal:42', components: [{ type: 1, components: [{ type: 4, custom_id: 'reason', value: 'not your post' }] }] },
+    }
+
+    beforeEach(() => {
+      getCompletionForReview.mockReset().mockResolvedValue({ discordId: OTHER_ID, level: 3, status: 'PENDING', holdReason: null, reviewedBy: null, reviewedAt: null })
+      approveMission.mockReset()
+      after.mockReset()
+      vi.doMock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after }))
+      vi.doMock('@/app/lib/missions', async (orig) => ({ ...(await orig<typeof import('@/app/lib/missions')>()), getCompletionForReview, approveMission }))
+      process.env.MISSION_REVIEW_CARDS_ENABLED = '1'
+    })
+    afterEach(() => {
+      delete process.env.MISSION_REVIEW_CARDS_ENABLED
+    })
+
+    it('401s a component click with a bad signature, before reading anything', async () => {
+      const res = await post(button('mr:approve:42'), '00'.repeat(64))
+      expect(res.status).toBe(401)
+      expect(getCompletionForReview).not.toHaveBeenCalled()
+      expect(after).not.toHaveBeenCalled()
+    })
+
+    it('401s a Reject modal submit with a bad signature', async () => {
+      const res = await post(modalSubmit, '11'.repeat(64))
+      expect(res.status).toBe(401)
+      expect(getCompletionForReview).not.toHaveBeenCalled()
+    })
+
+    it('401s a click whose body was changed after signing (e.g. another completion id)', async () => {
+      const { POST } = await import('@/app/api/discord/interactions/route')
+      const signedBody = JSON.stringify(button('mr:approve:42'))
+      const { sig, ts } = signed(signedBody)
+      const res = await POST(
+        new Request('https://app.pizzadao.org/api/discord/interactions', {
+          method: 'POST',
+          headers: { 'x-signature-ed25519': sig, 'x-signature-timestamp': ts },
+          body: JSON.stringify(button('mr:approve:43')),
+        }),
+      )
+      expect(res.status).toBe(401)
+      expect(getCompletionForReview).not.toHaveBeenCalled()
+    })
+
+    it('a signed click from a reviewer is acked with a deferred update; the decision runs in after()', async () => {
+      const res = await post(button('mr:approve:42'))
+      expect(res.status).toBe(200)
+      expect(await res.json()).toEqual({ type: 6 })
+      expect(getCompletionForReview).toHaveBeenCalledWith(42)
+      expect(after).toHaveBeenCalledTimes(1)
+      expect(approveMission).not.toHaveBeenCalled() // not inside the 3 s response
+    })
+
+    it('a signed Reject click opens the modal; a signed modal submit is deferred', async () => {
+      expect((await (await post(button('mr:reject:42'))).json()).type).toBe(9)
+      expect(await (await post(modalSubmit)).json()).toEqual({ type: 6 })
+      expect(after).toHaveBeenCalledTimes(1)
+    })
+
+    it('a signed click from a non-reviewer is refused (ephemeral)', async () => {
+      const body = await (await post(button('mr:approve:42', ['123']))).json()
+      expect(body).toMatchObject({ type: 4, data: { flags: 64 } })
+      expect(after).not.toHaveBeenCalled()
+    })
+
+    it('with MISSION_REVIEW_CARDS_ENABLED off the buttons only answer "turned off"', async () => {
+      delete process.env.MISSION_REVIEW_CARDS_ENABLED
+      const body = await (await post(button('mr:approve:42'))).json()
+      expect(body.data.embeds[0].description).toMatch(/turned off/)
+      expect(getCompletionForReview).not.toHaveBeenCalled()
+    })
+  })
 })
