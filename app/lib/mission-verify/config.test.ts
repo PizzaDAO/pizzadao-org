@@ -17,7 +17,6 @@ const seedRows = (): MissionDbRow[] =>
     verifierKey: null,
     verifierParams: null,
     proofKind: 'NONE',
-    autoVerify: c.level === 1 || c.level === 3,
   }))
 
 describe('planVerifierMigration', () => {
@@ -27,15 +26,35 @@ describe('planVerifierMigration', () => {
     expect(plan.updates).toHaveLength(12)
     const auto = MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey && VERIFIERS[c.verifierKey]?.mode === 'auto')
     expect(auto.map((c) => `L${c.level}.${c.index}`)).toEqual(['L1.1', 'L2.0', 'L3.0', 'L3.1', 'L5.0', 'L6.0', 'L7.0'])
-    expect(MISSION_VERIFIER_CONFIG.filter((c) => !c.verifierKey).map((c) => `L${c.level}.${c.index}`)).toEqual(['L2.1', 'L4.1', 'L5.1', 'L6.1'])
+    const semi = MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey && VERIFIERS[c.verifierKey]?.mode === 'semi')
+    expect(semi.map((c) => `L${c.level}.${c.index}:${c.verifierKey}`)).toEqual(['L2.1:social_post', 'L4.1:poap_drop', 'L5.1:media_proof', 'L6.1:gpp_host'])
+    expect(semi.every((c) => c.proofKind === 'URL')).toBe(true)
+    expect(MISSION_VERIFIER_CONFIG.filter((c) => !c.verifierKey)).toEqual([])
     expect(MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey === 'manual').map((c) => `L${c.level}.${c.index}`)).toEqual(['L8.0'])
     // Every configured verifier exists and accepts its params.
     for (const c of MISSION_VERIFIER_CONFIG) if (c.verifierKey) expect(() => VERIFIERS[c.verifierKey!].parse(c.verifierParams)).not.toThrow()
   })
 
-  it('rewords L1.0 to "Link your X account" (D1) and turns autoVerify off', () => {
+  it('rewords L1.0 to "Link your X account" (D1); never touches the legacy autoVerify column', () => {
     const l1 = planVerifierMigration(seedRows()).updates.find((u) => u.level === 1)!
-    expect(l1.data).toMatchObject({ title: 'Link your X account and follow @RarePizzas + @Pizza_DAO', verifierKey: 'x_linked', autoVerify: false })
+    expect(l1.data).toMatchObject({ title: 'Link your X account and follow @RarePizzas + @Pizza_DAO', verifierKey: 'x_linked' })
+    for (const u of planVerifierMigration(seedRows()).updates) expect(u.data).not.toHaveProperty('autoVerify')
+  })
+
+  it('Phase 4: a database already on the Phase 1 config only gets the new semi verifiers (and descriptions)', () => {
+    // Prod after Phase 1: L2.1 / L4.1 / L5.1 / L6.1 had verifierKey null, proofKind URL.
+    const rows = seedRows()
+    for (const c of MISSION_VERIFIER_CONFIG) {
+      const r = rows.find((x) => x.level === c.level && x.index === c.index)!
+      Object.assign(r, { title: c.title ?? c.seedTitle, description: c.description ?? 'seed', proofKind: c.proofKind })
+      if (['social_post', 'poap_drop', 'media_proof', 'gpp_host', 'referral'].includes(c.verifierKey ?? '')) Object.assign(r, { description: 'old' })
+      if (!['social_post', 'poap_drop', 'media_proof', 'gpp_host'].includes(c.verifierKey ?? '')) Object.assign(r, { verifierKey: c.verifierKey, verifierParams: c.verifierParams })
+    }
+    const plan = planVerifierMigration(rows)
+    expect(plan.errors).toEqual([])
+    expect(plan.updates.map((u) => `L${u.level}.${u.index}`)).toEqual(['L2.1', 'L3.1', 'L4.1', 'L5.1', 'L6.1'])
+    expect(plan.updates.find((u) => u.level === 2)!.changes).toContain('verifierKey null -> social_post')
+    expect(plan.updates.find((u) => u.level === 3)!.changes).toEqual(['description'])
   })
 
   it('is idempotent: applying the plan leaves nothing to do', () => {

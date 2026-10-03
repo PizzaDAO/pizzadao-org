@@ -29,10 +29,10 @@ const { NEW_MEMBER, COMPLETE_MEMBER, MEMBERS } = fixtures;
 
 const MISSIONS = [
   // Verifier settings as in app/lib/mission-verify/mission-config.ts (Phase 1).
-  { level: 1, index: 0, title: "Link your X account and follow @RarePizzas + @Pizza_DAO", reward: 69, levelTitle: "Pizza Trainee", autoVerify: false, verifierKey: "x_linked", verifierParams: {} },
-  { level: 2, index: 0, title: "Say hi on a community or crew call", reward: 420, levelTitle: "Pizza Noob", autoVerify: false, verifierKey: "attendance_count", verifierParams: { min: 1, crews: "any" } },
-  { level: 2, index: 1, title: "Post about PizzaDAO", reward: 420, levelTitle: "Pizza Noob", autoVerify: false, proofKind: "URL" },
-  { level: 3, index: 0, title: "Share your community in #show-and-tell", reward: 1337, levelTitle: null, autoVerify: false, verifierKey: "discord_message", verifierParams: { channelName: "show-and-tell" }, proofKind: "DISCORD_MESSAGE" },
+  { level: 1, index: 0, title: "Link your X account and follow @RarePizzas + @Pizza_DAO", reward: 69, levelTitle: "Pizza Trainee", verifierKey: "x_linked", verifierParams: {} },
+  { level: 2, index: 0, title: "Say hi on a community or crew call", reward: 420, levelTitle: "Pizza Noob", verifierKey: "attendance_count", verifierParams: { min: 1, crews: "any" } },
+  { level: 2, index: 1, title: "Post about PizzaDAO", reward: 420, levelTitle: "Pizza Noob", verifierKey: "social_post", verifierParams: { minReplies: 3, minLikes: 10, platforms: ["x", "farcaster"] }, proofKind: "URL" },
+  { level: 3, index: 0, title: "Share your community in #show-and-tell", reward: 1337, levelTitle: null, verifierKey: "discord_message", verifierParams: { channelName: "show-and-tell" }, proofKind: "DISCORD_MESSAGE" },
 ];
 
 async function main() {

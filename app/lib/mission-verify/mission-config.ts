@@ -7,10 +7,15 @@
  * refuses to touch a row whose title is neither the seed title nor the new
  * title set here (the production rows may have been edited by hand).
  *
- * Phase 1 verifiers: x_linked, attendance_count, discord_message, referral
- * (stub), discord_role, manual. The semi-automatic missions (L2.1, L4.0, L5.1,
- * L6.1) get their verifiers in Phase 4 and stay manual for now (proofKind URL
- * only changes the submit form's hint).
+ * Automatic verifiers: x_linked, attendance_count, discord_message,
+ * referral (Phase 4: real referral capture), discord_role; manual for L8.
+ * Phase 4 adds the semi-automatic ones (L2.1 social_post, L4.1 poap_drop,
+ * L5.1 media_proof, L6.1 gpp_host): the member submits a proof link, the
+ * verifier pre-checks it on submit (MissionCompletion.checkResult) and a
+ * reviewer approves with one click. They never approve on their own.
+ *
+ * Mission.autoVerify is no longer read or written (it is @ignore in the
+ * schema and dropped by "Migration B" after this release).
  */
 
 export type ProofKindName = 'NONE' | 'URL' | 'DISCORD_MESSAGE' | 'UPLOAD'
@@ -54,8 +59,10 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     level: 2,
     index: 1,
     seedTitle: 'Post about PizzaDAO (3+ comments, 10+ likes)',
-    verifierKey: null, // social_post, Phase 4
-    verifierParams: null,
+    description:
+      'Post about PizzaDAO on X or Farcaster and get at least 3 comments and 10 likes, then submit the link to your post. A reviewer checks the numbers.',
+    verifierKey: 'social_post', // D15: X (handle match) + Farcaster (Neynar); a reviewer judges the engagement
+    verifierParams: { minReplies: 3, minLikes: 10, platforms: ['x', 'farcaster'] },
     proofKind: 'URL',
   },
   {
@@ -70,7 +77,9 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     level: 3,
     index: 1,
     seedTitle: 'Invite a friend to Discord',
-    verifierKey: 'referral', // stub until the Phase 4 referral capture; never passes yet
+    description:
+      'Invite a friend with your personal invite link (shown on this mission), or have them pick you in the "Who invited you?" step when they join. It counts once they finish onboarding. Invited someone before this existed? Submit it for review and say who.',
+    verifierKey: 'referral', // D4: the Referral table (onboarding step + /join?ref= links), qualifies on onboarding
     verifierParams: { min: 1, qualify: 'onboarded' },
     proofKind: 'NONE',
   },
@@ -78,8 +87,10 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     level: 4,
     index: 1, // prod: the original index-0 row was deleted; this mission sits at index 1
     seedTitle: 'Make a POAP for a community call',
-    verifierKey: null, // poap_drop, Phase 4
-    verifierParams: null,
+    description:
+      'Create a POAP for one of the community calls, then submit the POAP drop link (poap.gallery or collectors.poap.xyz) or the drop ID. A reviewer confirms you made it.',
+    verifierKey: 'poap_drop', // drop info from POAP Compass; a reviewer confirms authorship
+    verifierParams: {},
     proofKind: 'URL',
   },
   {
@@ -95,8 +106,10 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     level: 5,
     index: 1,
     seedTitle: 'Do a selfie interview',
-    verifierKey: null, // media_proof, Phase 4
-    verifierParams: null,
+    description:
+      'Record a selfie interview about your PizzaDAO experience and submit a link to it (YouTube, X, Google Drive or Loom).',
+    verifierKey: 'media_proof', // D16: links only
+    verifierParams: { kinds: ['youtube', 'x', 'drive', 'loom'] },
     proofKind: 'URL',
   },
   {
@@ -111,8 +124,10 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     level: 6,
     index: 1,
     seedTitle: 'Onboard a Bitcoin Pizza Day city',
-    verifierKey: null, // gpp_host, Phase 4
-    verifierParams: null,
+    description:
+      'Help a new city host a Bitcoin Pizza Day party, then submit its rsv.pizza event link. A reviewer confirms you hosted or onboarded it (linking Telegram on your profile helps).',
+    verifierKey: 'gpp_host', // D14: rsv.pizza event link + Telegram; Phase 5 adds a service endpoint
+    verifierParams: { eventType: 'gpp', statuses: ['approved', 'listed'] },
     proofKind: 'URL',
   },
   {
@@ -142,7 +157,6 @@ export interface MissionDbRow {
   verifierKey: string | null
   verifierParams: unknown
   proofKind: string
-  autoVerify: boolean
 }
 
 export interface MissionUpdate {
@@ -155,7 +169,6 @@ export interface MissionUpdate {
     verifierKey: string | null
     verifierParams: Record<string, unknown> | null
     proofKind: ProofKindName
-    autoVerify: false
   }
   changes: string[]
 }
@@ -197,7 +210,6 @@ export function planVerifierMigration(
       verifierKey: c.verifierKey,
       verifierParams: c.verifierParams,
       proofKind: c.proofKind,
-      autoVerify: false,
     }
     const changes: string[] = []
     if (c.title && row.title !== c.title) {
@@ -211,7 +223,6 @@ export function planVerifierMigration(
     if (row.verifierKey !== c.verifierKey) changes.push(`verifierKey ${row.verifierKey ?? 'null'} -> ${c.verifierKey ?? 'null'}`)
     if (stable(row.verifierParams ?? null) !== stable(c.verifierParams)) changes.push(`verifierParams -> ${stable(c.verifierParams)}`)
     if (row.proofKind !== c.proofKind) changes.push(`proofKind ${row.proofKind} -> ${c.proofKind}`)
-    if (row.autoVerify) changes.push('autoVerify -> false')
     if (changes.length) plan.updates.push({ id: row.id, level: c.level, index: c.index, data, changes })
     else plan.unchanged.push(label)
   }

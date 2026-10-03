@@ -102,7 +102,7 @@ describe('approveMission / rejectMission', () => {
 
 describe('submitMissionCompletion', () => {
   it('maps a concurrent duplicate submission (unique violation) to a 409', async () => {
-    mockFn(prisma.mission.findUnique).mockResolvedValue({ ...LEVEL_MISSIONS[0], level: 1, autoVerify: true, title: 'x' })
+    mockFn(prisma.mission.findUnique).mockResolvedValue({ ...LEVEL_MISSIONS[0], level: 1, title: 'x' })
     mockFn(prisma.missionCompletion.findUnique).mockResolvedValue(null)
     mockFn(prisma.missionCompletion.findMany).mockResolvedValue([])
     mockFn(prisma.missionCompletion.create).mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }))

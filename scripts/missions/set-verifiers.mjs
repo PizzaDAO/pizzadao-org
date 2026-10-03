@@ -1,18 +1,25 @@
 #!/usr/bin/env node
 /**
- * Mission verification Phase 1 data migration. DRY RUN BY DEFAULT.
+ * Mission verification data migration (Phases 1 and 4). DRY RUN BY DEFAULT.
  *
- * Sets Mission.verifierKey / verifierParams / proofKind (and autoVerify=false)
- * on the seeded missions, keyed by (level, index), per
- * app/lib/mission-verify/mission-config.ts; rewords L1.0 to "Link your X
- * account and follow @RarePizzas + @Pizza_DAO" (D1) and clarifies L5.0 (D3);
+ * Sets Mission.verifierKey / verifierParams / proofKind (and the reworded
+ * titles / descriptions) on the seeded missions, keyed by (level, index), per
+ * app/lib/mission-verify/mission-config.ts:
+ *   Phase 1  L1.1 x_linked (reworded, D1), L2.0 / L5.0 attendance_count,
+ *            L3.0 discord_message, L6.0 / L7.0 discord_role, L8.0 manual
+ *   Phase 4  L2.1 social_post, L4.1 poap_drop, L5.1 media_proof, L6.1 gpp_host
+ *            (semi-automatic: pre-checks on submit, a reviewer approves), and
+ *            L3.1 referral (now real) with a description that explains the
+ *            invite link
  * and marks the grandfathered no-proof approvals (reviewedBy = 'auto', D6) as
- * source = 'AUTO'.
+ * source = 'AUTO'. It never reads or writes the legacy Mission.autoVerify
+ * column (@ignore since Phase 4, dropped by Migration B).
  *
  * It ABORTS, changing nothing, if any (level, index) row has a title that is
  * neither the seed title nor the new title (production rows may have been
  * edited by hand: export them first, see plans/mission-verification.md §1).
- * Idempotent: a second run reports nothing to do.
+ * Idempotent: a second run reports nothing to do. Already on the Phase 1
+ * config, it only reports the Phase 4 rows.
  *
  * Requires Migration A (prisma/migrations/20261006000000_mission_verifiers)
  * to be applied first.
@@ -22,7 +29,8 @@
  *   DATABASE_URL=... node scripts/missions/set-verifiers.mjs --apply    # writes, in one transaction
  *
  * Automatic approval stays off until MISSION_VERIFIERS_ENABLED=1 is set in
- * Vercel, so applying this alone changes no member's status or balance.
+ * Vercel, and the semi verifiers never approve on their own, so applying this
+ * alone changes no member's status or balance.
  */
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -54,7 +62,7 @@ try {
   console.log(`Database host: ${host}`);
 
   const rows = await prisma.mission.findMany({
-    select: { id: true, level: true, index: true, title: true, description: true, verifierKey: true, verifierParams: true, proofKind: true, autoVerify: true },
+    select: { id: true, level: true, index: true, title: true, description: true, verifierKey: true, verifierParams: true, proofKind: true },
     orderBy: [{ level: "asc" }, { index: "asc" }],
   });
   const plan = planVerifierMigration(rows);
