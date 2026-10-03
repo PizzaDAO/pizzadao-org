@@ -24,9 +24,13 @@
  *   media_proof  L5.1  YouTube / X / Drive / Loom link format (D16: links only),
  *                      reachability via oEmbed where the platform has one.
  *   gpp_host     L6.1  an rsv.pizza event link that rsv.pizza's public GPP list
- *                      knows (and its status). The public list has no host
- *                      Telegram, so the reviewer compares the member's linked
- *                      Telegram by hand (D14; Phase 5 adds a service endpoint).
+ *                      knows (and its status). Phase 5: with RSV_PIZZA_SERVICE_KEY
+ *                      set, rsv.pizza's service endpoint is asked whether the
+ *                      member's linked wallets / Telegram hosted or onboarded
+ *                      that event; a match marks the result `autoVerified`
+ *                      (L6 still waits for a human release, D9). Without the
+ *                      key (or when the lookup is down / finds nothing) the
+ *                      reviewer compares the member's Telegram by hand (D14).
  */
 import { fetchPoapDrop } from '../poap'
 import { fetchJsonCapped } from './net'
@@ -297,6 +301,60 @@ type GppEvent = {
   cancelledAt?: string | null
 }
 
+/** One event from rsv.pizza's service host lookup (POST /api/service/gpp-host-lookup): no PII. */
+export type RsvHostEvent = {
+  slug: string
+  city: string | null
+  status: string
+  type: string
+  date: string | null
+  role: string
+  matchedBy: string[]
+}
+
+type HostLookup =
+  | { state: 'off' }
+  | { state: 'no_ids' }
+  | { state: 'unavailable' }
+  | { state: 'ok'; events: RsvHostEvent[] }
+
+/**
+ * Ask rsv.pizza whether the member's identifiers hosted / onboarded a GPP
+ * event (Phase 5). Identifiers: linked wallets (MemberWallet) and the linked
+ * Telegram username. pizzadao.org stores no member email, so none is sent.
+ * Only events with the wanted type + status are kept.
+ */
+async function rsvHostLookup(ctx: VerifyCtx, telegram: string | null, { eventType, statuses }: GppParams): Promise<HostLookup> {
+  const key = ctx.sources.rsvPizzaServiceKey()
+  if (!key) return { state: 'off' }
+  const wallets = (await ctx.sources.getWalletAddresses(ctx.discordId, ctx.memberId).catch(() => [] as string[]))
+    .filter((w) => /^(0x[0-9a-fA-F]{40}|[1-9A-HJ-NP-Za-km-z]{32,44})$/.test(w))
+    .slice(0, 10)
+  const telegrams = telegram && /^[A-Za-z0-9_]{3,32}$/.test(telegram) ? [telegram] : []
+  if (!wallets.length && !telegrams.length) return { state: 'no_ids' }
+  const r = await fetchJsonCapped<{ ok?: boolean; events?: RsvHostEvent[] }>(
+    ctx.sources.fetch,
+    `${ctx.sources.rsvPizzaApiUrl()}/api/service/gpp-host-lookup`,
+    {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', 'x-service-key': key },
+      body: JSON.stringify({ wallets, telegrams }),
+    },
+  )
+  if (!r || !r.ok || !r.json || !Array.isArray(r.json.events)) return { state: 'unavailable' }
+  const events = r.json.events.filter(
+    (e) =>
+      e &&
+      typeof e.slug === 'string' &&
+      (e.type ?? eventType).toLowerCase() === eventType.toLowerCase() &&
+      statuses.includes(String(e.status ?? '').toLowerCase()),
+  )
+  return { state: 'ok', events }
+}
+
+const describeHost = (e: RsvHostEvent) =>
+  `${e.role === 'underboss' ? 'onboarded' : e.role === 'cohost' ? 'co-hosted' : 'hosted'} rsv.pizza/${e.slug}${e.city ? ` (${e.city})` : ''}`
+
 export const gppHost: Verifier<GppParams> = {
   key: 'gpp_host',
   mode: 'semi',
@@ -308,7 +366,8 @@ export const gppHost: Verifier<GppParams> = {
     const statuses = o.statuses === undefined ? ['approved', 'listed'] : stringList(o.statuses, 'statuses')
     return { eventType, statuses: statuses.map((s) => s.toLowerCase()) }
   },
-  async check(ctx, { statuses }) {
+  async check(ctx, params) {
+    const { statuses } = params
     const hint = 'Submit the rsv.pizza link of the party you onboarded (e.g. https://rsv.pizza/yourcity).'
     const link = parseRsvPizzaUrl(ctx.evidence)
     if (!link) return fail('No rsv.pizza event link submitted', hint)
@@ -320,18 +379,54 @@ export const gppHost: Verifier<GppParams> = {
     const evidence: Record<string, unknown> = { url: link.url, slug: link.slug, memberTelegram: telegram }
     const checks: SemiCheck[] = [{ label: 'rsv.pizza event link', ok: true }]
 
-    const r = await fetchJsonCapped<{ event?: GppEvent }>(
-      ctx.sources.fetch,
-      `${ctx.sources.rsvPizzaApiUrl()}/api/gpp/events/by-city/${encodeURIComponent(link.slug)}`,
-    )
-    if (!r || (!r.ok && r.status !== 404)) {
-      checks.push({ label: 'rsv.pizza unreachable (open the link)', ok: null }, tgCheck)
-      return review(`rsv.pizza/${link.slug}`, checks, evidence)
+    const [r, host] = await Promise.all([
+      fetchJsonCapped<{ event?: GppEvent }>(
+        ctx.sources.fetch,
+        `${ctx.sources.rsvPizzaApiUrl()}/api/gpp/events/by-city/${encodeURIComponent(link.slug)}`,
+      ),
+      rsvHostLookup(ctx, telegram, params).catch((): HostLookup => ({ state: 'unavailable' })),
+    ])
+
+    const ev = r?.ok ? r.json?.event : undefined
+    // The member's events per rsv.pizza; the submitted one (slug or its canonical custom URL) is the match.
+    const slugs = new Set([link.slug, ev?.customUrl?.toLowerCase()].filter((x): x is string => !!x))
+    const hostEvents = host.state === 'ok' ? host.events : []
+    const match = hostEvents.find((e) => slugs.has(e.slug.toLowerCase())) ?? null
+    if (host.state !== 'off') {
+      evidence.hostLookup =
+        host.state === 'ok'
+          ? { matched: !!match, events: hostEvents.map((e) => ({ slug: e.slug, role: e.role, status: e.status, date: e.date, matchedBy: e.matchedBy })) }
+          : { state: host.state }
     }
-    const ev = r.ok ? r.json?.event : undefined
+
+    // What the member's identity check says (replaces the by-hand Telegram compare on a match).
+    const identityChecks = (): SemiCheck[] => {
+      if (match) return [{ label: `rsv.pizza confirms the member ${describeHost(match)} (matched by ${match.matchedBy.join(' + ') || 'identity'})`, ok: true }]
+      if (host.state === 'ok' && hostEvents.length) {
+        return [{ label: `rsv.pizza: the member ${hostEvents.slice(0, 3).map(describeHost).join(', ')}, but not rsv.pizza/${link.slug}`, ok: null }]
+      }
+      if (host.state === 'ok') return [{ label: "rsv.pizza host lookup: no approved GPP event for the member's wallets / Telegram", ok: null }, tgCheck]
+      if (host.state === 'unavailable') return [{ label: 'rsv.pizza host lookup unavailable', ok: null }, tgCheck]
+      return [tgCheck]
+    }
+
+    if (!ev && match) {
+      // Not in the public list (an invite-code link, or the list is down), but
+      // the service lookup knows it as an approved / listed GPP event.
+      const status = match.status.toLowerCase()
+      Object.assign(evidence, { city: match.city, date: match.date, status })
+      checks.push({ label: `Global Pizza Party: rsv.pizza/${match.slug}${match.city ? ` (${match.city})` : ''}`, ok: true })
+      checks.push({ label: `Status "${status}" (need ${statuses.join(' / ')})`, ok: statuses.includes(status) })
+      checks.push(...identityChecks())
+      return finish(`GPP ${match.city ?? match.slug}: ${status}`)
+    }
+    if (!r || (!r.ok && r.status !== 404)) {
+      checks.push({ label: 'rsv.pizza unreachable (open the link)', ok: null }, ...identityChecks())
+      return finish(`rsv.pizza/${link.slug}`)
+    }
     if (!ev) {
-      checks.push({ label: `rsv.pizza/${link.slug} isn't in the public Global Pizza Party list (an invite code link? open it)`, ok: null }, tgCheck)
-      return review(`rsv.pizza/${link.slug} (not in the GPP list)`, checks, evidence)
+      checks.push({ label: `rsv.pizza/${link.slug} isn't in the public Global Pizza Party list (an invite code link? open it)`, ok: null }, ...identityChecks())
+      return finish(`rsv.pizza/${link.slug} (not in the GPP list)`)
     }
     const status = (ev.underbossStatus ?? 'pending').toLowerCase()
     Object.assign(evidence, {
@@ -349,8 +444,15 @@ export const gppHost: Verifier<GppParams> = {
     checks.push({ label: `Global Pizza Party: ${ev.name ?? link.slug}${ev.city ? ` (${ev.city}${ev.country ? `, ${ev.country}` : ''})` : ''}`, ok: true })
     checks.push({ label: `Status "${status}" (need ${statuses.join(' / ')})`, ok: statuses.includes(status) })
     if (ev.cancelledAt) checks.push({ label: 'The party was cancelled', ok: false })
-    checks.push(tgCheck)
-    return review(`GPP ${ev.city ?? ev.name ?? link.slug}: ${status}${typeof ev.guestCount === 'number' ? `, ${ev.guestCount} guests` : ''}`, checks, evidence)
+    checks.push(...identityChecks())
+    return finish(`GPP ${ev.city ?? ev.name ?? link.slug}: ${status}${typeof ev.guestCount === 'number' ? `, ${ev.guestCount} guests` : ''}`)
+
+    function finish(summary: string): VerifyResult {
+      const res = review(match ? `Host confirmed by rsv.pizza · ${summary}` : summary, checks, evidence)
+      // Auto-verifiable only when rsv.pizza ties the member to this very event and nothing failed.
+      if (match && res.status === 'needs_review' && !checks.some((c) => c.ok === false)) res.autoVerified = true
+      return res
+    }
   },
 }
 

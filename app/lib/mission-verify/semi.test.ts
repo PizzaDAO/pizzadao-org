@@ -43,6 +43,8 @@ function sources(over: Partial<VerifierSources> = {}): VerifierSources {
     fetch: mockFetch({}) as unknown as typeof fetch,
     neynarApiKey: () => null,
     rsvPizzaApiUrl: () => 'https://api.rsv.example',
+    rsvPizzaServiceKey: () => null,
+    getWalletAddresses: vi.fn(async () => ['0xAbCdEf0123456789aBcDeF0123456789AbCdEf01']),
     ...over,
   }
 }
@@ -289,5 +291,89 @@ describe('gpp_host (L6.1, D14)', () => {
     for (const bad of ['https://rsv.pizza/', 'https://rsv.pizza/login', 'https://lu.ma/lisbon', null]) {
       expect(await gppHost.check(ctx(sources(), bad), params)).toMatchObject({ status: 'fail', hint: expect.stringMatching(/rsv\.pizza/) })
     }
+  })
+
+  it('without RSV_PIZZA_SERVICE_KEY the host lookup is never called and nothing is auto-verified', async () => {
+    const f = rsv(() => json({ event: EVENT }))
+    const r = asReview(await gppHost.check(ctx(sources({ fetch: f as unknown as typeof fetch }), 'https://rsv.pizza/lisbon'), params))
+    expect(f).toHaveBeenCalledTimes(1)
+    expect(r.autoVerified).toBeUndefined()
+    expect(r.evidence.hostLookup).toBeUndefined()
+  })
+
+  describe('Phase 5: rsv.pizza host lookup (RSV_PIZZA_SERVICE_KEY)', () => {
+    const KEY = 'svc-key'
+    const HOST = { slug: 'lisbon', city: 'Lisbon', status: 'approved', type: 'gpp', date: '2026-05-22T18:00:00.000Z', role: 'underboss', matchedBy: ['wallet'] }
+    const lookup = (events: unknown[] | (() => Response), event: unknown = EVENT) =>
+      mockFetch({
+        'https://api.rsv.example/api/gpp/events/by-city/': () => (event ? json({ event }) : json({ error: 'not found' }, 404)),
+        'https://api.rsv.example/api/service/gpp-host-lookup': typeof events === 'function' ? events : () => json({ ok: true, matched: events.length > 0, events }),
+      })
+    const withKey = (f: ReturnType<typeof mockFetch>, over: Partial<VerifierSources> = {}) =>
+      sources({ fetch: f as unknown as typeof fetch, rsvPizzaServiceKey: () => KEY, ...over })
+
+    it("sends the member's wallets + Telegram with the service key; a match on this event is auto-verified", async () => {
+      const f = lookup([HOST])
+      const r = asReview(await gppHost.check(ctx(withKey(f), 'https://rsv.pizza/lisbon'), params))
+      const call = f.mock.calls.find((c) => String(c[0]).endsWith('/api/service/gpp-host-lookup'))!
+      const init = call[1] as RequestInit
+      expect(init.method).toBe('POST')
+      expect((init.headers as Record<string, string>)['x-service-key']).toBe(KEY)
+      expect(JSON.parse(String(init.body))).toEqual({ wallets: ['0xAbCdEf0123456789aBcDeF0123456789AbCdEf01'], telegrams: ['pizzafan_tg'] })
+      expect(r.autoVerified).toBe(true)
+      expect(r.confidence).toBe('high')
+      expect(oks(r)).toEqual([true, true, true, true])
+      expect(r.checks[3].label).toMatch(/onboarded rsv\.pizza\/lisbon.*wallet/)
+      expect(r.summary).toMatch(/^Host confirmed by rsv\.pizza/)
+      expect(r.evidence.hostLookup).toMatchObject({ matched: true, events: [{ slug: 'lisbon', role: 'underboss' }] })
+    })
+
+    it('an invite-code link outside the public list still matches through the lookup', async () => {
+      const f = lookup([{ ...HOST, slug: 'AbC123', role: 'host', city: 'Lagos' }], null)
+      const r = asReview(await gppHost.check(ctx(withKey(f), 'https://rsv.pizza/rsvp/AbC123'), params))
+      expect(r.autoVerified).toBe(true)
+      expect(oks(r)).toEqual([true, true, true, true])
+      expect(r.evidence).toMatchObject({ city: 'Lagos', status: 'approved' })
+    })
+
+    it('the member hosted another event: shown, not auto-verified', async () => {
+      const r = asReview(await gppHost.check(ctx(withKey(lookup([{ ...HOST, slug: 'porto', city: 'Porto' }])), 'https://rsv.pizza/lisbon'), params))
+      expect(r.autoVerified).toBeUndefined()
+      expect(r.checks[3]).toMatchObject({ ok: null, label: expect.stringMatching(/porto.*but not rsv\.pizza\/lisbon/) })
+    })
+
+    it('no match: falls back to the by-hand Telegram compare', async () => {
+      const r = asReview(await gppHost.check(ctx(withKey(lookup([])), 'https://rsv.pizza/lisbon'), params))
+      expect(r.autoVerified).toBeUndefined()
+      expect(oks(r)).toEqual([true, true, true, null, null])
+      expect(r.checks[3].label).toMatch(/no approved GPP event/)
+      expect(r.checks[4].label).toContain('@pizzafan_tg')
+    })
+
+    it('ignores events of another type or status, and never auto-verifies a failing event', async () => {
+      const r1 = asReview(await gppHost.check(ctx(withKey(lookup([{ ...HOST, status: 'pending' }, { ...HOST, type: 'standard' }])), 'https://rsv.pizza/lisbon'), params))
+      expect(r1.autoVerified).toBeUndefined()
+      const r2 = asReview(await gppHost.check(ctx(withKey(lookup([HOST], { ...EVENT, cancelledAt: '2026-05-01' })), 'https://rsv.pizza/lisbon'), params))
+      expect(r2.autoVerified).toBeUndefined()
+      expect(r2.confidence).toBe('low')
+    })
+
+    it('lookup down (401 / 503 / 500 / network): unchecked, degrades to the manual compare', async () => {
+      for (const resp of [() => json({ ok: false }, 401), () => json({ ok: false, reason: 'not configured' }, 503), () => new Response('', { status: 500 })]) {
+        const r = asReview(await gppHost.check(ctx(withKey(lookup(resp)), 'https://rsv.pizza/lisbon'), params))
+        expect(r.autoVerified).toBeUndefined()
+        expect(r.checks[3]).toMatchObject({ ok: null, label: 'rsv.pizza host lookup unavailable' })
+        expect(r.evidence.hostLookup).toEqual({ state: 'unavailable' })
+      }
+    })
+
+    it('no wallets and no Telegram: the lookup is skipped', async () => {
+      const f = lookup([HOST])
+      const src = withKey(f, { getWalletAddresses: vi.fn(async () => []), getTelegramUsername: vi.fn(async () => null) })
+      const r = asReview(await gppHost.check(ctx(src, 'https://rsv.pizza/lisbon'), params))
+      expect(f.mock.calls.some((c) => String(c[0]).includes('/api/service/'))).toBe(false)
+      expect(r.evidence.hostLookup).toEqual({ state: 'no_ids' })
+      expect(r.autoVerified).toBeUndefined()
+    })
   })
 })

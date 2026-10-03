@@ -98,7 +98,7 @@ describe('getCurrentLevel', () => {
 describe('submitMissionCompletion', () => {
   const AUTO_L1 = { id: 1, level: 1, index: 0, title: 'Follow on X', reward: 69, isActive: true }
 
-  it('never approves on submit (the old autoVerify missions too): PENDING, nothing paid', async () => {
+  it('never approves on submit (the old no-proof missions too): PENDING, nothing paid', async () => {
     mockFn(prisma.mission.findUnique).mockResolvedValue(AUTO_L1)
     mockFn(prisma.missionCompletion.findUnique).mockResolvedValue(null)
     mockFn(prisma.missionCompletion.create).mockImplementation(async ({ data }: { data: object }) => ({ id: 5, ...data, mission: AUTO_L1 }))

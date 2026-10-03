@@ -48,7 +48,19 @@ export type VerifyResult =
    * Semi-automatic verifiers: the proof looks valid, here is what was checked;
    * a reviewer decides (the completion stays PENDING with this as checkResult).
    */
-  | { status: 'needs_review'; evidence: Record<string, unknown>; checks: SemiCheck[]; confidence: Confidence; summary: string }
+  | {
+      status: 'needs_review'
+      evidence: Record<string, unknown>
+      checks: SemiCheck[]
+      confidence: Confidence
+      summary: string
+      /**
+       * The proof was confirmed against an authoritative source (e.g. rsv.pizza's
+       * host lookup for L6.1): the submit route marks the PENDING row as
+       * auto-verified, held for a human release when the policy (D9) needs one.
+       */
+      autoVerified?: boolean
+    }
 
 export interface Verifier<P = unknown> {
   key: string
@@ -93,6 +105,10 @@ export interface VerifierSources {
   neynarApiKey(): string | null
   /** RSV_PIZZA_API_URL, default https://api.rsv.pizza. */
   rsvPizzaApiUrl(): string
+  /** RSV_PIZZA_SERVICE_KEY (rsv.pizza's PIZZADAO_SERVICE_KEY), or null: the L6.1 host lookup is then skipped. */
+  rsvPizzaServiceKey(): string | null
+  /** The member's linked wallet addresses (MemberWallet), for the rsv.pizza host lookup. */
+  getWalletAddresses(discordId: string, memberId: string | null): Promise<string[]>
 }
 
 export interface ReferralRow {

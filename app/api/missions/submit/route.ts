@@ -49,7 +49,7 @@ const POST_HANDLER = async (request: NextRequest) => {
   // reviewer. Missions without a verifier only get a link preview.
   const mission = await prisma.mission.findUnique({
     where: { id: missionId },
-    select: { verifierKey: true, verifierParams: true, isActive: true },
+    select: { verifierKey: true, verifierParams: true, isActive: true, level: true },
   })
   const precheck =
     mission?.isActive && isPrecheckedMission(mission.verifierKey)
@@ -68,7 +68,8 @@ const POST_HANDLER = async (request: NextRequest) => {
   )
 
   if (precheck.checkResult) {
-    await storeCheckResult(completion.id, precheck.checkResult, !!mission?.verifierKey)
+    // An auto-verified pre-check (L6.1 host confirmed by rsv.pizza) is held for a release (D9).
+    await storeCheckResult(completion.id, precheck.checkResult, !!mission?.verifierKey, precheck.hold ?? null)
   }
 
   // Missions with an automatic verifier are checked right away (e.g. the

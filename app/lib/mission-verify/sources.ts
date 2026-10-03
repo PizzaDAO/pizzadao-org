@@ -104,4 +104,16 @@ export const defaultSources: VerifierSources = {
   neynarApiKey: () => process.env.NEYNAR_API_KEY?.trim() || null,
 
   rsvPizzaApiUrl: () => (process.env.RSV_PIZZA_API_URL?.trim() || 'https://api.rsv.pizza').replace(/\/$/, ''),
+
+  rsvPizzaServiceKey: () => process.env.RSV_PIZZA_SERVICE_KEY?.trim() || null,
+
+  async getWalletAddresses(discordId, memberId) {
+    const rows = await prisma.memberWallet.findMany({
+      where: memberId ? { OR: [{ memberId }, { discordId }] } : { discordId },
+      select: { walletAddress: true },
+      orderBy: [{ isPrimary: 'desc' }, { createdAt: 'asc' }],
+      take: 10,
+    })
+    return [...new Set(rows.map((r) => r.walletAddress.trim()).filter(Boolean))]
+  },
 }

@@ -359,10 +359,6 @@ model Mission {
   description String?
   reward      Int      @default(0) // PEP reward (per-level, shared)
   levelTitle  String?  // e.g., "Pizza Trainee"
-  // Legacy, ignored since Phase 0. @ignore keeps it out of the generated client
-  // (no query selects it any more), so "Migration B" (DROP COLUMN) is safe to
-  // apply once this release is deployed. Do not read or write it.
-  autoVerify  Boolean  @default(false) @ignore
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   // Mission verification (plans/mission-verification.md §3). null = manual.
