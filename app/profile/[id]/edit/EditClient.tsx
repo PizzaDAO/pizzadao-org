@@ -476,7 +476,7 @@ function LanguageSection({ memberId }: { memberId: string }) {
     const t = useTranslations("language");
     return (
         <EditorialSection
-            overline="§ 06 · Language"
+            overline="§ 05 · Language"
             title={t("sectionTitle")}
             description={t("description")}
         >
@@ -694,7 +694,7 @@ export function EditClient({ memberId }: { memberId: string }) {
 
                 {/* Wallets pointer */}
                 <EditorialSection
-                    overline="§ 07 · Wallets"
+                    overline="§ 06 · Wallets"
                     title="Wallets"
                     description="Wallet management has its own page now."
                 >
