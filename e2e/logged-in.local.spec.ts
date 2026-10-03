@@ -233,3 +233,39 @@ test.describe('profile-complete celebration (member 990002)', () => {
     await ctx.close();
   });
 });
+
+test.describe('level-up approved while away (member 990002)', () => {
+  // lastCelebratedLevel is claimed once per member in the DB: desktop only.
+  test.beforeEach(async ({ context }, info) => {
+    test.skip(info.project.name !== 'desktop', 'one-shot server flag — desktop only');
+    await login(context, COMPLETE);
+  });
+
+  test('the next /missions visit shows the level-up modal once', async ({ page, browser }, info) => {
+    const diag = watch(page);
+    await page.goto('/missions');
+    const modal = page.getByTestId('level-up-modal');
+    await expect(modal).toBeVisible({ timeout: 60_000 });
+    await expect(modal).toContainText('69'); // the Level 1 reward that was paid
+    await shot(page, info, 'level-up-while-away', diag);
+    await modal.click({ position: { x: 5, y: 5 } }); // backdrop dismisses
+    await expect(modal).toBeHidden();
+
+    // Another browser: the server claim alone must suppress it.
+    const ctx = await browser.newContext({ viewport: { width: 1280, height: 800 } });
+    await login(ctx, COMPLETE);
+    const p2 = await ctx.newPage();
+    const claim = p2.waitForResponse(
+      (r) => r.url().includes('/api/missions/celebration') && r.request().method() === 'POST',
+      { timeout: 60_000 },
+    ).catch(() => null);
+    await p2.goto('/missions');
+    await settle(p2);
+    // Either no claim is attempted (state already celebrated) or it loses.
+    const res = await Promise.race([claim, p2.waitForTimeout(3000).then(() => null)]);
+    if (res) expect((await res.json()).levelUpClaimed).not.toBe(true);
+    await expect(p2.getByTestId('level-up-modal')).toHaveCount(0);
+    await ctx.close();
+    expect(diag.pageErrors, 'uncaught page errors').toEqual([]);
+  });
+});

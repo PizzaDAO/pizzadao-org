@@ -95,6 +95,36 @@ async function main() {
     },
   });
 
+  // Complete member: Level 1 was approved by a reviewer (and paid) while they
+  // were away, and never celebrated. /missions must show the level-up modal on
+  // the next visit, once. firstMissionCelebratedAt is set so the first-mission
+  // overlay doesn't take its place.
+  const l1 = await prisma.mission.findUniqueOrThrow({ where: { level_index: { level: 1, index: 0 } } });
+  await prisma.missionCompletion.create({
+    data: {
+      missionId: l1.id,
+      discordId: COMPLETE_MEMBER.discordId,
+      memberId: COMPLETE_MEMBER.memberId,
+      status: "APPROVED",
+      reviewedBy: "e2e-reviewer",
+      reviewedAt: new Date(),
+    },
+  });
+  await prisma.transaction.create({
+    data: {
+      userId: COMPLETE_MEMBER.discordId,
+      type: "MISSION_REWARD",
+      amount: 69,
+      balance: 4200,
+      description: "Mission reward: Level 1 - Pizza Trainee",
+      metadata: { level: 1 },
+    },
+  });
+  await prisma.memberProfileExtras.update({
+    where: { memberId: COMPLETE_MEMBER.memberId },
+    data: { firstMissionCelebratedAt: new Date(), lastCelebratedLevel: 0 },
+  });
+
   console.log(`[e2e:local] seeded ${MEMBERS.length} test members (${NEW_MEMBER.memberId}, ${COMPLETE_MEMBER.memberId}) and ${MISSIONS.length} missions`);
 }
 
