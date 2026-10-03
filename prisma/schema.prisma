@@ -194,6 +194,8 @@ enum TransactionType {
   ROB_FINE           // /rob failure: robber pays (-), victim receives (+)
   GAME_BET           // Casino game stake (-)
   GAME_WIN           // Casino game payout incl. stake returned on a push (+)
+  ADMIN_GRANT        // Discord /add-money by an admin (+)
+  ADMIN_REMOVE       // Discord /remove-money by an admin (-)
 }
 
 model Transaction {

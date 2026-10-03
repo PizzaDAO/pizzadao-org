@@ -4,16 +4,23 @@
  * so it is unit-testable without Discord or a DB. The route wires the real
  * implementations in app/api/discord/interactions/route.ts.
  *
- * Every reply sets allowed_mentions: [] so the bot never pings anyone.
+ * Every reply is an UnbelievaBoat-style embed (see ./embeds): green success,
+ * red errors/refusals, amber cooldowns; errors and cooldowns are ephemeral.
+ * allowed_mentions is { parse: [] } so nothing pings, except the few replies
+ * that deliberately ping one member in plain content (/pay's recipient,
+ * /add-money and /remove-money's target).
  */
 import { ApiError } from '../errors/api-errors'
+import { adminGrantError, normalizeReason, type AdminAdjustResult } from '../pep-admin'
 import type { IncomeResult } from '../pep-earn/income'
 import type { PeaceResult, RobContext, RobResult } from '../pep-earn/rob'
 import type { BlackjackMove, BlackjackStart, BlackjackView } from '../pep-games/blackjack'
 import { SLOT_EMOJI, type SlotSymbol } from '../pep-games/slots'
 import { EPHEMERAL, InteractionType, ResponseType } from './commands'
+import { authorFor, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
 
 type Option = { name: string; type: number; value: unknown; focused?: boolean }
+type DiscordUser = { id: string; username?: string; global_name?: string | null; avatar?: string | null; bot?: boolean }
 
 export interface Interaction {
   type: number
@@ -24,18 +31,21 @@ export interface Interaction {
     custom_id?: string
     component_type?: number
     resolved?: {
-      users?: Record<string, { id: string; username?: string; global_name?: string | null; bot?: boolean }>
+      users?: Record<string, DiscordUser>
       members?: Record<string, { roles?: string[]; joined_at?: string; nick?: string | null }>
     }
   }
-  member?: { user?: { id: string; bot?: boolean }; roles?: string[]; joined_at?: string }
-  user?: { id: string }
+  member?: { user?: DiscordUser; roles?: string[]; joined_at?: string; nick?: string | null; avatar?: string | null }
+  user?: DiscordUser
 }
 
+type AllowedMentions = { parse: string[]; users?: string[] }
+
 type MessageData = {
-  content: string
+  content?: string
+  embeds?: Embed[]
   flags?: number
-  allowed_mentions: { parse: string[] }
+  allowed_mentions: AllowedMentions
   components?: unknown[]
 }
 
@@ -54,7 +64,7 @@ export interface HandlerDeps {
   doWork: (discordId: string) => Promise<{ ok: true; amount: number; balance: number; prompt: string } | { ok: false; readyAt: Date }>
   collectIncome: (discordId: string, roleIds: string[]) => Promise<IncomeResult & { unresolved?: string[] }>
   pay: (fromId: string, toId: string, amount: number) => Promise<unknown>
-  leaderboard: () => Promise<Array<{ userId: string; balance: number; name?: string | null }>>
+  leaderboard: () => Promise<Array<{ userId: string; balance: number }>>
   robEnabled: () => boolean
   rob: (robberId: string, victimId: string, ctx: RobContext) => Promise<RobResult>
   getPeace: (discordId: string) => Promise<boolean>
@@ -66,204 +76,284 @@ export interface HandlerDeps {
   slots: (discordId: string, bet: number) => Spin<{ reels: string[]; multiplier: number }>
   shopItems: () => Promise<Array<{ id: number; name: string; price: number; quantity: number; description?: string | null }>>
   buy: (discordId: string, itemId: number, quantity: number) => Promise<{ item: string; quantity: number; totalCost: number }>
+  /** Whether member.roles may run /add-money and /remove-money (ADMIN_ROLE_IDS, Pepperoni Mafia, PEP_ADMIN_ROLE_*). */
+  isAdmin: (memberRoles: string[]) => Promise<boolean>
+  /** Largest single admin grant (ADMIN_GRANT_MAX). */
+  adminGrantMax: number
+  addMoney: (adminId: string, targetId: string, amount: number, reason: string) => Promise<AdminAdjustResult>
+  removeMoney: (adminId: string, targetId: string, amount: number, reason: string) => Promise<AdminAdjustResult>
+  /** Optional audit post (PEP_ADMIN_LOG_CHANNEL_ID). Must not throw or block the reply. */
+  logAdmin?: (text: string) => void
 }
 
 const n = (v: number) => v.toLocaleString('en-US')
 const rel = (d: Date) => `<t:${Math.ceil(d.getTime() / 1000)}:R>`
 const SNOWFLAKE = /^\d{5,25}$/
+const NO_PINGS: AllowedMentions = { parse: [] }
 
-function reply(content: string, ephemeral = false, components?: unknown[]): InteractionResponse {
-  return {
-    type: ResponseType.CHANNEL_MESSAGE,
-    data: {
-      content,
-      ...(ephemeral ? { flags: EPHEMERAL } : {}),
-      allowed_mentions: { parse: [] },
-      ...(components ? { components } : {}),
-    },
+/** Builds replies with the invoking member as the embed author. */
+class Out {
+  constructor(private readonly author: EmbedAuthor | undefined) {}
+
+  embed(tone: Tone, headline: string, body?: string, fields?: EmbedField[]): Embed {
+    return makeEmbed(tone, headline, body, { author: this.author, fields })
   }
-}
 
-function update(content: string, components: unknown[]): InteractionResponse {
-  return { type: ResponseType.UPDATE_MESSAGE, data: { content, allowed_mentions: { parse: [] }, components } }
+  /** Public (or ephemeral) message. `ping` puts that user's mention in content and lets it notify them. */
+  send(
+    tone: Tone,
+    headline: string,
+    body?: string,
+    opts: { ephemeral?: boolean; components?: unknown[]; ping?: string; fields?: EmbedField[] } = {},
+  ): InteractionResponse {
+    return {
+      type: ResponseType.CHANNEL_MESSAGE,
+      data: {
+        ...(opts.ping ? { content: `<@${opts.ping}>` } : {}),
+        embeds: [this.embed(tone, headline, body, opts.fields)],
+        ...(opts.ephemeral ? { flags: EPHEMERAL } : {}),
+        allowed_mentions: opts.ping ? { parse: [], users: [opts.ping] } : NO_PINGS,
+        ...(opts.components ? { components: opts.components } : {}),
+      },
+    }
+  }
+
+  ok(headline: string, body?: string, opts: { ephemeral?: boolean; components?: unknown[]; ping?: string; fields?: EmbedField[] } = {}) {
+    return this.send('success', headline, body, opts)
+  }
+
+  /** Errors and refusals: red, ephemeral. */
+  error(headline: string, body?: string) {
+    return this.send('error', headline, body, { ephemeral: true })
+  }
+
+  /** Cooldowns: amber, ephemeral. */
+  wait(headline: string, body?: string, components?: unknown[]) {
+    return this.send('cooldown', headline, body, { ephemeral: true, components })
+  }
+
+  update(embed: Embed, components: unknown[]): InteractionResponse {
+    return { type: ResponseType.UPDATE_MESSAGE, data: { embeds: [embed], allowed_mentions: NO_PINGS, components } }
+  }
 }
 
 const opt = (i: Interaction, name: string) => i.data?.options?.find((o) => o.name === name)?.value
 
 export async function handleInteraction(i: Interaction, deps: HandlerDeps): Promise<InteractionResponse> {
   if (i.type === InteractionType.PING) return { type: ResponseType.PONG }
+  const out = new Out(authorFor(i.member ? { ...i.member, guildId: i.guild_id } : i.user ? { user: i.user } : undefined))
   const known: number[] = [InteractionType.APPLICATION_COMMAND, InteractionType.MESSAGE_COMPONENT, InteractionType.AUTOCOMPLETE]
-  if (!known.includes(i.type)) return reply('Unsupported interaction.', true)
+  if (!known.includes(i.type)) return out.error('Unsupported interaction.')
 
   if (!deps.guildId || i.guild_id !== deps.guildId) {
     if (i.type === InteractionType.AUTOCOMPLETE) return { type: ResponseType.AUTOCOMPLETE_RESULT, data: { choices: [] } }
-    return reply('These commands only work in the PizzaDAO server.', true)
+    return out.error('These commands only work in the PizzaDAO server.')
   }
   const userId = i.member?.user?.id ?? i.user?.id
-  if (!userId) return reply('Could not identify you.', true)
+  if (!userId) return out.error('Could not identify you.')
   const cur = deps.currency ?? '$PEP'
 
   try {
     if (i.type === InteractionType.AUTOCOMPLETE) return await autocomplete(i, deps)
-    if (i.type === InteractionType.MESSAGE_COMPONENT) return await component(i, userId, deps, cur)
-    return await command(i, userId, deps, cur)
+    if (i.type === InteractionType.MESSAGE_COMPONENT) return await component(i, userId, deps, cur, out)
+    return await command(i, userId, deps, cur, out)
   } catch (err) {
     // Validation problems (bad amount, insufficient funds, out of stock...) are user errors.
-    if (err instanceof ApiError && err.statusCode < 500) return reply(err.message, true)
+    if (err instanceof ApiError && err.statusCode < 500) return out.error(err.message)
     throw err
   }
 }
 
-async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: string): Promise<InteractionResponse> {
+async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: string, out: Out): Promise<InteractionResponse> {
   const pep = (v: number) => `${cur} **${n(v)}**`
+  const amt = (v: number) => `${cur} ${n(v)}`
   switch (i.data?.name) {
     case 'balance': {
       const target = opt(i, 'member')
       const who = typeof target === 'string' && SNOWFLAKE.test(target) ? target : userId
       const wallet = await deps.getWallet(who)
-      return reply(who === userId ? `Your balance: ${pep(wallet)}` : `<@${who}> has ${pep(wallet)}`, true)
+      return out.ok(who === userId ? 'Your balance' : `Balance of <@${who}>`, undefined, {
+        ephemeral: true,
+        fields: [{ name: 'Wallet', value: amt(wallet), inline: true }],
+      })
     }
 
     case 'work': {
       const r = await deps.doWork(userId)
-      if (!r.ok) return reply(`You're still on your break. You can /work again ${rel(r.readyAt)}.`, true)
+      if (!r.ok) return out.wait("You're still on your break.", `You can /work again ${rel(r.readyAt)}.`)
       const text = r.prompt.split('{amount}').join(pep(r.amount))
-      return reply(`${text}\nBalance: ${cur} ${n(r.balance)}`)
+      return out.ok('Shift complete!', `${text}\n\nEarned: ${amt(r.amount)} • Balance: ${amt(r.balance)}`)
     }
 
     case 'collect-income': {
       const r = await deps.collectIncome(userId, i.member?.roles ?? [])
-      const lines: string[] = []
-      for (const p of r.paid) lines.push(`+ ${pep(p.amount)} from **${p.name}**`)
-      for (const w of r.waiting) lines.push(`**${w.name}**: next collection ${rel(w.readyAt)}`)
       if (r.paid.length === 0 && r.waiting.length === 0) {
-        return reply("None of your roles pay income. Role income comes from roles like Crew Member and Pizza Holder.", true)
+        return out.error("None of your roles pay income.", 'Role income comes from roles like Crew Member and Pizza Holder.')
       }
-      if (r.paid.length === 0) return reply(`Nothing to collect yet.\n${lines.join('\n')}`, true)
-      return reply(`<@${userId}> collected ${pep(r.total)} in role income.\n${lines.join('\n')}\nBalance: ${cur} ${n(r.balance)}`)
+      const waiting = r.waiting.map((w) => `${roleLabel(w.roleId, w.name)}: next collection ${rel(w.readyAt)}`)
+      if (r.paid.length === 0) return out.wait('Nothing to collect yet.', waiting.join('\n'))
+      const paid = [...r.paid].sort((a, b) => b.amount - a.amount).map((p) => `${roleLabel(p.roleId, p.name)} ${amt(p.amount)} (cash)`)
+      const body = [numbered(paid), '', `Total: ${amt(r.total)} • Balance: ${amt(r.balance)}`]
+      if (waiting.length) body.push('', ...waiting)
+      return out.ok('Role income successfully collected!', body.join('\n'))
     }
 
     case 'pay': {
       const to = opt(i, 'member')
       const amount = opt(i, 'amount')
-      if (typeof to !== 'string' || !SNOWFLAKE.test(to)) return reply('Pick a member to pay.', true)
-      if (to === userId) return reply("You can't pay yourself.", true)
-      if (i.data?.resolved?.users?.[to]?.bot) return reply("You can't pay a bot.", true)
+      if (typeof to !== 'string' || !SNOWFLAKE.test(to)) return out.error('Pick a member to pay.')
+      if (to === userId) return out.error("You can't pay yourself.")
+      if (i.data?.resolved?.users?.[to]?.bot) return out.error("You can't pay a bot.")
       if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
-        return reply('Amount must be a positive whole number.', true)
+        return out.error('Amount must be a positive whole number.')
       }
       await deps.pay(userId, to, amount)
-      return reply(`<@${userId}> paid <@${to}> ${pep(amount)}.`)
+      return out.ok('Payment sent!', `<@${userId}> paid <@${to}> ${pep(amount)}.`, { ping: to })
     }
 
     case 'leaderboard': {
       const rows = await deps.leaderboard()
-      if (rows.length === 0) return reply('Nobody has any $PEP yet.', true)
-      const medal = ['🥇', '🥈', '🥉']
-      const lines = rows.map((r, idx) => `${medal[idx] ?? `**${idx + 1}.**`} ${r.name ? escapeMd(r.name) : `<@${r.userId}>`}: ${cur} ${n(r.balance)}`)
-      return reply(`**$PEP leaderboard**\n${lines.join('\n')}`)
+      if (rows.length === 0) return out.error('Nobody has any $PEP yet.')
+      return out.ok('$PEP leaderboard', numbered(rows.map((r) => `<@${r.userId}> ${amt(r.balance)}`)))
     }
 
     case 'rob': {
-      if (!deps.robEnabled()) return reply("Robbing isn't enabled yet.", true)
+      if (!deps.robEnabled()) return out.error("Robbing isn't enabled yet.")
       const victim = opt(i, 'member')
-      if (typeof victim !== 'string' || !SNOWFLAKE.test(victim)) return reply('Pick a member to rob.', true)
+      if (typeof victim !== 'string' || !SNOWFLAKE.test(victim)) return out.error('Pick a member to rob.')
       const resolvedMember = i.data?.resolved?.members?.[victim]
-      if (victim !== userId && !resolvedMember) return reply("They're not in the server.", true)
+      if (victim !== userId && !resolvedMember) return out.error("They're not in the server.")
       const r = await deps.rob(userId, victim, {
         victimIsBot: !!i.data?.resolved?.users?.[victim]?.bot,
         robberJoinedAt: i.member?.joined_at ? new Date(i.member.joined_at) : null,
         victimJoinedAt: resolvedMember?.joined_at ? new Date(resolvedMember.joined_at) : null,
       })
-      if (!r.ok) return reply(robRefusal(r, victim, cur), true)
-      if (r.outcome === 'success') {
-        return reply(`💰 <@${userId}> robbed <@${victim}> and got away with ${pep(r.amount)} (${r.percent}% of their wallet).`)
+      if (!r.ok) {
+        const { tone, text } = robRefusal(r, victim, cur)
+        return tone === 'cooldown' ? out.wait(text) : out.error(text)
       }
-      return reply(`🚨 <@${userId}> got caught trying to rob <@${victim}> and paid them a ${pep(r.amount)} fine.`)
+      if (r.outcome === 'success') {
+        return out.ok('Robbery successful!', `💰 <@${userId}> robbed <@${victim}> and got away with ${pep(r.amount)} (${r.percent}% of their wallet).`)
+      }
+      return out.send('error', 'Caught!', `🚨 <@${userId}> got caught trying to rob <@${victim}> and paid them a ${pep(r.amount)} fine.`)
     }
 
     case 'peace': {
-      if (!deps.robEnabled()) return reply("Robbing isn't enabled yet, so there's nothing to opt out of.", true)
+      if (!deps.robEnabled()) return out.error("Robbing isn't enabled yet, so there's nothing to opt out of.")
       const want = opt(i, 'enabled')
       if (typeof want !== 'boolean') {
         const on = await deps.getPeace(userId)
-        return reply(on ? "🕊️ Peace mode is **on**: you can't rob or be robbed." : '⚔️ Peace mode is **off**: you can rob and be robbed.', true)
+        return on
+          ? out.ok('Peace mode is **on**.', "🕊️ You can't rob or be robbed.", { ephemeral: true })
+          : out.ok('Peace mode is **off**.', '⚔️ You can rob and be robbed.', { ephemeral: true })
       }
       const r = await deps.setPeace(userId, want)
       if (!r.ok) {
-        return reply(
-          r.reason === 'robbed_recently'
-            ? `You tried a robbery recently. You can turn on peace mode ${rel(r.readyAt)}.`
-            : `You changed peace mode recently. You can change it again ${rel(r.readyAt)}.`,
-          true,
-        )
+        return r.reason === 'robbed_recently'
+          ? out.wait('You tried a robbery recently.', `You can turn on peace mode ${rel(r.readyAt)}.`)
+          : out.wait('You changed peace mode recently.', `You can change it again ${rel(r.readyAt)}.`)
       }
-      if (!r.changed) return reply(`Peace mode is already ${want ? 'on' : 'off'}.`, true)
-      return reply(want ? "🕊️ Peace mode is now **on**. You can't rob or be robbed." : '⚔️ Peace mode is now **off**.', true)
+      if (!r.changed) return out.error(`Peace mode is already ${want ? 'on' : 'off'}.`)
+      return want
+        ? out.ok('Peace mode is now **on**.', "🕊️ You can't rob or be robbed.", { ephemeral: true })
+        : out.ok('Peace mode is now **off**.', '⚔️ You can rob and be robbed again.', { ephemeral: true })
     }
 
     case 'blackjack': {
-      if (!deps.gamesEnabled()) return reply("Games aren't enabled yet.", true)
+      if (!deps.gamesEnabled()) return out.error("Games aren't enabled yet.")
       const r = await deps.startBlackjack(userId, Number(opt(i, 'bet')))
-      if (!r.ok && r.reason === 'cooldown') return reply(`Slow down. You can play again ${rel(r.readyAt)}.`, true)
-      if (!r.ok) return reply('You already have a hand in play:\n' + renderBlackjack(r.game, cur), true, blackjackButtons(r.game))
-      return reply(renderBlackjack(r.game, cur, r.balance, userId), false, blackjackButtons(r.game))
+      if (!r.ok && r.reason === 'cooldown') return out.wait('Slow down.', `You can play again ${rel(r.readyAt)}.`)
+      if (!r.ok) return out.wait('You already have a hand in play.', renderBlackjack(r.game, cur).lines.join('\n'), blackjackButtons(r.game))
+      return {
+        type: ResponseType.CHANNEL_MESSAGE,
+        data: { embeds: [blackjackEmbed(r.game, cur, out, r.balance, userId)], allowed_mentions: NO_PINGS, components: blackjackButtons(r.game) },
+      }
     }
 
     case 'roulette': {
-      if (!deps.gamesEnabled()) return reply("Games aren't enabled yet.", true)
+      if (!deps.gamesEnabled()) return out.error("Games aren't enabled yet.")
       const r = await deps.roulette(userId, Number(opt(i, 'bet')), String(opt(i, 'space') ?? ''))
-      if (!r.ok) return reply(`Slow down. You can play again ${rel(r.readyAt)}.`, true)
+      if (!r.ok) return out.wait('Slow down.', `You can play again ${rel(r.readyAt)}.`)
       const dot = r.color === 'red' ? '🔴' : r.color === 'black' ? '⚫' : '🟢'
-      const head = `🎡 <@${userId}> bet ${pep(r.bet)} on **${r.space}**. The ball lands on ${dot} **${r.landed}**.`
-      const tail = r.payout > 0 ? `You win ${pep(r.payout)} (${r.multiplier}x)!` : 'You lose.'
-      return reply(`${head}\n${tail}\nBalance: ${cur} ${n(r.balance)}`)
+      const body = `🎡 <@${userId}> bet ${pep(r.bet)} on **${r.space}**. The ball lands on ${dot} **${r.landed}**.\n\nBalance: ${amt(r.balance)}`
+      return r.payout > 0 ? out.ok(`You win ${pep(r.payout)} (${r.multiplier}x)!`, body) : out.send('error', 'You lose.', body)
     }
 
     case 'slots': {
-      if (!deps.gamesEnabled()) return reply("Games aren't enabled yet.", true)
+      if (!deps.gamesEnabled()) return out.error("Games aren't enabled yet.")
       const r = await deps.slots(userId, Number(opt(i, 'bet')))
-      if (!r.ok) return reply(`Slow down. You can play again ${rel(r.readyAt)}.`, true)
+      if (!r.ok) return out.wait('Slow down.', `You can play again ${rel(r.readyAt)}.`)
       const reels = r.reels.map((s) => SLOT_EMOJI[s as SlotSymbol] ?? s).join(' | ')
-      const tail =
-        r.multiplier > 1 ? `You win ${pep(r.payout)} (${r.multiplier}x)!` : r.multiplier === 1 ? 'Stake back.' : 'No luck.'
-      return reply(`🎰 <@${userId}> bet ${pep(r.bet)}\n[ ${reels} ]\n${tail}\nBalance: ${cur} ${n(r.balance)}`)
+      const body = `🎰 <@${userId}> bet ${pep(r.bet)}\n[ ${reels} ]\n\nBalance: ${amt(r.balance)}`
+      if (r.multiplier > 1) return out.ok(`You win ${pep(r.payout)} (${r.multiplier}x)!`, body)
+      if (r.multiplier === 1) return out.ok('Stake back.', body)
+      return out.send('error', 'No luck.', body)
     }
 
     case 'shop': {
       const items = await deps.shopItems()
-      if (items.length === 0) return reply('The shop is empty right now.', true)
+      if (items.length === 0) return out.error('The shop is empty right now.')
       const lines = items.map(
-        (it) => `**${escapeMd(it.name)}**: ${cur} ${n(it.price)}${it.quantity === -1 ? '' : it.quantity > 0 ? ` (${n(it.quantity)} left)` : ' (sold out)'}`,
+        (it) => `**${escapeMd(it.name)}** ${amt(it.price)}${it.quantity === -1 ? '' : it.quantity > 0 ? ` (${n(it.quantity)} left)` : ' (sold out)'}`,
       )
-      return reply(`**$PEP shop**\n${lines.join('\n')}\nBuy with /buy, or at [app.pizzadao.org/pep](<https://app.pizzadao.org/pep>)`, true)
+      return out.ok('$PEP shop', `${numbered(lines)}\n\nBuy with /buy, or at [app.pizzadao.org/pep](<https://app.pizzadao.org/pep>)`, { ephemeral: true })
     }
 
     case 'buy': {
       const raw = String(opt(i, 'item') ?? '').trim()
       const qtyRaw = opt(i, 'quantity')
       const quantity = qtyRaw === undefined ? 1 : Number(qtyRaw)
-      if (!Number.isInteger(quantity) || quantity <= 0) return reply('Quantity must be a positive whole number.', true)
+      if (!Number.isInteger(quantity) || quantity <= 0) return out.error('Quantity must be a positive whole number.')
       const items = await deps.shopItems()
       const norm = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
       const item = items.find((it) => String(it.id) === raw) ?? items.find((it) => norm(it.name) === norm(raw))
-      if (!item) return reply(`No shop item called "${raw}". See /shop.`, true)
+      if (!item) return out.error(`No shop item called "${escapeMd(raw)}".`, 'See /shop.')
       const r = await deps.buy(userId, item.id, quantity)
-      return reply(`🛍️ You bought ${r.quantity}x **${escapeMd(r.item)}** for ${pep(r.totalCost)}.`, true)
+      return out.ok('Purchase complete!', `🛍️ You bought ${r.quantity}x **${escapeMd(r.item)}** for ${pep(r.totalCost)}.`, { ephemeral: true })
     }
 
+    case 'add-money':
+    case 'remove-money':
+      return adminMoney(i, userId, deps, cur, out, i.data.name === 'add-money')
+
     default:
-      return reply('Unknown command.', true)
+      return out.error('Unknown command.')
   }
 }
 
-async function component(i: Interaction, userId: string, deps: HandlerDeps, cur: string): Promise<InteractionResponse> {
+/** /add-money and /remove-money. Admin gate first, so non-admins learn nothing else. */
+async function adminMoney(i: Interaction, adminId: string, deps: HandlerDeps, cur: string, out: Out, add: boolean): Promise<InteractionResponse> {
+  if (!(await deps.isAdmin(i.member?.roles ?? []))) return out.error('Only admins can use this command.')
+
+  const target = opt(i, 'member')
+  const amount = opt(i, 'amount')
+  const reason = normalizeReason(opt(i, 'reason'))
+  if (typeof target !== 'string' || !SNOWFLAKE.test(target)) return out.error('Pick a member.')
+  if (i.data?.resolved?.users?.[target]?.bot) return out.error("Bots don't have wallets.")
+  if (add && !i.data?.resolved?.members?.[target]) return out.error("They're not in the server.")
+  const invalid = adminGrantError(amount, reason, deps.adminGrantMax)
+  if (invalid) return out.error(invalid)
+  const value = amount as number
+
+  const r = add ? await deps.addMoney(adminId, target, value, reason) : await deps.removeMoney(adminId, target, value, reason)
+  const pep = `${cur} **${n(value)}**`
+  if (!r.ok) {
+    return out.error('Not enough $PEP.', `<@${target}> only has ${cur} **${n(r.balance)}**. Nothing was removed.`)
+  }
+  const line = add
+    ? `<@${adminId}> gave <@${target}> ${pep}: ${escapeMd(reason)}`
+    : `<@${adminId}> took ${pep} from <@${target}>: ${escapeMd(reason)}`
+  deps.logAdmin?.(`${add ? '➕' : '➖'} ${line} (balance now ${cur} ${n(r.balance)})`)
+  return out.ok(add ? '$PEP added!' : '$PEP removed!', `🍕 ${line}\n\nBalance: ${cur} ${n(r.balance)}`, { ping: target })
+}
+
+async function component(i: Interaction, userId: string, deps: HandlerDeps, cur: string, out: Out): Promise<InteractionResponse> {
   const m = /^bj:(hit|stand):([a-z0-9]{10,40})$/.exec(i.data?.custom_id ?? '')
-  if (!m) return reply('Unknown button.', true)
-  if (!deps.gamesEnabled()) return reply("Games aren't enabled right now.", true)
+  if (!m) return out.error('Unknown button.')
+  if (!deps.gamesEnabled()) return out.error("Games aren't enabled right now.")
   const r = await deps.blackjackAction(userId, m[2], m[1] as 'hit' | 'stand')
-  if (!r.ok) return reply(r.reason === 'not_yours' ? "That's not your hand. Start your own with /blackjack." : 'That hand is gone.', true)
-  return update(renderBlackjack(r.game, cur, r.balance, userId), blackjackButtons(r.game))
+  if (!r.ok) return out.error(r.reason === 'not_yours' ? "That's not your hand." : 'That hand is gone.', r.reason === 'not_yours' ? 'Start your own with /blackjack.' : undefined)
+  return out.update(blackjackEmbed(r.game, cur, out, r.balance, userId), blackjackButtons(r.game))
 }
 
 async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<InteractionResponse> {
@@ -280,32 +370,34 @@ async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<Interact
   return { type: ResponseType.AUTOCOMPLETE_RESULT, data: { choices } }
 }
 
-function robRefusal(r: Extract<RobResult, { ok: false }>, victim: string, cur: string): string {
+function robRefusal(r: Extract<RobResult, { ok: false }>, victim: string, cur: string): { tone: Tone; text: string } {
+  const error = (text: string) => ({ tone: 'error' as const, text })
+  const wait = (text: string) => ({ tone: 'cooldown' as const, text })
   switch (r.reason) {
     case 'disabled':
-      return "Robbing isn't enabled yet."
+      return error("Robbing isn't enabled yet.")
     case 'self':
-      return "You can't rob yourself."
+      return error("You can't rob yourself.")
     case 'bot':
-      return "You can't rob a bot."
+      return error("You can't rob a bot.")
     case 'robber_new':
-      return `New members can't rob yet. You can ${r.readyAt ? rel(r.readyAt) : 'soon'}.`
+      return wait(`New members can't rob yet. You can ${r.readyAt ? rel(r.readyAt) : 'soon'}.`)
     case 'victim_new':
-      return `<@${victim}> is a new member and is protected for now.`
+      return error(`<@${victim}> is a new member and is protected for now.`)
     case 'robber_peace':
-      return "You're in peace mode. Turn it off with /peace enabled:False to rob."
+      return error("You're in peace mode. Turn it off with /peace enabled:False to rob.")
     case 'victim_peace':
-      return `<@${victim}> is in peace mode and can't be robbed.`
+      return error(`<@${victim}> is in peace mode and can't be robbed.`)
     case 'peace_recent':
-      return `You changed peace mode recently. You can rob ${r.readyAt ? rel(r.readyAt) : 'later'}.`
+      return wait(`You changed peace mode recently. You can rob ${r.readyAt ? rel(r.readyAt) : 'later'}.`)
     case 'robber_poor':
-      return `You need at least ${cur} ${n(r.min ?? 0)} in your wallet to rob (you risk a fine).`
+      return error(`You need at least ${cur} ${n(r.min ?? 0)} in your wallet to rob (you risk a fine).`)
     case 'victim_poor':
-      return `<@${victim}> has less than ${cur} ${n(r.min ?? 0)}. Not worth it.`
+      return error(`<@${victim}> has less than ${cur} ${n(r.min ?? 0)}. Not worth it.`)
     case 'cooldown':
-      return `You're laying low. You can rob again ${r.readyAt ? rel(r.readyAt) : 'later'}.`
+      return wait(`You're laying low. You can rob again ${r.readyAt ? rel(r.readyAt) : 'later'}.`)
     case 'victim_cooldown':
-      return `<@${victim}> was targeted recently. They can be robbed again ${r.readyAt ? rel(r.readyAt) : 'later'}.`
+      return wait(`<@${victim}> was targeted recently. They can be robbed again ${r.readyAt ? rel(r.readyAt) : 'later'}.`)
   }
 }
 
@@ -314,17 +406,28 @@ function robRefusal(r: Extract<RobResult, { ok: false }>, victim: string, cur: s
 const SUIT: Record<string, string> = { S: '♠', H: '♥', D: '♦', C: '♣' }
 export const cardLabel = (c: string) => (c === '??' ? '🂠' : `${c[0] === 'T' ? '10' : c[0]}${SUIT[c[1]] ?? ''}`)
 
-const OUTCOME_TEXT: Record<string, string> = {
-  blackjack: 'Blackjack! You win',
-  win: 'You win',
-  dealer_bust: 'Dealer busts. You win',
-  push: 'Push. Your stake comes back:',
-  lose: 'Dealer wins.',
-  bust: 'Bust! Dealer wins.',
-  dealer_blackjack: 'Dealer has blackjack.',
+const OUTCOME: Record<string, { tone: Tone; text: string }> = {
+  blackjack: { tone: 'success', text: 'Blackjack! You win' },
+  win: { tone: 'success', text: 'You win' },
+  dealer_bust: { tone: 'success', text: 'Dealer busts. You win' },
+  push: { tone: 'success', text: 'Push. Your stake comes back:' },
+  lose: { tone: 'error', text: 'Dealer wins.' },
+  bust: { tone: 'error', text: 'Bust! Dealer wins.' },
+  dealer_blackjack: { tone: 'error', text: 'Dealer has blackjack.' },
 }
 
-export function renderBlackjack(g: BlackjackView, cur: string, balance?: number, userId?: string): string {
+/** The hand as an embed: amber while it waits for Hit/Stand, then green (win/push) or red (loss). */
+function blackjackEmbed(g: BlackjackView, cur: string, out: Out, balance?: number, userId?: string): Embed {
+  const { headline, tone, lines } = renderBlackjack(g, cur, balance, userId)
+  return out.embed(tone, headline, lines.join('\n'))
+}
+
+export function renderBlackjack(
+  g: BlackjackView,
+  cur: string,
+  balance?: number,
+  userId?: string,
+): { tone: Tone; headline: string; lines: string[] } {
   const who = userId ? `<@${userId}>'s ` : ''
   const lines = [
     `🃏 ${who}**Blackjack**, bet ${cur} **${n(g.bet)}**`,
@@ -332,13 +435,13 @@ export function renderBlackjack(g: BlackjackView, cur: string, balance?: number,
     `Dealer: ${g.dealer.map(cardLabel).join(' ')}${g.dealerTotal != null ? ` (**${g.dealerTotal}**)` : ''}`,
   ]
   if (g.status === 'SETTLED') {
-    const text = OUTCOME_TEXT[g.outcome ?? ''] ?? 'Settled.'
-    lines.push(`${g.autoStood ? '⏱️ Timed out, auto-stood. ' : ''}${text}${g.payout ? ` ${cur} **${n(g.payout)}**` : ''}`)
-    if (balance !== undefined) lines.push(`Balance: ${cur} ${n(balance)}`)
-  } else {
-    lines.push(`Hit or stand? Auto-stands <t:${Math.ceil(new Date(g.expiresAt).getTime() / 1000)}:R>.`)
+    const o = OUTCOME[g.outcome ?? ''] ?? { tone: 'success' as const, text: 'Settled.' }
+    const headline = `${g.autoStood ? 'Timed out, auto-stood. ' : ''}${o.text}${g.payout ? ` ${cur} **${n(g.payout)}**` : ''}`
+    if (balance !== undefined) lines.push('', `Balance: ${cur} ${n(balance)}`)
+    return { tone: o.tone, headline, lines }
   }
-  return lines.join('\n')
+  lines.push('', `Auto-stands <t:${Math.ceil(new Date(g.expiresAt).getTime() / 1000)}:R>.`)
+  return { tone: 'cooldown', headline: 'Hit or stand?', lines }
 }
 
 export function blackjackButtons(g: BlackjackView): unknown[] {
@@ -355,5 +458,5 @@ export function blackjackButtons(g: BlackjackView): unknown[] {
 }
 
 function escapeMd(s: string): string {
-  return s.replace(/([*_`~|>\\])/g, '\\$1').replace(/@/g, '@\u200b')
+  return s.replace(/([*_`~|>\\[\]])/g, '\\$1').replace(/@/g, '@\u200b')
 }

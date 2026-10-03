@@ -5,6 +5,13 @@
  *
  * /rob, /peace and the games are registered like the rest but answer "not
  * enabled yet" until PEP_ROB_ENABLED=1 / PEP_GAMES_ENABLED=1.
+ *
+ * /add-money and /remove-money are visible to everyone (no
+ * default_member_permissions, so Pepperoni Mafia holders without Administrator
+ * can see them); the handler rejects anyone not holding an admin role
+ * (ADMIN_ROLE_IDS, Pepperoni Mafia, PEP_ADMIN_ROLE_IDS / _NAMES, see
+ * isPepAdmin). To hide them from others, set per-command role permissions in
+ * Server Settings > Integrations > Pepperoni Bot.
  */
 
 // Discord application command option types
@@ -14,6 +21,14 @@ const BOOLEAN = 5
 const USER = 6
 
 const bet = { type: INTEGER, name: 'bet', description: 'How much $PEP to bet', required: true, min_value: 1 } as const
+
+// Reason length matches ADMIN_REASON_MIN/MAX in app/lib/pep-admin.ts (the handler enforces it too).
+const adminMoneyOptions = (verb: string) =>
+  [
+    { type: USER, name: 'member', description: `Member to ${verb}`, required: true },
+    { type: INTEGER, name: 'amount', description: 'How much $PEP', required: true, min_value: 1 },
+    { type: STRING, name: 'reason', description: 'Why (shown publicly and logged)', required: true, min_length: 3, max_length: 200 },
+  ] as const
 
 export const PEP_COMMANDS = [
   {
@@ -91,6 +106,18 @@ export const PEP_COMMANDS = [
       { type: STRING, name: 'item', description: 'Item to buy', required: true, autocomplete: true },
       { type: INTEGER, name: 'quantity', description: 'How many (default 1)', required: false, min_value: 1, max_value: 100 },
     ],
+    dm_permission: false,
+  },
+  {
+    name: 'add-money',
+    description: 'Admin: give $PEP to a member',
+    options: adminMoneyOptions('give $PEP to'),
+    dm_permission: false,
+  },
+  {
+    name: 'remove-money',
+    description: 'Admin: take $PEP from a member (never below 0)',
+    options: adminMoneyOptions('take $PEP from'),
     dm_permission: false,
   },
 ] as const
