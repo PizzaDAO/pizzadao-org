@@ -18,6 +18,8 @@ export type DiscordTarget =
 
 export interface DiscordMessageBody {
   content: string;
+  /** Rich embeds (e.g. the Pepperoni Bot style from discord-interactions/embeds.ts). */
+  embeds?: unknown[];
   allowed_mentions?: { parse?: Array<"everyone" | "roles" | "users">; users?: string[] };
   flags?: number;
 }

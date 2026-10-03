@@ -18,6 +18,16 @@ type MissionProgress = {
   status: string;
   submittedAt: string;
   reviewNote?: string | null;
+  /** Auto-verified, waiting for a reviewer's release (plans/mission-verification.md D9). */
+  holdReason?: string | null;
+};
+
+/** One verifier result from "Check my progress" (POST /api/missions/check). */
+export type MissionCheckInfo = {
+  status: "pass" | "fail" | "unknown" | "skipped";
+  reason?: string;
+  hint?: string;
+  progress?: { have: number; need: number };
 };
 
 type MissionData = {
@@ -26,11 +36,22 @@ type MissionData = {
   title: string;
   description: string | null;
   autoVerify: boolean;
+  /** Checked automatically by a verifier (no submission needed). */
+  autoChecked?: boolean;
+  /** What the submit form asks for (NONE / URL / DISCORD_MESSAGE / UPLOAD). */
+  proofKind?: string;
   progress: MissionProgress | null;
+};
+
+const HOLD_COPY: Record<string, string> = {
+  NEW_ACCOUNT: "Verified. New Discord accounts get a reviewer's release first.",
+  HIGH_LEVEL: "Verified. A reviewer releases Level 6+ rewards.",
+  PREVIOUSLY_REJECTED: "Verified now. A reviewer will take another look.",
 };
 
 type Props = {
   mission: MissionData;
+  check?: MissionCheckInfo;
   levelUnlocked: boolean;
   onSubmit: (missionId: number, evidence?: string, notes?: string) => Promise<void>;
 };
@@ -95,7 +116,7 @@ function statusPillStyle(variant: StatusVariant) {
   };
 }
 
-export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
+export function MissionCard({ mission, levelUnlocked, onSubmit, check }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [evidence, setEvidence] = useState("");
   const [notes, setNotes] = useState("");
@@ -118,6 +139,10 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
     pillVariant = "approved";
     pillLabel = "Approved";
     pillIcon = "✓";
+  } else if (isPending && mission.progress?.holdReason) {
+    pillVariant = "pending";
+    pillLabel = "Awaiting Release";
+    pillIcon = "🔐";
   } else if (isPending) {
     pillVariant = "pending";
     pillLabel = "Pending Review";
@@ -255,6 +280,42 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
               {mission.description}
             </div>
           )}
+          {mission.autoChecked && !isCompleted && (
+            <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 6 }}>
+              ✓ Checked automatically. Use “Check my progress” after you do it.
+            </div>
+          )}
+          {isPending && mission.progress?.holdReason && (
+            <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>
+              {HOLD_COPY[mission.progress.holdReason] ?? "Verified. Awaiting a reviewer's release."}
+            </div>
+          )}
+          {check && !isCompleted && check.status === "fail" && (check.hint || check.reason) && (
+            <div
+              data-testid="mission-check-hint"
+              style={{
+                fontSize: 13,
+                color: "hsl(var(--foreground))",
+                marginTop: 8,
+                padding: "8px 10px",
+                background: "hsl(var(--butter) / 0.15)",
+                borderLeft: "2px solid hsl(var(--butter))",
+                borderRadius: 4,
+              }}
+            >
+              {check.progress && (
+                <strong style={{ marginRight: 6 }}>
+                  {check.progress.have}/{check.progress.need}
+                </strong>
+              )}
+              {check.hint ?? check.reason}
+            </div>
+          )}
+          {check && !isCompleted && check.status === "unknown" && (
+            <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 6 }}>
+              Couldn’t check this right now ({check.reason}). Try again later.
+            </div>
+          )}
           {isRejected && mission.progress?.reviewNote && (
             <div
               style={{
@@ -327,7 +388,11 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
               type="text"
               value={evidence}
               onChange={(e) => setEvidence(e.target.value)}
-              placeholder="Link to proof (screenshot, tweet, etc.)"
+              placeholder={
+                mission.proofKind === "DISCORD_MESSAGE"
+                  ? "Discord message link (right-click your message > Copy Message Link)"
+                  : "Link to proof (screenshot, tweet, etc.)"
+              }
               style={{ ...input(), fontSize: 13 }}
             />
           </div>

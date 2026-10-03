@@ -6,11 +6,12 @@ import {
   memberIdColumn,
   membersColumn,
 } from "@/app/lib/sheets/member-repository";
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { crewIdToLabel, normalizeCrewId } from "@/app/lib/crew-labels";
 import { internalError } from "@/app/lib/errors/error-response";
+import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 
 export const runtime = "nodejs";
 
@@ -221,6 +222,12 @@ export async function POST(req: Request) {
       } else {
         discordResult = { ok: true, note: "No Discord role for this crew" };
       }
+    }
+
+    if (action === "join") {
+      // Re-check the member's missions in the background (no-op unless enabled).
+      const crewDiscordId = session.discordId;
+      after(() => emitMissionEvent(crewDiscordId, "crew_joined", { memberId: member.memberId }).then(() => undefined));
     }
 
     return NextResponse.json({

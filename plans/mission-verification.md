@@ -1,6 +1,6 @@
 # Plan: mission verification + rewards
 
-Status: **decisions recorded (§9, all DECIDED); Phase 0 implemented.** Phases 1–5 are still plan only.
+Status: **decisions recorded (§9, all DECIDED); Phases 0 and 1 implemented** (Phase 1: see "What Phase 1 changed" at the end). Phases 2–5 are still plan only.
 
 ## 0. TL;DR
 
@@ -9,9 +9,11 @@ Status: **decisions recorded (§9, all DECIDED); Phase 0 implemented.** Phases 1
 
   | Method | Count | Missions |
   |---|---|---|
-  | **Automatic** | 6 | L1.0, L2.0, L3.0, L3.1, L5.0, L6.0 |
+  | **Automatic** | 7 | L1.0, L2.0, L3.0, L3.1, L5.0, L6.0, L7.0 |
   | **Semi-automatic** (proof link with format and API checks, then a one-click admin approve) | 4 | L2.1, L4.0, L5.1, L6.1 |
-  | **Manual only** | 2 | L7.0, L8.0 |
+  | **Manual only** | 1 | L8.0 |
+
+  L6.0 and L7.0 are role checks, but as L6+ missions they still need a human release before they pay (D9).
 
   - L3.1 needs a small piece of new referral capture.
   - L1.0 needs its wording changed: a real "follows" check requires a paid X API tier.
@@ -80,7 +82,7 @@ Legend: **A** = automatic, **B** = semi-automatic (proof plus checks plus quick 
 | L5.1 | Do a selfie interview | manual | `media_proof` {kinds:["youtube","x","loom","drive","blob-video"]} | URL allowlist plus an oEmbed reachability check. Optional Vercel Blob **client** upload for video; the current upload routes are images-only and limited to 5 MB. | **B** | **S** for the link plus quick approve. **M** to add video upload. |
 | L6.0 | Join Pepperoni Mafia | manual | `discord_role` {roleIds:["823266914834841610"]} | `hasAnyRole()` / `lookupGuildMembership()`, the bulk `getMembersWithRoles()`, and the interaction payload's `member.roles` | **A** | **S.** The role is granted by a human, so that grant is the real gate. Stateful: losing the role later leads to a flag (§3.6). |
 | L6.1 | Onboard a Bitcoin Pizza Day city | manual | `gpp_host` {eventType:"gpp", statuses:["approved","listed"]} — proof is an rsv.pizza event URL | rsv-pizza public `GET /api/gpp/events` (`underbossStatus` plus host `user.telegram`). Match the host's Telegram to the member's `TelegramAccount.username`. | **B** now, **A** later | **M.** rsv-pizza has **no Discord ids** and no cross-user lookup. Its API keys are tenant-scoped. Full automation needs a new service-to-service endpoint in rsv-pizza (§9, Phase 5), keyed by email or wallet. |
-| L7.0 | Become a Crew Leader | manual | `discord_role` {roleIds:[CREW_LEADER]}, *if* such a role or sheet column is created; otherwise `manual` | No crew-leader role id or roster "leader" column exists today. Task-row "Lead ID" is a task owner, not a crew lead. | **C** (→ A) | **S** once the owner picks the source of truth. Until then it stays manual and admin-only. |
+| L7.0 | Become a Crew Leader | manual | `discord_role` {roleNames:["Crew Leader"], roleEnv:"MISSION_CREW_LEADER_ROLE"} (D12) | The **"Crew Leader"** Discord role, resolved by name from the cached guild role list (`MISSION_CREW_LEADER_ROLE`, a role id or name, overrides it); `member.roles` from an interaction when available | **A** (+ human release) | **S.** The role is granted by a human. As an L6+ mission it always needs a human release before it pays (D9). Stateful: losing the role leads to a flag (§3.6). |
 | L8.0 | Called upon by Dread Pizza Roberts | manual | `manual` {reviewerRoleIds:["812131585327235113"]} | Human; DPR only | **C** | **S.** Restrict who can approve it to the DPR role. |
 
 ### Data sources that no current mission uses
@@ -416,7 +418,7 @@ The economic unit is the discordId. Signals to compute in the cron, surfaced as 
 - **Discord account age:** derived from the snowflake (`id >> 22`, plus the epoch). Accounts younger than 30 days get no automatic payouts at any level; the completion goes to "auto-verified, awaiting release" (D9).
 - **Referrals:** the invitee must not share a wallet, X or Telegram account with the inviter. The invitee's account must be at least 7 days old and still in the guild, and must have attended at least 1 call. Credit is capped at one qualifying referral per mission, since the mission needs only one.
 - **Sheet duplicates:** `buildIndex` silently keeps only the last row per discordId. The cron logs discordIds that appear on more than one row.
-- Optional, high level: **human release for L6+** (6,942 PEP and up), even when the verifiers pass (D9). L6.0 and L7.0 are human-granted roles anyway.
+- **Human release for L6+** (6,942 PEP and up), even when the verifiers pass (D9). L6.0 and L7.0 are human-granted roles anyway.
 
 ### 6.3 Rate limits (`app/lib/rate-limit.ts`, Upstash)
 
@@ -459,7 +461,7 @@ The economic unit is the discordId. Signals to compute in the cron, surfaced as 
 | **2 — Cron + backfill + flags** | `vercel.json` crons (attendance sync, missions nightly, SLA digest). Bulk `checkMany` paths. `VerifierRun`. Backfill dry run, then apply. Stateful re-check plus flagging. Duplicate signals. Drop `autoVerify` (Migration B). | **M** (~2–3 days) |
 | **3 — Discord** | `/missions` command (deferred reply). Review channel cards with Approve/Reject buttons plus the reject modal, two-way sync with the web. Level-up channel posts. Register commands via `scripts/discord/register-commands.mjs`. | **M** (~3 days) |
 | **4 — Semi verifiers + referral** | `social_post` (X handle match, Farcaster via Neynar), `poap_drop`, `media_proof` (link, optional Blob client upload), `gpp_host` (rsv.pizza public GPP API plus Telegram match). `Referral` capture (onboarding step and/or bot invite codes) and the `referral` verifier. Review panel previews and bulk approve. | **M–L** (~4–5 days) |
-| **5 — Optional upgrades** | rsv-pizza service endpoint (`GET /api/integrations/participation?email|wallet`, `x-api-key` shared secret, following the telegram-link-callback pattern) to make L6.1 automatic. Paid X API for a real follow check (L1.0) and post metrics (L2.1). A crew-leader role or sheet column to make L7.0 automatic. A POAP whitelist "creator" column to make L4.0 automatic. `MissionLevel` table. | **L** (cross-repo; and spend) |
+| **5 — Optional upgrades** | rsv-pizza service endpoint (`GET /api/integrations/participation?email|wallet`, `x-api-key` shared secret, following the telegram-link-callback pattern) to make L6.1 automatic. Paid X API for a real follow check (L1.0) and post metrics (L2.1). A POAP whitelist "creator" column to make L4.0 automatic. `MissionLevel` table. | **L** (cross-repo; and spend) |
 
 **Migration A** (additive, safe to deploy before the code):
 
@@ -493,7 +495,7 @@ UPDATE "Mission" SET "verifierKey"='attendance_count', "verifierParams"='{"min":
 UPDATE "Mission" SET "verifierKey"='media_proof', "proofKind"='URL' WHERE level=5 AND "index"=1;
 UPDATE "Mission" SET "verifierKey"='discord_role', "verifierParams"='{"roleIds":["823266914834841610"]}' WHERE level=6 AND "index"=0;
 UPDATE "Mission" SET "verifierKey"='gpp_host', "proofKind"='URL', "verifierParams"='{"eventType":"gpp","statuses":["approved","listed"]}' WHERE level=6 AND "index"=1;
-UPDATE "Mission" SET "verifierKey"='manual' WHERE level=7 AND "index"=0;
+UPDATE "Mission" SET "verifierKey"='discord_role', "verifierParams"='{"roleNames":["Crew Leader"],"roleEnv":"MISSION_CREW_LEADER_ROLE"}' WHERE level=7 AND "index"=0; -- D12
 UPDATE "Mission" SET "verifierKey"='manual', "reviewerRoleIds"='{812131585327235113}' WHERE level=8 AND "index"=0;
 ```
 
@@ -532,7 +534,7 @@ The owner accepted every recommended default. Where a decision differs from the 
 | D9 | High-value release | **DECIDED** | A **human release is required for L6+** payouts **and for any auto-pay to a Discord account younger than 30 days**, even when the verifiers pass. |
 | D10 | Reviewers | **DECIDED** | **Dread Pizza Roberts, Pizza Capo and Pepperoni Mafia approve L1–L7** (the existing admin role, Leonardo, keeps its access too). **Only Dread Pizza Roberts approves L8.** No one reviews their own submission. *(Implemented in Phase 0: `canReviewMission`.)* |
 | D11 | Discord surfaces | **DECIDED** | Level-ups: a **DM** to the member **plus one celebration channel**. The **review queue and the celebration posts both go to the Discord `#work` channel**: configurable with `MISSION_REVIEW_CHANNEL_ID` (and `MISSIONS_ANNOUNCE_CHANNEL_ID`), defaulting to resolving the channel named `work` via the guild channels API at runtime. |
-| D12 | Crew-leader source (L7.0) | **DECIDED** | A **Discord role** (`discord_role` verifier). The role name is still needed from the owner (below). |
+| D12 | Crew-leader source (L7.0) | **DECIDED** | The Discord role named **"Crew Leader"** (`discord_role` verifier, resolved by name; `MISSION_CREW_LEADER_ROLE` overrides). L7 is L6+, so it still needs a **human release** (D9). |
 | D13 | SLA | **DECIDED** | **48 hours** for a first decision at every level; **admins are pinged** for anything older. |
 | D14 | L6.1 / rsv-pizza | **DECIDED** | **Proof link plus a Telegram match** for now (semi-automatic). The rsv-pizza service endpoint stays an optional Phase 5 upgrade. |
 | D15 | L2.1 platforms | **DECIDED** | **X and Farcaster.** Farcaster is checked via Neynar; X gets the handle match plus a reviewer's eye on the engagement numbers. |
@@ -541,9 +543,7 @@ The owner accepted every recommended default. Where a decision differs from the 
 
 ### Owner inputs still needed
 
-- **Crew-leader role name** (D12): the Discord role that marks a crew leader, so L7.0 can use `discord_role`. Until then L7.0 stays manual.
-
-(Resolved: the review and celebration channel is `#work`, D11.)
+None. (Resolved: the review and celebration channel is `#work`, D11; the crew-leader role is "Crew Leader", D12.)
 
 ### What Phase 0 changed (this PR)
 
@@ -552,3 +552,14 @@ The owner accepted every recommended default. Where a decision differs from the 
 - Nothing is approved on submit any more: L1.0 and L3.0 go to `PENDING` until the Phase 1 verifiers exist. Existing approvals are kept (D6).
 - The level is data-driven (no hard-coded 8), and a level already paid (a `MISSION_REWARD` ledger row) counts as completed, so adding a mission to a finished level never drops a member back. Nothing is paid twice.
 - A level-up approved while the member was away is celebrated on their next `/missions` visit, once (`claimLevelUp` is an atomic server-side claim on `lastCelebratedLevel`).
+
+### What Phase 1 changed
+
+- **Migration A** (`prisma/migrations/20261006000000_mission_verifiers`, additive, idempotent): `Mission.verifierKey` / `verifierParams` / `proofKind`; `MissionCompletion.source` / `checkResult` / `attempts` / `holdReason` / `flaggedAt` / `flagReason` / `updatedAt`; the `MissionReviewEvent` audit table. Not included: `Referral` (Phase 4), `VerifierRun` (Phase 2), `reviewerRoleIds` (L8 = DPR stays in code), `reviewMsgId` (Phase 3). Data changes live in `scripts/missions/set-verifiers.mjs` (dry run by default, title assertions keyed by `(level, index)`), not in the migration.
+- **Registry and engine** in `app/lib/mission-verify/`: `x_linked`, `attendance_count`, `discord_message`, `discord_role` (ids or names), `referral` (stub: never passes until Phase 4), `wallet_connected`, `manual`. `runVerifiers()` and `settleLevels()` as in §3.3. Everything is behind `MISSION_VERIFIERS_ENABLED` (default off = dry run).
+- **Release state (D9):** a verifier pass that needs a human stays `PENDING` with `holdReason` (`HIGH_LEVEL` for L6+, `NEW_ACCOUNT` for accounts under 30 days, `PREVIOUSLY_REJECTED` when a human had rejected it). The review panel shows it as "Auto-verified · awaiting release" with a **Release** button (the approve endpoint; audited as `RELEASED`). A `NEW_ACCOUNT` hold is lifted automatically once the account is 30 days old.
+- **Rejections are never overridden:** a human-rejected row whose verifier later passes is reopened for review once (`REOPENED`), never approved.
+- **Review history** moved to `MissionReviewEvent` (`SUBMITTED`, `RESUBMITTED`, `APPROVED`, `REJECTED`, `AUTO_*`, ...); legacy Phase 0 notes blocks are still read and carried over, not migrated.
+- **Triggers:** "Check my progress" (`POST /api/missions/check`), `/missions` (deferred, Phase 3 pulled forward), submit, and event hooks (X link, wallet, crew join, attendance sync). No cron yet (Phase 2).
+- **Notifications:** in-app on approval / hold / level-up; a Pepperoni Bot DM and one `#work` post per level-up (only the member is mentioned).
+

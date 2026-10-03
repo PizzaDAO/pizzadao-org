@@ -1,9 +1,10 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { hasAnyRole } from "@/app/lib/discord";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 import { syncAllCrewAttendance } from "@/app/lib/attendance";
 import { internalError } from "@/app/lib/errors/error-response";
+import { emitMissionEventMany } from "@/app/lib/mission-verify/events";
 
 export async function POST(request: NextRequest) {
   // Auth: either Discord admin session OR CRON_SECRET bearer token
@@ -25,8 +26,10 @@ export async function POST(request: NextRequest) {
   }
 
   try {
-    const stats = await syncAllCrewAttendance();
-    return NextResponse.json(stats);
+    const { affectedDiscordIds = [], ...stats } = await syncAllCrewAttendance();
+    // Members who gained attendance rows: re-check the call missions (L2.0, L5.0).
+    if (affectedDiscordIds.length) after(() => emitMissionEventMany(affectedDiscordIds, "attendance_synced"));
+    return NextResponse.json({ ...stats, affectedMembers: affectedDiscordIds.length });
   } catch (err) {
     return internalError(err, "attendance/sync", "Sync failed");
   }

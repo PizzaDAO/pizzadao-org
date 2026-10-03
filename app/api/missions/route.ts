@@ -1,73 +1,19 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle } from '@/app/lib/missions'
-import { getCachedMissionsList, setCachedMissionsList } from '@/app/lib/mission-cache'
+import { getMissionsOverview } from '@/app/lib/missions-overview'
+import { missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
 
 export const runtime = 'nodejs'
 
-// GET - List all missions + user progress if authenticated
+// GET - List all missions + user progress if authenticated. Same payload as
+// the server-rendered /missions page (getMissionsOverview), plus whether
+// automatic verification is switched on.
 export async function GET() {
   try {
     const session = await getSession()
+    const overview = await getMissionsOverview(session?.discordId)
 
-    const missionsByLevel = await getMissionsByLevel()
-
-    let progress: Awaited<ReturnType<typeof getUserMissionProgress>> = []
-    let currentLevel = 1
-    let levelTitle: string | null = null
-
-    if (session?.discordId) {
-      progress = await getUserMissionProgress(session.discordId)
-      currentLevel = await getCurrentLevel(session.discordId)
-      levelTitle = await getLevelTitle(currentLevel)
-    }
-
-    // Build progress map: missionId -> completion status
-    const progressMap: Record<number, { status: string; submittedAt: string; reviewNote?: string | null }> = {}
-    for (const p of progress) {
-      progressMap[p.missionId] = {
-        status: p.status,
-        submittedAt: p.submittedAt.toISOString(),
-        reviewNote: p.reviewNote,
-      }
-    }
-
-    // Use cached mission definitions if available (for unauthenticated requests)
-    // For authenticated requests, we need per-user progress so only cache the base levels
-    let levels
-    const cachedLevels = !session?.discordId ? getCachedMissionsList() : null
-    if (cachedLevels) {
-      levels = cachedLevels
-    } else {
-      levels = Object.entries(missionsByLevel).map(([levelNum, missions]) => {
-        const level = parseInt(levelNum)
-        return {
-          level,
-          title: missions[0]?.levelTitle || null,
-          reward: missions[0]?.reward || 0,
-          missions: missions.map(m => ({
-            id: m.id,
-            index: m.index,
-            title: m.title,
-            description: m.description,
-            autoVerify: m.autoVerify,
-            progress: progressMap[m.id] || null,
-          })),
-        }
-      })
-
-      // Cache unauthenticated mission list (no per-user progress)
-      if (!session?.discordId) {
-        setCachedMissionsList(levels)
-      }
-    }
-
-    return NextResponse.json({
-      levels,
-      currentLevel,
-      levelTitle,
-      isAuthenticated: !!session?.discordId,
-    }, {
+    return NextResponse.json({ ...overview, verifiersEnabled: missionVerifiersEnabled() }, {
       headers: {
         'Cache-Control': session?.discordId
           ? 'private, no-store'

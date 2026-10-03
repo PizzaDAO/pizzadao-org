@@ -24,6 +24,12 @@ type Submission = {
   /** Earlier rejections of this submission (it was resubmitted), oldest first. */
   reviewHistory?: string[];
   attempt?: number;
+  /** MANUAL / AUTO / SEMI. */
+  source?: string;
+  /** Set when a verifier passed but a human must release it (L6+, new account, previously rejected). */
+  holdReason?: string | null;
+  holdLabel?: string | null;
+  checkResult?: Record<string, unknown> | null;
   submittedAt: string;
   mission: {
     title: string;
@@ -35,6 +41,20 @@ type Submission = {
 
 const DISPLAY_FONT =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
+
+/** "xUsername: pizza · calls: 3" from a verifier's checkResult. */
+function formatCheck(r: Record<string, unknown>): string {
+  return Object.entries(r)
+    .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
+    .map(([k, v]) => `${k}: ${String(v)}`)
+    .concat(
+      Object.entries(r)
+        .filter(([, v]) => Array.isArray(v))
+        .map(([k, v]) => `${k}: ${(v as unknown[]).join(", ")}`),
+    )
+    .join(" · ")
+    .slice(0, 300);
+}
 
 export function MissionReviewPanel() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
@@ -365,6 +385,33 @@ export function MissionReviewPanel() {
                 </div>
               )}
 
+              {sub.holdReason && (
+                <div
+                  data-testid="awaiting-release"
+                  style={{
+                    fontSize: 13,
+                    color: "hsl(var(--foreground))",
+                    padding: "8px 10px",
+                    background: "rgba(16, 185, 129, 0.08)",
+                    borderLeft: "2px solid rgb(16, 185, 129)",
+                    borderRadius: 4,
+                  }}
+                >
+                  <span
+                    className="overline"
+                    style={{ display: "block", marginBottom: 2, color: "rgb(4, 120, 87)" }}
+                  >
+                    § Auto-verified · awaiting release
+                  </span>
+                  {sub.holdLabel ?? sub.holdReason}
+                  {sub.checkResult && Object.keys(sub.checkResult).length > 0 && (
+                    <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 4, wordBreak: "break-word" }}>
+                      Verifier saw: {formatCheck(sub.checkResult)}
+                    </div>
+                  )}
+                </div>
+              )}
+
               {sub.notes && (
                 <div
                   style={{
@@ -451,7 +498,7 @@ export function MissionReviewPanel() {
                     cursor: processing.has(sub.id) ? "not-allowed" : "pointer",
                   }}
                 >
-                  Approve
+                  {sub.holdReason ? "Release" : "Approve"}
                 </button>
                 <button
                   onClick={() => handleReview(sub.id, "reject")}

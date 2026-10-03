@@ -23,6 +23,9 @@ type DiscordUser = { id: string; username?: string; global_name?: string | null;
 
 export interface Interaction {
   type: number
+  /** Needed to edit a deferred reply via the interaction webhook. */
+  application_id?: string
+  token?: string
   guild_id?: string
   data?: {
     name?: string
@@ -79,6 +82,24 @@ export interface HandlerDeps {
   removeMoney: (adminId: string, targetId: string, amount: number, reason: string) => Promise<AdminAdjustResult>
   /** Optional audit post (PEP_ADMIN_LOG_CHANNEL_ID). Must not throw or block the reply. */
   logAdmin?: (text: string) => void
+  /**
+   * /missions. `rateLimit` returns when the member may run it again (null =
+   * allowed now, and counts this use). `defer` schedules the verifier run and
+   * the webhook edit of the deferred reply; it must not block (route: after()).
+   */
+  missions?: {
+    rateLimit: (discordId: string) => Promise<Date | null>
+    defer: (job: MissionsJob) => void
+  }
+}
+
+/** What the deferred /missions follow-up needs. */
+export interface MissionsJob {
+  discordId: string
+  roles: string[]
+  applicationId: string
+  token: string
+  author?: EmbedAuthor
 }
 
 const n = (v: number) => v.toLocaleString('en-US')
@@ -268,6 +289,22 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
     case 'add-money':
     case 'remove-money':
       return adminMoney(i, userId, deps, cur, out, i.data.name === 'add-money')
+
+    case 'missions': {
+      if (!deps.missions) return out.error('Missions are not available right now.')
+      if (!i.application_id || !i.token) return out.error('Could not start the check. Please try again.')
+      const readyAt = await deps.missions.rateLimit(userId)
+      if (readyAt) return out.wait('Slow down.', `You can check your missions again ${rel(readyAt)}.`)
+      deps.missions.defer({
+        discordId: userId,
+        roles: i.member?.roles ?? [],
+        applicationId: i.application_id,
+        token: i.token,
+        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+      })
+      // "Pepperoni Bot is thinking..." (ephemeral); the result is edited in.
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
+    }
 
     default:
       return out.error('Unknown command.')

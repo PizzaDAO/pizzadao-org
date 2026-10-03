@@ -391,7 +391,7 @@ describe('handleInteraction', () => {
   it('registers every command that has a handler, and nothing else', () => {
     expect(PEP_COMMANDS.map((c) => c.name)).toEqual([
       'balance', 'work', 'collect-income', 'pay', 'leaderboard', 'blackjack', 'roulette', 'slots', 'shop', 'buy',
-      'add-money', 'remove-money',
+      'add-money', 'remove-money', 'missions',
     ])
   })
 })

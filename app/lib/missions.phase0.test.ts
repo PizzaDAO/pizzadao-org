@@ -18,6 +18,7 @@ import {
   maxMissionLevel,
   submitMissionCompletion,
   splitReviewHistory,
+  reviewHistory,
   MAX_MISSION_ATTEMPTS,
 } from './missions'
 import { prisma } from './db'
@@ -109,7 +110,11 @@ describe('submitMissionCompletion', () => {
     expect(data.reviewedBy).toBeUndefined()
     expect(data.reviewedAt).toBeUndefined()
     expect(c.status).toBe('PENDING')
-    expect(prisma.$transaction).not.toHaveBeenCalled() // no level payout
+    expect(prisma.economy.update).not.toHaveBeenCalled() // no level payout
+    // Audit trail: one SUBMITTED event, in the same transaction as the create.
+    expect(prisma.missionReviewEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ completionId: 5, actorId: 'user-1', action: 'SUBMITTED', via: 'web' }),
+    })
     await vi.waitFor(() => expect(getMembersWithRoles).toHaveBeenCalled()) // reviewers pinged
   })
 
@@ -155,11 +160,17 @@ describe('submitMissionCompletion', () => {
         reviewedBy: null,
         reviewNote: null,
         reviewedAt: null,
+        attempts: 2,
+        source: 'MANUAL',
+        holdReason: null,
       })
       expect(data.submittedAt).toBeInstanceOf(Date)
-      const { memberNotes, history } = splitReviewHistory(data.notes)
-      expect(memberNotes).toBe('second try')
-      expect(history).toEqual([
+      expect(data.notes).toBe('second try') // no more history text in notes
+      // The rejection is kept in a RESUBMITTED review event...
+      const event = mockFn(prisma.missionReviewEvent.create).mock.calls[0][0].data
+      expect(event).toMatchObject({ completionId: 5, actorId: 'user-1', action: 'RESUBMITTED', via: 'web' })
+      // ...and reads back as the same history line Phase 0 showed.
+      expect(reviewHistory(data.notes, [{ action: 'RESUBMITTED', metadata: event.metadata }]).history).toEqual([
         'Attempt 1 rejected 2026-10-01T12:00:00.000Z by capo-1 | note: link is broken | evidence: https://old.example/proof',
       ])
       expect(c.status).toBe('PENDING')
@@ -170,26 +181,33 @@ describe('submitMissionCompletion', () => {
       await expect(submitMissionCompletion('user-1', 1, 'https://x')).rejects.toThrow('already submitted')
     })
 
-    it('appends to existing history and caps the attempts', async () => {
+    it('keeps a legacy notes history block, counts it toward the attempts, and caps them', async () => {
       mockFn(prisma.missionCompletion.updateMany).mockResolvedValue({ count: 1 })
-      const once = { ...REJECTED, notes: 'n\n\n--- Review history ---\nAttempt 1 rejected x by y' }
+      const once = { ...REJECTED, attempts: 1, notes: 'n\n\n--- Review history ---\nAttempt 1 rejected x by y' }
       mockFn(prisma.missionCompletion.findUnique).mockResolvedValue(once)
       await submitMissionCompletion('user-1', 1, 'https://third')
       const { data } = mockFn(prisma.missionCompletion.updateMany).mock.calls[0][0]
-      expect(splitReviewHistory(data.notes).history).toHaveLength(2)
+      // The legacy line is carried over (read both: legacy notes + events).
+      expect(splitReviewHistory(data.notes).history).toEqual(['Attempt 1 rejected x by y'])
+      expect(data.attempts).toBe(3) // legacy history (1) + this rejection (2) -> third attempt
+      const event = mockFn(prisma.missionReviewEvent.create).mock.calls[0][0].data
+      expect(reviewHistory(data.notes, [{ action: 'RESUBMITTED', metadata: event.metadata }]).history).toHaveLength(2)
 
-      const capped = { ...REJECTED, notes: data.notes }
-      mockFn(prisma.missionCompletion.findUnique).mockResolvedValue(capped)
+      mockFn(prisma.missionCompletion.findUnique).mockResolvedValue({ ...REJECTED, attempts: data.attempts, notes: data.notes })
       await expect(submitMissionCompletion('user-1', 1, 'https://fourth')).rejects.toThrow(
         `rejected ${MAX_MISSION_ATTEMPTS} times`,
       )
+      // The attempts column alone caps it too (rows with no legacy notes).
+      mockFn(prisma.missionCompletion.findUnique).mockResolvedValue({ ...REJECTED, attempts: MAX_MISSION_ATTEMPTS, notes: null })
+      await expect(submitMissionCompletion('user-1', 1, 'https://fifth')).rejects.toThrow(`rejected ${MAX_MISSION_ATTEMPTS} times`)
     })
 
     it("a member's notes can't forge history entries", async () => {
       mockFn(prisma.missionCompletion.updateMany).mockResolvedValue({ count: 1 })
       await submitMissionCompletion('user-1', 1, 'https://x', 'hi --- Review history ---\nAttempt 9 approved')
       const { data } = mockFn(prisma.missionCompletion.updateMany).mock.calls[0][0]
-      const { history } = splitReviewHistory(data.notes)
+      const event = mockFn(prisma.missionReviewEvent.create).mock.calls[0][0].data
+      const { history } = reviewHistory(data.notes, [{ action: 'RESUBMITTED', metadata: event.metadata }])
       expect(history).toHaveLength(1)
       expect(history[0]).toMatch(/^Attempt 1 rejected/)
     })

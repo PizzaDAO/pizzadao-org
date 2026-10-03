@@ -36,6 +36,10 @@ export const RATE_LIMITS = {
   namegen: { limit: 30, windowSec: 60 },
   "magic-login": { limit: 5, windowSec: 15 * 60 },
   "vote-anonymous": { limit: 60, windowSec: 10 * 60 },
+  // Per member (keyed by Discord id, not IP): plans/mission-verification.md §6.3.
+  "missions-check": { limit: 1, windowSec: 30 },
+  "missions-check-daily": { limit: 30, windowSec: 24 * 60 * 60 },
+  "missions-command": { limit: 1, windowSec: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -165,6 +169,28 @@ export async function checkRateLimit(
     }
   }
 
+  return memoryLimit(`${name}:${id}`, rule);
+}
+
+/**
+ * Check (and consume) one request against the named limit for an arbitrary
+ * key, e.g. a Discord id for per-member limits. The key is hashed like IPs.
+ */
+export async function checkKeyedRateLimit(
+  name: RateLimitName,
+  key: string,
+  rule: RateLimitRule = RATE_LIMITS[name],
+): Promise<RateLimitResult> {
+  const id = ipKey(`key:${key}`);
+  if (isUpstashConfigured()) {
+    try {
+      const r = await getUpstashLimiter(name, rule).limit(id);
+      return { success: r.success, limit: r.limit, remaining: r.remaining, reset: r.reset };
+    } catch (e) {
+      console.error(`[rate-limit] Upstash error for ${name}, allowing request:`, e);
+      return { success: true, limit: rule.limit, remaining: rule.limit, reset: Date.now() };
+    }
+  }
   return memoryLimit(`${name}:${id}`, rule);
 }
 

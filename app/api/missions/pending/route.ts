@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { getPendingSubmissions, splitReviewHistory } from '@/app/lib/missions'
+import { attemptsSoFar, getPendingSubmissions, reviewHistory } from '@/app/lib/missions'
+import { HOLD_LABEL } from '@/app/lib/mission-verify/policy'
 import { missionReviewScope } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
@@ -39,7 +40,8 @@ const GET_HANDLER = async () => {
 
   return NextResponse.json({
     submissions: pending.map(p => {
-      const { memberNotes, history } = splitReviewHistory(p.notes)
+      // Rejection history: RESUBMITTED / REOPENED events, plus legacy Phase 0 notes blocks.
+      const { memberNotes, history } = reviewHistory(p.notes, p.events ?? [])
       return {
         id: p.id,
         missionId: p.missionId,
@@ -50,7 +52,12 @@ const GET_HANDLER = async () => {
         notes: memberNotes,
         // Earlier rejections of this same submission (it was resubmitted).
         reviewHistory: history,
-        attempt: history.length + 1,
+        attempt: Math.max(attemptsSoFar(p), history.length + 1),
+        // Auto-verified, held for a human release (D9): the reviewer "releases" it (approve).
+        source: p.source ?? 'MANUAL',
+        holdReason: p.holdReason ?? null,
+        holdLabel: p.holdReason ? HOLD_LABEL[p.holdReason] : null,
+        checkResult: p.checkResult ?? null,
         submittedAt: p.submittedAt.toISOString(),
         mission: {
           title: p.mission.title,

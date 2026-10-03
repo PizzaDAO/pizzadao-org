@@ -107,11 +107,18 @@ export const PEP_COMMANDS = [
     options: adminMoneyOptions('take $PEP from'),
     dm_permission: false,
   },
+  {
+    // Deferred (type 5): the verifier run can exceed Discord's 3 s window,
+    // so the reply is edited in via the interaction webhook afterwards.
+    name: 'missions',
+    description: 'Check your PizzaDAO missions: verifies what it can and shows your level',
+    dm_permission: false,
+  },
 ] as const
 
 export type PepCommandName = (typeof PEP_COMMANDS)[number]['name']
 
 // Interaction + response types (subset)
 export const InteractionType = { PING: 1, APPLICATION_COMMAND: 2, MESSAGE_COMPONENT: 3, AUTOCOMPLETE: 4 } as const
-export const ResponseType = { PONG: 1, CHANNEL_MESSAGE: 4, UPDATE_MESSAGE: 7, AUTOCOMPLETE_RESULT: 8 } as const
+export const ResponseType = { PONG: 1, CHANNEL_MESSAGE: 4, DEFERRED_CHANNEL_MESSAGE: 5, UPDATE_MESSAGE: 7, AUTOCOMPLETE_RESULT: 8 } as const
 export const EPHEMERAL = 64

@@ -9,8 +9,20 @@
 
 import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle } from "@/app/lib/missions";
 import { getCachedMissionsList, setCachedMissionsList } from "@/app/lib/mission-cache";
+import { getVerifier } from "@/app/lib/mission-verify/verifiers";
 
-export type MissionProgress = { status: string; submittedAt: string; reviewNote?: string | null };
+/** Whether a mission's verifier can approve it automatically (not "manual", not a stub that never passes). */
+function isAutoChecked(key: string | null | undefined): boolean {
+  return getVerifier(key)?.mode === "auto" && key !== "referral";
+}
+
+export type MissionProgress = {
+  status: string;
+  submittedAt: string;
+  reviewNote?: string | null;
+  /** Set while an auto-verified completion awaits a reviewer's release (D9). */
+  holdReason?: string | null;
+};
 
 export type MissionsOverview = {
   levels: {
@@ -23,6 +35,10 @@ export type MissionsOverview = {
       title: string;
       description: string | null;
       autoVerify: boolean;
+      /** Checked automatically (an automatic verifier is configured). */
+      autoChecked: boolean;
+      /** What the submit form asks for: NONE / URL / DISCORD_MESSAGE / UPLOAD. */
+      proofKind: string;
       progress: MissionProgress | null;
     }[];
   }[];
@@ -45,6 +61,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         status: p.status,
         submittedAt: p.submittedAt.toISOString(),
         reviewNote: p.reviewNote,
+        holdReason: p.holdReason ?? null,
       };
     }
   }
@@ -62,6 +79,8 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         title: m.title,
         description: m.description,
         autoVerify: m.autoVerify,
+        autoChecked: isAutoChecked(m.verifierKey),
+        proofKind: m.proofKind ?? "NONE",
         progress: progressMap[m.id] || null,
       })),
     }));

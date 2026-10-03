@@ -1,10 +1,11 @@
-import { NextRequest, NextResponse } from 'next/server'
+import { after, NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { approveMission, rejectMission, getCompletionForReview } from '@/app/lib/missions'
 import { canReviewMission } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError, ValidationError, NotFoundError } from '@/app/lib/errors/api-errors'
 import { invalidateProgressCache } from '@/app/lib/mission-cache'
+import { announceMissionResults } from '@/app/lib/mission-verify/notify'
 
 export const runtime = 'nodejs'
 
@@ -43,7 +44,15 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   let result
   if (action === 'approve') {
-    result = await approveMission(session.discordId, completionId, reviewNote)
+    // Also "releases" an auto-verified completion that was held for a human (D9).
+    const approved = await approveMission(session.discordId, completionId, reviewNote)
+    const levelsPaid = approved.levelsPaid ?? []
+    if (levelsPaid.length) {
+      after(() =>
+        announceMissionResults({ discordId: approved.discordId, trigger: 'review', approvedTitles: [], levelsPaid }).then(() => undefined),
+      )
+    }
+    result = approved
   } else {
     result = await rejectMission(session.discordId, completionId, reviewNote)
   }
