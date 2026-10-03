@@ -12,14 +12,6 @@
  */
 import { prisma } from './db'
 
-/** The four UnbelievaBoat store items (plan §2.3). Prices in PEP. */
-export const UB_STORE_ITEMS: ReadonlyArray<{ name: string; price: number; description: string; limited?: boolean }> = [
-  { name: 'Global Pizza Party T-shirt', price: 20_240, description: 'Official Global Pizza Party tee.' },
-  { name: 'Proof of Pizza', price: 13_370, description: 'Proof you were there for the pizza.' },
-  { name: 'Rare Pizza Box', price: 42_069, description: 'A rare PizzaDAO pizza box. Limited stock.', limited: true },
-  { name: 'Pizza Sticks', price: 1_337, description: 'Pizza Sticks.' },
-]
-
 export const normalizeItemName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 
 export interface GrantRow {

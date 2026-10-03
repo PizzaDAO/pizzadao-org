@@ -3,7 +3,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DEFAULT_ROLE_INCOME, normalizeRoleName, resolveRoleIncome, roleIncomeConfig } from '../income'
 import { clearGuildRolesCache, getGuildRoles } from '../../discord-interactions/guild-roles'
 import { robConfig } from '../rob'
-import { parseGrantCsv, splitCsvLine, UB_STORE_ITEMS } from '../../shop-grants'
+import { parseGrantCsv, splitCsvLine } from '../../shop-grants'
 
 describe('role income config', () => {
   it('ports the 11 UnbelievaBoat roles and amounts as-is', () => {
@@ -113,15 +113,6 @@ describe('item grant CSV', () => {
       'line 5: bad discordId "abc"',
       'line 6: qty must be a positive whole number',
       'line 7: expected 3 columns (discordId,item,qty)',
-    ])
-  })
-
-  it('lists the four UnbelievaBoat store items at their UB prices', () => {
-    expect(UB_STORE_ITEMS.map((i) => [i.name, i.price])).toEqual([
-      ['Global Pizza Party T-shirt', 20240],
-      ['Proof of Pizza', 13370],
-      ['Rare Pizza Box', 42069],
-      ['Pizza Sticks', 1337],
     ])
   })
 })
