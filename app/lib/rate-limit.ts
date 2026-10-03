@@ -40,6 +40,9 @@ export const RATE_LIMITS = {
   "missions-check": { limit: 1, windowSec: 30 },
   "missions-check-daily": { limit: 30, windowSec: 24 * 60 * 60 },
   "missions-command": { limit: 1, windowSec: 60 },
+  "missions-submit": { limit: 10, windowSec: 60 * 60 },
+  "missions-bulk-review": { limit: 20, windowSec: 60 * 60 },
+  "referral-search": { limit: 60, windowSec: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

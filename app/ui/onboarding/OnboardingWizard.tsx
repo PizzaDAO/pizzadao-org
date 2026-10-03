@@ -22,12 +22,14 @@ import { RolesStep } from "./steps/RolesStep";
 import { MemberIdStep } from "./steps/MemberIdStep";
 import { CrewsStep } from "./steps/CrewsStep";
 import { ReviewStep } from "./steps/ReviewStep";
+import { InvitedByStep } from "./steps/InvitedByStep";
 
 // mozzarella-41832: card/btn/alert primitives replaced by editorial
 // utilities (.paper-soft, .btn-pill-lg, .overline) inline in the JSX.
 import {
   FlowState,
   WizardData,
+  WizardStep,
   CrewOption,
   NamegenResponse,
   LS_KEY,
@@ -124,6 +126,41 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         }
       } catch {}
       if (alive) setCrewsLoading(false);
+    })();
+    return () => {
+      alive = false;
+    };
+  }, []);
+
+  // --- Personal invite link: /join?ref=<memberId> (L3.1) ---
+  // Remember the inviter in the httpOnly pd_ref cookie before the Discord
+  // login, and pre-fill the "Who invited you?" step.
+  useEffect(() => {
+    const url = new URL(window.location.href);
+    const ref = url.searchParams.get("ref");
+    if (!ref) return;
+    url.searchParams.delete("ref");
+    window.history.replaceState({}, "", url.toString());
+    let alive = true;
+    (async () => {
+      try {
+        const res = await fetch("/api/referrals/ref", {
+          method: "POST",
+          credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ ref }),
+        });
+        if (!res.ok) return;
+        const json = await res.json();
+        const inviter = json?.inviter;
+        if (alive && inviter?.memberId) {
+          setData((p) =>
+            p.invitedBy === undefined
+              ? { ...p, invitedBy: { memberId: String(inviter.memberId), name: String(inviter.name || ""), viaLink: true } }
+              : p,
+          );
+        }
+      } catch {}
     })();
     return () => {
       alive = false;
@@ -407,6 +444,8 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           turtle: data.turtles.join(", "),
           turtles: data.turtles,
           crews: data.crews,
+          // L3.1: undefined = not asked (the server uses the invite-link cookie), "" = no one.
+          invitedBy: data.invitedBy === undefined ? undefined : (data.invitedBy?.memberId ?? ""),
           memberId: data.memberId,
           discordId: data.discordId,
           discordJoined: data.discordJoined,
@@ -454,13 +493,13 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   }
 
   // --- Navigation helpers ---
-  function goToStep(step: 0 | 1 | 2 | 3 | 4 | 5 | 6) {
+  function goToStep(step: WizardStep) {
     setFlow({ type: "wizard", step, isUpdate: flow.type === "wizard" && flow.isUpdate });
   }
 
   function nextStep() {
     if (flow.type !== "wizard") return;
-    const next = Math.min(flow.step + 1, 6) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const next = Math.min(flow.step + 1, 6) as WizardStep;
     // Skip step 4 (member ID) for updates
     const actualNext = flow.isUpdate && next === 4 ? 5 : next;
     setFlow({ type: "wizard", step: actualNext, isUpdate: flow.isUpdate });
@@ -468,7 +507,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
   function prevStep() {
     if (flow.type !== "wizard") return;
-    const prev = Math.max(flow.step - 1, 0) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
+    const prev = Math.max(flow.step - 1, 0) as WizardStep;
     // Skip step 4 (member ID) for updates
     const actualPrev = flow.isUpdate && prev === 4 ? 3 : prev;
     setFlow({ type: "wizard", step: actualPrev, isUpdate: flow.isUpdate });
@@ -606,9 +645,11 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       );
     }
 
-    // Progress (steps 1..6 = 6 visible steps)
-    const totalSteps = 6;
-    const currentIndex = Math.max(1, flow.step);
+    // Progress. New members: name, city, roles, member ID, who invited you
+    // (step 7), crews. The edit flow: name, city, roles, crews, review.
+    const order: WizardStep[] = flow.isUpdate ? [1, 2, 3, 5, 6] : [1, 2, 3, 4, 7, 5];
+    const totalSteps = order.length;
+    const currentIndex = Math.max(1, order.indexOf(flow.step) + 1);
     const progress = Math.min(100, Math.round((currentIndex / totalSteps) * 100));
 
     return (
@@ -823,8 +864,18 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           <MemberIdStep
             value={data.memberId || ""}
             onChange={(memberId) => setData((p) => ({ ...p, memberId }))}
-            onNext={() => goToStep(5)}
+            onNext={() => goToStep(7)}
             onBack={() => goToStep(3)}
+          />
+        )}
+
+        {flow.step === 7 && (
+          <InvitedByStep
+            value={data.invitedBy}
+            ownMemberId={data.memberId}
+            onChange={(invitedBy) => setData((p) => ({ ...p, invitedBy }))}
+            onNext={() => goToStep(5)}
+            onBack={() => goToStep(4)}
           />
         )}
 
@@ -836,7 +887,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             crewsLoading={crewsLoading}
             onChange={(crews) => setData((p) => ({ ...p, crews }))}
             onSubmit={flow.isUpdate ? () => goToStep(6) : claimRoles}
-            onBack={() => goToStep(flow.isUpdate ? 3 : 4)}
+            onBack={() => goToStep(flow.isUpdate ? 3 : 7)}
             isUpdate={flow.isUpdate}
             submitting={false}
           />
@@ -889,6 +940,8 @@ function getStepTitle(
       return t("stepTitleCrews");
     case 6:
       return t("stepTitleReview");
+    case 7:
+      return t("stepTitleInvitedBy");
     default:
       return "";
   }
