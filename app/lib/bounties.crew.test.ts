@@ -12,7 +12,8 @@ import { prisma } from './db'
 vi.mock('./db')
 vi.mock('./economy', () => ({
   getOrCreateEconomy: vi.fn(),
-  updateBalance: vi.fn(),
+  debitInTx: vi.fn(),
+  creditInTx: vi.fn(),
 }))
 vi.mock('./notifications', () => ({
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
@@ -26,7 +27,7 @@ vi.mock('./crew-mappings', () => ({
   getCrewMappings: vi.fn(),
 }))
 
-import { getOrCreateEconomy, updateBalance } from './economy'
+import { getOrCreateEconomy, debitInTx } from './economy'
 import { getCrewMappings } from './crew-mappings'
 
 const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -42,6 +43,7 @@ const CREWS = {
 beforeEach(() => {
   vi.clearAllMocks()
   mockFn(getCrewMappings).mockResolvedValue(CREWS)
+  mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
 })
 
 describe('resolveBountyCrewId', () => {
@@ -73,7 +75,7 @@ describe('resolveBountyCrewId', () => {
 describe('createBounty with a crew', () => {
   it('stores the crew id on the bounty', async () => {
     mockFn(getOrCreateEconomy).mockResolvedValue({ id: 'creator-1', wallet: 500 })
-    mockFn(updateBalance).mockResolvedValue({ id: 'creator-1', wallet: 400 })
+    mockFn(debitInTx).mockResolvedValue(undefined)
     mockFn(prisma.bounty.create).mockResolvedValue({ id: 11, crewId: 'ops', status: 'OPEN' })
 
     const bounty = await createBounty('creator-1', 'Run the ops call', 100, undefined, 'ops')
