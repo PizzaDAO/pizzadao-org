@@ -24,6 +24,8 @@ const report = (over: Partial<RunReport> = {}): RunReport => ({
   reopened: [],
   flagged: [],
   unflagged: [],
+  wouldFlag: [],
+  wouldUnflag: [],
   levelsPaid: [],
   errors: [],
   ...over,

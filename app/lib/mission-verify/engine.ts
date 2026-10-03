@@ -51,6 +51,11 @@ export interface RunOptions {
   sources?: VerifierSources
   /** Override the flag (tests). */
   enabled?: boolean
+  /**
+   * The active missions with a verifier, already loaded (bulk runs load them
+   * once per batch instead of once per member). Filtered like the query below.
+   */
+  missions?: MissionRow[]
 }
 
 export type CheckOutcome =
@@ -87,6 +92,9 @@ export interface RunReport {
   reopened: number[]
   flagged: number[]
   unflagged: number[]
+  /** Dry runs: APPROVED rows a stateful re-check would flag / unflag. */
+  wouldFlag: number[]
+  wouldUnflag: number[]
   levelsPaid: number[]
   errors: string[]
 }
@@ -121,7 +129,7 @@ const ROW_SELECT = {
   notes: true,
 } as const
 
-type MissionRow = {
+export type MissionRow = {
   id: number
   level: number
   index: number
@@ -148,19 +156,28 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
     reopened: [],
     flagged: [],
     unflagged: [],
+    wouldFlag: [],
+    wouldUnflag: [],
     levelsPaid: [],
     errors: [],
   }
 
-  const missions: MissionRow[] = await prisma.mission.findMany({
-    where: {
-      isActive: true,
-      verifierKey: opts.verifierKeys ? { in: opts.verifierKeys } : { not: null },
-      ...(opts.missionIds ? { id: { in: opts.missionIds } } : {}),
-    },
-    select: { id: true, level: true, index: true, title: true, verifierKey: true, verifierParams: true },
-    orderBy: [{ level: 'asc' }, { index: 'asc' }],
-  })
+  const missions: MissionRow[] = opts.missions
+    ? opts.missions.filter(
+        (m) =>
+          m.verifierKey != null &&
+          (!opts.verifierKeys || opts.verifierKeys.includes(m.verifierKey)) &&
+          (!opts.missionIds || opts.missionIds.includes(m.id)),
+      )
+    : await prisma.mission.findMany({
+        where: {
+          isActive: true,
+          verifierKey: opts.verifierKeys ? { in: opts.verifierKeys } : { not: null },
+          ...(opts.missionIds ? { id: { in: opts.missionIds } } : {}),
+        },
+        select: { id: true, level: true, index: true, title: true, verifierKey: true, verifierParams: true },
+        orderBy: [{ level: 'asc' }, { index: 'asc' }],
+      })
   const runnable = missions.filter((m) => getVerifier(m.verifierKey)?.mode === 'auto')
   if (runnable.length === 0) return report
 
@@ -216,6 +233,8 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       const r = await check()
       report.checks.push({ ...base, result: r, outcome: 'already_approved' })
       if (!dryRun) await maybeFlag(row, r, m, report, opts.trigger)
+      else if (r.status === 'fail' && !row.flaggedAt) report.wouldFlag.push(m.id)
+      else if (r.status === 'pass' && row.flaggedAt) report.wouldUnflag.push(m.id)
       continue
     }
 
