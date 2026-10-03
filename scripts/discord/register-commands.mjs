@@ -3,6 +3,11 @@
  * Register the $PEP slash commands (app/lib/discord-interactions/commands.ts)
  * as GUILD commands of the PizzaDAO Discord application. DRY RUN BY DEFAULT.
  *
+ * Commands: /balance /work /collect-income /pay /leaderboard /rob /peace
+ * /blackjack /roulette /slots /shop /buy. /rob and /peace answer "not enabled
+ * yet" until PEP_ROB_ENABLED=1, the games until PEP_GAMES_ENABLED=1 (Vercel
+ * env), so registering them all up front is safe.
+ *
  * Usage:
  *   DISCORD_APPLICATION_ID=... DISCORD_BOT_TOKEN=... DISCORD_GUILD_ID=... \
  *     node scripts/discord/register-commands.mjs [--apply]
