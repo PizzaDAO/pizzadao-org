@@ -5,3 +5,5 @@ export { PepIcon, PepAmount } from "./PepIcon";
 export { TransactionHistory } from "./TransactionHistory";
 export { SendPepModal } from "./SendPepModal";
 export type { SendPepModalProps } from "./SendPepModal";
+export { CrimeCard } from "./CrimeCard";
+export { GamesCard } from "./GamesCard";

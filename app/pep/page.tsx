@@ -13,7 +13,7 @@
 
 import React, { useEffect, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { Leaderboard, PepIcon, PepAmount, TransactionHistory } from "../ui/economy";
+import { CrimeCard, GamesCard, Leaderboard, PepIcon, PepAmount, TransactionHistory } from "../ui/economy";
 import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
@@ -516,6 +516,16 @@ export default function PepDashboard() {
     setWalletKey((k) => k + 1);
   };
 
+  // Flag-gated cards (PEP_CRIME_ENABLED / PEP_GAMES_ENABLED): hidden unless on.
+  const [features, setFeatures] = useState<{ crime: boolean; games: boolean }>({ crime: false, games: false });
+  useEffect(() => {
+    if (!meData?.authenticated) return;
+    fetch("/api/economy/features")
+      .then((r) => (r.ok ? r.json() : null))
+      .then((f) => f && setFeatures({ crime: !!f.crime, games: !!f.games }))
+      .catch(() => {});
+  }, [meData?.authenticated]);
+
   if (loading) {
     return (
       <div style={pageContainer()}>
@@ -647,6 +657,12 @@ export default function PepDashboard() {
               currentUserId={session.discordId || ""}
               onBountyAction={refreshWallet}
             />
+            {(features.crime || features.games) && (
+              <div className="mt-6 grid gap-6">
+                {features.crime && <CrimeCard onResult={refreshWallet} />}
+                {features.games && <GamesCard onResult={refreshWallet} />}
+              </div>
+            )}
           </div>
 
           {/* Right: Leaderboard, Balance, Inventory, Shop, Transactions */}
