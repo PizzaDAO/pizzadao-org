@@ -7,14 +7,20 @@
  *   x_linked          L1.0  an OAuth-linked X account (the follow stays on the honor system, D1)
  *   attendance_count  L2.0 (min 1), L5.0 (min 3): calls attended, any crews, community calls count (D2, D3)
  *   discord_message   L3.0  the submitted message link is the member's own post in #show-and-tell
- *   referral          L3.1  stub until the Phase 4 referral capture exists (never passes)
+ *   referral          L3.1  a friend this member invited finished onboarding (Phase 4, D4)
  *   discord_role      L6.0  holds the Pepperoni Mafia role; L7.0 holds the "Crew Leader" role
  *                     (D12; MISSION_CREW_LEADER_ROLE overrides). L6+ always needs a human release (D9).
  *   wallet_connected  catalog: at least one wallet linked
  *   manual            L8.0: never run, always a human (Dread Pizza Roberts)
+ *
+ * Phase 4 adds the semi-automatic ones (./semi.ts): social_post (L2.1),
+ * poap_drop (L4.1), media_proof (L5.1), gpp_host (L6.1). They pre-check a
+ * submitted proof for a reviewer and never approve on their own.
  */
 import { asObject, positiveInt, stringList, type Verifier, type VerifyCtx, type VerifyResult } from './types'
 import { parseMessageLink } from '../discord-channels'
+import { inviteUrl } from '../referral-link'
+import { SEMI_VERIFIERS } from './semi'
 
 const fail = (reason: string, hint?: string, progress?: { have: number; need: number }): VerifyResult => ({
   status: 'fail',
@@ -146,9 +152,16 @@ export const discordMessage: Verifier<MessageParams> = {
 }
 
 /**
- * L3.1 "Invite a friend". Referral capture (the "Who invited you?" step and
- * personal invite links, D4) is Phase 4, so this never passes yet: the
- * mission stays a manual submission a reviewer approves.
+ * L3.1 "Invite a friend" (D4). Passes once `min` people this member invited
+ * (Referral rows: the invitee picked them in the "Who invited you?" step, or
+ * joined through their /join?ref= link) have finished onboarding.
+ *
+ * Never counted: a self-referral (also refused at capture), and a referral
+ * whose invitee shares a wallet / X / Telegram / member ID with the inviter
+ * (the flags stored at capture, plus the nightly AccountSignal rows). Those
+ * are "flags, not blocks" (D4, §6.2): the member can still submit the mission
+ * and a reviewer approves it by hand, with a note (also the path for invites
+ * from before tracking existed).
  */
 export const referral: Verifier<{ min: number }> = {
   key: 'referral',
@@ -156,10 +169,36 @@ export const referral: Verifier<{ min: number }> = {
   stateful: false,
   parse: (p) => {
     const o = asObject(p)
+    if (o.qualify !== undefined && o.qualify !== 'onboarded') throw new Error('qualify must be "onboarded"')
     return { min: positiveInt(o.min, 'min', 1) }
   },
-  async check() {
-    return fail('Invite tracking is not live yet', 'Submit this mission for review and a reviewer will confirm your invite.')
+  async check(ctx, { min }) {
+    const rows = await ctx.sources.getReferrals(ctx.discordId)
+    const qualified = rows.filter((r) => r.qualifiedAt && r.inviteeDiscordId !== ctx.discordId)
+    const clean: string[] = []
+    const flagged: Array<{ invitee: string; flags: string[] }> = []
+    for (const r of qualified) {
+      const flags = [...new Set([...r.flags, ...(await ctx.sources.sharedSignalKinds(ctx.discordId, r.inviteeDiscordId))])]
+      if (flags.length) flagged.push({ invitee: r.inviteeDiscordId, flags })
+      else clean.push(r.inviteeDiscordId)
+    }
+    if (clean.length >= min) {
+      return { status: 'pass', evidence: { referrals: clean.length, invitees: clean.slice(0, 5), ...(flagged.length ? { flagged: flagged.length } : {}) } }
+    }
+    const link = ctx.memberId ? inviteUrl(ctx.memberId) : null
+    const share = link ? `Share your invite link ${link}` : 'Finish onboarding to get your invite link'
+    if (flagged.length) {
+      return fail(
+        `${flagged.length} invite${flagged.length === 1 ? '' : 's'} shares a wallet, X or Telegram account with you`,
+        'Submit this mission for review: a reviewer can approve it.',
+        { have: clean.length, need: min },
+      )
+    }
+    return fail(
+      `${clean.length}/${min} invited friends finished onboarding`,
+      `${share}, or ask your friend to pick you in "Who invited you?" when they join. Invited someone before? Submit this mission for review and say who.`,
+      { have: clean.length, need: min },
+    )
   },
 }
 
@@ -194,7 +233,7 @@ async function memberRoles(ctx: VerifyCtx): Promise<string[] | null> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const VERIFIERS: Record<string, Verifier<any>> = Object.fromEntries(
-  [xLinked, attendanceCount, discordRole, discordMessage, referral, walletConnected, manual].map((v) => [v.key, v]),
+  [xLinked, attendanceCount, discordRole, discordMessage, referral, walletConnected, manual, ...SEMI_VERIFIERS].map((v) => [v.key, v]),
 )
 
 export function getVerifier(key: string | null | undefined): Verifier<unknown> | null {
