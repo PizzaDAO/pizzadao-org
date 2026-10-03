@@ -188,6 +188,12 @@ enum TransactionType {
   WORK_REWARD        // Discord /work payout
   CRIME_REWARD       // Web crime success
   CRIME_FINE         // Web crime fine (negative)
+  ROLE_INCOME        // Discord /collect-income payout (one row per role)
+  ROB_STEAL          // /rob success: the robber's gain (+)
+  ROB_LOSS           // /rob success: the victim's loss (-)
+  ROB_FINE           // /rob failure: robber pays (-), victim receives (+)
+  GAME_BET           // Casino game stake (-)
+  GAME_WIN           // Casino game payout incl. stake returned on a push (+)
 }
 
 model Transaction {
@@ -740,4 +746,59 @@ model EconomyCooldown {
   lastAt    DateTime
 
   @@id([discordId, action])
+}
+
+// ===== UNBELIEVABOAT REPLACEMENT: ROB, GAMES, ITEM GRANTS =====
+
+// /rob opt-out ("peace mode"). A row means peace mode is on: the member can't
+// rob and can't be robbed. Toggling has a cooldown (EconomyCooldown action
+// "peace-toggle"), so it can't be flipped on just to dodge a counter-rob.
+model EconomyPeaceMode {
+  discordId String   @id
+  enabledAt DateTime @default(now())
+}
+
+enum BlackjackStatus {
+  ACTIVE
+  SETTLED
+}
+
+// One blackjack hand. The stake is debited (GAME_BET) when the row is created
+// and paid out (GAME_WIN) exactly once, by the conditional ACTIVE -> SETTLED
+// update that settles it. `activeKey` = discordId while ACTIVE and NULL once
+// settled, so its unique index allows one live hand per member.
+model BlackjackGame {
+  id        String          @id @default(cuid())
+  discordId String
+  activeKey String?         @unique
+  source    String // "discord" | "web"
+  bet       Int
+  state     Json // { deck, player, dealer } card codes, e.g. "AS", "TD"
+  version   Int             @default(0) // bumped on every move (optimistic lock)
+  status    BlackjackStatus @default(ACTIVE)
+  outcome   String? // blackjack | win | push | lose | bust | dealer_bust
+  payout    Int? // PEP returned to the player (0 on a loss)
+  createdAt DateTime        @default(now())
+  updatedAt DateTime        @updatedAt
+  expiresAt DateTime // after this, the hand auto-stands
+  settledAt DateTime?
+
+  @@index([status, expiresAt])
+  @@index([discordId, createdAt])
+}
+
+// Idempotency record for manual item grants (UnbelievaBoat holdings carried
+// over by scripts/unbelievaboat/grant-items.mjs). One row per grantKey; the
+// Inventory increment happens in the same transaction as the insert.
+model ItemGrant {
+  id        Int      @id @default(autoincrement())
+  grantKey  String   @unique // "unbelievaboat:<discordId>:<itemId>"
+  source    String // "unbelievaboat"
+  discordId String
+  itemId    Int
+  quantity  Int
+  note      String?
+  createdAt DateTime @default(now())
+
+  @@index([discordId])
 }
