@@ -3,6 +3,7 @@
 import React, { useEffect, useState, useCallback, useRef } from "react";
 import { useRouter } from "next/navigation";
 import { NotificationItem, NotificationData } from "./NotificationItem";
+import { useSession } from "@/app/lib/hooks/use-session";
 
 type NotificationBellProps = {
   /** Polling interval in milliseconds. Default: 30000 (30 seconds) */
@@ -126,9 +127,21 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
   const [loading, setLoading] = useState(false);
   const containerRef = useRef<HTMLDivElement>(null);
 
+  // Only poll while signed in: after logout the cached session flips to
+  // authenticated:false (markLoggedOut) and the effects below tear down, so
+  // no stray 401s hit /api/notifications.
+  const { data: session } = useSession();
+  const authenticated = session?.authenticated === true;
+  const [unauthorized, setUnauthorized] = useState(false);
+  const enabled = authenticated && !unauthorized;
+
   const fetchNotifications = useCallback(async () => {
     try {
       const res = await fetch("/api/notifications");
+      if (res.status === 401) {
+        setUnauthorized(true);
+        return;
+      }
       if (!res.ok) return;
       const data = await res.json();
       setNotifications(data.notifications || []);
@@ -140,16 +153,17 @@ export function NotificationBell({ pollInterval = 30000 }: NotificationBellProps
 
   // Initial fetch
   useEffect(() => {
+    if (!enabled) return;
     fetchNotifications();
-  }, [fetchNotifications]);
+  }, [fetchNotifications, enabled]);
 
   // Polling
   useEffect(() => {
-    if (pollInterval <= 0) return;
+    if (!enabled || pollInterval <= 0) return;
 
     const interval = setInterval(fetchNotifications, pollInterval);
     return () => clearInterval(interval);
-  }, [fetchNotifications, pollInterval]);
+  }, [fetchNotifications, pollInterval, enabled]);
 
   // Close dropdown on outside click
   useEffect(() => {
