@@ -52,6 +52,40 @@ describe('renderReviewCard', () => {
     ])
   })
 
+  it('a semi-automatic pre-check (Phase 4): summary, ✅ / ❌ / 👀 lines, confidence, and the preview as thumbnail', () => {
+    const msg = renderReviewCard(
+      view({
+        level: 2,
+        title: 'Post about PizzaDAO',
+        evidence: 'https://x.com/pizzafan/status/1844000000000000001',
+        checkResult: {
+          verifier: 'social_post',
+          summary: 'X post by @pizzafan',
+          confidence: 'medium',
+          checks: [
+            { label: 'X post link', ok: true },
+            { label: 'Link is under @someone; linked X is @pizzafan', ok: false },
+            { label: 'Engagement: check by eye', ok: null },
+          ],
+          data: { platform: 'x' },
+          preview: { url: 'https://x.com/pizzafan/status/1844000000000000001', kind: 'page', image: 'https://pbs.twimg.com/card.jpg' },
+        },
+      }),
+      { appUrl: APP },
+    )
+    const e = msg.embeds[0]
+    const saw = e.fields?.find((f) => f.name === 'Verifier saw')?.value ?? ''
+    expect(saw.split('\n')).toEqual([
+      '**X post by @\u200bpizzafan**',
+      '✅ X post link',
+      '❌ Link is under @\u200bsomeone; linked X is @\u200bpizzafan',
+      '👀 Engagement: check by eye',
+      'Confidence: 🟡 some things need your eye',
+    ])
+    expect(e.thumbnail).toEqual({ url: 'https://pbs.twimg.com/card.jpg' })
+    expect(e.image).toBeUndefined()
+  })
+
   it('an auto-hold: Release instead of Approve, the hold reason and what the verifier saw', () => {
     const msg = renderReviewCard(view({ level: 6, holdReason: 'HIGH_LEVEL', checkResult: { roleIds: ['823266914834841610'], handle: 'x_y' } }), { appUrl: APP })
     const e = msg.embeds[0]

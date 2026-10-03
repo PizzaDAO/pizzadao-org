@@ -18,14 +18,25 @@
 import type { MissionHold } from '@prisma/client'
 import { InteractionType, ResponseType } from './commands'
 import type { Interaction, InteractionResponse } from './handle'
-import { handledText, REJECT_MODAL_ID, REJECT_REASON_INPUT, REVIEW_BUTTON_ID, rejectModalId, type CardRef, type ReviewButton } from '../mission-verify/review-ids'
+import {
+  APPROVE_MODAL_ID,
+  APPROVE_NOTE_INPUT,
+  approveModalId,
+  handledText,
+  REJECT_MODAL_ID,
+  REJECT_REASON_INPUT,
+  REVIEW_BUTTON_ID,
+  rejectModalId,
+  type CardRef,
+  type ReviewButton,
+} from '../mission-verify/review-ids'
 
 /** What the deferred decision (../mission-verify/review-decision.ts) needs. */
 export interface ReviewDecisionJob {
   action: ReviewButton
   completionId: number
   reviewerId: string
-  /** Reject only: the modal's reason. */
+  /** Reject: the modal's reason. Approve (a note-required mission): the reviewer's note. */
   reason?: string
   applicationId: string
   token: string
@@ -40,6 +51,8 @@ export interface ReviewTarget {
   holdReason: MissionHold | null
   reviewedBy: string | null
   reviewedAt: Date | null
+  /** Approving needs a note (a manual L3.1 referral): Approve opens a modal. */
+  noteRequired?: boolean
 }
 
 export interface MissionReviewDeps {
@@ -133,15 +146,54 @@ export async function handleReviewButton(i: Interaction, userId: string, deps: M
     }
   }
 
+  if (action === 'approve' && c.target.noteRequired) {
+    return {
+      type: ResponseType.MODAL,
+      data: {
+        custom_id: approveModalId(completionId),
+        title: 'Approve: who did they invite?',
+        components: [
+          {
+            type: 1,
+            components: [
+              {
+                type: 4,
+                custom_id: APPROVE_NOTE_INPUT,
+                style: 2,
+                label: 'Note (who they invited, how you checked)',
+                min_length: REJECT_REASON_MIN,
+                max_length: REJECT_REASON_MAX,
+                required: true,
+                placeholder: 'e.g. Invited @friend in March; confirmed on the community call.',
+              },
+            ],
+          },
+        ],
+      },
+    }
+  }
+
   const j = job(i, userId, completionId, action)
   if (!j) return refuse('Could not record that. Please try again.')
   deps.decide(j)
   return { type: ResponseType.DEFERRED_UPDATE_MESSAGE }
 }
 
-/** The submitted Reject modal. */
+/** The submitted Reject modal, or the Approve-with-a-note modal. */
 export async function handleReviewModal(i: Interaction, userId: string, deps: MissionReviewDeps, refuse: Refuse): Promise<InteractionResponse> {
   if (i.type !== InteractionType.MODAL_SUBMIT) return refuse('Unsupported interaction.')
+  const a = APPROVE_MODAL_ID.exec(i.data?.custom_id ?? '')
+  if (a) {
+    const completionId = Number(a[1])
+    const note = modalValue(i, APPROVE_NOTE_INPUT).trim()
+    if (note.length < REJECT_REASON_MIN) return refuse(`Write a note of at least ${REJECT_REASON_MIN} characters.`)
+    const c = await check(i, userId, completionId, deps, refuse)
+    if (!c.ok) return c.res
+    const j = job(i, userId, completionId, 'approve', note.slice(0, REJECT_REASON_MAX))
+    if (!j) return refuse('Could not record that. Please try again.')
+    deps.decide(j)
+    return { type: ResponseType.DEFERRED_UPDATE_MESSAGE }
+  }
   const m = REJECT_MODAL_ID.exec(i.data?.custom_id ?? '')
   if (!m) return refuse('Unknown form.')
   const completionId = Number(m[1])

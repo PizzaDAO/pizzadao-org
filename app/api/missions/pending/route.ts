@@ -7,6 +7,8 @@ import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
 import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
 import { getFlaggedCompletions, getSignalViews } from '@/app/lib/mission-verify/review-extras'
+import { isAllGreen } from '@/app/lib/mission-verify/precheck'
+import { approvalNeedsNote } from '@/app/lib/mission-verify/review-ids'
 
 export const runtime = 'nodejs'
 
@@ -64,6 +66,10 @@ const GET_HANDLER = async () => {
         holdReason: p.holdReason ?? null,
         holdLabel: p.holdReason ? HOLD_LABEL[p.holdReason] : null,
         checkResult: p.checkResult ?? null,
+        // Semi-automatic pre-checks all passed: offered for bulk approve.
+        allGreen: isAllGreen(p.checkResult),
+        // A manual "Invite a friend": approving needs a note (who they invited).
+        noteRequired: approvalNeedsNote({ verifierKey: p.mission.verifierKey, holdReason: p.holdReason }),
         accountSignals: signals.get(p.discordId) ?? [],
         submittedAt: p.submittedAt.toISOString(),
         mission: {
@@ -71,6 +77,7 @@ const GET_HANDLER = async () => {
           level: p.mission.level,
           index: p.mission.index,
           description: p.mission.description,
+          verifierKey: p.mission.verifierKey ?? null,
         },
       }
     }),

@@ -35,6 +35,8 @@ export interface Embed {
   fields?: EmbedField[]
   /** A large image (e.g. an evidence screenshot on a mission review card). */
   image?: { url: string }
+  /** A small image top-right (e.g. a proof link preview). */
+  thumbnail?: { url: string }
   footer?: { text: string }
 }
 
@@ -87,6 +89,7 @@ export function makeEmbed(tone: Tone, headline: string, body?: string, extra: Pa
   if (extra.author) embed.author = extra.author
   if (extra.fields?.length) embed.fields = extra.fields
   if (extra.image) embed.image = extra.image
+  if (extra.thumbnail) embed.thumbnail = extra.thumbnail
   if (extra.footer) embed.footer = extra.footer
   return embed
 }

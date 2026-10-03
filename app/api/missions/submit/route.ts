@@ -10,6 +10,9 @@ import { runVerifiers } from '@/app/lib/mission-verify/engine'
 import { missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
 import { announceMissionResults } from '@/app/lib/mission-verify/notify'
 import { reviewCardsEnabled, syncReviewCardsFor } from '@/app/lib/mission-verify/review-cards'
+import { isPrecheckedMission, precheckProof, storeCheckResult } from '@/app/lib/mission-verify/precheck'
+import { prisma } from '@/app/lib/db'
+import { checkKeyedRateLimit, rateLimitResponse } from '@/app/lib/rate-limit'
 
 export const runtime = 'nodejs'
 
@@ -32,6 +35,29 @@ const POST_HANDLER = async (request: NextRequest) => {
   if (!missionId || typeof missionId !== 'number') {
     throw new ValidationError('Valid mission ID required')
   }
+  if (evidence !== undefined && evidence !== null && (typeof evidence !== 'string' || evidence.length > 2000)) {
+    throw new ValidationError('Evidence must be a link or a short text')
+  }
+
+  // Submissions fetch proof previews / pre-checks from third parties: 10 an hour per member.
+  const rl = await checkKeyedRateLimit('missions-submit', session.discordId)
+  if (!rl.success) return rateLimitResponse(rl)
+
+  // Semi-automatic missions (Phase 4): pre-check the proof link before writing
+  // anything. Not the right kind of link -> 400 with the hint, no row (the
+  // member just fixes it). Otherwise the checks go on the PENDING row for the
+  // reviewer. Missions without a verifier only get a link preview.
+  const mission = await prisma.mission.findUnique({
+    where: { id: missionId },
+    select: { verifierKey: true, verifierParams: true, isActive: true },
+  })
+  const precheck =
+    mission?.isActive && isPrecheckedMission(mission.verifierKey)
+      ? await precheckProof({ discordId: session.discordId, memberId: memberId ?? null, mission, evidence })
+      : {}
+  if (precheck.reject) {
+    throw new ValidationError(precheck.reject.hint ? `${precheck.reject.reason}. ${precheck.reject.hint}` : precheck.reject.reason, 'evidence')
+  }
 
   const completion = await submitMissionCompletion(
     session.discordId,
@@ -41,12 +67,16 @@ const POST_HANDLER = async (request: NextRequest) => {
     memberId
   )
 
+  if (precheck.checkResult) {
+    await storeCheckResult(completion.id, precheck.checkResult, !!mission?.verifierKey)
+  }
+
   // Missions with an automatic verifier are checked right away (e.g. the
   // #show-and-tell message link). A pass approves (or holds for a release);
   // anything else leaves the submission PENDING for a reviewer.
   let status: string = completion.status
   let levelsPaid: number[] = []
-  if (missionVerifiersEnabled() && completion.mission.verifierKey) {
+  if (missionVerifiersEnabled() && completion.mission.verifierKey && !isPrecheckedMission(completion.mission.verifierKey)) {
     try {
       const report = await runVerifiers(session.discordId, {
         trigger: 'submit',

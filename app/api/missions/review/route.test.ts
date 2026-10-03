@@ -102,6 +102,23 @@ describe('POST /api/missions/review', () => {
     expect(approveMission).not.toHaveBeenCalled()
   })
 
+  it('a manual "Invite a friend" (no tracked referral) needs a note to approve (D4 manual path)', async () => {
+    vi.mocked(getCompletionForReview).mockResolvedValue({ discordId: 'member-1', status: 'PENDING', level: 3, noteRequired: true } as never)
+    as('capo', [CAPO])
+    expect((await review(4)).status).toBe(400)
+    expect(approveMission).not.toHaveBeenCalled()
+    const withNote = await POST(
+      new NextRequest('http://localhost/api/missions/review', {
+        method: 'POST',
+        body: JSON.stringify({ completionId: 4, action: 'approve', reviewNote: 'Invited @friend in March, confirmed on the call' }),
+      }),
+    )
+    expect(withNote.status).toBe(200)
+    expect(approveMission).toHaveBeenCalledWith('capo', 4, 'Invited @friend in March, confirmed on the call')
+    // Rejecting needs no note.
+    expect((await review(4, 'reject')).status).toBe(200)
+  })
+
   it('404 for an unknown completion', async () => {
     vi.mocked(getCompletionForReview).mockResolvedValue(null)
     as('dpr', [DPR])

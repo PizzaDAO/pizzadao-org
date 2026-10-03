@@ -121,9 +121,30 @@ function evidenceField(evidence: string | null): string {
   return clip(escapeMd(evidence.trim()), 1000)
 }
 
-/** A few "key: value" lines from the verifier's snapshot (checkResult). */
-function checkLines(check: Prisma.JsonValue | null): string | null {
+const CONFIDENCE_LABEL: Record<string, string> = {
+  high: '🟢 every pre-check passed',
+  medium: '🟡 some things need your eye',
+  low: '🔴 a pre-check failed: look closely',
+}
+
+/**
+ * What the verifier saw. A semi-automatic pre-check (Phase 4) is shown as its
+ * summary, the checks as ✅ / ❌ / 👀 lines and a confidence hint; an automatic
+ * verifier's snapshot as a few "key: value" lines.
+ */
+export function checkLines(check: Prisma.JsonValue | null): string | null {
   if (!check || typeof check !== 'object' || Array.isArray(check)) return null
+  const semi = check as { summary?: unknown; checks?: unknown; confidence?: unknown }
+  if (Array.isArray(semi.checks)) {
+    const out: string[] = []
+    if (typeof semi.summary === 'string' && semi.summary) out.push(`**${escapeMd(clip(semi.summary, 200))}**`)
+    for (const c of semi.checks.slice(0, 8) as Array<{ label?: unknown; ok?: unknown }>) {
+      if (typeof c?.label !== 'string') continue
+      out.push(`${c.ok === true ? '✅' : c.ok === false ? '❌' : '👀'} ${escapeMd(clip(c.label, 160))}`)
+    }
+    if (typeof semi.confidence === 'string' && CONFIDENCE_LABEL[semi.confidence]) out.push(`Confidence: ${CONFIDENCE_LABEL[semi.confidence]}`)
+    return out.length ? clip(out.join('\n'), 1000) : null
+  }
   const lines: string[] = []
   for (const [k, v] of Object.entries(check)) {
     if (v === null || v === undefined) continue
@@ -132,6 +153,15 @@ function checkLines(check: Prisma.JsonValue | null): string | null {
     if (lines.length >= 6) break
   }
   return lines.length ? clip(lines.join('\n'), 1000) : null
+}
+
+/** A proof preview image from the pre-check (link unfurl, YouTube / POAP / party image). https only. */
+export function previewImage(check: Prisma.JsonValue | null): string | null {
+  if (!check || typeof check !== 'object' || Array.isArray(check)) return null
+  const c = check as { preview?: { image?: unknown; kind?: unknown; url?: unknown }; data?: { thumbnail?: unknown; image?: unknown } }
+  const candidates = [c.data?.thumbnail, c.data?.image, c.preview?.image, c.preview?.kind === 'image' ? c.preview?.url : null]
+  for (const x of candidates) if (typeof x === 'string' && httpsUrl(x)) return x
+  return null
 }
 
 function decisionLine(v: ReviewCardView): string | null {
@@ -179,10 +209,12 @@ export function renderReviewCard(v: ReviewCardView, opts: { appUrl: string }): C
   if (v.status === 'REJECTED' && v.reviewNote) fields.push({ name: 'Reason', value: clip(escapeMd(v.reviewNote), 1000) })
 
   const image = v.status === 'PENDING' ? evidenceImage(v.evidence) : null
+  const thumb = !image && v.status === 'PENDING' ? previewImage(v.checkResult) : null
   const embed = makeEmbed(tone, headline, body.join('\n'), {
     fields,
     footer: { text: `Mission review · completion #${v.id}` },
     ...(image ? { image: { url: image } } : {}),
+    ...(thumb ? { thumbnail: { url: thumb } } : {}),
   })
 
   const buttons = [

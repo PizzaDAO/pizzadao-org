@@ -43,6 +43,11 @@ const POST_HANDLER = async (request: NextRequest) => {
     throw new ForbiddenError("You can't review your own mission submission")
   }
 
+  if (action === 'approve' && target.noteRequired && !(typeof reviewNote === 'string' && reviewNote.trim().length >= 3)) {
+    // A member-submitted "Invite a friend" with no tracked referral (D4 manual path).
+    throw new ValidationError('Add a review note: who did they invite, and how did you check?')
+  }
+
   let result
   if (action === 'approve') {
     // Also "releases" an auto-verified completion that was held for a human (D9).
