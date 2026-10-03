@@ -7,6 +7,9 @@ import { prisma } from '@/app/lib/db'
 // Admin role IDs that can complete jobs
 const ADMIN_ROLE_IDS = process.env.ADMIN_ROLE_IDS?.split(',') || []
 
+// Upper bound on a single admin job reward (this endpoint mints PEP).
+const MAX_ADMIN_JOB_REWARD = Math.max(JOB_REWARD_AMOUNT * 100, 10_000)
+
 export const runtime = 'nodejs'
 
 async function isAdmin(discordId: string): Promise<boolean> {
@@ -42,9 +45,13 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })
     }
 
-    const rewardAmount = typeof reward === 'number' ? Math.floor(reward) : JOB_REWARD_AMOUNT
+    if (typeof reward !== 'number' || !Number.isInteger(reward) || reward < 0 || reward > MAX_ADMIN_JOB_REWARD) {
+      return NextResponse.json({ error: `Reward must be a whole number between 0 and ${MAX_ADMIN_JOB_REWARD}` }, { status: 400 })
+    }
+    const rewardAmount = reward
 
-    const result = await completeJob(userId, rewardAmount)
+    // grantedBy is recorded in the ledger row's metadata (who minted this PEP).
+    const result = await completeJob(userId, rewardAmount, session.discordId)
 
     return NextResponse.json({
       success: true,
