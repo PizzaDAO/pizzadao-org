@@ -18,6 +18,7 @@
 //     exactly once
 //   * /rob and the games: cooldowns hold under races, robbing conserves PEP,
 //     stakes can't overdraw
+//   * /remove-money can't take a wallet below 0, however many race
 // Finally it runs every check in scripts/pep-reconcile.sql against the DB.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -58,6 +59,7 @@ type Libs = {
   slots: typeof import('./pep-games/slots')
   blackjack: typeof import('./pep-games/blackjack')
   grants: typeof import('./shop-grants')
+  admin: typeof import('./pep-admin')
 }
 let L: Libs
 const N = 20
@@ -127,6 +129,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       slots: await import('./pep-games/slots'),
       blackjack: await import('./pep-games/blackjack'),
       grants: await import('./shop-grants'),
+      admin: await import('./pep-admin'),
     }
   }, 60_000)
 
@@ -523,6 +526,69 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     expect((await L.prisma.shopItem.findUniqueOrThrow({ where: { id: item.id } })).quantity).toBe(0)
   }, 60_000)
 
+  // ---- Admin money: /add-money, /remove-money ----
+
+  const ADMIN = '900000000000000001'
+
+  it(`${N} parallel /remove-money calls can't overdraw: exactly the wallet comes out`, async () => {
+    const user = await seedUser(1000)
+    const res = await Promise.allSettled(Array.from({ length: N }, () => L.admin.adminRemoveMoney(ADMIN, user, 100, 'race test')))
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    const values = res.map((r) => (r as PromiseFulfilledResult<Awaited<ReturnType<typeof L.admin.adminRemoveMoney>>>).value)
+    expect(values.filter((v) => v.ok).length).toBe(10)
+    expect(values.filter((v) => !v.ok && v.reason === 'insufficient').length).toBe(10)
+    expect(await wallet(user)).toBe(0)
+    const rows = await ledger(user)
+    expect(rows.length).toBe(10)
+    for (const r of rows) {
+      expect(r.type).toBe('ADMIN_REMOVE')
+      expect(r.amount).toBe(-100)
+      expect(r.metadata).toEqual({ adminId: ADMIN, reason: 'race test', source: 'discord' })
+    }
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it(`/remove-money with an uneven amount stops short of 0 instead of going negative`, async () => {
+    const user = await seedUser(250)
+    const res = await Promise.all(Array.from({ length: N }, () => L.admin.adminRemoveMoney(ADMIN, user, 100, 'race test')))
+    expect(res.filter((v) => v.ok).length).toBe(2)
+    expect(await wallet(user)).toBe(50)
+    // Refusals report the balance left at the time (50 once both removals landed).
+    expect(res.filter((v) => !v.ok).every((v) => v.balance === 50 || v.balance === 150 || v.balance === 250)).toBe(true)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it(`${N} parallel /add-money calls all land, each with an ADMIN_GRANT row`, async () => {
+    const user = await seedUser(5)
+    const res = await Promise.allSettled(Array.from({ length: N }, (_, i) => L.admin.adminAddMoney(ADMIN, user, i + 1, `grant ${i + 1}`)))
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    expect(await wallet(user)).toBe(5 + (N * (N + 1)) / 2)
+    const rows = await ledger(user)
+    expect(rows.map((r: any) => r.type)).toEqual(Array(N).fill('ADMIN_GRANT'))
+    expect(rows.map((r: any) => r.metadata.reason).sort()).toEqual(Array.from({ length: N }, (_, i) => `grant ${i + 1}`).sort())
+    expect(rows.every((r: any) => r.metadata.adminId === ADMIN && r.amount > 0)).toBe(true)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it('/add-money creates User + Economy for a member with no wallet; /remove-money never creates one', async () => {
+    const fresh = uid()
+    touched.set(fresh, 0)
+    expect(await L.admin.adminAddMoney(ADMIN, fresh, 314, 'welcome bonus')).toEqual({ ok: true, amount: 314, balance: 314 })
+    expect(await L.prisma.user.findUnique({ where: { id: fresh } })).not.toBeNull()
+    const [row] = await ledger(fresh)
+    expect(row).toMatchObject({ type: 'ADMIN_GRANT', amount: 314, balance: 314, metadata: { adminId: ADMIN, reason: 'welcome bonus' } })
+    expect(row.description).toContain('welcome bonus')
+
+    const nobody = uid()
+    expect(await L.admin.adminRemoveMoney(ADMIN, nobody, 1, 'nothing there')).toEqual({ ok: false, reason: 'insufficient', balance: 0 })
+    expect(await L.prisma.economy.findUnique({ where: { id: nobody } })).toBeNull()
+
+    // The lib re-validates (the handler isn't the only line of defence).
+    await expect(L.admin.adminAddMoney(ADMIN, fresh, 0, 'zero')).rejects.toThrow(/positive/)
+    await expect(L.admin.adminAddMoney(ADMIN, fresh, 10_001, 'too much')).rejects.toThrow(/at most/)
+    await expect(L.admin.adminRemoveMoney(ADMIN, fresh, 5, 'no')).rejects.toThrow(/Reason/)
+  }, 60_000)
+
   it('every touched wallet reconciles with the ledger', async () => {
     await settle()
     for (const id of touched.keys()) await expectLedgerConsistent(id)
@@ -567,6 +633,10 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     }
     const orphan = uid()
     await L.prisma.transaction.create({ data: { userId: orphan, type: 'JOB_REWARD', amount: 1, balance: 1, description: 'x' } })
+    // Admin rows with the wrong sign.
+    const badSign = await seedUser(0)
+    await L.prisma.transaction.create({ data: { userId: badSign, type: 'ADMIN_REMOVE', amount: 5, balance: 5, description: 'x' } })
+    await L.prisma.transaction.create({ data: { userId: badSign, type: 'ADMIN_GRANT', amount: -5, balance: 0, description: 'x' } })
 
     const rows = await runReconcile()
     const has = (check: string, user: string) => rows.some((r) => r.check_name === check && r.user_id === user)
@@ -574,10 +644,14 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     expect(has('negative_wallet', negative)).toBe(true)
     expect(has('mission_reward_duplicate', dup)).toBe(true)
     expect(has('orphan_transaction', orphan)).toBe(true)
+    expect(rows.filter((r) => r.check_name === 'amount_sign' && r.user_id === badSign).map((r) => r.type).sort()).toEqual(['ADMIN_GRANT', 'ADMIN_REMOVE'])
+    const summary = rows.find((r) => r.check_name === 'summary')
+    expect(Number(summary.minted_admin)).toBeGreaterThan(0)
+    expect(Number(summary.burned_admin)).toBeGreaterThan(0)
 
     // Clean up so later runs against a kept DB stay quiet.
-    await L.prisma.transaction.deleteMany({ where: { userId: { in: [drift, other, dup, orphan] } } })
-    await L.prisma.economy.updateMany({ where: { id: { in: [drift, negative, dup, other] } }, data: { wallet: 0 } })
-    for (const id of [drift, negative, dup, other]) touched.set(id, 0)
+    await L.prisma.transaction.deleteMany({ where: { userId: { in: [drift, other, dup, orphan, badSign] } } })
+    await L.prisma.economy.updateMany({ where: { id: { in: [drift, negative, dup, other, badSign] } }, data: { wallet: 0 } })
+    for (const id of [drift, negative, dup, other, badSign]) touched.set(id, 0)
   }, 60_000)
 })

@@ -5,6 +5,11 @@
  *
  * /rob, /peace and the games are registered like the rest but answer "not
  * enabled yet" until PEP_ROB_ENABLED=1 / PEP_GAMES_ENABLED=1.
+ *
+ * /add-money and /remove-money are admin-only twice over: default_member_permissions
+ * "0" hides them from everyone without the Administrator permission (a server
+ * admin can allow more roles under Server Settings > Integrations), and the
+ * handler re-checks member.roles against ADMIN_ROLE_IDS.
  */
 
 // Discord application command option types
@@ -13,7 +18,18 @@ const INTEGER = 4
 const BOOLEAN = 5
 const USER = 6
 
+/** Only members with Administrator see the command until a server admin allows more roles. */
+const ADMIN_ONLY = '0'
+
 const bet = { type: INTEGER, name: 'bet', description: 'How much $PEP to bet', required: true, min_value: 1 } as const
+
+// Reason length matches ADMIN_REASON_MIN/MAX in app/lib/pep-admin.ts (the handler enforces it too).
+const adminMoneyOptions = (verb: string) =>
+  [
+    { type: USER, name: 'member', description: `Member to ${verb}`, required: true },
+    { type: INTEGER, name: 'amount', description: 'How much $PEP', required: true, min_value: 1 },
+    { type: STRING, name: 'reason', description: 'Why (shown publicly and logged)', required: true, min_length: 3, max_length: 200 },
+  ] as const
 
 export const PEP_COMMANDS = [
   {
@@ -92,6 +108,20 @@ export const PEP_COMMANDS = [
       { type: INTEGER, name: 'quantity', description: 'How many (default 1)', required: false, min_value: 1, max_value: 100 },
     ],
     dm_permission: false,
+  },
+  {
+    name: 'add-money',
+    description: 'Admin: give $PEP to a member',
+    options: adminMoneyOptions('give $PEP to'),
+    dm_permission: false,
+    default_member_permissions: ADMIN_ONLY,
+  },
+  {
+    name: 'remove-money',
+    description: 'Admin: take $PEP from a member (never below 0)',
+    options: adminMoneyOptions('take $PEP from'),
+    dm_permission: false,
+    default_member_permissions: ADMIN_ONLY,
   },
 ] as const
 

@@ -93,7 +93,9 @@ GROUP BY t."userId";
 SELECT 'amount_sign' AS check_name, 'error' AS severity, "userId" AS user_id, id AS tx_id, type, amount
 FROM "Transaction"
 WHERE amount = 0
-   OR (type IN ('TRANSFER_SENT', 'SHOP_PURCHASE', 'BOUNTY_ESCROW', 'ROB_LOSS', 'GAME_BET', 'CRIME_FINE') AND amount > 0)
+   OR (type IN ('TRANSFER_SENT', 'SHOP_PURCHASE', 'BOUNTY_ESCROW', 'ROB_LOSS', 'GAME_BET', 'CRIME_FINE',
+                'ADMIN_REMOVE') AND amount > 0)
+   OR (type = 'ADMIN_GRANT' AND amount < 0)
    OR (type IN ('TRANSFER_RECEIVED', 'JOB_REWARD', 'BOUNTY_REWARD', 'BOUNTY_REFUND', 'MISSION_REWARD',
                 'ROLE_INCOME', 'ROB_STEAL', 'GAME_WIN', 'WORK_REWARD', 'CRIME_REWARD') AND amount < 0
        -- approved admin clawbacks (scripts/pep-fixes) reverse a reward type on purpose
@@ -221,6 +223,8 @@ WHERE COALESCE(w.n, 0) > 1
 --       held      = SUM(wallet) + PEP escrowed in open/claimed bounties
 --       minted    = JOB_REWARD + MISSION_REWARD             (new PEP)
 --       burned    = -SHOP_PURCHASE                          (PEP leaves circulation)
+--       minted_admin / burned_admin = ADMIN_GRANT / -ADMIN_REMOVE (/add-money, /remove-money);
+--                   listed on their own, not folded into minted/burned
 --       opening   = SUM(wallet) - SUM(all ledger amounts)   (pre-ledger balances)
 --     Invariant: held = opening + minted - burned + (escrow_in_bounty_table - escrow_in_ledger)
 --     and transfers_net = 0. escrow_in_bounty_table vs escrow_in_ledger differ
@@ -234,6 +238,8 @@ SELECT 'summary' AS check_name, 'info' AS severity,
   (SELECT COALESCE(SUM(amount), 0) FROM "Transaction" WHERE type = 'JOB_REWARD')::bigint     AS minted_jobs,
   (SELECT COALESCE(SUM(amount), 0) FROM "Transaction" WHERE type = 'MISSION_REWARD')::bigint AS minted_missions,
   (SELECT COALESCE(-SUM(amount), 0) FROM "Transaction" WHERE type = 'SHOP_PURCHASE')::bigint AS burned_shop,
+  (SELECT COALESCE(SUM(amount), 0) FROM "Transaction" WHERE type = 'ADMIN_GRANT')::bigint    AS minted_admin,
+  (SELECT COALESCE(-SUM(amount), 0) FROM "Transaction" WHERE type = 'ADMIN_REMOVE')::bigint  AS burned_admin,
   (SELECT COALESCE(SUM(amount), 0) FROM "Transaction" WHERE type IN ('TRANSFER_SENT', 'TRANSFER_RECEIVED'))::bigint AS transfers_net,
   (SELECT COALESCE(SUM(wallet), 0) FROM "Economy")::bigint
     - (SELECT COALESCE(SUM(amount), 0) FROM "Transaction")::bigint           AS opening_unledgered,
