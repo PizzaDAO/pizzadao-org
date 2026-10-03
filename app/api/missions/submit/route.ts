@@ -80,7 +80,6 @@ const POST_HANDLER = async (request: NextRequest) => {
       mission: {
         title: completion.mission.title,
         level: completion.mission.level,
-        autoVerify: completion.mission.autoVerify,
       },
     },
     levelsPaid,

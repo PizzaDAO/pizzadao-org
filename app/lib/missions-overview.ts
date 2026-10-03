@@ -34,7 +34,6 @@ export type MissionsOverview = {
       index: number;
       title: string;
       description: string | null;
-      autoVerify: boolean;
       /** Checked automatically (an automatic verifier is configured). */
       autoChecked: boolean;
       /** What the submit form asks for: NONE / URL / DISCORD_MESSAGE / UPLOAD. */
@@ -78,7 +77,6 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         index: m.index,
         title: m.title,
         description: m.description,
-        autoVerify: m.autoVerify,
         autoChecked: isAutoChecked(m.verifierKey),
         proofKind: m.proofKind ?? "NONE",
         progress: progressMap[m.id] || null,

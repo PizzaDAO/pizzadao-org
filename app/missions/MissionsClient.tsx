@@ -29,7 +29,6 @@ type MissionData = {
   index: number;
   title: string;
   description: string | null;
-  autoVerify: boolean;
   autoChecked?: boolean;
   proofKind?: string;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;

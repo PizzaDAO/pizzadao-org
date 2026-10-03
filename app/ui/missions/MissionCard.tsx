@@ -35,7 +35,6 @@ type MissionData = {
   index: number;
   title: string;
   description: string | null;
-  autoVerify: boolean;
   /** Checked automatically by a verifier (no submission needed). */
   autoChecked?: boolean;
   /** What the submit form asks for (NONE / URL / DISCORD_MESSAGE / UPLOAD). */

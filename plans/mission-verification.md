@@ -1,6 +1,6 @@
 # Plan: mission verification + rewards
 
-Status: **decisions recorded (§9, all DECIDED); Phases 0 and 1 implemented** (Phase 1: see "What Phase 1 changed" at the end). Phases 2–5 are still plan only.
+Status: **decisions recorded (§9, all DECIDED); Phases 0, 1 and 2 implemented** (see "What Phase 1 changed" / "What Phase 2 changed" at the end). Phases 3–5 are still plan only.
 
 ## 0. TL;DR
 
@@ -563,3 +563,10 @@ None. (Resolved: the review and celebration channel is `#work`, D11; the crew-le
 - **Triggers:** "Check my progress" (`POST /api/missions/check`), `/missions` (deferred, Phase 3 pulled forward), submit, and event hooks (X link, wallet, crew join, attendance sync). No cron yet (Phase 2).
 - **Notifications:** in-app on approval / hold / level-up; a Pepperoni Bot DM and one `#work` post per level-up (only the member is mentioned).
 
+### What Phase 2 changed
+
+- **Migration** `prisma/migrations/20261007000000_mission_phase2` (additive, idempotent): `VerifierRun` (kind, dryRun, cursor, leaseUntil, stats) and `AccountSignal` (duplicate-account signals). **Migration B (drop `Mission.autoVerify`) is deferred** to the next release: the Phase 1 code running in production, `scripts/missions/set-verifiers.mjs`, the seed scripts and the concurrency suite still read or write the column. This release removes the app's remaining reads (`MissionCard`, `MissionsClient`, `missions-overview`, the submit route), so the next one can drop it.
+- **Crons** (`vercel.json`, all `Authorization: Bearer $CRON_SECRET`, fail closed without it): `GET /api/cron/attendance` at 05:00 UTC (the attendance sync, now scheduled); `GET /api/cron/missions` at 05:30 UTC plus resume slots at 06:00, 06:30, 07:00. The SLA digest cron is not in this phase.
+- **Nightly run** (`app/lib/mission-verify/nightly.ts`): `checkMany()` (`bulk.ts`) prefetches X accounts, attendance, wallets, paid levels and one full guild member listing per batch/run, then runs the Phase 1 engine per member (idempotent writes, `settleLevels` payouts). Batched, time-boxed (`MISSIONS_CRON_BUDGET_MS`, default 240 s), resumable via `VerifierRun.cursor`, one invocation at a time via `leaseUntil`. With `MISSION_VERIFIERS_ENABLED` off it is a dry run: the `VerifierRun.stats` hold what would be approved / held / flagged / paid, and nothing is written to completions or paid. Role re-checks flag / unflag APPROVED rows (never claw back); an incomplete guild listing decides nothing. A finished live run posts one count-only summary to the review channel and a PEP alert above `MISSIONS_RUN_PEP_ALERT`.
+- **Duplicate-account signals** (`signals.ts`): shared wallet, shared X handle, shared Telegram username, one members-sheet ID on several Discord accounts, one Discord id on several sheet rows. Recomputed at the start of each nightly run, shown to reviewers in the review panel (per submission) next to the flagged completions. Flags only.
+- **Backfill** (`scripts/missions/backfill.mjs`, report math in `backfill.ts`): dry run by default (writes nothing) → CSV + summary; `--apply` needs `--confirm-total <PEP>` equal to the re-computed plan and `MISSION_VERIFIERS_ENABLED=1`; batched, resumable (`VerifierRun` kind `backfill`), stops if it would ever pay more than the confirmed total; in-app notifications only.
