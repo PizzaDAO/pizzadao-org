@@ -3,11 +3,53 @@
 import { useState } from "react";
 import { useQuery } from "@tanstack/react-query";
 import { useSession } from "@/app/lib/hooks/use-session";
+import type { BotCheck } from "@/app/lib/announce/bot-check";
+
+function BotCheckStatus({ check }: { check?: BotCheck }) {
+  if (!check) return null;
+  if ("via" in check && check.via === "webhook") {
+    return (
+      <p className="text-sm text-green-700 mb-4" data-testid="announce-bot-check">
+        ✓ Posting via webhook (no bot permission check needed)
+      </p>
+    );
+  }
+  if (!("canView" in check)) return null;
+  const channel = check.channelName ? `#${check.channelName}` : "the announcement channel";
+  if (!check.configured) {
+    return (
+      <p className="text-sm text-red-700 mb-4" data-testid="announce-bot-check">
+        ✗ Discord isn&apos;t configured for announcements. {check.error}
+      </p>
+    );
+  }
+  if (check.canView && check.canSend && check.canMentionEveryone) {
+    return (
+      <p className="text-sm text-green-700 mb-4" data-testid="announce-bot-check">
+        ✓ Bot can post in {channel}
+      </p>
+    );
+  }
+  const missing = [
+    !check.canView && "View Channel",
+    !check.canSend && "Send Messages",
+    !check.canMentionEveryone && "Mention @everyone",
+  ].filter(Boolean);
+  return (
+    <div className="text-sm text-red-700 mb-4" data-testid="announce-bot-check">
+      <p>
+        ✗ Bot is missing: {missing.join(", ")} in {channel}. Fix: Server Settings → channel → Permissions.
+      </p>
+      {check.error && <p className="text-xs text-red-600 mt-1">{check.error}</p>}
+      <p className="text-xs text-gray-500 mt-1">You can still try firing; the check may be stale (cached 5 min).</p>
+    </div>
+  );
+}
 
 export default function AnnouncePage() {
   const { data: session, isLoading } = useSession();
   // Access is decided server-side (Discord role check); the page only asks.
-  const { data: access, isLoading: accessLoading } = useQuery<{ allowed: boolean }>({
+  const { data: access, isLoading: accessLoading } = useQuery<{ allowed: boolean; botCheck?: BotCheck }>({
     queryKey: ["announce-access", session?.discordId],
     enabled: Boolean(session?.authenticated),
     queryFn: async () => {
@@ -119,6 +161,8 @@ export default function AnnouncePage() {
                   {error}
                 </div>
               )}
+
+              <BotCheckStatus check={access?.botCheck} />
 
               {!confirming ? (
                 <button
