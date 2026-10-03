@@ -27,7 +27,10 @@ WITH firsts AS (
   FROM "Transaction" ORDER BY "userId", id ASC
 ), lasts AS (
   SELECT DISTINCT ON ("userId") "userId", balance AS last_balance, "createdAt" AS last_at
-  FROM "Transaction" ORDER BY "userId", id DESC
+  FROM "Transaction"
+  -- chainNeutral backfill rows (scripts/pep-fixes) sit outside the running-balance chain
+  WHERE COALESCE(metadata->>'chainNeutral', 'false') <> 'true'
+  ORDER BY "userId", id DESC
 ), sums AS (
   SELECT "userId", SUM(amount)::bigint AS ledger_sum, COUNT(*)::bigint AS tx_count
   FROM "Transaction" GROUP BY "userId"
@@ -52,8 +55,17 @@ SELECT 'running_balance_chain' AS check_name, 'error' AS severity, "userId" AS u
 FROM (
   SELECT t.*, LAG(balance) OVER (PARTITION BY "userId" ORDER BY id) AS prev_balance
   FROM "Transaction" t
+  WHERE COALESCE(t.metadata->>'chainNeutral', 'false') <> 'true'
 ) x
 WHERE prev_balance IS NOT NULL AND prev_balance + amount <> balance
+  -- a break that a chainNeutral backfill row explains (same tx, same amount) is resolved
+  AND NOT EXISTS (
+    SELECT 1 FROM "Transaction" b
+    WHERE b."userId" = x."userId"
+      AND b.metadata->>'chainNeutral' = 'true'
+      AND (b.metadata->>'explainsTxId')::int = x.id
+      AND b.amount = x.balance - (x.prev_balance + x.amount)
+  )
 ORDER BY "userId", id;
 
 -- 3. Balances with no ledger at all (predate the ledger, or seeded by hand).
@@ -83,7 +95,9 @@ FROM "Transaction"
 WHERE amount = 0
    OR (type IN ('TRANSFER_SENT', 'SHOP_PURCHASE', 'BOUNTY_ESCROW', 'ROB_LOSS', 'GAME_BET', 'CRIME_FINE') AND amount > 0)
    OR (type IN ('TRANSFER_RECEIVED', 'JOB_REWARD', 'BOUNTY_REWARD', 'BOUNTY_REFUND', 'MISSION_REWARD',
-                'ROLE_INCOME', 'ROB_STEAL', 'GAME_WIN', 'WORK_REWARD', 'CRIME_REWARD') AND amount < 0);
+                'ROLE_INCOME', 'ROB_STEAL', 'GAME_WIN', 'WORK_REWARD', 'CRIME_REWARD') AND amount < 0
+       -- approved admin clawbacks (scripts/pep-fixes) reverse a reward type on purpose
+       AND COALESCE(metadata->>'adjustment', '') <> 'clawback');
 
 -- 7. Ledger rows pointing at a bounty / job / shop item that does not exist.
 SELECT 'orphan_reference' AS check_name, 'warn' AS severity, t."userId" AS user_id, t.id AS tx_id, t.type, t.metadata
@@ -158,7 +172,14 @@ GROUP BY p."userId", p.level
 HAVING COUNT(mc.id) < COUNT(m.id);
 
 -- 12. Daily job paid more than once per (user, job, UTC day).
-SELECT 'daily_job_duplicate' AS check_name, 'error' AS severity, "userId" AS user_id,
+--     Downgraded to 'info' once an admin clawback row exists for the user
+--     (scripts/pep-fixes), since the history stays but the excess is reversed.
+SELECT 'daily_job_duplicate' AS check_name,
+       CASE WHEN EXISTS (
+         SELECT 1 FROM "Transaction" c
+         WHERE c."userId" = "Transaction"."userId" AND c.metadata->>'adjustment' = 'clawback'
+       ) THEN 'info (clawed back)' ELSE 'error' END AS severity,
+       "userId" AS user_id,
        (metadata->>'jobId')::int AS job_id, ("createdAt" AT TIME ZONE 'UTC')::date AS utc_day,
        COUNT(*)::bigint AS payouts, SUM(amount)::bigint AS total_paid
 FROM "Transaction"
@@ -231,5 +252,5 @@ FROM "Transaction" GROUP BY type ORDER BY type;
 SELECT 'non_discord_wallet' AS check_name, 'warn' AS severity, e.id AS user_id, e.wallet, e."createdAt",
        (SELECT COUNT(*) FROM "Transaction" t WHERE t."userId" = e.id)::bigint AS tx_count
 FROM "Economy" e
-WHERE e.id !~ '^[0-9]{17,20}$'
+WHERE e.id !~ '^[0-9]{17,20}$' AND e.wallet <> 0
 ORDER BY e.wallet DESC;
