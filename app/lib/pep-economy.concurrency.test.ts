@@ -223,16 +223,16 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     await expectLedgerConsistent(user)
   }, 60_000)
 
-  it('concurrent auto-verified submissions completing a level pay the reward once', async () => {
+  it(`${N} concurrent level-completion checks (what parallel auto-verified submissions trigger) pay once`, async () => {
     const level = 2000 + (Number(RUN) % 1000)
     const missions = await Promise.all(
       Array.from({ length: 4 }, (_, index) =>
         L.prisma.mission.create({ data: { level, index, title: `it auto ${index}`, reward: 69, autoVerify: true } }),
       ),
     )
-    // Unlock the level for the user: getCurrentLevel requires prior levels complete,
-    // so put the user on an isolated level by approving nothing below it isn't
-    // possible — call checkAndAwardLevelReward directly after concurrent approvals.
+    // submitMissionCompletion gates on getCurrentLevel (all lower levels done), so on an
+    // isolated level we create the approvals directly and race the payout check itself,
+    // which is what each auto-verified submission calls.
     const user = await seedUser(0)
     await Promise.all(
       missions.map((m) =>
@@ -271,20 +271,56 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     for (const id of touched.keys()) await expectLedgerConsistent(id)
   }, 60_000)
 
-  it('scripts/pep-reconcile.sql runs and flags nothing for the test users', async () => {
+  async function runReconcile(): Promise<any[]> {
     const sql = readFileSync(resolve(process.cwd(), 'scripts/pep-reconcile.sql'), 'utf8')
     const statements = sql
       .split(/;\s*$/m)
       .map((s) => s.replace(/^\s*--.*$/gm, '').trim())
       .filter(Boolean)
-    expect(statements.length).toBeGreaterThan(5)
-    const ids = new Set(touched.keys())
+    expect(statements.length).toBeGreaterThan(10)
+    const out: any[] = []
     for (const stmt of statements) {
       expect(stmt, 'reconcile script must be read-only').toMatch(/^(SELECT|WITH)\b/i)
-      const rows: any[] = await L.prisma.$queryRawUnsafe(stmt)
-      // No error-severity row may belong to a user this suite touched.
-      const flagged = rows.filter((r) => r.severity === 'error' && r.user_id && ids.has(r.user_id))
-      expect(flagged, stmt.slice(0, 80)).toEqual([])
+      out.push(...((await L.prisma.$queryRawUnsafe(stmt)) as any[]))
     }
+    return out
+  }
+
+  it('scripts/pep-reconcile.sql runs and flags nothing for the test users', async () => {
+    const ids = new Set(touched.keys())
+    const rows = await runReconcile()
+    // No error-severity row may belong to a user this suite touched.
+    expect(rows.filter((r) => r.severity === 'error' && r.user_id && ids.has(r.user_id))).toEqual([])
+    expect(rows.some((r) => r.check_name === 'summary')).toBe(true)
+  }, 60_000)
+
+  it('scripts/pep-reconcile.sql detects injected corruption', async () => {
+    // Drift: a wallet change with no ledger row.
+    const drift = await seedUser(0)
+    const other = await seedUser(100)
+    await L.economy.transfer(other, drift, 10)
+    await L.prisma.economy.update({ where: { id: drift }, data: { wallet: { increment: 5 } } })
+    // Negative wallet.
+    const negative = await seedUser(0)
+    await L.prisma.economy.update({ where: { id: negative }, data: { wallet: -7 } })
+    // Duplicate mission reward + orphan ledger row.
+    const dup = await seedUser(0)
+    for (let i = 0; i < 2; i++) {
+      await L.prisma.$transaction((tx: any) => L.economy.creditInTx(tx, dup, 69, 'MISSION_REWARD', 'Mission reward: Level 1', { level: 1 }))
+    }
+    const orphan = uid()
+    await L.prisma.transaction.create({ data: { userId: orphan, type: 'JOB_REWARD', amount: 1, balance: 1, description: 'x' } })
+
+    const rows = await runReconcile()
+    const has = (check: string, user: string) => rows.some((r) => r.check_name === check && r.user_id === user)
+    expect(has('wallet_vs_ledger', drift)).toBe(true)
+    expect(has('negative_wallet', negative)).toBe(true)
+    expect(has('mission_reward_duplicate', dup)).toBe(true)
+    expect(has('orphan_transaction', orphan)).toBe(true)
+
+    // Clean up so later runs against a kept DB stay quiet.
+    await L.prisma.transaction.deleteMany({ where: { userId: { in: [drift, other, dup, orphan] } } })
+    await L.prisma.economy.updateMany({ where: { id: { in: [drift, negative, dup, other] } }, data: { wallet: 0 } })
+    for (const id of [drift, negative, dup, other]) touched.set(id, 0)
   }, 60_000)
 })
