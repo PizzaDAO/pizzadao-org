@@ -26,7 +26,7 @@ export type { ReviewDecisionJob } from '../discord-interactions/mission-review'
 const API = 'https://discord.com/api/v10'
 
 export interface ReviewDecisionDeps {
-  approve: (reviewerId: string, completionId: number) => Promise<{ discordId: string; levelsPaid?: number[] }>
+  approve: (reviewerId: string, completionId: number, note?: string) => Promise<{ discordId: string; levelsPaid?: number[] }>
   reject: (reviewerId: string, completionId: number, reason: string) => Promise<{ discordId: string }>
   handledBy: (completionId: number) => Promise<HandledState | null>
   syncCard: (completionId: number, card?: CardRef) => Promise<unknown>
@@ -48,7 +48,8 @@ export async function runReviewDecision(job: ReviewDecisionJob, deps: ReviewDeci
       const reason = (job.reason ?? '').trim()
       ;({ discordId } = await deps.reject(job.reviewerId, job.completionId, reason))
     } else {
-      const r = await deps.approve(job.reviewerId, job.completionId)
+      const note = job.reason?.trim()
+      const r = note ? await deps.approve(job.reviewerId, job.completionId, note) : await deps.approve(job.reviewerId, job.completionId)
       discordId = r.discordId
       levelsPaid = r.levelsPaid ?? []
     }

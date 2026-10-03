@@ -568,6 +568,23 @@ describe('POST /api/discord/interactions', () => {
       expect(after).toHaveBeenCalledTimes(1)
     })
 
+    it('Approve on a manual "Invite a friend" opens a note modal; the note is passed to approveMission', async () => {
+      getCompletionForReview.mockResolvedValue({ discordId: OTHER_ID, level: 3, status: 'PENDING', holdReason: null, reviewedBy: null, reviewedAt: null, noteRequired: true })
+      const modal = await (await post(button('mr:approve:42'))).json()
+      expect(modal).toMatchObject({ type: 9, data: { custom_id: 'mr:approve-modal:42' } })
+      expect(after).not.toHaveBeenCalled()
+      const submit = (value: string) => ({
+        ...modalSubmit,
+        data: { custom_id: 'mr:approve-modal:42', components: [{ type: 1, components: [{ type: 4, custom_id: 'note', value }] }] },
+      })
+      expect((await (await post(submit('x'))).json()).type).toBe(4) // too short: ephemeral refusal
+      expect(await (await post(submit('Invited @friend in March'))).json()).toEqual({ type: 6 })
+      expect(after).toHaveBeenCalledTimes(1)
+      approveMission.mockResolvedValue({ discordId: OTHER_ID, levelsPaid: [] })
+      await (after.mock.calls[0][0] as () => Promise<void>)().catch(() => undefined)
+      expect(approveMission).toHaveBeenCalledWith(USER, 42, 'Invited @friend in March', 'discord')
+    })
+
     it('a signed click from a non-reviewer is refused (ephemeral)', async () => {
       const body = await (await post(button('mr:approve:42', ['123']))).json()
       expect(body).toMatchObject({ type: 4, data: { flags: 64 } })

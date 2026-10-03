@@ -140,6 +140,25 @@
       "back": "Retour",
       "next": "Suivant"
     },
+    "invitedBy": {
+      "overline": "§ 04½ · Ton contact",
+      "headingPrefix": "Qui",
+      "headingAccent": "t’a invité",
+      "headingSuffix": " ?",
+      "tagline": "Facultatif. Si un membre t’a fait découvrir PizzaDAO, trouve-le ici : l’invitation lui sera créditée.",
+      "searchLabel": "§ Rechercher un membre",
+      "searchPlaceholder": "Nom ou ID de membre",
+      "searching": "Recherche dans la famille…",
+      "noResults": "Aucun membre trouvé.",
+      "selectedLabel": "§ Invité par",
+      "viaLink": "§ Invité par (via ton lien d’invitation)",
+      "memberNumber": "Membre n° {id}",
+      "change": "Changer",
+      "nobody": "Personne ne m’a invité",
+      "back": "Retour",
+      "next": "Suivant",
+      "skip": "Passer"
+    },
     "crews": {
       "overline": "§ 05 · Tes crews",
       "headingPrefix": "Rejoins quelques",
@@ -297,7 +316,8 @@
       "errorLoadProfile": "Impossible de charger le profil pour modification",
       "errorGenerateNames": "Impossible de générer les noms",
       "errorSaveProfile": "Impossible d'enregistrer le profil",
-      "errorSaveGeneric": "Impossible d'enregistrer"
+      "errorSaveGeneric": "Impossible d'enregistrer",
+      "stepTitleInvitedBy": "Qui t’a invité ?"
     },
     "topping": {
       "placeholder": "Quelle est ta garniture ?",

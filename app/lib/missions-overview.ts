@@ -10,10 +10,13 @@
 import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle } from "@/app/lib/missions";
 import { getCachedMissionsList, setCachedMissionsList } from "@/app/lib/mission-cache";
 import { getVerifier } from "@/app/lib/mission-verify/verifiers";
+import { PROOF_HINTS } from "@/app/lib/mission-verify/proof-links";
+import { inviteUrl } from "@/app/lib/referral-link";
+import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
-/** Whether a mission's verifier can approve it automatically (not "manual", not a stub that never passes). */
+/** Whether a mission's verifier can approve it automatically (not "manual", not a semi pre-check). */
 function isAutoChecked(key: string | null | undefined): boolean {
-  return getVerifier(key)?.mode === "auto" && key !== "referral";
+  return getVerifier(key)?.mode === "auto";
 }
 
 export type MissionProgress = {
@@ -38,23 +41,34 @@ export type MissionsOverview = {
       autoChecked: boolean;
       /** What the submit form asks for: NONE / URL / DISCORD_MESSAGE / UPLOAD. */
       proofKind: string;
+      /** Semi-automatic (Phase 4): the proof link is pre-checked on submit, then a reviewer approves. */
+      semiChecked?: boolean;
+      /** The submit form's placeholder for the proof link. */
+      proofHint?: string;
+      /** L3.1 "Invite a friend": the mission that shows the viewer's invite link. */
+      referral?: boolean;
       progress: MissionProgress | null;
     }[];
   }[];
   currentLevel: number;
   levelTitle: string | null;
   isAuthenticated: boolean;
+  /** The viewer's personal invite link (/join?ref=<memberId>), when signed in and onboarded. */
+  inviteUrl?: string | null;
 };
 
 export async function getMissionsOverview(discordId: string | null | undefined): Promise<MissionsOverview> {
   const progressMap: Record<number, MissionProgress> = {};
   let currentLevel = 1;
   let levelTitle: string | null = null;
+  let myInviteUrl: string | null = null;
 
   if (discordId) {
     const progress = await getUserMissionProgress(discordId);
     currentLevel = await getCurrentLevel(discordId);
     levelTitle = await getLevelTitle(currentLevel);
+    const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null);
+    myInviteUrl = memberId ? inviteUrl(memberId) : null;
     for (const p of progress) {
       progressMap[p.missionId] = {
         status: p.status,
@@ -79,11 +93,14 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         description: m.description,
         autoChecked: isAutoChecked(m.verifierKey),
         proofKind: m.proofKind ?? "NONE",
+        ...(getVerifier(m.verifierKey)?.mode === "semi" ? { semiChecked: true } : {}),
+        ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
+        ...(m.verifierKey === "referral" ? { referral: true } : {}),
         progress: progressMap[m.id] || null,
       })),
     }));
     if (!discordId) setCachedMissionsList(levels);
   }
 
-  return { levels, currentLevel, levelTitle, isAuthenticated: !!discordId };
+  return { levels, currentLevel, levelTitle, isAuthenticated: !!discordId, inviteUrl: myInviteUrl };
 }

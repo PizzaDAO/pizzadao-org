@@ -30,6 +30,10 @@ type Submission = {
   holdReason?: string | null;
   holdLabel?: string | null;
   checkResult?: Record<string, unknown> | null;
+  /** Semi-automatic pre-checks all passed (Phase 4): offered for bulk approve. */
+  allGreen?: boolean;
+  /** A manual "Invite a friend": approving needs a note (who they invited). */
+  noteRequired?: boolean;
   /** Possible duplicate accounts (shared wallet / X / Telegram / member ID): information only. */
   accountSignals?: AccountSignal[];
   submittedAt: string;
@@ -38,8 +42,122 @@ type Submission = {
     level: number;
     index: number;
     description: string | null;
+    verifierKey?: string | null;
   };
 };
+
+type SemiCheck = { label: string; ok: boolean | null };
+type Preview = { url: string; kind: "image" | "page"; title?: string; description?: string; image?: string; siteName?: string };
+type PreCheck = {
+  verifier: string | null;
+  summary: string;
+  confidence: "high" | "medium" | "low" | null;
+  checks: SemiCheck[];
+  data: Record<string, unknown>;
+  preview?: Preview;
+};
+
+/** A Phase 4 pre-check (semi verifier / link preview) rather than an automatic verifier's evidence. */
+function asPreCheck(r: Record<string, unknown> | null | undefined): PreCheck | null {
+  if (!r || !Array.isArray(r.checks) || typeof r.summary !== "string") return null;
+  return r as unknown as PreCheck;
+}
+
+const httpsOnly = (u: unknown): string | null =>
+  typeof u === "string" && /^https:\/\//i.test(u) ? u : null;
+
+/** The image to show for a proof: the evidence itself, the unfurl image, a video thumbnail, the POAP / party art. */
+function proofImage(sub: Submission, pre: PreCheck | null): string | null {
+  if (sub.evidence && /^https:\/\/\S+\.(png|jpe?g|gif|webp)(\?\S*)?$/i.test(sub.evidence)) return sub.evidence;
+  if (sub.evidence && /^https:\/\/[^/]+\.public\.blob\.vercel-storage\.com\//i.test(sub.evidence)) return sub.evidence;
+  if (!pre) return null;
+  return (
+    httpsOnly(pre.data?.thumbnail) ??
+    httpsOnly(pre.data?.image) ??
+    httpsOnly(pre.preview?.image) ??
+    (pre.preview?.kind === "image" ? httpsOnly(pre.preview.url) : null)
+  );
+}
+
+const CONFIDENCE: Record<string, { label: string; color: string; bg: string }> = {
+  high: { label: "All checks green", color: "rgb(4, 120, 87)", bg: "rgba(16, 185, 129, 0.10)" },
+  medium: { label: "Needs your eye", color: "rgb(146, 64, 14)", bg: "rgba(245, 158, 11, 0.10)" },
+  low: { label: "A check failed", color: "hsl(var(--tomato-deep))", bg: "hsl(var(--tomato) / 0.08)" },
+};
+
+function PreCheckBlock({ sub, pre }: { sub: Submission; pre: PreCheck }) {
+  const conf = pre.confidence ? CONFIDENCE[pre.confidence] : null;
+  const img = proofImage(sub, pre);
+  const text = typeof pre.data?.text === "string" ? (pre.data.text as string) : null;
+  return (
+    <div
+      data-testid="pre-checks"
+      style={{
+        fontSize: 13,
+        color: "hsl(var(--foreground))",
+        padding: "8px 10px",
+        background: conf?.bg ?? "hsl(var(--ink) / 0.04)",
+        borderLeft: `2px solid ${conf?.color ?? "hsl(var(--ink) / 0.4)"}`,
+        borderRadius: 4,
+        display: "grid",
+        gap: 6,
+      }}
+    >
+      <span className="overline" style={{ display: "block", color: conf?.color ?? "hsl(var(--ink) / 0.65)" }}>
+        § {pre.verifier ? "Pre-checks" : "Link preview"}
+        {conf ? ` · ${conf.label}` : ""}
+      </span>
+      {pre.verifier && <div style={{ fontWeight: 600 }}>{pre.summary}</div>}
+      {pre.checks.length > 0 && (
+        <ul style={{ margin: 0, paddingLeft: 0, listStyle: "none", display: "grid", gap: 2 }}>
+          {pre.checks.map((c, i) => (
+            <li key={i} style={{ wordBreak: "break-word" }}>
+              <span aria-hidden style={{ marginRight: 6 }}>{c.ok === true ? "✅" : c.ok === false ? "❌" : "👀"}</span>
+              {c.label}
+            </li>
+          ))}
+        </ul>
+      )}
+      {text && (
+        <blockquote style={{ margin: 0, paddingLeft: 8, borderLeft: "2px solid hsl(var(--rule-warm))", color: "hsl(var(--muted-foreground))" }}>
+          {text}
+        </blockquote>
+      )}
+      {(img || pre.preview?.title) && (
+        <a
+          href={httpsOnly(pre.preview?.url) ?? httpsOnly(pre.data?.url) ?? sub.evidence ?? "#"}
+          target="_blank"
+          rel="noreferrer noopener"
+          style={{ display: "flex", gap: 10, alignItems: "flex-start", textDecoration: "none", color: "inherit" }}
+        >
+          {img && (
+            // eslint-disable-next-line @next/next/no-img-element -- third-party proof image, any host
+            <img
+              src={img}
+              alt=""
+              referrerPolicy="no-referrer"
+              loading="lazy"
+              style={{ width: 120, maxHeight: 90, objectFit: "cover", borderRadius: 4, flexShrink: 0, background: "hsl(var(--ink) / 0.06)" }}
+            />
+          )}
+          {pre.preview?.title && (
+            <span style={{ minWidth: 0 }}>
+              <span style={{ display: "block", fontWeight: 600 }}>{pre.preview.title}</span>
+              {pre.preview.description && (
+                <span style={{ display: "block", fontSize: 12, color: "hsl(var(--muted-foreground))" }}>
+                  {pre.preview.description.slice(0, 160)}
+                </span>
+              )}
+              {pre.preview.siteName && (
+                <span style={{ display: "block", fontSize: 11, color: "hsl(var(--muted-foreground))" }}>{pre.preview.siteName}</span>
+              )}
+            </span>
+          )}
+        </a>
+      )}
+    </div>
+  );
+}
 
 type AccountSignal = { kind: string; label: string; key: string; others: string[] };
 
@@ -76,6 +194,9 @@ export function MissionReviewPanel() {
   const [error, setError] = useState<string | null>(null);
   const [reviewNotes, setReviewNotes] = useState<Record<number, string>>({});
   const [processing, setProcessing] = useState<Set<number>>(new Set());
+  const [selected, setSelected] = useState<Set<number>>(new Set());
+  const [bulkNote, setBulkNote] = useState("");
+  const [bulkBusy, setBulkBusy] = useState(false);
 
   useEffect(() => {
     fetchPending();
@@ -123,12 +244,54 @@ export function MissionReviewPanel() {
 
       // Remove from list
       setSubmissions((prev) => prev.filter((s) => s.id !== completionId));
+      setSelected((prev) => {
+        const next = new Set(prev);
+        next.delete(completionId);
+        return next;
+      });
     } finally {
       setProcessing((prev) => {
         const next = new Set(prev);
         next.delete(completionId);
         return next;
       });
+    }
+  }
+
+  function toggleSelected(id: number) {
+    setSelected((prev) => {
+      const next = new Set(prev);
+      if (next.has(id)) next.delete(id);
+      else next.add(id);
+      return next;
+    });
+  }
+
+  async function handleBulkApprove() {
+    const ids = submissions.filter((s) => selected.has(s.id)).map((s) => s.id);
+    if (!ids.length) return;
+    setBulkBusy(true);
+    try {
+      const res = await fetch("/api/missions/review/bulk", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ completionIds: ids, reviewNote: bulkNote.trim() || undefined }),
+      });
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        toast.error(json.error || "Bulk approve failed");
+        return;
+      }
+      const results: Array<{ id: number; outcome: string }> = json.results ?? [];
+      const gone = new Set(results.filter((r) => r.outcome === "approved" || r.outcome === "already_handled" || r.outcome === "not_found").map((r) => r.id));
+      setSubmissions((prev) => prev.filter((s) => !gone.has(s.id)));
+      setSelected(new Set());
+      const approved = results.filter((r) => r.outcome === "approved").length;
+      const skipped = results.length - approved;
+      if (skipped) toast.error(`Approved ${approved}; ${skipped} skipped (already handled, needs a note, or not yours to review).`);
+      else toast.success(`Approved ${approved}.`);
+    } finally {
+      setBulkBusy(false);
     }
   }
 
@@ -207,6 +370,66 @@ export function MissionReviewPanel() {
           </h3>
         </div>
       </div>
+
+      {submissions.length > 0 && (
+        <div
+          data-testid="bulk-approve"
+          style={{
+            display: "flex",
+            gap: 10,
+            alignItems: "center",
+            flexWrap: "wrap",
+            padding: "10px 12px",
+            borderRadius: "var(--radius)",
+            border: "1px dashed hsl(var(--rule-warm) / 0.75)",
+            background: "hsl(var(--cream))",
+            fontSize: 13,
+          }}
+        >
+          <button
+            type="button"
+            className="btn-pill"
+            onClick={() => setSelected(new Set(submissions.filter((s) => s.allGreen).map((s) => s.id)))}
+            disabled={!submissions.some((s) => s.allGreen)}
+            style={{ fontSize: 12, padding: "0.4rem 0.9rem", background: "transparent", border: "1px solid hsl(var(--rule-warm) / 0.7)", color: "hsl(var(--foreground))" }}
+          >
+            Select all green ({submissions.filter((s) => s.allGreen).length})
+          </button>
+          {selected.size > 0 && (
+            <button
+              type="button"
+              onClick={() => setSelected(new Set())}
+              style={{ fontSize: 12, background: "none", border: "none", color: "hsl(var(--muted-foreground))", textDecoration: "underline", cursor: "pointer" }}
+            >
+              Clear
+            </button>
+          )}
+          <input
+            type="text"
+            value={bulkNote}
+            onChange={(e) => setBulkNote(e.target.value)}
+            placeholder="Note for all (optional)"
+            style={{ ...input(), fontSize: 12, flex: 1, minWidth: 140 }}
+          />
+          <button
+            type="button"
+            className="btn-pill"
+            onClick={handleBulkApprove}
+            disabled={selected.size === 0 || bulkBusy}
+            style={{
+              fontSize: 12,
+              padding: "0.45rem 1rem",
+              background: "hsl(var(--ink))",
+              color: "hsl(var(--cream))",
+              border: "1px solid transparent",
+              opacity: selected.size === 0 || bulkBusy ? 0.5 : 1,
+              cursor: selected.size === 0 || bulkBusy ? "not-allowed" : "pointer",
+            }}
+          >
+            {bulkBusy ? "Approving…" : `Approve selected (${selected.size})`}
+          </button>
+        </div>
+      )}
 
       {submissions.length === 0 ? (
         <div
@@ -314,6 +537,13 @@ export function MissionReviewPanel() {
                   gap: 8,
                 }}
               >
+                <input
+                  type="checkbox"
+                  aria-label={`Select ${sub.mission.title} by ${sub.memberName ?? sub.discordId} for bulk approve`}
+                  checked={selected.has(sub.id)}
+                  onChange={() => toggleSelected(sub.id)}
+                  style={{ marginTop: 4, width: 18, height: 18, flexShrink: 0 }}
+                />
                 <div style={{ minWidth: 0, flex: 1 }}>
                   <span
                     className="overline"
@@ -398,6 +628,16 @@ export function MissionReviewPanel() {
                   )}
                 </div>
               )}
+
+              {(() => {
+                const pre = asPreCheck(sub.checkResult);
+                if (pre && !sub.holdReason) return <PreCheckBlock sub={sub} pre={pre} />;
+                const img = !sub.holdReason ? proofImage(sub, null) : null;
+                return img ? (
+                  // eslint-disable-next-line @next/next/no-img-element -- member-uploaded proof image
+                  <img src={img} alt="Proof" referrerPolicy="no-referrer" loading="lazy" style={{ maxWidth: 240, maxHeight: 180, borderRadius: 4, objectFit: "contain" }} />
+                ) : null;
+              })()}
 
               {sub.holdReason && (
                 <div
@@ -521,12 +761,13 @@ export function MissionReviewPanel() {
                   onChange={(e) =>
                     setReviewNotes((prev) => ({ ...prev, [sub.id]: e.target.value }))
                   }
-                  placeholder="Review note (optional)"
+                  placeholder={sub.noteRequired ? "Who did they invite? (note required)" : "Review note (optional)"}
                   style={{ ...input(), fontSize: 13, flex: 1, minWidth: 160 }}
                 />
                 <button
                   onClick={() => handleReview(sub.id, "approve")}
-                  disabled={processing.has(sub.id)}
+                  disabled={processing.has(sub.id) || (!!sub.noteRequired && (reviewNotes[sub.id] ?? "").trim().length < 3)}
+                  title={sub.noteRequired ? "Add a note: who did they invite?" : undefined}
                   className="btn-pill"
                   style={{
                     fontSize: 13,

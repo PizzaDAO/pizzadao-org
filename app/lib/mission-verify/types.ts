@@ -13,7 +13,7 @@
 export type Trigger = 'on_demand' | 'discord' | 'event' | 'submit' | 'cron' | 'backfill'
 
 /** Events that re-run the verifiers for one member (route hooks). */
-export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced'
+export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created'
 
 export interface VerifyCtx {
   discordId: string
@@ -30,16 +30,34 @@ export interface VerifyCtx {
   memo: Map<string, unknown>
 }
 
+/** One pre-check a semi-automatic verifier ran on a proof (true / false / null = not checkable, a reviewer looks). */
+export interface SemiCheck {
+  label: string
+  ok: boolean | null
+}
+
+/** How much the pre-checks vouch for a proof: every check passed / some unchecked / one failed. */
+export type Confidence = 'high' | 'medium' | 'low'
+
 export type VerifyResult =
   | { status: 'pass'; evidence: Record<string, unknown> }
   | { status: 'fail'; reason: string; progress?: { have: number; need: number }; hint?: string }
   /** The data source was unavailable: nothing is written, nothing is flagged. */
   | { status: 'unknown'; reason: string }
+  /**
+   * Semi-automatic verifiers: the proof looks valid, here is what was checked;
+   * a reviewer decides (the completion stays PENDING with this as checkResult).
+   */
+  | { status: 'needs_review'; evidence: Record<string, unknown>; checks: SemiCheck[]; confidence: Confidence; summary: string }
 
 export interface Verifier<P = unknown> {
   key: string
-  /** 'auto' verifiers may approve; 'manual' ones are never run. */
-  mode: 'auto' | 'manual'
+  /**
+   * 'auto' verifiers may approve (the engine runs them); 'semi' ones only
+   * pre-check a submitted proof for a reviewer (the submit route runs them,
+   * never the engine); 'manual' ones are never run.
+   */
+  mode: 'auto' | 'semi' | 'manual'
   /** Whether a pass can later become a fail (a role removed): flag, never claw back. */
   stateful: boolean
   /** Validate Mission.verifierParams. Throws on bad params (the mission is skipped and reported). */
@@ -61,6 +79,36 @@ export interface VerifierSources {
   getChannelMessage(channelId: string, messageId: string): Promise<{ channelId: string; authorId: string } | null | 'unknown'>
   getChannel(channelId: string): Promise<{ id: string; parentId: string | null } | null | 'unknown'>
   countWallets(discordId: string, memberId: string | null): Promise<number>
+  /** Referrals naming this member as the inviter (L3.1). */
+  getReferrals(inviterDiscordId: string): Promise<ReferralRow[]>
+  /** Duplicate-account signal kinds (AccountSignal) that involve both Discord accounts. */
+  sharedSignalKinds(a: string, b: string): Promise<string[]>
+  /** Farcaster accounts linked to the member (SocialAccount; fid when resolved). */
+  getFarcasterAccounts(memberId: string | null): Promise<Array<{ username: string; fid: number | null }>>
+  /** The member's linked Telegram username (TelegramAccount), without the @. */
+  getTelegramUsername(discordId: string): Promise<string | null>
+  /** HTTP for the semi verifiers (always wrapped in ./net.ts: timeout + size cap). */
+  fetch: typeof fetch
+  /** NEYNAR_API_KEY, or null (Farcaster then falls back to the URL check). */
+  neynarApiKey(): string | null
+  /** RSV_PIZZA_API_URL, default https://api.rsv.pizza. */
+  rsvPizzaApiUrl(): string
+}
+
+export interface ReferralRow {
+  inviteeDiscordId: string
+  inviteeMemberId: string | null
+  via: string
+  createdAt: Date
+  qualifiedAt: Date | null
+  flags: string[]
+}
+
+/** Confidence from the checks: any failed -> low; any unchecked -> medium; else high. */
+export function confidenceOf(checks: readonly SemiCheck[]): Confidence {
+  if (checks.some((c) => c.ok === false)) return 'low'
+  if (checks.some((c) => c.ok === null)) return 'medium'
+  return 'high'
 }
 
 // ---- small param helpers (no zod dependency) ----

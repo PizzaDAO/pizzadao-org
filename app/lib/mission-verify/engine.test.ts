@@ -67,6 +67,13 @@ function sources(over: Partial<VerifierSources> = {}): VerifierSources {
     getChannelMessage: vi.fn(async () => null),
     getChannel: vi.fn(async () => null),
     countWallets: vi.fn(async () => 0),
+    getReferrals: vi.fn(async () => []),
+    sharedSignalKinds: vi.fn(async () => []),
+    getFarcasterAccounts: vi.fn(async () => []),
+    getTelegramUsername: vi.fn(async () => null),
+    fetch: vi.fn(async () => { throw new Error("no network in tests") }) as unknown as typeof fetch,
+    neynarApiKey: () => null,
+    rsvPizzaApiUrl: () => "https://api.rsv.example",
     ...over,
   }
 }

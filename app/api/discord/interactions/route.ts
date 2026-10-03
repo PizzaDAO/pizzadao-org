@@ -111,7 +111,7 @@ const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.pi
 function decideReview(job: ReviewDecisionJob) {
   after(async () => {
     await runReviewDecision(job, {
-      approve: (reviewerId, id) => approveMission(reviewerId, id, undefined, "discord"),
+      approve: (reviewerId, id, note) => approveMission(reviewerId, id, note, "discord"),
       reject: (reviewerId, id, reason) => rejectMission(reviewerId, id, reason, "discord"),
       handledBy: getCompletionForReview,
       syncCard: (id, card) => syncReviewCard(id, undefined, card),

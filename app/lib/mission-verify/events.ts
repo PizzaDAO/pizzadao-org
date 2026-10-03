@@ -20,6 +20,7 @@ const EVENT_VERIFIERS: Record<MissionEvent, string[] | null> = {
   wallet_connected: ['wallet_connected'],
   attendance_synced: ['attendance_count'],
   crew_joined: null,
+  referral_created: ['referral'],
 }
 
 export async function emitMissionEvent(

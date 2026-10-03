@@ -359,7 +359,10 @@ model Mission {
   description String?
   reward      Int      @default(0) // PEP reward (per-level, shared)
   levelTitle  String?  // e.g., "Pizza Trainee"
-  autoVerify  Boolean  @default(false) // legacy, ignored since Phase 0; dropped in Phase 2 (verifierKey replaces it)
+  // Legacy, ignored since Phase 0. @ignore keeps it out of the generated client
+  // (no query selects it any more), so "Migration B" (DROP COLUMN) is safe to
+  // apply once this release is deployed. Do not read or write it.
+  autoVerify  Boolean  @default(false) @ignore
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
   // Mission verification (plans/mission-verification.md §3). null = manual.
@@ -479,6 +482,28 @@ model MissionSlaDigest {
   channelId String?
   messageId String?
   overdue   Int      @default(0)
+}
+
+// L3.1 "Invite a friend" (plans/mission-verification.md D4, Phase 4): who
+// invited whom. Captured when the invitee completes onboarding, from the
+// "Who invited you?" step and/or a personal invite link (/join?ref=<memberId>,
+// carried through the Discord login in the pd_ref cookie). One inviter per
+// invitee. Self-referrals are never stored; a shared wallet / X / Telegram
+// with the inviter is stored as a flag (the referral verifier does not count
+// a flagged referral; a reviewer can still approve it by hand).
+model Referral {
+  id               Int       @id @default(autoincrement())
+  inviteeDiscordId String    @unique
+  inviteeMemberId  String?
+  inviterDiscordId String
+  inviterMemberId  String?
+  via              String    // onboarding | invite_link
+  inviteCode       String?   // the ?ref= value of the invite link, when used
+  createdAt        DateTime  @default(now())
+  qualifiedAt      DateTime? // the invitee completed onboarding (D4)
+  flags            String[]  @default([]) // duplicate-account signal kinds shared with the inviter
+
+  @@index([inviterDiscordId])
 }
 
 // Duplicate-account signals (plans/mission-verification.md §6.2), recomputed

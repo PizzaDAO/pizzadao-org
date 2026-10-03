@@ -23,7 +23,7 @@ export type FlowState =
       foundName: string | null;
       error: string | null;
     }
-  | { type: "wizard"; step: 0 | 1 | 2 | 3 | 4 | 5 | 6; isUpdate: boolean }
+  | { type: "wizard"; step: WizardStep; isUpdate: boolean }
   | { type: "success"; redirectTo: string }
   | { type: "magic_login" }
   | { type: "error"; message: string; details?: string };
@@ -36,6 +36,16 @@ export type FlowState =
  * The actual form data collected during the wizard.
  * Separate from flow control state.
  */
+/**
+ * Wizard steps. Display order for a new member: 1 name, 2 city, 3 roles,
+ * 4 member ID, 7 who invited you, 5 crews (then the Discord login); 6 is the
+ * review screen of the edit flow. 7 was added later, hence the number.
+ */
+export type WizardStep = 0 | 1 | 2 | 3 | 4 | 5 | 6 | 7;
+
+/** The member who invited this one (L3.1 referrals). */
+export type InvitedBy = { memberId: string; name: string; viaLink?: boolean };
+
 export type WizardData = {
   sessionId: string;
 
@@ -63,6 +73,11 @@ export type WizardData = {
 
   // Step 4: Member ID
   memberId?: string;
+
+  // Step 7 ("Who invited you?", shown between 4 and 5 for new members, L3.1).
+  // undefined = not answered (the server falls back to the invite-link
+  // cookie); null = "no one"; otherwise the inviter.
+  invitedBy?: InvitedBy | null;
 
   // Step 5: Crews
   crews: string[];

@@ -20,6 +20,13 @@ function sources(over: Partial<VerifierSources> = {}): VerifierSources {
     getChannelMessage: vi.fn(async () => null),
     getChannel: vi.fn(async () => null),
     countWallets: vi.fn(async () => 0),
+    getReferrals: vi.fn(async () => []),
+    sharedSignalKinds: vi.fn(async () => []),
+    getFarcasterAccounts: vi.fn(async () => []),
+    getTelegramUsername: vi.fn(async () => null),
+    fetch: vi.fn(async () => { throw new Error("no network in tests") }) as unknown as typeof fetch,
+    neynarApiKey: () => null,
+    rsvPizzaApiUrl: () => "https://api.rsv.example",
     ...over,
   }
 }
@@ -33,11 +40,15 @@ afterEach(() => {
 })
 
 describe('registry', () => {
-  it('has the Phase 1 verifiers, and only "manual" is never run', () => {
+  it('has the Phase 1 + Phase 4 verifiers; only "manual" is never run, the semi ones never approve', () => {
     expect(Object.keys(VERIFIERS).sort()).toEqual(
-      ['attendance_count', 'discord_message', 'discord_role', 'manual', 'referral', 'wallet_connected', 'x_linked'].sort(),
+      [
+        'attendance_count', 'discord_message', 'discord_role', 'manual', 'referral', 'wallet_connected', 'x_linked',
+        'social_post', 'poap_drop', 'media_proof', 'gpp_host',
+      ].sort(),
     )
     expect(Object.values(VERIFIERS).filter((v) => v.mode === 'manual').map((v) => v.key)).toEqual(['manual'])
+    expect(Object.values(VERIFIERS).filter((v) => v.mode === 'semi').map((v) => v.key).sort()).toEqual(['gpp_host', 'media_proof', 'poap_drop', 'social_post'])
     expect(VERIFIERS.discord_role.stateful).toBe(true)
   })
 })
@@ -177,12 +188,58 @@ describe('discord_role (L6.0 Pepperoni Mafia, L7.0 Crew Leader)', () => {
   })
 })
 
-describe('referral (L3.1, Phase 4 stub) / wallet_connected / manual', () => {
-  it('referral never passes yet and points to manual review', async () => {
-    expect(await referral.check(ctx(sources()), referral.parse({ min: 1, qualify: 'onboarded' }))).toMatchObject({
+describe('referral (L3.1, D4) / wallet_connected / manual', () => {
+  const FRIEND = '300000000000000002'
+  const FRIEND2 = '300000000000000003'
+  const row = (inviteeDiscordId: string, over: Record<string, unknown> = {}) => ({
+    inviteeDiscordId,
+    inviteeMemberId: null,
+    via: 'invite_link',
+    createdAt: new Date('2026-10-01T00:00:00Z'),
+    qualifiedAt: new Date('2026-10-01T00:00:00Z'),
+    flags: [] as string[],
+    ...over,
+  })
+  const params = referral.parse({ min: 1, qualify: 'onboarded' })
+
+  it('no referral yet: fails with the personal invite link and the manual path', async () => {
+    const r = await referral.check(ctx(sources()), params)
+    expect(r).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
+    expect((r as { hint: string }).hint).toContain('/join?ref=m-1')
+    expect((r as { hint: string }).hint).toMatch(/Submit this mission for review/)
+  })
+
+  it('passes once an invited friend finished onboarding (qualifiedAt)', async () => {
+    const src = sources({ getReferrals: vi.fn(async () => [row(FRIEND)]) })
+    expect(await referral.check(ctx(src), params)).toEqual({ status: 'pass', evidence: { referrals: 1, invitees: [FRIEND] } })
+    expect(src.getReferrals).toHaveBeenCalledWith(ME)
+    expect(src.sharedSignalKinds).toHaveBeenCalledWith(ME, FRIEND)
+  })
+
+  it('never counts a self-referral or an unqualified one', async () => {
+    const src = sources({ getReferrals: vi.fn(async () => [row(ME), row(FRIEND, { qualifiedAt: null })]) })
+    expect(await referral.check(ctx(src), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
+  })
+
+  it('a referral sharing an account with the inviter (stored flag or AccountSignal) is not counted: manual review', async () => {
+    const flagged = sources({ getReferrals: vi.fn(async () => [row(FRIEND, { flags: ['shared_wallet'] })]) })
+    expect(await referral.check(ctx(flagged), params)).toMatchObject({
       status: 'fail',
+      reason: expect.stringMatching(/shares a wallet, X or Telegram/),
       hint: expect.stringMatching(/Submit this mission for review/),
     })
+    const signal = sources({
+      getReferrals: vi.fn(async () => [row(FRIEND), row(FRIEND2)]),
+      sharedSignalKinds: vi.fn(async (_a: string, b: string) => (b === FRIEND ? ['shared_x'] : [])),
+    })
+    expect(await referral.check(ctx(signal), referral.parse({ min: 1 }))).toEqual({
+      status: 'pass',
+      evidence: { referrals: 1, invitees: [FRIEND2], flagged: 1 },
+    })
+  })
+
+  it('rejects unknown qualify modes', () => {
+    expect(() => referral.parse({ qualify: 'joined_discord' })).toThrow()
   })
 
   it('wallet_connected counts wallets by member or discord id', async () => {

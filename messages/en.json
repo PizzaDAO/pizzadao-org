@@ -140,6 +140,25 @@
       "back": "Back",
       "next": "Next"
     },
+    "invitedBy": {
+      "overline": "§ 04½ · Your connection",
+      "headingPrefix": "Who",
+      "headingAccent": "invited you",
+      "headingSuffix": "?",
+      "tagline": "Optional. If a member brought you to PizzaDAO, find them here and they get credit for the invite.",
+      "searchLabel": "§ Search members",
+      "searchPlaceholder": "Name or member ID",
+      "searching": "Searching the family…",
+      "noResults": "No member found.",
+      "selectedLabel": "§ Invited by",
+      "viaLink": "§ Invited by (from your invite link)",
+      "memberNumber": "Member #{id}",
+      "change": "Change",
+      "nobody": "No one invited me",
+      "back": "Back",
+      "next": "Next",
+      "skip": "Skip"
+    },
     "crews": {
       "overline": "§ 05 · Your crews",
       "headingPrefix": "Join some",
@@ -297,7 +316,8 @@
       "errorLoadProfile": "Failed to load profile for editing",
       "errorGenerateNames": "Failed to generate names",
       "errorSaveProfile": "Failed to save profile",
-      "errorSaveGeneric": "Failed to save"
+      "errorSaveGeneric": "Failed to save",
+      "stepTitleInvitedBy": "Who invited you?"
     },
     "topping": {
       "placeholder": "What's your topping?",

@@ -65,4 +65,43 @@ export const defaultSources: VerifierSources = {
       where: memberId ? { OR: [{ memberId }, { discordId }] } : { discordId },
     })
   },
+
+  async getReferrals(inviterDiscordId) {
+    return prisma.referral.findMany({
+      where: { inviterDiscordId },
+      select: { inviteeDiscordId: true, inviteeMemberId: true, via: true, createdAt: true, qualifiedAt: true, flags: true },
+      orderBy: { createdAt: 'asc' },
+      take: 50,
+    })
+  },
+
+  async sharedSignalKinds(a, b) {
+    const rows = await prisma.accountSignal
+      .findMany({ where: { discordIds: { hasEvery: [a, b] } }, select: { kind: true } })
+      .catch(() => [] as Array<{ kind: string }>)
+    return [...new Set(rows.map((r) => r.kind))]
+  },
+
+  async getFarcasterAccounts(memberId) {
+    if (!memberId) return []
+    const rows = await prisma.socialAccount.findMany({
+      where: { memberId, platform: 'FARCASTER' },
+      select: { handle: true, platformId: true },
+    })
+    return rows.map((r) => ({
+      username: r.handle.replace(/^@/, '').toLowerCase(),
+      fid: r.platformId && /^\d+$/.test(r.platformId) ? Number(r.platformId) : null,
+    }))
+  },
+
+  async getTelegramUsername(discordId) {
+    const t = await prisma.telegramAccount.findUnique({ where: { discordId }, select: { username: true } })
+    return t?.username?.replace(/^@/, '') || null
+  },
+
+  fetch: (input, init) => fetch(input, init),
+
+  neynarApiKey: () => process.env.NEYNAR_API_KEY?.trim() || null,
+
+  rsvPizzaApiUrl: () => (process.env.RSV_PIZZA_API_URL?.trim() || 'https://api.rsv.pizza').replace(/\/$/, ''),
 }

@@ -6,7 +6,7 @@ import { getMembersWithRoles } from './discord'
 import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
 import { DPR_ONLY_MIN_LEVEL, missionReviewerRoleIds } from './mission-review-access'
 import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
-import { NEW_REVIEW_ROUND } from './mission-verify/review-ids'
+import { approvalNeedsNote, NEW_REVIEW_ROUND } from './mission-verify/review-ids'
 
 // ===== QUERIES =====
 
@@ -697,7 +697,7 @@ export async function getCompletionForReview(completionId: number) {
       holdReason: true,
       reviewedBy: true,
       reviewedAt: true,
-      mission: { select: { level: true } },
+      mission: { select: { level: true, verifierKey: true } },
     },
   })
   return row
@@ -708,6 +708,8 @@ export async function getCompletionForReview(completionId: number) {
         holdReason: row.holdReason,
         reviewedBy: row.reviewedBy,
         reviewedAt: row.reviewedAt,
+        /** Approving needs a note (a manual L3.1 referral: who did they invite?). */
+        noteRequired: approvalNeedsNote({ verifierKey: row.mission.verifierKey, holdReason: row.holdReason }),
       }
     : null
 }

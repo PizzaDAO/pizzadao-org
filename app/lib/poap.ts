@@ -3,6 +3,7 @@ import { GvizResponse, GvizCell } from './types/gviz';
 import { cacheGet, cacheSet } from '../api/lib/cache';
 import { fetchGviz } from './sheets/gviz';
 import { SHEET_IDS } from './sheets/config';
+import { fetchJsonCapped } from './mission-verify/net';
 
 // POAP service layer - fetches and filters POAPs from POAP Compass API and Google Sheets
 
@@ -403,5 +404,73 @@ export async function fetchFilteredPOAPs(walletAddress: string): Promise<{
       rawPOAPsCount: rawPOAPs.length,
       newPOAPsCount: allPOAPs.length,
     },
+  };
+}
+
+// ---------------------------------------------------------------------------
+// One drop (mission verification, L4.1 "Make a POAP for a community call")
+// ---------------------------------------------------------------------------
+
+export const POAP_COMPASS_URL = 'https://public.compass.poap.tech/v1/graphql';
+
+export interface PoapDropInfo {
+  id: number;
+  name: string;
+  description: string;
+  imageUrl: string | null;
+  startDate: string | null;
+  endDate: string | null;
+  city: string | null;
+  country: string | null;
+  /** Mints so far, when Compass answered the aggregate query; null otherwise. */
+  mints: number | null;
+  galleryUrl: string;
+}
+
+/**
+ * Look up a POAP drop on the public POAP Compass GraphQL API (no API key,
+ * like the rest of this file). Returns null when the drop doesn't exist and
+ * 'unknown' when Compass can't be reached. Bounded: 4 s, 256 KB per request.
+ * The drop's creator is not public (it is tied to a private email), so a
+ * reviewer still confirms who made it.
+ */
+export async function fetchPoapDrop(
+  dropId: number,
+  fetchImpl: typeof fetch = fetch,
+): Promise<PoapDropInfo | null | 'unknown'> {
+  if (!Number.isInteger(dropId) || dropId < 1 || dropId > 1e9) return null;
+  const post = (query: string) =>
+    fetchJsonCapped<{ data?: Record<string, unknown>; errors?: unknown }>(fetchImpl, POAP_COMPASS_URL, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ query }),
+    });
+
+  // Inline id (the whitelist route found variables unreliable with the bigint type).
+  const res = await post(
+    `query { drops(where: { id: { _eq: ${dropId} } }, limit: 1) { id name description image_url start_date end_date city country } }`,
+  );
+  if (!res || !res.ok || !res.json || res.json.errors) return 'unknown';
+  const drops = (res.json.data?.drops ?? []) as Array<Record<string, unknown>>;
+  const d = drops[0];
+  if (!d) return null;
+
+  let mints: number | null = null;
+  const agg = await post(`query { poaps_aggregate(where: { drop_id: { _eq: ${dropId} } }) { aggregate { count } } }`);
+  const count = (agg?.json?.data?.poaps_aggregate as { aggregate?: { count?: unknown } } | undefined)?.aggregate?.count;
+  if (typeof count === 'number') mints = count;
+
+  const str = (v: unknown) => (typeof v === 'string' && v.trim() ? v.trim() : null);
+  return {
+    id: Number(d.id),
+    name: str(d.name) ?? `POAP #${dropId}`,
+    description: (str(d.description) ?? '').slice(0, 500),
+    imageUrl: str(d.image_url),
+    startDate: str(d.start_date),
+    endDate: str(d.end_date),
+    city: str(d.city),
+    country: str(d.country),
+    mints,
+    galleryUrl: `https://poap.gallery/drops/${dropId}`,
   };
 }

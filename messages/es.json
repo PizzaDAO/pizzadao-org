@@ -140,6 +140,25 @@
       "back": "Atrás",
       "next": "Siguiente"
     },
+    "invitedBy": {
+      "overline": "§ 04½ · Tu conexión",
+      "headingPrefix": "¿Quién",
+      "headingAccent": "te invitó",
+      "headingSuffix": "?",
+      "tagline": "Opcional. Si un miembro te trajo a PizzaDAO, búscalo aquí y recibirá el crédito por la invitación.",
+      "searchLabel": "§ Buscar miembros",
+      "searchPlaceholder": "Nombre o ID de miembro",
+      "searching": "Buscando en la familia…",
+      "noResults": "No se encontró ningún miembro.",
+      "selectedLabel": "§ Te invitó",
+      "viaLink": "§ Te invitó (desde tu enlace de invitación)",
+      "memberNumber": "Miembro n.º {id}",
+      "change": "Cambiar",
+      "nobody": "Nadie me invitó",
+      "back": "Atrás",
+      "next": "Siguiente",
+      "skip": "Omitir"
+    },
     "crews": {
       "overline": "§ 05 · Tus crews",
       "headingPrefix": "Únete a algunas",
@@ -297,7 +316,8 @@
       "errorLoadProfile": "No se pudo cargar el perfil para editar",
       "errorGenerateNames": "No se pudieron generar los nombres",
       "errorSaveProfile": "No se pudo guardar el perfil",
-      "errorSaveGeneric": "No se pudo guardar"
+      "errorSaveGeneric": "No se pudo guardar",
+      "stepTitleInvitedBy": "¿Quién te invitó?"
     },
     "topping": {
       "placeholder": "¿Cuál es tu ingrediente?",

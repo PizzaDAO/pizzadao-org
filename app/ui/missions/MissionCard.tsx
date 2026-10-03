@@ -39,6 +39,10 @@ type MissionData = {
   autoChecked?: boolean;
   /** What the submit form asks for (NONE / URL / DISCORD_MESSAGE / UPLOAD). */
   proofKind?: string;
+  /** The proof link is pre-checked on submit, then a reviewer approves (Phase 4). */
+  semiChecked?: boolean;
+  /** Placeholder for the proof link. */
+  proofHint?: string;
   progress: MissionProgress | null;
 };
 
@@ -51,6 +55,8 @@ const HOLD_COPY: Record<string, string> = {
 type Props = {
   mission: MissionData;
   check?: MissionCheckInfo;
+  /** L3.1: the viewer's personal invite link (null = not onboarded yet). */
+  inviteUrl?: string | null;
   levelUnlocked: boolean;
   onSubmit: (missionId: number, evidence?: string, notes?: string) => Promise<void>;
 };
@@ -115,7 +121,7 @@ function statusPillStyle(variant: StatusVariant) {
   };
 }
 
-export function MissionCard({ mission, levelUnlocked, onSubmit, check }: Props) {
+export function MissionCard({ mission, levelUnlocked, onSubmit, check, inviteUrl }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [evidence, setEvidence] = useState("");
   const [notes, setNotes] = useState("");
@@ -284,6 +290,12 @@ export function MissionCard({ mission, levelUnlocked, onSubmit, check }: Props) 
               ✓ Checked automatically. Use “Check my progress” after you do it.
             </div>
           )}
+          {mission.semiChecked && !isCompleted && !isPending && (
+            <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 6 }}>
+              Submit the link: it is checked right away, then a reviewer approves it.
+            </div>
+          )}
+          {inviteUrl !== undefined && !isCompleted && <InviteLink url={inviteUrl} />}
           {isPending && mission.progress?.holdReason && (
             <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>
               {HOLD_COPY[mission.progress.holdReason] ?? "Verified. Awaiting a reviewer's release."}
@@ -390,7 +402,7 @@ export function MissionCard({ mission, levelUnlocked, onSubmit, check }: Props) 
               placeholder={
                 mission.proofKind === "DISCORD_MESSAGE"
                   ? "Discord message link (right-click your message > Copy Message Link)"
-                  : "Link to proof (screenshot, tweet, etc.)"
+                  : mission.proofHint ?? "Link to proof (screenshot, tweet, etc.)"
               }
               style={{ ...input(), fontSize: 13 }}
             />
@@ -433,6 +445,60 @@ export function MissionCard({ mission, levelUnlocked, onSubmit, check }: Props) 
           </button>
         </div>
       )}
+    </div>
+  );
+}
+
+/** L3.1: the member's personal invite link, with a copy button. */
+function InviteLink({ url }: { url: string | null }) {
+  const [copied, setCopied] = useState(false);
+  if (!url) {
+    return (
+      <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 8 }}>
+        Finish onboarding to get your personal invite link.
+      </div>
+    );
+  }
+  return (
+    <div
+      data-testid="mission-invite-link"
+      style={{
+        marginTop: 10,
+        padding: "8px 10px",
+        background: "hsl(var(--butter) / 0.15)",
+        borderLeft: "2px solid hsl(var(--butter))",
+        borderRadius: 4,
+        display: "flex",
+        gap: 8,
+        alignItems: "center",
+        flexWrap: "wrap",
+        fontSize: 13,
+      }}
+    >
+      <span className="overline" style={{ color: "hsl(var(--ink) / 0.7)" }}>
+        § Your invite link
+      </span>
+      <code style={{ wordBreak: "break-all", flex: "1 1 220px" }}>{url}</code>
+      <button
+        type="button"
+        className="btn-pill"
+        onClick={async () => {
+          try {
+            await navigator.clipboard.writeText(url);
+            setCopied(true);
+            setTimeout(() => setCopied(false), 2000);
+          } catch {}
+        }}
+        style={{
+          fontSize: 12,
+          padding: "0.35rem 0.85rem",
+          background: "hsl(var(--ink))",
+          color: "hsl(var(--cream))",
+          border: "1px solid transparent",
+        }}
+      >
+        {copied ? "Copied" : "Copy"}
+      </button>
     </div>
   );
 }

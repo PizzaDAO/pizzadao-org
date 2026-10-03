@@ -1,5 +1,5 @@
 // app/api/profile/route.ts
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
 import { getSession } from "@/app/lib/session";
 import { saveMemberTimezone } from "@/app/lib/city-timezone";
@@ -10,7 +10,10 @@ import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { GvizCell } from "@/app/lib/types/gviz";
 import { withErrorHandling } from "@/app/lib/errors/error-response";
 import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
-import { fetchMemberById, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
+import { fetchMemberById, fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
+import { chooseInviter, recordReferral, type RecordReferralResult } from "@/app/lib/referrals";
+import { readRefCookie, refCookieOptions, REF_COOKIE } from "@/app/lib/referral-cookie";
+import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { validateProfilePayload, sanitizeDisplayName } from "@/app/lib/profile/validation";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
@@ -237,6 +240,11 @@ const POST_HANDLER = async (req: Request) => {
     // If row doesn't exist, it's a NEW signup with a chosen memberId - allow it to proceed
   }
 
+  // L3.1 referrals (D4) count a member's FIRST onboarding only: a new row,
+  // and no members-sheet row for this Discord account yet.
+  const firstOnboarding =
+    isNewSignup && !(await fetchMemberIdByDiscordId(payload.discordId, { fresh: true }).catch(() => null));
+
   // 1) Write to Sheets
   let parsed: unknown;
   try {
@@ -330,7 +338,40 @@ const POST_HANDLER = async (req: Request) => {
     });
   }
 
-  return NextResponse.json({ ok: true, discord: discordResult, sheets: parsed, welcome: welcomeResult, isNewSignup });
+  // 4) Who invited them (L3.1, D4): the "Who invited you?" step's choice, or
+  // the /join?ref= invite-link cookie. Completing onboarding is what
+  // qualifies the referral; the inviter's referral verifier re-runs in the
+  // background. Self-referrals are refused inside recordReferral. Never fails
+  // the profile save.
+  const cookieRef = readRefCookie(req);
+  let referral: RecordReferralResult | null = null;
+  if (firstOnboarding) {
+    const pick = chooseInviter(body.invitedBy, cookieRef);
+    if (pick.memberId) {
+      referral = await recordReferral({
+        inviteeDiscordId: payload.discordId,
+        inviteeMemberId: payload.memberId || null,
+        inviterMemberId: pick.memberId,
+        via: pick.via,
+        inviteCode: pick.inviteCode,
+      });
+      const inviter = referral.inviterDiscordId;
+      if (inviter && (referral.outcome === "recorded" || referral.outcome === "recorded_flagged")) {
+        after(() => emitMissionEvent(inviter, "referral_created").then(() => undefined));
+      }
+    }
+  }
+
+  const res = NextResponse.json({
+    ok: true,
+    discord: discordResult,
+    sheets: parsed,
+    welcome: welcomeResult,
+    isNewSignup,
+    referral: referral ? { outcome: referral.outcome } : null,
+  });
+  if (cookieRef) res.cookies.set(REF_COOKIE, "", refCookieOptions(req, 0));
+  return res;
 };
 
 export const POST = withErrorHandling(POST_HANDLER);

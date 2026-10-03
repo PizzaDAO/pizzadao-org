@@ -10,9 +10,23 @@ export type ReviewButton = 'approve' | 'release' | 'reject'
 export const REVIEW_BUTTON_ID = /^mr:(approve|release|reject):(\d{1,10})$/
 export const REJECT_MODAL_ID = /^mr:reject-modal:(\d{1,10})$/
 export const REJECT_REASON_INPUT = 'reason'
+/** Approve with a note (a manual L3.1 referral: "who did they invite?"). */
+export const APPROVE_MODAL_ID = /^mr:approve-modal:(\d{1,10})$/
+export const APPROVE_NOTE_INPUT = 'note'
 
 export const reviewButtonId = (action: ReviewButton, completionId: number) => `mr:${action}:${completionId}`
 export const rejectModalId = (completionId: number) => `mr:reject-modal:${completionId}`
+export const approveModalId = (completionId: number) => `mr:approve-modal:${completionId}`
+
+/**
+ * Approvals that need a reviewer's note: a member-submitted L3.1 "Invite a
+ * friend" (no tracked referral passed, e.g. an invite from before tracking
+ * existed). The note says who they invited. An auto-verified hold (the
+ * referral verifier passed) needs no note.
+ */
+export function approvalNeedsNote(c: { verifierKey: string | null | undefined; holdReason: string | null | undefined }): boolean {
+  return c.verifierKey === 'referral' && !c.holdReason
+}
 
 /** A review card message. */
 export interface CardRef {

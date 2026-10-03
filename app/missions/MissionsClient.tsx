@@ -31,6 +31,9 @@ type MissionData = {
   description: string | null;
   autoChecked?: boolean;
   proofKind?: string;
+  semiChecked?: boolean;
+  proofHint?: string;
+  referral?: boolean;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };
 
@@ -47,6 +50,7 @@ type MissionsResponse = {
   levelTitle: string | null;
   isAuthenticated: boolean;
   verifiersEnabled?: boolean;
+  inviteUrl?: string | null;
 };
 
 type CheckResponse = {
@@ -887,6 +891,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                       key={mission.id}
                       mission={mission}
                       check={checks[mission.id]}
+                      inviteUrl={mission.referral ? (data?.inviteUrl ?? null) : undefined}
                       levelUnlocked={isUnlocked}
                       onSubmit={handleSubmit}
                     />
