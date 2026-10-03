@@ -59,7 +59,9 @@ const CSP_REPORT_ONLY = [
   ].join(" "),
   "frame-src 'self' https://verify.walletconnect.com https://verify.walletconnect.org https://vercel.live",
   "worker-src 'self' blob:",
-  "upgrade-insecure-requests",
+  // `upgrade-insecure-requests` is omitted: browsers ignore it in a
+  // Report-Only policy and warn on every page. Add it back when this policy
+  // is promoted to an enforced Content-Security-Policy header.
 ].join("; ");
 
 const SECURITY_HEADERS = [
