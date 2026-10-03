@@ -209,3 +209,12 @@ SELECT 'totals_by_type' AS check_name, 'info' AS severity, type::text AS tx_type
        COUNT(*)::bigint AS rows, SUM(amount)::bigint AS amount_sum,
        MIN("createdAt") AS first_at, MAX("createdAt") AS last_at
 FROM "Transaction" GROUP BY type ORDER BY type;
+
+-- 16. Wallets whose id is not a Discord snowflake (17-20 digits). Before the
+--     recipient fix, sending to a member number or a typo auto-created such a
+--     wallet; any balance there is stranded (nobody can log in as it).
+SELECT 'non_discord_wallet' AS check_name, 'warn' AS severity, e.id AS user_id, e.wallet, e."createdAt",
+       (SELECT COUNT(*) FROM "Transaction" t WHERE t."userId" = e.id)::bigint AS tx_count
+FROM "Economy" e
+WHERE e.id !~ '^[0-9]{17,20}$'
+ORDER BY e.wallet DESC;
