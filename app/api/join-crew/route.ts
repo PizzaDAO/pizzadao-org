@@ -231,6 +231,6 @@ export async function POST(req: Request) {
       discord: discordResult,
     });
   } catch (err: any) {
-    return internalError(err, "join-crew", "Failed to update crew");
+    return internalError(err, "join-crew", "Couldn't update your crews right now. Please try again later.");
   }
 }

@@ -1,6 +1,6 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
-import { withErrorHandling } from "@/app/lib/errors/error-response";
+import { withErrorHandling, internalError } from "@/app/lib/errors/error-response";
 import { getCityChats } from "@/app/lib/chats";
 
 export const runtime = "nodejs";
@@ -12,7 +12,19 @@ const GET_HANDLER = async () => {
     return NextResponse.json({ error: "Not authenticated" }, { status: 401 });
   }
 
-  const cities = await getCityChats();
+  let cities: Awaited<ReturnType<typeof getCityChats>>;
+  try {
+    cities = await getCityChats();
+  } catch (e) {
+    // Missing RSVPIZZA_* env or an upstream Supabase failure: log the detail,
+    // show members a generic message.
+    return internalError(
+      e,
+      "chats",
+      "The chat directory is unavailable right now. Please try again later.",
+      503
+    );
+  }
 
   // List payload omits chatUrl; cards link through /chats/{slug}.
   const list = cities.map(({ slug, name, country, region, isSupergroup }) => ({
