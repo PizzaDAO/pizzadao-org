@@ -8,7 +8,7 @@
  * Robust parsing based on sheets-claude MCP implementation.
  */
 
-import { GvizCell, GvizRow, GvizTable, GvizResponse } from './types/gviz';
+import type { GvizCell, GvizRow, GvizTable, GvizResponse } from './types/gviz';
 
 // Re-export types for convenience
 export type { GvizCell, GvizRow, GvizTable, GvizResponse };

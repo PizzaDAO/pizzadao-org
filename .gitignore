@@ -50,3 +50,6 @@ next-env.d.ts
 
 # e2e:local artifacts (sessions, screenshots, logs)
 e2e/.local/
+
+# mission backfill dry-run reports (member data)
+mission-backfill-*.csv
