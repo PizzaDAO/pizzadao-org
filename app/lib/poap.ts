@@ -1,5 +1,5 @@
-import { AlchemyPOAP, POAPDisplayItem } from './poap-types';
-import { GvizResponse, GvizCell } from './types/gviz';
+import type { AlchemyPOAP, POAPDisplayItem } from './poap-types';
+import type { GvizResponse, GvizCell } from './types/gviz';
 import { cacheGet, cacheSet } from '../api/lib/cache';
 import { fetchGviz } from './sheets/gviz';
 import { SHEET_IDS } from './sheets/config';
