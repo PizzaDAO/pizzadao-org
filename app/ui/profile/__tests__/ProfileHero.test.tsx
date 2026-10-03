@@ -43,7 +43,7 @@ describe("ProfileHero", () => {
         }
     });
 
-    // onion-47612 moved the "Edit on dashboard" CTA out of the hero into the
+    // onion-47612 moved the "Edit profile" CTA out of the hero into the
     // sticky bottom dock; the hero now links to the dashboard from the owner
     // "This is your public profile" banner.
     it("owner-readonly mode links to the owner's dashboard", () => {
@@ -71,8 +71,8 @@ describe("ProfileHero", () => {
         );
         const vouchBtn = screen.getByTestId("add-vouch-button");
         expect(vouchBtn.textContent).toContain("vouch:14071:42");
-        // Edit-on-dashboard CTA should NOT appear in public mode.
-        expect(screen.queryByRole("link", { name: /edit on dashboard/i })).toBeNull();
+        // Edit-profile CTA should NOT appear in public mode.
+        expect(screen.queryByRole("link", { name: /edit profile/i })).toBeNull();
     });
 
     it("public mode with no viewer renders 'Sign in to vouch'", () => {

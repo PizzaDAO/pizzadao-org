@@ -10,7 +10,7 @@
 // vocabulary established by PRs #93/#94 — paper-soft cards, "§ NN ·"
 // overline section labels, handwritten margin annotations, btn-pill
 // CTAs, fade-up reveal, and a sticky bottom dock for the owner-only
-// "Edit on dashboard" affordance. Underlying hooks, props, and routing
+// "Edit profile" affordance (links to /profile/[id]/edit). Underlying hooks, props, and routing
 // behaviour are unchanged.
 //
 // Plan: plans/truffle-91035-profile-redesign.md §6.3 — PR3 (capricciosa-16483).
@@ -180,7 +180,7 @@ export function ProfileClient({ id }: ProfileClientProps) {
                 </div>
             </div>
 
-            {/* Editorial sticky bottom dock — owner-only "Edit on dashboard" CTA. */}
+            {/* Editorial sticky bottom dock — owner-only "Edit profile" CTA. */}
             {isOwner && (
                 <div
                     className="fixed inset-x-0 bottom-0 z-30 pointer-events-none"
@@ -220,14 +220,14 @@ export function ProfileClient({ id }: ProfileClientProps) {
                                 </p>
                             </div>
                             <Link
-                                href={`/dashboard/${id}`}
+                                href={`/profile/${id}/edit`}
                                 className="btn-pill relative group shrink-0"
                                 style={{
                                     background: "hsl(var(--tomato))",
                                     color: "hsl(var(--cream))",
                                 }}
                             >
-                                Edit on dashboard
+                                Edit profile
                                 <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                             </Link>
                         </div>
