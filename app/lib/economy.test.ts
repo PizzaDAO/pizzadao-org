@@ -1,5 +1,5 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { transfer } from './economy'
+import { transfer, getOrCreateEconomy, creditInTx, debitInTx } from './economy'
 import { prisma } from './db'
 
 vi.mock('./db')
@@ -104,5 +104,43 @@ describe('transfer', () => {
       data: { wallet: { decrement: 100 } },
     })
     expect(update).not.toHaveBeenCalled() // recipient never credited
+  })
+})
+
+describe('creditInTx / debitInTx', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('reject zero, negative, fractional and out-of-range amounts before touching the DB', async () => {
+    const tx = { economy: { update: vi.fn(), updateMany: vi.fn() } }
+    for (const bad of [0, -1, 1.5, NaN, Infinity, 2 ** 31]) {
+      await expect(creditInTx(tx as never, 'u', bad, 'JOB_REWARD', 'x')).rejects.toThrow('whole number')
+      await expect(debitInTx(tx as never, 'u', bad, 'SHOP_PURCHASE', 'x')).rejects.toThrow('whole number')
+    }
+    expect(tx.economy.update).not.toHaveBeenCalled()
+    expect(tx.economy.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('debit logs a negative ledger amount only after the conditional update succeeds', async () => {
+    const tx = { economy: { updateMany: vi.fn().mockResolvedValue({ count: 1 }) } }
+    await debitInTx(tx as never, 'u', 25, 'SHOP_PURCHASE', 'Bought', { itemId: 1 })
+    expect(logTransaction).toHaveBeenCalledWith(tx, 'u', 'SHOP_PURCHASE', -25, 'Bought', { itemId: 1 })
+  })
+})
+
+describe('getOrCreateEconomy', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('returns the existing row without writing', async () => {
+    ;(prisma.economy.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'u', wallet: 5 })
+    await expect(getOrCreateEconomy('u')).resolves.toEqual({ id: 'u', wallet: 5 })
+    expect(prisma.economy.upsert).not.toHaveBeenCalled()
+  })
+
+  it('survives losing a concurrent first-insert race', async () => {
+    ;(prisma.economy.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+    ;(prisma.user.upsert as ReturnType<typeof vi.fn>).mockResolvedValue({})
+    ;(prisma.economy.upsert as ReturnType<typeof vi.fn>).mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }))
+    ;(prisma.economy.findUniqueOrThrow as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'u', wallet: 0 })
+    await expect(getOrCreateEconomy('u')).resolves.toEqual({ id: 'u', wallet: 0 })
   })
 })

@@ -8,8 +8,11 @@ function createModelMock() {
     findMany: vi.fn(),
     create: vi.fn(),
     update: vi.fn(),
+    updateMany: vi.fn(),
     upsert: vi.fn(),
     delete: vi.fn(),
+    deleteMany: vi.fn(),
+    findUniqueOrThrow: vi.fn(),
     count: vi.fn(),
     groupBy: vi.fn(),
   }
@@ -26,5 +29,8 @@ export const prisma = {
   jobAssignment: createModelMock(),
   jobCycle: createModelMock(),
   articleReaction: createModelMock(),
+  mission: createModelMock(),
+  missionCompletion: createModelMock(),
+  $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }
