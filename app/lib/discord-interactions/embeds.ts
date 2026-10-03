@@ -4,7 +4,7 @@
  *   author       the invoking member (display name + avatar)
  *   color        green = success, red = error / refusal, amber = cooldown / waiting
  *   description  "✅ Headline" (or ❌ / ⏳), a blank line, then the body
- *   lists        numbered "1 - <@&role> 🍕 420 (cash)"
+ *   lists        numbered "1 - <@&role> 🍕 420"
  *
  * Mentions inside an embed render (role pills, user names) but never ping, so
  * only a plain `content` mention can notify someone, and only when the reply's

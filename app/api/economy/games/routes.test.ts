@@ -37,7 +37,6 @@ describe('web games API', () => {
   afterEach(() => {
     delete process.env.PEP_GAMES_ENABLED
     delete process.env.PEP_CRIME_ENABLED
-    delete process.env.PEP_ROB_ENABLED
   })
 
   it('is hidden (404) unless PEP_GAMES_ENABLED=1, and the features endpoint says so', async () => {
@@ -47,10 +46,10 @@ describe('web games API', () => {
     expect((await bj(req({ action: 'start', bet: 10 }))).status).toBe(404)
     expect((await bjGet()).status).toBe(404)
     expect(playSlots).not.toHaveBeenCalled()
-    expect(await (await features()).json()).toEqual({ crime: false, games: false, rob: false })
+    expect(await (await features()).json()).toEqual({ crime: false, games: false })
     process.env.PEP_GAMES_ENABLED = '1'
     process.env.PEP_CRIME_ENABLED = '1'
-    expect(await (await features()).json()).toEqual({ crime: true, games: true, rob: false })
+    expect(await (await features()).json()).toEqual({ crime: true, games: true })
   })
 
   it('requires a session', async () => {

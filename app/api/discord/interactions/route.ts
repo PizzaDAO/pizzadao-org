@@ -9,7 +9,7 @@
 // Env: DISCORD_PUBLIC_KEY (hex, Developer Portal > General Information),
 //      DISCORD_GUILD_ID, DISCORD_BOT_TOKEN (guild role names for
 //      /collect-income), optional PEP_EMOJI (e.g. <:pepperoni:973304305979367444>).
-// Flags: PEP_ROB_ENABLED=1 (/rob, /peace), PEP_GAMES_ENABLED=1 (games).
+// Flags: PEP_GAMES_ENABLED=1 (games).
 // Admin money (/add-money, /remove-money): holders of ADMIN_ROLE_IDS
 //      (app/ui/constants.ts) or of PEP_ADMIN_ROLE_IDS / PEP_ADMIN_ROLE_NAMES
 //      (default "Pepperoni Mafia"); optional ADMIN_GRANT_MAX (default 10000)
@@ -20,7 +20,6 @@ import { handleInteraction, type HandlerDeps, type Interaction } from "@/app/lib
 import { getGuildRoles } from "@/app/lib/discord-interactions/guild-roles";
 import { doWork } from "@/app/lib/pep-earn/work";
 import { collectIncome, resolveRoleIncome, roleIncomeConfig } from "@/app/lib/pep-earn/income";
-import { attemptRob, getPeaceMode, robEnabled, setPeaceMode } from "@/app/lib/pep-earn/rob";
 import { gamesEnabled } from "@/app/lib/pep-games/config";
 import { blackjackAction, startBlackjack } from "@/app/lib/pep-games/blackjack";
 import { parseRouletteSpace, playRoulette } from "@/app/lib/pep-games/roulette";
@@ -73,10 +72,6 @@ function deps(guildId: string | undefined): HandlerDeps {
     },
     pay: (from, to, amount) => transfer(from, to, amount),
     leaderboard: () => getLeaderboard(10),
-    robEnabled,
-    rob: (robber, victim, ctx) => attemptRob(robber, victim, ctx),
-    getPeace: getPeaceMode,
-    setPeace: (id, enable) => setPeaceMode(id, enable),
     gamesEnabled,
     startBlackjack: (id, bet) => startBlackjack(id, bet, { source: "discord" }),
     blackjackAction: (id, gameId, action) => blackjackAction(id, gameId, action),

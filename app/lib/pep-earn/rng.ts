@@ -1,6 +1,6 @@
 /**
- * Server-side randomness for anything that moves PEP on chance (/rob, the
- * casino games). Uses node:crypto, never Math.random, so outcomes can't be
+ * Server-side randomness for anything that moves PEP on chance (the casino
+ * games). Uses node:crypto, never Math.random, so outcomes can't be
  * predicted from earlier ones.
  *
  * Everything takes an injectable `Rng` so tests can script outcomes.

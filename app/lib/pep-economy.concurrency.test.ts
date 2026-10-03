@@ -16,8 +16,7 @@
 //   * one-shot payouts (bounty complete/cancel, mission level reward, daily
 //     job, role income per role, a blackjack hand, an item grant) pay out
 //     exactly once
-//   * /rob and the games: cooldowns hold under races, robbing conserves PEP,
-//     stakes can't overdraw
+//   * the games: cooldowns hold under races, stakes can't overdraw
 //   * /remove-money can't take a wallet below 0, however many race
 // Finally it runs every check in scripts/pep-reconcile.sql against the DB.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
@@ -54,7 +53,6 @@ type Libs = {
   missions: typeof import('./missions')
   jobs: typeof import('./jobs')
   income: typeof import('./pep-earn/income')
-  rob: typeof import('./pep-earn/rob')
   roulette: typeof import('./pep-games/roulette')
   slots: typeof import('./pep-games/slots')
   blackjack: typeof import('./pep-games/blackjack')
@@ -111,7 +109,6 @@ function outcomes(results: PromiseSettledResult<unknown>[]) {
 describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = DB_URL
-    process.env.PEP_ROB_ENABLED = '1'
     const u = new URL(DB_URL)
     process.env.E2E_PG_HOST = '127.0.0.1'
     process.env.E2E_PG_PORT = u.port || '5432'
@@ -125,7 +122,6 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       missions: await import('./missions'),
       jobs: await import('./jobs'),
       income: await import('./pep-earn/income'),
-      rob: await import('./pep-earn/rob'),
       roulette: await import('./pep-games/roulette'),
       slots: await import('./pep-games/slots'),
       blackjack: await import('./pep-games/blackjack'),
@@ -324,11 +320,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     await expectLedgerConsistent(user)
   }, 60_000)
 
-  // ---- UnbelievaBoat replacement: /pay, /collect-income, /rob, games, item grants ----
-
-  const OLD_JOIN = { robberJoinedAt: new Date('2020-01-01'), victimJoinedAt: new Date('2020-01-01') }
-  const WIN = () => 0 // rob: success, minimum percent
-  const LOSE = () => 0.99 // rob: caught, maximum fine percent
+  // ---- UnbelievaBoat replacement: /pay, /collect-income, games, item grants ----
 
   it(`${N} parallel /pay calls both ways between two members conserve PEP and don't deadlock`, async () => {
     const a = await seedUser(100)
@@ -359,80 +351,6 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     const tomorrow = new Date(Date.now() + 24 * 3_600_000 + 1000)
     expect((await L.income.collectIncome(user, roles, incomes, { now: tomorrow })).total).toBe(111)
     await expectLedgerConsistent(user)
-  }, 60_000)
-
-  it(`${N} robbers on one victim: one attempt (victim cooldown), PEP conserved, both sides ledgered`, async () => {
-    const victim = await seedUser(2000)
-    const robbers = await Promise.all(Array.from({ length: N }, () => seedUser(1000)))
-    const res = await Promise.all(robbers.map((r) => L.rob.attemptRob(r, victim, OLD_JOIN, { rng: WIN })))
-    const ok = res.filter((r) => r.ok)
-    expect(ok).toHaveLength(1)
-    expect(res.filter((r) => !r.ok && r.reason === 'victim_cooldown')).toHaveLength(N - 1)
-    expect(ok[0]).toMatchObject({ outcome: 'success', amount: 100, percent: 5 })
-    const total = (await wallet(victim)) + (await Promise.all(robbers.map(wallet))).reduce((s, w) => s + w, 0)
-    expect(total).toBe(2000 + N * 1000)
-    expect(await wallet(victim)).toBe(1900)
-    await expectLedgerConsistent(victim)
-    for (const r of robbers) await expectLedgerConsistent(r)
-    expect((await ledger(victim)).map((r: any) => r.type)).toEqual(['ROB_LOSS'])
-  }, 60_000)
-
-  it(`one robber on ${N} victims: one attempt (robber cooldown); a failed rob fines the robber to the victim`, async () => {
-    const robber = await seedUser(1000)
-    const victims = await Promise.all(Array.from({ length: N }, () => seedUser(500)))
-    const res = await Promise.all(victims.map((v) => L.rob.attemptRob(robber, v, OLD_JOIN, { rng: LOSE })))
-    const ok = res.filter((r) => r.ok)
-    expect(ok).toHaveLength(1)
-    expect(ok[0]).toMatchObject({ outcome: 'caught', amount: 250, percent: 25 })
-    expect(await wallet(robber)).toBe(750)
-    const sum = (await Promise.all(victims.map(wallet))).reduce((s, w) => s + w, 0)
-    expect(sum).toBe(N * 500 + 250)
-    await expectLedgerConsistent(robber)
-    for (const v of victims) await expectLedgerConsistent(v)
-    expect((await ledger(robber)).map((r: any) => [r.type, r.amount])).toEqual([['ROB_FINE', -250]])
-  }, 60_000)
-
-  it('members robbing each other at the same time neither deadlock nor lose PEP', async () => {
-    const pairs = await Promise.all(Array.from({ length: N / 2 }, async () => [await seedUser(1000), await seedUser(1000)]))
-    const res = await Promise.allSettled(
-      pairs.flatMap(([a, b]) => [L.rob.attemptRob(a, b, OLD_JOIN), L.rob.attemptRob(b, a, OLD_JOIN)]),
-    )
-    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
-    for (const [a, b] of pairs) {
-      expect((await wallet(a)) + (await wallet(b))).toBe(2000)
-      await expectLedgerConsistent(a)
-      await expectLedgerConsistent(b)
-    }
-  }, 60_000)
-
-  it('rob refuses: self, bots, new members, poor robbers/victims, peace mode', async () => {
-    const rich = await seedUser(1000)
-    const poor = await seedUser(100)
-    const target = await seedUser(1000)
-    const r = (a: string, b: string, ctx: any = OLD_JOIN) => L.rob.attemptRob(a, b, ctx, { rng: WIN })
-    expect(await r(rich, rich)).toMatchObject({ reason: 'self' })
-    expect(await r(rich, target, { ...OLD_JOIN, victimIsBot: true })).toMatchObject({ reason: 'bot' })
-    expect(await r(rich, target, { ...OLD_JOIN, victimJoinedAt: new Date() })).toMatchObject({ reason: 'victim_new' })
-    expect(await r(rich, target, { ...OLD_JOIN, robberJoinedAt: new Date() })).toMatchObject({ reason: 'robber_new' })
-    expect(await r(poor, target)).toMatchObject({ reason: 'robber_poor', min: 500 })
-    expect(await r(rich, poor)).toMatchObject({ reason: 'victim_poor', min: 200 })
-    expect(await r(rich, uid())).toMatchObject({ reason: 'victim_poor' })
-
-    // Peace mode: N parallel toggles change it once; then the member can't be robbed.
-    const toggles = await Promise.all(Array.from({ length: N }, () => L.rob.setPeaceMode(target, true)))
-    expect(toggles.filter((t) => t.ok && t.changed)).toHaveLength(1)
-    expect(await r(rich, target)).toMatchObject({ reason: 'victim_peace' })
-    expect(await L.rob.setPeaceMode(target, false)).toMatchObject({ ok: false, reason: 'cooldown' })
-    const later = new Date(Date.now() + 25 * 3_600_000)
-    expect(await L.rob.setPeaceMode(target, false, { now: later })).toMatchObject({ ok: true, changed: true })
-    // Just left peace mode: can't rob until the toggle cooldown passes.
-    expect(await L.rob.attemptRob(target, rich, OLD_JOIN, { now: later })).toMatchObject({ reason: 'peace_recent' })
-    // Robbed recently: can't hide in peace mode right after.
-    expect(await r(rich, target)).toMatchObject({ ok: true })
-    expect(await L.rob.setPeaceMode(rich, true)).toMatchObject({ ok: false, reason: 'robbed_recently' })
-    // Refusals write nothing.
-    expect(await ledger(poor)).toEqual([])
-    for (const id of [rich, poor, target]) await expectLedgerConsistent(id)
   }, 60_000)
 
   it(`${N} parallel game starts are rate limited to one stake`, async () => {

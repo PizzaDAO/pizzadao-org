@@ -2,7 +2,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { DEFAULT_ROLE_INCOME, normalizeRoleName, resolveRoleIncome, roleIncomeConfig } from '../income'
 import { clearGuildRolesCache, getGuildRoles } from '../../discord-interactions/guild-roles'
-import { robConfig } from '../rob'
 import { parseGrantCsv, splitCsvLine } from '../../shop-grants'
 
 describe('role income config', () => {
@@ -73,28 +72,6 @@ describe('guild roles cache', () => {
 
   it('returns null without a bot token', async () => {
     expect(await getGuildRoles('g', { botToken: '' })).toBeNull()
-  })
-})
-
-describe('rob config', () => {
-  it('defaults to the documented anti-abuse rules', () => {
-    expect(robConfig()).toEqual({
-      minRobberBalance: 500,
-      minVictimBalance: 200,
-      successPercent: 40,
-      stealMinPercent: 5,
-      stealMaxPercent: 20,
-      stealCap: 1000,
-      fineMinPercent: 10,
-      fineMaxPercent: 25,
-      fineFloor: 50,
-      fineCap: 1000,
-      cooldownMs: 4 * 3_600_000,
-      victimCooldownMs: 12 * 3_600_000,
-      newMemberMs: 7 * 86_400_000,
-      peaceToggleMs: 24 * 3_600_000,
-      peaceAfterRobMs: 12 * 3_600_000,
-    })
   })
 })
 

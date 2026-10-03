@@ -189,9 +189,11 @@ enum TransactionType {
   CRIME_REWARD       // Web crime success
   CRIME_FINE         // Web crime fine (negative)
   ROLE_INCOME        // Discord /collect-income payout (one row per role)
-  ROB_STEAL          // /rob success: the robber's gain (+)
-  ROB_LOSS           // /rob success: the victim's loss (-)
-  ROB_FINE           // /rob failure: robber pays (-), victim receives (+)
+  // ROB_*: legacy. /rob was removed (owner decision, 2026-10-03); kept so the
+  // enum stays in sync with the DB and any historical rows still reconcile.
+  ROB_STEAL          // (removed /rob) robber's gain (+)
+  ROB_LOSS           // (removed /rob) victim's loss (-)
+  ROB_FINE           // (removed /rob) robber pays (-), victim receives (+)
   GAME_BET           // Casino game stake (-)
   GAME_WIN           // Casino game payout incl. stake returned on a push (+)
   ADMIN_GRANT        // Discord /add-money by an admin (+)
@@ -750,11 +752,11 @@ model EconomyCooldown {
   @@id([discordId, action])
 }
 
-// ===== UNBELIEVABOAT REPLACEMENT: ROB, GAMES, ITEM GRANTS =====
+// ===== UNBELIEVABOAT REPLACEMENT: GAMES, ITEM GRANTS =====
 
-// /rob opt-out ("peace mode"). A row means peace mode is on: the member can't
-// rob and can't be robbed. Toggling has a cooldown (EconomyCooldown action
-// "peace-toggle"), so it can't be flipped on just to dodge a counter-rob.
+// Unused: backed the removed /peace opt-out for /rob (removed 2026-10-03,
+// owner decision). Nothing reads or writes it; a later cleanup migration can
+// drop the table.
 model EconomyPeaceMode {
   discordId String   @id
   enabledAt DateTime @default(now())
