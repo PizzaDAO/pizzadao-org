@@ -15,6 +15,7 @@
 
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/app/ui/shared/Toast";
+import { useSession } from "@/app/lib/hooks/use-session";
 import { pageContainer, loadingSpinner } from "../ui/shared-styles";
 import { MissionCard } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
@@ -85,6 +86,10 @@ const DISPLAY_FONT =
 export default function MissionsClient({ initial }: { initial: MissionsResponse | null }) {
   const [data, setData] = useState<MissionsResponse | null>(initial);
   const toast = useToast();
+  // /api/missions/pending is admin-only (ADMIN_ROLE_IDS); /api/session exposes
+  // the same check as isAdmin, so only reviewers mount the review panel.
+  const { data: session } = useSession();
+  const canReview = session?.isAdmin === true;
   const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
   // Auto-expand current level
@@ -555,7 +560,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
         )}
 
         {/* Admin Review Panel */}
-        {isAuthenticated && <MissionReviewPanel />}
+        {isAuthenticated && canReview && <MissionReviewPanel />}
 
         {/* ─── Level Accordion ────────────────────────────────────
             Each level group is a "§ NN · Level X" file folder. */}
