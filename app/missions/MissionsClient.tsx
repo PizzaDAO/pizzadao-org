@@ -17,7 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/app/ui/shared/Toast";
 import { useSession } from "@/app/lib/hooks/use-session";
 import { pageContainer, loadingSpinner } from "../ui/shared-styles";
-import { MissionCard } from "../ui/missions/MissionCard";
+import { MissionCard, type MissionCheckInfo } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
 import { MissionCompleteCelebration } from "../ui/missions/MissionCompleteCelebration";
 import { LevelUpModal } from "../ui/missions/LevelUpModal";
@@ -30,7 +30,9 @@ type MissionData = {
   title: string;
   description: string | null;
   autoVerify: boolean;
-  progress: { status: string; submittedAt: string; reviewNote?: string | null } | null;
+  autoChecked?: boolean;
+  proofKind?: string;
+  progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };
 
 type LevelData = {
@@ -45,6 +47,16 @@ type MissionsResponse = {
   currentLevel: number;
   levelTitle: string | null;
   isAuthenticated: boolean;
+  verifiersEnabled?: boolean;
+};
+
+type CheckResponse = {
+  enabled: boolean;
+  approved: number[];
+  held: number[];
+  reopened: number[];
+  levelsPaid: number[];
+  missions: Array<{ missionId: number; check: MissionCheckInfo | null }>;
 };
 
 function countApproved(snapshot: MissionsResponse): number {
@@ -107,6 +119,10 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   const [showVouchPrompt, setShowVouchPrompt] = useState(false);
   // Last seen counts to detect a freshly approved mission after submit/refresh.
   const lastApprovedCountRef = useRef<number | null>(initial ? countApproved(initial) : null);
+
+  // "Check my progress" (POST /api/missions/check): per-mission verifier hints.
+  const [checking, setChecking] = useState(false);
+  const [checks, setChecks] = useState<Record<number, MissionCheckInfo>>({});
 
   const levelUpClaimInFlight = useRef(false);
   const initialCelebrationChecked = useRef(false);
@@ -287,6 +303,44 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
       }
       return next;
     });
+  }
+
+  async function handleCheckProgress() {
+    if (checking) return;
+    setChecking(true);
+    try {
+      const res = await fetch("/api/missions/check", { method: "POST" });
+      if (res.status === 429) {
+        const wait = Number(res.headers.get("Retry-After")) || 30;
+        toast.error(`Hang on: you can check again in ${wait}s.`);
+        return;
+      }
+      const json = (await res.json()) as CheckResponse & { error?: string };
+      if (!res.ok) {
+        toast.error(json.error || "Couldn't check your progress");
+        return;
+      }
+      const next: Record<number, MissionCheckInfo> = {};
+      for (const m of json.missions) if (m.check) next[m.missionId] = m.check;
+      setChecks(next);
+      if (json.levelsPaid.length) {
+        toast.success(`Level ${json.levelsPaid[json.levelsPaid.length - 1]} complete!`);
+      } else if (json.approved.length) {
+        toast.success(`${json.approved.length} mission${json.approved.length > 1 ? "s" : ""} verified!`);
+      } else if (json.held.length) {
+        toast.success("Verified! A reviewer will release it shortly.");
+      } else if (!json.enabled) {
+        toast.info("Progress updated. Automatic approval isn't switched on yet.");
+      } else {
+        toast.info("Nothing new yet. See the hints on each mission.");
+      }
+      // Refetch: a new approval runs the usual celebration flow.
+      await fetchMissions();
+    } catch {
+      toast.error("Couldn't check your progress");
+    } finally {
+      setChecking(false);
+    }
   }
 
   async function handleSubmit(missionId: number, evidence?: string, notes?: string) {
@@ -579,6 +633,27 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                 <span className="circle-scribble">{data.levelTitle}</span>
               </div>
             )}
+            <div style={{ display: "flex", justifyContent: "center", marginTop: 6 }}>
+              <button
+                type="button"
+                onClick={handleCheckProgress}
+                disabled={checking}
+                className="btn-pill"
+                data-testid="check-progress"
+                style={{
+                  fontSize: 13,
+                  padding: "0.55rem 1.15rem",
+                  background: "hsl(var(--ink))",
+                  color: "hsl(var(--cream))",
+                  border: "1px solid transparent",
+                  boxShadow: "var(--shadow-soft)",
+                  opacity: checking ? 0.6 : 1,
+                  cursor: checking ? "not-allowed" : "pointer",
+                }}
+              >
+                {checking ? "Checking…" : "Check my progress"}
+              </button>
+            </div>
             {allLevelsDone && (
               <div
                 className="handwritten"
@@ -812,6 +887,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                     <MissionCard
                       key={mission.id}
                       mission={mission}
+                      check={checks[mission.id]}
                       levelUnlocked={isUnlocked}
                       onSubmit={handleSubmit}
                     />
