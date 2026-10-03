@@ -81,8 +81,9 @@ GROUP BY t."userId";
 SELECT 'amount_sign' AS check_name, 'error' AS severity, "userId" AS user_id, id AS tx_id, type, amount
 FROM "Transaction"
 WHERE amount = 0
-   OR (type IN ('TRANSFER_SENT', 'SHOP_PURCHASE', 'BOUNTY_ESCROW') AND amount > 0)
-   OR (type IN ('TRANSFER_RECEIVED', 'JOB_REWARD', 'BOUNTY_REWARD', 'BOUNTY_REFUND', 'MISSION_REWARD') AND amount < 0);
+   OR (type IN ('TRANSFER_SENT', 'SHOP_PURCHASE', 'BOUNTY_ESCROW', 'ROB_LOSS', 'GAME_BET', 'CRIME_FINE') AND amount > 0)
+   OR (type IN ('TRANSFER_RECEIVED', 'JOB_REWARD', 'BOUNTY_REWARD', 'BOUNTY_REFUND', 'MISSION_REWARD',
+                'ROLE_INCOME', 'ROB_STEAL', 'GAME_WIN', 'WORK_REWARD', 'CRIME_REWARD') AND amount < 0);
 
 -- 7. Ledger rows pointing at a bounty / job / shop item that does not exist.
 SELECT 'orphan_reference' AS check_name, 'warn' AS severity, t."userId" AS user_id, t.id AS tx_id, t.type, t.metadata
@@ -180,6 +181,20 @@ SELECT 'transfer_unmatched' AS check_name, 'error' AS severity,
 FROM sent s
 FULL OUTER JOIN recv r ON r.from_id = s.from_id AND r.to_id = s.to_id AND r.amt = s.amt
 WHERE COALESCE(s.n, 0) <> COALESCE(r.n, 0);
+
+-- 13b. Blackjack: a hand pays out at most once, the payout matches the
+--      settled row, and a live (ACTIVE) hand has paid nothing yet.
+WITH wins AS (
+  SELECT metadata->>'gameId' AS game_id, COUNT(*)::bigint AS n, SUM(amount)::bigint AS paid
+  FROM "Transaction" WHERE type = 'GAME_WIN' AND metadata->>'game' = 'blackjack' GROUP BY 1
+)
+SELECT 'blackjack_payout' AS check_name, 'error' AS severity, g."discordId" AS user_id, g.id AS game_id,
+       g.status::text AS status, g.payout, COALESCE(w.n, 0) AS win_rows, COALESCE(w.paid, 0) AS paid
+FROM "BlackjackGame" g
+LEFT JOIN wins w ON w.game_id = g.id
+WHERE COALESCE(w.n, 0) > 1
+   OR (g.status = 'ACTIVE' AND COALESCE(w.n, 0) > 0)
+   OR (g.status = 'SETTLED' AND COALESCE(w.paid, 0) <> COALESCE(g.payout, 0));
 
 -- 14. Supply summary (one row). With the ledger as the record of flows:
 --       held      = SUM(wallet) + PEP escrowed in open/claimed bounties
