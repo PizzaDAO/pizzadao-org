@@ -279,3 +279,23 @@ The scripts need Node ≥ 22.18. They re-exec themselves with `--experimental-tr
 | `scripts/discord/register-commands.mjs` | Guild command registration (dry-run by default) |
 | `prisma/migrations/20261003000000_pep_migration_and_earning` | `PendingPepClaim`, `EconomyCooldown`, `PepClaimStatus`, `TransactionType` += `MIGRATION_CREDIT`, `MIGRATION_REVERSAL`, `WORK_REWARD`, `CRIME_REWARD`, `CRIME_FINE` |
 | `app/api/discord/callback/route.ts` | +1 fire-and-forget call: `claimPendingPepOnLogin(me.id)` |
+
+## Appendix: current UnbelievaBoat role income (read from the UB dashboard, 2026-10-03)
+
+All are *collectable* (via `/collect-income`), paid in **cash**, once per **1 day**:
+
+| Role | PEP / day |
+|---|---|
+| Dread Pizza Roberts | 420 |
+| Pizzaiolo | 690 |
+| Pizza Holder | 69 |
+| Pizza Mafia | 69 |
+| Pizza Capo | 69 |
+| Crew Member | 42 |
+| Box Mafia | 42 |
+| Pizza Sticks Holder | 8 |
+| Pizza Pop Holder | 8 |
+| Pizza Tattoo Club | 8 |
+| Pockets Checked | 1 |
+
+Members with several roles collect each role's income (UB behaviour). Port these values as-is unless the owner says otherwise.
