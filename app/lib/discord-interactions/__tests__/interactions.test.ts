@@ -62,10 +62,6 @@ describe('handleInteraction', () => {
     collectIncome: vi.fn(async () => ({ paid: [], waiting: [], total: 0, balance: 0 })),
     pay: vi.fn(async () => ({ success: true })),
     leaderboard: vi.fn(async () => []),
-    robEnabled: () => true,
-    rob: vi.fn(async () => ({ ok: false as const, reason: 'cooldown' as const, readyAt: new Date(1_800_000_000_000) })),
-    getPeace: vi.fn(async () => false),
-    setPeace: vi.fn(async () => ({ ok: true as const, enabled: true, changed: true })),
     gamesEnabled: () => true,
     startBlackjack: vi.fn(async () => ({ ok: true as const, game: bjView() as never, balance: 900 })),
     blackjackAction: vi.fn(async () => ({ ok: true as const, game: bjView() as never, balance: 900 })),
@@ -174,8 +170,8 @@ describe('handleInteraction', () => {
       [
         '✅ Role income successfully collected!',
         '',
-        `1 - <@&839206162837798945> ${CUR} 420 (cash)`,
-        `2 - <@&900000000000000001> ${CUR} 42 (cash)`,
+        `1 - <@&839206162837798945> ${CUR} 420`,
+        `2 - <@&900000000000000001> ${CUR} 42`,
         '',
         `Total: ${CUR} 462 • Balance: ${CUR} 5,871`,
         '',
@@ -226,47 +222,6 @@ describe('handleInteraction', () => {
     const r = await handleInteraction(cmd('leaderboard'), deps({ leaderboard }))
     expect(desc(r)).toBe(`✅ $PEP leaderboard\n\n1 - <@${USER}> ${CUR} 9,000\n2 - <@${OTHER}> ${CUR} 10`)
     expect(r.data?.allowed_mentions).toEqual({ parse: [] })
-  })
-
-  it('/rob passes join dates and bot flag, and explains refusals', async () => {
-    const rob = vi.fn(async () => ({ ok: true as const, outcome: 'success' as const, amount: 120, percent: 12, robberBalance: 1, victimBalance: 1 }))
-    const i = cmd('rob', [{ name: 'member', type: 6, value: OTHER }], {
-      resolved: { users: { [OTHER]: { id: OTHER } }, members: { [OTHER]: { joined_at: '2025-01-01T00:00:00.000Z' } } },
-    })
-    const r = await handleInteraction(i, deps({ rob }))
-    expect(rob).toHaveBeenCalledWith(USER, OTHER, {
-      victimIsBot: false,
-      robberJoinedAt: new Date('2024-01-01T00:00:00.000Z'),
-      victimJoinedAt: new Date('2025-01-01T00:00:00.000Z'),
-    })
-    expect(embed(r)?.color).toBe(GREEN)
-    expect(desc(r)).toMatch(/robbed <@100000000000000009> and got away with .*\*\*120\*\*/)
-
-    const caught = vi.fn(async () => ({ ok: true as const, outcome: 'caught' as const, amount: 75, percent: 15, robberBalance: 1, victimBalance: 1 }))
-    const c = await handleInteraction(i, deps({ rob: caught }))
-    expect(embed(c)?.color).toBe(RED)
-    expect(c.data?.flags).toBeUndefined()
-    expect(desc(c)).toMatch(/got caught .* \*\*75\*\* fine/)
-
-    const refused = await handleInteraction(i, deps())
-    expect(refused.data?.flags).toBe(64)
-    expect(embed(refused)?.color).toBe(AMBER)
-    expect(desc(refused)).toContain('<t:1800000000:R>')
-
-    const notMember = cmd('rob', [{ name: 'member', type: 6, value: OTHER }], { resolved: { users: { [OTHER]: { id: OTHER } } } })
-    expect(desc(await handleInteraction(notMember, deps({ rob })))).toMatch(/not in the server/)
-    expect(desc(await handleInteraction(i, deps({ robEnabled: () => false })))).toMatch(/isn't enabled/)
-  })
-
-  it('/peace shows status and toggles', async () => {
-    expect(desc(await handleInteraction(cmd('peace'), deps()))).toMatch(/\*\*off\*\*/)
-    const setPeace = vi.fn(async () => ({ ok: true as const, enabled: true, changed: true }))
-    expect(desc(await handleInteraction(cmd('peace', [{ name: 'enabled', type: 5, value: true }]), deps({ setPeace })))).toMatch(/now \*\*on\*\*/)
-    expect(setPeace).toHaveBeenCalledWith(USER, true)
-    const cd = vi.fn(async () => ({ ok: false as const, reason: 'cooldown' as const, readyAt: new Date(1_800_000_000_000) }))
-    const r = await handleInteraction(cmd('peace', [{ name: 'enabled', type: 5, value: false }]), deps({ setPeace: cd }))
-    expect(embed(r)?.color).toBe(AMBER)
-    expect(desc(r)).toMatch(/<t:1800000000:R>/)
   })
 
   it('/blackjack posts the hand as an embed with Hit/Stand buttons; buttons update it', async () => {
@@ -427,9 +382,15 @@ describe('handleInteraction', () => {
     })
   })
 
+  it('/rob and /peace are gone (a stale registration gets "Unknown command.")', async () => {
+    for (const name of ['rob', 'peace']) {
+      expect(desc(await handleInteraction(cmd(name), deps()))).toMatch(/Unknown command/)
+    }
+  })
+
   it('registers every command that has a handler, and nothing else', () => {
     expect(PEP_COMMANDS.map((c) => c.name)).toEqual([
-      'balance', 'work', 'collect-income', 'pay', 'leaderboard', 'rob', 'peace', 'blackjack', 'roulette', 'slots', 'shop', 'buy',
+      'balance', 'work', 'collect-income', 'pay', 'leaderboard', 'blackjack', 'roulette', 'slots', 'shop', 'buy',
       'add-money', 'remove-money',
     ])
   })
