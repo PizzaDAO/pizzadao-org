@@ -11,6 +11,7 @@ import {
   oauthStateCookieOptions,
 } from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
+import { claimPendingPepOnLogin } from "@/app/lib/unbelievaboat/claims";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 import { lookupGuildMembership } from "@/app/lib/discord";
 import { internalError } from "@/app/lib/errors/error-response";
@@ -195,6 +196,11 @@ export async function GET(req: Request) {
     // Fire-and-forget: sync Discord roles to the sheet on every login.
     // This is intentionally not awaited so it never blocks the redirect.
     syncRolesOnLogin(me.id, existingMember?.name ?? nick).catch(() => {}); // extra safety net
+
+    // Fire-and-forget: credit any UnbelievaBoat balance held for this Discord ID
+    // (plans/unbelievaboat-replacement.md). No-op unless PEP_MIGRATION_CLAIMS=1;
+    // never throws, and idempotent, so a cut-off run simply retries next login.
+    claimPendingPepOnLogin(me.id).catch(() => {});
 
     // Build redirect URL
     let redirectUrl: URL;

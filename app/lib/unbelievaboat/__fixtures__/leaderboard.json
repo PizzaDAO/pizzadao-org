@@ -1,0 +1,14 @@
+{
+  "_comment": "Fake UnbelievaBoat leaderboard for tests (made-up IDs). Served by the mock API two users per page.",
+  "guildId": "812097286003359764",
+  "users": [
+    { "rank": "1", "user_id": "100000000000000006", "cash": 0, "bank": "Infinity", "total": "Infinity" },
+    { "rank": "2", "user_id": "100000000000000001", "cash": 54, "bank": 1000, "total": 1054 },
+    { "rank": "3", "user_id": "100000000000000003", "cash": 300, "bank": 200, "total": 500 },
+    { "rank": "4", "user_id": "100000000000000008", "cash": -50, "bank": 500, "total": 450 },
+    { "rank": "5", "user_id": "100000000000000005", "cash": 69, "bank": 0, "total": 69 },
+    { "rank": "6", "user_id": "100000000000000007", "cash": 10, "bank": 0, "total": 10 },
+    { "rank": "7", "user_id": "100000000000000004", "cash": 0, "bank": 0, "total": 0 },
+    { "rank": "8", "user_id": "100000000000000002", "cash": -20, "bank": 0, "total": -20 }
+  ]
+}
