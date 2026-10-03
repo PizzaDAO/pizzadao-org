@@ -14,7 +14,10 @@
 //   * every balance change has a ledger row: wallet == opening + SUM(amount)
 //   * the running `balance` column chains (prev.balance + amount == balance)
 //   * one-shot payouts (bounty complete/cancel, mission level reward, daily
-//     job) pay out exactly once
+//     job, role income per role, a blackjack hand, an item grant) pay out
+//     exactly once
+//   * /rob and the games: cooldowns hold under races, robbing conserves PEP,
+//     stakes can't overdraw
 // Finally it runs every check in scripts/pep-reconcile.sql against the DB.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -49,6 +52,12 @@ type Libs = {
   bounties: typeof import('./bounties')
   missions: typeof import('./missions')
   jobs: typeof import('./jobs')
+  income: typeof import('./pep-earn/income')
+  rob: typeof import('./pep-earn/rob')
+  roulette: typeof import('./pep-games/roulette')
+  slots: typeof import('./pep-games/slots')
+  blackjack: typeof import('./pep-games/blackjack')
+  grants: typeof import('./shop-grants')
 }
 let L: Libs
 const N = 20
@@ -99,6 +108,7 @@ function outcomes(results: PromiseSettledResult<unknown>[]) {
 describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () => {
   beforeAll(async () => {
     process.env.DATABASE_URL = DB_URL
+    process.env.PEP_ROB_ENABLED = '1'
     const u = new URL(DB_URL)
     process.env.E2E_PG_HOST = '127.0.0.1'
     process.env.E2E_PG_PORT = u.port || '5432'
@@ -111,6 +121,12 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       bounties: await import('./bounties'),
       missions: await import('./missions'),
       jobs: await import('./jobs'),
+      income: await import('./pep-earn/income'),
+      rob: await import('./pep-earn/rob'),
+      roulette: await import('./pep-games/roulette'),
+      slots: await import('./pep-games/slots'),
+      blackjack: await import('./pep-games/blackjack'),
+      grants: await import('./shop-grants'),
     }
   }, 60_000)
 
@@ -264,6 +280,247 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     await settle()
     expect(await wallet(user)).toBe(50)
     await expectLedgerConsistent(user)
+  }, 60_000)
+
+  // ---- UnbelievaBoat replacement: /pay, /collect-income, /rob, games, item grants ----
+
+  const OLD_JOIN = { robberJoinedAt: new Date('2020-01-01'), victimJoinedAt: new Date('2020-01-01') }
+  const WIN = () => 0 // rob: success, minimum percent
+  const LOSE = () => 0.99 // rob: caught, maximum fine percent
+
+  it(`${N} parallel /pay calls both ways between two members conserve PEP and don't deadlock`, async () => {
+    const a = await seedUser(100)
+    const b = await seedUser(100)
+    const res = await Promise.allSettled(
+      Array.from({ length: N }, (_, i) => (i % 2 ? L.economy.transfer(a, b, 15) : L.economy.transfer(b, a, 15))),
+    )
+    expect(res.filter((r) => r.status === 'rejected' && !/Insufficient/.test(String(r.reason)))).toEqual([])
+    expect((await wallet(a)) + (await wallet(b))).toBe(200)
+    await expectLedgerConsistent(a)
+    await expectLedgerConsistent(b)
+  }, 60_000)
+
+  it(`${N} parallel /collect-income calls pay each held role once`, async () => {
+    const user = await seedUser(0)
+    const incomes = [
+      { name: 'it Crew Member', amount: 42, intervalHours: 24, roleId: `7${RUN}01` },
+      { name: 'it Pizza Holder', amount: 69, intervalHours: 24, roleId: `7${RUN}02` },
+      { name: 'it Not Held', amount: 690, intervalHours: 24, roleId: `7${RUN}03` },
+    ]
+    const roles = [`7${RUN}01`, `7${RUN}02`, 'unrelated']
+    const res = await Promise.all(Array.from({ length: N }, () => L.income.collectIncome(user, roles, incomes)))
+    expect(res.reduce((s, r) => s + r.total, 0)).toBe(111)
+    expect(await wallet(user)).toBe(111)
+    const rows = (await ledger(user)).filter((r: any) => r.type === 'ROLE_INCOME')
+    expect(rows.map((r: any) => r.amount).sort()).toEqual([42, 69])
+    // Next day: collectable again.
+    const tomorrow = new Date(Date.now() + 24 * 3_600_000 + 1000)
+    expect((await L.income.collectIncome(user, roles, incomes, { now: tomorrow })).total).toBe(111)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it(`${N} robbers on one victim: one attempt (victim cooldown), PEP conserved, both sides ledgered`, async () => {
+    const victim = await seedUser(2000)
+    const robbers = await Promise.all(Array.from({ length: N }, () => seedUser(1000)))
+    const res = await Promise.all(robbers.map((r) => L.rob.attemptRob(r, victim, OLD_JOIN, { rng: WIN })))
+    const ok = res.filter((r) => r.ok)
+    expect(ok).toHaveLength(1)
+    expect(res.filter((r) => !r.ok && r.reason === 'victim_cooldown')).toHaveLength(N - 1)
+    expect(ok[0]).toMatchObject({ outcome: 'success', amount: 100, percent: 5 })
+    const total = (await wallet(victim)) + (await Promise.all(robbers.map(wallet))).reduce((s, w) => s + w, 0)
+    expect(total).toBe(2000 + N * 1000)
+    expect(await wallet(victim)).toBe(1900)
+    await expectLedgerConsistent(victim)
+    for (const r of robbers) await expectLedgerConsistent(r)
+    expect((await ledger(victim)).map((r: any) => r.type)).toEqual(['ROB_LOSS'])
+  }, 60_000)
+
+  it(`one robber on ${N} victims: one attempt (robber cooldown); a failed rob fines the robber to the victim`, async () => {
+    const robber = await seedUser(1000)
+    const victims = await Promise.all(Array.from({ length: N }, () => seedUser(500)))
+    const res = await Promise.all(victims.map((v) => L.rob.attemptRob(robber, v, OLD_JOIN, { rng: LOSE })))
+    const ok = res.filter((r) => r.ok)
+    expect(ok).toHaveLength(1)
+    expect(ok[0]).toMatchObject({ outcome: 'caught', amount: 250, percent: 25 })
+    expect(await wallet(robber)).toBe(750)
+    const sum = (await Promise.all(victims.map(wallet))).reduce((s, w) => s + w, 0)
+    expect(sum).toBe(N * 500 + 250)
+    await expectLedgerConsistent(robber)
+    for (const v of victims) await expectLedgerConsistent(v)
+    expect((await ledger(robber)).map((r: any) => [r.type, r.amount])).toEqual([['ROB_FINE', -250]])
+  }, 60_000)
+
+  it('members robbing each other at the same time neither deadlock nor lose PEP', async () => {
+    const pairs = await Promise.all(Array.from({ length: N / 2 }, async () => [await seedUser(1000), await seedUser(1000)]))
+    const res = await Promise.allSettled(
+      pairs.flatMap(([a, b]) => [L.rob.attemptRob(a, b, OLD_JOIN), L.rob.attemptRob(b, a, OLD_JOIN)]),
+    )
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    for (const [a, b] of pairs) {
+      expect((await wallet(a)) + (await wallet(b))).toBe(2000)
+      await expectLedgerConsistent(a)
+      await expectLedgerConsistent(b)
+    }
+  }, 60_000)
+
+  it('rob refuses: self, bots, new members, poor robbers/victims, peace mode', async () => {
+    const rich = await seedUser(1000)
+    const poor = await seedUser(100)
+    const target = await seedUser(1000)
+    const r = (a: string, b: string, ctx: any = OLD_JOIN) => L.rob.attemptRob(a, b, ctx, { rng: WIN })
+    expect(await r(rich, rich)).toMatchObject({ reason: 'self' })
+    expect(await r(rich, target, { ...OLD_JOIN, victimIsBot: true })).toMatchObject({ reason: 'bot' })
+    expect(await r(rich, target, { ...OLD_JOIN, victimJoinedAt: new Date() })).toMatchObject({ reason: 'victim_new' })
+    expect(await r(rich, target, { ...OLD_JOIN, robberJoinedAt: new Date() })).toMatchObject({ reason: 'robber_new' })
+    expect(await r(poor, target)).toMatchObject({ reason: 'robber_poor', min: 500 })
+    expect(await r(rich, poor)).toMatchObject({ reason: 'victim_poor', min: 200 })
+    expect(await r(rich, uid())).toMatchObject({ reason: 'victim_poor' })
+
+    // Peace mode: N parallel toggles change it once; then the member can't be robbed.
+    const toggles = await Promise.all(Array.from({ length: N }, () => L.rob.setPeaceMode(target, true)))
+    expect(toggles.filter((t) => t.ok && t.changed)).toHaveLength(1)
+    expect(await r(rich, target)).toMatchObject({ reason: 'victim_peace' })
+    expect(await L.rob.setPeaceMode(target, false)).toMatchObject({ ok: false, reason: 'cooldown' })
+    const later = new Date(Date.now() + 25 * 3_600_000)
+    expect(await L.rob.setPeaceMode(target, false, { now: later })).toMatchObject({ ok: true, changed: true })
+    // Just left peace mode: can't rob until the toggle cooldown passes.
+    expect(await L.rob.attemptRob(target, rich, OLD_JOIN, { now: later })).toMatchObject({ reason: 'peace_recent' })
+    // Robbed recently: can't hide in peace mode right after.
+    expect(await r(rich, target)).toMatchObject({ ok: true })
+    expect(await L.rob.setPeaceMode(rich, true)).toMatchObject({ ok: false, reason: 'robbed_recently' })
+    // Refusals write nothing.
+    expect(await ledger(poor)).toEqual([])
+    for (const id of [rich, poor, target]) await expectLedgerConsistent(id)
+  }, 60_000)
+
+  it(`${N} parallel game starts are rate limited to one stake`, async () => {
+    const user = await seedUser(1000)
+    const res = await Promise.all(Array.from({ length: N }, () => L.slots.playSlots(user, 10)))
+    expect(res.filter((r) => r.ok)).toHaveLength(1)
+    expect((await ledger(user)).filter((r: any) => r.type === 'GAME_BET')).toHaveLength(1)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it(`${N} parallel roulette bets (no rate limit) can't overdraw the wallet`, async () => {
+    process.env.GAME_COOLDOWN_SECONDS = '0'
+    try {
+      const user = await seedUser(100)
+      const res = await Promise.allSettled(
+        Array.from({ length: N }, () => L.roulette.playRoulette(user, 10, { kind: 'red' }, { rng: () => 0 })), // lands on 0
+      )
+      const played = res.filter((r) => r.status === 'fulfilled' && (r.value as any).ok).length
+      expect(played).toBeGreaterThan(0)
+      expect(played).toBeLessThanOrEqual(10)
+      expect(await wallet(user)).toBe(100 - 10 * played)
+      await expectLedgerConsistent(user)
+    } finally {
+      delete process.env.GAME_COOLDOWN_SECONDS
+    }
+  }, 60_000)
+
+  it('roulette and slots pay GAME_WIN in the same transaction as the GAME_BET', async () => {
+    process.env.GAME_COOLDOWN_SECONDS = '0'
+    try {
+      const user = await seedUser(1000)
+      const ro = await L.roulette.playRoulette(user, 100, { kind: 'number', n: 0 }, { rng: () => 0 })
+      expect(ro).toMatchObject({ ok: true, landed: 0, payout: 3600, balance: 4500 })
+      const sl = await L.slots.playSlots(user, 10, { rng: () => 0 }) // three pizzas
+      expect(sl).toMatchObject({ ok: true, reels: ['pizza', 'pizza', 'pizza'], payout: 1000, balance: 5490 })
+      expect((await ledger(user)).map((r: any) => [r.type, r.amount])).toEqual([
+        ['GAME_BET', -100], ['GAME_WIN', 3600], ['GAME_BET', -10], ['GAME_WIN', 1000],
+      ])
+      await expect(L.slots.playSlots(user, 5)).rejects.toThrow(/Bet must be/)
+      await expect(L.slots.playSlots(user, 6000)).rejects.toThrow(/Bet must be/)
+      await expectLedgerConsistent(user)
+    } finally {
+      delete process.env.GAME_COOLDOWN_SECONDS
+    }
+  }, 60_000)
+
+  async function activeHand(user: string, bet = 10) {
+    process.env.GAME_COOLDOWN_SECONDS = '0'
+    try {
+      for (let i = 0; i < 20; i++) {
+        const r = await L.blackjack.startBlackjack(user, bet)
+        if (r.ok && r.game.status === 'ACTIVE') return r.game
+      }
+      throw new Error('no active hand dealt')
+    } finally {
+      delete process.env.GAME_COOLDOWN_SECONDS
+    }
+  }
+
+  async function expectBlackjackSettledOnce(user: string) {
+    const games = await L.prisma.blackjackGame.findMany({ where: { discordId: user } })
+    const wins = (await ledger(user)).filter((r: any) => r.type === 'GAME_WIN')
+    for (const g of games) {
+      const mine = wins.filter((w: any) => w.metadata?.gameId === g.id)
+      expect(mine.length).toBeLessThanOrEqual(1)
+      expect(mine.reduce((s: number, w: any) => s + w.amount, 0)).toBe(g.payout ?? 0)
+    }
+    expect((await ledger(user)).filter((r: any) => r.type === 'GAME_BET')).toHaveLength(games.length)
+  }
+
+  it(`${N} parallel /blackjack starts deal one hand and take one stake`, async () => {
+    const user = await seedUser(1000)
+    const res = await Promise.all(Array.from({ length: N }, () => L.blackjack.startBlackjack(user, 50)))
+    expect(res.filter((r) => r.ok)).toHaveLength(1)
+    expect(await L.prisma.blackjackGame.count({ where: { discordId: user } })).toBe(1)
+    await expectBlackjackSettledOnce(user)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it(`${N} parallel Stand presses settle the hand exactly once`, async () => {
+    const user = await seedUser(1000)
+    const game = await activeHand(user)
+    const res = await Promise.all(Array.from({ length: N }, () => L.blackjack.blackjackAction(user, game.id, 'stand')))
+    expect(res.every((r) => r.ok && r.game.status === 'SETTLED')).toBe(true)
+    expect(res.filter((r) => r.ok && !r.stale)).toHaveLength(1)
+    await expectBlackjackSettledOnce(user)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it(`${N} parallel Hit presses apply one card at a time; a stranger can't press`, async () => {
+    const user = await seedUser(1000)
+    const game = await activeHand(user)
+    const stranger = await seedUser(0)
+    expect(await L.blackjack.blackjackAction(stranger, game.id, 'hit')).toEqual({ ok: false, reason: 'not_yours' })
+    const res = await Promise.all(Array.from({ length: N }, () => L.blackjack.blackjackAction(user, game.id, 'hit')))
+    expect(res.filter((r) => r.ok && !r.stale)).toHaveLength(1)
+    const row = await L.prisma.blackjackGame.findUniqueOrThrow({ where: { id: game.id } })
+    expect((row.state as any).player).toHaveLength(3)
+    await L.blackjack.blackjackAction(user, game.id, 'stand')
+    await expectBlackjackSettledOnce(user)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it('a timed-out hand auto-stands once, however many sweeps race', async () => {
+    const user = await seedUser(1000)
+    const game = await activeHand(user)
+    const later = new Date(Date.now() + 10 * 60_000)
+    await Promise.all(Array.from({ length: N }, () => L.blackjack.sweepExpiredBlackjack({ now: later, discordId: user })))
+    const row = await L.prisma.blackjackGame.findUniqueOrThrow({ where: { id: game.id } })
+    expect(row.status).toBe('SETTLED')
+    expect(row.activeKey).toBeNull()
+    // A late Hit on the timed-out hand changes nothing.
+    expect(await L.blackjack.blackjackAction(user, game.id, 'hit', { now: later })).toMatchObject({ ok: true, stale: true })
+    await expectBlackjackSettledOnce(user)
+    await expectLedgerConsistent(user)
+  }, 60_000)
+
+  it(`${N} parallel grant-items runs grant a holding once`, async () => {
+    const user = uid()
+    const item = await L.prisma.shopItem.create({ data: { name: `it-grant-${RUN}`, price: 1337, quantity: 0 } })
+    const [row] = await L.grants.planGrants([{ line: 1, discordId: user, item: `IT grant ${RUN}`, qty: 3 }])
+    expect(row.status).toBe('grant')
+    const res = await Promise.all(Array.from({ length: N }, () => L.grants.applyGrant(row)))
+    expect(res.filter(Boolean)).toHaveLength(1)
+    const inv = await L.prisma.inventory.findUniqueOrThrow({ where: { userId_itemId: { userId: user, itemId: item.id } } })
+    expect(inv.quantity).toBe(3)
+    expect((await L.grants.planGrants([{ line: 1, discordId: user, item: `it-grant-${RUN}`, qty: 3 }]))[0].status).toBe('already_granted')
+    expect((await L.grants.planGrants([{ line: 1, discordId: user, item: `it-grant-${RUN}`, qty: 4 }]))[0].status).toBe('conflict')
+    // Stock is untouched (holdings were bought in UnbelievaBoat).
+    expect((await L.prisma.shopItem.findUniqueOrThrow({ where: { id: item.id } })).quantity).toBe(0)
   }, 60_000)
 
   it('every touched wallet reconciles with the ledger', async () => {

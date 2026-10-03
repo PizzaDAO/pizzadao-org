@@ -30,8 +30,10 @@ describe('transfer', () => {
       .mockResolvedValueOnce({ id: 'recipient-1', wallet: 100 }) // getOrCreateEconomy for recipient
 
     // Mock the $transaction to execute the callback immediately
+    const $queryRaw = vi.fn().mockResolvedValue([])
     ;(prisma.$transaction as ReturnType<typeof vi.fn>).mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
       const txClient = {
+        $queryRaw,
         economy: {
           update: vi.fn().mockResolvedValue({}),
           updateMany: vi.fn().mockResolvedValue({ count: 1 }),
@@ -44,6 +46,8 @@ describe('transfer', () => {
     const result = await transfer('sender-1', 'recipient-1', 100)
 
     expect(result).toEqual({ success: true, amount: 100 })
+    // Both wallets are row-locked first, in id order (deadlock-free A->B vs B->A).
+    expect($queryRaw.mock.calls.map((c) => c[1])).toEqual(['recipient-1', 'sender-1'])
 
     // Verify logTransaction was called inside the $transaction callback
     expect(logTransaction).toHaveBeenCalledTimes(2)
@@ -95,7 +99,7 @@ describe('transfer', () => {
     const updateMany = vi.fn().mockResolvedValue({ count: 0 }) // conditional debit matched no row
     const update = vi.fn().mockResolvedValue({})
     ;(prisma.$transaction as ReturnType<typeof vi.fn>).mockImplementation(async (fn: (tx: unknown) => Promise<void>) => {
-      await fn({ economy: { update, updateMany } })
+      await fn({ $queryRaw: vi.fn().mockResolvedValue([]), economy: { update, updateMany } })
     })
 
     await expect(transfer('sender-1', 'recipient-1', 100)).rejects.toThrow('Insufficient funds')
