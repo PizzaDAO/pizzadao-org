@@ -1,6 +1,5 @@
 import { NextResponse } from 'next/server'
 import { gamesEnabled } from '@/app/lib/pep-games/config'
-import { robEnabled } from '@/app/lib/pep-earn/rob'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -13,6 +12,5 @@ export async function GET() {
   return NextResponse.json({
     crime: process.env.PEP_CRIME_ENABLED === '1',
     games: gamesEnabled(),
-    rob: robEnabled(),
   })
 }

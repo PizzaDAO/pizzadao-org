@@ -1,6 +1,6 @@
 # Replace UnbelievaBoat with the $PEP economy
 
-**Status:** owner decisions made (2026-10-03, see §0). Part 1 (#134, merged): balance import tooling, `/balance`, `/work`, web crime API. Part 2 (branch `ub-replacement-2`): `/collect-income`, `/pay`, `/leaderboard`, `/rob` + `/peace`, blackjack/roulette/slots, `/shop` + `/buy`, store seed + item-grant scripts, crime and games cards on `/pep`. Everything that changes live behaviour is behind a flag or needs an owner step; nothing is live until the owner runs §4.
+**Status:** owner decisions made (2026-10-03, see §0). Part 1 (#134, merged): balance import tooling, `/balance`, `/work`, web crime API. Part 2 (branch `ub-replacement-2`): `/collect-income`, `/pay`, `/leaderboard`, blackjack/roulette/slots, `/shop` + `/buy`, store seed + item-grant scripts, crime and games cards on `/pep`. Everything that changes live behaviour is behind a flag or needs an owner step; nothing is live until the owner runs §4. **2026-10-03 (owner decision): `/rob` and `/peace` were removed entirely** (§7.4), and replies no longer label anything as cash or bank: there is one wallet, shown as $PEP.
 **Guild:** PizzaDAO, `812097286003359764`
 
 ## 0. Owner decisions (2026-10-03)
@@ -9,7 +9,7 @@
 |---|---|
 | UB API token | **None.** Export balances only from the public leaderboard (`export.mjs --public`). Item holdings are entered by hand (§7.6). UB balances are reset by hand in UB at cutover |
 | Balances | **Merge cash + bank 1:1** into the single wallet. **Forgive negative** net balances |
-| `/rob` | **Keep**, with the anti-abuse rules in §7.4 |
+| `/rob` | **Removed** (owner decision, 2026-10-03; was first kept, see §7.4) |
 | `/slut` | **Drop** |
 | Games | **Add** blackjack, roulette and slots (§7.5). Russian roulette, cock-fight and higher-lower are dropped |
 | Store | **Move** UB's 4 items to the $PEP shop (§7.6) |
@@ -21,7 +21,7 @@
 2. **No member loses a balance.** Every UB balance (cash + bank) is carried into $PEP once, auditable per user, with a signed snapshot kept for audit.
 3. **Nobody is paid twice.** The import is idempotent: one unique migration key per Discord ID. UB balances are zeroed at cutover.
 4. People who haven't onboarded keep their balance. It is held under their Discord ID and credited on their first login.
-5. The Discord habits people actually use keep working: `/work`, `/collect-income`, `/balance`, `/pay`, `/leaderboard`, `/rob`, the games and the store become **our** slash commands, and crime moves to the web app.
+5. The Discord habits people actually use keep working: `/work`, `/collect-income`, `/balance`, `/pay`, `/leaderboard`, the games and the store become **our** slash commands, and crime moves to the web app.
 6. Every payout, migrated or new, is a ledger row.
 
 Out of scope: **bounties.** UB has no bounty feature, and PizzaDAO's bounties already live in the Google Sheet behind the app.pizzadao.org task list, so there is nothing to migrate. Historical manual payouts (`/add-money` by staff) exist only in UB's **money audit log channel**. Export or keep that channel as the historical record (see §4, step 8).
@@ -69,9 +69,9 @@ Live configuration, read from the UB dashboard:
 - Currency is `<:pepperoni:973304305979367444>`. Starting balance is 0, there's no cash or bank cap, and balances are split into **cash + bank**.
 - **/work:** 30s cooldown, pays 10–100. Default replies are **off**. Custom replies are PizzaDAO "mission prompts" (e.g. "invite a friend to this week's community call… 314 bonus", "share a gif in #… 69-314 bonus"), and staff pay those bonuses by hand.
 - **/crime:** on. 30s cooldown, pays 2–420, 60% chance of a fine, fine is 5–55% (percent type).
-- **/slut, /rob and games** (blackjack, roulette, slots, russian-roulette, cock-fight, higher-lower) are in the menu, with settings unconfirmed. Owner decision: keep /rob (with §7.4 rules), drop /slut, port blackjack/roulette/slots (§7.5).
+- **/slut, /rob and games** (blackjack, roulette, slots, russian-roulette, cock-fight, higher-lower) are in the menu, with settings unconfirmed. Owner decision: drop /rob (removed 2026-10-03, §7.4) and /slut, port blackjack/roulette/slots (§7.5).
 - **Chat money:** off (0–0).
-- **Role income (`/collect-income`):** 11 roles, all daily cash; amounts in the appendix (ported as-is, §7.2).
+- **Role income (`/collect-income`):** 11 roles, all daily; amounts in the appendix (ported as-is, §7.2).
 - **Store (4 items):**
 
   | Item | Price | Note |
@@ -99,7 +99,7 @@ Live configuration, read from the UB dashboard:
 | `/collect-income` | **Built** | §7.2. 11 roles, daily, `ROLE_INCOME` |
 | `/give-money` | **Built** as `/pay member amount` | Hardened `transfer()` (now deadlock-free, §7.1) |
 | `/leaderboard` | **Built** | Top 10 by wallet, names from the members sheet |
-| `/rob` | **Built, off** | §7.4. Flag `PEP_ROB_ENABLED=1`. Plus `/peace` opt-out |
+| `/rob` | **Removed** (owner, 2026-10-03) | §7.4. `/peace` removed with it |
 | `/slut` | **Dropped** (owner) | |
 | Games | **Built, off** | Blackjack, roulette, slots on Discord **and** `/pep`. Flag `PEP_GAMES_ENABLED=1`. §7.5 |
 | Store (4 items) | **Built** | Seed script + Shop-tab rows (§7.6); `/shop`, `/buy item [quantity]` on Discord |
@@ -117,18 +117,18 @@ Live configuration, read from the UB dashboard:
 |---|---|---|---|
 | 0 | T-14d | Merge the PRs. On a **Neon branch** of prod: `npx prisma migrate deploy` (applies `20261003000000_pep_migration_and_earning` and `20261004000000_pep_discord_economy`), then rehearse steps 4-6 against that branch | Owner + dev |
 | 1 | T-14d | **Store:** add UB's 4 items to the **Shop** tab of the jobs/shop sheet (rows printed by `node scripts/unbelievaboat/seed-store.mjs --rare-box-stock N`). Confirm Rare Pizza Box stock. Collect **item holdings** by hand into a private CSV `discordId,item,qty` | Owner / staff |
-| 2 | T-7d | **Announce** in #announcements: date, "your UB balance (cash + bank) becomes $PEP 1:1, debts are forgiven", "log in at app.pizzadao.org to claim if you aren't a member yet", the new commands. Optional: run `export.mjs --public` → `import.mjs` dry run to quote totals | Owner |
+| 2 | T-7d | **Announce** in #announcements: date, "your UB balance becomes $PEP 1:1, debts are forgiven", "log in at app.pizzadao.org to claim if you aren't a member yet", the new commands. Optional: run `export.mjs --public` → `import.mjs` dry run to quote totals | Owner |
 | 3 | T-0, start | **Freeze UB.** In UB's dashboard disable the economy commands (work, crime, slut, rob, games, give-money, deposit/withdraw, collect-income, buy-item) or restrict them to staff. Turn off role income. Make sure the **leaderboard is public** (the export needs it). Post "economy frozen" | Owner (UB dashboard) |
 | 4 | T-0 | **Final export:** `UB_SNAPSHOT_SIGNING_KEY=... node scripts/unbelievaboat/export.mjs --public`. Re-run a minute later and compare sha256s; a mismatch means the freeze is leaking | Owner/dev |
 | 5 | T-0 | **Dry run:** `import.mjs --snapshot … --members crew.csv` (Crew sheet as CSV) with DATABASE_URL set. Check: no `invalid` (UB "Infinity" balances), bots excluded (the public leaderboard carries bot flags), negatives forgiven, totals match | Dev, owner signs off |
 | 6 | T-0 | **Apply:** `import.mjs … --apply --confirm-total <N>`. Then `grant-items.mjs --csv holdings.csv` (dry run) and `--apply`. Keep the `diff-*.csv`, `result-*.json` and grant output | Dev |
 | 7 | T-0 | **Verify** (§6). Then set `PEP_MIGRATION_CLAIMS=1` in Vercel so pending claims pay out on login | Dev |
 | 8 | T-0 | **Reset UB by hand:** without a token `zero-balances.mjs` can't run, so use UB's `/reset-economy` (or remove UB right away, step 11). Export UB's money-audit-log channel (DiscordChatExporter or a channel archive) first | Owner |
-| 9 | T-0 | **Switch on the new commands:** Interactions Endpoint URL + `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` (already set), `PEP_EMOJI`; `node scripts/discord/register-commands.mjs --apply`. Then flip, when wanted: `PEP_CRIME_ENABLED=1`, `PEP_ROB_ENABLED=1`, `PEP_GAMES_ENABLED=1` | Owner (Discord dev portal + Vercel), dev |
+| 9 | T-0 | **Switch on the new commands:** Interactions Endpoint URL + `DISCORD_PUBLIC_KEY`, `DISCORD_BOT_TOKEN` (already set), `PEP_EMOJI`; `node scripts/discord/register-commands.mjs --apply`. Then flip, when wanted: `PEP_CRIME_ENABLED=1`, `PEP_GAMES_ENABLED=1` | Owner (Discord dev portal + Vercel), dev |
 | 10 | T+1d…T+14d | Answer questions in a pinned thread. Watch the pending-claim count go down. Run `scripts/pep-reconcile.sql` (read-only) weekly | Owner / dev |
 | 11 | T+14d | **Decommission:** remove UnbelievaBoat from the server; archive the snapshot (§6.3) | Owner |
 
-**Do not register the new commands while UB still answers the same names** (`/work`, `/balance`, `/pay` vs UB's own, `/leaderboard`, `/rob`, `/blackjack`, ...). Discord shows both apps' commands; members would pick the wrong one. Register at step 9, after UB is frozen.
+**Do not register the new commands while UB still answers the same names** (`/work`, `/balance`, `/pay` vs UB's own, `/leaderboard`, `/blackjack`, ...). Discord shows both apps' commands; members would pick the wrong one. Register at step 9, after UB is frozen.
 
 ## 5. Balance mapping
 
@@ -171,7 +171,7 @@ Archive these privately: the snapshot `.json`, `.csv` and `.manifest.json`; the 
 
 ## 7. Discord commands and economy features
 
-All commands work only in the PizzaDAO guild and are verified with Ed25519 (`DISCORD_PUBLIC_KEY`). Replies are UnbelievaBoat-style embeds (`app/lib/discord-interactions/embeds.ts`): the invoking member as author (display name + avatar), green for success, red for errors and refusals, amber for cooldowns, a ✅/❌/⏳ headline, and numbered lists (`1 - <@&role> 🍕 420 (cash)`). Mentions inside embeds never ping; `allowed_mentions` is `{ parse: [] }` everywhere except `/pay`, `/add-money` and `/remove-money`, which ping the one member they name. Validation errors (bad amount, insufficient funds, out of stock) and cooldowns are answered ephemerally. Every PEP movement is a ledger row written in the same DB transaction as the wallet change; cooldowns are claimed in that transaction too (`EconomyCooldown`), so concurrent invocations can't double-pay. Real-Postgres race tests for all of it: `npm run test:pep-concurrency`.
+All commands work only in the PizzaDAO guild and are verified with Ed25519 (`DISCORD_PUBLIC_KEY`). Replies are UnbelievaBoat-style embeds (`app/lib/discord-interactions/embeds.ts`): the invoking member as author (display name + avatar), green for success, red for errors and refusals, amber for cooldowns, a ✅/❌/⏳ headline, and numbered lists (`1 - <@&role> 🍕 420`). Mentions inside embeds never ping; `allowed_mentions` is `{ parse: [] }` everywhere except `/pay`, `/add-money` and `/remove-money`, which ping the one member they name. Validation errors (bad amount, insufficient funds, out of stock) and cooldowns are answered ephemerally. Every PEP movement is a ledger row written in the same DB transaction as the wallet change; cooldowns are claimed in that transaction too (`EconomyCooldown`), so concurrent invocations can't double-pay. Real-Postgres race tests for all of it: `npm run test:pep-concurrency`.
 
 ### 7.1 Built
 | Command | Behaviour |
@@ -181,7 +181,6 @@ All commands work only in the PizzaDAO guild and are verified with Ed25519 (`DIS
 | `/collect-income` | §7.2 |
 | `/pay member amount` | Positive whole amount, not yourself, not a bot. Uses `transfer()`: conditional debit + credit + `TRANSFER_SENT`/`TRANSFER_RECEIVED` rows. **Fixed in this PR:** two members paying each other at the same moment deadlocked (Postgres aborted one); both wallets are now locked in id order first |
 | `/leaderboard` | Top 10 by wallet, numbered `1 - <@user> 🍕 amount` (mentions inside the embed render as names and never ping, so the members-sheet name lookup was dropped) |
-| `/rob member`, `/peace [enabled]` | §7.4, flag `PEP_ROB_ENABLED` |
 | `/blackjack bet`, `/roulette bet space`, `/slots bet` | §7.5, flag `PEP_GAMES_ENABLED` |
 | `/shop`, `/buy item [quantity]` | §7.6. `/buy` autocompletes item names and uses the hardened `buyItem()` |
 | `/add-money member amount reason`, `/remove-money member amount reason` | §7.7, admins and Pepperoni Mafia |
@@ -189,39 +188,20 @@ All commands work only in the PizzaDAO guild and are verified with Ed25519 (`DIS
 Web: crime card and games card on `/pep`, shown only when `GET /api/economy/features` reports the flag on.
 
 ### 7.2 Role income (`/collect-income`)
-- Table in code (`app/lib/pep-earn/income.ts`, `DEFAULT_ROLE_INCOME`) with the UB values from the appendix: every role daily, cash. Staff can override it without a code change with **`ROLE_INCOME_JSON`** (`[{"name":"Crew Member","amount":42,"intervalHours":24,"roleId":"..."}]`; invalid JSON falls back to the built-in table and logs a warning).
+- Table in code (`app/lib/pep-earn/income.ts`, `DEFAULT_ROLE_INCOME`) with the UB values from the appendix: every role daily, paid into the one $PEP wallet. Staff can override it without a code change with **`ROLE_INCOME_JSON`** (`[{"name":"Crew Member","amount":42,"intervalHours":24,"roleId":"..."}]`; invalid JSON falls back to the built-in table and logs a warning).
 - Role ids: Dread Pizza Roberts (`812131585327235113`) and Pizza Capo (`839206162837798945`) are pinned. The rest are resolved **by name** from `GET /guilds/{id}/roles` with the bot token, cached for an hour, matching names case-, space-, punctuation- and emoji-insensitively. A name that matches no role or several roles is skipped and logged (`[collect-income] unresolved roles`). Pin an id in `ROLE_INCOME_JSON` to fix either case.
 - The member's roles come from the interaction payload (`member.roles`), so no extra Discord call per use.
 - Per role and member, cooldown `income:<roleId>` (24h). Members collect every role they hold, one `ROLE_INCOME` row per role. Like UB: no stacking; a missed day is not paid later.
 
 ### 7.3 Dropped / not built
-- Dropped (owner): `/slut`, `/deposit`, `/withdraw`, russian roulette, cock-fight, higher-lower.
+- Dropped (owner): `/rob` and `/peace` (removed 2026-10-03), `/slut`, `/deposit`, `/withdraw`, russian roulette, cock-fight, higher-lower.
 - Built: the `/grant member amount reason` spec is now `/add-money` and `/remove-money` (§7.7).
 - Not built yet: moving /work prompts to a sheet tab.
 
-### 7.4 `/rob` rules (anti-abuse)
-Off unless **`PEP_ROB_ENABLED=1`**. Every number is an env-overridable constant in `app/lib/pep-earn/rob.ts` (`robConfig()`):
+### 7.4 `/rob` (removed)
+**Removed per owner decision, 2026-10-03.** `/rob` and its `/peace` opt-out were built behind `PEP_ROB_ENABLED`; the commands, `app/lib/pep-earn/rob.ts`, the `PEP_ROB_ENABLED` / `ROB_*` / `PEACE_*` config and the `rob` entry in `/api/economy/features` are gone. Re-run `node scripts/discord/register-commands.mjs --apply` so Discord drops the registered `/rob` and `/peace` (until then they answer "Unknown command.").
 
-| Rule | Default | Env | Why |
-|---|---|---|---|
-| Robber's minimum wallet | 500 | `ROB_MIN_ROBBER_BALANCE` | Robbing costs something: you need skin in the game for the fine |
-| Victim's minimum wallet | 200 | `ROB_MIN_VICTIM_BALANCE` | Small wallets (new and casual members) can't be farmed |
-| Success chance | 40% | `ROB_SUCCESS_PERCENT` | |
-| Steal on success | random 5-20% of the victim's wallet, max 1,000 | `ROB_STEAL_MIN_PERCENT`, `ROB_STEAL_MAX_PERCENT`, `ROB_STEAL_CAP` | Bounded loss for big holders |
-| Fine on failure, **paid to the victim** | random 10-25% of the robber's wallet, clamped to 50..1,000 (never more than the wallet) | `ROB_FINE_MIN_PERCENT`, `ROB_FINE_MAX_PERCENT`, `ROB_FINE_FLOOR`, `ROB_FINE_CAP` | Failed attempts compensate the target instead of burning PEP |
-| Robber cooldown | 4h (any outcome) | `ROB_COOLDOWN_HOURS` | |
-| Victim protection | one attempt per victim per 12h, **by anyone, any outcome** | `ROB_VICTIM_COOLDOWN_HOURS` | No pile-ons; no harassment loops |
-| No self, no bots | always | | Bots via the interaction's resolved user |
-| New members | can't rob or be robbed for 7 days after joining the server | `ROB_NEW_MEMBER_DAYS` | Uses `member.joined_at` from the interaction; also stops fresh alt accounts robbing |
-| Must be in the server | target must be a current member | | From the interaction's resolved members |
-| Peace mode | `/peace enabled:True`: can't rob, can't be robbed | | Opt-out for people who don't want the game |
-| Peace toggle cooldown | 24h between changes | `PEACE_TOGGLE_COOLDOWN_HOURS` | Can't flip it on and off tactically |
-| After leaving peace mode | can't rob until the toggle cooldown passes (24h) | | No "safe until I strike" |
-| After a rob attempt | can't enter peace mode for 12h | `PEACE_AFTER_ROB_HOURS` | Can't rob and then hide from retaliation |
-
-Expected value is roughly break-even to mildly positive for a robber with a modest wallet against a rich victim (e.g. robber 1,000 vs victim 5,000: +250 expected steal vs -105 expected fine), negative against near-minimum victims. That is in the spirit of UB's rob.
-
-**Atomicity:** one DB transaction locks both wallets (`SELECT … FOR UPDATE` in id order, so A-robs-B racing B-robs-A can't deadlock), re-reads balances under the lock, checks peace mode, claims both cooldowns, then moves PEP. Success: `ROB_LOSS` (-victim) + `ROB_STEAL` (+robber). Failure: `ROB_FINE` (-robber) + `ROB_FINE` (+victim). A refusal rolls everything back, so a refused attempt burns no cooldown.
+Database: the `ROB_STEAL` / `ROB_LOSS` / `ROB_FINE` enum values and the `EconomyPeaceMode` table stay (dropping Postgres enum values is invasive; no rows should exist). `scripts/pep-reconcile.sql` still checks `ROB_*` signs so any historical rows reconcile. A later cleanup migration can drop `EconomyPeaceMode`.
 
 ### 7.5 Games
 Off unless **`PEP_GAMES_ENABLED=1`** (Discord and web). `app/lib/pep-games/`.
@@ -267,7 +247,7 @@ Replaces UB's `add-money` / `remove-money` (e.g. /work mission bonuses, fixing m
   - The report lists any **shortfall** (PEP already spent). Then unset `PEP_MIGRATION_CLAIMS`, re-enable UB's commands, and announce.
 - **After step 8:** without a token UB can't be restored by script; balances would have to be re-entered in UB by hand (`/add-money`) from the snapshot. Avoid: only reset UB once the import has been verified.
 - **Schema:** the migrations are additive (new tables, enums and enum values), so leaving them in place is harmless. Postgres can't drop enum values easily, so don't try.
-- **Features:** unset `PEP_ROB_ENABLED` / `PEP_GAMES_ENABLED` / `PEP_CRIME_ENABLED` to switch them off instantly (Discord replies "not enabled", web APIs 404, `/pep` hides the cards). Live blackjack hands still settle on the next press or sweep once games are back on; to refund them sooner, flip the flag back on briefly or settle them by hand.
+- **Features:** unset `PEP_GAMES_ENABLED` / `PEP_CRIME_ENABLED` to switch them off instantly (Discord replies "not enabled", web APIs 404, `/pep` hides the cards). Live blackjack hands still settle on the next press or sweep once games are back on; to refund them sooner, flip the flag back on briefly or settle them by hand.
 - **Item grants:** reverse by hand (decrement `Inventory`, delete the `ItemGrant` row) if a CSV line was wrong.
 - **Commands:** deleting them in the dev portal (or registering an empty list) removes them. Clearing the Interactions Endpoint URL disables the route.
 
@@ -280,7 +260,7 @@ Replaces UB's `add-money` / `remove-money` (e.g. /work mission bonuses, fixing m
 5. **Holdings CSV:** list current UB item holders by hand (`discordId,item,qty`); keep it private.
 6. **UB leaderboard must be public** at export time; **reset UB by hand** (`/reset-economy`) or remove UB after the import.
 7. **Discord application settings:** Interactions Endpoint URL = `https://app.pizzadao.org/api/discord/interactions`; Vercel env `DISCORD_PUBLIC_KEY`, `DISCORD_APPLICATION_ID`, `PEP_EMOJI` (and `DISCORD_BOT_TOKEN`, `DISCORD_GUILD_ID`, already used by the app). If the PizzaDAO application already serves interactions another way, use a new application.
-8. **Flags**, when ready: `PEP_MIGRATION_CLAIMS=1`, `PEP_CRIME_ENABLED=1`, `PEP_ROB_ENABLED=1`, `PEP_GAMES_ENABLED=1`. Optional tuning: `ROLE_INCOME_JSON`, `ROB_*`, `PEACE_*`, `GAME_*`, `BLACKJACK_TIMEOUT_SECONDS`.
+8. **Flags**, when ready: `PEP_MIGRATION_CLAIMS=1`, `PEP_CRIME_ENABLED=1`, `PEP_GAMES_ENABLED=1`. Optional tuning: `ROLE_INCOME_JSON`, `GAME_*`, `BLACKJACK_TIMEOUT_SECONDS`.
 9. A private archive location for the snapshot and audit files, and optionally a `UB_SNAPSHOT_SIGNING_KEY` kept offline.
 
 ## 10. Decisions
@@ -290,7 +270,7 @@ Replaces UB's `add-money` / `remove-money` (e.g. /work mission bonuses, fixing m
 | Rate | **1 UB (cash + bank) = 1 PEP** (decided) |
 | Negative balances | **Forgive** (decided) |
 | Export path | **Public leaderboard, no token** (decided) |
-| `/rob` | **Keep with §7.4 rules** (decided) |
+| `/rob` | **Removed** (owner decision, 2026-10-03) |
 | `/slut` | **Drop** (decided) |
 | Games | **Blackjack, roulette, slots** (decided) |
 | Store | **Move the 4 items** (decided) |
@@ -331,7 +311,7 @@ DATABASE_URL=... node scripts/unbelievaboat/grant-items.mjs --csv holdings.csv -
 DISCORD_APPLICATION_ID=... DISCORD_BOT_TOKEN=... DISCORD_GUILD_ID=812097286003359764 \
   node scripts/discord/register-commands.mjs --apply
 
-# 8. flags when ready: PEP_CRIME_ENABLED=1, PEP_ROB_ENABLED=1, PEP_GAMES_ENABLED=1
+# 8. flags when ready: PEP_CRIME_ENABLED=1, PEP_GAMES_ENABLED=1
 
 # health check any time (read-only)
 PGOPTIONS='-c default_transaction_read_only=on' psql "$DATABASE_URL" -X -f scripts/pep-reconcile.sql
@@ -355,7 +335,6 @@ The scripts need Node ≥ 22.18. They re-exec themselves with `--experimental-tr
 | `app/lib/shop-grants.ts` | CSV parsing, grant planning and apply (`ItemGrant`) |
 | `app/lib/pep-earn/{cooldown,work,crime}.ts` | #134: cooldowns, `/work`, crime |
 | `app/lib/pep-earn/income.ts` | Role income table, name→id resolution, `collectIncome()` |
-| `app/lib/pep-earn/rob.ts` | `/rob` and peace mode |
 | `app/lib/pep-earn/rng.ts` | crypto RNG helpers |
 | `app/lib/pep-games/{config,roulette,slots,blackjack}.ts` | Games |
 | `app/lib/discord-interactions/{verify,commands,handle,guild-roles,embeds}.ts` | Verification, command definitions, dispatch (commands, buttons, autocomplete), cached guild roles, UB-style reply embeds |
@@ -370,11 +349,11 @@ The scripts need Node ≥ 22.18. They re-exec themselves with `--experimental-tr
 | `app/lib/pep-economy.concurrency.test.ts` | Real-Postgres race tests (`npm run test:pep-concurrency`) |
 | `prisma/migrations/20261003000000_pep_migration_and_earning` | #134: `PendingPepClaim`, `EconomyCooldown`, enum values |
 | `prisma/migrations/20261005000000_admin_grant_types` | `TransactionType` += `ADMIN_GRANT`, `ADMIN_REMOVE` |
-| `prisma/migrations/20261004000000_pep_discord_economy` | `EconomyPeaceMode`, `BlackjackGame` (+ `BlackjackStatus`), `ItemGrant`; `TransactionType` += `ROLE_INCOME`, `ROB_STEAL`, `ROB_LOSS`, `ROB_FINE`, `GAME_BET`, `GAME_WIN` |
+| `prisma/migrations/20261004000000_pep_discord_economy` | `EconomyPeaceMode` (unused since /rob was removed), `BlackjackGame` (+ `BlackjackStatus`), `ItemGrant`; `TransactionType` += `ROLE_INCOME`, `ROB_STEAL`, `ROB_LOSS`, `ROB_FINE` (legacy), `GAME_BET`, `GAME_WIN` |
 
 ## Appendix: current UnbelievaBoat role income (read from the UB dashboard, 2026-10-03)
 
-All are *collectable* (via `/collect-income`), paid in **cash**, once per **1 day**:
+All are *collectable* (via `/collect-income`), once per **1 day**, into the single $PEP wallet:
 
 | Role | PEP / day |
 |---|---|

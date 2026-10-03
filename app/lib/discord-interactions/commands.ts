@@ -3,8 +3,8 @@
  * payloads (scripts/discord/register-commands.mjs PUTs these as guild
  * commands). Only commands with a handler are listed.
  *
- * /rob, /peace and the games are registered like the rest but answer "not
- * enabled yet" until PEP_ROB_ENABLED=1 / PEP_GAMES_ENABLED=1.
+ * The games are registered like the rest but answer "not enabled yet" until
+ * PEP_GAMES_ENABLED=1.
  *
  * /add-money and /remove-money are visible to everyone (no
  * default_member_permissions, so Pepperoni Mafia holders without Administrator
@@ -17,7 +17,6 @@
 // Discord application command option types
 const STRING = 3
 const INTEGER = 4
-const BOOLEAN = 5
 const USER = 6
 
 const bet = { type: INTEGER, name: 'bet', description: 'How much $PEP to bet', required: true, min_value: 1 } as const
@@ -59,18 +58,6 @@ export const PEP_COMMANDS = [
   {
     name: 'leaderboard',
     description: 'Top 10 $PEP wallets',
-    dm_permission: false,
-  },
-  {
-    name: 'rob',
-    description: 'Try to rob a member (you risk a fine)',
-    options: [{ type: USER, name: 'member', description: 'Who to rob', required: true }],
-    dm_permission: false,
-  },
-  {
-    name: 'peace',
-    description: 'Peace mode: you can’t rob and can’t be robbed. No option = show status',
-    options: [{ type: BOOLEAN, name: 'enabled', description: 'Turn peace mode on or off', required: false }],
     dm_permission: false,
   },
   {

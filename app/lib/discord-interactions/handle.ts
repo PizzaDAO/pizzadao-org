@@ -13,7 +13,6 @@
 import { ApiError } from '../errors/api-errors'
 import { adminGrantError, normalizeReason, type AdminAdjustResult } from '../pep-admin'
 import type { IncomeResult } from '../pep-earn/income'
-import type { PeaceResult, RobContext, RobResult } from '../pep-earn/rob'
 import type { BlackjackMove, BlackjackStart, BlackjackView } from '../pep-games/blackjack'
 import { SLOT_EMOJI, type SlotSymbol } from '../pep-games/slots'
 import { EPHEMERAL, InteractionType, ResponseType } from './commands'
@@ -68,10 +67,6 @@ export interface HandlerDeps {
   collectIncome: (discordId: string, roleIds: string[]) => Promise<IncomeResult & { unresolved?: string[] }>
   pay: (fromId: string, toId: string, amount: number) => Promise<unknown>
   leaderboard: () => Promise<Array<{ userId: string; balance: number }>>
-  robEnabled: () => boolean
-  rob: (robberId: string, victimId: string, ctx: RobContext) => Promise<RobResult>
-  getPeace: (discordId: string) => Promise<boolean>
-  setPeace: (discordId: string, enable: boolean) => Promise<PeaceResult>
   gamesEnabled: () => boolean
   startBlackjack: (discordId: string, bet: number) => Promise<BlackjackStart>
   blackjackAction: (discordId: string, gameId: string, action: 'hit' | 'stand') => Promise<BlackjackMove>
@@ -213,7 +208,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       }
       const waiting = r.waiting.map((w) => `${roleLabel(w.roleId, w.name)}: next collection ${rel(w.readyAt)}`)
       if (r.paid.length === 0) return out.wait('Nothing to collect yet.', waiting.join('\n'))
-      const paid = [...r.paid].sort((a, b) => b.amount - a.amount).map((p) => `${roleLabel(p.roleId, p.name)} ${amt(p.amount)} (cash)`)
+      const paid = [...r.paid].sort((a, b) => b.amount - a.amount).map((p) => `${roleLabel(p.roleId, p.name)} ${amt(p.amount)}`)
       const body = [numbered(paid), '', `Total: ${amt(r.total)} • Balance: ${amt(r.balance)}`]
       if (waiting.length) body.push('', ...waiting)
       return out.ok('Role income successfully collected!', body.join('\n'))
@@ -236,48 +231,6 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       const rows = await deps.leaderboard()
       if (rows.length === 0) return out.error('Nobody has any $PEP yet.')
       return out.ok('$PEP leaderboard', numbered(rows.map((r) => `<@${r.userId}> ${amt(r.balance)}`)))
-    }
-
-    case 'rob': {
-      if (!deps.robEnabled()) return out.error("Robbing isn't enabled yet.")
-      const victim = opt(i, 'member')
-      if (typeof victim !== 'string' || !SNOWFLAKE.test(victim)) return out.error('Pick a member to rob.')
-      const resolvedMember = i.data?.resolved?.members?.[victim]
-      if (victim !== userId && !resolvedMember) return out.error("They're not in the server.")
-      const r = await deps.rob(userId, victim, {
-        victimIsBot: !!i.data?.resolved?.users?.[victim]?.bot,
-        robberJoinedAt: i.member?.joined_at ? new Date(i.member.joined_at) : null,
-        victimJoinedAt: resolvedMember?.joined_at ? new Date(resolvedMember.joined_at) : null,
-      })
-      if (!r.ok) {
-        const { tone, text } = robRefusal(r, victim, cur)
-        return tone === 'cooldown' ? out.wait(text) : out.error(text)
-      }
-      if (r.outcome === 'success') {
-        return out.ok('Robbery successful!', `💰 <@${userId}> robbed <@${victim}> and got away with ${pep(r.amount)} (${r.percent}% of their wallet).`)
-      }
-      return out.send('error', 'Caught!', `🚨 <@${userId}> got caught trying to rob <@${victim}> and paid them a ${pep(r.amount)} fine.`)
-    }
-
-    case 'peace': {
-      if (!deps.robEnabled()) return out.error("Robbing isn't enabled yet, so there's nothing to opt out of.")
-      const want = opt(i, 'enabled')
-      if (typeof want !== 'boolean') {
-        const on = await deps.getPeace(userId)
-        return on
-          ? out.ok('Peace mode is **on**.', "🕊️ You can't rob or be robbed.", { ephemeral: true })
-          : out.ok('Peace mode is **off**.', '⚔️ You can rob and be robbed.', { ephemeral: true })
-      }
-      const r = await deps.setPeace(userId, want)
-      if (!r.ok) {
-        return r.reason === 'robbed_recently'
-          ? out.wait('You tried a robbery recently.', `You can turn on peace mode ${rel(r.readyAt)}.`)
-          : out.wait('You changed peace mode recently.', `You can change it again ${rel(r.readyAt)}.`)
-      }
-      if (!r.changed) return out.error(`Peace mode is already ${want ? 'on' : 'off'}.`)
-      return want
-        ? out.ok('Peace mode is now **on**.', "🕊️ You can't rob or be robbed.", { ephemeral: true })
-        : out.ok('Peace mode is now **off**.', '⚔️ You can rob and be robbed again.', { ephemeral: true })
     }
 
     case 'blackjack': {
@@ -405,37 +358,6 @@ async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<Interact
       .map((it) => ({ name: `${it.name} (${n(it.price)})`.slice(0, 100), value: String(it.id) }))
   }
   return { type: ResponseType.AUTOCOMPLETE_RESULT, data: { choices } }
-}
-
-function robRefusal(r: Extract<RobResult, { ok: false }>, victim: string, cur: string): { tone: Tone; text: string } {
-  const error = (text: string) => ({ tone: 'error' as const, text })
-  const wait = (text: string) => ({ tone: 'cooldown' as const, text })
-  switch (r.reason) {
-    case 'disabled':
-      return error("Robbing isn't enabled yet.")
-    case 'self':
-      return error("You can't rob yourself.")
-    case 'bot':
-      return error("You can't rob a bot.")
-    case 'robber_new':
-      return wait(`New members can't rob yet. You can ${r.readyAt ? rel(r.readyAt) : 'soon'}.`)
-    case 'victim_new':
-      return error(`<@${victim}> is a new member and is protected for now.`)
-    case 'robber_peace':
-      return error("You're in peace mode. Turn it off with /peace enabled:False to rob.")
-    case 'victim_peace':
-      return error(`<@${victim}> is in peace mode and can't be robbed.`)
-    case 'peace_recent':
-      return wait(`You changed peace mode recently. You can rob ${r.readyAt ? rel(r.readyAt) : 'later'}.`)
-    case 'robber_poor':
-      return error(`You need at least ${cur} ${n(r.min ?? 0)} in your wallet to rob (you risk a fine).`)
-    case 'victim_poor':
-      return error(`<@${victim}> has less than ${cur} ${n(r.min ?? 0)}. Not worth it.`)
-    case 'cooldown':
-      return wait(`You're laying low. You can rob again ${r.readyAt ? rel(r.readyAt) : 'later'}.`)
-    case 'victim_cooldown':
-      return wait(`<@${victim}> was targeted recently. They can be robbed again ${r.readyAt ? rel(r.readyAt) : 'later'}.`)
-  }
 }
 
 // ------------------------------------------------------------- blackjack ---
