@@ -218,7 +218,8 @@ export async function composeProfileSummary(
         typeof mission.currentLevel === "number" &&
         (mission.approvedCount ?? 0) > 0
     ) {
-        level = mission.currentLevel > 8 ? "MAX" : mission.currentLevel;
+        const maxLevel = typeof mission.maxLevel === "number" && mission.maxLevel > 0 ? mission.maxLevel : 8;
+        level = mission.currentLevel > maxLevel ? "MAX" : mission.currentLevel;
         levelTitle = mission.levelTitle ?? "";
     }
 

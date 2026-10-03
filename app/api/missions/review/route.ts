@@ -1,25 +1,22 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { approveMission, rejectMission } from '@/app/lib/missions'
-import { hasAnyRole } from '@/app/lib/discord'
-import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
+import { approveMission, rejectMission, getCompletionForReview } from '@/app/lib/missions'
+import { canReviewMission } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
-import { UnauthorizedError, ForbiddenError, ValidationError } from '@/app/lib/errors/api-errors'
+import { UnauthorizedError, ForbiddenError, ValidationError, NotFoundError } from '@/app/lib/errors/api-errors'
 import { invalidateProgressCache } from '@/app/lib/mission-cache'
 
 export const runtime = 'nodejs'
 
-// POST - Approve or reject a mission submission
+// POST - Approve or reject a mission submission.
+// Reviewers: the admin roles + Dread Pizza Roberts, Pizza Capo and Pepperoni
+// Mafia for L1–L7; Dread Pizza Roberts only for L8 (canReviewMission).
+// Nobody reviews their own submission.
 const POST_HANDLER = async (request: NextRequest) => {
   const session = await getSession()
 
   if (!session?.discordId) {
     throw new UnauthorizedError()
-  }
-
-  const isAdmin = await hasAnyRole(session.discordId, ADMIN_ROLE_IDS)
-  if (!isAdmin) {
-    throw new ForbiddenError('Only admins can review mission submissions')
   }
 
   const body = await request.json()
@@ -31,6 +28,17 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   if (action !== 'approve' && action !== 'reject') {
     throw new ValidationError('Action must be "approve" or "reject"')
+  }
+
+  const target = await getCompletionForReview(completionId)
+  if (!target) {
+    throw new NotFoundError('Mission completion')
+  }
+  if (!(await canReviewMission(session.discordId, target.level))) {
+    throw new ForbiddenError(`You can't review Level ${target.level} mission submissions`)
+  }
+  if (target.discordId === session.discordId) {
+    throw new ForbiddenError("You can't review your own mission submission")
   }
 
   let result

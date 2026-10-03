@@ -92,8 +92,8 @@ export function MissionsProgress({ summary }: MissionsProgressProps = {}) {
     0
   );
 
-  // Max level check
-  const allDone = currentLevel > 8;
+  // Max level check: past the highest level that has missions (no hard-coded 8).
+  const allDone = levels.length > 0 && currentLevel > Math.max(...levels.map((l) => l.level));
 
   return (
     <div
