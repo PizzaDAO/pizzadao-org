@@ -448,6 +448,37 @@ model MissionReviewEvent {
   @@index([actorId, createdAt])
 }
 
+// One nightly verifier run (/api/cron/missions) or backfill
+// (scripts/missions/backfill.mjs): bookkeeping, resume point and report.
+model VerifierRun {
+  id         Int       @id @default(autoincrement())
+  kind       String    // nightly | backfill
+  dryRun     Boolean   // true while MISSION_VERIFIERS_ENABLED is off (or a backfill dry run)
+  startedAt  DateTime  @default(now())
+  finishedAt DateTime?
+  cursor     String?   // resume point: the last discordId processed
+  leaseUntil DateTime? // an invocation working on this run holds it until then
+  stats      Json?     // { members, approved, held, levelsPaid, pepPaid, wouldApprove, ..., errors }
+  updatedAt  DateTime  @default(now()) @updatedAt
+
+  @@index([kind, startedAt])
+}
+
+// Duplicate-account signals (plans/mission-verification.md §6.2), recomputed
+// by the nightly run. Flags for reviewers only: nothing is blocked or revoked.
+model AccountSignal {
+  id          Int      @id @default(autoincrement())
+  kind        String   // shared_wallet | shared_x | shared_telegram | shared_member_id | sheet_duplicate
+  key         String   // what is shared (wallet address, handle, memberId, discordId)
+  discordIds  String[]
+  memberIds   String[] @default([])
+  detail      Json?
+  firstSeenAt DateTime @default(now())
+  lastSeenAt  DateTime @default(now())
+
+  @@unique([kind, key])
+}
+
 // ===== VOUCHES IN THE DAO =====
 
 enum SocialPlatform {

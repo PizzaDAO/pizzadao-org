@@ -69,6 +69,9 @@ type Libs = {
   celebration: typeof import('./celebration')
   engine: typeof import('./mission-verify/engine')
   policy: typeof import('./mission-verify/policy')
+  bulk: typeof import('./mission-verify/bulk')
+  nightly: typeof import('./mission-verify/nightly')
+  runs: typeof import('./mission-verify/runs')
 }
 let L: Libs
 const N = 20
@@ -140,6 +143,9 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       celebration: await import('./celebration'),
       engine: await import('./mission-verify/engine'),
       policy: await import('./mission-verify/policy'),
+      bulk: await import('./mission-verify/bulk'),
+      nightly: await import('./mission-verify/nightly'),
+      runs: await import('./mission-verify/runs'),
     }
   }, 60_000)
 
@@ -406,6 +412,111 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     expect(await wallet(user)).toBe(0)
     await deactivate([m.id])
   }, 60_000)
+
+  // ---- Mission verification Phase 2 (nightly cron + backfill on the same member) ----
+
+  /** A bulk context limited to the test missions (no Discord, no sheet). */
+  const bulkCtx = async (ids: number[]) => {
+    const rows = await L.prisma.mission.findMany({
+      where: { id: { in: ids } },
+      select: { id: true, level: true, index: true, title: true, reward: true, verifierKey: true, verifierParams: true },
+    })
+    return { catalog: L.bulk.buildCatalog(rows), guildRoles: null, memberIds: null }
+  }
+
+  it(`backfill --apply and the nightly run racing on one member (${N} each) pay each level exactly once, in order`, async () => {
+    const a = await missionAt(1, 'it p2 link X', 'x_linked', {}, 69)
+    const b = await missionAt(2, 'it p2 call', 'attendance_count', { min: 1 }, 420)
+    const user = await seedUser(0)
+    await linkX(user)
+    await L.prisma.callAttendance.create({
+      data: { discordId: user, crewId: 'community_call', crewLabel: 'Community Call', callDate: new Date(), dailySheetId: `it-p2-${RUN}-${user}` },
+    })
+    const ctx = await bulkCtx([a.id, b.id])
+
+    // The dry run (flag off) projects both levels and writes nothing.
+    const [dry] = await L.bulk.checkMany([user], { trigger: 'backfill', dryRun: true, enabled: false, ctx })
+    expect(dry.report?.checks.map((c) => c.outcome)).toEqual(['would_approve', 'would_approve'])
+    expect(dry.payouts).toEqual([{ level: 1, reward: 69 }, { level: 2, reward: 420 }])
+    expect(await L.prisma.missionCompletion.count({ where: { discordId: user } })).toBe(0)
+
+    // A real nightly invocation (VerifierRun row, lease, cursor) for this member only...
+    const nightly = L.nightly.runNightlyMissions({
+      budgetMs: 60_000,
+      batchSize: 1,
+      deps: {
+        enabled: () => true,
+        loadContext: async () => ctx,
+        listMembers: async () => [user],
+        refreshSignals: async () => ({ skipped: 'test' }),
+        announce: async () => {},
+      },
+    })
+    // ...racing N backfill --apply batches and N more nightly-style batches on the same member.
+    const res = await Promise.allSettled([
+      nightly,
+      ...Array.from({ length: N }, () => L.bulk.checkMany([user], { trigger: 'backfill', dryRun: false, enabled: true, ctx })),
+      ...Array.from({ length: N }, () => L.bulk.checkMany([user], { trigger: 'cron', dryRun: false, enabled: true, ctx })),
+    ])
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    await settle()
+
+    const rows = await L.prisma.missionCompletion.findMany({ where: { discordId: user }, include: { events: true } })
+    expect(rows).toHaveLength(2)
+    for (const r of rows) {
+      expect(r).toMatchObject({ status: 'APPROVED', source: 'AUTO' })
+      expect(r.events.filter((e: any) => e.action === 'AUTO_APPROVED')).toHaveLength(1)
+    }
+    const rewards = await L.prisma.transaction.findMany({ where: { userId: user, type: 'MISSION_REWARD' }, orderBy: { id: 'asc' } })
+    expect(rewards.map((t: any) => t.metadata.level)).toEqual([1, 2])
+    expect(await wallet(user)).toBe(69 + 420)
+    // Exactly one of all those runs paid each level.
+    const outcomes = res.flatMap((r) => (r.status === 'fulfilled' && Array.isArray(r.value) ? r.value : []))
+    const nightlyRes = (res[0] as PromiseFulfilledResult<any>).value
+    const paid = [...outcomes.flatMap((o: any) => o.payouts.map((p: any) => p.level)), ...Object.keys(nightlyRes.stats.levelsPaid).map(Number)]
+    expect(paid.sort()).toEqual([1, 2])
+    expect(nightlyRes).toMatchObject({ status: 'finished', dryRun: false, processed: 1, remaining: 0 })
+    const run = await L.prisma.verifierRun.findUniqueOrThrow({ where: { id: nightlyRes.runId } })
+    expect(run).toMatchObject({ kind: 'nightly', dryRun: false, cursor: user, leaseUntil: null })
+    expect(run.finishedAt).not.toBeNull()
+    await expectLedgerConsistent(user)
+
+    // Re-running everything is a no-op (idempotent).
+    const again = await L.bulk.checkMany([user], { trigger: 'backfill', dryRun: false, enabled: true, ctx })
+    expect(again[0].payouts).toEqual([])
+    expect(await wallet(user)).toBe(69 + 420)
+    await deactivate([a.id, b.id])
+  }, 120_000)
+
+  it(`${N} simultaneous nightly invocations pay the member once (lease / runs never double-pay)`, async () => {
+    await L.prisma.verifierRun.deleteMany({ where: { kind: 'nightly' } })
+    const m = await missionAt(1, 'it p2 lease', 'x_linked', {}, 69)
+    const user = await seedUser(0)
+    await linkX(user)
+    const ctx = await bulkCtx([m.id])
+    const res = await Promise.allSettled(
+      Array.from({ length: N }, () =>
+        L.nightly.runNightlyMissions({
+          budgetMs: 60_000,
+          deps: {
+            enabled: () => true,
+            loadContext: async () => ctx,
+            listMembers: async () => [user],
+            refreshSignals: async () => ({}),
+            announce: async () => {},
+          },
+        }),
+      ),
+    )
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    await settle()
+    expect(await wallet(user)).toBe(69)
+    await expectLedgerConsistent(user)
+    const statuses = res.map((r) => (r as PromiseFulfilledResult<any>).value.status)
+    expect(statuses.filter((s) => s === 'finished').length).toBeGreaterThanOrEqual(1)
+    expect(statuses.every((s) => ['finished', 'busy', 'already_ran'].includes(s))).toBe(true)
+    await deactivate([m.id])
+  }, 120_000)
 
   it(`${N} parallel level-up claims (tabs, reloads) celebrate once`, async () => {
     const memberId = `it-${RUN}`

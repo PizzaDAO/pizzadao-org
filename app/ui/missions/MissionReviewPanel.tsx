@@ -30,6 +30,8 @@ type Submission = {
   holdReason?: string | null;
   holdLabel?: string | null;
   checkResult?: Record<string, unknown> | null;
+  /** Possible duplicate accounts (shared wallet / X / Telegram / member ID): information only. */
+  accountSignals?: AccountSignal[];
   submittedAt: string;
   mission: {
     title: string;
@@ -37,6 +39,16 @@ type Submission = {
     index: number;
     description: string | null;
   };
+};
+
+type AccountSignal = { kind: string; label: string; key: string; others: string[] };
+
+type FlaggedCompletion = {
+  id: number;
+  discordId: string;
+  flaggedAt: string;
+  flagReason: string | null;
+  mission: { title: string; level: number; index: number };
 };
 
 const DISPLAY_FONT =
@@ -58,6 +70,7 @@ function formatCheck(r: Record<string, unknown>): string {
 
 export function MissionReviewPanel() {
   const [submissions, setSubmissions] = useState<Submission[]>([]);
+  const [flagged, setFlagged] = useState<FlaggedCompletion[]>([]);
   const toast = useToast();
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -81,6 +94,7 @@ export function MissionReviewPanel() {
       }
       const json = await res.json();
       setSubmissions(json.submissions);
+      setFlagged(json.flagged ?? []);
     } catch {
       setError("Failed to load pending submissions");
     } finally {
@@ -412,6 +426,33 @@ export function MissionReviewPanel() {
                 </div>
               )}
 
+              {sub.accountSignals && sub.accountSignals.length > 0 && (
+                <div
+                  data-testid="account-signals"
+                  style={{
+                    fontSize: 13,
+                    color: "hsl(var(--foreground))",
+                    padding: "8px 10px",
+                    background: "rgba(245, 158, 11, 0.08)",
+                    borderLeft: "2px solid rgb(245, 158, 11)",
+                    borderRadius: 4,
+                  }}
+                >
+                  <span
+                    className="overline"
+                    style={{ display: "block", marginBottom: 2, color: "rgb(180, 83, 9)" }}
+                  >
+                    § Possible duplicate account · check before approving
+                  </span>
+                  {sub.accountSignals.map((sig) => (
+                    <div key={`${sig.kind}:${sig.key}`} style={{ wordBreak: "break-word" }}>
+                      {sig.label}
+                      {sig.others.length > 0 ? ` ${sig.others.join(", ")}` : ""} ({sig.key})
+                    </div>
+                  ))}
+                </div>
+              )}
+
               {sub.notes && (
                 <div
                   style={{
@@ -521,6 +562,22 @@ export function MissionReviewPanel() {
           );
         })}
       </div>
+      )}
+
+      {flagged.length > 0 && (
+        <div data-testid="flagged-completions" style={{ marginTop: 22 }}>
+          <span className="overline" style={{ display: "block", marginBottom: 6, color: "rgb(180, 83, 9)" }}>
+            § Flagged · approved, but no longer met (nothing was taken back)
+          </span>
+          <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "hsl(var(--foreground))" }}>
+            {flagged.map((f) => (
+              <li key={f.id} style={{ wordBreak: "break-word" }}>
+                L{f.mission.level}.{f.mission.index} {f.mission.title} · {f.discordId}
+                {f.flagReason ? ` · ${f.flagReason}` : ""} · {new Date(f.flaggedAt).toLocaleDateString()}
+              </li>
+            ))}
+          </ul>
+        </div>
       )}
     </div>
   );

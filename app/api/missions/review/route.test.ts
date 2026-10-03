@@ -9,6 +9,10 @@ vi.mock('@/app/lib/mission-cache', () => ({ invalidateProgressCache: vi.fn() }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({
   fetchMemberByDiscordId: vi.fn(async (id: string) => ({ name: `name-${id}` })),
 }))
+vi.mock('@/app/lib/mission-verify/review-extras', () => ({
+  getFlaggedCompletions: vi.fn(async () => []),
+  getSignalViews: vi.fn(async () => new Map()),
+}))
 vi.mock('@/app/lib/missions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/lib/missions')>()
   return {
@@ -27,6 +31,7 @@ import { GET as PENDING } from '../pending/route'
 import { getSession } from '@/app/lib/session'
 import { getUserRoles } from '@/app/lib/discord'
 import { approveMission, rejectMission, getCompletionForReview, getPendingSubmissions } from '@/app/lib/missions'
+import { getFlaggedCompletions, getSignalViews } from '@/app/lib/mission-verify/review-extras'
 
 const DPR = '812131585327235113'
 const CAPO = '839206162837798945'
@@ -130,6 +135,24 @@ describe('GET /api/missions/pending', () => {
     expect(resub.notes).toBe('again')
     expect(resub.reviewHistory).toEqual(['Attempt 1 rejected t by r | note: blurry'])
     expect(resub.attempt).toBe(2)
+  })
+
+  it('shows duplicate-account signals per submission and the flagged list (levels the reviewer may review, not their own)', async () => {
+    vi.mocked(getSignalViews).mockResolvedValueOnce(
+      new Map([['member-1', [{ kind: 'shared_wallet', label: 'Shares a wallet with', key: '0xabc', others: ['member-2'] }]]]),
+    )
+    vi.mocked(getFlaggedCompletions).mockResolvedValueOnce([
+      { id: 9, discordId: 'member-3', flaggedAt: '2026-10-02T05:31:00.000Z', flagReason: 'Required Discord role not held', mission: { title: 'Mafia', level: 6, index: 0 } },
+      { id: 10, discordId: 'capo', flaggedAt: '2026-10-02T05:31:00.000Z', flagReason: 'x', mission: { title: 'Mafia', level: 6, index: 0 } },
+      { id: 11, discordId: 'member-4', flaggedAt: '2026-10-02T05:31:00.000Z', flagReason: 'x', mission: { title: 'DPR', level: 8, index: 0 } },
+    ])
+    as('capo', [CAPO])
+    const { submissions, flagged } = await (await PENDING()).json()
+    expect(submissions.find((s: { id: number }) => s.id === 1).accountSignals).toEqual([
+      { kind: 'shared_wallet', label: 'Shares a wallet with', key: '0xabc', others: ['member-2'] },
+    ])
+    expect(submissions.find((s: { id: number }) => s.id === 4).accountSignals).toEqual([])
+    expect(flagged.map((f: { id: number }) => f.id)).toEqual([9])
   })
 
   it('Dread Pizza Roberts sees L8 too', async () => {

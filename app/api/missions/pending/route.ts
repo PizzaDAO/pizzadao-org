@@ -6,6 +6,7 @@ import { missionReviewScope } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
 import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
+import { getFlaggedCompletions, getSignalViews } from '@/app/lib/mission-verify/review-extras'
 
 export const runtime = 'nodejs'
 
@@ -38,6 +39,11 @@ const GET_HANDLER = async () => {
   )
   const nameMap = new Map(memberLookups)
 
+  // Reviewer information only (never blocks): duplicate-account signals for
+  // these members, and approved missions flagged because the state was lost.
+  const [flaggedAll, signals] = await Promise.all([getFlaggedCompletions(), getSignalViews(uniqueDiscordIds)])
+  const flagged = flaggedAll.filter(f => canReviewLevel(f.mission.level) && f.discordId !== session.discordId)
+
   return NextResponse.json({
     submissions: pending.map(p => {
       // Rejection history: RESUBMITTED / REOPENED events, plus legacy Phase 0 notes blocks.
@@ -58,6 +64,7 @@ const GET_HANDLER = async () => {
         holdReason: p.holdReason ?? null,
         holdLabel: p.holdReason ? HOLD_LABEL[p.holdReason] : null,
         checkResult: p.checkResult ?? null,
+        accountSignals: signals.get(p.discordId) ?? [],
         submittedAt: p.submittedAt.toISOString(),
         mission: {
           title: p.mission.title,
@@ -67,6 +74,7 @@ const GET_HANDLER = async () => {
         },
       }
     }),
+    flagged,
   })
 }
 
