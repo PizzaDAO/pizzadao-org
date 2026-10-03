@@ -21,6 +21,10 @@
 //   * mission verification: parallel runVerifiers for one member (and racing
 //     human approvals) pay each level exactly once, hold what needs a human
 //     release, and never override a rejection
+//   * Phase 4: a web bulk approve racing single approves and Discord clicks
+//     decides each submission once and pays once; parallel onboarding
+//     completions record one Referral, and the inviter's referral verifier
+//     pays once
 // Finally it runs every check in scripts/pep-reconcile.sql against the DB.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -75,6 +79,8 @@ type Libs = {
   reviewDecision: typeof import('./mission-verify/review-decision')
   reviewCards: typeof import('./mission-verify/review-cards')
   sla: typeof import('./mission-verify/sla')
+  bulkReview: typeof import('./mission-verify/bulk-review')
+  referrals: typeof import('./referrals')
 }
 let L: Libs
 const N = 20
@@ -152,6 +158,8 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       reviewDecision: await import('./mission-verify/review-decision'),
       reviewCards: await import('./mission-verify/review-cards'),
       sla: await import('./mission-verify/sla'),
+      bulkReview: await import('./mission-verify/bulk-review'),
+      referrals: await import('./referrals'),
     }
   }, 60_000)
 
@@ -252,7 +260,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
   it(`${N} parallel approvals of the last mission pay the level reward once`, async () => {
     const level = 100 + (Number(RUN) % 1000) // isolated level, outside the real 1-8 range
     const mission = await L.prisma.mission.create({
-      data: { level, index: 0, title: 'it mission', reward: 420, autoVerify: false },
+      data: { level, index: 0, title: 'it mission', reward: 420 },
     })
     const user = await seedUser(0)
     const completion = await L.prisma.missionCompletion.create({
@@ -268,7 +276,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     const level = 2000 + (Number(RUN) % 1000)
     const missions = await Promise.all(
       Array.from({ length: 4 }, (_, index) =>
-        L.prisma.mission.create({ data: { level, index, title: `it auto ${index}`, reward: 69, autoVerify: true } }),
+        L.prisma.mission.create({ data: { level, index, title: `it auto ${index}`, reward: 69 } }),
       ),
     )
     // submitMissionCompletion gates on getCurrentLevel (all lower levels done), so on an
@@ -292,11 +300,11 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     // Level 1 with a run-unique index: getCurrentLevel is data-driven, so the
     // mission must sit at the bottom level for the submit's level gate.
     const mission = await L.prisma.mission.create({
-      data: { level: 1, index: 1000 + (Number(RUN) % 100000), title: 'it resubmit', reward: 0, autoVerify: true },
+      data: { level: 1, index: 1000 + (Number(RUN) % 100000), title: 'it resubmit', reward: 0 },
     })
     const user = await seedUser(0)
     const first = await L.missions.submitMissionCompletion(user, mission.id, 'https://one', 'first')
-    expect(first.status).toBe('PENDING') // autoVerify no longer approves on submit
+    expect(first.status).toBe('PENDING') // nothing approves on submit
     await L.missions.rejectMission('reviewer', first.id, 'blurry')
 
     const res = await Promise.allSettled(
@@ -625,6 +633,106 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     expect(resub.reviewQueuedAt).not.toBeNull()
     expect(await L.reviewCards.syncReviewCard(c.id, deps)).toBe('posted')
     expect(post).toHaveBeenCalledTimes(2)
+    await deactivate([m.id])
+  }, 60_000)
+
+  // ---- Mission verification Phase 4 (bulk approve, referrals) ----
+
+  /** bulkApprove wired like /api/missions/review/bulk (the reviewer may review every level here). */
+  const bulkDeps = {
+    target: (id: number) => L.missions.getCompletionForReview(id),
+    canReview: async () => true,
+    approve: async (by: string, id: number, note?: string) => {
+      const r = await L.missions.approveMission(by, id, note)
+      return { discordId: r.discordId, levelsPaid: r.levelsPaid }
+    },
+  }
+
+  it(`${N} bulk approves racing ${N} single web approves and ${N} Discord clicks: each submission decided once, the level paid once`, async () => {
+    const m1 = await missionAt(1, 'it bulk a', null, null, 69)
+    const m2 = await missionAt(1, 'it bulk b', null, null, 69)
+    const user = await seedUser(0)
+    const c1 = await L.prisma.missionCompletion.create({ data: { missionId: m1.id, discordId: user, status: 'PENDING' } })
+    const c2 = await L.prisma.missionCompletion.create({ data: { missionId: m2.id, discordId: user, status: 'PENDING' } })
+    const d = discordDecisionDeps()
+    const res = await Promise.allSettled([
+      ...Array.from({ length: N }, (_, i) => L.bulkReview.bulkApprove(`bulk-it-${i}`, [c1.id, c2.id], {}, bulkDeps)),
+      ...Array.from({ length: N }, () => L.missions.approveMission('web-it', c1.id)),
+      ...Array.from({ length: N }, (_, i) => L.reviewDecision.runReviewDecision(decisionJob('approve', c2.id, `disc-it-${i}`), d)),
+    ])
+    expect(res.filter((r) => r.status === 'rejected' && !/already been reviewed/.test(String((r as PromiseRejectedResult).reason)))).toEqual([])
+    await settle()
+
+    // Exactly one decision per submission, whoever won.
+    const bulkResults = res
+      .slice(0, N)
+      .flatMap((r) => (r.status === 'fulfilled' ? (r.value as Array<{ id: number; outcome: string }>) : []))
+    for (const c of [c1, c2]) {
+      const events = await L.prisma.missionReviewEvent.findMany({ where: { completionId: c.id, action: 'APPROVED' } })
+      expect(events, `completion ${c.id}`).toHaveLength(1)
+      const bulkWins = bulkResults.filter((r) => r.id === c.id && r.outcome === 'approved').length
+      expect(bulkResults.filter((r) => r.id === c.id && !['approved', 'already_handled'].includes(r.outcome))).toEqual([])
+      const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: c.id } })
+      expect(row.status).toBe('APPROVED')
+      if (bulkWins) expect(row.reviewedBy).toMatch(/^bulk-it-/)
+      expect(bulkWins).toBeLessThanOrEqual(1)
+    }
+    const webWins = res.slice(N, 2 * N).filter((r) => r.status === 'fulfilled').length
+    const discordWins = res.slice(2 * N).filter((r) => r.status === 'fulfilled' && r.value === 'approved').length
+    expect(bulkResults.filter((r) => r.id === c1.id && r.outcome === 'approved').length + webWins).toBe(1)
+    expect(bulkResults.filter((r) => r.id === c2.id && r.outcome === 'approved').length + discordWins).toBe(1)
+
+    // Level 1 (both missions) paid exactly once.
+    await L.missions.settleLevels(user)
+    const rewards = await L.prisma.transaction.findMany({ where: { userId: user, type: 'MISSION_REWARD' } })
+    expect(rewards).toHaveLength(1)
+    expect(await wallet(user)).toBe(69)
+    await expectLedgerConsistent(user)
+    await deactivate([m1.id, m2.id])
+  }, 60_000)
+
+  it(`referral capture end to end: ${N} parallel onboarding completions record one Referral; the inviter's L3.1 approves and pays once`, async () => {
+    const m = await missionAt(1, 'it invite a friend', 'referral', { min: 1, qualify: 'onboarded' }, 69)
+    const inviter = await seedUser(0)
+    const invitee = uid()
+    const inviterMemberId = String(4000 + (Number(RUN) % 1000))
+    const deps = { ...L.referrals.defaultReferralDeps, inviterDiscordId: async (mid: string) => (mid === inviterMemberId ? inviter : null) }
+    const pick = L.referrals.chooseInviter(undefined, inviterMemberId) // the pd_ref cookie, no explicit choice
+
+    // Nothing before the friend onboards.
+    let runs = await runAll(inviter, [m.id])
+    expect(runs.flatMap((r) => (r.status === 'fulfilled' ? r.value.approved : []))).toEqual([])
+
+    const recorded = await Promise.all(
+      Array.from({ length: N }, () =>
+        L.referrals.recordReferral({ inviteeDiscordId: invitee, inviteeMemberId: '9001', inviterMemberId: pick.memberId, via: pick.via, inviteCode: pick.inviteCode }, deps),
+      ),
+    )
+    expect(recorded.filter((r) => r.outcome === 'recorded')).toHaveLength(1)
+    expect(recorded.filter((r) => r.outcome === 'already_referred')).toHaveLength(N - 1)
+    const rows = await L.prisma.referral.findMany({ where: { inviteeDiscordId: invitee } })
+    expect(rows).toEqual([
+      expect.objectContaining({ inviterDiscordId: inviter, inviterMemberId, via: 'invite_link', inviteCode: inviterMemberId, flags: [], qualifiedAt: expect.any(Date) }),
+    ])
+
+    // A self-referral writes nothing.
+    expect(await L.referrals.recordReferral({ inviteeDiscordId: inviter, inviteeMemberId: '77', inviterMemberId, via: 'onboarding' }, deps)).toEqual({
+      outcome: 'self_referral',
+      inviterDiscordId: inviter,
+    })
+    expect(await L.prisma.referral.count({ where: { inviteeDiscordId: inviter } })).toBe(0)
+
+    // The inviter's referral verifier now passes: approved once, paid once.
+    runs = await runAll(inviter, [m.id])
+    expect(runs.filter((r) => r.status === 'rejected')).toEqual([])
+    await settle()
+    const done = await L.prisma.missionCompletion.findMany({ where: { discordId: inviter, missionId: m.id }, include: { events: true } })
+    expect(done).toHaveLength(1)
+    expect(done[0]).toMatchObject({ status: 'APPROVED', reviewedBy: 'auto:referral', source: 'AUTO' })
+    expect(done[0].events.filter((e: any) => e.action === 'AUTO_APPROVED')).toHaveLength(1)
+    expect(await wallet(inviter)).toBe(69)
+    await expectLedgerConsistent(inviter)
+    await L.prisma.referral.deleteMany({ where: { inviteeDiscordId: invitee } })
     await deactivate([m.id])
   }, 60_000)
 
