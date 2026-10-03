@@ -140,6 +140,10 @@ export async function transfer(fromId: string, toId: string, amount: number) {
 
   // Debit, credit and both ledger rows commit together or not at all.
   await prisma.$transaction(async (tx) => {
+    // Lock both wallets in a fixed (id) order first. Without this, A->B racing
+    // B->A locks the rows in opposite orders and Postgres aborts one of them
+    // with "deadlock detected" (found by the concurrency suite).
+    for (const id of [fromId, toId].sort()) await lockWallet(tx, id)
     await debitInTx(tx, fromId, amount, 'TRANSFER_SENT', `Transfer to ${toId}`, { toUserId: toId })
     await creditInTx(tx, toId, amount, 'TRANSFER_RECEIVED', `Transfer from ${fromId}`, { fromUserId: fromId })
   })
