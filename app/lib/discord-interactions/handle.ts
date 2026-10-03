@@ -236,7 +236,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       const lines = items.map(
         (it) => `**${escapeMd(it.name)}**: ${cur} ${n(it.price)}${it.quantity === -1 ? '' : it.quantity > 0 ? ` (${n(it.quantity)} left)` : ' (sold out)'}`,
       )
-      return reply(`**$PEP shop**\n${lines.join('\n')}\nBuy with /buy, or at app.pizzadao.org/pep`, true)
+      return reply(`**$PEP shop**\n${lines.join('\n')}\nBuy with /buy, or at [app.pizzadao.org/pep](<https://app.pizzadao.org/pep>)`, true)
     }
 
     case 'buy': {
