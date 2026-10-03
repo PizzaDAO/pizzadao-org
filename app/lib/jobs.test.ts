@@ -1,10 +1,11 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { completeJob, recordDailyJobCompletion } from './jobs'
+import { completeJob, recordDailyJobCompletion, isTodaysDailyJob } from './jobs'
 import { prisma } from './db'
 
 vi.mock('./db')
-vi.mock('./economy', () => ({
-  updateWallet: vi.fn().mockResolvedValue({}),
+vi.mock('./economy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./economy')>()),
+  getOrCreateEconomy: vi.fn().mockResolvedValue({}),
 }))
 vi.mock('./transactions', () => ({
   logTransaction: vi.fn().mockResolvedValue({
@@ -19,34 +20,40 @@ vi.mock('./transactions', () => ({
   }),
 }))
 
-import { updateWallet } from './economy'
 import { logTransaction } from './transactions'
+
+const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
 
 describe('completeJob', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
+    mockFn(prisma.economy.update).mockResolvedValue({})
   })
 
-  it('should award reward and log a JOB_REWARD transaction', async () => {
-    ;(prisma.jobAssignment.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 1,
-      jobId: 7,
-      userId: 'worker-1',
-      job: { id: 7, description: 'Clean the kitchen', type: 'General', isActive: true },
-    })
-    ;(prisma.jobAssignment.delete as ReturnType<typeof vi.fn>).mockResolvedValue({})
+  const ASSIGNMENT = {
+    id: 1,
+    jobId: 7,
+    userId: 'worker-1',
+    job: { id: 7, description: 'Clean the kitchen', type: 'General', isActive: true },
+  }
 
-    const result = await completeJob('worker-1', 50)
+  it('removes the assignment, pays and logs JOB_REWARD (with the granting admin) in one transaction', async () => {
+    mockFn(prisma.jobAssignment.findFirst).mockResolvedValue(ASSIGNMENT)
+    mockFn(prisma.jobAssignment.deleteMany).mockResolvedValue({ count: 1 })
 
-    expect(prisma.jobAssignment.delete).toHaveBeenCalledWith({ where: { id: 1 } })
-    expect(updateWallet).toHaveBeenCalledWith('worker-1', 50)
+    const result = await completeJob('worker-1', 50, 'admin-1')
+
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(prisma.jobAssignment.deleteMany).toHaveBeenCalledWith({ where: { id: 1 } })
+    expect(prisma.economy.update).toHaveBeenCalledWith({ where: { id: 'worker-1' }, data: { wallet: { increment: 50 } } })
     expect(logTransaction).toHaveBeenCalledWith(
       prisma,
       'worker-1',
       'JOB_REWARD',
       50,
       'Job reward: Clean the kitchen',
-      { jobId: 7 }
+      { jobId: 7, grantedBy: 'admin-1' }
     )
     expect(result).toEqual({
       success: true,
@@ -55,25 +62,38 @@ describe('completeJob', () => {
     })
   })
 
+  it('does not pay when a concurrent completion already removed the assignment', async () => {
+    mockFn(prisma.jobAssignment.findFirst).mockResolvedValue(ASSIGNMENT)
+    mockFn(prisma.jobAssignment.deleteMany).mockResolvedValue({ count: 0 })
+
+    await expect(completeJob('worker-1', 50)).rejects.toThrow('User does not have an active job')
+    expect(prisma.economy.update).not.toHaveBeenCalled()
+    expect(logTransaction).not.toHaveBeenCalled()
+  })
+
   it('should not log transaction when reward is zero', async () => {
-    ;(prisma.jobAssignment.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 2,
-      jobId: 8,
-      userId: 'worker-1',
-      job: { id: 8, description: 'Sweep the floor', type: 'General', isActive: true },
-    })
-    ;(prisma.jobAssignment.delete as ReturnType<typeof vi.fn>).mockResolvedValue({})
+    mockFn(prisma.jobAssignment.findFirst).mockResolvedValue({ ...ASSIGNMENT, id: 2 })
+    mockFn(prisma.jobAssignment.deleteMany).mockResolvedValue({ count: 1 })
 
     await completeJob('worker-1', 0)
 
-    expect(updateWallet).not.toHaveBeenCalled()
+    expect(prisma.economy.update).not.toHaveBeenCalled()
     expect(logTransaction).not.toHaveBeenCalled()
   })
 
   it('should throw when user has no active job', async () => {
-    ;(prisma.jobAssignment.findFirst as ReturnType<typeof vi.fn>).mockResolvedValue(null)
-
+    mockFn(prisma.jobAssignment.findFirst).mockResolvedValue(null)
     await expect(completeJob('worker-1', 50)).rejects.toThrow('User does not have an active job')
+  })
+})
+
+describe('isTodaysDailyJob', () => {
+  it("only accepts the jobs on today's board", async () => {
+    const jobs = Array.from({ length: 10 }, (_, i) => ({ id: i + 1, description: `job ${i + 1}`, type: 't', assignments: [] }))
+    mockFn(prisma.job.findMany).mockResolvedValue(jobs)
+    const results = await Promise.all(jobs.map((j) => isTodaysDailyJob(j.id)))
+    expect(results.filter(Boolean)).toHaveLength(3)
+    expect(await isTodaysDailyJob(999)).toBe(false)
   })
 })
 

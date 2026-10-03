@@ -1,65 +1,77 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { createBounty, completeBounty, cancelBounty } from './bounties'
+import { createBounty, claimBounty, completeBounty, cancelBounty } from './bounties'
 import { prisma } from './db'
 
 vi.mock('./db')
-vi.mock('./economy', () => ({
+// Real debitInTx / creditInTx (so the tests see the wallet + ledger writes);
+// only the wallet-row bootstrap is mocked.
+vi.mock('./economy', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('./economy')>()),
   getOrCreateEconomy: vi.fn(),
-  updateBalance: vi.fn(),
 }))
 vi.mock('./notifications', () => ({
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
   notifyBountyCompleted: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('./transactions', () => ({
-  logTransaction: vi.fn().mockResolvedValue({
-    id: 1,
-    userId: '',
-    type: '',
-    amount: 0,
-    balance: 0,
-    description: '',
-    metadata: null,
-    createdAt: new Date(),
-  }),
+  logTransaction: vi.fn().mockResolvedValue({}),
 }))
 
-import { getOrCreateEconomy, updateBalance } from './economy'
+import { getOrCreateEconomy } from './economy'
 import { logTransaction } from './transactions'
 
-describe('createBounty', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
+const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
 
-  it('should escrow funds and log a BOUNTY_ESCROW transaction', async () => {
-    ;(getOrCreateEconomy as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'creator-1', wallet: 500 })
-    ;(updateBalance as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'creator-1', wallet: 400 })
-    ;(prisma.bounty.create as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      description: 'Fix the bug',
-      reward: 100,
-      createdBy: 'creator-1',
-      status: 'OPEN',
-    })
+/** The tx client is the mocked prisma itself; $transaction just runs the callback. */
+function runTxOnPrisma() {
+  mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
+}
+
+const CLAIMED = {
+  id: 10,
+  description: 'Fix the bug',
+  reward: 100,
+  createdBy: 'creator-1',
+  claimedBy: 'claimer-1',
+  status: 'CLAIMED',
+}
+
+beforeEach(() => {
+  vi.clearAllMocks()
+  runTxOnPrisma()
+  mockFn(getOrCreateEconomy).mockResolvedValue({ id: 'creator-1', wallet: 500 })
+  mockFn(prisma.economy.update).mockResolvedValue({})
+  mockFn(prisma.economy.updateMany).mockResolvedValue({ count: 1 })
+})
+
+describe('createBounty', () => {
+  it('creates the bounty and escrows (conditional debit + BOUNTY_ESCROW) in one transaction', async () => {
+    mockFn(prisma.bounty.create).mockResolvedValue({ id: 10, description: 'Fix the bug', reward: 100, createdBy: 'creator-1', status: 'OPEN' })
 
     const bounty = await createBounty('creator-1', 'Fix the bug', 100)
 
-    expect(updateBalance).toHaveBeenCalledWith('creator-1', -100)
-    expect(logTransaction).toHaveBeenCalledWith(
-      prisma,
-      'creator-1',
-      'BOUNTY_ESCROW',
-      -100,
-      'Bounty escrow: Fix the bug',
-      { bountyId: 10 }
-    )
+    expect(prisma.$transaction).toHaveBeenCalledTimes(1)
+    expect(prisma.economy.updateMany).toHaveBeenCalledWith({
+      where: { id: 'creator-1', wallet: { gte: 100 } },
+      data: { wallet: { decrement: 100 } },
+    })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'creator-1', 'BOUNTY_ESCROW', -100, 'Bounty escrow: Fix the bug', { bountyId: 10 })
     expect(bounty.id).toBe(10)
     expect(bounty.status).toBe('OPEN')
   })
 
-  it('should throw ValidationError for zero reward', async () => {
-    await expect(createBounty('creator-1', 'Do thing', 0)).rejects.toThrow('Reward must be positive')
+  it('fails (rolling back the bounty row) when a concurrent spend drained the wallet', async () => {
+    mockFn(prisma.bounty.create).mockResolvedValue({ id: 10 })
+    mockFn(prisma.economy.updateMany).mockResolvedValue({ count: 0 })
+
+    await expect(createBounty('creator-1', 'Fix the bug', 100)).rejects.toThrow('Insufficient funds to escrow reward')
+    expect(logTransaction).not.toHaveBeenCalled()
+  })
+
+  it('rejects zero, negative and fractional rewards', async () => {
+    await expect(createBounty('creator-1', 'Do thing', 0)).rejects.toThrow('Reward must be a positive whole number')
+    await expect(createBounty('creator-1', 'Do thing', -5)).rejects.toThrow('Reward must be a positive whole number')
+    await expect(createBounty('creator-1', 'Do thing', 1.5)).rejects.toThrow('Reward must be a positive whole number')
   })
 
   it('should throw ValidationError for empty description', async () => {
@@ -67,115 +79,106 @@ describe('createBounty', () => {
   })
 
   it('should throw ValidationError for insufficient funds', async () => {
-    ;(getOrCreateEconomy as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'creator-1', wallet: 50 })
-
+    mockFn(getOrCreateEconomy).mockResolvedValue({ id: 'creator-1', wallet: 50 })
     await expect(createBounty('creator-1', 'Expensive task', 100)).rejects.toThrow('Insufficient funds')
   })
 })
 
-describe('completeBounty', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
+describe('claimBounty', () => {
+  it('claims with a conditional OPEN -> CLAIMED update', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...CLAIMED, claimedBy: null, status: 'OPEN' })
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
+
+    const result = await claimBounty('claimer-1', 10)
+
+    expect(prisma.bounty.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, status: 'OPEN' },
+      data: { claimedBy: 'claimer-1', status: 'CLAIMED' },
+    })
+    expect(result.status).toBe('CLAIMED')
   })
 
-  it('should pay the claimer and log a BOUNTY_REWARD transaction', async () => {
-    ;(prisma.bounty.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      description: 'Fix the bug',
-      reward: 100,
-      createdBy: 'creator-1',
-      claimedBy: 'claimer-1',
-      status: 'CLAIMED',
-    })
-    ;(updateBalance as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'claimer-1', wallet: 200 })
-    ;(prisma.bounty.update as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      status: 'COMPLETED',
-    })
+  it('loses cleanly when someone else claimed it concurrently', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...CLAIMED, claimedBy: null, status: 'OPEN' })
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 0 })
+
+    await expect(claimBounty('claimer-2', 10)).rejects.toThrow('Bounty is not available')
+  })
+})
+
+describe('completeBounty', () => {
+  it('flips CLAIMED -> COMPLETED and pays the claimer (+ BOUNTY_REWARD) in one transaction', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue(CLAIMED)
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
 
     const result = await completeBounty('creator-1', 10)
 
-    expect(updateBalance).toHaveBeenCalledWith('claimer-1', 100)
-    expect(logTransaction).toHaveBeenCalledWith(
-      prisma,
-      'claimer-1',
-      'BOUNTY_REWARD',
-      100,
-      'Bounty reward: Fix the bug',
-      { bountyId: 10 }
-    )
+    expect(prisma.bounty.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, createdBy: 'creator-1', status: 'CLAIMED', claimedBy: 'claimer-1' },
+      data: { status: 'COMPLETED' },
+    })
+    expect(prisma.economy.update).toHaveBeenCalledWith({
+      where: { id: 'claimer-1' },
+      data: { wallet: { increment: 100 } },
+    })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Fix the bug', { bountyId: 10 })
     expect(result.status).toBe('COMPLETED')
   })
 
-  it('should throw NotFoundError when bounty does not exist', async () => {
-    ;(prisma.bounty.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue(null)
+  it('does not pay when a concurrent complete/cancel already released the escrow', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue(CLAIMED) // stale read
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 0 })
 
+    await expect(completeBounty('creator-1', 10)).rejects.toThrow('no longer awaiting completion')
+    expect(prisma.economy.update).not.toHaveBeenCalled()
+    expect(logTransaction).not.toHaveBeenCalled()
+  })
+
+  it('should throw NotFoundError when bounty does not exist', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue(null)
     await expect(completeBounty('creator-1', 999)).rejects.toThrow('Bounty not found')
   })
 
   it('should throw ForbiddenError when user is not the creator', async () => {
-    ;(prisma.bounty.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      createdBy: 'creator-1',
-      claimedBy: 'claimer-1',
-      status: 'CLAIMED',
-    })
-
+    mockFn(prisma.bounty.findUnique).mockResolvedValue(CLAIMED)
     await expect(completeBounty('other-user', 10)).rejects.toThrow('Only the bounty creator')
   })
 })
 
 describe('cancelBounty', () => {
-  beforeEach(() => {
-    vi.clearAllMocks()
-  })
-
-  it('should refund the creator and log a BOUNTY_REFUND transaction', async () => {
-    ;(prisma.bounty.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      description: 'Fix the bug',
-      reward: 100,
-      createdBy: 'creator-1',
-      claimedBy: null,
-      status: 'OPEN',
-    })
-    ;(updateBalance as ReturnType<typeof vi.fn>).mockResolvedValue({ id: 'creator-1', wallet: 600 })
-    ;(prisma.bounty.update as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      status: 'CANCELLED',
-    })
+  it('flips OPEN/CLAIMED -> CANCELLED and refunds (+ BOUNTY_REFUND) in one transaction', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...CLAIMED, claimedBy: null, status: 'OPEN' })
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
 
     const result = await cancelBounty('creator-1', 10)
 
-    expect(updateBalance).toHaveBeenCalledWith('creator-1', 100)
-    expect(logTransaction).toHaveBeenCalledWith(
-      prisma,
-      'creator-1',
-      'BOUNTY_REFUND',
-      100,
-      'Bounty refund: Fix the bug',
-      { bountyId: 10 }
-    )
+    expect(prisma.bounty.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, createdBy: 'creator-1', status: { in: ['OPEN', 'CLAIMED'] } },
+      data: { status: 'CANCELLED' },
+    })
+    expect(prisma.economy.update).toHaveBeenCalledWith({
+      where: { id: 'creator-1' },
+      data: { wallet: { increment: 100 } },
+    })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'creator-1', 'BOUNTY_REFUND', 100, 'Bounty refund: Fix the bug', { bountyId: 10 })
     expect(result.status).toBe('CANCELLED')
   })
 
-  it('should throw ConflictError when bounty is already completed', async () => {
-    ;(prisma.bounty.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      createdBy: 'creator-1',
-      status: 'COMPLETED',
-    })
+  it('does not refund twice when a concurrent cancel/complete won', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...CLAIMED, status: 'OPEN' })
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 0 })
 
+    await expect(cancelBounty('creator-1', 10)).rejects.toThrow('can no longer be cancelled')
+    expect(prisma.economy.update).not.toHaveBeenCalled()
+  })
+
+  it('should throw ConflictError when bounty is already completed', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ id: 10, createdBy: 'creator-1', status: 'COMPLETED' })
     await expect(cancelBounty('creator-1', 10)).rejects.toThrow('Cannot cancel a completed bounty')
   })
 
   it('should throw ConflictError when bounty is already cancelled', async () => {
-    ;(prisma.bounty.findUnique as ReturnType<typeof vi.fn>).mockResolvedValue({
-      id: 10,
-      createdBy: 'creator-1',
-      status: 'CANCELLED',
-    })
-
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ id: 10, createdBy: 'creator-1', status: 'CANCELLED' })
     await expect(cancelBounty('creator-1', 10)).rejects.toThrow('already cancelled')
   })
 })

@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { transfer, requireOnboarded, formatCurrency } from '@/app/lib/economy'
+import { resolvePepRecipient } from '@/app/lib/pep-recipient'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -22,11 +23,14 @@ const POST_HANDLER = async (request: NextRequest) => {
     throw new ValidationError('Recipient user ID required')
   }
 
-  if (!amount || typeof amount !== 'number' || amount <= 0) {
-    throw new ValidationError('Valid positive amount required')
+  if (typeof amount !== 'number' || !Number.isInteger(amount) || amount <= 0) {
+    throw new ValidationError('Amount must be a positive whole number')
   }
 
-  const result = await transfer(session.discordId, toUserId, Math.floor(amount))
+  // Member ID or Discord ID -> Discord ID of a real member (never a new orphan wallet).
+  const recipientId = await resolvePepRecipient(toUserId)
+
+  const result = await transfer(session.discordId, recipientId, amount)
 
   return NextResponse.json({
     success: true,

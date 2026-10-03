@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/app/lib/auth-guards'
-import { getJob, JOB_REWARD_AMOUNT, hasCompletedJobToday, recordDailyJobCompletion } from '@/app/lib/jobs'
+import { getJob, JOB_REWARD_AMOUNT, hasCompletedJobToday, recordDailyJobCompletion, isTodaysDailyJob } from '@/app/lib/jobs'
 import { requireOnboarded, getOrCreateEconomy, formatCurrency } from '@/app/lib/economy'
 
 export const runtime = 'nodejs'
@@ -24,6 +24,12 @@ export async function POST(request: NextRequest) {
     const job = await getJob(jobId)
     if (!job || !job.isActive) {
       return NextResponse.json({ error: 'Job not found' }, { status: 404 })
+    }
+
+    // Only today's daily jobs pay out (the board shows 3); without this any
+    // active job id could be completed for a reward every day.
+    if (!(await isTodaysDailyJob(jobId))) {
+      return NextResponse.json({ error: "This job is not one of today's jobs" }, { status: 400 })
     }
 
     // Fast path for a friendly error; the atomic check below is authoritative.

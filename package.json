@@ -10,7 +10,8 @@
     "test": "vitest",
     "test:run": "vitest run",
     "postinstall": "prisma generate",
-    "e2e:local": "node e2e/local/run.mjs"
+    "e2e:local": "node e2e/local/run.mjs",
+    "test:pep-concurrency": "node scripts/pep-concurrency-local.mjs"
   },
   "dependencies": {
     "@cloudflare/blindrsa-ts": "^0.4.4",

@@ -1,6 +1,6 @@
 import { prisma } from './db'
-import { getOrCreateEconomy } from './economy'
-import { logTransaction } from './transactions'
+import { assertPepAmount, debitInTx, getOrCreateEconomy } from './economy'
+import { ConflictError, NotFoundError, ValidationError } from './errors/api-errors'
 
 /**
  * Get all available shop items
@@ -34,8 +34,8 @@ export async function getShopItemByName(name: string) {
  * Buy an item from the shop
  */
 export async function buyItem(userId: string, itemId: number, quantity = 1) {
-  if (quantity <= 0) {
-    throw new Error('Quantity must be positive')
+  if (!Number.isInteger(quantity) || quantity <= 0) {
+    throw new ValidationError('Quantity must be a positive whole number')
   }
 
   const item = await prisma.shopItem.findUnique({
@@ -43,39 +43,48 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
   })
 
   if (!item) {
-    throw new Error('Item not found')
+    throw new NotFoundError('Item')
   }
 
   if (!item.isAvailable) {
-    throw new Error('Item is not available')
+    throw new ValidationError('Item is not available')
+  }
+
+  // A zero/negative/fractional price (e.g. a bad row from the shop sheet sync)
+  // would turn a purchase into a mint. Refuse it.
+  if (!Number.isInteger(item.price) || item.price <= 0) {
+    throw new ValidationError('Item is not available')
   }
 
   // Check stock (quantity = -1 means unlimited)
   if (item.quantity !== -1 && item.quantity < quantity) {
-    throw new Error(`Not enough stock. Only ${item.quantity} available.`)
+    throw new ValidationError(`Not enough stock. Only ${item.quantity} available.`)
   }
 
   const totalCost = item.price * quantity
+  assertPepAmount(totalCost, 'Total cost')
   const economy = await getOrCreateEconomy(userId)
 
   if (economy.wallet < totalCost) {
-    throw new Error(`Insufficient funds. Need ${totalCost}, have ${economy.wallet}`)
+    throw new ValidationError(`Insufficient funds. Need ${totalCost}, have ${economy.wallet}`)
   }
 
-  // Use transaction for atomicity
-  await prisma.$transaction(async (tx: any) => {
-    // Deduct from balance
-    await tx.economy.update({
-      where: { id: userId },
-      data: { wallet: { decrement: totalCost } }
-    })
+  // One DB transaction: conditional debit + ledger row, conditional stock
+  // decrement, inventory credit. Both conditional updates are atomic in
+  // Postgres, so concurrent purchases can't overdraw the wallet or oversell
+  // limited stock; any failure rolls back the whole purchase.
+  await prisma.$transaction(async (tx) => {
+    await debitInTx(tx, userId, totalCost, 'SHOP_PURCHASE', `Purchased ${quantity}x ${item.name}`, { itemId, itemName: item.name, quantity })
 
     // Reduce stock if not unlimited
     if (item.quantity !== -1) {
-      await tx.shopItem.update({
-        where: { id: itemId },
+      const stock = await tx.shopItem.updateMany({
+        where: { id: itemId, isAvailable: true, quantity: { gte: quantity } },
         data: { quantity: { decrement: quantity } }
       })
+      if (stock.count !== 1) {
+        throw new ConflictError('Not enough stock')
+      }
     }
 
     // Add to inventory (upsert)
@@ -92,9 +101,6 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
         quantity: { increment: quantity }
       }
     })
-
-    // Log the purchase transaction
-    await logTransaction(tx, userId, 'SHOP_PURCHASE', -totalCost, `Purchased ${quantity}x ${item.name}`, { itemId, itemName: item.name, quantity })
   })
 
   return {
@@ -190,6 +196,10 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
   // Add or update items
   for (const item of items) {
     if (!item.name || item.price === undefined) continue
+    // Skip rows with a price that would make a purchase mint PEP (<= 0) or
+    // break integer accounting; the existing item is then deactivated below.
+    if (!Number.isInteger(item.price) || item.price <= 0) continue
+    if (item.quantity !== undefined && (!Number.isInteger(item.quantity) || item.quantity < -1)) continue
 
     seenNames.add(item.name)
     const existing = currentByName.get(item.name)

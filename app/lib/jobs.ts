@@ -1,6 +1,5 @@
 import { prisma } from './db'
-import { updateWallet } from './economy'
-import { logTransaction } from './transactions'
+import { creditInTx, getOrCreateEconomy } from './economy'
 
 const JOB_REWARD_AMOUNT = parseInt(process.env.JOB_REWARD_AMOUNT || '50', 10)
 const JOBS_SHEET_ID = process.env.JOBS_SHEET_ID
@@ -71,11 +70,7 @@ export async function recordDailyJobCompletion(
         await tx.jobAssignment.create({ data: { jobId, userId } })
       }
 
-      await tx.economy.update({
-        where: { id: userId },
-        data: { wallet: { increment: reward } },
-      })
-      await logTransaction(tx, userId, 'JOB_REWARD', reward, description, { jobId })
+      await creditInTx(tx, userId, reward, 'JOB_REWARD', description, { jobId })
       return true
     })
   } catch (e: unknown) {
@@ -148,6 +143,15 @@ export async function getDailyJobs() {
     jobs: dailyJobs,
     resetAt: getNextResetTime()
   }
+}
+
+/**
+ * Is this job one of today's daily jobs? Daily-job rewards are only for the
+ * DAILY_JOBS_COUNT jobs picked for the current UTC day, not every active job.
+ */
+export async function isTodaysDailyJob(jobId: number): Promise<boolean> {
+  const { jobs } = await getDailyJobs()
+  return jobs.some((j: { id: number }) => j.id === jobId)
 }
 
 /**
@@ -288,7 +292,7 @@ export async function quitJob(userId: string) {
 /**
  * Complete a job and award reward (admin function)
  */
-export async function completeJob(userId: string, reward: number) {
+export async function completeJob(userId: string, reward: number, grantedBy?: string) {
   const assignment = await prisma.jobAssignment.findFirst({
     where: { userId },
     include: { job: true }
@@ -298,18 +302,22 @@ export async function completeJob(userId: string, reward: number) {
     throw new Error('User does not have an active job')
   }
 
-  // Remove the assignment
-  await prisma.jobAssignment.delete({
-    where: { id: assignment.id }
+  if (reward > 0) await getOrCreateEconomy(userId)
+
+  // Remove the assignment and pay the reward (with its ledger row) in one DB
+  // transaction. The delete is conditional, so concurrent completions of the
+  // same assignment pay at most once.
+  await prisma.$transaction(async (tx) => {
+    const removed = await tx.jobAssignment.deleteMany({
+      where: { id: assignment.id }
+    })
+    if (removed.count !== 1) {
+      throw new Error('User does not have an active job')
+    }
+    if (reward > 0) {
+      await creditInTx(tx, userId, reward, 'JOB_REWARD', `Job reward: ${assignment.job.description}`, { jobId: assignment.job.id, ...(grantedBy ? { grantedBy } : {}) })
+    }
   })
-
-  // Award the reward if > 0
-  if (reward > 0) {
-    await updateWallet(userId, reward)
-
-    // Log the job reward transaction (fire and forget)
-    logTransaction(prisma, userId, 'JOB_REWARD', reward, `Job reward: ${assignment.job.description}`, { jobId: assignment.job.id }).catch(() => {})
-  }
 
   return {
     success: true,

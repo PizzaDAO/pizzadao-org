@@ -1,8 +1,7 @@
 import { prisma } from './db'
-import { getOrCreateEconomy, updateBalance } from './economy'
+import { creditInTx, debitInTx, getOrCreateEconomy } from './economy'
 import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from './errors/api-errors'
 import { notifyBountyClaimed, notifyBountyCompleted, notifyBountyComment } from './notifications'
-import { logTransaction } from './transactions'
 import { getCrewMappings } from './crew-mappings'
 import { CREW_ID_PATTERN, normalizeCrewId } from './crew-id'
 
@@ -56,6 +55,9 @@ function crewWhere(filter?: BountyListFilter) {
  *
  * Anyone who can post a bounty can tag it for a crew (crew leads included);
  * `crewId` must already be resolved via `resolveBountyCrewId`.
+ *
+ * The escrow debit, its ledger row and the bounty row are written in one DB
+ * transaction: either the PEP is escrowed against a bounty, or nothing happens.
  */
 export async function createBounty(
   creatorId: string,
@@ -64,39 +66,39 @@ export async function createBounty(
   link?: string,
   crewId?: string | null,
 ) {
-  if (reward <= 0) {
-    throw new ValidationError('Reward must be positive')
+  if (!Number.isInteger(reward) || reward <= 0) {
+    throw new ValidationError('Reward must be a positive whole number')
   }
 
   if (!description.trim()) {
     throw new ValidationError('Description is required')
   }
 
-  // Check creator has enough funds
+  // Friendly fast path; the conditional debit in debitInTx is authoritative.
   const economy = await getOrCreateEconomy(creatorId)
   if (economy.wallet < reward) {
     throw new ValidationError('Insufficient funds to escrow reward')
   }
 
-  // Escrow the reward from creator's wallet
-  await updateBalance(creatorId, -reward)
-
-  // Create the bounty
-  const bounty = await prisma.bounty.create({
-    data: {
-      description: description.trim(),
-      link: link?.trim() || null,
-      reward,
-      createdBy: creatorId,
-      status: 'OPEN',
-      crewId: crewId || null
+  return prisma.$transaction(async (tx) => {
+    const bounty = await tx.bounty.create({
+      data: {
+        description: description.trim(),
+        link: link?.trim() || null,
+        reward,
+        createdBy: creatorId,
+        status: 'OPEN',
+        crewId: crewId || null
+      }
+    })
+    try {
+      await debitInTx(tx, creatorId, reward, 'BOUNTY_ESCROW', `Bounty escrow: ${description.trim()}`, { bountyId: bounty.id })
+    } catch (e) {
+      if (e instanceof ValidationError) throw new ValidationError('Insufficient funds to escrow reward')
+      throw e
     }
+    return bounty
   })
-
-  // Log the escrow transaction (fire and forget)
-  logTransaction(prisma, creatorId, 'BOUNTY_ESCROW', -reward, `Bounty escrow: ${description.trim()}`, { bountyId: bounty.id }).catch(() => {})
-
-  return bounty
 }
 
 /**
@@ -130,7 +132,10 @@ export async function getClaimedBounties(userId: string) {
 }
 
 /**
- * Claim an open bounty
+ * Claim an open bounty.
+ *
+ * The OPEN -> CLAIMED transition is a conditional update, so of N concurrent
+ * claims exactly one wins.
  */
 export async function claimBounty(userId: string, bountyId: number) {
   const bounty = await prisma.bounty.findUnique({
@@ -149,18 +154,21 @@ export async function claimBounty(userId: string, bountyId: number) {
     throw new ValidationError('Cannot claim your own bounty')
   }
 
-  const updatedBounty = await prisma.bounty.update({
-    where: { id: bountyId },
+  const claimed = await prisma.bounty.updateMany({
+    where: { id: bountyId, status: 'OPEN' },
     data: {
       claimedBy: userId,
       status: 'CLAIMED'
     }
   })
+  if (claimed.count !== 1) {
+    throw new ConflictError('Bounty is not available')
+  }
 
   // Notify the bounty poster (fire and forget - don't block on notification)
   notifyBountyClaimed(bounty.createdBy, userId, bountyId, bounty.description).catch(() => {})
 
-  return updatedBounty
+  return { ...bounty, claimedBy: userId, status: 'CLAIMED' as const }
 }
 
 /**
@@ -183,17 +191,26 @@ export async function giveUpBounty(userId: string, bountyId: number) {
     throw new ConflictError('Bounty is not in claimed status')
   }
 
-  return prisma.bounty.update({
-    where: { id: bountyId },
+  const released = await prisma.bounty.updateMany({
+    where: { id: bountyId, status: 'CLAIMED', claimedBy: userId },
     data: {
       claimedBy: null,
       status: 'OPEN'
     }
   })
+  if (released.count !== 1) {
+    throw new ConflictError('Bounty is not in claimed status')
+  }
+
+  return { ...bounty, claimedBy: null, status: 'OPEN' as const }
 }
 
 /**
- * Complete a bounty (creator approves, reward paid to claimer)
+ * Complete a bounty (creator approves, escrowed reward paid to claimer).
+ *
+ * The CLAIMED -> COMPLETED transition is a conditional update in the same DB
+ * transaction as the payout and its ledger row, so the escrow is released
+ * exactly once even if complete is double-submitted or races a cancel.
  */
 export async function completeBounty(creatorId: string, bountyId: number) {
   const bounty = await prisma.bounty.findUnique({
@@ -215,27 +232,33 @@ export async function completeBounty(creatorId: string, bountyId: number) {
   if (!bounty.claimedBy) {
     throw new ConflictError('No one has claimed this bounty')
   }
+  const claimerId = bounty.claimedBy
 
-  // Pay the claimer
-  await updateBalance(bounty.claimedBy, bounty.reward)
+  await getOrCreateEconomy(claimerId)
 
-  // Log the reward transaction (fire and forget)
-  logTransaction(prisma, bounty.claimedBy, 'BOUNTY_REWARD', bounty.reward, `Bounty reward: ${bounty.description}`, { bountyId }).catch(() => {})
-
-  // Mark as completed
-  const updatedBounty = await prisma.bounty.update({
-    where: { id: bountyId },
-    data: { status: 'COMPLETED' }
+  await prisma.$transaction(async (tx) => {
+    const done = await tx.bounty.updateMany({
+      where: { id: bountyId, createdBy: creatorId, status: 'CLAIMED', claimedBy: claimerId },
+      data: { status: 'COMPLETED' }
+    })
+    if (done.count !== 1) {
+      throw new ConflictError('Bounty is no longer awaiting completion')
+    }
+    await creditInTx(tx, claimerId, bounty.reward, 'BOUNTY_REWARD', `Bounty reward: ${bounty.description}`, { bountyId })
   })
 
   // Notify the claimer (fire and forget - don't block on notification)
-  notifyBountyCompleted(bounty.claimedBy, creatorId, bountyId, bounty.description, bounty.reward).catch(() => {})
+  notifyBountyCompleted(claimerId, creatorId, bountyId, bounty.description, bounty.reward).catch(() => {})
 
-  return updatedBounty
+  return { ...bounty, status: 'COMPLETED' as const }
 }
 
 /**
- * Cancel a bounty (creator cancels, reward refunded)
+ * Cancel a bounty (creator cancels, escrowed reward refunded).
+ *
+ * Same pattern as completeBounty: the status transition, the refund and its
+ * ledger row commit together, and only one of any concurrent complete/cancel
+ * calls can win.
  */
 export async function cancelBounty(creatorId: string, bountyId: number) {
   const bounty = await prisma.bounty.findUnique({
@@ -258,17 +281,20 @@ export async function cancelBounty(creatorId: string, bountyId: number) {
     throw new ConflictError('Bounty is already cancelled')
   }
 
-  // Refund the creator
-  await updateBalance(creatorId, bounty.reward)
+  await getOrCreateEconomy(creatorId)
 
-  // Log the refund transaction (fire and forget)
-  logTransaction(prisma, creatorId, 'BOUNTY_REFUND', bounty.reward, `Bounty refund: ${bounty.description}`, { bountyId }).catch(() => {})
-
-  // Mark as cancelled
-  return prisma.bounty.update({
-    where: { id: bountyId },
-    data: { status: 'CANCELLED' }
+  await prisma.$transaction(async (tx) => {
+    const cancelled = await tx.bounty.updateMany({
+      where: { id: bountyId, createdBy: creatorId, status: { in: ['OPEN', 'CLAIMED'] } },
+      data: { status: 'CANCELLED' }
+    })
+    if (cancelled.count !== 1) {
+      throw new ConflictError('Bounty can no longer be cancelled')
+    }
+    await creditInTx(tx, creatorId, bounty.reward, 'BOUNTY_REFUND', `Bounty refund: ${bounty.description}`, { bountyId })
   })
+
+  return { ...bounty, status: 'CANCELLED' as const }
 }
 
 /**

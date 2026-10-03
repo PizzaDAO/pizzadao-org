@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/app/lib/auth-guards'
 import { prisma } from '@/app/lib/db'
 import { getOrCreateEconomy } from '@/app/lib/economy'
+import { resolvePepRecipient } from '@/app/lib/pep-recipient'
+import { ValidationError } from '@/app/lib/errors/api-errors'
 
 export const runtime = 'nodejs'
 
@@ -26,7 +28,16 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Valid quantity required' }, { status: 400 })
     }
 
-    if (toUserId === session.discordId) {
+    // Member ID or Discord ID -> Discord ID of a real member (never a new orphan row).
+    let recipientId: string
+    try {
+      recipientId = await resolvePepRecipient(toUserId)
+    } catch (e) {
+      if (e instanceof ValidationError) return NextResponse.json({ error: e.message }, { status: 400 })
+      throw e
+    }
+
+    if (recipientId === session.discordId) {
       return NextResponse.json({ error: 'Cannot send to yourself' }, { status: 400 })
     }
 
@@ -43,7 +54,7 @@ export async function POST(request: NextRequest) {
     }
 
     // Ensure recipient exists (creates User and Economy if needed)
-    await getOrCreateEconomy(toUserId)
+    await getOrCreateEconomy(recipientId)
 
     // Transfer the item
     await prisma.$transaction(async (tx: any) => {
@@ -64,10 +75,10 @@ export async function POST(request: NextRequest) {
       // Add to recipient (upsert)
       await tx.inventory.upsert({
         where: {
-          userId_itemId: { userId: toUserId, itemId }
+          userId_itemId: { userId: recipientId, itemId }
         },
         create: {
-          userId: toUserId,
+          userId: recipientId,
           itemId,
           quantity
         },
@@ -79,7 +90,7 @@ export async function POST(request: NextRequest) {
 
     return NextResponse.json({
       success: true,
-      message: `Sent ${quantity}x ${senderInventory.item.name} to ${toUserId}`
+      message: `Sent ${quantity}x ${senderInventory.item.name} to ${recipientId}`
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
