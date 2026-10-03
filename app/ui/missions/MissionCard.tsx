@@ -105,7 +105,8 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
   const isCompleted = status === "APPROVED";
   const isPending = status === "PENDING";
   const isRejected = status === "REJECTED";
-  const canSubmit = !status && levelUnlocked;
+  // A rejected submission can be resubmitted (the server caps attempts).
+  const canSubmit = (!status || isRejected) && levelUnlocked;
   const isLocked = !levelUnlocked && !status;
 
   // Status pill: approved (emerald), pending (butter), rejected (tomato),
@@ -254,22 +255,6 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
               {mission.description}
             </div>
           )}
-          {mission.autoVerify && !status && (
-            <div
-              style={{
-                fontSize: 12,
-                color: "hsl(var(--muted-foreground))",
-                marginTop: 8,
-                fontStyle: "italic",
-                display: "inline-flex",
-                alignItems: "center",
-                gap: 6,
-              }}
-            >
-              <span aria-hidden style={{ opacity: 0.7 }}>↻</span>
-              Auto-verified on submit
-            </div>
-          )}
           {isRejected && mission.progress?.reviewNote && (
             <div
               style={{
@@ -300,11 +285,7 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
             style={{
               fontSize: 13,
               padding: "0.55rem 1.15rem",
-              background: expanded
-                ? "transparent"
-                : mission.autoVerify
-                  ? "hsl(var(--tomato))"
-                  : "hsl(var(--ink))",
+              background: expanded ? "transparent" : "hsl(var(--ink))",
               color: expanded
                 ? "hsl(var(--foreground))"
                 : "hsl(var(--cream))",
@@ -316,7 +297,7 @@ export function MissionCard({ mission, levelUnlocked, onSubmit }: Props) {
               flexShrink: 0,
             }}
           >
-            {expanded ? "Cancel" : mission.autoVerify ? "Complete" : "Submit"}
+            {expanded ? "Cancel" : isRejected ? "Resubmit" : "Submit"}
           </button>
         )}
       </div>

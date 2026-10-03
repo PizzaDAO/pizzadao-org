@@ -22,6 +22,7 @@ import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
 import { MissionCompleteCelebration } from "../ui/missions/MissionCompleteCelebration";
 import { LevelUpModal } from "../ui/missions/LevelUpModal";
 import { VouchPromptCard } from "../ui/missions/VouchPromptCard";
+import { levelUpToCelebrate, type LevelUp } from "./level-up";
 
 type MissionData = {
   id: number;
@@ -65,7 +66,7 @@ type CelebrationState = {
 
 type Celebration =
   | { kind: "firstMission"; level: number; reward: number; levelTitle: string | null }
-  | { kind: "levelUp"; level: number; reward: number; levelTitle: string | null };
+  | ({ kind: "levelUp" } & LevelUp);
 
 const LEVEL_TITLES: Record<number, string> = {
   1: "Pizza Trainee",
@@ -86,10 +87,11 @@ const DISPLAY_FONT =
 export default function MissionsClient({ initial }: { initial: MissionsResponse | null }) {
   const [data, setData] = useState<MissionsResponse | null>(initial);
   const toast = useToast();
-  // /api/missions/pending is admin-only (ADMIN_ROLE_IDS); /api/session exposes
-  // the same check as isAdmin, so only reviewers mount the review panel.
+  // /api/missions/pending is reviewer-only (mission-review-access.ts);
+  // /api/session exposes the same check as canReviewMissions, so only
+  // reviewers mount the review panel.
   const { data: session } = useSession();
-  const canReview = session?.isAdmin === true;
+  const canReview = session?.canReviewMissions === true;
   const [loading, setLoading] = useState(!initial);
   const [error, setError] = useState<string | null>(null);
   // Auto-expand current level
@@ -106,11 +108,24 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   // Last seen counts to detect a freshly approved mission after submit/refresh.
   const lastApprovedCountRef = useRef<number | null>(initial ? countApproved(initial) : null);
 
+  const levelUpClaimInFlight = useRef(false);
+  const initialCelebrationChecked = useRef(false);
+
   useEffect(() => {
     if (!initial) fetchMissions();
     fetchCelebrationState();
     // eslint-disable-next-line react-hooks/exhaustive-deps -- mount-only, as before
   }, []);
+
+  // Initial-load celebration check, once both the missions and the
+  // celebration state are in (they load independently; with a server-rendered
+  // `initial`, fetchMissions never runs on mount).
+  useEffect(() => {
+    if (initialCelebrationChecked.current || !data || !celebrationState) return;
+    initialCelebrationChecked.current = true;
+    maybeTriggerCelebration(data, null, countApproved(data));
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when both are loaded
+  }, [data, celebrationState]);
 
   async function fetchMissions() {
     try {
@@ -131,8 +146,10 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
         setExpandedLevels(new Set([json.currentLevel]));
       }
 
-      // Trigger celebrations if conditions met
-      maybeTriggerCelebration(json, prevApproved, nextApproved);
+      // Trigger celebrations if conditions met. The first load (prevApproved
+      // null) is handled by the initial-check effect once celebration state
+      // is in.
+      if (prevApproved !== null) maybeTriggerCelebration(json, prevApproved, nextApproved);
     } catch (e) {
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
@@ -197,15 +214,37 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
       return;
     }
 
-    // CASE 2: Level-up — currentLevel exceeds last celebrated level.
-    if (snapshot.currentLevel > celebrationState.lastCelebratedLevel && justGainedAnApproval) {
-      setActiveCelebration({
-        kind: "levelUp",
-        level: snapshot.currentLevel,
-        reward: currentLevelData?.reward ?? 0,
-        levelTitle: currentLevelData?.title ?? snapshot.levelTitle ?? null,
+    // CASE 2: Level-up — currentLevel exceeds last celebrated level. Also on
+    // the initial load, so a level-up approved while the member was away
+    // (reviewer, Discord, backfill) is shown on their next visit. One modal
+    // covers every uncelebrated level; the server claim makes it once only.
+    if (justGainedAnApproval || isInitialLoad) {
+      const up = levelUpToCelebrate(snapshot, celebrationState.lastCelebratedLevel);
+      if (up) void claimLevelUp(up);
+    }
+  }
+
+  async function claimLevelUp(up: LevelUp) {
+    if (levelUpClaimInFlight.current) return;
+    levelUpClaimInFlight.current = true;
+    try {
+      const res = await fetch("/api/missions/celebration", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ claimLevelUp: true }),
       });
-      persistCelebration({ lastCelebratedLevel: snapshot.currentLevel });
+      if (!res.ok) return;
+      const json: CelebrationState & { levelUpClaimed?: boolean } = await res.json();
+      setCelebrationState(json);
+      // Only the request that raised lastCelebratedLevel shows the modal
+      // (another tab or an earlier visit already celebrated otherwise).
+      if (json.levelUpClaimed === true) {
+        setActiveCelebration((current) => current ?? { kind: "levelUp", ...up });
+      }
+    } catch {
+      // Non-essential
+    } finally {
+      levelUpClaimInFlight.current = false;
     }
   }
 
@@ -373,6 +412,8 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   }
 
   const { levels, currentLevel, isAuthenticated } = data;
+  // Data-driven top level (no hard-coded 8): past it means every level is done.
+  const allLevelsDone = levels.length > 0 && currentLevel > Math.max(...levels.map((l) => l.level));
 
   return (
     <div style={pageContainer()}>
@@ -516,7 +557,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                 color: "hsl(var(--tomato))",
               }}
             >
-              {currentLevel > 8 ? "MAX" : (
+              {allLevelsDone ? "MAX" : (
                 <>
                   <span style={{ color: "hsl(var(--foreground) / 0.35)", fontWeight: 700 }}>
                     Lv.
@@ -538,7 +579,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                 <span className="circle-scribble">{data.levelTitle}</span>
               </div>
             )}
-            {currentLevel > 8 && (
+            {allLevelsDone && (
               <div
                 className="handwritten"
                 style={{
@@ -848,6 +889,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
           level={activeCelebration.level}
           levelTitle={activeCelebration.levelTitle}
           reward={activeCelebration.reward}
+          isFinal={activeCelebration.isFinal}
           onDismiss={handleCelebrationDismiss}
         />
       )}

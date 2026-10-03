@@ -4,7 +4,8 @@ import {
   fetchMemberByDiscordId,
   fetchMemberById,
 } from "@/app/lib/sheets/member-repository";
-import { hasAnyRole } from "@/app/lib/discord";
+import { getUserRoles } from "@/app/lib/discord";
+import { canReviewAnyMission } from "@/app/lib/mission-review-access";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 
 export const runtime = "nodejs";
@@ -45,11 +46,17 @@ export async function GET() {
     // Silently fail - memberId will be null
   }
 
-  // Check admin status (parallel-safe since it's a Discord API call)
+  // Admin + mission-reviewer status from one guild-roles lookup (fails closed).
+  // canReviewMissions (not isAdmin) gates the /missions review panel: the
+  // reviewer roles are wider than the admin roles (mission-review-access.ts).
+  let canReviewMissions = false;
   try {
-    isAdmin = await hasAnyRole(session.discordId, ADMIN_ROLE_IDS);
+    const roles = await getUserRoles(session.discordId);
+    isAdmin = roles.some((r) => (ADMIN_ROLE_IDS as readonly string[]).includes(r));
+    canReviewMissions = await canReviewAnyMission(roles);
   } catch {
     isAdmin = false;
+    canReviewMissions = false;
   }
 
   // PFP is a quick fs check - include it to avoid a separate request
@@ -77,6 +84,7 @@ export async function GET() {
       pfpUrl: pfpPath,
       crews,
       isAdmin,
+      canReviewMissions,
     },
     {
       headers: { "Cache-Control": "private, max-age=300" },

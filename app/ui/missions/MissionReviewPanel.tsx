@@ -21,6 +21,9 @@ type Submission = {
   memberName: string | null;
   evidence: string | null;
   notes: string | null;
+  /** Earlier rejections of this submission (it was resubmitted), oldest first. */
+  reviewHistory?: string[];
+  attempt?: number;
   submittedAt: string;
   mission: {
     title: string;
@@ -384,6 +387,32 @@ export function MissionReviewPanel() {
                     § Notes
                   </span>
                   {sub.notes}
+                </div>
+              )}
+
+              {sub.reviewHistory && sub.reviewHistory.length > 0 && (
+                <div
+                  data-testid="review-history"
+                  style={{
+                    fontSize: 12,
+                    color: "hsl(var(--tomato-deep))",
+                    padding: "8px 10px",
+                    background: "hsl(var(--tomato) / 0.05)",
+                    borderLeft: "2px solid hsl(var(--tomato))",
+                    borderRadius: 4,
+                  }}
+                >
+                  <span
+                    className="overline"
+                    style={{ display: "block", marginBottom: 2, color: "hsl(var(--tomato-deep))" }}
+                  >
+                    § Resubmission — attempt {sub.attempt ?? sub.reviewHistory.length + 1}
+                  </span>
+                  <ul style={{ margin: 0, paddingLeft: 16, wordBreak: "break-word" }}>
+                    {sub.reviewHistory.map((line, i) => (
+                      <li key={i}>{line}</li>
+                    ))}
+                  </ul>
                 </div>
               )}
 

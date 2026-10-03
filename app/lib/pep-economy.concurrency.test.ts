@@ -60,6 +60,7 @@ type Libs = {
   blackjack: typeof import('./pep-games/blackjack')
   grants: typeof import('./shop-grants')
   admin: typeof import('./pep-admin')
+  celebration: typeof import('./celebration')
 }
 let L: Libs
 const N = 20
@@ -130,6 +131,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       blackjack: await import('./pep-games/blackjack'),
       grants: await import('./shop-grants'),
       admin: await import('./pep-admin'),
+      celebration: await import('./celebration'),
     }
   }, 60_000)
 
@@ -262,6 +264,43 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     await settle()
     expect(await wallet(user)).toBe(69)
     await expectLedgerConsistent(user)
+  }, 60_000)
+
+  // ---- Mission verification Phase 0 ----
+
+  it(`${N} parallel resubmits of a rejected mission: one wins, the rejection is kept once`, async () => {
+    // Level 1 with a run-unique index: getCurrentLevel is data-driven, so the
+    // mission must sit at the bottom level for the submit's level gate.
+    const mission = await L.prisma.mission.create({
+      data: { level: 1, index: 1000 + (Number(RUN) % 100000), title: 'it resubmit', reward: 0, autoVerify: true },
+    })
+    const user = await seedUser(0)
+    const first = await L.missions.submitMissionCompletion(user, mission.id, 'https://one', 'first')
+    expect(first.status).toBe('PENDING') // autoVerify no longer approves on submit
+    await L.missions.rejectMission('reviewer', first.id, 'blurry')
+
+    const res = await Promise.allSettled(
+      Array.from({ length: N }, (_, i) => L.missions.submitMissionCompletion(user, mission.id, `https://two/${i}`, 'second')),
+    )
+    expect(outcomes(res).ok).toBe(1)
+    const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: first.id } })
+    expect(row).toMatchObject({ status: 'PENDING', reviewedBy: null, reviewNote: null, reviewedAt: null })
+    const { memberNotes, history } = L.missions.splitReviewHistory(row.notes)
+    expect(memberNotes).toBe('second')
+    expect(history).toHaveLength(1)
+    expect(history[0]).toMatch(/^Attempt 1 rejected .* by reviewer \| note: blurry \| evidence: https:\/\/one$/)
+    await L.prisma.missionCompletion.delete({ where: { id: first.id } })
+    await L.prisma.mission.update({ where: { id: mission.id }, data: { isActive: false } })
+  }, 60_000)
+
+  it(`${N} parallel level-up claims (tabs, reloads) celebrate once`, async () => {
+    const memberId = `it-${RUN}`
+    const res = await Promise.allSettled(Array.from({ length: N }, () => L.celebration.claimLevelCelebration(memberId, 3)))
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    expect(res.filter((r) => r.status === 'fulfilled' && r.value === true)).toHaveLength(1)
+    await expect(L.celebration.claimLevelCelebration(memberId, 3)).resolves.toBe(false)
+    await expect(L.celebration.claimLevelCelebration(memberId, 4)).resolves.toBe(true) // the next level-up
+    await L.prisma.memberProfileExtras.delete({ where: { memberId } })
   }, 60_000)
 
   it(`${N} parallel daily-job completions pay once`, async () => {

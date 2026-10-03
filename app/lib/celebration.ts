@@ -148,6 +148,31 @@ export async function updateCelebrationState(
 }
 
 /**
+ * Atomically claim the level-up celebration for `level` (the level reached,
+ * same units as lastCelebratedLevel). Returns true only for the single call
+ * that raises lastCelebratedLevel to `level`; any later or concurrent call
+ * (another tab, a reload, a retry) gets false. The client shows LevelUpModal
+ * only when this returns true, so each level-up is celebrated exactly once,
+ * including level-ups approved while the member was away.
+ */
+export async function claimLevelCelebration(memberId: string, level: number): Promise<boolean> {
+  if (!memberId) {
+    throw new Error('memberId required')
+  }
+  if (!Number.isInteger(level) || level < 1) return false
+
+  // Ensure the row exists. INSERT ... ON CONFLICT DO NOTHING, so concurrent
+  // first claims (several tabs) don't trip the memberId primary key.
+  await prisma.memberProfileExtras.createMany({ data: [{ memberId }], skipDuplicates: true })
+
+  const { count } = await prisma.memberProfileExtras.updateMany({
+    where: { memberId, lastCelebratedLevel: { lt: level } },
+    data: { lastCelebratedLevel: level },
+  })
+  return count === 1
+}
+
+/**
  * jalapeno-34126 — atomically claim the one-shot "profile complete"
  * celebration. Returns true only for the single call that flips
  * `profileCompletedCelebratedAt` from null to now(); every later call (other

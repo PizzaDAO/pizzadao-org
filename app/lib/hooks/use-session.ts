@@ -12,6 +12,8 @@ export interface SessionData {
   pfpUrl: string | null;
   crews: string[];
   isAdmin: boolean;
+  /** May review mission submissions (admins + DPR / Pizza Capo / Pepperoni Mafia). */
+  canReviewMissions?: boolean;
 }
 
 export const LOGGED_OUT_SESSION: SessionData = {
@@ -22,6 +24,7 @@ export const LOGGED_OUT_SESSION: SessionData = {
   pfpUrl: null,
   crews: [],
   isAdmin: false,
+  canReviewMissions: false,
 };
 
 /**

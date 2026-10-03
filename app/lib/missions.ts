@@ -4,7 +4,8 @@ import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
 import { getMembersWithRoles } from './discord'
 import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
-import { ValidationError, NotFoundError, ConflictError, ForbiddenError } from './errors/api-errors'
+import { DPR_ONLY_MIN_LEVEL, missionReviewerRoleIds } from './mission-review-access'
+import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
 
 // ===== QUERIES =====
 
@@ -38,43 +39,88 @@ export async function getUserMissionProgress(discordId: string) {
 }
 
 /**
- * Get the current level for a user (highest fully completed level + 1)
+ * Levels whose reward this user has already been paid, from the
+ * MISSION_REWARD ledger rows (the exactly-once marker). New rows carry
+ * metadata.level; older rows only have it in the description.
+ */
+export async function getPaidLevels(discordId: string): Promise<Set<number>> {
+  const rows = await prisma.transaction.findMany({
+    where: { userId: discordId, type: 'MISSION_REWARD' },
+    select: { metadata: true, description: true },
+  })
+  const levels = new Set<number>()
+  for (const row of rows ?? []) {
+    const level = paidLevelOf(row)
+    if (level !== null) levels.add(level)
+  }
+  return levels
+}
+
+/** The level a MISSION_REWARD ledger row paid, or null if it can't be read. */
+export function paidLevelOf(row: { metadata?: unknown; description?: string | null }): number | null {
+  const meta = row.metadata
+  if (meta && typeof meta === 'object' && !Array.isArray(meta)) {
+    const level = (meta as Record<string, unknown>).level
+    if (typeof level === 'number' && Number.isInteger(level)) return level
+  }
+  const m = /^Mission reward: Level (\d+)(?: - |$)/.exec(row.description ?? '')
+  return m ? Number(m[1]) : null
+}
+
+/**
+ * Pure level computation: the highest level completed, in order, plus one.
+ *
+ * Data-driven: the levels are whatever levels the active missions use (no
+ * hard-coded 8). A level counts as completed when every active mission in it
+ * is approved OR its reward was already paid, so adding a mission to a level
+ * a member already finished never drops them back a level (and the ledger
+ * marker means it is never paid twice). Returns maxLevel + 1 when everything
+ * is done ("MAX").
+ */
+export function computeCurrentLevel(
+  missions: ReadonlyArray<{ id: number; level: number }>,
+  approvedMissionIds: ReadonlySet<number>,
+  paidLevels: ReadonlySet<number> = new Set(),
+): number {
+  const byLevel = new Map<number, number[]>()
+  for (const m of missions) {
+    const ids = byLevel.get(m.level) ?? []
+    ids.push(m.id)
+    byLevel.set(m.level, ids)
+  }
+
+  let highestCompleted = 0
+  for (const level of [...byLevel.keys()].sort((a, b) => a - b)) {
+    const done = paidLevels.has(level) || byLevel.get(level)!.every(id => approvedMissionIds.has(id))
+    if (!done) break
+    highestCompleted = level
+  }
+  return highestCompleted + 1
+}
+
+/** The highest level used by `missions` (0 when there are none). */
+export function maxMissionLevel(missions: ReadonlyArray<{ level: number }>): number {
+  return missions.reduce((max, m) => Math.max(max, m.level), 0)
+}
+
+/**
+ * Get the current level for a user (highest fully completed level + 1).
+ * See computeCurrentLevel for the rules.
  */
 export async function getCurrentLevel(discordId: string) {
-  const completions = await prisma.missionCompletion.findMany({
-    where: { discordId, status: 'APPROVED' },
-    include: { mission: true },
-  })
+  const [completions, missions, paidLevels] = await Promise.all([
+    prisma.missionCompletion.findMany({
+      where: { discordId, status: 'APPROVED' },
+      select: { missionId: true },
+    }),
+    prisma.mission.findMany({
+      where: { isActive: true },
+      select: { id: true, level: true },
+    }),
+    getPaidLevels(discordId),
+  ])
 
-  const missions = await prisma.mission.findMany({
-    where: { isActive: true },
-    orderBy: [{ level: 'asc' }, { index: 'asc' }],
-  })
-
-  // Group missions by level
-  const missionsByLevel: Record<number, number[]> = {}
-  for (const m of missions) {
-    if (!missionsByLevel[m.level]) missionsByLevel[m.level] = []
-    missionsByLevel[m.level].push(m.id)
-  }
-
-  // Find highest completed level
-  const completedMissionIds = new Set(completions.map(c => c.missionId))
-  let highestCompleted = 0
-
-  for (let level = 1; level <= 8; level++) {
-    const levelMissions = missionsByLevel[level]
-    if (!levelMissions || levelMissions.length === 0) continue
-
-    const allComplete = levelMissions.every(id => completedMissionIds.has(id))
-    if (allComplete) {
-      highestCompleted = level
-    } else {
-      break
-    }
-  }
-
-  return highestCompleted + 1
+  return computeCurrentLevel(missions ?? [], new Set((completions ?? []).map(c => c.missionId)), paidLevels)
 }
 
 /**
@@ -118,8 +164,15 @@ export async function submitMissionCompletion(
     where: { missionId_discordId: { missionId, discordId } },
   })
 
-  if (existing) {
+  // A REJECTED row can be resubmitted (same row, same unique key); anything
+  // else (PENDING / APPROVED) is a duplicate.
+  if (existing && existing.status !== 'REJECTED') {
     throw new ConflictError('You have already submitted this mission')
+  }
+  if (existing && splitReviewHistory(existing.notes).history.length + 1 >= MAX_MISSION_ATTEMPTS) {
+    throw new ValidationError(
+      `This mission has been rejected ${MAX_MISSION_ATTEMPTS} times. Ask a reviewer in Discord before trying again.`,
+    )
   }
 
   // Check that previous levels are completed
@@ -128,40 +181,135 @@ export async function submitMissionCompletion(
     throw new ValidationError(`You must complete Level ${currentLevel} before starting Level ${mission.level}`)
   }
 
-  // Create the completion
-  const status = mission.autoVerify ? 'APPROVED' : 'PENDING'
+  // Phase 0 (plans/mission-verification.md): nothing is approved on submit.
+  // `autoVerify` missions (L1.0 follow on X, L3.0 #show-and-tell) used to be
+  // approved with no check at all; until the Phase 1 verifiers exist they go
+  // to PENDING for a human like every other mission. Approvals made before
+  // this change are kept (decision D6).
   let completion
-  try {
-    completion = await prisma.missionCompletion.create({
-      data: {
-        missionId,
-        discordId,
-        memberId,
-        status,
-        evidence: evidence || null,
-        notes: notes || null,
-        reviewedAt: mission.autoVerify ? new Date() : null,
-        reviewedBy: mission.autoVerify ? 'auto' : null,
-      },
-      include: { mission: true },
-    })
-  } catch (e: unknown) {
-    // A concurrent duplicate submission lost the @@unique([missionId, discordId]) race.
-    if ((e as { code?: string })?.code === 'P2002') {
-      throw new ConflictError('You have already submitted this mission')
+  if (existing) {
+    completion = await resubmitRejected(existing, evidence, notes, memberId)
+  } else {
+    try {
+      completion = await prisma.missionCompletion.create({
+        data: {
+          missionId,
+          discordId,
+          memberId,
+          status: 'PENDING',
+          evidence: evidence || null,
+          notes: sanitizeMemberNotes(notes),
+        },
+        include: { mission: true },
+      })
+    } catch (e: unknown) {
+      // A concurrent duplicate submission lost the @@unique([missionId, discordId]) race.
+      if ((e as { code?: string })?.code === 'P2002') {
+        throw new ConflictError('You have already submitted this mission')
+      }
+      throw e
     }
-    throw e
   }
 
-  // If auto-verified, check if the full level is now complete
-  if (mission.autoVerify) {
-    await checkAndAwardLevelReward(discordId, mission.level)
-  } else {
-    // Notify reviewers that a mission needs manual review
-    notifyReviewers(discordId, mission.title).catch(() => {})
-  }
+  // Notify reviewers that a mission needs manual review
+  notifyReviewers(discordId, mission.title, mission.level).catch(() => {})
 
   return completion
+}
+
+/**
+ * Move a REJECTED completion back to PENDING with the new evidence. The
+ * rejection (reviewer, time, note, old evidence) is appended to the row's
+ * review history, kept in `notes` below a fixed marker (no schema change), and
+ * the reviewer fields are cleared. Conditional on status = REJECTED, so of two
+ * concurrent resubmits exactly one wins.
+ */
+async function resubmitRejected(
+  existing: {
+    id: number
+    notes: string | null
+    evidence: string | null
+    reviewedBy: string | null
+    reviewNote: string | null
+    reviewedAt: Date | null
+    memberId: string | null
+  },
+  evidence: string | undefined,
+  notes: string | undefined,
+  memberId: string | undefined,
+) {
+  const { history } = splitReviewHistory(existing.notes)
+  const entry = formatRejection(history.length + 1, existing)
+  const updated = await prisma.missionCompletion.updateMany({
+    where: { id: existing.id, status: 'REJECTED' },
+    data: {
+      status: 'PENDING',
+      evidence: evidence || null,
+      notes: joinReviewHistory(sanitizeMemberNotes(notes), [...history, entry]),
+      memberId: memberId ?? existing.memberId,
+      submittedAt: new Date(),
+      reviewedBy: null,
+      reviewNote: null,
+      reviewedAt: null,
+    },
+  })
+  if (updated.count !== 1) {
+    throw new ConflictError('You have already submitted this mission')
+  }
+  return prisma.missionCompletion.findUniqueOrThrow({
+    where: { id: existing.id },
+    include: { mission: true },
+  })
+}
+
+// ----- review history (rejections), kept in MissionCompletion.notes -----
+
+/** Submissions per mission, counting the first one (plan §5.1: cap of 3). */
+export const MAX_MISSION_ATTEMPTS = 3
+
+const REVIEW_HISTORY_MARKER = '--- Review history ---'
+const NOTES_MAX = 1000
+
+/** Member-entered notes, trimmed, capped, and unable to forge the history marker. */
+function sanitizeMemberNotes(notes: string | undefined | null): string | null {
+  if (typeof notes !== 'string') return null
+  const clean = notes.split(REVIEW_HISTORY_MARKER).join('').trim().slice(0, NOTES_MAX)
+  return clean || null
+}
+
+/** Split a completion's `notes` into the member's notes and the rejection history lines. */
+export function splitReviewHistory(notes: string | null | undefined): { memberNotes: string | null; history: string[] } {
+  if (!notes) return { memberNotes: null, history: [] }
+  const at = notes.indexOf(REVIEW_HISTORY_MARKER)
+  if (at === -1) return { memberNotes: notes.trim() || null, history: [] }
+  const memberNotes = notes.slice(0, at).trim() || null
+  const history = notes
+    .slice(at + REVIEW_HISTORY_MARKER.length)
+    .split('\n')
+    .map(l => l.trim())
+    .filter(Boolean)
+  return { memberNotes, history }
+}
+
+function joinReviewHistory(memberNotes: string | null, history: string[]): string | null {
+  if (history.length === 0) return memberNotes
+  return `${memberNotes ?? ''}\n\n${REVIEW_HISTORY_MARKER}\n${history.join('\n')}`.trimStart()
+}
+
+function oneLine(s: string, max: number): string {
+  const flat = s.replace(/\s+/g, ' ').trim()
+  return flat.length > max ? flat.slice(0, max - 3) + '...' : flat
+}
+
+function formatRejection(
+  attempt: number,
+  row: { reviewedBy: string | null; reviewNote: string | null; reviewedAt: Date | null; evidence: string | null },
+): string {
+  const when = row.reviewedAt ? row.reviewedAt.toISOString() : 'unknown time'
+  const parts = [`Attempt ${attempt} rejected ${when} by ${row.reviewedBy ?? 'unknown'}`]
+  if (row.reviewNote) parts.push(`note: ${oneLine(row.reviewNote, 200)}`)
+  if (row.evidence) parts.push(`evidence: ${oneLine(row.evidence, 300)}`)
+  return parts.join(' | ')
 }
 
 /**
@@ -355,6 +503,15 @@ export async function checkAndAwardLevelReward(discordId: string, level: number)
   return true
 }
 
+/** What a reviewer check needs about a completion: whose it is and its level. */
+export async function getCompletionForReview(completionId: number) {
+  const row = await prisma.missionCompletion.findUnique({
+    where: { id: completionId },
+    select: { discordId: true, status: true, mission: { select: { level: true } } },
+  })
+  return row ? { discordId: row.discordId, status: row.status, level: row.mission.level } : null
+}
+
 /**
  * Get pending mission submissions (for admin review)
  */
@@ -396,6 +553,8 @@ export async function getUserProgressSummary(discordId: string) {
 
   return {
     currentLevel,
+    /** Highest level with an active mission; currentLevel > maxLevel means "MAX". */
+    maxLevel: maxMissionLevel(missions),
     levelTitle,
     totalMissions,
     approvedCount,
@@ -407,10 +566,13 @@ export async function getUserProgressSummary(discordId: string) {
 // ===== HELPERS =====
 
 /**
- * Notify all members with reviewer roles that a mission needs review
+ * Notify the members who can review it that a mission needs review: the
+ * MISSION_REVIEWER_ROLE_IDS holders, or only Dread Pizza Roberts for the
+ * DPR-only levels (L8).
  */
-async function notifyReviewers(submitterDiscordId: string, missionTitle: string) {
-  const reviewerIds = await getMembersWithRoles(MISSION_REVIEWER_ROLE_IDS)
+async function notifyReviewers(submitterDiscordId: string, missionTitle: string, level: number) {
+  const roleIds = level >= DPR_ONLY_MIN_LEVEL ? missionReviewerRoleIds(level) : MISSION_REVIEWER_ROLE_IDS
+  const reviewerIds = await getMembersWithRoles(roleIds)
 
   await Promise.allSettled(
     reviewerIds

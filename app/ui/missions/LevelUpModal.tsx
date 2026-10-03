@@ -14,14 +14,16 @@ type Props = {
   levelTitle: string | null;
   reward: number;
   onDismiss: () => void;
+  /** Every level is done. Callers pass it from the mission data; defaults to the old level >= 8 rule. */
+  isFinal?: boolean;
 };
 
 const DISPLAY_FONT =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
-export function LevelUpModal({ level, levelTitle, reward, onDismiss }: Props) {
+export function LevelUpModal({ level, levelTitle, reward, onDismiss, isFinal }: Props) {
   const t = useTranslations("dashboard.celebrations.levelUp");
-  const isFinalLevel = level >= 8;
+  const isFinalLevel = isFinal ?? level >= 8;
 
   return (
     <div

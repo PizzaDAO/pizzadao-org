@@ -5,7 +5,9 @@ import {
   getCelebrationState,
   updateCelebrationState,
   claimProfileCompletedCelebration,
+  claimLevelCelebration,
 } from '@/app/lib/celebration'
+import { getCurrentLevel } from '@/app/lib/missions'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -48,7 +50,8 @@ const GET_HANDLER = async () => {
  * POST /api/missions/celebration
  *
  * Body: { lastCelebratedLevel?: number, firstMissionCelebrated?: boolean,
- *         vouchPromptDismissed?: boolean, profileCompleted?: boolean }
+ *         vouchPromptDismissed?: boolean, profileCompleted?: boolean,
+ *         claimLevelUp?: boolean }
  *
  * Idempotent — `lastCelebratedLevel` is monotonic and the boolean fields
  * only flip null -> timestamp once.
@@ -103,12 +106,27 @@ const POST_HANDLER = async (request: NextRequest) => {
   if (body.profileCompleted !== undefined && typeof body.profileCompleted !== 'boolean') {
     throw new ValidationError('profileCompleted must be a boolean')
   }
+  if (body.claimLevelUp !== undefined && typeof body.claimLevelUp !== 'boolean') {
+    throw new ValidationError('claimLevelUp must be a boolean')
+  }
   const profileCompletedClaimed =
     body.profileCompleted === true ? await claimProfileCompletedCelebration(memberId) : undefined
 
+  // `claimLevelUp: true` claims the level-up celebration for the member's
+  // current level as computed here on the server (not a client-sent number),
+  // so a level-up approved while they were away is celebrated exactly once.
+  let levelUp: { levelUpClaimed: boolean; level: number } | undefined
+  if (body.claimLevelUp === true) {
+    const level = await getCurrentLevel(session.discordId)
+    levelUp = { levelUpClaimed: level >= 2 && (await claimLevelCelebration(memberId, level)), level }
+  }
+
   const state = await updateCelebrationState(memberId, patch)
-  const payload =
-    profileCompletedClaimed === undefined ? state : { ...state, profileCompletedClaimed }
+  const payload = {
+    ...state,
+    ...(profileCompletedClaimed === undefined ? {} : { profileCompletedClaimed }),
+    ...(levelUp ?? {}),
+  }
   return NextResponse.json(payload, {
     headers: { 'Cache-Control': 'private, no-store' },
   })
