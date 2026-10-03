@@ -185,6 +185,9 @@ enum TransactionType {
   MISSION_REWARD     // Earned $PEP from completing all missions in a level
   MIGRATION_CREDIT   // One-time credit migrated from another economy (UnbelievaBoat)
   MIGRATION_REVERSAL // Rollback of a MIGRATION_CREDIT
+  WORK_REWARD        // Discord /work payout
+  CRIME_REWARD       // Web crime success
+  CRIME_FINE         // Web crime fine (negative)
 }
 
 model Transaction {
@@ -725,4 +728,16 @@ model PendingPepClaim {
 
   @@index([discordId, status])
   @@index([source, status])
+}
+
+// Per-user, per-action cooldown for earning commands (/work, crime, and later
+// /collect-income per role, e.g. action "income:<roleId>"). Claimed with a
+// conditional update / insert-on-conflict-do-nothing inside the payout
+// transaction, so concurrent invocations cannot both pay out.
+model EconomyCooldown {
+  discordId String
+  action    String
+  lastAt    DateTime
+
+  @@id([discordId, action])
 }
