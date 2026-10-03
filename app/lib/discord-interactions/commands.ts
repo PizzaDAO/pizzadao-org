@@ -6,10 +6,12 @@
  * /rob, /peace and the games are registered like the rest but answer "not
  * enabled yet" until PEP_ROB_ENABLED=1 / PEP_GAMES_ENABLED=1.
  *
- * /add-money and /remove-money are admin-only twice over: default_member_permissions
- * "0" hides them from everyone without the Administrator permission (a server
- * admin can allow more roles under Server Settings > Integrations), and the
- * handler re-checks member.roles against ADMIN_ROLE_IDS.
+ * /add-money and /remove-money are visible to everyone (no
+ * default_member_permissions, so Pepperoni Mafia holders without Administrator
+ * can see them); the handler rejects anyone not holding an admin role
+ * (ADMIN_ROLE_IDS, Pepperoni Mafia, PEP_ADMIN_ROLE_IDS / _NAMES, see
+ * isPepAdmin). To hide them from others, set per-command role permissions in
+ * Server Settings > Integrations > Pepperoni Bot.
  */
 
 // Discord application command option types
@@ -17,9 +19,6 @@ const STRING = 3
 const INTEGER = 4
 const BOOLEAN = 5
 const USER = 6
-
-/** Only members with Administrator see the command until a server admin allows more roles. */
-const ADMIN_ONLY = '0'
 
 const bet = { type: INTEGER, name: 'bet', description: 'How much $PEP to bet', required: true, min_value: 1 } as const
 
@@ -114,14 +113,12 @@ export const PEP_COMMANDS = [
     description: 'Admin: give $PEP to a member',
     options: adminMoneyOptions('give $PEP to'),
     dm_permission: false,
-    default_member_permissions: ADMIN_ONLY,
   },
   {
     name: 'remove-money',
     description: 'Admin: take $PEP from a member (never below 0)',
     options: adminMoneyOptions('take $PEP from'),
     dm_permission: false,
-    default_member_permissions: ADMIN_ONLY,
   },
 ] as const
 

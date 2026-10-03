@@ -6,12 +6,72 @@
  * ADMIN_GRANT (+) / ADMIN_REMOVE (-) Transaction row commit together, and a
  * removal is a conditional decrement (wallet >= amount), so it can never take a
  * balance below 0, however many run at once. Whoever calls these must already
- * have checked that the caller is an admin (the interactions handler checks
- * member.roles against ADMIN_ROLE_IDS).
+ * have checked that the caller may use them (isPepAdmin, on member.roles).
  */
 import { prisma } from './db'
 import { ValidationError } from './errors/api-errors'
 import { creditInTx, debitInTx, getOrCreateEconomy } from './economy'
+import { normalizeRoleName } from './pep-earn/income'
+
+// ------------------------------------------------------------ who may use ---
+
+/** Known role ids by normalized name, used when the guild role list can't resolve a name. */
+const PINNED_ROLE_IDS: Record<string, string> = {
+  pepperonimafia: '823266914834841610', // Pepperoni Mafia (also in app/ui/constants.ts)
+}
+const DEFAULT_ROLE_NAMES = ['Pepperoni Mafia']
+const ID = /^\d{5,25}$/
+
+const list = (raw: string | undefined) =>
+  (raw ?? '')
+    .split(',')
+    .map((s) => s.trim())
+    .filter(Boolean)
+
+/**
+ * Extra roles allowed to run /add-money and /remove-money, besides
+ * ADMIN_ROLE_IDS: PEP_ADMIN_ROLE_IDS (comma-separated ids) and
+ * PEP_ADMIN_ROLE_NAMES (comma-separated names, default "Pepperoni Mafia").
+ * Set PEP_ADMIN_ROLE_NAMES to "-" for no named roles.
+ */
+export function pepAdminRoleConfig(env: Record<string, string | undefined> = process.env): { ids: string[]; names: string[] } {
+  const ids = list(env.PEP_ADMIN_ROLE_IDS).filter((id) => ID.test(id))
+  const rawNames = env.PEP_ADMIN_ROLE_NAMES?.trim()
+  const names = rawNames === '-' ? [] : rawNames ? list(rawNames) : DEFAULT_ROLE_NAMES
+  return { ids, names }
+}
+
+/**
+ * Whether a member (by the role ids in the interaction payload) may use the
+ * admin money commands. Fixed ids are checked first; only if none match are
+ * the configured names resolved against the guild role list (getGuildRoles is
+ * cached for an hour, so this is normally no API call). A name matching zero
+ * or several guild roles falls back to its pinned id, if any, never a guess.
+ */
+export async function isPepAdmin(
+  memberRoles: readonly string[],
+  opts: {
+    baseRoleIds: readonly string[]
+    config?: { ids: string[]; names: string[] }
+    getGuildRoles?: () => Promise<ReadonlyArray<{ id: string; name: string }> | null>
+  },
+): Promise<boolean> {
+  if (memberRoles.length === 0) return false
+  const config = opts.config ?? pepAdminRoleConfig()
+  const held = new Set(memberRoles)
+  if ([...opts.baseRoleIds, ...config.ids].some((id) => held.has(id))) return true
+  if (config.names.length === 0) return false
+  const roles = (await opts.getGuildRoles?.().catch(() => null)) ?? null
+  for (const name of config.names) {
+    const key = normalizeRoleName(name)
+    const matches = (roles ?? []).filter((r) => normalizeRoleName(r.name) === key).map((r) => r.id)
+    const id = matches.length === 1 ? matches[0] : PINNED_ROLE_IDS[key]
+    if (id && held.has(id)) return true
+  }
+  return false
+}
+
+// ---------------------------------------------------------------- grants ---
 
 export const ADMIN_REASON_MIN = 3
 export const ADMIN_REASON_MAX = 200

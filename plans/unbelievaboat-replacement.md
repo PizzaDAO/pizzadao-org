@@ -106,7 +106,7 @@ Live configuration, read from the UB dashboard:
 | Inventories / holdings | **Built (manual)** | No token, so holdings can't be exported: staff list them in a CSV and run `grant-items.mjs` (§7.6) |
 | Item use/actions (roles on use) | Open | Owner checks whether any UB item grants a role. If so, grant it by hand |
 | Chat money | Off in UB | Not needed |
-| `add-money` / `remove-money` | **Built** | The `/grant` spec, built as `/add-money` and `/remove-money` (admins only, `ADMIN_GRANT` / `ADMIN_REMOVE` ledger rows, §7.7) |
+| `add-money` / `remove-money` | **Built** | The `/grant` spec, built as `/add-money` and `/remove-money` (admins + Pepperoni Mafia, `ADMIN_GRANT` / `ADMIN_REMOVE` ledger rows, §7.7) |
 | Money audit log | Replaced | The `Transaction` ledger. Archive UB's audit-log channel (§4) |
 | Currency emoji | Built | `PEP_EMOJI` (set to `<:pepperoni:973304305979367444>`) |
 | Bounties | Not a UB feature | No migration |
@@ -184,7 +184,7 @@ All commands work only in the PizzaDAO guild and are verified with Ed25519 (`DIS
 | `/rob member`, `/peace [enabled]` | §7.4, flag `PEP_ROB_ENABLED` |
 | `/blackjack bet`, `/roulette bet space`, `/slots bet` | §7.5, flag `PEP_GAMES_ENABLED` |
 | `/shop`, `/buy item [quantity]` | §7.6. `/buy` autocompletes item names and uses the hardened `buyItem()` |
-| `/add-money member amount reason`, `/remove-money member amount reason` | §7.7, admins only |
+| `/add-money member amount reason`, `/remove-money member amount reason` | §7.7, admins and Pepperoni Mafia |
 
 Web: crime card and games card on `/pep`, shown only when `GET /api/economy/features` reports the flag on.
 
@@ -252,7 +252,7 @@ Off unless **`PEP_GAMES_ENABLED=1`** (Discord and web). `app/lib/pep-games/`.
 
 ### 7.7 Admin money (`/add-money`, `/remove-money`)
 Replaces UB's `add-money` / `remove-money` (e.g. /work mission bonuses, fixing mistakes).
-- **Who:** members holding a role in `ADMIN_ROLE_IDS` (`app/ui/constants.ts`), checked against `member.roles` in the interaction payload (no Discord API call). The commands are also registered with `default_member_permissions: "0"`, so only members with Administrator see them; a server admin can let other roles see them under Server Settings > Integrations. The server-side role check applies either way.
+- **Who:** members holding a role in `ADMIN_ROLE_IDS` (`app/ui/constants.ts`) or **Pepperoni Mafia**, checked against `member.roles` in the interaction payload. Extra roles are configurable: **`PEP_ADMIN_ROLE_IDS`** (comma-separated ids) and **`PEP_ADMIN_ROLE_NAMES`** (comma-separated names, default `Pepperoni Mafia`; `-` for none). Names resolve through the cached guild role list (`guild-roles.ts`, same as role income), falling back to the pinned Pepperoni Mafia id (`823266914834841610`) if the list is unavailable. A fixed-id match needs no lookup at all. The commands are registered without `default_member_permissions`, so everyone sees them and non-holders get an ephemeral ❌. To hide them from others, set per-command role permissions in Server Settings > Integrations > Pepperoni Bot.
 - **Input:** `amount` is a positive whole number up to **`ADMIN_GRANT_MAX`** (default 10000); `reason` is required, 3-200 characters (whitespace collapsed). The target can't be a bot; `/add-money` needs them in the server, `/remove-money` works on members who left.
 - **Money:** `/add-money` creates the member's User/Economy rows if needed (like `/pay` recipients) and credits with an `ADMIN_GRANT` row. `/remove-money` is a conditional decrement (`wallet >= amount`) with an `ADMIN_REMOVE` row: it never takes a wallet below 0, and when the wallet is short it removes nothing and replies with the current balance. Ledger metadata: `{ adminId, reason, source: "discord" }`.
 - **Reply:** public embed, e.g. "🍕 @admin gave @member 🍕 314: reason", pinging only the member. If **`PEP_ADMIN_LOG_CHANNEL_ID`** is set (and `DISCORD_BOT_TOKEN`), the same line is posted there after the reply (`next/server` `after()`).

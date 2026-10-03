@@ -5,6 +5,7 @@ import { verifyDiscordRequest } from '../verify'
 import { handleInteraction, type HandlerDeps } from '../handle'
 import { PEP_COMMANDS } from '../commands'
 import { ValidationError } from '../../errors/api-errors'
+import { isPepAdmin, pepAdminRoleConfig } from '../../pep-admin'
 
 const GUILD = '812097286003359764'
 const USER = '100000000000000001'
@@ -35,6 +36,7 @@ describe('verifyDiscordRequest', () => {
 describe('handleInteraction', () => {
   const OTHER = '100000000000000009'
   const ADMIN_ROLE = '815976204900499537'
+  const MAFIA_ROLE = '823266914834841610' // Pepperoni Mafia
   const CUR = '<:pepperoni:973304305979367444>'
   const GREEN = 0x2ecc71
   const RED = 0xe74c3c
@@ -74,7 +76,8 @@ describe('handleInteraction', () => {
       { id: 2, name: 'Rare Pizza Box', price: 42069, quantity: 3 },
     ]),
     buy: vi.fn(async () => ({ item: 'Pizza Sticks', quantity: 1, totalCost: 1337 })),
-    adminRoleIds: [ADMIN_ROLE],
+    // The real check, with the default config (Pepperoni Mafia) and no guild role list.
+    isAdmin: (roles) => isPepAdmin(roles, { baseRoleIds: [ADMIN_ROLE], config: pepAdminRoleConfig({}), getGuildRoles: async () => null }),
     adminGrantMax: 10_000,
     addMoney: vi.fn(async (_a: string, _t: string, amount: number) => ({ ok: true as const, amount, balance: 1000 + amount })),
     removeMoney: vi.fn(async (_a: string, _t: string, amount: number) => ({ ok: true as const, amount, balance: 1000 - amount })),
@@ -344,9 +347,20 @@ describe('handleInteraction', () => {
       }
       // Even with an invalid amount, a non-admin only learns that they're not an admin.
       expect(desc(await handleInteraction(money('add-money', -1, 'x', []), d))).toBe('❌ Only admins can use this command.')
-      expect(desc(await handleInteraction(money('add-money', 100, 'bonus'), deps({ adminRoleIds: [] })))).toMatch(/Only admins/)
+      expect(desc(await handleInteraction(money('add-money', 100, 'bonus'), deps({ isAdmin: async () => false })))).toMatch(/Only admins/)
       expect(d.addMoney).not.toHaveBeenCalled()
       expect(d.removeMoney).not.toHaveBeenCalled()
+    })
+
+    it('allows Pepperoni Mafia holders (and ADMIN_ROLE_IDS holders)', async () => {
+      const d = deps()
+      const mafia = await handleInteraction(money('add-money', 100, 'mission bonus', ['r1', MAFIA_ROLE]), d)
+      expect(embed(mafia)?.color).toBe(GREEN)
+      expect(d.addMoney).toHaveBeenCalledWith(USER, OTHER, 100, 'mission bonus')
+      const removed = await handleInteraction(money('remove-money', 10, 'oops fix', [MAFIA_ROLE]), d)
+      expect(embed(removed)?.color).toBe(GREEN)
+      expect(d.removeMoney).toHaveBeenCalledWith(USER, OTHER, 10, 'oops fix')
+      expect(embed(await handleInteraction(money('add-money', 1, 'admin', [ADMIN_ROLE]), d))?.color).toBe(GREEN)
     })
 
     it('validates amount, cap, reason, target', async () => {
@@ -404,15 +418,12 @@ describe('handleInteraction', () => {
       expect(poor.logAdmin).not.toHaveBeenCalled()
     })
 
-    it('are hidden from non-admins at registration (default_member_permissions "0")', () => {
+    it('are registered visible (no default_member_permissions) with three required options', () => {
       for (const name of ['add-money', 'remove-money']) {
-        const c = PEP_COMMANDS.find((x) => x.name === name) as unknown as { default_member_permissions?: string; options: Array<{ name: string; required: boolean }> }
-        expect(c.default_member_permissions).toBe('0')
+        const c = PEP_COMMANDS.find((x) => x.name === name) as unknown as { options: Array<{ name: string; required: boolean }> }
         expect(c.options.map((o) => [o.name, o.required])).toEqual([['member', true], ['amount', true], ['reason', true]])
       }
-      for (const c of PEP_COMMANDS.filter((x) => !['add-money', 'remove-money'].includes(x.name))) {
-        expect('default_member_permissions' in c).toBe(false)
-      }
+      for (const c of PEP_COMMANDS) expect('default_member_permissions' in c).toBe(false)
     })
   })
 
@@ -473,7 +484,7 @@ describe('POST /api/discord/interactions', () => {
     expect(findUnique).toHaveBeenCalledWith({ where: { id: USER }, select: { wallet: true } })
   })
 
-  it('routes /add-money to adminAddMoney for ADMIN_ROLE_IDS holders only', async () => {
+  it('routes /add-money to adminAddMoney for ADMIN_ROLE_IDS and Pepperoni Mafia holders only', async () => {
     const adminAddMoney = vi.fn(async (_a: string, _t: string, amount: number) => ({ ok: true, amount, balance: amount }))
     vi.doMock('@/app/lib/pep-admin', async (orig) => ({ ...(await orig<typeof import('@/app/lib/pep-admin')>()), adminAddMoney }))
     const { ADMIN_ROLE_IDS } = await import('@/app/ui/constants')
@@ -498,6 +509,10 @@ describe('POST /api/discord/interactions', () => {
     const ok = await (await post(body([ADMIN_ROLE_IDS[0]]))).json()
     expect(adminAddMoney).toHaveBeenCalledWith(USER, target, 314, 'mission bonus')
     expect(ok.data.allowed_mentions).toEqual({ parse: [], users: [target] })
+    // No DISCORD_BOT_TOKEN here, so the guild role list is unavailable: the pinned Pepperoni Mafia id applies.
+    const mafia = await (await post(body(['823266914834841610']))).json()
+    expect(mafia.data.embeds[0].description).toMatch(/^✅ \$PEP added!/)
+    expect(adminAddMoney).toHaveBeenCalledTimes(2)
   })
 
   it('returns an ephemeral error message if the handler throws', async () => {

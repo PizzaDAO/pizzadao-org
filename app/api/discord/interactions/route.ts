@@ -10,9 +10,10 @@
 //      DISCORD_GUILD_ID, DISCORD_BOT_TOKEN (guild role names for
 //      /collect-income), optional PEP_EMOJI (e.g. <:pepperoni:973304305979367444>).
 // Flags: PEP_ROB_ENABLED=1 (/rob, /peace), PEP_GAMES_ENABLED=1 (games).
-// Admin money (/add-money, /remove-money): ADMIN_ROLE_IDS (app/ui/constants.ts)
-//      gate it; optional ADMIN_GRANT_MAX (default 10000) and
-//      PEP_ADMIN_LOG_CHANNEL_ID (audit post via the bot token).
+// Admin money (/add-money, /remove-money): holders of ADMIN_ROLE_IDS
+//      (app/ui/constants.ts) or of PEP_ADMIN_ROLE_IDS / PEP_ADMIN_ROLE_NAMES
+//      (default "Pepperoni Mafia"); optional ADMIN_GRANT_MAX (default 10000)
+//      and PEP_ADMIN_LOG_CHANNEL_ID (audit post via the bot token).
 import { after, NextResponse } from "next/server";
 import { verifyDiscordRequest } from "@/app/lib/discord-interactions/verify";
 import { handleInteraction, type HandlerDeps, type Interaction } from "@/app/lib/discord-interactions/handle";
@@ -26,7 +27,7 @@ import { parseRouletteSpace, playRoulette } from "@/app/lib/pep-games/roulette";
 import { playSlots } from "@/app/lib/pep-games/slots";
 import { getLeaderboard, transfer } from "@/app/lib/economy";
 import { buyItem, getShopItems } from "@/app/lib/shop";
-import { adminAddMoney, adminGrantMax, adminRemoveMoney } from "@/app/lib/pep-admin";
+import { adminAddMoney, adminGrantMax, adminRemoveMoney, isPepAdmin } from "@/app/lib/pep-admin";
 import { makeEmbed } from "@/app/lib/discord-interactions/embeds";
 import { postDiscordMessage } from "@/app/lib/discord-rest";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
@@ -83,7 +84,8 @@ function deps(guildId: string | undefined): HandlerDeps {
     slots: (id, bet) => playSlots(id, bet),
     shopItems: getShopItems,
     buy: (id, itemId, qty) => buyItem(id, itemId, qty),
-    adminRoleIds: ADMIN_ROLE_IDS,
+    isAdmin: (roles) =>
+      isPepAdmin(roles, { baseRoleIds: ADMIN_ROLE_IDS, getGuildRoles: async () => (guildId ? getGuildRoles(guildId) : null) }),
     adminGrantMax: adminGrantMax(),
     addMoney: adminAddMoney,
     removeMoney: adminRemoveMoney,

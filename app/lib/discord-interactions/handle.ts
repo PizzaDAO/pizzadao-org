@@ -76,8 +76,8 @@ export interface HandlerDeps {
   slots: (discordId: string, bet: number) => Spin<{ reels: string[]; multiplier: number }>
   shopItems: () => Promise<Array<{ id: number; name: string; price: number; quantity: number; description?: string | null }>>
   buy: (discordId: string, itemId: number, quantity: number) => Promise<{ item: string; quantity: number; totalCost: number }>
-  /** Role ids allowed to run /add-money and /remove-money (checked against member.roles). */
-  adminRoleIds: readonly string[]
+  /** Whether member.roles may run /add-money and /remove-money (ADMIN_ROLE_IDS, Pepperoni Mafia, PEP_ADMIN_ROLE_*). */
+  isAdmin: (memberRoles: string[]) => Promise<boolean>
   /** Largest single admin grant (ADMIN_GRANT_MAX). */
   adminGrantMax: number
   addMoney: (adminId: string, targetId: string, amount: number, reason: string) => Promise<AdminAdjustResult>
@@ -323,8 +323,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
 
 /** /add-money and /remove-money. Admin gate first, so non-admins learn nothing else. */
 async function adminMoney(i: Interaction, adminId: string, deps: HandlerDeps, cur: string, out: Out, add: boolean): Promise<InteractionResponse> {
-  const roles = i.member?.roles ?? []
-  if (!deps.adminRoleIds.some((r) => roles.includes(r))) return out.error('Only admins can use this command.')
+  if (!(await deps.isAdmin(i.member?.roles ?? []))) return out.error('Only admins can use this command.')
 
   const target = opt(i, 'member')
   const amount = opt(i, 'amount')
