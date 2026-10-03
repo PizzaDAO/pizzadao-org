@@ -1,5 +1,5 @@
 import { prisma } from './db'
-import { Prisma } from '@prisma/client'
+import { Prisma, type ReviewAction } from '@prisma/client'
 import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
 import { getMembersWithRoles } from './discord'
@@ -136,6 +136,37 @@ export async function getLevelTitle(level: number): Promise<string | null> {
 
 // ===== MUTATIONS =====
 
+/** A transaction client (or the client itself) that can write review events. */
+type EventWriter = Pick<Prisma.TransactionClient, 'missionReviewEvent'>
+
+/**
+ * Append one MissionReviewEvent (the audit trail). Call it inside the same
+ * transaction as the status change it records, after the conditional update
+ * won, so exactly one event is written per transition.
+ */
+export async function recordReviewEvent(
+  db: EventWriter,
+  e: {
+    completionId: number
+    actorId: string
+    action: ReviewAction
+    via: string
+    note?: string | null
+    metadata?: Prisma.InputJsonValue
+  },
+) {
+  await db.missionReviewEvent.create({
+    data: {
+      completionId: e.completionId,
+      actorId: e.actorId,
+      action: e.action,
+      via: e.via,
+      note: e.note ? e.note.slice(0, 1000) : null,
+      ...(e.metadata !== undefined ? { metadata: e.metadata } : {}),
+    },
+  })
+}
+
 /**
  * Submit a mission completion
  */
@@ -169,38 +200,48 @@ export async function submitMissionCompletion(
   if (existing && existing.status !== 'REJECTED') {
     throw new ConflictError('You have already submitted this mission')
   }
-  if (existing && splitReviewHistory(existing.notes).history.length + 1 >= MAX_MISSION_ATTEMPTS) {
+  if (existing && attemptsSoFar(existing) >= MAX_MISSION_ATTEMPTS) {
     throw new ValidationError(
       `This mission has been rejected ${MAX_MISSION_ATTEMPTS} times. Ask a reviewer in Discord before trying again.`,
     )
   }
 
-  // Check that previous levels are completed
+  // Check that previous levels are completed. (Automatic verification ignores
+  // this gate: it needs no effort from the member, and payouts still go in
+  // level order, see settleLevels.)
   const currentLevel = await getCurrentLevel(discordId)
   if (mission.level > currentLevel) {
     throw new ValidationError(`You must complete Level ${currentLevel} before starting Level ${mission.level}`)
   }
 
-  // Phase 0 (plans/mission-verification.md): nothing is approved on submit.
-  // `autoVerify` missions (L1.0 follow on X, L3.0 #show-and-tell) used to be
-  // approved with no check at all; until the Phase 1 verifiers exist they go
-  // to PENDING for a human like every other mission. Approvals made before
-  // this change are kept (decision D6).
+  // Nothing is approved on submit: the submission is PENDING. When automatic
+  // verification is on (MISSION_VERIFIERS_ENABLED) the submit route then runs
+  // the mission's verifier, which may approve it (app/lib/mission-verify).
   let completion
   if (existing) {
     completion = await resubmitRejected(existing, evidence, notes, memberId)
   } else {
     try {
-      completion = await prisma.missionCompletion.create({
-        data: {
-          missionId,
-          discordId,
-          memberId,
-          status: 'PENDING',
-          evidence: evidence || null,
-          notes: sanitizeMemberNotes(notes),
-        },
-        include: { mission: true },
+      completion = await prisma.$transaction(async (tx) => {
+        const created = await tx.missionCompletion.create({
+          data: {
+            missionId,
+            discordId,
+            memberId,
+            status: 'PENDING',
+            evidence: evidence || null,
+            notes: sanitizeMemberNotes(notes),
+          },
+          include: { mission: true },
+        })
+        await recordReviewEvent(tx, {
+          completionId: created.id,
+          actorId: discordId,
+          action: 'SUBMITTED',
+          via: 'web',
+          metadata: evidence ? { evidence: oneLine(evidence, 500) } : undefined,
+        })
+        return created
       })
     } catch (e: unknown) {
       // A concurrent duplicate submission lost the @@unique([missionId, discordId]) race.
@@ -219,41 +260,58 @@ export async function submitMissionCompletion(
 
 /**
  * Move a REJECTED completion back to PENDING with the new evidence. The
- * rejection (reviewer, time, note, old evidence) is appended to the row's
- * review history, kept in `notes` below a fixed marker (no schema change), and
- * the reviewer fields are cleared. Conditional on status = REJECTED, so of two
- * concurrent resubmits exactly one wins.
+ * rejection (reviewer, time, note, old evidence) is kept in a RESUBMITTED
+ * MissionReviewEvent, and the reviewer fields are cleared. A legacy Phase 0
+ * review-history block in `notes` is carried over unchanged. Conditional on
+ * status = REJECTED, so of two concurrent resubmits exactly one wins.
  */
 async function resubmitRejected(
   existing: {
     id: number
+    discordId: string
     notes: string | null
     evidence: string | null
     reviewedBy: string | null
     reviewNote: string | null
     reviewedAt: Date | null
     memberId: string | null
+    attempts?: number | null
   },
   evidence: string | undefined,
   notes: string | undefined,
   memberId: string | undefined,
 ) {
-  const { history } = splitReviewHistory(existing.notes)
-  const entry = formatRejection(history.length + 1, existing)
-  const updated = await prisma.missionCompletion.updateMany({
-    where: { id: existing.id, status: 'REJECTED' },
-    data: {
-      status: 'PENDING',
-      evidence: evidence || null,
-      notes: joinReviewHistory(sanitizeMemberNotes(notes), [...history, entry]),
-      memberId: memberId ?? existing.memberId,
-      submittedAt: new Date(),
-      reviewedBy: null,
-      reviewNote: null,
-      reviewedAt: null,
-    },
+  const { history: legacyHistory } = splitReviewHistory(existing.notes)
+  const attempt = attemptsSoFar(existing)
+  const won = await prisma.$transaction(async (tx) => {
+    const updated = await tx.missionCompletion.updateMany({
+      where: { id: existing.id, status: 'REJECTED' },
+      data: {
+        status: 'PENDING',
+        evidence: evidence || null,
+        notes: joinReviewHistory(sanitizeMemberNotes(notes), legacyHistory),
+        memberId: memberId ?? existing.memberId,
+        submittedAt: new Date(),
+        reviewedBy: null,
+        reviewNote: null,
+        reviewedAt: null,
+        attempts: attempt + 1,
+        source: 'MANUAL',
+        holdReason: null,
+        checkResult: Prisma.DbNull,
+      },
+    })
+    if (updated.count !== 1) return false
+    await recordReviewEvent(tx, {
+      completionId: existing.id,
+      actorId: existing.discordId,
+      action: 'RESUBMITTED',
+      via: 'web',
+      metadata: { attempt: attempt + 1, previous: rejectionSnapshot(attempt, existing) },
+    })
+    return true
   })
-  if (updated.count !== 1) {
+  if (!won) {
     throw new ConflictError('You have already submitted this mission')
   }
   return prisma.missionCompletion.findUniqueOrThrow({
@@ -262,13 +320,24 @@ async function resubmitRejected(
   })
 }
 
-// ----- review history (rejections), kept in MissionCompletion.notes -----
+// ----- review history (rejections) -----
+//
+// Since Phase 1 every rejection a member resubmits over (or a verifier
+// reopens) is kept in a RESUBMITTED / REOPENED MissionReviewEvent. Phase 0
+// kept it as text in MissionCompletion.notes below a fixed marker; those
+// legacy blocks are still read (and carried over), not migrated.
 
 /** Submissions per mission, counting the first one (plan §5.1: cap of 3). */
 export const MAX_MISSION_ATTEMPTS = 3
 
 const REVIEW_HISTORY_MARKER = '--- Review history ---'
 const NOTES_MAX = 1000
+
+/** Submissions so far: the attempts column, or the legacy notes history for older rows. */
+export function attemptsSoFar(row: { attempts?: number | null; notes?: string | null }): number {
+  const legacy = splitReviewHistory(row.notes).history.length + 1
+  return Math.max(row.attempts ?? 1, legacy)
+}
 
 /** Member-entered notes, trimmed, capped, and unable to forge the history marker. */
 function sanitizeMemberNotes(notes: string | undefined | null): string | null {
@@ -277,7 +346,7 @@ function sanitizeMemberNotes(notes: string | undefined | null): string | null {
   return clean || null
 }
 
-/** Split a completion's `notes` into the member's notes and the rejection history lines. */
+/** Split a completion's `notes` into the member's notes and the legacy rejection history lines. */
 export function splitReviewHistory(notes: string | null | undefined): { memberNotes: string | null; history: string[] } {
   if (!notes) return { memberNotes: null, history: [] }
   const at = notes.indexOf(REVIEW_HISTORY_MARKER)
@@ -289,6 +358,54 @@ export function splitReviewHistory(notes: string | null | undefined): { memberNo
     .map(l => l.trim())
     .filter(Boolean)
   return { memberNotes, history }
+}
+
+/**
+ * The full rejection history of a completion, oldest first: legacy notes
+ * lines, then one line per RESUBMITTED / REOPENED event (same text format).
+ */
+export function reviewHistory(
+  notes: string | null | undefined,
+  events: ReadonlyArray<{ action: string; metadata?: unknown; createdAt?: Date }> = [],
+): { memberNotes: string | null; history: string[] } {
+  const { memberNotes, history } = splitReviewHistory(notes)
+  const lines = [...history]
+  const sorted = [...events].sort((a, b) => (a.createdAt?.getTime() ?? 0) - (b.createdAt?.getTime() ?? 0))
+  for (const e of sorted) {
+    if (e.action !== 'RESUBMITTED' && e.action !== 'REOPENED') continue
+    const prev = (e.metadata as { previous?: RejectionSnapshot } | null)?.previous
+    if (!prev) continue
+    const line = formatRejection(prev.attempt ?? lines.length + 1, {
+      reviewedBy: prev.reviewedBy ?? null,
+      reviewNote: prev.reviewNote ?? null,
+      reviewedAt: prev.reviewedAt ? new Date(prev.reviewedAt) : null,
+      evidence: prev.evidence ?? null,
+    })
+    lines.push(e.action === 'REOPENED' ? `${line} | reopened: verifier now passes` : line)
+  }
+  return { memberNotes, history: lines }
+}
+
+type RejectionSnapshot = {
+  attempt?: number
+  reviewedBy?: string | null
+  reviewNote?: string | null
+  reviewedAt?: string | null
+  evidence?: string | null
+}
+
+/** What a rejection looked like, for the RESUBMITTED / REOPENED event metadata. */
+export function rejectionSnapshot(
+  attempt: number,
+  row: { reviewedBy: string | null; reviewNote: string | null; reviewedAt: Date | null; evidence: string | null },
+): RejectionSnapshot {
+  return {
+    attempt,
+    reviewedBy: row.reviewedBy,
+    reviewNote: row.reviewNote ? oneLine(row.reviewNote, 200) : null,
+    reviewedAt: row.reviewedAt ? row.reviewedAt.toISOString() : null,
+    evidence: row.evidence ? oneLine(row.evidence, 300) : null,
+  }
 }
 
 function joinReviewHistory(memberNotes: string | null, history: string[]): string | null {
@@ -313,12 +430,17 @@ function formatRejection(
 }
 
 /**
- * Admin: approve a mission completion
+ * Reviewer: approve a mission completion, or "release" one that a verifier
+ * passed but that was held for a human (holdReason set, decision D9). Then
+ * pays every newly complete level, in order (settleLevels).
+ *
+ * Returns the updated row plus `levelsPaid` (for the level-up notifications).
  */
 export async function approveMission(
   adminDiscordId: string,
   completionId: number,
-  reviewNote?: string
+  reviewNote?: string,
+  via: string = 'web',
 ) {
   const completion = await prisma.missionCompletion.findUnique({
     where: { id: completionId },
@@ -333,18 +455,33 @@ export async function approveMission(
     throw new ConflictError('This submission has already been reviewed')
   }
 
+  const release = !!completion.holdReason
+
   // Conditional PENDING -> APPROVED transition: of concurrent reviews of the
-  // same submission exactly one wins.
-  const reviewed = await prisma.missionCompletion.updateMany({
-    where: { id: completionId, status: 'PENDING' },
-    data: {
-      status: 'APPROVED',
-      reviewedBy: adminDiscordId,
-      reviewNote: reviewNote || null,
-      reviewedAt: new Date(),
-    },
+  // same submission exactly one wins (and writes the one audit event).
+  const won = await prisma.$transaction(async (tx) => {
+    const reviewed = await tx.missionCompletion.updateMany({
+      where: { id: completionId, status: 'PENDING' },
+      data: {
+        status: 'APPROVED',
+        reviewedBy: adminDiscordId,
+        reviewNote: reviewNote || null,
+        reviewedAt: new Date(),
+        holdReason: null,
+      },
+    })
+    if (reviewed.count !== 1) return false
+    await recordReviewEvent(tx, {
+      completionId,
+      actorId: adminDiscordId,
+      action: release ? 'RELEASED' : 'APPROVED',
+      via,
+      note: reviewNote || null,
+      metadata: release ? { holdReason: completion.holdReason } : undefined,
+    })
+    return true
   })
-  if (reviewed.count !== 1) {
+  if (!won) {
     throw new ConflictError('This submission has already been reviewed')
   }
   const updated = await prisma.missionCompletion.findUniqueOrThrow({
@@ -363,10 +500,11 @@ export async function approveMission(
     linkUrl: '/missions',
   }).catch(() => {})
 
-  // Check if the full level is now complete
-  await checkAndAwardLevelReward(completion.discordId, completion.mission.level)
+  // Pay every level that is now complete, in order (this approval may also
+  // complete a level above one that was banked by a verifier).
+  const levelsPaid = await settleLevels(completion.discordId)
 
-  return updated
+  return { ...updated, levelsPaid }
 }
 
 /**
@@ -375,7 +513,8 @@ export async function approveMission(
 export async function rejectMission(
   adminDiscordId: string,
   completionId: number,
-  reviewNote?: string
+  reviewNote?: string,
+  via: string = 'web',
 ) {
   const completion = await prisma.missionCompletion.findUnique({
     where: { id: completionId },
@@ -392,16 +531,29 @@ export async function rejectMission(
 
   // Conditional PENDING -> REJECTED transition: of concurrent reviews of the
   // same submission exactly one wins.
-  const reviewed = await prisma.missionCompletion.updateMany({
-    where: { id: completionId, status: 'PENDING' },
-    data: {
-      status: 'REJECTED',
-      reviewedBy: adminDiscordId,
-      reviewNote: reviewNote || null,
-      reviewedAt: new Date(),
-    },
+  const won = await prisma.$transaction(async (tx) => {
+    const reviewed = await tx.missionCompletion.updateMany({
+      where: { id: completionId, status: 'PENDING' },
+      data: {
+        status: 'REJECTED',
+        reviewedBy: adminDiscordId,
+        reviewNote: reviewNote || null,
+        reviewedAt: new Date(),
+        holdReason: null,
+      },
+    })
+    if (reviewed.count !== 1) return false
+    await recordReviewEvent(tx, {
+      completionId,
+      actorId: adminDiscordId,
+      action: 'REJECTED',
+      via,
+      note: reviewNote || null,
+      metadata: completion.holdReason ? { holdReason: completion.holdReason } : undefined,
+    })
+    return true
   })
-  if (reviewed.count !== 1) {
+  if (!won) {
     throw new ConflictError('This submission has already been reviewed')
   }
   const updated = await prisma.missionCompletion.findUniqueOrThrow({
@@ -421,6 +573,34 @@ export async function rejectMission(
   }).catch(() => {})
 
   return updated
+}
+
+/**
+ * Pay every fully complete level in order, stopping at the first incomplete
+ * one (decision D5: verification may happen out of order, payouts never do).
+ * A level already paid counts as complete. Each payment goes through
+ * checkAndAwardLevelReward (wallet row lock + MISSION_REWARD ledger marker),
+ * so concurrent callers pay each level exactly once.
+ *
+ * Returns the levels this call paid.
+ */
+export async function settleLevels(discordId: string): Promise<number[]> {
+  const [missions, approved, paid] = await Promise.all([
+    prisma.mission.findMany({ where: { isActive: true }, select: { id: true, level: true } }),
+    prisma.missionCompletion.findMany({ where: { discordId, status: 'APPROVED' }, select: { missionId: true } }),
+    getPaidLevels(discordId),
+  ])
+  const approvedIds = new Set((approved ?? []).map(c => c.missionId))
+  const byLevel = new Map<number, number[]>()
+  for (const m of missions ?? []) byLevel.set(m.level, [...(byLevel.get(m.level) ?? []), m.id])
+
+  const paidNow: number[] = []
+  for (const level of [...byLevel.keys()].sort((a, b) => a - b)) {
+    if (paid.has(level)) continue
+    if (!byLevel.get(level)!.every(id => approvedIds.has(id))) break
+    if (await checkAndAwardLevelReward(discordId, level)) paidNow.push(level)
+  }
+  return paidNow
 }
 
 /**
@@ -518,7 +698,7 @@ export async function getCompletionForReview(completionId: number) {
 export async function getPendingSubmissions() {
   return prisma.missionCompletion.findMany({
     where: { status: 'PENDING' },
-    include: { mission: true },
+    include: { mission: true, events: { orderBy: { createdAt: 'asc' } } },
     orderBy: { submittedAt: 'asc' },
   })
 }
@@ -570,7 +750,12 @@ export async function getUserProgressSummary(discordId: string) {
  * MISSION_REVIEWER_ROLE_IDS holders, or only Dread Pizza Roberts for the
  * DPR-only levels (L8).
  */
-async function notifyReviewers(submitterDiscordId: string, missionTitle: string, level: number) {
+export async function notifyReviewers(
+  submitterDiscordId: string,
+  missionTitle: string,
+  level: number,
+  message = `New submission for "${truncate(missionTitle, 50)}" needs approval.`,
+) {
   const roleIds = level >= DPR_ONLY_MIN_LEVEL ? missionReviewerRoleIds(level) : MISSION_REVIEWER_ROLE_IDS
   const reviewerIds = await getMembersWithRoles(roleIds)
 
@@ -583,7 +768,7 @@ async function notifyReviewers(submitterDiscordId: string, missionTitle: string,
           recipientId,
           actorId: submitterDiscordId,
           title: 'Mission Needs Review',
-          message: `New submission for "${truncate(missionTitle, 50)}" needs approval.`,
+          message,
           linkUrl: '/missions',
         })
       )

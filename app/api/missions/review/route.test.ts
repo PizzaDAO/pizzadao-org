@@ -13,6 +13,8 @@ vi.mock('@/app/lib/missions', async (importOriginal) => {
   const actual = await importOriginal<typeof import('@/app/lib/missions')>()
   return {
     splitReviewHistory: actual.splitReviewHistory,
+    reviewHistory: actual.reviewHistory,
+    attemptsSoFar: actual.attemptsSoFar,
     approveMission: vi.fn(async (by: string, id: number) => ({ id, discordId: 'member-1', status: 'APPROVED', reviewedBy: by, reviewedAt: new Date() })),
     rejectMission: vi.fn(async (by: string, id: number) => ({ id, discordId: 'member-1', status: 'REJECTED', reviewedBy: by, reviewedAt: new Date() })),
     getCompletionForReview: vi.fn(),

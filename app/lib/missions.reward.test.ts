@@ -88,7 +88,9 @@ describe('approveMission / rejectMission', () => {
     mockFn(prisma.missionCompletion.updateMany).mockResolvedValue({ count: 0 })
 
     await expect(approveMission('admin-2', 7)).rejects.toThrow('already been reviewed')
-    expect(prisma.$transaction).not.toHaveBeenCalled()
+    // The conditional update ran in the review transaction; no payout followed.
+    expect(prisma.economy.update).not.toHaveBeenCalled()
+    expect(prisma.missionReviewEvent.create).not.toHaveBeenCalled()
   })
 
   it('reject is conditional too', async () => {

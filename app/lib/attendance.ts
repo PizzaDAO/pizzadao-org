@@ -59,6 +59,8 @@ export interface SyncStats {
   newRecords: number;
   crews: string[];
   errors: string[];
+  /** Members who gained attendance rows in this sync (for the mission hooks). */
+  affectedDiscordIds?: string[];
 }
 
 // ---------------------------------------------------------------------------
@@ -456,6 +458,8 @@ export async function syncAllCrewAttendance(): Promise<SyncStats> {
       stats.errors.push(`${crew.crewLabel}: ${msg}`);
     }
   }
+
+  stats.affectedDiscordIds = [...allAffectedIds];
 
   // Rebuild attendance summaries for affected members
   if (allAffectedIds.size > 0) {

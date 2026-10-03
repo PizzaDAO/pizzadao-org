@@ -31,6 +31,10 @@ export const prisma = {
   articleReaction: createModelMock(),
   mission: createModelMock(),
   missionCompletion: createModelMock(),
+  missionReviewEvent: createModelMock(),
+  xAccount: createModelMock(),
+  callAttendance: createModelMock(),
+  memberWallet: createModelMock(),
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }

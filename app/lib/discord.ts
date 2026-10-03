@@ -163,6 +163,7 @@ export async function getMembersWithRoles(roleIds: readonly string[]): Promise<s
 export async function sendDM(
   userId: string,
   content: string,
+  extra: { embeds?: unknown[] } = {},
 ): Promise<{ success: boolean; error?: string }> {
   const botToken = botTokenOnly()
   if (!botToken) return { success: false, error: "discord_not_configured" }
@@ -194,7 +195,7 @@ export async function sendDM(
       Authorization: `Bot ${botToken}`,
       "Content-Type": "application/json",
     },
-    body: JSON.stringify({ content }),
+    body: JSON.stringify(extra.embeds?.length ? { content, embeds: extra.embeds, allowed_mentions: { parse: [] } } : { content }),
   })
 
   if (!msgRes.ok) {
