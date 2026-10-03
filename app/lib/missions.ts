@@ -1,6 +1,6 @@
 import { prisma } from './db'
-import { updateBalance } from './economy'
-import { logTransaction } from './transactions'
+import { Prisma } from '@prisma/client'
+import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
 import { getMembersWithRoles } from './discord'
 import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
@@ -130,19 +130,28 @@ export async function submitMissionCompletion(
 
   // Create the completion
   const status = mission.autoVerify ? 'APPROVED' : 'PENDING'
-  const completion = await prisma.missionCompletion.create({
-    data: {
-      missionId,
-      discordId,
-      memberId,
-      status,
-      evidence: evidence || null,
-      notes: notes || null,
-      reviewedAt: mission.autoVerify ? new Date() : null,
-      reviewedBy: mission.autoVerify ? 'auto' : null,
-    },
-    include: { mission: true },
-  })
+  let completion
+  try {
+    completion = await prisma.missionCompletion.create({
+      data: {
+        missionId,
+        discordId,
+        memberId,
+        status,
+        evidence: evidence || null,
+        notes: notes || null,
+        reviewedAt: mission.autoVerify ? new Date() : null,
+        reviewedBy: mission.autoVerify ? 'auto' : null,
+      },
+      include: { mission: true },
+    })
+  } catch (e: unknown) {
+    // A concurrent duplicate submission lost the @@unique([missionId, discordId]) race.
+    if ((e as { code?: string })?.code === 'P2002') {
+      throw new ConflictError('You have already submitted this mission')
+    }
+    throw e
+  }
 
   // If auto-verified, check if the full level is now complete
   if (mission.autoVerify) {
@@ -176,14 +185,22 @@ export async function approveMission(
     throw new ConflictError('This submission has already been reviewed')
   }
 
-  const updated = await prisma.missionCompletion.update({
-    where: { id: completionId },
+  // Conditional PENDING -> APPROVED transition: of concurrent reviews of the
+  // same submission exactly one wins.
+  const reviewed = await prisma.missionCompletion.updateMany({
+    where: { id: completionId, status: 'PENDING' },
     data: {
       status: 'APPROVED',
       reviewedBy: adminDiscordId,
       reviewNote: reviewNote || null,
       reviewedAt: new Date(),
     },
+  })
+  if (reviewed.count !== 1) {
+    throw new ConflictError('This submission has already been reviewed')
+  }
+  const updated = await prisma.missionCompletion.findUniqueOrThrow({
+    where: { id: completionId },
     include: { mission: true },
   })
 
@@ -225,14 +242,22 @@ export async function rejectMission(
     throw new ConflictError('This submission has already been reviewed')
   }
 
-  const updated = await prisma.missionCompletion.update({
-    where: { id: completionId },
+  // Conditional PENDING -> REJECTED transition: of concurrent reviews of the
+  // same submission exactly one wins.
+  const reviewed = await prisma.missionCompletion.updateMany({
+    where: { id: completionId, status: 'PENDING' },
     data: {
       status: 'REJECTED',
       reviewedBy: adminDiscordId,
       reviewNote: reviewNote || null,
       reviewedAt: new Date(),
     },
+  })
+  if (reviewed.count !== 1) {
+    throw new ConflictError('This submission has already been reviewed')
+  }
+  const updated = await prisma.missionCompletion.findUniqueOrThrow({
+    where: { id: completionId },
     include: { mission: true },
   })
 
@@ -251,7 +276,29 @@ export async function rejectMission(
 }
 
 /**
- * Check if all missions in a level are approved, and if so award the PEP reward
+ * Ledger filter for "this user's level reward was already paid". New rows carry
+ * metadata.level; older rows only have it in the description
+ * ("Mission reward: Level 3" or "Mission reward: Level 3 - Title").
+ */
+function levelRewardWhere(discordId: string, level: number): Prisma.TransactionWhereInput {
+  return {
+    userId: discordId,
+    type: 'MISSION_REWARD',
+    OR: [
+      { metadata: { path: ['level'], equals: level } },
+      { description: `Mission reward: Level ${level}` },
+      { description: { startsWith: `Mission reward: Level ${level} - ` } },
+    ],
+  }
+}
+
+/**
+ * Check if all missions in a level are approved, and if so award the PEP reward.
+ *
+ * Runs in one DB transaction holding a row lock on the user's wallet, so the
+ * "already paid?" check, the credit and the MISSION_REWARD ledger row (which
+ * is the paid marker) are atomic per user: concurrent approvals / auto-verified
+ * submissions can't pay the same level twice.
  */
 export async function checkAndAwardLevelReward(discordId: string, level: number) {
   // Get all missions for this level
@@ -261,44 +308,39 @@ export async function checkAndAwardLevelReward(discordId: string, level: number)
 
   if (levelMissions.length === 0) return false
 
-  // Get the user's approved completions for this level
-  const approvedCompletions = await prisma.missionCompletion.findMany({
-    where: {
-      discordId,
-      status: 'APPROVED',
-      missionId: { in: levelMissions.map(m => m.id) },
-    },
-  })
-
-  // Check if all missions in the level are completed
-  if (approvedCompletions.length < levelMissions.length) return false
-
   // Get the reward amount (all missions in a level share the same reward)
   const reward = levelMissions[0].reward
-  if (reward <= 0) return false
+  if (!Number.isInteger(reward) || reward <= 0) return false
 
-  // Check if reward was already given (prevent double-awarding)
-  // We check for existing MISSION_REWARD transactions for this level
-  const existingReward = await prisma.transaction.findFirst({
-    where: {
-      userId: discordId,
-      type: 'MISSION_REWARD',
-      description: { contains: `Level ${level}` },
-    },
-  })
-
-  if (existingReward) return false
-
-  // Award the PEP reward
-  await updateBalance(discordId, reward)
-
-  // Log the transaction
   const levelTitle = levelMissions[0].levelTitle
   const desc = levelTitle
     ? `Mission reward: Level ${level} - ${levelTitle}`
     : `Mission reward: Level ${level}`
 
-  logTransaction(prisma, discordId, 'MISSION_REWARD', reward, desc, { level }).catch(() => {})
+  await getOrCreateEconomy(discordId)
+
+  const awarded = await prisma.$transaction(async (tx) => {
+    await lockWallet(tx, discordId)
+
+    // Check (under the lock) that every mission in the level is approved
+    const approvedCount = await tx.missionCompletion.count({
+      where: {
+        discordId,
+        status: 'APPROVED',
+        missionId: { in: levelMissions.map(m => m.id) },
+      },
+    })
+    if (approvedCount < levelMissions.length) return false
+
+    // Check if reward was already given (prevent double-awarding)
+    const existingReward = await tx.transaction.findFirst({ where: levelRewardWhere(discordId, level) })
+    if (existingReward) return false
+
+    await creditInTx(tx, discordId, reward, 'MISSION_REWARD', desc, { level })
+    return true
+  })
+
+  if (!awarded) return false
 
   // Send level completion notification
   createNotification({

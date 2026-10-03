@@ -1,3 +1,4 @@
+import { Prisma } from '@prisma/client'
 import { prisma } from './db'
 import { ValidationError } from './errors/api-errors'
 import { logTransaction } from './transactions'
@@ -7,32 +8,43 @@ const PEP_NAME = process.env.PEP_NAME || 'PEP'
 
 export { PEP_SYMBOL, PEP_NAME }
 
+type TxClient = Prisma.TransactionClient
+type TransactionType = Prisma.TransactionCreateInput['type']
+
 export function formatCurrency(amount: number): string {
   return `${PEP_SYMBOL}${amount.toLocaleString()}`
 }
 
 /**
- * Get or create economy record for a user
+ * Get or create economy record for a user.
+ *
+ * Upserts, so two concurrent first requests for the same user can't both try
+ * to INSERT and fail one of them on the primary key.
  */
 export async function getOrCreateEconomy(userId: string) {
-  let economy = await prisma.economy.findUnique({
-    where: { id: userId }
+  const existing = await prisma.economy.findUnique({ where: { id: userId } })
+  if (existing) return existing
+
+  // Ensure User record exists first (required by foreign key)
+  await prisma.user.upsert({
+    where: { id: userId },
+    create: { id: userId, roles: [] },
+    update: {}
   })
 
-  if (!economy) {
-    // Ensure User record exists first (required by foreign key)
-    await prisma.user.upsert({
+  try {
+    return await prisma.economy.upsert({
       where: { id: userId },
-      create: { id: userId, roles: [] },
+      create: { id: userId, wallet: 0 },
       update: {}
     })
-
-    economy = await prisma.economy.create({
-      data: { id: userId, wallet: 0 }
-    })
+  } catch (e: unknown) {
+    // Lost a concurrent INSERT race: the row exists now.
+    if ((e as { code?: string })?.code === 'P2002') {
+      return prisma.economy.findUniqueOrThrow({ where: { id: userId } })
+    }
+    throw e
   }
-
-  return economy
 }
 
 /**
@@ -43,41 +55,76 @@ export async function getBalance(userId: string) {
   return { balance: economy.wallet }
 }
 
-/**
- * Add or subtract from user's balance
- */
-export async function updateBalance(userId: string, amount: number) {
-  await getOrCreateEconomy(userId)
-
-  // Atomic in the database: no read-modify-write of an absolute value (which
-  // could lose concurrent updates), and debits only apply if funds suffice.
-  if (amount >= 0) {
-    return prisma.economy.update({
-      where: { id: userId },
-      data: { wallet: { increment: amount } }
-    })
+/** PEP amounts are positive whole numbers that fit Postgres INT4. */
+export function assertPepAmount(amount: number, label = 'Amount') {
+  if (!Number.isInteger(amount) || amount <= 0 || amount > 2_147_483_647) {
+    throw new ValidationError(`${label} must be positive and a whole number`)
   }
+}
 
-  const debit = await prisma.economy.updateMany({
-    where: { id: userId, wallet: { gte: -amount } },
+/**
+ * Credit a wallet and write its ledger row, inside the caller's DB transaction.
+ *
+ * Together with debitInTx this is the only way balances change: the wallet
+ * update and the Transaction row commit or roll back together, so
+ * Economy.wallet can't drift from the ledger. The wallet row must already
+ * exist (call getOrCreateEconomy before opening the transaction).
+ */
+export async function creditInTx(
+  tx: TxClient,
+  userId: string,
+  amount: number,
+  type: TransactionType,
+  description: string,
+  metadata?: Prisma.InputJsonValue,
+) {
+  assertPepAmount(amount)
+  await tx.economy.update({
+    where: { id: userId },
     data: { wallet: { increment: amount } }
+  })
+  await logTransaction(tx, userId, type, amount, description, metadata)
+}
+
+/**
+ * Debit a wallet and write its ledger row, inside the caller's DB transaction.
+ *
+ * The debit is a conditional UPDATE (wallet >= amount), atomic in Postgres, so
+ * concurrent debits can never overdraw. Throws ValidationError('Insufficient
+ * funds') — rolling back the caller's transaction — when funds don't suffice.
+ */
+export async function debitInTx(
+  tx: TxClient,
+  userId: string,
+  amount: number,
+  type: TransactionType,
+  description: string,
+  metadata?: Prisma.InputJsonValue,
+) {
+  assertPepAmount(amount)
+  const debit = await tx.economy.updateMany({
+    where: { id: userId, wallet: { gte: amount } },
+    data: { wallet: { decrement: amount } }
   })
   if (debit.count !== 1) {
     throw new ValidationError('Insufficient funds')
   }
-  return prisma.economy.findUniqueOrThrow({ where: { id: userId } })
+  await logTransaction(tx, userId, type, -amount, description, metadata)
 }
 
-// Alias for backward compatibility
-export const updateWallet = updateBalance
+/**
+ * Take a row lock on a user's wallet for the rest of the DB transaction.
+ * Serializes per-user check-then-pay logic (e.g. "was this reward paid yet?").
+ */
+export async function lockWallet(tx: TxClient, userId: string) {
+  await tx.$queryRaw`SELECT id FROM "Economy" WHERE id = ${userId} FOR UPDATE`
+}
 
 /**
  * Transfer currency between users
  */
 export async function transfer(fromId: string, toId: string, amount: number) {
-  if (!Number.isInteger(amount) || amount <= 0) {
-    throw new ValidationError('Amount must be positive and a whole number')
-  }
+  assertPepAmount(amount)
 
   if (fromId === toId) {
     throw new ValidationError('Cannot transfer to yourself')
@@ -86,29 +133,15 @@ export async function transfer(fromId: string, toId: string, amount: number) {
   const fromEconomy = await getOrCreateEconomy(fromId)
   await getOrCreateEconomy(toId) // Ensure recipient exists
 
+  // Friendly fast path; the conditional debit in debitInTx is authoritative.
   if (fromEconomy.wallet < amount) {
     throw new ValidationError('Insufficient funds')
   }
 
-  // Use interactive transaction to ensure atomicity and log both sides.
-  // The debit is a conditional update (wallet >= amount) so two concurrent
-  // transfers can't both pass the balance check above and overdraw.
-  await prisma.$transaction(async (tx: any) => {
-    const debit = await tx.economy.updateMany({
-      where: { id: fromId, wallet: { gte: amount } },
-      data: { wallet: { decrement: amount } }
-    })
-    if (debit.count !== 1) {
-      throw new ValidationError('Insufficient funds')
-    }
-    await tx.economy.update({
-      where: { id: toId },
-      data: { wallet: { increment: amount } }
-    })
-
-    // Log both sides of the transfer
-    await logTransaction(tx, fromId, 'TRANSFER_SENT', -amount, `Transfer to ${toId}`, { toUserId: toId })
-    await logTransaction(tx, toId, 'TRANSFER_RECEIVED', amount, `Transfer from ${fromId}`, { fromUserId: fromId })
+  // Debit, credit and both ledger rows commit together or not at all.
+  await prisma.$transaction(async (tx) => {
+    await debitInTx(tx, fromId, amount, 'TRANSFER_SENT', `Transfer to ${toId}`, { toUserId: toId })
+    await creditInTx(tx, toId, amount, 'TRANSFER_RECEIVED', `Transfer from ${fromId}`, { fromUserId: fromId })
   })
 
   return { success: true, amount }
