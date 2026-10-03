@@ -357,11 +357,50 @@ model Mission {
   description String?
   reward      Int      @default(0) // PEP reward (per-level, shared)
   levelTitle  String?  // e.g., "Pizza Trainee"
-  autoVerify  Boolean  @default(false)
+  autoVerify  Boolean  @default(false) // legacy, ignored since Phase 0; dropped in Phase 2 (verifierKey replaces it)
   isActive    Boolean  @default(true)
   createdAt   DateTime @default(now())
+  // Mission verification (plans/mission-verification.md §3). null = manual.
+  verifierKey    String?   // registry key, e.g. "x_linked" (app/lib/mission-verify/verifiers)
+  verifierParams Json?     // parsed by the verifier's params parser
+  proofKind      ProofKind @default(NONE) // what the submit form asks for
   completions MissionCompletion[]
   @@unique([level, index])
+}
+
+enum ProofKind {
+  NONE
+  URL
+  DISCORD_MESSAGE
+  UPLOAD
+}
+
+enum CompletionSource {
+  MANUAL // submitted by the member, decided by a human
+  AUTO   // a verifier passed (approved, or held for a human release)
+  SEMI   // proof + pre-checks, decided by a human (Phase 4)
+}
+
+// Why an auto-verified completion is PENDING, waiting for a human "release"
+// (decision D9) instead of being approved automatically.
+enum MissionHold {
+  NEW_ACCOUNT         // Discord account younger than 30 days (cleared automatically once it is older)
+  HIGH_LEVEL          // L6+: always a human release
+  PREVIOUSLY_REJECTED // a human rejected it before; a verifier passing never overrides that
+}
+
+enum ReviewAction {
+  SUBMITTED
+  RESUBMITTED
+  AUTO_APPROVED
+  AUTO_HELD // verifier passed, held for a human release
+  RELEASED  // a human released a held completion
+  APPROVED
+  REJECTED
+  REOPENED  // REJECTED -> PENDING because a verifier now passes (a human decides again)
+  FLAGGED
+  UNFLAGGED
+  NOTE
 }
 
 model MissionCompletion {
@@ -376,10 +415,35 @@ model MissionCompletion {
   reviewNote  String?
   submittedAt DateTime      @default(now())
   reviewedAt  DateTime?
+  source      CompletionSource @default(MANUAL)
+  checkResult Json?         // what the verifier saw (handle, roles, counts, message ids)
+  attempts    Int           @default(1) // submissions so far (cap 3); legacy rows also count their notes history
+  holdReason  MissionHold?  // set while an auto-verified completion awaits a human release
+  flaggedAt   DateTime?     // underlying state lost later: flagged, never clawed back (D17)
+  flagReason  String?
+  updatedAt   DateTime      @default(now()) @updatedAt
   mission     Mission       @relation(fields: [missionId], references: [id])
+  events      MissionReviewEvent[]
   @@unique([missionId, discordId])
   @@index([discordId])
   @@index([status])
+}
+
+// Append-only audit trail for mission completions. Replaces the Phase 0
+// review-history block in MissionCompletion.notes (legacy blocks are still read).
+model MissionReviewEvent {
+  id           Int               @id @default(autoincrement())
+  completionId Int
+  actorId      String // a Discord id, "auto:<verifierKey>" or "system:<what>"
+  action       ReviewAction
+  via          String // web | discord | on_demand | event | submit | cron | backfill
+  note         String?
+  metadata     Json?
+  createdAt    DateTime          @default(now())
+  completion   MissionCompletion @relation(fields: [completionId], references: [id], onDelete: Cascade)
+
+  @@index([completionId])
+  @@index([actorId, createdAt])
 }
 
 // ===== VOUCHES IN THE DAO =====
