@@ -1,7 +1,15 @@
 // /api/missions/review and /api/missions/pending: reviewer roles per level.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
+vi.mock('next/server', async (importOriginal) => ({
+  ...(await importOriginal<typeof import('next/server')>()),
+  after: vi.fn(),
+}))
+vi.mock('@/app/lib/mission-verify/review-cards', async (importOriginal) => ({
+  reviewCardsEnabled: (await importOriginal<typeof import('@/app/lib/mission-verify/review-cards')>()).reviewCardsEnabled,
+  syncReviewCard: vi.fn(async () => 'edited'),
+}))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn() }))
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
@@ -26,7 +34,9 @@ vi.mock('@/app/lib/missions', async (importOriginal) => {
   }
 })
 
+import { after } from 'next/server'
 import { POST } from './route'
+import { syncReviewCard } from '@/app/lib/mission-verify/review-cards'
 import { GET as PENDING } from '../pending/route'
 import { getSession } from '@/app/lib/session'
 import { getUserRoles } from '@/app/lib/discord'
@@ -96,6 +106,49 @@ describe('POST /api/missions/review', () => {
     vi.mocked(getCompletionForReview).mockResolvedValue(null)
     as('dpr', [DPR])
     expect((await review(99)).status).toBe(404)
+  })
+
+  describe('Discord review card sync', () => {
+    afterEach(() => {
+      delete process.env.MISSION_REVIEW_CARDS_ENABLED
+    })
+
+    it.each(['approve', 'reject'])('a web %s edits the Discord card after the response (never blocking it)', async (action) => {
+      process.env.MISSION_REVIEW_CARDS_ENABLED = '1'
+      target(3)
+      as('capo', [CAPO])
+      expect((await review(5, action)).status).toBe(200)
+      // Scheduled with after(), not awaited by the request.
+      expect(syncReviewCard).not.toHaveBeenCalled()
+      expect(after).toHaveBeenCalledTimes(1)
+      await (vi.mocked(after).mock.calls[0][0] as () => Promise<void>)()
+      expect(syncReviewCard).toHaveBeenCalledWith(5)
+    })
+
+    it('a slow or failing Discord edit cannot affect the web decision', async () => {
+      process.env.MISSION_REVIEW_CARDS_ENABLED = '1'
+      vi.mocked(syncReviewCard).mockImplementationOnce(() => new Promise(() => {})) // never settles
+      target(3)
+      as('capo', [CAPO])
+      const res = await review(5)
+      expect(res.status).toBe(200)
+      expect((await res.json()).completion.status).toBe('APPROVED')
+    })
+
+    it('no card sync while MISSION_REVIEW_CARDS_ENABLED is off', async () => {
+      target(3)
+      as('capo', [CAPO])
+      expect((await review(5)).status).toBe(200)
+      expect(after).not.toHaveBeenCalled()
+    })
+
+    it('a refused review (not a reviewer) touches no card', async () => {
+      process.env.MISSION_REVIEW_CARDS_ENABLED = '1'
+      target(3)
+      as('someone', ['123'])
+      expect((await review(5)).status).toBe(403)
+      expect(after).not.toHaveBeenCalled()
+    })
   })
 })
 

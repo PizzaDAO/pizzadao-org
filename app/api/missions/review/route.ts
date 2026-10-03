@@ -6,6 +6,7 @@ import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError, ValidationError, NotFoundError } from '@/app/lib/errors/api-errors'
 import { invalidateProgressCache } from '@/app/lib/mission-cache'
 import { announceMissionResults } from '@/app/lib/mission-verify/notify'
+import { reviewCardsEnabled, syncReviewCard } from '@/app/lib/mission-verify/review-cards'
 
 export const runtime = 'nodejs'
 
@@ -59,6 +60,12 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   // Invalidate cached progress for the submission's owner
   invalidateProgressCache(result.discordId)
+
+  // Keep the Discord review card in sync (outcome, who, when; buttons
+  // disabled). After the response, best effort: never blocks this request.
+  if (reviewCardsEnabled()) {
+    after(() => syncReviewCard(completionId).then(() => undefined))
+  }
 
   return NextResponse.json({
     success: true,

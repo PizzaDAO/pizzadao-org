@@ -28,6 +28,8 @@ import { Prisma, type MissionHold } from '@prisma/client'
 import { prisma } from '../db'
 import { createNotification } from '../notifications'
 import { notifyReviewers, recordReviewEvent, rejectionSnapshot, settleLevels } from '../missions'
+import { queueReviewCardSync, reviewCardsEnabled, syncReviewCardsFor } from './review-cards'
+import { NEW_REVIEW_ROUND } from './review-ids'
 import { invalidateProgressCache } from '../mission-cache'
 import { fetchMemberIdByDiscordId } from '../sheets/member-repository'
 import { getVerifier } from './verifiers'
@@ -294,6 +296,12 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       invalidateProgressCache(discordId)
     }
     notifyInApp(discordId, report)
+    // Discord review cards (Phase 3): post one for a new hold / reopen, and
+    // update an existing card the verifier just approved or held.
+    const cardMissions = report.checks
+      .filter((c) => c.outcome === 'approved' || c.outcome === 'held' || c.outcome === 'reopened')
+      .map((c) => c.missionId)
+    if (cardMissions.length && reviewCardsEnabled()) queueReviewCardSync(() => syncReviewCardsFor(discordId, cardMissions))
   }
   return report
 }
@@ -336,6 +344,7 @@ async function applyPass(
             source: 'AUTO',
             checkResult: json(evidence),
             ...decided,
+            ...(hold ? { reviewQueuedAt: new Date() } : {}),
           },
           select: { id: true },
         })
@@ -388,6 +397,7 @@ async function reopen(row: Row, m: MissionRow, key: string, evidence: Record<str
         reviewedBy: null,
         reviewNote: null,
         reviewedAt: null,
+        ...NEW_REVIEW_ROUND(),
       },
     })
     if (u.count !== 1) return false

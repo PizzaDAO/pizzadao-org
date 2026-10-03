@@ -9,6 +9,7 @@ import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { runVerifiers } from '@/app/lib/mission-verify/engine'
 import { missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
 import { announceMissionResults } from '@/app/lib/mission-verify/notify'
+import { reviewCardsEnabled, syncReviewCardsFor } from '@/app/lib/mission-verify/review-cards'
 
 export const runtime = 'nodejs'
 
@@ -69,6 +70,14 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   // Invalidate cached progress for this user
   invalidateProgressCache(session.discordId)
+
+  // Still waiting for a human (submission, resubmission, or a hold): post the
+  // Discord review card in #work, after the response. Independent of
+  // MISSION_VERIFIERS_ENABLED; gated by MISSION_REVIEW_CARDS_ENABLED.
+  if (status !== 'APPROVED' && reviewCardsEnabled()) {
+    const discordId = session.discordId
+    after(() => syncReviewCardsFor(discordId, [missionId]).then(() => undefined))
+  }
 
   return NextResponse.json({
     success: true,
