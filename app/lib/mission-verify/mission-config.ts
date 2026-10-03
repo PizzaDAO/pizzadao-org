@@ -33,7 +33,7 @@ export const DREAD_PIZZA_ROBERTS_ROLE_ID = '812131585327235113'
 export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
   {
     level: 1,
-    index: 0,
+    index: 1, // prod: the original index-0 row was deleted; this mission sits at index 1
     seedTitle: 'Follow @RarePizzas and @Pizza_DAO on X',
     title: 'Link your X account and follow @RarePizzas + @Pizza_DAO',
     description:
@@ -61,7 +61,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
   {
     level: 3,
     index: 0,
-    seedTitle: 'Share your community in #show-and-tell',
+    seedTitle: 'Share something in #show-and-tell', // prod title (edited from the seed's 'Share your community in #show-and-tell')
     verifierKey: 'discord_message',
     verifierParams: { channelName: 'show-and-tell', channelEnv: 'SHOW_AND_TELL_CHANNEL_ID' },
     proofKind: 'DISCORD_MESSAGE',
@@ -76,7 +76,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
   },
   {
     level: 4,
-    index: 0,
+    index: 1, // prod: the original index-0 row was deleted; this mission sits at index 1
     seedTitle: 'Make a POAP for a community call',
     verifierKey: null, // poap_drop, Phase 4
     verifierParams: null,

@@ -26,8 +26,8 @@ describe('planVerifierMigration', () => {
     expect(plan.errors).toEqual([])
     expect(plan.updates).toHaveLength(12)
     const auto = MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey && VERIFIERS[c.verifierKey]?.mode === 'auto')
-    expect(auto.map((c) => `L${c.level}.${c.index}`)).toEqual(['L1.0', 'L2.0', 'L3.0', 'L3.1', 'L5.0', 'L6.0', 'L7.0'])
-    expect(MISSION_VERIFIER_CONFIG.filter((c) => !c.verifierKey).map((c) => `L${c.level}.${c.index}`)).toEqual(['L2.1', 'L4.0', 'L5.1', 'L6.1'])
+    expect(auto.map((c) => `L${c.level}.${c.index}`)).toEqual(['L1.1', 'L2.0', 'L3.0', 'L3.1', 'L5.0', 'L6.0', 'L7.0'])
+    expect(MISSION_VERIFIER_CONFIG.filter((c) => !c.verifierKey).map((c) => `L${c.level}.${c.index}`)).toEqual(['L2.1', 'L4.1', 'L5.1', 'L6.1'])
     expect(MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey === 'manual').map((c) => `L${c.level}.${c.index}`)).toEqual(['L8.0'])
     // Every configured verifier exists and accepts its params.
     for (const c of MISSION_VERIFIER_CONFIG) if (c.verifierKey) expect(() => VERIFIERS[c.verifierKey!].parse(c.verifierParams)).not.toThrow()
@@ -50,7 +50,7 @@ describe('planVerifierMigration', () => {
     const rows = seedRows()
     rows[5].title = 'Make a POAP (edited)'
     const plan = planVerifierMigration(rows)
-    expect(plan.errors).toEqual([expect.stringMatching(/^L4\.0: title is "Make a POAP \(edited\)"/)])
+    expect(plan.errors).toEqual([expect.stringMatching(/^L4\.1: title is "Make a POAP \(edited\)"/)])
   })
 
   it('reports missing rows without failing', () => {
