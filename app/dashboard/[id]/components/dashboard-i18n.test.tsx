@@ -130,7 +130,7 @@ describe("dashboard in Spanish", () => {
         );
         expect(screen.getByRole("link", { name: /Únete a tu primera crew/ })).toHaveAttribute(
             "href",
-            "/crew",
+            "/crews",
         );
     });
 

@@ -19,6 +19,9 @@ const eslintConfig = defineConfig([
     "test-results/**",
   ]),
   {
+    // Scoped to the file types eslint-config-next registers its plugins for;
+    // without this, plain .cjs files (e.g. e2e/local) hit "plugin not found".
+    files: ["**/*.{js,jsx,mjs,ts,tsx}"],
     // Existing code has many `any`s and unused vars. Keep them visible as
     // warnings so `npm run lint` can gate PRs on real errors; tighten these
     // back to "error" as the backlog is paid down.
@@ -31,6 +34,11 @@ const eslintConfig = defineConfig([
       "react-hooks/purity": "warn",
       "react-hooks/refs": "warn",
     },
+  },
+  {
+    // CommonJS files (e.g. the e2e/local Node preload) legitimately use require().
+    files: ["**/*.cjs"],
+    rules: { "@typescript-eslint/no-require-imports": "off" },
   },
 ]);
 

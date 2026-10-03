@@ -39,7 +39,7 @@ describe("<NextActionPanel />", () => {
             kind: "join_crew",
             headline: "Welcome — pick a crew to get started",
             body: "Crews are how members coordinate work across the DAO.",
-            primaryCta: { label: "Join your first crew", href: "/crew" },
+            primaryCta: { label: "Join your first crew", href: "/crews" },
         });
         renderWithIntl(<NextActionPanel nextAction={a} />);
 
@@ -49,7 +49,7 @@ describe("<NextActionPanel />", () => {
         expect(screen.getByText("Crews are how members coordinate work across the DAO."))
             .toBeInTheDocument();
         const cta = screen.getByRole("link", { name: "Join your first crew" });
-        expect(cta).toHaveAttribute("href", "/crew");
+        expect(cta).toHaveAttribute("href", "/crews");
         expect(screen.getByTestId("next-action-panel"))
             .toHaveAttribute("data-kind", "join_crew");
     });

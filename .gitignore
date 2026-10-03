@@ -47,3 +47,6 @@ next-env.d.ts
 
 # local Claude Code settings (may contain secrets)
 .claude/settings.local.json
+
+# e2e:local artifacts (sessions, screenshots, logs)
+e2e/.local/

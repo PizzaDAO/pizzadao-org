@@ -31,7 +31,7 @@ describe("getProfileCompletion", () => {
         expect(c.percent).toBe(0);
         expect(c.isComplete).toBe(false);
         expect(c.next?.key).toBe("join_crew");
-        expect(c.next?.href).toBe("/crew");
+        expect(c.next?.href).toBe("/crews");
     });
 
     it("lists steps in priority order with labels and hrefs", () => {

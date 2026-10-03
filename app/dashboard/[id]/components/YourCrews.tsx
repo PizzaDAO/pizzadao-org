@@ -121,7 +121,7 @@ export function YourCrews({
                     </h3>
                 </div>
                 <Link
-                    href="/crew"
+                    href="/crews"
                     className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
                     style={{ textDecoration: "none", fontWeight: 600 }}
                 >
