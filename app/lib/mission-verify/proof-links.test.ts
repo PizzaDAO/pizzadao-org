@@ -3,7 +3,12 @@
 // submit-time pre-check. Every fetch and DNS lookup is mocked.
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('../db', () => ({ prisma: { missionCompletion: { updateMany: vi.fn(async () => ({ count: 1 })) } } }))
+vi.mock('../db', () => {
+  const missionCompletion = { updateMany: vi.fn(async () => ({ count: 1 })) }
+  const missionReviewEvent = { create: vi.fn(async () => ({})) }
+  const tx = { missionCompletion, missionReviewEvent }
+  return { prisma: { ...tx, $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)) } }
+})
 
 import { parseFarcasterCast, parseHttpsUrl, parseMediaLink, parsePoapProof, parseRsvPizzaUrl, parseXPost } from './proof-links'
 import { isInternalIp, isSafePublicUrl, parseUnfurl, unfurlProof } from './unfurl'
@@ -162,6 +167,8 @@ function sources(fetchImpl: typeof fetch): VerifierSources {
     fetch: fetchImpl,
     neynarApiKey: () => null,
     rsvPizzaApiUrl: () => 'https://api.rsv.example',
+    rsvPizzaServiceKey: () => null,
+    getWalletAddresses: vi.fn(async () => []),
   } as unknown as VerifierSources
 }
 
@@ -223,6 +230,39 @@ describe('precheckProof (submit route)', () => {
       preview: { kind: 'image' },
     })
     expect(await precheckProof({ discordId: '1', memberId: null, mission: { verifierKey: 'x_linked', verifierParams: {} }, evidence: 'https://e.com', unfurl })).toEqual({})
+  })
+
+  it('an auto-verified pre-check (L6.1 host confirmed) carries the D9 hold; below L6 it stays a plain all-green review', async () => {
+    const GPP = (level: number) => ({ verifierKey: 'gpp_host', verifierParams: {}, level })
+    const event = { slug: 'lisbon', city: 'Lisbon', status: 'approved', type: 'gpp', date: null, role: 'host', matchedBy: ['telegram'] }
+    const f = (async (input: RequestInfo | URL) =>
+      String(input).includes('/api/service/')
+        ? new Response(JSON.stringify({ ok: true, matched: true, events: [event] }))
+        : new Response(JSON.stringify({ event: { customUrl: 'lisbon', city: 'Lisbon', underbossStatus: 'approved' } }))) as unknown as typeof fetch
+    const src = { ...sources(f), rsvPizzaServiceKey: () => 'k', getTelegramUsername: vi.fn(async () => 'cityhost') }
+    const OLD = '300000000000000001' // a 2016 snowflake: not a new account
+    const held = await precheckProof({ discordId: OLD, memberId: null, mission: GPP(6), evidence: 'https://rsv.pizza/lisbon', sources: src, unfurl: async () => null })
+    expect(held.checkResult).toMatchObject({ verifier: 'gpp_host', autoVerified: true, confidence: 'high' })
+    expect(held.hold).toBe('HIGH_LEVEL')
+    const low = await precheckProof({ discordId: OLD, memberId: null, mission: GPP(2), evidence: 'https://rsv.pizza/lisbon', sources: src, unfurl: async () => null })
+    expect(low.checkResult?.autoVerified).toBe(true)
+    expect(low.hold).toBeNull()
+    const noKey = await precheckProof({ discordId: OLD, memberId: null, mission: GPP(6), evidence: 'https://rsv.pizza/lisbon', sources: { ...src, rsvPizzaServiceKey: () => null }, unfurl: async () => null })
+    expect(noKey.checkResult?.autoVerified).toBeUndefined()
+    expect(noKey.hold).toBeUndefined()
+  })
+
+  it('storeCheckResult with a hold sets holdReason and records AUTO_HELD in one transaction', async () => {
+    vi.mocked(prisma.missionCompletion.updateMany).mockClear()
+    const ok = await storeCheckResult(9, { verifier: 'gpp_host', summary: 's', confidence: 'high', checks: [], data: {}, checkedAt: 'now', autoVerified: true }, true, 'HIGH_LEVEL')
+    expect(ok).toBe(true)
+    expect(prisma.missionCompletion.updateMany).toHaveBeenCalledWith({
+      where: { id: 9, status: 'PENDING' },
+      data: expect.objectContaining({ source: 'SEMI', holdReason: 'HIGH_LEVEL' }),
+    })
+    expect(prisma.missionReviewEvent.create).toHaveBeenCalledWith({
+      data: expect.objectContaining({ completionId: 9, actorId: 'auto:gpp_host', action: 'AUTO_HELD', via: 'submit' }),
+    })
   })
 
   it('storeCheckResult writes only onto a PENDING row (source SEMI for verifier-backed checks)', async () => {

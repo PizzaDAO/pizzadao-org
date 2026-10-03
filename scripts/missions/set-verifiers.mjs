@@ -12,8 +12,7 @@
  *            L3.1 referral (now real) with a description that explains the
  *            invite link
  * and marks the grandfathered no-proof approvals (reviewedBy = 'auto', D6) as
- * source = 'AUTO'. It never reads or writes the legacy Mission.autoVerify
- * column (@ignore since Phase 4, dropped by Migration B).
+ * source = 'AUTO'.
  *
  * It ABORTS, changing nothing, if any (level, index) row has a title that is
  * neither the seed title nor the new title (production rows may have been

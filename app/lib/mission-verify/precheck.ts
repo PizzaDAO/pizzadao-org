@@ -5,21 +5,29 @@
  *                     (and fetches a link preview for reviewers, in parallel):
  *                       fail          -> `reject`: the submit route answers 400
  *                                        with the hint and writes NO row
- *                       needs_review  -> `checkResult` for the PENDING row
+ *                       needs_review  -> `checkResult` for the PENDING row;
+ *                                        `autoVerified` (Phase 5, L6.1 host
+ *                                        confirmed by rsv.pizza) also yields the
+ *                                        D9 `hold`, so the row shows as
+ *                                        "Auto-verified · awaiting release"
  *                       unknown/error -> `checkResult` saying it couldn't check
- *   storeCheckResult() writes it onto the PENDING completion (source SEMI),
- *                     conditional on the row still being PENDING.
+ *   storeCheckResult() writes it (and the hold, if any) onto the PENDING
+ *                     completion (source SEMI), conditional on the row still
+ *                     being PENDING.
  *
  * The result is what the review card ("Verifier saw") and the web panel show:
  *   { verifier, summary, confidence, checks: [{label, ok}], data, preview?, checkedAt }
  * Missions without a verifier (manual) only get the link preview.
- * Never approves anything.
+ * Never approves anything: an auto-verified pre-check below the release
+ * threshold (no D9 hold) stays an all-green review for a one-click approve.
  */
-import { Prisma } from '@prisma/client'
+import { Prisma, type MissionHold } from '@prisma/client'
 import { prisma } from '../db'
 import { defaultSources } from './sources'
 import { unfurlProof, type ProofPreview, type UnfurlDeps } from './unfurl'
 import { getVerifier } from './verifiers'
+import { HOLD_LABEL, releaseHoldFor } from './policy'
+import { recordReviewEvent } from '../missions'
 import type { Confidence, SemiCheck, VerifierSources, VerifyCtx } from './types'
 
 export interface SemiCheckResult {
@@ -30,6 +38,8 @@ export interface SemiCheckResult {
   data: Record<string, unknown>
   preview?: ProofPreview
   checkedAt: string
+  /** An authoritative source confirmed the proof (L6.1: rsv.pizza host lookup). */
+  autoVerified?: boolean
 }
 
 export interface PrecheckOutcome {
@@ -37,12 +47,14 @@ export interface PrecheckOutcome {
   reject?: { reason: string; hint?: string }
   /** For the PENDING row. */
   checkResult?: SemiCheckResult
+  /** checkResult.autoVerified and D9 needs a human: hold the PENDING row for a release. */
+  hold?: MissionHold | null
 }
 
 export interface PrecheckInput {
   discordId: string
   memberId: string | null
-  mission: { verifierKey: string | null; verifierParams: Prisma.JsonValue | null }
+  mission: { verifierKey: string | null; verifierParams: Prisma.JsonValue | null; level?: number }
   evidence: string | null | undefined
   sources?: VerifierSources
   unfurl?: (url: string) => Promise<ProofPreview | null>
@@ -95,7 +107,11 @@ export async function precheckProof(input: PrecheckInput): Promise<PrecheckOutco
   if (r.status === 'fail') return { reject: { reason: r.reason, ...(r.hint ? { hint: r.hint } : {}) } }
   const base = { verifier: v.key, checkedAt: now.toISOString(), ...(preview ? { preview } : {}) }
   if (r.status === 'needs_review') {
-    return { checkResult: { ...base, summary: r.summary, confidence: r.confidence, checks: r.checks, data: r.evidence } }
+    const checkResult: SemiCheckResult = { ...base, summary: r.summary, confidence: r.confidence, checks: r.checks, data: r.evidence }
+    if (!r.autoVerified) return { checkResult }
+    checkResult.autoVerified = true
+    const hold = typeof input.mission.level === 'number' ? releaseHoldFor(input.mission.level, input.discordId, now) : null
+    return { checkResult, hold }
   }
   if (r.status === 'pass') {
     // Semi verifiers don't pass; treat a pass like an all-green review.
@@ -106,17 +122,41 @@ export async function precheckProof(input: PrecheckInput): Promise<PrecheckOutco
   }
 }
 
-/** Put the pre-check on the PENDING completion (source SEMI). Best effort; returns whether it was written. */
-export async function storeCheckResult(completionId: number, checkResult: SemiCheckResult, verifierBacked: boolean): Promise<boolean> {
+/**
+ * Put the pre-check on the PENDING completion (source SEMI). With a `hold`
+ * (an auto-verified pre-check that D9 says a human must release) the row also
+ * gets `holdReason`, and an AUTO_HELD review event is recorded. Best effort;
+ * returns whether it was written.
+ */
+export async function storeCheckResult(
+  completionId: number,
+  checkResult: SemiCheckResult,
+  verifierBacked: boolean,
+  hold: MissionHold | null = null,
+): Promise<boolean> {
   try {
-    const r = await prisma.missionCompletion.updateMany({
-      where: { id: completionId, status: 'PENDING' },
-      data: {
-        checkResult: JSON.parse(JSON.stringify(checkResult)) as Prisma.InputJsonValue,
-        ...(verifierBacked ? { source: 'SEMI' as const } : {}),
-      },
+    const data = {
+      checkResult: JSON.parse(JSON.stringify(checkResult)) as Prisma.InputJsonValue,
+      ...(verifierBacked ? { source: 'SEMI' as const } : {}),
+      ...(hold ? { holdReason: hold } : {}),
+    }
+    if (!hold) {
+      const r = await prisma.missionCompletion.updateMany({ where: { id: completionId, status: 'PENDING' }, data })
+      return r.count === 1
+    }
+    return await prisma.$transaction(async (tx) => {
+      const r = await tx.missionCompletion.updateMany({ where: { id: completionId, status: 'PENDING' }, data })
+      if (r.count !== 1) return false
+      await recordReviewEvent(tx, {
+        completionId,
+        actorId: `auto:${checkResult.verifier ?? 'semi'}`,
+        action: 'AUTO_HELD',
+        via: 'submit',
+        note: HOLD_LABEL[hold],
+        metadata: { holdReason: hold, summary: checkResult.summary },
+      })
+      return true
     })
-    return r.count === 1
   } catch (e) {
     console.error(`[missions] storing the pre-check of completion ${completionId} failed:`, e)
     return false

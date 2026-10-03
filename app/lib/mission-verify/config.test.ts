@@ -35,10 +35,9 @@ describe('planVerifierMigration', () => {
     for (const c of MISSION_VERIFIER_CONFIG) if (c.verifierKey) expect(() => VERIFIERS[c.verifierKey!].parse(c.verifierParams)).not.toThrow()
   })
 
-  it('rewords L1.0 to "Link your X account" (D1); never touches the legacy autoVerify column', () => {
+  it('rewords L1.0 to "Link your X account" (D1)', () => {
     const l1 = planVerifierMigration(seedRows()).updates.find((u) => u.level === 1)!
     expect(l1.data).toMatchObject({ title: 'Link your X account and follow @RarePizzas + @Pizza_DAO', verifierKey: 'x_linked' })
-    for (const u of planVerifierMigration(seedRows()).updates) expect(u.data).not.toHaveProperty('autoVerify')
   })
 
   it('Phase 4: a database already on the Phase 1 config only gets the new semi verifiers (and descriptions)', () => {

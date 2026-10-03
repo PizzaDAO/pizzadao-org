@@ -13,9 +13,6 @@
  * L5.1 media_proof, L6.1 gpp_host): the member submits a proof link, the
  * verifier pre-checks it on submit (MissionCompletion.checkResult) and a
  * reviewer approves with one click. They never approve on their own.
- *
- * Mission.autoVerify is no longer read or written (it is @ignore in the
- * schema and dropped by "Migration B" after this release).
  */
 
 export type ProofKindName = 'NONE' | 'URL' | 'DISCORD_MESSAGE' | 'UPLOAD'

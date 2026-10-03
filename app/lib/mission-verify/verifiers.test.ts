@@ -27,6 +27,8 @@ function sources(over: Partial<VerifierSources> = {}): VerifierSources {
     fetch: vi.fn(async () => { throw new Error("no network in tests") }) as unknown as typeof fetch,
     neynarApiKey: () => null,
     rsvPizzaApiUrl: () => "https://api.rsv.example",
+    rsvPizzaServiceKey: () => null,
+    getWalletAddresses: vi.fn(async () => []),
     ...over,
   }
 }

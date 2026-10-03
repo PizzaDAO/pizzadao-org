@@ -1,6 +1,6 @@
 # Plan: mission verification + rewards
 
-Status: **decisions recorded (§9, all DECIDED); Phases 0–4 implemented** (see "What Phase 1 changed" … "What Phase 4 changed" at the end). Phase 5 is still plan only.
+Status: **decisions recorded (§9, all DECIDED); Phases 0–5 implemented** (see "What Phase 1 changed" … "What Phase 5 changed" at the end). What is still optional (not planned) is listed at the end of "What Phase 5 changed".
 
 ## 0. TL;DR
 
@@ -461,7 +461,7 @@ The economic unit is the discordId. Signals to compute in the cron, surfaced as 
 | **2 — Cron + backfill + flags** | `vercel.json` crons (attendance sync, missions nightly, SLA digest). Bulk `checkMany` paths. `VerifierRun`. Backfill dry run, then apply. Stateful re-check plus flagging. Duplicate signals. Drop `autoVerify` (Migration B). | **M** (~2–3 days) |
 | **3 — Discord** | `/missions` command (deferred reply). Review channel cards with Approve/Reject buttons plus the reject modal, two-way sync with the web. Level-up channel posts. Register commands via `scripts/discord/register-commands.mjs`. | **M** (~3 days) |
 | **4 — Semi verifiers + referral** | `social_post` (X handle match, Farcaster via Neynar), `poap_drop`, `media_proof` (link, optional Blob client upload), `gpp_host` (rsv.pizza public GPP API plus Telegram match). `Referral` capture (onboarding step and/or bot invite codes) and the `referral` verifier. Review panel previews and bulk approve. | **M–L** (~4–5 days) |
-| **5 — Optional upgrades** | rsv-pizza service endpoint (`GET /api/integrations/participation?email|wallet`, `x-api-key` shared secret, following the telegram-link-callback pattern) to make L6.1 automatic. Paid X API for a real follow check (L1.0) and post metrics (L2.1). A POAP whitelist "creator" column to make L4.0 automatic. `MissionLevel` table. | **L** (cross-repo; and spend) |
+| **5 — rsv.pizza host lookup + Migration B** (**done**, see "What Phase 5 changed") | rsv-pizza service endpoint (`POST /api/service/gpp-host-lookup`, `x-service-key` shared secret) used by `gpp_host` so a host match on L6.1 is auto-verified (still held for a release, D9). Migration B drops `Mission.autoVerify`. Still optional, not planned: paid X API (L1.0 follow, L2.1 metrics; D1), a POAP whitelist "creator" column (L4.0), a `MissionLevel` table. | **M** (cross-repo) |
 
 **Migration A** (additive, safe to deploy before the code):
 
@@ -501,7 +501,7 @@ UPDATE "Mission" SET "verifierKey"='manual', "reviewerRoleIds"='{812131585327235
 
 Update `scripts/seed-missions.mjs` and `e2e/local/seed.mjs` to match.
 
-**Migration B** (Phase 2, after one release): `ALTER TABLE "Mission" DROP COLUMN "autoVerify"`. Remove the remaining `autoVerify` references in `MissionCard`, `missions-overview` and the API routes. The UI uses `proofKind` and `verifierKey` instead.
+**Migration B** (done in Phase 5 as `prisma/migrations/20261010000000_drop_mission_autoverify`; originally planned for Phase 2): `ALTER TABLE "Mission" DROP COLUMN IF EXISTS "autoVerify"`. Remove the remaining `autoVerify` references in `MissionCard`, `missions-overview` and the API routes. The UI uses `proofKind` and `verifierKey` instead.
 
 New env and config:
 
@@ -511,7 +511,7 @@ New env and config:
 - `MISSIONS_AUTOVERIFY_ENABLED`
 - `MISSIONS_RUN_PEP_ALERT`
 - `CRON_SECRET` (exists)
-- later, `RSV_PIZZA_API_URL` and `RSV_PIZZA_API_SECRET`
+- `RSV_PIZZA_API_URL` (optional) and `RSV_PIZZA_SERVICE_KEY` (Phase 5; the same value as rsv.pizza's `PIZZADAO_SERVICE_KEY`)
 
 The bot needs Read Message History in #show-and-tell, Send Messages and Embed Links in the review and announce channels, and Create Invite if D4 chooses invite codes.
 
@@ -536,7 +536,7 @@ The owner accepted every recommended default. Where a decision differs from the 
 | D11 | Discord surfaces | **DECIDED** | Level-ups: a **DM** to the member **plus one celebration channel**. The **review queue and the celebration posts both go to the Discord `#work` channel**: configurable with `MISSION_REVIEW_CHANNEL_ID` (and `MISSIONS_ANNOUNCE_CHANNEL_ID`), defaulting to resolving the channel named `work` via the guild channels API at runtime. |
 | D12 | Crew-leader source (L7.0) | **DECIDED** | The Discord role named **"Crew Leader"** (`discord_role` verifier, resolved by name; `MISSION_CREW_LEADER_ROLE` overrides). L7 is L6+, so it still needs a **human release** (D9). |
 | D13 | SLA | **DECIDED** | **48 hours** for a first decision at every level; **admins are pinged** for anything older. |
-| D14 | L6.1 / rsv-pizza | **DECIDED** | **Proof link plus a Telegram match** for now (semi-automatic). The rsv-pizza service endpoint stays an optional Phase 5 upgrade. |
+| D14 | L6.1 / rsv-pizza | **DECIDED** | **Proof link plus a Telegram match** for now (semi-automatic). *(Phase 5: with the rsv-pizza service endpoint configured, a host match marks the submission auto-verified; L6 still needs a human release, D9. Without it, this stays the behaviour.)* |
 | D15 | L2.1 platforms | **DECIDED** | **X and Farcaster.** Farcaster is checked via Neynar; X gets the handle match plus a reviewer's eye on the engagement numbers. |
 | D16 | L5.1 video | **DECIDED** | **Links only**; no direct uploads. |
 | D17 | Flags | **DECIDED** | **Flag, never claw back, and don't freeze** future payouts. |
@@ -596,3 +596,29 @@ None. (Resolved: the review and celebration channel is `#work`, D11; the crew-le
 - **Bulk approve** (`POST /api/missions/review/bulk`, `bulk-review.ts`): checkboxes per submission, "Select all green" (every pre-check passed), an optional shared note, "Approve selected". Each item goes through the same checks and the same race-safe `approveMission` as a single approve (roles per level, L8 = DPR only, never your own, the referral note); at most 50 ids, 20 bulk calls an hour per reviewer. The concurrency suite races 20 bulk approves against 20 web approves and 20 Discord clicks: each submission is decided once and the level is paid once.
 - **Data**: `scripts/missions/set-verifiers.mjs` now also sets L2.1 `social_post`, L4.1 `poap_drop`, L5.1 `media_proof`, L6.1 `gpp_host` (and clearer descriptions, including L3.1's invite link); dry run by default, `--apply` to write.
 - **Env**: `NEYNAR_API_KEY` (already used by Farcaster discovery; optional: without it Farcaster posts get the URL check), `RSV_PIZZA_API_URL` (optional, default `https://api.rsv.pizza`). Submissions are rate limited to 10 an hour per member (`missions-submit`).
+
+### What Phase 5 changed
+
+- **rsv.pizza service endpoint** (PizzaDAO/rsv-pizza, `POST /api/service/gpp-host-lookup`, its own PR; it must be merged and deployed by the rsv.pizza team **before** auto-verification can work). Auth is `x-service-key` against rsv.pizza's `PIZZADAO_SERVICE_KEY`, compared in constant time. It answers 503 when the key is unset and 401 on a mismatch, and is limited to 60 requests a minute per IP.
+  - **Input:** emails, wallets and Telegram handles (up to 10 of each).
+  - **Output:** per approved / listed, non-cancelled `gpp` event, only `slug, city, status, type, date, role (host | cohost | underboss), matchedBy`. No PII.
+  - **Matching:** owner `User.email` / `payout_wallet_address` / `telegram`; `co_hosts[].email` / `.telegram` (`isUnderboss` gives role `underboss`, i.e. "onboarded"); reimbursement `payouts.payout_wallet_address`; and the bot-verified `party_telegram_hosts.username` (`telegram_verified`).
+  - rsv.pizza stores **no Discord ids**, which was confirmed. No rsv.pizza schema change.
+- **`gpp_host` (L6.1)** (`semi.ts`): when `RSV_PIZZA_SERVICE_KEY` is set, it calls the endpoint in parallel with the public GPP lookup. It sends the member's linked wallets (`MemberWallet`, up to 10) and linked Telegram username (`TelegramAccount`).
+  - **Email:** pizzadao.org stores **no member email**, so none is sent. The endpoint accepts emails in case one is stored later.
+  - **On a match:** if rsv.pizza ties the member to *the submitted event* (its slug or canonical custom URL) and no check failed, the result is `autoVerified`. The identity check turns ✔ ("rsv.pizza confirms the member onboarded rsv.pizza/lisbon (matched by wallet)") and replaces the by-hand Telegram compare. An invite-code link that isn't in the public list still matches through the lookup.
+  - **Other outcomes, all left for a reviewer:**
+    - The member hosted a different event: shown, 👀.
+    - No match, the lookup is down, or no identifiers: 👀, plus the old Telegram compare.
+  - **Without the key:** exactly the Phase 4 behaviour; the lookup is never called.
+  - **Release:** `precheckProof` turns `autoVerified` into the D9 hold (`releaseHoldFor(level)`, so `HIGH_LEVEL` for L6.1). `storeCheckResult` writes `holdReason` and an `AUTO_HELD` review event in one transaction. The row then shows as **"Auto-verified · awaiting release"** with a **Release** button in the web panel and on the Discord card.
+  - It never approves on its own. A pass below L6 for an account older than 30 days gets no hold and stays an all-green review for one-click approval.
+- **Migration B** (`prisma/migrations/20261010000000_drop_mission_autoverify`): `ALTER TABLE "Mission" DROP COLUMN IF EXISTS "autoVerify";`. The `@ignore` field is gone from `schema.prisma`, and no app code, script or test references `autoVerify` any more; only migration history and this plan do.
+  - Validated on a throwaway Postgres 17 pushed from origin/main's schema: applied twice (the re-run is a no-op) and `prisma migrate diff` came back empty.
+  - Safe in either order relative to the deploy, because the deployed Phase 4 client never selects the column.
+- **Env (pizzadao.org):** `RSV_PIZZA_SERVICE_KEY` (optional; the same value as rsv.pizza's `PIZZADAO_SERVICE_KEY`, e.g. `openssl rand -hex 32`) and `RSV_PIZZA_API_URL` (optional, default `https://api.rsv.pizza`).
+- **Still optional, not planned:**
+  - **Paid X API tier**, for a real follow check on L1.0 and likes / replies on L2.1 X posts. Not planned (D1: the follow stays on the honor system; a reviewer judges X engagement).
+  - A **POAP whitelist "creator discordId" column**, which would make L4.0 automatic.
+  - A **`MissionLevel` table** (level titles and rewards as data).
+  - Possible rsv.pizza indexes if the lookup ever gets heavy traffic: `parties (event_type, underboss_status)` and `lower()` expression indexes. These are not needed at one call per L6.1 submission.
