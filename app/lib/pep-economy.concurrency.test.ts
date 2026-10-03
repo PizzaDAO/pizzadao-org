@@ -19,6 +19,9 @@
 //   * /rob and the games: cooldowns hold under races, robbing conserves PEP,
 //     stakes can't overdraw
 //   * /remove-money can't take a wallet below 0, however many race
+//   * mission verification: parallel runVerifiers for one member (and racing
+//     human approvals) pay each level exactly once, hold what needs a human
+//     release, and never override a rejection
 // Finally it runs every check in scripts/pep-reconcile.sql against the DB.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -43,7 +46,12 @@ vi.mock('./notifications', () => ({
 vi.mock('./discord', () => ({
   getMembersWithRoles: vi.fn().mockResolvedValue([]),
   hasAnyRole: vi.fn().mockResolvedValue(false),
+  getUserRoles: vi.fn().mockResolvedValue([]),
+  lookupGuildMembership: vi.fn().mockResolvedValue({ status: 'unknown' }),
+  sendDM: vi.fn().mockResolvedValue({ success: false, error: 'discord_not_configured' }),
 }))
+// Never reach the members sheet from the engine (memberId is passed in).
+vi.mock('./sheets/member-repository', () => ({ fetchMemberIdByDiscordId: vi.fn().mockResolvedValue(null) }))
 
 /* eslint-disable @typescript-eslint/no-explicit-any */
 type Libs = {
@@ -61,6 +69,8 @@ type Libs = {
   grants: typeof import('./shop-grants')
   admin: typeof import('./pep-admin')
   celebration: typeof import('./celebration')
+  engine: typeof import('./mission-verify/engine')
+  policy: typeof import('./mission-verify/policy')
 }
 let L: Libs
 const N = 20
@@ -132,6 +142,8 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       grants: await import('./shop-grants'),
       admin: await import('./pep-admin'),
       celebration: await import('./celebration'),
+      engine: await import('./mission-verify/engine'),
+      policy: await import('./mission-verify/policy'),
     }
   }, 60_000)
 
@@ -283,14 +295,120 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
       Array.from({ length: N }, (_, i) => L.missions.submitMissionCompletion(user, mission.id, `https://two/${i}`, 'second')),
     )
     expect(outcomes(res).ok).toBe(1)
-    const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: first.id } })
-    expect(row).toMatchObject({ status: 'PENDING', reviewedBy: null, reviewNote: null, reviewedAt: null })
-    const { memberNotes, history } = L.missions.splitReviewHistory(row.notes)
+    const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: first.id }, include: { events: true } })
+    expect(row).toMatchObject({ status: 'PENDING', reviewedBy: null, reviewNote: null, reviewedAt: null, attempts: 2 })
+    // The rejection is kept once, in the audit trail (one RESUBMITTED event).
+    expect(row.events.map((e: any) => e.action).sort()).toEqual(['REJECTED', 'RESUBMITTED', 'SUBMITTED'])
+    const { memberNotes, history } = L.missions.reviewHistory(row.notes, row.events)
     expect(memberNotes).toBe('second')
     expect(history).toHaveLength(1)
     expect(history[0]).toMatch(/^Attempt 1 rejected .* by reviewer \| note: blurry \| evidence: https:\/\/one$/)
     await L.prisma.missionCompletion.delete({ where: { id: first.id } })
     await L.prisma.mission.update({ where: { id: mission.id }, data: { isActive: false } })
+  }, 60_000)
+
+  // ---- Mission verification Phase 1 (runVerifiers + settleLevels) ----
+
+  const runAll = (user: string, missionIds: number[], extra: Record<string, unknown> = {}) =>
+    Promise.allSettled(
+      Array.from({ length: N }, () =>
+        L.engine.runVerifiers(user, { trigger: 'on_demand', enabled: true, memberId: null, missionIds, ...extra }),
+      ),
+    )
+  let xSeq = 0
+  const linkX = (discordId: string) =>
+    L.prisma.xAccount.create({ data: { discordId, xId: `it-x-${RUN}-${++xSeq}`, xUsername: `it${xSeq}`, accessToken: 'enc' } })
+  // Isolated bottom levels: payouts go in level order, so the test missions
+  // sit at level 1 / 2 (unique index) and are deactivated afterwards.
+  const missionAt = (level: number, title: string, verifierKey: string | null, verifierParams: object | null, reward: number) =>
+    L.prisma.mission.create({
+      data: { level, index: 5000 + (Number(RUN) % 100000) + ++xSeq, title, reward, verifierKey, verifierParams: verifierParams ?? undefined },
+    })
+  const deactivate = (ids: number[]) => L.prisma.mission.updateMany({ where: { id: { in: ids } }, data: { isActive: false } })
+
+  it(`${N} parallel runVerifiers on one member approve once and pay the level once`, async () => {
+    const m = await missionAt(1, 'it link X', 'x_linked', {}, 69)
+    const user = await seedUser(0)
+    await linkX(user)
+    const res = await runAll(user, [m.id])
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    await settle()
+    const rows = await L.prisma.missionCompletion.findMany({ where: { discordId: user }, include: { events: true } })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ status: 'APPROVED', reviewedBy: 'auto:x_linked', source: 'AUTO' })
+    expect(rows[0].events.filter((e: any) => e.action === 'AUTO_APPROVED')).toHaveLength(1)
+    const paid = res.flatMap((r) => (r.status === 'fulfilled' ? r.value.levelsPaid : []))
+    expect(paid).toEqual([1]) // exactly one run paid it
+    expect(await wallet(user)).toBe(69)
+    await expectLedgerConsistent(user)
+    await deactivate([m.id])
+  }, 60_000)
+
+  it('parallel runVerifiers racing human approvals pay each level exactly once, in order', async () => {
+    const a = await missionAt(1, 'it link X 2', 'x_linked', {}, 69)
+    const b = await missionAt(2, 'it call', 'attendance_count', { min: 1 }, 420)
+    const c = await missionAt(2, 'it manual', null, null, 420)
+    const user = await seedUser(0)
+    await linkX(user)
+    await L.prisma.callAttendance.create({
+      data: { discordId: user, crewId: 'community_call', crewLabel: 'Community Call', callDate: new Date(), dailySheetId: `it-sheet-${RUN}-${user}` },
+    })
+    const pending = await L.prisma.missionCompletion.create({ data: { missionId: c.id, discordId: user, status: 'PENDING' } })
+    const res = await Promise.allSettled([
+      ...Array.from({ length: N }, () =>
+        L.engine.runVerifiers(user, { trigger: 'on_demand', enabled: true, memberId: null, missionIds: [a.id, b.id] }),
+      ),
+      ...Array.from({ length: N }, () => L.missions.approveMission('capo-it', pending.id)),
+    ])
+    expect(res.filter((r) => r.status === 'fulfilled').length).toBeGreaterThanOrEqual(N + 1) // one approval wins
+    await settle()
+    // A last settle catches the case where the approval landed after every run settled.
+    await L.missions.settleLevels(user)
+    expect(await wallet(user)).toBe(69 + 420)
+    const rewards = await L.prisma.transaction.findMany({ where: { userId: user, type: 'MISSION_REWARD' }, orderBy: { id: 'asc' } })
+    expect(rewards.map((t: any) => t.metadata.level)).toEqual([1, 2])
+    await expectLedgerConsistent(user)
+    await deactivate([a.id, b.id, c.id])
+  }, 60_000)
+
+  it(`${N} parallel runs for a Discord account under 30 days hold once for a human release and pay nothing`, async () => {
+    const m = await missionAt(1, 'it young', 'x_linked', {}, 69)
+    const young = L.policy.snowflakeAt(new Date(Date.now() - 2 * 86_400_000), Number(RUN) % 4096)
+    await L.prisma.user.create({ data: { id: young, roles: [] } })
+    await L.prisma.economy.create({ data: { id: young, wallet: 0 } })
+    touched.set(young, 0)
+    await linkX(young)
+    await runAll(young, [m.id])
+    await settle()
+    const rows = await L.prisma.missionCompletion.findMany({ where: { discordId: young }, include: { events: true } })
+    expect(rows).toHaveLength(1)
+    expect(rows[0]).toMatchObject({ status: 'PENDING', holdReason: 'NEW_ACCOUNT', source: 'AUTO' })
+    expect(rows[0].events.map((e: any) => e.action)).toEqual(['AUTO_HELD'])
+    expect(await wallet(young)).toBe(0)
+    // A reviewer releases it: paid exactly once even if released concurrently.
+    await Promise.allSettled(Array.from({ length: N }, () => L.missions.approveMission('capo-it', rows[0].id)))
+    await settle()
+    expect(await wallet(young)).toBe(69)
+    const after = await L.prisma.missionReviewEvent.findMany({ where: { completionId: rows[0].id } })
+    expect(after.filter((e: any) => e.action === 'RELEASED')).toHaveLength(1)
+    await expectLedgerConsistent(young)
+    await deactivate([m.id])
+  }, 60_000)
+
+  it(`${N} parallel runs never override a human rejection: reopened for review once, nothing paid`, async () => {
+    const m = await missionAt(1, 'it rejected', 'x_linked', {}, 69)
+    const user = await seedUser(0)
+    await linkX(user)
+    const c = await L.prisma.missionCompletion.create({
+      data: { missionId: m.id, discordId: user, status: 'REJECTED', reviewedBy: 'capo-it', reviewNote: 'no', reviewedAt: new Date() },
+    })
+    await runAll(user, [m.id])
+    await settle()
+    const row = await L.prisma.missionCompletion.findUniqueOrThrow({ where: { id: c.id }, include: { events: true } })
+    expect(row).toMatchObject({ status: 'PENDING', holdReason: 'PREVIOUSLY_REJECTED' })
+    expect(row.events.map((e: any) => e.action)).toEqual(['REOPENED'])
+    expect(await wallet(user)).toBe(0)
+    await deactivate([m.id])
   }, 60_000)
 
   it(`${N} parallel level-up claims (tabs, reloads) celebrate once`, async () => {

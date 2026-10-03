@@ -338,6 +338,9 @@ async function applyPass(
     }
   }
 
+  // Already held (e.g. a concurrent run held it first): stays held, nothing to write.
+  if (hold && row.holdReason) return 'awaiting_release'
+
   // PENDING -> APPROVED / held, conditional on the row still being in the state we read.
   const won = await prisma.$transaction(async (tx) => {
     const u = await tx.missionCompletion.updateMany({
