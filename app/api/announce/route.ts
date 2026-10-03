@@ -2,17 +2,22 @@ import { NextResponse } from "next/server";
 import { requireSession } from "@/app/lib/auth-guards";
 import { canAnnounce, requireAnnouncer } from "@/app/lib/announce/access";
 import { runAnnouncementFromEnv } from "@/app/lib/announce/run";
+import { getAnnounceBotCheck } from "@/app/lib/announce/bot-check";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 // GET /api/announce - whether the logged-in user may fire the announcement.
 // Lets the page decide what to show without shipping the access list.
+// For announcers it also returns `botCheck`: whether the bot can view / post /
+// mention @everyone in the announcement channel (cached 5 min).
 export async function GET() {
   const auth = await requireSession();
   if (!auth.ok) return auth.response;
   const allowed = await canAnnounce(auth.session.discordId);
-  return NextResponse.json({ allowed });
+  if (!allowed) return NextResponse.json({ allowed });
+  const botCheck = await getAnnounceBotCheck();
+  return NextResponse.json({ allowed, botCheck });
 }
 
 // POST /api/announce - fire the Community Call announcement.

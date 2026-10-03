@@ -12,7 +12,7 @@
 //
 // onion-47612: editorial restyle. Visitor sign-in CTA uses .btn-pill;
 // the owner-mode inline CTA is suppressed because /profile/[id]'s sticky
-// bottom dock now carries the "Edit on dashboard" affordance (avoids two
+// bottom dock now carries the "Edit profile" affordance (avoids two
 // copies in the hero). Vouch button is sourced from AddVouchButton —
 // left untouched (lives across owner & visitor flows).
 
@@ -97,7 +97,7 @@ export function ProfileActions({
 
     if (isOwner) {
         // onion-47612: the sticky editorial bottom dock on /profile/[id]
-        // carries the "Edit on dashboard" CTA, so we suppress the inline
+        // carries the "Edit profile" CTA, so we suppress the inline
         // hero copy. The kebab still shows for Share/Copy.
         primary = null;
     } else if (viewerId && !isSelf) {
@@ -202,12 +202,12 @@ export function ProfileActions({
                         )}
                         {isOwner && (
                             <Link
-                                href={`/dashboard/${memberId}`}
+                                href={`/profile/${memberId}/edit`}
                                 role="menuitem"
                                 className="block w-full text-left px-3 py-3 min-h-11 text-sm hover:bg-tomato/10 cursor-pointer no-underline text-foreground"
                                 onClick={() => setMenuOpen(false)}
                             >
-                                Edit on dashboard →
+                                Edit profile →
                             </Link>
                         )}
                     </div>

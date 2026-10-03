@@ -5,6 +5,8 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
+import { useQueryClient } from "@tanstack/react-query";
+import type { SessionData } from "@/app/lib/hooks/use-session";
 import { useTranslations } from "next-intl";
 import { TURTLES } from "../constants";
 import { sanitizeDisplayName } from "@/app/lib/display-name";
@@ -53,6 +55,7 @@ export type OnboardingWizardProps = {
 export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   const t = useTranslations("onboarding.chrome");
   const router = useRouter();
+  const queryClient = useQueryClient();
   const hasProcessedParams = useRef(false);
 
   // --- Flow State Machine ---
@@ -187,6 +190,13 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
   // --- Check existing session ---
   async function checkSession() {
+    // Just logged out (markLoggedOut wrote authenticated:false into the
+    // cache): skip the /api/me probe, which would only 401.
+    const cached = queryClient.getQueryData<SessionData>(["session"]);
+    if (cached && !cached.authenticated) {
+      setFlow({ type: "wizard", step: 0, isUpdate: false });
+      return;
+    }
     setFlow({ type: "checking_session" });
     try {
       const res = await fetch("/api/me", { credentials: "include" });

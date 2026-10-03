@@ -1,7 +1,41 @@
+// Discord bot credentials. When DISCORD_GUILD_ID or DISCORD_BOT_TOKEN is
+// unset (local dev, previews), every lookup short-circuits to "unknown / not a
+// member" instead of calling e.g. `guilds//members/<id>` with an empty ID.
+let warnedMissingDiscordConfig = false
+
+function warnMissingDiscordConfig(missing: string[]) {
+  if (warnedMissingDiscordConfig) return
+  warnedMissingDiscordConfig = true
+  console.warn(`[discord] ${missing.join(" and ")} not set; skipping Discord API calls`)
+}
+
+function guildConfig(): { guildId: string; botToken: string } | null {
+  const guildId = process.env.DISCORD_GUILD_ID
+  const botToken = process.env.DISCORD_BOT_TOKEN
+  if (!guildId || !botToken) {
+    const missing: string[] = []
+    if (!guildId) missing.push("DISCORD_GUILD_ID")
+    if (!botToken) missing.push("DISCORD_BOT_TOKEN")
+    warnMissingDiscordConfig(missing)
+    return null
+  }
+  return { guildId, botToken }
+}
+
+function botTokenOnly(): string | null {
+  const botToken = process.env.DISCORD_BOT_TOKEN
+  if (!botToken) {
+    warnMissingDiscordConfig(["DISCORD_BOT_TOKEN"])
+    return null
+  }
+  return botToken
+}
+
 // Fetch guild member data including roles
 export async function fetchGuildMember(userId: string) {
-  const guildId = process.env.DISCORD_GUILD_ID!
-  const botToken = process.env.DISCORD_BOT_TOKEN!
+  const cfg = guildConfig()
+  if (!cfg) return null
+  const { guildId, botToken } = cfg
 
   const r = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
     headers: { Authorization: `Bot ${botToken}` },
@@ -27,8 +61,9 @@ export type GuildMembership =
  * "unknown" means the Discord API call itself failed (not a 404).
  */
 export async function lookupGuildMembership(userId: string): Promise<GuildMembership> {
-  const guildId = process.env.DISCORD_GUILD_ID!
-  const botToken = process.env.DISCORD_BOT_TOKEN!
+  const cfg = guildConfig()
+  if (!cfg) return { status: "unknown" }
+  const { guildId, botToken } = cfg
   try {
     const r = await fetch(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
       headers: { Authorization: `Bot ${botToken}` },
@@ -67,8 +102,9 @@ export async function getUserRoles(userId: string): Promise<string[]> {
 
 // Search guild members by username query
 export async function searchGuildMembers(query: string, limit = 5) {
-  const guildId = process.env.DISCORD_GUILD_ID!
-  const botToken = process.env.DISCORD_BOT_TOKEN!
+  const cfg = guildConfig()
+  if (!cfg) return []
+  const { guildId, botToken } = cfg
 
   const r = await fetch(
     `https://discord.com/api/v10/guilds/${guildId}/members/search?query=${encodeURIComponent(query)}&limit=${limit}`,
@@ -93,8 +129,9 @@ export async function getMembersWithRoles(roleIds: readonly string[]): Promise<s
     return membersByRoleCache.ids
   }
 
-  const guildId = process.env.DISCORD_GUILD_ID!
-  const botToken = process.env.DISCORD_BOT_TOKEN!
+  const cfg = guildConfig()
+  if (!cfg) return []
+  const { guildId, botToken } = cfg
   const ids: string[] = []
   let after = '0'
 
@@ -127,7 +164,8 @@ export async function sendDM(
   userId: string,
   content: string,
 ): Promise<{ success: boolean; error?: string }> {
-  const botToken = process.env.DISCORD_BOT_TOKEN!
+  const botToken = botTokenOnly()
+  if (!botToken) return { success: false, error: "discord_not_configured" }
 
   // Step 1: Create/open DM channel
   const chanRes = await fetch("https://discord.com/api/v10/users/@me/channels", {

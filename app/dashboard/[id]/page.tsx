@@ -18,6 +18,7 @@ import { use, useEffect, useState } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
+import { markLoggedOut } from "../../lib/hooks/use-session";
 import { useTranslations } from "next-intl";
 import { CREWS } from "../../ui/constants";
 import { norm } from "../../lib/strings";
@@ -304,8 +305,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                                 try {
                                     await fetch("/api/logout", { method: "POST" });
                                 } catch { }
-                                // Drop the cached session so the site header flips to Log in / Join.
-                                queryClient.removeQueries({ queryKey: ["session"] });
+                                // Mark the cached session logged-out so the site header flips to
+                                // Log in / Join and session-gated pollers stop (no stray 401s).
+                                markLoggedOut(queryClient);
                                 router.push("/");
                             }}
                             className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
