@@ -10,6 +10,8 @@
 //      DISCORD_GUILD_ID, DISCORD_BOT_TOKEN (guild role names for
 //      /collect-income), optional PEP_EMOJI (e.g. <:pepperoni:973304305979367444>).
 // Flags: PEP_ROB_ENABLED=1 (/rob, /peace), PEP_GAMES_ENABLED=1 (games).
+// /missions: deferred reply, then the verifier run (dry run unless
+//      MISSION_VERIFIERS_ENABLED=1) is edited in via the interaction webhook.
 // Admin money (/add-money, /remove-money): holders of ADMIN_ROLE_IDS
 //      (app/ui/constants.ts) or of PEP_ADMIN_ROLE_IDS / PEP_ADMIN_ROLE_NAMES
 //      (default "Pepperoni Mafia"); optional ADMIN_GRANT_MAX (default 10000)
@@ -32,6 +34,12 @@ import { makeEmbed } from "@/app/lib/discord-interactions/embeds";
 import { postDiscordMessage } from "@/app/lib/discord-rest";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 import { prisma } from "@/app/lib/db";
+import { checkKeyedRateLimit } from "@/app/lib/rate-limit";
+import { runVerifiers } from "@/app/lib/mission-verify/engine";
+import { runMissionsCommand } from "@/app/lib/mission-verify/discord-command";
+import { announceMissionResults } from "@/app/lib/mission-verify/notify";
+import { getMissionsOverview } from "@/app/lib/missions-overview";
+import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -57,6 +65,28 @@ function logAdminGrant(text: string) {
     } catch (err) {
       console.error("[discord/interactions] admin log post failed:", err);
     }
+  });
+}
+
+/** /missions: 1 per 60 s per member (plans/mission-verification.md §6.3). */
+async function missionsRateLimit(discordId: string): Promise<Date | null> {
+  const r = await checkKeyedRateLimit("missions-command", discordId);
+  return r.success ? null : new Date(r.reset);
+}
+
+/** The deferred /missions work, after the type-5 reply has gone out. */
+function deferMissions(job: Parameters<NonNullable<HandlerDeps["missions"]>["defer"]>[0]) {
+  after(async () => {
+    const currency = process.env.PEP_EMOJI?.trim() || "$PEP";
+    await runMissionsCommand(job, {
+      isMember: async (id) => !!(await fetchMemberIdByDiscordId(id).catch(() => null)),
+      run: (id, roles) => runVerifiers(id, { trigger: "discord", interactionRoles: roles }),
+      overview: (id) => getMissionsOverview(id),
+      announce: (view, id) =>
+        announceMissionResults({ discordId: id, trigger: "discord", approvedTitles: view.approvedTitles, levelsPaid: view.levelsPaid }),
+      currency,
+      appUrl: (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.pizzadao.org").replace(/\/$/, ""),
+    });
   });
 }
 
@@ -90,6 +120,7 @@ function deps(guildId: string | undefined): HandlerDeps {
     addMoney: adminAddMoney,
     removeMoney: adminRemoveMoney,
     logAdmin: logAdminGrant,
+    missions: { rateLimit: missionsRateLimit, defer: deferMissions },
   };
 }
 

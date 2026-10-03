@@ -1,4 +1,4 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { writeToSheet } from "../profile/route";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
@@ -10,6 +10,7 @@ import {
   setPrimaryWallet,
   getWalletForMember,
 } from "@/app/lib/wallet-lookup";
+import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 
 export const runtime = "nodejs";
 
@@ -163,6 +164,10 @@ export async function POST(request: NextRequest) {
 
     // Sync primary wallet to Google Sheet
     await syncPrimaryToSheet(String(memberId));
+
+    // Re-check missions that look at wallets (background, no-op unless enabled).
+    const walletDiscordId = session.discordId;
+    after(() => emitMissionEvent(walletDiscordId, "wallet_connected", { memberId: String(memberId) }).then(() => undefined));
 
     return NextResponse.json({
       success: true,

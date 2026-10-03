@@ -1,10 +1,11 @@
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyXState, encryptToken } from "@/app/lib/x-oauth";
 import { prisma } from "@/app/lib/db";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { internalError } from "@/app/lib/errors/error-response";
+import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 
 export const runtime = "nodejs";
 
@@ -108,6 +109,10 @@ export async function GET(req: Request) {
         refreshToken: tokenData.refresh_token ? encryptToken(tokenData.refresh_token) : null,
       },
     });
+
+    // L1.0 "Link your X account": re-check the member's missions in the background.
+    const linkedDiscordId = stateData.discordId;
+    after(() => emitMissionEvent(linkedDiscordId, "x_linked", { memberId: resolvedMemberId ?? null }).then(() => undefined));
 
     // Write X username to Google Sheet
     const sheetsUrl = process.env.GOOGLE_SHEETS_WEBAPP_URL;
