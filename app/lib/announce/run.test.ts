@@ -1,4 +1,4 @@
-import { describe, it, expect, vi, beforeEach } from "vitest";
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 // Nothing in these tests may reach Google or Discord.
 vi.mock("googleapis", () => ({
@@ -38,14 +38,112 @@ function fakeSheet(b: AnnounceBlock = block()) {
   return { io: { readBlock, writeCells } as AnnounceSheetIO, readBlock, writeCells };
 }
 
+const SS_URL = "https://script.google.com/macros/s/test/exec";
 const BOT_CONFIG: AnnounceConfig = {
   discord: { kind: "bot", channelId: "812143244149915679", botToken: "test-token" },
   telegram: null,
   timeZone: TZ,
+  secretService: { url: SS_URL, password: "pw", spreadsheetId: "sheet-123" },
 };
 
+function jsonRes(body: unknown, status = 200) {
+  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json" } });
+}
+
+/** Apps Script style: POST -> 302 -> GET returns the JSON. */
+function secretServiceFetch(final: () => Response = () => jsonRes({ success: true, results: { attendance: { success: true } } })) {
+  return vi.fn(async (url: string | URL | Request) => {
+    if (String(url) === SS_URL) {
+      return new Response(null, { status: 302, headers: { location: "https://script.googleusercontent.com/echo?x=1" } });
+    }
+    return final();
+  });
+}
+
 describe("runAnnouncement", () => {
-  beforeEach(() => __resetAnnounceLockForTests());
+  let fetchMock: ReturnType<typeof secretServiceFetch>;
+  beforeEach(() => {
+    __resetAnnounceLockForTests();
+    fetchMock = secretServiceFetch();
+    vi.stubGlobal("fetch", fetchMock);
+  });
+  afterEach(() => vi.unstubAllGlobals());
+
+  it("calls SecretService for event + tweet + attendance with Discord posts disabled", async () => {
+    const sheet = fakeSheet();
+    const postDiscord = vi.fn(async () => ({ id: "m1" }));
+    const r = await runAnnouncement({ sheet: sheet.io, config: BOT_CONFIG, now: () => NOW, postDiscord });
+
+    expect(r.status).toBe(200);
+    expect(r.body.success).toBe(true);
+    expect(r.body.results?.secretService).toEqual({ success: true });
+    expect(fetchMock).toHaveBeenCalledTimes(2);
+    const [url, init] = fetchMock.mock.calls[0] as unknown as [string, RequestInit];
+    expect(url).toBe(SS_URL);
+    expect(init.method).toBe("POST");
+    expect(init.redirect).toBe("manual");
+    expect(JSON.parse(String(init.body))).toEqual({
+      password: "pw",
+      spreadsheetId: "sheet-123",
+      action: "announce",
+      options: { postGeneral: false, postBand: false, postCrew: false },
+    });
+    const [url2, init2] = fetchMock.mock.calls[1] as unknown as [string, RequestInit];
+    expect(url2).toBe("https://script.googleusercontent.com/echo?x=1");
+    expect(init2.method).toBe("GET");
+  });
+
+  it("surfaces a SecretService failure without un-sending the Discord post", async () => {
+    vi.stubGlobal("fetch", secretServiceFetch(() => jsonRes({ success: false, error: "No voice channel found" })));
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const sheet = fakeSheet();
+    const r = await runAnnouncement({
+      sheet: sheet.io,
+      config: BOT_CONFIG,
+      now: () => NOW,
+      postDiscord: vi.fn(async () => ({ id: "m1" })),
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.success).toBe(false);
+    expect(r.body.error).toMatch(/Sent with errors: .*attendance \(SecretService\): SecretService: No voice channel found/);
+    expect(r.body.results?.discord).toEqual({ success: true });
+    expect(sheet.writeCells).toHaveBeenCalledWith([
+      { range: "'Crews'!C23", value: "Sent" },
+      { range: "'Crews'!E23", value: "2026-10-02 14:00:00" },
+      { range: "'Crews'!G23", value: expect.stringContaining("SecretService") },
+    ]);
+    expect(errSpy).toHaveBeenCalledWith(expect.stringContaining("SecretService (event/tweet/attendance) failed"));
+    errSpy.mockRestore();
+  });
+
+  it("reports SecretService as failed when it is not configured", async () => {
+    const errSpy = vi.spyOn(console, "error").mockImplementation(() => {});
+    const r = await runAnnouncement({
+      sheet: fakeSheet().io,
+      config: { ...BOT_CONFIG, secretService: null },
+      now: () => NOW,
+      postDiscord: vi.fn(async () => ({ id: "m1" })),
+    });
+    expect(r.status).toBe(200);
+    expect(r.body.success).toBe(false);
+    expect(r.body.error).toMatch(/not configured/);
+    expect(fetchMock).not.toHaveBeenCalled();
+    errSpy.mockRestore();
+  });
+
+  it("does not call SecretService when the Discord post failed (a retry must not double-tweet)", async () => {
+    const r = await runAnnouncement({
+      sheet: fakeSheet().io,
+      config: BOT_CONFIG,
+      now: () => NOW,
+      postDiscord: vi.fn(async () => {
+        throw new Error("boom");
+      }),
+    });
+    expect(r.status).toBe(502);
+    expect(r.body.results?.secretService).toBeNull();
+    expect(fetchMock).not.toHaveBeenCalled();
+  });
 
   it("posts to Discord, marks Sent, stamps Last Sent and clears the stale Last Error", async () => {
     const sheet = fakeSheet();
@@ -197,6 +295,15 @@ describe("getAnnounceConfig", () => {
 
   it("returns no Discord target when nothing is configured", () => {
     expect(getAnnounceConfig({}).discord).toBeNull();
+    expect(getAnnounceConfig({}).secretService).toBeNull();
+  });
+
+  it("reads SecretService config from ANNOUNCE_WEBAPP_URL / ANNOUNCE_PASSWORD", () => {
+    expect(getAnnounceConfig({ ANNOUNCE_WEBAPP_URL: "https://x/exec", ANNOUNCE_PASSWORD: "p" }, "sid").secretService).toEqual({
+      url: "https://x/exec",
+      password: "p",
+      spreadsheetId: "sid",
+    });
   });
 });
 
