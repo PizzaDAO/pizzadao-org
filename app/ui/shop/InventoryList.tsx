@@ -7,6 +7,7 @@ type InventoryItem = {
   itemId: number;
   name: string;
   description: string | null;
+  isCollectible?: boolean;
   quantity: number;
 };
 
@@ -124,6 +125,11 @@ export function InventoryList() {
                   }}
                 >
                   {item.name}
+                  {item.isCollectible && (
+                    <span style={{ marginLeft: 6, fontSize: 11, fontWeight: 500, color: "hsl(var(--muted-foreground))" }}>
+                      collectible
+                    </span>
+                  )}
                 </h3>
                 {item.description && (
                   <p

@@ -38,6 +38,12 @@ model ShopItem {
   quantity    Int         @default(-1) // -1 = unlimited
   image       String?     // URL to item image
   isAvailable Boolean     @default(true)
+  // Collectible: exists so it can be held (granted, shown in inventories) but
+  // is never for sale. The shop-sheet sync never touches collectibles (no
+  // deactivation, no update from a same-named sheet row) and every purchase
+  // path refuses them. Created with scripts/unbelievaboat/seed-store.mjs
+  // --collectible "<name>" (e.g. the retired UnbelievaBoat Molto Benny Pin).
+  isCollectible Boolean   @default(false)
   createdAt   DateTime    @default(now())
   inventory   Inventory[]
 }
@@ -927,6 +933,14 @@ model BlackjackGame {
 // Idempotency record for manual item grants (UnbelievaBoat holdings carried
 // over by scripts/unbelievaboat/grant-items.mjs). One row per grantKey; the
 // Inventory increment happens in the same transaction as the insert.
+// PENDING: the member had no app account (User row) when the grant ran, so the
+// items are held and credited into Inventory on their first login/onboarding
+// (creditPendingItemGrants in app/lib/shop-grants.ts). CREDITED: in Inventory.
+enum ItemGrantStatus {
+  PENDING
+  CREDITED
+}
+
 model ItemGrant {
   id        Int      @id @default(autoincrement())
   grantKey  String   @unique // "unbelievaboat:<discordId>:<itemId>"
@@ -935,7 +949,10 @@ model ItemGrant {
   itemId    Int
   quantity  Int
   note      String?
+  status     ItemGrantStatus @default(CREDITED)
+  creditedAt DateTime?
   createdAt DateTime @default(now())
 
   @@index([discordId])
+  @@index([discordId, status])
 }

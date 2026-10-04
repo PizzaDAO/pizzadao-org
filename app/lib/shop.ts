@@ -3,11 +3,13 @@ import { assertPepAmount, debitInTx, getOrCreateEconomy } from './economy'
 import { ConflictError, NotFoundError, ValidationError } from './errors/api-errors'
 
 /**
- * Get all available shop items
+ * Get all items for sale (web shop, Discord /shop, /buy and its autocomplete).
+ * Collectibles are never for sale, so they are left out here; inventories
+ * (getInventory) still show them.
  */
 export async function getShopItems() {
   return prisma.shopItem.findMany({
-    where: { isAvailable: true },
+    where: { isAvailable: true, isCollectible: false },
     orderBy: { price: 'asc' }
   })
 }
@@ -50,6 +52,11 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
     throw new ValidationError('Item is not available')
   }
 
+  // Collectibles (e.g. the retired Molto Benny Pin) can be held, never bought.
+  if (item.isCollectible) {
+    throw new ValidationError('That item is a collectible and is not for sale')
+  }
+
   // A zero/negative/fractional price (e.g. a bad row from the shop sheet sync)
   // would turn a purchase into a mint. Refuse it.
   if (!Number.isInteger(item.price) || item.price <= 0) {
@@ -79,7 +86,7 @@ export async function buyItem(userId: string, itemId: number, quantity = 1) {
     // Reduce stock if not unlimited
     if (item.quantity !== -1) {
       const stock = await tx.shopItem.updateMany({
-        where: { id: itemId, isAvailable: true, quantity: { gte: quantity } },
+        where: { id: itemId, isAvailable: true, isCollectible: false, quantity: { gte: quantity } },
         data: { quantity: { decrement: quantity } }
       })
       if (stock.count !== 1) {
@@ -178,11 +185,15 @@ interface ShopItemData {
 }
 
 /**
- * Sync shop items from data array (from Google Apps Script webhook)
+ * Sync shop items from data array (from Google Apps Script webhook).
+ *
+ * Collectibles are outside the sheet's control: they are never deactivated
+ * when missing from the sheet, and a sheet row with a collectible's name is
+ * ignored (reported in `skippedCollectibles`) so it can't make one buyable.
  */
 export async function syncShopItemsFromData(items: ShopItemData[]) {
   if (items.length === 0) {
-    return { synced: 0, added: 0, updated: 0, deactivated: 0 }
+    return { synced: 0, added: 0, updated: 0, deactivated: 0, skippedCollectibles: [] as string[] }
   }
 
   // Get current items
@@ -192,6 +203,7 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
   let added = 0
   let updated = 0
   const seenNames = new Set<string>()
+  const skippedCollectibles: string[] = []
 
   // Add or update items
   for (const item of items) {
@@ -203,6 +215,11 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
 
     seenNames.add(item.name)
     const existing = currentByName.get(item.name)
+
+    if (existing?.isCollectible) {
+      skippedCollectibles.push(item.name)
+      continue
+    }
 
     if (existing) {
       // Update if any field changed or was unavailable
@@ -245,7 +262,7 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
   // Deactivate items no longer in sheet
   let deactivated = 0
   for (const item of currentItems) {
-    if (item.isAvailable && !seenNames.has(item.name)) {
+    if (item.isAvailable && !item.isCollectible && !seenNames.has(item.name)) {
       await prisma.shopItem.update({
         where: { id: item.id },
         data: { isAvailable: false }
@@ -254,7 +271,7 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
     }
   }
 
-  return { synced: items.length, added, updated, deactivated }
+  return { synced: items.length, added, updated, deactivated, skippedCollectibles }
 }
 
 // ===== Admin Functions =====

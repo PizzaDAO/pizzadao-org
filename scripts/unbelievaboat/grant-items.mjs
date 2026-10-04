@@ -9,7 +9,7 @@
  *
  *   discordId,item,qty
  *   100000000000000001,Rare Pizza Box,1
- *   100000000000000002,"Global Pizza Party T-shirt",2
+ *   100000000000000002,"Molto Benny Pin",2
  *
  * Header row optional, # comments allowed. Item names match the shop's item
  * names ignoring case, spaces and punctuation (create the items first: see
@@ -24,6 +24,15 @@
  * and never applied (fix it by hand). Grants don't change shop stock or any
  * wallet. --apply refuses to run while the CSV has errors, unknown items or
  * duplicate rows. Exit code 2 if there are conflicts.
+ *
+ * Members with no app account yet (no User row) are not skipped: their grant
+ * is HELD (ItemGrant status PENDING, same grantKey) and credited into their
+ * inventory automatically on first login / onboarding. The dry run marks each
+ * row "+ GRANT NOW" or "~ HOLD PENDING". Set ITEM_GRANT_CLAIMS=0 in the app to
+ * pause the login credit (on by default).
+ *
+ * Collectibles (e.g. Molto Benny Pin, see seed-store.mjs --collectible) can be
+ * granted like any other item; they just can't be bought.
  */
 import { createRequire } from "node:module";
 import { readFileSync } from "node:fs";
@@ -52,15 +61,7 @@ let exitCode = 0;
 try {
   const plan = await grants.planGrants(rows);
   const by = (s) => plan.filter((p) => p.status === s);
-  for (const p of plan) {
-    const what = `${p.discordId}  ${p.qty} x ${p.itemName ?? p.item}`;
-    const tag = { grant: "+", already_granted: "=", conflict: "!", unknown_item: "?", duplicate_in_csv: "!" }[p.status];
-    console.log(`  ${tag} line ${p.line}: ${what}  [${p.status}]${p.detail ? "  " + p.detail : ""}`);
-  }
-  console.log(
-    `\nTo grant: ${by("grant").length}  already granted: ${by("already_granted").length}  conflicts: ${by("conflict").length}` +
-      `  unknown items: ${by("unknown_item").length}  duplicates: ${by("duplicate_in_csv").length}`,
-  );
+  for (const line of grants.formatGrantPlan(plan)) console.log(line);
   if (by("conflict").length) exitCode = 2;
 
   if (!args.apply) {
@@ -69,13 +70,16 @@ try {
     if (errors.length || by("unknown_item").length || by("duplicate_in_csv").length) {
       die("fix the CSV errors, unknown items and duplicate rows before --apply");
     }
-    let granted = 0;
-    let raced = 0;
-    for (const p of by("grant")) {
-      if (await grants.applyGrant(p, "unbelievaboat", args.note ? String(args.note) : "UnbelievaBoat holding")) granted++;
-      else raced++;
+    const tally = { credited: 0, held: 0, raced: 0 };
+    for (const p of [...by("grant"), ...by("hold")]) {
+      const r = await grants.applyGrant(p, "unbelievaboat", args.note ? String(args.note) : "UnbelievaBoat holding");
+      if (r) tally[r]++;
+      else tally.raced++;
     }
-    console.log(`\nGranted ${granted} holding(s)${raced ? `, ${raced} already granted by a concurrent run` : ""}.`);
+    console.log(
+      `\nGranted now: ${tally.credited}  held pending signup: ${tally.held}` +
+        `${tally.raced ? `  already granted by a concurrent run: ${tally.raced}` : ""}`,
+    );
   }
 } finally {
   await prisma.$disconnect();

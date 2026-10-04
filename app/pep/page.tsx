@@ -35,6 +35,7 @@ type InventoryItem = {
     name: string;
     description: string | null;
     image: string | null;
+    isCollectible?: boolean;
   };
 };
 
@@ -483,6 +484,7 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
                     style={{ color: "hsl(var(--muted-foreground))" }}
                   >
                     × {inv.quantity}
+                    {inv.item.isCollectible ? " · collectible" : ""}
                   </div>
                 </div>
               </div>

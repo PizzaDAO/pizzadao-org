@@ -86,7 +86,7 @@ describe('buyItem', () => {
 
     await expect(buyItem('buyer-1', 5, 1)).rejects.toThrow('Not enough stock')
     expect(tx.shopItem.updateMany).toHaveBeenCalledWith({
-      where: { id: 5, isAvailable: true, quantity: { gte: 1 } },
+      where: { id: 5, isAvailable: true, isCollectible: false, quantity: { gte: 1 } },
       data: { quantity: { decrement: 1 } },
     })
     expect(tx.inventory.upsert).not.toHaveBeenCalled()
