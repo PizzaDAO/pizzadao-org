@@ -19,7 +19,7 @@ export function InventoryList() {
   useEffect(() => {
     const fetchInventory = async () => {
       try {
-        const res = await fetch("/api/inventory");
+        const res = await fetch("/api/inventory", { cache: "no-store" });
         const data = await res.json();
         if (!res.ok) throw new Error(data.error || "Failed to fetch inventory");
         setItems(data.inventory);

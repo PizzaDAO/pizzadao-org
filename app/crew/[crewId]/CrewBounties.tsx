@@ -42,7 +42,7 @@ export function CrewBounties({
     ;(async () => {
       let list: CrewBounty[] = []
       try {
-        const res = await fetch(`/api/bounties?crewId=${encodeURIComponent(crewId)}`)
+        const res = await fetch(`/api/bounties?crewId=${encodeURIComponent(crewId)}`, { cache: "no-store" })
         if (res?.ok) {
           const json = (await res.json()) as { bounties?: CrewBounty[] }
           list = openCrewBounties(Array.isArray(json?.bounties) ? json.bounties : [], crewId)

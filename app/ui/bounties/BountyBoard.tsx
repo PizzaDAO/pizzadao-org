@@ -2,7 +2,6 @@
 
 import React, { useState, useEffect } from "react";
 import { BountyCard } from "./BountyCard";
-import { PepIcon } from "../economy/PepIcon";
 import { card, btn, input } from "../shared-styles";
 import { useCrewMappings } from "@/app/lib/hooks/use-api";
 
@@ -45,7 +44,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
 
   const fetchBounties = async () => {
     try {
-      const res = await fetch("/api/bounties");
+      const res = await fetch("/api/bounties", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch bounties");
       setBounties(data.bounties);
@@ -267,7 +266,6 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                   Reward amount (will be escrowed)
                 </label>
                 <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
-                  <PepIcon size={20} />
                   <input
                     type="number"
                     value={formReward}
@@ -276,7 +274,11 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                     style={{ ...input(), flex: 1 }}
                     disabled={formLoading}
                     min="1"
+                    aria-label="Reward amount in $PEP"
                   />
+                  <span style={{ fontWeight: 700, color: "hsl(var(--muted-foreground))", whiteSpace: "nowrap" }}>
+                    $PEP
+                  </span>
                 </div>
               </div>
               {formError && (

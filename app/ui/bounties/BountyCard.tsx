@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState, type CSSProperties } from "react";
-import { PepAmount } from "../economy/PepIcon";
+import { formatPep } from "../economy/PepIcon";
 import { UserLink } from "../UserLink";
 import { BountyComments } from "./BountyComments";
 import { card as cardBase, btn, badge } from "../shared-styles";
@@ -228,18 +228,19 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
           }}
         >
           <div
+            data-testid="bounty-reward"
             style={{
-              fontSize: 24,
-              fontWeight: 700,
+              fontSize: 18,
+              fontWeight: 900,
               color: "hsl(var(--tomato))",
               fontFamily:
                 "var(--font-display), var(--font-sans), system-ui, sans-serif",
               letterSpacing: "-0.01em",
-              display: "flex",
-              alignItems: "center",
+              fontVariantNumeric: "tabular-nums",
+              whiteSpace: "nowrap",
             }}
           >
-            <PepAmount amount={bounty.reward} size={20} />
+            {formatPep(bounty.reward)}
           </div>
 
           {/* Action buttons */}

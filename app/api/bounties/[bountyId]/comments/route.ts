@@ -4,6 +4,7 @@ import { getBountyComments, addBountyComment, deleteBountyComment } from '@/app/
 import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
+import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 
 export const runtime = 'nodejs'
 
@@ -29,7 +30,7 @@ export async function GET(
         content: c.content,
         createdAt: c.createdAt.toISOString()
       }))
-    })
+    }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
     return NextResponse.json({ error: message }, { status: 500 })

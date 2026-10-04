@@ -44,7 +44,7 @@ describe("<CrewBounties />", () => {
     expect(screen.queryByText("Claimed ops task")).not.toBeInTheDocument();
     expect(screen.queryByText("Tech task")).not.toBeInTheDocument();
     expect(screen.getByText("Crew Bounties (2)")).toBeInTheDocument();
-    expect(fetchMock).toHaveBeenCalledWith("/api/bounties?crewId=ops");
+    expect(fetchMock).toHaveBeenCalledWith("/api/bounties?crewId=ops", { cache: "no-store" });
   });
 
   it("shows an empty state for members", async () => {

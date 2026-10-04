@@ -11,7 +11,7 @@
 // anchovy-67435 (Restyle Phase 4d): semantic HSL tokens.
 
 import React, { useEffect, useState, useCallback } from "react";
-import { PepIcon } from "./PepIcon";
+import { PepIcon, formatPep } from "./PepIcon";
 
 type TransactionData = {
   id: number;
@@ -127,7 +127,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
 
   const fetchTransactions = useCallback(async (offset = 0, append = false) => {
     try {
-      const res = await fetch(`/api/economy/history?limit=${PAGE_SIZE}&offset=${offset}`);
+      const res = await fetch(`/api/economy/history?limit=${PAGE_SIZE}&offset=${offset}`, { cache: "no-store" });
       if (!res.ok) return;
       const data = await res.json();
       if (append) {
@@ -373,8 +373,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                             }}
                           >
                             {isCredit ? "+" : ""}
-                            {tx.amount.toLocaleString()}
-                            <PepIcon size={13} />
+                            {formatPep(tx.amount)}
                           </span>
                         </span>
                       </button>
