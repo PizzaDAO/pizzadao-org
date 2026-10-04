@@ -10,6 +10,7 @@
  *   referral          L3.1  a friend this member invited finished onboarding (Phase 4, D4)
  *   discord_role      L6.0  holds the Pepperoni Mafia role; L7.0 holds the "Crew Leader" role
  *                     (D12; MISSION_CREW_LEADER_ROLE overrides). L6+ always needs a human release (D9).
+ *   vouch_given       L5.2  vouched for at least `min` OTHER members (PizzaDAO-native vouches by default)
  *   wallet_connected  catalog: at least one wallet linked
  *   manual            L8.0: never run, always a human (Dread Pizza Roberts)
  *
@@ -202,6 +203,41 @@ export const referral: Verifier<{ min: number }> = {
   },
 }
 
+const VOUCH_SOURCES = ['PIZZADAO', 'TWITTER', 'FARCASTER'] as const
+
+/**
+ * L5.2 "Vouch for another member". Passes once the member has vouched for at
+ * least `min` other members (Vouch rows, keyed by member ID).
+ *
+ * Self-vouches never count (the add route refuses them; this re-checks).
+ * `sources` defaults to PIZZADAO only: FARCASTER / TWITTER rows are follows
+ * imported from another network, not a deliberate vouch made in PizzaDAO, so
+ * they don't show the member engaging with the community.
+ */
+export const vouchGiven: Verifier<{ min: number; sources: string[] }> = {
+  key: 'vouch_given',
+  mode: 'auto',
+  stateful: false,
+  parse: (p) => {
+    const o = asObject(p)
+    const sources = o.sources === undefined ? ['PIZZADAO'] : stringList(o.sources, 'sources').map((s) => s.toUpperCase())
+    const bad = sources.filter((s) => !(VOUCH_SOURCES as readonly string[]).includes(s))
+    if (bad.length) throw new Error(`sources must be from ${VOUCH_SOURCES.join(', ')}`)
+    return { min: positiveInt(o.min, 'min', 1), sources }
+  },
+  async check(ctx, { min, sources }) {
+    const hint = (left: number) =>
+      `Vouch for ${left === 1 ? 'another member' : `${left} more members`}: open their profile and tap Vouch. Your vouches are listed on /vouches.`
+    if (!ctx.memberId) return fail('No PizzaDAO member profile yet', 'Finish onboarding first, then vouch for another member.', { have: 0, need: min })
+    const rows = await ctx.sources.getVouchesGiven(ctx.memberId)
+    const counted = [
+      ...new Set(rows.filter((r) => r.followeeId && r.followeeId !== ctx.memberId && sources.includes(r.source)).map((r) => r.followeeId)),
+    ]
+    if (counted.length >= min) return { status: 'pass', evidence: { vouches: counted.length, need: min, members: counted.slice(0, 5) } }
+    return fail(`${counted.length}/${min} members vouched for`, hint(min - counted.length), { have: counted.length, need: min })
+  },
+}
+
 export const walletConnected: Verifier<{ min: number }> = {
   key: 'wallet_connected',
   mode: 'auto',
@@ -233,7 +269,7 @@ async function memberRoles(ctx: VerifyCtx): Promise<string[] | null> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const VERIFIERS: Record<string, Verifier<any>> = Object.fromEntries(
-  [xLinked, attendanceCount, discordRole, discordMessage, referral, walletConnected, manual, ...SEMI_VERIFIERS].map((v) => [v.key, v]),
+  [xLinked, attendanceCount, discordRole, discordMessage, referral, vouchGiven, walletConnected, manual, ...SEMI_VERIFIERS].map((v) => [v.key, v]),
 )
 
 export function getVerifier(key: string | null | undefined): Verifier<unknown> | null {

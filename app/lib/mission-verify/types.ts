@@ -13,7 +13,7 @@
 export type Trigger = 'on_demand' | 'discord' | 'event' | 'submit' | 'cron' | 'backfill'
 
 /** Events that re-run the verifiers for one member (route hooks). */
-export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created'
+export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created' | 'vouch_created'
 
 export interface VerifyCtx {
   discordId: string
@@ -93,6 +93,11 @@ export interface VerifierSources {
   countWallets(discordId: string, memberId: string | null): Promise<number>
   /** Referrals naming this member as the inviter (L3.1). */
   getReferrals(inviterDiscordId: string): Promise<ReferralRow[]>
+  /**
+   * Vouches this member gave (Vouch, table "Friendship"; keyed by member ID, not
+   * Discord ID). L5.2 "Vouch for another member".
+   */
+  getVouchesGiven(memberId: string): Promise<VouchRow[]>
   /** Duplicate-account signal kinds (AccountSignal) that involve both Discord accounts. */
   sharedSignalKinds(a: string, b: string): Promise<string[]>
   /** Farcaster accounts linked to the member (SocialAccount; fid when resolved). */
@@ -118,6 +123,14 @@ export interface ReferralRow {
   createdAt: Date
   qualifiedAt: Date | null
   flags: string[]
+}
+
+export interface VouchRow {
+  /** The member ID vouched for. */
+  followeeId: string
+  /** VouchSource: PIZZADAO (vouched in the app), FARCASTER / TWITTER (imported follows). */
+  source: string
+  createdAt: Date
 }
 
 /** Confidence from the checks: any failed -> low; any unchecked -> medium; else high. */

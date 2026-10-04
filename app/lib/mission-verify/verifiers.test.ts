@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Each verifier against mocked data sources: no DB, no Discord, no Google.
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { VERIFIERS, attendanceCount, discordMessage, discordRole, referral, walletConnected, xLinked, manual } from './verifiers'
+import { VERIFIERS, attendanceCount, discordMessage, discordRole, referral, vouchGiven, walletConnected, xLinked, manual } from './verifiers'
 import type { VerifierSources, VerifyCtx } from './types'
 
 const ME = '300000000000000001'
@@ -21,6 +21,7 @@ function sources(over: Partial<VerifierSources> = {}): VerifierSources {
     getChannel: vi.fn(async () => null),
     countWallets: vi.fn(async () => 0),
     getReferrals: vi.fn(async () => []),
+    getVouchesGiven: vi.fn(async () => []),
     sharedSignalKinds: vi.fn(async () => []),
     getFarcasterAccounts: vi.fn(async () => []),
     getTelegramUsername: vi.fn(async () => null),
@@ -45,7 +46,7 @@ describe('registry', () => {
   it('has the Phase 1 + Phase 4 verifiers; only "manual" is never run, the semi ones never approve', () => {
     expect(Object.keys(VERIFIERS).sort()).toEqual(
       [
-        'attendance_count', 'discord_message', 'discord_role', 'manual', 'referral', 'wallet_connected', 'x_linked',
+        'attendance_count', 'discord_message', 'discord_role', 'manual', 'referral', 'vouch_given', 'wallet_connected', 'x_linked',
         'social_post', 'poap_drop', 'media_proof', 'gpp_host',
       ].sort(),
     )
@@ -252,5 +253,63 @@ describe('referral (L3.1, D4) / wallet_connected / manual', () => {
 
   it('manual is never automatic', () => {
     expect(manual.mode).toBe('manual')
+  })
+})
+
+describe('vouch_given (L5.2)', () => {
+  const vouch = (followeeId: string, source = 'PIZZADAO') => ({ followeeId, source, createdAt: new Date('2026-10-01T00:00:00Z') })
+  const params = vouchGiven.parse({ min: 1, sources: ['PIZZADAO'] })
+
+  it('parses: min defaults to 1, sources default to PIZZADAO only, unknown sources rejected', () => {
+    expect(vouchGiven.parse({})).toEqual({ min: 1, sources: ['PIZZADAO'] })
+    expect(vouchGiven.parse({ min: 2, sources: ['pizzadao', 'FARCASTER'] })).toEqual({ min: 2, sources: ['PIZZADAO', 'FARCASTER'] })
+    expect(() => vouchGiven.parse({ sources: ['LINKEDIN'] })).toThrow()
+    expect(() => vouchGiven.parse({ min: 0 })).toThrow()
+    expect(() => vouchGiven.parse({ sources: [] })).toThrow()
+    expect(vouchGiven.mode).toBe('auto')
+  })
+
+  it('no vouches: fails with progress 0/1 and a hint pointing at profiles and /vouches', async () => {
+    const r = await vouchGiven.check(ctx(sources()), params)
+    expect(r).toMatchObject({ status: 'fail', reason: '0/1 members vouched for', progress: { have: 0, need: 1 } })
+    expect((r as { hint: string }).hint).toMatch(/Vouch for another member.*\/vouches/)
+  })
+
+  it('passes with one PizzaDAO vouch for another member (looked up by member ID, not Discord ID)', async () => {
+    const src = sources({ getVouchesGiven: vi.fn(async () => [vouch('m-2')]) })
+    expect(await vouchGiven.check(ctx(src), params)).toEqual({ status: 'pass', evidence: { vouches: 1, need: 1, members: ['m-2'] } })
+    expect(src.getVouchesGiven).toHaveBeenCalledWith('m-1')
+  })
+
+  it('a self-vouch never counts', async () => {
+    const src = sources({ getVouchesGiven: vi.fn(async () => [vouch('m-1')]) })
+    expect(await vouchGiven.check(ctx(src), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
+  })
+
+  it('sources filter: imported Farcaster / X follows do not count by default, but can be enabled', async () => {
+    const src = sources({ getVouchesGiven: vi.fn(async () => [vouch('m-2', 'FARCASTER'), vouch('m-3', 'TWITTER')]) })
+    expect(await vouchGiven.check(ctx(src), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
+    expect(await vouchGiven.check(ctx(src), vouchGiven.parse({ min: 1, sources: ['PIZZADAO', 'FARCASTER'] }))).toMatchObject({
+      status: 'pass',
+      evidence: { vouches: 1, members: ['m-2'] },
+    })
+  })
+
+  it('min: needs that many distinct other members', async () => {
+    const two = vouchGiven.parse({ min: 2, sources: ['PIZZADAO'] })
+    const one = sources({ getVouchesGiven: vi.fn(async () => [vouch('m-2'), vouch('m-1'), vouch('m-4', 'FARCASTER')]) })
+    const r = await vouchGiven.check(ctx(one), two)
+    expect(r).toMatchObject({ status: 'fail', reason: '1/2 members vouched for', progress: { have: 1, need: 2 } })
+    expect((r as { hint: string }).hint).toMatch(/^Vouch for another member/)
+    const none = await vouchGiven.check(ctx(sources()), two)
+    expect((none as { hint: string }).hint).toMatch(/^Vouch for 2 more members/)
+    const both = sources({ getVouchesGiven: vi.fn(async () => [vouch('m-2'), vouch('m-3')]) })
+    expect(await vouchGiven.check(ctx(both), two)).toMatchObject({ status: 'pass', evidence: { vouches: 2 } })
+  })
+
+  it('no member ID (not onboarded): fails without querying', async () => {
+    const src = sources()
+    expect(await vouchGiven.check(ctx(src, { memberId: null }), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
+    expect(src.getVouchesGiven).not.toHaveBeenCalled()
   })
 })

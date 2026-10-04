@@ -161,6 +161,7 @@ function sources(fetchImpl: typeof fetch): VerifierSources {
     getChannel: vi.fn(),
     countWallets: vi.fn(),
     getReferrals: vi.fn(),
+    getVouchesGiven: vi.fn(),
     sharedSignalKinds: vi.fn(),
     getFarcasterAccounts: vi.fn(async () => []),
     getTelegramUsername: vi.fn(async () => null),

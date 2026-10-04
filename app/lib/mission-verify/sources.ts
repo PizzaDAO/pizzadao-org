@@ -75,6 +75,15 @@ export const defaultSources: VerifierSources = {
     })
   },
 
+  async getVouchesGiven(memberId) {
+    return prisma.vouch.findMany({
+      where: { followerId: memberId },
+      select: { followeeId: true, source: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    })
+  },
+
   async sharedSignalKinds(a, b) {
     const rows = await prisma.accountSignal
       .findMany({ where: { discordIds: { hasEvery: [a, b] } }, select: { kind: true } })

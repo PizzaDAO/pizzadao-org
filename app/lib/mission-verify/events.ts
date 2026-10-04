@@ -1,7 +1,7 @@
 /**
  * Event hooks (plans/mission-verification.md §3.4): when something a verifier
  * looks at changes (X linked, wallet connected, crew joined, attendance
- * synced), re-run the member's verifiers in the background.
+ * synced, vouch given), re-run the member's verifiers in the background.
  *
  * Call it from a route inside `after()` so it never delays the response:
  *
@@ -21,6 +21,7 @@ const EVENT_VERIFIERS: Record<MissionEvent, string[] | null> = {
   attendance_synced: ['attendance_count'],
   crew_joined: null,
   referral_created: ['referral'],
+  vouch_created: ['vouch_given'],
 }
 
 export async function emitMissionEvent(
