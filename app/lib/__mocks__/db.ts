@@ -25,6 +25,7 @@ export const prisma = {
   bounty: createModelMock(),
   shopItem: createModelMock(),
   inventory: createModelMock(),
+  itemGrant: createModelMock(),
   job: createModelMock(),
   jobAssignment: createModelMock(),
   jobCycle: createModelMock(),

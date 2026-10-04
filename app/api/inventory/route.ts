@@ -17,12 +17,24 @@ export async function GET() {
 
     const inventory = await getInventory(session.discordId)
 
+    // Every held item is listed, including collectibles and items no longer
+    // for sale. Flat fields for the shop InventoryList, plus `item` for the
+    // /pep inventory card (which reads inv.item.*).
     return NextResponse.json({
       inventory: inventory.map((inv: any) => ({
         itemId: inv.itemId,
         name: inv.item.name,
         description: inv.item.description,
-        quantity: inv.quantity
+        image: inv.item.image ?? null,
+        isCollectible: !!inv.item.isCollectible,
+        quantity: inv.quantity,
+        item: {
+          id: inv.item.id,
+          name: inv.item.name,
+          description: inv.item.description,
+          image: inv.item.image ?? null,
+          isCollectible: !!inv.item.isCollectible
+        }
       }))
     })
   } catch (error) {

@@ -12,6 +12,7 @@ import { withErrorHandling } from "@/app/lib/errors/error-response";
 import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
 import { fetchMemberById, fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { chooseInviter, recordReferral, type RecordReferralResult } from "@/app/lib/referrals";
+import { creditPendingItemGrantsOnLogin } from "@/app/lib/shop-grants";
 import { readRefCookie, refCookieOptions, REF_COOKIE } from "@/app/lib/referral-cookie";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 import { syncDiscordMember } from "@/app/lib/services/discord-api";
@@ -343,6 +344,13 @@ const POST_HANDLER = async (req: Request) => {
   // qualifies the referral; the inviter's referral verifier re-runs in the
   // background. Self-referrals are refused inside recordReferral. Never fails
   // the profile save.
+  // First onboarding: credit any held UnbelievaBoat item grants (also done
+  // on login; idempotent, so whichever runs first wins). Never fails the save.
+  if (firstOnboarding && payload.discordId) {
+    const discordId = payload.discordId;
+    after(() => creditPendingItemGrantsOnLogin(discordId));
+  }
+
   const cookieRef = readRefCookie(req);
   let referral: RecordReferralResult | null = null;
   if (firstOnboarding) {

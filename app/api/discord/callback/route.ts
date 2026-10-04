@@ -12,6 +12,7 @@ import {
 } from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { claimPendingPepOnLogin } from "@/app/lib/unbelievaboat/claims";
+import { creditPendingItemGrantsOnLogin } from "@/app/lib/shop-grants";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 import { lookupGuildMembership } from "@/app/lib/discord";
 import { internalError } from "@/app/lib/errors/error-response";
@@ -201,6 +202,12 @@ export async function GET(req: Request) {
     // (plans/unbelievaboat-replacement.md). No-op unless PEP_MIGRATION_CLAIMS=1;
     // never throws, and idempotent, so a cut-off run simply retries next login.
     claimPendingPepOnLogin(me.id).catch(() => {});
+
+    // Fire-and-forget: credit UnbelievaBoat item holdings that were held
+    // (ItemGrant PENDING) because this member had no app account when
+    // grant-items.mjs ran. On unless ITEM_GRANT_CLAIMS=0; never throws;
+    // exactly-once per grant, so a cut-off run retries next login.
+    creditPendingItemGrantsOnLogin(me.id).catch(() => {});
 
     // Build redirect URL
     let redirectUrl: URL;

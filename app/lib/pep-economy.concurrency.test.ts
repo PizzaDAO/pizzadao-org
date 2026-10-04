@@ -25,6 +25,9 @@
 //     decides each submission once and pays once; parallel onboarding
 //     completions record one Referral, and the inviter's referral verifier
 //     pays once
+//   * UB item carry-over: a grant for a member with no app account is held
+//     PENDING and parallel logins credit it into Inventory exactly once; a
+//     collectible can't be bought; grant-items.mjs dry run / --apply output
 // Finally it runs every check in scripts/pep-reconcile.sql against the DB.
 import { describe, it, expect, beforeAll, afterAll, vi } from 'vitest'
 import { readFileSync } from 'node:fs'
@@ -938,6 +941,7 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
 
   it(`${N} parallel grant-items runs grant a holding once`, async () => {
     const user = uid()
+    await L.prisma.user.create({ data: { id: user, roles: [] } }) // has an app account: granted now
     const item = await L.prisma.shopItem.create({ data: { name: `it-grant-${RUN}`, price: 1337, quantity: 0 } })
     const [row] = await L.grants.planGrants([{ line: 1, discordId: user, item: `IT grant ${RUN}`, qty: 3 }])
     expect(row.status).toBe('grant')
@@ -950,6 +954,117 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     // Stock is untouched (holdings were bought in UnbelievaBoat).
     expect((await L.prisma.shopItem.findUniqueOrThrow({ where: { id: item.id } })).quantity).toBe(0)
   }, 60_000)
+
+  // ---- UB item carry-over: pending grants + collectibles ----
+
+  it(`a holder with no app account is held PENDING (${N} parallel applies hold once), then ${N} parallel logins credit it exactly once`, async () => {
+    const newbie = uid() // no User row
+    const pin = await L.prisma.shopItem.create({
+      data: { name: `it-pin-${RUN}`, price: 0, quantity: 0, isAvailable: false, isCollectible: true },
+    })
+    const sticks = await L.prisma.shopItem.create({ data: { name: `it-sticks-${RUN}`, price: 1337, quantity: -1 } })
+    const plan = await L.grants.planGrants([
+      { line: 1, discordId: newbie, item: `it pin ${RUN}`, qty: 1 },
+      { line: 2, discordId: newbie, item: `it-sticks-${RUN}`, qty: 3 },
+    ])
+    expect(plan.map((p) => p.status)).toEqual(['hold', 'hold'])
+    const applied = await Promise.all(plan.flatMap((p) => Array.from({ length: N }, () => L.grants.applyGrant(p))))
+    expect(applied.filter((r) => r === 'held')).toHaveLength(2)
+    expect(applied.filter((r) => r === 'credited')).toHaveLength(0)
+    expect(await L.prisma.inventory.count({ where: { userId: newbie } })).toBe(0)
+    expect((await L.grants.planGrants([{ line: 1, discordId: newbie, item: `it-pin-${RUN}`, qty: 1 }]))[0].status).toBe('already_held')
+
+    // Signs up; N logins (tabs, retries, the onboarding hook) race.
+    await L.prisma.user.create({ data: { id: newbie, roles: [] } })
+    const res = await Promise.allSettled(Array.from({ length: N }, () => L.grants.creditPendingItemGrants(newbie)))
+    expect(res.filter((r) => r.status === 'rejected')).toEqual([])
+    const credited = res.map((r) => (r as PromiseFulfilledResult<{ credited: number }>).value.credited)
+    expect(credited.reduce((a, b) => a + b, 0)).toBe(2)
+    const inv = await L.prisma.inventory.findMany({ where: { userId: newbie }, orderBy: { itemId: 'asc' } })
+    expect(inv.map((i: any) => [i.itemId, i.quantity])).toEqual([
+      [pin.id, 1],
+      [sticks.id, 3],
+    ])
+    const rows = await L.prisma.itemGrant.findMany({ where: { discordId: newbie } })
+    expect(rows.every((g: any) => g.status === 'CREDITED' && g.creditedAt)).toBe(true)
+
+    // Later logins and a CSV re-run change nothing.
+    expect(await L.grants.creditPendingItemGrants(newbie)).toEqual({ credited: 0, items: [] })
+    await L.grants.creditPendingItemGrantsOnLogin(newbie)
+    const again = await L.grants.planGrants([{ line: 1, discordId: newbie, item: `it-pin-${RUN}`, qty: 1 }])
+    expect(again[0].status).toBe('already_granted')
+    expect(await L.grants.applyGrant({ ...plan[0], status: 'grant' })).toBe(false)
+    expect((await L.prisma.inventory.findMany({ where: { userId: newbie } })).map((i: any) => i.quantity).sort()).toEqual([1, 3])
+  }, 60_000)
+
+  it('a collectible in an inventory cannot be bought, even when misflagged available with a price', async () => {
+    const buyer = await seedUser(10_000)
+    const pin = await L.prisma.shopItem.create({
+      data: { name: `it-pin-buy-${RUN}`, price: 10, quantity: -1, isAvailable: true, isCollectible: true },
+    })
+    const res = await Promise.allSettled(Array.from({ length: N }, () => L.shop.buyItem(buyer, pin.id, 1)))
+    expect(outcomes(res)).toEqual({ ok: 0, failed: N })
+    expect(await wallet(buyer)).toBe(10_000)
+    expect(await L.prisma.inventory.count({ where: { userId: buyer } })).toBe(0)
+    expect((await L.shop.getShopItems()).some((i: any) => i.id === pin.id)).toBe(false)
+  }, 60_000)
+
+  it('grant-items.mjs dry run shows granted-now vs held-pending per row; --apply writes them', async () => {
+    const { execFile } = await import('node:child_process')
+    const { promisify } = await import('node:util')
+    const { mkdtempSync, writeFileSync } = await import('node:fs')
+    const { tmpdir } = await import('node:os')
+    const member = await seedUser(0)
+    const newbie = uid()
+    const box = await L.prisma.shopItem.create({ data: { name: `it-script-box-${RUN}`, price: 42069, quantity: 3 } })
+    const pin = await L.prisma.shopItem.create({
+      data: { name: `it-script-pin-${RUN}`, price: 0, quantity: 0, isAvailable: false, isCollectible: true },
+    })
+    const dir = mkdtempSync(resolve(tmpdir(), 'grant-items-'))
+    const csv = resolve(dir, 'holdings.csv')
+    writeFileSync(
+      csv,
+      ['discordId,item,qty', `${member},it-script-box-${RUN},1`, `${newbie},"it script pin ${RUN}",2`, `${newbie},Chicken,5`, ''].join('\n'),
+    )
+    const u = new URL(DB_URL)
+    const env: NodeJS.ProcessEnv = {
+      NODE_ENV: 'test',
+      PATH: process.env.PATH ?? '',
+      HOME: dir,
+      DATABASE_URL: DB_URL,
+      E2E_PG_HOST: '127.0.0.1',
+      E2E_PG_PORT: u.port || '5432',
+      NODE_OPTIONS: `--require ${resolve(process.cwd(), 'e2e/local/preload.cjs')}`,
+    }
+    const script = resolve(process.cwd(), 'scripts/unbelievaboat/grant-items.mjs')
+    const run = (...args: string[]) => promisify(execFile)(process.execPath, [script, '--csv', csv, ...args], { cwd: dir, env, timeout: 50_000 })
+
+    const dry = (await run()).stdout
+    expect(dry).toContain(`+ line 2: ${member}  1 x it-script-box-${RUN}  [grant]  GRANT NOW -> inventory`)
+    expect(dry).toContain(`~ line 3: ${newbie}  2 x it-script-pin-${RUN} (collectible)  [hold]  HOLD PENDING -> credited on first login/onboarding`)
+    expect(dry).toContain(`- line 4: ${newbie}  5 x Chicken  [not_carried_over]`)
+    expect(dry).toContain('Grant now: 1  hold pending signup: 1')
+    expect(dry).toContain('DRY RUN - nothing written')
+    expect(await L.prisma.itemGrant.count({ where: { discordId: { in: [member, newbie] } } })).toBe(0)
+
+    const applied = (await run('--apply')).stdout
+    expect(applied).toContain('Granted now: 1  held pending signup: 1')
+    expect((await L.prisma.inventory.findUniqueOrThrow({ where: { userId_itemId: { userId: member, itemId: box.id } } })).quantity).toBe(1)
+    expect(await L.prisma.inventory.count({ where: { userId: newbie } })).toBe(0)
+    expect(await L.prisma.itemGrant.findMany({ where: { discordId: newbie }, select: { itemId: true, quantity: true, status: true } })).toEqual([
+      { itemId: pin.id, quantity: 2, status: 'PENDING' },
+    ])
+    // Box stock untouched by grants.
+    expect((await L.prisma.shopItem.findUniqueOrThrow({ where: { id: box.id } })).quantity).toBe(3)
+
+    const rerun = (await run()).stdout
+    expect(rerun).toContain('[already_granted]')
+    expect(rerun).toContain('[already_held]')
+    expect(rerun).toContain('Grant now: 0  hold pending signup: 0  already granted: 1  already held: 1')
+
+    await L.grants.creditPendingItemGrantsOnLogin(newbie)
+    expect((await L.prisma.inventory.findUniqueOrThrow({ where: { userId_itemId: { userId: newbie, itemId: pin.id } } })).quantity).toBe(2)
+  }, 120_000)
 
   // ---- Admin money: /add-money, /remove-money ----
 
