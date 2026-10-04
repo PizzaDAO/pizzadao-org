@@ -6,10 +6,14 @@
  *   2. Build the same message the sheet's Apps Script builds.
  *   3. Post it to Discord directly (bot token or webhook) with 429 handling,
  *      and optionally to Telegram.
- *   4. Write Announce? / Last Sent: / Last Error: back to the sheet.
+ *   4. Once something went out, call the Apps Script "SecretService" web app
+ *      (action "announce", all Discord posts off) so it still starts the
+ *      Discord event, posts the tweet and takes voice attendance.
+ *   5. Write Announce? / Last Sent: / Last Error: back to the sheet.
  *
- * No Google Apps Script is involved, so Discord's Cloudflare block on Apps
- * Script's shared egress IPs (429 / error 1015) can no longer break it.
+ * The Discord message itself never goes through Apps Script, so Discord's
+ * Cloudflare block on Apps Script's shared egress IPs (429 / error 1015)
+ * can no longer break it.
  *
  * Server-side only.
  */
@@ -28,6 +32,11 @@ import {
   parseSheetTimestamp,
 } from "./message";
 import { createAnnounceSheetIO, SENT_VALUE, type AnnounceSheetIO } from "./sheet";
+import {
+  callSecretServiceAnnounce,
+  getSecretServiceConfig,
+  type SecretServiceConfig,
+} from "./secret-service";
 
 /** Default: the #announcements channel the Apps Script posted to. */
 export const DEFAULT_ANNOUNCE_CHANNEL_ID = "812143244149915679";
@@ -39,9 +48,14 @@ export interface AnnounceConfig {
   discord: DiscordTarget | null;
   telegram: { botToken: string; chatIds: string[] } | null;
   timeZone: string;
+  /** Apps Script SecretService (event + tweet + attendance); null = not configured. */
+  secretService: SecretServiceConfig | null;
 }
 
-export function getAnnounceConfig(env: Record<string, string | undefined> = process.env): AnnounceConfig {
+export function getAnnounceConfig(
+  env: Record<string, string | undefined> = process.env,
+  spreadsheetId: string = SHEET_IDS.announce,
+): AnnounceConfig {
   const webhookUrl = env.ANNOUNCE_DISCORD_WEBHOOK_URL?.trim();
   const botToken = env.DISCORD_BOT_TOKEN?.trim();
   const channelId = (env.ANNOUNCE_DISCORD_CHANNEL_ID?.trim() || DEFAULT_ANNOUNCE_CHANNEL_ID).replace(/\D/g, "");
@@ -60,6 +74,7 @@ export function getAnnounceConfig(env: Record<string, string | undefined> = proc
     discord,
     telegram: tgToken && tgChats.length ? { botToken: tgToken, chatIds: tgChats } : null,
     timeZone: env.ANNOUNCE_TIMEZONE?.trim() || DEFAULT_ANNOUNCE_TIMEZONE,
+    secretService: getSecretServiceConfig(spreadsheetId, env),
   };
 }
 
@@ -95,10 +110,18 @@ export interface AnnounceDeps {
   now?: () => Date;
   postDiscord?: typeof postDiscordMessage;
   postTelegram?: typeof postToTelegram;
+  callSecretService?: typeof callSecretServiceAnnounce;
   discordOptions?: DiscordPostOptions;
 }
 
 type ChannelResult = { success: true } | { success: false; error: string } | null;
+
+export interface AnnounceResults {
+  discord: ChannelResult;
+  telegram: ChannelResult;
+  /** SecretService: Discord event + tweet + attendance. null = not attempted. */
+  secretService: ChannelResult;
+}
 
 export interface AnnounceResult {
   status: number;
@@ -106,7 +129,7 @@ export interface AnnounceResult {
     success: boolean;
     error?: string;
     sentAt?: string;
-    results?: { discord: ChannelResult; telegram: ChannelResult };
+    results?: AnnounceResults;
   };
 }
 
@@ -128,6 +151,7 @@ export async function runAnnouncement(deps: AnnounceDeps): Promise<AnnounceResul
   const now = deps.now ?? (() => new Date());
   const postDiscord = deps.postDiscord ?? postDiscordMessage;
   const postTg = deps.postTelegram ?? postToTelegram;
+  const callSecretService = deps.callSecretService ?? callSecretServiceAnnounce;
   const { config, sheet } = deps;
 
   if (!config.discord) {
@@ -172,7 +196,7 @@ export async function runAnnouncement(deps: AnnounceDeps): Promise<AnnounceResul
 
     const msgs = buildCommunityCallMessages(block.specials, now(), config.timeZone);
 
-    const results: { discord: ChannelResult; telegram: ChannelResult } = { discord: null, telegram: null };
+    const results: AnnounceResults = { discord: null, telegram: null, secretService: null };
     try {
       await postDiscord(
         config.discord,
@@ -194,9 +218,35 @@ export async function runAnnouncement(deps: AnnounceDeps): Promise<AnnounceResul
     }
 
     const anySuccess = results.discord?.success === true || results.telegram?.success === true;
+
+    // Event + tweet + attendance via SecretService, only once the message went
+    // out (a failed send gets retried, and a retry must not double-tweet).
+    if (anySuccess) {
+      if (!config.secretService) {
+        results.secretService = {
+          success: false,
+          error: "not configured (ANNOUNCE_WEBAPP_URL / ANNOUNCE_PASSWORD missing)",
+        };
+      } else {
+        try {
+          const ss = await callSecretService(config.secretService);
+          results.secretService = ss.success ? { success: true } : { success: false, error: ss.error ?? "unknown error" };
+          if (ss.success) console.log("[announce] SecretService event/tweet/attendance ok", JSON.stringify(ss.results ?? {}));
+        } catch (err) {
+          results.secretService = { success: false, error: errorText(err) };
+        }
+      }
+      if (results.secretService && !results.secretService.success) {
+        console.error(`[announce] SecretService (event/tweet/attendance) failed: ${results.secretService.error}`);
+      }
+    }
+
     const failures = [
       results.discord && !results.discord.success ? `❌ Discord: ${results.discord.error}` : null,
       results.telegram && !results.telegram.success ? `❌ Telegram: ${results.telegram.error}` : null,
+      results.secretService && !results.secretService.success
+        ? `❌ Discord event / tweet / attendance (SecretService): ${results.secretService.error}`
+        : null,
     ].filter((x): x is string => Boolean(x));
     const errorSummary = failures.join("; ");
     const stamp = formatSheetTimestamp(now(), config.timeZone);

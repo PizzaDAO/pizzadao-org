@@ -147,6 +147,7 @@ export default function AnnouncePage() {
           <ul className="list-disc list-inside text-sm text-gray-600 mb-6 space-y-1">
             <li>Post to the Discord announcements channel (@everyone)</li>
             <li>Post to Telegram, if configured</li>
+            <li>Start the Discord event, post the tweet and take attendance (via SecretService)</li>
             <li>Update Announce? / Last Sent / Last Error on the sheet</li>
           </ul>
 
