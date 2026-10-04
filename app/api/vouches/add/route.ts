@@ -1,8 +1,9 @@
-import { NextRequest, NextResponse } from "next/server";
+import { after, NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { findMemberByDiscordId } from "@/app/lib/member-utils";
 import { addVouch, notifyVouchAdded } from "@/app/lib/vouches";
+import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 
 export const runtime = "nodejs";
 
@@ -55,6 +56,12 @@ export async function POST(req: NextRequest) {
 
     // Create the vouch
     await addVouch(currentUser.memberId, targetMemberId);
+
+    // L5.2 "Vouch for another member": re-check the voucher's vouch_given
+    // mission after the response (no-op while MISSION_VERIFIERS_ENABLED is off).
+    const voucherDiscordId = session.discordId;
+    const voucherMemberId = currentUser.memberId;
+    after(() => emitMissionEvent(voucherDiscordId, "vouch_created", { memberId: voucherMemberId }).then(() => undefined));
 
     // Notify the target (non-blocking)
     const targetDiscordId = targetMember.discordId;

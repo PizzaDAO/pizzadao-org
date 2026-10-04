@@ -68,6 +68,7 @@ function sources(over: Partial<VerifierSources> = {}): VerifierSources {
     getChannel: vi.fn(async () => null),
     countWallets: vi.fn(async () => 0),
     getReferrals: vi.fn(async () => []),
+    getVouchesGiven: vi.fn(async () => []),
     sharedSignalKinds: vi.fn(async () => []),
     getFarcasterAccounts: vi.fn(async () => []),
     getTelegramUsername: vi.fn(async () => null),

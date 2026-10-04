@@ -128,6 +128,7 @@ describe('batchSources', () => {
     approved: new Map(),
     paidLevels: new Map(),
     legacyAuto: [],
+    vouches: new Map([['m-a', [{ followeeId: 'm-b', source: 'PIZZADAO', createdAt: new Date(0) }]]]),
   }
   it('answers from the prefetch, never per member upstream', async () => {
     const s = batchSources(base, data, new Map([[OLD_A, [MAFIA]]]))
@@ -139,6 +140,8 @@ describe('batchSources', () => {
     expect(await s.getMemberRoles(OLD_A)).toEqual([MAFIA])
     expect(await s.getMemberRoles(OLD_B)).toEqual([]) // not in the (complete) listing = not in the guild
     expect(base.getMemberRoles).not.toHaveBeenCalled()
+    expect(await s.getVouchesGiven('m-a')).toEqual([{ followeeId: 'm-b', source: 'PIZZADAO', createdAt: new Date(0) }])
+    expect(await s.getVouchesGiven('m-z')).toEqual([])
   })
   it('roles are unknown (null) when there is no complete guild listing', async () => {
     expect(await batchSources(base, data, null).getMemberRoles(OLD_A)).toBeNull()

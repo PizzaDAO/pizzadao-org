@@ -24,7 +24,7 @@ import { getSheetData } from '../sheets/member-repository'
 import { runVerifiers, type MissionRow, type RunReport } from './engine'
 import { defaultSources } from './sources'
 import { getVerifier } from './verifiers'
-import type { VerifierSources, VerifyCtx } from './types'
+import type { VerifierSources, VerifyCtx, VouchRow } from './types'
 
 export interface LevelInfo {
   level: number
@@ -202,12 +202,14 @@ export interface BatchData {
   approved: Map<string, Set<number>>
   paidLevels: Map<string, Set<number>>
   legacyAuto: Array<{ discordId: string; missionId: number; evidence: string | null }>
+  /** Vouches given, by voucher memberId (L5.2 vouch_given). */
+  vouches: Map<string, VouchRow[]>
 }
 
 /** The per-member data for a batch, one query per table. */
 export async function prefetchBatch(discordIds: string[], memberIds: Map<string, string> | null): Promise<BatchData> {
   const members = discordIds.map((d) => memberIds?.get(d)).filter((m): m is string => !!m)
-  const [x, calls, wallets, completions, rewards] = await Promise.all([
+  const [x, calls, wallets, completions, rewards, vouches] = await Promise.all([
     prisma.xAccount.findMany({ where: { discordId: { in: discordIds } }, select: { discordId: true, xUsername: true } }),
     prisma.callAttendance.groupBy({ by: ['discordId', 'crewId'], where: { discordId: { in: discordIds } }, _count: { _all: true } }),
     prisma.memberWallet.findMany({
@@ -222,9 +224,28 @@ export async function prefetchBatch(discordIds: string[], memberIds: Map<string,
       where: { userId: { in: discordIds }, type: 'MISSION_REWARD' },
       select: { userId: true, metadata: true, description: true },
     }),
+    members.length
+      ? prisma.vouch.findMany({
+          where: { followerId: { in: members } },
+          select: { followerId: true, followeeId: true, source: true, createdAt: true },
+        })
+      : Promise.resolve([]),
   ])
 
-  const data: BatchData = { x: new Map(), calls: new Map(), wallets: new Map(), approved: new Map(), paidLevels: new Map(), legacyAuto: [] }
+  const data: BatchData = {
+    x: new Map(),
+    calls: new Map(),
+    wallets: new Map(),
+    approved: new Map(),
+    paidLevels: new Map(),
+    legacyAuto: [],
+    vouches: new Map(),
+  }
+  for (const v of vouches ?? []) {
+    const list = data.vouches.get(v.followerId) ?? []
+    list.push({ followeeId: v.followeeId, source: v.source, createdAt: v.createdAt })
+    data.vouches.set(v.followerId, list)
+  }
   for (const r of x) data.x.set(r.discordId, { xUsername: r.xUsername })
   for (const r of calls) {
     const c = data.calls.get(r.discordId) ?? { total: 0, byCrew: {} }
@@ -265,6 +286,7 @@ export function batchSources(base: VerifierSources, data: BatchData, guildRoles:
     // Not in the listing = not in the guild ([]); no listing = unknown (null).
     getMemberRoles: async (id) => (guildRoles ? (guildRoles.get(id) ?? []) : null),
     countWallets: async (id) => data.wallets.get(id) ?? 0,
+    getVouchesGiven: async (memberId) => data.vouches.get(memberId) ?? [],
   }
 }
 

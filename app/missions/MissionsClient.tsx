@@ -86,6 +86,9 @@ type Celebration =
 const LEVEL_TITLES: Record<number, string> = {
   1: "Pizza Trainee",
   2: "Pizza Noob",
+  3: "Make us an offer we can't refuse",
+  4: "Do some dirty work",
+  5: "Do a favor for the mafia",
   6: "Street Muscle",
   7: "Made Mafia",
   8: "Don of Dons",

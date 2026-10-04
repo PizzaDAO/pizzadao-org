@@ -40,16 +40,17 @@ const missions = [
   { level: 2, index: 0, title: 'Say hi on a community or crew call', description: 'Attend a community or crew call and introduce yourself.', reward: 420, levelTitle: 'Pizza Noob', verifierKey: 'attendance_count', verifierParams: { min: 1, crews: 'any' } },
   { level: 2, index: 1, title: 'Post about PizzaDAO (3+ comments, 10+ likes)', description: 'Create a social media post about PizzaDAO that gets at least 3 comments and 10 likes.', reward: 420, levelTitle: 'Pizza Noob', verifierKey: 'social_post', verifierParams: { minReplies: 3, minLikes: 10, platforms: ['x', 'farcaster'] }, proofKind: 'URL' },
 
-  // Level 3 (1,337 PEP)
-  { level: 3, index: 0, title: 'Share your community in #show-and-tell', description: 'Share something you are building or involved with in the #show-and-tell channel.', reward: 1337, levelTitle: null, verifierKey: 'discord_message', verifierParams: { channelName: 'show-and-tell', channelEnv: 'SHOW_AND_TELL_CHANNEL_ID' }, proofKind: 'DISCORD_MESSAGE' },
-  { level: 3, index: 1, title: 'Invite a friend to Discord', description: 'Invite a friend to join the PizzaDAO Discord server.', reward: 1337, levelTitle: null, verifierKey: 'referral', verifierParams: { min: 1, qualify: 'onboarded' } },
+  // Level 3 - Make us an offer we can't refuse (1,337 PEP)
+  { level: 3, index: 0, title: 'Share your community in #show-and-tell', description: 'Share something you are building or involved with in the #show-and-tell channel.', reward: 1337, levelTitle: "Make us an offer we can't refuse", verifierKey: 'discord_message', verifierParams: { channelName: 'show-and-tell', channelEnv: 'SHOW_AND_TELL_CHANNEL_ID' }, proofKind: 'DISCORD_MESSAGE' },
+  { level: 3, index: 1, title: 'Invite a friend to Discord', description: 'Invite a friend to join the PizzaDAO Discord server.', reward: 1337, levelTitle: "Make us an offer we can't refuse", verifierKey: 'referral', verifierParams: { min: 1, qualify: 'onboarded' } },
 
-  // Level 4 (3,141 PEP)
-  { level: 4, index: 0, title: 'Make a POAP for a community call', description: 'Create a POAP (Proof of Attendance Protocol) for one of the community calls.', reward: 3141, levelTitle: null, verifierKey: 'poap_drop', verifierParams: {}, proofKind: 'URL' },
+  // Level 4 - Do some dirty work (3,141 PEP)
+  { level: 4, index: 0, title: 'Make a POAP for a community call', description: 'Create a POAP (Proof of Attendance Protocol) for one of the community calls.', reward: 3141, levelTitle: 'Do some dirty work', verifierKey: 'poap_drop', verifierParams: {}, proofKind: 'URL' },
 
-  // Level 5 (4,269 PEP)
-  { level: 5, index: 0, title: 'Join three crew calls', description: 'Attend three crew calls in total: any crews, and community calls count too.', reward: 4269, levelTitle: null, verifierKey: 'attendance_count', verifierParams: { min: 3, crews: 'any', distinct: 'call' } },
-  { level: 5, index: 1, title: 'Do a selfie interview', description: 'Record and share a selfie interview about your PizzaDAO experience.', reward: 4269, levelTitle: null, verifierKey: 'media_proof', verifierParams: { kinds: ['youtube', 'x', 'drive', 'loom'] }, proofKind: 'URL' },
+  // Level 5 - Do a favor for the mafia (4,269 PEP)
+  { level: 5, index: 0, title: 'Join three crew calls', description: 'Attend three crew calls in total: any crews, and community calls count too.', reward: 4269, levelTitle: 'Do a favor for the mafia', verifierKey: 'attendance_count', verifierParams: { min: 3, crews: 'any', distinct: 'call' } },
+  { level: 5, index: 1, title: 'Do a selfie interview', description: 'Record and share a selfie interview about your PizzaDAO experience.', reward: 4269, levelTitle: 'Do a favor for the mafia', verifierKey: 'media_proof', verifierParams: { kinds: ['youtube', 'x', 'drive', 'loom'] }, proofKind: 'URL' },
+  { level: 5, index: 2, title: 'Vouch for another member', description: 'Vouch for another PizzaDAO member: open their profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.', reward: 4269, levelTitle: 'Do a favor for the mafia', verifierKey: 'vouch_given', verifierParams: { min: 1, sources: ['PIZZADAO'] } },
 
   // Level 6 - Street Muscle (6,942 PEP)
   { level: 6, index: 0, title: 'Join Pepperoni Mafia', description: 'Become a member of the Pepperoni Mafia.', reward: 6942, levelTitle: 'Street Muscle', verifierKey: 'discord_role', verifierParams: { roleIds: ['823266914834841610'] } },

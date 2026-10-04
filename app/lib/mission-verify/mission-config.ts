@@ -13,6 +13,12 @@
  * L5.1 media_proof, L6.1 gpp_host): the member submits a proof link, the
  * verifier pre-checks it on submit (MissionCompletion.checkResult) and a
  * reviewer approves with one click. They never approve on their own.
+ *
+ * Missions added after the seed (L5.2 "Vouch for another member") carry an
+ * `insert` block: the migration INSERTs the row when (level, index) is
+ * missing, so it is idempotent. MISSION_LEVEL_TITLES sets Mission.levelTitle
+ * on every row of those levels (the level's display name and the reward
+ * ledger description).
  */
 
 export type ProofKindName = 'NONE' | 'URL' | 'DISCORD_MESSAGE' | 'UPLOAD'
@@ -27,7 +33,30 @@ export interface MissionVerifierConfig {
   verifierKey: string | null
   verifierParams: Record<string, unknown> | null
   proofKind: ProofKindName
+  /**
+   * A mission that is not in the seed: INSERT the row when (level, index) is
+   * missing. `reward` must equal the level's shared reward (checked against
+   * the level's existing rows). Needs `description`; the title is `seedTitle`.
+   */
+  insert?: { reward: number }
 }
+
+/**
+ * Level titles (Mission.levelTitle), set on EVERY mission row of the level.
+ * Levels not listed keep whatever their rows have (L1 Pizza Trainee, L2 Pizza
+ * Noob, L7 Made Mafia, L8 Don of Dons). To rename a level: change it here (or
+ * pass --level-titles to the script), then run
+ * scripts/missions/set-verifiers.mjs (dry run, then --apply).
+ */
+export const MISSION_LEVEL_TITLES: Readonly<Record<number, string>> = {
+  3: "Make us an offer we can't refuse",
+  4: 'Do some dirty work',
+  5: 'Do a favor for the mafia',
+  6: 'Street Muscle', // unchanged from prod; pinned so every L6 row carries it
+}
+
+/** L5's shared per-level reward (the new L5.2 row must match it). */
+export const LEVEL_5_REWARD = 4269
 
 export const PEPPERONI_MAFIA_ROLE_ID = '823266914834841610'
 export const DREAD_PIZZA_ROBERTS_ROLE_ID = '812131585327235113'
@@ -110,6 +139,18 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     proofKind: 'URL',
   },
   {
+    level: 5,
+    index: 2, // new: not in the seed, INSERTed by the migration
+    seedTitle: 'Vouch for another member',
+    description:
+      'Vouch for another PizzaDAO member: open their profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.',
+    // Only PizzaDAO-native vouches: FARCASTER / TWITTER rows are imported follows, not a vouch made here.
+    verifierKey: 'vouch_given',
+    verifierParams: { min: 1, sources: ['PIZZADAO'] },
+    proofKind: 'NONE',
+    insert: { reward: LEVEL_5_REWARD },
+  },
+  {
     level: 6,
     index: 0,
     seedTitle: 'Join Pepperoni Mafia',
@@ -154,28 +195,52 @@ export interface MissionDbRow {
   verifierKey: string | null
   verifierParams: unknown
   proofKind: string
+  /** Optional so fixtures without these columns still plan (levelTitle then reads as null). */
+  levelTitle?: string | null
+  reward?: number
 }
 
 export interface MissionUpdate {
   id: number
   level: number
   index: number
+  /** Only the fields that change (verifierParams null = SQL NULL). */
   data: {
     title?: string
     description?: string
-    verifierKey: string | null
-    verifierParams: Record<string, unknown> | null
-    proofKind: ProofKindName
+    levelTitle?: string
+    verifierKey?: string | null
+    verifierParams?: Record<string, unknown> | null
+    proofKind?: ProofKindName
   }
   changes: string[]
 }
 
+export interface MissionInsert {
+  level: number
+  index: number
+  data: {
+    level: number
+    index: number
+    title: string
+    description: string
+    reward: number
+    levelTitle: string | null
+    isActive: true
+    verifierKey: string | null
+    verifierParams: Record<string, unknown> | null
+    proofKind: ProofKindName
+  }
+}
+
 export interface VerifierMigrationPlan {
   updates: MissionUpdate[]
+  /** New mission rows: config entries with `insert` and no row yet. */
+  inserts: MissionInsert[]
   unchanged: string[]
   /** Config entries with no row (reported, not an error). */
   missing: string[]
-  /** Title mismatches: the migration must abort. */
+  /** Title / reward mismatches: the migration must abort. */
   errors: string[]
 }
 
@@ -185,17 +250,67 @@ const stable = (v: unknown): string => JSON.stringify(v, (_k, val) =>
     : val,
 )
 
-/** Pure: what the data migration would change. Idempotent (a second run finds nothing to do). */
+const labelOf = (r: { level: number; index: number }) => `L${r.level}.${r.index}`
+
+/**
+ * Pure: what the data migration would change. Idempotent (a second run finds
+ * nothing to do):
+ *
+ *   - configured rows: verifier, title, description (title-guarded)
+ *   - `insert` entries with no row: a new mission row
+ *   - level titles: levelTitle on every row of the listed levels
+ */
 export function planVerifierMigration(
   rows: readonly MissionDbRow[],
   config: readonly MissionVerifierConfig[] = MISSION_VERIFIER_CONFIG,
+  levelTitles: Readonly<Record<number, string>> = MISSION_LEVEL_TITLES,
 ): VerifierMigrationPlan {
-  const plan: VerifierMigrationPlan = { updates: [], unchanged: [], missing: [], errors: [] }
+  const plan: VerifierMigrationPlan = { updates: [], inserts: [], unchanged: [], missing: [], errors: [] }
+  const updates = new Map<number, MissionUpdate>()
+  const updateFor = (row: MissionDbRow): MissionUpdate => {
+    let u = updates.get(row.id)
+    if (!u) {
+      u = { id: row.id, level: row.level, index: row.index, data: {}, changes: [] }
+      updates.set(row.id, u)
+    }
+    return u
+  }
+  const okRows: Array<{ label: string; id: number }> = []
+
   for (const c of config) {
-    const label = `L${c.level}.${c.index}`
+    const label = labelOf(c)
     const row = rows.find((r) => r.level === c.level && r.index === c.index)
     if (!row) {
-      plan.missing.push(`${label} "${c.seedTitle}"`)
+      if (!c.insert) {
+        plan.missing.push(`${label} "${c.seedTitle}"`)
+        continue
+      }
+      if (!c.description) {
+        plan.errors.push(`${label}: an inserted mission needs a description`)
+        continue
+      }
+      const levelRewards = [...new Set(rows.filter((r) => r.level === c.level && typeof r.reward === 'number').map((r) => r.reward))]
+      const reward = c.insert.reward
+      if (levelRewards.some((r) => r !== reward)) {
+        plan.errors.push(`${label}: reward ${c.insert.reward} differs from level ${c.level}'s shared reward ${levelRewards.join(' / ')}`)
+        continue
+      }
+      plan.inserts.push({
+        level: c.level,
+        index: c.index,
+        data: {
+          level: c.level,
+          index: c.index,
+          title: c.title ?? c.seedTitle,
+          description: c.description,
+          reward: c.insert.reward,
+          levelTitle: levelTitles[c.level] ?? rows.find((r) => r.level === c.level && r.levelTitle)?.levelTitle ?? null,
+          isActive: true,
+          verifierKey: c.verifierKey,
+          verifierParams: c.verifierParams,
+          proofKind: c.proofKind,
+        },
+      })
       continue
     }
     const accepted = [c.seedTitle, c.title].filter(Boolean)
@@ -203,11 +318,8 @@ export function planVerifierMigration(
       plan.errors.push(`${label}: title is "${row.title}", expected "${c.seedTitle}"${c.title ? ` or "${c.title}"` : ''}`)
       continue
     }
-    const data: MissionUpdate['data'] = {
-      verifierKey: c.verifierKey,
-      verifierParams: c.verifierParams,
-      proofKind: c.proofKind,
-    }
+    okRows.push({ label, id: row.id })
+    const data: MissionUpdate['data'] = {}
     const changes: string[] = []
     if (c.title && row.title !== c.title) {
       data.title = c.title
@@ -217,11 +329,55 @@ export function planVerifierMigration(
       data.description = c.description
       changes.push('description')
     }
-    if (row.verifierKey !== c.verifierKey) changes.push(`verifierKey ${row.verifierKey ?? 'null'} -> ${c.verifierKey ?? 'null'}`)
-    if (stable(row.verifierParams ?? null) !== stable(c.verifierParams)) changes.push(`verifierParams -> ${stable(c.verifierParams)}`)
-    if (row.proofKind !== c.proofKind) changes.push(`proofKind ${row.proofKind} -> ${c.proofKind}`)
-    if (changes.length) plan.updates.push({ id: row.id, level: c.level, index: c.index, data, changes })
-    else plan.unchanged.push(label)
+    if (row.verifierKey !== c.verifierKey) {
+      data.verifierKey = c.verifierKey
+      changes.push(`verifierKey ${row.verifierKey ?? 'null'} -> ${c.verifierKey ?? 'null'}`)
+    }
+    if (stable(row.verifierParams ?? null) !== stable(c.verifierParams)) {
+      data.verifierParams = c.verifierParams
+      changes.push(`verifierParams -> ${stable(c.verifierParams)}`)
+    }
+    if (row.proofKind !== c.proofKind) {
+      data.proofKind = c.proofKind
+      changes.push(`proofKind ${row.proofKind} -> ${c.proofKind}`)
+    }
+    if (changes.length) {
+      const u = updateFor(row)
+      Object.assign(u.data, data)
+      u.changes.push(...changes)
+    }
   }
+
+  // Level titles go on every row of the level, configured or not: the UI and
+  // the reward ledger description read the level's first row.
+  for (const row of rows) {
+    const want = levelTitles[row.level]
+    if (want === undefined || (row.levelTitle ?? null) === want) continue
+    const u = updateFor(row)
+    u.data.levelTitle = want
+    u.changes.push(`levelTitle ${row.levelTitle == null ? 'null' : `"${row.levelTitle}"`} -> "${want}"`)
+  }
+
+  plan.updates = [...updates.values()].sort((a, b) => a.level - b.level || a.index - b.index)
+  plan.unchanged = okRows.filter((r) => !updates.has(r.id)).map((r) => r.label)
   return plan
+}
+
+/**
+ * `--level-titles 3="Title",4="Other"` (CLI) -> { 3: 'Title', 4: 'Other' }.
+ * The script merges it over MISSION_LEVEL_TITLES, for a rename without a code
+ * change. Titles may be quoted ("..." or '...'); unquoted ones end at a comma.
+ */
+export function parseLevelTitlesArg(arg: string): Record<number, string> {
+  const out: Record<number, string> = {}
+  const re = /\s*(\d+)\s*=\s*(?:"([^"]*)"|'([^']*)'|([^,]*?))\s*(?:,|$)/y
+  while (re.lastIndex < arg.length) {
+    const m = re.exec(arg)
+    if (!m || m[0] === '') throw new Error(`--level-titles: can't parse "${arg}" (expected 3="Title",4="Title")`)
+    const title = (m[2] ?? m[3] ?? m[4] ?? '').trim()
+    if (!title) throw new Error(`--level-titles: level ${m[1]} has an empty title`)
+    out[Number(m[1])] = title
+  }
+  if (!Object.keys(out).length) throw new Error('--level-titles: no titles given (expected 3="Title",4="Title")')
+  return out
 }
