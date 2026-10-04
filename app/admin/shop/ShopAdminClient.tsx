@@ -8,6 +8,7 @@
 // /api/admin/shop/*, which re-checks shop-admin access and validates input.
 
 import { useMemo, useRef, useState, type FormEvent, type ReactNode } from "react";
+import Link from "next/link";
 import { Eye, EyeOff, Gift, Minus, PackagePlus, Pencil, Plus, Trash2, Upload, X } from "lucide-react";
 import type { ShopAdminEventView, ShopAdminItem } from "@/app/lib/shop-admin";
 import type { PeopleLabels } from "@/app/lib/shop-admin-people";
@@ -568,7 +569,14 @@ function Person({ id, people }: { id: string; people: PeopleLabels }) {
   const p = people[id];
   return p ? (
     <span title={`Discord ${id}`}>
-      {p.name || "Member"} <span className="text-foreground/50">#{p.memberId}</span>
+      {p.memberId ? (
+        <Link href={`/profile/${p.memberId}`} className="underline decoration-[hsl(var(--rule-warm))]">
+          {p.name || "Member"}
+        </Link>
+      ) : (
+        p.name || "Member"
+      )}{" "}
+      <span className="text-foreground/50">{p.memberId ? `member #${p.memberId}` : p.handle ?? ""}</span>
     </span>
   ) : (
     <span className="font-mono text-xs">{id}</span>

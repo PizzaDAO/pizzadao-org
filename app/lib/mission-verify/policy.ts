@@ -54,6 +54,6 @@ export function releaseHoldFor(level: number, discordId: string, now: Date): Mis
 
 export const HOLD_LABEL: Record<MissionHold, string> = {
   NEW_ACCOUNT: 'Discord account under 30 days old',
-  HIGH_LEVEL: 'Level 6+ needs a human release',
+  HIGH_LEVEL: 'Level 6+ needs a human approval',
   PREVIOUSLY_REJECTED: 'Rejected before; the verifier now passes',
 }

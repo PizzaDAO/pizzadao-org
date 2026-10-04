@@ -457,7 +457,7 @@ function notifyInApp(discordId: string, report: RunReport) {
     }
     if (c.outcome === 'held' || c.outcome === 'reopened') {
       const why = c.holdReason ? HOLD_LABEL[c.holdReason] : 'needs a reviewer'
-      notifyReviewers(discordId, c.title, c.level, `"${c.title.slice(0, 50)}" was auto-verified and awaits your release (${why}).`).catch(
+      notifyReviewers(discordId, c.title, c.level, `"${c.title.slice(0, 50)}" was auto-verified and needs your approval (${why}).`).catch(
         () => {},
       )
     }

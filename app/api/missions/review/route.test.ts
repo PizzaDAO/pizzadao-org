@@ -14,8 +14,24 @@ vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn() }))
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 vi.mock('@/app/lib/mission-cache', () => ({ invalidateProgressCache: vi.fn() }))
-vi.mock('@/app/lib/sheets/member-repository', () => ({
-  fetchMemberByDiscordId: vi.fn(async (id: string) => ({ name: `name-${id}` })),
+// Names: the sheet knows member-1 (member #42); Discord knows member-2; nobody knows the rest.
+vi.mock('@/app/lib/people', () => ({
+  resolvePeople: vi.fn(async (refs: Array<{ discordId: string; memberId?: string | null }>) => {
+    const out = new Map()
+    for (const r of refs) {
+      if (r.discordId === 'member-1') out.set(r.discordId, { discordId: r.discordId, name: 'Pizza Pal', memberId: '42', source: 'sheet' })
+      else if (r.discordId === 'member-2')
+        out.set(r.discordId, { discordId: r.discordId, name: 'Doughy', handle: '@dough', avatarUrl: 'https://cdn.discordapp.com/avatars/2/a.png', source: 'discord' })
+      else out.set(r.discordId, { discordId: r.discordId, name: r.discordId, source: 'id' })
+    }
+    return out
+  }),
+}))
+vi.mock('@/app/lib/discord-interactions/guild-roles', () => ({
+  getGuildRoles: vi.fn(async () => [{ id: '823266914834841610', name: 'Pepperoni Mafia' }]),
+}))
+vi.mock('@/app/lib/discord-channels', () => ({
+  getGuildChannels: vi.fn(async () => [{ id: '900000000000000001', name: 'show-and-tell', type: 0 }]),
 }))
 vi.mock('@/app/lib/mission-verify/review-extras', () => ({
   getFlaggedCompletions: vi.fn(async () => []),
@@ -219,10 +235,42 @@ describe('GET /api/missions/pending', () => {
     as('capo', [CAPO])
     const { submissions, flagged } = await (await PENDING()).json()
     expect(submissions.find((s: { id: number }) => s.id === 1).accountSignals).toEqual([
-      { kind: 'shared_wallet', label: 'Shares a wallet with', key: '0xabc', others: ['member-2'] },
+      {
+        kind: 'shared_wallet',
+        label: 'Shares a wallet with',
+        key: '0xabc',
+        others: ['member-2'],
+        othersLabeled: [{ name: 'Doughy', discordId: 'member-2', handle: '@dough', avatarUrl: 'https://cdn.discordapp.com/avatars/2/a.png' }],
+      },
     ])
     expect(submissions.find((s: { id: number }) => s.id === 4).accountSignals).toEqual([])
     expect(flagged.map((f: { id: number }) => f.id)).toEqual([9])
+    expect(flagged[0].member).toEqual({ name: 'member-3', discordId: 'member-3' })
+  })
+
+  it('returns a named submitter (sheet, else Discord, else the raw ID) and names in what the verifier saw', async () => {
+    vi.stubEnv('DISCORD_GUILD_ID', '700000000000000000')
+    vi.mocked(getPendingSubmissions).mockResolvedValueOnce([
+      { ...row(1, 6), source: 'AUTO', holdReason: 'HIGH_LEVEL', checkResult: { roleIds: ['823266914834841610'] } },
+      { ...row(2, 3, 'member-2'), checkResult: { channelId: '900000000000000001', messageId: '900000000000000002' } },
+      { ...row(3, 2, 'member-9'), checkResult: { summary: 'X post', checks: [{ label: 'X post link', ok: true }] } },
+    ] as never)
+    as('capo', [CAPO])
+    const { submissions } = await (await PENDING()).json()
+    const [a, b, c] = submissions
+    expect(a.submitter).toEqual({ name: 'Pizza Pal', discordId: 'member-1', memberId: '42' })
+    expect(a.holdLabel).toBe('Level 6+ needs a human approval')
+    expect(a.checkItems).toEqual([{ label: 'Roles', value: 'Pepperoni Mafia' }])
+    expect(b.submitter).toEqual({ name: 'Doughy', discordId: 'member-2', handle: '@dough', avatarUrl: 'https://cdn.discordapp.com/avatars/2/a.png' })
+    expect(b.checkItems).toEqual([
+      { label: 'Channel', value: '#show-and-tell' },
+      { label: 'Message', value: 'open in Discord', href: 'https://discord.com/channels/700000000000000000/900000000000000001/900000000000000002' },
+    ])
+    expect(c.submitter).toEqual({ name: 'member-9', discordId: 'member-9' })
+    // A semi-automatic pre-check is rendered by the panel itself.
+    expect(c.checkItems).toEqual([])
+    expect(JSON.stringify(submissions)).not.toContain('memberName')
+    vi.unstubAllEnvs()
   })
 
   it('Dread Pizza Roberts sees L8 too', async () => {

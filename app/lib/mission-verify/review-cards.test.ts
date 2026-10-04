@@ -86,13 +86,26 @@ describe('renderReviewCard', () => {
     expect(e.image).toBeUndefined()
   })
 
-  it('an auto-hold: Release instead of Approve, the hold reason and what the verifier saw', () => {
+  it('an auto-hold: Approve (the release action), the hold reason and what the verifier saw', () => {
     const msg = renderReviewCard(view({ level: 6, holdReason: 'HIGH_LEVEL', checkResult: { roleIds: ['823266914834841610'], handle: 'x_y' } }), { appUrl: APP })
     const e = msg.embeds[0]
-    expect(e.description).toMatch(/Auto-verified, awaiting release: L6\.0/)
-    expect(e.fields?.find((f) => f.name === 'Release needed')?.value).toMatch(/Level 6\+/)
+    expect(e.description).toMatch(/Auto-verified, needs approval: L6\.0/)
+    expect(e.description).not.toMatch(/[Rr]elease/)
+    expect(e.fields?.find((f) => f.name === 'Approval needed')?.value).toMatch(/Level 6\+/)
     expect(e.fields?.find((f) => f.name === 'Verifier saw')?.value).toContain('handle: x\\_y')
-    expect(buttons(msg)[0]).toMatchObject({ label: 'Release', custom_id: 'mr:release:42' })
+    expect(buttons(msg)[0]).toMatchObject({ label: 'Approve', custom_id: 'mr:release:42' })
+  })
+
+  it('IDs the verifier saw are mentions (Discord shows names), never bare numbers', () => {
+    const msg = renderReviewCard(
+      view({ checkResult: { roleIds: ['823266914834841610'], channelId: '900000000000000001', messageId: '900000000000000002', invitees: ['100000000000000009'] } }),
+      { appUrl: APP },
+    )
+    const saw = msg.embeds[0].fields?.find((f) => f.name === 'Verifier saw')?.value ?? ''
+    expect(saw).toContain('roleIds: <@&823266914834841610>')
+    expect(saw).toContain('channelId: <#900000000000000001>')
+    expect(saw).toContain('invitees: <@100000000000000009>')
+    expect(msg.allowed_mentions).toEqual({ parse: [] })
   })
 
   it('duplicate-account signals and flags are shown', () => {
@@ -130,9 +143,11 @@ describe('renderReviewCard', () => {
     expect(buttons(msg).find((b) => b.url)?.disabled).toBeUndefined()
   })
 
-  it('released and rejected cards say so; the reject reason is shown', () => {
+  it('approved holds and rejected cards say so; the reject reason is shown', () => {
     const rel = renderReviewCard(view({ status: 'APPROVED', reviewedBy: '100000000000000001', reviewedAt: new Date(), decision: 'RELEASED' }), { appUrl: APP })
-    expect(rel.embeds[0].description).toMatch(/Released by <@100000000000000001>/)
+    expect(rel.embeds[0].description).toMatch(/^✅ Approved: L3\.0/)
+    expect(rel.embeds[0].description).toMatch(/Approved by <@100000000000000001>/)
+    expect(rel.embeds[0].description).not.toMatch(/Released/)
     const rej = renderReviewCard(view({ status: 'REJECTED', reviewedBy: '100000000000000001', reviewedAt: new Date(), reviewNote: 'Not your post', decision: 'REJECTED' }), { appUrl: APP })
     expect(rej.embeds[0].color).toBe(0xe74c3c)
     expect(rej.embeds[0].description).toMatch(/❌ Rejected by <@100000000000000001>/)

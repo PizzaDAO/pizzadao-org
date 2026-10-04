@@ -201,7 +201,7 @@ export async function announceRun({ runId, dryRun, stats }: NightlySummary): Pro
     if (channelId) {
       const lines = [
         `🍕 Nightly mission check (run ${runId}): ${stats.members.toLocaleString('en-US')} members checked.`,
-        stats.held || stats.reopened ? `• ${stats.held + stats.reopened} auto-verified mission(s) await a human release.` : '',
+        stats.held || stats.reopened ? `• ${stats.held + stats.reopened} auto-verified mission(s) need a reviewer's approval.` : '',
         stats.flagged ? `• ${stats.flagged} approved mission(s) flagged: the member no longer meets them (nothing was taken back).` : '',
         newSignals ? `• ${newSignals} new possible duplicate-account signal(s).` : '',
         `Review: <${appUrl}/missions>`,

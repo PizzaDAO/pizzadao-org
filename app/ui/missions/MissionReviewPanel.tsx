@@ -10,6 +10,7 @@
 // Prior: garlic-68749 (Phase 4b token migration).
 
 import { useState, useEffect } from "react";
+import Link from "next/link";
 import { useToast } from "@/app/ui/shared/Toast";
 import { input } from "../shared-styles";
 
@@ -18,7 +19,8 @@ type Submission = {
   missionId: number;
   discordId: string;
   memberId: string | null;
-  memberName: string | null;
+  /** Resolved server-side: Crew-sheet name, else Discord nickname / username, else the raw ID. */
+  submitter?: Person;
   evidence: string | null;
   notes: string | null;
   /** Earlier rejections of this submission (it was resubmitted), oldest first. */
@@ -26,10 +28,12 @@ type Submission = {
   attempt?: number;
   /** MANUAL / AUTO / SEMI. */
   source?: string;
-  /** Set when a verifier passed but a human must release it (L6+, new account, previously rejected). */
+  /** Set when a verifier passed but a human must approve it (L6+, new account, previously rejected). */
   holdReason?: string | null;
   holdLabel?: string | null;
   checkResult?: Record<string, unknown> | null;
+  /** What an automatic verifier saw, with role / channel / member names instead of IDs. */
+  checkItems?: CheckItem[];
   /** Semi-automatic pre-checks all passed (Phase 4): offered for bulk approve. */
   allGreen?: boolean;
   /** A manual "Invite a friend": approving needs a note (who they invited). */
@@ -159,11 +163,15 @@ function PreCheckBlock({ sub, pre }: { sub: Submission; pre: PreCheck }) {
   );
 }
 
-type AccountSignal = { kind: string; label: string; key: string; others: string[] };
+type Person = { name: string; discordId: string; memberId?: string; handle?: string; avatarUrl?: string };
+type CheckItem = { label: string; value: string; href?: string };
+
+type AccountSignal = { kind: string; label: string; key: string; others: string[]; othersLabeled?: Person[] };
 
 type FlaggedCompletion = {
   id: number;
   discordId: string;
+  member?: Person;
   flaggedAt: string;
   flagReason: string | null;
   mission: { title: string; level: number; index: number };
@@ -172,18 +180,31 @@ type FlaggedCompletion = {
 const DISPLAY_FONT =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
 
-/** "xUsername: pizza · calls: 3" from a verifier's checkResult. */
-function formatCheck(r: Record<string, unknown>): string {
-  return Object.entries(r)
-    .filter(([, v]) => v !== null && v !== undefined && typeof v !== "object")
-    .map(([k, v]) => `${k}: ${String(v)}`)
-    .concat(
-      Object.entries(r)
-        .filter(([, v]) => Array.isArray(v))
-        .map(([k, v]) => `${k}: ${(v as unknown[]).join(", ")}`),
-    )
-    .join(" · ")
-    .slice(0, 300);
+const personOf = (sub: Submission): Person => sub.submitter ?? { name: sub.discordId, discordId: sub.discordId };
+
+/** "member #N" when they're in the Crew sheet, else their Discord handle. */
+const personHint = (p: Person): string | null => (p.memberId ? `member #${p.memberId}` : p.handle ?? null);
+
+/** A name (linked to the profile when there's a member ID) plus a small muted hint. */
+function PersonName({ person, strong = true }: { person: Person; strong?: boolean }) {
+  const hint = personHint(person);
+  const nameStyle = { fontWeight: strong ? 600 : 400, color: "hsl(var(--foreground))" } as const;
+  return (
+    <span title={`Discord ${person.discordId}`} style={{ display: "inline-flex", alignItems: "center", gap: 5, flexWrap: "wrap" }}>
+      {person.avatarUrl && (
+        // eslint-disable-next-line @next/next/no-img-element -- Discord CDN avatar
+        <img src={person.avatarUrl} alt="" width={16} height={16} loading="lazy" referrerPolicy="no-referrer" style={{ borderRadius: 999 }} />
+      )}
+      {person.memberId ? (
+        <Link href={`/profile/${person.memberId}`} style={{ ...nameStyle, textDecoration: "underline", textDecorationColor: "hsl(var(--rule-warm))" }}>
+          {person.name}
+        </Link>
+      ) : (
+        <span style={nameStyle}>{person.name}</span>
+      )}
+      {hint && <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))", opacity: 0.85 }}>{hint}</span>}
+    </span>
+  );
 }
 
 export function MissionReviewPanel() {
@@ -539,7 +560,7 @@ export function MissionReviewPanel() {
               >
                 <input
                   type="checkbox"
-                  aria-label={`Select ${sub.mission.title} by ${sub.memberName ?? sub.discordId} for bulk approve`}
+                  aria-label={`Select ${sub.mission.title} by ${personOf(sub).name} for bulk approve`}
                   checked={selected.has(sub.id)}
                   onChange={() => toggleSelected(sub.id)}
                   style={{ marginTop: 4, width: 18, height: 18, flexShrink: 0 }}
@@ -575,8 +596,8 @@ export function MissionReviewPanel() {
                     }}
                   >
                     submitted by{" "}
-                    <span style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>
-                      {sub.memberName ?? sub.discordId}
+                    <span data-testid="submitter">
+                      <PersonName person={personOf(sub)} />
                     </span>{" "}
                     ·{" "}
                     {new Date(sub.submittedAt).toLocaleDateString("en-US", {
@@ -655,12 +676,25 @@ export function MissionReviewPanel() {
                     className="overline"
                     style={{ display: "block", marginBottom: 2, color: "rgb(4, 120, 87)" }}
                   >
-                    § Auto-verified · awaiting release
+                    § Auto-verified · needs approval
                   </span>
                   {sub.holdLabel ?? sub.holdReason}
-                  {sub.checkResult && Object.keys(sub.checkResult).length > 0 && (
-                    <div style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 4, wordBreak: "break-word" }}>
-                      Verifier saw: {formatCheck(sub.checkResult)}
+                  {sub.checkItems && sub.checkItems.length > 0 && (
+                    <div data-testid="verifier-saw" style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 4, wordBreak: "break-word" }}>
+                      Verifier saw:{" "}
+                      {sub.checkItems.map((c, i) => (
+                        <span key={`${c.label}-${i}`}>
+                          {i > 0 && " · "}
+                          {c.label}:{" "}
+                          {c.href ? (
+                            <a href={c.href} target="_blank" rel="noreferrer noopener" style={{ color: "inherit", textDecoration: "underline" }}>
+                              {c.value}
+                            </a>
+                          ) : (
+                            <span style={{ color: "hsl(var(--foreground))" }}>{c.value}</span>
+                          )}
+                        </span>
+                      ))}
                     </div>
                   )}
                 </div>
@@ -686,8 +720,14 @@ export function MissionReviewPanel() {
                   </span>
                   {sub.accountSignals.map((sig) => (
                     <div key={`${sig.kind}:${sig.key}`} style={{ wordBreak: "break-word" }}>
-                      {sig.label}
-                      {sig.others.length > 0 ? ` ${sig.others.join(", ")}` : ""} ({sig.key})
+                      {sig.label}{" "}
+                      {(sig.othersLabeled ?? sig.others.map((d) => ({ name: d, discordId: d }))).map((p, i) => (
+                        <span key={p.discordId}>
+                          {i > 0 && ", "}
+                          <PersonName person={p} strong={false} />
+                        </span>
+                      ))}{" "}
+                      ({sig.key})
                     </div>
                   ))}
                 </div>
@@ -780,7 +820,7 @@ export function MissionReviewPanel() {
                     cursor: processing.has(sub.id) ? "not-allowed" : "pointer",
                   }}
                 >
-                  {sub.holdReason ? "Release" : "Approve"}
+                  Approve
                 </button>
                 <button
                   onClick={() => handleReview(sub.id, "reject")}
@@ -813,7 +853,8 @@ export function MissionReviewPanel() {
           <ul style={{ margin: 0, paddingLeft: 18, fontSize: 13, color: "hsl(var(--foreground))" }}>
             {flagged.map((f) => (
               <li key={f.id} style={{ wordBreak: "break-word" }}>
-                L{f.mission.level}.{f.mission.index} {f.mission.title} · {f.discordId}
+                L{f.mission.level}.{f.mission.index} {f.mission.title} ·{" "}
+                <PersonName person={f.member ?? { name: f.discordId, discordId: f.discordId }} strong={false} />
                 {f.flagReason ? ` · ${f.flagReason}` : ""} · {new Date(f.flaggedAt).toLocaleDateString()}
               </li>
             ))}

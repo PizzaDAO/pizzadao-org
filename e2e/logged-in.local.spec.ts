@@ -247,6 +247,29 @@ test.describe('shop admin (Pepperoni Mafia member 990003)', () => {
     expect(diag.pageErrors, 'uncaught page errors').toEqual([]);
     expect(diag.dialogs, 'native dialogs').toEqual([]);
   });
+
+  test('/missions review panel: names instead of Discord IDs, role names, Approve for holds', async ({ page }, info) => {
+    const diag = watch(page);
+    await page.goto('/missions');
+    const submitters = page.getByTestId('submitter');
+    await expect(submitters.first()).toBeVisible({ timeout: 60_000 });
+    // Sheet member: Crew-sheet name, "member #N", linked to the profile.
+    const sheet = submitters.filter({ hasText: 'E2E Test Margherita' });
+    await expect(sheet).toContainText('member #990001');
+    await expect(sheet.getByRole('link')).toHaveAttribute('href', '/profile/990001');
+    // Not in the sheet: the Discord nickname and handle, not the raw ID.
+    const discordOnly = submitters.filter({ hasText: 'E2E Discord-only Diavola' });
+    await expect(discordOnly).toContainText('@e2e-discord-only');
+    await expect(page.getByTestId('verifier-saw')).toContainText('Roles: Pepperoni Mafia');
+    await expect(page.getByTestId('awaiting-release')).toContainText('Auto-verified · needs approval');
+    const panelText = await page.locator('body').innerText();
+    expect(panelText).not.toContain('100000000000990009');
+    expect(panelText).not.toContain('823266914834841610');
+    expect(panelText).not.toMatch(/\bRelease\b/);
+    await page.getByTestId('awaiting-release').scrollIntoViewIfNeeded();
+    await shot(page, info, 'mission-review-panel', diag);
+    expect(diag.pageErrors, 'uncaught page errors').toEqual([]);
+  });
 });
 
 test.describe('profile-complete celebration (member 990002)', () => {

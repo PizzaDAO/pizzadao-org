@@ -62,7 +62,7 @@ describe('renderSlaDigest', () => {
     const d = (body.embeds![0] as { description: string }).description
     expect(d).toMatch(/^⏳ 2 mission reviews are past the 48h target/)
     expect(d).toContain('https://discord.com/channels/812097286003359764/200000000000000001/300000000000000001')
-    expect(d).toContain('awaiting release')
+    expect(d).toContain('needs approval')
     expect(d).toContain('waiting 2d 12h')
   })
 

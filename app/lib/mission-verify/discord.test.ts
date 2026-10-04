@@ -159,7 +159,7 @@ describe('renderMissionsEmbed', () => {
     expect(e.description).toContain('Earned from missions: $PEP 69')
     expect(e.description).toContain('▫️ Say hi on a call: 0/1 Join a community call')
     expect(e.description).toContain('⏳ Post about PizzaDAO (pending review)')
-    expect(e.description).toContain("🔐 Join Pepperoni Mafia (verified, awaiting a reviewer's release: Level 6+ needs a human release)")
+    expect(e.description).toContain("🔐 Join Pepperoni Mafia (verified, awaiting a reviewer's release: Level 6+ needs a human approval)")
     expect(e.description).not.toContain('Link X') // level 1 is done
   })
 

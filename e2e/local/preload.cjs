@@ -21,7 +21,8 @@
 //
 //      Exception: GET guilds/<FAKE_DISCORD_GUILD_ID>/members/<id> for a fixture
 //      member is answered locally with that fixture's discordRoles (404 for
-//      anyone else), and GET guilds/<FAKE_DISCORD_GUILD_ID>/roles with [], so
+//      anyone else; DISCORD_ONLY_MEMBER is in the guild but not the sheet), and
+//      GET guilds/<FAKE_DISCORD_GUILD_ID>/roles with Pepperoni Mafia only, so
 //      role checks (e.g. /admin/shop) can be exercised.
 //      Nothing is sent to Discord.
 //
@@ -33,7 +34,7 @@
 
 const net = require("node:net");
 const fs = require("node:fs");
-const { E2E_MEMBERS_SHEET_ID, REAL_MEMBERS_SHEET_ID, TEST_MEMBER_ROWS, MEMBERS, FAKE_DISCORD_GUILD_ID } = require("./fixtures.cjs");
+const { E2E_MEMBERS_SHEET_ID, REAL_MEMBERS_SHEET_ID, TEST_MEMBER_ROWS, MEMBERS, DISCORD_ONLY_MEMBER, FAKE_DISCORD_GUILD_ID } = require("./fixtures.cjs");
 
 const PG_HOST = process.env.E2E_PG_HOST || "127.0.0.1";
 const PG_PORT = Number(process.env.E2E_PG_PORT || 54329);
@@ -137,7 +138,7 @@ const realFetch = globalThis.fetch;
 
 /** Local answer for a guild member lookup: fixture members only, never Discord. */
 function fakeGuildMember(discordId) {
-  const m = MEMBERS.find((x) => x.discordId === discordId);
+  const m = [...MEMBERS, DISCORD_ONLY_MEMBER].find((x) => x.discordId === discordId);
   if (!m) {
     return new Response(JSON.stringify({ message: "Unknown Member", code: 10007 }), {
       status: 404,
@@ -206,10 +207,10 @@ globalThis.fetch = async function guardedFetch(input, init) {
   if (/(^|\.)discord(app)?\.com$/.test(u.hostname)) {
     const fake = method === "GET" && u.pathname.match(/^\/api\/v10\/guilds\/([^/]+)\/members\/(\d+)$/);
     if (fake && fake[1] === FAKE_DISCORD_GUILD_ID) return fakeGuildMember(fake[2]);
-    // Guild role list (role-name resolution, e.g. "Pepperoni Mafia"): empty, so
-    // the app falls back to its pinned role ids.
+    // Guild role list (role-name resolution, review-panel role names): only
+    // Pepperoni Mafia, at its pinned id; other names fall back to pinned ids.
     if (method === "GET" && u.pathname === `/api/v10/guilds/${FAKE_DISCORD_GUILD_ID}/roles`) {
-      return new Response("[]", { status: 200, headers: { "content-type": "application/json" } });
+      return new Response(JSON.stringify([{ id: "823266914834841610", name: "Pepperoni Mafia" }]), { status: 200, headers: { "content-type": "application/json" } });
     }
     logBlocked(method, url, "discord");
     return blockedResponse("discord");
