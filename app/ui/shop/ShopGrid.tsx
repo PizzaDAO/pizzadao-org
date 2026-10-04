@@ -25,7 +25,7 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
 
   const fetchItems = async () => {
     try {
-      const res = await fetch("/api/shop");
+      const res = await fetch("/api/shop", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch shop items");
       setItems(data.items);
@@ -48,7 +48,7 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
   // 2-col on small, 3-col mid, 4-col wide per spec.
   const gridStyle: React.CSSProperties = {
     display: "grid",
-    gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))",
+    gridTemplateColumns: "repeat(auto-fill, minmax(min(100%, 180px), 1fr))",
     gap: 14,
   };
 
@@ -59,7 +59,7 @@ export function ShopGrid({ onPurchase }: ShopGridProps) {
           <div
             key={i}
             style={{
-              height: 180,
+              height: 220,
               background: "hsl(var(--muted))",
               borderRadius: "var(--radius)",
             }}

@@ -1,6 +1,7 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { writeToSheet } from "../profile/route";
 import { getSession } from "@/app/lib/session";
+import { NO_STORE_HEADERS } from "@/app/lib/no-store";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import {
   getAllWalletsForMember,
@@ -99,7 +100,7 @@ export async function GET(request: NextRequest) {
 
     const wallets = await getAllWalletsForMember(memberId);
 
-    return NextResponse.json({ wallets });
+    return NextResponse.json({ wallets }, { headers: NO_STORE_HEADERS });
   } catch (error) {
     console.error("GET /api/wallet error:", error);
     return NextResponse.json(

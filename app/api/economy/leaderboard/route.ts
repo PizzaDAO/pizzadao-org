@@ -1,22 +1,16 @@
 import { NextResponse } from 'next/server'
 import { getLeaderboard, formatCurrency } from '@/app/lib/economy'
 import { getSheetData } from '@/app/lib/sheets/member-repository'
+import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 
 export const runtime = 'nodejs'
 
-// In-memory cache for leaderboard (5-min TTL)
-let leaderboardCache: { data: any; timestamp: number } | null = null
-const LEADERBOARD_CACHE_TTL = 5 * 60 * 1000 // 5 minutes
+// Balances change with every job, bounty, purchase and transfer, so the
+// leaderboard is computed per request and never stored by the CDN or browser
+// (it used to be memoized for 5 minutes and CDN-cached for up to 35).
 
 export async function GET() {
   try {
-    // Check cache
-    if (leaderboardCache && Date.now() - leaderboardCache.timestamp < LEADERBOARD_CACHE_TTL) {
-      return NextResponse.json(leaderboardCache.data, {
-        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' }
-      })
-    }
-
     const leaderboard = await getLeaderboard(10)
 
     // spinach-65462: resolve each entry's Discord ID to a memberId on the
@@ -37,14 +31,11 @@ export async function GET() {
       }))
     }
 
-    // Cache the result
-    leaderboardCache = { data: result, timestamp: Date.now() }
-
     return NextResponse.json(result, {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' }
+      headers: NO_STORE_HEADERS
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS })
   }
 }

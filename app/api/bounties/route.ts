@@ -4,6 +4,7 @@ import { getAllBounties, createBounty, resolveBountyCrewId, getCrewLabelMap } fr
 import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
+import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 
 export const runtime = 'nodejs'
 
@@ -29,11 +30,11 @@ export async function GET(request: NextRequest) {
         commentCount: b._count.comments
       }))
     }, {
-      headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' }
+      headers: NO_STORE_HEADERS
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
-    return NextResponse.json({ error: message }, { status: 500 })
+    return NextResponse.json({ error: message }, { status: 500, headers: NO_STORE_HEADERS })
   }
 }
 

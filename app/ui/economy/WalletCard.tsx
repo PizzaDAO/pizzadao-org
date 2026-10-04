@@ -24,7 +24,7 @@ export function WalletCard() {
 
   const fetchBalance = async () => {
     try {
-      const res = await fetch("/api/economy/balance");
+      const res = await fetch("/api/economy/balance", { cache: "no-store" });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch balance");
       setBalance(data);

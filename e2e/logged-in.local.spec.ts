@@ -172,6 +172,30 @@ test.describe('logged-in (new member 990001)', () => {
     });
   }
 
+  test('/pep: wallet, leaderboard, job cards and fresh bounty reads', async ({ page }, info) => {
+    const diag = watch(page);
+    await page.goto('/pep');
+    const wallet = page.getByTestId('pep-wallet');
+    await expect(wallet.getByRole('button', { name: 'Send $PEP' })).toBeVisible({ timeout: 60_000 });
+    await expect(wallet).toContainText('$PEP');
+    const board = page.getByTestId('pep-leaderboard');
+    await expect(board.locator('li').first()).toContainText(/\d[\d,]* \$PEP/);
+    // Job cards: each is one button with a plain "50 $PEP" reward, no nested button.
+    const jobs = page.getByTestId('job-card');
+    await expect(jobs.first()).toBeVisible();
+    await expect(jobs.first()).toHaveJSProperty('tagName', 'BUTTON');
+    await expect(jobs.first()).toContainText(/\d[\d,]* \$PEP/);
+    await expect(jobs.first().locator('button, img')).toHaveCount(0);
+    // Nothing on the page may overflow horizontally (the old 2-up wallet did).
+    const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+    expect(overflow).toBeLessThanOrEqual(0);
+    const res = await page.request.get('/api/bounties');
+    expect(res.headers()['cache-control']).toBe('private, no-store');
+    await settle(page);
+    await shot(page, info, 'pep-economy', diag);
+    expect(diag.pageErrors, 'uncaught page errors').toEqual([]);
+  });
+
   test('failing action shows a toast, not alert()', async ({ page }, info) => {
     const diag = watch(page);
     await page.goto('/crews');

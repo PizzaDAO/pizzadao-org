@@ -153,7 +153,26 @@ async function main() {
   await prisma.shopAdminEvent.create({ data: { actorId, action: "HIDE", itemId: apron.id, itemName: apron.name, before: { isAvailable: true }, after: { isAvailable: false }, reason: "Out of season" } });
   await prisma.shopAdminEvent.create({ data: { actorId, action: "GRANT", itemId: pin.id, itemName: pin.name, targetId: NEW_MEMBER.discordId, quantity: 1, after: { status: "CREDITED" }, reason: "UB carry-over" } });
 
-  console.log(`[e2e:local] seeded ${MEMBERS.length} test members (${MEMBERS.map((m) => m.memberId).join(", ")}), ${MISSIONS.length} missions and 4 shop items`);
+  // /pep jobs + bounties: three daily jobs and two bounties (one open, one
+  // claimed) so the job and bounty cards render with real data.
+  await prisma.jobAssignment.deleteMany({ where: { userId: { in: discordIds } } });
+  await prisma.bounty.deleteMany({ where: { createdBy: { in: discordIds } } });
+  await prisma.job.deleteMany({ where: { description: { startsWith: "E2E " } } });
+  for (const [description, type] of [
+    ["E2E Share a pizza photo in #general", "Social"],
+    ["E2E Welcome a new member on a crew call", "Community"],
+    ["E2E Review one open pull request", "Tech"],
+  ]) {
+    await prisma.job.create({ data: { description, type, isActive: true } });
+  }
+  await prisma.bounty.create({
+    data: { description: "E2E Design a flyer for the Testville pizza party", reward: 1500, createdBy: COMPLETE_MEMBER.discordId, status: "OPEN" },
+  });
+  await prisma.bounty.create({
+    data: { description: "E2E Translate the onboarding guide to Spanish", reward: 250, createdBy: SHOP_ADMIN_MEMBER.discordId, claimedBy: COMPLETE_MEMBER.discordId, status: "CLAIMED" },
+  });
+
+  console.log(`[e2e:local] seeded ${MEMBERS.length} test members (${MEMBERS.map((m) => m.memberId).join(", ")}), ${MISSIONS.length} missions, 4 shop items, 3 jobs and 2 bounties`);
 }
 
 main()

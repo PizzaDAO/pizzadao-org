@@ -31,6 +31,14 @@ export function PepIcon({ size = 16, style }: PepIconProps) {
   );
 }
 
+/**
+ * Plain PEP amount, e.g. "1,500 $PEP" — the same text style the missions page
+ * and shop admin use. Prefer this over the icon + number <PepAmount> on cards.
+ */
+export function formatPep(amount: number): string {
+  return `${amount.toLocaleString()} $PEP`;
+}
+
 type PepAmountProps = {
   amount: number | string;
   size?: number;

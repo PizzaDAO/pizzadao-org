@@ -1,7 +1,7 @@
 "use client";
 
 import React, { useState } from "react";
-import { PepAmount } from "../economy/PepIcon";
+import { formatPep } from "../economy/PepIcon";
 import { card as cardBase, btn, input } from "../shared-styles";
 
 type Item = {
@@ -66,7 +66,9 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
       {/* Image placeholder area (top of card) */}
       <div
         style={{
-          aspectRatio: "1 / 1",
+          // Was aspectRatio 1/1: in the one-column shop on /pep that made
+          // every placeholder ~330px tall.
+          height: 88,
           background:
             "linear-gradient(135deg, hsl(var(--butter) / 0.40) 0%, hsl(var(--tomato) / 0.25) 100%)",
           borderTopLeftRadius: "var(--radius)",
@@ -167,57 +169,63 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
         )}
       </div>
 
-      {/* Footer with price + buy */}
+      {/* Footer: plain price, then quantity + buy */}
       <div
         style={{
           padding: 14,
           borderTop: "1px solid hsl(var(--rule) / 0.12)",
           background: "hsl(var(--cream-warm))",
-          display: "flex",
-          alignItems: "center",
-          gap: 8,
+          display: "grid",
+          gap: 10,
         }}
       >
         <div
+          data-testid="shop-item-price"
           style={{
-            fontSize: 22,
-            fontWeight: 700,
+            fontSize: 18,
+            fontWeight: 900,
             color: "hsl(var(--tomato))",
             fontFamily:
               "var(--font-display), var(--font-sans), system-ui, sans-serif",
             letterSpacing: "-0.01em",
-            display: "flex",
-            alignItems: "center",
+            fontVariantNumeric: "tabular-nums",
+            whiteSpace: "nowrap",
           }}
         >
-          <PepAmount amount={item.price} size={18} />
+          {formatPep(item.price)}
         </div>
-        <input
-          type="number"
-          value={quantity}
-          onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
-          min="1"
-          max={item.quantity === -1 ? 999 : item.quantity}
-          style={{
-            ...input(),
-            width: 56,
-            textAlign: "center",
-            padding: "8px 6px",
-          }}
-          disabled={loading || !item.inStock}
-        />
-        <button
-          onClick={handleBuy}
-          disabled={loading || !item.inStock}
-          style={{
-            ...btn("accent", loading || !item.inStock),
-            flex: 1,
-            padding: "8px 12px",
-            fontSize: 13,
-          }}
-        >
-          {loading ? "Buying..." : item.inStock ? "Buy" : "Out of Stock"}
-        </button>
+        <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          <input
+            type="number"
+            aria-label={`Quantity of ${item.name}`}
+            value={quantity}
+            onChange={(e) => setQuantity(Math.max(1, Number(e.target.value)))}
+            min="1"
+            max={item.quantity === -1 ? 999 : item.quantity}
+            style={{
+              ...input(),
+              width: 56,
+              flexShrink: 0,
+              textAlign: "center",
+              padding: "8px 6px",
+            }}
+            disabled={loading || !item.inStock}
+          />
+          <button
+            type="button"
+            onClick={handleBuy}
+            disabled={loading || !item.inStock}
+            style={{
+              ...btn("accent", loading || !item.inStock),
+              flex: 1,
+              minWidth: 0,
+              padding: "8px 12px",
+              fontSize: 13,
+            }}
+          >
+            {loading ? "Buying..." : item.inStock ? "Buy" : "Out of Stock"}
+          </button>
+        </div>
       </div>
     </div>
   );
