@@ -1,5 +1,6 @@
 /**
- * The deferred half of a review-card button (Approve / Release) or of the
+ * The deferred half of a review-card Approve button (mr:approve, or mr:release
+ * on an auto-verified hold) or of the
  * Reject modal. The interaction handler has already checked the reviewer
  * (canReviewMission with the interaction's member.roles, not their own
  * submission, still PENDING) and answered Discord within 3 s with a deferred

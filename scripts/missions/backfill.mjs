@@ -8,7 +8,7 @@
  * happen:
  *   - every mission that would be newly approved, per mission;
  *   - every level that would be paid, in level order, with its PEP;
- *   - the items that would go to the human release queue instead of being
+ *   - the items that would go to the human approval queue instead of being
  *     paid: L6+ (HIGH_LEVEL), Discord accounts under 30 days (NEW_ACCOUNT)
  *     and missions a human rejected before (PREVIOUSLY_REJECTED);
  *   - approved role missions that would be flagged, and grandfathered
@@ -145,7 +145,7 @@ DRY RUN - nothing was written to the database.
 ================================ NEXT STEPS ================================
  1. The OWNER reviews the CSV above, row by row:
       approve  missions that would be approved automatically
-      hold     verifier passed, but a human must release it (L6+ / account < 30 days)
+      hold     verifier passed, but a human must approve it (L6+ / account < 30 days)
       reopen   a human rejected it before; it goes back to the review queue
       pay      a level that would be paid, with its PEP
       flag     an approved role mission whose role is gone (flag only, nothing is taken back)
@@ -225,7 +225,7 @@ DRY RUN - nothing was written to the database.
   const s = res.run.stats;
   console.log(`
 Backfill run ${run.id} ${res.done ? "FINISHED" : "STOPPED"}:
-  members ${fmt(s.members)}, approved ${fmt(s.approved)}, held for release ${fmt(s.held)}, reopened ${fmt(s.reopened)}, flagged ${fmt(s.flagged)}
+  members ${fmt(s.members)}, approved ${fmt(s.approved)}, held for approval ${fmt(s.held)}, reopened ${fmt(s.reopened)}, flagged ${fmt(s.flagged)}
   levels paid ${JSON.stringify(s.levelsPaid)}
   PEP paid ${fmt(s.pepPaid)} (confirmed ${fmt(confirmedTotal)})
   errors ${s.errors}${s.errorSamples.length ? `\n    ${s.errorSamples.join("\n    ")}` : ""}`);
@@ -238,7 +238,7 @@ Backfill run ${run.id} ${res.done ? "FINISHED" : "STOPPED"}:
 function printSummary(s) {
   console.log(`\n================================ SUMMARY ================================`);
   console.log(`Members checked: ${fmt(s.members)}; with something to report: ${fmt(s.membersWithChanges)}`);
-  console.log(`\nPer mission (newly approved / held for release / reopened / flagged / legacy 'auto' that would fail):`);
+  console.log(`\nPer mission (newly approved / held for approval / reopened / flagged / legacy 'auto' that would fail):`);
   for (const m of s.perMission) {
     console.log(`  L${m.level}.${m.index} ${m.title.slice(0, 50).padEnd(50)} ${String(m.approve).padStart(6)} ${String(m.hold).padStart(6)} ${String(m.reopen).padStart(6)} ${String(m.flag).padStart(6)} ${String(m.legacyWouldFail).padStart(6)}`);
   }
@@ -247,7 +247,7 @@ function printSummary(s) {
   for (const l of s.perLevel) console.log(`  Level ${l.level}: ${fmt(l.members)} members x ${fmt(l.reward)} = ${fmt(l.pep)} PEP`);
   console.log(`  TOTAL: ${fmt(s.totalPep)} PEP`);
   console.log(
-    `\nRelease queue (not paid; a reviewer releases them): L6+ ${s.held.HIGH_LEVEL}, account < 30 days ${s.held.NEW_ACCOUNT}, previously rejected ${s.held.PREVIOUSLY_REJECTED}`,
+    `\nApproval queue (not paid until a reviewer approves them): L6+ ${s.held.HIGH_LEVEL}, account < 30 days ${s.held.NEW_ACCOUNT}, previously rejected ${s.held.PREVIOUSLY_REJECTED}`,
   );
   if (s.top.length) {
     console.log(`\nTop ${s.top.length} recipients:`);

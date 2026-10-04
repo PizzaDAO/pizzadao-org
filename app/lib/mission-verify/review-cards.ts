@@ -5,13 +5,14 @@
  * (MISSION_REVIEW_CHANNEL_ID, else the channel named "work"):
  *
  *   - a member's PENDING submission or resubmission,
- *   - an auto-verified completion held for a human release (L6+, a new
+ *   - an auto-verified completion held for a human approval (L6+, a new
  *     Discord account, a previously rejected mission).
  *
  * The card shows the member, level and mission, the evidence (a link, or the
  * image itself), the attempt count, any hold reason, what the verifier saw,
  * duplicate-account signals and the member's flagged completions, with
- * Approve (or Release, for holds) and Reject buttons. The buttons are handled
+ * Approve and Reject buttons (a hold's Approve keeps the `mr:release` id and
+ * is audited as RELEASED). The buttons are handled
  * by /api/discord/interactions (./review-decision.ts).
  *
  * `syncReviewCard(id)` is the one entry point: it renders the completion's
@@ -36,6 +37,7 @@ import { resolveChannelId } from '../discord-channels'
 import { editDiscordMessage, postDiscordMessage } from '../discord-rest'
 import { makeEmbed, type Embed, type EmbedField, type Tone } from '../discord-interactions/embeds'
 import { attemptsSoFar, MAX_MISSION_ATTEMPTS } from '../missions'
+import { CHECK_ID_KEYS, mentionFor } from './check-labels'
 import { HOLD_LABEL } from './policy'
 import { getSignalViews, type AccountSignalView } from './review-extras'
 import { reviewButtonId, type CardRef } from './review-ids'
@@ -68,7 +70,7 @@ export interface ReviewCardView {
   reviewedBy: string | null
   reviewedAt: Date | null
   reviewNote: string | null
-  /** The last human / automatic decision event, to tell "Released" from "Approved". */
+  /** The last human / automatic decision event (a hold's approval is audited as RELEASED). */
   decision: 'APPROVED' | 'RELEASED' | 'REJECTED' | 'AUTO_APPROVED' | null
   checkResult: Prisma.JsonValue | null
   reviewMsgId: string | null
@@ -148,8 +150,15 @@ export function checkLines(check: Prisma.JsonValue | null): string | null {
   const lines: string[] = []
   for (const [k, v] of Object.entries(check)) {
     if (v === null || v === undefined) continue
-    const value = typeof v === 'object' ? JSON.stringify(v) : String(v)
-    lines.push(`${escapeMd(k)}: ${escapeMd(clip(value, 120))}`)
+    const kind = CHECK_ID_KEYS[k]
+    const ids = kind && kind !== 'message' ? (Array.isArray(v) ? v : [v]).filter((x): x is string => typeof x === 'string' && /^\d{5,25}$/.test(x)) : []
+    if (ids.length) {
+      // Discord IDs as mentions, which Discord renders as role / channel / member names.
+      lines.push(`${escapeMd(k)}: ${ids.slice(0, 10).map((id) => mentionFor(kind, id)).join(', ')}`)
+    } else {
+      const value = typeof v === 'object' ? JSON.stringify(v) : String(v)
+      lines.push(`${escapeMd(k)}: ${escapeMd(clip(value, 120))}`)
+    }
     if (lines.length >= 6) break
   }
   return lines.length ? clip(lines.join('\n'), 1000) : null
@@ -170,7 +179,7 @@ function decisionLine(v: ReviewCardView): string | null {
   const auto = !v.reviewedBy || v.reviewedBy.startsWith('auto:') || v.reviewedBy === 'auto'
   if (v.status === 'APPROVED') {
     if (auto) return `✅ Verified automatically${when}`
-    return `✅ ${v.decision === 'RELEASED' ? 'Released' : 'Approved'} by <@${v.reviewedBy}>${when}`
+    return `✅ Approved by <@${v.reviewedBy}>${when}`
   }
   return `❌ Rejected by ${auto ? 'the verifier' : `<@${v.reviewedBy}>`}${when}`
 }
@@ -180,10 +189,10 @@ export function renderReviewCard(v: ReviewCardView, opts: { appUrl: string }): C
   const decided = v.status !== 'PENDING'
   const label = missionLabel(v)
   let tone: Tone = 'cooldown'
-  let headline = v.holdReason ? `Auto-verified, awaiting release: ${label}` : `Needs review: ${label}`
+  let headline = v.holdReason ? `Auto-verified, needs approval: ${label}` : `Needs review: ${label}`
   if (v.status === 'APPROVED') {
     tone = 'success'
-    headline = `${v.decision === 'RELEASED' ? 'Released' : 'Approved'}: ${label}`
+    headline = `Approved: ${label}`
   } else if (v.status === 'REJECTED') {
     tone = 'error'
     headline = `Rejected: ${label}`
@@ -195,7 +204,7 @@ export function renderReviewCard(v: ReviewCardView, opts: { appUrl: string }): C
   if (decision) body.push('', decision)
 
   const fields: EmbedField[] = [{ name: 'Evidence', value: evidenceField(v.evidence) }]
-  if (v.holdReason) fields.push({ name: 'Release needed', value: HOLD_LABEL[v.holdReason] })
+  if (v.holdReason) fields.push({ name: 'Approval needed', value: HOLD_LABEL[v.holdReason] })
   const checks = checkLines(v.checkResult)
   if (checks) fields.push({ name: 'Verifier saw', value: checks })
   if (v.signals.length) {
@@ -219,7 +228,7 @@ export function renderReviewCard(v: ReviewCardView, opts: { appUrl: string }): C
 
   const buttons = [
     v.holdReason && !decided
-      ? { type: 2, style: 3, label: 'Release', custom_id: reviewButtonId('release', v.id) }
+      ? { type: 2, style: 3, label: 'Approve', custom_id: reviewButtonId('release', v.id) }
       : { type: 2, style: 3, label: 'Approve', custom_id: reviewButtonId('approve', v.id) },
     { type: 2, style: 4, label: 'Reject', custom_id: reviewButtonId('reject', v.id) },
   ].map((b) => (decided ? { ...b, disabled: true } : b))

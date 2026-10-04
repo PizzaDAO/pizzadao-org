@@ -5,12 +5,18 @@ import { HOLD_LABEL } from '@/app/lib/mission-verify/policy'
 import { missionReviewScope } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
-import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
+import { loadReviewLabels } from '@/app/lib/mission-verify/review-labels'
 import { getFlaggedCompletions, getSignalViews } from '@/app/lib/mission-verify/review-extras'
 import { isAllGreen } from '@/app/lib/mission-verify/precheck'
 import { approvalNeedsNote } from '@/app/lib/mission-verify/review-ids'
 
 export const runtime = 'nodejs'
+
+/** A person on the review panel: a display name instead of a bare Discord ID. */
+export type ReviewPerson = { name: string; discordId: string; memberId?: string; handle?: string; avatarUrl?: string }
+
+/** A Phase 4 pre-check (semi verifier / link preview), rendered by the panel itself. */
+const isPreCheck = (r: unknown) => !!r && typeof r === 'object' && Array.isArray((r as { checks?: unknown }).checks)
 
 // GET - List the pending mission submissions this reviewer may review
 // (L1–L7 for admins / DPR / Pizza Capo / Pepperoni Mafia, L8 for DPR only),
@@ -31,23 +37,37 @@ const GET_HANDLER = async () => {
     p => canReviewLevel(p.mission.level) && p.discordId !== session.discordId,
   )
 
-  // Resolve Discord IDs to member names
   const uniqueDiscordIds = [...new Set(pending.map(p => p.discordId))]
-  const memberLookups = await Promise.all(
-    uniqueDiscordIds.map(async (did) => {
-      const member = await fetchMemberByDiscordId(did)
-      return [did, member?.name ?? null] as const
-    })
-  )
-  const nameMap = new Map(memberLookups)
 
   // Reviewer information only (never blocks): duplicate-account signals for
   // these members, and approved missions flagged because the state was lost.
   const [flaggedAll, signals] = await Promise.all([getFlaggedCompletions(), getSignalViews(uniqueDiscordIds)])
   const flagged = flaggedAll.filter(f => canReviewLevel(f.mission.level) && f.discordId !== session.discordId)
 
+  // Names instead of Discord IDs (sheet → Discord → raw ID), and role / channel
+  // names for what the verifiers saw, in one parallel batch.
+  const autoChecks = pending.map(p => (isPreCheck(p.checkResult) ? null : p.checkResult ?? null))
+  const labels = await loadReviewLabels({
+    people: [
+      ...pending.map(p => ({ discordId: p.discordId, memberId: p.memberId })),
+      ...[...signals.values()].flat().flatMap(s => s.others.map(discordId => ({ discordId }))),
+      ...flagged.map(f => ({ discordId: f.discordId })),
+    ],
+    checks: autoChecks,
+  })
+  const personView = (discordId: string, memberId?: string | null): ReviewPerson => {
+    const l = labels.person(discordId, memberId)
+    return {
+      name: l.name,
+      discordId,
+      ...(l.memberId ? { memberId: l.memberId } : {}),
+      ...(l.handle ? { handle: l.handle } : {}),
+      ...(l.avatarUrl ? { avatarUrl: l.avatarUrl } : {}),
+    }
+  }
+
   return NextResponse.json({
-    submissions: pending.map(p => {
+    submissions: pending.map((p, i) => {
       // Rejection history: RESUBMITTED / REOPENED events, plus legacy Phase 0 notes blocks.
       const { memberNotes, history } = reviewHistory(p.notes, p.events ?? [])
       return {
@@ -55,7 +75,7 @@ const GET_HANDLER = async () => {
         missionId: p.missionId,
         discordId: p.discordId,
         memberId: p.memberId,
-        memberName: nameMap.get(p.discordId) ?? null,
+        submitter: personView(p.discordId, p.memberId),
         evidence: p.evidence,
         notes: memberNotes,
         // Earlier rejections of this same submission (it was resubmitted).
@@ -66,11 +86,13 @@ const GET_HANDLER = async () => {
         holdReason: p.holdReason ?? null,
         holdLabel: p.holdReason ? HOLD_LABEL[p.holdReason] : null,
         checkResult: p.checkResult ?? null,
+        // What an automatic verifier saw, with role / channel / member names instead of IDs.
+        checkItems: autoChecks[i] ? labels.describe(autoChecks[i]) : [],
         // Semi-automatic pre-checks all passed: offered for bulk approve.
         allGreen: isAllGreen(p.checkResult),
         // A manual "Invite a friend": approving needs a note (who they invited).
         noteRequired: approvalNeedsNote({ verifierKey: p.mission.verifierKey, holdReason: p.holdReason }),
-        accountSignals: signals.get(p.discordId) ?? [],
+        accountSignals: (signals.get(p.discordId) ?? []).map(sig => ({ ...sig, othersLabeled: sig.others.map(d => personView(d)) })),
         submittedAt: p.submittedAt.toISOString(),
         mission: {
           title: p.mission.title,
@@ -81,7 +103,7 @@ const GET_HANDLER = async () => {
         },
       }
     }),
-    flagged,
+    flagged: flagged.map(f => ({ ...f, member: personView(f.discordId) })),
   })
 }
 

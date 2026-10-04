@@ -109,7 +109,7 @@ export function renderSlaDigest(items: OverdueItem[], opts: { guildId: string | 
       it.reviewMsgId && it.reviewChannelId && opts.guildId
         ? `https://discord.com/channels/${opts.guildId}/${it.reviewChannelId}/${it.reviewMsgId}`
         : `${opts.appUrl}/missions`
-    const hold = it.holdReason ? ' · awaiting release' : ''
+    const hold = it.holdReason ? ' · needs approval' : ''
     return `**${missionLabel(it)}** · <@${it.discordId}> · waiting ${fmtWait(it.waitingMs)}${hold} · [review](<${link}>)`
   })
   const more = items.length > DIGEST_MAX_LINES ? `\n…and ${items.length - DIGEST_MAX_LINES} more in [the app](<${opts.appUrl}/missions>).` : ''

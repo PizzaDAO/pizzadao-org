@@ -52,6 +52,18 @@ const SHOP_ADMIN_MEMBER = {
 const MEMBERS = [NEW_MEMBER, COMPLETE_MEMBER, SHOP_ADMIN_MEMBER];
 
 /**
+ * In the (fake) guild but NOT in the members sheet, like the held L6/L7 role
+ * holders from the mission backfill. The review panel must name them from
+ * Discord (nickname), not show the raw ID.
+ */
+const DISCORD_ONLY_MEMBER = {
+  discordId: "100000000000990009",
+  username: "e2e-discord-only",
+  name: "E2E Discord-only Diavola",
+  discordRoles: ["823266914834841610"], // Pepperoni Mafia
+};
+
+/**
  * Dummy DISCORD_GUILD_ID for e2e:local. preload.cjs answers
  * GET discord.com/api/v10/guilds/<this>/members/<fixture discordId> locally
  * (with the fixture's discordRoles) so role-gated pages can be exercised.
@@ -98,6 +110,7 @@ module.exports = {
   COMPLETE_MEMBER,
   SHOP_ADMIN_MEMBER,
   MEMBERS,
+  DISCORD_ONLY_MEMBER,
   FAKE_DISCORD_GUILD_ID,
   TEST_MEMBER_ROWS: { header: DEFAULT_HEADER.map((h) => h ?? ""), rows },
 };

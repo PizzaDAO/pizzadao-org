@@ -25,7 +25,7 @@ if (!["localhost", "127.0.0.1"].includes(host)) {
 }
 
 const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString: url }) });
-const { NEW_MEMBER, COMPLETE_MEMBER, SHOP_ADMIN_MEMBER, MEMBERS } = fixtures;
+const { NEW_MEMBER, COMPLETE_MEMBER, SHOP_ADMIN_MEMBER, DISCORD_ONLY_MEMBER, MEMBERS } = fixtures;
 
 const MISSIONS = [
   // Verifier settings as in app/lib/mission-verify/mission-config.ts (Phase 1).
@@ -33,6 +33,7 @@ const MISSIONS = [
   { level: 2, index: 0, title: "Say hi on a community or crew call", reward: 420, levelTitle: "Pizza Noob", verifierKey: "attendance_count", verifierParams: { min: 1, crews: "any" } },
   { level: 2, index: 1, title: "Post about PizzaDAO", reward: 420, levelTitle: "Pizza Noob", verifierKey: "social_post", verifierParams: { minReplies: 3, minLikes: 10, platforms: ["x", "farcaster"] }, proofKind: "URL" },
   { level: 3, index: 0, title: "Share your community in #show-and-tell", reward: 1337, levelTitle: null, verifierKey: "discord_message", verifierParams: { channelName: "show-and-tell" }, proofKind: "DISCORD_MESSAGE" },
+  { level: 6, index: 0, title: "Join Pepperoni Mafia", reward: 6942, levelTitle: null, verifierKey: "discord_role", verifierParams: { roleIds: ["823266914834841610"] } },
 ];
 
 async function main() {
@@ -41,7 +42,7 @@ async function main() {
 
   // Reset test members.
   await prisma.notification.deleteMany({ where: { recipientId: { in: discordIds } } });
-  await prisma.missionCompletion.deleteMany({ where: { discordId: { in: discordIds } } });
+  await prisma.missionCompletion.deleteMany({ where: { discordId: { in: [...discordIds, DISCORD_ONLY_MEMBER.discordId] } } });
   await prisma.transaction.deleteMany({ where: { userId: { in: discordIds } } });
   await prisma.xAccount.deleteMany({ where: { discordId: { in: discordIds } } });
   await prisma.memberWallet.deleteMany({ where: { memberId: { in: memberIds } } });
@@ -124,6 +125,24 @@ async function main() {
   await prisma.memberProfileExtras.update({
     where: { memberId: COMPLETE_MEMBER.memberId },
     data: { firstMissionCelebratedAt: new Date(), lastCelebratedLevel: 0 },
+  });
+
+  // Review queue (/missions, seen by the Pepperoni Mafia fixture): a sheet
+  // member's submission, and an auto-verified L6 hold from someone who is only
+  // in Discord (named from the guild nickname, role shown by name).
+  await prisma.missionCompletion.create({
+    data: { missionId: l1.id, discordId: NEW_MEMBER.discordId, memberId: NEW_MEMBER.memberId, status: "PENDING", evidence: "https://x.com/e2e_fake/status/1" },
+  });
+  const l6 = await prisma.mission.findUniqueOrThrow({ where: { level_index: { level: 6, index: 0 } } });
+  await prisma.missionCompletion.create({
+    data: {
+      missionId: l6.id,
+      discordId: DISCORD_ONLY_MEMBER.discordId,
+      status: "PENDING",
+      source: "AUTO",
+      holdReason: "HIGH_LEVEL",
+      checkResult: { roleIds: ["823266914834841610"] },
+    },
   });
 
   // Shop (/pep shop, /admin/shop): one item of each kind, a purchase, holdings

@@ -208,3 +208,83 @@ export async function sendDM(
 
   return { success: true }
 }
+
+// ------------------------------------------------------------ display names ---
+
+/** What a person is called in the guild: nickname, global display name, username, avatar. */
+export type GuildMemberProfile = {
+  id: string
+  nick: string | null
+  globalName: string | null
+  username: string | null
+  avatarUrl: string | null
+}
+
+const PROFILE_TTL_MS = 60 * 60 * 1000
+const PROFILE_MISS_TTL_MS = 10 * 60 * 1000
+const PROFILE_CACHE_MAX = 5000
+const profileCache = new Map<string, { profile: GuildMemberProfile | null; at: number }>()
+
+export function clearGuildMemberProfileCache() {
+  profileCache.clear()
+}
+
+function avatarUrlFor(
+  guildId: string,
+  m: { avatar?: string | null; user?: { id: string; avatar?: string | null } },
+): string | null {
+  const uid = m.user?.id
+  if (!uid) return null
+  if (m.avatar) return `https://cdn.discordapp.com/guilds/${guildId}/users/${uid}/avatars/${m.avatar}.png?size=64`
+  if (m.user?.avatar) return `https://cdn.discordapp.com/avatars/${uid}/${m.user.avatar}.png?size=64`
+  return null
+}
+
+/**
+ * A guild member's display names via the bot, cached in memory for an hour
+ * (a "not in the guild" answer for 10 minutes). Returns null when the person
+ * isn't in the guild, Discord isn't configured, or the call fails or times out
+ * (a failure is not cached). Used to label people who aren't in the Crew sheet.
+ */
+export async function fetchGuildMemberProfile(
+  userId: string,
+  opts: { timeoutMs?: number; fetchImpl?: typeof fetch; now?: number } = {},
+): Promise<GuildMemberProfile | null> {
+  if (!/^\d{5,25}$/.test(userId)) return null
+  const now = opts.now ?? Date.now()
+  const hit = profileCache.get(userId)
+  if (hit && now - hit.at < (hit.profile ? PROFILE_TTL_MS : PROFILE_MISS_TTL_MS)) return hit.profile
+
+  const cfg = guildConfig()
+  if (!cfg) return null
+  const { guildId, botToken } = cfg
+  try {
+    const r = await (opts.fetchImpl ?? fetch)(`https://discord.com/api/v10/guilds/${guildId}/members/${userId}`, {
+      headers: { Authorization: `Bot ${botToken}` },
+      cache: "no-store",
+      signal: AbortSignal.timeout(opts.timeoutMs ?? 1500),
+    })
+    let profile: GuildMemberProfile | null = null
+    if (r.ok) {
+      const m = (await r.json()) as {
+        nick?: string | null
+        avatar?: string | null
+        user?: { id: string; username?: string; global_name?: string | null; avatar?: string | null }
+      }
+      profile = {
+        id: userId,
+        nick: m.nick?.trim() || null,
+        globalName: m.user?.global_name?.trim() || null,
+        username: m.user?.username?.trim() || null,
+        avatarUrl: avatarUrlFor(guildId, m),
+      }
+    } else if (r.status !== 404) {
+      return hit?.profile ?? null // transient failure: keep any stale answer, cache nothing
+    }
+    if (profileCache.size >= PROFILE_CACHE_MAX) profileCache.clear()
+    profileCache.set(userId, { profile, at: now })
+    return profile
+  } catch {
+    return hit?.profile ?? null
+  }
+}
