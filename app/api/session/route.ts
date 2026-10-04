@@ -6,6 +6,7 @@ import {
 } from "@/app/lib/sheets/member-repository";
 import { getUserRoles } from "@/app/lib/discord";
 import { canReviewAnyMission } from "@/app/lib/mission-review-access";
+import { canManageShopRoles } from "@/app/lib/shop-admin-auth";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 
 export const runtime = "nodejs";
@@ -49,14 +50,21 @@ export async function GET() {
   // Admin + mission-reviewer status from one guild-roles lookup (fails closed).
   // canReviewMissions (not isAdmin) gates the /missions review panel: the
   // reviewer roles are wider than the admin roles (mission-review-access.ts).
+  // canManageShop: the /add-money rule (admin roles + Pepperoni Mafia), for
+  // the /admin/shop link; the page and its API check it again server-side.
   let canReviewMissions = false;
+  let canManageShop = false;
   try {
     const roles = await getUserRoles(session.discordId);
     isAdmin = roles.some((r) => (ADMIN_ROLE_IDS as readonly string[]).includes(r));
-    canReviewMissions = await canReviewAnyMission(roles);
+    [canReviewMissions, canManageShop] = await Promise.all([
+      canReviewAnyMission(roles),
+      canManageShopRoles(roles),
+    ]);
   } catch {
     isAdmin = false;
     canReviewMissions = false;
+    canManageShop = false;
   }
 
   // PFP is a quick fs check - include it to avoid a separate request
@@ -85,6 +93,7 @@ export async function GET() {
       crews,
       isAdmin,
       canReviewMissions,
+      canManageShop,
     },
     {
       headers: { "Cache-Control": "private, max-age=300" },

@@ -956,3 +956,39 @@ model ItemGrant {
   @@index([discordId])
   @@index([discordId, status])
 }
+
+// ===== SHOP ADMIN (/admin/shop) =====
+
+// What an admin did to the shop. One ShopAdminEvent row per change, written in
+// the same transaction as the change itself (app/lib/shop-admin.ts).
+enum ShopAdminAction {
+  CREATE // new item
+  UPDATE // edited fields (name, description, price, stock, image, flags)
+  HIDE // taken off sale (isAvailable = false); holdings and history stay
+  SHOW // back on sale
+  DELETE // hard delete: only for items never bought, held or granted
+  RESTOCK // stock += n
+  ADJUST_STOCK // stock -= n (shrinkage, correction)
+  GRANT // item given to a member (also an ItemGrant row, source "admin")
+  REMOVE // item taken out of a member's inventory
+}
+
+// Audit log for /admin/shop. No FK to ShopItem on purpose: the row (with its
+// item name snapshot) must survive a hard delete of the item.
+model ShopAdminEvent {
+  id        Int             @id @default(autoincrement())
+  actorId   String // Discord ID of the admin
+  action    ShopAdminAction
+  itemId    Int?
+  itemName  String // name at the time of the change
+  targetId  String? // member Discord ID (GRANT / REMOVE)
+  quantity  Int? // units granted / removed / restocked / adjusted
+  before    Json?
+  after     Json?
+  reason    String?
+  createdAt DateTime        @default(now())
+
+  @@index([createdAt])
+  @@index([itemId, createdAt])
+  @@index([targetId])
+}

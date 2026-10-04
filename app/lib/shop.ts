@@ -175,6 +175,14 @@ export async function removeFromInventory(userId: string, itemId: number, quanti
 }
 
 // ===== Sync from Google Sheets =====
+//
+// RETIRED: the shop is managed at /admin/shop (app/lib/shop-admin.ts). POST
+// /api/shop/sync is a no-op unless SHOP_SHEET_SYNC_ENABLED=1, so a stray
+// Apps Script push can't overwrite admin edits.
+
+/** The sheet sync only runs when SHOP_SHEET_SYNC_ENABLED is exactly "1". */
+export const shopSheetSyncEnabled = (env: Record<string, string | undefined> = process.env) =>
+  env.SHOP_SHEET_SYNC_ENABLED?.trim() === '1'
 
 interface ShopItemData {
   name: string
@@ -275,52 +283,6 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
 }
 
 // ===== Admin Functions =====
-
-/**
- * Add a new item to the shop (admin only)
- */
-export async function addShopItem(
-  name: string,
-  price: number,
-  description?: string,
-  quantity = -1
-) {
-  return prisma.shopItem.create({
-    data: {
-      name,
-      price,
-      description,
-      quantity,
-      isAvailable: true
-    }
-  })
-}
-
-/**
- * Update a shop item (admin only)
- */
-export async function updateShopItem(
-  itemId: number,
-  data: {
-    name?: string
-    price?: number
-    description?: string
-    quantity?: number
-    isAvailable?: boolean
-  }
-) {
-  return prisma.shopItem.update({
-    where: { id: itemId },
-    data
-  })
-}
-
-/**
- * Remove a shop item (admin only)
- */
-export async function removeShopItem(itemId: number) {
-  return prisma.shopItem.update({
-    where: { id: itemId },
-    data: { isAvailable: false }
-  })
-}
+//
+// Item create / edit / hide / restock / delete and admin grants live in
+// app/lib/shop-admin.ts: every change there is audited (ShopAdminEvent).

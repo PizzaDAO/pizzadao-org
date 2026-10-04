@@ -32,7 +32,8 @@ type NavLabelKey =
   | "nfts"
   | "poaps"
   | "print"
-  | "support";
+  | "support"
+  | "shopAdmin";
 
 type NavItem = {
   href: string;
@@ -41,6 +42,8 @@ type NavItem = {
   /** Custom active-state matcher; defaults to exact-or-prefix match. */
   match?: (pathname: string) => boolean;
   membersOnly?: boolean;
+  /** Only for members who may manage the shop (session.canManageShop). */
+  shopAdminOnly?: boolean;
 };
 
 const PRIMARY: NavItem[] = [
@@ -66,6 +69,7 @@ const MORE: NavItem[] = [
   { href: "/poaps", labelKey: "poaps" },
   { href: "/print", labelKey: "print" },
   { href: "/support", labelKey: "support" },
+  { href: "/admin/shop", labelKey: "shopAdmin", shopAdminOnly: true },
 ];
 
 /** Routes where the onboarding wizard is full-screen and owns the chrome. */
@@ -118,7 +122,8 @@ export default function SiteHeader() {
   const loggedIn = !!session?.authenticated;
   const dashboardHref = session?.memberId ? `/dashboard/${session.memberId}` : "/";
   const primary = PRIMARY.filter((i) => !i.membersOnly || loggedIn);
-  const moreActive = MORE.some((i) => isActive(i, pathname));
+  const more = MORE.filter((i) => !i.shopAdminOnly || !!session?.canManageShop);
+  const moreActive = more.some((i) => isActive(i, pathname));
   const dashboardActive = pathname.startsWith("/dashboard/");
 
   const linkClass = (active: boolean) =>
@@ -205,7 +210,7 @@ export default function SiteHeader() {
                   boxShadow: "var(--shadow-lifted)",
                 }}
               >
-                {MORE.map((item) => {
+                {more.map((item) => {
                   const active = isActive(item, pathname);
                   return (
                     <li key={item.href}>
@@ -342,7 +347,7 @@ export default function SiteHeader() {
             <div className="rule-warm my-3" />
             <p className="overline m-0 mb-1 text-foreground/55">{t("more")}</p>
             <ul className="m-0 grid list-none grid-cols-2 gap-x-4 p-0">
-              {MORE.map((item) => {
+              {more.map((item) => {
                 const active = isActive(item, pathname);
                 return (
                   <li key={item.href}>

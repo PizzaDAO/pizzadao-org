@@ -1,29 +1,13 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { put } from '@vercel/blob'
-import { randomBytes } from 'crypto'
 import { getSession } from '@/app/lib/session'
 import { hasAnyRole } from '@/app/lib/discord'
 import { ARTICLE_AUTHOR_ROLE_IDS } from '@/app/ui/constants'
-import { sniffImageFile } from '@/app/lib/image-sniff'
+import { fileFromForm, uploadImageToBlob } from '@/app/lib/blob-image-upload'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
-import {
-  UnauthorizedError,
-  ForbiddenError,
-  ValidationError,
-} from '@/app/lib/errors/api-errors'
+import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
-
-const MAX_BYTES = 5 * 1024 * 1024 // 5 MB
-
-function sanitizeBase(name: string): string {
-  // Strip extension, replace disallowed chars, truncate, fallback to 'image'
-  const withoutExt = name.replace(/\.[^.]+$/, '')
-  const cleaned = withoutExt.replace(/[^a-zA-Z0-9_-]+/g, '-').replace(/^-+|-+$/g, '')
-  const truncated = cleaned.slice(0, 60)
-  return truncated || 'image'
-}
 
 // POST /api/articles/upload - Upload an image for an article (role-gated)
 const POST_HANDLER = async (request: NextRequest) => {
@@ -37,50 +21,11 @@ const POST_HANDLER = async (request: NextRequest) => {
     throw new ForbiddenError('You do not have permission to upload article images')
   }
 
-  const formData = await request.formData()
-  const fileField = formData.get('file')
-
-  if (!(fileField instanceof File)) {
-    throw new ValidationError('Missing file field in upload', 'file')
-  }
-
-  const file = fileField
-
-  // Size limits
-  if (file.size === 0) {
-    throw new ValidationError('File is empty', 'file')
-  }
-  if (file.size > MAX_BYTES) {
-    throw new ValidationError('File too large. Max 5 MB.', 'file')
-  }
-
-  // Identify the image by its magic bytes, not the client-supplied file.type.
-  // Only PNG/JPEG/GIF/WebP are accepted (deliberately no SVG).
-  const sniffed = await sniffImageFile(file)
-  if (!sniffed) {
-    throw new ValidationError(
-      'Unsupported file type. Use PNG, JPEG, WebP, or GIF.',
-      'file'
-    )
-  }
-  const { ext, mime } = sniffed
-
-  const safeBase = sanitizeBase(file.name || 'image')
-  const timestamp = Date.now()
-  const rand = randomBytes(3).toString('hex')
-  const key = `articles/${session.discordId}/${timestamp}-${rand}-${safeBase}.${ext}`
-
-  const blob = await put(key, file, {
-    access: 'public',
-    addRandomSuffix: false,
-    contentType: mime,
-  })
-
-  return NextResponse.json({
-    url: blob.url,
-    pathname: blob.pathname,
-    filename: `${safeBase}.${ext}`,
-  })
+  const file = fileFromForm(await request.formData())
+  // Size and real image type (magic bytes; PNG/JPEG/GIF/WebP, no SVG) are
+  // checked in uploadImageToBlob.
+  const uploaded = await uploadImageToBlob(file, `articles/${session.discordId}`)
+  return NextResponse.json(uploaded)
 }
 
 export const POST = withErrorHandling(POST_HANDLER)

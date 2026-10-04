@@ -6,6 +6,7 @@ import { resolve } from 'node:path';
 // it seeds two synthetic members and mints their session cookies.
 //   990001 — new member, profile 0/3 complete
 //   990002 — complete member (crew + wallet + X), celebration not yet shown
+//   990003 — shop admin (Pepperoni Mafia role via the fake guild lookup in preload.cjs)
 // Nothing here writes to Google Sheets or Discord; the network guard in
 // e2e/local/preload.cjs would block it anyway.
 
@@ -193,6 +194,58 @@ test.describe('logged-in (new member 990001)', () => {
     await page.goto('/admin/roster-audit');
     await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible({ timeout: 60_000 });
     await shot(page, info, 'admin-roster-audit', diag);
+  });
+
+  test('shop admin denies non-admins and is not in their menu', async ({ page }, info) => {
+    const diag = watch(page);
+    await page.goto('/admin/shop');
+    await expect(page.getByRole('heading', { name: 'Access Denied' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByText('E2E Rare Pizza Box')).toHaveCount(0);
+    await shot(page, info, 'admin-shop-denied', diag);
+    const res = await page.request.get('/api/admin/shop');
+    expect(res.status()).toBe(403);
+    if (info.project.name === 'desktop') {
+      await page.goto('/missions');
+      await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /More/ }).click();
+      await expect(page.locator('#site-nav-more').getByRole('link', { name: 'Manuals' })).toBeVisible();
+      await expect(page.locator('#site-nav-more').getByRole('link', { name: 'Shop admin' })).toHaveCount(0);
+    }
+  });
+});
+
+test.describe('shop admin (Pepperoni Mafia member 990003)', () => {
+  const ADMIN = SESSIONS['990003'];
+  test.beforeEach(async ({ context }) => login(context, ADMIN));
+
+  test('/admin/shop: item list, More-menu link, create an item, audit log', async ({ page }, info) => {
+    const diag = watch(page);
+    await page.goto('/admin/shop');
+    await expect(page.getByRole('heading', { name: 'Shop admin' })).toBeVisible({ timeout: 60_000 });
+    await expect(page.getByRole('heading', { name: 'E2E Rare Pizza Box' })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'E2E Molto Benny Pin' })).toBeVisible();
+    await settle(page);
+    await expectNoCrash(page);
+    await shot(page, info, 'admin-shop', diag);
+
+    if (info.project.name === 'desktop') {
+      await page.getByRole('navigation', { name: 'Main' }).getByRole('button', { name: /More/ }).click();
+      await expect(page.locator('#site-nav-more').getByRole('link', { name: 'Shop admin' })).toHaveAttribute('href', '/admin/shop', { timeout: 30_000 });
+      await page.keyboard.press('Escape');
+    }
+
+    const name = `E2E Hat ${info.project.name} ${Date.now() % 100000}`;
+    await page.getByRole('button', { name: /New item/ }).click();
+    const dialog = page.getByRole('dialog', { name: 'New item' });
+    await dialog.getByLabel('Name').fill(name);
+    await dialog.getByLabel('Price ($PEP)').fill('42');
+    await shot(page, info, 'admin-shop-new-item', diag);
+    await dialog.getByRole('button', { name: 'Create item' }).click();
+    await expect(page.getByText(`Created ${name}.`)).toBeVisible({ timeout: 30_000 });
+    await expect(page.getByRole('heading', { name })).toBeVisible();
+    await expect(page.locator('ol li').filter({ hasText: name }).filter({ hasText: 'Created' })).toBeVisible();
+    await shot(page, info, 'admin-shop-created', diag);
+    expect(diag.pageErrors, 'uncaught page errors').toEqual([]);
+    expect(diag.dialogs, 'native dialogs').toEqual([]);
   });
 });
 

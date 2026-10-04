@@ -1,12 +1,13 @@
 #!/usr/bin/env node
 // scripts/pep-concurrency-local.mjs — `npm run test:pep-concurrency`
 //
-// Runs the real-Postgres $PEP concurrency suite
-// (app/lib/pep-economy.concurrency.test.ts) against a throwaway local Postgres:
+// Runs the real-Postgres $PEP concurrency suites
+// (app/lib/pep-economy.concurrency.test.ts and the /admin/shop suite,
+// app/lib/shop-admin.concurrency.test.ts) against a throwaway local Postgres:
 //   1. starts postgres:17 in docker on 127.0.0.1:$PEP_IT_PG_PORT (tmpfs, --rm),
 //      or uses PEP_IT_DATABASE_URL if it points at localhost
 //   2. creates the schema with `prisma db push` (same as e2e:local)
-//   3. runs the vitest file with PEP_IT_DATABASE_URL set
+//   3. runs the vitest files with PEP_IT_DATABASE_URL set
 //
 // It never touches production: the URL must be localhost, and the app's Neon
 // adapter is routed to the local socket by e2e/local/preload.cjs's WebSocket shim.
@@ -60,6 +61,6 @@ process.on("exit", cleanup);
 
 const env = { ...process.env, DATABASE_URL: databaseUrl, PEP_IT_DATABASE_URL: databaseUrl, NODE_OPTIONS: "" };
 run("npx", ["prisma", "db", "push", "--accept-data-loss"], { env });
-const r = spawnSync("npx", ["vitest", "run", "app/lib/pep-economy.concurrency.test.ts", ...process.argv.slice(2)], { cwd: ROOT, stdio: "inherit", env });
+const r = spawnSync("npx", ["vitest", "run", "app/lib/pep-economy.concurrency.test.ts", "app/lib/shop-admin.concurrency.test.ts", "--no-file-parallelism", ...process.argv.slice(2)], { cwd: ROOT, stdio: "inherit", env });
 cleanup();
 process.exit(r.status ?? 1);

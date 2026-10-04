@@ -33,7 +33,30 @@ const COMPLETE_MEMBER = {
   xUsername: "e2e_fake_x",
 };
 
-const MEMBERS = [NEW_MEMBER, COMPLETE_MEMBER];
+/**
+ * Shop admin: holds the Pepperoni Mafia role, which may manage the shop
+ * (/admin/shop, same rule as /add-money). Its roles come from the fake guild
+ * member lookup in preload.cjs; every other Discord call stays blocked.
+ */
+const SHOP_ADMIN_MEMBER = {
+  memberId: "990003",
+  discordId: "100000000000990003",
+  username: "e2e-shop-admin",
+  name: "E2E Test Pepperoni",
+  city: "Testville",
+  crews: "",
+  status: "Weekly",
+  discordRoles: ["823266914834841610"], // Pepperoni Mafia (app/ui/constants.ts)
+};
+
+const MEMBERS = [NEW_MEMBER, COMPLETE_MEMBER, SHOP_ADMIN_MEMBER];
+
+/**
+ * Dummy DISCORD_GUILD_ID for e2e:local. preload.cjs answers
+ * GET discord.com/api/v10/guilds/<this>/members/<fixture discordId> locally
+ * (with the fixture's discordRoles) so role-gated pages can be exercised.
+ */
+const FAKE_DISCORD_GUILD_ID = "e2e-local-guild";
 
 const DEFAULT_HEADER = [null, "Status", "Name", "City", "Orgs", "Crews", "Skills", "Telegram", "ENS", "Turtles", "Region", "Notes", "DiscordID", "Wallet", "X"];
 
@@ -73,6 +96,8 @@ module.exports = {
   E2E_MEMBERS_SHEET_ID,
   NEW_MEMBER,
   COMPLETE_MEMBER,
+  SHOP_ADMIN_MEMBER,
   MEMBERS,
+  FAKE_DISCORD_GUILD_ID,
   TEST_MEMBER_ROWS: { header: DEFAULT_HEADER.map((h) => h ?? ""), rows },
 };
