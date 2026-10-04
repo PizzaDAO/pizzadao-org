@@ -356,7 +356,8 @@
     "join": "Únete",
     "openMenu": "Abrir menú",
     "closeMenu": "Cerrar menú",
-    "support": "Soporte"
+    "support": "Soporte",
+    "shopAdmin": "Admin tienda"
   },
   "dashboard": {
     "loading": {

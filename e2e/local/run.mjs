@@ -26,6 +26,9 @@ import { existsSync, readFileSync, writeFileSync, mkdirSync, rmSync } from "node
 import { resolve, dirname } from "node:path";
 import { fileURLToPath } from "node:url";
 import { tmpdir } from "node:os";
+import fixtures from "./fixtures.cjs";
+
+const { FAKE_DISCORD_GUILD_ID } = fixtures;
 
 const ROOT = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const LOCAL_DIR = resolve(ROOT, "e2e/.local");
@@ -131,9 +134,12 @@ const env = {
   ...process.env,
   ...fileEnv,
   // Make sure nothing real leaks in from the shell.
-  DISCORD_BOT_TOKEN: "",
+  // Dummy guild + token so role lookups reach preload.cjs, which answers
+  // guild member GETs for fixture members locally and blocks all other
+  // Discord calls. No real Discord credentials are ever present.
+  DISCORD_BOT_TOKEN: "e2e-fake-bot-token",
   DISCORD_CLIENT_SECRET: "",
-  DISCORD_GUILD_ID: "",
+  DISCORD_GUILD_ID: FAKE_DISCORD_GUILD_ID,
   GOOGLE_SERVICE_ACCOUNT_JSON: "",
   GOOGLE_SHEETS_WEBAPP_URL: "",
   GOOGLE_SHEETS_SHARED_SECRET: "",

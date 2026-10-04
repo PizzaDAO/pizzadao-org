@@ -43,3 +43,22 @@ describe('GET /api/session reviewer flags', () => {
     expect(await flags(new Error('down'))).toEqual({ isAdmin: false, canReviewMissions: false })
   })
 })
+
+describe('GET /api/session canManageShop (the /add-money rule)', () => {
+  const shop = async (roles: string[] | Error) => {
+    if (roles instanceof Error) vi.mocked(getUserRoles).mockRejectedValue(roles)
+    else vi.mocked(getUserRoles).mockResolvedValue(roles)
+    return (await (await GET()).json()).canManageShop
+  }
+
+  it('admins and Pepperoni Mafia may manage the shop', async () => {
+    expect(await shop([ADMIN_ROLE_IDS[0]])).toBe(true)
+    expect(await shop(['823266914834841610'])).toBe(true)
+  })
+
+  it('Pizza Capo (a mission reviewer) and everyone else may not; errors fail closed', async () => {
+    expect(await shop(['839206162837798945'])).toBe(false)
+    expect(await shop(['1234567'])).toBe(false)
+    expect(await shop(new Error('down'))).toBe(false)
+  })
+})

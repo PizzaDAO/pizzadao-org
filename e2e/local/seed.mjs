@@ -25,7 +25,7 @@ if (!["localhost", "127.0.0.1"].includes(host)) {
 }
 
 const prisma = new PrismaClient({ adapter: new PrismaNeon({ connectionString: url }) });
-const { NEW_MEMBER, COMPLETE_MEMBER, MEMBERS } = fixtures;
+const { NEW_MEMBER, COMPLETE_MEMBER, SHOP_ADMIN_MEMBER, MEMBERS } = fixtures;
 
 const MISSIONS = [
   // Verifier settings as in app/lib/mission-verify/mission-config.ts (Phase 1).
@@ -126,7 +126,34 @@ async function main() {
     data: { firstMissionCelebratedAt: new Date(), lastCelebratedLevel: 0 },
   });
 
-  console.log(`[e2e:local] seeded ${MEMBERS.length} test members (${NEW_MEMBER.memberId}, ${COMPLETE_MEMBER.memberId}) and ${MISSIONS.length} missions`);
+  // Shop (/pep shop, /admin/shop): one item of each kind, a purchase, holdings
+  // and a few audit rows by the shop admin fixture.
+  await prisma.inventory.deleteMany({ where: { userId: { in: discordIds } } });
+  await prisma.itemGrant.deleteMany({ where: { discordId: { in: discordIds } } });
+  await prisma.shopAdminEvent.deleteMany({ where: { actorId: SHOP_ADMIN_MEMBER.discordId } });
+  const item = (name, data) => prisma.shopItem.upsert({ where: { name }, create: { name, ...data }, update: data });
+  const box = await item("E2E Rare Pizza Box", { description: "Numbered box from the first print run.", price: 500, quantity: 7, isAvailable: true, isCollectible: false });
+  await item("E2E Pizza Party Hat", { description: "One size fits most.", price: 69, quantity: -1, isAvailable: true, isCollectible: false });
+  const apron = await item("E2E Retired Apron", { description: "Off sale since the last season.", price: 120, quantity: 0, isAvailable: false, isCollectible: false });
+  const pin = await item("E2E Molto Benny Pin", { description: "Carried over from UnbelievaBoat.", price: 1, quantity: -1, isAvailable: false, isCollectible: true });
+  await prisma.transaction.create({
+    data: {
+      userId: SHOP_ADMIN_MEMBER.discordId,
+      type: "SHOP_PURCHASE",
+      amount: -1000,
+      balance: 69,
+      description: `Purchased 2x ${box.name}`,
+      metadata: { itemId: box.id, itemName: box.name, quantity: 2 },
+    },
+  });
+  await prisma.inventory.create({ data: { userId: SHOP_ADMIN_MEMBER.discordId, itemId: box.id, quantity: 2 } });
+  await prisma.inventory.create({ data: { userId: NEW_MEMBER.discordId, itemId: pin.id, quantity: 1 } });
+  const actorId = SHOP_ADMIN_MEMBER.discordId;
+  await prisma.shopAdminEvent.create({ data: { actorId, action: "RESTOCK", itemId: box.id, itemName: box.name, quantity: 5, before: { quantity: 2 }, after: { quantity: 7 }, reason: "Second print run arrived" } });
+  await prisma.shopAdminEvent.create({ data: { actorId, action: "HIDE", itemId: apron.id, itemName: apron.name, before: { isAvailable: true }, after: { isAvailable: false }, reason: "Out of season" } });
+  await prisma.shopAdminEvent.create({ data: { actorId, action: "GRANT", itemId: pin.id, itemName: pin.name, targetId: NEW_MEMBER.discordId, quantity: 1, after: { status: "CREDITED" }, reason: "UB carry-over" } });
+
+  console.log(`[e2e:local] seeded ${MEMBERS.length} test members (${MEMBERS.map((m) => m.memberId).join(", ")}), ${MISSIONS.length} missions and 4 shop items`);
 }
 
 main()

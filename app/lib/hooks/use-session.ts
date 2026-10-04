@@ -14,6 +14,8 @@ export interface SessionData {
   isAdmin: boolean;
   /** May review mission submissions (admins + DPR / Pizza Capo / Pepperoni Mafia). */
   canReviewMissions?: boolean;
+  /** May manage the $PEP shop at /admin/shop (admins + Pepperoni Mafia). */
+  canManageShop?: boolean;
 }
 
 export const LOGGED_OUT_SESSION: SessionData = {
@@ -25,6 +27,7 @@ export const LOGGED_OUT_SESSION: SessionData = {
   crews: [],
   isAdmin: false,
   canReviewMissions: false,
+  canManageShop: false,
 };
 
 /**
