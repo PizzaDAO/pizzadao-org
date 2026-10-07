@@ -48,10 +48,22 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   const { disconnectAsync } = useDisconnect();
   const { openConnectModal } = useConnectModal();
   const [pendingReconnect, setPendingReconnect] = useState(false);
+  // "Latest ref" pattern: kept in sync with isConnected on every render (no
+  // effect needed) so the handleConnectDifferent failsafe below can read the
+  // current value from inside an already-resolved async callback.
+  const isConnectedRef = useRef(isConnected);
+  isConnectedRef.current = isConnected;
   // Tracks the last address that failed to auto-save, so the autoSave
   // effect (which re-fires on every `saving` change) doesn't retry the same
   // address forever on a persistent (non-409) error.
   const lastFailedAddressRef = useRef<string | null>(null);
+  // Tracks the address we've already resolved for this connection (saved
+  // successfully, found already-linked, or server returned 409) so the
+  // autoSave effect — which re-fires whenever `wallets` changes, including
+  // right after we save — doesn't re-show the "already linked" notice for
+  // the wallet it just saved, and doesn't re-show a dismissed notice on
+  // every later refetch.
+  const handledAddressRef = useRef<string | null>(null);
 
   const fetchWallets = useCallback(async () => {
     try {
@@ -86,9 +98,15 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   }, [pendingReconnect, isConnected, openConnectModal]);
 
   // Stale notice from a previous connection shouldn't linger after the
-  // wallet is disconnected.
+  // wallet is disconnected, and a fresh connect (even of the same address)
+  // should get a clean slate: retry a previously-failed save, and
+  // re-evaluate already-linked state.
   useEffect(() => {
-    if (!isConnected) setNotice(null);
+    if (!isConnected) {
+      setNotice(null);
+      lastFailedAddressRef.current = null;
+      handledAddressRef.current = null;
+    }
   }, [isConnected]);
 
   // When user connects via RainbowKit, auto-save the wallet
@@ -101,12 +119,16 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       const addr = connectedAddress.toLowerCase();
       // Don't keep retrying an address that already failed to save.
       if (lastFailedAddressRef.current === addr) return;
+      // Already resolved this address for this connection (saved, already-
+      // linked, or 409) — nothing left to do until it disconnects/changes.
+      if (handledAddressRef.current === addr) return;
 
       // Check if this address is already saved
       const alreadySaved = wallets.some(
         (w) => w.walletAddress.toLowerCase() === addr
       );
       if (alreadySaved) {
+        handledAddressRef.current = addr;
         setNotice(`This wallet (${truncateAddress(connectedAddress)}) is already linked.`);
         return;
       }
@@ -124,12 +146,14 @@ export function WalletManager({ memberId }: WalletManagerProps) {
           }),
         });
         if (res.ok) {
+          handledAddressRef.current = addr;
           lastFailedAddressRef.current = null;
           setNotice(null);
           await fetchWallets();
         } else if (res.status === 409) {
           // Already linked server-side (e.g. stale client list) — treat the
           // same as the alreadySaved case above rather than a silent no-op.
+          handledAddressRef.current = addr;
           setNotice(`This wallet (${truncateAddress(connectedAddress)}) is already linked.`);
           await fetchWallets();
         } else {
@@ -153,7 +177,17 @@ export function WalletManager({ memberId }: WalletManagerProps) {
       await disconnectAsync();
     } catch {
       setPendingReconnect(false);
+      return;
     }
+    // Failsafe: the effect above clears pendingReconnect once isConnected
+    // flips to false and openConnectModal becomes defined. If disconnect
+    // was a no-op (wallet is somehow still connected once it settles) or
+    // the modal never becomes available, don't leave pendingReconnect set
+    // forever — it would pop the connect modal later, unprompted, on some
+    // unrelated render.
+    window.setTimeout(() => {
+      if (isConnectedRef.current) setPendingReconnect(false);
+    }, 1500);
   };
 
   const handleDisconnect = async () => {
