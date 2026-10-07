@@ -1,8 +1,8 @@
 "use client";
 
-import React, { useState, useEffect, useCallback } from "react";
-import { ConnectButton } from "@rainbow-me/rainbowkit";
-import { useAccount } from "wagmi";
+import React, { useState, useEffect, useCallback, useRef } from "react";
+import { ConnectButton, useConnectModal } from "@rainbow-me/rainbowkit";
+import { useAccount, useDisconnect } from "wagmi";
 import { btn, input as inputStyle } from "../shared-styles";
 
 interface Wallet {
@@ -35,6 +35,7 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
   const [showManualAdd, setShowManualAdd] = useState(false);
   const [manualAddress, setManualAddress] = useState("");
   const [manualChain, setManualChain] = useState<"evm" | "solana">("evm");
@@ -44,6 +45,25 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   const [confirmDeleteId, setConfirmDeleteId] = useState<number | null>(null);
 
   const { address: connectedAddress, isConnected } = useAccount();
+  const { disconnectAsync } = useDisconnect();
+  const { openConnectModal } = useConnectModal();
+  const [pendingReconnect, setPendingReconnect] = useState(false);
+  // "Latest ref" pattern: kept in sync with isConnected on every render (no
+  // effect needed) so the handleConnectDifferent failsafe below can read the
+  // current value from inside an already-resolved async callback.
+  const isConnectedRef = useRef(isConnected);
+  isConnectedRef.current = isConnected;
+  // Tracks the last address that failed to auto-save, so the autoSave
+  // effect (which re-fires on every `saving` change) doesn't retry the same
+  // address forever on a persistent (non-409) error.
+  const lastFailedAddressRef = useRef<string | null>(null);
+  // Tracks the address we've already resolved for this connection (saved
+  // successfully, found already-linked, or server returned 409) so the
+  // autoSave effect — which re-fires whenever `wallets` changes, including
+  // right after we save — doesn't re-show the "already linked" notice for
+  // the wallet it just saved, and doesn't re-show a dismissed notice on
+  // every later refetch.
+  const handledAddressRef = useRef<string | null>(null);
 
   const fetchWallets = useCallback(async () => {
     try {
@@ -63,15 +83,55 @@ export function WalletManager({ memberId }: WalletManagerProps) {
     fetchWallets();
   }, [fetchWallets]);
 
+  // RainbowKit's ConnectButton.Custom hands back a no-op openConnectModal
+  // once a wallet is already connected (wagmi persists the connection
+  // across visits), so clicking "Connect Wallet" again silently does
+  // nothing. To let the user switch wallets we disconnect first, then open
+  // the connect modal once RainbowKit's hook gives us a real
+  // openConnectModal back (it becomes defined on the next render after
+  // disconnecting).
+  useEffect(() => {
+    if (pendingReconnect && !isConnected && openConnectModal) {
+      setPendingReconnect(false);
+      openConnectModal();
+    }
+  }, [pendingReconnect, isConnected, openConnectModal]);
+
+  // Stale notice from a previous connection shouldn't linger after the
+  // wallet is disconnected, and a fresh connect (even of the same address)
+  // should get a clean slate: retry a previously-failed save, and
+  // re-evaluate already-linked state.
+  useEffect(() => {
+    if (!isConnected) {
+      setNotice(null);
+      lastFailedAddressRef.current = null;
+      handledAddressRef.current = null;
+    }
+  }, [isConnected]);
+
   // When user connects via RainbowKit, auto-save the wallet
   useEffect(() => {
     async function autoSave() {
-      if (!isConnected || !connectedAddress || saving) return;
+      // Wait for the initial wallet list to load — otherwise `wallets` is
+      // still [] and we'd race a POST before we know the address is saved.
+      if (loading || !isConnected || !connectedAddress || saving) return;
+
+      const addr = connectedAddress.toLowerCase();
+      // Don't keep retrying an address that already failed to save.
+      if (lastFailedAddressRef.current === addr) return;
+      // Already resolved this address for this connection (saved, already-
+      // linked, or 409) — nothing left to do until it disconnects/changes.
+      if (handledAddressRef.current === addr) return;
+
       // Check if this address is already saved
       const alreadySaved = wallets.some(
-        (w) => w.walletAddress.toLowerCase() === connectedAddress.toLowerCase()
+        (w) => w.walletAddress.toLowerCase() === addr
       );
-      if (alreadySaved) return;
+      if (alreadySaved) {
+        handledAddressRef.current = addr;
+        setNotice(`This wallet (${truncateAddress(connectedAddress)}) is already linked.`);
+        return;
+      }
 
       setSaving(true);
       setError(null);
@@ -86,21 +146,58 @@ export function WalletManager({ memberId }: WalletManagerProps) {
           }),
         });
         if (res.ok) {
+          handledAddressRef.current = addr;
+          lastFailedAddressRef.current = null;
+          setNotice(null);
+          await fetchWallets();
+        } else if (res.status === 409) {
+          // Already linked server-side (e.g. stale client list) — treat the
+          // same as the alreadySaved case above rather than a silent no-op.
+          handledAddressRef.current = addr;
+          setNotice(`This wallet (${truncateAddress(connectedAddress)}) is already linked.`);
           await fetchWallets();
         } else {
-          const data = await res.json();
-          if (res.status !== 409) {
-            setError(data.error || "Failed to save wallet");
-          }
+          const data = await res.json().catch(() => ({}) as { error?: string });
+          lastFailedAddressRef.current = addr;
+          setError(data.error || "Failed to save wallet");
         }
       } catch {
+        lastFailedAddressRef.current = addr;
         setError("Failed to save wallet");
       } finally {
         setSaving(false);
       }
     }
     autoSave();
-  }, [isConnected, connectedAddress, wallets, memberId, saving, fetchWallets]);
+  }, [isConnected, connectedAddress, wallets, memberId, saving, loading, fetchWallets]);
+
+  const handleConnectDifferent = async () => {
+    setPendingReconnect(true);
+    try {
+      await disconnectAsync();
+    } catch {
+      setPendingReconnect(false);
+      return;
+    }
+    // Failsafe: the effect above clears pendingReconnect once isConnected
+    // flips to false and openConnectModal becomes defined. If disconnect
+    // was a no-op (wallet is somehow still connected once it settles) or
+    // the modal never becomes available, don't leave pendingReconnect set
+    // forever — it would pop the connect modal later, unprompted, on some
+    // unrelated render.
+    window.setTimeout(() => {
+      if (isConnectedRef.current) setPendingReconnect(false);
+    }, 1500);
+  };
+
+  const handleDisconnect = async () => {
+    try {
+      await disconnectAsync();
+    } catch {
+      // Ignore — wagmi already logs disconnect errors; nothing actionable
+      // for the user here.
+    }
+  };
 
   const handleManualAdd = async () => {
     if (!manualAddress.trim()) return;
@@ -326,6 +423,41 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         </div>
       )}
 
+      {notice && (
+        <div
+          style={{
+            padding: "8px 12px",
+            borderRadius: "var(--radius)",
+            background: "hsl(var(--butter) / 0.15)",
+            border: "1px solid hsl(var(--butter) / 0.45)",
+            color: "hsl(var(--foreground))",
+            fontSize: 13,
+            marginBottom: 12,
+            display: "flex",
+            justifyContent: "space-between",
+            alignItems: "center",
+            gap: 8,
+          }}
+        >
+          <span>{notice}</span>
+          <button
+            onClick={() => setNotice(null)}
+            style={{
+              background: "none",
+              border: "none",
+              cursor: "pointer",
+              fontSize: 14,
+              color: "hsl(var(--foreground))",
+              fontWeight: 700,
+              padding: 0,
+            }}
+            aria-label="Dismiss notice"
+          >
+            ×
+          </button>
+        </div>
+      )}
+
       {/* Wallet list */}
       {wallets.length > 0 && (
         <div style={{ display: "grid", gap: 8, marginBottom: 16 }}>
@@ -536,6 +668,65 @@ export function WalletManager({ memberId }: WalletManagerProps) {
           <div style={{ fontSize: 13, color: "hsl(var(--muted-foreground))" }}>
             Saving wallet…
           </div>
+        ) : isConnected && connectedAddress ? (
+          <>
+            <div
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                padding: "8px 12px",
+                borderRadius: "var(--radius)",
+                border: "1px solid hsl(var(--rule) / 0.22)",
+                background: "hsl(var(--muted))",
+                fontSize: 13,
+                fontFamily: monoFont,
+                color: "hsl(var(--foreground))",
+              }}
+              title={connectedAddress}
+            >
+              Connected: {truncateAddress(connectedAddress)}
+            </div>
+
+            <button
+              onClick={handleConnectDifferent}
+              style={{
+                ...btn("secondary"),
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+              }}
+            >
+              Connect a different wallet
+            </button>
+
+            <button
+              onClick={handleDisconnect}
+              style={{
+                ...btn("secondary"),
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+              }}
+            >
+              Disconnect
+            </button>
+
+            <button
+              onClick={() => setShowManualAdd(!showManualAdd)}
+              style={{
+                ...btn("secondary"),
+                display: "inline-flex",
+                alignItems: "center",
+                gap: 6,
+                fontSize: 13,
+              }}
+            >
+              {showManualAdd ? "Cancel" : "Add Manually"}
+            </button>
+          </>
         ) : (
           <>
             <ConnectButton.Custom>
