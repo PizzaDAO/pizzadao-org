@@ -27,7 +27,7 @@ export async function GET(req: Request) {
   const clientId = process.env.X_CLIENT_ID!;
   const redirectUri = `${url.origin}/api/x/callback`;
 
-  const authUrl = new URL("https://twitter.com/i/oauth2/authorize");
+  const authUrl = new URL("https://x.com/i/oauth2/authorize");
   authUrl.searchParams.set("response_type", "code");
   authUrl.searchParams.set("client_id", clientId);
   authUrl.searchParams.set("redirect_uri", redirectUri);

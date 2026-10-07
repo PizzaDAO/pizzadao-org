@@ -4,7 +4,6 @@ import { verifyXState, encryptToken } from "@/app/lib/x-oauth";
 import { prisma } from "@/app/lib/db";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
-import { internalError } from "@/app/lib/errors/error-response";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 
 export const runtime = "nodejs";
@@ -146,6 +145,11 @@ export async function GET(req: Request) {
     res.cookies.delete("x_pkce_verifier");
     return res;
   } catch (e: unknown) {
-    return internalError(e, "x/callback", "X account linking failed. Please try again.");
+    // Don't return internalError's raw JSON 500 here — this route is hit via
+    // a top-level browser redirect (no client-side fetch to read the JSON),
+    // so a JSON response just renders as an ugly error page. Redirect back
+    // with an error code instead, logging the same way internalError does.
+    console.error("[x/callback]", e);
+    return NextResponse.redirect(new URL("/?x_error=failed", new URL(req.url).origin).toString());
   }
 }
