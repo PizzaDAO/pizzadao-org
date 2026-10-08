@@ -282,15 +282,22 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         setWallets(data.wallets || []);
         setConfirmDeleteId(null);
 
-        // Deleting the currently-connected address must not have the
-        // autoSave effect below see it missing from `wallets` and POST it
-        // straight back. Mark it resolved immediately (closes the race
-        // between this setWallets and disconnectAsync settling), then
-        // disconnect so the UI doesn't keep claiming a "connected" wallet
-        // that's no longer linked to this member. Disconnecting flips
-        // `isConnected` to false, which the effect above resets
+        // Deleting the currently-connected address doesn't disconnect the
+        // wallet itself — wagmi still reports it connected, and without
+        // this block the autoSave effect below would see the address
+        // missing from `wallets` and POST it straight back. Setting
+        // handledAddressRef here is a belt-and-suspenders guard for the
+        // current mount only (it's already set by the time this address
+        // is visible/deletable in the list, and a remount clears it
+        // regardless) — it does NOT survive a page reload. The real fix is
+        // disconnecting: that flips `isConnected` to false, so autoSave's
+        // own top-of-function guard (`!isConnected`) skips it from then on
+        // even after a remount, and it's also what the effect above resets
         // handledAddressRef/lastFailedAddressRef from — so reconnecting
-        // (even the same address) saves it again, fresh.
+        // (even the same address) saves it again, fresh. If the disconnect
+        // call itself fails, the wallet stays connected-but-unlinked and
+        // WILL get re-added on the next page load (handledAddressRef won't
+        // have survived), so tell the user to disconnect it themselves.
         if (
           walletToDelete &&
           connectedAddress &&
@@ -301,8 +308,9 @@ export function WalletManager({ memberId }: WalletManagerProps) {
           try {
             await disconnectAsync();
           } catch {
-            // Ignore — handledAddressRef already blocks the re-add even if
-            // the disconnect call itself fails.
+            setError(
+              "Wallet removed, but it's still connected — disconnect it in your wallet to stop it being re-added.",
+            );
           }
         }
       }

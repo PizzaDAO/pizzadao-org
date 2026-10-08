@@ -113,6 +113,43 @@ describe("WalletManager — delete the connected wallet", () => {
     expect(disconnectAsyncMock).toHaveBeenCalledTimes(1);
   });
 
+  it("shows a warning banner telling the user to disconnect manually if disconnectAsync fails", async () => {
+    const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
+    disconnectAsyncMock.mockRejectedValue(new Error("user rejected"));
+
+    fetchMock.mockImplementation((url: string, init?: RequestInit) => {
+      const method = init?.method || "GET";
+      if (method === "GET") {
+        return Promise.resolve({ ok: true, json: async () => ({ wallets: [walletRow()] }) });
+      }
+      if (method === "DELETE") {
+        return Promise.resolve({ ok: true, json: async () => ({ wallets: [] }) });
+      }
+      return Promise.resolve({ ok: true, json: async () => ({ reward: 0 }) });
+    });
+
+    render(<WalletManager memberId="member-1" />);
+
+    await waitFor(() => {
+      expect(screen.getByText(/already linked/i)).toBeInTheDocument();
+    });
+
+    fireEvent.click(screen.getByTitle("Remove wallet"));
+    fireEvent.click(screen.getByText("Yes"));
+
+    await waitFor(() => {
+      expect(disconnectAsyncMock).toHaveBeenCalledTimes(1);
+    });
+
+    await waitFor(() => {
+      expect(
+        screen.getByText(
+          /still connected.*disconnect it in your wallet/i,
+        ),
+      ).toBeInTheDocument();
+    });
+  });
+
   it("does not disconnect or touch the autoSave guard when deleting a different wallet", async () => {
     const OTHER_ADDRESS = "0xaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa";
     const fetchMock = global.fetch as unknown as ReturnType<typeof vi.fn>;
