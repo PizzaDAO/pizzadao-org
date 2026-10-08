@@ -24,14 +24,19 @@
  *                      `formatDiscordTimestamp` for what each one renders
  *                      as. Rendered as a formatted date/time (in the
  *                      viewer's own locale, via `Intl`) instead of being
- *                      stripped.
+ *                      stripped. UNIX is capped at 13 digits and must also
+ *                      pass `isValidDiscordTimestamp` (roughly ±273,790
+ *                      years from the epoch — the range `Date` can hold);
+ *                      anything out of range is treated as malformed (see
+ *                      below) rather than risk a throw from `Date`/`Intl`
+ *                      downstream.
  *
  * Any other `<...>` that looks like Discord syntax but isn't one of the
- * above — a malformed mention, a malformed timestamp tag (bad style letter,
- * e.g. `<t:123:Z>`), a slash-command mention `</cmd subcommand:id>`, a
- * guide/onboarding tag `<id:customize>`, etc. — is parsed as an "unknown"
- * token and dropped on render. Raw Discord markup should never reach the
- * page.
+ * above — a malformed mention, a malformed timestamp tag (bad style letter
+ * e.g. `<t:123:Z>`, too many digits, or an out-of-range UNIX value), a
+ * slash-command mention `</cmd subcommand:id>`, a guide/onboarding tag
+ * `<id:customize>`, etc. — is parsed as an "unknown" token and dropped on
+ * render. Raw Discord markup should never reach the page.
  */
 
 export type TimestampStyle = "t" | "T" | "d" | "D" | "f" | "F" | "R"
@@ -43,7 +48,7 @@ export type DiscordMarkupToken =
   | { type: "user"; id: string }
   | { type: "emoji"; id: string; name: string; animated: boolean }
   | { type: "link"; href: string; text: string }
-  | { type: "timestamp"; unix: number; style: TimestampStyle }
+  | { type: "timestamp"; unix: number; style: TimestampStyle; raw: string }
   | { type: "unknown"; raw: string }
 
 export interface DiscordMarkupMaps {
@@ -51,6 +56,29 @@ export interface DiscordMarkupMaps {
   channels?: Record<string, string>
   /** role id -> role name (no leading "@") */
   roles?: Record<string, string>
+}
+
+export interface PlainTextOptions {
+  /**
+   * Re-serialize a "timestamp" token back to its original `<t:unix[:style]>`
+   * tag instead of formatting it. For write-time memo storage (e.g. a job
+   * reward ledger memo) so a relative/absolute timestamp isn't frozen at
+   * the moment it's written — display-time rendering (`DiscordText`) still
+   * formats it fresh, every time it's shown.
+   */
+  keepTimestamps?: boolean
+}
+
+// The largest magnitude (in ms) `Date` can represent — ECMA-262 bounds it to
+// ±100,000,000 days from the epoch (±8,640,000,000,000,000 ms, ~±273,790
+// years). Anything outside this throws a RangeError from `Date#toISOString`
+// and `Intl.DateTimeFormat#format`, so a timestamp this large is rejected at
+// parse time instead of risking a throw later during render/plain-text.
+const MAX_TIMESTAMP_MS = 8.64e15
+
+/** Whether `unixSeconds` is safe to format/convert to a `Date` without throwing. */
+export function isValidDiscordTimestamp(unixSeconds: number): boolean {
+  return Number.isFinite(unixSeconds) && Math.abs(unixSeconds) * 1000 <= MAX_TIMESTAMP_MS
 }
 
 const SNOWFLAKE = "\\d{5,25}"
@@ -87,7 +115,7 @@ const TOKEN_RE = new RegExp(
     `<#(${SNOWFLAKE})>`, // <#channelId>
     `<@&(${SNOWFLAKE})>`, // <@&roleId>
     `<@!?(${SNOWFLAKE})>`, // <@userId> / <@!userId>
-    `<t:(\\d+)(?::([tTdDfFR]))?>`, // <t:unix> / <t:unix:STYLE>
+    `<t:(\\d{1,13})(?::([tTdDfFR]))?>`, // <t:unix> / <t:unix:STYLE> (digits capped; see isValidDiscordTimestamp)
     `(https?:\\/\\/[^\\s<>\\[\\]]+)`, // bare url (trimmed below)
     `(<(?:${UNKNOWN_TAG_INNER})>)`, // any other Discord-shaped tag — stripped
   ].join("|"),
@@ -172,11 +200,20 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
     } else if (userId !== undefined) {
       tokens.push({ type: "user", id: userId })
     } else if (timestampUnix !== undefined) {
-      tokens.push({
-        type: "timestamp",
-        unix: Number(timestampUnix),
-        style: (timestampStyle as TimestampStyle | undefined) ?? "f",
-      })
+      const unix = Number(timestampUnix)
+      if (isValidDiscordTimestamp(unix)) {
+        tokens.push({
+          type: "timestamp",
+          unix,
+          style: (timestampStyle as TimestampStyle | undefined) ?? "f",
+          raw: match[0],
+        })
+      } else {
+        // In range for the capped-digits regex (<= 13 digits) but still
+        // too large a UNIX value to safely become a Date — treat the same
+        // as any other malformed timestamp tag.
+        tokens.push({ type: "unknown", raw: match[0] })
+      }
     } else if (rawBareUrl !== undefined) {
       const trimmed = trimTrailingPunctuation(rawBareUrl)
       tokens.push({ type: "link", href: trimmed, text: trimmed })
@@ -246,26 +283,44 @@ function formatRelativeTimestamp(unixSeconds: number, nowMs: number): string {
  * using `Intl` with no explicit locale so it renders in the viewer's own
  * locale (both here and in `DiscordText`'s `<time>` element — same call,
  * same string). `now` is injectable for tests; defaults to `Date.now()`.
+ *
+ * Defensive: `parseDiscordMarkup` already rejects out-of-range values
+ * (anything `Date`/`Intl` could throw on) before a "timestamp" token is
+ * ever created, but this is called directly in a few places, so it
+ * re-checks and falls back to "" (render/flatten as nothing, same as an
+ * unknown tag) instead of risking a throw for any input.
  */
 export function formatDiscordTimestamp(
   unixSeconds: number,
   style: TimestampStyle = "f",
   now: number = Date.now(),
 ): string {
-  if (style === "R") return formatRelativeTimestamp(unixSeconds, now)
-  const date = new Date(unixSeconds * 1000)
-  return new Intl.DateTimeFormat(undefined, TIMESTAMP_DATE_FORMAT_OPTIONS[style]).format(date)
+  if (!isValidDiscordTimestamp(unixSeconds)) return ""
+  try {
+    if (style === "R") return formatRelativeTimestamp(unixSeconds, now)
+    const date = new Date(unixSeconds * 1000)
+    return new Intl.DateTimeFormat(undefined, TIMESTAMP_DATE_FORMAT_OPTIONS[style]).format(date)
+  } catch {
+    return ""
+  }
 }
 
 /**
  * Flatten parsed tokens to a plain-text string — `#name`, `@name`, `@user`,
  * a link's text, `:name:` for an emoji, a formatted date/time for a
- * timestamp, and nothing for a dropped/unknown tag. For use anywhere a
- * description needs to go into an aria-label, title, or other
- * non-visual/plain-text context. `maps` is an optional fallback in case a
- * token wasn't resolved when it was parsed.
+ * timestamp (or, with `opts.keepTimestamps`, the timestamp's original
+ * `<t:unix[:style]>` tag, unresolved — see `PlainTextOptions`), and nothing
+ * for a dropped/unknown tag. For use anywhere a description needs to go
+ * into an aria-label, title, or other non-visual/plain-text context, or
+ * (with `keepTimestamps`) into write-time storage that shouldn't freeze a
+ * timestamp. `maps` is an optional fallback in case a token wasn't resolved
+ * when it was parsed.
  */
-export function discordMarkupToPlainText(tokens: DiscordMarkupToken[], maps: DiscordMarkupMaps = {}): string {
+export function discordMarkupToPlainText(
+  tokens: DiscordMarkupToken[],
+  maps: DiscordMarkupMaps = {},
+  opts: PlainTextOptions = {},
+): string {
   return tokens
     .map((token) => {
       switch (token.type) {
@@ -282,7 +337,7 @@ export function discordMarkupToPlainText(tokens: DiscordMarkupToken[], maps: Dis
         case "link":
           return token.text
         case "timestamp":
-          return formatDiscordTimestamp(token.unix, token.style)
+          return opts.keepTimestamps ? token.raw : formatDiscordTimestamp(token.unix, token.style)
         case "unknown":
           return ""
         default:
@@ -293,8 +348,8 @@ export function discordMarkupToPlainText(tokens: DiscordMarkupToken[], maps: Dis
 }
 
 /** Parse `text` and flatten it to plain text in one step (see `discordMarkupToPlainText`). */
-export function discordTextToPlainText(text: string, maps: DiscordMarkupMaps = {}): string {
-  return discordMarkupToPlainText(parseDiscordMarkup(text, maps), maps)
+export function discordTextToPlainText(text: string, maps: DiscordMarkupMaps = {}, opts: PlainTextOptions = {}): string {
+  return discordMarkupToPlainText(parseDiscordMarkup(text, maps), maps, opts)
 }
 
 /** Channel and role ids mentioned in `text` (deduped), for resolving names. */

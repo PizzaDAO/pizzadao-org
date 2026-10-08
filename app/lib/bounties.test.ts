@@ -82,6 +82,31 @@ describe('createBounty', () => {
     mockFn(getOrCreateEconomy).mockResolvedValue({ id: 'creator-1', wallet: 50 })
     await expect(createBounty('creator-1', 'Expensive task', 100)).rejects.toThrow('Insufficient funds')
   })
+
+  it('resolves a channel mention in the escrow memo while keeping a <t:...> tag raw', async () => {
+    mockFn(prisma.bounty.create).mockResolvedValue({ id: 11 })
+
+    await createBounty('creator-1', 'Due <t:1700000000:R> — see <#123456789012345678>', 100)
+
+    // No Discord bot token configured in tests, so the mention falls back
+    // to "#channel" instead of leaking raw <#id> markup into the ledger;
+    // the timestamp tag is kept raw, not frozen to a formatted string.
+    expect(logTransaction).toHaveBeenCalledWith(
+      prisma,
+      'creator-1',
+      'BOUNTY_ESCROW',
+      -100,
+      'Bounty escrow: Due <t:1700000000:R> — see #channel',
+      { bountyId: 11 },
+    )
+  })
+
+  it('never throws escrowing a bounty whose description has an out-of-range timestamp', async () => {
+    mockFn(prisma.bounty.create).mockResolvedValue({ id: 12 })
+
+    await expect(createBounty('creator-1', 'Due <t:9999999999999>', 100)).resolves.toMatchObject({ id: 12 })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'creator-1', 'BOUNTY_ESCROW', -100, 'Bounty escrow: Due ', { bountyId: 12 })
+  })
 })
 
 describe('claimBounty', () => {
@@ -142,6 +167,14 @@ describe('completeBounty', () => {
   it('should throw ForbiddenError when user is not the creator', async () => {
     mockFn(prisma.bounty.findUnique).mockResolvedValue(CLAIMED)
     await expect(completeBounty('other-user', 10)).rejects.toThrow('Only the bounty creator')
+  })
+
+  it('never throws paying out a bounty whose description has an out-of-range timestamp', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...CLAIMED, description: 'Due <t:9999999999999>' })
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
+
+    await expect(completeBounty('creator-1', 10)).resolves.toMatchObject({ status: 'COMPLETED' })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Due ', { bountyId: 10 })
   })
 })
 

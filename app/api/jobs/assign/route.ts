@@ -48,7 +48,11 @@ export async function POST(request: NextRequest) {
     // throws — a failed Discord lookup just falls back to "#channel"/"@role"
     // instead of a name).
     const { channels, roles } = await resolveDiscordMentions([rawDescription])
-    const description = `Daily job: ${discordTextToPlainText(rawDescription, { channels, roles })}`
+    // keepTimestamps: true — a <t:...> tag in the description shouldn't be
+    // frozen to today's formatted date/relative string at write time; keep
+    // it raw in the stored memo so display-time rendering (DiscordText)
+    // formats it fresh, every time it's shown.
+    const description = `Daily job: ${discordTextToPlainText(rawDescription, { channels, roles }, { keepTimestamps: true })}`
     const awarded = await recordDailyJobCompletion(session.discordId, jobId, JOB_REWARD_AMOUNT, description)
     if (!awarded) {
       return NextResponse.json({ error: 'You have already completed this job today' }, { status: 400 })

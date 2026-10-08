@@ -1,5 +1,5 @@
 import { describe, it, expect } from "vitest";
-import { render, screen, fireEvent } from "@testing-library/react";
+import { render, screen, fireEvent, cleanup } from "@testing-library/react";
 import { DiscordText } from "./DiscordText";
 import { formatDiscordTimestamp } from "@/app/lib/discord-markup";
 
@@ -105,6 +105,20 @@ describe("DiscordText", () => {
         expect(container.querySelector("time")).not.toBeNull();
         expect(container.textContent).not.toMatch(/<t:/);
         unmount();
+      }
+    });
+
+    it("never throws on an out-of-range timestamp and strips it instead of rendering a <time>", () => {
+      for (const text of [
+        "due <t:9999999999999> soon", // 13 digits, past the safe Date range
+        "due <t:99999999999999:R> soon", // 14 digits, past the regex's digit cap
+        `due <t:${"9".repeat(400)}> soon`, // absurdly long
+      ]) {
+        expect(() => render(<DiscordText text={text} />)).not.toThrow();
+        expect(document.querySelector("time")).toBeNull();
+        expect(screen.getByText(/due/)).toBeInTheDocument();
+        expect(screen.getByText(/soon/)).toBeInTheDocument();
+        cleanup();
       }
     });
   });
