@@ -418,7 +418,19 @@ body::before {
   opacity: 0.11;
 }
 .paper-soft-dark::after { display: none; }
-.paper-soft > * { position: relative; z-index: 1; }
+/*
+ * Lift direct children above the paper-grain ::before/::after (which sit at
+ * z-index: 0). This must live inside the `components` layer — Tailwind's
+ * `@import "tailwindcss"` declares layer order theme < base < components <
+ * utilities, so anything here loses to a `position`/`z-index` utility
+ * (absolute, fixed, sticky, z-*) on the same element regardless of source
+ * order or specificity. Left unlayered, this rule would silently beat those
+ * utilities on any direct child of a `.paper-soft` element (it did — see
+ * JobCard, PR #158).
+ */
+@layer components {
+  .paper-soft > * { position: relative; z-index: 1; }
+}
 
 /* Ultra-light photocopy toner-fleck noise */
 .print-noise {
@@ -435,7 +447,10 @@ body::before {
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='pn'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23pn)'/></svg>");
 }
-.print-noise > * { position: relative; z-index: 1; }
+/* Same reasoning as `.paper-soft > *` above — layered so Tailwind position/z-index utilities win. */
+@layer components {
+  .print-noise > * { position: relative; z-index: 1; }
+}
 
 /* Soft halftone dot field */
 .halftone-soft {
@@ -453,7 +468,10 @@ body::before {
   background-image: radial-gradient(hsl(var(--ink)) 0.6px, transparent 1.1px);
   background-size: 6px 6px;
 }
-.halftone-soft > * { position: relative; z-index: 1; }
+/* Same reasoning as `.paper-soft > *` above — layered so Tailwind position/z-index utilities win. */
+@layer components {
+  .halftone-soft > * { position: relative; z-index: 1; }
+}
 
 /* Soft ink-bleed gradient on edges of dark blocks */
 .ink-spread {
@@ -471,7 +489,10 @@ body::before {
     radial-gradient(120% 80% at 10% 0%, hsl(var(--tomato) / 0.06), transparent 55%),
     radial-gradient(110% 70% at 90% 100%, hsl(var(--butter) / 0.05), transparent 55%);
 }
-.ink-spread > * { position: relative; z-index: 1; }
+/* Same reasoning as `.paper-soft > *` above — layered so Tailwind position/z-index utilities win. */
+@layer components {
+  .ink-spread > * { position: relative; z-index: 1; }
+}
 
 /* Cycling reveal helper used by NameStep CyclingStage */
 @keyframes cycleBlurIn {

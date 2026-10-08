@@ -268,6 +268,10 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   const handleDelete = async (walletId: number) => {
     setError(null);
     try {
+      // Captured before the request so we can tell afterwards whether the
+      // wallet being deleted is the one wagmi currently reports as
+      // connected — deleting it doesn't disconnect the wallet itself.
+      const walletToDelete = wallets.find((w) => w.id === walletId);
       const res = await fetch("/api/wallet", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -277,6 +281,30 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         const data = await res.json();
         setWallets(data.wallets || []);
         setConfirmDeleteId(null);
+
+        // Deleting the currently-connected address must not have the
+        // autoSave effect below see it missing from `wallets` and POST it
+        // straight back. Mark it resolved immediately (closes the race
+        // between this setWallets and disconnectAsync settling), then
+        // disconnect so the UI doesn't keep claiming a "connected" wallet
+        // that's no longer linked to this member. Disconnecting flips
+        // `isConnected` to false, which the effect above resets
+        // handledAddressRef/lastFailedAddressRef from — so reconnecting
+        // (even the same address) saves it again, fresh.
+        if (
+          walletToDelete &&
+          connectedAddress &&
+          walletToDelete.walletAddress.toLowerCase() ===
+            connectedAddress.toLowerCase()
+        ) {
+          handledAddressRef.current = connectedAddress.toLowerCase();
+          try {
+            await disconnectAsync();
+          } catch {
+            // Ignore — handledAddressRef already blocks the re-add even if
+            // the disconnect call itself fails.
+          }
+        }
       }
     } catch {
       setError("Failed to delete wallet");
