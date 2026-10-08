@@ -9,6 +9,19 @@
 // Channel/role id -> name maps and the guild id come from the API that
 // served the text (see app/lib/discord-mention-resolve.ts) so this
 // component never needs the bot token.
+//
+// `interactive` (default true) controls whether channel mentions / links
+// render as real anchors:
+//   - true: real <a> elements. The anchors set `pointerEvents: "auto"` so
+//     they keep working when a consumer wraps the whole description in a
+//     `pointer-events: none` layer to implement a "stretched button" (the
+//     rest of a card is one big click target; only these anchors should
+//     intercept the click) — see app/ui/jobs/JobCard.tsx.
+//   - false: styled <span>s, not links. Use this when the description
+//     already sits inside another link/button that is the card's single
+//     click target (e.g. the Discover dashboard preview tiles, which link
+//     the whole tile to /pep) — nesting a real anchor in there would be
+//     invalid HTML and fight the outer click target.
 
 import React from "react";
 import { parseDiscordMarkup } from "@/app/lib/discord-markup";
@@ -21,6 +34,8 @@ export type DiscordTextProps = {
   roles?: Record<string, string>;
   /** guild id, used to build discord.com/channels/<guild>/<id> links */
   guildId?: string | null;
+  /** render channel mentions/links as real anchors (default true) */
+  interactive?: boolean;
   className?: string;
 };
 
@@ -72,16 +87,14 @@ function DiscordEmoji({ id, name, animated }: { id: string; name: string; animat
   );
 }
 
-// Job/bounty descriptions render inside other clickable elements (the whole
-// JobCard is a <button>; the Discover preview tiles are wrapped in a <Link>).
-// Stop the click here so it never bubbles to that ancestor's handler — a tap
-// on a mention link should open the link, not also complete the job or
-// navigate the card away.
-function stopPropagation(e: React.SyntheticEvent) {
-  e.stopPropagation();
-}
-
-export function DiscordText({ text, channels, roles, guildId, className }: DiscordTextProps) {
+export function DiscordText({
+  text,
+  channels,
+  roles,
+  guildId,
+  interactive = true,
+  className,
+}: DiscordTextProps) {
   const tokens = React.useMemo(
     () => parseDiscordMarkup(text, { channels, roles }),
     [text, channels, roles],
@@ -95,14 +108,20 @@ export function DiscordText({ text, channels, roles, guildId, className }: Disco
             return <React.Fragment key={i}>{token.text}</React.Fragment>;
 
           case "link":
+            if (!interactive) {
+              return (
+                <span key={i} style={linkStyle}>
+                  {token.text}
+                </span>
+              );
+            }
             return (
               <a
                 key={i}
                 href={token.href}
                 target="_blank"
                 rel="noopener noreferrer"
-                style={linkStyle}
-                onClick={stopPropagation}
+                style={{ ...linkStyle, pointerEvents: "auto" }}
               >
                 {token.text}
               </a>
@@ -110,18 +129,27 @@ export function DiscordText({ text, channels, roles, guildId, className }: Disco
 
           case "channel": {
             const label = token.name ? `#${token.name}` : "#channel";
-            if (!guildId) return <React.Fragment key={i}>{label}</React.Fragment>;
+            if (interactive && guildId) {
+              return (
+                <a
+                  key={i}
+                  href={`https://discord.com/channels/${guildId}/${token.id}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ ...channelLinkStyle, pointerEvents: "auto" }}
+                >
+                  {label}
+                </a>
+              );
+            }
+            if (interactive) {
+              // No guild id to link to — plain text, not styled as a link.
+              return <React.Fragment key={i}>{label}</React.Fragment>;
+            }
             return (
-              <a
-                key={i}
-                href={`https://discord.com/channels/${guildId}/${token.id}`}
-                target="_blank"
-                rel="noopener noreferrer"
-                style={channelLinkStyle}
-                onClick={stopPropagation}
-              >
+              <span key={i} style={channelLinkStyle}>
                 {label}
-              </a>
+              </span>
             );
           }
 
@@ -144,7 +172,8 @@ export function DiscordText({ text, channels, roles, guildId, className }: Disco
 
           case "unknown":
             // Discord syntax we don't render (malformed mention, timestamp
-            // tag, etc.) — stripped rather than shown raw.
+            // tag, slash-command mention, etc.) — stripped rather than
+            // shown raw.
             return null;
 
           default:

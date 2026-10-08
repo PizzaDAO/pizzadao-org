@@ -1,5 +1,11 @@
 import { describe, it, expect } from "vitest"
-import { parseDiscordMarkup, extractMentionIds, extractMentionIdsFromAll } from "./discord-markup"
+import {
+  parseDiscordMarkup,
+  discordMarkupToPlainText,
+  discordTextToPlainText,
+  extractMentionIds,
+  extractMentionIdsFromAll,
+} from "./discord-markup"
 
 describe("parseDiscordMarkup", () => {
   it("returns a single text token for plain text", () => {
@@ -134,6 +140,82 @@ describe("parseDiscordMarkup", () => {
     expect(parseDiscordMarkup("<::>")).toEqual([{ type: "unknown", raw: "<::>" }])
   })
 
+  it("strips a slash-command mention as unknown", () => {
+    expect(parseDiscordMarkup("run </tag:815277786012975134>")).toEqual([
+      { type: "text", text: "run " },
+      { type: "unknown", raw: "</tag:815277786012975134>" },
+    ])
+  })
+
+  it("strips a slash-command mention with a subcommand (spaces) as unknown", () => {
+    expect(parseDiscordMarkup("</tag user set:815277786012975134>")).toEqual([
+      { type: "unknown", raw: "</tag user set:815277786012975134>" },
+    ])
+  })
+
+  it("strips guide/onboarding <id:...> tags as unknown", () => {
+    for (const tag of ["<id:customize>", "<id:browse>", "<id:guide>"]) {
+      expect(parseDiscordMarkup(tag)).toEqual([{ type: "unknown", raw: tag }])
+    }
+  })
+
+  it("allows one level of balanced parens in a markdown link href", () => {
+    const tokens = parseDiscordMarkup(
+      "[Foo](https://en.wikipedia.org/wiki/Foo_(bar)) is relevant",
+    )
+    expect(tokens).toEqual([
+      { type: "link", href: "https://en.wikipedia.org/wiki/Foo_(bar)", text: "Foo" },
+      { type: "text", text: " is relevant" },
+    ])
+  })
+
+  it("strips/resolves markup inside markdown link text", () => {
+    const tokens = parseDiscordMarkup(
+      "[Check <#1099323056012394556> out](https://pizzadao.xyz)",
+      { channels: { "1099323056012394556": "partner-suggestions" } },
+    )
+    expect(tokens).toEqual([
+      { type: "link", href: "https://pizzadao.xyz", text: "Check #partner-suggestions out" },
+    ])
+  })
+
+  it("drops an emoji tag inside markdown link text down to :name:", () => {
+    const tokens = parseDiscordMarkup(
+      "[Nice <:frankpepe_trade:1234826199080112138> job](https://pizzadao.xyz)",
+    )
+    expect(tokens).toEqual([
+      { type: "link", href: "https://pizzadao.xyz", text: "Nice :frankpepe_trade: job" },
+    ])
+  })
+
+  it("trims trailing sentence punctuation from a bare url", () => {
+    expect(parseDiscordMarkup("go to https://pizzadao.xyz/join!")).toEqual([
+      { type: "text", text: "go to " },
+      { type: "link", href: "https://pizzadao.xyz/join", text: "https://pizzadao.xyz/join" },
+      { type: "text", text: "!" },
+    ])
+  })
+
+  it("trims a trailing unbalanced close-paren from a bare url", () => {
+    expect(parseDiscordMarkup("(see https://pizzadao.xyz/join)")).toEqual([
+      { type: "text", text: "(see " },
+      { type: "link", href: "https://pizzadao.xyz/join", text: "https://pizzadao.xyz/join" },
+      { type: "text", text: ")" },
+    ])
+  })
+
+  it("keeps a trailing close-paren on a bare url when it balances an earlier open-paren", () => {
+    expect(parseDiscordMarkup("see https://en.wikipedia.org/wiki/Foo_(bar) now")).toEqual([
+      { type: "text", text: "see " },
+      {
+        type: "link",
+        href: "https://en.wikipedia.org/wiki/Foo_(bar)",
+        text: "https://en.wikipedia.org/wiki/Foo_(bar)",
+      },
+      { type: "text", text: " now" },
+    ])
+  })
+
   it("handles a markdown link plus channel mention and trailing emoji", () => {
     const text =
       "Let everyone know the state of [PizzaDAO's treasury](https://treasury.pizzadao.xyz) in <#812097286476922943> so we don't overspend. 🧮"
@@ -147,6 +229,34 @@ describe("parseDiscordMarkup", () => {
       { type: "channel", id: "812097286476922943", name: "treasury-talk" },
       { type: "text", text: " so we don't overspend. 🧮" },
     ])
+  })
+})
+
+describe("discordMarkupToPlainText / discordTextToPlainText", () => {
+  it("flattens every token kind to plain text", () => {
+    const text =
+      "Now tag <@&815277786012975134> in <#1099323056012394556>, hi <@123456789012345678>, nice <:pizza:1234826199080112138>, see [the treasury](https://treasury.pizzadao.xyz), ignore <t:1700000000:R>"
+    const plain = discordTextToPlainText(text, {
+      roles: { "815277786012975134": "Partnerships" },
+      channels: { "1099323056012394556": "partner-suggestions" },
+    })
+    expect(plain).toBe(
+      "Now tag @Partnerships in #partner-suggestions, hi @user, nice :pizza:, see the treasury, ignore ",
+    )
+  })
+
+  it("falls back to the maps argument when a token wasn't resolved at parse time", () => {
+    const tokens = parseDiscordMarkup("<#1099323056012394556>")
+    expect(tokens).toEqual([{ type: "channel", id: "1099323056012394556", name: null }])
+    expect(
+      discordMarkupToPlainText(tokens, { channels: { "1099323056012394556": "partner-suggestions" } }),
+    ).toBe("#partner-suggestions")
+  })
+
+  it("falls back to a generic label when nothing resolves", () => {
+    expect(discordTextToPlainText("<#1099323056012394556> <@&815277786012975134>")).toBe(
+      "#channel @role",
+    )
   })
 })
 

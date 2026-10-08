@@ -21,6 +21,7 @@ import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DiscordText } from "@/app/ui/shared/DiscordText";
+import { discordTextToPlainText } from "@/app/lib/discord-markup";
 
 // ── Item shapes ──────────────────────────────────────────────────────────
 
@@ -225,11 +226,17 @@ function JobItem({
     const t = useTranslations("dashboard.discover");
     const pillStyle = j.completed ? pill("claimed") : pill("open");
     const pillLabel = j.completed ? t("status.done") : t("status.open");
+    // The tile itself is the link (to /pep) — a plain-text version of the
+    // description for the accessible name, and mentions/links inside the
+    // description render as styled, non-interactive text (interactive
+    // nested inside this <Link> would be invalid HTML and fight the
+    // tile's own click target).
+    const plainDescription = discordTextToPlainText(j.description, { channels, roles });
     return (
         <Link
             href={`/pep`}
             style={previewCard()}
-            aria-label={t("jobAriaLabel", { description: j.description })}
+            aria-label={t("jobAriaLabel", { description: plainDescription })}
             className="paper-soft group"
         >
             <div
@@ -252,7 +259,13 @@ function JobItem({
                         WebkitBoxOrient: "vertical",
                     }}
                 >
-                    <DiscordText text={j.description} channels={channels} roles={roles} guildId={guildId} />
+                    <DiscordText
+                        text={j.description}
+                        channels={channels}
+                        roles={roles}
+                        guildId={guildId}
+                        interactive={false}
+                    />
                 </span>
                 <span style={pillStyle}>{pillLabel}</span>
             </div>

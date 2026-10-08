@@ -1,4 +1,4 @@
-import { describe, it, expect, vi } from "vitest";
+import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { DiscordText } from "./DiscordText";
 
@@ -16,6 +16,9 @@ describe("DiscordText", () => {
     expect(link).toHaveAttribute("href", "https://discord.com/channels/999/1099323056012394556");
     expect(link).toHaveAttribute("target", "_blank");
     expect(link).toHaveAttribute("rel", "noopener noreferrer");
+    // Keeps working inside a `pointer-events: none` stretched-button
+    // ancestor (see JobCard) by re-enabling pointer events on itself.
+    expect(link).toHaveStyle({ pointerEvents: "auto" });
 
     rerender(<DiscordText text="in <#1099323056012394556>" guildId="999" />);
     const fallbackLink = screen.getByRole("link", { name: "#channel" });
@@ -75,14 +78,38 @@ describe("DiscordText", () => {
     expect(screen.queryByText(/<t:/)).toBeNull();
   });
 
-  it("stops a mention/link click from bubbling to an ancestor's onClick", () => {
-    const onAncestorClick = vi.fn();
-    render(
-      <button onClick={onAncestorClick}>
-        <DiscordText text="go to <#1099323056012394556>" channels={{ "1099323056012394556": "partner-suggestions" }} guildId="999" />
-      </button>,
-    );
-    fireEvent.click(screen.getByRole("link", { name: "#partner-suggestions" }));
-    expect(onAncestorClick).not.toHaveBeenCalled();
+  describe("interactive={false}", () => {
+    it("renders a channel mention as styled text, not a link", () => {
+      const { container } = render(
+        <DiscordText
+          text="in <#1099323056012394556>"
+          channels={{ "1099323056012394556": "partner-suggestions" }}
+          guildId="999"
+          interactive={false}
+        />,
+      );
+      expect(screen.queryByRole("link")).toBeNull();
+      expect(container.textContent).toBe("in #partner-suggestions");
+    });
+
+    it("renders a markdown link as styled text, not a link", () => {
+      render(
+        <DiscordText text="see [the treasury](https://treasury.pizzadao.xyz)" interactive={false} />,
+      );
+      expect(screen.queryByRole("link")).toBeNull();
+      expect(screen.getByText("the treasury")).toBeInTheDocument();
+    });
+
+    it("still renders non-link tokens (role pill, emoji) the same way", () => {
+      render(
+        <DiscordText
+          text="tag <@&815277786012975134> <:pizza:1234826199080112138>"
+          roles={{ "815277786012975134": "Partnerships" }}
+          interactive={false}
+        />,
+      );
+      expect(screen.getByText("@Partnerships")).toBeInTheDocument();
+      expect(screen.getByRole("img", { name: ":pizza:" })).toBeInTheDocument();
+    });
   });
 });
