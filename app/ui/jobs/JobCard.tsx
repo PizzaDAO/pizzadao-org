@@ -122,10 +122,11 @@ export function JobCard({
           aria-busy={loading || undefined}
           aria-describedby={error ? errorId : undefined}
           aria-label={`${actionWord} job: ${plainDescription} — ${formatPep(reward)}`}
-          // Inline on purpose: globals.css `.paper-soft > * { position: relative; z-index: 1 }`
-          // is unlayered and beats the Tailwind `absolute`/`z-0` utilities, which put the
-          // button back in the flex row and crushed the description column.
-          style={{ position: "absolute", inset: 0, zIndex: 0 }}
+          // `.paper-soft > * { position: relative; z-index: 1 }` in globals.css now lives in
+          // `@layer components`, so these `absolute`/`inset-0`/`z-0` utilities (in Tailwind's
+          // `utilities` layer) win by layer order — no inline style override needed any more.
+          // (Previously this was unlayered and beat the utilities, putting the button back in
+          // the flex row and crushing the description column — see PR #158.)
           className={[
             "absolute inset-0 z-0 h-full w-full rounded-[inherit] border-0 bg-transparent p-0",
             "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-tomato focus-visible:ring-offset-2 focus-visible:ring-offset-background",

@@ -368,9 +368,15 @@ body::before {
   padding: 0.45em 1.1em;
 }
 
-/* Newspaper grain overlay (applied to relative parent) */
-.grain {
-  position: relative;
+/* Newspaper grain overlay (applied to relative parent).
+ * Layered (see the `.paper-soft > *` comment below for why) so an element
+ * that carries `.grain` itself can still use `absolute`/`fixed`/`sticky` —
+ * those establish a positioning context too, so the grain `::after` (also
+ * unlayered, unaffected by this) still overlays correctly either way. */
+@layer components {
+  .grain {
+    position: relative;
+  }
 }
 .grain::after {
   content: "";
@@ -382,10 +388,19 @@ body::before {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='160' height='160'><filter id='n'><feTurbulence type='fractalNoise' baseFrequency='0.9' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.6 0'/></filter><rect width='100%25' height='100%25' filter='url(%23n)'/></svg>");
 }
 
-/* Soft tactile paper noise — for cards/containers */
-.paper-soft {
-  position: relative;
-  isolation: isolate;
+/* Soft tactile paper noise — for cards/containers.
+ * Layered (base rule only — the ::before/::after grain below stays
+ * unlayered and must stay below content) so an element that carries
+ * `.paper-soft` itself, not just its children, can use `absolute`/`fixed`/
+ * `sticky` utilities (e.g. a dropdown panel) without losing them to this
+ * rule — `absolute`/`fixed` still establish a positioning context, so
+ * `isolation: isolate` and the grain pseudo-elements keep working the same
+ * either way. */
+@layer components {
+  .paper-soft {
+    position: relative;
+    isolation: isolate;
+  }
 }
 .paper-soft::before {
   content: "";
@@ -418,12 +433,27 @@ body::before {
   opacity: 0.11;
 }
 .paper-soft-dark::after { display: none; }
-.paper-soft > * { position: relative; z-index: 1; }
+/*
+ * Lift direct children above the paper-grain ::before/::after (which sit at
+ * z-index: 0). This must live inside the `components` layer — Tailwind's
+ * `@import "tailwindcss"` declares layer order theme < base < components <
+ * utilities, so anything here loses to a `position`/`z-index` utility
+ * (absolute, fixed, sticky, z-*) on the same element regardless of source
+ * order or specificity. Left unlayered, this rule would silently beat those
+ * utilities on any direct child of a `.paper-soft` element (it did — see
+ * JobCard, PR #158).
+ */
+@layer components {
+  .paper-soft > * { position: relative; z-index: 1; }
+}
 
-/* Ultra-light photocopy toner-fleck noise */
-.print-noise {
-  position: relative;
-  isolation: isolate;
+/* Ultra-light photocopy toner-fleck noise. Layered base rule — same
+ * reasoning as `.paper-soft` above. */
+@layer components {
+  .print-noise {
+    position: relative;
+    isolation: isolate;
+  }
 }
 .print-noise::after {
   content: "";
@@ -435,12 +465,18 @@ body::before {
   mix-blend-mode: multiply;
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='240' height='240'><filter id='pn'><feTurbulence type='fractalNoise' baseFrequency='1.4' numOctaves='2' stitchTiles='stitch'/><feColorMatrix values='0 0 0 0 0  0 0 0 0 0  0 0 0 0 0  0 0 0 0.5 0'/></filter><rect width='100%25' height='100%25' filter='url(%23pn)'/></svg>");
 }
-.print-noise > * { position: relative; z-index: 1; }
+/* Same reasoning as `.paper-soft > *` above — layered so Tailwind position/z-index utilities win. */
+@layer components {
+  .print-noise > * { position: relative; z-index: 1; }
+}
 
-/* Soft halftone dot field */
-.halftone-soft {
-  position: relative;
-  isolation: isolate;
+/* Soft halftone dot field. Layered base rule — same reasoning as
+ * `.paper-soft` above. */
+@layer components {
+  .halftone-soft {
+    position: relative;
+    isolation: isolate;
+  }
 }
 .halftone-soft::after {
   content: "";
@@ -453,12 +489,18 @@ body::before {
   background-image: radial-gradient(hsl(var(--ink)) 0.6px, transparent 1.1px);
   background-size: 6px 6px;
 }
-.halftone-soft > * { position: relative; z-index: 1; }
+/* Same reasoning as `.paper-soft > *` above — layered so Tailwind position/z-index utilities win. */
+@layer components {
+  .halftone-soft > * { position: relative; z-index: 1; }
+}
 
-/* Soft ink-bleed gradient on edges of dark blocks */
-.ink-spread {
-  position: relative;
-  isolation: isolate;
+/* Soft ink-bleed gradient on edges of dark blocks. Layered base rule —
+ * same reasoning as `.paper-soft` above. */
+@layer components {
+  .ink-spread {
+    position: relative;
+    isolation: isolate;
+  }
 }
 .ink-spread::after {
   content: "";
@@ -471,7 +513,10 @@ body::before {
     radial-gradient(120% 80% at 10% 0%, hsl(var(--tomato) / 0.06), transparent 55%),
     radial-gradient(110% 70% at 90% 100%, hsl(var(--butter) / 0.05), transparent 55%);
 }
-.ink-spread > * { position: relative; z-index: 1; }
+/* Same reasoning as `.paper-soft > *` above — layered so Tailwind position/z-index utilities win. */
+@layer components {
+  .ink-spread > * { position: relative; z-index: 1; }
+}
 
 /* Cycling reveal helper used by NameStep CyclingStage */
 @keyframes cycleBlurIn {

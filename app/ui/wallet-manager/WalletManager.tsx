@@ -268,6 +268,10 @@ export function WalletManager({ memberId }: WalletManagerProps) {
   const handleDelete = async (walletId: number) => {
     setError(null);
     try {
+      // Captured before the request so we can tell afterwards whether the
+      // wallet being deleted is the one wagmi currently reports as
+      // connected — deleting it doesn't disconnect the wallet itself.
+      const walletToDelete = wallets.find((w) => w.id === walletId);
       const res = await fetch("/api/wallet", {
         method: "DELETE",
         headers: { "Content-Type": "application/json" },
@@ -277,6 +281,38 @@ export function WalletManager({ memberId }: WalletManagerProps) {
         const data = await res.json();
         setWallets(data.wallets || []);
         setConfirmDeleteId(null);
+
+        // Deleting the currently-connected address doesn't disconnect the
+        // wallet itself — wagmi still reports it connected, and without
+        // this block the autoSave effect below would see the address
+        // missing from `wallets` and POST it straight back. Setting
+        // handledAddressRef here is a belt-and-suspenders guard for the
+        // current mount only (it's already set by the time this address
+        // is visible/deletable in the list, and a remount clears it
+        // regardless) — it does NOT survive a page reload. The real fix is
+        // disconnecting: that flips `isConnected` to false, so autoSave's
+        // own top-of-function guard (`!isConnected`) skips it from then on
+        // even after a remount, and it's also what the effect above resets
+        // handledAddressRef/lastFailedAddressRef from — so reconnecting
+        // (even the same address) saves it again, fresh. If the disconnect
+        // call itself fails, the wallet stays connected-but-unlinked and
+        // WILL get re-added on the next page load (handledAddressRef won't
+        // have survived), so tell the user to disconnect it themselves.
+        if (
+          walletToDelete &&
+          connectedAddress &&
+          walletToDelete.walletAddress.toLowerCase() ===
+            connectedAddress.toLowerCase()
+        ) {
+          handledAddressRef.current = connectedAddress.toLowerCase();
+          try {
+            await disconnectAsync();
+          } catch {
+            setError(
+              "Wallet removed, but it's still connected — disconnect it in your wallet to stop it being re-added.",
+            );
+          }
+        }
       }
     } catch {
       setError("Failed to delete wallet");
