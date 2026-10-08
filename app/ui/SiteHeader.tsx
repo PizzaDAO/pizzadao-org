@@ -17,6 +17,7 @@ import { useEffect, useRef, useState } from "react";
 import { ChevronDown, Menu, X } from "lucide-react";
 import { useTranslations } from "next-intl";
 import { useSession } from "@/app/lib/hooks/use-session";
+import { PizzaDAOLogo } from "./PizzaDAOLogo";
 
 type NavLabelKey =
   | "crews"
@@ -153,23 +154,10 @@ export default function SiteHeader() {
         {/* Masthead */}
         <Link
           href={loggedIn ? dashboardHref : "/"}
-          className="mr-2 inline-flex items-baseline gap-1.5 no-underline text-foreground"
+          className="mr-2 inline-flex items-center no-underline text-foreground"
           aria-label={t("homeAriaLabel")}
         >
-          <span aria-hidden className="text-tomato" style={{ fontFamily: DISPLAY_FONT, fontWeight: 800 }}>
-            §
-          </span>
-          <span
-            style={{
-              fontFamily: DISPLAY_FONT,
-              fontWeight: 800,
-              fontSize: 20,
-              letterSpacing: "-0.015em",
-              lineHeight: 1,
-            }}
-          >
-            PizzaDAO
-          </span>
+          <PizzaDAOLogo height={28} />
         </Link>
 
         {/* Desktop links */}
