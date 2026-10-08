@@ -177,7 +177,7 @@ function TurtleCard({
           ? "0 36px 70px -28px hsl(0 93% 60% / 0.45)"
           : "var(--shadow-soft)",
       }}
-      className={`group relative flex items-center gap-4 rounded-[20px] border p-4 text-left transition-all duration-500 md:p-5 ${
+      className={`group relative flex items-center gap-2.5 rounded-[20px] border p-4 text-left transition-all duration-500 md:p-5 ${
         selected ? "-translate-y-1 z-10" : "hover:-translate-y-1 hover:rotate-0"
       }`}
     >
@@ -204,7 +204,7 @@ function TurtleCard({
       />
 
       <div
-        className="relative grid h-14 w-14 shrink-0 place-items-center rounded-full"
+        className="relative grid h-12 w-12 shrink-0 place-items-center rounded-full"
         style={{
           background: "hsl(var(--cream) / 0.65)",
           border: "1.5px dashed hsl(var(--foreground) / 0.3)",
@@ -214,14 +214,16 @@ function TurtleCard({
         <img
           src={image}
           alt={label}
-          className="h-9 w-9 object-contain"
+          className="h-8 w-8 object-contain"
         />
       </div>
 
       <div className="relative flex-1 min-w-0">
         <h3
           className="font-[family-name:var(--font-display)] font-black tracking-[-0.005em] text-foreground"
-          style={{ fontSize: "clamp(1.1rem, 1.6vw, 1.4rem)", lineHeight: 1.05 }}
+          // Fixed size: the card width doesn't grow with the viewport, so a vw-based
+          // size overflowed long names ("Michelangelo") into the checkbox.
+          style={{ fontSize: "1.05rem", lineHeight: 1.05 }}
         >
           {label}
         </h3>
