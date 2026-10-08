@@ -77,7 +77,15 @@ export function FilmPoster({ film, index }: Props) {
   const words = film.title.replace(/^The\s+/i, "").split(/\s+/);
   const stacked = words.length >= 2 && film.title.length <= 28;
 
+  // Fallback-title size from the longest word, in rem (not vw): the tile is
+  // ~76px wide at every viewport, so a vw size overflowed long titles.
+  const longestWord = Math.max(...words.map((w) => w.length), 1);
+  const titleRem = Math.min(stacked ? 1.25 : 1.1, (stacked ? 8 : 9) / longestWord);
+
   const { src: posterSrc, loaded, onLoaded } = useFilmPoster(film.id);
+  // A real poster already carries its own title art — show it clean instead of
+  // stacking our composed title/meta on top of it.
+  const showPoster = !!posterSrc && loaded;
 
   return (
     <div
@@ -99,105 +107,99 @@ export function FilmPoster({ film, index }: Props) {
           }`}
         />
       )}
-      {posterSrc && loaded && (
+      {!showPoster && (
+        <>
+        {/* Soft glow */}
         <div
           className="absolute inset-0"
           style={{
-            background: `linear-gradient(180deg, ${p.from}00 35%, ${p.from}cc 100%)`,
+            background: `radial-gradient(${decoR}% ${decoR}% at ${dotX}% ${dotY}%, ${p.accent}26, transparent 65%)`,
           }}
         />
-      )}
-      {/* Soft glow */}
-      <div
-        className="absolute inset-0"
-        style={{
-          background: `radial-gradient(${decoR}% ${decoR}% at ${dotX}% ${dotY}%, ${p.accent}26, transparent 65%)`,
-        }}
-      />
 
-      {/* Decorative ring/circle */}
-      <svg
-        className="absolute inset-0 h-full w-full mix-blend-screen opacity-60"
-        viewBox="0 0 100 150"
-        preserveAspectRatio="xMidYMid slice"
-      >
-        <circle
-          cx={decoX}
-          cy={decoY}
-          r={decoR / 2}
-          fill="none"
-          stroke={p.accent}
-          strokeWidth="0.4"
-          opacity="0.45"
-        />
-        <circle
-          cx={100 - decoX}
-          cy={150 - decoY}
-          r={decoR / 3}
-          fill="none"
-          stroke={p.ink}
-          strokeWidth="0.2"
-          opacity="0.35"
-        />
-      </svg>
-
-      {/* Film grain dots */}
-      <div
-        className="absolute inset-0 opacity-[0.18] mix-blend-overlay"
-        style={{
-          backgroundImage:
-            "radial-gradient(circle at 25% 30%, rgba(255,255,255,0.6) 0.5px, transparent 1px), radial-gradient(circle at 70% 80%, rgba(255,255,255,0.4) 0.5px, transparent 1px)",
-          backgroundSize: "3px 3px, 5px 5px",
-        }}
-      />
-
-      {/* Top meta */}
-      <div className="absolute inset-x-0 top-0 flex items-start justify-between px-3 pt-3">
-        <span
-          className="ui text-[10px] uppercase tracking-[0.28em]"
-          style={{ color: `${p.ink}99` }}
+        {/* Decorative ring/circle */}
+        <svg
+          className="absolute inset-0 h-full w-full mix-blend-screen opacity-60"
+          viewBox="0 0 100 150"
+          preserveAspectRatio="xMidYMid slice"
         >
-          § {String((index ?? 0) + 1).padStart(2, "0")}
-        </span>
-        <span
-          className="ui text-[10px] uppercase tracking-[0.28em]"
-          style={{ color: `${p.accent}` }}
-        >
-          {film.year}
-        </span>
-      </div>
+          <circle
+            cx={decoX}
+            cy={decoY}
+            r={decoR / 2}
+            fill="none"
+            stroke={p.accent}
+            strokeWidth="0.4"
+            opacity="0.45"
+          />
+          <circle
+            cx={100 - decoX}
+            cy={150 - decoY}
+            r={decoR / 3}
+            fill="none"
+            stroke={p.ink}
+            strokeWidth="0.2"
+            opacity="0.35"
+          />
+        </svg>
 
-      {/* Title */}
-      <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+        {/* Film grain dots */}
         <div
-          className="font-[family-name:var(--font-display)] font-black leading-[0.85] tracking-[-0.02em]"
-          style={{ color: p.ink }}
-        >
-          {stacked ? (
-            words.map((w, i) => (
-              <div
-                key={i}
-                style={{
-                  fontSize: `clamp(0.9rem, ${Math.max(1.2, 2.4 - w.length * 0.08)}vw, 1.4rem)`,
-                }}
-              >
-                {w}
-              </div>
-            ))
-          ) : (
-            <div style={{ fontSize: "clamp(0.9rem, 1.6vw, 1.3rem)" }}>
-              {film.title}
-            </div>
-          )}
+          className="absolute inset-0 opacity-[0.18] mix-blend-overlay"
+          style={{
+            backgroundImage:
+              "radial-gradient(circle at 25% 30%, rgba(255,255,255,0.6) 0.5px, transparent 1px), radial-gradient(circle at 70% 80%, rgba(255,255,255,0.4) 0.5px, transparent 1px)",
+            backgroundSize: "3px 3px, 5px 5px",
+          }}
+        />
+
+        {/* Top meta */}
+        <div className="absolute inset-x-0 top-0 flex items-start justify-between px-3 pt-3">
+          <span
+            className="ui text-[10px] uppercase tracking-[0.28em]"
+            style={{ color: `${p.ink}99` }}
+          >
+            § {String((index ?? 0) + 1).padStart(2, "0")}
+          </span>
+          <span
+            className="ui text-[10px] uppercase tracking-[0.28em]"
+            style={{ color: `${p.accent}` }}
+          >
+            {film.year}
+          </span>
         </div>
-        <div className="mt-2 h-px w-10" style={{ background: p.accent }} />
-        <p
-          className="ui mt-2 text-[9px] uppercase tracking-[0.24em]"
-          style={{ color: `${p.ink}99` }}
-        >
-          {film.country}
-        </p>
-      </div>
+
+        {/* Title */}
+        <div className="absolute inset-x-0 bottom-0 px-3 pb-3">
+          <div
+            className="font-[family-name:var(--font-display)] font-black leading-[0.85] tracking-[-0.02em]"
+            style={{ color: p.ink }}
+          >
+            {stacked ? (
+              words.map((w, i) => (
+                <div
+                  key={i}
+                  style={{ fontSize: `${titleRem}rem`, overflowWrap: "anywhere" }}
+                >
+                  {w}
+                </div>
+              ))
+            ) : (
+              <div style={{ fontSize: `${titleRem}rem`, overflowWrap: "anywhere" }}>
+                {film.title}
+              </div>
+            )}
+          </div>
+          <div className="mt-2 h-px w-10" style={{ background: p.accent }} />
+          <p
+            className="ui mt-2 text-[9px] uppercase tracking-[0.24em]"
+            style={{ color: `${p.ink}99` }}
+          >
+            {film.country}
+          </p>
+        </div>
+        </>
+      )}
     </div>
   );
 }

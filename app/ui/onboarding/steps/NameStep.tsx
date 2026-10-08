@@ -977,6 +977,7 @@ function FilmPicker({
                 key={f.id}
                 type="button"
                 onClick={() => handlePick(f)}
+                aria-label={`${f.title} (${f.year})`}
                 className="group relative flex aspect-[2/3] w-full overflow-hidden rounded-xl border text-left transition-all hover:-translate-y-0.5"
                 style={{
                   background: "hsl(var(--ink))",
