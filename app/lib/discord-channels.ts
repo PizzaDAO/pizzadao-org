@@ -1,10 +1,14 @@
 /**
- * Small Discord REST helpers for channels and messages (bot token, no
- * gateway). Used by the mission verifiers (#show-and-tell message check) and
- * the mission announcements (#work).
+ * Small Discord REST helpers for channels, roles and messages (bot token, no
+ * gateway). Used by the mission verifiers (#show-and-tell message check),
+ * the mission announcements (#work), and resolving `<#id>` / `<@&id>`
+ * mentions in job descriptions (see discord-mention-resolve.ts).
  *
  *   - resolveChannelId(name, envName): an env override, else the guild channel
  *     with that name, cached in memory for an hour (a failed refresh keeps the
+ *     stale list).
+ *   - getGuildChannels / getGuildRoles: the guild's full channel or role
+ *     list, each cached in memory for an hour (a failed refresh keeps the
  *     stale list).
  *   - getChannelMessage / getChannel: one REST call each. "unknown" means the
  *     call itself failed (network, 5xx, rate limit, no token), as opposed to a
@@ -31,6 +35,13 @@ let channelCache: { guildId: string; channels: GuildChannel[]; at: number } | nu
 
 export function clearGuildChannelsCache() {
   channelCache = null
+}
+
+type GuildRole = { id: string; name: string }
+let roleCache: { guildId: string; roles: GuildRole[]; at: number } | null = null
+
+export function clearGuildRolesCache() {
+  roleCache = null
 }
 
 function token(opts: DiscordOpts): string {
@@ -75,6 +86,24 @@ export async function getGuildChannels(opts: DiscordOpts = {}): Promise<GuildCha
   }))
   channelCache = { guildId, channels, at: now }
   return channels
+}
+
+/** The guild's roles (cached for an hour), or null when unavailable. */
+export async function getGuildRoles(opts: DiscordOpts = {}): Promise<GuildRole[] | null> {
+  const guildId = guild(opts)
+  if (!guildId) return null
+  const now = opts.now ?? Date.now()
+  if (roleCache && roleCache.guildId === guildId && now - roleCache.at < TTL_MS) return roleCache.roles
+  const r = await getJson(`/guilds/${guildId}/roles`, opts)
+  if (!r.ok || !Array.isArray(r.json)) {
+    return roleCache?.guildId === guildId ? roleCache.roles : null
+  }
+  const roles = (r.json as Array<{ id: string; name: string }>).map((ro) => ({
+    id: String(ro.id),
+    name: String(ro.name ?? ''),
+  }))
+  roleCache = { guildId, roles, at: now }
+  return roles
 }
 
 /** Normalize a channel name for matching: "#Show-and-Tell" / "🎨・show-and-tell" -> "show-and-tell". */

@@ -42,6 +42,9 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [rewardAmount, setRewardAmount] = useState<number>(50);
+  const [channels, setChannels] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<Record<string, string>>({});
+  const [guildId, setGuildId] = useState<string | null>(null);
 
   const fetchJobs = async () => {
     try {
@@ -55,6 +58,9 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
       if (data.rewardAmount) {
         setRewardAmount(data.rewardAmount);
       }
+      setChannels(data.channels || {});
+      setRoles(data.roles || {});
+      setGuildId(data.guildId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -214,6 +220,9 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
                 job={job}
                 rewardAmount={rewardAmount}
                 alreadyCompleted={job.completed}
+                channels={channels}
+                roles={roles}
+                guildId={guildId}
                 onAssign={() => {
                   fetchJobs();
                   onJobCompleted?.();

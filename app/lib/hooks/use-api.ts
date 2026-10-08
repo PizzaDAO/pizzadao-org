@@ -562,6 +562,10 @@ export interface DiscoverData {
     crewLabel: string
     date: string
   }>
+  /** channel/role id -> name maps resolved server-side, for rendering Discord mentions in job descriptions */
+  channels: Record<string, string>
+  roles: Record<string, string>
+  guildId: string | null
 }
 
 /**
@@ -602,10 +606,12 @@ export function useDiscover() {
           fetch('/api/bounties'),
           {},
         ),
-        safeJson<{ jobs?: Array<{ id: number; description: string; type?: string; completed?: boolean }> }>(
-          fetch('/api/jobs'),
-          {},
-        ),
+        safeJson<{
+          jobs?: Array<{ id: number; description: string; type?: string; completed?: boolean }>
+          channels?: Record<string, string>
+          roles?: Record<string, string>
+          guildId?: string | null
+        }>(fetch('/api/jobs'), {}),
         safeJson<{ articles?: RawArticle[] }>(
           fetch('/api/articles?limit=3'),
           {},
@@ -654,7 +660,15 @@ export function useDiscover() {
           date: c.date,
         }))
 
-      return { bounties, jobs, articles, calls }
+      return {
+        bounties,
+        jobs,
+        articles,
+        calls,
+        channels: jobsRes.channels ?? {},
+        roles: jobsRes.roles ?? {},
+        guildId: jobsRes.guildId ?? null,
+      }
     },
     staleTime: 5 * 60 * 1000,
     gcTime: 10 * 60 * 1000,

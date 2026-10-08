@@ -7,6 +7,7 @@
 import React, { useState } from "react";
 import { formatPep } from "../economy/PepIcon";
 import { paperCard } from "../shared/Editorial";
+import { DiscordText } from "../shared/DiscordText";
 
 type Job = {
   id: number;
@@ -21,6 +22,10 @@ type JobCardProps = {
   alreadyCompleted?: boolean;
   onAssign?: () => void;
   disabled?: boolean;
+  /** channel/role id -> name maps resolved server-side, and the guild id for channel links */
+  channels?: Record<string, string>;
+  roles?: Record<string, string>;
+  guildId?: string | null;
 };
 
 const chip =
@@ -32,6 +37,9 @@ export function JobCard({
   alreadyCompleted,
   onAssign,
   disabled,
+  channels,
+  roles,
+  guildId,
 }: JobCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
@@ -106,7 +114,9 @@ export function JobCard({
             )}
             <span className="text-[11px] text-muted-foreground">#{job.id}</span>
           </span>
-          <span className="block text-sm leading-[1.45] text-foreground">{job.description}</span>
+          <span className="block text-sm leading-[1.45] text-foreground">
+            <DiscordText text={job.description} channels={channels} roles={roles} guildId={guildId} />
+          </span>
         </span>
 
         <span className="flex shrink-0 flex-col items-end gap-1 text-right">

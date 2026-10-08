@@ -2,6 +2,7 @@ import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getDailyJobs, getCompletedJobsToday, JOB_REWARD_AMOUNT } from '@/app/lib/jobs'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
+import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
 
 export const runtime = 'nodejs'
 
@@ -21,16 +22,26 @@ export async function GET() {
       completedJobIds = await getCompletedJobsToday(session.discordId)
     }
 
+    const descriptions = jobs.map((job: any) => replaceAmountPlaceholder(job.description))
+
+    // Resolve any <#channelId> / <@&roleId> Discord mentions in the job
+    // descriptions to names here, server-side (bot token stays on the
+    // server) — the client renders them via DiscordText using these maps.
+    const { channels, roles, guildId } = await resolveDiscordMentions(descriptions)
+
     return NextResponse.json({
-      jobs: jobs.map((job: any) => ({
+      jobs: jobs.map((job: any, i: number) => ({
         id: job.id,
-        description: replaceAmountPlaceholder(job.description),
+        description: descriptions[i],
         type: job.type,
         assignees: job.assignees,
         completed: completedJobIds.includes(job.id)
       })),
       resetAt: resetAt.toISOString(),
-      rewardAmount: JOB_REWARD_AMOUNT
+      rewardAmount: JOB_REWARD_AMOUNT,
+      channels,
+      roles,
+      guildId
     }, { headers: NO_STORE_HEADERS })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'

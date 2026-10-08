@@ -253,6 +253,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         jobs={discoverData?.jobs}
                         articles={discoverData?.articles}
                         calls={discoverData?.calls}
+                        channels={discoverData?.channels}
+                        roles={discoverData?.roles}
+                        guildId={discoverData?.guildId}
                     />
 
                     {/* ── 3. Missions Progress ── */}
