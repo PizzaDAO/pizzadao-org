@@ -18,7 +18,7 @@ import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
 import { NotificationBell } from "../ui/notifications";
-import { useMe, useMemberLookup } from "../lib/hooks/use-api";
+import { useMe } from "../lib/hooks/use-api";
 import { input, pageContainer } from "../ui/shared-styles";
 import { pillTomato } from "../ui/shared/Editorial";
 
@@ -437,10 +437,6 @@ function InventoryWithSend({ walletKey, onSendItem }: { walletKey: number; onSen
 export default function PepDashboard() {
   const { data: meData, isLoading: meLoading } = useMe();
   const session: SessionData | null = meLoading ? null : (meData ?? { authenticated: false });
-  const { data: memberData } = useMemberLookup(
-    meData?.authenticated && meData?.discordId ? meData.discordId : undefined
-  );
-  const memberName = memberData?.memberName ?? null;
   const loading = meLoading;
 
   const [walletKey, setWalletKey] = useState(0);
@@ -564,16 +560,6 @@ export default function PepDashboard() {
               >
                 <PepIcon size={64} /> PEP
               </h1>
-              <p
-                className="mt-4 text-foreground/70"
-                style={{ fontSize: 17, lineHeight: 1.5, maxWidth: "44ch" }}
-              >
-                A community ledger.{" "}
-                <span style={{ color: "hsl(var(--foreground))", fontWeight: 600 }}>
-                  {memberName || session.username || session.discordId}
-                </span>
-                {" — "}every credit and debit on the record.
-              </p>
             </div>
 
             <div className="flex shrink-0 items-center gap-2 pt-2">
