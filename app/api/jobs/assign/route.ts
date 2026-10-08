@@ -2,6 +2,8 @@ import { NextRequest, NextResponse } from 'next/server'
 import { requireSession } from '@/app/lib/auth-guards'
 import { getJob, JOB_REWARD_AMOUNT, hasCompletedJobToday, recordDailyJobCompletion, isTodaysDailyJob } from '@/app/lib/jobs'
 import { requireOnboarded, getOrCreateEconomy, formatCurrency } from '@/app/lib/economy'
+import { discordTextToPlainText } from '@/app/lib/discord-markup'
+import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
 
 export const runtime = 'nodejs'
 
@@ -40,7 +42,17 @@ export async function POST(request: NextRequest) {
 
     // Ensure the wallet row exists, then record completion + pay reward atomically.
     await getOrCreateEconomy(session.discordId)
-    const description = `Daily job: ${job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())}`
+    const rawDescription = job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())
+    // Resolve any <#channelId> / <@&roleId> Discord mentions so the ledger
+    // memo stores plain text, not raw markup (resolveDiscordMentions never
+    // throws — a failed Discord lookup just falls back to "#channel"/"@role"
+    // instead of a name).
+    const { channels, roles } = await resolveDiscordMentions([rawDescription])
+    // keepTimestamps: true — a <t:...> tag in the description shouldn't be
+    // frozen to today's formatted date/relative string at write time; keep
+    // it raw in the stored memo so display-time rendering (DiscordText)
+    // formats it fresh, every time it's shown.
+    const description = `Daily job: ${discordTextToPlainText(rawDescription, { channels, roles }, { keepTimestamps: true })}`
     const awarded = await recordDailyJobCompletion(session.discordId, jobId, JOB_REWARD_AMOUNT, description)
     if (!awarded) {
       return NextResponse.json({ error: 'You have already completed this job today' }, { status: 400 })

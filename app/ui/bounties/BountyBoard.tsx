@@ -26,6 +26,9 @@ type BountyBoardProps = {
 
 export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps) {
   const [bounties, setBounties] = useState<Bounty[]>([]);
+  const [channels, setChannels] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<Record<string, string>>({});
+  const [guildId, setGuildId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [showForm, setShowForm] = useState(false);
@@ -48,6 +51,9 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
       const data = await res.json();
       if (!res.ok) throw new Error(data.error || "Failed to fetch bounties");
       setBounties(data.bounties);
+      setChannels(data.channels ?? {});
+      setRoles(data.roles ?? {});
+      setGuildId(data.guildId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
     } finally {
@@ -323,6 +329,9 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                 bounty={bounty}
                 currentUserId={currentUserId}
                 onAction={handleAction}
+                channels={channels}
+                roles={roles}
+                guildId={guildId}
               />
             ))}
           </div>

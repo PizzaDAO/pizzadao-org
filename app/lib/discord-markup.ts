@@ -19,13 +19,27 @@
  *                      shows up raw)
  *   https://…         bare URL (trailing `.,;:!?)` is trimmed unless the
  *                      `)` balances a `(` earlier in the URL)
+ *   <t:UNIX>          Discord timestamp, default style "f"
+ *   <t:UNIX:STYLE>    Discord timestamp, STYLE one of t/T/d/D/f/F/R — see
+ *                      `formatDiscordTimestamp` for what each one renders
+ *                      as. Rendered as a formatted date/time (in the
+ *                      viewer's own locale, via `Intl`) instead of being
+ *                      stripped. UNIX is capped at 13 digits and must also
+ *                      pass `isValidDiscordTimestamp` (roughly ±273,790
+ *                      years from the epoch — the range `Date` can hold);
+ *                      anything out of range is treated as malformed (see
+ *                      below) rather than risk a throw from `Date`/`Intl`
+ *                      downstream.
  *
  * Any other `<...>` that looks like Discord syntax but isn't one of the
- * above — a malformed mention, a timestamp tag `<t:...>`, a slash-command
- * mention `</cmd subcommand:id>`, a guide/onboarding tag `<id:customize>`,
- * etc. — is parsed as an "unknown" token and dropped on render. Raw
- * Discord markup should never reach the page.
+ * above — a malformed mention, a malformed timestamp tag (bad style letter
+ * e.g. `<t:123:Z>`, too many digits, or an out-of-range UNIX value), a
+ * slash-command mention `</cmd subcommand:id>`, a guide/onboarding tag
+ * `<id:customize>`, etc. — is parsed as an "unknown" token and dropped on
+ * render. Raw Discord markup should never reach the page.
  */
+
+export type TimestampStyle = "t" | "T" | "d" | "D" | "f" | "F" | "R"
 
 export type DiscordMarkupToken =
   | { type: "text"; text: string }
@@ -34,6 +48,7 @@ export type DiscordMarkupToken =
   | { type: "user"; id: string }
   | { type: "emoji"; id: string; name: string; animated: boolean }
   | { type: "link"; href: string; text: string }
+  | { type: "timestamp"; unix: number; style: TimestampStyle; raw: string }
   | { type: "unknown"; raw: string }
 
 export interface DiscordMarkupMaps {
@@ -41,6 +56,29 @@ export interface DiscordMarkupMaps {
   channels?: Record<string, string>
   /** role id -> role name (no leading "@") */
   roles?: Record<string, string>
+}
+
+export interface PlainTextOptions {
+  /**
+   * Re-serialize a "timestamp" token back to its original `<t:unix[:style]>`
+   * tag instead of formatting it. For write-time memo storage (e.g. a job
+   * reward ledger memo) so a relative/absolute timestamp isn't frozen at
+   * the moment it's written — display-time rendering (`DiscordText`) still
+   * formats it fresh, every time it's shown.
+   */
+  keepTimestamps?: boolean
+}
+
+// The largest magnitude (in ms) `Date` can represent — ECMA-262 bounds it to
+// ±100,000,000 days from the epoch (±8,640,000,000,000,000 ms, ~±273,790
+// years). Anything outside this throws a RangeError from `Date#toISOString`
+// and `Intl.DateTimeFormat#format`, so a timestamp this large is rejected at
+// parse time instead of risking a throw later during render/plain-text.
+const MAX_TIMESTAMP_MS = 8.64e15
+
+/** Whether `unixSeconds` is safe to format/convert to a `Date` without throwing. */
+export function isValidDiscordTimestamp(unixSeconds: number): boolean {
+  return Number.isFinite(unixSeconds) && Math.abs(unixSeconds) * 1000 <= MAX_TIMESTAMP_MS
 }
 
 const SNOWFLAKE = "\\d{5,25}"
@@ -64,7 +102,12 @@ const UNKNOWN_TAG_INNER = [
 
 // Alternatives, tried left to right at each position; capture groups below
 // map 1:1 to the branches (link text/href, emoji animated flag/name/id,
-// channel id, role id, user id, bare url, unknown tag).
+// channel id, role id, user id, timestamp unix/style, bare url, unknown tag).
+//
+// The timestamp branch is listed before the generic "unknown tag" fallback
+// so a *valid* `<t:unix>` / `<t:unix:STYLE>` is captured specifically;
+// anything timestamp-shaped but malformed (bad style letter, etc.) falls
+// through to the unknown-tag branch at the end and is stripped as before.
 const TOKEN_RE = new RegExp(
   [
     `\\[([^\\]\\n]+)\\]\\((${HREF_WITH_BALANCED_PARENS})\\)`, // [text](href)
@@ -72,6 +115,7 @@ const TOKEN_RE = new RegExp(
     `<#(${SNOWFLAKE})>`, // <#channelId>
     `<@&(${SNOWFLAKE})>`, // <@&roleId>
     `<@!?(${SNOWFLAKE})>`, // <@userId> / <@!userId>
+    `<t:(\\d{1,13})(?::([tTdDfFR]))?>`, // <t:unix> / <t:unix:STYLE> (digits capped; see isValidDiscordTimestamp)
     `(https?:\\/\\/[^\\s<>\\[\\]]+)`, // bare url (trimmed below)
     `(<(?:${UNKNOWN_TAG_INNER})>)`, // any other Discord-shaped tag — stripped
   ].join("|"),
@@ -123,8 +167,21 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
       tokens.push({ type: "text", text: text.slice(lastIndex, match.index) })
     }
 
-    const [, linkText, linkHref, emojiAnimated, emojiName, emojiId, channelId, roleId, userId, rawBareUrl, unknownTag] =
-      match
+    const [
+      ,
+      linkText,
+      linkHref,
+      emojiAnimated,
+      emojiName,
+      emojiId,
+      channelId,
+      roleId,
+      userId,
+      timestampUnix,
+      timestampStyle,
+      rawBareUrl,
+      unknownTag,
+    ] = match
 
     let matchEnd = match.index + match[0].length
 
@@ -142,6 +199,21 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
       tokens.push({ type: "role", id: roleId, name: maps.roles?.[roleId] ?? null })
     } else if (userId !== undefined) {
       tokens.push({ type: "user", id: userId })
+    } else if (timestampUnix !== undefined) {
+      const unix = Number(timestampUnix)
+      if (isValidDiscordTimestamp(unix)) {
+        tokens.push({
+          type: "timestamp",
+          unix,
+          style: (timestampStyle as TimestampStyle | undefined) ?? "f",
+          raw: match[0],
+        })
+      } else {
+        // In range for the capped-digits regex (<= 13 digits) but still
+        // too large a UNIX value to safely become a Date — treat the same
+        // as any other malformed timestamp tag.
+        tokens.push({ type: "unknown", raw: match[0] })
+      }
     } else if (rawBareUrl !== undefined) {
       const trimmed = trimTrailingPunctuation(rawBareUrl)
       tokens.push({ type: "link", href: trimmed, text: trimmed })
@@ -162,14 +234,93 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
   return tokens
 }
 
+// Intl.DateTimeFormat options for each absolute Discord timestamp style,
+// matching what Discord's own client shows for that style (but in the
+// viewer's own locale via Intl, rather than Discord's fixed US-English
+// rendering):
+//   t  short time       9:01 AM
+//   T  long time        9:01:00 AM
+//   d  short date       11/28/2018
+//   D  long date        November 28, 2018
+//   f  short date/time  November 28, 2018 9:01 AM   (default style)
+//   F  long date/time   Wednesday, November 28, 2018 9:01 AM
+const TIMESTAMP_DATE_FORMAT_OPTIONS: Record<Exclude<TimestampStyle, "R">, Intl.DateTimeFormatOptions> = {
+  t: { hour: "numeric", minute: "2-digit" },
+  T: { hour: "numeric", minute: "2-digit", second: "2-digit" },
+  d: { year: "numeric", month: "numeric", day: "numeric" },
+  D: { year: "numeric", month: "long", day: "numeric" },
+  f: { year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
+  F: { weekday: "long", year: "numeric", month: "long", day: "numeric", hour: "numeric", minute: "2-digit" },
+}
+
+// Largest-unit-first thresholds for Intl.RelativeTimeFormat, the standard
+// "divide down" recipe: keep dividing the delta by each unit's size until
+// it's smaller than the next unit, then format in that unit.
+const RELATIVE_DIVISIONS: Array<{ amount: number; unit: Intl.RelativeTimeFormatUnit }> = [
+  { amount: 60, unit: "seconds" },
+  { amount: 60, unit: "minutes" },
+  { amount: 24, unit: "hours" },
+  { amount: 7, unit: "days" },
+  { amount: 4.34524, unit: "weeks" },
+  { amount: 12, unit: "months" },
+  { amount: Number.POSITIVE_INFINITY, unit: "years" },
+]
+
+function formatRelativeTimestamp(unixSeconds: number, nowMs: number): string {
+  let duration = (unixSeconds * 1000 - nowMs) / 1000 // seconds; positive = future
+  const rtf = new Intl.RelativeTimeFormat(undefined, { numeric: "auto" })
+  for (const division of RELATIVE_DIVISIONS) {
+    if (Math.abs(duration) < division.amount) {
+      return rtf.format(Math.round(duration), division.unit)
+    }
+    duration /= division.amount
+  }
+  return rtf.format(Math.round(duration), "years")
+}
+
+/**
+ * Format a Discord `<t:UNIX>` / `<t:UNIX:STYLE>` timestamp as a string,
+ * using `Intl` with no explicit locale so it renders in the viewer's own
+ * locale (both here and in `DiscordText`'s `<time>` element — same call,
+ * same string). `now` is injectable for tests; defaults to `Date.now()`.
+ *
+ * Defensive: `parseDiscordMarkup` already rejects out-of-range values
+ * (anything `Date`/`Intl` could throw on) before a "timestamp" token is
+ * ever created, but this is called directly in a few places, so it
+ * re-checks and falls back to "" (render/flatten as nothing, same as an
+ * unknown tag) instead of risking a throw for any input.
+ */
+export function formatDiscordTimestamp(
+  unixSeconds: number,
+  style: TimestampStyle = "f",
+  now: number = Date.now(),
+): string {
+  if (!isValidDiscordTimestamp(unixSeconds)) return ""
+  try {
+    if (style === "R") return formatRelativeTimestamp(unixSeconds, now)
+    const date = new Date(unixSeconds * 1000)
+    return new Intl.DateTimeFormat(undefined, TIMESTAMP_DATE_FORMAT_OPTIONS[style]).format(date)
+  } catch {
+    return ""
+  }
+}
+
 /**
  * Flatten parsed tokens to a plain-text string — `#name`, `@name`, `@user`,
- * a link's text, `:name:` for an emoji, and nothing for a dropped/unknown
- * tag. For use anywhere a description needs to go into an aria-label,
- * title, or other non-visual/plain-text context. `maps` is an optional
- * fallback in case a token wasn't resolved when it was parsed.
+ * a link's text, `:name:` for an emoji, a formatted date/time for a
+ * timestamp (or, with `opts.keepTimestamps`, the timestamp's original
+ * `<t:unix[:style]>` tag, unresolved — see `PlainTextOptions`), and nothing
+ * for a dropped/unknown tag. For use anywhere a description needs to go
+ * into an aria-label, title, or other non-visual/plain-text context, or
+ * (with `keepTimestamps`) into write-time storage that shouldn't freeze a
+ * timestamp. `maps` is an optional fallback in case a token wasn't resolved
+ * when it was parsed.
  */
-export function discordMarkupToPlainText(tokens: DiscordMarkupToken[], maps: DiscordMarkupMaps = {}): string {
+export function discordMarkupToPlainText(
+  tokens: DiscordMarkupToken[],
+  maps: DiscordMarkupMaps = {},
+  opts: PlainTextOptions = {},
+): string {
   return tokens
     .map((token) => {
       switch (token.type) {
@@ -185,6 +336,8 @@ export function discordMarkupToPlainText(tokens: DiscordMarkupToken[], maps: Dis
           return `:${token.name}:`
         case "link":
           return token.text
+        case "timestamp":
+          return opts.keepTimestamps ? token.raw : formatDiscordTimestamp(token.unix, token.style)
         case "unknown":
           return ""
         default:
@@ -195,8 +348,8 @@ export function discordMarkupToPlainText(tokens: DiscordMarkupToken[], maps: Dis
 }
 
 /** Parse `text` and flatten it to plain text in one step (see `discordMarkupToPlainText`). */
-export function discordTextToPlainText(text: string, maps: DiscordMarkupMaps = {}): string {
-  return discordMarkupToPlainText(parseDiscordMarkup(text, maps), maps)
+export function discordTextToPlainText(text: string, maps: DiscordMarkupMaps = {}, opts: PlainTextOptions = {}): string {
+  return discordMarkupToPlainText(parseDiscordMarkup(text, maps), maps, opts)
 }
 
 /** Channel and role ids mentioned in `text` (deduped), for resolving names. */

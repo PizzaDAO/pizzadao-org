@@ -12,6 +12,7 @@
 
 import React, { useEffect, useState, useCallback } from "react";
 import { PepIcon, formatPep } from "./PepIcon";
+import { DiscordText } from "../shared/DiscordText";
 
 type TransactionData = {
   id: number;
@@ -124,6 +125,11 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
   const [loading, setLoading] = useState(true);
   const [loadingMore, setLoadingMore] = useState(false);
   const [expandedId, setExpandedId] = useState<number | null>(null);
+  // Channel/role id -> name maps resolved server-side, for rendering any
+  // Discord markup still present in older memos (see DiscordText below).
+  const [channels, setChannels] = useState<Record<string, string>>({});
+  const [roles, setRoles] = useState<Record<string, string>>({});
+  const [guildId, setGuildId] = useState<string | null>(null);
 
   const fetchTransactions = useCallback(async (offset = 0, append = false) => {
     try {
@@ -132,10 +138,18 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
       const data = await res.json();
       if (append) {
         setTransactions((prev) => [...prev, ...data.transactions]);
+        // Merge in this page's maps rather than replacing — "Load more"
+        // only resolves the ids referenced in the new page, and earlier
+        // pages' rows are still on screen.
+        setChannels((prev) => ({ ...prev, ...(data.channels ?? {}) }));
+        setRoles((prev) => ({ ...prev, ...(data.roles ?? {}) }));
       } else {
         setTransactions(data.transactions);
+        setChannels(data.channels ?? {});
+        setRoles(data.roles ?? {});
       }
       setTotal(data.total);
+      setGuildId(data.guildId ?? null);
     } catch {
       // ignore
     }
@@ -307,7 +321,11 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                               lineHeight: 1.15,
                             }}
                           >
-                            {tx.description}
+                            {/* interactive={false}: this row is itself a <button> — a
+                                real <a> (e.g. a channel mention link) can't nest inside
+                                it, so mentions/links render as styled, non-interactive
+                                text instead. */}
+                            <DiscordText text={tx.description} channels={channels} roles={roles} guildId={guildId} interactive={false} />
                           </span>
                           <span
                             className="ui mt-1 block text-[10px] uppercase tracking-[0.22em]"

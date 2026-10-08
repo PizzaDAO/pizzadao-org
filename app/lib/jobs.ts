@@ -1,5 +1,7 @@
 import { prisma } from './db'
 import { creditInTx, getOrCreateEconomy } from './economy'
+import { discordTextToPlainText } from './discord-markup'
+import { resolveDiscordMentions } from './discord-mention-resolve'
 
 const JOB_REWARD_AMOUNT = parseInt(process.env.JOB_REWARD_AMOUNT || '50', 10)
 const JOBS_SHEET_ID = process.env.JOBS_SHEET_ID
@@ -304,6 +306,16 @@ export async function completeJob(userId: string, reward: number, grantedBy?: st
 
   if (reward > 0) await getOrCreateEconomy(userId)
 
+  // Resolve any <#channelId> / <@&roleId> Discord mentions in the job
+  // description so the ledger memo stores plain text, not raw markup
+  // (resolveDiscordMentions never throws — a failed Discord lookup just
+  // means the memo falls back to "#channel"/"@role" instead of a name).
+  // keepTimestamps: true — a <t:...> tag shouldn't be frozen to today's
+  // formatted date/relative string at write time; keep it raw so
+  // display-time rendering (DiscordText) formats it fresh.
+  const { channels, roles } = await resolveDiscordMentions([assignment.job.description])
+  const plainDescription = discordTextToPlainText(assignment.job.description, { channels, roles }, { keepTimestamps: true })
+
   // Remove the assignment and pay the reward (with its ledger row) in one DB
   // transaction. The delete is conditional, so concurrent completions of the
   // same assignment pay at most once.
@@ -315,7 +327,7 @@ export async function completeJob(userId: string, reward: number, grantedBy?: st
       throw new Error('User does not have an active job')
     }
     if (reward > 0) {
-      await creditInTx(tx, userId, reward, 'JOB_REWARD', `Job reward: ${assignment.job.description}`, { jobId: assignment.job.id, ...(grantedBy ? { grantedBy } : {}) })
+      await creditInTx(tx, userId, reward, 'JOB_REWARD', `Job reward: ${plainDescription}`, { jobId: assignment.job.id, ...(grantedBy ? { grantedBy } : {}) })
     }
   })
 

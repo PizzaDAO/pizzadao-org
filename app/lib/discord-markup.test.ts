@@ -5,6 +5,8 @@ import {
   discordTextToPlainText,
   extractMentionIds,
   extractMentionIdsFromAll,
+  formatDiscordTimestamp,
+  isValidDiscordTimestamp,
 } from "./discord-markup"
 
 describe("parseDiscordMarkup", () => {
@@ -129,11 +131,77 @@ describe("parseDiscordMarkup", () => {
     expect(parseDiscordMarkup("<#12>")).toEqual([{ type: "unknown", raw: "<#12>" }])
   })
 
-  it("strips a Discord timestamp tag as unknown", () => {
+  it("strips a malformed Discord timestamp tag (invalid style letter) as unknown", () => {
+    expect(parseDiscordMarkup("due <t:1700000000:Z>")).toEqual([
+      { type: "text", text: "due " },
+      { type: "unknown", raw: "<t:1700000000:Z>" },
+    ])
+  })
+
+  it("parses a Discord timestamp with no style as a timestamp token (default style f)", () => {
+    expect(parseDiscordMarkup("due <t:1700000000>")).toEqual([
+      { type: "text", text: "due " },
+      { type: "timestamp", unix: 1700000000, style: "f", raw: "<t:1700000000>" },
+    ])
+  })
+
+  it("parses a Discord timestamp with an explicit style as a timestamp token", () => {
     expect(parseDiscordMarkup("due <t:1700000000:R>")).toEqual([
       { type: "text", text: "due " },
-      { type: "unknown", raw: "<t:1700000000:R>" },
+      { type: "timestamp", unix: 1700000000, style: "R", raw: "<t:1700000000:R>" },
     ])
+  })
+
+  it("parses every valid Discord timestamp style", () => {
+    for (const style of ["t", "T", "d", "D", "f", "F", "R"] as const) {
+      expect(parseDiscordMarkup(`<t:1700000000:${style}>`)).toEqual([
+        { type: "timestamp", unix: 1700000000, style, raw: `<t:1700000000:${style}>` },
+      ])
+    }
+  })
+
+  describe("out-of-range timestamps (would otherwise throw from Date/Intl)", () => {
+    it("treats a 13-digit UNIX value past the safe Date range as unknown, not a crash", () => {
+      // 9,999,999,999,999 * 1000 ms > 8.64e15 — outside what Date can hold.
+      expect(() => parseDiscordMarkup("<t:9999999999999>")).not.toThrow()
+      expect(parseDiscordMarkup("<t:9999999999999>")).toEqual([
+        { type: "unknown", raw: "<t:9999999999999>" },
+      ])
+    })
+
+    it("treats a 14-digit UNIX value (over the regex's digit cap) as unknown, not a crash", () => {
+      expect(() => parseDiscordMarkup("<t:99999999999999:R>")).not.toThrow()
+      expect(parseDiscordMarkup("<t:99999999999999:R>")).toEqual([
+        { type: "unknown", raw: "<t:99999999999999:R>" },
+      ])
+    })
+
+    it("treats a 400-digit UNIX value as unknown, not a crash", () => {
+      const hugeDigits = "9".repeat(400)
+      const text = `<t:${hugeDigits}>`
+      expect(() => parseDiscordMarkup(text)).not.toThrow()
+      expect(parseDiscordMarkup(text)).toEqual([{ type: "unknown", raw: text }])
+    })
+
+    it("isValidDiscordTimestamp rejects non-finite and out-of-range values", () => {
+      expect(isValidDiscordTimestamp(1700000000)).toBe(true)
+      expect(isValidDiscordTimestamp(8.64e12)).toBe(true)
+      expect(isValidDiscordTimestamp(8.65e12)).toBe(false)
+      expect(isValidDiscordTimestamp(Infinity)).toBe(false)
+      expect(isValidDiscordTimestamp(NaN)).toBe(false)
+    })
+
+    it("formatDiscordTimestamp never throws on an out-of-range value, and returns ''", () => {
+      expect(() => formatDiscordTimestamp(9999999999999)).not.toThrow()
+      expect(formatDiscordTimestamp(9999999999999)).toBe("")
+      expect(() => formatDiscordTimestamp(9999999999999, "R")).not.toThrow()
+      expect(formatDiscordTimestamp(9999999999999, "R")).toBe("")
+    })
+
+    it("discordTextToPlainText never throws and drops an out-of-range timestamp to nothing", () => {
+      expect(() => discordTextToPlainText("due <t:9999999999999> soon")).not.toThrow()
+      expect(discordTextToPlainText("due <t:9999999999999> soon")).toBe("due  soon")
+    })
   })
 
   it("strips a malformed/empty emoji tag as unknown", () => {
@@ -235,7 +303,7 @@ describe("parseDiscordMarkup", () => {
 describe("discordMarkupToPlainText / discordTextToPlainText", () => {
   it("flattens every token kind to plain text", () => {
     const text =
-      "Now tag <@&815277786012975134> in <#1099323056012394556>, hi <@123456789012345678>, nice <:pizza:1234826199080112138>, see [the treasury](https://treasury.pizzadao.xyz), ignore <t:1700000000:R>"
+      "Now tag <@&815277786012975134> in <#1099323056012394556>, hi <@123456789012345678>, nice <:pizza:1234826199080112138>, see [the treasury](https://treasury.pizzadao.xyz), ignore <t:1700000000:Z>"
     const plain = discordTextToPlainText(text, {
       roles: { "815277786012975134": "Partnerships" },
       channels: { "1099323056012394556": "partner-suggestions" },
@@ -243,6 +311,35 @@ describe("discordMarkupToPlainText / discordTextToPlainText", () => {
     expect(plain).toBe(
       "Now tag @Partnerships in #partner-suggestions, hi @user, nice :pizza:, see the treasury, ignore ",
     )
+  })
+
+  it("flattens a valid Discord timestamp to the same formatted string formatDiscordTimestamp produces", () => {
+    const tokens = parseDiscordMarkup("<t:1700000000:D>")
+    expect(discordMarkupToPlainText(tokens)).toBe(formatDiscordTimestamp(1700000000, "D"))
+  })
+
+  describe("keepTimestamps", () => {
+    it("re-serializes a timestamp token back to its original <t:unix:style> tag instead of formatting it", () => {
+      const tokens = parseDiscordMarkup("due <t:1700000000:R> soon")
+      expect(discordMarkupToPlainText(tokens, {}, { keepTimestamps: true })).toBe("due <t:1700000000:R> soon")
+    })
+
+    it("re-serializes a no-style timestamp back to its original <t:unix> tag (no style suffix added)", () => {
+      expect(discordTextToPlainText("due <t:1700000000>", {}, { keepTimestamps: true })).toBe("due <t:1700000000>")
+    })
+
+    it("still resolves channels/roles to plain text while keeping the timestamp raw", () => {
+      const plain = discordTextToPlainText(
+        "meet in <#1099323056012394556> at <t:1700000000:t>",
+        { channels: { "1099323056012394556": "partner-suggestions" } },
+        { keepTimestamps: true },
+      )
+      expect(plain).toBe("meet in #partner-suggestions at <t:1700000000:t>")
+    })
+
+    it("still drops a malformed timestamp tag even with keepTimestamps set", () => {
+      expect(discordTextToPlainText("due <t:123:Z>", {}, { keepTimestamps: true })).toBe("due ")
+    })
   })
 
   it("falls back to the maps argument when a token wasn't resolved at parse time", () => {
@@ -287,5 +384,34 @@ describe("extractMentionIdsFromAll", () => {
     ])
     expect(result.roleIds).toEqual(["11111"])
     expect(result.channelIds).toEqual(["999999999999999999"])
+  })
+})
+
+describe("formatDiscordTimestamp", () => {
+  const UNIX = 1700000000 // 2023-11-14T22:13:20.000Z
+
+  it("defaults to style f when none is given", () => {
+    expect(formatDiscordTimestamp(UNIX)).toBe(formatDiscordTimestamp(UNIX, "f"))
+  })
+
+  it("formats every absolute style as a non-empty string, date-bearing styles including the year", () => {
+    for (const style of ["t", "T", "d", "D", "f", "F"] as const) {
+      const formatted = formatDiscordTimestamp(UNIX, style)
+      expect(formatted.length).toBeGreaterThan(0)
+    }
+    for (const style of ["d", "D", "f", "F"] as const) {
+      expect(formatDiscordTimestamp(UNIX, style)).toMatch(/2023/)
+    }
+  })
+
+  it("formats a relative (R) timestamp relative to the given `now`, past and future", () => {
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 3600) * 1000)).toBe("1 hour ago")
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX - 3600) * 1000)).toBe("in 1 hour")
+  })
+
+  it("picks the right relative unit across magnitudes", () => {
+    expect(formatDiscordTimestamp(UNIX, "R", UNIX * 1000)).toBe("now")
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 45) * 1000)).toBe("45 seconds ago")
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 3 * 86400) * 1000)).toBe("3 days ago")
   })
 })

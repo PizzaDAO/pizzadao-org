@@ -4,6 +4,22 @@ import { ValidationError, NotFoundError, ForbiddenError, ConflictError } from '.
 import { notifyBountyClaimed, notifyBountyCompleted, notifyBountyComment } from './notifications'
 import { getCrewMappings } from './crew-mappings'
 import { CREW_ID_PATTERN, normalizeCrewId } from './crew-id'
+import { discordTextToPlainText } from './discord-markup'
+import { resolveDiscordMentions } from './discord-mention-resolve'
+
+/**
+ * Resolve any <#channelId> / <@&roleId> Discord mentions in `description` so
+ * a ledger memo (escrow/reward/refund) stores plain text, not raw markup —
+ * same pattern as the job-reward memo in jobs.ts. resolveDiscordMentions
+ * never throws (a failed Discord lookup just falls back to "#channel" /
+ * "@role" instead of a name). keepTimestamps: true keeps a `<t:...>` tag
+ * raw in the memo rather than freezing it to today's formatted
+ * date/relative string — display-time rendering formats it fresh.
+ */
+async function plainMemoDescription(description: string): Promise<string> {
+  const { channels, roles } = await resolveDiscordMentions([description])
+  return discordTextToPlainText(description, { channels, roles }, { keepTimestamps: true })
+}
 
 /**
  * Resolve an optional crew tag for a bounty (jalapeno-82565).
@@ -70,7 +86,8 @@ export async function createBounty(
     throw new ValidationError('Reward must be a positive whole number')
   }
 
-  if (!description.trim()) {
+  const trimmedDescription = description.trim()
+  if (!trimmedDescription) {
     throw new ValidationError('Description is required')
   }
 
@@ -80,10 +97,12 @@ export async function createBounty(
     throw new ValidationError('Insufficient funds to escrow reward')
   }
 
+  const plainDescription = await plainMemoDescription(trimmedDescription)
+
   return prisma.$transaction(async (tx) => {
     const bounty = await tx.bounty.create({
       data: {
-        description: description.trim(),
+        description: trimmedDescription,
         link: link?.trim() || null,
         reward,
         createdBy: creatorId,
@@ -92,7 +111,7 @@ export async function createBounty(
       }
     })
     try {
-      await debitInTx(tx, creatorId, reward, 'BOUNTY_ESCROW', `Bounty escrow: ${description.trim()}`, { bountyId: bounty.id })
+      await debitInTx(tx, creatorId, reward, 'BOUNTY_ESCROW', `Bounty escrow: ${plainDescription}`, { bountyId: bounty.id })
     } catch (e) {
       if (e instanceof ValidationError) throw new ValidationError('Insufficient funds to escrow reward')
       throw e
@@ -236,6 +255,8 @@ export async function completeBounty(creatorId: string, bountyId: number) {
 
   await getOrCreateEconomy(claimerId)
 
+  const plainDescription = await plainMemoDescription(bounty.description)
+
   await prisma.$transaction(async (tx) => {
     const done = await tx.bounty.updateMany({
       where: { id: bountyId, createdBy: creatorId, status: 'CLAIMED', claimedBy: claimerId },
@@ -244,7 +265,7 @@ export async function completeBounty(creatorId: string, bountyId: number) {
     if (done.count !== 1) {
       throw new ConflictError('Bounty is no longer awaiting completion')
     }
-    await creditInTx(tx, claimerId, bounty.reward, 'BOUNTY_REWARD', `Bounty reward: ${bounty.description}`, { bountyId })
+    await creditInTx(tx, claimerId, bounty.reward, 'BOUNTY_REWARD', `Bounty reward: ${plainDescription}`, { bountyId })
   })
 
   // Notify the claimer (fire and forget - don't block on notification)
@@ -283,6 +304,8 @@ export async function cancelBounty(creatorId: string, bountyId: number) {
 
   await getOrCreateEconomy(creatorId)
 
+  const plainDescription = await plainMemoDescription(bounty.description)
+
   await prisma.$transaction(async (tx) => {
     const cancelled = await tx.bounty.updateMany({
       where: { id: bountyId, createdBy: creatorId, status: { in: ['OPEN', 'CLAIMED'] } },
@@ -291,7 +314,7 @@ export async function cancelBounty(creatorId: string, bountyId: number) {
     if (cancelled.count !== 1) {
       throw new ConflictError('Bounty can no longer be cancelled')
     }
-    await creditInTx(tx, creatorId, bounty.reward, 'BOUNTY_REFUND', `Bounty refund: ${bounty.description}`, { bountyId })
+    await creditInTx(tx, creatorId, bounty.reward, 'BOUNTY_REFUND', `Bounty refund: ${plainDescription}`, { bountyId })
   })
 
   return { ...bounty, status: 'CANCELLED' as const }

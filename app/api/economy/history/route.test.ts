@@ -100,6 +100,26 @@ describe('GET /api/economy/history', () => {
     expect(getTransactionHistory).toHaveBeenCalledWith('user-1', 20, 0)
   })
 
+  it('resolves Discord mentions referenced in the returned memos', async () => {
+    ;(getSession as ReturnType<typeof vi.fn>).mockResolvedValue({ discordId: 'user-1' })
+    ;(getTransactionHistory as ReturnType<typeof vi.fn>).mockResolvedValue({
+      transactions: [
+        { id: 1, type: 'JOB_REWARD', amount: 50, balance: 50, description: 'Job reward: Clean <#123456789012345678> now', createdAt: '2025-01-01T00:00:00Z' },
+      ],
+      total: 1,
+    })
+
+    const res = await GET(createRequest('/api/economy/history'))
+    const body = await res.json()
+
+    expect(res.status).toBe(200)
+    // No bot token configured in tests, so the mention resolves to {} —
+    // the fields are present regardless, for TransactionHistory to render with.
+    expect(body.channels).toEqual({})
+    expect(body.roles).toEqual({})
+    expect(body).toHaveProperty('guildId')
+  })
+
   it('should return 400 when getTransactionHistory throws', async () => {
     ;(getSession as ReturnType<typeof vi.fn>).mockResolvedValue({ discordId: 'user-1' })
     ;(getTransactionHistory as ReturnType<typeof vi.fn>).mockRejectedValue(new Error('Database error'))

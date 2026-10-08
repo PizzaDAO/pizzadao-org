@@ -5,6 +5,7 @@ import { formatPep } from "../economy/PepIcon";
 import { UserLink } from "../UserLink";
 import { BountyComments } from "./BountyComments";
 import { card as cardBase, btn, badge } from "../shared-styles";
+import { DiscordText } from "../shared/DiscordText";
 
 type Bounty = {
   id: number;
@@ -23,6 +24,10 @@ type BountyCardProps = {
   bounty: Bounty;
   currentUserId: string;
   onAction?: () => void;
+  /** channel/role id -> name maps resolved server-side, and the guild id for channel links */
+  channels?: Record<string, string>;
+  roles?: Record<string, string>;
+  guildId?: string | null;
 };
 
 function cardStyle(status: "OPEN" | "CLAIMED"): CSSProperties {
@@ -62,7 +67,7 @@ function statusBadge(status: "OPEN" | "CLAIMED"): CSSProperties {
   };
 }
 
-export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps) {
+export function BountyCard({ bounty, currentUserId, onAction, channels, roles, guildId }: BountyCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showComments, setShowComments] = useState(false);
@@ -131,7 +136,7 @@ export function BountyCard({ bounty, currentUserId, onAction }: BountyCardProps)
               color: "hsl(var(--foreground))",
             }}
           >
-            {bounty.description}
+            <DiscordText text={bounty.description} channels={channels} roles={roles} guildId={guildId} />
           </p>
           {bounty.link && (
             <a

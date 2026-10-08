@@ -7,6 +7,7 @@
 import Link from 'next/link'
 import { useEffect, useState } from 'react'
 import { badge, card } from '@/app/ui/shared-styles'
+import { DiscordText } from '@/app/ui/shared/DiscordText'
 
 export type CrewBounty = {
   id: number
@@ -36,21 +37,35 @@ export function CrewBounties({
   // Plain fetch (like the page's manuals fetch) so the crew page doesn't
   // need a react-query provider in tests.
   const [bounties, setBounties] = useState<CrewBounty[] | null>(null)
+  const [channels, setChannels] = useState<Record<string, string>>({})
+  const [roles, setRoles] = useState<Record<string, string>>({})
 
   useEffect(() => {
     let cancelled = false
     ;(async () => {
       let list: CrewBounty[] = []
+      let resolvedChannels: Record<string, string> = {}
+      let resolvedRoles: Record<string, string> = {}
       try {
         const res = await fetch(`/api/bounties?crewId=${encodeURIComponent(crewId)}`, { cache: "no-store" })
         if (res?.ok) {
-          const json = (await res.json()) as { bounties?: CrewBounty[] }
+          const json = (await res.json()) as {
+            bounties?: CrewBounty[]
+            channels?: Record<string, string>
+            roles?: Record<string, string>
+          }
           list = openCrewBounties(Array.isArray(json?.bounties) ? json.bounties : [], crewId)
+          resolvedChannels = json?.channels ?? {}
+          resolvedRoles = json?.roles ?? {}
         }
       } catch {
         // Non-critical section: fall through to the empty state.
       }
-      if (!cancelled) setBounties(list)
+      if (!cancelled) {
+        setBounties(list)
+        setChannels(resolvedChannels)
+        setRoles(resolvedRoles)
+      }
     })()
     return () => {
       cancelled = true
@@ -116,7 +131,7 @@ export function CrewBounties({
                   href="/pep"
                   style={{ fontSize: 14, fontWeight: 600, color: 'hsl(var(--foreground))', textDecoration: 'none' }}
                 >
-                  {b.description}
+                  <DiscordText text={b.description} channels={channels} roles={roles} interactive={false} />
                 </Link>
                 {b.link && (
                   <div style={{ marginTop: 4 }}>
