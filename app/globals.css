@@ -361,8 +361,11 @@ body::before {
   background-image: url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 200 80' preserveAspectRatio='none'><path d='M100 6 C 40 6 6 22 6 40 C 6 60 50 74 100 74 C 160 74 194 58 194 40 C 194 22 150 6 100 6 Z' fill='none' stroke='%23F83A3A' stroke-width='2.5' stroke-linecap='round'/></svg>");
   background-repeat: no-repeat;
   background-position: center;
-  background-size: 115% 130%;
-  padding: 0.05em 0.5em;
+  /* Fit the oval to the box (backgrounds are clipped to it — anything over
+     100% cuts the top/bottom off) and pad so the text sits inside the ring. */
+  background-size: 100% 100%;
+  display: inline-block;
+  padding: 0.45em 1.1em;
 }
 
 /* Newspaper grain overlay (applied to relative parent) */
