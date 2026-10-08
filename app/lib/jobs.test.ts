@@ -62,6 +62,29 @@ describe('completeJob', () => {
     })
   })
 
+  it('resolves Discord markup in the job description to plain text in the ledger memo', async () => {
+    mockFn(prisma.jobAssignment.findFirst).mockResolvedValue({
+      ...ASSIGNMENT,
+      id: 3,
+      job: { id: 7, description: 'Clean <#123456789012345678> now', type: 'General', isActive: true },
+    })
+    mockFn(prisma.jobAssignment.deleteMany).mockResolvedValue({ count: 1 })
+
+    await completeJob('worker-1', 50)
+
+    // No Discord bot token configured in tests, so the mention can't be
+    // resolved to a real name — it falls back to "#channel" instead of
+    // leaking the raw <#id> markup into the ledger.
+    expect(logTransaction).toHaveBeenCalledWith(
+      prisma,
+      'worker-1',
+      'JOB_REWARD',
+      50,
+      'Job reward: Clean #channel now',
+      { jobId: 7 },
+    )
+  })
+
   it('does not pay when a concurrent completion already removed the assignment', async () => {
     mockFn(prisma.jobAssignment.findFirst).mockResolvedValue(ASSIGNMENT)
     mockFn(prisma.jobAssignment.deleteMany).mockResolvedValue({ count: 0 })

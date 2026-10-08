@@ -1,6 +1,7 @@
 import { describe, it, expect } from "vitest";
 import { render, screen, fireEvent } from "@testing-library/react";
 import { DiscordText } from "./DiscordText";
+import { formatDiscordTimestamp } from "@/app/lib/discord-markup";
 
 describe("DiscordText", () => {
   it("renders plain text unchanged", () => {
@@ -72,10 +73,40 @@ describe("DiscordText", () => {
   });
 
   it("strips unrecognized Discord-shaped tags instead of showing them raw", () => {
-    render(<DiscordText text="due <t:1700000000:R> soon" />);
+    // A timestamp tag with an invalid style letter is malformed, not a
+    // valid <t:...> form — still stripped as "unknown" (see the
+    // "renders Discord timestamps" block below for valid forms).
+    render(<DiscordText text="due <t:1700000000:Z> soon" />);
     expect(screen.getByText(/due/)).toBeInTheDocument();
     expect(screen.getByText(/soon/)).toBeInTheDocument();
     expect(screen.queryByText(/<t:/)).toBeNull();
+  });
+
+  describe("renders Discord timestamps", () => {
+    it("renders <t:UNIX> (default style f) in a <time> element with a dateTime attribute", () => {
+      render(<DiscordText text="due <t:1700000000>" />);
+      const time = document.querySelector("time");
+      expect(time).not.toBeNull();
+      expect(time).toHaveAttribute("dateTime", new Date(1700000000 * 1000).toISOString());
+      // "f" style: a long date + short time — e.g. "November 14, 2023, 10:13 PM".
+      expect(time?.textContent).toMatch(/2023/);
+    });
+
+    it("renders a relative <t:UNIX:R> timestamp using the same string as the plain-text helper", () => {
+      render(<DiscordText text="due <t:1700000000:R>" />);
+      const time = document.querySelector("time");
+      expect(time).not.toBeNull();
+      expect(time?.textContent).toBe(formatDiscordTimestamp(1700000000, "R"));
+    });
+
+    it("renders each absolute style without throwing and keeps the raw tag off the page", () => {
+      for (const style of ["t", "T", "d", "D", "f", "F"] as const) {
+        const { container, unmount } = render(<DiscordText text={`<t:1700000000:${style}>`} />);
+        expect(container.querySelector("time")).not.toBeNull();
+        expect(container.textContent).not.toMatch(/<t:/);
+        unmount();
+      }
+    });
   });
 
   describe("interactive={false}", () => {

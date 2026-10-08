@@ -24,7 +24,7 @@
 //     invalid HTML and fight the outer click target.
 
 import React from "react";
-import { parseDiscordMarkup } from "@/app/lib/discord-markup";
+import { parseDiscordMarkup, formatDiscordTimestamp } from "@/app/lib/discord-markup";
 
 export type DiscordTextProps = {
   text: string;
@@ -169,6 +169,13 @@ export function DiscordText({
 
           case "emoji":
             return <DiscordEmoji key={i} id={token.id} name={token.name} animated={token.animated} />;
+
+          case "timestamp":
+            return (
+              <time key={i} dateTime={new Date(token.unix * 1000).toISOString()}>
+                {formatDiscordTimestamp(token.unix, token.style)}
+              </time>
+            );
 
           case "unknown":
             // Discord syntax we don't render (malformed mention, timestamp

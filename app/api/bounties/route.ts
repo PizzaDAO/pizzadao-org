@@ -5,6 +5,7 @@ import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
+import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
 
 export const runtime = 'nodejs'
 
@@ -14,6 +15,12 @@ export async function GET(request: NextRequest) {
     const crewId = request.nextUrl.searchParams.get('crewId')
     const bounties = await getAllBounties({ crewId })
     const crewLabels = bounties.some((b) => b.crewId) ? await getCrewLabelMap() : new Map<string, string>()
+
+    // Resolve any <#channelId> / <@&roleId> Discord mentions in the bounty
+    // descriptions to names here, server-side (bot token stays on the
+    // server) — the client renders them via DiscordText using these maps,
+    // same as /api/jobs.
+    const { channels, roles, guildId } = await resolveDiscordMentions(bounties.map((b) => b.description))
 
     return NextResponse.json({
       bounties: bounties.map((b) => ({
@@ -28,7 +35,10 @@ export async function GET(request: NextRequest) {
         crewLabel: b.crewId ? (crewLabels.get(b.crewId) ?? b.crewId) : null,
         createdAt: b.createdAt.toISOString(),
         commentCount: b._count.comments
-      }))
+      })),
+      channels,
+      roles,
+      guildId
     }, {
       headers: NO_STORE_HEADERS
     })

@@ -602,10 +602,12 @@ export function useDiscover() {
       }
 
       const [bountiesRes, jobsRes, articlesRes, callsRes] = await Promise.all([
-        safeJson<{ bounties?: Array<DiscoverData['bounties'][number] & { crewLabel?: string | null }> }>(
-          fetch('/api/bounties'),
-          {},
-        ),
+        safeJson<{
+          bounties?: Array<DiscoverData['bounties'][number] & { crewLabel?: string | null }>
+          channels?: Record<string, string>
+          roles?: Record<string, string>
+          guildId?: string | null
+        }>(fetch('/api/bounties'), {}),
         safeJson<{
           jobs?: Array<{ id: number; description: string; type?: string; completed?: boolean }>
           channels?: Record<string, string>
@@ -665,9 +667,11 @@ export function useDiscover() {
         jobs,
         articles,
         calls,
-        channels: jobsRes.channels ?? {},
-        roles: jobsRes.roles ?? {},
-        guildId: jobsRes.guildId ?? null,
+        // Merge both endpoints' id -> name maps — bounty and job
+        // descriptions can mention different channels/roles.
+        channels: { ...bountiesRes.channels, ...jobsRes.channels },
+        roles: { ...bountiesRes.roles, ...jobsRes.roles },
+        guildId: jobsRes.guildId ?? bountiesRes.guildId ?? null,
       }
     },
     staleTime: 5 * 60 * 1000,

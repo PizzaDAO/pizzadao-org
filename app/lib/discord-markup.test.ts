@@ -5,6 +5,7 @@ import {
   discordTextToPlainText,
   extractMentionIds,
   extractMentionIdsFromAll,
+  formatDiscordTimestamp,
 } from "./discord-markup"
 
 describe("parseDiscordMarkup", () => {
@@ -129,11 +130,33 @@ describe("parseDiscordMarkup", () => {
     expect(parseDiscordMarkup("<#12>")).toEqual([{ type: "unknown", raw: "<#12>" }])
   })
 
-  it("strips a Discord timestamp tag as unknown", () => {
+  it("strips a malformed Discord timestamp tag (invalid style letter) as unknown", () => {
+    expect(parseDiscordMarkup("due <t:1700000000:Z>")).toEqual([
+      { type: "text", text: "due " },
+      { type: "unknown", raw: "<t:1700000000:Z>" },
+    ])
+  })
+
+  it("parses a Discord timestamp with no style as a timestamp token (default style f)", () => {
+    expect(parseDiscordMarkup("due <t:1700000000>")).toEqual([
+      { type: "text", text: "due " },
+      { type: "timestamp", unix: 1700000000, style: "f" },
+    ])
+  })
+
+  it("parses a Discord timestamp with an explicit style as a timestamp token", () => {
     expect(parseDiscordMarkup("due <t:1700000000:R>")).toEqual([
       { type: "text", text: "due " },
-      { type: "unknown", raw: "<t:1700000000:R>" },
+      { type: "timestamp", unix: 1700000000, style: "R" },
     ])
+  })
+
+  it("parses every valid Discord timestamp style", () => {
+    for (const style of ["t", "T", "d", "D", "f", "F", "R"] as const) {
+      expect(parseDiscordMarkup(`<t:1700000000:${style}>`)).toEqual([
+        { type: "timestamp", unix: 1700000000, style },
+      ])
+    }
   })
 
   it("strips a malformed/empty emoji tag as unknown", () => {
@@ -235,7 +258,7 @@ describe("parseDiscordMarkup", () => {
 describe("discordMarkupToPlainText / discordTextToPlainText", () => {
   it("flattens every token kind to plain text", () => {
     const text =
-      "Now tag <@&815277786012975134> in <#1099323056012394556>, hi <@123456789012345678>, nice <:pizza:1234826199080112138>, see [the treasury](https://treasury.pizzadao.xyz), ignore <t:1700000000:R>"
+      "Now tag <@&815277786012975134> in <#1099323056012394556>, hi <@123456789012345678>, nice <:pizza:1234826199080112138>, see [the treasury](https://treasury.pizzadao.xyz), ignore <t:1700000000:Z>"
     const plain = discordTextToPlainText(text, {
       roles: { "815277786012975134": "Partnerships" },
       channels: { "1099323056012394556": "partner-suggestions" },
@@ -243,6 +266,11 @@ describe("discordMarkupToPlainText / discordTextToPlainText", () => {
     expect(plain).toBe(
       "Now tag @Partnerships in #partner-suggestions, hi @user, nice :pizza:, see the treasury, ignore ",
     )
+  })
+
+  it("flattens a valid Discord timestamp to the same formatted string formatDiscordTimestamp produces", () => {
+    const tokens = parseDiscordMarkup("<t:1700000000:D>")
+    expect(discordMarkupToPlainText(tokens)).toBe(formatDiscordTimestamp(1700000000, "D"))
   })
 
   it("falls back to the maps argument when a token wasn't resolved at parse time", () => {
@@ -287,5 +315,34 @@ describe("extractMentionIdsFromAll", () => {
     ])
     expect(result.roleIds).toEqual(["11111"])
     expect(result.channelIds).toEqual(["999999999999999999"])
+  })
+})
+
+describe("formatDiscordTimestamp", () => {
+  const UNIX = 1700000000 // 2023-11-14T22:13:20.000Z
+
+  it("defaults to style f when none is given", () => {
+    expect(formatDiscordTimestamp(UNIX)).toBe(formatDiscordTimestamp(UNIX, "f"))
+  })
+
+  it("formats every absolute style as a non-empty string, date-bearing styles including the year", () => {
+    for (const style of ["t", "T", "d", "D", "f", "F"] as const) {
+      const formatted = formatDiscordTimestamp(UNIX, style)
+      expect(formatted.length).toBeGreaterThan(0)
+    }
+    for (const style of ["d", "D", "f", "F"] as const) {
+      expect(formatDiscordTimestamp(UNIX, style)).toMatch(/2023/)
+    }
+  })
+
+  it("formats a relative (R) timestamp relative to the given `now`, past and future", () => {
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 3600) * 1000)).toBe("1 hour ago")
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX - 3600) * 1000)).toBe("in 1 hour")
+  })
+
+  it("picks the right relative unit across magnitudes", () => {
+    expect(formatDiscordTimestamp(UNIX, "R", UNIX * 1000)).toBe("now")
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 45) * 1000)).toBe("45 seconds ago")
+    expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 3 * 86400) * 1000)).toBe("3 days ago")
   })
 })

@@ -148,16 +148,32 @@ function pill(kind: "open" | "claimed"): React.CSSProperties {
 
 // ── Item renderers ───────────────────────────────────────────────────────
 
-function BountyItem({ b }: { b: DiscoverBounty }) {
+function BountyItem({
+    b,
+    channels,
+    roles,
+    guildId,
+}: {
+    b: DiscoverBounty;
+    channels?: Record<string, string>;
+    roles?: Record<string, string>;
+    guildId?: string | null;
+}) {
     const t = useTranslations("dashboard.discover");
     const isOpen = b.status === "OPEN";
     const pillStyle = isOpen ? pill("open") : pill("claimed");
     const pillLabel = isOpen ? t("status.open") : t("status.claimed");
+    // The tile itself is the link (to /pep) — a plain-text version of the
+    // description for the accessible name, and mentions/links inside the
+    // description render as styled, non-interactive text (interactive
+    // nested inside this <Link> would be invalid HTML and fight the
+    // tile's own click target) — same pattern as JobItem below.
+    const plainDescription = discordTextToPlainText(b.description, { channels, roles });
     return (
         <Link
             href={`/pep`}
             style={previewCard()}
-            aria-label={t("bountyAriaLabel", { description: b.description })}
+            aria-label={t("bountyAriaLabel", { description: plainDescription })}
             className="paper-soft group"
         >
             <div
@@ -180,7 +196,13 @@ function BountyItem({ b }: { b: DiscoverBounty }) {
                         WebkitBoxOrient: "vertical",
                     }}
                 >
-                    {b.description}
+                    <DiscordText
+                        text={b.description}
+                        channels={channels}
+                        roles={roles}
+                        guildId={guildId}
+                        interactive={false}
+                    />
                 </span>
                 <span style={pillStyle}>{pillLabel}</span>
             </div>
@@ -532,7 +554,9 @@ export function Discover({
                     ) : (
                         bounties
                             .slice(0, 3)
-                            .map((b) => <BountyItem key={b.id} b={b} />)
+                            .map((b) => (
+                                <BountyItem key={b.id} b={b} channels={channels} roles={roles} guildId={guildId} />
+                            ))
                     ))}
                 {active === "jobs" &&
                     (jobs.length === 0 ? (

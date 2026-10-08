@@ -141,6 +141,35 @@ describe('TransactionHistory', () => {
       expect(screen.getByText('Completed job: Weekly standup notes')).toBeInTheDocument()
     })
 
+    it('renders Discord markup in a memo as plain styled text, not a nested link (the row is itself a button)', async () => {
+      ;(global.fetch as Mock).mockResolvedValue({
+        ok: true,
+        json: () =>
+          Promise.resolve({
+            transactions: [
+              makeTx({
+                id: 1,
+                type: 'JOB_REWARD',
+                amount: 50,
+                description: 'Job reward: Check <#1099323056012394556> for details',
+              }),
+            ],
+            total: 1,
+            channels: { '1099323056012394556': 'partner-suggestions' },
+            roles: {},
+            guildId: '999',
+          }),
+      })
+      render(<TransactionHistory />)
+
+      await waitFor(() => {
+        expect(screen.getByText(/#partner-suggestions/)).toBeInTheDocument()
+      })
+      // No nested <a> inside the row's <button> — the channel mention
+      // renders as styled text, not a link.
+      expect(screen.queryByRole('link')).toBeNull()
+    })
+
     it('shows correct transaction type icons for all types', async () => {
       const allTypes = [
         makeTx({ id: 1, type: 'BOUNTY_ESCROW', amount: -50, description: 'Escrow tx' }),
