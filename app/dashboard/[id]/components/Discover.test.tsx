@@ -86,6 +86,32 @@ describe("<Discover />", () => {
         expect(screen.getByText("Done")).toBeInTheDocument();
     });
 
+    it("renders a job description's Discord markup as plain styled text, not a nested link, and uses a plain-text aria-label", async () => {
+        const jobsWithMarkup: DiscoverJob[] = [
+            { id: 20, description: "Check <#1099323056012394556> for details", crew: "Comms" },
+        ];
+        renderWithIntl(
+            <Discover
+                bounties={BOUNTIES}
+                jobs={jobsWithMarkup}
+                articles={ARTICLES}
+                calls={CALLS}
+                channels={{ "1099323056012394556": "partner-suggestions" }}
+                guildId="999"
+            />,
+        );
+        await act(async () => {
+            fireEvent.click(screen.getByRole("tab", { name: /Jobs/ }));
+        });
+        // The whole tile is the one link (to /pep), with a plain-text
+        // accessible name — no second, nested anchor for the channel
+        // mention inside it.
+        const tile = screen.getByRole("link", { name: /#partner-suggestions/ });
+        expect(tile).toHaveAttribute("href", "/pep");
+        expect(screen.queryByRole("link", { name: "#partner-suggestions" })).toBeNull();
+        expect(screen.getByText("#partner-suggestions")).toBeInTheDocument();
+    });
+
     it("switches to the Articles tab and links to the article slug", async () => {
         renderWithIntl(<Discover bounties={BOUNTIES} jobs={JOBS} articles={ARTICLES} calls={CALLS} />);
         await act(async () => {

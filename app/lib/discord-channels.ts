@@ -1,11 +1,18 @@
 /**
- * Small Discord REST helpers for channels and messages (bot token, no
- * gateway). Used by the mission verifiers (#show-and-tell message check) and
- * the mission announcements (#work).
+ * Small Discord REST helpers for channels, roles and messages (bot token, no
+ * gateway). Used by the mission verifiers (#show-and-tell message check),
+ * the mission announcements (#work), and resolving `<#id>` / `<@&id>`
+ * mentions in job descriptions (see discord-mention-resolve.ts).
  *
  *   - resolveChannelId(name, envName): an env override, else the guild channel
  *     with that name, cached in memory for an hour (a failed refresh keeps the
  *     stale list).
+ *   - getGuildChannels / getGuildRoles: the guild's full channel or role
+ *     list, each cached in memory for an hour (a failed refresh keeps the
+ *     stale list). A failed refresh also starts a short (~60s) negative
+ *     cache so a Discord outage doesn't make every request in that window
+ *     wait out the REST timeout again — they get the stale list (or null)
+ *     immediately instead.
  *   - getChannelMessage / getChannel: one REST call each. "unknown" means the
  *     call itself failed (network, 5xx, rate limit, no token), as opposed to a
  *     definite "not found" (null).
@@ -14,6 +21,7 @@
  */
 const API = 'https://discord.com/api/v10'
 const TTL_MS = 60 * 60 * 1000
+const FAIL_TTL_MS = 60 * 1000
 const TIMEOUT_MS = 2500
 const SNOWFLAKE = /^\d{5,25}$/
 
@@ -28,9 +36,20 @@ export interface DiscordOpts {
 
 type GuildChannel = { id: string; name: string; type: number; parent_id?: string | null }
 let channelCache: { guildId: string; channels: GuildChannel[]; at: number } | null = null
+let channelFailCache: { guildId: string; at: number } | null = null
 
 export function clearGuildChannelsCache() {
   channelCache = null
+  channelFailCache = null
+}
+
+type GuildRole = { id: string; name: string }
+let roleCache: { guildId: string; roles: GuildRole[]; at: number } | null = null
+let roleFailCache: { guildId: string; at: number } | null = null
+
+export function clearGuildRolesCache() {
+  roleCache = null
+  roleFailCache = null
 }
 
 function token(opts: DiscordOpts): string {
@@ -63,9 +82,16 @@ export async function getGuildChannels(opts: DiscordOpts = {}): Promise<GuildCha
   if (!guildId) return null
   const now = opts.now ?? Date.now()
   if (channelCache && channelCache.guildId === guildId && now - channelCache.at < TTL_MS) return channelCache.channels
+  const stale = () => (channelCache?.guildId === guildId ? channelCache.channels : null)
+  if (channelFailCache && channelFailCache.guildId === guildId && now - channelFailCache.at < FAIL_TTL_MS) {
+    // A refresh failed recently — don't hit Discord (and wait out the REST
+    // timeout) again until the short negative-cache window elapses.
+    return stale()
+  }
   const r = await getJson(`/guilds/${guildId}/channels`, opts)
   if (!r.ok || !Array.isArray(r.json)) {
-    return channelCache?.guildId === guildId ? channelCache.channels : null
+    channelFailCache = { guildId, at: now }
+    return stale()
   }
   const channels = (r.json as GuildChannel[]).map((c) => ({
     id: String(c.id),
@@ -74,7 +100,32 @@ export async function getGuildChannels(opts: DiscordOpts = {}): Promise<GuildCha
     parent_id: c.parent_id ? String(c.parent_id) : null,
   }))
   channelCache = { guildId, channels, at: now }
+  channelFailCache = null
   return channels
+}
+
+/** The guild's roles (cached for an hour), or null when unavailable. */
+export async function getGuildRoles(opts: DiscordOpts = {}): Promise<GuildRole[] | null> {
+  const guildId = guild(opts)
+  if (!guildId) return null
+  const now = opts.now ?? Date.now()
+  if (roleCache && roleCache.guildId === guildId && now - roleCache.at < TTL_MS) return roleCache.roles
+  const stale = () => (roleCache?.guildId === guildId ? roleCache.roles : null)
+  if (roleFailCache && roleFailCache.guildId === guildId && now - roleFailCache.at < FAIL_TTL_MS) {
+    return stale()
+  }
+  const r = await getJson(`/guilds/${guildId}/roles`, opts)
+  if (!r.ok || !Array.isArray(r.json)) {
+    roleFailCache = { guildId, at: now }
+    return stale()
+  }
+  const roles = (r.json as Array<{ id: string; name: string }>).map((ro) => ({
+    id: String(ro.id),
+    name: String(ro.name ?? ''),
+  }))
+  roleCache = { guildId, roles, at: now }
+  roleFailCache = null
+  return roles
 }
 
 /** Normalize a channel name for matching: "#Show-and-Tell" / "🎨・show-and-tell" -> "show-and-tell". */

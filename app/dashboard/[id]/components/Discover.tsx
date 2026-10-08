@@ -20,6 +20,8 @@ import Link from "next/link";
 import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
+import { DiscordText } from "@/app/ui/shared/DiscordText";
+import { discordTextToPlainText } from "@/app/lib/discord-markup";
 
 // ── Item shapes ──────────────────────────────────────────────────────────
 
@@ -57,6 +59,10 @@ export type DiscoverProps = {
     jobs?: DiscoverJob[];
     articles?: DiscoverArticle[];
     calls?: DiscoverCall[];
+    /** channel/role id -> name maps resolved server-side, for rendering Discord mentions in job descriptions */
+    channels?: Record<string, string>;
+    roles?: Record<string, string>;
+    guildId?: string | null;
 };
 
 type TabKey = "bounties" | "jobs" | "articles" | "calls";
@@ -206,15 +212,31 @@ function BountyItem({ b }: { b: DiscoverBounty }) {
     );
 }
 
-function JobItem({ j }: { j: DiscoverJob }) {
+function JobItem({
+    j,
+    channels,
+    roles,
+    guildId,
+}: {
+    j: DiscoverJob;
+    channels?: Record<string, string>;
+    roles?: Record<string, string>;
+    guildId?: string | null;
+}) {
     const t = useTranslations("dashboard.discover");
     const pillStyle = j.completed ? pill("claimed") : pill("open");
     const pillLabel = j.completed ? t("status.done") : t("status.open");
+    // The tile itself is the link (to /pep) — a plain-text version of the
+    // description for the accessible name, and mentions/links inside the
+    // description render as styled, non-interactive text (interactive
+    // nested inside this <Link> would be invalid HTML and fight the
+    // tile's own click target).
+    const plainDescription = discordTextToPlainText(j.description, { channels, roles });
     return (
         <Link
             href={`/pep`}
             style={previewCard()}
-            aria-label={t("jobAriaLabel", { description: j.description })}
+            aria-label={t("jobAriaLabel", { description: plainDescription })}
             className="paper-soft group"
         >
             <div
@@ -237,7 +259,13 @@ function JobItem({ j }: { j: DiscoverJob }) {
                         WebkitBoxOrient: "vertical",
                     }}
                 >
-                    {j.description}
+                    <DiscordText
+                        text={j.description}
+                        channels={channels}
+                        roles={roles}
+                        guildId={guildId}
+                        interactive={false}
+                    />
                 </span>
                 <span style={pillStyle}>{pillLabel}</span>
             </div>
@@ -394,6 +422,9 @@ export function Discover({
     jobs = [],
     articles = [],
     calls = [],
+    channels,
+    roles,
+    guildId,
 }: DiscoverProps) {
     const t = useTranslations("dashboard.discover");
     const [active, setActive] = useState<TabKey>("bounties");
@@ -507,7 +538,11 @@ export function Discover({
                     (jobs.length === 0 ? (
                         <EmptyState kind="jobs" />
                     ) : (
-                        jobs.slice(0, 3).map((j) => <JobItem key={j.id} j={j} />)
+                        jobs
+                            .slice(0, 3)
+                            .map((j) => (
+                                <JobItem key={j.id} j={j} channels={channels} roles={roles} guildId={guildId} />
+                            ))
                     ))}
                 {active === "articles" &&
                     (articles.length === 0 ? (
