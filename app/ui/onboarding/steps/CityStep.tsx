@@ -336,10 +336,11 @@ function CityAutocomplete({
         </label>
       </div>
 
-      {/* Suggestions dropdown */}
+      {/* Suggestions list — in normal flow, not absolute: the wizard card is
+          overflow-hidden, so a floating dropdown gets clipped at its bottom edge. */}
       {open && items.length > 0 && (
         <div
-          className="paper-soft absolute left-0 right-0 top-full mt-2 z-50 overflow-hidden rounded-[20px] border"
+          className="paper-soft mt-2 overflow-hidden rounded-[20px] border"
           style={{
             background: "hsl(var(--cream))",
             borderColor: "hsl(var(--rule-warm) / 0.55)",
