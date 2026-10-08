@@ -197,7 +197,7 @@ export function TaglineEditor({ memberId, initialTagline }: TaglineEditorProps) 
                         <p
                             style={{
                                 fontSize: 12,
-                                color: "hsl(var(--tomato))",
+                                color: "hsl(var(--tomato-readable))",
                                 margin: 0,
                             }}
                             role="alert"

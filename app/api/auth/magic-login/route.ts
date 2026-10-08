@@ -3,6 +3,7 @@ import { verifyMagicToken } from "@/app/lib/magic-login";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
+import { loginReturnPath } from "@/app/lib/login-return";
 
 export const runtime = "nodejs";
 
@@ -12,7 +13,7 @@ export async function GET(req: Request) {
 
   if (!rawToken) {
     return NextResponse.redirect(
-      new URL("/?loginError=missing_token", url.origin).toString(),
+      new URL("/login?loginError=missing_token", url.origin).toString(),
     );
   }
 
@@ -25,7 +26,7 @@ export async function GET(req: Request) {
       used: "link_already_used",
     };
     return NextResponse.redirect(
-      new URL(`/?loginError=${errorMap[result.reason]}`, url.origin).toString(),
+      new URL(`/login?loginError=${errorMap[result.reason]}`, url.origin).toString(),
     );
   }
 
@@ -60,8 +61,8 @@ export async function GET(req: Request) {
 
   // Build redirect URL
   let redirectUrl: URL;
-  if (memberId) {
-    redirectUrl = new URL(`/dashboard/${memberId}`, url.origin);
+  if (memberId && url.searchParams.get("onboarding") !== "1") {
+    redirectUrl = new URL(loginReturnPath(url.searchParams.get("returnTo")) || `/dashboard/${memberId}`, url.origin);
   } else {
     // New/unlinked user — redirect to onboarding with Discord info. The
     // wizard uses discordNick for the name-match auto-claim.

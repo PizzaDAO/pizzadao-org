@@ -30,6 +30,7 @@ type Props = {
   timezoneLabel?: string;
   onTimezoneResolved?: (timezoneId: string | null, timezoneLabel: string | null) => void;
   onNext: () => void;
+  nextLabel?: string;
   onBack: () => void;
 };
 
@@ -45,6 +46,7 @@ export function CityStep({
   timezoneLabel,
   onTimezoneResolved,
   onNext,
+  nextLabel,
   onBack,
 }: Props) {
   const t = useTranslations("onboarding.city");
@@ -99,7 +101,7 @@ export function CityStep({
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">{t("overline")}</p>
+        <p className="overline text-tomato-readable">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -108,7 +110,7 @@ export function CityStep({
             textWrap: "balance",
           }}
         >
-          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
+          {t("headingPrefix")} <span className="text-tomato-readable">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
@@ -120,7 +122,7 @@ export function CityStep({
 
       {/* ─── City autocomplete card ─────────────────────────────── */}
       <section className="grid gap-4">
-        <p className="overline text-tomato">{t("fieldLabel")}</p>
+        <p className="overline text-tomato-readable">{t("fieldLabel")}</p>
         <CityAutocomplete
           value={city}
           onChange={onChange}
@@ -132,7 +134,7 @@ export function CityStep({
 
         {timezoneLabel && (
           <p
-            className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.24em] text-foreground/55"
+            className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70"
             data-testid="city-timezone"
           >
             <Clock className="h-3 w-3" aria-hidden />
@@ -141,7 +143,7 @@ export function CityStep({
         )}
 
         {telegramLoading && (
-          <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/45">
+          <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {t("lookingForChapter")}
           </p>
         )}
@@ -160,7 +162,7 @@ export function CityStep({
         <button
           type="button"
           onClick={onBack}
-          className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+          className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
         >
           <ArrowLeft className="h-3 w-3" />
           {t("back")}
@@ -171,12 +173,12 @@ export function CityStep({
           disabled={!canProceed}
           className="btn-pill-lg group"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
             boxShadow: "var(--shadow-soft)",
           }}
         >
-          {t("next")}
+          {nextLabel || t("next")}
           <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
         </button>
       </div>
@@ -283,7 +285,7 @@ function CityAutocomplete({
       <div
         className="relative overflow-hidden rounded-[24px] transition-shadow"
         style={{
-          background: "hsl(var(--cream))",
+          background: "hsl(var(--background))",
           border: "1px solid hsl(var(--rule-warm) / 0.6)",
           boxShadow: "0 30px 60px -40px hsl(46 100% 50% / 0.35)",
         }}
@@ -302,7 +304,7 @@ function CityAutocomplete({
         />
         <label className="relative flex items-center gap-3 px-4 py-4 md:gap-4 md:px-6 md:py-5">
           <MapPin
-            className="h-5 w-5 shrink-0 text-foreground/35 md:h-6 md:w-6"
+            className="h-5 w-5 shrink-0 text-foreground/70 md:h-6 md:w-6"
             aria-hidden
           />
           <input
@@ -329,7 +331,7 @@ function CityAutocomplete({
           />
           {loading && (
             <Sparkles
-              className="h-4 w-4 shrink-0 animate-pulse text-tomato/70"
+              className="h-4 w-4 shrink-0 animate-pulse text-tomato-readable/70"
               aria-hidden
             />
           )}
@@ -342,7 +344,7 @@ function CityAutocomplete({
         <div
           className="paper-soft mt-2 overflow-hidden rounded-[20px] border"
           style={{
-            background: "hsl(var(--cream))",
+            background: "hsl(var(--background))",
             borderColor: "hsl(var(--rule-warm) / 0.55)",
             boxShadow: "var(--shadow-lifted)",
           }}
@@ -398,7 +400,7 @@ function TelegramInvite({
       }}
     >
       <div className="relative">
-        <p className="overline text-tomato">{t("telegramOverline")}</p>
+        <p className="overline text-tomato-readable">{t("telegramOverline")}</p>
         <h3
           className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.01em] text-foreground"
           style={{ fontSize: "clamp(1.1rem, 2.4vw, 1.5rem)", lineHeight: 1.1 }}
@@ -417,7 +419,7 @@ function TelegramInvite({
           rel="noopener noreferrer"
           className="btn-pill group mt-4 inline-flex no-underline"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
             boxShadow: "var(--shadow-soft)",
           }}

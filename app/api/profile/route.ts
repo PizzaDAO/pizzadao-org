@@ -19,6 +19,7 @@ import { syncDiscordMember } from "@/app/lib/services/discord-api";
 import { validateProfilePayload, sanitizeDisplayName } from "@/app/lib/profile/validation";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { getRegionRoleId, ALL_REGION_ROLE_IDS } from "@/app/lib/region-mapping";
+import { registerWithMemberId } from "@/app/lib/member-registration";
 import { crewIdToLabel } from "@/app/lib/crew-labels";
 
 export const runtime = "nodejs";
@@ -149,6 +150,8 @@ const POST_HANDLER = async (req: Request) => {
     : [];
 
   const memberId = clampStr(body.memberId ?? "", 20);
+  const autoAssignMemberId = body.autoAssignMemberId === true && !memberId;
+  if (!memberId && !autoAssignMemberId) throw new ValidationError("Member ID is required");
 
   // Validate mediaType
   const mediaType = body.mediaType === "movie" || body.mediaType === "tv" ? body.mediaType : undefined;
@@ -249,8 +252,18 @@ const POST_HANDLER = async (req: Request) => {
   // 1) Write to Sheets
   let parsed: unknown;
   try {
-    parsed = await writeToSheet(payload);
+    if (autoAssignMemberId) {
+      const registration = await registerWithMemberId(payload.discordId, async assignedId => {
+        payload.memberId = assignedId;
+        payload.raw.memberId = assignedId;
+        return writeToSheet(payload);
+      });
+      parsed = { ...(registration.result as Record<string, unknown>), memberId: registration.memberId };
+    } else {
+      parsed = await writeToSheet(payload);
+    }
   } catch (e: unknown) {
+    if (e instanceof ValidationError) throw e;
     console.error('[profile] sheet write failed:', e);
     throw new ExternalServiceError('Google Sheets');
   }

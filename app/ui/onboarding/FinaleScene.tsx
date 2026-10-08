@@ -12,6 +12,7 @@
 
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
+import { useLocale, useTranslations } from "next-intl";
 
 // --- Archive number ---------------------------------------------------------
 // Deterministic per-name + per-day, matching the mockup's familyArchiveNo.
@@ -59,6 +60,8 @@ type Props = {
 };
 
 export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
+  const t = useTranslations("onboarding.finale");
+  const locale = useLocale();
   const reducedMotion = usePrefersReducedMotion();
   const [phase, setPhase] = useState<number>(reducedMotion ? 6 : 0);
   const [shareToast, setShareToast] = useState<string | null>(null);
@@ -94,7 +97,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
 
   const handleShare = async () => {
     const url = shareUrlRef.current || dashboardHref;
-    const text = `I just got made in PizzaDAO. My name is ${mafiaName}.`;
+    const text = t("shareText", { name: mafiaName });
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ title: mafiaName, text, url });
@@ -106,14 +109,14 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
     try {
       if (typeof navigator !== "undefined" && navigator.clipboard) {
         await navigator.clipboard.writeText(`${text} ${url}`);
-        setShareToast("Copied — paste it anywhere.");
+        setShareToast(t("copied"));
         window.setTimeout(() => setShareToast(null), 2400);
         return;
       }
     } catch {
       // ignore — final fallback below
     }
-    setShareToast("Sharing isn't available here.");
+    setShareToast(t("shareUnavailable"));
     window.setTimeout(() => setShareToast(null), 2400);
   };
 
@@ -199,17 +202,17 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
                 flex: 1,
                 minWidth: 0,
                 color: "hsl(var(--foreground) / 0.6)",
-                letterSpacing: "0.32em",
+                letterSpacing: "0.08em",
               }}
             >
-              PizzaDAO · Family Record
+              {t("record")}
             </p>
             <p
               className="overline"
               style={{
                 flexShrink: 0,
                 color: "hsl(var(--foreground) / 0.55)",
-                letterSpacing: "0.32em",
+                letterSpacing: "0.08em",
               }}
             >
               № {archiveNo}
@@ -248,7 +251,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
                   "inset 0 0 0 2px hsl(var(--tomato) / 0.28), inset 0 6px 14px -6px hsl(var(--tomato-deep) / 0.5), 0 16px 28px -14px hsl(20 30% 10% / 0.45)",
                 display: "grid",
                 placeItems: "center",
-                color: "hsl(var(--tomato))",
+                color: "hsl(var(--tomato-readable))",
                 transform: phase >= 2 ? "rotate(-11deg) scale(1)" : "scale(0.6)",
                 opacity: phase >= 2 ? 1 : 0,
                 ...transition(700),
@@ -291,7 +294,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
                   style={{
                     marginTop: 4,
                     fontSize: 8,
-                    letterSpacing: "0.32em",
+                    letterSpacing: "0.08em",
                     opacity: 0.8,
                   }}
                 >
@@ -306,13 +309,13 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
               <p
                 className="overline"
                 style={{
-                  color: "hsl(var(--tomato))",
-                  letterSpacing: "0.32em",
+                  color: "hsl(var(--tomato-readable))",
+                  letterSpacing: "0.08em",
                   ...transition(500),
                   opacity: phase >= 3 ? 1 : 0,
                 }}
               >
-                Status · Made
+                {t("madeStatus")}
               </p>
 
               {/* Phase 4 — name reveal */}
@@ -344,12 +347,12 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
                   marginTop: 6,
                   transform: "rotate(-3deg)",
                   fontSize: 15,
-                  color: "hsl(var(--tomato))",
+                  color: "hsl(var(--tomato-readable))",
                   ...transition(500),
                   opacity: phase >= 5 ? 1 : 0,
                 }}
               >
-                approved — the family
+                {t("approved")}
               </span>
 
               {/* Phase 5 — "you've been made" descriptor */}
@@ -365,7 +368,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
                   opacity: phase >= 5 ? 1 : 0,
                 }}
               >
-                &quot;You&apos;ve been made. The record is sealed.&quot;
+                {t("descriptor")}
               </p>
             </div>
           </div>
@@ -384,17 +387,17 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
               opacity: phase >= 5 ? 1 : 0,
             }}
           >
-            <DossierField label="Status" value="Made" />
-            <DossierField label="Archive" value={`№ ${archiveNo}`} />
+            <DossierField label={t("status")} value={t("made")} />
+            <DossierField label={t("archive")} value={`№ ${archiveNo}`} />
             <DossierField
-              label="Initiated"
-              value={new Date().toLocaleDateString(undefined, {
+              label={t("initiated")}
+              value={new Date().toLocaleDateString(locale, {
                 month: "short",
                 day: "numeric",
                 year: "numeric",
               })}
             />
-            {memberId && <DossierField label="Member" value={`№ ${memberId}`} />}
+            {memberId && <DossierField label={t("member")} value={`№ ${memberId}`} />}
           </div>
         </div>
 
@@ -415,13 +418,13 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
             href={dashboardHref}
             className="btn-pill-lg"
             style={{
-              background: "hsl(var(--tomato))",
+              background: "hsl(var(--tomato-deep))",
               color: "hsl(var(--cream))",
               border: "1px solid hsl(var(--tomato))",
               textDecoration: "none",
             }}
           >
-            Continue to dashboard
+            {t("continueButton")}
           </a>
           <button
             type="button"
@@ -434,7 +437,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
               cursor: "pointer",
             }}
           >
-            Share my name
+            {t("shareButton")}
           </button>
         </div>
 
@@ -449,7 +452,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
             opacity: phase >= 6 ? 1 : 0,
           }}
         >
-          § Filed in the family record · {new Date().getFullYear()}
+          § {t("footnote", { year: new Date().getFullYear() })}
         </p>
 
         {shareToast && (
@@ -464,7 +467,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
               padding: "10px 16px",
               borderRadius: 999,
               background: "hsl(var(--foreground))",
-              color: "hsl(var(--background))",
+              color: "hsl(var(--cream))",
               fontSize: 13,
               fontWeight: 600,
               boxShadow: "var(--shadow-lifted)",

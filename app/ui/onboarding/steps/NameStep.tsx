@@ -59,6 +59,7 @@ type Props = {
 
   // Callbacks
   onChange: (updates: {
+    mafiaName?: string;
     topping?: string;
     mafiaMovieTitle?: string;
     style?: "balanced" | "serious" | "goofy";
@@ -157,7 +158,7 @@ export function NameStep({
   releaseDate,
   mediaType,
   seenNames,
-  mafiaName: _mafiaName,
+  mafiaName,
   isUpdate,
   existingName,
   discordNick,
@@ -203,7 +204,7 @@ export function NameStep({
   const showKeepDiscord = Boolean(
     !isUpdate &&
       keepableDiscordNick &&
-      (_mafiaName === discordNick || _mafiaName === keepableDiscordNick || !_mafiaName),
+      (mafiaName === discordNick || mafiaName === keepableDiscordNick || !mafiaName),
   );
 
   const topThree = useMemo(
@@ -261,7 +262,7 @@ export function NameStep({
         />
       )}
       {(showKeepExisting || showKeepDiscord) && (
-        <p className="ui text-center text-[11px] uppercase tracking-[0.28em] text-foreground/45">
+        <p className="ui text-center text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {t("orGenerateInstead")}
         </p>
       )}
@@ -277,7 +278,7 @@ export function NameStep({
               textWrap: "balance",
             }}
           >
-            {t("heroPrefix")} <span className="text-tomato">{t("heroAccent")}</span>
+            {t("heroPrefix")} <span className="text-tomato-readable">{t("heroAccent")}</span>
           </h1>
           <p
             className="mt-5 max-w-xl text-foreground/75"
@@ -286,6 +287,15 @@ export function NameStep({
             {t("heroTagline")}
           </p>
         </header>
+      )}
+
+      {!suggestions && !submitting && (
+        <section className="grid gap-3" aria-label={t("displayNameLabel")}>
+          <label htmlFor="onboarding-display-name" className="text-sm font-semibold text-foreground">{t("displayNameLabel")}</label>
+          <input id="onboarding-display-name" type="text" autoComplete="nickname" maxLength={64} value={mafiaName || ""} onChange={event => onChange({ mafiaName: event.target.value })} placeholder={t("displayNamePlaceholder")} className="min-h-12 w-full rounded-xl border border-[hsl(var(--rule-warm)/0.65)] bg-background px-4 text-base text-foreground focus-visible:outline-2 focus-visible:outline-tomato-readable" />
+          <button type="button" disabled={!sanitizeDisplayName(mafiaName)} onClick={() => onPickName(sanitizeDisplayName(mafiaName)!)} className="btn-pill min-h-11 justify-self-start bg-foreground text-background">{t("useDisplayName")}</button>
+          <p className="overline mt-5 text-foreground/75">{t("orGenerateName")}</p>
+        </section>
       )}
 
       {/* ─── Input phase — shown until suggestions arrive ────────── */}
@@ -310,7 +320,7 @@ export function NameStep({
               disabled={!canGenerate || submitting}
               className="btn-pill-lg group"
               style={{
-                background: "hsl(var(--tomato))",
+                background: "hsl(var(--tomato-deep))",
                 color: "hsl(var(--cream))",
                 boxShadow: "var(--shadow-soft)",
               }}
@@ -320,7 +330,7 @@ export function NameStep({
             </button>
 
             {resolvedMovieTitle && (
-              <span className="ui text-[12px] uppercase tracking-[0.22em] text-foreground/55">
+              <span className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
                 {t("matchedLabel")}{" "}
                 <b className="text-foreground">{resolvedMovieTitle}</b>
                 {releaseDate ? ` (${releaseDate.slice(0, 4)})` : ""}
@@ -330,7 +340,7 @@ export function NameStep({
           </div>
 
           {seenNames.length > 0 && (
-            <p className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/45">
+            <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
               {t("seenLabel")}{" "}
               <b className="text-foreground">{seenNames.length}</b>
             </p>
@@ -354,7 +364,7 @@ export function NameStep({
       {!submitting && topThree.length > 0 && (
         <section className="relative">
           <div className="text-center md:mt-2">
-            <p className="overline text-tomato">{t("revealOverline")}</p>
+            <p className="overline text-tomato-readable">{t("revealOverline")}</p>
             <h2
               className="font-[family-name:var(--font-display)] mx-auto mt-4 max-w-3xl font-black tracking-[-0.01em] text-foreground"
               style={{
@@ -364,7 +374,7 @@ export function NameStep({
             >
               {t("revealHeading")}
             </h2>
-            <p className="ui mt-4 text-[12px] uppercase tracking-[0.28em] text-foreground/45">
+            <p className="ui mt-4 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
               {t("revealSubhead")}
             </p>
           </div>
@@ -427,7 +437,7 @@ export function NameStep({
             </div>
           </div>
 
-          <p className="ui mt-10 text-center text-[11px] uppercase tracking-[0.24em] text-foreground/45">
+          <p className="ui mt-10 text-center text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {t("tapToClaim")}
           </p>
         </section>
@@ -520,7 +530,7 @@ export function NameStep({
                   disabled={!finalName.trim()}
                   className="btn-pill group"
                   style={{
-                    background: "hsl(var(--tomato))",
+                    background: "hsl(var(--tomato-deep))",
                     color: "hsl(var(--cream))",
                   }}
                 >
@@ -562,7 +572,7 @@ function KeepBlock({
         boxShadow: "var(--shadow-soft)",
       }}
     >
-      <p className="overline relative text-tomato">{eyebrow}</p>
+      <p className="overline relative text-tomato-readable">{eyebrow}</p>
       <h3
         className="font-[family-name:var(--font-display)] relative mt-3 font-black tracking-[-0.01em] text-foreground"
         style={{ fontSize: "clamp(1.4rem, 3.2vw, 2.2rem)", lineHeight: 1 }}
@@ -581,7 +591,7 @@ function KeepBlock({
           onClick={onKeep}
           className="btn-pill group"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
           }}
         >
@@ -618,9 +628,9 @@ function CyclingStage({ tick, attempt }: { tick: number; attempt: number }) {
 
   return (
     <div className="relative grid place-items-center py-20 md:py-28">
-      <p className="overline text-tomato/80">{cycleOverline(attempt)}</p>
+      <p className="overline text-tomato-readable/80">{cycleOverline(attempt)}</p>
 
-      <span className="handwritten pointer-events-none absolute left-[8%] top-[18%] hidden rotate-[-8deg] text-[18px] text-foreground/55 md:block">
+      <span className="handwritten pointer-events-none absolute left-[8%] top-[18%] hidden rotate-[-8deg] text-[18px] text-foreground/70 md:block">
         <span className="relative">
           {crossed}
           <span
@@ -630,7 +640,7 @@ function CyclingStage({ tick, attempt }: { tick: number; attempt: number }) {
           />
         </span>
       </span>
-      <span className="handwritten pointer-events-none absolute right-[10%] top-[28%] hidden rotate-[6deg] text-[16px] text-foreground/45 md:block">
+      <span className="handwritten pointer-events-none absolute right-[10%] top-[28%] hidden rotate-[6deg] text-[16px] text-foreground/70 md:block">
         <span className="relative">
           {crossed2}
           <span
@@ -640,7 +650,7 @@ function CyclingStage({ tick, attempt }: { tick: number; attempt: number }) {
           />
         </span>
       </span>
-      <span className="handwritten pointer-events-none absolute right-[14%] bottom-[20%] hidden rotate-[-4deg] text-[20px] text-tomato md:block">
+      <span className="handwritten pointer-events-none absolute right-[14%] bottom-[20%] hidden rotate-[-4deg] text-[20px] text-tomato-readable md:block">
         {note}
       </span>
 
@@ -663,19 +673,19 @@ function CyclingStage({ tick, attempt }: { tick: number; attempt: number }) {
       <div className="mt-6 flex gap-1.5">
         <span
           className="h-1.5 w-1.5 animate-pulse rounded-full"
-          style={{ background: "hsl(var(--tomato))" }}
+          style={{ background: "hsl(var(--tomato-deep))" }}
         />
         <span
           className="h-1.5 w-1.5 animate-pulse rounded-full"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             animationDelay: "120ms",
           }}
         />
         <span
           className="h-1.5 w-1.5 animate-pulse rounded-full"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             animationDelay: "240ms",
           }}
         />
@@ -712,7 +722,7 @@ function FamilyFileCard({
       aria-pressed={isSelected}
       style={{
         transform: `rotate(${isSelected ? 0 : persona.rotation}deg)`,
-        background: "hsl(var(--cream))",
+        background: "hsl(var(--background))",
         borderColor: isSelected
           ? "hsl(var(--tomato) / 0.7)"
           : "hsl(var(--rule-warm) / 0.55)",
@@ -753,7 +763,7 @@ function FamilyFileCard({
       />
 
       <div className="relative">
-        <p className="ui text-[10px] uppercase tracking-[0.28em] text-foreground/50">
+        <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {fileLabel}
         </p>
       </div>
@@ -796,7 +806,7 @@ function FamilyFileCard({
           aria-hidden
           className="absolute -bottom-1 left-0 h-[3px] transition-all duration-500"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             width: isSelected ? "72%" : "0%",
             opacity: isSelected ? 1 : 0,
             borderRadius: 2,
@@ -805,7 +815,7 @@ function FamilyFileCard({
       </h3>
 
       {flavor && (
-        <p className="ui relative mt-3 text-[10px] uppercase tracking-[0.22em] text-foreground/55">
+        <p className="ui relative mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {flavor}
         </p>
       )}
@@ -815,7 +825,7 @@ function FamilyFileCard({
         className="handwritten pointer-events-none absolute -bottom-3 right-5 rotate-[-6deg] transition-all duration-500"
         style={{
           fontSize: "17px",
-          color: isSelected ? "hsl(var(--tomato))" : "hsl(var(--foreground) / 0.45)",
+          color: isSelected ? "hsl(var(--tomato-readable))" : "hsl(var(--foreground) / 0.45)",
           opacity: isSelected ? 1 : 0.8,
         }}
       >
@@ -880,11 +890,11 @@ function FilmPicker({
 
   return (
     <div className="relative">
-      <p className="overline text-tomato">{label}</p>
+      <p className="overline text-tomato-readable">{label}</p>
       <div
         className="relative mt-4 overflow-hidden rounded-[28px] transition-shadow"
         style={{
-          background: "hsl(var(--cream))",
+          background: "hsl(var(--background))",
           border: "1px solid hsl(var(--rule-warm) / 0.6)",
           boxShadow: "0 30px 60px -40px hsl(46 100% 50% / 0.35)",
         }}
@@ -903,7 +913,7 @@ function FilmPicker({
         />
         <label className="relative flex items-center gap-3 px-4 py-3.5 md:gap-4 md:px-6 md:py-4">
           <Search
-            className="h-4 w-4 shrink-0 text-foreground/35 md:h-5 md:w-5"
+            className="h-4 w-4 shrink-0 text-foreground/70 md:h-5 md:w-5"
             aria-hidden
           />
           <input
@@ -934,7 +944,7 @@ function FilmPicker({
                 setOpen(false);
                 setQuery("");
               }}
-              className="ui hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:border-tomato hover:text-tomato md:inline-flex"
+              className="ui hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:border-tomato hover:text-tomato-readable md:inline-flex"
             >
               {t("filmPickerClose")}
             </button>
@@ -944,12 +954,12 @@ function FilmPicker({
 
       {/* Selected confirmation footer — appears when a canonical film is locked in. */}
       {matchedFilm && !open && (
-        <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/45">
+        <p className="ui mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {matchedFilm.year} · {matchedFilm.country}
         </p>
       )}
       {!matchedFilm && (
-        <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/40">
+        <p className="ui mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {t("filmPickerToneHint")}
         </p>
       )}
@@ -968,7 +978,7 @@ function FilmPicker({
             backdropFilter: "blur(8px)",
           }}
         >
-          <p className="ui text-[10px] uppercase tracking-[0.28em] text-foreground/45">
+          <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {effectiveQuery ? t("filmPickerMatches") : t("filmPickerRecentlyRespected")}
           </p>
           <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5">
@@ -1006,7 +1016,7 @@ function FilmPicker({
                   style={{
                     borderColor: "hsl(var(--tomato) / 0.4)",
                     background: "hsl(var(--tomato) / 0.05)",
-                    color: "hsl(var(--tomato))",
+                    color: "hsl(var(--tomato-readable))",
                   }}
                 >
                   <Sparkles className="h-5 w-5" />
@@ -1014,7 +1024,7 @@ function FilmPicker({
                     {t("filmPickerUseCustom", { query: (query || value).trim() })}
                   </span>
                   <span
-                    className="ui text-[9px] uppercase tracking-[0.22em]"
+                    className="ui text-[13px] uppercase tracking-[0.08em]"
                     style={{ color: "hsl(var(--tomato) / 0.7)" }}
                   >
                     {t("filmPickerOffCanon")}
@@ -1022,7 +1032,7 @@ function FilmPicker({
                 </button>
               )}
           </div>
-          <p className="ui mt-4 text-[10px] uppercase tracking-[0.24em] text-foreground/35">
+          <p className="ui mt-4 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {t("filmPickerFooter")}
           </p>
         </div>

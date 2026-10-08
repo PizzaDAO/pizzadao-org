@@ -156,13 +156,13 @@ export function FilmPoster({ film, index }: Props) {
         {/* Top meta */}
         <div className="absolute inset-x-0 top-0 flex items-start justify-between px-3 pt-3">
           <span
-            className="ui text-[10px] uppercase tracking-[0.28em]"
+            className="ui text-[13px] uppercase tracking-[0.08em]"
             style={{ color: `${p.ink}99` }}
           >
             § {String((index ?? 0) + 1).padStart(2, "0")}
           </span>
           <span
-            className="ui text-[10px] uppercase tracking-[0.28em]"
+            className="ui text-[13px] uppercase tracking-[0.08em]"
             style={{ color: `${p.accent}` }}
           >
             {film.year}
@@ -192,7 +192,7 @@ export function FilmPoster({ film, index }: Props) {
           </div>
           <div className="mt-2 h-px w-10" style={{ background: p.accent }} />
           <p
-            className="ui mt-2 text-[9px] uppercase tracking-[0.24em]"
+            className="ui mt-2 text-[13px] uppercase tracking-[0.08em]"
             style={{ color: `${p.ink}99` }}
           >
             {film.country}

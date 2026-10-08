@@ -111,7 +111,7 @@ export function ProfileActions({
         const returnTo = encodeURIComponent(`/profile/${memberId}`);
         primary = (
             <a
-                href={`/api/discord/login?returnTo=${returnTo}`}
+                href={`/login?returnTo=${returnTo}`}
                 className="btn-pill"
                 style={{
                     background: "hsl(var(--tomato))",

@@ -11,6 +11,7 @@
 // anchovy-67435 (Restyle Phase 4d): semantic HSL tokens.
 // sicilian-41551: mobile-first layout (single column under lg).
 
+import { TermExplanation } from "@/app/ui/shared/TermExplanation";
 import React, { useEffect, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { CrimeCard, GamesCard, Leaderboard, PepIcon, TransactionHistory } from "../ui/economy";
@@ -516,7 +517,7 @@ export default function PepDashboard() {
           </p>
           <button
             onClick={() => {
-              (window.top || window).location.href = "/api/discord/login";
+              (window.top || window).location.href = "/login?returnTo=/pep";
             }}
             className="btn-pill-lg group relative mt-6"
             style={{
@@ -574,7 +575,8 @@ export default function PepDashboard() {
         {/*
           sicilian-41551: stacks under lg, side-by-side from lg up.
         */}
-        <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
+        <TermExplanation term="pep" />
+      <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           {/* Left: Jobs and Bounties */}
           <div className="min-w-0">
             <JobBoard onJobCompleted={refreshWallet} />

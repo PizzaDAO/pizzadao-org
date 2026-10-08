@@ -106,7 +106,7 @@ export function ReviewStep({
 
       {/* ─── Ceremony headline ──────────────────────────────────── */}
       <header className="relative text-center">
-        <p className="overline text-tomato">{t("overline")}</p>
+        <p className="overline text-tomato-readable">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mx-auto mt-4 max-w-[14ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -115,7 +115,7 @@ export function ReviewStep({
             textWrap: "balance",
           }}
         >
-          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
+          {t("headingPrefix")} <span className="text-tomato-readable">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mx-auto mt-4 max-w-md text-foreground/70"
@@ -171,10 +171,10 @@ export function ReviewStep({
                   transform: "rotate(-12deg)",
                 }}
               />
-              <p className="ui flex-1 truncate text-[10px] uppercase tracking-[0.32em] text-foreground/55">
+              <p className="ui flex-1 truncate text-[13px] uppercase tracking-[0.32em] text-foreground/70">
                 {t("recordLabel")}
               </p>
-              <p className="ui shrink-0 text-[10px] uppercase tracking-[0.32em] text-foreground/50">
+              <p className="ui shrink-0 text-[13px] uppercase tracking-[0.32em] text-foreground/70">
                 {t("archiveLabel", { archive })}
               </p>
             </div>
@@ -185,7 +185,7 @@ export function ReviewStep({
 
             {/* Big alias display */}
             <div className="relative mt-5 grid gap-1.5">
-              <p className="ui text-[9.5px] uppercase tracking-[0.32em] text-tomato">
+              <p className="ui text-[9.5px] uppercase tracking-[0.32em] text-tomato-readable">
                 {t("statusMade")}
               </p>
               <h3
@@ -199,7 +199,7 @@ export function ReviewStep({
               </h3>
               <span
                 aria-hidden
-                className="handwritten mt-1 inline-block rotate-[-3deg] text-[15px] text-tomato"
+                className="handwritten mt-1 inline-block rotate-[-3deg] text-[15px] text-tomato-readable"
               >
                 {t("approvedNote")}
               </span>
@@ -242,7 +242,7 @@ export function ReviewStep({
               <span
                 className="relative grid h-[68px] w-[68px] place-items-center sm:h-[78px] sm:w-[78px] md:h-[96px] md:w-[96px]"
                 style={{
-                  color: "hsl(var(--tomato))",
+                  color: "hsl(var(--tomato-readable))",
                   backgroundImage:
                     "radial-gradient(60% 60% at 32% 28%, hsl(0 93% 60% / 0.18), transparent 70%), radial-gradient(40% 40% at 75% 75%, hsl(0 93% 40% / 0.12), transparent 70%)",
                   border: "3px solid hsl(0 93% 45% / 0.82)",
@@ -262,7 +262,7 @@ export function ReviewStep({
                   }}
                 />
                 <div className="relative text-center leading-tight">
-                  <div className="font-[family-name:var(--font-display)] text-[10px] font-black uppercase tracking-[0.18em] md:text-[11.5px]">
+                  <div className="font-[family-name:var(--font-display)] text-[13px] font-black uppercase tracking-[0.08em] md:text-[11.5px]">
                     {t("stampOfficially")}
                   </div>
                   <div className="font-[family-name:var(--font-display)] text-[14px] font-black uppercase tracking-[0.14em] md:text-[17px]">
@@ -279,7 +279,7 @@ export function ReviewStep({
           {/* Margin scribbles */}
           <span
             aria-hidden
-            className="handwritten pointer-events-none absolute -left-2 top-[-18px] hidden rotate-[-6deg] text-[16px] text-foreground/55 md:block"
+            className="handwritten pointer-events-none absolute -left-2 top-[-18px] hidden rotate-[-6deg] text-[16px] text-foreground/70 md:block"
           >
             {t("fileUnder", { name: (mafiaName || empty).toLowerCase() })}
           </span>
@@ -308,7 +308,7 @@ export function ReviewStep({
           disabled={submitting}
           className="btn-pill-lg group"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
             boxShadow: "var(--shadow-soft)",
           }}
@@ -342,13 +342,13 @@ function DossierField({
 }) {
   return (
     <div>
-      <p className="ui flex items-center gap-1.5 text-[9px] uppercase tracking-[0.3em] text-foreground/45">
+      <p className="ui flex items-center gap-1.5 text-[13px] uppercase tracking-[0.3em] text-foreground/70">
         {label}
         {changed && (
           <span
             aria-hidden
             className="inline-block h-1 w-1 rounded-full"
-            style={{ background: "hsl(var(--tomato))" }}
+            style={{ background: "hsl(var(--tomato-deep))" }}
             title={modifiedTitle}
           />
         )}
@@ -362,7 +362,7 @@ function DossierField({
         {value}
       </p>
       {oldValue && changed && (
-        <p className="ui mt-0.5 text-[10px] uppercase tracking-[0.22em] text-foreground/40">
+        <p className="ui mt-0.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {wasLabel} {oldValue}
         </p>
       )}

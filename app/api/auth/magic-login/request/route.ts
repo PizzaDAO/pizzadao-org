@@ -20,7 +20,10 @@ export async function POST(req: Request) {
     }
 
     const origin = new URL(req.url).origin;
-    const result = await requestMagicLogin(username, origin);
+    const result = await requestMagicLogin(username, origin, {
+      returnTo: body?.returnTo,
+      onboarding: body?.onboarding === true,
+    });
 
     switch (result.status) {
       case "sent":

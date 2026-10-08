@@ -61,7 +61,7 @@ export default function ChatsPage() {
   // Redirect unauthenticated users to login.
   useEffect(() => {
     if (!isLoading && !session?.authenticated) {
-      router.push("/api/discord/login");
+      router.push("/login?returnTo=/chats");
     }
   }, [isLoading, session?.authenticated, router]);
 

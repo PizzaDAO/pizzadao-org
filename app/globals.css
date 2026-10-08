@@ -17,7 +17,8 @@
   --ink:          0 0% 4%;
   --ink-soft:     0 0% 14%;
   --tomato:       0 93% 60%;
-  --tomato-deep:  0 70% 50%;
+  --tomato-deep:  0 70% 44%;
+  --tomato-readable: var(--tomato-deep);
   --butter:       46 100% 62%;
   --muted:        44 30% 88%;
   --rule:         0 0% 8%;
@@ -104,6 +105,7 @@
 }
 
 [data-theme="dark"] {
+  --tomato-readable: 0 93% 72%;
   /* Raw palette tweaks for dark mode */
   --muted:        0 0% 12%;
   --rule:         0 0% 100%;
@@ -166,6 +168,7 @@
   --color-ink:          hsl(var(--ink));
   --color-ink-soft:     hsl(var(--ink-soft));
   --color-tomato:       hsl(var(--tomato));
+  --color-tomato-readable: hsl(var(--tomato-readable));
   --color-tomato-deep:  hsl(var(--tomato-deep));
   --color-butter:       hsl(var(--butter));
   --color-muted:        hsl(var(--muted));
@@ -255,8 +258,8 @@ body::before {
 .overline {
   font-family: var(--font-sans), system-ui, sans-serif;
   text-transform: uppercase;
-  letter-spacing: 0.18em;
-  font-size: 11px;
+  letter-spacing: 0.08em;
+  font-size: 13px;
   font-weight: 600;
 }
 

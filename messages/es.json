@@ -23,13 +23,19 @@
       "heading": "Únete a la mafia de la pizza",
       "tagline": "Somos una cooperativa internacional de pizza que organiza una Fiesta Mundial de la Pizza cada año.",
       "joinButton": "Unirse a PizzaDAO",
-      "loginButton": "¿Ya estás en nuestro Discord? Inicia sesión",
-      "magicLoginButton": "¿No puedes entrar? Prueba el MD de Discord"
+      "loginButton": "Entrar por mensaje de Discord",
+      "overline": "§ ··· La invitación",
+      "stepIn": "§ Adelante",
+      "doorNote": "pasa, la puerta está abierta",
+      "appetiteNote": "ven con hambre",
+      "explore": "Explorar PizzaDAO",
+      "stories": "Leer nuestras historias",
+      "guides": "Ver guías"
     },
     "name": {
       "heroPrefix": "Reclama tu",
       "heroAccent": "nombre de mafia.",
-      "heroTagline": "Elige un ingrediente. Elige una película. La familia se encarga del resto.",
+      "heroTagline": "Tu nombre público en PizzaDAO. Usa tu propio nombre o crea uno inspirado en la pizza.",
       "toppingLabel": "§ 01 · Your topping",
       "movieLabel": "§ 02 · Your mafia movie",
       "generateButton": "Generar 3 nombres",
@@ -80,7 +86,11 @@
         "thisOne": "¿este?",
         "earner": "currante",
         "skipIt": "pasa de él"
-      }
+      },
+      "displayNameLabel": "Tu nombre público",
+      "displayNamePlaceholder": "Tu nombre o apodo",
+      "useDisplayName": "Usar este nombre",
+      "orGenerateName": "O crea un nombre inspirado en la pizza"
     },
     "city": {
       "overline": "§ 02 · Tu barrio",
@@ -105,7 +115,7 @@
       "headingPrefix": "Elige tus",
       "headingAccent": "tortugas",
       "headingSuffix": ".",
-      "tagline": "Una o varias. Estos son los papeles que llevas dentro de la familia.",
+      "tagline": "Nuestros roles de comunidad, inspirados en las Tortugas Ninja. Elige los intereses que te representen; puedes cambiarlos después.",
       "selectedLabel": "Seleccionado ·",
       "noneYet": "(ninguna todavía)",
       "back": "Atrás",
@@ -164,7 +174,7 @@
       "headingPrefix": "Únete a algunas",
       "headingAccent": "crews",
       "headingSuffix": ".",
-      "tagline": "Las crews a las que te unas deciden en qué llamadas estás y qué trabajo termina en tu puerta. Elige las que sean tu estilo.",
+      "tagline": "Grupos de trabajo que organizan proyectos de PizzaDAO y se reúnen regularmente. Únete cuando quieras contribuir.",
       "loading": "Cargando crews…",
       "back": "Atrás",
       "recommended": "Recomendada",
@@ -243,7 +253,8 @@
       "errorMissingToken": "No se recibió ningún token de acceso.",
       "errorGeneric": "El acceso falló. Inténtalo de nuevo.",
       "errorSomethingWrong": "Algo salió mal",
-      "errorNetwork": "Error de red. Comprueba tu conexión e inténtalo de nuevo."
+      "errorNetwork": "Error de red. Comprueba tu conexión e inténtalo de nuevo.",
+      "sameBrowserHint": "¿Estás completando tu perfil? Abre el enlace en el mismo navegador donde empezaste para recuperar tus datos guardados."
     },
     "claim": {
       "askOverline": "§ ··· Bienvenido de nuevo",
@@ -317,7 +328,10 @@
       "errorGenerateNames": "No se pudieron generar los nombres",
       "errorSaveProfile": "No se pudo guardar el perfil",
       "errorSaveGeneric": "No se pudo guardar",
-      "stepTitleInvitedBy": "¿Quién te invitó?"
+      "stepTitleInvitedBy": "¿Quién te invitó?",
+      "continueViaDm": "Continuar por mensaje de Discord",
+      "optionalNumber": "Elegir un número de miembro (opcional)",
+      "numberAssigned": "Te asignaremos un número de miembro al terminar. Podrás elegir roles y equipos desde tu panel después."
     },
     "topping": {
       "placeholder": "¿Cuál es tu ingrediente?",
@@ -330,6 +344,39 @@
       "useCustom": "Usar \"{query}\"",
       "offCanon": "Fuera de canon",
       "footer": "Toca para elegir · o escribe el tuyo"
+    },
+    "community": {
+      "overline": "§ La comunidad de la pizza",
+      "heading": "Gente real. Pizza compartida.",
+      "description": "Conoce a quienes forman PizzaDAO: comunidades locales, equipos de trabajo y una Global Pizza Party anual.",
+      "photoAlt": "Encuentro de la comunidad PizzaDAO en {city}",
+      "photoCaption": "Comunidad PizzaDAO",
+      "participate": "Encuentra tu lugar",
+      "localTitle": "Conoce a tu comunidad local",
+      "localDescription": "Dinos tu ciudad al unirte para encontrar personas y chats de comunidades cercanas.",
+      "crewsTitle": "Únete a un equipo de trabajo",
+      "crewsDescription": "Explora los grupos que organizan proyectos y se reúnen regularmente.",
+      "projectsTitle": "Contribuye a un proyecto",
+      "projectsDescription": "Descubre qué está creando el equipo técnico y cómo puedes ayudar.",
+      "stories": "Historias de la comunidad",
+      "allStories": "Todas las historias ↗"
+    },
+    "finale": {
+      "shareText": "Me acabo de unir a PizzaDAO. Me llamo {name}.",
+      "copied": "Copiado — pégalo donde quieras.",
+      "shareUnavailable": "No se puede compartir aquí.",
+      "record": "PizzaDAO · Registro familiar",
+      "madeStatus": "Estado · Miembro",
+      "approved": "aprobado — la familia",
+      "descriptor": "Ya eres de la familia. El registro está sellado.",
+      "status": "Estado",
+      "made": "Miembro",
+      "archive": "Archivo",
+      "initiated": "Fecha de ingreso",
+      "member": "Miembro",
+      "continueButton": "Ir al panel",
+      "shareButton": "Compartir mi nombre",
+      "footnote": "Archivado en el registro familiar · {year}"
     }
   },
   "nav": {
@@ -339,15 +386,15 @@
     "crews": "Crews",
     "members": "Miembros",
     "missions": "Misiones",
-    "pep": "PEP",
-    "articles": "Artículos",
-    "calls": "Llamadas",
+    "pep": "Ganar y gastar PEP",
+    "articles": "Historias",
+    "calls": "Historial de llamadas",
     "chats": "Chats",
-    "manuals": "Manuales",
-    "turtles": "Turtles",
+    "manuals": "Guías",
+    "turtles": "Roles (Turtles)",
     "techProjects": "Proyectos tech",
     "nfts": "NFTs",
-    "poaps": "POAPs",
+    "poaps": "Insignias de eventos (POAPs)",
     "print": "Material impreso",
     "more": "Más",
     "explore": "§ Explorar",
@@ -357,7 +404,10 @@
     "openMenu": "Abrir menú",
     "closeMenu": "Cerrar menú",
     "support": "Soporte",
-    "shopAdmin": "Admin tienda"
+    "shopAdmin": "Admin tienda",
+    "community": "Comunidad",
+    "contribute": "Contribuir",
+    "resources": "Recursos"
   },
   "dashboard": {
     "loading": {
@@ -552,6 +602,85 @@
         "finalBody": "Llegaste a la cima. Eres un auténtico Pizza Don.",
         "continue": "Continuar"
       }
+    },
+    "optionalSetup": {
+      "title": "Siéntete como en casa",
+      "description": "Tu perfil está listo. Elige roles y equipos cuando quieras participar.",
+      "roles": "Elegir tus roles",
+      "crews": "Explorar equipos"
     }
+  },
+  "crewsPage": {
+    "joined": "Inscrito",
+    "viewCrew": "Ver equipo",
+    "leaving": "Saliendo…",
+    "leaveCrew": "Salir del equipo",
+    "joining": "Entrando…",
+    "joinCrew": "Unirse al equipo",
+    "loginPrompt": "Inicia sesión para unirte a un equipo.",
+    "topTasks": "Tareas principales",
+    "moreTasks": "+{count} tareas más",
+    "openSheet": "Abrir hoja ↗",
+    "loading": "Cargando equipos…",
+    "error": "§ Error",
+    "errorTitle": "No se pudo cargar la lista de equipos.",
+    "loadError": "No se pudieron cargar los equipos. Inténtalo de nuevo.",
+    "joinError": "No pudiste unirte al equipo. Inténtalo de nuevo.",
+    "leaveError": "No pudiste salir del equipo. Inténtalo de nuevo.",
+    "home": "Volver al inicio",
+    "overline": "Los equipos",
+    "titlePrefix": "Elige un equipo,",
+    "titleAccent": "únete a la llamada",
+    "description": "Grupos de trabajo que organizan proyectos de PizzaDAO y se reúnen regularmente. Únete cuando quieras contribuir.",
+    "welcome": "¡Hola, {name}! Únete a equipos para participar.",
+    "loginHint": "Inicia sesión para unirte a equipos.",
+    "pages": "Páginas de equipos",
+    "dashboard": "Mi panel",
+    "members": "Ver miembros",
+    "manuals": "Ver todos los manuales",
+    "schedule": "Horario semanal",
+    "every": "Cada",
+    "offCalendar": "Sin horario fijo",
+    "otherCrews": "Otros equipos",
+    "loginTitle": "Entra por mensaje de Discord para unirte a equipos",
+    "login": "Entrar",
+    "dayMonday": "Lunes",
+    "dayTuesday": "Martes",
+    "dayWednesday": "Miércoles",
+    "dayThursday": "Jueves",
+    "dayFriday": "Viernes",
+    "daySaturday": "Sábado",
+    "daySunday": "Domingo"
+  },
+  "callsPage": {
+    "overline": "Registro de llamadas",
+    "titlePrefix": "Historial",
+    "titleAccent": "de llamadas",
+    "recorded": "{count, plural, one {# llamada de equipo registrada} other {# llamadas de equipo registradas}} — toca una llamada para ver quién asistió.",
+    "description": "Todas las llamadas de equipo registradas y sus asistentes.",
+    "filedUnder": "Filtrar por",
+    "all": "Todos",
+    "ledger": "El registro",
+    "noMatches": "Ninguna llamada coincide con tus filtros",
+    "showing": "Mostrando {shown} de {total, plural, one {# llamada} other {# llamadas}}",
+    "clear": "Borrar filtros",
+    "sort": "Ordenar llamadas",
+    "newest": "Más recientes primero",
+    "oldest": "Más antiguos primero",
+    "empty": "No se encontraron llamadas.",
+    "attendees": "{count, plural, one {# asistente} other {# asistentes}}",
+    "room": "Asistentes",
+    "loadingAttendees": "Cargando asistentes…",
+    "attendeesError": "No se pudieron cargar los asistentes.",
+    "loadError": "No se pudieron cargar las llamadas. Inténtalo de nuevo.",
+    "prev": "← Anterior",
+    "next": "Siguiente →",
+    "page": "Página {current} de {total}",
+    "upcoming": "¿Buscas próximas llamadas? Consulta el horario semanal de los equipos."
+  },
+  "communityTerms": {
+    "missions": "Tareas guiadas para empezar a participar en PizzaDAO.",
+    "pep": "PEP son los puntos de la comunidad PizzaDAO. Gánalos contribuyendo y descubre en qué puedes gastarlos.",
+    "poaps": "Los POAPs son insignias digitales que se coleccionan en eventos de la comunidad."
   }
 }

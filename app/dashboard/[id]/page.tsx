@@ -242,6 +242,17 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         profileCompletion={summary?.profileCompletion}
                     />
 
+                    {!splitTurtlesCell(data?.Turtles).length && (
+                        <section className="my-5 rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] p-5" aria-label={t("optionalSetup.title")}>
+                            <h2 className="font-display text-2xl font-bold">{t("optionalSetup.title")}</h2>
+                            <p className="mt-2 text-sm leading-relaxed text-foreground/80">{t("optionalSetup.description")}</p>
+                            <div className="mt-4 flex flex-wrap gap-3">
+                                <Link href={`/?edit=1&memberId=${encodeURIComponent(id)}`} className="btn-pill min-h-11 bg-foreground text-background no-underline">{t("optionalSetup.roles")}</Link>
+                                <Link href="/crews" className="btn-pill min-h-11 border border-[hsl(var(--rule-warm)/0.55)] text-foreground no-underline">{t("optionalSetup.crews")}</Link>
+                            </div>
+                        </section>
+                    )}
+
                     {/* ── 1.5. Next Action ── */}
                     {summary?.nextAction && (
                         <NextActionPanel nextAction={summary.nextAction} />

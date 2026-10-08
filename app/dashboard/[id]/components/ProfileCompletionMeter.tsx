@@ -16,7 +16,7 @@ const STROKE = 4;
 const RADIUS = (RING_SIZE - STROKE) / 2;
 const CIRCUMFERENCE = 2 * Math.PI * RADIUS;
 const NEXT_LINK_CLASS =
-    "ui inline-flex items-center gap-1.5 text-[12px] font-semibold uppercase tracking-[0.18em] text-tomato transition-colors hover:text-foreground";
+    "ui inline-flex items-center gap-1.5 text-[13px] font-semibold uppercase tracking-[0.08em] text-tomato-readable transition-colors hover:text-foreground";
 const NEXT_LINK_STYLE = { textDecoration: "none", minHeight: 44 } as const;
 
 export function ProfileCompletionMeter({ completion }: { completion: ProfileCompletion | null | undefined }) {
@@ -39,7 +39,7 @@ export function ProfileCompletionMeter({ completion }: { completion: ProfileComp
             className="mt-5 flex flex-wrap items-center gap-x-4 gap-y-2 rounded-[18px] border px-4 py-3"
             style={{
                 borderColor: "hsl(var(--rule-warm) / 0.55)",
-                background: "hsl(var(--cream) / 0.55)",
+                background: "hsl(var(--background) / 0.55)",
             }}
         >
             <div
@@ -84,7 +84,7 @@ export function ProfileCompletionMeter({ completion }: { completion: ProfileComp
             </div>
 
             <div className="min-w-0 flex-1">
-                <p className="overline m-0 text-tomato">{t("overline")}</p>
+                <p className="overline m-0 text-tomato-readable">{t("overline")}</p>
                 <p
                     className="m-0 font-[family-name:var(--font-display)] font-bold tracking-[-0.01em] text-foreground"
                     style={{ fontSize: 16, lineHeight: 1.2 }}

@@ -19,7 +19,7 @@ export const pillInk =
 
 /** Tomato pill button (loud CTA). */
 export const pillTomato =
-  "btn-pill min-h-11 bg-tomato text-cream border border-transparent hover:opacity-90 no-underline";
+  "btn-pill min-h-11 bg-tomato-deep text-cream border border-transparent hover:opacity-90 no-underline";
 
 export function EditorialMasthead({
   overline,
@@ -39,7 +39,7 @@ export function EditorialMasthead({
 }) {
   return (
     <header className="relative fade-up mb-8">
-      <p className="overline text-tomato m-0">
+      <p className="overline text-tomato-readable m-0">
         <span aria-hidden>§</span>
         <span aria-hidden className="mx-2 opacity-50">
           ···
@@ -86,11 +86,11 @@ export function SectionHeading({
 }) {
   return (
     <div className="mb-3">
-      {overline && <p className="overline text-foreground/45 m-0">{overline}</p>}
+      {overline && <p className="overline text-foreground/70 m-0">{overline}</p>}
       <Tag className="font-display text-xl md:text-2xl font-black tracking-tight text-foreground mt-1 mb-0">
         {title}
         {count !== undefined && (
-          <span className="ml-2 align-middle inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[hsl(var(--butter)/0.35)] text-foreground text-[11px] font-bold tabular-nums">
+          <span className="ml-2 align-middle inline-flex items-center justify-center min-w-[24px] h-6 px-1.5 rounded-full bg-[hsl(var(--butter)/0.35)] text-foreground text-[13px] font-bold tabular-nums">
             {count}
           </span>
         )}

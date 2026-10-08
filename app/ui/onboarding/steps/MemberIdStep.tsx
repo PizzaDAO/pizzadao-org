@@ -83,7 +83,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">{t("overline")}</p>
+        <p className="overline text-tomato-readable">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -92,7 +92,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
             textWrap: "balance",
           }}
         >
-          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
+          {t("headingPrefix")} <span className="text-tomato-readable">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
@@ -111,10 +111,10 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           boxShadow: "var(--shadow-soft)",
         }}
       >
-        <p className="relative overline text-tomato">{t("nextAvailable")}</p>
+        <p className="relative overline text-tomato-readable">{t("nextAvailable")}</p>
 
         {loadingSuggestions ? (
-          <p className="relative mt-3 ui text-[12px] uppercase tracking-[0.24em] text-foreground/50">
+          <p className="relative mt-3 ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {t("pullingNumbers")}
           </p>
         ) : (
@@ -129,8 +129,8 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
                   className="ui inline-flex min-h-11 items-center gap-1 rounded-full px-4 py-2 text-sm font-bold transition-all"
                   style={{
                     background: picked
-                      ? "hsl(var(--tomato))"
-                      : "hsl(var(--cream))",
+                      ? "hsl(var(--tomato-deep))"
+                      : "hsl(var(--background))",
                     color: picked
                       ? "hsl(var(--cream))"
                       : "hsl(var(--foreground))",
@@ -159,12 +159,12 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           boxShadow: "var(--shadow-soft)",
         }}
       >
-        <p className="relative overline text-tomato">{t("claimSpecific")}</p>
+        <p className="relative overline text-tomato-readable">{t("claimSpecific")}</p>
 
         <div
           className="relative mt-4 overflow-hidden rounded-[18px]"
           style={{
-            background: "hsl(var(--cream))",
+            background: "hsl(var(--background))",
             border: "1px solid hsl(var(--rule-warm) / 0.6)",
             boxShadow: "0 20px 40px -32px hsl(46 100% 50% / 0.3)",
           }}
@@ -175,7 +175,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           />
           <label className="relative flex items-center gap-3 px-4 py-3.5 md:gap-4 md:px-5 md:py-4">
             <Hash
-              className="h-5 w-5 shrink-0 text-foreground/35"
+              className="h-5 w-5 shrink-0 text-foreground/70"
               aria-hidden
             />
             <input
@@ -197,7 +197,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
               type="button"
               onClick={() => checkAvailability(availability.id)}
               disabled={checking || !availability.id}
-              className="ui shrink-0 rounded-full px-4 py-2 text-[11px] uppercase tracking-[0.22em] transition-colors disabled:opacity-40"
+              className="ui shrink-0 rounded-full px-4 py-2 text-[13px] uppercase tracking-[0.08em] transition-colors disabled:opacity-40"
               style={{
                 border: "1px solid hsl(var(--foreground) / 0.2)",
                 color: "hsl(var(--foreground))",
@@ -213,11 +213,11 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           <div className="relative mt-4">
             {availability.status === "available" && (
               <div className="flex flex-wrap items-center gap-3">
-                <span className="ui inline-flex items-center gap-1.5 text-[12px] uppercase tracking-[0.22em] text-foreground">
+                <span className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground">
                   <span
                     aria-hidden
                     className="h-1.5 w-1.5 rounded-full"
-                    style={{ background: "hsl(var(--tomato))" }}
+                    style={{ background: "hsl(var(--tomato-deep))" }}
                   />
                   {t("available", { id: availability.id })}
                 </span>
@@ -226,7 +226,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
                   onClick={() => onChange(availability.id)}
                   className="btn-pill group"
                   style={{
-                    background: "hsl(var(--tomato))",
+                    background: "hsl(var(--tomato-deep))",
                     color: "hsl(var(--cream))",
                   }}
                 >
@@ -236,12 +236,12 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
               </div>
             )}
             {availability.status === "taken" && (
-              <p className="ui text-[12px] uppercase tracking-[0.24em] text-destructive">
+              <p className="ui text-[13px] uppercase tracking-[0.08em] text-destructive">
                 {t("taken", { id: availability.id })}
               </p>
             )}
             {availability.status === "invalid" && (
-              <p className="ui text-[12px] uppercase tracking-[0.24em] text-tomato">
+              <p className="ui text-[13px] uppercase tracking-[0.08em] text-tomato-readable">
                 {t("invalid")}
               </p>
             )}
@@ -250,7 +250,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
       </section>
 
       {/* ─── Selected summary ──────────────────────────────────── */}
-      <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/55">
+      <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
         {t("selectedLabel")}{" "}
         <b className="text-foreground">{value || t("none")}</b>
       </p>
@@ -260,7 +260,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
         <button
           type="button"
           onClick={onBack}
-          className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+          className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
         >
           <ArrowLeft className="h-3 w-3" />
           {t("back")}
@@ -271,7 +271,7 @@ export function MemberIdStep({ value, onChange, onNext, onBack }: Props) {
           disabled={!value}
           className="btn-pill-lg group"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
             boxShadow: "var(--shadow-soft)",
           }}

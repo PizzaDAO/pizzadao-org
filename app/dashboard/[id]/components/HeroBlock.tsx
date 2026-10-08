@@ -79,7 +79,7 @@ export function HeroBlock({
 
             {/* ── Top utility row — chrome controls float free of the headline */}
             <div className="flex items-center justify-between gap-3">
-                <p className="overline text-tomato">{t("overline")}</p>
+                <p className="overline text-tomato-readable">{t("overline")}</p>
                 <div className="flex items-center gap-2">
                     <ThemeToggle />
                     <NotificationBell />
@@ -100,7 +100,7 @@ export function HeroBlock({
                                 border: "1.5px solid hsl(var(--rule-warm) / 0.55)",
                                 boxShadow: "var(--shadow-soft)",
                                 imageRendering: "crisp-edges",
-                                background: "hsl(var(--cream))",
+                                background: "hsl(var(--card))",
                             }}
                             onError={(e) => {
                                 (e.target as HTMLImageElement).style.display = "none";
@@ -111,7 +111,7 @@ export function HeroBlock({
                             className="grain relative grid h-[88px] w-[88px] place-items-center rounded-full md:h-[104px] md:w-[104px]"
                             style={{
                                 border: "1.5px dashed hsl(var(--foreground) / 0.35)",
-                                background: "hsl(var(--cream) / 0.6)",
+                                background: "hsl(var(--background) / 0.6)",
                                 color: "hsl(var(--foreground) / 0.75)",
                                 boxShadow: "var(--shadow-soft)",
                             }}
@@ -123,7 +123,7 @@ export function HeroBlock({
                     )}
                     <span
                         aria-hidden
-                        className="handwritten pointer-events-none absolute -bottom-3 -right-2 rotate-[-6deg] text-tomato"
+                        className="handwritten pointer-events-none absolute -bottom-3 -right-2 rotate-[-6deg] text-tomato-readable"
                         style={{ fontSize: 15 }}
                     >
                         #{idValue}
@@ -135,7 +135,7 @@ export function HeroBlock({
                     <div className="flex flex-wrap items-baseline gap-x-3 gap-y-2">
                         <Link
                             href={`/profile/${idValue}`}
-                            className="font-[family-name:var(--font-display)] font-black tracking-[-0.02em] text-foreground transition-colors hover:text-tomato"
+                            className="font-[family-name:var(--font-display)] font-black tracking-[-0.02em] text-foreground transition-colors hover:text-tomato-readable"
                             style={{
                                 fontSize: "clamp(2rem, 5vw, 3.25rem)",
                                 lineHeight: 0.95,
@@ -147,7 +147,7 @@ export function HeroBlock({
                         </Link>
                         {badge && (
                             <span
-                                className="ui inline-flex items-center gap-1 rounded-full px-3 py-1 text-[11px] font-semibold uppercase tracking-[0.18em]"
+                                className="ui inline-flex items-center gap-1 rounded-full px-3 py-1 text-[13px] font-semibold uppercase tracking-[0.08em]"
                                 style={{
                                     background: "hsl(var(--butter) / 0.30)",
                                     color: "hsl(var(--ink))",
@@ -162,14 +162,14 @@ export function HeroBlock({
                     </div>
 
                     <div className="mt-3 flex flex-wrap items-center gap-x-3 gap-y-1.5 text-sm">
-                        <span className="ui text-[12px] uppercase tracking-[0.22em] text-foreground/55">
+                        <span className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
                             {city}
                         </span>
                         <span aria-hidden className="text-foreground/30">
                             ·
                         </span>
                         <span
-                            className="inline-flex items-center gap-1 font-semibold text-tomato"
+                            className="inline-flex items-center gap-1 font-semibold text-tomato-readable"
                             style={{ fontSize: 14 }}
                         >
                             {pepBalance !== null ? (
@@ -218,7 +218,7 @@ export function HeroBlock({
                 </Link>
                 <Link
                     href="/me/wallets"
-                    className="ui inline-flex items-center gap-1.5 text-[12px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+                    className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
                     style={{
                         textDecoration: "none",
                         minHeight: 32,

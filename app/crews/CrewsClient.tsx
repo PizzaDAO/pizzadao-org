@@ -7,6 +7,7 @@
 
 import { useEffect, useState, useMemo } from 'react'
 import Link from 'next/link'
+import { useTranslations } from 'next-intl'
 import { groupCrewsByDay } from '@/app/lib/crew-schedule'
 import { useToast } from '@/app/ui/shared/Toast'
 import { LoginPrompt } from '@/app/ui/shared/LoginPrompt'
@@ -53,6 +54,7 @@ type UserData = {
  * mappings). When it is null the client fetches /api/crew-mappings itself.
  */
 export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption[] | null }) {
+  const t = useTranslations('crewsPage')
   const [crews, setCrews] = useState<CrewOption[]>(initialCrews ?? [])
   const [loading, setLoading] = useState(!initialCrews)
   // True until we know whether the viewer is logged in (hides login nudges meanwhile).
@@ -71,7 +73,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
         // Fetch crews (only when the server couldn't render them)
         if (!initialCrews) {
           const crewsRes = await fetch('/api/crew-mappings')
-          if (!crewsRes.ok) throw new Error('Failed to load crews')
+          if (!crewsRes.ok) throw new Error(t('loadError'))
           const crewsData = await crewsRes.json()
           setCrews(crewsData.crews || [])
         }
@@ -97,15 +99,15 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
             }
           }
         }
-      } catch (e: unknown) {
-        setError(e instanceof Error ? e.message : String(e))
+      } catch {
+        setError(t('loadError'))
       } finally {
         setLoading(false)
         setUserLoading(false)
       }
     }
     fetchData()
-  }, [initialCrews])
+  }, [initialCrews, t])
 
   // Group crews by day of week, separating "Other" crews
   const crewsByDay = useMemo(() => groupCrewsByDay(crews), [crews])
@@ -126,8 +128,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
         body: JSON.stringify({ crewId, action: 'join' }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to join crew')
+      if (!res.ok) throw new Error(t('joinError'))
 
       // Update local state
       setUser(prev => prev ? {
@@ -135,8 +136,8 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
         crews: [...prev.crews, crewId.toLowerCase()]
       } : null)
 
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Something went wrong')
+    } catch {
+      toast.error(t('joinError'))
     } finally {
       setJoining(null)
     }
@@ -153,8 +154,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
         body: JSON.stringify({ crewId, action: 'leave' }),
       })
 
-      const data = await res.json()
-      if (!res.ok) throw new Error(data.error || 'Failed to leave crew')
+      if (!res.ok) throw new Error(t('leaveError'))
 
       // Update local state
       setUser(prev => prev ? {
@@ -162,8 +162,8 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
         crews: prev.crews.filter(c => c.toLowerCase() !== crewId.toLowerCase())
       } : null)
 
-    } catch (e: unknown) {
-      toast.error(e instanceof Error ? e.message : 'Something went wrong')
+    } catch {
+      toast.error(t('leaveError'))
     } finally {
       setLeaving(null)
     }
@@ -197,14 +197,14 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
               {crew.label}
             </h3>
             {(crew.callTime || crew.callLength) && (
-              <p className="overline text-foreground/55 mt-2 mb-0">
+              <p className="overline text-foreground/70 mt-2 mb-0">
                 {crew.callTime && (
                   crew.callTimeUrl ? (
                     <a
                       href={crew.callTimeUrl}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-inherit underline decoration-[hsl(var(--tomato)/0.5)] underline-offset-2 hover:text-tomato"
+                      className="text-inherit underline decoration-[hsl(var(--tomato)/0.5)] underline-offset-2 hover:text-tomato-readable"
                     >
                       {crew.callTime}
                     </a>
@@ -217,17 +217,17 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
           </div>
           {inCrew && (
             <span
-              className="overline shrink-0 px-2 py-1 rounded-full bg-[hsl(var(--tomato)/0.12)] text-tomato"
-              style={{ fontSize: 10 }}
+              className="overline shrink-0 px-2 py-1 rounded-full bg-[hsl(var(--tomato)/0.12)] text-tomato-readable"
+              style={{ fontSize: 13 }}
             >
-              Joined
+              {t('joined')}
             </span>
           )}
         </div>
 
         <div className="flex gap-2.5">
           <Link href={`/crew/${crew.id}`} className={`${pillOutline} flex-1`}>
-            View crew
+            {t('viewCrew')}
           </Link>
 
           {user && (
@@ -238,7 +238,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
                 disabled={isLeaving}
                 className={`${pillOutline} flex-1 !text-destructive !border-[hsl(var(--destructive)/0.5)] ${isLeaving ? 'cursor-wait' : ''}`}
               >
-                {isLeaving ? 'Leaving…' : 'Leave crew'}
+                {isLeaving ? t('leaving') : t('leaveCrew')}
               </button>
             ) : (
               <button
@@ -247,26 +247,26 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
                 disabled={isJoining}
                 className={`${pillInk} flex-1 ${isJoining ? 'cursor-wait' : ''}`}
               >
-                {isJoining ? 'Joining…' : 'Join crew'}
+                {isJoining ? t('joining') : t('joinCrew')}
               </button>
             )
           )}
         </div>
         {loginPromptFor === crew.id && (
-          <LoginPrompt message="Please log in to join a crew." onDismiss={() => setLoginPromptFor(null)} />
+          <LoginPrompt message={t('loginPrompt')} onDismiss={() => setLoginPromptFor(null)} />
         )}
 
         {/* Tasks Section */}
         {crew.tasks && crew.tasks.length > 0 && (
           <div className="rule-warm pt-3">
-            <p className="overline text-foreground/45 mt-0 mb-2">Top tasks</p>
+            <p className="overline text-foreground/70 mt-0 mb-2">{t('topTasks')}</p>
             <ul className="m-0 p-0 list-none flex flex-col gap-1.5">
               {crew.tasks.map((task, idx) => (
                 <li key={idx} className="flex items-start gap-2">
                   {task.priority && (
                     <span
                       className={`overline shrink-0 px-1.5 py-0.5 rounded-md mt-0.5 ${priorityClass(task.priority)}`}
-                      style={{ fontSize: 9.5, letterSpacing: '0.12em' }}
+                      style={{ fontSize: 13, letterSpacing: '0.12em' }}
                     >
                       {task.priority}
                     </span>
@@ -276,7 +276,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
                       href={task.url}
                       target="_blank"
                       rel="noreferrer"
-                      className="text-sm leading-snug text-foreground no-underline hover:text-tomato min-h-[28px] flex items-center"
+                      className="text-sm leading-snug text-foreground no-underline hover:text-tomato-readable min-h-[28px] flex items-center"
                     >
                       {task.label}
                     </a>
@@ -288,7 +288,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
             </ul>
             {(crew.taskCount ?? 0) > 3 && (
               <p className="text-xs text-muted-foreground mt-2 mb-0 italic">
-                +{(crew.taskCount ?? 0) - 3} more tasks
+                {t('moreTasks', { count: (crew.taskCount ?? 0) - 3 })}
               </p>
             )}
           </div>
@@ -299,9 +299,9 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
             href={crew.sheet}
             target="_blank"
             rel="noreferrer"
-            className="overline mt-auto inline-flex items-center min-h-11 text-foreground/55 no-underline hover:text-tomato"
+            className="overline mt-auto inline-flex items-center min-h-11 text-foreground/70 no-underline hover:text-tomato-readable"
           >
-            Open sheet ↗
+            {t('openSheet')}
           </a>
         )}
       </article>
@@ -311,7 +311,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
   if (loading) {
     return (
       <EditorialPage width="max-w-[1200px]">
-        <LoadingLine label="Loading crews…" />
+        <LoadingLine label={t('loading')} />
       </EditorialPage>
     )
   }
@@ -320,15 +320,15 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
     return (
       <EditorialPage width="max-w-[640px]">
         <div className={`${paperCard} p-7 grid gap-3`} style={{ boxShadow: 'var(--shadow-soft)' }}>
-          <p className="overline text-tomato m-0">§ Error</p>
+          <p className="overline text-tomato-readable m-0">{t('error')}</p>
           <h1
             className="font-display font-black tracking-tight text-foreground m-0"
             style={{ fontSize: 'clamp(1.75rem, 5vw, 2.25rem)', lineHeight: 1.05 }}
           >
-            The crew roster went missing.
+            {t('errorTitle')}
           </h1>
           <p className="text-muted-foreground m-0">{error}</p>
-          <Link href="/" className={`${pillInk} justify-self-start`}>Back to home</Link>
+          <Link href="/" className={`${pillInk} justify-self-start`}>{t('home')}</Link>
         </div>
       </EditorialPage>
     )
@@ -337,41 +337,41 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
   return (
     <EditorialPage width="max-w-[1200px]">
       <EditorialMasthead
-        overline="The Crews"
+        overline={t('overline')}
         title={
           <>
-            Pick a crew, <span className="text-tomato underline-scribble">join the call</span>
+            {t('titlePrefix')} <span className="text-tomato-readable underline-scribble">{t('titleAccent')}</span>
           </>
         }
         dek={
           <>
-            Working groups that meet on a regular call.{' '}
-            {user ? `Welcome, ${user.name}! Join crews to get involved.` : userLoading ? '' : 'Log in to join crews.'}
+            {t('description')}{' '}
+            {user ? t('welcome', { name: user.name }) : userLoading ? '' : t('loginHint')}
           </>
         }
       >
-        <nav aria-label="Crew pages" className="flex flex-wrap gap-2.5">
+        <nav aria-label={t('pages')} className="flex flex-wrap gap-2.5">
           {user && (
             <Link href={`/dashboard/${user.memberId}`} className={pillOutline}>
-              My dashboard
+              {t('dashboard')}
             </Link>
           )}
           <Link href="/crew" className={pillOutline}>
-            Browse members
+            {t('members')}
           </Link>
           <Link href="/manuals" className="btn-pill min-h-11 no-underline bg-butter text-ink border border-transparent hover:opacity-90">
-            Browse all manuals
+            {t('manuals')}
           </Link>
         </nav>
       </EditorialMasthead>
 
       {/* Crews by day of week: stacked on mobile, side-by-side columns from md */}
-      <section aria-label="Weekly schedule" className="flex flex-col md:flex-row gap-6 md:items-start">
+      <section aria-label={t('schedule')} className="flex flex-col md:flex-row gap-6 md:items-start">
         {scheduledCrews.map(({ day, crews: dayCrews }) => (
           <div key={day} className="flex-1 min-w-0">
             <div className="mb-3 pb-2 border-b-2 border-foreground md:text-center">
-              <p className="overline text-foreground/45 m-0">Every</p>
-              <h2 className="font-display text-xl font-black tracking-tight text-foreground m-0">{day}</h2>
+              <p className="overline text-foreground/70 m-0">{t('every')}</p>
+              <h2 className="font-display text-xl font-black tracking-tight text-foreground m-0">{t(`day${day}`)}</h2>
             </div>
             <div className="flex flex-col gap-3">
               {dayCrews.map(crew => renderCrewCard(crew as CrewOption))}
@@ -383,7 +383,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
       {/* Other Crews Section */}
       {otherCrews.length > 0 && (
         <section className="mt-12">
-          <SectionHeading overline="Off the calendar" title="Other crews" count={otherCrews.length} />
+          <SectionHeading overline={t('offCalendar')} title={t('otherCrews')} count={otherCrews.length} />
           <div className="rule-warm mb-4" />
           <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
             {otherCrews.map(crew => renderCrewCard(crew as CrewOption))}
@@ -398,10 +398,10 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
           style={{ boxShadow: 'var(--shadow-soft)' }}
         >
           <p className="font-display text-lg font-black text-foreground m-0">
-            Log in with Discord to join crews
+            {t('loginTitle')}
           </p>
           <Link href="/login" className={pillTomato}>
-            Log in
+            {t('login')}
           </Link>
         </div>
       )}
@@ -412,7 +412,7 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
 function priorityClass(priority: string): string {
   switch (priority) {
     case 'Top':
-      return 'bg-[hsl(var(--tomato)/0.15)] text-tomato'
+      return 'bg-[hsl(var(--tomato)/0.15)] text-tomato-readable'
     case 'High':
       return 'bg-[hsl(32_95%_55%/0.16)] text-[hsl(28_90%_38%)] dark:text-[hsl(32_95%_65%)]'
     case 'Mid':

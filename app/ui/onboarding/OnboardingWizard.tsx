@@ -295,6 +295,8 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         setData((p) => ({
           ...p,
           memberId: lookup.memberId,
+          turtles: p.turtles.length ? p.turtles : parseList(lookup.data["Turtles"]),
+          crews: p.crews.length ? p.crews : parseList(lookup.data["Crews"]),
           existingData: {
             mafiaName: lookup.data["Name"] || "",
             city: lookup.data["City"] || "",
@@ -308,11 +310,11 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
       // Not found - check if user has pending wizard data
       const hasPendingClaim = localStorage.getItem(PENDING_CLAIM_KEY) === "1";
-      const hasWizardData = !!(data.memberId && data.mafiaName);
+      const hasWizardData = !!(data.mafiaName && data.city);
 
       if (hasPendingClaim && hasWizardData) {
-        // User completed wizard - submit directly
-        submitAll();
+        // State updates above have not rendered yet; use the verified identity.
+        submitAll(discordId);
         return;
       }
 
@@ -414,15 +416,12 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   }
 
   // --- Submit profile ---
-  async function submitAll() {
+  async function submitAll(verifiedDiscordId?: string) {
     setIsSubmitting(true);
     setFlow({ type: "submitting" });
     setError(undefined);
 
     try {
-      // Clear pending claim flag
-      localStorage.removeItem(PENDING_CLAIM_KEY);
-
       const res = await fetch("/api/profile", {
         method: "POST",
         credentials: "include",
@@ -447,8 +446,9 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           // L3.1: undefined = not asked (the server uses the invite-link cookie), "" = no one.
           invitedBy: data.invitedBy === undefined ? undefined : (data.invitedBy?.memberId ?? ""),
           memberId: data.memberId,
-          discordId: data.discordId,
-          discordJoined: data.discordJoined,
+          autoAssignMemberId: !data.memberId,
+          discordId: verifiedDiscordId || data.discordId,
+          discordJoined: verifiedDiscordId ? true : data.discordJoined,
         }),
       });
 
@@ -461,7 +461,10 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       // pizzaiolo-35410 — Don't redirect immediately. Play the finale ceremony
       // first; FinaleScene's "Continue to dashboard" CTA (and the auto-redirect
       // fallback below) handles the navigation.
-      const memberId = data.memberId || result?.sheets?.memberId || data.discordId;
+      const memberId = result?.sheets?.memberId || result?.sheets?.crewSync?.id || result?.sheets?.id || data.memberId;
+      if (!memberId) throw new Error(t("errorSaveProfile"));
+      localStorage.removeItem(PENDING_CLAIM_KEY);
+      setData(p => ({ ...p, memberId: String(memberId) }));
       localStorage.removeItem(LS_KEY);
       const redirectTo = memberId ? `/dashboard/${memberId}` : "/";
       setFlow({ type: "success", redirectTo });
@@ -471,13 +474,13 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       setErrorDetails((e as any)?.details);
       setFlow({
         type: "wizard",
-        step: flow.type === "wizard" ? flow.step : 5,
+        step: flow.type === "wizard" ? flow.step : 2,
         isUpdate: flow.type === "wizard" && flow.isUpdate,
       });
     }
   }
 
-  // --- Claim roles (start OAuth or submit) ---
+  // --- Verify membership by Discord DM, or submit an authenticated profile ---
   function claimRoles() {
     if (!data.discordId) {
       // Force persist before redirect
@@ -485,8 +488,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         localStorage.setItem(LS_KEY, JSON.stringify(data));
         localStorage.setItem(PENDING_CLAIM_KEY, "1");
       } catch {}
-      const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
-      (window.top || window).location.href = loginUrl;
+      router.push("/login?onboarding=1");
       return;
     }
     submitAll();
@@ -539,7 +541,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         <MagicLoginFlow
           onBack={() => {
             setLoginError(null);
-            setFlow({ type: "wizard", step: 0, isUpdate: false });
+            router.push("/");
           }}
           loginError={loginError}
         />
@@ -574,7 +576,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           boxShadow: "var(--shadow-soft)",
         }}
       >
-        <p className="overline text-tomato">{t("errorSomethingSnapped")}</p>
+        <p className="overline text-tomato-readable">{t("errorSomethingSnapped")}</p>
         <div
           className="relative paper-soft overflow-hidden rounded-[18px] border p-4"
           style={{
@@ -590,7 +592,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           </div>
           {flow.details && (
             <details className="mt-2">
-              <summary className="text-xs text-foreground/55 cursor-pointer">{t("errorDetails")}</summary>
+              <summary className="text-xs text-foreground/70 cursor-pointer">{t("errorDetails")}</summary>
               <pre className="text-xs whitespace-pre-wrap text-foreground/65 mt-1">{flow.details}</pre>
             </details>
           )}
@@ -636,18 +638,14 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       return (
         <WelcomeStep
           onJoin={() => goToStep(1)}
-          onLogin={() => {
-            const loginUrl = `/api/discord/login?state=${encodeURIComponent(data.sessionId)}`;
-            (window.top || window).location.href = loginUrl;
-          }}
-          onMagicLogin={() => setFlow({ type: "magic_login" })}
+          onLogin={() => router.push("/login")}
         />
       );
     }
 
     // Progress. New members: name, city, roles, member ID, who invited you
     // (step 7), crews. The edit flow: name, city, roles, crews, review.
-    const order: WizardStep[] = flow.isUpdate ? [1, 2, 3, 5, 6] : [1, 2, 3, 4, 7, 5];
+    const order: WizardStep[] = flow.isUpdate ? [1, 2, 3, 5, 6] : flow.step === 4 ? [1, 2, 4] : [1, 2];
     const totalSteps = order.length;
     const currentIndex = Math.max(1, order.indexOf(flow.step) + 1);
     const progress = Math.min(100, Math.round((currentIndex / totalSteps) * 100));
@@ -664,10 +662,10 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         {/* Progress — editorial overline + thick tomato bar */}
         <div className="relative grid gap-2.5">
           <div className="flex items-center justify-between">
-            <p className="overline text-tomato/85">
+            <p className="overline text-tomato-readable/85">
               {t("stepOf", { current: currentIndex, total: totalSteps })}
             </p>
-            <p className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/55">
+            <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
               {progress}%
             </p>
           </div>
@@ -679,7 +677,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
               className="h-full transition-all duration-500 ease-out"
               style={{
                 width: `${progress}%`,
-                background: "hsl(var(--tomato))",
+                background: "hsl(var(--tomato-deep))",
                 boxShadow: "0 0 14px hsl(var(--tomato) / 0.4)",
               }}
             />
@@ -711,7 +709,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         <div className="relative flex flex-wrap items-start justify-between gap-3">
           {stepTitle ? (
             <div className="flex-1 min-w-0">
-              <p className="overline text-tomato">{t("chapter", { current: currentIndex })}</p>
+              <p className="overline text-tomato-readable">{t("chapter", { current: currentIndex })}</p>
               <h2
                 className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                 style={{
@@ -734,7 +732,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
               setData({ ...initialWizardData, sessionId: uuidLike() });
               setFlow({ type: "wizard", step: 1, isUpdate: false });
             }}
-            className="ui inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.28em] text-foreground/45 transition-colors hover:text-tomato min-h-11"
+            className="ui inline-flex items-center gap-1 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable min-h-11"
             style={{ background: "none", border: "none" }}
           >
             <span aria-hidden>×</span>
@@ -759,8 +757,8 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             </p>
             {errorDetails && (
               <details className="mt-2">
-                <summary className="text-xs text-foreground/55 cursor-pointer">
-                  Details
+                <summary className="text-xs text-foreground/70 cursor-pointer">
+                  {t("errorDetails")}
                 </summary>
                 <pre className="text-xs whitespace-pre-wrap text-foreground/65 mt-1">
                   {errorDetails}
@@ -827,6 +825,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         )}
 
         {flow.step === 2 && (
+          <>
           <CityStep
             city={data.city}
             onChange={(city) => setData((p) => ({ ...p, city }))}
@@ -845,9 +844,12 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 timezoneLabel: timezoneLabel ?? undefined,
               }))
             }
-            onNext={() => goToStep(3)}
+            nextLabel={flow.isUpdate ? undefined : t("continueViaDm")}
+            onNext={() => flow.isUpdate ? goToStep(3) : claimRoles()}
             onBack={() => goToStep(1)}
           />
+          {!flow.isUpdate && <div className="grid gap-2"><p className="text-sm leading-relaxed text-foreground/80">{t("numberAssigned")}</p><button type="button" onClick={() => goToStep(4)} className="min-h-11 justify-self-start bg-transparent text-sm font-semibold text-tomato-readable underline underline-offset-4">{t("optionalNumber")}</button></div>}
+          </>
         )}
 
         {flow.step === 3 && (
@@ -864,8 +866,8 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           <MemberIdStep
             value={data.memberId || ""}
             onChange={(memberId) => setData((p) => ({ ...p, memberId }))}
-            onNext={() => goToStep(7)}
-            onBack={() => goToStep(3)}
+            onNext={() => goToStep(2)}
+            onBack={() => goToStep(2)}
           />
         )}
 
@@ -969,7 +971,7 @@ function mergeSeen(prevSeen: string[], newNames: string[]): string[] {
 function SummaryStamp({ label, value }: { label: string; value: string }) {
   return (
     <div className="min-w-0">
-      <p className="ui text-[9px] uppercase tracking-[0.3em] text-foreground/45">
+      <p className="ui text-[13px] uppercase tracking-[0.3em] text-foreground/70">
         {label}
       </p>
       <p

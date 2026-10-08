@@ -13,6 +13,7 @@
 // - garlic-68749 (Phase 4b token migration)
 // - sicilian-41551 (mobile typography clamps)
 
+import { TermExplanation } from "@/app/ui/shared/TermExplanation";
 import { useEffect, useRef, useState } from "react";
 import { useToast } from "@/app/ui/shared/Toast";
 import { useSession } from "@/app/lib/hooks/use-session";
@@ -554,6 +555,8 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
           />
         </header>
 
+        <TermExplanation term="missions" />
+
         {/* ─── Login prompt ──────────────────────────────────────── */}
         {!isAuthenticated && (
           <div
@@ -568,7 +571,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
           >
             <p style={{ margin: 0, fontSize: 15, color: "hsl(var(--foreground))" }}>
               <a
-                href="/api/discord/login"
+                href="/login?returnTo=/missions"
                 style={{
                   color: "hsl(var(--tomato))",
                   fontWeight: 700,
