@@ -1,4 +1,5 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { Asap, Asap_Condensed, Geist_Mono, Rock_Salt } from "next/font/google";
 import { NextIntlClientProvider } from "next-intl";
 import { getLocale, getMessages } from "next-intl/server";
@@ -71,7 +72,7 @@ export default async function RootLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>
             <XConnectNotice />
-            <SiteHeader />
+            <Suspense fallback={null}><SiteHeader /></Suspense>
             <div id="main-content">{children}</div>
           </Providers>
         </NextIntlClientProvider>

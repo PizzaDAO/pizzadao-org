@@ -70,23 +70,23 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // Read browser storage after hydration, before processing a login callback.
   useEffect(() => {
     function restoreData(): WizardData {
-    try {
-      const raw = localStorage.getItem(LS_KEY);
-      if (raw) {
-        const parsed = JSON.parse(raw);
-        return {
-          ...initialWizardData,
-          ...parsed,
-          sessionId: parsed?.sessionId || uuidLike(),
-          turtles: Array.isArray(parsed?.turtles)
-            ? parsed.turtles
-            : parsed?.turtle
-              ? [String(parsed.turtle)]
-              : [],
-        };
-      }
-    } catch {}
-    return { ...initialWizardData, sessionId: uuidLike() };
+      try {
+        const raw = localStorage.getItem(LS_KEY);
+        if (raw) {
+          const parsed = JSON.parse(raw);
+          return {
+            ...initialWizardData,
+            ...parsed,
+            sessionId: parsed?.sessionId || uuidLike(),
+            turtles: Array.isArray(parsed?.turtles)
+              ? parsed.turtles
+              : parsed?.turtle
+                ? [String(parsed.turtle)]
+                : [],
+          };
+        }
+      } catch {}
+      return { ...initialWizardData, sessionId: uuidLike() };
     }
     setData(restoreData());
     setDataReady(true);
