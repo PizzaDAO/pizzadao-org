@@ -144,8 +144,6 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     const url = new URL(window.location.href);
     const ref = url.searchParams.get("ref");
     if (!ref) return;
-    url.searchParams.delete("ref");
-    window.history.replaceState({}, "", url.toString());
     let alive = true;
     (async () => {
       try {
@@ -184,18 +182,9 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     const memberId = url.searchParams.get("memberId") || undefined;
     const loginErrorParam = url.searchParams.get("loginError");
 
-    // Clean URL params
-    if (discordId || isEdit || loginErrorParam) {
-      hasProcessedParams.current = true;
-      url.searchParams.delete("discordId");
-      url.searchParams.delete("discordJoined");
-      url.searchParams.delete("sessionId");
-      url.searchParams.delete("discordNick");
-      url.searchParams.delete("edit");
-      url.searchParams.delete("memberId");
-      url.searchParams.delete("loginError");
-      window.history.replaceState({}, "", url.toString());
-    }
+    // Keep callback parameters stable while the streamed layout hydrates.
+    // The authenticated cookie remains the authority for profile writes.
+    if (discordId || isEdit || loginErrorParam) hasProcessedParams.current = true;
 
     // Handle magic login error redirect
     if (loginErrorParam) {
