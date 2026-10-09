@@ -64,10 +64,12 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   const [flow, setFlow] = useState<FlowState>({ type: "initializing" });
 
   // --- Wizard Data (form state) ---
-  const [data, setData] = useState<WizardData>(() => {
-    // Load from localStorage on init
-    if (typeof window === "undefined") return initialWizardData;
+  const [data, setData] = useState<WizardData>(initialWizardData);
+  const [dataReady, setDataReady] = useState(false);
 
+  // Read browser storage after hydration, before processing a login callback.
+  useEffect(() => {
+    function restoreData(): WizardData {
     try {
       const raw = localStorage.getItem(LS_KEY);
       if (raw) {
@@ -85,7 +87,10 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       }
     } catch {}
     return { ...initialWizardData, sessionId: uuidLike() };
-  });
+    }
+    setData(restoreData());
+    setDataReady(true);
+  }, []);
 
   // --- Crew Options (loaded from API) ---
   const [crewOptions, setCrewOptions] = useState<CrewOption[]>([]);
@@ -107,11 +112,11 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
   // --- Persist data to localStorage ---
   useEffect(() => {
-    if (typeof window === "undefined") return;
+    if (!dataReady) return;
     try {
       localStorage.setItem(LS_KEY, JSON.stringify(data));
     } catch {}
-  }, [data]);
+  }, [data, dataReady]);
 
   // --- Load crew mappings ---
   useEffect(() => {
@@ -169,7 +174,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
   // --- Initialize flow based on URL params and session ---
   useEffect(() => {
-    if (hasProcessedParams.current) return;
+    if (!dataReady || hasProcessedParams.current) return;
 
     const url = new URL(window.location.href);
     const discordId = url.searchParams.get("discordId");
@@ -223,7 +228,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
     // Check if user is already logged in
     checkSession();
-  }, [initialFlow]);
+  }, [initialFlow, dataReady]);
 
   // --- Check existing session ---
   async function checkSession() {
