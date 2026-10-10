@@ -32,21 +32,19 @@ describe("resolveNextAction", () => {
         expect(action.primaryCta.href).toBe("/crews");
     });
 
-    it("returns connect_wallet when member has crews but no wallet", () => {
+    it("offers a mission without requiring a wallet or X account", () => {
         const input = baseInput();
         input.wallets.count = 0;
-        const action = resolveNextAction(input);
-        expect(action.kind).toBe("connect_wallet");
-        expect(action.primaryCta.href).toContain("/profile/");
+        input.x.connected = false;
+        input.level.nextMission = { id: 14, title: "Introduce yourself" };
+        expect(resolveNextAction(input).kind).toBe("submit_mission");
     });
 
-    it("returns connect_x when wallet present but X not connected", () => {
+    it("offers discovery when optional connections are missing", () => {
         const input = baseInput();
+        input.wallets.count = 0;
         input.x.connected = false;
-        const action = resolveNextAction(input);
-        expect(action.kind).toBe("connect_x");
-        expect(action.primaryCta.href).toContain("/api/x/login");
-        expect(action.primaryCta.href).toContain("memberId=42");
+        expect(resolveNextAction(input).kind).toBe("power_user_discover");
     });
 
     it("returns submit_mission when next mission is available", () => {

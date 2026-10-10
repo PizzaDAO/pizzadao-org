@@ -254,7 +254,7 @@
       "errorGeneric": "El acceso falló. Inténtalo de nuevo.",
       "errorSomethingWrong": "Algo salió mal",
       "errorNetwork": "Error de red. Comprueba tu conexión e inténtalo de nuevo.",
-      "sameBrowserHint": "¿Estás completando tu perfil? Abre el enlace en el mismo navegador donde empezaste para recuperar tus datos guardados."
+      "sameBrowserHint": "Tus datos de registro acompañan este enlace. Ábrelo en cualquier dispositivo y revisa tu nombre y ciudad."
     },
     "claim": {
       "askOverline": "§ ··· Bienvenido de nuevo",
@@ -331,7 +331,10 @@
       "stepTitleInvitedBy": "¿Quién te invitó?",
       "continueViaDm": "Continuar por mensaje de Discord",
       "optionalNumber": "Elegir un número de miembro (opcional)",
-      "numberAssigned": "Te asignaremos un número de miembro al terminar. Podrás elegir roles y equipos desde tu panel después."
+      "numberAssigned": "Te asignaremos un número de miembro al terminar. Podrás elegir roles y equipos desde tu panel después.",
+      "restoreFailed": "No pudimos recuperar tu registro. Actualiza para reintentar o vuelve a introducir tus datos.",
+      "draftRestored": "Hemos recuperado tu registro. Revisa tu nombre y ciudad antes de crear el perfil.",
+      "finishSignup": "Crear mi perfil"
     },
     "topping": {
       "placeholder": "¿Cuál es tu ingrediente?",
@@ -407,7 +410,8 @@
     "shopAdmin": "Admin tienda",
     "community": "Comunidad",
     "contribute": "Contribuir",
-    "resources": "Recursos"
+    "resources": "Recursos",
+    "activation": "Activación de miembros"
   },
   "dashboard": {
     "loading": {
@@ -579,7 +583,7 @@
         "stamp": "archivado",
         "overline": "§ Perfil completo",
         "headline": "¡Ya estás listo!",
-        "body": "Tu expediente está completo — la Familia puede encontrarte, avalarte y ver tu colección.",
+        "body": "Ya formas parte de un equipo. Conócelo y encuentra tu primera contribución.",
         "stepsAriaLabel": "Pasos completados",
         "nice": "¡Genial!",
         "viewProfile": "Ver tu perfil"
@@ -608,6 +612,12 @@
       "description": "Tu perfil está listo. Elige roles y equipos cuando quieras participar.",
       "roles": "Elegir tus roles",
       "crews": "Explorar equipos"
+    },
+    "connections": {
+      "title": "Conexiones opcionales",
+      "description": "Puedes participar sin conectar una cartera ni X. Añádelas para mostrar coleccionables o usar sus funciones.",
+      "wallet": "Gestionar carteras",
+      "x": "Conectar X"
     }
   },
   "crewsPage": {
@@ -682,5 +692,26 @@
     "missions": "Tareas guiadas para empezar a participar en PizzaDAO.",
     "pep": "PEP son los puntos de la comunidad PizzaDAO. Gánalos contribuyendo y descubre en qué puedes gastarlos.",
     "poaps": "Los POAPs son insignias digitales que se coleccionan en eventos de la comunidad."
+  },
+  "crewGettingStarted": {
+    "title": "Participa",
+    "focus": "Enfoque actual:",
+    "nextCall": "Próxima reunión programada",
+    "localTime": "Tu hora local",
+    "calendar": "Añadir al calendario",
+    "scheduleNote": "Según el horario semanal ({schedule}); consulta el enlace por si hay cambios.",
+    "scheduleMissing": "Pregunta al equipo cuándo será la próxima reunión.",
+    "meetingLink": "Ver detalles de la reunión",
+    "contact": "Con quién hablar",
+    "contactFallback": "Pregunta por un responsable en el chat del equipo.",
+    "chat": "Abrir chat del equipo",
+    "firstStep": "Tu primera contribución",
+    "intro": "Preséntate y pregunta qué tarea encaja con tu tiempo y habilidades. Puedes consultar estas tareas disponibles con el equipo.",
+    "claim": "Asumir esta tarea",
+    "claiming": "Asignando…",
+    "login": "Inicia sesión para asumir una tarea",
+    "noTasks": "No hay tareas sin asignar. Únete a una reunión o pregunta dónde puedes ayudar.",
+    "discord": "Únete al Discord de PizzaDAO",
+    "taskDetails": "Ver detalles de la tarea"
   }
 }

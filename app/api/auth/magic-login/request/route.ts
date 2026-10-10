@@ -1,3 +1,6 @@
+import { activationActor, recordActivationLater as recordActivation } from "@/app/lib/activation";
+import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
+import { readRefCookie } from "@/app/lib/referral-cookie";
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { requestMagicLogin } from "@/app/lib/magic-login";
@@ -8,8 +11,15 @@ export async function POST(req: Request) {
   const limited = await enforceRateLimit(req, "magic-login");
   if (limited) return limited;
 
+  let actor: string | undefined;
   try {
-    const body = await req.json();
+    const text = await req.text();
+    if (text.length > 8192) return NextResponse.json({ error: "Request too large" }, { status: 413 });
+    const body = JSON.parse(text);
+    const draft = sanitizeSignupDraft(body?.signupDraft);
+    actor = draft?.sessionId || activationActor(body.actor);
+    const ref = readRefCookie(req);
+    if (draft && ref && draft.invitedBy === undefined) draft.invitedBy = { memberId: ref, name: "", viaLink: true };
     const username = String(body?.username ?? "").trim();
 
     if (username.length < 2 || username.length > 32) {
@@ -23,8 +33,10 @@ export async function POST(req: Request) {
     const result = await requestMagicLogin(username, origin, {
       returnTo: body?.returnTo,
       onboarding: body?.onboarding === true,
+      signupDraft: draft,
     });
 
+    if (result.status !== "sent") recordActivation("login_failed", { actor, code: result.status });
     switch (result.status) {
       case "sent":
         return NextResponse.json({ status: "sent" });
@@ -50,6 +62,7 @@ export async function POST(req: Request) {
         );
     }
   } catch (e: unknown) {
+    recordActivation("login_failed", { actor, code: "request_error" });
     console.error("Magic login request error:", e);
     return NextResponse.json(
       { error: "Internal server error" },

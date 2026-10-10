@@ -614,6 +614,7 @@ model AttendanceSyncLog {
 // ===== MAGIC LOGIN VIA DISCORD DM =====
 
 model MagicLoginToken {
+  signupDraft Json?            // Allowlisted signup fields, expires with the login journey
   id        String    @id @default(cuid())
   tokenHash String    @unique   // SHA-256 of raw token (raw goes in DM link)
   discordId String
@@ -991,4 +992,18 @@ model ShopAdminEvent {
   @@index([createdAt])
   @@index([itemId, createdAt])
   @@index([targetId])
+}
+
+// Privacy-minimized activation funnel: no names, cities, tokens, or raw error text.
+model ActivationEvent {
+  id        String   @id @default(cuid())
+  actor     String
+  memberKey String?
+  event     String
+  code      String   @default("")
+  createdAt DateTime @default(now())
+
+  @@unique([actor, event, code])
+  @@index([createdAt, event])
+  @@index([memberKey, event])
 }

@@ -1,3 +1,4 @@
+import { recordActivationLater as recordActivation } from "@/app/lib/activation";
 import { after, NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { submitMissionCompletion } from '@/app/lib/missions'
@@ -110,6 +111,7 @@ const POST_HANDLER = async (request: NextRequest) => {
     after(() => syncReviewCardsFor(discordId, [missionId]).then(() => undefined))
   }
 
+  recordActivation('first_contribution', { discordId: session.discordId, code: 'mission_submission' })
   return NextResponse.json({
     success: true,
     completion: {

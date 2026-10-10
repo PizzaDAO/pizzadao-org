@@ -253,6 +253,15 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         </section>
                     )}
 
+                    <details className="my-4 rounded-2xl border border-foreground/15 p-4">
+                        <summary className="cursor-pointer min-h-11 font-semibold">{t("connections.title")}</summary>
+                        <p className="my-3 text-sm text-foreground/80">{t("connections.description")}</p>
+                        <div className="flex flex-wrap gap-3">
+                            <Link href={`/profile/${id}`} className="btn-pill min-h-11 border border-foreground/20">{t("connections.wallet")}</Link>
+                            <Link href={`/profile/${id}`} className="btn-pill min-h-11 border border-foreground/20">{t("connections.x")}</Link>
+                        </div>
+                    </details>
+
                     {/* ── 1.5. Next Action ── */}
                     {summary?.nextAction && (
                         <NextActionPanel nextAction={summary.nextAction} />

@@ -77,19 +77,13 @@ export interface NextActionInput {
 /**
  * Resolve the single next action for the dashboard.
  *
- * Priority order (plan §5):
- *   1–3. Profile setup steps, in PROFILE_STEPS order (./profile-completion.ts):
- *        no crews → join a crew; no wallet → connect wallet; no X → connect X
- *   4. Has next mission to submit → submit mission
- *   5. All level missions submitted, awaiting review → check progress
- *   6. < 3 vouches → get vouches
- *   7. Important unread notification → review notification
- *   8. Power user fallback → review (admin) or discover bounties
+ * Prioritize community participation. Wallet and X connections are optional.
+ * Join a crew, do a mission, follow review progress, then discover more work.
  */
 export function resolveNextAction(input: NextActionInput): NextAction {
   const { member, level, vouches, notifications, isReviewer } = input;
 
-  // 1–3. Profile setup (join crew → connect wallet → connect X). The step
+  // Community setup. Optional external connections do not block missions. The step
   //      definitions and copy live in ./profile-completion.ts so the
   //      dashboard's completion meter shares this exact ordering.
   const setupStep = PROFILE_STEPS.find((step) => !step.isDone(input));
