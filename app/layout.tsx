@@ -73,7 +73,7 @@ export default async function RootLayout({
           <Providers>
             <XConnectNotice />
             <Suspense fallback={null}><SiteHeader /></Suspense>
-            <div id="main-content">{children}</div>
+            <Suspense fallback={null}><div id="main-content">{children}</div></Suspense>
           </Providers>
         </NextIntlClientProvider>
         {/* Suggestion + GitHub links - Fixed Bottom Right */}
