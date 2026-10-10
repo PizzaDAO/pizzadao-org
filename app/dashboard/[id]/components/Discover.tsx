@@ -109,7 +109,7 @@ function previewCard(): React.CSSProperties {
         padding: 16,
         borderRadius: 16,
         border: "1px solid hsl(var(--rule-warm) / 0.45)",
-        background: "hsl(var(--cream))",
+        background: "hsl(var(--card))",
         boxShadow: "var(--shadow-soft)",
         color: "hsl(var(--foreground))",
         textDecoration: "none",
@@ -123,7 +123,7 @@ function pill(kind: "open" | "claimed"): React.CSSProperties {
         alignItems: "center",
         padding: "3px 10px",
         borderRadius: 999,
-        fontSize: 10,
+        fontSize: 13,
         fontWeight: 700,
         fontFamily: "var(--font-sans), system-ui, sans-serif",
         textTransform: "uppercase",
@@ -210,7 +210,7 @@ function BountyItem({
                 className="font-[family-name:var(--font-display)]"
                 style={{
                     fontSize: 14,
-                    color: "hsl(var(--tomato))",
+                    color: "hsl(var(--tomato-readable))",
                     fontWeight: 800,
                     letterSpacing: "-0.01em",
                 }}
@@ -221,7 +221,7 @@ function BountyItem({
                 <div
                     className="ui"
                     style={{
-                        fontSize: 10,
+                        fontSize: 13,
                         textTransform: "uppercase",
                         letterSpacing: "0.22em",
                         color: "hsl(var(--muted-foreground))",
@@ -295,7 +295,7 @@ function JobItem({
                 <div
                     className="ui"
                     style={{
-                        fontSize: 10,
+                        fontSize: 13,
                         textTransform: "uppercase",
                         letterSpacing: "0.22em",
                         color: "hsl(var(--muted-foreground))",
@@ -343,7 +343,7 @@ function ArticleItem({ a }: { a: DiscoverArticle }) {
             <div
                 className="ui"
                 style={{
-                    fontSize: 10,
+                    fontSize: 13,
                     color: "hsl(var(--muted-foreground))",
                     display: "flex",
                     gap: 6,
@@ -399,7 +399,7 @@ function CallItem({ c }: { c: DiscoverCall }) {
             <div
                 className="ui"
                 style={{
-                    fontSize: 10,
+                    fontSize: 13,
                     color: "hsl(var(--muted-foreground))",
                     textTransform: "uppercase",
                     letterSpacing: "0.22em",
@@ -420,15 +420,15 @@ function EmptyState({ kind }: { kind: TabKey }) {
             className="paper-soft relative rounded-2xl border px-5 py-6 text-center"
             style={{
                 borderColor: "hsl(var(--rule-warm) / 0.45)",
-                background: "hsl(var(--cream) / 0.5)",
+                background: "hsl(var(--background) / 0.5)",
                 color: "hsl(var(--foreground) / 0.6)",
             }}
         >
-            <span className="handwritten text-tomato" style={{ fontSize: 17 }}>
+            <span className="handwritten text-tomato-readable" style={{ fontSize: 17 }}>
                 {t("emptyMark")}
             </span>
             <p
-                className="ui relative mt-2 text-[11px] uppercase tracking-[0.22em]"
+                className="ui relative mt-2 text-[13px] uppercase tracking-[0.08em]"
                 style={{ margin: 0, color: "hsl(var(--foreground) / 0.55)" }}
             >
                 {t(`empty.${kind}`)}
@@ -483,7 +483,7 @@ export function Discover({
                 }}
             >
                 <div>
-                    <p className="overline text-tomato">{t("overline")}</p>
+                    <p className="overline text-tomato-readable">{t("overline")}</p>
                     <h3
                         className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                         style={{
@@ -497,7 +497,7 @@ export function Discover({
                 </div>
                 <Link
                     href={viewAllHref}
-                    className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+                    className="ui inline-flex items-center gap-1 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
                     style={{ textDecoration: "none", fontWeight: 600 }}
                 >
                     {t("viewAll")}

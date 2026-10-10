@@ -189,7 +189,7 @@ export function NextActionPanel({
                         clearSnooze(nextAction.kind);
                         setSnoozedUntil(null);
                     }}
-                    className="ui text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+                    className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
                     style={{
                         background: "transparent",
                         border: "none",
@@ -286,7 +286,7 @@ export function NextActionPanel({
                     {secondary && (
                         <Link
                             href={secondary.href}
-                            className="ui inline-flex items-center gap-1 text-[12px] uppercase tracking-[0.22em] transition-colors"
+                            className="ui inline-flex items-center gap-1 text-[13px] uppercase tracking-[0.08em] transition-colors"
                             style={{
                                 color: "hsl(var(--cream) / 0.75)",
                                 textDecoration: "underline",
@@ -302,7 +302,7 @@ export function NextActionPanel({
                             writeSnooze(kind, until);
                             setSnoozedUntil(until);
                         }}
-                        className="ui text-[11px] uppercase tracking-[0.22em] transition-colors hover:text-tomato"
+                        className="ui text-[13px] uppercase tracking-[0.08em] transition-colors hover:text-tomato-readable"
                         style={{
                             background: "transparent",
                             border: "none",

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 import Link from "next/link";
+import { useLocale, useTranslations } from "next-intl";
 import {
   EditorialMasthead,
   EditorialPage,
@@ -51,6 +52,8 @@ interface CallDetail {
 const PAGE_LIMIT = 20;
 
 export default function CallsPage() {
+  const t = useTranslations("callsPage");
+  const locale = useLocale();
   const [calls, setCalls] = useState<CallEntry[]>([]);
   const [pagination, setPagination] = useState<Pagination>({
     page: 1,
@@ -82,8 +85,7 @@ export default function CallsPage() {
 
       const res = await fetch(`/api/calls?${params.toString()}`);
       if (!res.ok) {
-        const j = await res.json().catch(() => ({}));
-        throw new Error(j?.error || "Failed to load calls");
+        throw new Error(t("loadError"));
       }
       const data = await res.json();
       setCalls(data.calls || []);
@@ -91,12 +93,12 @@ export default function CallsPage() {
         data.pagination || { page: 1, limit: PAGE_LIMIT, total: 0, totalPages: 1 }
       );
       setCrewCounts(data.filters?.crews || []);
-    } catch (err) {
-      setError(err instanceof Error ? err.message : "Unknown error");
+    } catch {
+      setError(t("loadError"));
     } finally {
       setLoading(false);
     }
-  }, [page, crewFilter, sort]);
+  }, [page, crewFilter, sort, t]);
 
   useEffect(() => {
     fetchCalls();
@@ -143,7 +145,7 @@ export default function CallsPage() {
 
   function formatDate(dateStr: string) {
     const d = new Date(dateStr + "T00:00:00");
-    return d.toLocaleDateString("en-US", {
+    return d.toLocaleDateString(locale, {
       month: "short",
       day: "numeric",
       year: "numeric",
@@ -153,25 +155,27 @@ export default function CallsPage() {
   return (
     <EditorialPage width="max-w-[900px]">
       <EditorialMasthead
-        overline="The Call Log"
+        overline={t("overline")}
         title={
           <>
-            Call <span className="text-tomato underline-scribble">history</span>
+            {t("titlePrefix")} <span className="text-tomato-readable underline-scribble">{t("titleAccent")}</span>
           </>
         }
         dek={
           !loading && !error
-            ? `${pagination.total} crew call${pagination.total === 1 ? "" : "s"} recorded — tap a call to see who showed up.`
-            : "Every crew call on the books, with who showed up."
+            ? t("recorded", { count: pagination.total })
+            : t("description")
         }
       />
+
+      <Link href="/crews" className="mb-6 inline-flex min-h-11 items-center text-sm font-semibold text-tomato-readable underline underline-offset-4">{t("upcoming")}</Link>
 
       {/* Crew filter chips */}
       <div className={`${paperCard} print-noise mb-6 p-4 sm:p-5`}>
         <div className="flex flex-wrap gap-1.5 items-center">
-          <span className="overline text-foreground/45 mr-1">Filed under</span>
+          <span className="overline text-foreground/70 mr-1">{t("filedUnder")}</span>
           <FilterChip
-            label="All"
+            label={t("all")}
             active={crewFilter.length === 0}
             onClick={() => {
               setCrewFilter([]);
@@ -194,19 +198,17 @@ export default function CallsPage() {
       {!loading && !error && (
         <div className="flex flex-wrap justify-between items-end gap-3 mb-4">
           <div>
-            <p className="overline text-foreground/45 m-0">The ledger</p>
+            <p className="overline text-foreground/70 m-0">{t("ledger")}</p>
             <p className="font-display text-lg font-black tracking-tight text-foreground m-0 mt-1">
               {pagination.total === 0
-                ? "No calls match your filters"
-                : `Showing ${calls.length} of ${pagination.total} call${
-                    pagination.total === 1 ? "" : "s"
-                  }`}
+                ? t("noMatches")
+                : t("showing", { shown: calls.length, total: pagination.total })}
             </p>
           </div>
           <div className="flex gap-2 items-center">
             {hasActiveFilters && (
               <button type="button" onClick={clearFilters} className={pillOutline}>
-                Clear filters
+                {t("clear")}
               </button>
             )}
             <label className="sr-only" htmlFor="calls-sort">
@@ -221,8 +223,8 @@ export default function CallsPage() {
               }}
               className="min-h-11 px-4 rounded-full text-sm font-semibold bg-card text-foreground border border-[hsl(var(--rule-warm)/0.65)] cursor-pointer outline-none focus:border-tomato focus:ring-2 focus:ring-[hsl(var(--tomato)/0.3)]"
             >
-              <option value="newest">Newest first</option>
-              <option value="oldest">Oldest first</option>
+              <option value="newest">{t("newest")}</option>
+              <option value="oldest">{t("oldest")}</option>
             </select>
           </div>
         </div>
@@ -249,7 +251,7 @@ export default function CallsPage() {
 
       {/* Empty state */}
       {!loading && !error && calls.length === 0 && (
-        <EmptyState title="No calls found.">
+        <EmptyState title={t("empty")}>
           {hasActiveFilters && (
             <button type="button" onClick={clearFilters} className={`${pillOutline} mt-3`}>
               Clear filters
@@ -282,17 +284,17 @@ export default function CallsPage() {
                     {formatDate(call.date)}
                   </span>
                   <span
-                    className="overline px-2 py-1 rounded-full bg-[hsl(var(--tomato)/0.12)] text-tomato whitespace-nowrap"
-                    style={{ fontSize: 10 }}
+                    className="overline px-2 py-1 rounded-full bg-[hsl(var(--tomato)/0.12)] text-tomato-readable whitespace-nowrap"
+                    style={{ fontSize: 13 }}
                   >
                     {call.crewLabel}
                   </span>
                   <span className="ml-auto text-sm text-muted-foreground whitespace-nowrap tabular-nums">
-                    {call.attendeeCount} attendee{call.attendeeCount === 1 ? "" : "s"}
+                    {t("attendees", { count: call.attendeeCount })}
                   </span>
                   <span
                     aria-hidden
-                    className={`text-xs text-foreground/40 transition-transform duration-200 ${
+                    className={`text-xs text-foreground/70 transition-transform duration-200 ${
                       isExpanded ? "rotate-180" : ""
                     }`}
                   >
@@ -303,12 +305,12 @@ export default function CallsPage() {
                 {/* Expanded attendee list */}
                 {isExpanded && (
                   <div className="rule-warm px-4 py-3">
-                    <p className="overline text-foreground/45 mt-0 mb-2">In the room</p>
+                    <p className="overline text-foreground/70 mt-0 mb-2">{t("room")}</p>
                     {detailLoading && (
-                      <p className="m-0 text-sm text-muted-foreground italic">Loading attendees...</p>
+                      <p className="m-0 text-sm text-muted-foreground italic">{t("loadingAttendees")}</p>
                     )}
                     {!detailLoading && !detail && (
-                      <p className="m-0 text-sm text-muted-foreground italic">Failed to load attendees.</p>
+                      <p className="m-0 text-sm text-muted-foreground italic">{t("attendeesError")}</p>
                     )}
                     {!detailLoading && detail && (
                       <div className="flex flex-wrap gap-1.5">
@@ -317,7 +319,7 @@ export default function CallsPage() {
                             <Link
                               key={a.discordId}
                               href={`/profile/${a.memberId}`}
-                              className="text-[13px] px-2.5 py-1 rounded-full bg-[hsl(var(--tomato)/0.08)] text-tomato no-underline whitespace-nowrap hover:bg-[hsl(var(--tomato)/0.16)]"
+                              className="text-[13px] px-2.5 py-1 rounded-full bg-[hsl(var(--tomato)/0.08)] text-tomato-readable no-underline whitespace-nowrap hover:bg-[hsl(var(--tomato)/0.16)]"
                             >
                               {a.displayName}
                             </Link>
@@ -352,10 +354,10 @@ export default function CallsPage() {
             disabled={page <= 1}
             className={pillOutline}
           >
-            &larr; Prev
+            {t("prev")}
           </button>
-          <span className="overline text-foreground/55">
-            Page {pagination.page} of {pagination.totalPages}
+          <span className="overline text-foreground/70">
+            {t("page", { current: pagination.page, total: pagination.totalPages })}
           </span>
           <button
             type="button"
@@ -366,7 +368,7 @@ export default function CallsPage() {
             disabled={page >= pagination.totalPages}
             className={pillOutline}
           >
-            Next &rarr;
+            {t("next")}
           </button>
         </div>
       )}

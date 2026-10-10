@@ -108,7 +108,7 @@ export function YourCrews({
                 }}
             >
                 <div>
-                    <p className="overline text-tomato">{t("overline")}</p>
+                    <p className="overline text-tomato-readable">{t("overline")}</p>
                     <h3
                         className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                         style={{
@@ -122,7 +122,7 @@ export function YourCrews({
                 </div>
                 <Link
                     href="/crews"
-                    className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+                    className="ui inline-flex items-center gap-1 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
                     style={{ textDecoration: "none", fontWeight: 600 }}
                 >
                     {t("viewAll")}
@@ -175,7 +175,7 @@ export function YourCrews({
                             className="paper-soft relative overflow-hidden rounded-2xl"
                             style={{
                                 border: "1px solid hsl(var(--rule-warm) / 0.55)",
-                                background: "hsl(var(--cream))",
+                                background: "hsl(var(--card))",
                                 boxShadow: "var(--shadow-soft)",
                                 padding: 16,
                                 display: "grid",
@@ -191,7 +191,7 @@ export function YourCrews({
                                     style={{
                                         border:
                                             "1.5px dashed hsl(var(--foreground) / 0.3)",
-                                        background: "hsl(var(--cream) / 0.6)",
+                                        background: "hsl(var(--background) / 0.6)",
                                         fontSize: 20,
                                         transform: "rotate(-4deg)",
                                     }}
@@ -213,7 +213,7 @@ export function YourCrews({
                                         <div
                                             className="ui mt-1"
                                             style={{
-                                                fontSize: 10,
+                                                fontSize: 13,
                                                 textTransform: "uppercase",
                                                 letterSpacing: "0.22em",
                                                 color: "hsl(var(--foreground) / 0.55)",
@@ -267,7 +267,7 @@ export function YourCrews({
                                             color: hasPersonal
                                                 ? "hsl(var(--tomato))"
                                                 : "hsl(var(--foreground) / 0.4)",
-                                            fontSize: 10,
+                                            fontSize: 13,
                                             letterSpacing: "0.22em",
                                         }}
                                     >
@@ -368,7 +368,7 @@ export function YourCrews({
                             >
                                 <Link
                                     href={`/crew/${c?.id || cid}`}
-                                    className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-tomato transition-colors hover:text-tomato/80"
+                                    className="ui inline-flex items-center gap-1 text-[13px] uppercase tracking-[0.08em] text-tomato-readable transition-colors hover:text-tomato-readable/80"
                                     style={{
                                         fontWeight: 700,
                                         textDecoration: "none",
@@ -383,7 +383,7 @@ export function YourCrews({
                                         target="_blank"
                                         rel="noreferrer"
                                         onClick={(e) => e.stopPropagation()}
-                                        className="ui inline-flex items-center gap-1 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+                                        className="ui inline-flex items-center gap-1 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
                                         style={{
                                             fontWeight: 600,
                                             textDecoration: "none",

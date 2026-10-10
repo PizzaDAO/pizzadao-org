@@ -141,7 +141,7 @@ export function ToppingPicker({ label, value, onChange }: Props) {
 
   return (
     <div className="relative">
-      <p className="overline text-tomato">{label}</p>
+      <p className="overline text-tomato-readable">{label}</p>
       <div
         className="relative mt-4 overflow-hidden rounded-[28px] transition-shadow"
         style={FIELD_SURFACE}
@@ -157,7 +157,7 @@ export function ToppingPicker({ label, value, onChange }: Props) {
         />
         <label className="relative flex items-center gap-4 px-5 py-5 md:gap-6 md:px-8 md:py-7">
           <Search
-            className="h-5 w-5 shrink-0 text-foreground/35 md:h-6 md:w-6"
+            className="h-5 w-5 shrink-0 text-foreground/70 md:h-6 md:w-6"
             aria-hidden
           />
           <input
@@ -188,7 +188,7 @@ export function ToppingPicker({ label, value, onChange }: Props) {
                 setOpen(false);
                 setQuery("");
               }}
-              className="ui hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:border-tomato hover:text-tomato md:inline-flex"
+              className="ui hidden shrink-0 rounded-full border border-foreground/15 px-3 py-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:border-tomato hover:text-tomato-readable md:inline-flex"
             >
               <X className="mr-1 h-3 w-3" aria-hidden /> {t("close")}
             </button>
@@ -198,12 +198,12 @@ export function ToppingPicker({ label, value, onChange }: Props) {
 
       {/* Descriptor / hint footer when the field shows free text */}
       {!open && value.trim() && !matchedTopping && (
-        <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/45">
+        <p className="ui mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {toppingDescriptorFor(value)}
         </p>
       )}
       {!open && !value.trim() && (
-        <p className="ui mt-3 text-[10px] uppercase tracking-[0.24em] text-foreground/40">
+        <p className="ui mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {t("hint")}
         </p>
       )}
@@ -250,7 +250,7 @@ function SelectedToppingCard({
   const img = toppingImageFor(topping);
   return (
     <div className="relative">
-      <p className="overline text-tomato">{label}</p>
+      <p className="overline text-tomato-readable">{label}</p>
       <div
         className="paper-soft relative mt-4 flex items-center justify-between gap-6 overflow-hidden rounded-[28px] p-5 md:p-6"
         style={SELECTED_CARD_STYLE}
@@ -290,7 +290,7 @@ function SelectedToppingCard({
             >
               {topping}
             </h3>
-            <p className="ui mt-2 text-[11px] uppercase tracking-[0.22em] text-foreground/50">
+            <p className="ui mt-2 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
               {toppingDescriptorFor(topping)}
             </p>
           </div>
@@ -298,7 +298,7 @@ function SelectedToppingCard({
         <button
           type="button"
           onClick={onChange}
-          className="ui relative shrink-0 rounded-full border border-foreground/20 px-4 py-2 text-[11px] uppercase tracking-[0.22em] text-foreground/60 transition-colors hover:border-tomato hover:text-tomato"
+          className="ui relative shrink-0 rounded-full border border-foreground/20 px-4 py-2 text-[13px] uppercase tracking-[0.08em] text-foreground/60 transition-colors hover:border-tomato hover:text-tomato-readable"
         >
           {t("change")}
         </button>
@@ -332,7 +332,7 @@ function ToppingDrawer({
 
   return (
     <div className="relative">
-      <p className="ui relative text-[10px] uppercase tracking-[0.28em] text-foreground/45">
+      <p className="ui relative text-[13px] uppercase tracking-[0.08em] text-foreground/70">
         {q ? t("matches") : t("headliners")}
       </p>
 
@@ -391,7 +391,7 @@ function ToppingDrawer({
                   />
                   <span
                     aria-hidden
-                    className="handwritten pointer-events-none absolute -top-3 right-2 rotate-[-8deg] rounded-full px-2.5 py-1 text-[12px] text-tomato opacity-0 transition-all duration-300 group-hover:-top-4 group-hover:opacity-100 group-focus-visible:-top-4 group-focus-visible:opacity-100"
+                    className="handwritten pointer-events-none absolute -top-3 right-2 rotate-[-8deg] rounded-full px-2.5 py-1 text-[13px] text-tomato-readable opacity-0 transition-all duration-300 group-hover:-top-4 group-hover:opacity-100 group-focus-visible:-top-4 group-focus-visible:opacity-100"
                     style={{
                       background: "hsl(var(--cream))",
                       boxShadow: "0 6px 14px -8px hsl(0 93% 60% / 0.5)",
@@ -404,7 +404,7 @@ function ToppingDrawer({
                   <span className="font-[family-name:var(--font-display)] text-[16px] font-black leading-tight tracking-tight text-foreground">
                     {top}
                   </span>
-                  <span className="ui text-[9.5px] uppercase tracking-[0.18em] text-foreground/45">
+                  <span className="ui text-[9.5px] uppercase tracking-[0.08em] text-foreground/70">
                     {toppingDescriptorFor(top)}
                   </span>
                 </span>
@@ -417,7 +417,7 @@ function ToppingDrawer({
       {/* SUPPORTING — smaller, calmer chips */}
       {supporting.length > 0 && (
         <>
-          <p className="ui relative mt-10 text-[10px] uppercase tracking-[0.28em] text-foreground/40">
+          <p className="ui relative mt-10 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {t("supporting")}
           </p>
           <div className="relative mt-4 flex flex-wrap gap-2.5">
@@ -458,7 +458,7 @@ function ToppingDrawer({
           style={{
             borderColor: "hsl(var(--tomato) / 0.4)",
             background: "hsl(var(--tomato) / 0.05)",
-            color: "hsl(var(--tomato))",
+            color: "hsl(var(--tomato-readable))",
           }}
         >
           <Sparkles className="h-4 w-4" aria-hidden />
@@ -466,7 +466,7 @@ function ToppingDrawer({
             {t("useCustom", { query: query.trim() })}
           </span>
           <span
-            className="ui text-[9px] uppercase tracking-[0.22em]"
+            className="ui text-[13px] uppercase tracking-[0.08em]"
             style={{ color: "hsl(var(--tomato) / 0.7)" }}
           >
             {t("offCanon")}
@@ -474,7 +474,7 @@ function ToppingDrawer({
         </button>
       )}
 
-      <p className="ui relative mt-8 text-[10px] uppercase tracking-[0.24em] text-foreground/35">
+      <p className="ui relative mt-8 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
         {t("footer")}
       </p>
     </div>

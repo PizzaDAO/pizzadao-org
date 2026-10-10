@@ -3,6 +3,7 @@
 // Editorial restyle: § overline masthead, paper-soft search strip and
 // press-clipping event rows. Fetching and search are unchanged.
 
+import { TermExplanation } from "@/app/ui/shared/TermExplanation";
 import { useEffect, useState } from "react";
 import Image from "next/image";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
@@ -176,6 +177,8 @@ export default function POAPsPage() {
             : "Whitelisted PizzaDAO POAP events."
         }
       />
+
+      <TermExplanation term="poaps" />
 
       {/* Search */}
       <div className={`${paperCard} print-noise mb-8 p-4 sm:p-5`}>

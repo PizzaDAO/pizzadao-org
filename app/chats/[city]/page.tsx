@@ -8,12 +8,12 @@ type Params = { params: Promise<{ city: string }> };
 
 // /chats/[city] - auth-gated server redirect straight to the city's Telegram chat.
 export default async function CityChatRedirect({ params }: Params) {
+  const { city } = await params;
   const session = await getSession();
   if (!session?.discordId) {
-    redirect("/api/discord/login");
+    redirect(`/login?returnTo=${encodeURIComponent(`/chats/${city}`)}`);
   }
 
-  const { city } = await params;
   const match = await getCityChatBySlug(city);
 
   if (match) {

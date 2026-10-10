@@ -119,7 +119,7 @@ export function CrewsStep({
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">{t("overline")}</p>
+        <p className="overline text-tomato-readable">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -128,7 +128,7 @@ export function CrewsStep({
             textWrap: "balance",
           }}
         >
-          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
+          {t("headingPrefix")} <span className="text-tomato-readable">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
@@ -138,7 +138,7 @@ export function CrewsStep({
         </p>
 
         {crewsLoading && (
-          <p className="ui mt-4 text-[11px] uppercase tracking-[0.24em] text-foreground/50">
+          <p className="ui mt-4 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
             {t("loading")}
           </p>
         )}
@@ -170,7 +170,7 @@ export function CrewsStep({
         <button
           type="button"
           onClick={onBack}
-          className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+          className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
         >
           <ArrowLeft className="h-3 w-3" />
           {t("back")}
@@ -181,7 +181,7 @@ export function CrewsStep({
           disabled={submitting}
           className="btn-pill-lg group"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
             boxShadow: "var(--shadow-soft)",
           }}
@@ -290,11 +290,11 @@ function CrewCard({
 
           {recommended && recommended.length > 0 && (
             <div
-              className="ui mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[10px] uppercase tracking-[0.2em]"
+              className="ui mt-2 inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-[13px] uppercase tracking-[0.2em]"
               style={{
                 background: "hsl(var(--tomato) / 0.1)",
                 border: "1px solid hsl(var(--tomato) / 0.3)",
-                color: "hsl(var(--tomato))",
+                color: "hsl(var(--tomato-readable))",
                 fontWeight: 700,
               }}
             >
@@ -327,7 +327,7 @@ function CrewCard({
         <div
           className="relative grid h-7 w-7 shrink-0 place-items-center rounded-full transition-all"
           style={{
-            background: checked ? "hsl(var(--tomato))" : "transparent",
+            background: checked ? "hsl(var(--tomato-deep))" : "transparent",
             border: checked
               ? "1px solid hsl(var(--tomato))"
               : "1.5px solid hsl(var(--foreground) / 0.25)",
@@ -340,7 +340,7 @@ function CrewCard({
       </div>
 
       {(crew.callTime || crew.callLength) && (
-        <div className="relative ui flex items-center gap-1.5 text-[11px] uppercase tracking-[0.2em] text-foreground/55">
+        <div className="relative ui flex items-center gap-1.5 text-[13px] uppercase tracking-[0.2em] text-foreground/70">
           <Clock className="h-3 w-3" />
           {crew.callTime ? crew.callTime : ""}
           {crew.callTime && crew.callLength ? " · " : ""}
@@ -350,7 +350,7 @@ function CrewCard({
 
       {crew.tasks && crew.tasks.length > 0 && (
         <div className="relative grid gap-1">
-          <div className="ui text-[9px] font-bold uppercase tracking-[0.28em] text-foreground/45">
+          <div className="ui text-[13px] font-bold uppercase tracking-[0.08em] text-foreground/70">
             {t("topTasks")}
           </div>
           {crew.tasks.map((task, idx) => (
@@ -361,7 +361,7 @@ function CrewCard({
               <span
                 aria-hidden
                 className="shrink-0"
-                style={{ color: "hsl(var(--tomato))" }}
+                style={{ color: "hsl(var(--tomato-readable))" }}
               >
                 ·
               </span>
@@ -372,7 +372,7 @@ function CrewCard({
                     target="_blank"
                     rel="noreferrer"
                     onClick={(e) => e.stopPropagation()}
-                    className="text-inherit underline underline-offset-2 hover:text-tomato"
+                    className="text-inherit underline underline-offset-2 hover:text-tomato-readable"
                   >
                     {task.label}
                   </a>
@@ -391,7 +391,7 @@ function CrewCard({
           target="_blank"
           rel="noreferrer"
           onClick={(e) => e.stopPropagation()}
-          className="ui relative inline-flex items-center gap-1 text-[10px] uppercase tracking-[0.24em] text-foreground/55 no-underline hover:text-tomato"
+          className="ui relative inline-flex items-center gap-1 text-[13px] uppercase tracking-[0.08em] text-foreground/70 no-underline hover:text-tomato-readable"
           title={crew.sheet}
         >
           <ExternalLink className="h-3 w-3" />
@@ -423,13 +423,13 @@ function SuccessSummary({
         boxShadow: "var(--shadow-soft)",
       }}
     >
-      <p className="relative overline text-tomato">{t("successOverline")}</p>
+      <p className="relative overline text-tomato-readable">{t("successOverline")}</p>
       <h3
         className="font-[family-name:var(--font-display)] relative mt-2 font-black tracking-[-0.01em] text-foreground"
         style={{ fontSize: "clamp(1.4rem, 3vw, 2rem)", lineHeight: 1 }}
       >
         {t("successHeadingPrefix")}{" "}
-        <span className="text-tomato">{successData.mafiaName}</span>.
+        <span className="text-tomato-readable">{successData.mafiaName}</span>.
       </h3>
 
       <div className="relative mt-4 grid grid-cols-1 gap-2 text-sm sm:grid-cols-2">
@@ -476,7 +476,7 @@ function SuccessSummary({
 function SummaryLine({ label, value }: { label: string; value: string }) {
   return (
     <div>
-      <p className="ui text-[10px] uppercase tracking-[0.28em] text-foreground/50">
+      <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
         {label}
       </p>
       <p className="font-[family-name:var(--font-display)] mt-1 text-[15px] font-black leading-tight tracking-tight text-foreground">

@@ -45,7 +45,11 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       const res = await fetch("/api/auth/magic-login/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ username: name }),
+        body: JSON.stringify({
+          username: name,
+          returnTo: new URLSearchParams(window.location.search).get("returnTo"),
+          onboarding: new URLSearchParams(window.location.search).get("onboarding") === "1",
+        }),
       });
 
       const data = await res.json();
@@ -58,7 +62,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       setState({
         step: "error",
         code: data.status || "unknown",
-        message: data.error || t("errorSomethingWrong"),
+        message: t("errorSomethingWrong"),
         username: name,
       });
     } catch {
@@ -110,6 +114,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             b: (chunks) => <strong className="text-foreground">{chunks}</strong>,
           })}
         />
+        <p className="text-sm text-foreground/70">{t("sameBrowserHint")}</p>
         <div className="grid gap-3">
           <button
             type="button"
@@ -149,7 +154,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
               rel="noopener noreferrer"
               className="btn-pill-lg group no-underline"
               style={{
-                background: "hsl(var(--tomato))",
+                background: "hsl(var(--tomato-deep))",
                 color: "hsl(var(--cream))",
                 boxShadow: "var(--shadow-soft)",
               }}
@@ -200,7 +205,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
               onClick={() => handleSubmit(state.username)}
               className="btn-pill-lg group"
               style={{
-                background: "hsl(var(--tomato))",
+                background: "hsl(var(--tomato-deep))",
                 color: "hsl(var(--cream))",
               }}
             >
@@ -243,7 +248,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             onClick={() => handleSubmit(state.username)}
             className="btn-pill-lg group"
             style={{
-              background: "hsl(var(--tomato))",
+              background: "hsl(var(--tomato-deep))",
               color: "hsl(var(--cream))",
             }}
           >
@@ -278,7 +283,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       <div
         className="relative overflow-hidden rounded-[22px] transition-shadow"
         style={{
-          background: "hsl(var(--cream))",
+          background: "hsl(var(--background))",
           border: "1px solid hsl(var(--rule-warm) / 0.6)",
           boxShadow: "0 30px 60px -40px hsl(46 100% 50% / 0.35)",
         }}
@@ -289,7 +294,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
         />
         <label className="relative flex items-center gap-3 px-4 py-3.5 md:gap-4 md:px-5 md:py-4">
           <Sparkles
-            className="h-5 w-5 shrink-0 text-foreground/35"
+            className="h-5 w-5 shrink-0 text-foreground/70"
             aria-hidden
           />
           <input
@@ -301,7 +306,9 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             autoFocus
             disabled={state.step === "sending"}
             aria-label={t("usernameAriaLabel")}
-            className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none disabled:opacity-50"
+            maxLength={32}
+            autoComplete="username"
+            className="font-[family-name:var(--font-display)] w-full bg-transparent font-black leading-tight tracking-tight focus:outline-none focus-visible:ring-2 focus-visible:ring-tomato-readable rounded-md disabled:opacity-50"
             style={{
               fontSize: "clamp(1.1rem, 2.2vw, 1.5rem)",
               color: "hsl(var(--foreground))",
@@ -317,7 +324,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
           disabled={state.step === "sending" || username.trim().length < 2}
           className="btn-pill-lg group"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
             boxShadow: "var(--shadow-soft)",
           }}
@@ -348,7 +355,7 @@ function EditorialHeader({
 }) {
   return (
     <header className="relative">
-      <p className="overline text-tomato">{overline}</p>
+      <p className="overline text-tomato-readable">{overline}</p>
       <h2
         className="font-[family-name:var(--font-display)] mt-3 max-w-[16ch] font-black tracking-[-0.015em] text-foreground"
         style={{
@@ -415,7 +422,7 @@ function BackLink({ onBack, label }: { onBack: () => void; label: string }) {
     <button
       type="button"
       onClick={onBack}
-      className="ui inline-flex items-center justify-center gap-1.5 self-center text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato min-h-11"
+      className="ui inline-flex items-center justify-center gap-1.5 self-center text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable min-h-11"
       style={{ background: "none", border: "none" }}
     >
       <ArrowLeft className="h-3 w-3" />

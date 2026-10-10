@@ -85,7 +85,7 @@ describe("ProfileHero", () => {
         );
         const signIn = screen.getByRole("link", { name: /sign in to vouch/i });
         expect(signIn).toBeTruthy();
-        expect(signIn.getAttribute("href")).toContain("/api/discord/login");
+        expect(signIn.getAttribute("href")).toContain("/login?returnTo=");
         expect(signIn.getAttribute("href")).toContain(encodeURIComponent("/profile/14071"));
     });
 

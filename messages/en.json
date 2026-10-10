@@ -23,13 +23,19 @@
       "heading": "Join the pizza mafia",
       "tagline": "We're an international pizza co-op that throws a Global Pizza Party every year.",
       "joinButton": "Join PizzaDAO",
-      "loginButton": "Already in our Discord? Login",
-      "magicLoginButton": "Can't log in? Try Discord DM"
+      "loginButton": "Log in via Discord DM",
+      "overline": "§ ··· The Invitation",
+      "stepIn": "§ Step in",
+      "doorNote": "come in, the door’s open",
+      "appetiteNote": "bring your appetite",
+      "explore": "Explore PizzaDAO",
+      "stories": "Read our stories",
+      "guides": "Browse guides"
     },
     "name": {
       "heroPrefix": "Claim your",
       "heroAccent": "mafia name.",
-      "heroTagline": "Choose a topping. Choose a movie. The family handles the rest.",
+      "heroTagline": "Your display name in PizzaDAO. Use your own name or make a pizza-inspired one.",
       "toppingLabel": "§ 01 · Your topping",
       "movieLabel": "§ 02 · Your mafia movie",
       "generateButton": "Generate 3 names",
@@ -80,7 +86,11 @@
         "thisOne": "this one?",
         "earner": "earner",
         "skipIt": "skip it"
-      }
+      },
+      "displayNameLabel": "Your display name",
+      "displayNamePlaceholder": "Your name or nickname",
+      "useDisplayName": "Use this name",
+      "orGenerateName": "Or make a pizza-inspired name"
     },
     "city": {
       "overline": "§ 02 · Your block",
@@ -105,7 +115,7 @@
       "headingPrefix": "Pick your",
       "headingAccent": "turtles",
       "headingSuffix": ".",
-      "tagline": "One or more. These are the roles you wear in the family.",
+      "tagline": "Our community roles, inspired by the Ninja Turtles. Choose the interests that fit you; you can change them later.",
       "selectedLabel": "Selected ·",
       "noneYet": "(none yet)",
       "back": "Back",
@@ -164,7 +174,7 @@
       "headingPrefix": "Join some",
       "headingAccent": "crews",
       "headingSuffix": ".",
-      "tagline": "The crews you join decide which calls you sit in on and which work ends up at your door. Pick any that look like you.",
+      "tagline": "Working groups that organize PizzaDAO projects and meet regularly. Join one when you’re ready to contribute.",
       "loading": "Loading crews…",
       "back": "Back",
       "recommended": "Recommended",
@@ -243,7 +253,8 @@
       "errorMissingToken": "No login token provided.",
       "errorGeneric": "Login failed. Please try again.",
       "errorSomethingWrong": "Something went wrong",
-      "errorNetwork": "Network error. Please check your connection and try again."
+      "errorNetwork": "Network error. Please check your connection and try again.",
+      "sameBrowserHint": "Finishing your profile? Open the link in the same browser where you started so your saved details are available."
     },
     "claim": {
       "askOverline": "§ ··· Welcome back",
@@ -317,7 +328,10 @@
       "errorGenerateNames": "Failed to generate names",
       "errorSaveProfile": "Failed to save profile",
       "errorSaveGeneric": "Failed to save",
-      "stepTitleInvitedBy": "Who invited you?"
+      "stepTitleInvitedBy": "Who invited you?",
+      "continueViaDm": "Continue via Discord DM",
+      "optionalNumber": "Choose a member number (optional)",
+      "numberAssigned": "We’ll assign your member number when you finish. Choose roles and crews from your dashboard later."
     },
     "topping": {
       "placeholder": "What's your topping?",
@@ -330,6 +344,39 @@
       "useCustom": "Use \"{query}\"",
       "offCanon": "Off canon",
       "footer": "Tap to choose · or type your own"
+    },
+    "community": {
+      "overline": "§ The pizza community",
+      "heading": "Real people. Shared pizza.",
+      "description": "Meet the people behind PizzaDAO: local communities, working crews, and an annual Global Pizza Party.",
+      "photoAlt": "PizzaDAO community gathering in {city}",
+      "photoCaption": "PizzaDAO community",
+      "participate": "Find your way in",
+      "localTitle": "Meet your local community",
+      "localDescription": "Tell us your city when you join to find people and chapter chats near you.",
+      "crewsTitle": "Join a working crew",
+      "crewsDescription": "Explore the groups that organize projects and meet on regular calls.",
+      "projectsTitle": "Contribute to a project",
+      "projectsDescription": "See what the tech crew is building and where you can help.",
+      "stories": "Stories from the community",
+      "allStories": "All stories ↗"
+    },
+    "finale": {
+      "shareText": "I just joined PizzaDAO. My name is {name}.",
+      "copied": "Copied — paste it anywhere.",
+      "shareUnavailable": "Sharing isn’t available here.",
+      "record": "PizzaDAO · Family Record",
+      "madeStatus": "Status · Made",
+      "approved": "approved — the family",
+      "descriptor": "You’ve been made. The record is sealed.",
+      "status": "Status",
+      "made": "Made",
+      "archive": "Archive",
+      "initiated": "Initiated",
+      "member": "Member",
+      "continueButton": "Continue to dashboard",
+      "shareButton": "Share my name",
+      "footnote": "Filed in the family record · {year}"
     }
   },
   "nav": {
@@ -339,15 +386,15 @@
     "crews": "Crews",
     "members": "Members",
     "missions": "Missions",
-    "pep": "PEP",
-    "articles": "Articles",
-    "calls": "Calls",
+    "pep": "Earn & spend PEP",
+    "articles": "Stories",
+    "calls": "Call history",
     "chats": "Chats",
-    "manuals": "Manuals",
-    "turtles": "Turtles",
+    "manuals": "Guides",
+    "turtles": "Roles (Turtles)",
     "techProjects": "Tech Projects",
     "nfts": "NFTs",
-    "poaps": "POAPs",
+    "poaps": "Event badges (POAPs)",
     "print": "Print Materials",
     "more": "More",
     "explore": "§ Explore",
@@ -357,7 +404,10 @@
     "openMenu": "Open menu",
     "closeMenu": "Close menu",
     "support": "Support",
-    "shopAdmin": "Shop admin"
+    "shopAdmin": "Shop admin",
+    "community": "Community",
+    "contribute": "Contribute",
+    "resources": "Resources"
   },
   "dashboard": {
     "loading": {
@@ -552,6 +602,85 @@
         "finalBody": "You reached the top. You are a true Pizza Don.",
         "continue": "Continue"
       }
+    },
+    "optionalSetup": {
+      "title": "Make yourself at home",
+      "description": "Your profile is ready. Choose roles and crews whenever you’re ready to get involved.",
+      "roles": "Choose your roles",
+      "crews": "Explore crews"
     }
+  },
+  "crewsPage": {
+    "joined": "Joined",
+    "viewCrew": "View crew",
+    "leaving": "Leaving…",
+    "leaveCrew": "Leave crew",
+    "joining": "Joining…",
+    "joinCrew": "Join crew",
+    "loginPrompt": "Please log in to join a crew.",
+    "topTasks": "Top tasks",
+    "moreTasks": "+{count} more tasks",
+    "openSheet": "Open sheet ↗",
+    "loading": "Loading crews…",
+    "error": "§ Error",
+    "errorTitle": "The crew roster went missing.",
+    "loadError": "Could not load crews. Please try again.",
+    "joinError": "Could not join the crew. Please try again.",
+    "leaveError": "Could not leave the crew. Please try again.",
+    "home": "Back to home",
+    "overline": "The Crews",
+    "titlePrefix": "Pick a crew,",
+    "titleAccent": "join the call",
+    "description": "Working groups that organize PizzaDAO projects and meet regularly. Join one when you’re ready to contribute.",
+    "welcome": "Welcome, {name}! Join crews to get involved.",
+    "loginHint": "Log in to join crews.",
+    "pages": "Crew pages",
+    "dashboard": "My dashboard",
+    "members": "Browse members",
+    "manuals": "Browse all manuals",
+    "schedule": "Weekly schedule",
+    "every": "Every",
+    "offCalendar": "Off the calendar",
+    "otherCrews": "Other crews",
+    "loginTitle": "Log in via Discord DM to join crews",
+    "login": "Log in",
+    "dayMonday": "Monday",
+    "dayTuesday": "Tuesday",
+    "dayWednesday": "Wednesday",
+    "dayThursday": "Thursday",
+    "dayFriday": "Friday",
+    "daySaturday": "Saturday",
+    "daySunday": "Sunday"
+  },
+  "callsPage": {
+    "overline": "The Call Log",
+    "titlePrefix": "Call",
+    "titleAccent": "history",
+    "recorded": "{count, plural, one {# crew call recorded} other {# crew calls recorded}} — tap a call to see who showed up.",
+    "description": "Every crew call on the books, with who showed up.",
+    "filedUnder": "Filed under",
+    "all": "All",
+    "ledger": "The ledger",
+    "noMatches": "No calls match your filters",
+    "showing": "Showing {shown} of {total, plural, one {# call} other {# calls}}",
+    "clear": "Clear filters",
+    "sort": "Sort calls",
+    "newest": "Newest first",
+    "oldest": "Oldest first",
+    "empty": "No calls found.",
+    "attendees": "{count, plural, one {# attendee} other {# attendees}}",
+    "room": "In the room",
+    "loadingAttendees": "Loading attendees...",
+    "attendeesError": "Failed to load attendees.",
+    "loadError": "Failed to load calls. Please try again.",
+    "prev": "← Prev",
+    "next": "Next →",
+    "page": "Page {current} of {total}",
+    "upcoming": "Looking for upcoming calls? Browse the weekly crew schedule."
+  },
+  "communityTerms": {
+    "missions": "Guided tasks that help you get involved in PizzaDAO.",
+    "pep": "PEP is PizzaDAO’s community points. Earn them by contributing and explore what you can spend them on.",
+    "poaps": "POAPs are digital badges collected at community events."
   }
 }

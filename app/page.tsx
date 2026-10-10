@@ -17,7 +17,7 @@ export default function Page() {
             "radial-gradient(60% 60% at 50% 0%, hsl(var(--tomato) / 0.10), transparent 70%)",
         }}
       />
-      <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 lg:px-8 pt-12 sm:pt-20 pb-24">
+      <div className="mx-auto w-full max-w-2xl px-4 sm:px-6 lg:px-8 pt-8 sm:pt-12 pb-24">
         <OnboardingWizard />
       </div>
     </main>

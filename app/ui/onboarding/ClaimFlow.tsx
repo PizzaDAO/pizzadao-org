@@ -104,7 +104,7 @@ export function ClaimFlow({
           {step === "ask" && (
             <div className="relative grid gap-6 fade-up">
               <header>
-                <p className="overline text-tomato">{t("askOverline")}</p>
+                <p className="overline text-tomato-readable">{t("askOverline")}</p>
                 <h2
                   className="font-[family-name:var(--font-display)] mt-3 max-w-[14ch] font-black tracking-[-0.015em] text-foreground"
                   style={{
@@ -114,7 +114,7 @@ export function ClaimFlow({
                   }}
                 >
                   {t("askHeadlinePrefix")}{" "}
-                  <span className="text-tomato">{t("askHeadlineAccent")}</span>
+                  <span className="text-tomato-readable">{t("askHeadlineAccent")}</span>
                   {t("askHeadlineSuffix")}
                 </h2>
               </header>
@@ -135,7 +135,7 @@ export function ClaimFlow({
                   onClick={() => setStep("input-id")}
                   className="btn-pill-lg group"
                   style={{
-                    background: "hsl(var(--tomato))",
+                    background: "hsl(var(--tomato-deep))",
                     color: "hsl(var(--cream))",
                     boxShadow: "var(--shadow-soft)",
                   }}
@@ -162,7 +162,7 @@ export function ClaimFlow({
           {step === "input-id" && (
             <div className="relative grid gap-5 fade-up">
               <header>
-                <p className="overline text-tomato">{t("inputIdOverline")}</p>
+                <p className="overline text-tomato-readable">{t("inputIdOverline")}</p>
                 <h2
                   className="font-[family-name:var(--font-display)] mt-3 font-black tracking-[-0.015em] text-foreground"
                   style={{
@@ -178,7 +178,7 @@ export function ClaimFlow({
               </header>
 
               <CinematicField
-                icon={<Hash className="h-5 w-5 shrink-0 text-foreground/35" />}
+                icon={<Hash className="h-5 w-5 shrink-0 text-foreground/70" />}
               >
                 <input
                   type="text"
@@ -203,7 +203,7 @@ export function ClaimFlow({
                     setStep("ask");
                     setError(null);
                   }}
-                  className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato min-h-11"
+                  className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable min-h-11"
                 >
                   <ArrowLeft className="h-3 w-3" />
                   {t("back")}
@@ -213,7 +213,7 @@ export function ClaimFlow({
                   onClick={checkMemberId}
                   className="btn-pill-lg group"
                   style={{
-                    background: "hsl(var(--tomato))",
+                    background: "hsl(var(--tomato-deep))",
                     color: "hsl(var(--cream))",
                     boxShadow: "var(--shadow-soft)",
                   }}
@@ -235,7 +235,7 @@ export function ClaimFlow({
               }}
             >
               <header>
-                <p className="overline text-tomato">{t("inputPassOverline")}</p>
+                <p className="overline text-tomato-readable">{t("inputPassOverline")}</p>
                 <h2
                   className="font-[family-name:var(--font-display)] mt-3 font-black tracking-[-0.015em] text-foreground"
                   style={{
@@ -244,7 +244,7 @@ export function ClaimFlow({
                   }}
                 >
                   {t("inputPassHeadingPrefix")}{" "}
-                  <span className="text-tomato">{foundName}</span>
+                  <span className="text-tomato-readable">{foundName}</span>
                 </h2>
                 <p className="mt-3 text-sm text-foreground/65">
                   {t("inputPassHint")}
@@ -252,7 +252,7 @@ export function ClaimFlow({
               </header>
 
               <CinematicField
-                icon={<Lock className="h-5 w-5 shrink-0 text-foreground/35" />}
+                icon={<Lock className="h-5 w-5 shrink-0 text-foreground/70" />}
               >
                 <input
                   name="password"
@@ -277,7 +277,7 @@ export function ClaimFlow({
                     setStep("input-id");
                     setError(null);
                   }}
-                  className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato min-h-11"
+                  className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable min-h-11"
                 >
                   <ArrowLeft className="h-3 w-3" />
                   {t("back")}
@@ -286,7 +286,7 @@ export function ClaimFlow({
                   type="submit"
                   className="btn-pill-lg group"
                   style={{
-                    background: "hsl(var(--tomato))",
+                    background: "hsl(var(--tomato-deep))",
                     color: "hsl(var(--cream))",
                     boxShadow: "var(--shadow-soft)",
                   }}
@@ -300,23 +300,23 @@ export function ClaimFlow({
 
           {step === "processing" && (
             <div className="relative grid place-items-center gap-3 py-10 fade-up">
-              <p className="overline text-tomato/70">{t("processingOverline")}</p>
+              <p className="overline text-tomato-readable/70">{t("processingOverline")}</p>
               <div className="flex gap-1.5">
                 <span
                   className="h-2 w-2 animate-pulse rounded-full"
-                  style={{ background: "hsl(var(--tomato))" }}
+                  style={{ background: "hsl(var(--tomato-deep))" }}
                 />
                 <span
                   className="h-2 w-2 animate-pulse rounded-full"
                   style={{
-                    background: "hsl(var(--tomato))",
+                    background: "hsl(var(--tomato-deep))",
                     animationDelay: "120ms",
                   }}
                 />
                 <span
                   className="h-2 w-2 animate-pulse rounded-full"
                   style={{
-                    background: "hsl(var(--tomato))",
+                    background: "hsl(var(--tomato-deep))",
                     animationDelay: "240ms",
                   }}
                 />
@@ -371,7 +371,7 @@ function InlineError({ message }: { message: string }) {
       }}
     >
       <p
-        className="relative ui text-[12px] uppercase tracking-[0.22em] font-bold"
+        className="relative ui text-[13px] uppercase tracking-[0.08em] font-bold"
         style={{ color: "hsl(var(--destructive))" }}
       >
         {message}

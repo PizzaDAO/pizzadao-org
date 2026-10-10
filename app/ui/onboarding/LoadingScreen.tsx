@@ -97,25 +97,25 @@ export function LoadingScreen({ message, flow }: Props) {
       />
 
       <div className="relative grid place-items-center gap-5 py-14 md:py-20">
-        <p className="overline text-tomato/80">{overline}</p>
+        <p className="overline text-tomato-readable/80">{overline}</p>
 
         {/* Spinning dot trio */}
         <div className="flex gap-2">
           <span
             className="h-2.5 w-2.5 animate-pulse rounded-full"
-            style={{ background: "hsl(var(--tomato))" }}
+            style={{ background: "hsl(var(--tomato-deep))" }}
           />
           <span
             className="h-2.5 w-2.5 animate-pulse rounded-full"
             style={{
-              background: "hsl(var(--tomato))",
+              background: "hsl(var(--tomato-deep))",
               animationDelay: "120ms",
             }}
           />
           <span
             className="h-2.5 w-2.5 animate-pulse rounded-full"
             style={{
-              background: "hsl(var(--tomato))",
+              background: "hsl(var(--tomato-deep))",
               animationDelay: "240ms",
             }}
           />
@@ -132,13 +132,13 @@ export function LoadingScreen({ message, flow }: Props) {
         {/* Hand-scrawled margin notes */}
         <span
           aria-hidden
-          className="handwritten pointer-events-none absolute left-[8%] top-[18%] hidden rotate-[-8deg] text-[18px] text-foreground/40 md:block"
+          className="handwritten pointer-events-none absolute left-[8%] top-[18%] hidden rotate-[-8deg] text-[18px] text-foreground/70 md:block"
         >
           {scribble}
         </span>
         <span
           aria-hidden
-          className="handwritten pointer-events-none absolute right-[10%] bottom-[18%] hidden rotate-[6deg] text-[16px] text-tomato/70 md:block"
+          className="handwritten pointer-events-none absolute right-[10%] bottom-[18%] hidden rotate-[6deg] text-[16px] text-tomato-readable/70 md:block"
         >
           {scribbleAlt}
         </span>

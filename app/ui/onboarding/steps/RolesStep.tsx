@@ -60,7 +60,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
 
       {/* ─── Headline ────────────────────────────────────────────── */}
       <header className="relative">
-        <p className="overline text-tomato">{t("overline")}</p>
+        <p className="overline text-tomato-readable">{t("overline")}</p>
         <h2
           className="font-[family-name:var(--font-display)] mt-3 max-w-[18ch] font-black tracking-[-0.015em] text-foreground"
           style={{
@@ -69,7 +69,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
             textWrap: "balance",
           }}
         >
-          {t("headingPrefix")} <span className="text-tomato">{t("headingAccent")}</span>{t("headingSuffix")}
+          {t("headingPrefix")} <span className="text-tomato-readable">{t("headingAccent")}</span>{t("headingSuffix")}
         </h2>
         <p
           className="mt-4 max-w-xl text-foreground/70"
@@ -103,7 +103,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
       </section>
 
       {/* ─── Selected summary ────────────────────────────────────── */}
-      <p className="ui text-[11px] uppercase tracking-[0.24em] text-foreground/55">
+      <p className="ui text-[13px] uppercase tracking-[0.08em] text-foreground/70">
         {t("selectedLabel")}{" "}
         <b className="text-foreground">
           {turtles.length ? turtles.join(", ") : t("noneYet")}
@@ -115,7 +115,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
         <button
           type="button"
           onClick={onBack}
-          className="ui inline-flex items-center gap-1.5 text-[11px] uppercase tracking-[0.22em] text-foreground/55 transition-colors hover:text-tomato"
+          className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
         >
           <ArrowLeft className="h-3 w-3" />
           {t("back")}
@@ -126,7 +126,7 @@ export function RolesStep({ turtles, onChange, onNext, onBack, isUpdate: _isUpda
           disabled={!canProceed}
           className="btn-pill-lg group"
           style={{
-            background: "hsl(var(--tomato))",
+            background: "hsl(var(--tomato-deep))",
             color: "hsl(var(--cream))",
             boxShadow: "var(--shadow-soft)",
           }}
@@ -227,7 +227,7 @@ function TurtleCard({
         >
           {label}
         </h3>
-        <p className="ui mt-1 text-[10px] uppercase tracking-[0.24em] text-foreground/55">
+        <p className="ui mt-1 text-[13px] uppercase tracking-[0.08em] text-foreground/70">
           {role}
         </p>
       </div>
@@ -235,7 +235,7 @@ function TurtleCard({
       <div
         className="relative grid h-7 w-7 shrink-0 place-items-center rounded-full transition-all"
         style={{
-          background: selected ? "hsl(var(--tomato))" : "transparent",
+          background: selected ? "hsl(var(--tomato-deep))" : "transparent",
           border: selected
             ? "1px solid hsl(var(--tomato))"
             : "1.5px solid hsl(var(--foreground) / 0.25)",
@@ -251,7 +251,7 @@ function TurtleCard({
         className="handwritten pointer-events-none absolute -bottom-3 right-5 rotate-[-6deg] transition-all duration-500"
         style={{
           fontSize: "15px",
-          color: selected ? "hsl(var(--tomato))" : "hsl(var(--foreground) / 0.45)",
+          color: selected ? "hsl(var(--tomato-readable))" : "hsl(var(--foreground) / 0.45)",
           opacity: selected ? 1 : 0.75,
         }}
       >

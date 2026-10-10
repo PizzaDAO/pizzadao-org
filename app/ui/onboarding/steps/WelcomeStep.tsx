@@ -1,18 +1,19 @@
 // app/ui/onboarding/steps/WelcomeStep.tsx
 //
 // mozzarella-41832 — Editorial restyle.
-// Visual rewrite of the welcome screen. Props (`onJoin`, `onLogin`,
-// `onMagicLogin`) and i18n keys are unchanged — wizard flow is untouched.
+// Welcome screen with a single Discord DM login entry point.
 "use client";
 
 import type { CSSProperties } from "react";
+import Image from "next/image";
+import Link from "next/link";
+import { CommunityPreview } from "../CommunityPreview";
 import { ArrowUpRight } from "lucide-react";
 import { useTranslations } from "next-intl";
 
 type Props = {
   onJoin: () => void;
   onLogin: () => void;
-  onMagicLogin: () => void;
 };
 
 const HERO_SPOTLIGHT: CSSProperties = {
@@ -25,7 +26,7 @@ const DOCK_SPOTLIGHT: CSSProperties = {
     "radial-gradient(60% 80% at 20% 0%, hsl(46 100% 62% / 0.18), transparent 70%), radial-gradient(60% 80% at 100% 100%, hsl(0 93% 60% / 0.18), transparent 70%)",
 };
 
-export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
+export function WelcomeStep({ onJoin, onLogin }: Props) {
   const t = useTranslations("onboarding.welcome");
 
   return (
@@ -40,15 +41,17 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
       {/* ─── Hero ────────────────────────────────────────────────── */}
       <header className="relative text-center">
         <div className="flex justify-center mb-6">
-          <img
+          <Image
             src="/brand-kit/molto-benny/molto-benny-color.svg"
             alt="PizzaDAO"
+            width={100}
+            height={64}
             className="h-16 w-auto max-w-full object-contain"
             style={{ transform: "rotate(-2deg)" }}
           />
         </div>
 
-        <p className="overline text-tomato">§ ··· The Invitation</p>
+        <p className="overline text-tomato-readable">{t("overline")}</p>
 
         <h1
           className="font-[family-name:var(--font-display)] mx-auto mt-4 max-w-[16ch] font-black tracking-[-0.015em] text-foreground"
@@ -72,16 +75,16 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
             well below the centered 64-px logo so the wordmark stays clear. */}
         <span
           aria-hidden
-          className="handwritten pointer-events-none absolute right-[2%] top-[42%] hidden rotate-[8deg] text-[18px] text-tomato md:block lg:right-[-2%]"
+          className="handwritten pointer-events-none absolute right-[2%] bottom-[-28px] hidden max-w-[180px] text-right rotate-[5deg] text-[16px] text-tomato-readable md:block"
           style={{ opacity: 0.85 }}
         >
-          come in, the door&apos;s open
+          {t("doorNote")}
         </span>
         <span
           aria-hidden
-          className="handwritten pointer-events-none absolute left-[4%] bottom-[-12px] hidden rotate-[-5deg] text-[16px] text-foreground/55 md:block"
+          className="handwritten pointer-events-none absolute left-[4%] bottom-[-12px] hidden rotate-[-5deg] text-[16px] text-foreground/70 md:block"
         >
-          bring your appetite
+          {t("appetiteNote")}
         </span>
       </header>
 
@@ -112,14 +115,14 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
               className="overline"
               style={{ color: "hsl(var(--butter))" }}
             >
-              § Step in
+              {t("stepIn")}
             </p>
 
             <button
               onClick={onJoin}
               className="btn-pill-lg group"
               style={{
-                background: "hsl(var(--tomato))",
+                background: "hsl(var(--tomato-deep))",
                 color: "hsl(var(--cream))",
                 boxShadow: "var(--shadow-soft)",
               }}
@@ -142,18 +145,14 @@ export function WelcomeStep({ onJoin, onLogin, onMagicLogin }: Props) {
           </div>
         </div>
 
-        {/* Tertiary magic-login link */}
-        <div className="mt-5 text-center">
-          <button
-            onClick={onMagicLogin}
-            /* sicilian-41551: 44-px tap target on the tertiary link. */
-            className="ui inline-flex items-center justify-center min-h-11 px-3 text-[11px] uppercase tracking-[0.24em] text-foreground/55 transition-colors hover:text-tomato cursor-pointer"
-            style={{ background: "none", border: "none" }}
-          >
-            {t("magicLoginButton")}
-          </button>
+
+        <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-1">
+          <Link href="/crews" className="inline-flex min-h-11 items-center font-semibold text-tomato-readable underline underline-offset-4">{t("explore")}</Link>
+          <Link href="/articles" className="inline-flex min-h-11 items-center text-foreground/80 underline underline-offset-4">{t("stories")}</Link>
+          <Link href="/manuals" className="inline-flex min-h-11 items-center text-foreground/80 underline underline-offset-4">{t("guides")}</Link>
         </div>
       </section>
+      <CommunityPreview />
     </div>
   );
 }

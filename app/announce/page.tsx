@@ -105,7 +105,7 @@ export default function AnnouncePage() {
             You must log in with Discord to use this page.
           </p>
           <a
-            href="/api/discord/login"
+            href="/login?returnTo=/announce"
             className="inline-block bg-indigo-600 text-white px-4 py-2 rounded hover:bg-indigo-700"
           >
             Log in with Discord

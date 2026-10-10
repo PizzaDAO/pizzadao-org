@@ -1,6 +1,7 @@
 import { randomBytes, createHash } from "crypto";
 import { prisma } from "./db";
 import { searchGuildMembers, sendDM } from "./discord";
+import { loginReturnPath } from "./login-return";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -19,6 +20,7 @@ export type MagicLoginResult =
 export async function requestMagicLogin(
   username: string,
   origin: string,
+  options: { returnTo?: unknown; onboarding?: boolean } = {},
 ): Promise<MagicLoginResult> {
   // Search guild for exact username match
   const members = await searchGuildMembers(username, 5);
@@ -54,7 +56,11 @@ export async function requestMagicLogin(
   });
 
   // DM the user
-  const loginUrl = `${origin}/api/auth/magic-login?token=${rawToken}`;
+  const loginUrl = new URL("/api/auth/magic-login", origin);
+  loginUrl.searchParams.set("token", rawToken);
+  const returnTo = loginReturnPath(options.returnTo);
+  if (returnTo) loginUrl.searchParams.set("returnTo", returnTo);
+  if (options.onboarding) loginUrl.searchParams.set("onboarding", "1");
   const message = [
     "**PizzaDAO Login Link**",
     "",

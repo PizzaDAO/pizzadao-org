@@ -1,16 +1,5 @@
 "use client";
 
-// Global app shell header — editorial masthead + responsive nav.
-//
-// Rendered once from app/layout.tsx. Hidden on the full-screen onboarding
-// wizard routes (/, /join, /login) where the wizard owns the viewport and a
-// sticky bottom dock (NameStep). The header is sticky at the *top* so it
-// never collides with CornerLinks (fixed bottom-right) or bottom docks.
-//
-// Route naming note: /crews is the list of working crews and /crew is the
-// member directory. The URLs stay as-is (shared links); the nav labels them
-// "Crews" and "Members".
-
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
@@ -19,355 +8,118 @@ import { useTranslations } from "next-intl";
 import { useSession } from "@/app/lib/hooks/use-session";
 import { PizzaDAOLogo } from "./PizzaDAOLogo";
 
-type NavLabelKey =
-  | "crews"
-  | "members"
-  | "missions"
-  | "pep"
-  | "articles"
-  | "calls"
-  | "chats"
-  | "manuals"
-  | "turtles"
-  | "techProjects"
-  | "nfts"
-  | "poaps"
-  | "print"
-  | "support"
-  | "shopAdmin";
-
-type NavItem = {
-  href: string;
-  /** Key into the `nav` messages namespace. */
-  labelKey: NavLabelKey;
-  /** Custom active-state matcher; defaults to exact-or-prefix match. */
-  match?: (pathname: string) => boolean;
-  membersOnly?: boolean;
-  /** Only for members who may manage the shop (session.canManageShop). */
-  shopAdminOnly?: boolean;
-};
-
-const PRIMARY: NavItem[] = [
-  {
-    href: "/crews",
-    labelKey: "crews",
-    // /crew/[crewId] is an individual crew page — it belongs under Crews.
-    match: (p) => p === "/crews" || p.startsWith("/crew/"),
-  },
-  { href: "/crew", labelKey: "members", match: (p) => p === "/crew" },
-  { href: "/missions", labelKey: "missions" },
-  { href: "/pep", labelKey: "pep" },
-  { href: "/articles", labelKey: "articles" },
-  { href: "/calls", labelKey: "calls" },
-  { href: "/chats", labelKey: "chats", membersOnly: true },
+type NavItem = { href: string; label: string; membersOnly?: boolean; adminOnly?: boolean; match?: (path: string) => boolean };
+const GROUPS: { key: string; items: NavItem[] }[] = [
+  { key: "community", items: [
+    { href: "/crews", label: "crews", match: p => p === "/crews" || p.startsWith("/crew/") },
+    { href: "/crew", label: "members", match: p => p === "/crew" },
+    { href: "/articles", label: "articles" },
+    { href: "/chats", label: "chats", membersOnly: true },
+  ] },
+  { key: "contribute", items: [
+    { href: "/missions", label: "missions" },
+    { href: "/pep", label: "pep" },
+    { href: "/tech/projects", label: "techProjects" },
+  ] },
+  { key: "resources", items: [
+    { href: "/manuals", label: "manuals" },
+    { href: "/turtles", label: "turtles" },
+    { href: "/calls", label: "calls" },
+    { href: "/nfts", label: "nfts" },
+    { href: "/poaps", label: "poaps" },
+    { href: "/print", label: "print" },
+    { href: "/support", label: "support" },
+    { href: "/admin/shop", label: "shopAdmin", adminOnly: true },
+  ] },
 ];
-
-const MORE: NavItem[] = [
-  { href: "/manuals", labelKey: "manuals" },
-  { href: "/turtles", labelKey: "turtles" },
-  { href: "/tech/projects", labelKey: "techProjects" },
-  { href: "/nfts", labelKey: "nfts" },
-  { href: "/poaps", labelKey: "poaps" },
-  { href: "/print", labelKey: "print" },
-  { href: "/support", labelKey: "support" },
-  { href: "/admin/shop", labelKey: "shopAdmin", shopAdminOnly: true },
-];
-
-/** Routes where the onboarding wizard is full-screen and owns the chrome. */
-const HIDDEN_ON = new Set(["/", "/join", "/login"]);
-
-function isActive(item: NavItem, pathname: string) {
-  if (item.match) return item.match(pathname);
-  return pathname === item.href || pathname.startsWith(item.href + "/");
-}
-
-const DISPLAY_FONT = "var(--font-display), var(--font-sans), system-ui, sans-serif";
+const HIDDEN_ON = new Set(["/join", "/login"]);
+const activeItem = (item: NavItem, path: string) => item.match ? item.match(path) : path === item.href || path.startsWith(item.href + "/");
 
 export default function SiteHeader() {
   const pathname = usePathname() || "/";
   const t = useTranslations("nav");
   const { data: session } = useSession();
   const [mobileOpen, setMobileOpen] = useState(false);
-  const [moreOpen, setMoreOpen] = useState(false);
-  const moreRef = useRef<HTMLLIElement>(null);
-
-  // Close menus on navigation (derived-state pattern; no effect needed).
+  const [openGroup, setOpenGroup] = useState<string | null>(null);
   const [lastPath, setLastPath] = useState(pathname);
+  const desktopRef = useRef<HTMLUListElement>(null);
+  const buttonRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+  const mobileButtonRef = useRef<HTMLButtonElement>(null);
   if (lastPath !== pathname) {
     setLastPath(pathname);
     setMobileOpen(false);
-    setMoreOpen(false);
+    setOpenGroup(null);
   }
 
-  // Escape closes; outside-click closes the desktop "More" popover.
   useEffect(() => {
-    function onKey(e: KeyboardEvent) {
-      if (e.key === "Escape") {
-        setMobileOpen(false);
-        setMoreOpen(false);
-      }
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key !== "Escape") return;
+      if (openGroup) buttonRefs.current[openGroup]?.focus();
+      if (mobileOpen) mobileButtonRef.current?.focus();
+      setOpenGroup(null);
+      setMobileOpen(false);
     }
-    function onClick(e: MouseEvent) {
-      if (moreRef.current && !moreRef.current.contains(e.target as Node)) setMoreOpen(false);
+    function closeOutside(event: MouseEvent) {
+      if (desktopRef.current && !desktopRef.current.contains(event.target as Node)) setOpenGroup(null);
     }
-    document.addEventListener("keydown", onKey);
-    document.addEventListener("mousedown", onClick);
+    document.addEventListener("keydown", closeOnEscape);
+    document.addEventListener("mousedown", closeOutside);
     return () => {
-      document.removeEventListener("keydown", onKey);
-      document.removeEventListener("mousedown", onClick);
+      document.removeEventListener("keydown", closeOnEscape);
+      document.removeEventListener("mousedown", closeOutside);
     };
-  }, []);
+  }, [openGroup, mobileOpen]);
 
   if (HIDDEN_ON.has(pathname)) return null;
-
   const loggedIn = !!session?.authenticated;
   const dashboardHref = session?.memberId ? `/dashboard/${session.memberId}` : "/";
-  const primary = PRIMARY.filter((i) => !i.membersOnly || loggedIn);
-  const more = MORE.filter((i) => !i.shopAdminOnly || !!session?.canManageShop);
-  const moreActive = more.some((i) => isActive(i, pathname));
-  const dashboardActive = pathname.startsWith("/dashboard/");
-
-  const linkClass = (active: boolean) =>
-    `site-nav-link relative inline-flex items-center min-h-[44px] px-2.5 text-[13px] font-semibold tracking-[0.02em] no-underline transition-colors ${
-      active ? "text-tomato" : "text-foreground/70 hover:text-foreground"
-    }`;
+  const groups = GROUPS.map(group => ({ ...group, items: group.items.filter(item => (!item.membersOnly || loggedIn) && (!item.adminOnly || session?.canManageShop)) }));
+  const linkClass = "flex min-h-11 items-center rounded-xl px-3 py-2 text-sm no-underline transition-colors hover:bg-foreground/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-tomato-readable";
+  const account = loggedIn ? (
+    <Link href={dashboardHref} className="btn-pill min-h-11 bg-foreground text-background no-underline" aria-current={pathname.startsWith("/dashboard/") ? "page" : undefined}>{t("dashboard")}</Link>
+  ) : (
+    <>
+      <Link href="/login" className={linkClass + " text-foreground"}>{t("logIn")}</Link>
+      <Link href="/join" className="btn-pill min-h-11 bg-tomato-deep text-cream no-underline">{t("join")}</Link>
+    </>
+  );
 
   return (
-    <header
-      className="sticky top-0 z-50 border-b backdrop-blur-md print:hidden"
-      style={{
-        borderColor: "hsl(var(--rule-warm) / 0.55)",
-        background: "hsl(var(--background) / 0.88)",
-        fontFamily: "var(--font-sans), system-ui, sans-serif",
-      }}
-    >
-      <a
-        href="#main-content"
-        className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-[60] focus:rounded-full focus:bg-foreground focus:px-4 focus:py-2 focus:text-background"
-      >
-        {t("skipToContent")}
-      </a>
-      <nav
-        aria-label={t("mainAriaLabel")}
-        className="mx-auto flex h-14 max-w-[1200px] items-center gap-2 px-4 sm:px-6"
-      >
-        {/* Masthead */}
-        <Link
-          href={loggedIn ? dashboardHref : "/"}
-          className="mr-2 inline-flex items-center no-underline text-foreground"
-          aria-label={t("homeAriaLabel")}
-        >
-          <PizzaDAOLogo height={28} />
-        </Link>
-
-        {/* Desktop links */}
-        <ul className="m-0 hidden list-none items-center p-0 lg:flex">
-          {primary.map((item) => {
-            const active = isActive(item, pathname);
+    <header className="sticky top-0 z-50 border-b border-[hsl(var(--rule-warm)/0.55)] bg-background/95 backdrop-blur-md print:hidden">
+      <a href="#main-content" className="sr-only focus:not-sr-only focus:absolute focus:left-4 focus:top-2 focus:z-[60] focus:rounded-full focus:bg-foreground focus:px-4 focus:py-2 focus:text-background">{t("skipToContent")}</a>
+      <nav aria-label={t("mainAriaLabel")} className="mx-auto flex min-h-16 max-w-[1200px] items-center gap-3 px-4 sm:px-6">
+        <Link href={loggedIn ? dashboardHref : "/"} className="mr-2 inline-flex min-h-11 items-center text-foreground no-underline" aria-label={t("homeAriaLabel")}><PizzaDAOLogo height={28} /></Link>
+        <ul ref={desktopRef} className="m-0 hidden list-none items-center gap-1 p-0 lg:flex" onBlur={event => { if (!event.currentTarget.contains(event.relatedTarget)) setOpenGroup(null); }}>
+          {groups.map(group => {
+            const expanded = openGroup === group.key;
+            const active = group.items.some(item => activeItem(item, pathname));
             return (
-              <li key={item.href}>
-                <Link
-                  href={item.href}
-                  className={linkClass(active)}
-                  aria-current={active ? "page" : undefined}
-                >
-                  {t(item.labelKey)}
-                </Link>
+              <li key={group.key} className="relative">
+                <button ref={el => { buttonRefs.current[group.key] = el; }} type="button" aria-expanded={expanded} aria-controls={`nav-${group.key}`} onClick={() => setOpenGroup(expanded ? null : group.key)} className={`flex min-h-11 cursor-pointer items-center gap-1 rounded-full border-0 bg-transparent px-3 text-sm font-semibold focus-visible:outline-2 focus-visible:outline-tomato-readable ${active || expanded ? "text-tomato-readable" : "text-foreground/80"}`}>
+                  {t(group.key)}<ChevronDown size={15} aria-hidden className={expanded ? "rotate-180" : ""} />
+                </button>
+                {expanded && (
+                  <ul id={`nav-${group.key}`} className="absolute left-0 top-full m-0 mt-1 min-w-[230px] list-none rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] bg-card p-2 shadow-lg">
+                    {group.items.map(item => <li key={item.href}><Link href={item.href} aria-current={activeItem(item, pathname) ? "page" : undefined} className={`${linkClass} ${activeItem(item, pathname) ? "font-semibold text-tomato-readable" : "text-foreground"}`}>{t(item.label)}</Link></li>)}
+                  </ul>
+                )}
               </li>
             );
           })}
-          <li className="relative" ref={moreRef}>
-            <button
-              type="button"
-              className={linkClass(moreActive) + " gap-1 border-0 bg-transparent cursor-pointer"}
-              aria-expanded={moreOpen}
-              aria-haspopup="true"
-              aria-controls="site-nav-more"
-              onClick={() => setMoreOpen((o) => !o)}
-            >
-              {t("more")}
-              <ChevronDown size={14} aria-hidden className={moreOpen ? "rotate-180 transition-transform" : "transition-transform"} />
-            </button>
-            {moreOpen && (
-              <ul
-                id="site-nav-more"
-                className="absolute right-0 top-full z-10 m-0 mt-1 min-w-[200px] list-none overflow-hidden rounded-2xl border p-2"
-                style={{
-                  borderColor: "hsl(var(--rule-warm) / 0.55)",
-                  background: "hsl(var(--card))",
-                  boxShadow: "var(--shadow-lifted)",
-                }}
-              >
-                {more.map((item) => {
-                  const active = isActive(item, pathname);
-                  return (
-                    <li key={item.href}>
-                      <Link
-                        href={item.href}
-                        aria-current={active ? "page" : undefined}
-                        className={`flex min-h-[40px] items-center rounded-xl px-3 text-sm no-underline transition-colors hover:bg-foreground/5 ${
-                          active ? "text-tomato font-semibold" : "text-foreground"
-                        }`}
-                      >
-                        {t(item.labelKey)}
-                      </Link>
-                    </li>
-                  );
-                })}
-              </ul>
-            )}
-          </li>
         </ul>
-
         <div className="ml-auto flex items-center gap-2">
-          {/* Account CTAs (desktop + tablet) */}
-          <div className="hidden items-center gap-2 sm:flex">
-            {loggedIn ? (
-              <Link
-                href={dashboardHref}
-                aria-current={dashboardActive ? "page" : undefined}
-                className="btn-pill no-underline"
-                style={{
-                  padding: "0.5rem 1.1rem",
-                  background: dashboardActive ? "hsl(var(--tomato))" : "hsl(var(--foreground))",
-                  color: dashboardActive ? "hsl(var(--cream))" : "hsl(var(--background))",
-                }}
-              >
-                {t("dashboard")}
-              </Link>
-            ) : session ? (
-              <>
-                <Link href="/login" className={linkClass(false)}>
-                  {t("logIn")}
-                </Link>
-                <Link
-                  href="/join"
-                  className="btn-pill no-underline"
-                  style={{
-                    padding: "0.5rem 1.1rem",
-                    background: "hsl(var(--tomato))",
-                    color: "hsl(var(--cream))",
-                  }}
-                >
-                  {t("join")}
-                </Link>
-              </>
-            ) : null}
-          </div>
-
-          {/* Mobile menu toggle */}
-          <button
-            type="button"
-            className="inline-flex h-11 w-11 items-center justify-center rounded-full border bg-transparent text-foreground lg:hidden"
-            style={{ borderColor: "hsl(var(--rule-warm) / 0.55)", cursor: "pointer" }}
-            aria-expanded={mobileOpen}
-            aria-controls="site-nav-mobile"
-            aria-label={mobileOpen ? t("closeMenu") : t("openMenu")}
-            onClick={() => setMobileOpen((o) => !o)}
-          >
-            {mobileOpen ? <X size={20} aria-hidden /> : <Menu size={20} aria-hidden />}
-          </button>
+          <div className="hidden items-center gap-2 sm:flex">{account}</div>
+          <button ref={mobileButtonRef} type="button" aria-expanded={mobileOpen} aria-controls="site-nav-mobile" aria-label={mobileOpen ? t("closeMenu") : t("openMenu")} onClick={() => setMobileOpen(value => !value)} className="inline-flex h-11 w-11 cursor-pointer items-center justify-center rounded-full border border-[hsl(var(--rule-warm)/0.55)] bg-transparent text-foreground lg:hidden">{mobileOpen ? <X size={20} aria-hidden /> : <Menu size={20} aria-hidden />}</button>
         </div>
       </nav>
-
-      {/* Mobile panel */}
       {mobileOpen && (
-        <div
-          id="site-nav-mobile"
-          className="paper-soft fade-up max-h-[calc(100svh-3.5rem)] overflow-y-auto border-t lg:hidden"
-          style={{
-            borderColor: "hsl(var(--rule-warm) / 0.55)",
-            background: "hsl(var(--card))",
-            animationDuration: "0.3s",
-          }}
-        >
-          <div className="mx-auto max-w-[1200px] px-4 pb-6 pt-4 sm:px-6">
-            <div className="mb-4 flex gap-2 sm:hidden">
-              {loggedIn ? (
-                <Link
-                  href={dashboardHref}
-                  className="btn-pill flex-1 no-underline"
-                  style={{ background: "hsl(var(--foreground))", color: "hsl(var(--background))" }}
-                >
-                  {t("dashboard")}
-                </Link>
-              ) : (
-                <>
-                  <Link
-                    href="/login"
-                    className="btn-pill flex-1 border no-underline"
-                    style={{ borderColor: "hsl(var(--rule-warm))", color: "hsl(var(--foreground))" }}
-                  >
-                    {t("logIn")}
-                  </Link>
-                  <Link
-                    href="/join"
-                    className="btn-pill flex-1 no-underline"
-                    style={{ background: "hsl(var(--tomato))", color: "hsl(var(--cream))" }}
-                  >
-                    {t("join")}
-                  </Link>
-                </>
-              )}
-            </div>
-
-            <p className="overline m-0 mb-1 text-tomato">{t("explore")}</p>
-            <ul className="m-0 grid list-none grid-cols-2 gap-x-4 p-0">
-              {primary.map((item) => {
-                const active = isActive(item, pathname);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex min-h-[44px] items-center text-lg no-underline ${
-                        active ? "text-tomato" : "text-foreground"
-                      }`}
-                      style={{ fontFamily: DISPLAY_FONT, fontWeight: 700 }}
-                    >
-                      {t(item.labelKey)}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
-
-            <div className="rule-warm my-3" />
-            <p className="overline m-0 mb-1 text-foreground/55">{t("more")}</p>
-            <ul className="m-0 grid list-none grid-cols-2 gap-x-4 p-0">
-              {more.map((item) => {
-                const active = isActive(item, pathname);
-                return (
-                  <li key={item.href}>
-                    <Link
-                      href={item.href}
-                      aria-current={active ? "page" : undefined}
-                      className={`flex min-h-[44px] items-center text-[15px] no-underline ${
-                        active ? "text-tomato font-semibold" : "text-foreground/80"
-                      }`}
-                    >
-                      {t(item.labelKey)}
-                    </Link>
-                  </li>
-                );
-              })}
-            </ul>
+        <div id="site-nav-mobile" className="max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-[hsl(var(--rule-warm)/0.55)] bg-card lg:hidden">
+          <div className="mx-auto grid max-w-[1200px] gap-5 px-4 pb-6 pt-4 sm:px-6">
+            <div className="flex flex-wrap items-center gap-2 sm:hidden">{account}</div>
+            {groups.map(group => <section key={group.key} aria-label={t(group.key)}><h2 className="overline m-0 mb-1 text-tomato-readable">{t(group.key)}</h2><ul className="m-0 grid list-none grid-cols-2 gap-x-2 p-0">{group.items.map(item => <li key={item.href}><Link href={item.href} aria-current={activeItem(item, pathname) ? "page" : undefined} className={`${linkClass} ${activeItem(item, pathname) ? "font-semibold text-tomato-readable" : "text-foreground"}`}>{t(item.label)}</Link></li>)}</ul></section>)}
           </div>
         </div>
       )}
-      <style>{`
-        .site-nav-link[aria-current="page"]::after,
-        .site-nav-link[aria-expanded="true"]::after {
-          content: "";
-          position: absolute;
-          left: 10px;
-          right: 10px;
-          bottom: 8px;
-          height: 2px;
-          border-radius: 2px;
-          background: hsl(var(--tomato));
-        }
-      `}</style>
     </header>
   );
 }

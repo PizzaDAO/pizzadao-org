@@ -72,7 +72,7 @@ export function RecentActivity({ events }: RecentActivityProps) {
     const tTime = useTranslations("dashboard.activity.time");
     return (
         <section className="rule-warm relative pt-6">
-            <p className="overline text-tomato">{t("overline")}</p>
+            <p className="overline text-tomato-readable">{t("overline")}</p>
             <h3
                 className="font-[family-name:var(--font-display)] mt-2 font-black tracking-[-0.015em] text-foreground"
                 style={{
@@ -89,11 +89,11 @@ export function RecentActivity({ events }: RecentActivityProps) {
                     className="paper-soft mt-5 rounded-2xl border px-5 py-6 text-center"
                     style={{
                         borderColor: "hsl(var(--rule-warm) / 0.45)",
-                        background: "hsl(var(--cream) / 0.5)",
+                        background: "hsl(var(--background) / 0.5)",
                     }}
                 >
                     <span
-                        className="handwritten text-tomato"
+                        className="handwritten text-tomato-readable"
                         style={{ fontSize: 17 }}
                     >
                         {t("emptyMark")}
@@ -173,8 +173,8 @@ export function RecentActivity({ events }: RecentActivityProps) {
                                     style={{
                                         border:
                                             "1px solid hsl(var(--rule-warm) / 0.55)",
-                                        background: "hsl(var(--cream) / 0.6)",
-                                        color: "hsl(var(--tomato))",
+                                        background: "hsl(var(--background) / 0.6)",
+                                        color: "hsl(var(--tomato-readable))",
                                         marginTop: 1,
                                     }}
                                 >
