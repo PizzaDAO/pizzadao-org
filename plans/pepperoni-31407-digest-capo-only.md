@@ -31,9 +31,10 @@ Review permissions (`mission-review-access.ts`) are untouched; L8 approval stays
 - `npm run build` passes
 
 ## Progress (agent, 2026-10-14)
-- Done: worktree C:/dev/wt/pepperoni-31407 (branch pepperoni-31407-digest-capo-only); changes 1-3 implemented; committed and pushed.
+- DONE. Worktree C:/dev/wt/pepperoni-31407 (branch pepperoni-31407-digest-capo-only); changes 1-3 implemented, committed and pushed.
 - PR (draft): https://github.com/PizzaDAO/pizzadao-org/pull/164
+- Vercel preview: https://onboarding-git-pepperoni-31407-digest-capo-only-pizza-dao.vercel.app (deployment completed, HTTP 200). All PR checks pass (Typecheck/lint/test, Next.js build, both Vercel projects).
 - Tests: `npx vitest run app/lib/mission-verify` 223/223 pass; mission-review-access.test.ts 12/12 pass.
-- Local `npm run build`: fails at "Failed to collect page data for /api/discord/sync-roles". Likely because .env.local is missing in the worktree (copying it was denied). Still under investigation.
-- Note: `npm ci` fails on main (package-lock.json is out of sync: zod, @vercel/kv, ...). Used `npm install`; lockfile changes are not committed.
-- Remaining: confirm the build failure is env-only, then verify the Vercel preview deployment.
+- Build: `npm run build` passes locally when SESSION_SECRET is set. Without .env.local it fails only on "SESSION_SECRET environment variable is required".
+- Note: `npm ci` fails on main because package-lock.json is out of sync (zod, @vercel/kv, ...). This is pre-existing and not touched by this PR.
+- Remaining: Snax review, then merge and clean up the worktree.
