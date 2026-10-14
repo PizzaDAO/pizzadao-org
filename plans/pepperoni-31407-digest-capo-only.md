@@ -29,3 +29,11 @@ Review permissions (`mission-review-access.ts`) are untouched; L8 approval stays
 ## Verification
 - `npx vitest run app/lib/mission-verify` passes
 - `npm run build` passes
+
+## Progress (agent, 2026-10-14)
+- Done: worktree C:/dev/wt/pepperoni-31407 (branch pepperoni-31407-digest-capo-only); changes 1-3 implemented; committed and pushed.
+- PR (draft): https://github.com/PizzaDAO/pizzadao-org/pull/164
+- Tests: `npx vitest run app/lib/mission-verify` 223/223 pass; mission-review-access.test.ts 12/12 pass.
+- Local `npm run build`: fails at "Failed to collect page data for /api/discord/sync-roles". Likely because .env.local is missing in the worktree (copying it was denied). Still under investigation.
+- Note: `npm ci` fails on main (package-lock.json is out of sync: zod, @vercel/kv, ...). Used `npm install`; lockfile changes are not committed.
+- Remaining: confirm the build failure is env-only, then verify the Vercel preview deployment.
