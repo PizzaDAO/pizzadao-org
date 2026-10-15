@@ -6,9 +6,9 @@
  * any PENDING submission has waited more than 48 hours in the human queue it
  * posts ONE summary card in #work (MISSION_REVIEW_CHANNEL_ID, else "work"),
  * listing the overdue items oldest first with a link to each review card, and
- * pings the roles that may review them (the admin + reviewer roles; Dread
- * Pizza Roberts for L8). Never @everyone / @here: allowed_mentions lists only
- * those role ids.
+ * pings the Pizza Capo role only (at every level, L8 included; who may
+ * *review* is unchanged, see mission-review-access.ts). Never @everyone /
+ * @here: allowed_mentions lists only that role id.
  *
  * At most once per UTC day: the day is claimed by inserting a
  * MissionSlaDigest row (primary key = the date) before posting, so a retried
@@ -27,7 +27,7 @@ import { prisma } from '../db'
 import { resolveChannelId } from '../discord-channels'
 import { postDiscordMessage, type DiscordMessageBody } from '../discord-rest'
 import { makeEmbed } from '../discord-interactions/embeds'
-import { missionReviewerRoleIds } from '../mission-review-access'
+import { PIZZA_CAPO_ROLE_ID } from '@/app/ui/constants'
 import { reviewCardsEnabled, missionLabel } from './review-cards'
 
 export const SLA_HOURS = 48
@@ -94,11 +94,9 @@ const fmtWait = (ms: number) => {
   return h >= 48 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
 }
 
-/** Roles that may review at least one overdue item. */
+/** The digest tags only the Pizza Capo role, whatever the items' levels. */
 export function rolesToPing(items: Array<{ level: number }>): string[] {
-  const ids = new Set<string>()
-  for (const level of new Set(items.map((i) => i.level))) for (const id of missionReviewerRoleIds(level)) ids.add(id)
-  return [...ids]
+  return items.length ? [PIZZA_CAPO_ROLE_ID] : []
 }
 
 /** The digest message. Pure. */

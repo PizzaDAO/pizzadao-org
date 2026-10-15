@@ -51,14 +51,14 @@ describe('selectOverdue', () => {
 })
 
 describe('renderSlaDigest', () => {
-  it('pings the reviewer roles (never @everyone) and links each card', () => {
+  it('pings only the Pizza Capo role (never @everyone) and links each card', () => {
     const items = selectOverdue([row(1, { reviewMsgId: '300000000000000001', reviewChannelId: '200000000000000001' }), row(2, { holdReason: 'HIGH_LEVEL', level: 6 })], NOW)
     const body = renderSlaDigest(items, { guildId: '812097286003359764', appUrl: 'https://app.pizzadao.org' })
-    const roles = [LEONARDO, DPR, CAPO, MAFIA]
-    expect(new Set(body.allowed_mentions?.roles)).toEqual(new Set(roles))
+    expect(body.allowed_mentions?.roles).toEqual([CAPO])
     expect(body.allowed_mentions?.parse).toEqual([])
+    expect(body.content).toBe(`<@&${CAPO}>`)
     expect(body.content).not.toMatch(/@everyone|@here/)
-    for (const r of roles) expect(body.content).toContain(`<@&${r}>`)
+    for (const r of [LEONARDO, DPR, MAFIA]) expect(body.content).not.toContain(r)
     const d = (body.embeds![0] as { description: string }).description
     expect(d).toMatch(/^⏳ 2 mission reviews are past the 48h target/)
     expect(d).toContain('https://discord.com/channels/812097286003359764/200000000000000001/300000000000000001')
@@ -66,9 +66,18 @@ describe('renderSlaDigest', () => {
     expect(d).toContain('waiting 2d 12h')
   })
 
-  it('an overdue L8 pings Dread Pizza Roberts; only L8 items ping only DPR', () => {
-    expect(rolesToPing([{ level: 8 }])).toEqual([DPR])
-    expect(new Set(rolesToPing([{ level: 8 }, { level: 2 }]))).toEqual(new Set([DPR, LEONARDO, CAPO, MAFIA]))
+  it('every level, L8 included, pings only Pizza Capo; nothing overdue pings no one', () => {
+    expect(rolesToPing([{ level: 8 }])).toEqual([CAPO])
+    expect(rolesToPing([{ level: 8 }, { level: 2 }])).toEqual([CAPO])
+    expect(rolesToPing([{ level: 1 }, { level: 3 }, { level: 6 }])).toEqual([CAPO])
+    expect(rolesToPing([])).toEqual([])
+  })
+
+  it('an L8-only digest tags Pizza Capo, not Dread Pizza Roberts', () => {
+    const body = renderSlaDigest(selectOverdue([row(1, { level: 8 })], NOW), { guildId: null, appUrl: 'https://app.pizzadao.org' })
+    expect(body.content).toBe(`<@&${CAPO}>`)
+    expect(body.allowed_mentions?.roles).toEqual([CAPO])
+    expect(body.content).not.toContain(DPR)
   })
 
   it('caps the list and counts the rest', () => {
