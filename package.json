@@ -11,7 +11,8 @@
     "test:run": "vitest run",
     "postinstall": "prisma generate",
     "e2e:local": "node e2e/local/run.mjs",
-    "test:pep-concurrency": "node scripts/pep-concurrency-local.mjs"
+    "test:pep-concurrency": "node scripts/pep-concurrency-local.mjs",
+    "e2e:activation": "playwright test -c e2e/playwright.activation.config.ts"
   },
   "dependencies": {
     "@cloudflare/blindrsa-ts": "^0.4.4",

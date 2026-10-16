@@ -239,6 +239,8 @@ export async function GET(req: Request, { params }: Params) {
       return NextResponse.json({ error: 'Crew not found' }, { status: 404 })
     }
 
+    const fallbackTasks = (crew.tasks || []).map(t => ({ task: t.label, url: t.url, priority: t.priority || '', stage: 'todo', lead: '', leadId: '', notes: '' }))
+
     const cacheHeaders = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' };
 
     // If crew has no sheet URL, return just the metadata
@@ -256,7 +258,7 @@ export async function GET(req: Request, { params }: Params) {
         },
         roster: [],
         goals: [],
-        tasks: crew.tasks || [],
+        tasks: fallbackTasks,
         agenda: [],
         callInfo: null,
       }, { headers: cacheHeaders })
@@ -278,7 +280,7 @@ export async function GET(req: Request, { params }: Params) {
         },
         roster: [],
         goals: [],
-        tasks: crew.tasks || [],
+        tasks: fallbackTasks,
         agenda: [],
         callInfo: null,
         error: 'Invalid sheet URL',

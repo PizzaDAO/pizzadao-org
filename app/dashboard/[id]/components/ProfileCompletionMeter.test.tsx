@@ -11,28 +11,17 @@ afterEach(cleanup);
 describe("ProfileCompletionMeter", () => {
     it("shows N of M and links to the next incomplete step", () => {
         const completion = getProfileCompletion({
-            member: { id: "42", crews: ["tech"] },
+            member: { id: "42", crews: [] },
             wallets: { count: 0 },
             x: { connected: false },
         });
         renderWithIntl(<ProfileCompletionMeter completion={completion} />);
-        expect(screen.getByText(/1 of 3 done/)).toBeTruthy();
+        expect(screen.getByText(/0 of 1 done/)).toBeTruthy();
         const bar = screen.getByRole("progressbar", { name: "Profile setup" });
-        expect(bar.getAttribute("aria-valuenow")).toBe("1");
-        expect(bar.getAttribute("aria-valuemax")).toBe("3");
-        const link = screen.getByRole("link", { name: /Next: Connect a wallet/ });
-        expect(link.getAttribute("href")).toBe("/profile/42");
-    });
-
-    it("uses a plain anchor for the X OAuth /api route", () => {
-        const completion = getProfileCompletion({
-            member: { id: "42", crews: ["tech"] },
-            wallets: { count: 1 },
-            x: { connected: false },
-        });
-        renderWithIntl(<ProfileCompletionMeter completion={completion} />);
-        const link = screen.getByRole("link", { name: /Next: Connect X/ });
-        expect(link.getAttribute("href")).toBe("/api/x/login?memberId=42");
+        expect(bar.getAttribute("aria-valuenow")).toBe("0");
+        expect(bar.getAttribute("aria-valuemax")).toBe("1");
+        const link = screen.getByRole("link", { name: /Next: Join a crew/ });
+        expect(link.getAttribute("href")).toBe("/crews");
     });
 
     it("renders nothing once the profile is complete", () => {

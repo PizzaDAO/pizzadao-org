@@ -58,28 +58,12 @@ function nextActionInput(overrides: Partial<NextActionInput> = {}): NextActionIn
 }
 
 describe("dashboard in Spanish", () => {
-    it("ProfileCompletionMeter uses the ICU plural + translated step labels", () => {
-        const completion = getProfileCompletion({
-            member: { id: "42", crews: ["tech"] },
-            wallets: { count: 0 },
-            x: { connected: false },
-        });
+    it("ProfileCompletionMeter translates the community setup step", () => {
+        const completion = getProfileCompletion({ member: { id: "42", crews: [] }, wallets: { count: 0 }, x: { connected: false } });
         renderWithIntl(<ProfileCompletionMeter completion={completion} />, ES);
-        expect(screen.getByText(/1 de 3 lista/)).toBeInTheDocument();
-        expect(screen.getByText("§ configuración del perfil")).toBeInTheDocument();
-        const bar = screen.getByRole("progressbar", { name: "Configuración del perfil" });
-        expect(bar.getAttribute("aria-valuetext")).toBe("1 de 3 pasos completados");
-        expect(screen.getByRole("link", { name: /Siguiente: Conecta una wallet/ })).toBeInTheDocument();
-    });
-
-    it("ProfileCompletionMeter pluralizes for 2 done", () => {
-        const completion = getProfileCompletion({
-            member: { id: "42", crews: ["tech"] },
-            wallets: { count: 1 },
-            x: { connected: false },
-        });
-        renderWithIntl(<ProfileCompletionMeter completion={completion} />, ES);
-        expect(screen.getByText(/2 de 3 listas/)).toBeInTheDocument();
+        expect(screen.getByText(/0 de 1 listas/)).toBeInTheDocument();
+        expect(screen.getByRole("progressbar").getAttribute("aria-valuetext")).toBe("0 de 1 paso completado");
+        expect(screen.getByRole("link").getAttribute("href")).toBe("/crews");
     });
 
     it("HeroBlock translates CTAs, badge and formats PEP with the es locale", () => {
@@ -271,15 +255,11 @@ describe("dashboard in Spanish", () => {
 });
 
 describe("dashboard in French (spot check)", () => {
-    it("ProfileCompletionMeter pluralizes in French", () => {
-        const completion = getProfileCompletion({
-            member: { id: "42", crews: ["tech"] },
-            wallets: { count: 1 },
-            x: { connected: false },
-        });
+    it("ProfileCompletionMeter translates the remaining crew step in French", () => {
+        const completion = getProfileCompletion({ member: { id: "42", crews: [] }, wallets: { count: 0 }, x: { connected: false } });
         renderWithIntl(<ProfileCompletionMeter completion={completion} />, FR);
-        expect(screen.getByText(/2 sur 3 terminées/)).toBeInTheDocument();
-        expect(screen.getByRole("link", { name: /Suivant : Connecter X/ })).toBeInTheDocument();
+        expect(screen.getByText(/0 sur 1 terminée/)).toBeInTheDocument();
+        expect(screen.getByRole("link").getAttribute("href")).toBe("/crews");
     });
 
     it("LevelUpModal formats the reward with French grouping", () => {

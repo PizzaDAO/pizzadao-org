@@ -3,6 +3,8 @@ import { describe, it, expect, vi, beforeEach, type Mock } from 'vitest'
 import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
 import CrewPage from '../[crewId]/CrewPageClient'
 
+vi.mock('../[crewId]/CrewGettingStarted', () => ({ CrewGettingStarted: () => null }))
+
 // Mock next/font/google - must be before component import is evaluated
 vi.mock('next/font/google', () => ({
   Inter: () => ({

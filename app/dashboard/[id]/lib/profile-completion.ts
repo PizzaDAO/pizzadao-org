@@ -2,20 +2,6 @@
 //
 // jalapeno-34126 — Single source of truth for the "profile setup" steps.
 //
-// These are the same setup steps `resolveNextAction` (./next-action.ts) ranks
-// first: join a crew → connect a wallet → connect X. `resolveNextAction`
-// iterates `PROFILE_STEPS` in order and surfaces the first incomplete one, and
-// `getProfileCompletion` summarises the same list for the dashboard's
-// completion meter and the one-time "profile complete" celebration.
-//
-// Pure and synchronous — safe on the server (dashboard-summary route) and in
-// unit tests. Adding a step here automatically updates the next-action panel,
-// the meter, and the celebration trigger.
-//
-// NOTE: the prod backfill in
-// prisma/migrations/20260929000000_profile_completed_celebrated_at mirrors the
-// DB-visible part of these rules (wallet + X). If you add a step, revisit it.
-
 /** Just the fields the setup steps look at — a structural subset of NextActionInput. */
 export interface ProfileCompletionInput {
     member: { id: string; crews: string[] };
@@ -39,7 +25,7 @@ export interface ProfileStepDefinition {
     };
 }
 
-/** Ordered by priority — the first incomplete step is the "next" one. */
+/** Community setup; external accounts are optional and never gate participation. */
 export const PROFILE_STEPS: readonly ProfileStepDefinition[] = [
     {
         key: "join_crew",
@@ -52,6 +38,10 @@ export const PROFILE_STEPS: readonly ProfileStepDefinition[] = [
             ctaLabel: "Join your first crew",
         },
     },
+
+];
+
+export const OPTIONAL_CONNECTIONS: readonly ProfileStepDefinition[] = [
     {
         key: "connect_wallet",
         label: "Connect a wallet",

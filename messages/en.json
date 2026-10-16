@@ -254,7 +254,7 @@
       "errorGeneric": "Login failed. Please try again.",
       "errorSomethingWrong": "Something went wrong",
       "errorNetwork": "Network error. Please check your connection and try again.",
-      "sameBrowserHint": "Finishing your profile? Open the link in the same browser where you started so your saved details are available."
+      "sameBrowserHint": "Your signup details travel with this link. Open it on any device, then review your name and city."
     },
     "claim": {
       "askOverline": "§ ··· Welcome back",
@@ -331,7 +331,10 @@
       "stepTitleInvitedBy": "Who invited you?",
       "continueViaDm": "Continue via Discord DM",
       "optionalNumber": "Choose a member number (optional)",
-      "numberAssigned": "We’ll assign your member number when you finish. Choose roles and crews from your dashboard later."
+      "numberAssigned": "We’ll assign your member number when you finish. Choose roles and crews from your dashboard later.",
+      "restoreFailed": "We could not restore your saved signup. Refresh to retry, or enter your details again.",
+      "draftRestored": "Your signup was restored. Review your name and city before creating your profile.",
+      "finishSignup": "Create my profile"
     },
     "topping": {
       "placeholder": "What's your topping?",
@@ -407,7 +410,8 @@
     "shopAdmin": "Shop admin",
     "community": "Community",
     "contribute": "Contribute",
-    "resources": "Resources"
+    "resources": "Resources",
+    "activation": "Member activation"
   },
   "dashboard": {
     "loading": {
@@ -579,7 +583,7 @@
         "stamp": "on file",
         "overline": "§ Profile complete",
         "headline": "You're all set up!",
-        "body": "Your file is complete — the Family can find you, vouch for you, and see your collection.",
+        "body": "You’ve joined a crew. Meet the team and find your first contribution.",
         "stepsAriaLabel": "Completed steps",
         "nice": "Nice!",
         "viewProfile": "View your profile"
@@ -608,6 +612,12 @@
       "description": "Your profile is ready. Choose roles and crews whenever you’re ready to get involved.",
       "roles": "Choose your roles",
       "crews": "Explore crews"
+    },
+    "connections": {
+      "title": "Optional connections",
+      "description": "You can participate without connecting a wallet or X. Add them when you want to display collectibles or use connected features.",
+      "wallet": "Manage wallets",
+      "x": "Connect X"
     }
   },
   "crewsPage": {
@@ -682,5 +692,26 @@
     "missions": "Guided tasks that help you get involved in PizzaDAO.",
     "pep": "PEP is PizzaDAO’s community points. Earn them by contributing and explore what you can spend them on.",
     "poaps": "POAPs are digital badges collected at community events."
+  },
+  "crewGettingStarted": {
+    "title": "Get involved",
+    "focus": "Current focus:",
+    "nextCall": "Next scheduled call",
+    "localTime": "Your local time",
+    "calendar": "Add to calendar",
+    "scheduleNote": "Based on the weekly schedule ({schedule}); check the meeting link for changes.",
+    "scheduleMissing": "Ask the crew for the next meeting time.",
+    "meetingLink": "Open meeting details",
+    "contact": "Who to contact",
+    "contactFallback": "Ask for a crew lead in the crew chat.",
+    "chat": "Open crew chat",
+    "firstStep": "Your first contribution",
+    "intro": "Introduce yourself and ask which task fits your time and skills. These unclaimed tasks are available to discuss with the crew.",
+    "claim": "Claim this task",
+    "claiming": "Claiming…",
+    "login": "Log in to claim a task",
+    "noTasks": "No unclaimed tasks are listed. Join a call or ask the crew where help is needed.",
+    "discord": "Join PizzaDAO Discord",
+    "taskDetails": "View task details"
   }
 }

@@ -254,7 +254,7 @@
       "errorGeneric": "La connexion a échoué. Réessaie.",
       "errorSomethingWrong": "Quelque chose a mal tourné",
       "errorNetwork": "Erreur réseau. Vérifie ta connexion et réessaie.",
-      "sameBrowserHint": "Vous terminez votre profil ? Ouvrez le lien dans le navigateur où vous avez commencé pour retrouver vos informations enregistrées."
+      "sameBrowserHint": "Vos informations d’inscription accompagnent ce lien. Ouvrez-le sur n’importe quel appareil, puis vérifiez votre nom et votre ville."
     },
     "claim": {
       "askOverline": "§ ··· Content de te revoir",
@@ -331,7 +331,10 @@
       "stepTitleInvitedBy": "Qui t’a invité ?",
       "continueViaDm": "Continuer par message Discord",
       "optionalNumber": "Choisir un numéro de membre (facultatif)",
-      "numberAssigned": "Votre numéro de membre sera attribué à la fin. Vous pourrez choisir vos rôles et équipes depuis votre tableau de bord."
+      "numberAssigned": "Votre numéro de membre sera attribué à la fin. Vous pourrez choisir vos rôles et équipes depuis votre tableau de bord.",
+      "restoreFailed": "Votre inscription n’a pas pu être restaurée. Actualisez pour réessayer ou saisissez vos informations à nouveau.",
+      "draftRestored": "Votre inscription a été restaurée. Vérifiez votre nom et votre ville avant de créer votre profil.",
+      "finishSignup": "Créer mon profil"
     },
     "topping": {
       "placeholder": "Quelle est ta garniture ?",
@@ -407,7 +410,8 @@
     "shopAdmin": "Admin boutique",
     "community": "Communauté",
     "contribute": "Contribuer",
-    "resources": "Ressources"
+    "resources": "Ressources",
+    "activation": "Activation des membres"
   },
   "dashboard": {
     "loading": {
@@ -579,7 +583,7 @@
         "stamp": "classé",
         "overline": "§ Profil complet",
         "headline": "Tout est en place !",
-        "body": "Ton dossier est complet — la Famille peut te trouver, se porter garante de toi et voir ta collection.",
+        "body": "Vous avez rejoint une équipe. Rencontrez ses membres et trouvez votre première contribution.",
         "stepsAriaLabel": "Étapes terminées",
         "nice": "Génial !",
         "viewProfile": "Voir ton profil"
@@ -608,6 +612,12 @@
       "description": "Votre profil est prêt. Choisissez vos rôles et équipes quand vous souhaitez participer.",
       "roles": "Choisir vos rôles",
       "crews": "Découvrir les équipes"
+    },
+    "connections": {
+      "title": "Connexions facultatives",
+      "description": "Vous pouvez participer sans connecter de portefeuille ni X. Ajoutez-les pour afficher vos objets de collection ou utiliser leurs fonctionnalités.",
+      "wallet": "Gérer les portefeuilles",
+      "x": "Connecter X"
     }
   },
   "crewsPage": {
@@ -682,5 +692,26 @@
     "missions": "Des tâches guidées pour commencer à participer à PizzaDAO.",
     "pep": "Les PEP sont les points communautaires de PizzaDAO. Gagnez-en en contribuant et découvrez comment les dépenser.",
     "poaps": "Les POAP sont des badges numériques collectés lors d’événements communautaires."
+  },
+  "crewGettingStarted": {
+    "title": "Participer",
+    "focus": "Objectif actuel :",
+    "nextCall": "Prochaine réunion prévue",
+    "localTime": "Votre heure locale",
+    "calendar": "Ajouter au calendrier",
+    "scheduleNote": "Selon le calendrier hebdomadaire ({schedule}) ; consultez le lien pour les changements.",
+    "scheduleMissing": "Demandez à l’équipe la date de la prochaine réunion.",
+    "meetingLink": "Voir les détails de la réunion",
+    "contact": "Qui contacter",
+    "contactFallback": "Demandez un responsable dans le chat de l’équipe.",
+    "chat": "Ouvrir le chat de l’équipe",
+    "firstStep": "Votre première contribution",
+    "intro": "Présentez-vous et demandez quelle tâche correspond à votre temps et à vos compétences. Discutez de ces tâches disponibles avec l’équipe.",
+    "claim": "Prendre cette tâche",
+    "claiming": "Attribution…",
+    "login": "Connectez-vous pour prendre une tâche",
+    "noTasks": "Aucune tâche libre n’est répertoriée. Rejoignez une réunion ou demandez où aider.",
+    "discord": "Rejoindre le Discord PizzaDAO",
+    "taskDetails": "Voir les détails de la tâche"
   }
 }

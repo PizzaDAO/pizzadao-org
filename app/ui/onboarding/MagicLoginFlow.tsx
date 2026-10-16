@@ -6,6 +6,9 @@
 // arugula-30866 — i18n via next-intl (onboarding.magicLogin.*).
 "use client";
 
+import { LS_KEY } from "./types";
+import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
+import { trackActivation } from "@/app/lib/activation-client";
 import { useState } from "react";
 import type { CSSProperties } from "react";
 import { ArrowLeft, ArrowUpRight, Sparkles } from "lucide-react";
@@ -17,7 +20,7 @@ const DISCORD_INVITE =
 type State =
   | { step: "form" }
   | { step: "sending" }
-  | { step: "sent"; username: string }
+  | { step: "sent"; username: string; hasDraft?: boolean }
   | { step: "error"; code: string; message: string; username: string };
 
 type Props = {
@@ -40,13 +43,18 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
     if (name.length < 2) return;
 
     setState({ step: "sending" });
+    let signupDraft = null;
+    try { signupDraft = sanitizeSignupDraft(JSON.parse(localStorage.getItem(LS_KEY) || "null")); } catch {}
 
+    const actor = signupDraft?.sessionId || crypto.randomUUID();
     try {
       const res = await fetch("/api/auth/magic-login/request", {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           username: name,
+          actor,
+          signupDraft,
           returnTo: new URLSearchParams(window.location.search).get("returnTo"),
           onboarding: new URLSearchParams(window.location.search).get("onboarding") === "1",
         }),
@@ -55,7 +63,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       const data = await res.json();
 
       if (res.ok) {
-        setState({ step: "sent", username: name });
+        setState({ step: "sent", username: name, hasDraft: !!signupDraft && new URLSearchParams(window.location.search).get("onboarding") === "1" });
         return;
       }
 
@@ -66,6 +74,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
         username: name,
       });
     } catch {
+      trackActivation("client_error", actor, "login_network");
       setState({
         step: "error",
         code: "network",
@@ -114,7 +123,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             b: (chunks) => <strong className="text-foreground">{chunks}</strong>,
           })}
         />
-        <p className="text-sm text-foreground/70">{t("sameBrowserHint")}</p>
+        {state.hasDraft && <p className="text-sm text-foreground/70">{t("sameBrowserHint")}</p>}
         <div className="grid gap-3">
           <button
             type="button"

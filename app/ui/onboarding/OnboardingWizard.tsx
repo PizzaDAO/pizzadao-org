@@ -3,6 +3,8 @@
 // chapter titles, reset, error/success screens) live under onboarding.chrome.*.
 "use client";
 
+import { trackActivation } from "@/app/lib/activation-client";
+import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -66,6 +68,8 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // --- Wizard Data (form state) ---
   const [data, setData] = useState<WizardData>(initialWizardData);
   const [dataReady, setDataReady] = useState(false);
+  const [restoredDraft, setRestoredDraft] = useState(false);
+  const [restoreFailed, setRestoreFailed] = useState(false);
 
   // Read browser storage after hydration, before processing a login callback.
   useEffect(() => {
@@ -88,8 +92,29 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       } catch {}
       return { ...initialWizardData, sessionId: uuidLike() };
     }
-    setData(restoreData());
-    setDataReady(true);
+    let alive = true;
+    const controller = new AbortController();
+    const timeout = window.setTimeout(() => controller.abort(), 10000);
+    async function restore() {
+      let restored = restoreData();
+      if (new URLSearchParams(window.location.search).get("resumeSignup") === "1") {
+        try {
+          const response = await fetch("/api/onboarding/draft", { cache: "no-store", signal: controller.signal });
+          if (!response.ok) throw new Error("Draft unavailable");
+          const draft = sanitizeSignupDraft((await response.json()).draft);
+          if (!draft) throw new Error("Draft expired");
+          restored = { ...initialWizardData, ...draft };
+          if (alive) setRestoredDraft(true);
+        } catch {
+          if (alive) trackActivation("client_error", restored.sessionId, "draft_restore");
+          if (alive) setRestoreFailed(true);
+        }
+      }
+      window.clearTimeout(timeout);
+      if (alive) { setData(restored); setDataReady(true); }
+    }
+    void restore();
+    return () => { alive = false; controller.abort(); window.clearTimeout(timeout); };
   }, []);
 
   // --- Crew Options (loaded from API) ---
@@ -117,6 +142,10 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       localStorage.setItem(LS_KEY, JSON.stringify(data));
     } catch {}
   }, [data, dataReady]);
+
+  useEffect(() => {
+    if (dataReady && flow.type === "wizard" && flow.step === 1 && !flow.isUpdate) trackActivation("signup_started", data.sessionId);
+  }, [dataReady, data.sessionId, flow]);
 
   // --- Load crew mappings ---
   useEffect(() => {
@@ -186,6 +215,19 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     // The authenticated cookie remains the authority for profile writes.
     if (discordId || isEdit || loginErrorParam) hasProcessedParams.current = true;
 
+    if (restoreFailed) {
+      if (discordId) setData(p => ({ ...p, discordId, discordJoined: true, discordNick }));
+      setError(t("restoreFailed"));
+      setFlow({ type: "wizard", step: 1, isUpdate: false });
+      return;
+    }
+    if (restoredDraft && discordId) {
+      setData(p => ({ ...p, discordId, discordJoined: true, discordNick }));
+      // Explicit review before saving a draft supplied by the login requester.
+      setFlow({ type: "wizard", step: 1, isUpdate: false });
+      return;
+    }
+
     // Handle magic login error redirect
     if (loginErrorParam) {
       setLoginError(loginErrorParam);
@@ -217,7 +259,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
 
     // Check if user is already logged in
     checkSession();
-  }, [initialFlow, dataReady]);
+  }, [initialFlow, dataReady, restoredDraft, restoreFailed]);
 
   // --- Check existing session ---
   async function checkSession() {
@@ -464,6 +506,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       setFlow({ type: "success", redirectTo });
     } catch (e: unknown) {
       setIsSubmitting(false);
+      if (e instanceof TypeError) trackActivation("client_error", data.sessionId, "profile_network");
       setError((e as any)?.message || t("errorSaveGeneric"));
       setErrorDetails((e as any)?.details);
       setFlow({
@@ -734,6 +777,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           </button>
         </div>
 
+        {restoredDraft && <p role="status" className="rounded-xl bg-secondary p-4 text-sm">{t("draftRestored")}</p>}
         {/* Error display */}
         {error && (
           <div
@@ -838,7 +882,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 timezoneLabel: timezoneLabel ?? undefined,
               }))
             }
-            nextLabel={flow.isUpdate ? undefined : t("continueViaDm")}
+            nextLabel={flow.isUpdate ? undefined : t(data.discordId ? "finishSignup" : "continueViaDm")}
             onNext={() => flow.isUpdate ? goToStep(3) : claimRoles()}
             onBack={() => goToStep(1)}
           />

@@ -1,3 +1,7 @@
+import { prisma } from "@/app/lib/db";
+import { recordActivationLater as recordActivation } from "@/app/lib/activation";
+import { SIGNUP_DRAFT_COOKIE } from "@/app/lib/signup-draft";
+import { Prisma } from "@prisma/client";
 // app/api/profile/route.ts
 import { after, NextResponse } from "next/server";
 import { TURTLE_ROLE_IDS } from "@/app/ui/constants";
@@ -264,6 +268,7 @@ const POST_HANDLER = async (req: Request) => {
     }
   } catch (e: unknown) {
     if (e instanceof ValidationError) throw e;
+    recordActivation('profile_save_failed', { actor: payload.sessionId, discordId: payload.discordId, code: 'sheet_write' });
     console.error('[profile] sheet write failed:', e);
     throw new ExternalServiceError('Google Sheets');
   }
@@ -392,6 +397,13 @@ const POST_HANDLER = async (req: Request) => {
     referral: referral ? { outcome: referral.outcome } : null,
   });
   if (cookieRef) res.cookies.set(REF_COOKIE, "", refCookieOptions(req, 0));
+  if (firstOnboarding) {
+    recordActivation("profile_created", { actor: payload.sessionId, discordId: payload.discordId });
+    res.cookies.set(SIGNUP_DRAFT_COOKIE, "", refCookieOptions(req, 0));
+    after(async () => {
+      try { await prisma.magicLoginToken.updateMany({ where: { discordId: payload.discordId }, data: { signupDraft: Prisma.DbNull } }); } catch {}
+    });
+  }
   return res;
 };
 

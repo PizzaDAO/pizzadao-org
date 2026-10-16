@@ -12,7 +12,7 @@ const complete = getProfileCompletion({
     x: { connected: true },
 });
 const incomplete = getProfileCompletion({
-    member: { id: "42", crews: ["tech"] },
+    member: { id: "42", crews: [] },
     wallets: { count: 1 },
     x: { connected: false },
 });

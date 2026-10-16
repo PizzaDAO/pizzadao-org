@@ -34,6 +34,20 @@ describe("Discord DM login callback", () => {
     expect(location.searchParams.get("discordJoined")).toBe("1");
     expect(location.searchParams.get("discordNick")).toBe("Test Member");
   });
+  it("binds recovered data to a verified session and requests explicit review", async () => {
+    vi.mocked(fetchMemberByDiscordId).mockResolvedValue(null);
+    vi.mocked(verifyMagicToken).mockResolvedValue({ valid: true, discordId: "123", username: "test", nick: null, tokenHash: "a".repeat(64), draft: { mafiaName: "Test", city: "Paris", sessionId: "test-session" } });
+    const response = await GET(request("token=test"));
+    expect(response.headers.get("location")).toContain("resumeSignup=1");
+    expect(response.headers.get("set-cookie")).toContain("pd_signup_draft=");
+    expect(response.headers.get("set-cookie")).toContain("HttpOnly");
+  });
+  it("does not apply a signup draft to an existing profile", async () => {
+    vi.mocked(verifyMagicToken).mockResolvedValue({ valid: true, discordId: "123", username: "test", nick: null, tokenHash: "a".repeat(64), draft: { mafiaName: "Changed", city: "Paris", sessionId: "test-session" } });
+    const response = await GET(request("token=test&onboarding=1"));
+    expect(response.headers.get("location")).toBe("https://app.example/dashboard/42");
+    expect(response.headers.get("set-cookie")).not.toContain("pd_signup_draft");
+  });
   it("sends unlinked members to the onboarding/claim flow", async () => {
     vi.mocked(fetchMemberByDiscordId).mockResolvedValue(null);
     const response = await GET(request("token=test"));

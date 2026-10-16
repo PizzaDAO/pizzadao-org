@@ -53,3 +53,7 @@ e2e/.local/
 
 # mission backfill dry-run reports (member data)
 mission-backfill-*.csv
+
+# Browser CI artifacts
+playwright-report/
+test-results/

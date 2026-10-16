@@ -1,3 +1,4 @@
+import { recordActivationLater as recordActivation } from "@/app/lib/activation";
 import { NextResponse } from 'next/server'
 import { google } from 'googleapis'
 import { prisma } from '@/app/lib/db'
@@ -242,6 +243,7 @@ export async function POST(req: Request) {
       }
     }
 
+    if (action === 'claim') recordActivation('first_contribution', { discordId: auth.session.discordId, code: 'task_claim' })
     return NextResponse.json({ success: true, action })
   } catch (e: unknown) {
     return internalError(e, 'claim-task', 'Failed to claim task')

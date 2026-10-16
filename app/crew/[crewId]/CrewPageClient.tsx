@@ -13,6 +13,7 @@ import {
   navBtn,
   pageContainer,
 } from '@/app/ui/shared-styles'
+import { CrewGettingStarted } from './CrewGettingStarted'
 import { CrewBounties } from './CrewBounties'
 
 // Loading stages to show progress
@@ -565,7 +566,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 </button>
               ) : (
                 <Link
-                  href="/login"
+                  href={`/login?returnTo=${encodeURIComponent(`/crew/${crew.id}`)}`}
                   className="btn-pill-lg"
                   style={{
                     background: 'hsl(var(--tomato))',
@@ -601,6 +602,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               `}</style>
             </div>
           </header>
+
+          <CrewGettingStarted crew={crew} roster={roster} goals={goals} tasks={tasks} user={!!user} claimingTask={claimingTask} onClaim={handleClaimTask} />
 
           {loginPrompt && <LoginPrompt message={loginPrompt} onDismiss={() => setLoginPrompt(null)} />}
 
@@ -807,7 +810,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               </button>
             ) : (
               <Link
-                href="/login"
+                href={`/login?returnTo=${encodeURIComponent(`/crew/${crew.id}`)}`}
                 className="btn-pill-lg"
                 style={{
                   background: 'hsl(var(--tomato))',
@@ -965,7 +968,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             ) : (
               <p style={{ fontSize: 14, color: 'hsl(var(--muted-foreground))' }}>
                 <Link
-                  href="/login"
+                  href={`/login?returnTo=${encodeURIComponent(`/crew/${crew.id}`)}`}
                   style={{
                     color: 'hsl(var(--tomato))',
                     textDecoration: 'none',
@@ -979,6 +982,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             )}
           </div>
         </header>
+
+          <CrewGettingStarted crew={crew} roster={roster} goals={goals} tasks={tasks} user={!!user} claimingTask={claimingTask} onClaim={handleClaimTask} />
 
         {loginPrompt && <LoginPrompt message={loginPrompt} onDismiss={() => setLoginPrompt(null)} />}
 

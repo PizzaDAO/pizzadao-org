@@ -1,6 +1,8 @@
 import { randomBytes, createHash } from "crypto";
 import { prisma } from "./db";
 import { searchGuildMembers, sendDM } from "./discord";
+import { sanitizeSignupDraft, type SignupDraft } from "./signup-draft";
+import { recordActivationLater as recordActivation } from "./activation";
 import { loginReturnPath } from "./login-return";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
@@ -20,8 +22,9 @@ export type MagicLoginResult =
 export async function requestMagicLogin(
   username: string,
   origin: string,
-  options: { returnTo?: unknown; onboarding?: boolean } = {},
+  options: { returnTo?: unknown; onboarding?: boolean; signupDraft?: unknown } = {},
 ): Promise<MagicLoginResult> {
+  const draft = options.onboarding ? sanitizeSignupDraft(options.signupDraft) : null;
   // Search guild for exact username match
   const members = await searchGuildMembers(username, 5);
   const match = members.find(
@@ -48,6 +51,7 @@ export async function requestMagicLogin(
   await prisma.magicLoginToken.create({
     data: {
       tokenHash,
+      ...(draft ? { signupDraft: draft } : {}),
       discordId,
       username: match.user.username,
       nick,
@@ -86,11 +90,12 @@ export async function requestMagicLogin(
       .catch(() => {});
   }
 
+  recordActivation("dm_sent", { actor: draft?.sessionId, discordId });
   return { status: "sent" };
 }
 
 export type VerifyResult =
-  | { valid: true; discordId: string; username: string; nick: string | null }
+  | { valid: true; discordId: string; username: string; nick: string | null; draft?: SignupDraft; tokenHash?: string }
   | { valid: false; reason: "invalid" | "expired" | "used" };
 
 export async function verifyMagicToken(rawToken: string): Promise<VerifyResult> {
@@ -106,14 +111,17 @@ export async function verifyMagicToken(rawToken: string): Promise<VerifyResult> 
 
   // Atomic one-time use: only mark used if still unused (prevents race)
   const result = await prisma.magicLoginToken.updateMany({
-    where: { tokenHash, usedAt: null },
+    where: { tokenHash, usedAt: null, expiresAt: { gt: new Date() } },
     data: { usedAt: new Date() },
   });
 
   if (result.count === 0) return { valid: false, reason: "used" };
 
+  const draft = sanitizeSignupDraft(token.signupDraft);
+  recordActivation("discord_verified", { actor: draft?.sessionId, discordId: token.discordId });
   return {
     valid: true,
+    ...(draft ? { draft, tokenHash } : {}),
     discordId: token.discordId,
     username: token.username,
     nick: token.nick,

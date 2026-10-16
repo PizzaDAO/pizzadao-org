@@ -1,3 +1,5 @@
+import { SIGNUP_DRAFT_COOKIE, SIGNUP_DRAFT_TTL_SECONDS } from "@/app/lib/signup-draft";
+import { REF_COOKIE, refCookieOptions } from "@/app/lib/referral-cookie";
 import { NextResponse } from "next/server";
 import { verifyMagicToken } from "@/app/lib/magic-login";
 import { createSessionToken, getSessionCookieOptions, COOKIE_NAME } from "@/app/lib/session";
@@ -61,12 +63,13 @@ export async function GET(req: Request) {
 
   // Build redirect URL
   let redirectUrl: URL;
-  if (memberId && url.searchParams.get("onboarding") !== "1") {
+  if (memberId && (result.draft || url.searchParams.get("onboarding") !== "1")) {
     redirectUrl = new URL(loginReturnPath(url.searchParams.get("returnTo")) || `/dashboard/${memberId}`, url.origin);
   } else {
     // New/unlinked user — redirect to onboarding with Discord info. The
     // wizard uses discordNick for the name-match auto-claim.
     redirectUrl = new URL("/", url.origin);
+    if (result.draft) redirectUrl.searchParams.set("resumeSignup", "1");
     redirectUrl.searchParams.set("discordId", result.discordId);
     redirectUrl.searchParams.set("discordJoined", "1");
     const nickForClaim = result.nick ?? result.username;
@@ -76,5 +79,9 @@ export async function GET(req: Request) {
   const res = NextResponse.redirect(redirectUrl.toString());
   const cookieOpts = getSessionCookieOptions(req);
   res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
+  if (result.draft && result.tokenHash && !memberId) {
+    res.cookies.set(SIGNUP_DRAFT_COOKIE, result.tokenHash, { ...cookieOpts, maxAge: SIGNUP_DRAFT_TTL_SECONDS });
+    if (result.draft.invitedBy?.viaLink) res.cookies.set(REF_COOKIE, result.draft.invitedBy.memberId, refCookieOptions(req));
+  }
   return res;
 }

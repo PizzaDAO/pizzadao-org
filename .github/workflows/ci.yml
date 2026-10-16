@@ -63,5 +63,24 @@ jobs:
       - name: Install dependencies
         run: npm ci
 
+      - name: Validate activation migration
+        run: bash scripts/test-activation-migration.sh
+
       - name: Build
         run: npm run build
+
+      - name: Install Chromium
+        run: npx playwright install --with-deps chromium
+
+      - name: Browser member journeys
+        run: npm run e2e:activation
+
+      - name: Upload browser diagnostics
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: browser-diagnostics
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 7
