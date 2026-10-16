@@ -5,7 +5,8 @@ activation_container="pizzadao-activation-migration-$$"
 docker run --rm -d --name "$activation_container" -e POSTGRES_PASSWORD=local-test-only -e POSTGRES_DB=activation_test postgres:17 >/dev/null
 trap 'docker stop "$activation_container" >/dev/null' EXIT
 for attempt in {1..30}; do
-  if docker exec "$activation_container" pg_isready -U postgres -d activation_test >/dev/null 2>&1; then break; fi
+  # Query over TCP: the image's init-time server only listens on the socket, before activation_test exists.
+  if docker exec -e PGPASSWORD=local-test-only "$activation_container" psql -h 127.0.0.1 -U postgres -d activation_test -c 'SELECT 1' >/dev/null 2>&1; then break; fi
   sleep 1
 done
 docker exec -i "$activation_container" psql -U postgres -d activation_test -v ON_ERROR_STOP=1 <<'SQL'
