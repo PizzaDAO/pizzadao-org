@@ -74,12 +74,15 @@ export const ADMIN_ROLE_IDS = [
 
 export const DREAD_PIZZA_ROBERTS_ROLE_ID = "812131585327235113";
 
+// Pizza Capo: the only role tagged by the daily mission-review SLA digest.
+export const PIZZA_CAPO_ROLE_ID = "839206162837798945";
+
 // Roles notified when a mission needs manual review. Together with
 // ADMIN_ROLE_IDS they may also approve it (L1–L7; L8 is Dread Pizza Roberts
 // only): see app/lib/mission-review-access.ts.
 export const MISSION_REVIEWER_ROLE_IDS = [
   DREAD_PIZZA_ROBERTS_ROLE_ID, // Dread Pizza Roberts
-  "839206162837798945", // Pizza Capo
+  PIZZA_CAPO_ROLE_ID, // Pizza Capo
   "823266914834841610", // Pepperoni Mafia
 ] as const;
 
