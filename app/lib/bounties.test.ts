@@ -13,6 +13,10 @@ vi.mock('./notifications', () => ({
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
   notifyBountyCompleted: vi.fn().mockResolvedValue(undefined),
 }))
+// Poster-only permissions here; lead/admin rules are covered in bounties.review.test.ts.
+vi.mock('./crew-leads', () => ({
+  canManageBounty: vi.fn(async (id: string, b: { createdBy: string }) => b.createdBy === id),
+}))
 vi.mock('./transactions', () => ({
   logTransaction: vi.fn().mockResolvedValue({}),
 }))
@@ -139,14 +143,14 @@ describe('completeBounty', () => {
     const result = await completeBounty('creator-1', 10)
 
     expect(prisma.bounty.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, createdBy: 'creator-1', status: 'CLAIMED', claimedBy: 'claimer-1' },
-      data: { status: 'COMPLETED' },
+      where: { id: 10, status: { in: ['CLAIMED', 'SUBMITTED'] }, claimedBy: 'claimer-1' },
+      data: { status: 'COMPLETED', reviewedBy: 'creator-1', completedAt: expect.any(Date) },
     })
     expect(prisma.economy.update).toHaveBeenCalledWith({
       where: { id: 'claimer-1' },
       data: { wallet: { increment: 100 } },
     })
-    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Fix the bug', { bountyId: 10 })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Fix the bug', { bountyId: 10, approvedBy: 'creator-1' })
     expect(result.status).toBe('COMPLETED')
   })
 
@@ -166,7 +170,7 @@ describe('completeBounty', () => {
 
   it('should throw ForbiddenError when user is not the creator', async () => {
     mockFn(prisma.bounty.findUnique).mockResolvedValue(CLAIMED)
-    await expect(completeBounty('other-user', 10)).rejects.toThrow('Only the bounty creator')
+    await expect(completeBounty('other-user', 10)).rejects.toThrow('Only the bounty poster')
   })
 
   it('never throws paying out a bounty whose description has an out-of-range timestamp', async () => {
@@ -174,7 +178,7 @@ describe('completeBounty', () => {
     mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
 
     await expect(completeBounty('creator-1', 10)).resolves.toMatchObject({ status: 'COMPLETED' })
-    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Due ', { bountyId: 10 })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'claimer-1', 'BOUNTY_REWARD', 100, 'Bounty reward: Due ', { bountyId: 10, approvedBy: 'creator-1' })
   })
 })
 
@@ -186,14 +190,14 @@ describe('cancelBounty', () => {
     const result = await cancelBounty('creator-1', 10)
 
     expect(prisma.bounty.updateMany).toHaveBeenCalledWith({
-      where: { id: 10, createdBy: 'creator-1', status: { in: ['OPEN', 'CLAIMED'] } },
-      data: { status: 'CANCELLED' },
+      where: { id: 10, status: { in: ['OPEN', 'CLAIMED', 'SUBMITTED'] } },
+      data: { status: 'CANCELLED', reviewedBy: 'creator-1' },
     })
     expect(prisma.economy.update).toHaveBeenCalledWith({
       where: { id: 'creator-1' },
       data: { wallet: { increment: 100 } },
     })
-    expect(logTransaction).toHaveBeenCalledWith(prisma, 'creator-1', 'BOUNTY_REFUND', 100, 'Bounty refund: Fix the bug', { bountyId: 10 })
+    expect(logTransaction).toHaveBeenCalledWith(prisma, 'creator-1', 'BOUNTY_REFUND', 100, 'Bounty refund: Fix the bug', { bountyId: 10, cancelledBy: 'creator-1' })
     expect(result.status).toBe('CANCELLED')
   })
 

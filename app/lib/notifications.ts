@@ -1,5 +1,7 @@
 import { prisma } from './db'
 import { NotificationType, Prisma } from '@prisma/client'
+import { getCrewLeadMemberIds } from './crew-leads'
+import { fetchMemberById } from './sheets/member-repository'
 
 export { NotificationType }
 
@@ -86,6 +88,11 @@ export async function markAllAsRead(userId: string) {
 
 // ===== NOTIFICATION HELPERS =====
 
+/** Where a bounty notification should land: the crew's bounty board, or /pep. */
+function bountyLink(crewId?: string | null): string {
+  return crewId ? `/crew/${encodeURIComponent(crewId)}#bounties` : '/pep'
+}
+
 /**
  * Notify bounty poster when someone claims their bounty
  */
@@ -93,7 +100,8 @@ export async function notifyBountyClaimed(
   posterId: string,
   claimerId: string,
   bountyId: number,
-  bountyDescription: string
+  bountyDescription: string,
+  crewId?: string | null
 ) {
   // Don't notify yourself
   if (posterId === claimerId) return null
@@ -105,31 +113,119 @@ export async function notifyBountyClaimed(
     title: 'Bounty Claimed',
     message: `Someone claimed your bounty: "${truncate(bountyDescription, 50)}"`,
     metadata: { bountyId },
-    linkUrl: '/pep'
+    linkUrl: bountyLink(crewId)
   })
 }
 
 /**
- * Notify claimer when bounty is completed and reward paid
+ * Notify claimer when bounty is completed and reward paid. When a crew lead /
+ * admin approved someone else's bounty (approver !== poster), the poster is
+ * told too.
  */
 export async function notifyBountyCompleted(
   claimerId: string,
-  posterId: string,
+  approverId: string,
   bountyId: number,
   bountyDescription: string,
-  reward: number
+  reward: number,
+  crewId?: string | null,
+  posterId?: string
 ) {
+  const linkUrl = bountyLink(crewId)
+  const jobs: Promise<unknown>[] = []
+
   // Don't notify yourself
-  if (claimerId === posterId) return null
+  if (claimerId !== approverId) {
+    jobs.push(createNotification({
+      type: NotificationType.BOUNTY_COMPLETED,
+      recipientId: claimerId,
+      actorId: approverId,
+      title: 'Bounty Approved!',
+      message: `Your work on "${truncate(bountyDescription, 50)}" was approved. You earned ${reward} $PEP!`,
+      metadata: { bountyId, reward },
+      linkUrl
+    }))
+  }
+  if (posterId && posterId !== approverId && posterId !== claimerId) {
+    jobs.push(createNotification({
+      type: NotificationType.BOUNTY_COMPLETED,
+      recipientId: posterId,
+      actorId: approverId,
+      title: 'Bounty Approved',
+      message: `Your bounty "${truncate(bountyDescription, 50)}" was approved and ${reward} $PEP went to the claimer.`,
+      metadata: { bountyId, reward },
+      linkUrl
+    }))
+  }
+  if (jobs.length === 0) return null
+  return Promise.allSettled(jobs)
+}
+
+/**
+ * Notify the poster (and, best effort, the crew's leads) that work was submitted.
+ */
+export async function notifyBountySubmitted(
+  posterId: string,
+  claimerId: string,
+  bountyId: number,
+  bountyDescription: string,
+  crewId?: string | null
+) {
+  const recipients = new Set<string>([posterId])
+
+  if (crewId) {
+    // Best effort: lead lookup failing must never block the submission.
+    try {
+      const leadMemberIds = await getCrewLeadMemberIds(crewId)
+      const rows = await Promise.all(
+        Array.from(leadMemberIds).map((id) => fetchMemberById(id).catch(() => null))
+      )
+      for (const row of rows) {
+        if (row?.discordId) recipients.add(String(row.discordId))
+      }
+    } catch {
+      // swallow
+    }
+  }
+  recipients.delete(claimerId)
+
+  const linkUrl = bountyLink(crewId)
+  await Promise.allSettled(
+    Array.from(recipients).map((recipientId) =>
+      createNotification({
+        type: NotificationType.BOUNTY_SUBMITTED,
+        recipientId,
+        actorId: claimerId,
+        title: 'Bounty Work Submitted',
+        message: `Work was submitted on: "${truncate(bountyDescription, 50)}"`,
+        metadata: { bountyId },
+        linkUrl
+      })
+    )
+  )
+}
+
+/**
+ * Notify the claimer that their submission was sent back with feedback.
+ */
+export async function notifyBountyRejected(
+  claimerId: string,
+  reviewerId: string,
+  bountyId: number,
+  bountyDescription: string,
+  note: string,
+  crewId?: string | null
+) {
+  if (claimerId === reviewerId) return null
 
   return createNotification({
-    type: NotificationType.BOUNTY_COMPLETED,
+    type: NotificationType.BOUNTY_REJECTED,
     recipientId: claimerId,
-    actorId: posterId,
-    title: 'Bounty Approved!',
-    message: `Your work on "${truncate(bountyDescription, 50)}" was approved. You earned ${reward} $PEP!`,
-    metadata: { bountyId, reward },
-    linkUrl: '/pep'
+    actorId: reviewerId,
+    title: 'Bounty Sent Back',
+    message: `Your submission on "${truncate(bountyDescription, 50)}" was sent back: ${truncate(note, 100)}`,
+    metadata: { bountyId },
+    linkUrl: bountyLink(crewId)
   })
 }
 
@@ -143,7 +239,8 @@ export async function notifyBountyComment(
   bountyId: number,
   bountyDescription: string,
   posterId: string,
-  claimerId: string | null
+  claimerId: string | null,
+  crewId?: string | null
 ) {
   // Gather all unique commenter IDs from existing comments on this bounty
   const existingComments = await prisma.bountyComment.findMany({
@@ -174,7 +271,7 @@ export async function notifyBountyComment(
       title: 'New Bounty Comment',
       message: `New comment on bounty: "${truncate(bountyDescription, 50)}"`,
       metadata: { bountyId },
-      linkUrl: '/pep'
+      linkUrl: bountyLink(crewId)
     })
   )
 

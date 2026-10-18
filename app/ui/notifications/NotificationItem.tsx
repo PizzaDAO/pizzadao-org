@@ -4,7 +4,7 @@ import React from "react";
 
 export type NotificationData = {
   id: string;
-  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED";
+  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "BOUNTY_SUBMITTED" | "BOUNTY_REJECTED" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED";
   title: string;
   message: string;
   linkUrl: string | null;
@@ -28,6 +28,21 @@ function getIcon(type: NotificationData["type"]): React.ReactNode {
         <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <circle cx="12" cy="12" r="10" />
           <polyline points="12 6 12 12 16 14" />
+        </svg>
+      );
+    case "BOUNTY_SUBMITTED":
+      return (
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
+          <polyline points="14 2 14 8 20 8" />
+          <polyline points="9 15 11 17 15 13" />
+        </svg>
+      );
+    case "BOUNTY_REJECTED":
+      return (
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <polyline points="1 4 1 10 7 10" />
+          <path d="M3.51 15a9 9 0 1 0 2.13-9.36L1 10" />
         </svg>
       );
     case "BOUNTY_COMPLETED":
@@ -75,9 +90,11 @@ function getIcon(type: NotificationData["type"]): React.ReactNode {
 function getIconBg(type: NotificationData["type"]): string {
   switch (type) {
     case "BOUNTY_CLAIMED":
+    case "BOUNTY_REJECTED":
     case "TASK_DUE_SOON":
       return "hsl(var(--tomato) / 0.12)";
     case "BOUNTY_COMPLETED":
+    case "BOUNTY_SUBMITTED":
     case "TASK_ASSIGNED":
       return "hsl(var(--butter) / 0.35)";
     case "VOUCH_ADDED":
@@ -90,9 +107,11 @@ function getIconBg(type: NotificationData["type"]): string {
 function getIconColor(type: NotificationData["type"]): string {
   switch (type) {
     case "BOUNTY_CLAIMED":
+    case "BOUNTY_REJECTED":
     case "TASK_DUE_SOON":
       return "hsl(var(--tomato))";
     case "BOUNTY_COMPLETED":
+    case "BOUNTY_SUBMITTED":
     case "TASK_ASSIGNED":
     case "VOUCH_ADDED":
       return "hsl(var(--foreground))";

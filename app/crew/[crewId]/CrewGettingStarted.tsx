@@ -1,4 +1,5 @@
 "use client";
+import { isLeadStatus } from "@/app/lib/crew-lead-status";
 import { useEffect, useState } from "react";
 import { useLocale, useTranslations } from "next-intl";
 import Link from "next/link";
@@ -23,7 +24,7 @@ export function CrewGettingStarted({ crew, roster, goals, tasks, user, claimingT
   const [now, setNow] = useState<Date | null>(null);
   useEffect(() => { setNow(new Date()); const timer = setInterval(() => setNow(new Date()), 60000); return () => clearInterval(timer); }, []);
   const next = now ? nextCrewCall(crew.callTime, now) : null;
-  const lead = roster.find(m => !!m.id && /lead|capo/i.test(m.status) && !/iced|inactive/i.test(m.status));
+  const lead = roster.find(m => !!m.id && isLeadStatus(m.status));
   const open = availableCrewTasks(tasks);
   const channel = safeUrl(crew.channel);
   const meeting = safeUrl(crew.callTimeUrl) || channel;

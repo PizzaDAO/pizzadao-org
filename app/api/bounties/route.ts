@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
+import { canManageCrew } from '@/app/lib/crew-leads'
+import { normalizeCrewId } from '@/app/lib/crew-id'
 import { getAllBounties, createBounty, resolveBountyCrewId, getCrewLabelMap } from '@/app/lib/bounties'
 import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
@@ -22,7 +24,21 @@ export async function GET(request: NextRequest) {
     // same as /api/jobs.
     const { channels, roles, guildId } = await resolveDiscordMentions(bounties.map((b) => b.description))
 
+    // Who is looking (crew page only): lets the UI show Approve/Reject on bounties
+    // posted by others. Advisory only; the write routes re-check every time.
+    let viewer: { discordId: string; canManageCrew: boolean } | undefined
+    if (crewId) {
+      const session = await getSession().catch(() => null)
+      if (session?.discordId) {
+        viewer = {
+          discordId: session.discordId,
+          canManageCrew: await canManageCrew(session.discordId, normalizeCrewId(crewId)),
+        }
+      }
+    }
+
     return NextResponse.json({
+      ...(viewer ? { viewer } : {}),
       bounties: bounties.map((b) => ({
         id: b.id,
         description: b.description,
@@ -31,6 +47,10 @@ export async function GET(request: NextRequest) {
         createdBy: b.createdBy,
         claimedBy: b.claimedBy,
         status: b.status,
+        submissionNote: b.submissionNote ?? null,
+        submissionLink: b.submissionLink ?? null,
+        submittedAt: b.submittedAt ? b.submittedAt.toISOString() : null,
+        reviewNote: b.reviewNote ?? null,
         crewId: b.crewId ?? null,
         crewLabel: b.crewId ? (crewLabels.get(b.crewId) ?? b.crewId) : null,
         createdAt: b.createdAt.toISOString(),
