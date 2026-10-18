@@ -81,6 +81,11 @@ const nextConfig: NextConfig = {
   async headers() {
     return [{ source: "/:path*", headers: SECURITY_HEADERS }];
   },
+  async redirects() {
+    // Tax-form requests (W-9 / W-8) live on rsv.pizza; the ?payee=<token>
+    // query string is carried over by Next.js. Temporary so it can move later.
+    return [{ source: "/tax-form", destination: "https://rsv.pizza/tax-form", permanent: false }];
+  },
 };
 
 export default withNextIntl(nextConfig);
