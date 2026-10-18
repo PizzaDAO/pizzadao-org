@@ -10,6 +10,7 @@
  * only a plain `content` mention can notify someone, and only when the reply's
  * allowed_mentions lists that user.
  */
+import { realNick } from '../trainee-nick'
 
 export const EMBED_COLOR = { success: 0x2ecc71, error: 0xe74c3c, cooldown: 0xf39c12 } as const
 export type Tone = keyof typeof EMBED_COLOR
@@ -73,7 +74,7 @@ export function avatarUrl(m: InvokerLike): string {
 }
 
 export function displayName(m: InvokerLike): string {
-  return (m.nick || m.user?.global_name || m.user?.username || 'Member').slice(0, 256)
+  return (realNick(m.nick) || m.user?.global_name || m.user?.username || 'Member').slice(0, 256)
 }
 
 export function authorFor(m: InvokerLike | undefined): EmbedAuthor | undefined {

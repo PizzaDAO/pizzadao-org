@@ -17,6 +17,7 @@ vi.mock("@/app/lib/session", () => ({
 import { GET as login } from "./login/route";
 import { GET as callback } from "./callback/route";
 import { decodeOAuthState, encodeOAuthState } from "@/app/lib/oauth-proxy";
+import { createSessionToken } from "@/app/lib/session";
 
 const ORIGIN = "https://app.pizzadao.org";
 
@@ -34,7 +35,7 @@ function jsonRes(body: unknown, status = 200): { ok: boolean; status: number; js
 }
 
 /** Discord happy path: token, /users/@me, guild member lookup(s), optional PUT. */
-function mockDiscord({ inGuild = true, scope = "identify" } = {}) {
+function mockDiscord({ inGuild = true, scope = "identify", guildNick = "Nick" as string | null } = {}) {
   const calls: string[] = [];
   global.fetch = vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
     const u = String(input);
@@ -46,7 +47,7 @@ function mockDiscord({ inGuild = true, scope = "identify" } = {}) {
     if (u.endsWith("/users/@me")) return jsonRes({ id: "u1", username: "user1" });
     if (u.includes("/guilds/") && method === "PUT") return { ok: true, status: 201, text: async (): Promise<string> => "" };
     if (u.includes("/guilds/")) {
-      return inGuild ? jsonRes({ nick: "Nick", roles: [], user: { username: "user1" } }) : jsonRes({ message: "Unknown Member" }, 404);
+      return inGuild ? jsonRes({ nick: guildNick, roles: [], user: { username: "user1", global_name: "Global Name" } }) : jsonRes({ message: "Unknown Member" }, 404);
     }
     throw new Error(`unexpected fetch ${u}`);
   }) as unknown as typeof fetch;
@@ -239,5 +240,22 @@ describe("guild join flow (zucchini-21674)", () => {
     const loc = new URL(res.headers.get("location")!);
     expect(loc.pathname).toBe("/");
     expect(loc.searchParams.get("discordJoined")).toBe("0");
+  });
+});
+
+describe("session nick ignores the Pizza Trainee placeholder (anchovy-52918)", () => {
+  const cb = () =>
+    callback(new Request(`${ORIGIN}/api/discord/callback?code=c&state=${encodeURIComponent(encodeOAuthState({ sessionId: "", nonce: "n1" }))}`, { headers: { cookie: "oauth_state=n1" } }));
+
+  it("falls back to the global name when the guild nick is Pizza Trainee", async () => {
+    mockDiscord({ guildNick: "Pizza Trainee" });
+    await cb();
+    expect(vi.mocked(createSessionToken).mock.calls[0][0]).toMatchObject({ nick: "Global Name" });
+  });
+
+  it("keeps a real guild nick", async () => {
+    mockDiscord({ guildNick: "Tony" });
+    await cb();
+    expect(vi.mocked(createSessionToken).mock.calls[0][0]).toMatchObject({ nick: "Tony" });
   });
 });

@@ -24,6 +24,34 @@ export function nextMemberId(rows: unknown[][], discordId: string): string {
   return String(id);
 }
 
+/** Roster rows -> discordId -> Name, using the same header detection as nextMemberId. Throws when the headers or Discord ID column are missing. */
+export function parseSignedUpMembers(rows: unknown[][]): Map<string, string> {
+  const normalized = (value: unknown) => String(value ?? "").trim().toLowerCase().replace(/[\s_-]/g, "");
+  const headerIndex = rows.findIndex(row => row.some(cell => normalized(cell) === "name") && row.some(cell => ["status", "frequency", "city", "crews"].includes(normalized(cell))));
+  if (headerIndex < 0) throw new Error("Could not find member roster headers");
+  const headers = rows[headerIndex].map(normalized);
+  const discordIndex = headers.findIndex(header => header === "discordid");
+  if (discordIndex < 0) throw new Error("Could not find Discord ID column");
+  const nameIndex = headers.findIndex(header => header === "name");
+  const out = new Map<string, string>();
+  for (const row of rows.slice(headerIndex + 1)) {
+    const id = String(row[discordIndex] ?? "").trim();
+    if (/^\d{5,25}$/.test(id)) out.set(id, nameIndex < 0 ? "" : String(row[nameIndex] ?? "").trim());
+  }
+  return out;
+}
+
+/** Everyone with a roster row carrying their Discord ID, read live from the Sheets API (not GViz, which lags writes). */
+export async function readSignedUpMembers(): Promise<Map<string, string>> {
+  const sheets = google.sheets({ version: "v4", auth: getGoogleAuth([GOOGLE_SCOPES.sheetsReadonly]) });
+  const response = await sheets.spreadsheets.values.get({
+    spreadsheetId: SHEET_IDS.members,
+    range: `'${SHEET_TABS.members}'!A:AZ`,
+    valueRenderOption: "UNFORMATTED_VALUE",
+  });
+  return parseSignedUpMembers(response.data.values || []);
+}
+
 /**
  * Serialize automatic signups across server instances until the sheet write
  * completes. Apps Script additionally locks writes and rejects identity conflicts.

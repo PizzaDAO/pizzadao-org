@@ -56,6 +56,11 @@ describe('resolvePerson', () => {
     expect((await resolvePerson({ discordId: DISCORD_ID }, { sources: onlyUser })).name).toBe('heldl7')
   })
 
+  it('ignores the Pizza Trainee placeholder nickname', async () => {
+    const trainee = sources({ discordProfile: async (id) => ({ id, nick: 'Pizza Trainee', globalName: 'Global', username: 'heldl7', avatarUrl: null }) })
+    expect((await resolvePerson({ discordId: DISCORD_ID }, { sources: trainee })).name).toBe('Global')
+  })
+
   it('a sheet row with an empty name falls through to Discord but keeps the member ID', async () => {
     const s = sources({ sheetMember: async () => ({ memberId: '55', name: '' }) })
     expect(await resolvePerson({ discordId: DISCORD_ID }, { sources: s })).toMatchObject({ name: 'Held L7 Nick', memberId: '55', source: 'discord' })

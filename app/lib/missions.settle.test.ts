@@ -11,8 +11,13 @@ vi.mock('./transactions', () => ({ logTransaction: vi.fn().mockResolvedValue({})
 vi.mock('./notifications', () => ({ createNotification: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./discord', () => ({ getMembersWithRoles: vi.fn().mockResolvedValue([]) }))
 
-import { approveMission, settleLevels } from './missions'
+vi.mock('./trainee-nick-run', () => ({ removePizzaNoobOnGraduate: vi.fn().mockResolvedValue('removed') }))
+
+import { approveMission, settleLevels, completedLevelBy } from './missions'
+import { removePizzaNoobOnGraduate } from './trainee-nick-run'
 import { prisma } from './db'
+
+const flush = () => new Promise((r) => setTimeout(r, 0))
 
 const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
 const MISSIONS = [
@@ -65,6 +70,65 @@ describe('settleLevels', () => {
     paidLevels = [1]
     expect(await settleLevels('u')).toEqual([])
     expect(prisma.economy.update).not.toHaveBeenCalled()
+  })
+})
+
+describe('Pizza Noob graduation hook (anchovy-52918)', () => {
+  it('fires once with the Discord ID when Level 2 is paid, and not for other levels', async () => {
+    approved = [1, 2, 3, 4]
+    expect(await settleLevels('u')).toEqual([1, 2, 3])
+    await flush()
+    expect(removePizzaNoobOnGraduate).toHaveBeenCalledTimes(1)
+    expect(removePizzaNoobOnGraduate).toHaveBeenCalledWith('u')
+  })
+
+  it('does not fire for a level other than 2', async () => {
+    approved = [1]
+    await settleLevels('u')
+    await flush()
+    expect(removePizzaNoobOnGraduate).not.toHaveBeenCalled()
+  })
+
+  it('does not fire when Level 2 was already paid', async () => {
+    approved = [1, 2, 3]
+    paidLevels = [1, 2]
+    expect(await settleLevels('u')).toEqual([])
+    await flush()
+    expect(removePizzaNoobOnGraduate).not.toHaveBeenCalled()
+  })
+
+  it('a failing hook never fails the payout', async () => {
+    vi.mocked(removePizzaNoobOnGraduate).mockRejectedValueOnce(new Error('discord down'))
+    approved = [1, 2, 3]
+    expect(await settleLevels('u')).toEqual([1, 2])
+    await flush()
+  })
+})
+
+describe('completedLevelBy', () => {
+  it('returns the members who completed the level, in order, counting paid ledger rows', async () => {
+    mockFn(prisma.missionCompletion.findMany).mockResolvedValue([
+      { discordId: 'a', missionId: 1 }, { discordId: 'a', missionId: 2 }, { discordId: 'a', missionId: 3 },
+      { discordId: 'b', missionId: 2 }, { discordId: 'b', missionId: 3 }, // L2 without L1
+    ])
+    mockFn(prisma.transaction.findMany).mockResolvedValue([
+      { userId: 'c', metadata: { level: 1 }, description: null },
+      { userId: 'c', metadata: null, description: 'Mission reward: Level 2 - Pizza Noob' },
+    ])
+    expect(await completedLevelBy(['a', 'b', 'c', 'd'], 2)).toEqual(new Set(['a', 'c']))
+    expect(await completedLevelBy([], 2)).toEqual(new Set())
+  })
+
+  it('counts a paid ledger row even when the level has no active missions now', async () => {
+    mockFn(prisma.missionCompletion.findMany).mockResolvedValue([])
+    mockFn(prisma.transaction.findMany).mockResolvedValue([{ userId: 'p', metadata: { level: 2 }, description: null }])
+    mockFn(prisma.mission.findMany).mockResolvedValue([{ id: 1, level: 1 }, { id: 4, level: 3 }])
+    expect(await completedLevelBy(['p', 'q'], 2)).toEqual(new Set(['p']))
+  })
+
+  it('fails closed when there are no active missions', async () => {
+    mockFn(prisma.mission.findMany).mockResolvedValue([])
+    await expect(completedLevelBy(['a'], 2)).rejects.toThrow()
   })
 })
 
