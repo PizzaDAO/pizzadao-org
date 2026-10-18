@@ -470,16 +470,23 @@ export interface WelcomeResult {
   channel: "sent" | "skipped" | "failed"
   /** True when a leg failed with a 5xx, a still-429 after the retry, a timeout or a network error. */
   transient: boolean
+  /** True when a leg got a 429 that was not retried (wait over the cap) or was still 429 after the retry. */
+  rateLimited: boolean
 }
 
-const WELCOME_TIMEOUT_MS = 8000
-const WELCOME_MAX_429_WAIT_MS = 5000
+/**
+ * Worst case for one welcome: 3 requests x 5s timeout + one 3s 429 wait + one
+ * retried request of 5s = ~23s. The runner starts a welcome only before 85s of
+ * the run, so it ends by ~108s, inside the 115s lock transaction.
+ */
+const WELCOME_TIMEOUT_MS = 5000
+const WELCOME_MAX_429_WAIT_MS = 3000
 
 /**
  * oregano-41907: welcome one member by DM and, when channelId is given, by an
  * @mention post limited to that one user. Never throws on HTTP errors; each
  * leg reports its own outcome so one failing never blocks the other. A 429 is
- * retried once after Retry-After (capped at 5s). Every fetch has an 8s timeout.
+ * retried once after Retry-After (capped at 3s). Every fetch has a 5s timeout.
  */
 export async function sendWelcome(
   userId: string,
@@ -494,6 +501,7 @@ export async function sendWelcome(
   const headers = { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" }
   const api = "https://discord.com/api/v10"
   let transient = false
+  let rateLimited = false
 
   const send = (url: string, body: unknown) =>
     doFetch(url, { method: "POST", headers, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(WELCOME_TIMEOUT_MS) })
@@ -509,11 +517,13 @@ export async function sendWelcome(
     }
     return r
   }
-  const note = (r: Response) => {
+  const note = (r: Response, leg: string) => {
+    console.warn(`[welcome] ${leg} failed for ${userId}: HTTP ${r.status}`)
+    if (r.status === 429) rateLimited = true
     if (r.status === 429 || r.status >= 500) transient = true
   }
 
-  const out: WelcomeResult = { dm: "failed", channel: channelId ? "failed" : "skipped", transient: false }
+  const out: WelcomeResult = { dm: "failed", channel: channelId ? "failed" : "skipped", transient: false, rateLimited: false }
   try {
     const ch = await post(`${api}/users/@me/channels`, { recipient_id: userId })
     if (ch.ok) {
@@ -521,9 +531,9 @@ export async function sendWelcome(
       const m = await post(`${api}/channels/${dmId}/messages`, { content: text })
       if (m.ok) out.dm = "sent"
       else if (await isDmClosed(m)) out.dm = "closed"
-      else note(m)
+      else note(m, "DM")
     } else if (await isDmClosed(ch)) out.dm = "closed"
-    else note(ch)
+    else note(ch, "DM channel")
   } catch (e) {
     transient = true
     console.warn("[welcome] DM failed", (e as Error)?.message)
@@ -535,13 +545,14 @@ export async function sendWelcome(
         allowed_mentions: { parse: [], users: [userId] },
       })
       if (m.ok) out.channel = "sent"
-      else note(m)
+      else note(m, "channel post")
     } catch (e) {
       transient = true
       console.warn("[welcome] channel post failed", (e as Error)?.message)
     }
   }
   out.transient = transient
+  out.rateLimited = rateLimited
   return out
 }
 

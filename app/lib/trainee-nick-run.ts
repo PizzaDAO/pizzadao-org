@@ -92,6 +92,8 @@ export interface TraineeNickDeps {
   /** Delete the row so the next run retries (transient failure). */
   releaseWelcome: (id: string) => Promise<void>
   recordWelcome: (id: string, dm: string, channel: string) => Promise<void>
+  /** Delete claims with no outcome older than 15 min; returns how many. */
+  reclaimStaleWelcomes: () => Promise<number>
 }
 
 const defaultDeps = (): TraineeNickDeps => ({
@@ -132,6 +134,12 @@ const defaultDeps = (): TraineeNickDeps => ({
   recordWelcome: async (id, dm, channel) => {
     await prisma.traineeWelcome.updateMany({ where: { discordId: id }, data: { dm, channel } })
   },
+  reclaimStaleWelcomes: async () =>
+    (
+      await prisma.traineeWelcome.deleteMany({
+        where: { dm: null, channel: null, welcomedAt: { lt: new Date(Date.now() - STALE_CLAIM_MS) } },
+      })
+    ).count,
 })
 
 class BusySignal extends Error {}
@@ -148,7 +156,11 @@ export function parseSince(raw: string | undefined, now = Date.now()): number | 
 }
 
 /** Stop issuing writes after this long so the 115s lock transaction never times out mid-run. */
-const WRITE_BUDGET_MS = 90_000
+const WRITE_BUDGET_MS = 60_000
+/** Welcomes get their own slice: start a new one only before this (see sendWelcome for the worst case). */
+const WELCOME_DEADLINE_MS = 85_000
+/** A claim with no recorded outcome older than this was left by a killed run. */
+const STALE_CLAIM_MS = 15 * 60_000
 
 function intEnv(raw: string | undefined, fallback: number): number {
   const n = Number(raw)
@@ -376,6 +388,8 @@ export async function runTraineeNicks(opts: {
      * Independent of the Pizza Noob role. Never fails the run.
      */
     try {
+      // Skip when the stop means Discord is unhealthy for us (429s, 403s, repeated errors);
+      // time_budget only means the write loops used their slice, so welcomes still run.
       if (!stop || stop === 'time_budget') await welcomeStep()
     } catch (err) {
       console.warn('[trainee-nicks] welcome step failed', (err as Error)?.message)
@@ -388,6 +402,10 @@ export async function runTraineeNicks(opts: {
     return result
 
     async function welcomeStep() {
+      if (!dryRun) {
+        const stale = await deps.reclaimStaleWelcomes()
+        if (stale > 0) console.log(`[trainee-nicks] reclaimed ${stale} stale welcome claim(s)`)
+      }
       const ready = plan.candidates.filter((c) => !c.setNick || nickOk.has(c.id)).map((c) => c.id)
       const done = await deps.welcomedIds(ready)
       const due = ready.filter((id) => !done.has(id))
@@ -398,7 +416,7 @@ export async function runTraineeNicks(opts: {
           result.welcomeDeferred! += due.length - sent
           break
         }
-        if (deps.now() - writeStart > WRITE_BUDGET_MS) {
+        if (deps.now() - writeStart >= WELCOME_DEADLINE_MS) {
           // Not claimed, so the next run handles them.
           result.welcomeDeferred! += due.length - sent
           console.warn(`[trainee-nicks] time budget spent; ${due.length - sent} welcome(s) deferred`)
@@ -432,7 +450,14 @@ export async function runTraineeNicks(opts: {
           if (!delivered && w.transient) {
             await deps.releaseWelcome(id)
           } else {
-            await deps.recordWelcome(id, w.dm, w.channel).catch(() => {})
+            // Always non-null, so a finished row is never reclaimed as stale.
+            await deps.recordWelcome(id, w.dm || 'none', w.channel || 'none').catch(() => {})
+          }
+          if (w.rateLimited) {
+            // A 429 we could not ride out: back off for the rest of this run.
+            result.welcomeDeferred! += due.length - sent
+            console.warn(`[trainee-nicks] welcome rate limited; ${due.length - sent} welcome(s) deferred`)
+            break
           }
         } catch (err) {
           result.welcomeFailed!++

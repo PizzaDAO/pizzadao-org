@@ -5,7 +5,8 @@ vi.mock('./missions', () => ({ completedLevelBy: vi.fn() }))
 vi.mock('./member-registration', () => ({ readSignedUpMembers: vi.fn() }))
 
 import { runTraineeNicks, removePizzaNoobOnGraduate, parseSince, type TraineeNickDeps } from './trainee-nick-run'
-import type { MemberWrite, MemberWriteResult, WelcomeResult } from './discord'
+import { prisma } from './db'
+import type { MemberWrite,MemberWriteResult, WelcomeResult } from './discord'
 
 const NOOB = '555555'
 const BOT = 'botid'
@@ -26,7 +27,7 @@ const member = (id: string, over: Record<string, unknown> = {}) => ({
   ...over,
 })
 
-const W_OK: WelcomeResult = { dm: 'sent', channel: 'sent', transient: false }
+const W_OK: WelcomeResult = { dm: 'sent', channel: 'sent', transient: false, rateLimited: false }
 
 function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> = {}, store = new Set<string>()) {
   const writes: Array<{ op: MemberWrite; reason: string }> = []
@@ -58,6 +59,7 @@ function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> 
       store.delete(id)
     }),
     recordWelcome: vi.fn(async () => {}),
+    reclaimStaleWelcomes: vi.fn(async () => 0),
     ...over,
   }
   return { deps, writes, order, signed }
@@ -417,14 +419,14 @@ describe('oregano-41907 welcome', () => {
   })
 
   it('DM closed with channel sent counts as welcomed and is tallied', async () => {
-    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'closed', channel: 'sent', transient: false }) as WelcomeResult) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' })
+    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'closed', channel: 'sent', transient: false, rateLimited: false }) as WelcomeResult) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' })
     const r = await runTraineeNicks({ dryRun: false, deps })
     expect(r).toMatchObject({ welcomed: 2, welcomeFailed: 0, dmClosed: 2, channelFailed: 0 })
   })
 
   it('DM closed and no channel is a permanent miss: row kept, not retried', async () => {
     const store = new Set<string>()
-    const { deps } = setup({ listMembers: vi.fn(only('u1')), welcome: vi.fn(async () => ({ dm: 'closed', channel: 'skipped', transient: false }) as WelcomeResult) }, {}, store)
+    const { deps } = setup({ listMembers: vi.fn(only('u1')), welcome: vi.fn(async () => ({ dm: 'closed', channel: 'skipped', transient: false, rateLimited: false }) as WelcomeResult) }, {}, store)
     const r = await runTraineeNicks({ dryRun: false, deps })
     expect(r).toMatchObject({ welcomed: 0, welcomeFailed: 1, dmClosed: 1 })
     expect(store.has('u1')).toBe(true)
@@ -432,7 +434,7 @@ describe('oregano-41907 welcome', () => {
 
   it('a transient failure of every leg releases the row so the next run retries', async () => {
     const store = new Set<string>()
-    const { deps } = setup({ listMembers: vi.fn(only('u1')), welcome: vi.fn(async () => ({ dm: 'failed', channel: 'failed', transient: true }) as WelcomeResult) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' }, store)
+    const { deps } = setup({ listMembers: vi.fn(only('u1')), welcome: vi.fn(async () => ({ dm: 'failed', channel: 'failed', transient: true, rateLimited: false }) as WelcomeResult) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' }, store)
     const r = await runTraineeNicks({ dryRun: false, deps })
     expect(r).toMatchObject({ welcomed: 0, welcomeFailed: 1, channelFailed: 1 })
     expect(store.has('u1')).toBe(false)
@@ -447,16 +449,77 @@ describe('oregano-41907 welcome', () => {
     expect(store.size).toBe(0)
   })
 
-  it('respects the write time budget: unclaimed, deferred, logged', async () => {
+  it('welcomes still run after time_budget stops the writes', async () => {
+    let t = 0
+    const { deps } = setup({ now: () => t, write: vi.fn(async () => { t += 70_000; return ok }) })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r.stoppedReason).toBe('time_budget')
+    expect(deps.welcome).toHaveBeenCalled()
+  })
+
+  it('past the welcome deadline nothing is claimed; exactly the rest is deferred', async () => {
     let t = 0
     const { deps } = setup({ now: () => t, write: vi.fn(async () => { t += 100_000; return ok }) })
     const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
     const r = await runTraineeNicks({ dryRun: false, deps })
     expect(deps.claimWelcome).not.toHaveBeenCalled()
-    expect(deps.welcome).not.toHaveBeenCalled()
     expect(warn).toHaveBeenCalledWith(expect.stringContaining('deferred'))
     warn.mockRestore()
-    expect(r.welcomeDeferred).toBeGreaterThanOrEqual(0)
+    expect(r.welcomeDeferred).toBe(1) // u1 renamed; u2 never got its nick write
+  })
+
+  it('rate_limited / permission stops skip the welcome step', async () => {
+    const { deps } = setup({ write: vi.fn(async () => res(429, { blocked: true })) })
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).not.toHaveBeenCalled()
+    expect(deps.reclaimStaleWelcomes).not.toHaveBeenCalled()
+  })
+
+  it('stops the loop on a long 429: releases that row (undelivered) and defers the rest', async () => {
+    const store = new Set<string>()
+    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'failed', channel: 'failed', transient: true, rateLimited: true }) as WelcomeResult) }, {}, store)
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).toHaveBeenCalledTimes(1)
+    expect(r.welcomeDeferred).toBe(1)
+    expect(store.size).toBe(0)
+  })
+
+  it('reclaims stale claims at the start of the welcome step, not in dry runs', async () => {
+    const a = setup({ reclaimStaleWelcomes: vi.fn(async () => 3) })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await runTraineeNicks({ dryRun: false, deps: a.deps })
+    expect(a.deps.reclaimStaleWelcomes).toHaveBeenCalledTimes(1)
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('reclaimed 3'))
+    const b = setup()
+    await runTraineeNicks({ dryRun: true, deps: b.deps })
+    expect(b.deps.reclaimStaleWelcomes).not.toHaveBeenCalled()
+    log.mockRestore()
+  })
+
+  it('default stale reclaim only targets outcome-less claims older than 15 minutes', async () => {
+    const deleteMany = vi.fn(async () => ({ count: 2 }))
+    ;(prisma as any).traineeWelcome = { deleteMany }
+    const { deps } = setup()
+    delete (deps as any).reclaimStaleWelcomes
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const before = Date.now()
+    await runTraineeNicks({ dryRun: false, deps })
+    const where = (deleteMany.mock.calls[0] as any)[0].where
+    expect(where.dm).toBeNull()
+    expect(where.channel).toBeNull()
+    const cutoff = where.welcomedAt.lt.getTime()
+    expect(before - cutoff).toBeGreaterThanOrEqual(15 * 60_000 - 5)
+    expect(before - cutoff).toBeLessThan(15 * 60_000 + 5_000)
+  })
+
+  it('finished rows always get a non-null dm and channel outcome', async () => {
+    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'closed', channel: 'skipped', transient: false, rateLimited: false }) as WelcomeResult) })
+    await runTraineeNicks({ dryRun: false, deps })
+    for (const c of (deps.recordWelcome as any).mock.calls) {
+      expect(c[1]).toBeTruthy()
+      expect(c[2]).toBeTruthy()
+    }
+    expect((deps.recordWelcome as any).mock.calls.length).toBe(2)
   })
 
   it('caps welcomes per run at 20 and paces channel posts', async () => {
