@@ -89,6 +89,8 @@
       },
       "displayNameLabel": "Votre nom public",
       "displayNamePlaceholder": "Votre nom ou pseudo",
+      "displayNamePreview": "Sera enregistré sous : <b>{name}</b>",
+      "displayNameEmpty": "Utilise au moins une lettre ou un chiffre",
       "useDisplayName": "Utiliser ce nom",
       "orGenerateName": "Ou créez un nom inspiré de la pizza"
     },

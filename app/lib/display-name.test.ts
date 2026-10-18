@@ -2,6 +2,7 @@ import { describe, it, expect } from "vitest";
 import {
   sanitizeDisplayName,
   validateDisplayName,
+  truncateForDiscordNick,
   DISPLAY_NAME_MAX_LENGTH,
 } from "./display-name";
 import { validateProfilePayload } from "./profile/validation";
@@ -132,5 +133,52 @@ describe("validateProfilePayload", () => {
   it("normalises mafiaName with the shared sanitizer", () => {
     const p = validateProfilePayload({ mafiaName: "  🍕 Big​Tony  " });
     expect(p.mafiaName).toBe("BigTony");
+  });
+});
+
+describe("sanitizeDisplayName (artichoke-67361)", () => {
+  const cases: Array<[string, string]> = [
+    ["Tony™", "Tony"],
+    ["★ Big Tony ★", "Big Tony"],
+    ["Big_Tony", "Big Tony"],
+    ["xX_Sl1ceL0rd_Xx", "xX Sl1ceL0rd Xx"],
+    ["$$Money$$ Mike", "Money Mike"],
+    ["Tony ♥ 🍕 Pepperoni", "Tony Pepperoni"],
+    ["ＰＩＺＺＡ", "PIZZA"],
+    ["𝐓𝐨𝐧𝐲", "Tony"],
+    ["José Núñez", "José Núñez"],
+    ["Владимир", "Владимир"],
+    ["李小龍", "李小龍"],
+    ["محمد علي", "محمد علي"],
+    ["①②③", "123"],
+    ["🍕🍕🍕", ""],
+    ["Tony `The` Slice´s", "Tony 'The' Slice's"],
+  ];
+  it.each(cases)("%j -> %j", (input, expected) => {
+    expect(sanitizeDisplayName(input)).toBe(expected);
+  });
+  it("is idempotent", () => {
+    for (const [input] of cases) {
+      const once = sanitizeDisplayName(input);
+      expect(sanitizeDisplayName(once)).toBe(once);
+    }
+  });
+});
+
+describe("truncateForDiscordNick", () => {
+  it("leaves short names alone", () => {
+    expect(truncateForDiscordNick("Tony Pepperoni")).toBe("Tony Pepperoni");
+    expect(truncateForDiscordNick("")).toBe("");
+  });
+  it("cuts at a word boundary when one is near the end", () => {
+    expect(truncateForDiscordNick("Don Vito Corleone the Magnificent Pizzaiolo")).toBe("Don Vito Corleone the");
+  });
+  it("hard cuts when there is no space", () => {
+    expect(truncateForDiscordNick("a".repeat(40))).toBe("a".repeat(32));
+  });
+  it("never splits a surrogate pair", () => {
+    const out = truncateForDiscordNick("山".repeat(31) + "𠀀𠀀");
+    expect(Array.from(out)).toHaveLength(32);
+    expect(out).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
   });
 });
