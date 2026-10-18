@@ -845,6 +845,43 @@ model SupportTicket {
   @@index([status, createdAt])
 }
 
+// ===== MAFIA SPOTLIGHT (blackolive-55617) =====
+// Members nominate themselves or another member for the "Pizza Mafia
+// Spotlight" segment on the community call. Admins triage at /admin/spotlight.
+// adminNotes are internal and never returned to members.
+
+enum SpotlightStatus {
+  NEW
+  SHORTLISTED
+  FEATURED
+  DECLINED
+}
+
+model SpotlightSubmission {
+  id                 Int             @id @default(autoincrement())
+  submitterDiscordId String // session key of the person submitting
+  submitterMemberId  String? // sheet member id, best-effort
+  submitterName      String? // nick/username snapshot
+  isSelf             Boolean         @default(false)
+  nomineeName        String // display name (= submitter name when isSelf)
+  nomineeDiscord     String? // free-text handle as typed (when not self)
+  nomineeDiscordId   String? // = submitterDiscordId when isSelf
+  nomineeMemberId    String?
+  city               String?
+  pitch              String // "what they did / why spotlight them"
+  links              String[]        @default([])
+  photoUrl           String? // must be our Blob, /spotlight/ prefix
+  consent            Boolean // nominee agreed (or submitter confirms they will ask)
+  status             SpotlightStatus @default(NEW)
+  featuredOn         DateTime? // call date it was featured
+  adminNotes         String?
+  createdAt          DateTime        @default(now())
+  updatedAt          DateTime        @updatedAt
+
+  @@index([submitterDiscordId, createdAt])
+  @@index([status, createdAt])
+}
+
 // ===== ECONOMY MIGRATION (UnbelievaBoat -> $PEP) =====
 // See plans/unbelievaboat-replacement.md. One row per migrated Discord user.
 // `migrationKey` is unique, so re-running the import can never double-credit:
