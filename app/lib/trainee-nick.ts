@@ -75,6 +75,11 @@ export interface TraineePlan {
   skipped: { bot: number; owner: number; outranked: number; signedUp: number }
   /** Items beyond `max`, left for the next run. */
   overflow: number
+  /**
+   * oregano-41907: every in-window, renameable, non-signed-up member (capped or
+   * not), with whether their nick still needs setting. Welcome candidates.
+   */
+  candidates: Array<{ id: string; setNick: boolean }>
   /** In-scope members that are already compliant. */
   alreadyTrainee: number
   inScope: number
@@ -124,6 +129,7 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
   const heal: HealItem[] = []
   const sweep: SweepItem[] = []
   const enforce: EnforceItem[] = []
+  const candidates: Array<{ id: string; setNick: boolean }> = []
   let inScope = 0
   let alreadyTrainee = 0
   const useRole = roleOk(input)
@@ -157,6 +163,7 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
     if (isSignedUp) continue
 
     const setNick = m.nick !== TRAINEE_NICK
+    candidates.push({ id: m.id, setNick })
     const addRole = useRole && !holds && input.completedL2 !== null && !l2
     if (setNick || addRole) enforce.push({ id: m.id, setNick, addRole })
     else alreadyTrainee++
@@ -172,5 +179,5 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
   const total = heal.length + sweep.length + enforce.length
   const out = { heal: take(heal), sweep: take(sweep), enforce: take(enforce) }
   const kept = out.heal.length + out.sweep.length + out.enforce.length
-  return { ...out, skipped, overflow: total - kept, alreadyTrainee, inScope }
+  return { ...out, skipped, overflow: total - kept, alreadyTrainee, inScope, candidates }
 }

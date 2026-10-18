@@ -37,6 +37,10 @@ const MAX_RESET_WAIT_MS = 5_000
 const MAX_429_WAIT_MS = 15_000
 const SAMPLE_SIZE = 20
 /** oregano-41907: the one welcome message (DM and channel post). */
+/** At most this many welcomes per run; the rest wait for the next run. */
+const WELCOME_MAX_PER_RUN = 20
+/** Spacing between channel posts (Discord's per-channel message bucket). */
+const WELCOME_CHANNEL_GAP_MS = 1200
 export const TRAINEE_WELCOME_TEXT = 'Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org'
 
 export type RoleStatus = 'ok' | 'role_unresolved' | 'role_not_assignable'
@@ -53,6 +57,9 @@ export interface TraineeNickResult {
   roleRemoved?: number
   welcomed?: number
   welcomeFailed?: number
+  dmClosed?: number
+  channelFailed?: number
+  welcomeDeferred?: number
   roleStatus?: RoleStatus
   pizzaNoobRoleId?: string | null
   healed?: number
@@ -78,6 +85,13 @@ export interface TraineeNickDeps {
   completedL2: (ids: string[]) => Promise<Set<string>>
   write: (op: MemberWrite, reason: string) => Promise<MemberWriteResult>
   welcome: (userId: string, text: string, channelId: string | null) => Promise<WelcomeResult>
+  /** Which of these ids already have a TraineeWelcome row. */
+  welcomedIds: (ids: string[]) => Promise<Set<string>>
+  /** Insert the row; false when it already exists (someone else claimed it). */
+  claimWelcome: (id: string) => Promise<boolean>
+  /** Delete the row so the next run retries (transient failure). */
+  releaseWelcome: (id: string) => Promise<void>
+  recordWelcome: (id: string, dm: string, channel: string) => Promise<void>
 }
 
 const defaultDeps = (): TraineeNickDeps => ({
@@ -106,6 +120,18 @@ const defaultDeps = (): TraineeNickDeps => ({
   completedL2: (ids) => completedLevelBy(ids, PIZZA_NOOB_GRADUATE_LEVEL),
   write: (op, reason) => writeGuildMember(op, reason),
   welcome: (userId, text, channelId) => sendWelcome(userId, text, channelId),
+  welcomedIds: async (ids) => {
+    if (ids.length === 0) return new Set()
+    const rows = await prisma.traineeWelcome.findMany({ where: { discordId: { in: ids } }, select: { discordId: true } })
+    return new Set(rows.map((r) => r.discordId))
+  },
+  claimWelcome: async (id) => (await prisma.traineeWelcome.createMany({ data: [{ discordId: id }], skipDuplicates: true })).count === 1,
+  releaseWelcome: async (id) => {
+    await prisma.traineeWelcome.deleteMany({ where: { discordId: id } })
+  },
+  recordWelcome: async (id, dm, channel) => {
+    await prisma.traineeWelcome.updateMany({ where: { discordId: id }, data: { dm, channel } })
+  },
 })
 
 class BusySignal extends Error {}
@@ -218,6 +244,9 @@ export async function runTraineeNicks(opts: {
       roleRemoved: 0,
       welcomed: 0,
       welcomeFailed: 0,
+      dmClosed: 0,
+      channelFailed: 0,
+      welcomeDeferred: 0,
       roleStatus,
       pizzaNoobRoleId,
       healed: 0,
@@ -229,12 +258,19 @@ export async function runTraineeNicks(opts: {
       stoppedReason: completedL2 === null && roleAssignable ? 'l2_lookup_failed' : null,
     }
 
-    // oregano-41907: welcome on the first Pizza Noob add (see welcomeFirstTime).
+    // oregano-41907: welcome each new trainee once (see welcomeStep).
     const welcomeChannelId = (env.TRAINEE_WELCOME_CHANNEL_ID ?? '').trim() || guild.systemChannelId || null
 
     // 4. Dry run: report only.
     if (dryRun) {
-      for (const e of plan.enforce) if (e.addRole) console.log(`[trainee-nicks] would welcome ${e.id}`)
+      try {
+        const done = await deps.welcomedIds(plan.candidates.map((c) => c.id))
+        for (const c of plan.candidates.filter((c) => !done.has(c.id)).slice(0, WELCOME_MAX_PER_RUN)) {
+          console.log(`[trainee-nicks] would welcome ${c.id}`)
+        }
+      } catch (err) {
+        console.warn('[trainee-nicks] welcome dry-run lookup failed', (err as Error)?.message)
+      }
       result.samples = {
         heal: plan.heal.slice(0, SAMPLE_SIZE).map((h) => h.id),
         sweep: plan.sweep.slice(0, SAMPLE_SIZE).map((h) => h.id),
@@ -294,25 +330,6 @@ export async function runTraineeNicks(opts: {
       return 'ok'
     }
 
-    /**
-     * First-time signal = this run just added Pizza Noob. The planner only
-     * plans addRole for in-scope, non-signed-up members who lack the role, and
-     * nick re-enforcement never adds it, so each member qualifies once; the
-     * advisory lock stops overlapping runs. Welcome failures never fail the run.
-     */
-    const welcomeFirstTime = async (userId: string) => {
-      if (deps.now() - writeStart > WRITE_BUDGET_MS) return
-      try {
-        const w = await deps.welcome(userId, TRAINEE_WELCOME_TEXT, welcomeChannelId)
-        if (w.dm === 'sent' || w.channel === 'sent') result.welcomed!++
-        else result.welcomeFailed!++
-        if (w.dm === 'closed') console.log(`[trainee-nicks] DMs closed for ${userId}`)
-      } catch (err) {
-        result.welcomeFailed!++
-        console.warn(`[trainee-nicks] welcome failed for ${userId}`, (err as Error)?.message)
-      }
-    }
-
     for (const h of plan.heal) {
       if (stop) break
       if ((await perform({ kind: 'nick', userId: h.id, nick: h.nick }, AUDIT_REASON)) === 'ok') {
@@ -326,6 +343,7 @@ export async function runTraineeNicks(opts: {
         result.roleRemoved!++
       }
     }
+    const nickOk = new Set<string>()
     for (const e of plan.enforce) {
       if (stop) break
       let touched = false
@@ -334,6 +352,7 @@ export async function runTraineeNicks(opts: {
         if (o === 'ok') {
           result.nickSet!++
           touched = true
+          nickOk.add(e.id)
         } else if (o !== 'stop') {
           continue // 403/404/error: skip the role for this member too
         }
@@ -344,10 +363,22 @@ export async function runTraineeNicks(opts: {
         if (o === 'ok') {
           result.roleAdded!++
           touched = true
-          await welcomeFirstTime(e.id)
         }
       }
       if (touched) result.enforced!++
+    }
+
+    /**
+     * Welcome step. Qualifies: in-window, non-signed-up, nick is now the
+     * placeholder (already was, or set this run), no TraineeWelcome row. The row
+     * is claimed BEFORE sending (at-most-once across overlapping runs/restarts);
+     * a transient failure of every leg releases it so the next run retries.
+     * Independent of the Pizza Noob role. Never fails the run.
+     */
+    try {
+      if (!stop || stop === 'time_budget') await welcomeStep()
+    } catch (err) {
+      console.warn('[trainee-nicks] welcome step failed', (err as Error)?.message)
     }
 
     if (stop) {
@@ -355,6 +386,61 @@ export async function runTraineeNicks(opts: {
       if (stop === 'permission_error') result.status = 'aborted'
     }
     return result
+
+    async function welcomeStep() {
+      const ready = plan.candidates.filter((c) => !c.setNick || nickOk.has(c.id)).map((c) => c.id)
+      const done = await deps.welcomedIds(ready)
+      const due = ready.filter((id) => !done.has(id))
+      let lastChannelPost = -Infinity
+      let sent = 0
+      for (const id of due) {
+        if (sent >= WELCOME_MAX_PER_RUN) {
+          result.welcomeDeferred! += due.length - sent
+          break
+        }
+        if (deps.now() - writeStart > WRITE_BUDGET_MS) {
+          // Not claimed, so the next run handles them.
+          result.welcomeDeferred! += due.length - sent
+          console.warn(`[trainee-nicks] time budget spent; ${due.length - sent} welcome(s) deferred`)
+          break
+        }
+        let claimed = false
+        try {
+          claimed = await deps.claimWelcome(id)
+        } catch (err) {
+          console.warn(`[trainee-nicks] welcome claim failed for ${id}`, (err as Error)?.message)
+          result.welcomeFailed!++
+          continue
+        }
+        if (!claimed) continue
+        sent++
+        if (welcomeChannelId) {
+          const wait = WELCOME_CHANNEL_GAP_MS - (deps.now() - lastChannelPost)
+          if (wait > 0) await deps.sleep(wait)
+          lastChannelPost = deps.now()
+        }
+        try {
+          const w = await deps.welcome(id, TRAINEE_WELCOME_TEXT, welcomeChannelId)
+          const delivered = w.dm === 'sent' || w.channel === 'sent'
+          if (w.dm === 'closed') {
+            result.dmClosed!++
+            console.log(`[trainee-nicks] DMs closed for ${id}`)
+          }
+          if (w.channel === 'failed') result.channelFailed!++
+          if (delivered) result.welcomed!++
+          else result.welcomeFailed!++
+          if (!delivered && w.transient) {
+            await deps.releaseWelcome(id)
+          } else {
+            await deps.recordWelcome(id, w.dm, w.channel).catch(() => {})
+          }
+        } catch (err) {
+          result.welcomeFailed!++
+          console.warn(`[trainee-nicks] welcome failed for ${id}`, (err as Error)?.message)
+          await deps.releaseWelcome(id).catch(() => {})
+        }
+      }
+    }
   }
 }
 
