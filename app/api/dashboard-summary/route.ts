@@ -30,7 +30,15 @@ import {
     getProfileCompletion,
     type ProfileCompletion,
 } from "@/app/dashboard/[id]/lib/profile-completion";
-import { hasAnyRole } from "@/app/lib/discord";
+import { fetchGuildMember } from "@/app/lib/discord";
+import { getGuildRoles } from "@/app/lib/discord-interactions/guild-roles";
+import {
+    BOX_PURCHASE_URL,
+    boxMafiaDailyPep,
+    boxMafiaStatus,
+    resolveBoxMafiaRoleId,
+    type BoxMafiaStatus,
+} from "@/app/lib/box-mafia";
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
 import { resolvePfpUrl } from "@/app/lib/pfp";
 import { internalError } from "@/app/lib/errors/error-response";
@@ -84,6 +92,8 @@ export interface DashboardSummary {
     nextAction: NextAction;
     /** jalapeno-34126 — setup checklist backing the hero completion meter. */
     profileCompletion: ProfileCompletion;
+    /** woodfired-65373 — Box Mafia role suggestion; card shows only when "missing". */
+    boxMafia: { status: BoxMafiaStatus; purchaseUrl: string; dailyPep: number };
 }
 
 // ---------------------------------------------------------------------------
@@ -175,6 +185,7 @@ export async function GET(request: NextRequest) {
             notifications,
             unreadCount,
             crewMappings,
+            guildRoles,
         ] = await Promise.all([
             safe(fetchMemberById(memberId), null),
             safe(getBalance(discordId), { balance: 0 }),
@@ -209,15 +220,29 @@ export async function GET(request: NextRequest) {
             safe(getNotifications(discordId, 5), []),
             safe(getUnreadCount(discordId), 0),
             safe(getCrewMappings(), { crews: [] as CrewOption[], cached: false }),
+            safe(
+                process.env.DISCORD_GUILD_ID
+                    ? getGuildRoles(process.env.DISCORD_GUILD_ID)
+                    : Promise.resolve(null),
+                null
+            ),
         ]);
 
         // Reviewer detection — pulled in parallel-after-session so the Discord
-        // guild fetch doesn't gate the rest of the payload. `hasAnyRole`
-        // already caches the guild-member lookup for 60s.
-        const isReviewer = await safe(
-            hasAnyRole(discordId, MISSION_REVIEWER_ROLE_IDS),
-            false,
-        );
+        // guild fetch doesn't gate the rest of the payload. The guild member
+        // is fetched once (60s cached) and shared by the reviewer check and
+        // the Box Mafia check.
+        const guildMember = await safe(fetchGuildMember(discordId), null);
+        const isReviewer =
+            guildMember?.roles.some((r) => (MISSION_REVIEWER_ROLE_IDS as readonly string[]).includes(r)) ?? false;
+        const boxMafia = {
+            status: boxMafiaStatus(
+                guildMember?.roles ?? null,
+                resolveBoxMafiaRoleId(guildRoles)
+            ),
+            purchaseUrl: BOX_PURCHASE_URL,
+            dailyPep: boxMafiaDailyPep(),
+        };
 
         // --- Level info ---
         const levelTitle = await safe(getLevelTitle(currentLevel), null);
@@ -379,6 +404,7 @@ export async function GET(request: NextRequest) {
             notifications: { unread: unreadCount, top: topNotifications },
             nextAction,
             profileCompletion,
+            boxMafia,
         };
 
         CACHE.set(memberId, { time: Date.now(), data: summary });

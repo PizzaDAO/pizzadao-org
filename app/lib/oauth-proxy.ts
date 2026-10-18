@@ -192,3 +192,60 @@ export function verifyOAuthNonce(
   if (a.length !== b.length) return false;
   return timingSafeEqual(a, b);
 }
+
+// ---------------------------------------------------------------------------
+// Pending login (survives the optional guilds.join hop)
+// ---------------------------------------------------------------------------
+//
+// A non-member is sent through a second Discord authorize screen (guilds.join).
+// If they cancel it, Discord returns only `error=access_denied`, so the
+// identity verified in the first step is carried in this short-lived, signed,
+// httpOnly cookie. It holds no Discord tokens, only who they are.
+
+export const OAUTH_PENDING_COOKIE = "oauth_pending";
+
+export interface PendingLoginPayload {
+  discordId: string;
+  username: string;
+  nick: string;
+  /** The join-step oauth_state nonce this pending login is bound to. */
+  nonce: string;
+  exp: number;
+}
+
+function signPending(payload: string): string {
+  return createHmac("sha256", process.env.SESSION_SECRET!)
+    .update("pending:" + payload)
+    .digest("base64url");
+}
+
+export function createPendingLogin(data: Omit<PendingLoginPayload, "exp">): string {
+  const payload = Buffer.from(
+    JSON.stringify({ ...data, exp: Date.now() + OAUTH_STATE_TTL_SECONDS * 1000 })
+  ).toString("base64url");
+  return `${payload}.${signPending(payload)}`;
+}
+
+export function verifyPendingLogin(token: string | undefined): PendingLoginPayload | null {
+  if (!token) return null;
+  const dotIndex = token.lastIndexOf(".");
+  if (dotIndex === -1) return null;
+  const payload = token.slice(0, dotIndex);
+  const a = Buffer.from(token.slice(dotIndex + 1));
+  const b = Buffer.from(signPending(payload));
+  if (a.length !== b.length || !timingSafeEqual(a, b)) return null;
+  try {
+    const d = JSON.parse(Buffer.from(payload, "base64url").toString("utf-8"));
+    if (!d || typeof d.discordId !== "string" || !d.discordId) return null;
+    if (typeof d.exp !== "number" || Date.now() > d.exp) return null;
+    return {
+      discordId: d.discordId,
+      username: String(d.username ?? ""),
+      nick: String(d.nick ?? ""),
+      nonce: typeof d.nonce === "string" ? d.nonce : "",
+      exp: d.exp,
+    };
+  } catch {
+    return null;
+  }
+}

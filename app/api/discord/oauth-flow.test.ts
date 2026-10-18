@@ -16,7 +16,7 @@ vi.mock("@/app/lib/session", () => ({
 
 import { GET as login } from "./login/route";
 import { GET as callback } from "./callback/route";
-import { decodeOAuthState, encodeOAuthState } from "@/app/lib/oauth-proxy";
+import { decodeOAuthState, encodeOAuthState, createPendingLogin } from "@/app/lib/oauth-proxy";
 import { createSessionToken } from "@/app/lib/session";
 
 const ORIGIN = "https://app.pizzadao.org";
@@ -240,6 +240,119 @@ describe("guild join flow (zucchini-21674)", () => {
     const loc = new URL(res.headers.get("location")!);
     expect(loc.pathname).toBe("/");
     expect(loc.searchParams.get("discordJoined")).toBe("0");
+  });
+});
+
+describe("cancelling the guilds.join screen (zucchini-21674 gap 1)", () => {
+  process.env.SESSION_SECRET ||= "test-secret";
+  const pending = () => createPendingLogin({ discordId: "u1", username: "user1", nick: "Nicky", nonce: "n1" });
+  const cancel = (opts: { join?: boolean; cookie?: string; return_to?: string } = {}) => {
+    const { join = true, cookie = `oauth_state=n1; oauth_pending=${pending()}`, return_to } = opts;
+    const st = encodeOAuthState({ sessionId: "sess-9", nonce: "n1", join, return_to });
+    return callback(new Request(`${ORIGIN}/api/discord/callback?error=access_denied&state=${encodeURIComponent(st)}`, { headers: { cookie } }));
+  };
+
+  it("sets a signed oauth_pending cookie (no tokens) on the join redirect", async () => {
+    mockFetchMemberByDiscordId.mockResolvedValue(null);
+    mockDiscord({ inGuild: false, scope: "identify" });
+    const st = encodeOAuthState({ sessionId: "s", nonce: "n1" });
+    const res = await callback(new Request(`${ORIGIN}/api/discord/callback?code=c&state=${encodeURIComponent(st)}`, { headers: { cookie: "oauth_state=n1" } }));
+    const raw = (res.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("oauth_pending=") && !c.startsWith("oauth_pending=;"))!;
+    expect(raw).toMatch(/HttpOnly/i);
+    expect(raw).toMatch(/SameSite=lax/i);
+    expect(raw).toMatch(/Max-Age=600/i);
+    const payload = JSON.parse(Buffer.from(decodeURIComponent(raw.split("=")[1].split(";")[0]).split(".")[0], "base64url").toString());
+    expect(Object.keys(payload).sort()).toEqual(["discordId", "exp", "nick", "nonce", "username"]);
+    // bound to the join nonce, which also becomes the oauth_state cookie and the login ?nonce
+    expect(payload.nonce).toBe(cookieFrom(res, "oauth_state"));
+    expect(new URL(res.headers.get("location")!).searchParams.get("nonce")).toBe(payload.nonce);
+  });
+
+  it("logs the person in with discordJoined=0 and clears both cookies", async () => {
+    mockFetchMemberByDiscordId.mockResolvedValue(null);
+    const res = await cancel();
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.pathname).toBe("/");
+    expect(loc.searchParams.get("discordId")).toBe("u1");
+    expect(loc.searchParams.get("discordJoined")).toBe("0");
+    expect(loc.searchParams.get("discordNick")).toBe("Nicky");
+    expect(loc.searchParams.get("sessionId")).toBe("sess-9");
+    expect(cookieFrom(res, "pizzadao_session")).toBe("mock-session-token");
+    expect(cookieFrom(res, "oauth_pending")).toBe("");
+    expect(cookieFrom(res, "oauth_state")).toBe("");
+  });
+
+  it("an abandoned pending cookie cannot be used by a later unrelated join login", async () => {
+    const stale = pending(); // user A, bound to nonce n1, abandoned
+    const res = await login(new Request(`${ORIGIN}/api/discord/login?join=1`, { headers: { cookie: `oauth_pending=${stale}` } }));
+    const fresh = cookieFrom(res, "oauth_state")!;
+    expect(fresh).not.toBe("n1");
+    expect(cookieFrom(res, "oauth_pending")).toBe(""); // cleared
+    const st = encodeOAuthState({ sessionId: "", nonce: fresh, join: true });
+    const out = await callback(new Request(`${ORIGIN}/api/discord/callback?error=access_denied&state=${encodeURIComponent(st)}`, { headers: { cookie: `oauth_state=${fresh}; oauth_pending=${stale}` } }));
+    expect(out.headers.get("location")).toBe(`${ORIGIN}/`);
+    expect(cookieFrom(out, "pizzadao_session")).toBeUndefined();
+  });
+
+  it("login?join=1 reuses the offered nonce only when the pending cookie is bound to it", async () => {
+    const ok = await login(new Request(`${ORIGIN}/api/discord/login?join=1&nonce=n1`, { headers: { cookie: `oauth_pending=${pending()}` } }));
+    expect(cookieFrom(ok, "oauth_state")).toBe("n1");
+    expect(decodeOAuthState(new URL(ok.headers.get("location")!).searchParams.get("state")!).nonce).toBe("n1");
+    const bad = await login(new Request(`${ORIGIN}/api/discord/login?join=1&nonce=evil`, { headers: { cookie: `oauth_pending=${pending()}` } }));
+    expect(cookieFrom(bad, "oauth_state")).not.toBe("evil");
+  });
+
+  it("a non-join login start clears oauth_pending", async () => {
+    const res = await login(new Request(`${ORIGIN}/api/discord/login`, { headers: { cookie: `oauth_pending=${pending()}` } }));
+    expect(cookieFrom(res, "oauth_pending")).toBe("");
+  });
+
+  it("clears oauth_pending on error fallbacks and the nonce-failure 400", async () => {
+    const bare = await cancel({ cookie: "oauth_state=n1" });
+    expect(cookieFrom(bare, "oauth_pending")).toBe("");
+    const st = encodeOAuthState({ sessionId: "", nonce: "n1" });
+    const bad = await callback(new Request(`${ORIGIN}/api/discord/callback?code=c&state=${encodeURIComponent(st)}`, { headers: { cookie: `oauth_pending=${pending()}` } }));
+    expect(bad.status).toBe(400);
+    expect(cookieFrom(bad, "oauth_pending")).toBe("");
+  });
+
+  it("only access_denied is honored; other errors redirect as before", async () => {
+    const st = encodeOAuthState({ sessionId: "s", nonce: "n1", join: true });
+    for (const err of ["server_error", "invalid_request"]) {
+      const res = await callback(new Request(`${ORIGIN}/api/discord/callback?error=${err}&state=${encodeURIComponent(st)}`, { headers: { cookie: `oauth_state=n1; oauth_pending=${pending()}` } }));
+      expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+      expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+    }
+  });
+
+  it("does not log in without a valid pending cookie", async () => {
+    for (const cookie of ["oauth_state=n1", "oauth_state=n1; oauth_pending=garbage.sig", `oauth_state=n1; oauth_pending=${pending()}x`]) {
+      const res = await cancel({ cookie });
+      expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+      expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+    }
+  });
+
+  it("does not log in when the oauth_state nonce does not match", async () => {
+    const res = await cancel({ cookie: `oauth_state=other; oauth_pending=${pending()}` });
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+    expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+  });
+
+  it("ignores the pending cookie when cancelling the first (non-join) step", async () => {
+    const res = await cancel({ join: false });
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+    expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+  });
+
+  it("proxy flow returns a transfer token instead of a session cookie", async () => {
+    const returnTo = "https://onboarding-abc123xyz-pizza-dao.vercel.app";
+    const res = await cancel({ return_to: returnTo });
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.origin).toBe(returnTo);
+    expect(loc.pathname).toBe("/api/auth/session-transfer");
+    expect(loc.searchParams.get("token")).toBeTruthy();
+    expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
   });
 });
 
