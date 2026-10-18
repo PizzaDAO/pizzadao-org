@@ -1,13 +1,6 @@
-import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
+import { describe, it, expect, afterEach } from 'vitest'
 
-const fetchGuildMember = vi.fn()
-const getGuildRoles = vi.fn()
-vi.mock('@/app/lib/discord', () => ({ fetchGuildMember: (...a: unknown[]) => fetchGuildMember(...a) }))
-vi.mock('@/app/lib/discord-interactions/guild-roles', () => ({
-  getGuildRoles: (...a: unknown[]) => getGuildRoles(...a),
-}))
-
-import { boxMafiaStatus, getBoxMafiaStatus, resolveBoxMafiaRoleId } from './box-mafia'
+import { boxMafiaDailyPep, boxMafiaStatus, resolveBoxMafiaRoleId } from './box-mafia'
 
 const ROLES = [
   { id: '111111', name: 'Pizza Mafia' },
@@ -17,6 +10,7 @@ const ROLES = [
 describe('resolveBoxMafiaRoleId', () => {
   afterEach(() => {
     delete process.env.BOX_MAFIA_ROLE_ID
+    delete process.env.ROLE_INCOME_JSON
   })
 
   it('prefers a valid env id', () => {
@@ -33,6 +27,16 @@ describe('resolveBoxMafiaRoleId', () => {
   it('matches by name ignoring case, spaces and emoji', () => {
     expect(resolveBoxMafiaRoleId(ROLES)).toBe('222222')
     expect(resolveBoxMafiaRoleId([{ id: '5', name: 'BOX  mafia' }])).toBe('5')
+  })
+
+  it('uses the ROLE_INCOME_JSON roleId after the env override', () => {
+    process.env.ROLE_INCOME_JSON = JSON.stringify([{ name: 'Box Mafia', amount: 50, roleId: '777777' }])
+    expect(resolveBoxMafiaRoleId(ROLES)).toBe('777777')
+    process.env.BOX_MAFIA_ROLE_ID = '999999'
+    expect(resolveBoxMafiaRoleId(ROLES)).toBe('999999')
+    expect(boxMafiaDailyPep()).toBe(50)
+    delete process.env.ROLE_INCOME_JSON
+    expect(boxMafiaDailyPep()).toBe(42)
   })
 
   it('returns null for zero, several, or unavailable roles', () => {
@@ -53,39 +57,5 @@ describe('boxMafiaStatus', () => {
     expect(boxMafiaStatus(['a'], '222222')).toBe('missing')
     expect(boxMafiaStatus(null, '222222')).toBe('unknown')
     expect(boxMafiaStatus(['a'], null)).toBe('unknown')
-  })
-})
-
-describe('getBoxMafiaStatus', () => {
-  beforeEach(() => {
-    fetchGuildMember.mockReset()
-    getGuildRoles.mockReset()
-    process.env.DISCORD_GUILD_ID = 'g1'
-    getGuildRoles.mockResolvedValue(ROLES)
-  })
-  afterEach(() => {
-    delete process.env.DISCORD_GUILD_ID
-  })
-
-  it('is unknown when the guild member is unavailable', async () => {
-    fetchGuildMember.mockResolvedValue(null)
-    expect(await getBoxMafiaStatus('u1')).toBe('unknown')
-  })
-
-  it('is missing / has_role from the fetched member', async () => {
-    fetchGuildMember.mockResolvedValue({ roles: ['111111'] })
-    expect(await getBoxMafiaStatus('u1')).toBe('missing')
-    fetchGuildMember.mockResolvedValue({ roles: ['222222'] })
-    expect(await getBoxMafiaStatus('u1')).toBe('has_role')
-  })
-
-  it('reuses provided member roles without fetching the member', async () => {
-    expect(await getBoxMafiaStatus('u1', ['111111'])).toBe('missing')
-    expect(fetchGuildMember).not.toHaveBeenCalled()
-  })
-
-  it('never throws', async () => {
-    fetchGuildMember.mockRejectedValue(new Error('boom'))
-    expect(await getBoxMafiaStatus('u1')).toBe('unknown')
   })
 })

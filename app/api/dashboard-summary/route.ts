@@ -34,11 +34,11 @@ import { fetchGuildMember } from "@/app/lib/discord";
 import { getGuildRoles } from "@/app/lib/discord-interactions/guild-roles";
 import {
     BOX_PURCHASE_URL,
+    boxMafiaDailyPep,
     boxMafiaStatus,
     resolveBoxMafiaRoleId,
     type BoxMafiaStatus,
 } from "@/app/lib/box-mafia";
-import { DEFAULT_ROLE_INCOME } from "@/app/lib/pep-earn/income";
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
 import { resolvePfpUrl } from "@/app/lib/pfp";
 import { internalError } from "@/app/lib/errors/error-response";
@@ -241,8 +241,7 @@ export async function GET(request: NextRequest) {
                 resolveBoxMafiaRoleId(guildRoles)
             ),
             purchaseUrl: BOX_PURCHASE_URL,
-            dailyPep:
-                DEFAULT_ROLE_INCOME.find((r) => r.name === "Box Mafia")?.amount ?? 42,
+            dailyPep: boxMafiaDailyPep(),
         };
 
         // --- Level info ---
