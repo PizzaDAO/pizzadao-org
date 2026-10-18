@@ -411,7 +411,9 @@
     "community": "Communauté",
     "contribute": "Contribuer",
     "resources": "Ressources",
-    "activation": "Activation des membres"
+    "activation": "Activation des membres",
+    "spotlight": "Coup de projecteur Mafia",
+    "spotlightAdmin": "File Spotlight"
   },
   "dashboard": {
     "loading": {
@@ -713,5 +715,54 @@
     "noTasks": "Aucune tâche libre n’est répertoriée. Rejoignez une réunion ou demandez où aider.",
     "discord": "Rejoindre le Discord PizzaDAO",
     "taskDetails": "Voir les détails de la tâche"
+  },
+  "spotlight": {
+    "overline": "§ Coup de projecteur Mafia",
+    "title": "Mettez quelqu'un en lumière",
+    "intro": "À chaque appel, nous mettons en avant un membre et son travail. Proposez-vous ou proposez un autre membre.",
+    "metaDescription": "Proposez un membre pour le Spotlight de la Pizza Mafia lors de l'appel de la communauté.",
+    "loginPrompt": "Connectez-vous avec Discord pour proposer quelqu'un au Spotlight de la Mafia.",
+    "loginCta": "Se connecter",
+    "modeSelf": "Me mettre en avant",
+    "modeOther": "Proposer quelqu'un d'autre",
+    "nomineeName": "Nom de la personne proposée",
+    "nomineeDiscord": "Pseudo Discord de la personne (facultatif)",
+    "city": "Ville (facultatif)",
+    "pitch": "Qu'a-t-elle fait ? Pourquoi la mettre en avant ?",
+    "pitchHint": "Racontez-nous : projets, événements, impact sur la communauté.",
+    "pitchCount": "{count}/{max}",
+    "links": "Liens (jusqu'à {max})",
+    "addLink": "Ajouter un lien",
+    "linkPlaceholder": "https://…",
+    "photo": "Photo (facultatif)",
+    "photoHint": "PNG, JPEG, WebP ou GIF, jusqu'à 5 Mo.",
+    "removePhoto": "Retirer la photo",
+    "consentSelf": "J'accepte d'être mis en avant lors de l'appel et sur les canaux de PizzaDAO.",
+    "consentOther": "Je vais lui demander, ou elle a déjà accepté, d'être mise en avant lors de l'appel.",
+    "submit": "Envoyer",
+    "submitting": "Envoi…",
+    "success": "Merci ! Votre proposition est bien reçue. Les animateurs vont y jeter un œil.",
+    "submitAnother": "En envoyer une autre",
+    "mine": "Vos propositions",
+    "empty": "Aucune proposition pour l'instant.",
+    "loading": "Chargement…",
+    "featuredOn": "Mis en avant le {date}",
+    "status": {
+      "NEW": "Nouvelle",
+      "SHORTLISTED": "Présélectionnée",
+      "FEATURED": "Mise en avant",
+      "DECLINED": "Refusée"
+    },
+    "errors": {
+      "tooMany": "Vous avez atteint la limite de propositions. Réessayez plus tard.",
+      "generic": "Une erreur est survenue. Réessayez.",
+      "uploadFailed": "Échec de l'envoi de la photo. Essayez une autre image.",
+      "network": "Erreur réseau, réessayez.",
+      "pitch": "Dites-nous pourquoi la mettre en avant.",
+      "nomineeName": "Saisissez le nom de la personne proposée.",
+      "links": "Vérifiez vos liens : ils doivent commencer par http:// ou https://.",
+      "consent": "Veuillez cocher la case.",
+      "photoUrl": "Cette photo n'est pas valide."
+    }
   }
 }

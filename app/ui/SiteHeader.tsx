@@ -15,6 +15,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/crew", label: "members", match: p => p === "/crew" },
     { href: "/articles", label: "articles" },
     { href: "/chats", label: "chats", membersOnly: true },
+    { href: "/spotlight", label: "spotlight", membersOnly: true },
   ] },
   { key: "contribute", items: [
     { href: "/missions", label: "missions" },
@@ -31,6 +32,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/support", label: "support" },
     { href: "/admin/activation", label: "activation", analyticsOnly: true },
     { href: "/admin/shop", label: "shopAdmin", adminOnly: true },
+    { href: "/admin/spotlight", label: "spotlightAdmin", analyticsOnly: true },
   ] },
 ];
 const HIDDEN_ON = new Set(["/join", "/login"]);

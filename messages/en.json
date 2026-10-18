@@ -411,7 +411,9 @@
     "community": "Community",
     "contribute": "Contribute",
     "resources": "Resources",
-    "activation": "Member activation"
+    "activation": "Member activation",
+    "spotlight": "Mafia Spotlight",
+    "spotlightAdmin": "Spotlight queue"
   },
   "dashboard": {
     "loading": {
@@ -713,5 +715,54 @@
     "noTasks": "No unclaimed tasks are listed. Join a call or ask the crew where help is needed.",
     "discord": "Join PizzaDAO Discord",
     "taskDetails": "View task details"
+  },
+  "spotlight": {
+    "overline": "§ Mafia Spotlight",
+    "title": "Put someone in the spotlight",
+    "intro": "Every call we feature a member and their work. Nominate yourself or another member.",
+    "metaDescription": "Nominate a member for the Pizza Mafia Spotlight on the community call.",
+    "loginPrompt": "Log in with Discord to nominate someone for the Mafia Spotlight.",
+    "loginCta": "Log in",
+    "modeSelf": "Spotlight myself",
+    "modeOther": "Nominate someone else",
+    "nomineeName": "Nominee's name",
+    "nomineeDiscord": "Nominee's Discord handle (optional)",
+    "city": "City (optional)",
+    "pitch": "What did they do? Why spotlight them?",
+    "pitchHint": "Tell us the story: projects, events, impact on the community.",
+    "pitchCount": "{count}/{max}",
+    "links": "Links (up to {max})",
+    "addLink": "Add a link",
+    "linkPlaceholder": "https://…",
+    "photo": "Photo (optional)",
+    "photoHint": "PNG, JPEG, WebP or GIF, up to 5 MB.",
+    "removePhoto": "Remove photo",
+    "consentSelf": "I am happy to be featured on the call and in PizzaDAO channels.",
+    "consentOther": "I will ask them, or they already agreed, to be featured on the call.",
+    "submit": "Submit",
+    "submitting": "Sending…",
+    "success": "Thanks! Your submission is in. The hosts will take a look.",
+    "submitAnother": "Submit another",
+    "mine": "Your submissions",
+    "empty": "No submissions yet.",
+    "loading": "Loading…",
+    "featuredOn": "Featured on {date}",
+    "status": {
+      "NEW": "New",
+      "SHORTLISTED": "Shortlisted",
+      "FEATURED": "Featured",
+      "DECLINED": "Declined"
+    },
+    "errors": {
+      "tooMany": "You have reached the submission limit. Please try again later.",
+      "generic": "Something went wrong. Please try again.",
+      "uploadFailed": "Photo upload failed. Please try another image.",
+      "network": "Network error, please try again.",
+      "pitch": "Please tell us why they should be spotlighted.",
+      "nomineeName": "Please enter the nominee's name.",
+      "links": "Check your links: they must start with http:// or https://.",
+      "consent": "Please confirm the checkbox.",
+      "photoUrl": "That photo is not valid."
+    }
   }
 }

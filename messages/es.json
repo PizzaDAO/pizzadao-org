@@ -411,7 +411,9 @@
     "community": "Comunidad",
     "contribute": "Contribuir",
     "resources": "Recursos",
-    "activation": "Activación de miembros"
+    "activation": "Activación de miembros",
+    "spotlight": "Foco de la Mafia",
+    "spotlightAdmin": "Cola de Spotlight"
   },
   "dashboard": {
     "loading": {
@@ -713,5 +715,54 @@
     "noTasks": "No hay tareas sin asignar. Únete a una reunión o pregunta dónde puedes ayudar.",
     "discord": "Únete al Discord de PizzaDAO",
     "taskDetails": "Ver detalles de la tarea"
+  },
+  "spotlight": {
+    "overline": "§ Foco de la Mafia",
+    "title": "Pon a alguien en el foco",
+    "intro": "En cada llamada destacamos a un miembro y su trabajo. Nomínate a ti o a otro miembro.",
+    "metaDescription": "Nomina a un miembro para el Foco de la Pizza Mafia en la llamada de la comunidad.",
+    "loginPrompt": "Inicia sesión con Discord para nominar a alguien al Foco de la Mafia.",
+    "loginCta": "Iniciar sesión",
+    "modeSelf": "Destacarme a mí",
+    "modeOther": "Nominar a otra persona",
+    "nomineeName": "Nombre del nominado",
+    "nomineeDiscord": "Usuario de Discord del nominado (opcional)",
+    "city": "Ciudad (opcional)",
+    "pitch": "¿Qué hizo? ¿Por qué destacarle?",
+    "pitchHint": "Cuéntanos la historia: proyectos, eventos, impacto en la comunidad.",
+    "pitchCount": "{count}/{max}",
+    "links": "Enlaces (hasta {max})",
+    "addLink": "Añadir un enlace",
+    "linkPlaceholder": "https://…",
+    "photo": "Foto (opcional)",
+    "photoHint": "PNG, JPEG, WebP o GIF, hasta 5 MB.",
+    "removePhoto": "Quitar foto",
+    "consentSelf": "Estoy de acuerdo en ser destacado en la llamada y en los canales de PizzaDAO.",
+    "consentOther": "Le preguntaré, o ya aceptó, ser destacado en la llamada.",
+    "submit": "Enviar",
+    "submitting": "Enviando…",
+    "success": "¡Gracias! Tu envío está recibido. Los anfitriones le echarán un vistazo.",
+    "submitAnother": "Enviar otro",
+    "mine": "Tus envíos",
+    "empty": "Aún no hay envíos.",
+    "loading": "Cargando…",
+    "featuredOn": "Destacado el {date}",
+    "status": {
+      "NEW": "Nuevo",
+      "SHORTLISTED": "Preseleccionado",
+      "FEATURED": "Destacado",
+      "DECLINED": "Rechazado"
+    },
+    "errors": {
+      "tooMany": "Has alcanzado el límite de envíos. Inténtalo de nuevo más tarde.",
+      "generic": "Algo salió mal. Inténtalo de nuevo.",
+      "uploadFailed": "Error al subir la foto. Prueba con otra imagen.",
+      "network": "Error de red, inténtalo de nuevo.",
+      "pitch": "Cuéntanos por qué debería ser destacado.",
+      "nomineeName": "Escribe el nombre del nominado.",
+      "links": "Revisa tus enlaces: deben empezar por http:// o https://.",
+      "consent": "Confirma la casilla.",
+      "photoUrl": "Esa foto no es válida."
+    }
   }
 }
