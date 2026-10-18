@@ -5,7 +5,8 @@ vi.mock('./missions', () => ({ completedLevelBy: vi.fn() }))
 vi.mock('./member-registration', () => ({ readSignedUpMembers: vi.fn() }))
 
 import { runTraineeNicks, removePizzaNoobOnGraduate, parseSince, type TraineeNickDeps } from './trainee-nick-run'
-import type { MemberWrite, MemberWriteResult } from './discord'
+import { prisma } from './db'
+import type { MemberWrite,MemberWriteResult, WelcomeResult } from './discord'
 
 const NOOB = '555555'
 const BOT = 'botid'
@@ -26,7 +27,9 @@ const member = (id: string, over: Record<string, unknown> = {}) => ({
   ...over,
 })
 
-function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> = {}) {
+const W_OK: WelcomeResult = { dm: 'sent', channel: 'sent', transient: false, rateLimited: false }
+
+function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> = {}, store = new Set<string>()) {
   const writes: Array<{ op: MemberWrite; reason: string }> = []
   const order: string[] = []
   const signed = new Map<string, string>(Array.from({ length: 120 }, (_, i) => [`s${i}`, `Name ${i}`]))
@@ -49,6 +52,14 @@ function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> 
       writes.push({ op, reason })
       return ok
     }),
+    welcome: vi.fn(async () => W_OK),
+    welcomedIds: vi.fn(async (ids: string[]) => new Set(ids.filter((i) => store.has(i)))),
+    claimWelcome: vi.fn(async (id: string) => (store.has(id) ? false : (store.add(id), true))),
+    releaseWelcome: vi.fn(async (id: string) => {
+      store.delete(id)
+    }),
+    recordWelcome: vi.fn(async () => {}),
+    reclaimStaleWelcomes: vi.fn(async () => 0),
     ...over,
   }
   return { deps, writes, order, signed }
@@ -337,5 +348,197 @@ describe('removePizzaNoobOnGraduate', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const bad = await removePizzaNoobOnGraduate('u1', { env: baseEnv, guildInfo: async () => { throw new Error('x') } })
     expect(bad).toBe('skipped')
+  })
+})
+
+describe('oregano-41907 welcome', () => {
+  const TEXT = 'Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org'
+  const only = (id: string, over: Record<string, unknown> = {}) => async () => [
+    member(BOT, { roles: ['100003'], joined_at: '2020-01-01T00:00:00Z' }),
+    member(id, over),
+  ]
+
+  it('welcomes each new trainee once with the exact text, DM + channel', async () => {
+    const { deps } = setup({}, { TRAINEE_WELCOME_CHANNEL_ID: 'chan1' })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).toHaveBeenCalledTimes(2)
+    expect(deps.welcome).toHaveBeenCalledWith('u1', TEXT, 'chan1')
+    expect(r).toMatchObject({ welcomed: 2, welcomeFailed: 0 })
+    // second run: rows exist, so nobody is welcomed again
+    const again = setup({}, { TRAINEE_WELCOME_CHANNEL_ID: 'chan1' }, new Set(['u1', 'u2']))
+    await runTraineeNicks({ dryRun: false, deps: again.deps })
+    expect(again.deps.welcome).not.toHaveBeenCalled()
+  })
+
+  it('welcomes even when the role is unassignable or the L2 lookup failed', async () => {
+    const a = setup({ guildInfo: vi.fn(async () => ({ ownerId: 'owner', roles: ROLES.filter((r) => r.id !== NOOB) })) })
+    const ra = await runTraineeNicks({ dryRun: false, deps: a.deps })
+    expect(ra.roleStatus).toBe('role_unresolved')
+    expect(ra.welcomed).toBe(2)
+    const b = setup({ completedL2: vi.fn(async () => { throw new Error('x') }) })
+    expect((await runTraineeNicks({ dryRun: false, deps: b.deps })).welcomed).toBe(2)
+  })
+
+  it('welcomes an already-renamed member with no row, even after a mod removed the role; not again after', async () => {
+    const store = new Set<string>()
+    const mk = () => setup({ listMembers: vi.fn(only('u3', { nick: 'Pizza Trainee', roles: [] })) }, {}, store)
+    const first = mk()
+    expect((await runTraineeNicks({ dryRun: false, deps: first.deps })).welcomed).toBe(1)
+    const second = mk()
+    await runTraineeNicks({ dryRun: false, deps: second.deps })
+    expect(second.deps.welcome).not.toHaveBeenCalled()
+  })
+
+  it('an existing row means no welcome (rejoin)', async () => {
+    const { deps } = setup({ listMembers: vi.fn(only('u1')) }, {}, new Set(['u1']))
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).not.toHaveBeenCalled()
+  })
+
+  it('a failed nick write defers the welcome', async () => {
+    const { deps } = setup({ listMembers: vi.fn(only('u1')), write: vi.fn(async () => res(403)) })
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).not.toHaveBeenCalled()
+  })
+
+  it('claims the row before sending', async () => {
+    const calls: string[] = []
+    const { deps } = setup({
+      listMembers: vi.fn(only('u1')),
+      claimWelcome: vi.fn(async () => { calls.push('claim'); return true }),
+      welcome: vi.fn(async () => { calls.push('send'); return W_OK }),
+    })
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(calls).toEqual(['claim', 'send'])
+  })
+
+  it('a lost claim (overlapping run) sends nothing', async () => {
+    const { deps } = setup({ listMembers: vi.fn(only('u1')), claimWelcome: vi.fn(async () => false) })
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).not.toHaveBeenCalled()
+  })
+
+  it('DM closed with channel sent counts as welcomed and is tallied', async () => {
+    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'closed', channel: 'sent', transient: false, rateLimited: false }) as WelcomeResult) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r).toMatchObject({ welcomed: 2, welcomeFailed: 0, dmClosed: 2, channelFailed: 0 })
+  })
+
+  it('DM closed and no channel is a permanent miss: row kept, not retried', async () => {
+    const store = new Set<string>()
+    const { deps } = setup({ listMembers: vi.fn(only('u1')), welcome: vi.fn(async () => ({ dm: 'closed', channel: 'skipped', transient: false, rateLimited: false }) as WelcomeResult) }, {}, store)
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r).toMatchObject({ welcomed: 0, welcomeFailed: 1, dmClosed: 1 })
+    expect(store.has('u1')).toBe(true)
+  })
+
+  it('a transient failure of every leg releases the row so the next run retries', async () => {
+    const store = new Set<string>()
+    const { deps } = setup({ listMembers: vi.fn(only('u1')), welcome: vi.fn(async () => ({ dm: 'failed', channel: 'failed', transient: true, rateLimited: false }) as WelcomeResult) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' }, store)
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r).toMatchObject({ welcomed: 0, welcomeFailed: 1, channelFailed: 1 })
+    expect(store.has('u1')).toBe(false)
+  })
+
+  it('a thrown welcome releases the row and never fails the run or the role steps', async () => {
+    const store = new Set<string>()
+    const { deps, writes } = setup({ welcome: vi.fn(async () => { throw new Error('boom') }) }, {}, store)
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r).toMatchObject({ status: 'finished', roleAdded: 2, welcomed: 0, welcomeFailed: 2 })
+    expect(writes).toHaveLength(4)
+    expect(store.size).toBe(0)
+  })
+
+  it('welcomes still run after time_budget stops the writes', async () => {
+    let t = 0
+    const { deps } = setup({ now: () => t, write: vi.fn(async () => { t += 70_000; return ok }) })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r.stoppedReason).toBe('time_budget')
+    expect(deps.welcome).toHaveBeenCalled()
+  })
+
+  it('past the welcome deadline nothing is claimed; exactly the rest is deferred', async () => {
+    let t = 0
+    const { deps } = setup({ now: () => t, write: vi.fn(async () => { t += 100_000; return ok }) })
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.claimWelcome).not.toHaveBeenCalled()
+    expect(warn).toHaveBeenCalledWith(expect.stringContaining('deferred'))
+    warn.mockRestore()
+    expect(r.welcomeDeferred).toBe(1) // u1 renamed; u2 never got its nick write
+  })
+
+  it('rate_limited / permission stops skip the welcome step', async () => {
+    const { deps } = setup({ write: vi.fn(async () => res(429, { blocked: true })) })
+    await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).not.toHaveBeenCalled()
+    expect(deps.reclaimStaleWelcomes).not.toHaveBeenCalled()
+  })
+
+  it('stops the loop on a long 429: releases that row (undelivered) and defers the rest', async () => {
+    const store = new Set<string>()
+    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'failed', channel: 'failed', transient: true, rateLimited: true }) as WelcomeResult) }, {}, store)
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).toHaveBeenCalledTimes(1)
+    expect(r.welcomeDeferred).toBe(1)
+    expect(store.size).toBe(0)
+  })
+
+  it('reclaims stale claims at the start of the welcome step, not in dry runs', async () => {
+    const a = setup({ reclaimStaleWelcomes: vi.fn(async () => 3) })
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await runTraineeNicks({ dryRun: false, deps: a.deps })
+    expect(a.deps.reclaimStaleWelcomes).toHaveBeenCalledTimes(1)
+    expect(log).toHaveBeenCalledWith(expect.stringContaining('reclaimed 3'))
+    const b = setup()
+    await runTraineeNicks({ dryRun: true, deps: b.deps })
+    expect(b.deps.reclaimStaleWelcomes).not.toHaveBeenCalled()
+    log.mockRestore()
+  })
+
+  it('default stale reclaim only targets outcome-less claims older than 15 minutes', async () => {
+    const deleteMany = vi.fn(async () => ({ count: 2 }))
+    ;(prisma as any).traineeWelcome = { deleteMany }
+    const { deps } = setup()
+    delete (deps as any).reclaimStaleWelcomes
+    vi.spyOn(console, 'log').mockImplementation(() => {})
+    const before = Date.now()
+    await runTraineeNicks({ dryRun: false, deps })
+    const where = (deleteMany.mock.calls[0] as any)[0].where
+    expect(where.dm).toBeNull()
+    expect(where.channel).toBeNull()
+    const cutoff = where.welcomedAt.lt.getTime()
+    expect(before - cutoff).toBeGreaterThanOrEqual(15 * 60_000 - 5)
+    expect(before - cutoff).toBeLessThan(15 * 60_000 + 5_000)
+  })
+
+  it('finished rows always get a non-null dm and channel outcome', async () => {
+    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'closed', channel: 'skipped', transient: false, rateLimited: false }) as WelcomeResult) })
+    await runTraineeNicks({ dryRun: false, deps })
+    for (const c of (deps.recordWelcome as any).mock.calls) {
+      expect(c[1]).toBeTruthy()
+      expect(c[2]).toBeTruthy()
+    }
+    expect((deps.recordWelcome as any).mock.calls.length).toBe(2)
+  })
+
+  it('caps welcomes per run at 20 and paces channel posts', async () => {
+    const many = Array.from({ length: 25 }, (_, i) => member(`n${i}`, { nick: 'Pizza Trainee', roles: [NOOB] }))
+    const { deps } = setup({ listMembers: vi.fn(async () => [member(BOT, { roles: ['100003'], joined_at: '2020-01-01T00:00:00Z' }), ...many]) }, { TRAINEE_WELCOME_CHANNEL_ID: 'c' })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).toHaveBeenCalledTimes(20)
+    expect(r.welcomeDeferred).toBe(5)
+    expect(deps.sleep).toHaveBeenCalled()
+  })
+
+  it('dry run sends and claims nothing', async () => {
+    const { deps, writes } = setup()
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await runTraineeNicks({ dryRun: true, deps })
+    expect(deps.welcome).not.toHaveBeenCalled()
+    expect(deps.claimWelcome).not.toHaveBeenCalled()
+    expect(writes).toEqual([])
+    expect(log).toHaveBeenCalledWith('[trainee-nicks] would welcome u1')
+    log.mockRestore()
   })
 })

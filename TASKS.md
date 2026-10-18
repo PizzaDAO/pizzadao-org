@@ -7,7 +7,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| oregano-41907 | Welcome new Pizza Trainees by DM + welcome channel: "Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org" | doing | P2 |  |  |  |  |  | Follow-up to anchovy-52918 |
+| oregano-41907 | Welcome new Pizza Trainees by DM + welcome channel: "Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org" | review | P2 |  |  |  |  | #173 | Follow-up to anchovy-52918 |
 | calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | todo | P2 |  |  |  | plans/calzone-call-recorder.md |  | Railway service; awaiting Snax decisions |
 | blackolive-55617 | Mafia Spotlight Submission form | doing | P2 |  |  |  | plans/blackolive-55617.md |  |  |
 | jalapeno-82565 | Custom Crew Bounties 🏴‍☠️ | doing | P2 |  |  |  | plans/jalapeno-82565.md |  |  |

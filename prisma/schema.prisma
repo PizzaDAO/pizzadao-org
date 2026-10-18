@@ -1007,3 +1007,11 @@ model ActivationEvent {
   @@index([createdAt, event])
   @@index([memberKey, event])
 }
+
+// oregano-41907: one row per member already welcomed as a Pizza Trainee.
+model TraineeWelcome {
+  discordId  String   @id
+  welcomedAt DateTime @default(now())
+  dm         String?
+  channel    String?
+}

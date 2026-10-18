@@ -346,6 +346,7 @@ export async function listAllGuildMembers(
 
 export interface GuildInfo {
   ownerId: string | null
+  systemChannelId?: string | null
   roles: Array<{ id: string; name: string; position: number; managed: boolean }>
 }
 
@@ -361,10 +362,12 @@ export async function getGuildInfo(opts: { fetchImpl?: typeof fetch } = {}): Pro
   if (!r.ok) throw new Error(`Discord guild fetch failed (${r.status})`)
   const g = (await r.json()) as {
     owner_id?: string
+    system_channel_id?: string | null
     roles?: Array<{ id: string; name?: string; position?: number; managed?: boolean }>
   }
   return {
     ownerId: g.owner_id ? String(g.owner_id) : null,
+    systemChannelId: g.system_channel_id ? String(g.system_channel_id) : null,
     roles: (g.roles ?? []).map((ro) => ({
       id: String(ro.id),
       name: String(ro.name ?? ""),
@@ -460,3 +463,103 @@ export const addGuildMemberRole = (userId: string, roleId: string, reason: strin
   writeGuildMember({ kind: "addRole", userId, roleId }, reason)
 export const removeGuildMemberRole = (userId: string, roleId: string, reason: string) =>
   writeGuildMember({ kind: "removeRole", userId, roleId }, reason)
+
+export interface WelcomeResult {
+  /** 'closed' = Discord error 50007 (the member blocks DMs from this server). */
+  dm: "sent" | "closed" | "failed"
+  channel: "sent" | "skipped" | "failed"
+  /** True when a leg failed with a 5xx, a still-429 after the retry, a timeout or a network error. */
+  transient: boolean
+  /** True when a leg got a 429 that was not retried (wait over the cap) or was still 429 after the retry. */
+  rateLimited: boolean
+}
+
+/**
+ * Worst case for one welcome: 3 requests x 5s timeout + one 3s 429 wait + one
+ * retried request of 5s = ~23s. The runner starts a welcome only before 85s of
+ * the run, so it ends by ~108s, inside the 115s lock transaction.
+ */
+const WELCOME_TIMEOUT_MS = 5000
+const WELCOME_MAX_429_WAIT_MS = 3000
+
+/**
+ * oregano-41907: welcome one member by DM and, when channelId is given, by an
+ * @mention post limited to that one user. Never throws on HTTP errors; each
+ * leg reports its own outcome so one failing never blocks the other. A 429 is
+ * retried once after Retry-After (capped at 3s). Every fetch has a 5s timeout.
+ */
+export async function sendWelcome(
+  userId: string,
+  text: string,
+  channelId: string | null,
+  opts: { fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<WelcomeResult> {
+  const botToken = botTokenOnly()
+  if (!botToken) throw new Error("Discord is not configured")
+  const doFetch = opts.fetchImpl ?? fetch
+  const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
+  const headers = { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" }
+  const api = "https://discord.com/api/v10"
+  let transient = false
+  let rateLimited = false
+
+  const send = (url: string, body: unknown) =>
+    doFetch(url, { method: "POST", headers, body: JSON.stringify(body), cache: "no-store", signal: AbortSignal.timeout(WELCOME_TIMEOUT_MS) })
+  /** POST with one 429 retry. Throws on network error / timeout. */
+  const post = async (url: string, body: unknown): Promise<Response> => {
+    let r = await send(url, body)
+    if (r.status === 429) {
+      const text429 = await r.text()
+      const rl = parseRateLimit(r.headers, text429)
+      if (rl.cloudflare || rl.retryAfterMs === null || rl.retryAfterMs > WELCOME_MAX_429_WAIT_MS) return r
+      await sleep(rl.retryAfterMs)
+      r = await send(url, body)
+    }
+    return r
+  }
+  const note = (r: Response, leg: string) => {
+    console.warn(`[welcome] ${leg} failed for ${userId}: HTTP ${r.status}`)
+    if (r.status === 429) rateLimited = true
+    if (r.status === 429 || r.status >= 500) transient = true
+  }
+
+  const out: WelcomeResult = { dm: "failed", channel: channelId ? "failed" : "skipped", transient: false, rateLimited: false }
+  try {
+    const ch = await post(`${api}/users/@me/channels`, { recipient_id: userId })
+    if (ch.ok) {
+      const dmId = String(((await ch.json()) as { id: string }).id)
+      const m = await post(`${api}/channels/${dmId}/messages`, { content: text })
+      if (m.ok) out.dm = "sent"
+      else if (await isDmClosed(m)) out.dm = "closed"
+      else note(m, "DM")
+    } else if (await isDmClosed(ch)) out.dm = "closed"
+    else note(ch, "DM channel")
+  } catch (e) {
+    transient = true
+    console.warn("[welcome] DM failed", (e as Error)?.message)
+  }
+  if (channelId) {
+    try {
+      const m = await post(`${api}/channels/${channelId}/messages`, {
+        content: `<@${userId}> ${text}`,
+        allowed_mentions: { parse: [], users: [userId] },
+      })
+      if (m.ok) out.channel = "sent"
+      else note(m, "channel post")
+    } catch (e) {
+      transient = true
+      console.warn("[welcome] channel post failed", (e as Error)?.message)
+    }
+  }
+  out.transient = transient
+  out.rateLimited = rateLimited
+  return out
+}
+
+async function isDmClosed(r: Response): Promise<boolean> {
+  try {
+    return (JSON.parse(await r.text()) as { code?: number }).code === 50007
+  } catch {
+    return false
+  }
+}
