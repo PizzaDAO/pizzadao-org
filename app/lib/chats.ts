@@ -83,9 +83,10 @@ export async function getCityChats(): Promise<CityChat[]> {
     `&order=city_key.asc`;
 
   const res = await fetch(url, {
+    // apikey alone works for both legacy JWT anon keys and new sb_publishable_
+    // keys (new keys are not JWTs and must not be sent as a Bearer token).
     headers: {
       apikey: anonKey,
-      Authorization: `Bearer ${anonKey}`,
     },
     cache: "no-store",
   });
