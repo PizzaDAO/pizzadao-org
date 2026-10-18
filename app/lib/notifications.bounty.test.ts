@@ -62,7 +62,7 @@ describe('bounty notifications', () => {
 
   it('cancelled: tells the claimer, not the actor', async () => {
     await notifyBountyCancelled('claimer', 'lead', 7, 'Do a thing', 'ops')
-    expect(created()[0]).toMatchObject({ recipientId: 'claimer', actorId: 'lead', linkUrl: '/crew/ops#bounties' })
+    expect(created()[0]).toMatchObject({ type: 'BOUNTY_CANCELLED', recipientId: 'claimer', actorId: 'lead', linkUrl: '/crew/ops#bounties' })
     mockFn(prisma.notification.create).mockClear()
     expect(await notifyBountyCancelled('claimer', 'claimer', 7, 'Do a thing', 'ops')).toBeNull()
     expect(created()).toHaveLength(0)

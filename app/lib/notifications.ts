@@ -242,7 +242,7 @@ export async function notifyBountyCancelled(
   if (claimerId === actorId) return null
 
   return createNotification({
-    type: NotificationType.BOUNTY_REJECTED, // no dedicated enum value; keeps the migration unchanged
+    type: NotificationType.BOUNTY_CANCELLED,
     recipientId: claimerId,
     actorId,
     title: 'Bounty Cancelled',

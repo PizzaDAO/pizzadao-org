@@ -4,7 +4,7 @@ import React from "react";
 
 export type NotificationData = {
   id: string;
-  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "BOUNTY_SUBMITTED" | "BOUNTY_REJECTED" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED";
+  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "BOUNTY_SUBMITTED" | "BOUNTY_REJECTED" | "BOUNTY_CANCELLED" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED";
   title: string;
   message: string;
   linkUrl: string | null;
@@ -36,6 +36,14 @@ function getIcon(type: NotificationData["type"]): React.ReactNode {
           <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z" />
           <polyline points="14 2 14 8 20 8" />
           <polyline points="9 15 11 17 15 13" />
+        </svg>
+      );
+    case "BOUNTY_CANCELLED":
+      return (
+        <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
+          <circle cx="12" cy="12" r="10" />
+          <line x1="15" y1="9" x2="9" y2="15" />
+          <line x1="9" y1="9" x2="15" y2="15" />
         </svg>
       );
     case "BOUNTY_REJECTED":
@@ -91,6 +99,7 @@ function getIconBg(type: NotificationData["type"]): string {
   switch (type) {
     case "BOUNTY_CLAIMED":
     case "BOUNTY_REJECTED":
+    case "BOUNTY_CANCELLED":
     case "TASK_DUE_SOON":
       return "hsl(var(--tomato) / 0.12)";
     case "BOUNTY_COMPLETED":
@@ -108,6 +117,7 @@ function getIconColor(type: NotificationData["type"]): string {
   switch (type) {
     case "BOUNTY_CLAIMED":
     case "BOUNTY_REJECTED":
+    case "BOUNTY_CANCELLED":
     case "TASK_DUE_SOON":
       return "hsl(var(--tomato))";
     case "BOUNTY_COMPLETED":
