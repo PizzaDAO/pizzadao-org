@@ -9,7 +9,7 @@ export function sanitizeSignupDraft(value: unknown): SignupDraft | null {
   if (!value || typeof value !== "object") return null;
   const v = value as Record<string, unknown>;
   const str = (key: string, max: number) => typeof v[key] === "string" ? (v[key] as string).trim().slice(0, max) : "";
-  const mafiaName = sanitizeDisplayName(str("mafiaName", 64));
+  const mafiaName = sanitizeDisplayName(str("mafiaName", 256));
   const city = str("city", 120);
   if (!mafiaName || !city) return null;
   const sessionId = str("sessionId", 80);

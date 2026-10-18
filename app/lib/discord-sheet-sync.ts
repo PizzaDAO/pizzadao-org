@@ -8,6 +8,7 @@
 import { ROLE_ID_TO_TURTLE } from "@/app/ui/constants";
 import { writeToSheet } from "@/app/api/profile/route";
 import { prisma } from "@/app/lib/db";
+import { sanitizeDisplayName } from "@/app/lib/display-name";
 import { getSheetData, type MemberSheetData } from "@/app/lib/sheets/member-repository";
 
 const BASE_DISCORD_API = "https://discord.com/api/v10";
@@ -106,7 +107,10 @@ export async function syncDiscordRolesToSheet(
   let writeRes: unknown = undefined;
   if (found) {
     const finalMafiaName =
-      String(found.row.Name || "").trim() || fallbackName || discordMember.user?.username || "Unknown";
+      String(found.row.Name || "").trim() ||
+      sanitizeDisplayName(fallbackName) ||
+      sanitizeDisplayName(discordMember.user?.username) ||
+      "Unknown";
     writeRes = await writeToSheet({
       secret,
       source: "discord-sync",
