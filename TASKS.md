@@ -7,7 +7,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | review | P2 |  |  |  | plans/calzone-call-recorder.md | #174 | Railway service in recorder/; existing PizzaDAO bot; all crew calls; DPR review; summary+transcript public only |
+| calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | doing | P2 |  |  |  | plans/calzone-call-recorder.md | #174 | Phase 0+1 merged (#174). Next: Snax sets up R2 + Railway + Vercel env, test on a real call, then Phase 2 (transcripts/summaries, public pages) |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
 | jalapeno-34126 | Add animation/pop up to signal your profile has been completed | todo | P2 |  | Pizza Lord |  |  |  |  |
 | pizzaiolo-13628 | update timezone for crewsheet | todo | P2 |  |  |  |  |  | when someone selects their city, the timezone should auto format to their local pov |
