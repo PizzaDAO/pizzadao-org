@@ -8,7 +8,7 @@ vi.mock('./sheets/member-repository', () => ({ fetchMemberById: vi.fn() }))
 
 import { getCrewLeadMemberIds } from './crew-leads'
 import { fetchMemberById } from './sheets/member-repository'
-import { notifyBountySubmitted, notifyBountyRejected, notifyBountyCompleted, notifyBountyClaimed } from './notifications'
+import { notifyBountySubmitted, notifyBountyRejected, notifyBountyCompleted, notifyBountyClaimed, notifyBountyCancelled } from './notifications'
 
 const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
 const created = () => mockFn(prisma.notification.create).mock.calls.map(([a]) => a.data)
@@ -58,6 +58,14 @@ describe('bounty notifications', () => {
     await notifyBountyCompleted('claimer', 'poster', 7, 'Do a thing', 50, null, 'poster')
     expect(created().map((r) => r.recipientId)).toEqual(['claimer'])
     expect(created()[0].linkUrl).toBe('/pep')
+  })
+
+  it('cancelled: tells the claimer, not the actor', async () => {
+    await notifyBountyCancelled('claimer', 'lead', 7, 'Do a thing', 'ops')
+    expect(created()[0]).toMatchObject({ recipientId: 'claimer', actorId: 'lead', linkUrl: '/crew/ops#bounties' })
+    mockFn(prisma.notification.create).mockClear()
+    expect(await notifyBountyCancelled('claimer', 'claimer', 7, 'Do a thing', 'ops')).toBeNull()
+    expect(created()).toHaveLength(0)
   })
 
   it('claimed: links to the crew board for crew bounties', async () => {

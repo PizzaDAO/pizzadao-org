@@ -53,6 +53,7 @@ vi.mock('./crew-leads', () => ({
 vi.mock('./notifications', () => ({
   notifyBountySubmitted: vi.fn().mockResolvedValue(undefined),
   notifyBountyRejected: vi.fn().mockResolvedValue(undefined),
+  notifyBountyCancelled: vi.fn().mockResolvedValue(undefined),
   createNotification: vi.fn().mockResolvedValue(undefined),
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
   notifyBountyCompleted: vi.fn().mockResolvedValue(undefined),

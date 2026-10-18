@@ -18,6 +18,7 @@ vi.mock('./economy', () => ({
 vi.mock('./notifications', () => ({
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
   notifyBountyCompleted: vi.fn().mockResolvedValue(undefined),
+  notifyBountyCancelled: vi.fn().mockResolvedValue(undefined),
   notifyBountyComment: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('./crew-leads', () => ({

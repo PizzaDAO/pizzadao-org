@@ -230,6 +230,29 @@ export async function notifyBountyRejected(
 }
 
 /**
+ * Notify the claimer that the bounty they were working on was cancelled.
+ */
+export async function notifyBountyCancelled(
+  claimerId: string,
+  actorId: string,
+  bountyId: number,
+  bountyDescription: string,
+  crewId?: string | null
+) {
+  if (claimerId === actorId) return null
+
+  return createNotification({
+    type: NotificationType.BOUNTY_REJECTED, // no dedicated enum value; keeps the migration unchanged
+    recipientId: claimerId,
+    actorId,
+    title: 'Bounty Cancelled',
+    message: `The bounty "${truncate(bountyDescription, 50)}" you claimed was cancelled.`,
+    metadata: { bountyId, cancelled: true },
+    linkUrl: bountyLink(crewId)
+  })
+}
+
+/**
  * Notify all involved parties when a new comment is posted on a bounty.
  * Recipients: bounty poster, bounty claimer, and all previous commenters.
  * Excludes the person who just posted the comment.

@@ -81,7 +81,7 @@ enum NotificationType {
 }
 ```
 
-New migration `prisma/migrations/20261017000000_crew_bounty_review/migration.sql`. It is
+New migration `prisma/migrations/20261018000000_crew_bounty_review/migration.sql`. It is
 hand-written, additive only, and safe to re-run, in the same style as `20261005000000_admin_grant_types`
 and `20261012000000_shop_admin`:
 
@@ -243,7 +243,7 @@ the /pep bounty UI are hard-coded English.
 
 ## Files to change
 
-- `prisma/schema.prisma`, plus the new `prisma/migrations/20261017000000_crew_bounty_review/migration.sql`
+- `prisma/schema.prisma`, plus the new `prisma/migrations/20261018000000_crew_bounty_review/migration.sql`
 - `app/lib/bounties.ts`, plus the new `app/lib/crew-leads.ts` and `app/lib/crew-sheet.ts` (moved out of
   `app/api/crew/[crewId]/route.ts`)
 - `app/api/crew/[crewId]/route.ts` (import the moved parser)

@@ -7,6 +7,7 @@ import {
   notifyBountyComment,
   notifyBountySubmitted,
   notifyBountyRejected,
+  notifyBountyCancelled,
 } from './notifications'
 import { canManageBounty } from './crew-leads'
 import { getCrewMappings } from './crew-mappings'
@@ -238,9 +239,13 @@ export async function giveUpBounty(userId: string, bountyId: number) {
 
 const MAX_SUBMISSION_NOTE = 2000
 const MAX_REVIEW_NOTE = 2000
+const MAX_LINK_LENGTH = 2048
 
 /** An https URL, or throws. Returns the normalized string. */
 function validateHttpsLink(raw: string): string {
+  if (raw.length > MAX_LINK_LENGTH) {
+    throw new ValidationError(`Link must be at most ${MAX_LINK_LENGTH} characters`)
+  }
   let url: URL
   try {
     url = new URL(raw)
@@ -329,6 +334,10 @@ export async function rejectBounty(reviewerId: string, bountyId: number, note: s
     throw new NotFoundError('Bounty')
   }
 
+  if (bounty.claimedBy && bounty.claimedBy === reviewerId) {
+    throw new ForbiddenError('You cannot review your own work')
+  }
+
   if (!(await canManageBounty(reviewerId, bounty))) {
     throw new ForbiddenError('Only the bounty poster or a crew lead can reject a submission')
   }
@@ -383,6 +392,13 @@ export async function completeBounty(approverId: string, bountyId: number) {
     throw new ConflictError('Bounty must be claimed before completion')
   }
 
+  // Approving straight from CLAIMED (no submission) is the poster's legacy path only;
+  // leads and admins approve submitted work.
+  const isPoster = bounty.createdBy === approverId
+  if (bounty.status === 'CLAIMED' && !isPoster) {
+    throw new ForbiddenError('Only the bounty poster can approve before work is submitted')
+  }
+
   if (!bounty.claimedBy) {
     throw new ConflictError('No one has claimed this bounty')
   }
@@ -394,7 +410,11 @@ export async function completeBounty(approverId: string, bountyId: number) {
 
   await prisma.$transaction(async (tx) => {
     const done = await tx.bounty.updateMany({
-      where: { id: bountyId, status: { in: ['CLAIMED', 'SUBMITTED'] }, claimedBy: claimerId },
+      where: {
+        id: bountyId,
+        status: isPoster ? { in: ['CLAIMED', 'SUBMITTED'] } : 'SUBMITTED',
+        claimedBy: claimerId,
+      },
       data: { status: 'COMPLETED', reviewedBy: approverId, completedAt: new Date() }
     })
     if (done.count !== 1) {
@@ -463,6 +483,10 @@ export async function cancelBounty(actorId: string, bountyId: number) {
       cancelledBy: actorId,
     })
   })
+
+  if (bounty.claimedBy) {
+    notifyBountyCancelled(bounty.claimedBy, actorId, bountyId, bounty.description, bounty.crewId).catch(() => {})
+  }
 
   return { ...bounty, status: 'CANCELLED' as const }
 }

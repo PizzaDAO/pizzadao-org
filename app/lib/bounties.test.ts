@@ -12,6 +12,7 @@ vi.mock('./economy', async (importOriginal) => ({
 vi.mock('./notifications', () => ({
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
   notifyBountyCompleted: vi.fn().mockResolvedValue(undefined),
+  notifyBountyCancelled: vi.fn().mockResolvedValue(undefined),
 }))
 // Poster-only permissions here; lead/admin rules are covered in bounties.review.test.ts.
 vi.mock('./crew-leads', () => ({

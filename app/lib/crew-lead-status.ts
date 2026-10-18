@@ -2,8 +2,11 @@
 // Shared by the server permission check (crew-leads.ts) and the crew page UI
 // (CrewGettingStarted) so they can't drift. Client-safe: no server imports.
 
-/** Roster Status that counts as a crew lead: "lead" / "capo", but not iced/inactive. */
+/**
+ * Roster Status that counts as a crew lead: exactly "lead", "crew lead" or "capo"
+ * (any case, trimmed). Anything else ("Former lead", "Ex-lead", "Not lead",
+ * "Iced lead", "Inactive capo") is not a lead.
+ */
 export function isLeadStatus(status: string | null | undefined): boolean {
-  const s = status ?? ''
-  return /lead|capo/i.test(s) && !/iced|inactive/i.test(s)
+  return /^(crew\s+)?(lead|capo)$/i.test((status ?? '').trim())
 }

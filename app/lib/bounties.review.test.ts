@@ -16,6 +16,7 @@ vi.mock('./notifications', () => ({
   notifyBountyComment: vi.fn().mockResolvedValue(undefined),
   notifyBountySubmitted: vi.fn().mockResolvedValue(undefined),
   notifyBountyRejected: vi.fn().mockResolvedValue(undefined),
+  notifyBountyCancelled: vi.fn().mockResolvedValue(undefined),
 }))
 vi.mock('./transactions', () => ({ logTransaction: vi.fn().mockResolvedValue({}) }))
 vi.mock('./crew-mappings', () => ({ getCrewMappings: vi.fn() }))
@@ -29,7 +30,7 @@ import { getCrewMappings } from './crew-mappings'
 import { fetchCrewRoster } from './crew-sheet'
 import { findMemberIdByDiscordId } from './member-utils'
 import { isAdminDiscordId } from './auth-guards'
-import { notifyBountySubmitted, notifyBountyRejected, notifyBountyCompleted } from './notifications'
+import { notifyBountySubmitted, notifyBountyRejected, notifyBountyCompleted, notifyBountyCancelled } from './notifications'
 
 const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
 
@@ -124,6 +125,12 @@ describe('submitBounty', () => {
     expect(prisma.bounty.updateMany).not.toHaveBeenCalled()
   })
 
+  it('caps the link at 2048 characters', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...BASE, status: 'CLAIMED' })
+    await expect(submitBounty(CLAIMER, 10, 'x', 'https://example.com/' + 'a'.repeat(2048))).rejects.toThrow('2048')
+    expect(prisma.bounty.updateMany).not.toHaveBeenCalled()
+  })
+
   it('a lost race (updateMany count 0) is a ConflictError', async () => {
     mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...BASE, status: 'CLAIMED' })
     mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 0 })
@@ -151,6 +158,20 @@ describe('rejectBounty', () => {
     expect(prisma.economy.update).not.toHaveBeenCalled()
     expect(prisma.economy.updateMany).not.toHaveBeenCalled()
     expect(logTransaction).not.toHaveBeenCalled()
+  })
+
+  it('the claimer cannot reject their own submission, even as a lead or admin', async () => {
+    ROSTERS.ops.push({ id: 'm-claimer-lead', status: 'Lead' })
+    MEMBER_OF[CLAIMER] = 'm-claimer-lead'
+    admins.add(CLAIMER)
+    try {
+      mockFn(prisma.bounty.findUnique).mockResolvedValue(BASE)
+      await expect(rejectBounty(CLAIMER, 10, 'no')).rejects.toMatchObject({ statusCode: 403 })
+      expect(prisma.bounty.updateMany).not.toHaveBeenCalled()
+    } finally {
+      ROSTERS.ops.pop()
+      MEMBER_OF[CLAIMER] = 'm-claimer'
+    }
   })
 
   it('an admin can reject', async () => {
@@ -213,6 +234,29 @@ describe('completeBounty (approve)', () => {
     expect(notifyBountyCompleted).toHaveBeenCalledWith(CLAIMER, LEAD, 10, 'Fix the bug', 100, 'ops', POSTER)
   })
 
+  it('a lead or admin cannot approve a CLAIMED bounty (poster legacy path only); the poster still can', async () => {
+    admins.add('admin-1')
+    mockFn(prisma.bounty.findUnique).mockResolvedValue({ ...BASE, status: 'CLAIMED' })
+    for (const who of [LEAD, 'admin-1']) {
+      await expect(completeBounty(who, 10)).rejects.toMatchObject({ statusCode: 403 })
+    }
+    expect(prisma.bounty.updateMany).not.toHaveBeenCalled()
+    expect(logTransaction).not.toHaveBeenCalled()
+
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
+    await expect(completeBounty(POSTER, 10)).resolves.toMatchObject({ status: 'COMPLETED' })
+  })
+
+  it('a non-poster approval only matches SUBMITTED in the conditional update', async () => {
+    mockFn(prisma.bounty.findUnique).mockResolvedValue(BASE)
+    mockFn(prisma.bounty.updateMany).mockResolvedValue({ count: 1 })
+    await completeBounty(LEAD, 10)
+    expect(prisma.bounty.updateMany).toHaveBeenCalledWith({
+      where: { id: 10, status: 'SUBMITTED', claimedBy: CLAIMER },
+      data: expect.objectContaining({ status: 'COMPLETED', reviewedBy: LEAD }),
+    })
+  })
+
   it('a lead of a DIFFERENT crew, and a stranger, cannot approve', async () => {
     mockFn(prisma.bounty.findUnique).mockResolvedValue(BASE)
     for (const who of [OTHER_LEAD, STRANGER]) {
@@ -273,6 +317,7 @@ describe('cancelBounty', () => {
       data: { status: 'CANCELLED', reviewedBy: LEAD },
     })
     expect(prisma.economy.update).toHaveBeenCalledWith({ where: { id: POSTER }, data: { wallet: { increment: 100 } } })
+    expect(notifyBountyCancelled).toHaveBeenCalledWith(CLAIMER, LEAD, 10, 'Fix the bug', 'ops')
     expect(logTransaction).toHaveBeenCalledTimes(1)
     expect(logTransaction).toHaveBeenCalledWith(prisma, POSTER, 'BOUNTY_REFUND', 100, expect.any(String), {
       bountyId: 10,
