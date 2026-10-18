@@ -79,6 +79,7 @@ export class VoiceCapture {
 
   private connection: VoiceConnection | null = null
   private stopping = false
+  private capturing = false
   private readonly open = new Map<string, OpenSegment>()
   private readonly pending = new Set<string>()
   private readonly bots = new Set<string>()
@@ -93,8 +94,17 @@ export class VoiceCapture {
     mkdirSync(path.join(d.dir, 'seg'), { recursive: true })
   }
 
+  /** Join the channel. Nothing is subscribed to until `beginCapture()`. */
   async start(): Promise<void> {
     await this.join()
+  }
+
+  /**
+   * Start recording audio. Call only after the recording indicator (nickname or
+   * notice) is visible: join -> nickname -> notice -> beginCapture.
+   */
+  beginCapture(): void {
+    this.capturing = true
   }
 
   /** Users whose audio is being written right now. */
@@ -171,7 +181,7 @@ export class VoiceCapture {
   }
 
   private async onSpeakingStart(userId: string): Promise<void> {
-    if (this.stopping || this.open.has(userId) || this.pending.has(userId)) return
+    if (!this.capturing || this.stopping || this.open.has(userId) || this.pending.has(userId)) return
     if (this.purged.has(userId) || this.d.isOptedOut(userId) || this.bots.has(userId)) return
     this.pending.add(userId)
     try {

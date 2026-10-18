@@ -8,11 +8,14 @@ A small Node service (discord.js 14 + `@discordjs/voice` 0.19.2 with DAVE) that 
 2. When an event in the call channel (`CALL_VOICE_CHANNEL_ID`, default `823956905739026442`) goes **ACTIVE** it:
    - joins the channel (not deafened, self-muted);
    - sets its server nickname to `PizzaDAO Bot 🔴 REC` (the old nickname is saved to disk and restored afterwards, even after a crash);
-   - posts the recording notice in the voice channel's text chat. If neither the nickname nor the notice can be shown, it leaves without recording.
+   - posts the recording notice in the voice channel's text chat.
+   - Only then does it start capturing audio (order: join, nickname, notice, capture). If neither the nickname nor the notice can be shown it leaves without recording and deletes the session folder.
 3. Records one Ogg/Opus stream per speaker, written to `DATA_DIR/<sessionId>/seg/<userId>/` as it goes. Bots are skipped. Members who ran `/record optout` are never subscribed to (list fetched from the app, refreshed every `OPTOUT_REFRESH_SECONDS`; an opt-out mid-call deletes what was captured of that member).
 4. Stops on the first of: no humans in the channel for 5 minutes, `MAX_CALL_MINUTES` (default 120), the event goes COMPLETED/CANCELED, or a *different* event becomes ACTIVE (closes this one, starts the next).
 5. On stop: ffmpeg builds one aligned Opus track per speaker and one mono m4a mix; everything is uploaded to the private R2 bucket under `calls/<sessionId>/`; the app's ingest API is called with the metadata (event, channel, times, speakers with Discord ids, display names, talk time, R2 keys). The nickname is restored.
 6. `GET /health` (200 once Discord is ready) for Railway.
+
+Uploads wait for a fresh opt-out list: if the app cannot be reached when a call ends, nothing is uploaded and the session stays on the volume (retried every 10 minutes). A 401/403/404 from the ingest API is treated as a misconfiguration (wrong `RECORDER_API_KEY`, route not deployed): logged loudly and retried, never discarded. Only a payload the app rejects as invalid (other 4xx) is dropped, and then its R2 objects are deleted too.
 
 Resilience: auto-rejoin on disconnect (backoff, 5 tries); sessions live on the volume, so on boot any session without an `uploaded` marker is finalized and ingested (ingest is idempotent on the session id); a restart mid-call rejoins the still-active event as a new session.
 
@@ -30,7 +33,7 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `DISCORD_GUILD_ID` | yes | | PizzaDAO server id. |
 | `RECORDER_API_KEY` | yes | | Shared secret; must equal `RECORDER_API_KEY` on Vercel. |
 | `R2_ENDPOINT` | yes | | `https://<account>.r2.cloudflarestorage.com` |
-| `R2_ACCESS_KEY_ID` | yes | | Token scoped to the calls bucket, read/write. |
+| `R2_ACCESS_KEY_ID` | yes | | Token scoped to the calls bucket: Object Read & Write (read, write, list, delete). |
 | `R2_SECRET_ACCESS_KEY` | yes | | |
 | `R2_BUCKET_NAME` | yes | | Private bucket for call audio. |
 | `CALL_VOICE_CHANNEL_ID` | no | `823956905739026442` | |
@@ -40,6 +43,13 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `EMPTY_GRACE_MINUTES` | no | `5` | Humans-absent time before stopping. |
 | `OPTOUT_REFRESH_SECONDS` | no | `60` | |
 | `PORT` | no | `3000` (Railway sets it) | `/health` |
+
+## R2 bucket and tokens
+
+- Private bucket (no public access, no custom domain). Objects live under `calls/<sessionId>/` (`mix.m4a`, `tracks/<discordId>.ogg`).
+- **Railway token: Object Read & Write, scoped to this bucket.** The worker lists and deletes under `calls/<sessionId>/` (it clears leftovers of earlier upload attempts, and removes its uploads if the app permanently refuses a call), so list + delete are required, not just put.
+- **Vercel token: also Object Read & Write (read + list + delete), scoped to this bucket.** A read-only or list-only token breaks the retention sweep and the reviewer "Remove" takedown, which delete the whole `calls/<sessionId>/` prefix.
+- **Backstop lifecycle rule (do this):** in the Cloudflare dashboard, bucket > Settings > Object lifecycle rules, add a rule on prefix `calls/` that deletes objects after *retention + 7 days* (default 90 + 7 = **97 days**). It guarantees audio is gone even if a recording was never ingested, the app is down, or the sweep fails. Keep it in step with `RECORDING_AUDIO_RETENTION_DAYS`.
 
 ## Railway setup
 

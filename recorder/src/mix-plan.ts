@@ -12,8 +12,8 @@ export interface PlanSegment {
   startMs: number
 }
 
-/** Above this the inline filter graph risks the OS argv limit; the track is skipped. */
-export const MAX_SEGMENTS_PER_TRACK = 2500
+/** Sanity cap; beyond this a track is skipped (the call would have ~40 bursts a minute from one person for 8 hours). */
+export const MAX_SEGMENTS_PER_TRACK = 20000
 
 const COMMON = ['-y', '-hide_banner', '-loglevel', 'error']
 
@@ -38,6 +38,32 @@ export function buildSpeakerTrackArgs(segments: PlanSegment[], outFile: string):
     '-b:a', '32k',
     outFile,
   ]
+}
+
+/** At most this many input files are open in one ffmpeg pass (fd limit safety). */
+export const MAX_INPUTS_PER_PASS = 200
+
+/**
+ * The ffmpeg passes that build one speaker's track, in order. Up to
+ * MAX_INPUTS_PER_PASS segments is a single pass; more are built in chunks
+ * (each chunk is aligned to the call timeline, written at 64k) and then summed
+ * into the final track, so a chatty speaker never opens thousands of files.
+ */
+export function buildSpeakerTrackPlan(segments: PlanSegment[], outFile: string, chunkPrefix: string): string[][] {
+  if (segments.length <= MAX_INPUTS_PER_PASS) return [buildSpeakerTrackArgs(segments, outFile)]
+  if (segments.length > MAX_SEGMENTS_PER_TRACK) throw new Error(`Too many segments (${segments.length})`)
+  const sorted = [...segments].sort((a, b) => a.startMs - b.startMs)
+  const passes: string[][] = []
+  const chunkFiles: string[] = []
+  for (let i = 0; i < sorted.length; i += MAX_INPUTS_PER_PASS) {
+    const file = `${chunkPrefix}.part${chunkFiles.length}.ogg`
+    chunkFiles.push(file)
+    const args = buildSpeakerTrackArgs(sorted.slice(i, i + MAX_INPUTS_PER_PASS), file)
+    args[args.indexOf('32k')] = '64k'
+    passes.push(args)
+  }
+  passes.push(buildSpeakerTrackArgs(chunkFiles.map((file) => ({ file, startMs: 0 })), outFile))
+  return passes
 }
 
 export function buildMixArgs(trackFiles: string[], outFile: string): string[] {

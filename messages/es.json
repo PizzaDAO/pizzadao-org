@@ -872,6 +872,13 @@
     "noAudio": "No se subió audio para esta llamada.",
     "endReason": "Terminó: {reason}",
     "transcriptHeading": "Transcripción y resumen",
-    "transcriptPending": "La transcripción y el resumen aún no se han generado."
+    "transcriptPending": "La transcripción y el resumen aún no se han generado.",
+    "remove": "Eliminar grabación",
+    "removeConfirm": "¿Eliminar el audio de esta llamada del almacenamiento y marcarla como rechazada? No se puede deshacer.",
+    "removeYes": "Sí, eliminar",
+    "cancel": "Cancelar",
+    "removing": "Eliminando...",
+    "removeError": "No se pudo eliminar la grabación. Inténtalo de nuevo.",
+    "removedNote": "Esta grabación se eliminó; su audio fue borrado."
   }
 }

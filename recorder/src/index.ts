@@ -9,7 +9,7 @@ import { Client, GatewayIntentBits, type GuildScheduledEvent, type PartialGuildS
 import { generateDependencyReport } from '@discordjs/voice'
 import { loadConfig } from './config.js'
 import { EventStatus, pickBootEvent, type EventInfo } from './event-lifecycle.js'
-import { sweepOldSessions } from './finalize.js'
+import { clearAllStarting, sweepOldSessions } from './finalize.js'
 import { NicknameManager } from './nickname.js'
 import { appOptOutFetcher, OptOutCache } from './optouts.js'
 import { CallRecorder } from './recorder.js'
@@ -27,6 +27,12 @@ log(generateDependencyReport())
 const client = new Client({
   intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildScheduledEvents],
 })
+
+// One job at a time: start/stop/switch must not interleave.
+let chain: Promise<unknown> = Promise.resolve()
+function serial(fn: () => Promise<void>) {
+  chain = chain.then(fn).catch((err) => log(`event handling failed: ${err instanceof Error ? err.stack : String(err)}`))
+}
 
 let recorder: CallRecorder
 const optOuts = new OptOutCache(
@@ -48,6 +54,7 @@ recorder = new CallRecorder(
     postIngest: (payload) => postIngestWithRetry(cfg.appBaseUrl, cfg.recorderApiKey, payload),
   },
   log,
+  serial,
 )
 
 function toInfo(ev: GuildScheduledEvent): EventInfo {
@@ -61,19 +68,16 @@ function toInfo(ev: GuildScheduledEvent): EventInfo {
 }
 
 // One event at a time: start/stop/switch must not interleave.
-let chain: Promise<unknown> = Promise.resolve()
-const serial = (fn: () => Promise<void>) => {
-  chain = chain.then(fn).catch((err) => log(`event handling failed: ${err instanceof Error ? err.stack : String(err)}`))
-}
-
-async function onEvent(ev: GuildScheduledEvent | PartialGuildScheduledEvent) {
+// (the chain lives next to the recorder above; stops from ticks and fatal errors use it too)
+async function onEvent(ev: GuildScheduledEvent | PartialGuildScheduledEvent, statusChanged: boolean) {
   const full = ev.partial ? await ev.fetch() : ev
   if (full.guildId !== cfg.guildId) return
-  await recorder.handleEvent(toInfo(full))
+  await recorder.handleEvent(toInfo(full), true, statusChanged)
 }
 
-client.on('guildScheduledEventUpdate', (_old, ev) => serial(() => onEvent(ev)))
-client.on('guildScheduledEventCreate', (ev) => serial(() => onEvent(ev)))
+// Edits of an event that stays ACTIVE must not restart a recording that already finished.
+client.on('guildScheduledEventUpdate', (old, ev) => serial(() => onEvent(ev, old?.status !== ev.status)))
+client.on('guildScheduledEventCreate', (ev) => serial(() => onEvent(ev, true)))
 client.on('voiceStateUpdate', (o, n) => recorder.onVoiceState(o, n))
 client.on('error', (err) => log(`discord client error: ${err.message}`))
 
@@ -87,6 +91,7 @@ client.once('ready', () => {
     // Undo a nickname a crash left behind, finish sessions a crash left behind.
     await new NicknameManager(cfg.dataDir, log).recoverOnBoot(guild)
     sweepOldSessions(cfg.dataDir)
+    clearAllStarting(cfg.dataDir) // nothing is live at boot: finish sessions a crash left "starting"
     recorder.recoverPending()
     recorder.startRetryLoop()
 

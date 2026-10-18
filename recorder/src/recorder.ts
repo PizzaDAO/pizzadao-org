@@ -1,17 +1,20 @@
 /**
- * Orchestrates one recording at a time: join -> nickname + consent notice ->
- * capture -> stop (any stop condition) -> restore nickname -> queue finalize
- * (ffmpeg mix, R2 upload, ingest). Event serialization is the caller's job
- * (index.ts runs handleEvent calls one after another).
+ * Orchestrates one recording at a time:
+ *   join -> nickname -> consent notice -> start capturing -> stop (any stop
+ *   condition) -> restore nickname -> queue finalize (ffmpeg mix, R2 upload, ingest).
+ *
+ * Indicator rule: no audio is subscribed to until the nickname or the notice is
+ * visible; if neither can be shown the session is deleted without capturing.
+ * Event serialization is the caller's job (index.ts passes `serial`).
  */
-import { mkdirSync } from 'node:fs'
+import { mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import type { Client, Guild, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
 import type { Config } from './config.js'
 import { consentNotice, lateJoinReminder } from './consent.js'
-import { decideEventAction, type EventInfo } from './event-lifecycle.js'
-import { finalizeSession, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
+import { decideEventAction, EventStatus, type EventInfo } from './event-lifecycle.js'
+import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
 import { purgeUsersInDir } from './manifest.js'
 import { NicknameManager } from './nickname.js'
 import type { OptOutCache } from './optouts.js'
@@ -34,9 +37,13 @@ interface ActiveSession {
 
 export class CallRecorder {
   private current: ActiveSession | null = null
+  private starting: Promise<void> | null = null
+  private shuttingDown = false
   private queue: Promise<unknown> = Promise.resolve()
   private readonly queued = new Set<string>()
   private readonly botCache = new Map<string, boolean>()
+  /** Events whose recording ended on its own (empty / max duration): later edits must not restart them. */
+  private readonly finished = new Set<string>()
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -48,6 +55,8 @@ export class CallRecorder {
     private readonly nick: NicknameManager,
     private readonly finalizeDeps: FinalizeDeps,
     private readonly log: (msg: string) => void,
+    /** Runs a job on the event chain (index.ts); default runs it right away. */
+    private readonly serial: (fn: () => Promise<void>) => void = (fn) => void fn(),
   ) {}
 
   get currentEventId(): string | null {
@@ -71,13 +80,20 @@ export class CallRecorder {
 
   // ---- events ----------------------------------------------------------
 
-  async handleEvent(info: EventInfo, fresh = true): Promise<void> {
+  /**
+   * `statusChanged` is false for edits of an event that stayed ACTIVE (title,
+   * description...). An event that already finished its recording only starts
+   * again when it goes ACTIVE anew.
+   */
+  async handleEvent(info: EventInfo, fresh = true, statusChanged = true): Promise<void> {
+    if (this.shuttingDown) return
     const action = decideEventAction(
       this.currentEventId,
       info,
       { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() },
       fresh,
     )
+    if (info.status !== EventStatus.Active) this.finished.delete(info.id)
     switch (action.type) {
       case 'ignore':
         return
@@ -85,10 +101,12 @@ export class CallRecorder {
         await this.stop(action.reason)
         return
       case 'switch':
+        if (this.finished.has(action.event.id) && !statusChanged) return
         await this.stop(action.reason)
         await this.start(action.event)
         return
       case 'start':
+        if (this.finished.has(action.event.id) && !statusChanged) return
         await this.start(action.event)
         return
     }
@@ -97,11 +115,20 @@ export class CallRecorder {
   // ---- start / stop ----------------------------------------------------
 
   private async start(event: EventInfo): Promise<void> {
-    if (this.current) return
+    if (this.current || this.starting) return
+    this.starting = this.doStart(event).finally(() => {
+      this.starting = null
+    })
+    await this.starting
+  }
+
+  private async doStart(event: EventInfo): Promise<void> {
     const startedAtMs = Date.now()
     const sessionId = `${event.id}-${startedAtMs}`
     const dir = path.join(this.cfg.dataDir, sessionId)
     mkdirSync(dir, { recursive: true })
+    // Marker first: recovery must not finalize a session that is starting or live.
+    markStarting(dir)
     const meta: SessionMeta = {
       sessionId,
       eventId: event.id,
@@ -114,71 +141,82 @@ export class CallRecorder {
     }
     writeSessionMeta(dir, meta)
 
-    const guild = await this.client.guilds.fetch(this.cfg.guildId)
-    const channel = (await guild.channels.fetch(this.cfg.callChannelId)) as VoiceBasedChannel | null
-    if (!channel?.isVoiceBased()) {
-      this.log(`channel ${this.cfg.callChannelId} is not a voice channel; not recording`)
-      return
+    let capture: VoiceCapture | null = null
+    let nickAcquired = false
+    let guild: Guild | null = null
+    const abort = async (why: string) => {
+      this.log(`not recording ${sessionId}: ${why}`)
+      try {
+        await capture?.stop()
+      } catch {
+        // leaving anyway
+      }
+      if (nickAcquired && guild) await this.nick.release(guild)
+      rmSync(dir, { recursive: true, force: true }) // nothing was captured
     }
-
-    const capture = new VoiceCapture({
-      guild,
-      channelId: channel.id,
-      dir,
-      t0: startedAtMs,
-      isBot: (id) => this.isBot(id),
-      displayName: async (id) => {
-        const member = await guild.members.fetch(id)
-        return member.displayName
-      },
-      isOptedOut: (id) => this.optOuts.has(id),
-      log: (m) => this.log(`[${sessionId}] ${m}`),
-      onFatal: (reason) => void this.stop(reason as StopReason),
-    })
 
     try {
-      await capture.start()
+      guild = await this.client.guilds.fetch(this.cfg.guildId)
+      const channel = (await guild.channels.fetch(this.cfg.callChannelId)) as VoiceBasedChannel | null
+      if (!channel?.isVoiceBased()) return await abort(`channel ${this.cfg.callChannelId} is not a voice channel`)
+      const g = guild
+
+      capture = new VoiceCapture({
+        guild: g,
+        channelId: channel.id,
+        dir,
+        t0: startedAtMs,
+        isBot: (id) => this.isBot(id),
+        displayName: async (id) => (await g.members.fetch(id)).displayName,
+        isOptedOut: (id) => this.optOuts.has(id),
+        log: (m) => this.log(`[${sessionId}] ${m}`),
+        onFatal: (reason) => this.serial(() => this.stop(reason as StopReason)),
+      })
+
+      // 1. join (subscribes to nothing yet)
+      try {
+        await capture.start()
+      } catch (err) {
+        return await abort(`could not join the call channel: ${err instanceof Error ? err.message : String(err)}`)
+      }
+      if (this.shuttingDown) return await abort('shutting down')
+
+      // 2. + 3. the recording indicators. Without at least one, do not record.
+      nickAcquired = await this.nick.acquire(g)
+      const noticeOk = await this.send(channel, consentNotice())
+      if (!nickAcquired && !noticeOk) return await abort('could not show a recording indicator (nickname and notice both failed)')
+      if (this.shuttingDown) return await abort('shutting down')
+
+      // 4. only now start capturing audio
+      const tracker = new StopTracker(startedAtMs, {
+        maxCallMs: this.cfg.maxCallMinutes * 60_000,
+        emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
+      })
+      tracker.observeHumans(await this.humanCount(g), Date.now())
+      capture.beginCapture()
+
+      this.current = {
+        meta,
+        dir,
+        guild: g,
+        capture,
+        tracker,
+        reminded: new Set(),
+        stopping: false,
+        tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
+      }
+      this.finished.delete(event.id)
+      this.log(`recording "${event.name}" as ${sessionId}`)
     } catch (err) {
-      this.log(`could not join the call channel: ${err instanceof Error ? err.message : String(err)}`)
-      await capture.stop()
-      return
+      await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
     }
-
-    // The nickname and the notice are how people learn they are being recorded.
-    // If neither could be shown, do not record.
-    const nickOk = await this.nick.acquire(guild)
-    const noticeOk = await this.send(channel, consentNotice())
-    if (!nickOk && !noticeOk) {
-      this.log('could not show a recording indicator (nickname and notice both failed); leaving without recording')
-      await capture.stop()
-      return
-    }
-
-    const tracker = new StopTracker(startedAtMs, {
-      maxCallMs: this.cfg.maxCallMinutes * 60_000,
-      emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
-    })
-    tracker.observeHumans(await this.humanCount(), Date.now())
-
-    const session: ActiveSession = {
-      meta,
-      dir,
-      guild,
-      capture,
-      tracker,
-      reminded: new Set(),
-      stopping: false,
-      tick: setInterval(() => void this.onTick(), TICK_MS),
-    }
-    this.current = session
-    this.log(`recording "${event.name}" as ${sessionId}`)
   }
 
   private async onTick(): Promise<void> {
     const s = this.current
     if (!s || s.stopping) return
     try {
-      s.tracker.observeHumans(await this.humanCount(), Date.now())
+      s.tracker.observeHumans(await this.humanCount(s.guild), Date.now())
     } catch (err) {
       this.log(`human count failed: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -186,41 +224,70 @@ export class CallRecorder {
     if (reason) await this.stop(reason)
   }
 
+  /** Stop the current recording. Every step is isolated: a failure in one never skips the rest. */
   async stop(reason: StopReason): Promise<void> {
     const s = this.current
     if (!s || s.stopping) return
     s.stopping = true
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
+    if (reason === 'empty' || reason === 'max-duration') {
+      if (s.meta.eventId) this.finished.add(s.meta.eventId)
+    }
 
-    // Latest opt-outs apply to everything captured so far.
-    await this.optOuts.refresh()
-    await s.capture.stop()
-    for (const id of purgeUsersInDir(s.dir, (u) => this.optOuts.has(u))) this.log(`dropped audio of opted-out ${id}`)
-
-    s.meta.endedAtMs = Date.now()
-    s.meta.endReason = reason
-    s.meta.partial = s.capture.degraded
-    writeSessionMeta(s.dir, s.meta)
-    this.current = null
-
-    await this.nick.release(s.guild)
-    this.enqueueFinalize(s.dir)
+    try {
+      // Latest opt-outs apply to everything captured so far (finalize re-checks that they loaded).
+      await this.step('refresh opt-outs', () => this.optOuts.refresh())
+      if (!(await this.step('stop capture', () => s.capture.stop()))) s.capture.degraded = true
+      await this.step('purge opted-out audio', async () => {
+        for (const id of purgeUsersInDir(s.dir, (u) => this.optOuts.has(u))) this.log(`dropped audio of opted-out ${id}`)
+      })
+    } finally {
+      this.current = null
+      await this.step('write session record', async () => {
+        s.meta.endedAtMs = Date.now()
+        s.meta.endReason = reason
+        s.meta.partial = s.capture.degraded
+        writeSessionMeta(s.dir, s.meta)
+        clearStarting(s.dir)
+      })
+      await this.step('restore nickname', () => this.nick.release(s.guild))
+      this.enqueueFinalize(s.dir)
+    }
   }
 
   /** Process shutdown: close the capture and leave the files for the next boot to finish. */
   async shutdown(): Promise<void> {
+    this.shuttingDown = true
+    if (this.starting) await this.starting.catch(() => undefined)
     const s = this.current
     if (!s) return
     s.stopping = true
     clearInterval(s.tick)
-    await s.capture.stop()
-    s.meta.endedAtMs = Date.now()
-    s.meta.endReason = 'shutdown'
-    s.meta.partial = true
-    writeSessionMeta(s.dir, s.meta)
-    this.current = null
-    await this.nick.release(s.guild)
+    try {
+      await this.step('stop capture', () => s.capture.stop())
+    } finally {
+      this.current = null
+      await this.step('write session record', async () => {
+        s.meta.endedAtMs = Date.now()
+        s.meta.endReason = 'shutdown'
+        s.meta.partial = true
+        writeSessionMeta(s.dir, s.meta)
+        clearStarting(s.dir)
+      })
+      await this.step('restore nickname', () => this.nick.release(s.guild))
+    }
+  }
+
+  /** Run one cleanup step; returns whether it succeeded (never throws). */
+  private async step(name: string, fn: () => Promise<unknown>): Promise<boolean> {
+    try {
+      await fn()
+      return true
+    } catch (err) {
+      this.log(`${name} failed: ${err instanceof Error ? err.message : String(err)}`)
+      return false
+    }
   }
 
   // ---- finalize --------------------------------------------------------
@@ -231,7 +298,13 @@ export class CallRecorder {
     this.pendingCount++
     this.queue = this.queue.then(async () => {
       try {
-        await this.optOuts.refresh()
+        // Nothing is uploaded unless the opt-out list loaded just now: otherwise an opted-out
+        // member's audio could reach R2. The session stays pending and is retried.
+        const fresh = await this.optOuts.refresh()
+        if (!fresh || !this.optOuts.isLoaded) {
+          this.log(`opt-out list unavailable; keeping ${path.basename(dir)} pending`)
+          return
+        }
         purgeUsersInDir(dir, (u) => this.optOuts.has(u))
         await finalizeSession(dir, this.finalizeDeps)
       } catch (err) {
@@ -243,7 +316,7 @@ export class CallRecorder {
     })
   }
 
-  /** Finish sessions a crash, restart or outage left behind. */
+  /** Finish sessions a crash, restart or outage left behind (live and starting ones are skipped). */
   recoverPending(): void {
     const active = this.current ? [path.basename(this.current.dir)] : []
     for (const dir of pendingSessions(this.cfg.dataDir, active)) this.enqueueFinalize(dir)
@@ -292,8 +365,7 @@ export class CallRecorder {
     return user.bot
   }
 
-  private async humanCount(): Promise<number> {
-    const guild = this.current?.guild ?? (await this.client.guilds.fetch(this.cfg.guildId))
+  private async humanCount(guild: Guild): Promise<number> {
     const ids = guild.voiceStates.cache.filter((vs) => vs.channelId === this.cfg.callChannelId).map((vs) => vs.id)
     let humans = 0
     for (const id of ids) if (!(await this.isBot(id))) humans++

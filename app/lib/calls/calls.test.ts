@@ -12,7 +12,7 @@ vi.mock('@/app/lib/mission-review-access', () => ({
 }))
 vi.mock('./r2', () => ({
   signedAudioUrl: vi.fn(async (k: string) => `https://r2.example/${k}?sig=1`),
-  deleteAudioObjects: vi.fn(async () => undefined),
+  deleteRecordingPrefix: vi.fn(async () => 0),
   r2Configured: vi.fn(() => true),
   SIGNED_URL_TTL_SEC: 900,
 }))
@@ -21,7 +21,7 @@ import { prisma } from '@/app/lib/db'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { getSession } from '@/app/lib/session'
 import { canReviewMission } from '@/app/lib/mission-review-access'
-import { deleteAudioObjects } from './r2'
+import { deleteRecordingPrefix } from './r2'
 import { parseIngestPayload } from './ingest-schema'
 import { extractEventId, resolveCrewForEvent } from './crew-map'
 import { isRecorderAuthorized } from './recorder-auth'
@@ -30,6 +30,7 @@ import { setRecordingOptOut } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { GET as optoutsGET } from '@/app/api/calls/recorder/optouts/route'
 import { GET as audioGET } from '@/app/api/admin/calls/[id]/audio/route'
+import { POST as removePOST } from '@/app/api/admin/calls/[id]/remove/route'
 import { GET as retentionGET } from '@/app/api/cron/call-audio-retention/route'
 import { handleInteraction, type HandlerDeps } from '@/app/lib/discord-interactions/handle'
 
@@ -299,26 +300,26 @@ describe('audio retention', () => {
     expect(audioPastRetention(new Date('2026-07-19T00:00:00Z'), NOW, 90)).toBe(true)
     expect(audioPastRetention(new Date('2026-08-01T00:00:00Z'), NOW, 90)).toBe(false)
   })
-  it('sweeps expired recordings: deletes R2 objects, then clears the keys', async () => {
+  it('sweeps expired recordings: deletes the whole calls/<sessionId>/ prefix, then clears the keys', async () => {
     db.callRecording.findMany.mockResolvedValue([
-      { id: 'a', mixKey: 'calls/a/mix.m4a', speakers: [{ trackKey: 'calls/a/tracks/1.ogg' }, { trackKey: null }] },
-      { id: 'b', mixKey: null, speakers: [] },
+      { id: 'a', sessionId: 'sess-a' },
+      { id: 'b', sessionId: 'sess-b' },
     ])
-    const deleteObjects = vi.fn(async () => undefined)
-    const r = await sweepExpiredAudio(NOW, { deleteObjects })
+    const deletePrefix = vi.fn(async (_sessionId: string) => 3)
+    const r = await sweepExpiredAudio(NOW, { deletePrefix })
     expect(db.callRecording.findMany.mock.calls[0][0].where).toEqual({
       audioDeletedAt: null,
       endedAt: { lt: new Date('2026-07-20T12:00:00.000Z') },
     })
-    expect(deleteObjects).toHaveBeenCalledWith(['calls/a/mix.m4a', 'calls/a/tracks/1.ogg'])
+    expect(deletePrefix.mock.calls.map((c) => c[0])).toEqual(['sess-a', 'sess-b'])
     expect(db.callRecording.update).toHaveBeenCalledTimes(2)
     expect(db.callRecording.update.mock.calls[0][0].data).toMatchObject({ audioDeletedAt: NOW, mixKey: null })
     expect(r).toMatchObject({ checked: 2, deleted: 2, failed: 0 })
   })
-  it('keeps the keys when the R2 delete fails, so the next run retries', async () => {
-    db.callRecording.findMany.mockResolvedValue([{ id: 'a', mixKey: 'calls/a/mix.m4a', speakers: [] }])
+  it('keeps the row unmarked when the R2 delete fails, so the next run retries', async () => {
+    db.callRecording.findMany.mockResolvedValue([{ id: 'a', sessionId: 'sess-a' }])
     vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const r = await sweepExpiredAudio(NOW, { deleteObjects: vi.fn().mockRejectedValue(new Error('r2 down')) })
+    const r = await sweepExpiredAudio(NOW, { deletePrefix: vi.fn().mockRejectedValue(new Error('r2 down')) })
     expect(db.callRecording.update).not.toHaveBeenCalled()
     expect(r).toMatchObject({ deleted: 0, failed: 1 })
   })
@@ -345,7 +346,7 @@ describe('audio retention', () => {
       )
       expect(res.status).toBe(200)
       expect((await res.json()).status).toBe('finished')
-      expect(deleteAudioObjects).not.toHaveBeenCalled()
+      expect(deleteRecordingPrefix).not.toHaveBeenCalled()
     })
   })
 })

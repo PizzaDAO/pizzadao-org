@@ -6,6 +6,8 @@ import { prisma } from '@/app/lib/db'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { resolveCrewForEvent, type CrewRef } from './crew-map'
 import type { IngestPayload } from './ingest-schema'
+import { deleteRecordingPrefix } from './r2'
+import { markAudioDeleted } from './retention'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -86,6 +88,23 @@ export async function getRecording(id: string) {
     where: { id },
     include: { speakers: { orderBy: { talkTimeSec: 'desc' } } },
   })
+}
+
+/**
+ * Takedown: delete all of a call's audio from R2 (whole prefix), mark the row
+ * REJECTED with the audio deleted. Returns false when the recording is unknown.
+ * R2 is deleted first; if that throws the row is left untouched so it can be retried.
+ */
+export async function removeRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<boolean> {
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, sessionId: true } })
+  if (!rec) return false
+  await deleteRecordingPrefix(rec.sessionId)
+  await markAudioDeleted(rec.id, now)
+  await prisma.callRecording.update({
+    where: { id: rec.id },
+    data: { status: 'REJECTED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: null },
+  })
+  return true
 }
 
 /** Discord ids the worker must never record. */

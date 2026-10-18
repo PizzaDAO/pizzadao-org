@@ -872,6 +872,13 @@
     "noAudio": "Aucun audio n'a été envoyé pour cet appel.",
     "endReason": "Fin : {reason}",
     "transcriptHeading": "Transcription et résumé",
-    "transcriptPending": "La transcription et le résumé ne sont pas encore générés."
+    "transcriptPending": "La transcription et le résumé ne sont pas encore générés.",
+    "remove": "Supprimer l'enregistrement",
+    "removeConfirm": "Supprimer l'audio de cet appel du stockage et le marquer comme rejeté ? Action irréversible.",
+    "removeYes": "Oui, supprimer",
+    "cancel": "Annuler",
+    "removing": "Suppression...",
+    "removeError": "Impossible de supprimer l'enregistrement. Réessayez.",
+    "removedNote": "Cet enregistrement a été supprimé ; son audio est effacé."
   }
 }

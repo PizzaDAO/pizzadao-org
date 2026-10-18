@@ -12,6 +12,7 @@ import { canReviewCalls } from "@/app/lib/calls/access";
 import { getRecording } from "@/app/lib/calls/recordings";
 import { audioPastRetention, retentionDays } from "@/app/lib/calls/retention";
 import { CallAudioPlayer } from "../CallAudioPlayer";
+import { RemoveRecording } from "../RemoveRecording";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -98,6 +99,24 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 </li>
                             ))}
                         </ul>
+                    )}
+                </section>
+
+                <section className="grid gap-2">
+                    {rec.status === "REJECTED" ? (
+                        <p className="text-foreground/60 m-0">{t("removedNote")}</p>
+                    ) : (
+                        <RemoveRecording
+                            recordingId={rec.id}
+                            labels={{
+                                remove: t("remove"),
+                                confirm: t("removeConfirm"),
+                                confirmYes: t("removeYes"),
+                                cancel: t("cancel"),
+                                working: t("removing"),
+                                error: t("removeError"),
+                            }}
+                        />
                     )}
                 </section>
 

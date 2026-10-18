@@ -67,7 +67,7 @@ describe('mix-plan', () => {
 
   it('refuses empty and oversized plans', () => {
     expect(() => buildSpeakerTrackArgs([], '/o.ogg')).toThrow()
-    expect(() => buildSpeakerTrackArgs(Array.from({ length: 2501 }, (_, i) => ({ file: `/${i}.ogg`, startMs: i })), '/o.ogg')).toThrow()
+    expect(() => buildSpeakerTrackArgs(Array.from({ length: 20001 }, (_, i) => ({ file: `/${i}.ogg`, startMs: i })), '/o.ogg')).toThrow()
     expect(() => buildMixArgs([], '/m.m4a')).toThrow()
   })
 
@@ -192,9 +192,11 @@ describe('finalizeSession', () => {
   }
   const deps = (over: Record<string, unknown> = {}) => {
     const puts: string[] = []
+    const deleted: string[] = []
     const posted: IngestPayload[] = []
     return {
       puts,
+      deleted,
       posted,
       deps: {
         appBaseUrl: 'https://app',
@@ -206,6 +208,10 @@ describe('finalizeSession', () => {
           put: async (key: string) => {
             puts.push(key)
             return 5
+          },
+          deletePrefix: async (prefix: string) => {
+            deleted.push(prefix)
+            return 0
           },
         },
         postIngest: async (p: IngestPayload) => {

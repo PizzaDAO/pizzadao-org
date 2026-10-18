@@ -22,7 +22,7 @@ import { generateDependencyReport } from '@discordjs/voice'
 import { VoiceCapture } from './capture.js'
 import { loadSpikeConfig } from './config.js'
 import { readManifest, summarize } from './manifest.js'
-import { buildSpeakerTrackArgs } from './mix-plan.js'
+import { buildSpeakerTrack } from './finalize.js'
 
 const run = promisify(execFile)
 
@@ -71,6 +71,7 @@ const capture = new VoiceCapture({
 })
 
 await capture.start()
+capture.beginCapture()
 log(`recording ${channelId} for ${minutes} minute(s) into ${dir}`)
 const deadline = t0 + minutes * 60_000
 while (Date.now() < deadline && !fatal) await new Promise((r) => setTimeout(r, 1000))
@@ -82,7 +83,11 @@ for (const sp of speakers) {
   const st = capture.stats.get(sp.userId)
   const track = path.join(dir, `${sp.userId}.ogg`)
   try {
-    await run('ffmpeg', buildSpeakerTrackArgs(sp.segments.map((s) => ({ file: path.join(dir, s.file), startMs: s.startMs })), track))
+    await buildSpeakerTrack(
+      async (args) => void (await run('ffmpeg', args)),
+      sp.segments.map((s) => ({ file: path.join(dir, s.file), startMs: s.startMs })),
+      track,
+    )
   } catch (err) {
     console.log(`  (ffmpeg failed for ${sp.userId}: ${err instanceof Error ? err.message : String(err)})`)
   }

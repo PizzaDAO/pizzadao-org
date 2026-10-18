@@ -872,6 +872,13 @@
     "noAudio": "No audio was uploaded for this call.",
     "endReason": "Ended: {reason}",
     "transcriptHeading": "Transcript and summary",
-    "transcriptPending": "Transcript and summary are not generated yet."
+    "transcriptPending": "Transcript and summary are not generated yet.",
+    "remove": "Remove recording",
+    "removeConfirm": "Delete this call's audio from storage and mark it rejected? This cannot be undone.",
+    "removeYes": "Yes, delete",
+    "cancel": "Cancel",
+    "removing": "Deleting...",
+    "removeError": "Could not remove the recording. Try again.",
+    "removedNote": "This recording was removed; its audio is deleted."
   }
 }

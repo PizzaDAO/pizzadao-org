@@ -12,7 +12,7 @@ import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, wri
 import path from 'node:path'
 import { promisify } from 'node:util'
 import { readManifest, summarize, appendRecord, MANIFEST_FILE } from './manifest.js'
-import { buildMixArgs, buildSpeakerTrackArgs } from './mix-plan.js'
+import { buildMixArgs, buildSpeakerTrackPlan, type PlanSegment } from './mix-plan.js'
 import { postIngestWithRetry, type IngestResult } from './ingest.js'
 import { sessionKeys, type Uploader } from './storage.js'
 import type { IngestPayload, IngestSpeaker, SessionMeta } from './types.js'
@@ -81,6 +81,25 @@ async function defaultFfmpeg(args: string[]): Promise<void> {
   await run('ffmpeg', args, { maxBuffer: 10 * 1024 * 1024 })
 }
 
+/** One speaker's aligned track, built in chunks of at most 200 inputs per ffmpeg pass. */
+export async function buildSpeakerTrack(
+  ffmpeg: (args: string[]) => Promise<void>,
+  segments: PlanSegment[],
+  outFile: string,
+): Promise<void> {
+  for (const pass of buildSpeakerTrackPlan(segments, outFile, outFile.replace(/\.ogg$/, ''))) await ffmpeg(pass)
+}
+
+/** Marker: a session is being started/recorded right now, so recovery must not touch it. */
+export const STARTING = 'starting'
+export const markStarting = (dir: string) => writeFileSync(path.join(dir, STARTING), String(Date.now()))
+export const clearStarting = (dir: string) => rmSync(path.join(dir, STARTING), { force: true })
+/** On boot nothing is live: drop markers a crash left behind so those sessions get finalized. */
+export function clearAllStarting(dataDir: string): void {
+  if (!existsSync(dataDir)) return
+  for (const e of readdirSync(dataDir, { withFileTypes: true })) if (e.isDirectory()) clearStarting(path.join(dataDir, e.name))
+}
+
 export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<'uploaded' | 'rejected' | 'pending' | 'empty'> {
   const meta = readSessionMeta(dir)
   if (!meta) throw new Error(`no session.json in ${dir}`)
@@ -97,7 +116,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
   for (const sp of speakers) {
     const file = path.join(outDir, `${sp.userId}.ogg`)
     try {
-      await ffmpeg(buildSpeakerTrackArgs(sp.segments.map((s) => ({ file: path.join(dir, s.file), startMs: s.startMs })), file))
+      await buildSpeakerTrack(ffmpeg, sp.segments.map((s) => ({ file: path.join(dir, s.file), startMs: s.startMs })), file)
       trackFiles.push({ userId: sp.userId, file })
     } catch (err) {
       partial = true
@@ -118,6 +137,9 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
 
   // Upload. A failure leaves the directory for the next recovery pass.
   try {
+    // Remove anything an earlier attempt uploaded (a speaker since purged for opting out,
+    // a track that no longer exists), so only this attempt's files remain.
+    await deps.uploader.deletePrefix(keys.prefix)
     if (existsSync(mixFile)) {
       const bytes = await deps.uploader.put(keys.mix, mixFile, 'audio/mp4')
       mix = { key: keys.mix, bytes }
@@ -166,6 +188,12 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       return 'uploaded'
     }
     if (!res.retryable) {
+      // The app will never accept this payload: do not leave its audio orphaned in R2.
+      try {
+        await deps.uploader.deletePrefix(keys.prefix)
+      } catch (err) {
+        deps.log(`could not delete R2 objects of rejected session ${meta.sessionId}: ${err instanceof Error ? err.message : String(err)}`)
+      }
       writeFileSync(path.join(dir, REJECTED), res.error)
       deps.log(`app rejected session ${meta.sessionId}: ${res.error}`)
       return 'rejected'
@@ -190,7 +218,7 @@ export function pendingSessions(dataDir: string, exclude: string[] = []): string
   return readdirSync(dataDir, { withFileTypes: true })
     .filter((e) => e.isDirectory() && !exclude.includes(e.name))
     .map((e) => path.join(dataDir, e.name))
-    .filter((d) => existsSync(path.join(d, SESSION_FILE)) && !existsSync(path.join(d, UPLOADED)) && !existsSync(path.join(d, REJECTED)))
+    .filter((d) => existsSync(path.join(d, SESSION_FILE)) && !existsSync(path.join(d, UPLOADED)) && !existsSync(path.join(d, REJECTED)) && !existsSync(path.join(d, STARTING)))
     .sort()
 }
 
