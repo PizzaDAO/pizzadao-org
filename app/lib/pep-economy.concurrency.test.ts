@@ -43,7 +43,16 @@ const isLocal = (() => {
   }
 })()
 
+// Crew-lead permissions (jalapeno-82565 v2): the real check reads a Google Sheet, so
+// the suite drives it with a set of "leads" (any crew). Poster-or-lead, as in prod.
+const crewLeads = vi.hoisted(() => ({ leads: new Set<string>() }))
+vi.mock('./crew-leads', () => ({
+  canManageBounty: async (id: string, b: { createdBy: string; crewId?: string | null }) =>
+    b.createdBy === id || (!!b.crewId && crewLeads.leads.has(id)),
+}))
 vi.mock('./notifications', () => ({
+  notifyBountySubmitted: vi.fn().mockResolvedValue(undefined),
+  notifyBountyRejected: vi.fn().mockResolvedValue(undefined),
   createNotification: vi.fn().mockResolvedValue(undefined),
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
   notifyBountyCompleted: vi.fn().mockResolvedValue(undefined),
@@ -250,6 +259,107 @@ describe.skipIf(!isLocal)('$PEP economy under concurrency (real Postgres)', () =
     expect((await wallet(creator)) + (await wallet(claimer))).toBe(50)
     await expectLedgerConsistent(creator)
     await expectLedgerConsistent(claimer)
+  }, 60_000)
+
+  // ---- Crew bounties v2 (jalapeno-82565): crew-run submit -> review -> pay ----
+  async function submittedCrewBounty(reward = 50) {
+    const poster = await seedUser(reward)
+    const claimer = await seedUser(0)
+    const lead = await seedUser(0)
+    crewLeads.leads.add(lead)
+    const bounty = await L.bounties.createBounty(poster, 'it crew bounty', reward, undefined, 'ops')
+    await L.bounties.claimBounty(claimer, bounty.id)
+    await L.bounties.submitBounty(claimer, bounty.id, 'done', 'https://example.com/proof')
+    return { poster, claimer, lead, bounty }
+  }
+
+  it(`${N} parallel approvals by the poster and a lead pay the claimer once`, async () => {
+    const { poster, claimer, lead, bounty } = await submittedCrewBounty()
+    const res = await Promise.allSettled(
+      Array.from({ length: N }, (_, i) => L.bounties.completeBounty(i % 2 ? lead : poster, bounty.id)),
+    )
+    await settle()
+    expect(outcomes(res).ok).toBe(1)
+    expect(await wallet(claimer)).toBe(50)
+    expect(await wallet(lead)).toBe(0)
+    const rewards = (await ledger(claimer)).filter((r: any) => r.type === 'BOUNTY_REWARD')
+    expect(rewards).toHaveLength(1)
+    await expectLedgerConsistent(claimer)
+    await expectLedgerConsistent(poster)
+  }, 60_000)
+
+  it('the claimer can never approve their own bounty, even racing the real approvers', async () => {
+    const { poster, claimer, lead, bounty } = await submittedCrewBounty()
+    crewLeads.leads.add(claimer) // claimer is also a "lead": still forbidden
+    try {
+      const res = await Promise.allSettled([
+        ...Array.from({ length: N }, () => L.bounties.completeBounty(claimer, bounty.id)),
+        L.bounties.completeBounty(lead, bounty.id),
+      ])
+      await settle()
+      // Exactly the lead's approval can have paid, never the claimer's.
+      expect(res.slice(0, N).every((r) => r.status === 'rejected')).toBe(true)
+      expect(res[N].status).toBe('fulfilled')
+      const row = await L.prisma.bounty.findUniqueOrThrow({ where: { id: bounty.id } })
+      expect(row.reviewedBy).toBe(lead)
+      expect(await wallet(claimer)).toBe(50)
+      await expectLedgerConsistent(claimer)
+      await expectLedgerConsistent(poster)
+    } finally {
+      crewLeads.leads.delete(claimer)
+    }
+  }, 60_000)
+
+  it('approve racing reject: one outcome wins, at most one payout', async () => {
+    const { poster, claimer, lead, bounty } = await submittedCrewBounty()
+    await Promise.allSettled(
+      Array.from({ length: N }, (_, i) =>
+        i % 2 ? L.bounties.completeBounty(lead, bounty.id) : L.bounties.rejectBounty(poster, bounty.id, 'try again'),
+      ),
+    )
+    await settle()
+    const row = await L.prisma.bounty.findUniqueOrThrow({ where: { id: bounty.id } })
+    const rewards = (await ledger(claimer)).filter((r: any) => r.type === 'BOUNTY_REWARD')
+    if (row.status === 'COMPLETED') {
+      expect(rewards).toHaveLength(1)
+      expect(await wallet(claimer)).toBe(50)
+    } else {
+      // Rejected (back to CLAIMED, escrow still held) and never paid.
+      expect(row.status).toBe('CLAIMED')
+      expect(rewards).toHaveLength(0)
+      expect(await wallet(claimer)).toBe(0)
+    }
+    await expectLedgerConsistent(claimer)
+    await expectLedgerConsistent(poster)
+  }, 60_000)
+
+  it('approve racing cancel (from SUBMITTED) releases the escrow exactly once; refunds go to the poster', async () => {
+    const { poster, claimer, lead, bounty } = await submittedCrewBounty()
+    await Promise.allSettled(
+      Array.from({ length: N }, (_, i) =>
+        i % 2 ? L.bounties.completeBounty(poster, bounty.id) : L.bounties.cancelBounty(lead, bounty.id),
+      ),
+    )
+    await settle()
+    expect((await wallet(poster)) + (await wallet(claimer))).toBe(50)
+    expect(await wallet(lead)).toBe(0) // a cancelling lead is never refunded
+    const paid = (await ledger(claimer)).filter((r: any) => r.type === 'BOUNTY_REWARD').length
+    const refunded = (await ledger(poster)).filter((r: any) => r.type === 'BOUNTY_REFUND').length
+    expect(paid + refunded).toBe(1)
+    await expectLedgerConsistent(claimer)
+    await expectLedgerConsistent(poster)
+    await expectLedgerConsistent(lead)
+  }, 60_000)
+
+  it(`${N} parallel cancels by poster and lead refund the poster once`, async () => {
+    const { poster, lead, bounty } = await submittedCrewBounty()
+    await Promise.allSettled(
+      Array.from({ length: N }, (_, i) => L.bounties.cancelBounty(i % 2 ? lead : poster, bounty.id)),
+    )
+    await settle()
+    expect(await wallet(poster)).toBe(50)
+    expect(await wallet(lead)).toBe(0)
+    await expectLedgerConsistent(poster)
   }, 60_000)
 
   it(`${N} parallel claims leave exactly one claimer`, async () => {

@@ -4,8 +4,11 @@ import React, { useState, type CSSProperties } from "react";
 import { formatPep } from "../economy/PepIcon";
 import { UserLink } from "../UserLink";
 import { BountyComments } from "./BountyComments";
-import { card as cardBase, btn, badge } from "../shared-styles";
+import { useTranslations } from "next-intl";
+import { card as cardBase, btn, badge, input } from "../shared-styles";
 import { DiscordText } from "../shared/DiscordText";
+
+type BountyStatus = "OPEN" | "CLAIMED" | "SUBMITTED";
 
 type Bounty = {
   id: number;
@@ -14,7 +17,10 @@ type Bounty = {
   reward: number;
   createdBy: string;
   claimedBy: string | null;
-  status: "OPEN" | "CLAIMED";
+  status: BountyStatus;
+  submissionNote?: string | null;
+  submissionLink?: string | null;
+  reviewNote?: string | null;
   commentCount?: number;
   crewId?: string | null;
   crewLabel?: string | null;
@@ -30,9 +36,9 @@ type BountyCardProps = {
   guildId?: string | null;
 };
 
-function cardStyle(status: "OPEN" | "CLAIMED"): CSSProperties {
+function cardStyle(status: BountyStatus): CSSProperties {
   const base = cardBase();
-  if (status === "CLAIMED") {
+  if (status === "CLAIMED" || status === "SUBMITTED") {
     return {
       ...base,
       padding: 18,
@@ -49,9 +55,9 @@ function cardStyle(status: "OPEN" | "CLAIMED"): CSSProperties {
 //   in-progress (CLAIMED) = butter
 //   closed = muted
 //   expired = tomato
-function statusBadge(status: "OPEN" | "CLAIMED"): CSSProperties {
+function statusBadge(status: BountyStatus): CSSProperties {
   const base = badge("default");
-  if (status === "CLAIMED") {
+  if (status === "CLAIMED" || status === "SUBMITTED") {
     return {
       ...base,
       background: "hsl(var(--butter) / 0.20)",
@@ -71,22 +77,29 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showComments, setShowComments] = useState(false);
+  const t = useTranslations("bounties");
+  const [formKind, setFormKind] = useState<"submit" | "reject" | null>(null);
+  const [note, setNote] = useState("");
+  const [proof, setProof] = useState("");
 
   const isCreator = bounty.createdBy === currentUserId;
   const isClaimer = bounty.claimedBy === currentUserId;
   const canComment = isCreator || isClaimer;
 
-  const post = async (path: string) => {
+  const post = async (path: string, extra?: Record<string, unknown>) => {
     setLoading(true);
     setError(null);
     try {
       const res = await fetch(path, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ bountyId: bounty.id }),
+        body: JSON.stringify({ bountyId: bounty.id, ...extra }),
       });
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
+      setFormKind(null);
+      setNote("");
+      setProof("");
       onAction?.();
     } catch (err) {
       setError(err instanceof Error ? err.message : "Action failed");
@@ -110,7 +123,7 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
             }}
           >
             <span style={statusBadge(bounty.status)}>
-              {bounty.status === "CLAIMED" ? "In Progress" : "Open"}
+              {bounty.status === "SUBMITTED" ? t("awaitingReview") : bounty.status === "CLAIMED" ? "In Progress" : "Open"}
             </span>
             <span style={{ fontSize: 11, color: "hsl(var(--muted-foreground))" }}>
               #{bounty.id}
@@ -179,7 +192,7 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
           >
             Posted by <UserLink discordId={bounty.createdBy} />
           </div>
-          {bounty.status === "CLAIMED" && bounty.claimedBy && (
+          {(bounty.status === "CLAIMED" || bounty.status === "SUBMITTED") && bounty.claimedBy && (
             <div
               style={{
                 marginTop: 8,
@@ -204,6 +217,99 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
                 </span>
               )}
             </div>
+          )}
+          {bounty.status === "SUBMITTED" && (bounty.submissionNote || bounty.submissionLink) && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: "6px 10px",
+                background: "hsl(var(--butter) / 0.15)",
+                border: "1px solid hsl(var(--butter) / 0.40)",
+                borderRadius: "var(--radius)",
+                fontSize: 12,
+                display: "grid",
+                gap: 4,
+              }}
+            >
+              <strong>{t("submission")}</strong>
+              {bounty.submissionNote && (
+                <span style={{ whiteSpace: "pre-wrap", overflowWrap: "anywhere" }}>{bounty.submissionNote}</span>
+              )}
+              {bounty.submissionLink && /^https:\/\//i.test(bounty.submissionLink) && (
+                <a
+                  href={bounty.submissionLink}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ color: "hsl(var(--tomato))", wordBreak: "break-all" }}
+                >
+                  {t("viewProof")}
+                </a>
+              )}
+            </div>
+          )}
+          {bounty.status === "CLAIMED" && bounty.reviewNote && (
+            <div
+              style={{
+                marginTop: 8,
+                padding: 8,
+                background: "hsl(var(--tomato) / 0.06)",
+                border: "1px solid hsl(var(--tomato) / 0.30)",
+                borderRadius: "var(--radius)",
+                color: "hsl(var(--tomato))",
+                fontSize: 12,
+                overflowWrap: "anywhere",
+              }}
+            >
+              {t("sentBack", { note: bounty.reviewNote })}
+            </div>
+          )}
+          {formKind && (
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                if (!note.trim()) return;
+                if (formKind === "submit") {
+                  void post("/api/bounties/submit", { note, ...(proof.trim() ? { link: proof.trim() } : {}) });
+                } else {
+                  void post("/api/bounties/reject", { note });
+                }
+              }}
+              style={{ marginTop: 8, display: "grid", gap: 8 }}
+            >
+              <textarea
+                required
+                maxLength={2000}
+                value={note}
+                onChange={(e) => setNote(e.target.value)}
+                placeholder={formKind === "submit" ? t("submitNotePlaceholder") : t("rejectNotePlaceholder")}
+                style={{ ...input(), minHeight: 64, resize: "vertical" }}
+              />
+              {formKind === "submit" && (
+                <input
+                  type="url"
+                  value={proof}
+                  onChange={(e) => setProof(e.target.value)}
+                  placeholder={t("submitLinkPlaceholder")}
+                  style={input()}
+                />
+              )}
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="submit"
+                  disabled={loading || !note.trim()}
+                  style={{ ...btn("accent", loading || !note.trim()), padding: "6px 14px", fontSize: 13 }}
+                >
+                  {loading ? "..." : formKind === "submit" ? t("send") : t("rejectSend")}
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setFormKind(null)}
+                  style={{ ...btn("secondary", false), padding: "6px 14px", fontSize: 13 }}
+                >
+                  {t("close")}
+                </button>
+              </div>
+            </form>
           )}
           {error && (
             <div
@@ -281,6 +387,24 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
 
           {bounty.status === "CLAIMED" && isClaimer && (
             <button
+              onClick={() => {
+                setFormKind("submit");
+                setNote("");
+                setProof("");
+              }}
+              disabled={loading}
+              style={{
+                ...btn("accent", loading),
+                padding: "6px 14px",
+                fontSize: 13,
+              }}
+            >
+              {t("submitWork")}
+            </button>
+          )}
+
+          {(bounty.status === "CLAIMED" || bounty.status === "SUBMITTED") && isClaimer && (
+            <button
               onClick={() => post("/api/bounties/giveup")}
               disabled={loading}
               style={{
@@ -293,7 +417,7 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
             </button>
           )}
 
-          {bounty.status === "CLAIMED" && isCreator && (
+          {(bounty.status === "CLAIMED" || bounty.status === "SUBMITTED") && isCreator && (
             <div style={{ display: "flex", flexDirection: "column", gap: 6 }}>
               <button
                 onClick={() => post("/api/bounties/complete")}
@@ -306,6 +430,22 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
               >
                 {loading ? "..." : "Approve"}
               </button>
+              {bounty.status === "SUBMITTED" && (
+                <button
+                  onClick={() => {
+                    setFormKind("reject");
+                    setNote("");
+                  }}
+                  disabled={loading}
+                  style={{
+                    ...btn("secondary", loading),
+                    padding: "4px 12px",
+                    fontSize: 11,
+                  }}
+                >
+                  {t("reject")}
+                </button>
+              )}
               <button
                 onClick={() => post("/api/bounties/cancel")}
                 disabled={loading}

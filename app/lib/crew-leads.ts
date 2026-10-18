@@ -8,7 +8,6 @@ import { normalizeCrewId } from './crew-id'
 import { CREW_SHEET_REVALIDATE_SECONDS, fetchCrewRoster } from './crew-sheet'
 import { isLeadStatus } from './crew-lead-status'
 import { findMemberIdByDiscordId } from './member-utils'
-import { isAdminDiscordId } from './auth-guards'
 
 export { isLeadStatus }
 
@@ -39,6 +38,9 @@ export async function isCrewLead(discordId: string, crewId: string | null | unde
 export async function canManageCrew(discordId: string, crewId: string | null | undefined): Promise<boolean> {
   if (await isCrewLead(discordId, crewId)) return true
   try {
+    // Lazy: auth-guards pulls in the session module (needs SESSION_SECRET at import
+    // time), which notifications / bounties callers shouldn't pay for or trip over.
+    const { isAdminDiscordId } = await import('./auth-guards')
     return await isAdminDiscordId(discordId)
   } catch {
     return false
