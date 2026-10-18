@@ -620,6 +620,14 @@
       "description": "Puedes participar sin conectar una cartera ni X. Añádelas para mostrar coleccionables o usar sus funciones.",
       "wallet": "Gestionar carteras",
       "x": "Conectar X"
+    },
+    "boxMafia": {
+      "overline": "§ · box mafia",
+      "headline": "Únete a la Box Mafia",
+      "body": "Ten una Rare Pizzas Box para obtener el rol Box Mafia en Discord, y además {amount} PEP al día con /collect-income.",
+      "cta": "Consigue una caja",
+      "notNow": "Ahora no",
+      "ariaLabel": "Sugerencia de Box Mafia"
     }
   },
   "crewsPage": {

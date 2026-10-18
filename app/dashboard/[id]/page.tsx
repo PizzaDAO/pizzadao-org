@@ -40,6 +40,7 @@ import {
 import { HeroBlock } from "./components/HeroBlock";
 import { YourCrews, type CrewOption } from "./components/YourCrews";
 import { NextActionPanel } from "./components/NextActionPanel";
+import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
 import { RecentActivity } from "./components/RecentActivity";
 import { Discover } from "./components/Discover";
 import { ProfileCompleteCelebrationGate } from "./components/ProfileCompleteCelebrationGate";
@@ -266,6 +267,9 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     {summary?.nextAction && (
                         <NextActionPanel nextAction={summary.nextAction} />
                     )}
+
+                    {/* ── 1.6. Box Mafia suggestion (woodfired-65373) ── */}
+                    <BoxMafiaSuggestion boxMafia={summary?.boxMafia} />
 
                     {/* ── 2. Discover ── */}
                     <Discover
