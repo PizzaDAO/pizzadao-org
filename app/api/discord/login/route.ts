@@ -7,6 +7,10 @@ import {
   generateOAuthNonce,
   oauthStateCookieOptions,
   OAUTH_STATE_COOKIE,
+  OAUTH_PENDING_COOKIE,
+  readCookie,
+  verifyPendingLogin,
+  verifyOAuthNonce,
 } from "@/app/lib/oauth-proxy";
 
 export const runtime = "nodejs";
@@ -46,7 +50,13 @@ export async function GET(req: Request) {
     return NextResponse.redirect(canonical.toString());
   }
 
-  const nonce = generateOAuthNonce();
+  // The callback mints the join-step nonce itself and binds oauth_pending to
+  // it. Reuse it only if the signed pending cookie carries that same nonce;
+  // otherwise this is an unrelated login start: fresh nonce, no pending login.
+  const offered = url.searchParams.get("nonce") || undefined;
+  const pending = join && offered ? verifyPendingLogin(readCookie(req, OAUTH_PENDING_COOKIE)) : null;
+  const reuse = !!pending && verifyOAuthNonce(pending.nonce, offered);
+  const nonce = reuse ? offered! : generateOAuthNonce();
 
   const auth = new URL("https://discord.com/api/oauth2/authorize");
   auth.searchParams.set("client_id", clientId);
@@ -63,5 +73,8 @@ export async function GET(req: Request) {
 
   const res = NextResponse.redirect(auth.toString());
   res.cookies.set(OAUTH_STATE_COOKIE, nonce, oauthStateCookieOptions(req));
+  if (!reuse) {
+    res.cookies.set(OAUTH_PENDING_COOKIE, "", { ...oauthStateCookieOptions(req), maxAge: 0 });
+  }
   return res;
 }

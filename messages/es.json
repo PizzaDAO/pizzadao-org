@@ -89,6 +89,8 @@
       },
       "displayNameLabel": "Tu nombre público",
       "displayNamePlaceholder": "Tu nombre o apodo",
+      "displayNamePreview": "Se guardará como: <b>{name}</b>",
+      "displayNameEmpty": "Usa al menos una letra o un número",
       "useDisplayName": "Usar este nombre",
       "orGenerateName": "O crea un nombre inspirado en la pizza"
     },
