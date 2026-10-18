@@ -22,7 +22,6 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | mozzarella-67760 | Add Language Preference to the dashboard | todo | P2 |  |  |  |  |  |  |
 | bellpepper-80127 | Idea para dashboard: carpeta para subir memes de pizzadao y bennys xD | todo | P2 |  |  |  |  |  |  |
 | pineapple-84122 | Auto-Invite member to event or one is near their city | todo | P2 |  |  |  | plans/pineapple-84122-nearby-event-invites.md |  |  |
-| napoletana-52080 | pizza noob role logic | todo | P3 |  |  |  |  |  |  |
 | pineapple-71302 | add a email claiming system for memebes to claim a unique pizzadao emails | todo | P3 |  |  |  | plans/pineapple-71302-pizzadao-emails.md |  | 2026-10-17: on hold, not yet (Snax) |
 | buffalo-96244 | Support ticket function | todo | P3 |  |  |  |  |  |  |
 
@@ -30,6 +29,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 |----|------|----------|------|----|-------|
+| napoletana-52080 | pizza noob role logic | P3 | 2026-10-18 |  | Covered by anchovy-52918 (Pizza Noob role for trainees; removed on Level 2 completion) |
 | olive-40696 | add region role setting to onboarding flow | P1 |  |  |  |
 | diavola-24729 | Fix pep jobs so they don't have ugly discord names etc | P2 |  |  |  |
 | pizzaiolo-47022 | prompt the signing up user to join their nearest city's telegram group | P2 |  |  |  |
