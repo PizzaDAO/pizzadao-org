@@ -9,6 +9,10 @@ import {
   verifyOAuthNonce,
   OAUTH_STATE_COOKIE,
   oauthStateCookieOptions,
+  OAUTH_PENDING_COOKIE,
+  createPendingLogin,
+  generateOAuthNonce,
+  verifyPendingLogin,
 } from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
 import { claimPendingPepOnLogin } from "@/app/lib/unbelievaboat/claims";
@@ -100,21 +104,128 @@ async function checkExistingMember(discordId: string): Promise<{ memberId?: stri
   }
 }
 
-/** The oauth_state nonce is single-use: expire it once the callback consumes it. */
+/** The oauth_state nonce is single-use (as is oauth_pending): expire both once consumed. */
 function clearOAuthState(req: Request, res: NextResponse): NextResponse {
   res.cookies.set(OAUTH_STATE_COOKIE, "", { ...oauthStateCookieOptions(req), maxAge: 0 });
+  res.cookies.set(OAUTH_PENDING_COOKIE, "", { ...oauthStateCookieOptions(req), maxAge: 0 });
   return res;
 }
 
+/** Issue the login (proxy transfer token or session cookie) and redirect. */
+async function finishLogin(
+  req: Request,
+  url: URL,
+  opts: {
+    me: { id: string; username: string };
+    nick: string;
+    joined: boolean;
+    state: string;
+    return_to?: string;
+  },
+) {
+  const { me, nick, joined, state, return_to } = opts;
+  // If this is a proxy flow (return_to exists), create transfer token
+  // and redirect back to the preview
+  if (return_to && validateReturnTo(return_to)) {
+    const transferToken = createTransferToken({
+      discordId: me.id,
+      username: me.username,
+      nick: nick,
+      origin: return_to,
+    });
+
+    const transferUrl = new URL("/api/auth/session-transfer", return_to);
+    transferUrl.searchParams.set("token", transferToken);
+    return clearOAuthState(req, NextResponse.redirect(transferUrl.toString()));
+  }
+
+  // Create session token
+  const sessionToken = createSessionToken({
+    discordId: me.id,
+    username: me.username,
+    nick: nick,
+    createdAt: Date.now(),
+  });
+
+  // Check if user already has a member record
+  const existingMember = await checkExistingMember(me.id);
+
+  // Fire-and-forget: sync Discord roles to the sheet on every login.
+  // This is intentionally not awaited so it never blocks the redirect.
+  syncRolesOnLogin(me.id, existingMember?.name ?? nick).catch(() => {}); // extra safety net
+
+  // Fire-and-forget: credit any UnbelievaBoat balance held for this Discord ID
+  // (plans/unbelievaboat-replacement.md). No-op unless PEP_MIGRATION_CLAIMS=1;
+  // never throws, and idempotent, so a cut-off run simply retries next login.
+  claimPendingPepOnLogin(me.id).catch(() => {});
+
+  // Fire-and-forget: credit UnbelievaBoat item holdings that were held
+  // (ItemGrant PENDING) because this member had no app account when
+  // grant-items.mjs ran. On unless ITEM_GRANT_CLAIMS=0; never throws;
+  // exactly-once per grant, so a cut-off run retries next login.
+  creditPendingItemGrantsOnLogin(me.id).catch(() => {});
+
+  // Build redirect URL
+  let redirectUrl: URL;
+  if (existingMember?.memberId) {
+    // Existing member - go directly to dashboard
+    redirectUrl = new URL(`/dashboard/${existingMember.memberId}`, url.origin);
+  } else {
+    // New user - go to home page with params
+    redirectUrl = new URL("/", url.origin);
+    redirectUrl.searchParams.set("discordId", me.id);
+    if (state) redirectUrl.searchParams.set("sessionId", state);
+    redirectUrl.searchParams.set("discordJoined", joined ? "1" : "0");
+    if (nick) redirectUrl.searchParams.set("discordNick", nick);
+  }
+
+  // Create response and set session cookie
+  const res = NextResponse.redirect(redirectUrl.toString());
+  const cookieOpts = getSessionCookieOptions(req);
+  res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
+
+  return clearOAuthState(req, res);
+}
+
+/** oauth_pending is cleared on every exit except the redirect that sets it. */
 export async function GET(req: Request) {
+  const res = await handleCallback(req);
+  if (!res.cookies.get(OAUTH_PENDING_COOKIE)?.value) {
+    res.cookies.set(OAUTH_PENDING_COOKIE, "", { ...oauthStateCookieOptions(req), maxAge: 0 });
+  }
+  return res;
+}
+
+async function handleCallback(req: Request): Promise<NextResponse> {
   try {
     const url = new URL(req.url);
     const rawState = url.searchParams.get("state") || "";
-    const { return_to, join: isJoinStep } = decodeOAuthState(rawState);
+    const { return_to, join: isJoinStep, nonce: stateNonce, sessionId: stateSessionId } =
+      decodeOAuthState(rawState);
 
     // Handle OAuth errors (e.g. user clicked "Cancel" on Discord authorization screen)
     const oauthError = url.searchParams.get("error");
     if (oauthError) {
+      // Cancelling the guilds.join screen: the first step already proved who
+      // they are, so log them in as not joined. Only honored when this
+      // browser's oauth_state nonce matches (same CSRF check as the code path).
+      if (
+        oauthError === "access_denied" &&
+        isJoinStep &&
+        verifyOAuthNonce(readCookie(req, OAUTH_STATE_COOKIE), stateNonce)
+      ) {
+        const pending = verifyPendingLogin(readCookie(req, OAUTH_PENDING_COOKIE));
+        // The pending login must be bound to this very join attempt.
+        if (pending && verifyOAuthNonce(pending.nonce, stateNonce)) {
+          return finishLogin(req, url, {
+            me: { id: pending.discordId, username: pending.username },
+            nick: pending.nick,
+            joined: false,
+            state: stateSessionId,
+            return_to,
+          });
+        }
+      }
       // If this was a proxy flow, redirect back to the preview origin
       if (return_to && validateReturnTo(return_to)) {
         return NextResponse.redirect(return_to);
@@ -154,82 +265,33 @@ export async function GET(req: Request) {
     if (membership.status !== "member" && grantedJoin) {
       addedToGuild = (await addUserToGuild(me.id, token.access_token)).joined;
       membership = await lookupGuildMembership(me.id);
-    } else if (membership.status === "not_member") {
+    }
+    const guildMember = membership.status === "member" ? membership.member : null;
+    const nick = realNick(guildMember?.nick) || guildMember?.user?.global_name || me.username;
+    if (membership.status === "not_member" && !grantedJoin) {
       if (!isJoinStep) {
         const joinUrl = new URL("/api/discord/login", url.origin);
         joinUrl.searchParams.set("join", "1");
         if (state) joinUrl.searchParams.set("state", state);
         if (return_to && validateReturnTo(return_to)) joinUrl.searchParams.set("return_to", return_to);
-        return clearOAuthState(req, NextResponse.redirect(joinUrl.toString()));
+        // Mint the join-step nonce here and bind the pending login to it.
+        const joinNonce = generateOAuthNonce();
+        joinUrl.searchParams.set("nonce", joinNonce);
+        const res = clearOAuthState(req, NextResponse.redirect(joinUrl.toString()));
+        res.cookies.set(OAUTH_STATE_COOKIE, joinNonce, oauthStateCookieOptions(req));
+        res.cookies.set(
+          OAUTH_PENDING_COOKIE,
+          createPendingLogin({ discordId: me.id, username: me.username, nick, nonce: joinNonce }),
+          oauthStateCookieOptions(req),
+        );
+        return res;
       }
       // Join step came back without guilds.join: log in, but not joined.
     }
 
     const joined = membership.status === "member" || addedToGuild;
-    const guildMember = membership.status === "member" ? membership.member : null;
-    const nick = realNick(guildMember?.nick) || guildMember?.user?.global_name || me.username;
 
-    // If this is a proxy flow (return_to exists), create transfer token
-    // and redirect back to the preview
-    if (return_to && validateReturnTo(return_to)) {
-      const transferToken = createTransferToken({
-        discordId: me.id,
-        username: me.username,
-        nick: nick,
-        origin: return_to,
-      });
-
-      const transferUrl = new URL("/api/auth/session-transfer", return_to);
-      transferUrl.searchParams.set("token", transferToken);
-      return clearOAuthState(req, NextResponse.redirect(transferUrl.toString()));
-    }
-
-    // Create session token
-    const sessionToken = createSessionToken({
-      discordId: me.id,
-      username: me.username,
-      nick: nick,
-      createdAt: Date.now(),
-    });
-
-    // Check if user already has a member record
-    const existingMember = await checkExistingMember(me.id);
-
-    // Fire-and-forget: sync Discord roles to the sheet on every login.
-    // This is intentionally not awaited so it never blocks the redirect.
-    syncRolesOnLogin(me.id, existingMember?.name ?? nick).catch(() => {}); // extra safety net
-
-    // Fire-and-forget: credit any UnbelievaBoat balance held for this Discord ID
-    // (plans/unbelievaboat-replacement.md). No-op unless PEP_MIGRATION_CLAIMS=1;
-    // never throws, and idempotent, so a cut-off run simply retries next login.
-    claimPendingPepOnLogin(me.id).catch(() => {});
-
-    // Fire-and-forget: credit UnbelievaBoat item holdings that were held
-    // (ItemGrant PENDING) because this member had no app account when
-    // grant-items.mjs ran. On unless ITEM_GRANT_CLAIMS=0; never throws;
-    // exactly-once per grant, so a cut-off run retries next login.
-    creditPendingItemGrantsOnLogin(me.id).catch(() => {});
-
-    // Build redirect URL
-    let redirectUrl: URL;
-    if (existingMember?.memberId) {
-      // Existing member - go directly to dashboard
-      redirectUrl = new URL(`/dashboard/${existingMember.memberId}`, url.origin);
-    } else {
-      // New user - go to home page with params
-      redirectUrl = new URL("/", url.origin);
-      redirectUrl.searchParams.set("discordId", me.id);
-      if (state) redirectUrl.searchParams.set("sessionId", state);
-      redirectUrl.searchParams.set("discordJoined", joined ? "1" : "0");
-      if (nick) redirectUrl.searchParams.set("discordNick", nick);
-    }
-
-    // Create response and set session cookie
-    const res = NextResponse.redirect(redirectUrl.toString());
-    const cookieOpts = getSessionCookieOptions(req);
-    res.cookies.set(COOKIE_NAME, sessionToken, cookieOpts);
-
-    return clearOAuthState(req, res);
+    return finishLogin(req, url, { me, nick, joined, state, return_to });
   } catch (e: unknown) {
     return internalError(e, "discord/callback", "Discord login failed. Please try again.");
   }
