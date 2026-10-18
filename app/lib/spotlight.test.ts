@@ -3,9 +3,11 @@ import { describe, it, expect, afterEach, vi } from "vitest";
 
 vi.mock("./discord-webhook", () => ({ getWebhookUrl: vi.fn().mockResolvedValue(null) }));
 
-import { parseSubmissionInput, parseAdminUpdate, toMemberSubmission, toAdminSubmission, notifyNewSubmission } from "./spotlight";
+import { parseSubmissionInput as parseWithId, parseAdminUpdate, toMemberSubmission, toAdminSubmission, notifyNewSubmission } from "./spotlight";
 import { getWebhookUrl } from "./discord-webhook";
 import type { SpotlightSubmission } from "@prisma/client";
+
+const parseSubmissionInput = (payload: unknown, id = "d1") => parseWithId(payload, id);
 
 const savedToken = process.env.BLOB_READ_WRITE_TOKEN;
 afterEach(() => {
@@ -73,6 +75,7 @@ describe("parseSubmissionInput", () => {
             "https://evil.com/spotlight/x.png",
             "https://other.public.blob.vercel-storage.com/spotlight/x.png",
             "https://abc123.public.blob.vercel-storage.com/suggestions/x.png",
+            "https://abc123.public.blob.vercel-storage.com/spotlight/d2/x.png",
             123,
         ]) {
             expect(parseSubmissionInput({ ...valid, photoUrl: bad })).toMatchObject({ ok: false, field: "photoUrl" });

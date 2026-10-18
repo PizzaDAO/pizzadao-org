@@ -36,7 +36,7 @@ export async function PATCH(req: Request, { params }: { params: Promise<{ id: st
 
     const data = { ...parsed.value };
     if (data.status === "FEATURED" && data.featuredOn === undefined && !existing.featuredOn) {
-        data.featuredOn = new Date();
+        data.featuredOn = new Date(`${new Date().toISOString().slice(0, 10)}T00:00:00.000Z`);
     }
 
     const submission = await prisma.spotlightSubmission.update({ where: { id }, data });

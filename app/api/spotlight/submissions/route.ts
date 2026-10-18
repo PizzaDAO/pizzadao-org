@@ -4,7 +4,7 @@
 //   GET  -> the caller's submissions, newest first (admin notes omitted)
 //   POST -> creates a submission and pings Discord (best-effort)
 
-import { NextResponse } from "next/server";
+import { after, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
 import { requireSession } from "@/app/lib/auth-guards";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
@@ -39,7 +39,7 @@ export async function POST(req: Request) {
     if (!auth.ok) return auth.response;
     const { session } = auth;
 
-    const parsed = parseSubmissionInput(await req.json().catch(() => null));
+    const parsed = parseSubmissionInput(await req.json().catch(() => null), session.discordId);
     if (!parsed.ok) {
         return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: 400 });
     }
@@ -93,8 +93,12 @@ export async function POST(req: Request) {
         },
     });
 
-    // Never fail the request on a webhook problem.
-    await notifyNewSubmission(submission);
+    // Never delay or fail the request on a webhook problem.
+    try {
+        after(() => notifyNewSubmission(submission));
+    } catch {
+        void notifyNewSubmission(submission);
+    }
 
     return NextResponse.json({ ok: true, submission: toMemberSubmission(submission) }, { status: 201 });
 }

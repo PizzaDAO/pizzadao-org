@@ -5,7 +5,7 @@
 // Nomination form + "your submissions" list for /spotlight (blackolive-55617).
 
 import { useCallback, useEffect, useState } from "react";
-import { useTranslations } from "next-intl";
+import { useLocale, useTranslations } from "next-intl";
 import type { MemberSubmission } from "@/app/lib/spotlight";
 import {
     CITY_MAX_LEN,
@@ -53,6 +53,7 @@ function StatusPill({ status, label }: { status: SpotlightStatus; label: string 
 
 export function SpotlightClient() {
     const t = useTranslations("spotlight");
+    const locale = useLocale();
     const [items, setItems] = useState<MemberSubmission[] | null>(null);
     const [isSelf, setIsSelf] = useState(true);
     const [nomineeName, setNomineeName] = useState("");
@@ -334,8 +335,8 @@ export function SpotlightClient() {
                                     </div>
                                     <p className="m-0 text-sm text-foreground/75 whitespace-pre-wrap break-words">{s.pitch}</p>
                                     <p className="m-0 text-xs text-foreground/50">
-                                        {new Date(s.createdAt).toLocaleDateString()}
-                                        {s.featuredOn ? ` · ${t("featuredOn", { date: new Date(s.featuredOn).toLocaleDateString() })}` : ""}
+                                        {new Date(s.createdAt).toLocaleDateString(locale)}
+                                        {s.featuredOn ? ` · ${t("featuredOn", { date: new Date(s.featuredOn).toLocaleDateString(locale, { timeZone: "UTC" }) })}` : ""}
                                     </p>
                                 </li>
                             ))}

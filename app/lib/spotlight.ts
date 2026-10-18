@@ -50,9 +50,10 @@ function isHttpUrl(v: string): boolean {
 
 /**
  * Validate a member's new-submission payload. When `isSelf`, the route fills
- * the nominee from the session, so `nomineeName` is null here.
+ * the nominee from the session, so `nomineeName` is null here. `discordId`
+ * ties the photo URL to the uploader (`/spotlight/<discordId>/`).
  */
-export function parseSubmissionInput(payload: unknown): Parsed<SubmissionInput> {
+export function parseSubmissionInput(payload: unknown, discordId: string): Parsed<SubmissionInput> {
     const p = (payload && typeof payload === "object" ? payload : {}) as Record<string, unknown>;
     const str = (v: unknown) => (typeof v === "string" ? v.trim() : "");
 
@@ -102,7 +103,7 @@ export function parseSubmissionInput(payload: unknown): Parsed<SubmissionInput> 
 
     let photoUrl: string | null = null;
     if (p.photoUrl !== undefined && p.photoUrl !== null && p.photoUrl !== "") {
-        if (typeof p.photoUrl !== "string" || !isOwnBlobUrl(p.photoUrl.trim(), "/spotlight/")) {
+        if (typeof p.photoUrl !== "string" || !isOwnBlobUrl(p.photoUrl.trim(), `/spotlight/${discordId}/`)) {
             return { ok: false, error: "Invalid photo", field: "photoUrl" };
         }
         photoUrl = p.photoUrl.trim();
@@ -219,6 +220,7 @@ export async function notifyNewSubmission(
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({ content, allowed_mentions: { parse: [] } }),
+            signal: AbortSignal.timeout(5000),
         });
         return res.ok;
     } catch {
