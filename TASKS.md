@@ -7,14 +7,8 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| oregano-41907 | Welcome new Pizza Trainees by DM + welcome channel: "Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org" | review | P2 |  |  |  |  | #173 | Follow-up to anchovy-52918 |
 | calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | todo | P2 |  |  |  | plans/calzone-call-recorder.md |  | Railway service; awaiting Snax decisions |
-| blackolive-55617 | Mafia Spotlight Submission form | doing | P2 |  |  |  | plans/blackolive-55617.md |  |  |
-| jalapeno-82565 | Custom Crew Bounties 🏴‍☠️ | doing | P2 |  |  |  | plans/jalapeno-82565.md |  |  |
-| artichoke-67361 | it should truncate non alphanumeric characters from names on signup | review | P3 |  |  |  | plans/artichoke-67361.md | #171 |  |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
-| woodfired-65373 | Check box mafia role and suggest buying a box | doing | P3 |  |  |  | plans/woodfired-65373.md |  |  |
-| zucchini-21674 | if the user's already in pizzadao's discord, don't ask for permission to join servers for them | review | P3 |  |  |  | plans/zucchini-21674.md | #168 |  |
 | jalapeno-34126 | Add animation/pop up to signal your profile has been completed | todo | P2 |  | Pizza Lord |  |  |  |  |
 | pizzaiolo-13628 | update timezone for crewsheet | todo | P2 |  |  |  |  |  | when someone selects their city, the timezone should auto format to their local pov |
 | garlic-67660 | page of Print Materials to make it easy for members to print stickers etc | todo | P2 |  |  |  |  |  |  |
@@ -30,6 +24,12 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Priority | Done | PR | Notes |
 |----|------|----------|------|----|-------|
+| oregano-41907 | Welcome new Pizza Trainees by DM + welcome channel: "Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org" | P2 | 2026-10-18 | #173 | Gated by TRAINEE_NICK_ENABLED; optional TRAINEE_WELCOME_CHANNEL_ID |
+| blackolive-55617 | Mafia Spotlight Submission form | P2 | 2026-10-18 | #169 | Needs a "Mafia Spotlight" row in the webhooks sheet |
+| jalapeno-82565 | Custom Crew Bounties 🏴‍☠️ | P2 | 2026-10-18 | #172 |  |
+| artichoke-67361 | it should truncate non alphanumeric characters from names on signup | P3 | 2026-10-18 | #171 |  |
+| woodfired-65373 | Check box mafia role and suggest buying a box | P3 | 2026-10-18 | #170 |  |
+| zucchini-21674 | if the user's already in pizzadao's discord, don't ask for permission to join servers for them | P3 | 2026-10-18 | #168 |  |
 | anchovy-52918 | Bot names new Discord joiners "Pizza Trainee" unless they've signed up on app.pizzadao.org | P2 | 2026-10-18 | #166 | Ships disabled; enable with TRAINEE_NICK_SINCE + TRAINEE_NICK_ENABLED |
 | napoletana-52080 | pizza noob role logic | P3 | 2026-10-18 |  | Covered by anchovy-52918 (Pizza Noob role for trainees; removed on Level 2 completion) |
 | olive-40696 | add region role setting to onboarding flow | P1 |  |  |  |
