@@ -152,6 +152,12 @@ describe("sanitizeDisplayName (artichoke-67361)", () => {
     ["محمد علي", "محمد علي"],
     ["①②③", "123"],
     ["🍕🍕🍕", ""],
+    ["ⓉⓄⓃⓎ", "TONY"],
+    ["ⓣⓞⓝⓨ Pepperoni", "tony Pepperoni"],
+    ["⒯⒪⒩⒴", "tony"],
+    ["🅃🄾🄽🅈", "TONY"],
+    ["℡", ""],
+    ["Big＿Tony", "Big Tony"],
     ["Tony `The` Slice´s", "Tony 'The' Slice's"],
   ];
   it.each(cases)("%j -> %j", (input, expected) => {
@@ -176,9 +182,17 @@ describe("truncateForDiscordNick", () => {
   it("hard cuts when there is no space", () => {
     expect(truncateForDiscordNick("a".repeat(40))).toBe("a".repeat(32));
   });
-  it("never splits a surrogate pair", () => {
-    const out = truncateForDiscordNick("山".repeat(31) + "𠀀𠀀");
-    expect(Array.from(out)).toHaveLength(32);
-    expect(out).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])/);
+  it.each([
+    ["𠮷".repeat(40)],
+    ["山".repeat(31) + "𠀀𠀀"],
+    ["क्ष".repeat(20)],
+    ["a".repeat(31) + "e\u0301\u0301"],
+  ])("fits 32 UTF-16 units with no broken character: %#", (input) => {
+    const r = truncateForDiscordNick(input);
+    expect(r.length).toBeLessThanOrEqual(32);
+    expect(r.length).toBeGreaterThan(0);
+    expect(r).not.toMatch(/[\uD800-\uDBFF](?![\uDC00-\uDFFF])|(?<![\uD800-\uDBFF])[\uDC00-\uDFFF]/);
+    expect(input.startsWith(r)).toBe(true);
+    expect(r.endsWith("\u094D")).toBe(false);
   });
 });

@@ -1,4 +1,4 @@
-import { sanitizeDisplayName } from './display-name'
+import { sanitizeDisplayName, truncateForDiscordNick, DISCORD_NICK_MAX_LENGTH } from './display-name'
 
 // Same rule as normalizeRoleName in pep-earn/income.ts, copied so this module
 // stays free of prisma imports (it is used by tiny shared helpers like embeds).
@@ -14,7 +14,7 @@ export const TRAINEE_NICK = 'Pizza Trainee'
 export const PIZZA_NOOB_ROLE_NAME = 'Pizza Noob'
 /** Pizza Noob is removed once the member completes this missions level. */
 export const PIZZA_NOOB_GRADUATE_LEVEL = 2
-export const DISCORD_NICK_MAX = 32
+export const DISCORD_NICK_MAX = DISCORD_NICK_MAX_LENGTH
 
 export const isTraineeNick = (n?: string | null) => (n ?? '').trim().toLowerCase() === TRAINEE_NICK.toLowerCase()
 /** The member's own nickname, or null when it is the placeholder (or empty). */
@@ -144,7 +144,7 @@ export function planTraineeNicks(input: PlanInput): TraineePlan {
     if (isSignedUp) {
       if (inWindow) skipped.signedUp++
       if (isTraineeNick(m.nick)) {
-        const clean = sanitizeDisplayName(signedName).slice(0, DISCORD_NICK_MAX).trim()
+        const clean = truncateForDiscordNick(sanitizeDisplayName(signedName))
         heal.push({ id: m.id, nick: clean && !isTraineeNick(clean) ? clean : null })
       }
     }
