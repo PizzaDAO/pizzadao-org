@@ -9,6 +9,9 @@ import {
   readCookie,
   oauthStateCookieOptions,
   getProductionOrigin,
+  createPendingLogin,
+  verifyPendingLogin,
+  createTransferToken,
 } from './oauth-proxy'
 
 describe('validateReturnTo', () => {
@@ -107,5 +110,39 @@ describe('OAuth state', () => {
     const opts = oauthStateCookieOptions(new Request('https://app.pizzadao.org/api/discord/login'))
     expect(opts).toMatchObject({ httpOnly: true, secure: true, sameSite: 'lax', path: '/api/discord' })
     expect(opts.maxAge).toBeLessThanOrEqual(600)
+  })
+})
+
+describe('pending login cookie', () => {
+  process.env.SESSION_SECRET ||= 'test-secret'
+  const data = { discordId: '1', username: 'u', nick: 'n' }
+
+  afterEach(() => vi.useRealTimers())
+
+  it('round-trips', () => {
+    expect(verifyPendingLogin(createPendingLogin(data))).toMatchObject(data)
+  })
+
+  it('rejects tampered payloads and signatures, and missing values', () => {
+    const [p, sig] = createPendingLogin(data).split('.')
+    const forged = Buffer.from(JSON.stringify({ ...data, discordId: '2', exp: Date.now() + 1e6 })).toString('base64url')
+    expect(verifyPendingLogin(`${forged}.${sig}`)).toBeNull()
+    expect(verifyPendingLogin(`${p}.${sig}x`)).toBeNull()
+    expect(verifyPendingLogin(undefined)).toBeNull()
+    expect(verifyPendingLogin('nodot')).toBeNull()
+  })
+
+  it('is not interchangeable with transfer tokens', () => {
+    const t = createTransferToken({ ...data, origin: 'https://app.pizzadao.org' })
+    expect(verifyPendingLogin(t)).toBeNull()
+  })
+
+  it('expires after 10 minutes', () => {
+    vi.useFakeTimers()
+    const token = createPendingLogin(data)
+    vi.advanceTimersByTime(10 * 60 * 1000 - 1000)
+    expect(verifyPendingLogin(token)).not.toBeNull()
+    vi.advanceTimersByTime(2000)
+    expect(verifyPendingLogin(token)).toBeNull()
   })
 })

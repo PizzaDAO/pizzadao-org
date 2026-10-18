@@ -16,7 +16,7 @@ vi.mock("@/app/lib/session", () => ({
 
 import { GET as login } from "./login/route";
 import { GET as callback } from "./callback/route";
-import { decodeOAuthState, encodeOAuthState } from "@/app/lib/oauth-proxy";
+import { decodeOAuthState, encodeOAuthState, createPendingLogin } from "@/app/lib/oauth-proxy";
 import { createSessionToken } from "@/app/lib/session";
 
 const ORIGIN = "https://app.pizzadao.org";
@@ -240,6 +240,73 @@ describe("guild join flow (zucchini-21674)", () => {
     const loc = new URL(res.headers.get("location")!);
     expect(loc.pathname).toBe("/");
     expect(loc.searchParams.get("discordJoined")).toBe("0");
+  });
+});
+
+describe("cancelling the guilds.join screen (zucchini-21674 gap 1)", () => {
+  process.env.SESSION_SECRET ||= "test-secret";
+  const pending = () => createPendingLogin({ discordId: "u1", username: "user1", nick: "Nicky" });
+  const cancel = (opts: { join?: boolean; cookie?: string; return_to?: string } = {}) => {
+    const { join = true, cookie = `oauth_state=n1; oauth_pending=${pending()}`, return_to } = opts;
+    const st = encodeOAuthState({ sessionId: "sess-9", nonce: "n1", join, return_to });
+    return callback(new Request(`${ORIGIN}/api/discord/callback?error=access_denied&state=${encodeURIComponent(st)}`, { headers: { cookie } }));
+  };
+
+  it("sets a signed oauth_pending cookie (no tokens) on the join redirect", async () => {
+    mockFetchMemberByDiscordId.mockResolvedValue(null);
+    mockDiscord({ inGuild: false, scope: "identify" });
+    const st = encodeOAuthState({ sessionId: "s", nonce: "n1" });
+    const res = await callback(new Request(`${ORIGIN}/api/discord/callback?code=c&state=${encodeURIComponent(st)}`, { headers: { cookie: "oauth_state=n1" } }));
+    const raw = (res.headers.getSetCookie?.() ?? []).find((c) => c.startsWith("oauth_pending=") && !c.startsWith("oauth_pending=;"))!;
+    expect(raw).toMatch(/HttpOnly/i);
+    expect(raw).toMatch(/SameSite=lax/i);
+    expect(raw).toMatch(/Max-Age=600/i);
+    const payload = JSON.parse(Buffer.from(decodeURIComponent(raw.split("=")[1].split(";")[0]).split(".")[0], "base64url").toString());
+    expect(Object.keys(payload).sort()).toEqual(["discordId", "exp", "nick", "username"]);
+  });
+
+  it("logs the person in with discordJoined=0 and clears both cookies", async () => {
+    mockFetchMemberByDiscordId.mockResolvedValue(null);
+    const res = await cancel();
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.pathname).toBe("/");
+    expect(loc.searchParams.get("discordId")).toBe("u1");
+    expect(loc.searchParams.get("discordJoined")).toBe("0");
+    expect(loc.searchParams.get("discordNick")).toBe("Nicky");
+    expect(loc.searchParams.get("sessionId")).toBe("sess-9");
+    expect(cookieFrom(res, "pizzadao_session")).toBe("mock-session-token");
+    expect(cookieFrom(res, "oauth_pending")).toBe("");
+    expect(cookieFrom(res, "oauth_state")).toBe("");
+  });
+
+  it("does not log in without a valid pending cookie", async () => {
+    for (const cookie of ["oauth_state=n1", "oauth_state=n1; oauth_pending=garbage.sig", `oauth_state=n1; oauth_pending=${pending()}x`]) {
+      const res = await cancel({ cookie });
+      expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+      expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+    }
+  });
+
+  it("does not log in when the oauth_state nonce does not match", async () => {
+    const res = await cancel({ cookie: `oauth_state=other; oauth_pending=${pending()}` });
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+    expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+  });
+
+  it("ignores the pending cookie when cancelling the first (non-join) step", async () => {
+    const res = await cancel({ join: false });
+    expect(res.headers.get("location")).toBe(`${ORIGIN}/`);
+    expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
+  });
+
+  it("proxy flow returns a transfer token instead of a session cookie", async () => {
+    const returnTo = "https://onboarding-abc123xyz-pizza-dao.vercel.app";
+    const res = await cancel({ return_to: returnTo });
+    const loc = new URL(res.headers.get("location")!);
+    expect(loc.origin).toBe(returnTo);
+    expect(loc.pathname).toBe("/api/auth/session-transfer");
+    expect(loc.searchParams.get("token")).toBeTruthy();
+    expect(cookieFrom(res, "pizzadao_session")).toBeUndefined();
   });
 });
 
