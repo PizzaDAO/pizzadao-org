@@ -89,6 +89,8 @@
       },
       "displayNameLabel": "Your display name",
       "displayNamePlaceholder": "Your name or nickname",
+      "displayNamePreview": "Will be saved as: <b>{name}</b>",
+      "displayNameEmpty": "Use at least one letter or number",
       "useDisplayName": "Use this name",
       "orGenerateName": "Or make a pizza-inspired name"
     },

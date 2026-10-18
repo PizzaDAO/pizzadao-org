@@ -8,6 +8,9 @@ describe("signup drafts", () => {
     expect(sanitizeSignupDraft({ mafiaName: 'Test', city: 'Paris', sessionId: '<script>' })).toBeNull();
     expect(sanitizeSignupDraft({ city: 'Paris', sessionId: 'test-session' })).toBeNull();
   });
+  it("cleans the name before truncating so emoji-heavy input keeps its letters", () => {
+    expect(sanitizeSignupDraft({ mafiaName: "🍕".repeat(40) + "Tony", city: "Paris", sessionId: "abcdefgh12" })?.mafiaName).toBe("Tony");
+  });
   it("drops malformed member numbers and unknown timezones", () => {
     const draft = sanitizeSignupDraft({ mafiaName: 'Test', city: 'Paris', sessionId: 'test-session', memberId: '-1', timezone: 'Unknown/Place' });
     expect(draft?.memberId).toBeUndefined(); expect(draft?.timezone).toBeUndefined();
