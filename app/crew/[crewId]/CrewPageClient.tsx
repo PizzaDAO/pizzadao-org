@@ -705,7 +705,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
           )}
 
           {/* Crew bounties (jalapeno-82565) */}
-          <CrewBounties crewId={crew.id} crewLabel={crew.label} hideWhenEmpty />
+          <CrewBounties crewId={crew.id} crewLabel={crew.label} hideWhenEmpty viewerDiscordId={user?.discordId} />
 
           {/* Recent activity */}
           {recentTaskCloses.length > 0 && (
@@ -1597,7 +1597,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         })()}
 
         {/* Crew bounties (jalapeno-82565) */}
-        <CrewBounties crewId={crew.id} crewLabel={crew.label} />
+        <CrewBounties crewId={crew.id} crewLabel={crew.label} viewerDiscordId={user?.discordId} />
 
         {/* Manuals */}
         {manuals.length > 0 && (

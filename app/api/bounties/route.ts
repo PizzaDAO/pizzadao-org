@@ -1,5 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
+import { canManageCrew, canManageBounty } from '@/app/lib/crew-leads'
+import { normalizeCrewId } from '@/app/lib/crew-id'
 import { getAllBounties, createBounty, resolveBountyCrewId, getCrewLabelMap } from '@/app/lib/bounties'
 import { requireOnboarded } from '@/app/lib/economy'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
@@ -22,7 +24,32 @@ export async function GET(request: NextRequest) {
     // same as /api/jobs.
     const { channels, roles, guildId } = await resolveDiscordMentions(bounties.map((b) => b.description))
 
+    // Who is looking (crew page only): lets the UI show Approve/Reject on bounties
+    // posted by others. Advisory only; the write routes re-check every time.
+    let viewer: { discordId: string; canManageCrew: boolean } | undefined
+    if (crewId) {
+      const session = await getSession().catch(() => null)
+      if (session?.discordId) {
+        viewer = {
+          discordId: session.discordId,
+          canManageCrew: await canManageCrew(session.discordId, normalizeCrewId(crewId)),
+        }
+      }
+    }
+
+    // Submission details are only for the poster, the claimer, and crew leads / admins.
+    const sessionId = viewer?.discordId ?? (await getSession().catch(() => null))?.discordId
+    const canSeeSubmission = async (b: (typeof bounties)[number]) => {
+      if (!sessionId) return false
+      if (b.createdBy === sessionId || b.claimedBy === sessionId) return true
+      if (viewer?.canManageCrew && b.crewId) return true
+      return b.crewId ? canManageBounty(sessionId, b) : false
+    }
+    const visible = new Set<number>()
+    await Promise.all(bounties.map(async (b) => { if (await canSeeSubmission(b)) visible.add(b.id) }))
+
     return NextResponse.json({
+      ...(viewer ? { viewer } : {}),
       bounties: bounties.map((b) => ({
         id: b.id,
         description: b.description,
@@ -31,6 +58,10 @@ export async function GET(request: NextRequest) {
         createdBy: b.createdBy,
         claimedBy: b.claimedBy,
         status: b.status,
+        submissionNote: visible.has(b.id) ? (b.submissionNote ?? null) : null,
+        submissionLink: visible.has(b.id) ? (b.submissionLink ?? null) : null,
+        submittedAt: b.submittedAt ? b.submittedAt.toISOString() : null,
+        reviewNote: visible.has(b.id) ? (b.reviewNote ?? null) : null,
         crewId: b.crewId ?? null,
         crewLabel: b.crewId ? (crewLabels.get(b.crewId) ?? b.crewId) : null,
         createdAt: b.createdAt.toISOString(),

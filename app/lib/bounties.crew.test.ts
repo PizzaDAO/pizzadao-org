@@ -18,7 +18,11 @@ vi.mock('./economy', () => ({
 vi.mock('./notifications', () => ({
   notifyBountyClaimed: vi.fn().mockResolvedValue(undefined),
   notifyBountyCompleted: vi.fn().mockResolvedValue(undefined),
+  notifyBountyCancelled: vi.fn().mockResolvedValue(undefined),
   notifyBountyComment: vi.fn().mockResolvedValue(undefined),
+}))
+vi.mock('./crew-leads', () => ({
+  canManageBounty: vi.fn(async (id: string, b: { createdBy: string }) => b.createdBy === id),
 }))
 vi.mock('./transactions', () => ({
   logTransaction: vi.fn().mockResolvedValue({}),
@@ -104,7 +108,7 @@ describe('bounty listing by crew', () => {
     await getAllBounties({ crewId: 'Ops' })
     expect(prisma.bounty.findMany).toHaveBeenCalledWith(
       expect.objectContaining({
-        where: { status: { in: ['OPEN', 'CLAIMED'] }, crewId: 'ops' },
+        where: { status: { in: ['OPEN', 'CLAIMED', 'SUBMITTED'] }, crewId: 'ops' },
       }),
     )
   })
@@ -113,7 +117,7 @@ describe('bounty listing by crew', () => {
     mockFn(prisma.bounty.findMany).mockResolvedValue([])
     await getAllBounties()
     expect(prisma.bounty.findMany).toHaveBeenCalledWith(
-      expect.objectContaining({ where: { status: { in: ['OPEN', 'CLAIMED'] } } }),
+      expect.objectContaining({ where: { status: { in: ['OPEN', 'CLAIMED', 'SUBMITTED'] } } }),
     )
   })
 

@@ -23,6 +23,8 @@ export const prisma = {
   transaction: createModelMock(),
   user: createModelMock(),
   bounty: createModelMock(),
+  bountyComment: createModelMock(),
+  notification: createModelMock(),
   shopItem: createModelMock(),
   inventory: createModelMock(),
   itemGrant: createModelMock(),

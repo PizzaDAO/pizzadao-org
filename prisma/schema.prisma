@@ -96,6 +96,12 @@ model Bounty {
   claimedBy   String?          // Discord ID of claimer
   status      BountyStatus     @default(OPEN)
   crewId      String?          // Crew-mappings slug (e.g. "ops"); null = general bounty (jalapeno-82565)
+  submissionNote String?       // Claimer's "what I did" (jalapeno-82565 v2)
+  submissionLink String?       // Optional proof URL (https only)
+  submittedAt    DateTime?
+  reviewedBy     String?       // Discord ID of whoever approved/rejected/cancelled last
+  reviewNote     String?       // Rejection feedback (cleared on resubmit)
+  completedAt    DateTime?
   createdAt   DateTime         @default(now())
   updatedAt   DateTime         @updatedAt
   comments    BountyComment[]
@@ -118,6 +124,7 @@ model BountyComment {
 enum BountyStatus {
   OPEN       // Available to claim
   CLAIMED    // Someone is working on it
+  SUBMITTED  // Claimer submitted work, awaiting poster/crew-lead review (jalapeno-82565)
   COMPLETED  // Work done, reward paid
   CANCELLED  // Poster cancelled, refunded
 }
@@ -259,6 +266,9 @@ enum NotificationType {
   BOUNTY_CLAIMED     // Someone claimed your bounty
   BOUNTY_COMPLETED   // Bounty you claimed is approved, reward paid
   BOUNTY_COMMENT     // New comment on a bounty you're involved in
+  BOUNTY_SUBMITTED   // Work was submitted on a bounty you posted / lead
+  BOUNTY_REJECTED    // Your bounty submission was sent back
+  BOUNTY_CANCELLED   // A bounty you claimed was cancelled
   TASK_ASSIGNED      // A task was assigned to you
   TASK_DUE_SOON      // Task due within a week
   MISSION_SUBMITTED  // A mission submission needs admin review

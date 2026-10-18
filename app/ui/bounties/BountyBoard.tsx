@@ -12,7 +12,10 @@ type Bounty = {
   reward: number;
   createdBy: string;
   claimedBy: string | null;
-  status: "OPEN" | "CLAIMED";
+  status: "OPEN" | "CLAIMED" | "SUBMITTED";
+  submissionNote?: string | null;
+  submissionLink?: string | null;
+  reviewNote?: string | null;
   createdAt: string;
   commentCount: number;
   crewId?: string | null;
