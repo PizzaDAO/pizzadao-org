@@ -1,6 +1,6 @@
 import type { IngestPayload } from './types.js'
 
-export type IngestResult = { ok: true; id: string; duplicate: boolean } | { ok: false; retryable: boolean; error: string }
+export type IngestResult = { ok: true; id: string; duplicate: boolean; keys: string[] } | { ok: false; retryable: boolean; error: string }
 
 /**
  * 5xx, 429, 408 and the auth/route errors 401/403/404 (a deploy or key problem
@@ -20,8 +20,10 @@ export async function postIngest(appBaseUrl: string, apiKey: string, payload: In
       signal: AbortSignal.timeout(30_000),
     })
     if (res.ok) {
-      const body = (await res.json()) as { id: string; duplicate: boolean }
-      return { ok: true, id: body.id, duplicate: body.duplicate }
+      const body = (await res.json()) as { id: string; duplicate: boolean; keys?: unknown }
+      // The R2 keys the stored row references (for a duplicate: the EXISTING row's).
+      const keys = Array.isArray(body.keys) ? body.keys.filter((k): k is string => typeof k === 'string') : []
+      return { ok: true, id: body.id, duplicate: body.duplicate, keys }
     }
     const text = (await res.text()).slice(0, 300)
     const retryable = isRetryableStatus(res.status)

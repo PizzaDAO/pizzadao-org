@@ -834,7 +834,7 @@
   "adminCalls": {
     "overline": "Call recordings",
     "title": "Recorded calls",
-    "description": "Crew calls captured by the PizzaDAO bot. Audio is private to reviewers and is deleted after {days} days.",
+    "description": "Crew calls captured by the PizzaDAO bot. Audio is private to reviewers.",
     "metaDescription": "Review recorded crew calls.",
     "deniedTitle": "Access denied",
     "denied": "This page is restricted to Dread Pizza Roberts.",
@@ -867,18 +867,18 @@
     "mix": "Full mix",
     "tracks": "Individual tracks",
     "audioExpires": "Links expire in {minutes} minutes. Reload to refresh.",
-    "audioGone": "Audio was deleted after the retention window.",
+    "audioGone": "No audio is stored for this recording.",
     "audioError": "Could not load audio.",
     "noAudio": "No audio was uploaded for this call.",
     "endReason": "Ended: {reason}",
     "transcriptHeading": "Transcript and summary",
     "transcriptPending": "Transcript and summary are not generated yet.",
-    "remove": "Remove recording",
-    "removeConfirm": "Delete this call's audio from storage and mark it rejected? This cannot be undone.",
-    "removeYes": "Yes, delete",
+    "remove": "Reject (hide)",
+    "removeConfirm": "Reject this recording and hide it? The audio and details are kept.",
+    "removeYes": "Yes, reject",
     "cancel": "Cancel",
-    "removing": "Deleting...",
-    "removeError": "Could not remove the recording. Try again.",
-    "removedNote": "This recording was removed; its audio is deleted."
+    "removing": "Rejecting...",
+    "removeError": "Could not reject the recording. Try again.",
+    "removedNote": "This recording was rejected (hidden)."
   }
 }

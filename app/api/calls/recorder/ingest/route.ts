@@ -24,6 +24,7 @@ export const POST = withErrorHandling(async (request: Request) => {
     throw new ValidationError('Body must be JSON')
   }
   const payload = parseIngestPayload(body)
-  const { id, duplicate } = await ingestRecording(payload)
-  return NextResponse.json({ id, duplicate }, { status: duplicate ? 200 : 201 })
+  const { id, duplicate, keys } = await ingestRecording(payload)
+  // `keys` = the R2 objects the stored row references; the worker prunes anything else under the session prefix.
+  return NextResponse.json({ id, duplicate, keys }, { status: duplicate ? 200 : 201 })
 })

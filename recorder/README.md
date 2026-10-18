@@ -15,7 +15,7 @@ A small Node service (discord.js 14 + `@discordjs/voice` 0.19.2 with DAVE) that 
 5. On stop: ffmpeg builds one aligned Opus track per speaker and one mono m4a mix; everything is uploaded to the private R2 bucket under `calls/<sessionId>/`; the app's ingest API is called with the metadata (event, channel, times, speakers with Discord ids, display names, talk time, R2 keys). The nickname is restored.
 6. `GET /health` (200 once Discord is ready) for Railway.
 
-Uploads wait for a fresh opt-out list: if the app cannot be reached when a call ends, nothing is uploaded and the session stays on the volume (retried every 10 minutes). A 401/403/404 from the ingest API is treated as a misconfiguration (wrong `RECORDER_API_KEY`, route not deployed): logged loudly and retried, never discarded. Only a payload the app rejects as invalid (other 4xx) is dropped, and then its R2 objects are deleted too.
+Uploads wait for a fresh opt-out list: if the app cannot be reached when a call ends, nothing is uploaded and the session stays on the volume (retried every 10 minutes). A 401/403/404 from the ingest API is treated as a misconfiguration (wrong `RECORDER_API_KEY`, route not deployed): logged loudly and retried, never discarded. Only a payload the app rejects as invalid (other 4xx) is dropped; its R2 objects are left in place (a row might reference them) and logged for a human to check. After a successful ingest the worker uploads first, then deletes only the objects under `calls/<sessionId>/` that the stored row does not reference (leftovers of earlier attempts, e.g. a member who opted out in between). The app returns the row's keys in the ingest response for this.
 
 Resilience: auto-rejoin on disconnect (backoff, 5 tries); sessions live on the volume, so on boot any session without an `uploaded` marker is finalized and ingested (ingest is idempotent on the session id); a restart mid-call rejoins the still-active event as a new session.
 
@@ -33,7 +33,7 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `DISCORD_GUILD_ID` | yes | | PizzaDAO server id. |
 | `RECORDER_API_KEY` | yes | | Shared secret; must equal `RECORDER_API_KEY` on Vercel. |
 | `R2_ENDPOINT` | yes | | `https://<account>.r2.cloudflarestorage.com` |
-| `R2_ACCESS_KEY_ID` | yes | | Token scoped to the calls bucket: Object Read & Write (read, write, list, delete). |
+| `R2_ACCESS_KEY_ID` | yes | | Token scoped to the calls bucket: read, write, list, delete. |
 | `R2_SECRET_ACCESS_KEY` | yes | | |
 | `R2_BUCKET_NAME` | yes | | Private bucket for call audio. |
 | `CALL_VOICE_CHANNEL_ID` | no | `823956905739026442` | |
@@ -47,9 +47,9 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 ## R2 bucket and tokens
 
 - Private bucket (no public access, no custom domain). Objects live under `calls/<sessionId>/` (`mix.m4a`, `tracks/<discordId>.ogg`).
-- **Railway token: Object Read & Write, scoped to this bucket.** The worker lists and deletes under `calls/<sessionId>/` (it clears leftovers of earlier upload attempts, and removes its uploads if the app permanently refuses a call), so list + delete are required, not just put.
-- **Vercel token: also Object Read & Write (read + list + delete), scoped to this bucket.** A read-only or list-only token breaks the retention sweep and the reviewer "Remove" takedown, which delete the whole `calls/<sessionId>/` prefix.
-- **Backstop lifecycle rule (do this):** in the Cloudflare dashboard, bucket > Settings > Object lifecycle rules, add a rule on prefix `calls/` that deletes objects after *retention + 7 days* (default 90 + 7 = **97 days**). It guarantees audio is gone even if a recording was never ingested, the app is down, or the sweep fails. Keep it in step with `RECORDING_AUDIO_RETENTION_DAYS`.
+- Call audio is **kept forever**: there is no retention sweep and no lifecycle rule. Do not add one.
+- **Railway token (this worker): Object Read & Write, scoped to this bucket**: put, get, list and delete. List + delete are used to prune leftovers under `calls/<sessionId>/`.
+- **Vercel token (the app): read only, scoped to this bucket.** The app only creates signed GET URLs for reviewers; it never writes or deletes. "Reject (hide)" on `/admin/calls` only marks the row REJECTED and never touches R2.
 
 ## Railway setup
 

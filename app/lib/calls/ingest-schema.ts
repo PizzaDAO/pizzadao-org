@@ -3,9 +3,9 @@
  * POST /api/calls/recorder/ingest. Hand-validated (no zod dependency). Keep in
  * sync with recorder/src/types.ts.
  *
- * R2 keys must live under `calls/<sessionId>/`: the retention sweep deletes the
- * keys stored on a recording, so a worker bug (or leaked key) must not be able
- * to point it at unrelated objects.
+ * R2 keys must live under `calls/<sessionId>/`: the app signs URLs for the keys
+ * stored on a recording, so a worker bug (or leaked key) must not be able to
+ * point it at unrelated objects.
  */
 import { ValidationError } from '@/app/lib/errors/api-errors'
 

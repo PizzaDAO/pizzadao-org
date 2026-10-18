@@ -3,7 +3,7 @@
 export function consentNotice(): string {
   return [
     '🔴 **This call is being recorded.**',
-    'The audio is private (only Dread Pizza Roberts can listen) and is deleted after a retention period. A summary and transcript may be posted on pizzadao.org after review.',
+    'The audio is private (only Dread Pizza Roberts can listen) and is never published. A summary and transcript may be posted on pizzadao.org after review.',
     "Don't want your voice recorded? Run `/record optout` and your audio is never captured, or just stay muted. `/record optin` changes it back. Bots are never recorded.",
   ].join('\n')
 }

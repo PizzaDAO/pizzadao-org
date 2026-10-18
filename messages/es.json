@@ -834,7 +834,7 @@
   "adminCalls": {
     "overline": "Grabaciones de llamadas",
     "title": "Llamadas grabadas",
-    "description": "Llamadas de crew capturadas por el bot de PizzaDAO. El audio es privado para los revisores y se elimina a los {days} días.",
+    "description": "Llamadas de crew capturadas por el bot de PizzaDAO. El audio es privado para los revisores.",
     "metaDescription": "Revisa las llamadas de crew grabadas.",
     "deniedTitle": "Acceso denegado",
     "denied": "Esta página es solo para Dread Pizza Roberts.",
@@ -867,18 +867,18 @@
     "mix": "Mezcla completa",
     "tracks": "Pistas individuales",
     "audioExpires": "Los enlaces caducan en {minutes} minutos. Recarga para renovarlos.",
-    "audioGone": "El audio se eliminó al terminar el periodo de retención.",
+    "audioGone": "No hay audio guardado para esta grabación.",
     "audioError": "No se pudo cargar el audio.",
     "noAudio": "No se subió audio para esta llamada.",
     "endReason": "Terminó: {reason}",
     "transcriptHeading": "Transcripción y resumen",
     "transcriptPending": "La transcripción y el resumen aún no se han generado.",
-    "remove": "Eliminar grabación",
-    "removeConfirm": "¿Eliminar el audio de esta llamada del almacenamiento y marcarla como rechazada? No se puede deshacer.",
-    "removeYes": "Sí, eliminar",
+    "remove": "Rechazar (ocultar)",
+    "removeConfirm": "¿Rechazar esta grabación y ocultarla? El audio y los detalles se conservan.",
+    "removeYes": "Sí, rechazar",
     "cancel": "Cancelar",
-    "removing": "Eliminando...",
-    "removeError": "No se pudo eliminar la grabación. Inténtalo de nuevo.",
-    "removedNote": "Esta grabación se eliminó; su audio fue borrado."
+    "removing": "Rechazando...",
+    "removeError": "No se pudo rechazar la grabación. Inténtalo de nuevo.",
+    "removedNote": "Esta grabación fue rechazada (oculta)."
   }
 }

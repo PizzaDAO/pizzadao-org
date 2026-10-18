@@ -1,13 +1,11 @@
 /**
  * Call recordings: ingest (worker), review queries (/admin/calls), opt-outs.
- * Audio is private; see r2.ts and retention.ts.
+ * Audio is private and kept forever; the app never writes or deletes in R2 (see r2.ts).
  */
 import { prisma } from '@/app/lib/db'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { resolveCrewForEvent, type CrewRef } from './crew-map'
 import type { IngestPayload } from './ingest-schema'
-import { deleteRecordingPrefix } from './r2'
-import { markAudioDeleted } from './retention'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -29,10 +27,14 @@ async function loadCrews(): Promise<CrewRef[]> {
  * session returns the existing row untouched (so a reviewer's status changes
  * are never clobbered by a worker retry).
  */
-export async function ingestRecording(p: IngestPayload): Promise<{ id: string; duplicate: boolean }> {
-  const existing = await prisma.callRecording.findUnique({ where: { sessionId: p.sessionId }, select: { id: true } })
-  if (existing) return { id: existing.id, duplicate: true }
-
+export async function ingestRecording(p: IngestPayload): Promise<{ id: string; duplicate: boolean; keys: string[] }> {
+  const existing = await prisma.callRecording.findUnique({
+    where: { sessionId: p.sessionId },
+    select: { id: true, mixKey: true, speakers: { select: { trackKey: true } } },
+  })
+  // The worker deletes any R2 object under the session prefix that is NOT in `keys`
+  // (leftovers of earlier attempts), so `keys` is always what the stored row references.
+  if (existing) return { id: existing.id, duplicate: true, keys: storedKeys(existing) }
   const crew = resolveCrewForEvent(await loadCrews(), { eventId: p.eventId, eventName: p.eventName })
   const created = await prisma.callRecording.create({
     data: {
@@ -61,7 +63,15 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
     },
     select: { id: true },
   })
-  return { id: created.id, duplicate: false }
+  return {
+    id: created.id,
+    duplicate: false,
+    keys: storedKeys({ mixKey: p.mix?.key ?? null, speakers: p.speakers.map((s) => ({ trackKey: s.trackKey })) }),
+  }
+}
+
+function storedKeys(r: { mixKey: string | null; speakers: Array<{ trackKey: string | null }> }): string[] {
+  return [r.mixKey, ...r.speakers.map((s) => s.trackKey)].filter((k): k is string => !!k)
 }
 
 export async function listRecordings(take = 100) {
@@ -91,15 +101,13 @@ export async function getRecording(id: string) {
 }
 
 /**
- * Takedown: delete all of a call's audio from R2 (whole prefix), mark the row
- * REJECTED with the audio deleted. Returns false when the recording is unknown.
- * R2 is deleted first; if that throws the row is left untouched so it can be retried.
+ * Reject (hide) a recording: status REJECTED with who/when, in one update. The
+ * row, speakers, metadata and audio are all kept; R2 is never touched.
+ * Returns false when the recording is unknown.
  */
-export async function removeRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<boolean> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, sessionId: true } })
+export async function rejectRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<boolean> {
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true } })
   if (!rec) return false
-  await deleteRecordingPrefix(rec.sessionId)
-  await markAudioDeleted(rec.id, now)
   await prisma.callRecording.update({
     where: { id: rec.id },
     data: { status: 'REJECTED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: null },

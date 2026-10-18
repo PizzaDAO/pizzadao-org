@@ -9,7 +9,6 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { listRecordings } from "@/app/lib/calls/recordings";
-import { retentionDays } from "@/app/lib/calls/retention";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -50,7 +49,7 @@ export default async function AdminCallsPage() {
                 <header className="grid gap-2">
                     <p className="overline text-tomato m-0">{t("overline")}</p>
                     <h1 className="font-[family-name:var(--font-display)] font-black text-3xl m-0">{t("title")}</h1>
-                    <p className="m-0 text-foreground/70">{t("description", { days: retentionDays() })}</p>
+                    <p className="m-0 text-foreground/70">{t("description")}</p>
                 </header>
 
                 {rows.length === 0 ? (

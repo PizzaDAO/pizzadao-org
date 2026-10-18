@@ -1,4 +1,4 @@
-import { existsSync, mkdirSync, mkdtempSync, readFileSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it, vi } from 'vitest'
@@ -196,6 +196,19 @@ describe('CallRecorder stop paths', () => {
     expect(finalizeSession).toHaveBeenCalledTimes(1)
     const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
     expect(JSON.parse(readFileSync(path.join(dir, 'session.json'), 'utf8')).partial).toBe(true)
+  })
+
+  it('clears the starting marker even when the session record cannot be written', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    await w.rec.handleEvent(ev())
+    const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
+    rmSync(path.join(dir, 'session.json'))
+    mkdirSync(path.join(dir, 'session.json')) // writing session.json now fails
+    await w.rec.stop('empty')
+    expect(existsSync(path.join(dir, 'starting'))).toBe(false)
+    expect(w.rec.currentEventId).toBeNull()
+    expect(w.nicknames.at(-1)).toBe('Pizza Bot')
   })
 
   it('shutdown with a throwing capture still restores the nickname and leaves the session for the next boot', async () => {

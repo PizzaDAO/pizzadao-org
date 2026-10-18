@@ -249,8 +249,9 @@ export class CallRecorder {
         s.meta.endReason = reason
         s.meta.partial = s.capture.degraded
         writeSessionMeta(s.dir, s.meta)
-        clearStarting(s.dir)
       })
+      // Its own step: a failed meta write must not leave the dir marked "starting" forever.
+      await this.step('clear starting marker', async () => clearStarting(s.dir))
       await this.step('restore nickname', () => this.nick.release(s.guild))
       this.enqueueFinalize(s.dir)
     }
@@ -273,8 +274,8 @@ export class CallRecorder {
         s.meta.endReason = 'shutdown'
         s.meta.partial = true
         writeSessionMeta(s.dir, s.meta)
-        clearStarting(s.dir)
       })
+      await this.step('clear starting marker', async () => clearStarting(s.dir))
       await this.step('restore nickname', () => this.nick.release(s.guild))
     }
   }

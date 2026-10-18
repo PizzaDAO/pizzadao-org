@@ -834,7 +834,7 @@
   "adminCalls": {
     "overline": "Enregistrements d'appels",
     "title": "Appels enregistrés",
-    "description": "Appels de crew capturés par le bot PizzaDAO. L'audio est privé pour les relecteurs et supprimé après {days} jours.",
+    "description": "Appels de crew capturés par le bot PizzaDAO. L'audio est privé pour les relecteurs.",
     "metaDescription": "Relisez les appels de crew enregistrés.",
     "deniedTitle": "Accès refusé",
     "denied": "Cette page est réservée aux Dread Pizza Roberts.",
@@ -867,18 +867,18 @@
     "mix": "Mixage complet",
     "tracks": "Pistes individuelles",
     "audioExpires": "Les liens expirent dans {minutes} minutes. Rechargez pour les renouveler.",
-    "audioGone": "L'audio a été supprimé à la fin de la période de conservation.",
+    "audioGone": "Aucun audio n'est stocké pour cet enregistrement.",
     "audioError": "Impossible de charger l'audio.",
     "noAudio": "Aucun audio n'a été envoyé pour cet appel.",
     "endReason": "Fin : {reason}",
     "transcriptHeading": "Transcription et résumé",
     "transcriptPending": "La transcription et le résumé ne sont pas encore générés.",
-    "remove": "Supprimer l'enregistrement",
-    "removeConfirm": "Supprimer l'audio de cet appel du stockage et le marquer comme rejeté ? Action irréversible.",
-    "removeYes": "Oui, supprimer",
+    "remove": "Rejeter (masquer)",
+    "removeConfirm": "Rejeter cet enregistrement et le masquer ? L'audio et les détails sont conservés.",
+    "removeYes": "Oui, rejeter",
     "cancel": "Annuler",
-    "removing": "Suppression...",
-    "removeError": "Impossible de supprimer l'enregistrement. Réessayez.",
-    "removedNote": "Cet enregistrement a été supprimé ; son audio est effacé."
+    "removing": "Rejet...",
+    "removeError": "Impossible de rejeter l'enregistrement. Réessayez.",
+    "removedNote": "Cet enregistrement a été rejeté (masqué)."
   }
 }

@@ -137,9 +137,6 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
 
   // Upload. A failure leaves the directory for the next recovery pass.
   try {
-    // Remove anything an earlier attempt uploaded (a speaker since purged for opting out,
-    // a track that no longer exists), so only this attempt's files remain.
-    await deps.uploader.deletePrefix(keys.prefix)
     if (existsSync(mixFile)) {
       const bytes = await deps.uploader.put(keys.mix, mixFile, 'audio/mp4')
       mix = { key: keys.mix, bytes }
@@ -182,18 +179,25 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
     const post = deps.postIngest ?? ((p: IngestPayload) => postIngestWithRetry(deps.appBaseUrl, deps.apiKey, p))
     const res = await post(payload)
     if (res.ok) {
+      // Upload first, prune after: remove only objects the stored row does NOT reference
+      // (leftovers of earlier attempts, e.g. a speaker since purged for opting out).
+      const ours = [payload.mix?.key, ...payload.speakers.map((sp) => sp.trackKey)].filter((k): k is string => !!k)
+      const keep = new Set(res.keys.length ? res.keys : ours)
+      try {
+        const pruned = await deps.uploader.pruneExcept(keys.prefix, keep)
+        if (pruned) deps.log(`removed ${pruned} leftover R2 object(s) of ${meta.sessionId}`)
+      } catch (err) {
+        deps.log(`could not prune leftovers of ${meta.sessionId}: ${err instanceof Error ? err.message : String(err)}`)
+      }
       writeFileSync(path.join(dir, UPLOADED), res.id)
       cleanAudio(dir)
       deps.log(`session ${meta.sessionId} ingested as ${res.id}${res.duplicate ? ' (already existed)' : ''}`)
       return 'uploaded'
     }
     if (!res.retryable) {
-      // The app will never accept this payload: do not leave its audio orphaned in R2.
-      try {
-        await deps.uploader.deletePrefix(keys.prefix)
-      } catch (err) {
-        deps.log(`could not delete R2 objects of rejected session ${meta.sessionId}: ${err instanceof Error ? err.message : String(err)}`)
-      }
+      // Nothing is deleted from R2 here: a row for this session might already reference
+      // those objects. Leftovers stay under calls/<sessionId>/ for a human to look at.
+      deps.log(`NOT deleting R2 objects under ${keys.prefix}; check them by hand`)
       writeFileSync(path.join(dir, REJECTED), res.error)
       deps.log(`app rejected session ${meta.sessionId}: ${res.error}`)
       return 'rejected'

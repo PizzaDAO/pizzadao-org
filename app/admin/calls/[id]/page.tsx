@@ -10,7 +10,6 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { getRecording } from "@/app/lib/calls/recordings";
-import { audioPastRetention, retentionDays } from "@/app/lib/calls/retention";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
 
@@ -42,7 +41,6 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
 
     const when = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" });
     const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
-    const audioGone = !!rec.audioDeletedAt || audioPastRetention(rec.endedAt, new Date(), retentionDays());
     const hasAudio = !!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -66,9 +64,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
 
                 <section className="grid gap-3">
                     <h2 className="text-xl font-bold m-0">{t("audioHeading")}</h2>
-                    {audioGone ? (
-                        <p className="text-foreground/60 m-0">{t("audioGone")}</p>
-                    ) : hasAudio ? (
+                    {hasAudio ? (
                         <CallAudioPlayer
                             recordingId={rec.id}
                             labels={{

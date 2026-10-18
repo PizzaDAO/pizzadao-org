@@ -209,14 +209,14 @@ describe('finalizeSession', () => {
             puts.push(key)
             return 5
           },
-          deletePrefix: async (prefix: string) => {
-            deleted.push(prefix)
+          pruneExcept: async (prefix: string, keep: ReadonlySet<string>) => {
+            deleted.push(`${prefix} keep=${[...keep].sort().join(',')}`)
             return 0
           },
         },
         postIngest: async (p: IngestPayload) => {
           posted.push(p)
-          return { ok: true as const, id: 'rec1', duplicate: false }
+          return { ok: true as const, id: 'rec1', duplicate: false, keys: [] as string[] }
         },
         ...over,
       },

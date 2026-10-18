@@ -4,8 +4,9 @@ import path from 'node:path'
 import { describe, expect, it } from 'vitest'
 import { appendRecord } from './manifest.js'
 import { finalizeSession, writeSessionMeta } from './finalize.js'
-import { isRetryableStatus } from './ingest.js'
+import { isRetryableStatus, type IngestResult } from './ingest.js'
 import { buildSpeakerTrackPlan, MAX_INPUTS_PER_PASS } from './mix-plan.js'
+import { assertSessionPrefix, sessionKeys } from './storage.js'
 
 function session() {
   const dir = mkdtempSync(path.join(os.tmpdir(), 'fx-'))
@@ -19,7 +20,7 @@ function session() {
   return dir
 }
 
-const mk = (post: () => Promise<{ ok: false; retryable: boolean; error: string }>) => {
+const mk = (post: () => Promise<IngestResult>) => {
   const order: string[] = []
   return {
     order,
@@ -28,36 +29,70 @@ const mk = (post: () => Promise<{ ok: false; retryable: boolean; error: string }
       ffmpeg: async (args: string[]) => writeFileSync(args.at(-1)!, 'a'),
       uploader: {
         put: async (k: string) => (order.push(`put:${k}`), 1),
-        deletePrefix: async (p: string) => (order.push(`del:${p}`), 0),
+        pruneExcept: async (p: string, keep: ReadonlySet<string>) => (order.push(`prune:${p}:${[...keep].sort().join(',')}`), 0),
       },
       postIngest: post,
     },
   }
 }
 
-describe('finalize cleanup of R2', () => {
-  it('clears stale objects of earlier attempts before uploading', async () => {
-    const { deps, order } = mk(async () => ({ ok: false, retryable: true, error: '503' }))
-    await finalizeSession(session(), deps)
-    expect(order[0]).toBe('del:calls/ev1-1000/')
-    expect(order.slice(1).every((o) => o.startsWith('put:'))).toBe(true)
+describe('R2 cleanup after finalize', () => {
+  it('uploads first, then prunes only objects outside the stored row (never a window with missing objects)', async () => {
+    const { deps, order } = mk(async () => ({
+      ok: true,
+      id: 'r',
+      duplicate: false,
+      keys: ['calls/ev1-1000/mix.m4a', 'calls/ev1-1000/tracks/111.ogg'],
+    }))
+    expect(await finalizeSession(session(), deps)).toBe('uploaded')
+    expect(order.filter((o) => o.startsWith('put:'))).toHaveLength(2)
+    expect(order.at(-1)).toBe('prune:calls/ev1-1000/:calls/ev1-1000/mix.m4a,calls/ev1-1000/tracks/111.ogg')
+    expect(order.findIndex((o) => o.startsWith('prune:'))).toBeGreaterThan(order.findLastIndex((o) => o.startsWith('put:')))
   })
 
-  it('deletes everything it uploaded when the app permanently refuses the payload', async () => {
+  it('on a duplicate ingest keeps the EXISTING row\'s keys', async () => {
+    const { deps, order } = mk(async () => ({ ok: true, id: 'r', duplicate: true, keys: ['calls/ev1-1000/tracks/222.ogg'] }))
+    await finalizeSession(session(), deps)
+    expect(order.at(-1)).toBe('prune:calls/ev1-1000/:calls/ev1-1000/tracks/222.ogg')
+  })
+
+  it('does not prune (and stays pending) when the ingest has not succeeded', async () => {
+    const { deps, order } = mk(async () => ({ ok: false, retryable: true, error: '503' }))
+    expect(await finalizeSession(session(), deps)).toBe('pending')
+    expect(order.some((o) => o.startsWith('prune:'))).toBe(false)
+  })
+
+  it('never deletes anything from R2 when the app permanently refuses the payload', async () => {
     const { deps, order } = mk(async () => ({ ok: false, retryable: false, error: '400' }))
     expect(await finalizeSession(session(), deps)).toBe('rejected')
-    expect(order.at(-1)).toBe('del:calls/ev1-1000/')
+    expect(order.some((o) => o.startsWith('prune:'))).toBe(false)
   })
 
-  it('keeps audio (no delete, stays pending) on auth / route errors', async () => {
-    for (const status of [401, 403, 404]) {
-      expect(isRetryableStatus(status)).toBe(true)
-    }
+  it('keeps audio and stays pending on auth / route errors', async () => {
+    for (const status of [401, 403, 404]) expect(isRetryableStatus(status)).toBe(true)
     expect(isRetryableStatus(400)).toBe(false)
     expect(isRetryableStatus(422)).toBe(false)
     const { deps, order } = mk(async () => ({ ok: false, retryable: isRetryableStatus(401), error: '401' }))
     expect(await finalizeSession(session(), deps)).toBe('pending')
-    expect(order.filter((o) => o.startsWith('del:'))).toHaveLength(1) // only the pre-upload cleanup
+    expect(order.some((o) => o.startsWith('prune:'))).toBe(false)
+  })
+})
+
+describe('session prefix guard', () => {
+  it('accepts a real session prefix', () => {
+    expect(() => assertSessionPrefix('calls/1394003497153724497-1760000000000/')).not.toThrow()
+    expect(sessionKeys('ev1-1000').prefix).toBe('calls/ev1-1000/')
+  })
+
+  it.each(['', 'calls/', 'calls//', 'calls/../', 'calls/a b/', 'calls/abc/', 'other/ev1-1000/', 'calls/ev1-1000', 'calls/ev1-1000/tracks/'])(
+    'refuses %j',
+    (prefix) => {
+      expect(() => assertSessionPrefix(prefix)).toThrow()
+    },
+  )
+
+  it.each(['', 'a', '../x', 'a/b/c/d/e/f', 'x'.repeat(81)])('sessionKeys refuses a malformed session id %j', (id) => {
+    expect(() => sessionKeys(id)).toThrow()
   })
 })
 
@@ -65,13 +100,12 @@ describe('buildSpeakerTrackPlan', () => {
   const segs = (n: number) => Array.from({ length: n }, (_, i) => ({ file: `/s/${i}.ogg`, startMs: i * 1000 }))
 
   it('is one pass up to the per-pass limit', () => {
-    const plan = buildSpeakerTrackPlan(segs(MAX_INPUTS_PER_PASS), '/o/u.ogg', '/o/u')
-    expect(plan).toHaveLength(1)
+    expect(buildSpeakerTrackPlan(segs(MAX_INPUTS_PER_PASS), '/o/u.ogg', '/o/u')).toHaveLength(1)
   })
 
   it('chunks a chatty speaker: no pass opens more than 200 files, the last sums the chunks', () => {
     const plan = buildSpeakerTrackPlan(segs(450), '/o/u.ogg', '/o/u')
-    expect(plan).toHaveLength(4) // 200 + 200 + 50, then the final sum
+    expect(plan).toHaveLength(4)
     for (const pass of plan) expect(pass.filter((a) => a === '-i').length).toBeLessThanOrEqual(MAX_INPUTS_PER_PASS)
     expect(plan[3].filter((a) => a === '-i')).toHaveLength(3)
     expect(plan[3].at(-1)).toBe('/o/u.ogg')

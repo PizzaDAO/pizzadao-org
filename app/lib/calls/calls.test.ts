@@ -1,5 +1,5 @@
 // @vitest-environment node
-// calzone-30418: ingest auth/validation, DPR gating, opt-out, crew mapping, retention.
+// calzone-30418: ingest auth/validation, DPR gating, opt-out, crew mapping, reject (hide).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -12,26 +12,22 @@ vi.mock('@/app/lib/mission-review-access', () => ({
 }))
 vi.mock('./r2', () => ({
   signedAudioUrl: vi.fn(async (k: string) => `https://r2.example/${k}?sig=1`),
-  deleteRecordingPrefix: vi.fn(async () => 0),
-  r2Configured: vi.fn(() => true),
   SIGNED_URL_TTL_SEC: 900,
 }))
 
 import { prisma } from '@/app/lib/db'
+import { signedAudioUrl } from './r2'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { getSession } from '@/app/lib/session'
 import { canReviewMission } from '@/app/lib/mission-review-access'
-import { deleteRecordingPrefix } from './r2'
 import { parseIngestPayload } from './ingest-schema'
 import { extractEventId, resolveCrewForEvent } from './crew-map'
 import { isRecorderAuthorized } from './recorder-auth'
-import { audioPastRetention, retentionCutoff, retentionDays, sweepExpiredAudio } from './retention'
 import { setRecordingOptOut } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { GET as optoutsGET } from '@/app/api/calls/recorder/optouts/route'
 import { GET as audioGET } from '@/app/api/admin/calls/[id]/audio/route'
-import { POST as removePOST } from '@/app/api/admin/calls/[id]/remove/route'
-import { GET as retentionGET } from '@/app/api/cron/call-audio-retention/route'
+import { POST as rejectPOST } from '@/app/api/admin/calls/[id]/remove/route'
 import { handleInteraction, type HandlerDeps } from '@/app/lib/discord-interactions/handle'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -137,17 +133,22 @@ describe('POST /api/calls/recorder/ingest', () => {
     })
     const res = await ingestPOST(jsonReq('/api/calls/recorder/ingest', payload(), 'Bearer rec-key'))
     expect(res.status).toBe(201)
-    expect(await res.json()).toEqual({ id: 'rec1', duplicate: false })
+    expect(await res.json()).toEqual({
+      id: 'rec1',
+      duplicate: false,
+      keys: [`calls/${SESSION}/mix.m4a`, `calls/${SESSION}/tracks/111111111111111111.ogg`],
+    })
     const data = db.callRecording.create.mock.calls[0][0].data
     expect(data).toMatchObject({ sessionId: SESSION, crewId: 'community_call', crewLabel: 'Community Call', durationSec: 3600 })
     expect(data.speakers.create[0]).toMatchObject({ discordId: '111111111111111111', talkTimeSec: 600 })
   })
 
   it('is idempotent on sessionId', async () => {
-    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1' })
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', mixKey: 'calls/s/mix.m4a', speakers: [{ trackKey: 'calls/s/tracks/1.ogg' }, { trackKey: null }] })
     const res = await ingestPOST(jsonReq('/api/calls/recorder/ingest', payload(), 'Bearer rec-key'))
     expect(res.status).toBe(200)
-    expect(await res.json()).toEqual({ id: 'rec1', duplicate: true })
+    // a duplicate returns the EXISTING row's keys so the worker only prunes objects outside them
+    expect(await res.json()).toEqual({ id: 'rec1', duplicate: true, keys: ['calls/s/mix.m4a', 'calls/s/tracks/1.ogg'] })
     expect(db.callRecording.create).not.toHaveBeenCalled()
   })
 
@@ -276,77 +277,63 @@ describe('GET /api/admin/calls/[id]/audio (Dread Pizza Roberts only)', () => {
     db.callRecording.findUnique.mockResolvedValue(null)
     expect((await call()).status).toBe(404)
   })
-  it('410 once audio is deleted or past retention', async () => {
+  it('410 only when the recording has no stored audio, however old it is', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
     m(canReviewMission).mockResolvedValue(true)
-    db.callRecording.findUnique.mockResolvedValue(rec({ audioDeletedAt: new Date() }))
+    db.callRecording.findUnique.mockResolvedValue(rec({ mixKey: null, speakers: [{ discordId: '1', displayName: 'Ann', trackKey: null }] }))
     expect((await call()).status).toBe(410)
-    db.callRecording.findUnique.mockResolvedValue(rec({ endedAt: new Date(Date.now() - 91 * 86_400_000) }))
-    expect((await call()).status).toBe(410)
+    db.callRecording.findUnique.mockResolvedValue(rec({ endedAt: new Date(Date.now() - 400 * 86_400_000) }))
+    expect((await call()).status).toBe(200) // kept forever
   })
 })
 
-describe('audio retention', () => {
-  const NOW = new Date('2026-10-18T12:00:00Z')
+describe('POST /api/admin/calls/[id]/remove (reject / hide)', () => {
+  const ctx = { params: Promise.resolve({ id: 'rec1' }) }
+  const call = (body: unknown = { confirm: true }) =>
+    rejectPOST(
+      new Request('https://app.pizzadao.org/api/admin/calls/rec1/remove', { method: 'POST', body: JSON.stringify(body) }),
+      ctx,
+    )
+  const asReviewer = () => {
+    m(getSession).mockResolvedValue({ discordId: '9' })
+    m(canReviewMission).mockResolvedValue(true)
+  }
 
-  it('defaults to 90 days and reads RECORDING_AUDIO_RETENTION_DAYS', () => {
-    expect(retentionDays(env())).toBe(90)
-    expect(retentionDays(env({ RECORDING_AUDIO_RETENTION_DAYS: '30' }))).toBe(30)
-    expect(retentionDays(env({ RECORDING_AUDIO_RETENTION_DAYS: '0' }))).toBe(90)
-    expect(retentionDays(env({ RECORDING_AUDIO_RETENTION_DAYS: 'x' }))).toBe(90)
-  })
-  it('computes the cutoff and expiry', () => {
-    expect(retentionCutoff(NOW, 90).toISOString()).toBe('2026-07-20T12:00:00.000Z')
-    expect(audioPastRetention(new Date('2026-07-19T00:00:00Z'), NOW, 90)).toBe(true)
-    expect(audioPastRetention(new Date('2026-08-01T00:00:00Z'), NOW, 90)).toBe(false)
-  })
-  it('sweeps expired recordings: deletes the whole calls/<sessionId>/ prefix, then clears the keys', async () => {
-    db.callRecording.findMany.mockResolvedValue([
-      { id: 'a', sessionId: 'sess-a' },
-      { id: 'b', sessionId: 'sess-b' },
-    ])
-    const deletePrefix = vi.fn(async (_sessionId: string) => 3)
-    const r = await sweepExpiredAudio(NOW, { deletePrefix })
-    expect(db.callRecording.findMany.mock.calls[0][0].where).toEqual({
-      audioDeletedAt: null,
-      endedAt: { lt: new Date('2026-07-20T12:00:00.000Z') },
-    })
-    expect(deletePrefix.mock.calls.map((c) => c[0])).toEqual(['sess-a', 'sess-b'])
-    expect(db.callRecording.update).toHaveBeenCalledTimes(2)
-    expect(db.callRecording.update.mock.calls[0][0].data).toMatchObject({ audioDeletedAt: NOW, mixKey: null })
-    expect(r).toMatchObject({ checked: 2, deleted: 2, failed: 0 })
-  })
-  it('keeps the row unmarked when the R2 delete fails, so the next run retries', async () => {
-    db.callRecording.findMany.mockResolvedValue([{ id: 'a', sessionId: 'sess-a' }])
-    vi.spyOn(console, 'error').mockImplementation(() => undefined)
-    const r = await sweepExpiredAudio(NOW, { deletePrefix: vi.fn().mockRejectedValue(new Error('r2 down')) })
+  it('401 without a session and 403 for a non-reviewer, changing nothing', async () => {
+    m(getSession).mockResolvedValue(null)
+    expect((await call()).status).toBe(401)
+    m(getSession).mockResolvedValue({ discordId: '9' })
+    m(canReviewMission).mockResolvedValue(false)
+    expect((await call()).status).toBe(403)
     expect(db.callRecording.update).not.toHaveBeenCalled()
-    expect(r).toMatchObject({ deleted: 0, failed: 1 })
   })
 
-  describe('cron route', () => {
-    let saved: string | undefined
-    beforeEach(() => {
-      saved = process.env.CRON_SECRET
-      process.env.CRON_SECRET = 'cron-secret'
-    })
-    afterEach(() => {
-      if (saved === undefined) delete process.env.CRON_SECRET
-      else process.env.CRON_SECRET = saved
-    })
-    it('401 without the cron bearer', async () => {
-      const res = await retentionGET(new NextRequest('https://app.pizzadao.org/api/cron/call-audio-retention'))
-      expect(res.status).toBe(401)
-      expect(db.callRecording.findMany).not.toHaveBeenCalled()
-    })
-    it('runs the sweep with the cron bearer', async () => {
-      db.callRecording.findMany.mockResolvedValue([])
-      const res = await retentionGET(
-        new NextRequest('https://app.pizzadao.org/api/cron/call-audio-retention', { headers: { authorization: 'Bearer cron-secret' } }),
-      )
-      expect(res.status).toBe(200)
-      expect((await res.json()).status).toBe('finished')
-      expect(deleteRecordingPrefix).not.toHaveBeenCalled()
-    })
+  it('400 unless confirm is exactly true', async () => {
+    asReviewer()
+    expect((await call({})).status).toBe(400)
+    expect((await call({ confirm: 'yes' })).status).toBe(400)
+    expect(db.callRecording.update).not.toHaveBeenCalled()
+  })
+
+  it('404 for an unknown id', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue(null)
+    expect((await call()).status).toBe(404)
+    expect(db.callRecording.update).not.toHaveBeenCalled()
+  })
+
+  it('marks REJECTED with reviewedBy/reviewedAt in one update; audio keys, row and speakers untouched; no R2 calls', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1' })
+    expect((await call()).status).toBe(200)
+    expect(db.callRecording.update).toHaveBeenCalledTimes(1)
+    const arg = db.callRecording.update.mock.calls[0][0]
+    expect(arg.where).toEqual({ id: 'rec1' })
+    expect(arg.data).toMatchObject({ status: 'REJECTED', reviewedBy: '9', publishedAt: null })
+    expect(arg.data.reviewedAt).toBeInstanceOf(Date)
+    expect(Object.keys(arg.data).sort()).toEqual(['publishedAt', 'reviewedAt', 'reviewedBy', 'status'])
+    expect(db.callRecording.delete).not.toHaveBeenCalled()
+    expect(db.callSpeaker.deleteMany).not.toHaveBeenCalled()
+    expect(signedAudioUrl).not.toHaveBeenCalled() // nothing in R2 was touched
   })
 })
