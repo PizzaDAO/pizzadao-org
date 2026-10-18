@@ -1,0 +1,33 @@
+{
+  "name": "pizzadao-call-recorder",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Joins PizzaDAO crew calls in Discord, records one Opus stream per speaker, uploads to R2 and reports to the app.",
+  "engines": {
+    "node": ">=22"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "start": "node dist/index.js",
+    "dev": "tsx src/index.ts",
+    "spike": "tsx src/spike.ts",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "postinstall": "patch-package"
+  },
+  "dependencies": {
+    "@aws-sdk/client-s3": "^3.700.0",
+    "@discordjs/voice": "0.19.2",
+    "@snazzah/davey": "0.1.12",
+    "discord.js": "^14.22.0",
+    "libsodium-wrappers": "^0.7.15"
+  },
+  "devDependencies": {
+    "@types/node": "^22",
+    "patch-package": "^8.0.0",
+    "tsx": "^4.19.0",
+    "typescript": "^5",
+    "vitest": "^4.0.18"
+  }
+}

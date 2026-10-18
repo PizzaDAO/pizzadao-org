@@ -1,0 +1,26 @@
+diff --git a/node_modules/@discordjs/voice/dist/index.js b/node_modules/@discordjs/voice/dist/index.js
+--- a/node_modules/@discordjs/voice/dist/index.js
++++ b/node_modules/@discordjs/voice/dist/index.js
+@@ -957,8 +957,7 @@
+         this.consecutiveFailures++;
+         this.emit("debug", `Failed to decrypt a packet (${this.consecutiveFailures} consecutive fails)`);
+         if (this.consecutiveFailures > this.failureTolerance) {
+-          if (this.lastTransitionId) this.recoverFromInvalidTransition(this.lastTransitionId);
+-          else throw error;
++          this.recoverFromInvalidTransition(this.lastTransitionId ?? 0);
+         }
+       } else if (this.reinitializing) {
+         this.emit("debug", "Failed to decrypt a packet (reinitializing session)");
+diff --git a/node_modules/@discordjs/voice/dist/index.mjs b/node_modules/@discordjs/voice/dist/index.mjs
+--- a/node_modules/@discordjs/voice/dist/index.mjs
++++ b/node_modules/@discordjs/voice/dist/index.mjs
+@@ -897,8 +897,7 @@
+         this.consecutiveFailures++;
+         this.emit("debug", `Failed to decrypt a packet (${this.consecutiveFailures} consecutive fails)`);
+         if (this.consecutiveFailures > this.failureTolerance) {
+-          if (this.lastTransitionId) this.recoverFromInvalidTransition(this.lastTransitionId);
+-          else throw error;
++          this.recoverFromInvalidTransition(this.lastTransitionId ?? 0);
+         }
+       } else if (this.reinitializing) {
+         this.emit("debug", "Failed to decrypt a packet (reinitializing session)");
