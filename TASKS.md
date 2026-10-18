@@ -12,7 +12,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 | artichoke-67361 | it should truncate non alphanumeric characters from names on signup | doing | P3 |  |  |  | plans/artichoke-67361.md |  |  |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
 | woodfired-65373 | Check box mafia role and suggest buying a box | doing | P3 |  |  |  | plans/woodfired-65373.md |  |  |
-| zucchini-21674 | if the user's already in pizzadao's discord, don't ask for permission to join servers for them | doing | P3 |  |  |  | plans/zucchini-21674.md |  |  |
+| zucchini-21674 | if the user's already in pizzadao's discord, don't ask for permission to join servers for them | review | P3 |  |  |  | plans/zucchini-21674.md |  |  |
 | jalapeno-34126 | Add animation/pop up to signal your profile has been completed | todo | P2 |  | Pizza Lord |  |  |  |  |
 | pizzaiolo-13628 | update timezone for crewsheet | todo | P2 |  |  |  |  |  | when someone selects their city, the timezone should auto format to their local pov |
 | garlic-67660 | page of Print Materials to make it easy for members to print stickers etc | todo | P2 |  |  |  |  |  |  |
