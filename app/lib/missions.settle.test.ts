@@ -118,6 +118,18 @@ describe('completedLevelBy', () => {
     expect(await completedLevelBy(['a', 'b', 'c', 'd'], 2)).toEqual(new Set(['a', 'c']))
     expect(await completedLevelBy([], 2)).toEqual(new Set())
   })
+
+  it('counts a paid ledger row even when the level has no active missions now', async () => {
+    mockFn(prisma.missionCompletion.findMany).mockResolvedValue([])
+    mockFn(prisma.transaction.findMany).mockResolvedValue([{ userId: 'p', metadata: { level: 2 }, description: null }])
+    mockFn(prisma.mission.findMany).mockResolvedValue([{ id: 1, level: 1 }, { id: 4, level: 3 }])
+    expect(await completedLevelBy(['p', 'q'], 2)).toEqual(new Set(['p']))
+  })
+
+  it('fails closed when there are no active missions', async () => {
+    mockFn(prisma.mission.findMany).mockResolvedValue([])
+    await expect(completedLevelBy(['a'], 2)).rejects.toThrow()
+  })
 })
 
 describe('approveMission on a held (auto-verified) completion', () => {

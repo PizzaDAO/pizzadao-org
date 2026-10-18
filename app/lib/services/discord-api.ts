@@ -1,4 +1,5 @@
 import { isTraineeNick } from "@/app/lib/trainee-nick";
+import { sanitizeDisplayName } from "@/app/lib/display-name";
 
 /**
  * Low-level Discord API wrapper
@@ -86,7 +87,8 @@ export async function syncDiscordMember(opts: {
   if (nickname) body.nick = nickname.slice(0, 32);
   else if (replaceTraineeNickWith && isTraineeNick((member.json as any)?.nick)) {
     // A claimed roster row replaces the "Pizza Trainee" placeholder (anchovy-52918).
-    body.nick = replaceTraineeNickWith.slice(0, 32);
+    const clean = sanitizeDisplayName(replaceTraineeNickWith).slice(0, 32).trim();
+    if (clean && !isTraineeNick(clean)) body.nick = clean;
   }
 
   const patch = await discordFetch(`/guilds/${guildId}/members/${userId}`, {

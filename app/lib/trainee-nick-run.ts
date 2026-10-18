@@ -62,6 +62,7 @@ export interface TraineeNickResult {
 export interface TraineeNickDeps {
   env: NodeJS.ProcessEnv
   sleep: (ms: number) => Promise<void>
+  now: () => number
   /** Runs fn holding the single-flight lock; { busy: true } when someone else has it. */
   withLock: <T>(fn: () => Promise<T>) => Promise<{ busy: true } | { busy: false; value: T }>
   listMembers: () => Promise<GuildMemberRow[]>
@@ -75,6 +76,7 @@ export interface TraineeNickDeps {
 const defaultDeps = (): TraineeNickDeps => ({
   env: process.env,
   sleep: (ms) => new Promise((r) => setTimeout(r, ms)),
+  now: () => Date.now(),
   withLock: async (fn) => {
     try {
       return await prisma.$transaction(
@@ -100,10 +102,19 @@ const defaultDeps = (): TraineeNickDeps => ({
 
 class BusySignal extends Error {}
 
-function parseSince(raw: string | undefined): number | null {
-  const t = raw ? Date.parse(raw) : NaN
-  return Number.isFinite(t) ? t : null
+const SINCE_FLOOR = Date.parse('2026-10-01T00:00:00Z')
+
+/** Full ISO timestamp, not before the 2026-10-01 floor and not in the future; else null. */
+export function parseSince(raw: string | undefined, now = Date.now()): number | null {
+  const s = (raw ?? '').trim()
+  if (!/^\d{4}-\d{2}-\d{2}T/.test(s)) return null
+  const t = Date.parse(s)
+  if (!Number.isFinite(t) || t < SINCE_FLOOR || t > now) return null
+  return t
 }
+
+/** Stop issuing writes after this long so the 115s lock transaction never times out mid-run. */
+const WRITE_BUDGET_MS = 90_000
 
 function intEnv(raw: string | undefined, fallback: number): number {
   const n = Number(raw)
@@ -222,8 +233,13 @@ export async function runTraineeNicks(opts: {
     let forbiddenStreak = 0
     let errorStreak = 0
     let stop = null as string | null
+    const writeStart = deps.now()
 
     const perform = async (op: MemberWrite, reason: string): Promise<Outcome> => {
+      if (deps.now() - writeStart > WRITE_BUDGET_MS) {
+        stop = "time_budget"
+        return "stop"
+      }
       let res = await deps.write(op, reason)
       if (res.status === 429) {
         if (res.blocked || res.retryAfterMs === null || res.retryAfterMs > MAX_429_WAIT_MS) {

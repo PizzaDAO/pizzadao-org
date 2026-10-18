@@ -4,7 +4,7 @@ vi.mock('./db', () => ({ prisma: {} }))
 vi.mock('./missions', () => ({ completedLevelBy: vi.fn() }))
 vi.mock('./member-registration', () => ({ readSignedUpMembers: vi.fn() }))
 
-import { runTraineeNicks, removePizzaNoobOnGraduate, type TraineeNickDeps } from './trainee-nick-run'
+import { runTraineeNicks, removePizzaNoobOnGraduate, parseSince, type TraineeNickDeps } from './trainee-nick-run'
 import type { MemberWrite, MemberWriteResult } from './discord'
 
 const NOOB = '555555'
@@ -255,6 +255,37 @@ describe('runTraineeNicks: rate limits and errors', () => {
     expect(r.forbidden).toBe(0)
     expect(r.status).toBe('finished')
     expect(deps.write).toHaveBeenCalledTimes(2)
+  })
+})
+
+describe('parseSince', () => {
+  const now = Date.parse('2026-10-20T00:00:00Z')
+  it('rejects lenient, pre-floor and future values', () => {
+    for (const v of ['0', '2026', '10/18', '2025-01-01T00:00:00Z', '2026-12-01T00:00:00Z', '2026-10-18', '', undefined, '2026-13-45T00:00:00Z']) {
+      expect(parseSince(v, now)).toBeNull()
+    }
+  })
+  it('accepts a full ISO timestamp in range', () => {
+    expect(parseSince('2026-10-18T00:00:00Z', now)).toBe(Date.parse('2026-10-18T00:00:00Z'))
+  })
+  it('the runner is not_configured for a bad value', async () => {
+    const { deps } = setup({}, { TRAINEE_NICK_SINCE: '0' })
+    expect((await runTraineeNicks({ dryRun: false, deps })).status).toBe('not_configured')
+  })
+})
+
+describe('write time budget', () => {
+  it('stops writing after ~90s and returns partial stats', async () => {
+    let t = 0
+    const { deps } = setup({ now: () => t })
+    deps.write = vi.fn(async () => {
+      t += 60_000
+      return ok
+    })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r.stoppedReason).toBe('time_budget')
+    expect(deps.write).toHaveBeenCalledTimes(2)
+    expect(r.status).toBe('finished')
   })
 })
 

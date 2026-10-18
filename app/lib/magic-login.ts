@@ -27,7 +27,7 @@ export async function requestMagicLogin(
 ): Promise<MagicLoginResult> {
   const draft = options.onboarding ? sanitizeSignupDraft(options.signupDraft) : null;
   // Search guild for exact username match
-  const members = await searchGuildMembers(username, 5);
+  const members = await searchGuildMembers(username, 100);
   const match = members.find(
     (m) => m.user.username.toLowerCase() === username.toLowerCase(),
   );

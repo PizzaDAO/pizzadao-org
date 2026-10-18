@@ -68,6 +68,8 @@ export async function completedLevelBy(discordIds: readonly string[], level: num
   const done = new Set<string>()
   if (discordIds.length === 0) return done
   const missions = (await prisma.mission.findMany({ where: { isActive: true }, select: { id: true, level: true } })) ?? []
+  // Fail closed: an empty mission list would make every level look complete.
+  if (missions.length === 0) throw new Error('completedLevelBy: no active missions')
   for (let i = 0; i < discordIds.length; i += 1000) {
     const ids = discordIds.slice(i, i + 1000)
     const [approved, ledger] = await Promise.all([
@@ -95,7 +97,9 @@ export async function completedLevelBy(discordIds: readonly string[], level: num
       paidBy.set(row.userId, s)
     }
     for (const id of ids) {
-      if (computeCurrentLevel(missions, approvedBy.get(id) ?? new Set(), paidBy.get(id) ?? new Set()) > level) done.add(id)
+      const paid = paidBy.get(id) ?? new Set<number>()
+      // A paid ledger row for the level counts even if that level's missions changed since.
+      if (paid.has(level) || computeCurrentLevel(missions, approvedBy.get(id) ?? new Set(), paid) > level) done.add(id)
     }
   }
   return done
