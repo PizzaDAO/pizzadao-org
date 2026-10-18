@@ -15,6 +15,7 @@ const eslintConfig = defineConfig([
     // Local-only / non-source directories:
     ".backup/**",
     ".claude/**",
+    "recorder/**",
     "playwright-report/**",
     "test-results/**",
   ]),

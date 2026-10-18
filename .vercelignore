@@ -1,0 +1,3 @@
+# The call recorder worker deploys to Railway (root directory recorder/), not Vercel.
+# Anchored: an unanchored "recorder" would also match app/api/calls/recorder/*.
+/recorder

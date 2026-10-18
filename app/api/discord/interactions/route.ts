@@ -50,6 +50,7 @@ import { invalidateProgressCache } from "@/app/lib/mission-cache";
 import { reviewCardsEnabled, syncReviewCard } from "@/app/lib/mission-verify/review-cards";
 import { postEphemeralFollowup, runReviewDecision, type ReviewDecisionJob } from "@/app/lib/mission-verify/review-decision";
 import type { MissionReviewDeps } from "@/app/lib/discord-interactions/mission-review";
+import { setRecordingOptOut } from "@/app/lib/calls/recordings";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -159,6 +160,7 @@ function deps(guildId: string | undefined): HandlerDeps {
     logAdmin: logAdminGrant,
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
     missionReview,
+    setRecordingOptOut,
   };
 }
 

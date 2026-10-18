@@ -48,6 +48,13 @@ jobs:
       - name: Unit tests
         run: npx vitest run
 
+      - name: Recorder unit tests
+        run: |
+          cd recorder
+          npm ci
+          npm run typecheck
+          npm test
+
   build:
     name: Next.js build
     runs-on: ubuntu-latest

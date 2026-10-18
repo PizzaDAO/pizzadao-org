@@ -15,6 +15,7 @@
  */
 
 // Discord application command option types
+const SUB_COMMAND = 1
 const STRING = 3
 const INTEGER = 4
 const USER = 6
@@ -112,6 +113,17 @@ export const PEP_COMMANDS = [
     // so the reply is edited in via the interaction webhook afterwards.
     name: 'missions',
     description: 'Check your PizzaDAO missions: verifies what it can and shows your level',
+    dm_permission: false,
+  },
+  {
+    // calzone-30418: call recording preference. Opted-out members' audio is
+    // never captured by the call recorder.
+    name: 'record',
+    description: 'Choose whether the PizzaDAO bot may record your voice on calls',
+    options: [
+      { type: SUB_COMMAND, name: 'optout', description: 'Never record my voice on calls' },
+      { type: SUB_COMMAND, name: 'optin', description: 'Allow recording my voice on calls (the default)' },
+    ],
     dm_permission: false,
   },
 ] as const
