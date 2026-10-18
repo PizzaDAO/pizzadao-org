@@ -1,3 +1,5 @@
+import { parseRateLimit } from "./discord-rest"
+
 // Discord bot credentials. When DISCORD_GUILD_ID or DISCORD_BOT_TOKEN is
 // unset (local dev, previews), every lookup short-circuits to "unknown / not a
 // member" instead of calling e.g. `guilds//members/<id>` with an empty ID.
@@ -288,3 +290,173 @@ export async function fetchGuildMemberProfile(
     return hit?.profile ?? null
   }
 }
+
+// ---------------------------------------------------------------------------
+// Trainee nickname enforcement (anchovy-52918)
+// ---------------------------------------------------------------------------
+
+export interface GuildMemberRow {
+  nick?: string | null
+  roles: string[]
+  joined_at?: string | null
+  user: { id: string; bot?: boolean; username?: string }
+}
+
+const defaultSleep = (ms: number) => new Promise<void>((r) => setTimeout(r, ms))
+
+/**
+ * Every guild member, 1000 per page. Unlike getMembersWithRoles this THROWS on
+ * any non-OK response (a partial list would make enforcement decisions on
+ * missing data). A 429 is waited out once per page when the wait is short.
+ * Needs the GUILD_MEMBERS privileged intent.
+ */
+export async function listAllGuildMembers(
+  opts: { maxPages?: number; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void> } = {},
+): Promise<GuildMemberRow[]> {
+  const cfg = guildConfig()
+  if (!cfg) throw new Error("Discord is not configured")
+  const { guildId, botToken } = cfg
+  const doFetch = opts.fetchImpl ?? fetch
+  const sleep = opts.sleep ?? defaultSleep
+  const maxPages = opts.maxPages ?? 200
+  const all: GuildMemberRow[] = []
+  let after = "0"
+
+  for (let page = 0; page < maxPages; page++) {
+    const url = `https://discord.com/api/v10/guilds/${guildId}/members?limit=1000&after=${after}`
+    const init = { headers: { Authorization: `Bot ${botToken}` }, cache: "no-store" as const }
+    let r = await doFetch(url, init)
+    if (r.status === 429) {
+      const { retryAfterMs, cloudflare } = parseRateLimit(r.headers, await r.text())
+      if (cloudflare || retryAfterMs === null || retryAfterMs > 15_000) {
+        throw new Error("Discord member list rate limited")
+      }
+      await sleep(retryAfterMs)
+      r = await doFetch(url, init)
+    }
+    if (!r.ok) throw new Error(`Discord member list failed (${r.status})`)
+    const members = (await r.json()) as GuildMemberRow[]
+    if (members.length === 0) break
+    all.push(...members)
+    after = members[members.length - 1].user.id
+    if (members.length < 1000) break
+  }
+  return all
+}
+
+export interface GuildInfo {
+  ownerId: string | null
+  roles: Array<{ id: string; name: string; position: number; managed: boolean }>
+}
+
+/** Owner and roles (with position / managed) from GET /guilds/{id}. Throws on failure. */
+export async function getGuildInfo(opts: { fetchImpl?: typeof fetch } = {}): Promise<GuildInfo> {
+  const cfg = guildConfig()
+  if (!cfg) throw new Error("Discord is not configured")
+  const doFetch = opts.fetchImpl ?? fetch
+  const r = await doFetch(`https://discord.com/api/v10/guilds/${cfg.guildId}`, {
+    headers: { Authorization: `Bot ${cfg.botToken}` },
+    cache: "no-store",
+  })
+  if (!r.ok) throw new Error(`Discord guild fetch failed (${r.status})`)
+  const g = (await r.json()) as {
+    owner_id?: string
+    roles?: Array<{ id: string; name?: string; position?: number; managed?: boolean }>
+  }
+  return {
+    ownerId: g.owner_id ? String(g.owner_id) : null,
+    roles: (g.roles ?? []).map((ro) => ({
+      id: String(ro.id),
+      name: String(ro.name ?? ""),
+      position: Number(ro.position ?? 0),
+      managed: !!ro.managed,
+    })),
+  }
+}
+
+/** The bot's own user id (GET /users/@me). Throws on failure. */
+export async function getBotUserId(opts: { fetchImpl?: typeof fetch } = {}): Promise<string> {
+  const botToken = botTokenOnly()
+  if (!botToken) throw new Error("Discord is not configured")
+  const doFetch = opts.fetchImpl ?? fetch
+  const r = await doFetch("https://discord.com/api/v10/users/@me", {
+    headers: { Authorization: `Bot ${botToken}` },
+    cache: "no-store",
+  })
+  if (!r.ok) throw new Error(`Discord @me failed (${r.status})`)
+  return String(((await r.json()) as { id: string }).id)
+}
+
+export type MemberWrite =
+  | { kind: "nick"; userId: string; nick: string | null }
+  | { kind: "addRole"; userId: string; roleId: string }
+  | { kind: "removeRole"; userId: string; roleId: string }
+
+export interface MemberWriteResult {
+  status: number
+  /** X-RateLimit-Remaining / Reset-After (ms) when Discord sent them. */
+  remaining: number | null
+  resetAfterMs: number | null
+  /** On a 429: the wait, and whether it is a Cloudflare / global block. */
+  retryAfterMs: number | null
+  blocked: boolean
+}
+
+/**
+ * One guild-member write. A nickname is a PATCH with ONLY `nick` (never
+ * `roles`); a role add is PUT .../roles/{id} and a removal is DELETE
+ * .../roles/{id}, both idempotent single-role calls that can't race other role
+ * edits. Never throws on an HTTP error: the caller decides what to do.
+ */
+export async function writeGuildMember(
+  op: MemberWrite,
+  reason: string,
+  opts: { fetchImpl?: typeof fetch } = {},
+): Promise<MemberWriteResult> {
+  const cfg = guildConfig()
+  if (!cfg) throw new Error("Discord is not configured")
+  const doFetch = opts.fetchImpl ?? fetch
+  const base = `https://discord.com/api/v10/guilds/${cfg.guildId}/members/${op.userId}`
+  const headers: Record<string, string> = {
+    Authorization: `Bot ${cfg.botToken}`,
+    "X-Audit-Log-Reason": encodeURIComponent(reason),
+  }
+  let url = base
+  let method = "PATCH"
+  let body: string | undefined
+  if (op.kind === "nick") {
+    headers["Content-Type"] = "application/json"
+    body = JSON.stringify({ nick: op.nick })
+  } else {
+    url = `${base}/roles/${op.roleId}`
+    method = op.kind === "addRole" ? "PUT" : "DELETE"
+  }
+  const r = await doFetch(url, { method, headers, body, cache: "no-store" })
+  const num = (h: string) => {
+    const v = r.headers.get(h)
+    return v !== null && v !== "" && Number.isFinite(Number(v)) ? Number(v) : null
+  }
+  const resetAfter = num("x-ratelimit-reset-after")
+  let retryAfterMs: number | null = null
+  let blocked = false
+  if (r.status === 429) {
+    const text = await r.text()
+    const rl = parseRateLimit(r.headers, text)
+    retryAfterMs = rl.retryAfterMs
+    let global = false
+    try { global = !!(JSON.parse(text) as { global?: boolean }).global } catch { /* not JSON */ }
+    blocked = rl.cloudflare || global || r.headers.get("x-ratelimit-global") !== null
+  }
+  return {
+    status: r.status,
+    remaining: num("x-ratelimit-remaining"),
+    resetAfterMs: resetAfter === null ? null : Math.ceil(resetAfter * 1000),
+    retryAfterMs,
+    blocked,
+  }
+}
+
+export const addGuildMemberRole = (userId: string, roleId: string, reason: string) =>
+  writeGuildMember({ kind: "addRole", userId, roleId }, reason)
+export const removeGuildMemberRole = (userId: string, roleId: string, reason: string) =>
+  writeGuildMember({ kind: "removeRole", userId, roleId }, reason)

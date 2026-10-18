@@ -6,6 +6,7 @@
     { "path": "/api/cron/missions?slot=2", "schedule": "0 6 * * *" },
     { "path": "/api/cron/missions?slot=3", "schedule": "30 6 * * *" },
     { "path": "/api/cron/missions?slot=4", "schedule": "0 7 * * *" },
-    { "path": "/api/cron/mission-sla", "schedule": "0 15 * * *" }
+    { "path": "/api/cron/mission-sla", "schedule": "0 15 * * *" },
+    { "path": "/api/cron/trainee-nicks", "schedule": "*/10 * * * *" }
   ]
 }

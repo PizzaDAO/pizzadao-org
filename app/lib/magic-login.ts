@@ -4,6 +4,7 @@ import { searchGuildMembers, sendDM } from "./discord";
 import { sanitizeSignupDraft, type SignupDraft } from "./signup-draft";
 import { recordActivationLater as recordActivation } from "./activation";
 import { loginReturnPath } from "./login-return";
+import { realNick } from "./trainee-nick";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -34,7 +35,7 @@ export async function requestMagicLogin(
   if (!match) return { status: "not_found" };
 
   const discordId = match.user.id;
-  const nick = match.nick || match.user.global_name || match.user.username;
+  const nick = realNick(match.nick) || match.user.global_name || match.user.username;
 
   // Rate limit: max 3 requests per 15 min per Discord user
   const windowStart = new Date(Date.now() - RATE_LIMIT_WINDOW_MS);

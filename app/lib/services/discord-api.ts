@@ -1,3 +1,5 @@
+import { isTraineeNick } from "@/app/lib/trainee-nick";
+
 /**
  * Low-level Discord API wrapper
  */
@@ -26,6 +28,8 @@ export async function syncDiscordMember(opts: {
   botToken: string;
   userId: string;
   nickname?: string;
+  /** Used only when no `nickname` is given and the current nick is the "Pizza Trainee" placeholder. */
+  replaceTraineeNickWith?: string;
   turtleRoleIds: string[];
   crewRoleIds: string[];
   /** The single region role to assign (if any). */
@@ -38,6 +42,7 @@ export async function syncDiscordMember(opts: {
     botToken,
     userId,
     nickname,
+    replaceTraineeNickWith,
     turtleRoleIds,
     crewRoleIds,
     regionRoleId,
@@ -79,6 +84,10 @@ export async function syncDiscordMember(opts: {
   // 3. PATCH member
   const body: { roles: string[]; nick?: string } = { roles: nextRoles };
   if (nickname) body.nick = nickname.slice(0, 32);
+  else if (replaceTraineeNickWith && isTraineeNick((member.json as any)?.nick)) {
+    // A claimed roster row replaces the "Pizza Trainee" placeholder (anchovy-52918).
+    body.nick = replaceTraineeNickWith.slice(0, 32);
+  }
 
   const patch = await discordFetch(`/guilds/${guildId}/members/${userId}`, {
     method: "PATCH",

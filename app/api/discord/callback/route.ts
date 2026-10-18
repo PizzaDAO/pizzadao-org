@@ -15,6 +15,7 @@ import { claimPendingPepOnLogin } from "@/app/lib/unbelievaboat/claims";
 import { creditPendingItemGrantsOnLogin } from "@/app/lib/shop-grants";
 import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 import { lookupGuildMembership } from "@/app/lib/discord";
+import { realNick } from "@/app/lib/trainee-nick";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -166,7 +167,7 @@ export async function GET(req: Request) {
 
     const joined = membership.status === "member" || addedToGuild;
     const guildMember = membership.status === "member" ? membership.member : null;
-    const nick = guildMember?.nick || guildMember?.user?.global_name || me.username;
+    const nick = realNick(guildMember?.nick) || guildMember?.user?.global_name || me.username;
 
     // If this is a proxy flow (return_to exists), create transfer token
     // and redirect back to the preview

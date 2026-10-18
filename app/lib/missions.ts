@@ -1,4 +1,6 @@
+import { after } from 'next/server'
 import { prisma } from './db'
+import { PIZZA_NOOB_GRADUATE_LEVEL } from './trainee-nick'
 import { Prisma, type ReviewAction } from '@prisma/client'
 import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
@@ -55,6 +57,48 @@ export async function getPaidLevels(discordId: string): Promise<Set<number>> {
     if (level !== null) levels.add(level)
   }
   return levels
+}
+
+/**
+ * Bulk "has completed `level`" for many members (computeCurrentLevel > level:
+ * every level up to it is fully approved or already paid, in order). Three
+ * queries per 1000 ids. Returns the ids that completed it.
+ */
+export async function completedLevelBy(discordIds: readonly string[], level: number): Promise<Set<string>> {
+  const done = new Set<string>()
+  if (discordIds.length === 0) return done
+  const missions = (await prisma.mission.findMany({ where: { isActive: true }, select: { id: true, level: true } })) ?? []
+  for (let i = 0; i < discordIds.length; i += 1000) {
+    const ids = discordIds.slice(i, i + 1000)
+    const [approved, ledger] = await Promise.all([
+      prisma.missionCompletion.findMany({
+        where: { discordId: { in: ids }, status: 'APPROVED' },
+        select: { discordId: true, missionId: true },
+      }),
+      prisma.transaction.findMany({
+        where: { userId: { in: ids }, type: 'MISSION_REWARD' },
+        select: { userId: true, metadata: true, description: true },
+      }),
+    ])
+    const approvedBy = new Map<string, Set<number>>()
+    for (const c of approved ?? []) {
+      const s = approvedBy.get(c.discordId) ?? new Set<number>()
+      s.add(c.missionId)
+      approvedBy.set(c.discordId, s)
+    }
+    const paidBy = new Map<string, Set<number>>()
+    for (const row of ledger ?? []) {
+      const l = paidLevelOf(row)
+      if (l === null) continue
+      const s = paidBy.get(row.userId) ?? new Set<number>()
+      s.add(l)
+      paidBy.set(row.userId, s)
+    }
+    for (const id of ids) {
+      if (computeCurrentLevel(missions, approvedBy.get(id) ?? new Set(), paidBy.get(id) ?? new Set()) > level) done.add(id)
+    }
+  }
+  return done
 }
 
 /** The level a MISSION_REWARD ledger row paid, or null if it can't be read. */
@@ -683,6 +727,14 @@ export async function checkAndAwardLevelReward(discordId: string, level: number)
     metadata: { level, reward },
     linkUrl: '/missions',
   }).catch(() => {})
+
+  // Graduating from Pizza Noob (anchovy-52918): drop the Discord role. Never
+  // blocks or fails the payout; the 10-minute sweep retries anything missed.
+  if (level === PIZZA_NOOB_GRADUATE_LEVEL) {
+    const removeRole = () =>
+      import('./trainee-nick-run').then(m => m.removePizzaNoobOnGraduate(discordId)).catch(() => {})
+    try { after(removeRole) } catch { void removeRole() }
+  }
 
   return true
 }

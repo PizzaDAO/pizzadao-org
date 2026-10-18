@@ -192,6 +192,7 @@ export async function POST(req: Request) {
                     guildId,
                     botToken,
                     userId: sessionDiscordId,
+                    replaceTraineeNickWith: memberName || undefined,
                     turtleRoleIds,
                     crewRoleIds: [], // Claim doesn't set crews
                 });

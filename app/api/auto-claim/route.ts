@@ -170,6 +170,7 @@ export async function POST(req: Request) {
                         guildId,
                         botToken,
                         userId: sessionDiscordId,
+                        replaceTraineeNickWith: memberName || undefined,
                         turtleRoleIds,
                         crewRoleIds: [], // Auto-claim doesn't set crews
                     });

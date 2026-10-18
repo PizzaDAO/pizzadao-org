@@ -15,6 +15,11 @@ describe('DM signup handoff', () => {
     expect(data.discordId).toBe('verified-user'); expect(data.signupDraft).not.toHaveProperty('discordId');
     expect(data).not.toHaveProperty('rawToken'); expect(mocks.sendDM.mock.calls[0][0]).toBe('verified-user');
   });
+  it('stores the global name, not the Pizza Trainee placeholder, as the nick', async () => {
+    mocks.search.mockResolvedValue([{ user: { id: 'verified-user', username: 'test_member', global_name: 'Global' }, nick: 'Pizza Trainee' }]);
+    await requestMagicLogin('test_member', 'https://app.example');
+    expect(mocks.create.mock.calls[0][0].data.nick).toBe('Global');
+  });
   it('returns the draft only after a successful atomic token claim', async () => {
     mocks.findUnique.mockResolvedValue({ discordId: 'verified-user', username: 'member', nick: null, usedAt: null, expiresAt: new Date(Date.now() + 60000), signupDraft: { mafiaName: 'Test', city: 'Paris', sessionId: 'test-session' } });
     const verified = await verifyMagicToken('raw-test-token'); expect(verified).toMatchObject({ valid: true, discordId: 'verified-user', draft: { city: 'Paris' } });

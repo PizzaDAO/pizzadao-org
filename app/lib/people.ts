@@ -15,6 +15,7 @@
  */
 import { fetchGuildMemberProfile, type GuildMemberProfile } from './discord'
 import { getSheetData } from './sheets/member-repository'
+import { realNick } from './trainee-nick'
 
 export interface PersonLabel {
   discordId: string
@@ -109,7 +110,7 @@ export async function resolvePerson(ref: PersonRef, opts: ResolveOptions = {}): 
 
   const left = opts.deadline === undefined ? timeoutMs : Math.min(timeoutMs, opts.deadline - Date.now())
   const d = left > 0 ? await withTimeout(sources.discordProfile(ref.discordId, left), left) : null
-  const discordName = d?.nick || d?.globalName || d?.username
+  const discordName = realNick(d?.nick) || d?.globalName || d?.username
   if (d && discordName) {
     return {
       discordId: ref.discordId,
