@@ -9,7 +9,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 |----|------|-------|----------|-----|------|------|------|----|-------|
 | blackolive-55617 | Mafia Spotlight Submission form | doing | P2 |  |  |  | plans/blackolive-55617.md |  |  |
 | jalapeno-82565 | Custom Crew Bounties 🏴‍☠️ | doing | P2 |  |  |  | plans/jalapeno-82565.md |  |  |
-| artichoke-67361 | it should truncate non alphanumeric characters from names on signup | review | P3 |  |  |  | plans/artichoke-67361.md |  |  |
+| artichoke-67361 | it should truncate non alphanumeric characters from names on signup | review | P3 |  |  |  | plans/artichoke-67361.md | #171 |  |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
 | woodfired-65373 | Check box mafia role and suggest buying a box | doing | P3 |  |  |  | plans/woodfired-65373.md |  |  |
 | zucchini-21674 | if the user's already in pizzadao's discord, don't ask for permission to join servers for them | doing | P3 |  |  |  | plans/zucchini-21674.md |  |  |
