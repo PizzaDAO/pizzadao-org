@@ -115,7 +115,7 @@ describe('OAuth state', () => {
 
 describe('pending login cookie', () => {
   process.env.SESSION_SECRET ||= 'test-secret'
-  const data = { discordId: '1', username: 'u', nick: 'n' }
+  const data = { discordId: '1', username: 'u', nick: 'n', nonce: 'nn' }
 
   afterEach(() => vi.useRealTimers())
 

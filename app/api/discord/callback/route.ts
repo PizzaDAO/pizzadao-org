@@ -11,6 +11,7 @@ import {
   oauthStateCookieOptions,
   OAUTH_PENDING_COOKIE,
   createPendingLogin,
+  generateOAuthNonce,
   verifyPendingLogin,
 } from "@/app/lib/oauth-proxy";
 import { syncRolesOnLogin } from "@/app/lib/sync-roles-on-login";
@@ -186,7 +187,16 @@ async function finishLogin(
   return clearOAuthState(req, res);
 }
 
+/** oauth_pending is cleared on every exit except the redirect that sets it. */
 export async function GET(req: Request) {
+  const res = await handleCallback(req);
+  if (!res.cookies.get(OAUTH_PENDING_COOKIE)?.value) {
+    res.cookies.set(OAUTH_PENDING_COOKIE, "", { ...oauthStateCookieOptions(req), maxAge: 0 });
+  }
+  return res;
+}
+
+async function handleCallback(req: Request): Promise<NextResponse> {
   try {
     const url = new URL(req.url);
     const rawState = url.searchParams.get("state") || "";
@@ -199,9 +209,14 @@ export async function GET(req: Request) {
       // Cancelling the guilds.join screen: the first step already proved who
       // they are, so log them in as not joined. Only honored when this
       // browser's oauth_state nonce matches (same CSRF check as the code path).
-      if (isJoinStep && verifyOAuthNonce(readCookie(req, OAUTH_STATE_COOKIE), stateNonce)) {
+      if (
+        oauthError === "access_denied" &&
+        isJoinStep &&
+        verifyOAuthNonce(readCookie(req, OAUTH_STATE_COOKIE), stateNonce)
+      ) {
         const pending = verifyPendingLogin(readCookie(req, OAUTH_PENDING_COOKIE));
-        if (pending) {
+        // The pending login must be bound to this very join attempt.
+        if (pending && verifyOAuthNonce(pending.nonce, stateNonce)) {
           return finishLogin(req, url, {
             me: { id: pending.discordId, username: pending.username },
             nick: pending.nick,
@@ -259,11 +274,14 @@ export async function GET(req: Request) {
         joinUrl.searchParams.set("join", "1");
         if (state) joinUrl.searchParams.set("state", state);
         if (return_to && validateReturnTo(return_to)) joinUrl.searchParams.set("return_to", return_to);
+        // Mint the join-step nonce here and bind the pending login to it.
+        const joinNonce = generateOAuthNonce();
+        joinUrl.searchParams.set("nonce", joinNonce);
         const res = clearOAuthState(req, NextResponse.redirect(joinUrl.toString()));
-        // clearOAuthState expired the pending cookie; re-set it for the join hop.
+        res.cookies.set(OAUTH_STATE_COOKIE, joinNonce, oauthStateCookieOptions(req));
         res.cookies.set(
           OAUTH_PENDING_COOKIE,
-          createPendingLogin({ discordId: me.id, username: me.username, nick }),
+          createPendingLogin({ discordId: me.id, username: me.username, nick, nonce: joinNonce }),
           oauthStateCookieOptions(req),
         );
         return res;

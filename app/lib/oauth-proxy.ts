@@ -208,6 +208,8 @@ export interface PendingLoginPayload {
   discordId: string;
   username: string;
   nick: string;
+  /** The join-step oauth_state nonce this pending login is bound to. */
+  nonce: string;
   exp: number;
 }
 
@@ -240,6 +242,7 @@ export function verifyPendingLogin(token: string | undefined): PendingLoginPaylo
       discordId: d.discordId,
       username: String(d.username ?? ""),
       nick: String(d.nick ?? ""),
+      nonce: typeof d.nonce === "string" ? d.nonce : "",
       exp: d.exp,
     };
   } catch {
