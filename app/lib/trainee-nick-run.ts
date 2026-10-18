@@ -3,11 +3,13 @@ import {
   getBotUserId,
   getGuildInfo,
   listAllGuildMembers,
+  sendWelcome,
   writeGuildMember,
   type GuildInfo,
   type GuildMemberRow,
   type MemberWrite,
   type MemberWriteResult,
+  type WelcomeResult,
 } from './discord'
 import { completedLevelBy } from './missions'
 import { readSignedUpMembers } from './member-registration'
@@ -34,6 +36,8 @@ const ADVISORY_LOCK_KEY = 742019340
 const MAX_RESET_WAIT_MS = 5_000
 const MAX_429_WAIT_MS = 15_000
 const SAMPLE_SIZE = 20
+/** oregano-41907: the one welcome message (DM and channel post). */
+export const TRAINEE_WELCOME_TEXT = 'Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org'
 
 export type RoleStatus = 'ok' | 'role_unresolved' | 'role_not_assignable'
 
@@ -47,6 +51,8 @@ export interface TraineeNickResult {
   nickSet?: number
   roleAdded?: number
   roleRemoved?: number
+  welcomed?: number
+  welcomeFailed?: number
   roleStatus?: RoleStatus
   pizzaNoobRoleId?: string | null
   healed?: number
@@ -71,6 +77,7 @@ export interface TraineeNickDeps {
   readSignedUp: () => Promise<Map<string, string>>
   completedL2: (ids: string[]) => Promise<Set<string>>
   write: (op: MemberWrite, reason: string) => Promise<MemberWriteResult>
+  welcome: (userId: string, text: string, channelId: string | null) => Promise<WelcomeResult>
 }
 
 const defaultDeps = (): TraineeNickDeps => ({
@@ -98,6 +105,7 @@ const defaultDeps = (): TraineeNickDeps => ({
   readSignedUp: () => readSignedUpMembers(),
   completedL2: (ids) => completedLevelBy(ids, PIZZA_NOOB_GRADUATE_LEVEL),
   write: (op, reason) => writeGuildMember(op, reason),
+  welcome: (userId, text, channelId) => sendWelcome(userId, text, channelId),
 })
 
 class BusySignal extends Error {}
@@ -208,6 +216,8 @@ export async function runTraineeNicks(opts: {
       nickSet: 0,
       roleAdded: 0,
       roleRemoved: 0,
+      welcomed: 0,
+      welcomeFailed: 0,
       roleStatus,
       pizzaNoobRoleId,
       healed: 0,
@@ -219,8 +229,12 @@ export async function runTraineeNicks(opts: {
       stoppedReason: completedL2 === null && roleAssignable ? 'l2_lookup_failed' : null,
     }
 
+    // oregano-41907: welcome on the first Pizza Noob add (see welcomeFirstTime).
+    const welcomeChannelId = (env.TRAINEE_WELCOME_CHANNEL_ID ?? '').trim() || guild.systemChannelId || null
+
     // 4. Dry run: report only.
     if (dryRun) {
+      for (const e of plan.enforce) if (e.addRole) console.log(`[trainee-nicks] would welcome ${e.id}`)
       result.samples = {
         heal: plan.heal.slice(0, SAMPLE_SIZE).map((h) => h.id),
         sweep: plan.sweep.slice(0, SAMPLE_SIZE).map((h) => h.id),
@@ -280,6 +294,25 @@ export async function runTraineeNicks(opts: {
       return 'ok'
     }
 
+    /**
+     * First-time signal = this run just added Pizza Noob. The planner only
+     * plans addRole for in-scope, non-signed-up members who lack the role, and
+     * nick re-enforcement never adds it, so each member qualifies once; the
+     * advisory lock stops overlapping runs. Welcome failures never fail the run.
+     */
+    const welcomeFirstTime = async (userId: string) => {
+      if (deps.now() - writeStart > WRITE_BUDGET_MS) return
+      try {
+        const w = await deps.welcome(userId, TRAINEE_WELCOME_TEXT, welcomeChannelId)
+        if (w.dm === 'sent' || w.channel === 'sent') result.welcomed!++
+        else result.welcomeFailed!++
+        if (w.dm === 'closed') console.log(`[trainee-nicks] DMs closed for ${userId}`)
+      } catch (err) {
+        result.welcomeFailed!++
+        console.warn(`[trainee-nicks] welcome failed for ${userId}`, (err as Error)?.message)
+      }
+    }
+
     for (const h of plan.heal) {
       if (stop) break
       if ((await perform({ kind: 'nick', userId: h.id, nick: h.nick }, AUDIT_REASON)) === 'ok') {
@@ -311,6 +344,7 @@ export async function runTraineeNicks(opts: {
         if (o === 'ok') {
           result.roleAdded!++
           touched = true
+          await welcomeFirstTime(e.id)
         }
       }
       if (touched) result.enforced!++

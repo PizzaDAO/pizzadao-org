@@ -346,6 +346,7 @@ export async function listAllGuildMembers(
 
 export interface GuildInfo {
   ownerId: string | null
+  systemChannelId?: string | null
   roles: Array<{ id: string; name: string; position: number; managed: boolean }>
 }
 
@@ -361,10 +362,12 @@ export async function getGuildInfo(opts: { fetchImpl?: typeof fetch } = {}): Pro
   if (!r.ok) throw new Error(`Discord guild fetch failed (${r.status})`)
   const g = (await r.json()) as {
     owner_id?: string
+    system_channel_id?: string | null
     roles?: Array<{ id: string; name?: string; position?: number; managed?: boolean }>
   }
   return {
     ownerId: g.owner_id ? String(g.owner_id) : null,
+    systemChannelId: g.system_channel_id ? String(g.system_channel_id) : null,
     roles: (g.roles ?? []).map((ro) => ({
       id: String(ro.id),
       name: String(ro.name ?? ""),
@@ -460,3 +463,62 @@ export const addGuildMemberRole = (userId: string, roleId: string, reason: strin
   writeGuildMember({ kind: "addRole", userId, roleId }, reason)
 export const removeGuildMemberRole = (userId: string, roleId: string, reason: string) =>
   writeGuildMember({ kind: "removeRole", userId, roleId }, reason)
+
+export interface WelcomeResult {
+  /** 'closed' = Discord error 50007 (the member blocks DMs from this server). */
+  dm: "sent" | "closed" | "failed"
+  channel: "sent" | "skipped" | "failed"
+}
+
+/**
+ * oregano-41907: welcome one member by DM and, when channelId is given, by an
+ * @mention post limited to that one user. Never throws on HTTP errors; each
+ * leg reports its own outcome so one failing never blocks the other.
+ */
+export async function sendWelcome(
+  userId: string,
+  text: string,
+  channelId: string | null,
+  opts: { fetchImpl?: typeof fetch } = {},
+): Promise<WelcomeResult> {
+  const botToken = botTokenOnly()
+  if (!botToken) throw new Error("Discord is not configured")
+  const doFetch = opts.fetchImpl ?? fetch
+  const headers = { Authorization: `Bot ${botToken}`, "Content-Type": "application/json" }
+  const api = "https://discord.com/api/v10"
+  const post = (url: string, body: unknown) =>
+    doFetch(url, { method: "POST", headers, body: JSON.stringify(body), cache: "no-store" })
+
+  const out: WelcomeResult = { dm: "failed", channel: channelId ? "failed" : "skipped" }
+  try {
+    const ch = await post(`${api}/users/@me/channels`, { recipient_id: userId })
+    if (ch.ok) {
+      const dmId = String(((await ch.json()) as { id: string }).id)
+      const m = await post(`${api}/channels/${dmId}/messages`, { content: text })
+      if (m.ok) out.dm = "sent"
+      else if (await isDmClosed(m)) out.dm = "closed"
+    } else if (await isDmClosed(ch)) out.dm = "closed"
+  } catch (e) {
+    console.warn("[welcome] DM failed", (e as Error)?.message)
+  }
+  if (channelId) {
+    try {
+      const m = await post(`${api}/channels/${channelId}/messages`, {
+        content: `<@${userId}> ${text}`,
+        allowed_mentions: { parse: [], users: [userId] },
+      })
+      if (m.ok) out.channel = "sent"
+    } catch (e) {
+      console.warn("[welcome] channel post failed", (e as Error)?.message)
+    }
+  }
+  return out
+}
+
+async function isDmClosed(r: Response): Promise<boolean> {
+  try {
+    return (JSON.parse(await r.text()) as { code?: number }).code === 50007
+  } catch {
+    return false
+  }
+}

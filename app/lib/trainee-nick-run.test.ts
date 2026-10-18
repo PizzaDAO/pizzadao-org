@@ -49,6 +49,7 @@ function setup(over: Partial<TraineeNickDeps> = {}, env: Record<string, string> 
       writes.push({ op, reason })
       return ok
     }),
+    welcome: vi.fn(async () => ({ dm: 'sent' as const, channel: 'sent' as const })),
     ...over,
   }
   return { deps, writes, order, signed }
@@ -337,5 +338,62 @@ describe('removePizzaNoobOnGraduate', () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const bad = await removePizzaNoobOnGraduate('u1', { env: baseEnv, guildInfo: async () => { throw new Error('x') } })
     expect(bad).toBe('skipped')
+  })
+})
+
+describe('oregano-41907 welcome', () => {
+  const TEXT = 'Welcome to PizzaDAO! Grab a name at https://app.pizzadao.org'
+
+  it('welcomes on the first rename (role add), once per member, with the exact text', async () => {
+    const { deps } = setup({}, { TRAINEE_WELCOME_CHANNEL_ID: 'chan1' })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(deps.welcome).toHaveBeenCalledTimes(2)
+    expect(deps.welcome).toHaveBeenCalledWith('u1', TEXT, 'chan1')
+    expect(r).toMatchObject({ welcomed: 2, welcomeFailed: 0 })
+  })
+
+  it('a re-rename (member already holds Pizza Noob) does not welcome', async () => {
+    const { deps, writes } = setup({
+      listMembers: vi.fn(async () => [
+        member(BOT, { roles: ['100003'], joined_at: '2020-01-01T00:00:00Z' }),
+        member('u2', { nick: 'Custom', roles: [NOOB] }),
+      ]),
+    })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(writes.map((w) => w.op)).toEqual([{ kind: 'nick', userId: 'u2', nick: 'Pizza Trainee' }])
+    expect(deps.welcome).not.toHaveBeenCalled()
+    expect(r.welcomed).toBe(0)
+  })
+
+  it('DM closed (50007) still counts as welcomed when the channel post lands', async () => {
+    const { deps } = setup({ welcome: vi.fn(async () => ({ dm: 'closed' as const, channel: 'sent' as const })) }, { TRAINEE_WELCOME_CHANNEL_ID: 'chan1' })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r).toMatchObject({ status: 'finished', welcomed: 2, welcomeFailed: 0 })
+  })
+
+  it('falls back to the system channel; with none configured passes null (DM only)', async () => {
+    const a = setup({ guildInfo: vi.fn(async () => ({ ownerId: 'owner', roles: ROLES, systemChannelId: 'sys9' })) })
+    await runTraineeNicks({ dryRun: false, deps: a.deps })
+    expect(a.deps.welcome).toHaveBeenCalledWith('u1', TEXT, 'sys9')
+    const b = setup()
+    await runTraineeNicks({ dryRun: false, deps: b.deps })
+    expect(b.deps.welcome).toHaveBeenCalledWith('u1', TEXT, null)
+  })
+
+  it('a welcome failure never blocks rename/role steps or fails the run', async () => {
+    const { deps, writes } = setup({ welcome: vi.fn(async () => { throw new Error('boom') }) })
+    const r = await runTraineeNicks({ dryRun: false, deps })
+    expect(r).toMatchObject({ status: 'finished', roleAdded: 2, welcomed: 0, welcomeFailed: 2 })
+    expect(writes).toHaveLength(4)
+  })
+
+  it('dry run sends nothing', async () => {
+    const { deps, writes } = setup()
+    const log = vi.spyOn(console, 'log').mockImplementation(() => {})
+    await runTraineeNicks({ dryRun: true, deps })
+    expect(deps.welcome).not.toHaveBeenCalled()
+    expect(writes).toEqual([])
+    expect(log).toHaveBeenCalledWith('[trainee-nicks] would welcome u1')
+    log.mockRestore()
   })
 })
