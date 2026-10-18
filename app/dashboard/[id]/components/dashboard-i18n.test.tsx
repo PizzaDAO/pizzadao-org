@@ -23,6 +23,7 @@ vi.mock("../../../ui/ThemeToggle", () => ({ ThemeToggle: () => null }));
 import { Discover } from "./Discover";
 import { HeroBlock } from "./HeroBlock";
 import { NextActionPanel } from "./NextActionPanel";
+import { BoxMafiaSuggestion } from "./BoxMafiaSuggestion";
 import { ProfileCompletionMeter } from "./ProfileCompletionMeter";
 import { RecentActivity } from "./RecentActivity";
 import { YourCrews } from "./YourCrews";
@@ -116,6 +117,19 @@ describe("dashboard in Spanish", () => {
             "href",
             "/crews",
         );
+    });
+
+    it("BoxMafiaSuggestion renders in Spanish and French without raw keys", () => {
+        const data = { status: "missing" as const, purchaseUrl: "https://example.com/box", dailyPep: 42 };
+        renderWithIntl(<BoxMafiaSuggestion boxMafia={data} />, ES);
+        expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Únete a la Box Mafia");
+        expect(screen.getByText(/42 PEP al día/)).toBeInTheDocument();
+        expect(screen.queryByText(/boxMafia\./)).toBeNull();
+        cleanup();
+        renderWithIntl(<BoxMafiaSuggestion boxMafia={data} />, FR);
+        expect(screen.getByRole("heading", { level: 2 })).toHaveTextContent("Rejoignez la Box Mafia");
+        expect(screen.getByRole("link", { name: /Obtenir une boîte/ })).toBeInTheDocument();
+        expect(screen.queryByText(/boxMafia\./)).toBeNull();
     });
 
     it("Discover translates tabs, statuses, empty states and formats rewards/dates", () => {

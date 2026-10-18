@@ -618,6 +618,14 @@
       "description": "You can participate without connecting a wallet or X. Add them when you want to display collectibles or use connected features.",
       "wallet": "Manage wallets",
       "x": "Connect X"
+    },
+    "boxMafia": {
+      "overline": "§ · box mafia",
+      "headline": "Join the Box Mafia",
+      "body": "Hold a Rare Pizzas Box to get the Box Mafia role in Discord — plus {amount} PEP a day with /collect-income.",
+      "cta": "Get a box",
+      "notNow": "Not now",
+      "ariaLabel": "Box Mafia suggestion"
     }
   },
   "crewsPage": {

@@ -618,6 +618,14 @@
       "description": "Vous pouvez participer sans connecter de portefeuille ni X. Ajoutez-les pour afficher vos objets de collection ou utiliser leurs fonctionnalités.",
       "wallet": "Gérer les portefeuilles",
       "x": "Connecter X"
+    },
+    "boxMafia": {
+      "overline": "§ · box mafia",
+      "headline": "Rejoignez la Box Mafia",
+      "body": "Détenez une Rare Pizzas Box pour obtenir le rôle Box Mafia sur Discord, plus {amount} PEP par jour avec /collect-income.",
+      "cta": "Obtenir une boîte",
+      "notNow": "Pas maintenant",
+      "ariaLabel": "Suggestion Box Mafia"
     }
   },
   "crewsPage": {
