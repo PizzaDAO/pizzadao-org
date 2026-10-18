@@ -7,7 +7,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| blackolive-55617 | Mafia Spotlight Submission form | review | P2 |  |  |  | plans/blackolive-55617.md |  |  |
+| blackolive-55617 | Mafia Spotlight Submission form | review | P2 |  |  |  | plans/blackolive-55617.md | #169 |  |
 | jalapeno-82565 | Custom Crew Bounties 🏴‍☠️ | doing | P2 |  |  |  | plans/jalapeno-82565.md |  |  |
 | artichoke-67361 | it should truncate non alphanumeric characters from names on signup | doing | P3 |  |  |  | plans/artichoke-67361.md |  |  |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
