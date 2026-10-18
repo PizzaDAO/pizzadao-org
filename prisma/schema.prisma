@@ -1062,3 +1062,73 @@ model TraineeWelcome {
   dm         String?
   channel    String?
 }
+
+// ===== CALL RECORDER (calzone-30418) =====
+
+enum CallRecordingStatus {
+  RECORDED
+  PROCESSING
+  IN_REVIEW
+  PUBLISHED
+  REJECTED
+}
+
+// One recorded call. Written by the recorder worker through the ingest API
+// (idempotent on sessionId). Audio lives in a private R2 bucket and is never
+// public; transcript / summary / actionItems / chapters are filled in Phase 2.
+model CallRecording {
+  id                 String              @id @default(cuid())
+  sessionId          String              @unique // worker idempotency key
+  status             CallRecordingStatus @default(RECORDED)
+  discordEventId     String?
+  eventName          String?
+  crewId             String? // mapped from the Discord scheduled event (crew-mappings)
+  crewLabel          String?
+  channelId          String
+  startedAt          DateTime
+  endedAt            DateTime
+  durationSec        Int
+  endReason          String? // event-ended | empty | max-duration | superseded | shutdown | ...
+  partial            Boolean             @default(false)
+  mixKey             String? // R2 key of the mixed m4a
+  mixBytes           Int?
+  audioDeletedAt     DateTime? // set when the retention sweep removed the R2 audio
+  // Phase 2 (nullable, reserved)
+  title              String?
+  transcript         Json? // [{discordId, startMs, endMs, text}]
+  transcriptLanguage String?
+  summary            String?
+  actionItems        Json?
+  chapters           Json?
+  reviewedBy         String? // Discord id
+  reviewedAt         DateTime?
+  publishedAt        DateTime?
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
+
+  speakers CallSpeaker[]
+
+  @@index([status, startedAt])
+  @@index([crewId, startedAt])
+  @@index([createdAt])
+}
+
+model CallSpeaker {
+  id          Int           @id @default(autoincrement())
+  recordingId String
+  discordId   String
+  displayName String?
+  talkTimeSec Int           @default(0)
+  trackKey    String? // R2 key of this speaker's own track
+  trackBytes  Int?
+  recording   CallRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+
+  @@unique([recordingId, discordId])
+  @@index([discordId])
+}
+
+// Members who ran /record optout: the worker never subscribes to their audio.
+model RecordingOptOut {
+  discordId String   @id
+  createdAt DateTime @default(now())
+}
