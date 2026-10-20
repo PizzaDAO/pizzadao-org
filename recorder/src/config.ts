@@ -9,6 +9,8 @@ export interface Config {
   callChannelId: string
   appBaseUrl: string
   recorderApiKey: string
+  /** Deepgram key; transcription is skipped (logged once) when unset. */
+  deepgramApiKey: string | undefined
   dataDir: string
   maxCallMinutes: number
   /** The channel must have had no humans this long before the recording stops. */
@@ -42,6 +44,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     callChannelId: env.CALL_VOICE_CHANNEL_ID?.trim() || DEFAULT_CALL_VOICE_CHANNEL_ID,
     appBaseUrl: (env.APP_BASE_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),
     recorderApiKey: req('RECORDER_API_KEY'),
+    deepgramApiKey: env.DEEPGRAM_API_KEY?.trim() || undefined,
     dataDir: env.DATA_DIR?.trim() || '/data',
     maxCallMinutes: positiveNumber(env.MAX_CALL_MINUTES, 120, 'MAX_CALL_MINUTES', errors),
     emptyGraceMinutes: positiveNumber(env.EMPTY_GRACE_MINUTES, 5, 'EMPTY_GRACE_MINUTES', errors),

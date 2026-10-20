@@ -36,6 +36,7 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `R2_ACCESS_KEY_ID` | yes | | Token scoped to the calls bucket: read, write, list, delete. |
 | `R2_SECRET_ACCESS_KEY` | yes | | |
 | `R2_BUCKET_NAME` | yes | | Private bucket for call audio. |
+| `DEEPGRAM_API_KEY` | no | | Deepgram Nova-3 transcription of each speaker's speech. Unset: calls are ingested without a transcript (logged once). |
 | `CALL_VOICE_CHANNEL_ID` | no | `823956905739026442` | |
 | `APP_BASE_URL` | no | `https://app.pizzadao.org` | Ingest and opt-out API host. |
 | `DATA_DIR` | no | `/data` | Mount the Railway volume here. |

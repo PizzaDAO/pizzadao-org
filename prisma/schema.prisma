@@ -1103,6 +1103,9 @@ model CallRecording {
   reviewedBy         String? // Discord id
   reviewedAt         DateTime?
   publishedAt        DateTime?
+  // Speakers whose transcript lines are hidden from everything public and from the summary model.
+  // Non-destructive: the stored transcript is complete; this only filters.
+  redactedSpeakerIds String[]            @default([])
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 

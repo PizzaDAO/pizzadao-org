@@ -9,9 +9,12 @@ import { notFound } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
-import { getRecording } from "@/app/lib/calls/recordings";
+import { asSegments, getRecording } from "@/app/lib/calls/recordings";
+import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
+import { ReviewActions } from "../ReviewActions";
+import { RedactSpeaker } from "../RedactSpeaker";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -41,6 +44,11 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
 
     const when = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" });
     const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
+    const segments = asSegments(rec.transcript);
+    const redacted = new Set(rec.redactedSpeakerIds);
+    const names = new Map(rec.speakers.map((sp) => [sp.discordId, sp.displayName ?? sp.discordId]));
+    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
+    const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
     const hasAudio = !!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -88,12 +96,32 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <p className="text-foreground/60 m-0">{t("noSpeakers")}</p>
                     ) : (
                         <ul className="m-0 pl-5 grid gap-1">
-                            {rec.speakers.map((s) => (
-                                <li key={s.id}>
-                                    {s.displayName ?? s.discordId}{" "}
-                                    <span className="text-foreground/60">({t("talkTime", { time: clock(s.talkTimeSec) })})</span>
-                                </li>
-                            ))}
+                            {rec.speakers.map((s) => {
+                                const lines = segments.filter((seg) => seg.discordId === s.discordId).length;
+                                const missing = rec.status !== "PROCESSING" && s.talkTimeSec >= 10 && lines === 0;
+                                return (
+                                    <li key={s.id}>
+                                        {s.displayName ?? s.discordId}{" "}
+                                        <span className="text-foreground/60">
+                                            ({t("talkTime", { time: clock(s.talkTimeSec) })}
+                                            {segments.length > 0 ? `, ${t("lines", { count: lines })}` : ""})
+                                        </span>
+                                        {redacted.has(s.discordId) && <span className="text-tomato"> {t("redactedBadge")}</span>}
+                                        {missing && <span className="text-tomato"> {t("noLinesWarning")}</span>}
+                                        {(lines > 0 || redacted.has(s.discordId)) && rec.status !== "REJECTED" && rec.status !== "PROCESSING" && (
+                                            <>
+                                                {" "}
+                                                <RedactSpeaker
+                                                    recordingId={rec.id}
+                                                    discordId={s.discordId}
+                                                    redacted={redacted.has(s.discordId)}
+                                                    labels={{ redact: t("redactLines"), restore: t("restoreLines"), confirm: t("redactConfirm"), unsaved: t("unsavedWarning"), working: t("working"), error: t("reviewError") }}
+                                                />
+                                            </>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </section>
@@ -116,9 +144,97 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     )}
                 </section>
 
+                {rec.status !== "REJECTED" && (
+                    <section className="grid gap-3">
+                        <h2 className="text-xl font-bold m-0">{t("reviewHeading")}</h2>
+                        {rec.status === "PROCESSING" ? (
+                            <p className="text-foreground/60 m-0">{t("processingNote")}</p>
+                        ) : segments.length === 0 ? (
+                            <p className="text-foreground/60 m-0">{t("transcriptPending")}</p>
+                        ) : (
+                            <ReviewActions
+                                key={rec.updatedAt.toISOString()}
+                                recordingId={rec.id}
+                                status={rec.status}
+                                initialTitle={rec.title ?? ""}
+                                initialSummary={rec.summary ?? ""}
+                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string } => !!i.text)}
+                                initialChapters={chapters.filter((c): c is { startMs: number; title: string } => !!c.title && typeof c.startMs === "number")}
+                                labels={{
+                                    title: t("fieldTitle"),
+                                    actionItems: t("actionItemsHeading"),
+                                    actionItemsHint: t("actionItemsHint"),
+                                    tooManyItems: t("tooManyItems"),
+                                    tooManyChapters: t("tooManyChapters"),
+                                    badChapter: t("badChapter"),
+                                    chapters: t("chaptersHeading"),
+                                    chaptersHint: t("chaptersHint"),
+                                    summary: t("fieldSummary"),
+                                    save: t("save"),
+                                    saving: t("saving"),
+                                    saved: t("saved"),
+                                    regenerate: t("regenerate"),
+                                    regenerateConfirm: t("regenerateConfirm"),
+                                    regenerating: t("regenerating"),
+                                    publish: t("publish"),
+                                    unpublish: t("unpublish"),
+                                    publishNote: t("publishNote"),
+                                    publishNeedsContent: t("publishNeedsContent"),
+                                    working: t("working"),
+                                    error: t("reviewError"),
+                                }}
+                            />
+                        )}
+                        {rec.status === "PUBLISHED" && (
+                            <Link href={`/calls/${rec.id}`} className="underline text-sm">
+                                {t("viewPublic")}
+                            </Link>
+                        )}
+                    </section>
+                )}
+
+                {actionItems.length > 0 && (
+                    <section className="grid gap-2">
+                        <h2 className="text-xl font-bold m-0">{t("actionItemsHeading")}</h2>
+                        <ul className="m-0 pl-5 grid gap-1">
+                            {actionItems.map((item, i) => (
+                                <li key={i}>
+                                    {item.text}
+                                    {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
+
+                {chapters.length > 0 && (
+                    <section className="grid gap-2">
+                        <h2 className="text-xl font-bold m-0">{t("chaptersHeading")}</h2>
+                        <ul className="m-0 pl-5 grid gap-1">
+                            {chapters.map((c, i) => (
+                                <li key={i}>
+                                    <span className="tabular-nums text-foreground/60">{formatClock(c.startMs ?? 0)}</span> {c.title}
+                                </li>
+                            ))}
+                        </ul>
+                    </section>
+                )}
+
                 <section className="grid gap-2">
                     <h2 className="text-xl font-bold m-0">{t("transcriptHeading")}</h2>
-                    <p className="text-foreground/60 m-0">{rec.summary ?? t("transcriptPending")}</p>
+                    {segments.length === 0 ? (
+                        <p className="text-foreground/60 m-0">{t("transcriptPending")}</p>
+                    ) : (
+                        <ol className="m-0 p-0 list-none grid gap-2">
+                            {segments.map((seg, i) => (
+                                <li key={i} className={redacted.has(seg.discordId) ? "opacity-50" : undefined}>
+                                    <span className="tabular-nums text-foreground/60 text-sm">{formatClock(seg.startMs)}</span>{" "}
+                                    <strong>{names.get(seg.discordId) ?? seg.discordId}</strong>:{" "}
+                                    {redacted.has(seg.discordId) ? <em className="text-foreground/60">{t("hiddenLine")}</em> : seg.text}
+                                </li>
+                            ))}
+                        </ol>
+                    )}
                 </section>
             </div>
         </main>
