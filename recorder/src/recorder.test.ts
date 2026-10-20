@@ -348,3 +348,42 @@ describe('NicknameManager', () => {
 
 void mkdirSync
 void writeFileSync
+
+describe('CallRecorder schedule-window trigger', () => {
+  const sched = (over: Partial<EventInfo> = {}) =>
+    ev({ status: EventStatus.Scheduled, scheduledStartMs: Date.now() + 60_000, ...over })
+  const withHumans = (w: ReturnType<typeof world>, n: number) => {
+    w.guild.voiceStates.cache.filter = () => ({ map: () => Array.from({ length: n }, (_, i) => `u${i}`) }) as never
+  }
+
+  it('starts for a SCHEDULED event when humans are present, and not when the channel is empty', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    await w.rec.checkSchedule([sched()])
+    expect(w.rec.currentEventId).toBeNull()
+    withHumans(w, 2)
+    await w.rec.checkSchedule([sched()])
+    expect(w.rec.currentEventId).toBe('100')
+    await w.rec.checkSchedule([sched()]) // no double start
+    expect(calls.filter((c) => c === 'join')).toHaveLength(1)
+  })
+
+  it('does not record humans when no event window covers now', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 2)
+    await w.rec.checkSchedule([sched({ scheduledStartMs: Date.now() + 3 * 3_600_000 })])
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
+  it('restarts the same event after an early empty stop that captured no audio', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 2)
+    await w.rec.checkSchedule([sched()])
+    await w.rec.stop('empty')
+    expect(w.rec.currentEventId).toBeNull()
+    await w.rec.checkSchedule([sched()])
+    expect(w.rec.currentEventId).toBe('100')
+  })
+})

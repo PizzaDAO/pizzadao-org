@@ -65,6 +65,7 @@ function toInfo(ev: GuildScheduledEvent): EventInfo {
     channelId: ev.channelId,
     status: ev.status,
     scheduledStartMs: ev.scheduledStartTimestamp,
+    scheduledEndMs: ev.scheduledEndTimestamp,
   }
 }
 
@@ -76,10 +77,23 @@ async function onEvent(ev: GuildScheduledEvent | PartialGuildScheduledEvent, sta
   await recorder.handleEvent(toInfo(full), true, statusChanged)
 }
 
+/** Start a recording for humans present in an event's scheduled window (even if the event is not ACTIVE). */
+async function scheduleCheck(refetch: boolean) {
+  const guild = await client.guilds.fetch(cfg.guildId)
+  const events = [...(refetch ? await guild.scheduledEvents.fetch() : guild.scheduledEvents.cache).values()].map(toInfo)
+  await recorder.checkSchedule(events)
+}
+
 // Edits of an event that stays ACTIVE must not restart a recording that already finished.
 client.on('guildScheduledEventUpdate', (old, ev) => serial(() => onEvent(ev, old?.status !== ev.status)))
 client.on('guildScheduledEventCreate', (ev) => serial(() => onEvent(ev, true)))
-client.on('voiceStateUpdate', (o, n) => recorder.onVoiceState(o, n))
+client.on('voiceStateUpdate', (o, n) => {
+  recorder.onVoiceState(o, n)
+  // Someone joined or left the call channel: maybe a call is starting without its event being set ACTIVE.
+  if (n.guild.id !== cfg.guildId) return
+  if (n.channelId !== cfg.callChannelId && o.channelId !== cfg.callChannelId) return
+  serial(() => scheduleCheck(false))
+})
 client.on('error', (err) => log(`discord client error: ${err.message}`))
 
 client.once('ready', () => {
@@ -107,6 +121,10 @@ client.once('ready', () => {
       log(`event "${active.name}" is already active; joining`)
       await recorder.handleEvent({ ...active, status: EventStatus.Active }, false)
     }
+    await recorder.checkSchedule(events)
+
+    // Pick up calls whose event never goes ACTIVE (and ones that began while nobody was listening).
+    setInterval(() => serial(() => scheduleCheck(true)), 60_000).unref()
   })
 })
 

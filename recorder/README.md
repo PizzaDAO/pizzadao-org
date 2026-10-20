@@ -5,13 +5,17 @@ A small Node service (discord.js 14 + `@discordjs/voice` 0.19.2 with DAVE) that 
 ## What it does
 
 1. Logs in with the PizzaDAO bot token (`DISCORD_BOT_TOKEN`) and watches guild scheduled events. Intents: Guilds, GuildVoiceStates, GuildScheduledEvents (nothing else).
-2. When an event in the call channel (`CALL_VOICE_CHANNEL_ID`, default `823956905739026442`) goes **ACTIVE** it:
+2. A recording starts in either of two ways, for an event in the call channel (`CALL_VOICE_CHANNEL_ID`, default `823956905739026442`):
+   - the event goes **ACTIVE**; or
+   - **schedule window**: a human (bots do not count) is in the channel and an event's scheduled window covers now, even if its status is still SCHEDULED (hosts/the scheduler do not reliably start events). The window runs from 15 minutes before the scheduled start until the scheduled end (start + `MAX_CALL_MINUTES` if there is no end). Checked on every voice-state change in the channel, once a minute, and at boot (so a call in progress is picked up after a restart). If windows overlap, the event whose scheduled start is closest to now is used. People in the channel outside every window are never recorded. Both paths attribute the recording to the event (same event id = same session, so a later ACTIVE does not double-start).
+
+   Starting a recording:
    - joins the channel (not deafened, self-muted);
    - sets its server nickname to `PizzaDAO Bot 🔴 REC` (the old nickname is saved to disk and restored afterwards, even after a crash);
    - posts the recording notice in the voice channel's text chat.
    - Only then does it start capturing audio (order: join, nickname, notice, capture). If neither the nickname nor the notice can be shown it leaves without recording and deletes the session folder.
 3. Records one Ogg/Opus stream per speaker, written to `DATA_DIR/<sessionId>/seg/<userId>/` as it goes. Bots are skipped. Members who ran `/record optout` are never subscribed to (list fetched from the app, refreshed every `OPTOUT_REFRESH_SECONDS`; an opt-out mid-call deletes what was captured of that member).
-4. Stops on the first of: no humans in the channel for 5 minutes, `MAX_CALL_MINUTES` (default 120), the event goes COMPLETED/CANCELED, or a *different* event becomes ACTIVE (closes this one, starts the next).
+4. Stops on the first of: no humans in the channel for 5 minutes (not before any human has been present until the event's scheduled start + 15 minutes, so an event set ACTIVE early on an empty channel survives until people arrive), `MAX_CALL_MINUTES` (default 120), the event goes COMPLETED/CANCELED, or a *different* event becomes ACTIVE (closes this one, starts the next). With the schedule-window trigger, a running call is also closed and the next event started once that event is within 5 minutes of its scheduled start and people are present (back-to-back crew calls share the channel). An event stopped as empty/max-duration is not restarted, unless its session captured no audio and humans come back within its window.
 5. On stop: ffmpeg builds one aligned Opus track per speaker and one mono m4a mix; everything is uploaded to the private R2 bucket under `calls/<sessionId>/`; the app's ingest API is called with the metadata (event, channel, times, speakers with Discord ids, display names, talk time, R2 keys). The nickname is restored.
 6. `GET /health` (200 once Discord is ready) for Railway.
 

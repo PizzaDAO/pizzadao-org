@@ -13,7 +13,14 @@ import type { Client, Guild, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
 import type { Config } from './config.js'
 import { consentNotice, lateJoinReminder } from './consent.js'
-import { decideEventAction, EventStatus, type EventInfo } from './event-lifecycle.js'
+import {
+  decideEventAction,
+  decideWindowAction,
+  EventStatus,
+  NO_SHOW_GRACE_MS,
+  type EventInfo,
+  type FinishedInfo,
+} from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
 import { purgeUsersInDir } from './manifest.js'
 import { NicknameManager } from './nickname.js'
@@ -43,7 +50,7 @@ export class CallRecorder {
   private readonly queued = new Set<string>()
   private readonly botCache = new Map<string, boolean>()
   /** Events whose recording ended on its own (empty / max duration): later edits must not restart them. */
-  private readonly finished = new Set<string>()
+  private readonly finished = new Map<string, FinishedInfo>()
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -109,6 +116,40 @@ export class CallRecorder {
         if (this.finished.has(action.event.id) && !statusChanged) return
         await this.start(action.event)
         return
+    }
+  }
+
+  /**
+   * Schedule-window trigger: humans are in the call channel and an event's window covers now,
+   * whatever its status. Called from voice-state changes, a periodic check and boot.
+   */
+  async checkSchedule(events: EventInfo[]): Promise<void> {
+    if (this.shuttingDown || this.starting) return
+    if (this.current?.stopping) return
+    let humans: number
+    try {
+      const guild = await this.client.guilds.fetch(this.cfg.guildId)
+      humans = await this.humanCount(guild)
+    } catch (err) {
+      this.log(`schedule check failed: ${err instanceof Error ? err.message : String(err)}`)
+      return
+    }
+    const action = decideWindowAction({
+      callChannelId: this.cfg.callChannelId,
+      maxCallMs: this.cfg.maxCallMinutes * 60_000,
+      nowMs: Date.now(),
+      currentEventId: this.currentEventId,
+      humans,
+      events,
+      finished: this.finished,
+    })
+    if (action.type === 'start') {
+      this.log(`humans present in the window of "${action.event.name}" (${action.event.id}); starting`)
+      await this.start(action.event)
+    } else if (action.type === 'switch') {
+      this.log(`next event "${action.event.name}" (${action.event.id}) is starting; switching`)
+      await this.stop(action.reason)
+      await this.start(action.event)
     }
   }
 
@@ -188,10 +229,14 @@ export class CallRecorder {
       if (this.shuttingDown) return await abort('shutting down')
 
       // 4. only now start capturing audio
-      const tracker = new StopTracker(startedAtMs, {
-        maxCallMs: this.cfg.maxCallMinutes * 60_000,
-        emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
-      })
+      const tracker = new StopTracker(
+        startedAtMs,
+        {
+          maxCallMs: this.cfg.maxCallMinutes * 60_000,
+          emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
+        },
+        event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
+      )
       tracker.observeHumans(await this.humanCount(g), Date.now())
       capture.beginCapture()
 
@@ -232,7 +277,7 @@ export class CallRecorder {
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
     if (reason === 'empty' || reason === 'max-duration') {
-      if (s.meta.eventId) this.finished.add(s.meta.eventId)
+      if (s.meta.eventId) this.finished.set(s.meta.eventId, { capturedAudio: s.capture.stats.size > 0 })
     }
 
     try {

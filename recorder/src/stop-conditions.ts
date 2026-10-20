@@ -19,21 +19,32 @@ export interface StopLimits {
 export class StopTracker {
   /** Since when the channel has had no humans (null = a human is present). */
   private emptySinceMs: number | null = null
+  /** Whether a human has been in the channel at any point of this session. */
+  private everPresent = false
 
   constructor(
     private readonly startedAtMs: number,
     private readonly limits: StopLimits,
+    /**
+     * Until this time, "empty" cannot fire if no human has been present yet (an event set
+     * ACTIVE early on an empty channel). null = no protection.
+     */
+    private readonly noShowUntilMs: number | null = null,
   ) {}
 
   /** Report how many humans are in the channel right now. */
   observeHumans(count: number, nowMs: number): void {
-    if (count > 0) this.emptySinceMs = null
+    if (count > 0) {
+      this.emptySinceMs = null
+      this.everPresent = true
+    }
     else if (this.emptySinceMs === null) this.emptySinceMs = nowMs
   }
 
   /** The reason to stop now, or null to keep recording. Max duration wins ties. */
   check(nowMs: number): StopReason | null {
     if (nowMs - this.startedAtMs >= this.limits.maxCallMs) return 'max-duration'
+    if (!this.everPresent && this.noShowUntilMs !== null && nowMs < this.noShowUntilMs) return null
     if (this.emptySinceMs !== null && nowMs - this.emptySinceMs >= this.limits.emptyGraceMs) return 'empty'
     return null
   }
