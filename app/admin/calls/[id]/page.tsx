@@ -45,6 +45,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const when = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" });
     const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     const segments = asSegments(rec.transcript);
+    const redacted = new Set(rec.redactedSpeakerIds);
     const names = new Map(rec.speakers.map((sp) => [sp.discordId, sp.displayName ?? sp.discordId]));
     const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
@@ -105,14 +106,16 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                             ({t("talkTime", { time: clock(s.talkTimeSec) })}
                                             {segments.length > 0 ? `, ${t("lines", { count: lines })}` : ""})
                                         </span>
+                                        {redacted.has(s.discordId) && <span className="text-tomato"> {t("redactedBadge")}</span>}
                                         {missing && <span className="text-tomato"> {t("noLinesWarning")}</span>}
-                                        {lines > 0 && rec.status !== "REJECTED" && rec.status !== "PROCESSING" && (
+                                        {(lines > 0 || redacted.has(s.discordId)) && rec.status !== "REJECTED" && rec.status !== "PROCESSING" && (
                                             <>
                                                 {" "}
                                                 <RedactSpeaker
                                                     recordingId={rec.id}
                                                     discordId={s.discordId}
-                                                    labels={{ redact: t("redactLines"), confirm: t("redactConfirm"), working: t("working"), error: t("reviewError") }}
+                                                    redacted={redacted.has(s.discordId)}
+                                                    labels={{ redact: t("redactLines"), restore: t("restoreLines"), confirm: t("redactConfirm"), working: t("working"), error: t("reviewError") }}
                                                 />
                                             </>
                                         )}
@@ -221,9 +224,10 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     ) : (
                         <ol className="m-0 p-0 list-none grid gap-2">
                             {segments.map((seg, i) => (
-                                <li key={i}>
+                                <li key={i} className={redacted.has(seg.discordId) ? "opacity-50" : undefined}>
                                     <span className="tabular-nums text-foreground/60 text-sm">{formatClock(seg.startMs)}</span>{" "}
-                                    <strong>{names.get(seg.discordId) ?? seg.discordId}</strong>: {seg.text}
+                                    <strong>{names.get(seg.discordId) ?? seg.discordId}</strong>:{" "}
+                                    {redacted.has(seg.discordId) ? <em className="text-foreground/60">{t("hiddenLine")}</em> : seg.text}
                                 </li>
                             ))}
                         </ol>

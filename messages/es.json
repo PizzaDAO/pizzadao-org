@@ -917,10 +917,13 @@
     "chaptersHeading": "Capítulos",
     "lines": "{count, plural, one {# línea} other {# líneas}}",
     "noLinesWarning": "No hay líneas de transcripción de este orador (la transcripción pudo fallar).",
-    "redactLines": "Quitar sus líneas",
-    "redactConfirm": "¿Quitar todas las líneas de este orador de la transcripción? El audio se conserva. El resumen no se reescribe.",
+    "redactLines": "Ocultar sus líneas",
+    "redactConfirm": "¿Ocultar todas las líneas de este orador en la página pública y en los resúmenes? No se borra nada y puedes restaurarlas. El resumen no se reescribe.",
     "processingNote": "Se está generando el resumen. Recarga en un minuto.",
     "actionItemsHint": "Una por línea. Responsable opcional tras una barra vertical: Enviar la presentación | Ann",
-    "chaptersHint": "Una por línea: hora de inicio y título, como 12:30 Actualización del presupuesto"
+    "chaptersHint": "Una por línea: hora de inicio y título, como 12:30 Actualización del presupuesto",
+    "restoreLines": "Restaurar sus líneas",
+    "redactedBadge": "Oculto en la página pública",
+    "hiddenLine": "[oculto: las líneas de este orador no son públicas]"
   }
 }

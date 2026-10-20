@@ -196,11 +196,29 @@ export async function listPublishedRecordings(take = 100) {
 
 /** Null unless the call is PUBLISHED: in-review, recorded and rejected calls are not public. */
 export async function getPublishedRecording(id: string) {
-  return prisma.callRecording.findFirst({ where: { id, status: 'PUBLISHED' }, select: PUBLIC_SELECT })
+  const rec = await prisma.callRecording.findFirst({
+    where: { id, status: 'PUBLISHED' },
+    select: { ...PUBLIC_SELECT, redactedSpeakerIds: true },
+  })
+  if (!rec) return null
+  // Redaction is applied here, server-side: redacted lines and speakers never reach the page.
+  const { redactedSpeakerIds, ...pub } = rec
+  const hidden = new Set(redactedSpeakerIds ?? [])
+  return {
+    ...pub,
+    transcript: visibleSegments(rec.transcript, redactedSpeakerIds),
+    speakers: rec.speakers.filter((s) => !hidden.has(s.discordId)),
+  }
 }
 
 export function asSegments(v: unknown): TranscriptSegment[] {
   return Array.isArray(v) ? (v as TranscriptSegment[]) : []
+}
+
+/** The transcript without redacted speakers' lines (what the public page and the model may see). */
+export function visibleSegments(transcript: unknown, redactedSpeakerIds: readonly string[] | null | undefined): TranscriptSegment[] {
+  const hidden = new Set(redactedSpeakerIds ?? [])
+  return asSegments(transcript).filter((seg) => !hidden.has(seg.discordId))
 }
 
 /**
@@ -215,12 +233,12 @@ export function asSegments(v: unknown): TranscriptSegment[] {
 export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: boolean } = {}): Promise<boolean> {
   const rec = await prisma.callRecording.findUnique({
     where: { id },
-    select: { id: true, status: true, transcript: true, speakers: { select: { discordId: true, displayName: true } } },
+    select: { id: true, status: true, transcript: true, redactedSpeakerIds: true, speakers: { select: { discordId: true, displayName: true } } },
   })
   if (!rec || rec.status === 'REJECTED') return false
   const fresh = rec.status === 'PROCESSING' || rec.status === 'RECORDED'
   const toReview = () => (fresh ? prisma.callRecording.update({ where: { id }, data: { status: 'IN_REVIEW' } }) : null)
-  const segments = asSegments(rec.transcript)
+  const segments = visibleSegments(rec.transcript, rec.redactedSpeakerIds)
   if (segments.length === 0) {
     await toReview()
     return false
@@ -252,11 +270,11 @@ export type PublishResult = 'ok' | 'not-found' | 'not-allowed' | 'incomplete'
 
 /** IN_REVIEW -> PUBLISHED (needs a transcript and a summary). Rejected calls cannot be published. */
 export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<PublishResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true } })
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true } })
   if (!rec) return 'not-found'
   if (rec.status === 'PUBLISHED') return 'ok'
   if (rec.status !== 'IN_REVIEW') return 'not-allowed'
-  if (!rec.summary?.trim() || asSegments(rec.transcript).length === 0) return 'incomplete'
+  if (!rec.summary?.trim() || visibleSegments(rec.transcript, rec.redactedSpeakerIds).length === 0) return 'incomplete'
   await prisma.callRecording.update({
     where: { id },
     data: { status: 'PUBLISHED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: now },
@@ -305,17 +323,16 @@ export async function updateRecordingText(id: string, edit: RecordingTextEdit): 
 }
 
 /**
- * Redact one speaker: remove all of their lines from the stored transcript (what the public page
- * renders). Audio and the speaker row are kept. Returns the number of lines removed, or null if the
- * call is unknown, rejected or still processing.
+ * Hide (or restore) one speaker's lines. Non-destructive: the stored transcript, audio and speaker
+ * rows are untouched; the id is added to / removed from `redactedSpeakerIds`, which the public page
+ * and the summary model respect. Returns how many lines the speaker has, or null if the call is
+ * unknown, rejected or still processing.
  */
-export async function redactSpeakerFromTranscript(id: string, discordId: string): Promise<number | null> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, transcript: true } })
+export async function setSpeakerRedacted(id: string, discordId: string, redacted: boolean): Promise<number | null> {
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, transcript: true, redactedSpeakerIds: true } })
   if (!rec || rec.status === 'REJECTED' || rec.status === 'PROCESSING') return null
-  const all = asSegments(rec.transcript)
-  const kept = all.filter((seg) => seg.discordId !== discordId)
-  if (kept.length !== all.length) {
-    await prisma.callRecording.update({ where: { id }, data: { transcript: kept as unknown as Prisma.InputJsonValue } })
-  }
-  return all.length - kept.length
+  const current = rec.redactedSpeakerIds ?? []
+  const next = redacted ? (current.includes(discordId) ? current : [...current, discordId]) : current.filter((x) => x !== discordId)
+  if (next.length !== current.length) await prisma.callRecording.update({ where: { id }, data: { redactedSpeakerIds: next } })
+  return asSegments(rec.transcript).filter((seg) => seg.discordId === discordId).length
 }

@@ -23,7 +23,7 @@ import { getSession } from '@/app/lib/session'
 import { canReviewMission } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
 import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_MODEL, generateCallSummary, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
-import { generateAndStoreSummary, getPublishedRecording, listPublishedRecordings, publishRecording, redactSpeakerFromTranscript, unpublishRecording, updateRecordingText } from './recordings'
+import { generateAndStoreSummary, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { POST as publishPOST } from '@/app/api/admin/calls/[id]/publish/route'
 import { PATCH as summaryPATCH } from '@/app/api/admin/calls/[id]/summary/route'
@@ -439,10 +439,14 @@ describe('reviewer edits', () => {
   })
 })
 
-describe('redact a speaker', () => {
+describe('redact a speaker (non-destructive)', () => {
   const ctx = { params: Promise.resolve({ id: 'rec1' }) }
   const call = (body: unknown) => redactPOST(new Request('https://x/api', { method: 'POST', body: JSON.stringify(body) }), ctx)
   const seg = (discordId: string, text: string) => ({ discordId, startMs: 0, endMs: 1, text })
+  const asReviewer = () => {
+    m(getSession).mockResolvedValue({ discordId: '9' })
+    m(canReviewMission).mockResolvedValue(true)
+  }
 
   it('is DPR-gated', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
@@ -451,29 +455,69 @@ describe('redact a speaker', () => {
     expect(db.callRecording.update).not.toHaveBeenCalled()
   })
 
-  it('needs confirm and a Discord id', async () => {
-    m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+  it('needs confirm to hide (not to restore) and a Discord id', async () => {
+    asReviewer()
     expect((await call({ discordId: BOB })).status).toBe(400)
     expect((await call({ discordId: 'x', confirm: true })).status).toBe(400)
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: [], redactedSpeakerIds: [BOB] })
+    expect((await call({ discordId: BOB, restore: true })).status).toBe(200)
   })
 
-  it('removes only that speaker from the stored transcript and writes nothing else (audio untouched)', async () => {
-    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: [seg(ANN, 'a'), seg(BOB, 'b'), seg(BOB, 'c')] })
-    expect(await redactSpeakerFromTranscript('rec1', BOB)).toBe(2)
-    const data = db.callRecording.update.mock.calls[0][0].data
-    expect(Object.keys(data)).toEqual(['transcript'])
-    expect(data.transcript).toEqual([seg(ANN, 'a')])
+  it('hiding only appends the id: the transcript is never rewritten and nothing is deleted', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: [seg(ANN, 'a'), seg(BOB, 'b'), seg(BOB, 'c')], redactedSpeakerIds: [] })
+    expect(await setSpeakerRedacted('rec1', BOB, true)).toBe(2)
+    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ redactedSpeakerIds: [BOB] })
     expect(db.callRecording.delete).not.toHaveBeenCalled()
   })
 
-  it('is a no-op for a speaker with no lines, and unavailable for rejected or processing calls', async () => {
-    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: [seg(ANN, 'a')] })
-    expect(await redactSpeakerFromTranscript('rec1', BOB)).toBe(0)
+  it('restore removes the id again (undo); repeating either is a no-op', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: [seg(BOB, 'b')], redactedSpeakerIds: [BOB, ANN] })
+    await setSpeakerRedacted('rec1', BOB, false)
+    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ redactedSpeakerIds: [ANN] })
+    db.callRecording.update.mockClear()
+    await setSpeakerRedacted('rec1', ANN, true)
     expect(db.callRecording.update).not.toHaveBeenCalled()
+  })
+
+  it('is unavailable for rejected or processing calls', async () => {
     for (const status of ['REJECTED', 'PROCESSING']) {
-      db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status, transcript: [seg(BOB, 'b')] })
-      expect(await redactSpeakerFromTranscript('rec1', BOB)).toBeNull()
+      db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status, transcript: [seg(BOB, 'b')], redactedSpeakerIds: [] })
+      expect(await setSpeakerRedacted('rec1', BOB, true)).toBeNull()
     }
+  })
+
+  it('public output excludes redacted lines and speakers, server-side', async () => {
+    db.callRecording.findFirst.mockResolvedValue({
+      id: 'rec1',
+      summary: 's',
+      transcript: [seg(ANN, 'keep'), seg(BOB, 'secret')],
+      redactedSpeakerIds: [BOB],
+      speakers: [{ discordId: ANN, displayName: 'Ann' }, { discordId: BOB, displayName: 'Bob' }],
+    })
+    const rec = await getPublishedRecording('rec1')
+    expect(JSON.stringify(rec)).not.toContain('secret')
+    expect(JSON.stringify(rec)).not.toContain('Bob')
+    expect(rec).not.toHaveProperty('redactedSpeakerIds')
+    expect(rec?.transcript).toEqual([seg(ANN, 'keep')])
+  })
+
+  it('regenerate never sends redacted lines to the model', async () => {
+    m(generateText).mockResolvedValue({ output: { title: 't', summary: 's', actionItems: [], chapters: [] } })
+    db.callRecording.findUnique.mockResolvedValue({
+      id: 'rec1',
+      status: 'IN_REVIEW',
+      transcript: [seg(ANN, 'keep'), seg(BOB, 'secret')],
+      redactedSpeakerIds: [BOB],
+      speakers: [{ discordId: ANN, displayName: 'Ann' }, { discordId: BOB, displayName: 'Bob' }],
+    })
+    await generateAndStoreSummary('rec1')
+    const prompt = m(generateText).mock.calls[0][0].prompt as string
+    expect(prompt).toContain('keep')
+    expect(prompt).not.toContain('secret')
+  })
+
+  it('cannot publish when only redacted speakers have lines', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', summary: 'S', transcript: [seg(BOB, 'b')], redactedSpeakerIds: [BOB] })
+    expect(await publishRecording('rec1', '9')).toBe('incomplete')
   })
 })
