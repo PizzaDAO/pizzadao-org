@@ -7,7 +7,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | review | P2 |  |  |  | plans/calzone-call-recorder.md | #174, #175 | Phase 0+1 merged (#174); recorder live on Railway (2026-10-20). Phase 2 (transcripts, summaries, review, public pages) in review as #175; migration applied. Next: verify first real call, add DEEPGRAM_API_KEY on Railway |
+| calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | review | P2 |  |  |  | plans/calzone-call-recorder.md | #174, #175, #176 | Phase 0+1 (#174) and Phase 2 (#175) merged; recorder live on Railway. 10-20: no crew calls recorded (only started on Discord ACTIVE); trigger fix in review as #176. Next: merge + railway up before 10-21 15:00 UTC, verify first real call, add DEEPGRAM_API_KEY on Railway |
 | tax-form-redirect | Redirect app.pizzadao.org/tax-form to rsv.pizza/tax-form (keeps ?payee= token) for Rare Pizzas W-9/W-8 requests | review | P2 |  | Snax | tax |  | #165 |  |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
 | jalapeno-34126 | Add animation/pop up to signal your profile has been completed | todo | P2 |  | Pizza Lord |  |  |  |  |
