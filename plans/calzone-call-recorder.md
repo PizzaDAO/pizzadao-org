@@ -534,6 +534,14 @@ model CallRecordingOptOut {
 1. **Bot identity:** reuse the existing PizzaDAO bot (the pizzadao-discord-bot token on Railway), not a new "PizzaDAO Recorder" app. The recorder is still its own Railway service/process, logging in with the same token. While recording it sets its own server nickname to "PizzaDAO Bot 🔴 REC" and restores it afterwards, and posts the recording notice in the voice channel's text chat.
 2. **Scope:** record **all crew calls** (every call in the shared voice channel), not just the Community Call. Map each recording to its crew via the Discord scheduled event that is ACTIVE when recording starts (event name/ID → crew, using the same mapping the Apps Script scheduler uses).
 3. **Review:** recordings are reviewed on app.pizzadao.org by members with the **Dread Pizza Roberts** Discord role (reuse the role check used for L8 mission review in app/api/missions/review/route.ts). Only they can see `/admin/calls`, edit the summary, remove a speaker, and publish/unpublish.
-4. **Public output:** publish **only the summary and transcript** (plus title, chapters, action items). **Audio is never public**; keep it private in R2 for reviewers only (signed URLs on the review page) and delete it after a retention window (default 90 days, env-configurable).
+4. **Public output:** publish **only the summary and transcript** (plus title, chapters, action items). **Audio is never public**; keep it private in R2 for reviewers only (signed URLs on the review page). **Audio is kept forever** (Snax, 2026-10-18): no retention sweep, no lifecycle rule.
 5. **Attendance:** the recorder does **not** do attendance. Drop Phase 4; the Apps Script `/voice-attendance` polling stays the attendance source for parmesan-10386.
 6. **Repo:** put the worker in this repo under `recorder/` (its own package.json + Dockerfile; Railway root directory = `recorder/`), so the ingest API, schema, and worker change together. Migration timestamp must sort after 20261018100000_trainee_welcome.
+
+## Setup done (2026-10-20)
+
+- Cloudflare R2: private bucket `pizzadao-calls`; account tokens "pizzadao-calls website (read)" (Object Read, Vercel) and "pizzadao-calls recorder (read/write)" (Railway).
+- Vercel production: `R2_ENDPOINT`, `R2_BUCKET_NAME`, `R2_ACCESS_KEY_ID`, `R2_SECRET_ACCESS_KEY` (read-only token), `RECORDER_API_KEY`.
+- Railway: service `call-recorder` in project `pizzadao-discord-bot`, deployed with `railway up` from `recorder/` (no GitHub link); volume at `/data`. `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID` are references to the `pizzadao-discord-bot` service (bot user: Attendance Crawler, has Administrator).
+- `/record` registered on Onboarding Bot (14 guild commands).
+- First live test: the Music Crew call, 2026-10-20 17:30 UTC, in Pizza Hacking Radio.

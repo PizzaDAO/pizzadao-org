@@ -7,7 +7,7 @@ Imported from the project Google Sheet on 2026-10-04; this file is now the sourc
 
 | ID | Task | Stage | Priority | Due | Lead | Tags | Plan | PR | Notes |
 |----|------|-------|----------|-----|------|------|------|----|-------|
-| calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | doing | P2 |  |  |  | plans/calzone-call-recorder.md | #174 | Phase 0+1 merged (#174). Next: Snax sets up R2 + Railway + Vercel env, test on a real call, then Phase 2 (transcripts/summaries, public pages) |
+| calzone-30418 | Recorder bot joins community calls, records, transcribes, summarizes, and posts them on the website | doing | P2 |  |  |  | plans/calzone-call-recorder.md | #174 | Phase 0+1 merged (#174); R2 + Vercel + Railway set up and recorder live (2026-10-20). Next: verify first real call (Music Crew 10-20 17:30 UTC), then Phase 2 (transcripts/summaries, public pages) |
 | tax-form-redirect | Redirect app.pizzadao.org/tax-form to rsv.pizza/tax-form (keeps ?payee= token) for Rare Pizzas W-9/W-8 requests | review | P2 |  | Snax | tax |  | #165 |  |
 | parmesan-10386 | Deliver POAPs automatically to people on the discord channel attendance | doing | P3 |  |  |  | plans/parmesan-10386.md |  |  |
 | jalapeno-34126 | Add animation/pop up to signal your profile has been completed | todo | P2 |  | Pizza Lord |  |  |  |  |
