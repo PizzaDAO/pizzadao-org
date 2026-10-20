@@ -19,7 +19,6 @@ import {
   EventStatus,
   NO_SHOW_GRACE_MS,
   type EventInfo,
-  type FinishedInfo,
 } from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
 import { purgeUsersInDir } from './manifest.js'
@@ -40,6 +39,8 @@ interface ActiveSession {
   tick: NodeJS.Timeout
   reminded: Set<string>
   stopping: boolean
+  /** Scheduled start of the event being recorded (forward-only switching). */
+  eventStartMs: number | null
 }
 
 export class CallRecorder {
@@ -49,8 +50,8 @@ export class CallRecorder {
   private queue: Promise<unknown> = Promise.resolve()
   private readonly queued = new Set<string>()
   private readonly botCache = new Map<string, boolean>()
-  /** Events whose recording ended on its own (empty / max duration): later edits must not restart them. */
-  private readonly finished = new Map<string, FinishedInfo>()
+  /** Events whose recording ended on its own (empty / max duration): later edits of an ACTIVE event must not restart them. */
+  private readonly finished = new Set<string>()
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -99,6 +100,7 @@ export class CallRecorder {
       info,
       { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() },
       fresh,
+      this.current?.eventStartMs ?? null,
     )
     if (info.status !== EventStatus.Active) this.finished.delete(info.id)
     switch (action.type) {
@@ -139,9 +141,9 @@ export class CallRecorder {
       maxCallMs: this.cfg.maxCallMinutes * 60_000,
       nowMs: Date.now(),
       currentEventId: this.currentEventId,
+      currentStartMs: this.current?.eventStartMs ?? null,
       humans,
       events,
-      finished: this.finished,
     })
     if (action.type === 'start') {
       this.log(`humans present in the window of "${action.event.name}" (${action.event.id}); starting`)
@@ -229,8 +231,9 @@ export class CallRecorder {
       if (this.shuttingDown) return await abort('shutting down')
 
       // 4. only now start capturing audio
+      // Max duration counts from the scheduled start when the session began early.
       const tracker = new StopTracker(
-        startedAtMs,
+        Math.max(startedAtMs, event.scheduledStartMs ?? 0),
         {
           maxCallMs: this.cfg.maxCallMinutes * 60_000,
           emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
@@ -248,6 +251,7 @@ export class CallRecorder {
         tracker,
         reminded: new Set(),
         stopping: false,
+        eventStartMs: event.scheduledStartMs,
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
       this.finished.delete(event.id)
@@ -277,7 +281,7 @@ export class CallRecorder {
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
     if (reason === 'empty' || reason === 'max-duration') {
-      if (s.meta.eventId) this.finished.set(s.meta.eventId, { capturedAudio: s.capture.stats.size > 0 })
+      if (s.meta.eventId) this.finished.add(s.meta.eventId)
     }
 
     try {

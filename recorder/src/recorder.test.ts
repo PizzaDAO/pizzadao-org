@@ -1,7 +1,7 @@
 import { existsSync, mkdirSync, mkdtempSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import os from 'node:os'
 import path from 'node:path'
-import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EventInfo } from './event-lifecycle.js'
 import { EventStatus } from './event-lifecycle.js'
 import { REC_NICKNAME, type Config } from './config.js'
@@ -281,7 +281,7 @@ describe('CallRecorder restart rules', () => {
   it('a different event going ACTIVE closes this one and starts the next', async () => {
     const w = world()
     await w.optOuts.refresh()
-    await w.rec.handleEvent(ev())
+    await w.rec.handleEvent(ev({ scheduledStartMs: Date.now() - 60_000 }))
     await w.rec.handleEvent(ev({ id: '200', name: 'Ops' }))
     expect(w.rec.currentEventId).toBe('200')
     await w.rec.drain()
@@ -350,40 +350,146 @@ void mkdirSync
 void writeFileSync
 
 describe('CallRecorder schedule-window trigger', () => {
-  const sched = (over: Partial<EventInfo> = {}) =>
-    ev({ status: EventStatus.Scheduled, scheduledStartMs: Date.now() + 60_000, ...over })
+  const MIN = 60_000
+  const T = Date.parse('2026-10-20T18:15:00Z') // Creative Crew start
+  const at = (min: number) => vi.setSystemTime(T + min * MIN)
+  const sched = (id: string, startMin: number, over: Partial<EventInfo> = {}): EventInfo =>
+    ev({ id, name: id, status: EventStatus.Scheduled, scheduledStartMs: T + startMin * MIN, ...over })
   const withHumans = (w: ReturnType<typeof world>, n: number) => {
     w.guild.voiceStates.cache.filter = () => ({ map: () => Array.from({ length: n }, (_, i) => `u${i}`) }) as never
   }
+  const joins = () => calls.filter((c) => c === 'join').length
+  const day = () => [sched('music', -45), sched('creative', 0), sched('art', 15), sched('merch', 75)]
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
 
   it('starts for a SCHEDULED event when humans are present, and not when the channel is empty', async () => {
     const w = world()
     await w.optOuts.refresh()
-    await w.rec.checkSchedule([sched()])
+    at(0)
+    await w.rec.checkSchedule(day())
     expect(w.rec.currentEventId).toBeNull()
     withHumans(w, 2)
-    await w.rec.checkSchedule([sched()])
-    expect(w.rec.currentEventId).toBe('100')
-    await w.rec.checkSchedule([sched()]) // no double start
-    expect(calls.filter((c) => c === 'join')).toHaveLength(1)
+    await w.rec.checkSchedule(day())
+    expect(w.rec.currentEventId).toBe('creative')
+    await w.rec.checkSchedule(day()) // no double start
+    expect(joins()).toBe(1)
   })
 
   it('does not record humans when no event window covers now', async () => {
     const w = world()
     await w.optOuts.refresh()
     withHumans(w, 2)
-    await w.rec.checkSchedule([sched({ scheduledStartMs: Date.now() + 3 * 3_600_000 })])
+    at(300)
+    await w.rec.checkSchedule(day())
     expect(w.rec.currentEventId).toBeNull()
   })
 
-  it('restarts the same event after an early empty stop that captured no audio', async () => {
+  it('Creative recorded from 18:10, Art set ACTIVE at 18:15: exactly one switch, at 18:30, no ping-pong', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 3)
+    at(-5)
+    await w.rec.checkSchedule(day())
+    expect(w.rec.currentEventId).toBe('creative')
+    const art = (status: number) => sched('art', 15, { status })
+    at(0)
+    await w.rec.handleEvent(art(EventStatus.Active)) // 15 min early: must not cut the call
+    expect(w.rec.currentEventId).toBe('creative')
+    for (let m = 0; m < 30; m++) {
+      at(m)
+      await w.rec.checkSchedule(day().map((e) => (e.id === 'art' ? art(EventStatus.Active) : e)))
+      await w.rec.handleEvent(art(EventStatus.Active), true, false)
+      expect(w.rec.currentEventId).toBe(m < 15 ? 'creative' : 'art')
+    }
+    expect(joins()).toBe(2) // creative, art
+    // Creative flagged ACTIVE late (18:27 scenario): earlier than the current event, ignored
+    at(25)
+    await w.rec.handleEvent(sched('creative', 0, { status: EventStatus.Active }))
+    expect(w.rec.currentEventId).toBe('art')
+    expect(joins()).toBe(2)
+  })
+
+  it('Creative set ACTIVE late while Art (started idle at 18:27) is recording is ignored', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 3)
+    at(12)
+    await w.rec.checkSchedule(day())
+    expect(w.rec.currentEventId).toBe('art')
+    await w.rec.handleEvent(sched('creative', 0, { status: EventStatus.Active }))
+    expect(w.rec.currentEventId).toBe('art')
+  })
+
+  it('a lead-window drop-in stopped empty does not block the real call (no audio captured)', async () => {
     const w = world()
     await w.optOuts.refresh()
     withHumans(w, 2)
-    await w.rec.checkSchedule([sched()])
+    at(75 - 14) // 19:16
+    await w.rec.checkSchedule(day())
+    expect(w.rec.currentEventId).toBe('merch')
+    at(75 - 7) // 19:23
     await w.rec.stop('empty')
     expect(w.rec.currentEventId).toBeNull()
-    await w.rec.checkSchedule([sched()])
-    expect(w.rec.currentEventId).toBe('100')
+    at(75)
+    await w.rec.checkSchedule(day())
+    expect(w.rec.currentEventId).toBe('merch')
+  })
+
+  it('a mid-call empty stop after audio was captured restarts as a new session when people return in the window', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 2)
+    at(75)
+    await w.rec.checkSchedule(day())
+    ;(w.rec as unknown as { current: { capture: { stats: Map<string, unknown> } } }).current.capture.stats.set('u1', {})
+    at(95) // everyone dropped, grace passed
+    await w.rec.stop('empty')
+    at(100)
+    await w.rec.checkSchedule(day())
+    expect(w.rec.currentEventId).toBe('merch')
+    expect(joins()).toBe(2)
+  })
+
+  it('does not restart once the event window has ended', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 2)
+    at(75)
+    await w.rec.checkSchedule(day())
+    at(75 + 121)
+    await w.rec.stop('max-duration')
+    await w.rec.checkSchedule(day())
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
+  it('late edits of an ACTIVE event that already finished do not restart it', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    at(0)
+    await w.rec.handleEvent(sched('creative', 0, { status: EventStatus.Active }))
+    await w.rec.stop('empty')
+    await w.rec.handleEvent(sched('creative', 0, { status: EventStatus.Active }), true, false)
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
+  it('max duration counts from the scheduled start when the session began early', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 2)
+    at(-10)
+    await w.rec.checkSchedule(day())
+    const tick = () => (w.rec as unknown as { onTick(): Promise<void> }).onTick()
+    at(110) // 120 min after the session started, but only 110 after the scheduled start
+    await tick()
+    expect(w.rec.currentEventId).toBe('creative')
+    at(120)
+    await tick()
+    expect(w.rec.currentEventId).toBeNull()
   })
 })
