@@ -698,7 +698,24 @@
     "prev": "← Prev",
     "next": "Next →",
     "page": "Page {current} of {total}",
-    "upcoming": "Looking for upcoming calls? Browse the weekly crew schedule."
+    "upcoming": "Looking for upcoming calls? Browse the weekly crew schedule.",
+    "recording": {
+      "overline": "Call recordings",
+      "listTitle": "Call summaries and transcripts",
+      "listDescription": "Reviewed summaries and transcripts of PizzaDAO crew calls. Audio is not published.",
+      "toAttendance": "Back to the call log",
+      "empty": "No calls have been published yet.",
+      "back": "All published calls",
+      "untitled": "Crew call",
+      "minutes": "{count} min",
+      "summary": "Summary",
+      "actionItems": "Action items",
+      "chapters": "Chapters",
+      "transcript": "Transcript",
+      "transcriptNote": "Transcribed automatically and reviewed by PizzaDAO. It may contain errors.",
+      "unknownSpeaker": "Speaker"
+    },
+    "readRecordings": "Read summaries and transcripts of past calls."
   },
   "communityTerms": {
     "missions": "Guided tasks that help you get involved in PizzaDAO.",
@@ -879,6 +896,24 @@
     "cancel": "Cancel",
     "removing": "Rejecting...",
     "removeError": "Could not reject the recording. Try again.",
-    "removedNote": "This recording was rejected (hidden)."
+    "removedNote": "This recording was rejected (hidden).",
+    "reviewHeading": "Review and publish",
+    "fieldTitle": "Title",
+    "fieldSummary": "Summary",
+    "save": "Save edits",
+    "saving": "Saving...",
+    "saved": "Saved.",
+    "regenerate": "Regenerate summary",
+    "regenerateConfirm": "Regenerate the summary from the transcript? Your edits will be replaced.",
+    "regenerating": "Regenerating...",
+    "publish": "Publish",
+    "unpublish": "Unpublish",
+    "publishNote": "Publishing makes only the title, summary, action items and transcript public. Audio stays private.",
+    "publishNeedsContent": "A summary is required before publishing.",
+    "working": "Working...",
+    "reviewError": "That did not work. Try again.",
+    "viewPublic": "View public page",
+    "actionItemsHeading": "Action items",
+    "chaptersHeading": "Chapters"
   }
 }

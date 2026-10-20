@@ -698,7 +698,24 @@
     "prev": "← Précédent",
     "next": "Suivant →",
     "page": "Page {current} sur {total}",
-    "upcoming": "Vous cherchez les prochains appels ? Consultez le programme hebdomadaire des équipes."
+    "upcoming": "Vous cherchez les prochains appels ? Consultez le programme hebdomadaire des équipes.",
+    "recording": {
+      "overline": "Enregistrements des appels",
+      "listTitle": "Résumés et transcriptions des appels",
+      "listDescription": "Résumés et transcriptions relus des appels des équipes PizzaDAO. L’audio n’est pas publié.",
+      "toAttendance": "Retour au journal des appels",
+      "empty": "Aucun appel n’a encore été publié.",
+      "back": "Tous les appels publiés",
+      "untitled": "Appel d’équipe",
+      "minutes": "{count} min",
+      "summary": "Résumé",
+      "actionItems": "Actions à mener",
+      "chapters": "Chapitres",
+      "transcript": "Transcription",
+      "transcriptNote": "Transcrite automatiquement et relue par PizzaDAO. Elle peut contenir des erreurs.",
+      "unknownSpeaker": "Intervenant"
+    },
+    "readRecordings": "Lisez les résumés et transcriptions des appels passés."
   },
   "communityTerms": {
     "missions": "Des tâches guidées pour commencer à participer à PizzaDAO.",
@@ -879,6 +896,24 @@
     "cancel": "Annuler",
     "removing": "Rejet...",
     "removeError": "Impossible de rejeter l'enregistrement. Réessayez.",
-    "removedNote": "Cet enregistrement a été rejeté (masqué)."
+    "removedNote": "Cet enregistrement a été rejeté (masqué).",
+    "reviewHeading": "Relire et publier",
+    "fieldTitle": "Titre",
+    "fieldSummary": "Résumé",
+    "save": "Enregistrer les modifications",
+    "saving": "Enregistrement...",
+    "saved": "Enregistré.",
+    "regenerate": "Régénérer le résumé",
+    "regenerateConfirm": "Régénérer le résumé à partir de la transcription ? Vos modifications seront remplacées.",
+    "regenerating": "Régénération...",
+    "publish": "Publier",
+    "unpublish": "Dépublier",
+    "publishNote": "La publication rend publics uniquement le titre, le résumé, les actions et la transcription. L’audio reste privé.",
+    "publishNeedsContent": "Un résumé est nécessaire avant de publier.",
+    "working": "Traitement...",
+    "reviewError": "Cela n’a pas fonctionné. Réessayez.",
+    "viewPublic": "Voir la page publique",
+    "actionItemsHeading": "Actions à mener",
+    "chaptersHeading": "Chapitres"
   }
 }

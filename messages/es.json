@@ -698,7 +698,24 @@
     "prev": "← Anterior",
     "next": "Siguiente →",
     "page": "Página {current} de {total}",
-    "upcoming": "¿Buscas próximas llamadas? Consulta el horario semanal de los equipos."
+    "upcoming": "¿Buscas próximas llamadas? Consulta el horario semanal de los equipos.",
+    "recording": {
+      "overline": "Grabaciones de llamadas",
+      "listTitle": "Resúmenes y transcripciones de llamadas",
+      "listDescription": "Resúmenes y transcripciones revisados de las llamadas de los equipos de PizzaDAO. El audio no se publica.",
+      "toAttendance": "Volver al registro de llamadas",
+      "empty": "Aún no se ha publicado ninguna llamada.",
+      "back": "Todas las llamadas publicadas",
+      "untitled": "Llamada de equipo",
+      "minutes": "{count} min",
+      "summary": "Resumen",
+      "actionItems": "Tareas pendientes",
+      "chapters": "Capítulos",
+      "transcript": "Transcripción",
+      "transcriptNote": "Transcrita automáticamente y revisada por PizzaDAO. Puede contener errores.",
+      "unknownSpeaker": "Orador"
+    },
+    "readRecordings": "Lee resúmenes y transcripciones de llamadas anteriores."
   },
   "communityTerms": {
     "missions": "Tareas guiadas para empezar a participar en PizzaDAO.",
@@ -879,6 +896,24 @@
     "cancel": "Cancelar",
     "removing": "Rechazando...",
     "removeError": "No se pudo rechazar la grabación. Inténtalo de nuevo.",
-    "removedNote": "Esta grabación fue rechazada (oculta)."
+    "removedNote": "Esta grabación fue rechazada (oculta).",
+    "reviewHeading": "Revisar y publicar",
+    "fieldTitle": "Título",
+    "fieldSummary": "Resumen",
+    "save": "Guardar cambios",
+    "saving": "Guardando...",
+    "saved": "Guardado.",
+    "regenerate": "Regenerar resumen",
+    "regenerateConfirm": "¿Regenerar el resumen a partir de la transcripción? Se reemplazarán tus ediciones.",
+    "regenerating": "Regenerando...",
+    "publish": "Publicar",
+    "unpublish": "Despublicar",
+    "publishNote": "Al publicar solo se hacen públicos el título, el resumen, las tareas y la transcripción. El audio sigue siendo privado.",
+    "publishNeedsContent": "Se necesita un resumen antes de publicar.",
+    "working": "Procesando...",
+    "reviewError": "No funcionó. Inténtalo de nuevo.",
+    "viewPublic": "Ver página pública",
+    "actionItemsHeading": "Tareas pendientes",
+    "chaptersHeading": "Capítulos"
   }
 }

@@ -1,12 +1,14 @@
-import { NextResponse } from 'next/server'
+import { after, NextResponse } from 'next/server'
 import { isRecorderAuthorized } from '@/app/lib/calls/recorder-auth'
 import { parseIngestPayload } from '@/app/lib/calls/ingest-schema'
-import { ingestRecording } from '@/app/lib/calls/recordings'
+import { generateAndStoreSummary, ingestRecording } from '@/app/lib/calls/recordings'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// The summary runs after the response, inside this function's time budget.
+export const maxDuration = 300
 
 /**
  * POST /api/calls/recorder/ingest — the recorder worker reports a finished
@@ -24,7 +26,9 @@ export const POST = withErrorHandling(async (request: Request) => {
     throw new ValidationError('Body must be JSON')
   }
   const payload = parseIngestPayload(body)
-  const { id, duplicate, keys } = await ingestRecording(payload)
+  const { id, duplicate, keys, summarize } = await ingestRecording(payload)
+  // Summarize after responding so the worker is not kept waiting on the model.
+  if (summarize) after(() => generateAndStoreSummary(id).catch((err) => console.error('[calls/ingest] summary failed:', err instanceof Error ? err.message : err)))
   // `keys` = the R2 objects the stored row references; the worker prunes anything else under the session prefix.
   return NextResponse.json({ id, duplicate, keys }, { status: duplicate ? 200 : 201 })
 })

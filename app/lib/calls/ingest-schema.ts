@@ -22,6 +22,22 @@ export interface IngestSpeaker {
   trackBytes: number | null
 }
 
+export interface TranscriptSegment {
+  discordId: string
+  startMs: number
+  endMs: number
+  text: string
+}
+
+export interface IngestTranscript {
+  language: string | null
+  segments: TranscriptSegment[]
+}
+
+export const MAX_TRANSCRIPT_SEGMENTS = 20000
+const MAX_SEGMENT_TEXT = 4000
+const MAX_CALL_MS = MAX_SECONDS * 1000
+
 export interface IngestPayload {
   sessionId: string
   eventId: string | null
@@ -33,6 +49,8 @@ export interface IngestPayload {
   partial: boolean
   mix: { key: string; bytes: number | null } | null
   speakers: IngestSpeaker[]
+  /** Absent when the worker had no Deepgram key or transcription failed. */
+  transcript: IngestTranscript | null
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -64,6 +82,28 @@ function key(v: unknown, field: string, sessionId: string): string | null {
     throw new ValidationError(`${field} must be under calls/${sessionId}/`)
   }
   return k
+}
+
+function parseTranscript(v: unknown, speakerIds: Set<string>): IngestTranscript | null {
+  if (v === undefined || v === null) return null
+  if (!isObj(v)) throw new ValidationError('transcript must be an object')
+  if (!Array.isArray(v.segments)) throw new ValidationError('transcript.segments must be an array')
+  if (v.segments.length > MAX_TRANSCRIPT_SEGMENTS) throw new ValidationError(`At most ${MAX_TRANSCRIPT_SEGMENTS} transcript segments`)
+  const segments: TranscriptSegment[] = []
+  v.segments.forEach((raw, i) => {
+    if (!isObj(raw)) throw new ValidationError(`transcript.segments[${i}] must be an object`)
+    const discordId = str(raw.discordId, `transcript.segments[${i}].discordId`, 25, true)!
+    if (!SNOWFLAKE.test(discordId)) throw new ValidationError(`transcript.segments[${i}].discordId must be a Discord id`)
+    const text = str(raw.text, `transcript.segments[${i}].text`, MAX_SEGMENT_TEXT)?.trim()
+    const startMs = int(raw.startMs, `transcript.segments[${i}].startMs`, MAX_CALL_MS)
+    const endMs = int(raw.endMs, `transcript.segments[${i}].endMs`, MAX_CALL_MS)
+    // Only speakers in this payload may have words: the worker drops opted-out users from
+    // `speakers`, so their text can never arrive (or be stored) even if a worker bug sends it.
+    if (!text || !speakerIds.has(discordId)) return
+    segments.push({ discordId, startMs, endMs: Math.max(startMs, endMs), text })
+  })
+  segments.sort((a, b) => a.startMs - b.startMs)
+  return { language: str(v.language, 'transcript.language', 20), segments }
 }
 
 export function parseIngestPayload(body: unknown): IngestPayload {
@@ -118,5 +158,6 @@ export function parseIngestPayload(body: unknown): IngestPayload {
     partial: body.partial === true,
     mix,
     speakers,
+    transcript: parseTranscript(body.transcript, seen),
   }
 }

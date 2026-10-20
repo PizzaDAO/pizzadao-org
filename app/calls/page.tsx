@@ -168,7 +168,10 @@ export default function CallsPage() {
         }
       />
 
-      <Link href="/crews" className="mb-6 inline-flex min-h-11 items-center text-sm font-semibold text-tomato-readable underline underline-offset-4">{t("upcoming")}</Link>
+      <div className="mb-6 flex flex-wrap gap-x-6">
+        <Link href="/crews" className="inline-flex min-h-11 items-center text-sm font-semibold text-tomato-readable underline underline-offset-4">{t("upcoming")}</Link>
+        <Link href="/calls/recordings" className="inline-flex min-h-11 items-center text-sm font-semibold text-tomato-readable underline underline-offset-4">{t("readRecordings")}</Link>
+      </div>
 
       {/* Crew filter chips */}
       <div className={`${paperCard} print-noise mb-6 p-4 sm:p-5`}>
