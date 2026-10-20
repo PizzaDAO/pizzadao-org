@@ -904,7 +904,7 @@
     "saving": "Saving...",
     "saved": "Saved.",
     "regenerate": "Regenerate summary",
-    "regenerateConfirm": "Regenerate the summary from the transcript? Your edits will be replaced.",
+    "regenerateConfirm": "Regenerate the summary from the transcript? Your edits will be replaced. A published call goes back to review.",
     "regenerating": "Regenerating...",
     "publish": "Publish",
     "unpublish": "Unpublish",
@@ -914,6 +914,13 @@
     "reviewError": "That did not work. Try again.",
     "viewPublic": "View public page",
     "actionItemsHeading": "Action items",
-    "chaptersHeading": "Chapters"
+    "chaptersHeading": "Chapters",
+    "lines": "{count, plural, one {# line} other {# lines}}",
+    "noLinesWarning": "No transcript lines for this speaker (transcription may have failed).",
+    "redactLines": "Remove their lines",
+    "redactConfirm": "Remove all of this speaker's lines from the transcript? Audio is kept. The summary is not rewritten.",
+    "processingNote": "The summary is being generated. Reload in a minute.",
+    "actionItemsHint": "One per line. Optional owner after a vertical bar: Send the deck | Ann",
+    "chaptersHint": "One per line: start time then title, like 12:30 Budget update"
   }
 }

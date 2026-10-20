@@ -28,7 +28,7 @@ export const POST = withErrorHandling(async (request: Request) => {
   const payload = parseIngestPayload(body)
   const { id, duplicate, keys, summarize } = await ingestRecording(payload)
   // Summarize after responding so the worker is not kept waiting on the model.
-  if (summarize) after(() => generateAndStoreSummary(id).catch((err) => console.error('[calls/ingest] summary failed:', err instanceof Error ? err.message : err)))
+  if (summarize) after(() => generateAndStoreSummary(id, { onlyIfEmpty: true }).catch((err) => console.error('[calls/ingest] summary failed:', err instanceof Error ? err.message : err)))
   // `keys` = the R2 objects the stored row references; the worker prunes anything else under the session prefix.
   return NextResponse.json({ id, duplicate, keys }, { status: duplicate ? 200 : 201 })
 })

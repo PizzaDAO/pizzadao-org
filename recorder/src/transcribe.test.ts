@@ -3,7 +3,7 @@ import os from 'node:os'
 import path from 'node:path'
 import { beforeEach, describe, expect, it } from 'vitest'
 import { appendRecord, summarize, readManifest } from './manifest.js'
-import { finalizeSession, writeSessionMeta } from './finalize.js'
+import { finalizeSession, MAX_TRANSCRIBE_ATTEMPTS, writeSessionMeta } from './finalize.js'
 import type { IngestPayload } from './types.js'
 import {
   buildConcatList,
@@ -13,6 +13,7 @@ import {
   remapUtterances,
   resetNoKeyWarning,
   speechToCallMs,
+  TranscriptionFailedError,
   transcribeSession,
   transcribeWithDeepgram,
   type DeepgramResult,
@@ -227,6 +228,21 @@ describe('transcribeSession', () => {
     expect(out?.segments.map((s) => s.discordId)).toEqual(['222'])
   })
 
+  it('throws when every speaker failed, so the caller can retry later', async () => {
+    const dir = makeSession([{ id: '111', startMs: 0, endMs: 2000 }])
+    await expect(
+      transcribeSession(dir, dir, summarize(readManifest(dir)), {
+        apiKey: 'k',
+        log: () => {},
+        ffmpeg: async (args) => writeFileSync(args.at(-1)!, 'speech'),
+        probeMs: async () => 2000,
+        transcribeFile: async () => {
+          throw new Error('503')
+        },
+      }),
+    ).rejects.toBeInstanceOf(TranscriptionFailedError)
+  })
+
   it('drops cached words of someone who opted out since the cache was written', async () => {
     const dir = makeSession([
       { id: '111', startMs: 0, endMs: 2000 },
@@ -291,6 +307,23 @@ describe('finalizeSession with a transcript', () => {
     resetNoKeyWarning()
     const { deps, posted, dir } = base(makeSession([{ id: '111', startMs: 0, endMs: 2000 }]), { deepgramApiKey: undefined })
     expect(await finalizeSession(dir, deps)).toBe('uploaded')
+    expect(posted[0].transcript).toBeUndefined()
+  })
+
+  it('total transcription failure keeps the session pending, then ingests without a transcript after the retries', async () => {
+    const dir = makeSession([{ id: '111', startMs: 0, endMs: 2000 }])
+    const { deps, posted } = base(dir, {
+      deepgramApiKey: 'k',
+      transcribe: async () => {
+        throw new TranscriptionFailedError('all failed')
+      },
+    })
+    for (let i = 1; i < MAX_TRANSCRIBE_ATTEMPTS; i++) {
+      expect(await finalizeSession(dir, deps)).toBe('pending')
+      expect(posted).toHaveLength(0)
+    }
+    expect(await finalizeSession(dir, deps)).toBe('uploaded')
+    expect(posted).toHaveLength(1)
     expect(posted[0].transcript).toBeUndefined()
   })
 

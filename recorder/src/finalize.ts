@@ -15,7 +15,7 @@ import { readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSumma
 import { buildMixArgs, buildSpeakerTrackPlan, type PlanSegment } from './mix-plan.js'
 import { postIngestWithRetry, type IngestResult } from './ingest.js'
 import { sessionKeys, type Uploader } from './storage.js'
-import { transcribeSession, type TranscribeDeps } from './transcribe.js'
+import { transcribeSession, TranscriptionFailedError, type TranscribeDeps } from './transcribe.js'
 import type { IngestPayload, IngestSpeaker, SessionMeta } from './types.js'
 
 const run = promisify(execFile)
@@ -24,6 +24,20 @@ export const SESSION_FILE = 'session.json'
 const UPLOADED = 'uploaded'
 const REJECTED = 'ingest-rejected'
 const KEEP_DONE_DAYS = 7
+export const MAX_TRANSCRIBE_ATTEMPTS = 3
+const ATTEMPTS_FILE = 'transcribe-attempts'
+
+function bumpTranscribeAttempts(dir: string): number {
+  const file = path.join(dir, ATTEMPTS_FILE)
+  let n = 0
+  try {
+    n = Number(readFileSync(file, 'utf8')) || 0
+  } catch {
+    // first failure
+  }
+  writeFileSync(file, String(n + 1))
+  return n + 1
+}
 
 export interface FinalizeDeps {
   appBaseUrl: string
@@ -159,6 +173,15 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       if (t) transcript = t
     } catch (err) {
       deps.log(`transcription failed for ${meta.sessionId}: ${err instanceof Error ? err.message : String(err)}`)
+      if (err instanceof TranscriptionFailedError && deps.deepgramApiKey) {
+        // Total failure: keep the session pending (bounded), then give up and ingest without words.
+        const attempts = bumpTranscribeAttempts(dir)
+        if (attempts < MAX_TRANSCRIBE_ATTEMPTS) {
+          deps.log(`will retry transcription of ${meta.sessionId} (attempt ${attempts}/${MAX_TRANSCRIBE_ATTEMPTS})`)
+          return 'pending'
+        }
+        deps.log(`giving up on transcribing ${meta.sessionId}; ingesting without a transcript`)
+      }
     }
 
     const endedAtMs = meta.endedAtMs ?? statSync(path.join(dir, MANIFEST_FILE)).mtimeMs

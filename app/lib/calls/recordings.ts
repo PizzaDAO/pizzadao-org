@@ -2,12 +2,12 @@
  * Call recordings: ingest (worker), review queries (/admin/calls), opt-outs.
  * Audio is private and kept forever; the app never writes or deletes in R2 (see r2.ts).
  */
-import type { Prisma } from '@prisma/client'
+import { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { resolveCrewForEvent, type CrewRef } from './crew-map'
 import type { IngestPayload, TranscriptSegment } from './ingest-schema'
-import { generateCallSummary } from './summarize'
+import { buildSpeakerNames, generateCallSummary } from './summarize'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -32,11 +32,8 @@ async function loadCrews(): Promise<CrewRef[]> {
 export async function ingestRecording(p: IngestPayload): Promise<{ id: string; duplicate: boolean; keys: string[]; summarize: boolean }> {
   const existing = await prisma.callRecording.findUnique({
     where: { sessionId: p.sessionId },
-    select: { id: true, mixKey: true, speakers: { select: { trackKey: true } } },
+    select: { id: true, status: true, mixKey: true, speakers: { select: { trackKey: true } } },
   })
-  // The worker deletes any R2 object under the session prefix that is NOT in `keys`
-  // (leftovers of earlier attempts), so `keys` is always what the stored row references.
-  if (existing) return { id: existing.id, duplicate: true, keys: storedKeys(existing), summarize: false }
   // Opted-out people are never transcribed by the worker; drop their words here too, whatever arrives.
   let segments: TranscriptSegment[] = []
   if (p.transcript?.segments.length) {
@@ -44,6 +41,21 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
     segments = p.transcript.segments.filter((seg) => !optedOut.has(seg.discordId))
   }
   const hasTranscript = segments.length > 0
+  // The worker deletes any R2 object under the session prefix that is NOT in `keys`
+  // (leftovers of earlier attempts), so `keys` is always what the stored row references.
+  if (existing) {
+    // A retry may carry a transcript the first ingest lacked (e.g. Deepgram was down). Fill it in only
+    // while the row is still untouched (RECORDED, no transcript); anything else stays as the reviewer left it.
+    let filled = false
+    if (hasTranscript && existing.status === 'RECORDED') {
+      const res = await prisma.callRecording.updateMany({
+        where: { id: existing.id, status: 'RECORDED', transcript: { equals: Prisma.DbNull } },
+        data: { transcript: segments as unknown as Prisma.InputJsonValue, transcriptLanguage: p.transcript?.language ?? null, status: 'PROCESSING' },
+      })
+      filled = res.count === 1
+    }
+    return { id: existing.id, duplicate: true, keys: storedKeys(existing), summarize: filled }
+  }
   const crew = resolveCrewForEvent(await loadCrews(), { eventId: p.eventId, eventName: p.eventName })
   const created = await prisma.callRecording.create({
     data: {
@@ -193,16 +205,19 @@ export function asSegments(v: unknown): TranscriptSegment[] {
 
 /**
  * Generate (or regenerate) the AI title/summary/chapters/action items from the
- * stored transcript and move a fresh call to IN_REVIEW. Never publishes and
- * never changes the status of a PUBLISHED or REJECTED call. A model failure
- * leaves the transcript in place and the call in review so a reviewer can retry.
+ * stored transcript. The result always goes back to IN_REVIEW with publishedAt
+ * cleared (a regenerated PUBLISHED call is not public until a reviewer
+ * publishes it again); REJECTED calls are left alone. `onlyIfEmpty` (the
+ * automatic run after ingest) writes only while the row still has no summary,
+ * so it never overwrites a reviewer's work. A model failure keeps the transcript
+ * and moves a fresh call to review so a human can retry.
  */
-export async function generateAndStoreSummary(id: string): Promise<boolean> {
+export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: boolean } = {}): Promise<boolean> {
   const rec = await prisma.callRecording.findUnique({
     where: { id },
     select: { id: true, status: true, transcript: true, speakers: { select: { discordId: true, displayName: true } } },
   })
-  if (!rec) return false
+  if (!rec || rec.status === 'REJECTED') return false
   const fresh = rec.status === 'PROCESSING' || rec.status === 'RECORDED'
   const toReview = () => (fresh ? prisma.callRecording.update({ where: { id }, data: { status: 'IN_REVIEW' } }) : null)
   const segments = asSegments(rec.transcript)
@@ -211,18 +226,20 @@ export async function generateAndStoreSummary(id: string): Promise<boolean> {
     return false
   }
   try {
-    const names = Object.fromEntries(rec.speakers.map((s) => [s.discordId, s.displayName ?? s.discordId]))
-    const out = await generateCallSummary(segments, names)
-    await prisma.callRecording.update({
-      where: { id },
-      data: {
-        title: out.title,
-        summary: out.summary,
-        actionItems: out.actionItems as unknown as Prisma.InputJsonValue,
-        chapters: out.chapters as unknown as Prisma.InputJsonValue,
-        ...(fresh ? { status: 'IN_REVIEW' as const } : {}),
-      },
-    })
+    const out = await generateCallSummary(segments, buildSpeakerNames(rec.speakers, segments))
+    const data = {
+      title: out.title,
+      summary: out.summary,
+      actionItems: out.actionItems as unknown as Prisma.InputJsonValue,
+      chapters: out.chapters as unknown as Prisma.InputJsonValue,
+      status: 'IN_REVIEW' as const,
+      publishedAt: null,
+    }
+    if (opts.onlyIfEmpty) {
+      const res = await prisma.callRecording.updateMany({ where: { id, summary: null }, data })
+      return res.count === 1
+    }
+    await prisma.callRecording.update({ where: { id }, data })
     return true
   } catch (err) {
     console.error('[calls/summary] generation failed:', err instanceof Error ? err.message : err)
@@ -259,10 +276,46 @@ export async function unpublishRecording(id: string, reviewerDiscordId: string, 
   return 'ok'
 }
 
-/** Reviewer edits of the generated title and summary. Not allowed on a rejected call. */
-export async function updateRecordingText(id: string, data: { title: string | null; summary: string | null }): Promise<boolean> {
+export interface RecordingTextEdit {
+  title?: string | null
+  summary?: string | null
+  actionItems?: Array<{ text: string; owner?: string }>
+  chapters?: Array<{ startMs: number; title: string }>
+}
+
+export type EditResult = 'ok' | 'not-found' | 'invalid'
+
+/**
+ * Reviewer edits. Only the fields present are written. Not allowed on a rejected
+ * call; a PUBLISHED call may not lose its title or summary.
+ */
+export async function updateRecordingText(id: string, edit: RecordingTextEdit): Promise<EditResult> {
   const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true } })
-  if (!rec || rec.status === 'REJECTED') return false
-  await prisma.callRecording.update({ where: { id }, data: { title: data.title, summary: data.summary } })
-  return true
+  if (!rec || rec.status === 'REJECTED') return 'not-found'
+  if (rec.status === 'PROCESSING') return 'invalid'
+  if (rec.status === 'PUBLISHED' && (edit.title === null || edit.summary === null)) return 'invalid'
+  const data: Prisma.CallRecordingUpdateInput = {}
+  if (edit.title !== undefined) data.title = edit.title
+  if (edit.summary !== undefined) data.summary = edit.summary
+  if (edit.actionItems !== undefined) data.actionItems = edit.actionItems as unknown as Prisma.InputJsonValue
+  if (edit.chapters !== undefined) data.chapters = edit.chapters as unknown as Prisma.InputJsonValue
+  if (Object.keys(data).length === 0) return 'ok'
+  await prisma.callRecording.update({ where: { id }, data })
+  return 'ok'
+}
+
+/**
+ * Redact one speaker: remove all of their lines from the stored transcript (what the public page
+ * renders). Audio and the speaker row are kept. Returns the number of lines removed, or null if the
+ * call is unknown, rejected or still processing.
+ */
+export async function redactSpeakerFromTranscript(id: string, discordId: string): Promise<number | null> {
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, transcript: true } })
+  if (!rec || rec.status === 'REJECTED' || rec.status === 'PROCESSING') return null
+  const all = asSegments(rec.transcript)
+  const kept = all.filter((seg) => seg.discordId !== discordId)
+  if (kept.length !== all.length) {
+    await prisma.callRecording.update({ where: { id }, data: { transcript: kept as unknown as Prisma.InputJsonValue } })
+  }
+  return all.length - kept.length
 }

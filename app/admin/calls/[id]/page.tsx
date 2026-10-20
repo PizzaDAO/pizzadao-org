@@ -14,6 +14,7 @@ import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
 import { ReviewActions } from "../ReviewActions";
+import { RedactSpeaker } from "../RedactSpeaker";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -94,12 +95,30 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <p className="text-foreground/60 m-0">{t("noSpeakers")}</p>
                     ) : (
                         <ul className="m-0 pl-5 grid gap-1">
-                            {rec.speakers.map((s) => (
-                                <li key={s.id}>
-                                    {s.displayName ?? s.discordId}{" "}
-                                    <span className="text-foreground/60">({t("talkTime", { time: clock(s.talkTimeSec) })})</span>
-                                </li>
-                            ))}
+                            {rec.speakers.map((s) => {
+                                const lines = segments.filter((seg) => seg.discordId === s.discordId).length;
+                                const missing = rec.status !== "PROCESSING" && s.talkTimeSec >= 10 && lines === 0;
+                                return (
+                                    <li key={s.id}>
+                                        {s.displayName ?? s.discordId}{" "}
+                                        <span className="text-foreground/60">
+                                            ({t("talkTime", { time: clock(s.talkTimeSec) })}
+                                            {segments.length > 0 ? `, ${t("lines", { count: lines })}` : ""})
+                                        </span>
+                                        {missing && <span className="text-tomato"> {t("noLinesWarning")}</span>}
+                                        {lines > 0 && rec.status !== "REJECTED" && rec.status !== "PROCESSING" && (
+                                            <>
+                                                {" "}
+                                                <RedactSpeaker
+                                                    recordingId={rec.id}
+                                                    discordId={s.discordId}
+                                                    labels={{ redact: t("redactLines"), confirm: t("redactConfirm"), working: t("working"), error: t("reviewError") }}
+                                                />
+                                            </>
+                                        )}
+                                    </li>
+                                );
+                            })}
                         </ul>
                     )}
                 </section>
@@ -125,17 +144,25 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                 {rec.status !== "REJECTED" && (
                     <section className="grid gap-3">
                         <h2 className="text-xl font-bold m-0">{t("reviewHeading")}</h2>
-                        {segments.length === 0 ? (
+                        {rec.status === "PROCESSING" ? (
+                            <p className="text-foreground/60 m-0">{t("processingNote")}</p>
+                        ) : segments.length === 0 ? (
                             <p className="text-foreground/60 m-0">{t("transcriptPending")}</p>
                         ) : (
                             <ReviewActions
+                                key={rec.updatedAt.toISOString()}
                                 recordingId={rec.id}
                                 status={rec.status}
                                 initialTitle={rec.title ?? ""}
                                 initialSummary={rec.summary ?? ""}
-                                canPublish={!!rec.summary?.trim()}
+                                initialActionItems={actionItems.filter((i): i is { text: string; owner?: string } => !!i.text)}
+                                initialChapters={chapters.filter((c): c is { startMs: number; title: string } => !!c.title && typeof c.startMs === "number")}
                                 labels={{
                                     title: t("fieldTitle"),
+                                    actionItems: t("actionItemsHeading"),
+                                    actionItemsHint: t("actionItemsHint"),
+                                    chapters: t("chaptersHeading"),
+                                    chaptersHint: t("chaptersHint"),
                                     summary: t("fieldSummary"),
                                     save: t("save"),
                                     saving: t("saving"),

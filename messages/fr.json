@@ -904,7 +904,7 @@
     "saving": "Enregistrement...",
     "saved": "Enregistré.",
     "regenerate": "Régénérer le résumé",
-    "regenerateConfirm": "Régénérer le résumé à partir de la transcription ? Vos modifications seront remplacées.",
+    "regenerateConfirm": "Régénérer le résumé à partir de la transcription ? Vos modifications seront remplacées. Un appel publié repasse en relecture.",
     "regenerating": "Régénération...",
     "publish": "Publier",
     "unpublish": "Dépublier",
@@ -914,6 +914,13 @@
     "reviewError": "Cela n’a pas fonctionné. Réessayez.",
     "viewPublic": "Voir la page publique",
     "actionItemsHeading": "Actions à mener",
-    "chaptersHeading": "Chapitres"
+    "chaptersHeading": "Chapitres",
+    "lines": "{count, plural, one {# ligne} other {# lignes}}",
+    "noLinesWarning": "Aucune ligne de transcription pour cet intervenant (la transcription a peut-être échoué).",
+    "redactLines": "Supprimer ses lignes",
+    "redactConfirm": "Supprimer toutes les lignes de cet intervenant de la transcription ? L’audio est conservé. Le résumé n’est pas réécrit.",
+    "processingNote": "Le résumé est en cours de génération. Rechargez dans une minute.",
+    "actionItemsHint": "Une par ligne. Responsable facultatif après une barre verticale : Envoyer la présentation | Ann",
+    "chaptersHint": "Une par ligne : heure de début puis titre, par exemple 12:30 Point budget"
   }
 }

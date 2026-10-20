@@ -904,7 +904,7 @@
     "saving": "Guardando...",
     "saved": "Guardado.",
     "regenerate": "Regenerar resumen",
-    "regenerateConfirm": "¿Regenerar el resumen a partir de la transcripción? Se reemplazarán tus ediciones.",
+    "regenerateConfirm": "¿Regenerar el resumen a partir de la transcripción? Se reemplazarán tus ediciones. Una llamada publicada vuelve a revisión.",
     "regenerating": "Regenerando...",
     "publish": "Publicar",
     "unpublish": "Despublicar",
@@ -914,6 +914,13 @@
     "reviewError": "No funcionó. Inténtalo de nuevo.",
     "viewPublic": "Ver página pública",
     "actionItemsHeading": "Tareas pendientes",
-    "chaptersHeading": "Capítulos"
+    "chaptersHeading": "Capítulos",
+    "lines": "{count, plural, one {# línea} other {# líneas}}",
+    "noLinesWarning": "No hay líneas de transcripción de este orador (la transcripción pudo fallar).",
+    "redactLines": "Quitar sus líneas",
+    "redactConfirm": "¿Quitar todas las líneas de este orador de la transcripción? El audio se conserva. El resumen no se reescribe.",
+    "processingNote": "Se está generando el resumen. Recarga en un minuto.",
+    "actionItemsHint": "Una por línea. Responsable opcional tras una barra vertical: Enviar la presentación | Ann",
+    "chaptersHint": "Una por línea: hora de inicio y título, como 12:30 Actualización del presupuesto"
   }
 }

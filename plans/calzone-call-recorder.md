@@ -385,8 +385,8 @@ model CallRecordingOptOut {
 - **Worker:** speech-only tracks, Deepgram transcription and merge; send `transcript` in ingest.
 - **App:**
   - `app/lib/calls/summarize.ts` uses the AI SDK (`ai`) through the **Vercel AI Gateway**:
-    - Model `anthropic/claude-sonnet-5-5`. `CALL_SUMMARY_MODEL` can override it with
-      `anthropic/claude-opus-5-5`.
+    - Model `anthropic/claude-sonnet-5.5`. `CALL_SUMMARY_MODEL` can override it with
+      `anthropic/claude-opus-5.5`.
     - It calls `generateObject` with a zod schema `{title, summary, actionItems[], chapters[]}`.
     - Input is the speaker-labelled transcript as `[mm:ss] Name: text`.
     - The prompt says: no claims not in the transcript; attribute only to the named speaker;

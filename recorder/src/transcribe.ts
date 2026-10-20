@@ -169,6 +169,9 @@ async function defaultProbeMs(file: string): Promise<number> {
   return Math.round(sec * 1000)
 }
 
+/** Every speaker failed (e.g. Deepgram outage or bad key): worth retrying later instead of ingesting without words. */
+export class TranscriptionFailedError extends Error {}
+
 export interface TranscribeDeps {
   apiKey: string | undefined
   log: (msg: string) => void
@@ -212,6 +215,7 @@ export async function transcribeSession(sessionDir: string, outDir: string, spea
 
   const perSpeaker: Array<{ discordId: string; utterances: Utterance[] }> = []
   const languages = new Map<string, number>()
+  let failed = 0
   for (const sp of speakers) {
     try {
       const segs = [...sp.segments].sort((a, b) => a.startMs - b.startMs)
@@ -233,9 +237,11 @@ export async function transcribeSession(sessionDir: string, outDir: string, spea
       perSpeaker.push({ discordId: sp.userId, utterances: remapUtterances(result.utterances, buildOffsetMap(parts)) })
       if (result.language) languages.set(result.language, (languages.get(result.language) ?? 0) + sp.talkTimeSec)
     } catch (err) {
+      failed++
       deps.log(`transcription failed for ${sp.userId}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
+  if (speakers.length > 0 && failed === speakers.length) throw new TranscriptionFailedError(`all ${failed} speaker(s) failed`)
   const segments = mergeTranscripts(perSpeaker)
   if (segments.length === 0) return null
   const language = [...languages.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
