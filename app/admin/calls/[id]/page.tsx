@@ -115,7 +115,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                                     recordingId={rec.id}
                                                     discordId={s.discordId}
                                                     redacted={redacted.has(s.discordId)}
-                                                    labels={{ redact: t("redactLines"), restore: t("restoreLines"), confirm: t("redactConfirm"), working: t("working"), error: t("reviewError") }}
+                                                    labels={{ redact: t("redactLines"), restore: t("restoreLines"), confirm: t("redactConfirm"), unsaved: t("unsavedWarning"), working: t("working"), error: t("reviewError") }}
                                                 />
                                             </>
                                         )}
@@ -164,6 +164,9 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                     title: t("fieldTitle"),
                                     actionItems: t("actionItemsHeading"),
                                     actionItemsHint: t("actionItemsHint"),
+                                    tooManyItems: t("tooManyItems"),
+                                    tooManyChapters: t("tooManyChapters"),
+                                    badChapter: t("badChapter"),
                                     chapters: t("chaptersHeading"),
                                     chaptersHint: t("chaptersHint"),
                                     summary: t("fieldSummary"),

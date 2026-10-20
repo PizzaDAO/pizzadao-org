@@ -918,12 +918,16 @@
     "lines": "{count, plural, one {# line} other {# lines}}",
     "noLinesWarning": "No transcript lines for this speaker (transcription may have failed).",
     "redactLines": "Hide their lines",
-    "redactConfirm": "Hide all of this speaker's lines from the public page and from summaries? Nothing is deleted and you can restore them. The summary is not rewritten.",
+    "redactConfirm": "Hide all of this speaker's lines from the public page and from summaries? Nothing is deleted and you can restore them. A published call goes back to review. The summary is not rewritten.",
     "processingNote": "The summary is being generated. Reload in a minute.",
     "actionItemsHint": "One per line. Optional owner after a vertical bar: Send the deck | Ann",
     "chaptersHint": "One per line: start time then title, like 12:30 Budget update",
     "restoreLines": "Restore their lines",
     "redactedBadge": "Hidden from the public page",
-    "hiddenLine": "[hidden: this speaker's lines are not public]"
+    "hiddenLine": "[hidden: this speaker's lines are not public]",
+    "unsavedWarning": "You have unsaved edits that will be lost. Continue?",
+    "tooManyItems": "At most 30 action items.",
+    "tooManyChapters": "At most 30 chapters.",
+    "badChapter": "Chapter line needs a start time first, like 12:30 Title: {line}"
   }
 }

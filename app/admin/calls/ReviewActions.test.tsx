@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('next/navigation', () => ({ useRouter: () => ({ refresh: vi.fn() }) }))
 
-import { formatActionItems, formatChapters, parseActionItems, parseChapters } from './ReviewActions'
+import { formatActionItems, formatChapters, invalidChapterLines, parseActionItems, parseChapters } from './ReviewActions'
 
 describe('review form text formats', () => {
   it('round-trips action items with optional owners', () => {
@@ -23,5 +23,16 @@ describe('review form text formats', () => {
 
   it('ignores chapter lines without a time', () => {
     expect(parseChapters('no time here\n12:30 Budget')).toEqual([{ startMs: 750_000, title: 'Budget' }])
+  })
+
+  it('splits an action item on the LAST " | " only', () => {
+    expect(parseActionItems('Review a | b plan | Ann')).toEqual([{ text: 'Review a | b plan', owner: 'Ann' }])
+    expect(parseActionItems('Use the a|b notation')).toEqual([{ text: 'Use the a|b notation' }])
+    const items = [{ text: 'x | y', owner: 'Ann' }]
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+  })
+
+  it('flags chapter lines without a valid time', () => {
+    expect(invalidChapterLines('12:30 ok\nno time\n\n5 also bad')).toEqual(['no time', '5 also bad'])
   })
 })

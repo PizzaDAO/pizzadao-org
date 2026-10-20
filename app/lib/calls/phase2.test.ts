@@ -220,16 +220,32 @@ describe('summary generation', () => {
   it('stores the result and moves a PROCESSING call to IN_REVIEW (never PUBLISHED)', async () => {
     m(generateText).mockResolvedValue({ output: good })
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [{ discordId: ANN, displayName: 'Ann' }] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     expect(await generateAndStoreSummary('rec1')).toBe(true)
-    const data = db.callRecording.update.mock.calls[0][0].data
-    expect(data).toMatchObject({ title: 'Release planning', summary: 'They ship Friday.', status: 'IN_REVIEW' })
+    const arg = db.callRecording.updateMany.mock.calls[0][0]
+    expect(arg.data).toMatchObject({ title: 'Release planning', summary: 'They ship Friday.', status: 'IN_REVIEW' })
+    expect(arg.where).toEqual({ id: 'rec1', status: { not: 'REJECTED' } })
+  })
+
+  it('a reject that lands during generation stays rejected (the write matches nothing)', async () => {
+    m(generateText).mockResolvedValue({ output: good })
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 0 }) // WHERE status != REJECTED matched nothing
+    expect(await generateAndStoreSummary('rec1')).toBe(false)
+    for (const call of db.callRecording.updateMany.mock.calls) {
+      const st = call[0].where.status
+      expect(JSON.stringify(st)).toMatch(/REJECTED|PROCESSING/)
+      expect(call[0].data.status === 'PUBLISHED').toBe(false)
+    }
+    expect(db.callRecording.update).not.toHaveBeenCalled()
   })
 
   it('regenerating a PUBLISHED call takes it back to review (public text never changes unreviewed)', async () => {
     m(generateText).mockResolvedValue({ output: good })
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: segments, speakers: [] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     await generateAndStoreSummary('rec1')
-    expect(db.callRecording.update.mock.calls[0][0].data).toMatchObject({ status: 'IN_REVIEW', publishedAt: null })
+    expect(db.callRecording.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'IN_REVIEW', publishedAt: null })
   })
 
   it('the automatic run writes only while the summary is still empty', async () => {
@@ -237,8 +253,12 @@ describe('summary generation', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })
     db.callRecording.updateMany.mockResolvedValue({ count: 0 })
     expect(await generateAndStoreSummary('rec1', { onlyIfEmpty: true })).toBe(false)
-    expect(db.callRecording.updateMany.mock.calls[0][0].where).toEqual({ id: 'rec1', summary: null })
+    expect(db.callRecording.updateMany.mock.calls[0][0].where).toEqual({ id: 'rec1', summary: null, status: { not: 'REJECTED' } })
     expect(db.callRecording.update).not.toHaveBeenCalled()
+    // ...but a row still PROCESSING is moved to review rather than left stuck
+    const unstick = db.callRecording.updateMany.mock.calls[1][0]
+    expect(unstick.where).toEqual({ id: 'rec1', status: { in: ['PROCESSING', 'RECORDED'] } })
+    expect(unstick.data).toEqual({ status: 'IN_REVIEW' })
   })
 
   it('does nothing to a REJECTED call', async () => {
@@ -280,8 +300,9 @@ describe('summary generation', () => {
     m(generateText).mockRejectedValue(new Error('gateway down'))
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })
     expect(await generateAndStoreSummary('rec1')).toBe(false)
-    expect(db.callRecording.update).toHaveBeenCalledTimes(1)
-    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ status: 'IN_REVIEW' })
+    expect(db.callRecording.updateMany).toHaveBeenCalledTimes(1)
+    expect(db.callRecording.updateMany.mock.calls[0][0].data).toEqual({ status: 'IN_REVIEW' })
+    expect(db.callRecording.updateMany.mock.calls[0][0].where.status).toEqual({ in: ['PROCESSING', 'RECORDED'] })
   })
 })
 
@@ -466,8 +487,27 @@ describe('redact a speaker (non-destructive)', () => {
   it('hiding only appends the id: the transcript is never rewritten and nothing is deleted', async () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: [seg(ANN, 'a'), seg(BOB, 'b'), seg(BOB, 'c')], redactedSpeakerIds: [] })
     expect(await setSpeakerRedacted('rec1', BOB, true)).toBe(2)
-    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ redactedSpeakerIds: [BOB] })
+    const data = db.callRecording.update.mock.calls[0][0].data
+    expect(data.redactedSpeakerIds).toEqual([BOB])
+    expect(data.transcript).toBeUndefined()
     expect(db.callRecording.delete).not.toHaveBeenCalled()
+  })
+
+  it('hiding or restoring on a PUBLISHED call sends it back to review (unpublished)', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: [seg(BOB, 'b')], redactedSpeakerIds: [] })
+    await setSpeakerRedacted('rec1', BOB, true)
+    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ redactedSpeakerIds: [BOB], status: 'IN_REVIEW', publishedAt: null })
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: [seg(BOB, 'b')], redactedSpeakerIds: [BOB] })
+    await setSpeakerRedacted('rec1', BOB, false)
+    expect(db.callRecording.update.mock.calls[1][0].data).toEqual({ redactedSpeakerIds: [], status: 'IN_REVIEW', publishedAt: null })
+  })
+
+  it('a null redactedSpeakerIds column (legacy rows) counts as empty', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: [seg(BOB, 'b')], redactedSpeakerIds: null })
+    await setSpeakerRedacted('rec1', BOB, true)
+    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ redactedSpeakerIds: [BOB] })
+    db.callRecording.findFirst.mockResolvedValue({ id: 'rec1', summary: 's', transcript: [seg(BOB, 'b')], redactedSpeakerIds: null, speakers: [] })
+    expect((await getPublishedRecording('rec1'))?.transcript).toHaveLength(1)
   })
 
   it('restore removes the id again (undo); repeating either is a no-op', async () => {

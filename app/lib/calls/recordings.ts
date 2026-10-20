@@ -236,8 +236,8 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
     select: { id: true, status: true, transcript: true, redactedSpeakerIds: true, speakers: { select: { discordId: true, displayName: true } } },
   })
   if (!rec || rec.status === 'REJECTED') return false
-  const fresh = rec.status === 'PROCESSING' || rec.status === 'RECORDED'
-  const toReview = () => (fresh ? prisma.callRecording.update({ where: { id }, data: { status: 'IN_REVIEW' } }) : null)
+  // Never leave a fresh row stuck in PROCESSING/RECORDED; never touch a row rejected meanwhile.
+  const toReview = () => prisma.callRecording.updateMany({ where: { id, status: { in: ['PROCESSING', 'RECORDED'] } }, data: { status: 'IN_REVIEW' } })
   const segments = visibleSegments(rec.transcript, rec.redactedSpeakerIds)
   if (segments.length === 0) {
     await toReview()
@@ -253,12 +253,13 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
       status: 'IN_REVIEW' as const,
       publishedAt: null,
     }
-    if (opts.onlyIfEmpty) {
-      const res = await prisma.callRecording.updateMany({ where: { id, summary: null }, data })
-      return res.count === 1
-    }
-    await prisma.callRecording.update({ where: { id }, data })
-    return true
+    // REJECTED is excluded in the WHERE, so a reject that lands during generation stays rejected.
+    const where = opts.onlyIfEmpty ? { id, summary: null, status: { not: 'REJECTED' as const } } : { id, status: { not: 'REJECTED' as const } }
+    const res = await prisma.callRecording.updateMany({ where, data })
+    if (res.count === 1) return true
+    // Matched nothing (a summary appeared meanwhile, or the call was rejected): still unstick a fresh row.
+    await toReview()
+    return false
   } catch (err) {
     console.error('[calls/summary] generation failed:', err instanceof Error ? err.message : err)
     await toReview()
@@ -333,6 +334,12 @@ export async function setSpeakerRedacted(id: string, discordId: string, redacted
   if (!rec || rec.status === 'REJECTED' || rec.status === 'PROCESSING') return null
   const current = rec.redactedSpeakerIds ?? []
   const next = redacted ? (current.includes(discordId) ? current : [...current, discordId]) : current.filter((x) => x !== discordId)
-  if (next.length !== current.length) await prisma.callRecording.update({ where: { id }, data: { redactedSpeakerIds: next } })
+  if (next.length !== current.length) {
+    // On a PUBLISHED call the public text changes, so it goes back to review before it can be republished.
+    await prisma.callRecording.update({
+      where: { id },
+      data: { redactedSpeakerIds: next, ...(rec.status === 'PUBLISHED' ? { status: 'IN_REVIEW' as const, publishedAt: null } : {}) },
+    })
+  }
   return asSegments(rec.transcript).filter((seg) => seg.discordId === discordId).length
 }

@@ -6,11 +6,13 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
+import { isReviewDirty } from "./reviewDirty";
 
 export interface RedactLabels {
     redact: string;
     restore: string;
     confirm: string;
+    unsaved: string;
     working: string;
     error: string;
 }
@@ -20,6 +22,7 @@ export function RedactSpeaker({ recordingId, discordId, redacted, labels }: { re
     const [state, setState] = useState<"idle" | "working" | "error">("idle");
 
     async function redact() {
+        if (isReviewDirty() && !window.confirm(labels.unsaved)) return;
         if (!redacted && !window.confirm(labels.confirm)) return;
         setState("working");
         try {

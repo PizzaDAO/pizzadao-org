@@ -8,7 +8,8 @@
 // row is updated, so the form always shows what is stored after a refresh.
 // Publish saves the current fields first.
 
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { setReviewDirty } from "./reviewDirty";
 import { useRouter } from "next/navigation";
 
 export interface ReviewLabels {
@@ -18,6 +19,9 @@ export interface ReviewLabels {
     actionItemsHint: string;
     chapters: string;
     chaptersHint: string;
+    tooManyItems: string;
+    tooManyChapters: string;
+    badChapter: string;
     save: string;
     saving: string;
     saved: string;
@@ -52,7 +56,9 @@ function clock(ms: number): string {
     return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`;
 }
 
-/** "text | owner" per line. */
+export const MAX_LIST = 30;
+
+/** "text | owner" per line; the owner is whatever follows the LAST " | ". */
 export function formatActionItems(items: ActionItem[]): string {
     return items.map((i) => (i.owner ? `${i.text} | ${i.owner}` : i.text)).join("\n");
 }
@@ -62,9 +68,11 @@ export function parseActionItems(raw: string): ActionItem[] {
         .map((l) => l.trim())
         .filter(Boolean)
         .map((l) => {
-            const [text, ...owner] = l.split("|");
-            const o = owner.join("|").trim();
-            return { text: text.trim(), ...(o ? { owner: o } : {}) };
+            const at = l.lastIndexOf(" | ");
+            if (at === -1) return { text: l };
+            const owner = l.slice(at + 3).trim();
+            const text = l.slice(0, at).trim();
+            return owner ? { text, owner } : { text };
         })
         .filter((i) => i.text);
 }
@@ -72,16 +80,24 @@ export function parseActionItems(raw: string): ActionItem[] {
 export function formatChapters(chapters: Chapter[]): string {
     return chapters.map((c) => `${clock(c.startMs)} ${c.title}`).join("\n");
 }
+const CHAPTER_LINE = /^(\d+(?::\d{1,2}){1,2})\s+(.+)$/;
 export function parseChapters(raw: string): Chapter[] {
     const out: Chapter[] = [];
     for (const line of raw.split("\n")) {
-        const m = line.trim().match(/^(\d+(?::\d{1,2}){1,2})\s+(.+)$/);
+        const m = line.trim().match(CHAPTER_LINE);
         if (!m) continue;
         const parts = m[1].split(":").map(Number);
         const sec = parts.length === 3 ? parts[0] * 3600 + parts[1] * 60 + parts[2] : parts[0] * 60 + parts[1];
         out.push({ startMs: sec * 1000, title: m[2].trim() });
     }
     return out;
+}
+/** Non-empty chapter lines that do not start with a time. */
+export function invalidChapterLines(raw: string): string[] {
+    return raw
+        .split("\n")
+        .map((l) => l.trim())
+        .filter((l) => l && !CHAPTER_LINE.test(l));
 }
 
 export function ReviewActions({
@@ -108,10 +124,29 @@ export function ReviewActions({
     const [chapters, setChapters] = useState(formatChapters(initialChapters));
     const [busy, setBusy] = useState<Busy>(null);
     const [message, setMessage] = useState<"saved" | "error" | null>(null);
+    const [problem, setProblem] = useState<string | null>(null);
     const published = status === "PUBLISHED";
     const base = `/api/admin/calls/${recordingId}`;
     const json = { "Content-Type": "application/json" };
     const canPublish = summary.trim().length > 0;
+    const dirty =
+        title !== initialTitle ||
+        summary !== initialSummary ||
+        actionItems !== formatActionItems(initialActionItems) ||
+        chapters !== formatChapters(initialChapters);
+    useEffect(() => {
+        setReviewDirty(dirty);
+        return () => setReviewDirty(false);
+    }, [dirty]);
+
+    /** A clear message for input we can see is invalid, instead of a generic failure. */
+    function validate(): string | null {
+        if (parseActionItems(actionItems).length > MAX_LIST) return labels.tooManyItems;
+        if (parseChapters(chapters).length > MAX_LIST) return labels.tooManyChapters;
+        const bad = invalidChapterLines(chapters);
+        if (bad.length > 0) return labels.badChapter.replace("{line}", bad[0]);
+        return null;
+    }
 
     const saveRequest = () =>
         fetch(`${base}/summary`, {
@@ -126,12 +161,23 @@ export function ReviewActions({
         });
 
     async function run(kind: Exclude<Busy, null>, steps: Array<() => Promise<Response>>) {
-        setBusy(kind);
+        setProblem(null);
         setMessage(null);
+        if (kind === "save" || (kind === "publish" && !published)) {
+            const invalid = validate();
+            if (invalid) return setProblem(invalid);
+        }
+        setBusy(kind);
         try {
             for (const step of steps) {
                 const res = await step();
-                if (!res.ok) throw new Error(String(res.status));
+                if (!res.ok) {
+                    if (res.status === 400) {
+                        const body = (await res.json().catch(() => null)) as { error?: string } | null;
+                        if (body?.error) setProblem(body.error);
+                    }
+                    throw new Error(String(res.status));
+                }
             }
             setMessage(kind === "save" ? "saved" : null);
             router.refresh();
@@ -197,7 +243,8 @@ export function ReviewActions({
             {!published && !canPublish && <p className="m-0 text-sm text-foreground/60">{labels.publishNeedsContent}</p>}
             {!published && canPublish && <p className="m-0 text-sm text-foreground/60">{labels.publishNote}</p>}
             {message === "saved" && <p className="m-0 text-sm" role="status">{labels.saved}</p>}
-            {message === "error" && <p className="m-0 text-sm text-tomato" role="alert">{labels.error}</p>}
+            {problem && <p className="m-0 text-sm text-tomato" role="alert">{problem}</p>}
+            {message === "error" && !problem && <p className="m-0 text-sm text-tomato" role="alert">{labels.error}</p>}
         </div>
     );
 }
