@@ -16,8 +16,9 @@ import { consentNotice, lateJoinReminder } from './consent.js'
 import {
   decideEventAction,
   decideWindowAction,
-  EventStatus,
+  isFailureStop,
   NO_SHOW_GRACE_MS,
+  StartBackoff,
   type EventInfo,
 } from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
@@ -50,8 +51,7 @@ export class CallRecorder {
   private queue: Promise<unknown> = Promise.resolve()
   private readonly queued = new Set<string>()
   private readonly botCache = new Map<string, boolean>()
-  /** Events whose recording ended on its own (empty / max duration): later edits of an ACTIVE event must not restart them. */
-  private readonly finished = new Set<string>()
+  private readonly backoff = new StartBackoff()
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -88,37 +88,11 @@ export class CallRecorder {
 
   // ---- events ----------------------------------------------------------
 
-  /**
-   * `statusChanged` is false for edits of an event that stayed ACTIVE (title,
-   * description...). An event that already finished its recording only starts
-   * again when it goes ACTIVE anew.
-   */
-  async handleEvent(info: EventInfo, fresh = true, statusChanged = true): Promise<void> {
+  /** Status changes: only COMPLETED/CANCELED of the event being recorded matters (starts come from the schedule window). */
+  async handleEvent(info: EventInfo): Promise<void> {
     if (this.shuttingDown) return
-    const action = decideEventAction(
-      this.currentEventId,
-      info,
-      { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() },
-      fresh,
-      this.current?.eventStartMs ?? null,
-    )
-    if (info.status !== EventStatus.Active) this.finished.delete(info.id)
-    switch (action.type) {
-      case 'ignore':
-        return
-      case 'stop':
-        await this.stop(action.reason)
-        return
-      case 'switch':
-        if (this.finished.has(action.event.id) && !statusChanged) return
-        await this.stop(action.reason)
-        await this.start(action.event)
-        return
-      case 'start':
-        if (this.finished.has(action.event.id) && !statusChanged) return
-        await this.start(action.event)
-        return
-    }
+    const action = decideEventAction(this.currentEventId, info)
+    if (action.type === 'stop') await this.stop(action.reason)
   }
 
   /**
@@ -145,6 +119,7 @@ export class CallRecorder {
       humans,
       events,
     })
+    if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(action.event.id, Date.now())) return
     if (action.type === 'start') {
       this.log(`humans present in the window of "${action.event.name}" (${action.event.id}); starting`)
       await this.start(action.event)
@@ -189,6 +164,7 @@ export class CallRecorder {
     let guild: Guild | null = null
     const abort = async (why: string) => {
       this.log(`not recording ${sessionId}: ${why}`)
+      if (why !== 'shutting down') this.noteFailure(event.id)
       try {
         await capture?.stop()
       } catch {
@@ -254,7 +230,6 @@ export class CallRecorder {
         eventStartMs: event.scheduledStartMs,
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
-      this.finished.delete(event.id)
       this.log(`recording "${event.name}" as ${sessionId}`)
     } catch (err) {
       await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -273,6 +248,10 @@ export class CallRecorder {
     if (reason) await this.stop(reason)
   }
 
+  private noteFailure(eventId: string): void {
+    if (this.backoff.noteFailure(eventId, Date.now())) this.log(`giving up on event ${eventId} after repeated failures`)
+  }
+
   /** Stop the current recording. Every step is isolated: a failure in one never skips the rest. */
   async stop(reason: StopReason): Promise<void> {
     const s = this.current
@@ -280,9 +259,7 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
-    if (reason === 'empty' || reason === 'max-duration') {
-      if (s.meta.eventId) this.finished.add(s.meta.eventId)
-    }
+    if (isFailureStop(reason) && s.meta.eventId) this.noteFailure(s.meta.eventId)
 
     try {
       // Latest opt-outs apply to everything captured so far (finalize re-checks that they loaded).
