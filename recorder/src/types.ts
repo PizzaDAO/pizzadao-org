@@ -11,6 +11,18 @@ export interface IngestSpeaker {
   trackBytes: number | null
 }
 
+export interface TranscriptSegment {
+  discordId: string
+  startMs: number
+  endMs: number
+  text: string
+}
+
+export interface IngestTranscript {
+  language: string | null
+  segments: TranscriptSegment[]
+}
+
 export interface IngestPayload {
   sessionId: string
   eventId: string | null
@@ -22,6 +34,8 @@ export interface IngestPayload {
   partial: boolean
   mix: { key: string; bytes: number } | null
   speakers: IngestSpeaker[]
+  /** Omitted when there is no Deepgram key or nothing could be transcribed. */
+  transcript?: IngestTranscript
 }
 
 /** Written to <session dir>/session.json when a recording starts, updated as it ends. */

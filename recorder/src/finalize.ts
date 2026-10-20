@@ -11,10 +11,11 @@ import { execFile } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { readManifest, summarize, appendRecord, MANIFEST_FILE } from './manifest.js'
+import { readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSummary } from './manifest.js'
 import { buildMixArgs, buildSpeakerTrackPlan, type PlanSegment } from './mix-plan.js'
 import { postIngestWithRetry, type IngestResult } from './ingest.js'
 import { sessionKeys, type Uploader } from './storage.js'
+import { transcribeSession, type TranscribeDeps } from './transcribe.js'
 import type { IngestPayload, IngestSpeaker, SessionMeta } from './types.js'
 
 const run = promisify(execFile)
@@ -31,6 +32,9 @@ export interface FinalizeDeps {
   log: (msg: string) => void
   ffmpeg?: (args: string[]) => Promise<void>
   postIngest?: (payload: IngestPayload) => Promise<IngestResult>
+  /** Deepgram key; without it the call is ingested with no transcript. */
+  deepgramApiKey?: string
+  transcribe?: (sessionDir: string, outDir: string, speakers: SpeakerSummary[], deps: TranscribeDeps) => ReturnType<typeof transcribeSession>
 }
 
 export function writeSessionMeta(dir: string, meta: SessionMeta): void {
@@ -147,6 +151,16 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       uploadedTracks.set(t.userId, { key, bytes: await deps.uploader.put(key, t.file, 'audio/ogg') })
     }
 
+    // Only speakers whose track was built (post opt-out purge) are transcribed.
+    let transcript: IngestPayload['transcript']
+    try {
+      const transcribe = deps.transcribe ?? transcribeSession
+      const t = await transcribe(dir, outDir, speakers.filter((sp) => uploadedTracks.has(sp.userId)), { apiKey: deps.deepgramApiKey, log: deps.log, ffmpeg })
+      if (t) transcript = t
+    } catch (err) {
+      deps.log(`transcription failed for ${meta.sessionId}: ${err instanceof Error ? err.message : String(err)}`)
+    }
+
     const endedAtMs = meta.endedAtMs ?? statSync(path.join(dir, MANIFEST_FILE)).mtimeMs
     const payload: IngestPayload = {
       sessionId: meta.sessionId,
@@ -167,6 +181,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
           trackKey: uploadedTracks.get(sp.userId)!.key,
           trackBytes: uploadedTracks.get(sp.userId)!.bytes,
         })),
+      ...(transcript ? { transcript } : {}),
     }
 
     if (payload.speakers.length === 0 && !payload.mix) {

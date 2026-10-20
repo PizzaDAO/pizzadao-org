@@ -51,6 +51,7 @@ recorder = new CallRecorder(
     apiKey: cfg.recorderApiKey,
     uploader,
     log,
+    deepgramApiKey: cfg.deepgramApiKey,
     postIngest: (payload) => postIngestWithRetry(cfg.appBaseUrl, cfg.recorderApiKey, payload),
   },
   log,
