@@ -13,7 +13,16 @@ import type { Client, Guild, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
 import type { Config } from './config.js'
 import { consentNotice, lateJoinReminder } from './consent.js'
-import { decideEventAction, EventStatus, type EventInfo } from './event-lifecycle.js'
+import {
+  decideWindowAction,
+  eventKey,
+  eventsInWindow,
+  isFailureStop,
+  RECOVERY_MS,
+  NO_SHOW_GRACE_MS,
+  StartBackoff,
+  type EventInfo,
+} from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
 import { purgeUsersInDir } from './manifest.js'
 import { NicknameManager } from './nickname.js'
@@ -33,6 +42,10 @@ interface ActiveSession {
   tick: NodeJS.Timeout
   reminded: Set<string>
   stopping: boolean
+  /** Scheduled start of the event being recorded (forward-only switching). */
+  eventStartMs: number | null
+  /** eventKey of the event being recorded (back-off bookkeeping). */
+  key: string
 }
 
 export class CallRecorder {
@@ -42,8 +55,7 @@ export class CallRecorder {
   private queue: Promise<unknown> = Promise.resolve()
   private readonly queued = new Set<string>()
   private readonly botCache = new Map<string, boolean>()
-  /** Events whose recording ended on its own (empty / max duration): later edits must not restart them. */
-  private readonly finished = new Set<string>()
+  private readonly backoff = new StartBackoff()
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -81,34 +93,40 @@ export class CallRecorder {
   // ---- events ----------------------------------------------------------
 
   /**
-   * `statusChanged` is false for edits of an event that stayed ACTIVE (title,
-   * description...). An event that already finished its recording only starts
-   * again when it goes ACTIVE anew.
+   * Schedule-window trigger: humans are in the call channel and an event's window covers now,
+   * whatever its status. Called from voice-state changes, a periodic check and boot.
    */
-  async handleEvent(info: EventInfo, fresh = true, statusChanged = true): Promise<void> {
-    if (this.shuttingDown) return
-    const action = decideEventAction(
-      this.currentEventId,
-      info,
-      { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() },
-      fresh,
-    )
-    if (info.status !== EventStatus.Active) this.finished.delete(info.id)
-    switch (action.type) {
-      case 'ignore':
-        return
-      case 'stop':
-        await this.stop(action.reason)
-        return
-      case 'switch':
-        if (this.finished.has(action.event.id) && !statusChanged) return
-        await this.stop(action.reason)
-        await this.start(action.event)
-        return
-      case 'start':
-        if (this.finished.has(action.event.id) && !statusChanged) return
-        await this.start(action.event)
-        return
+  async checkSchedule(events: EventInfo[]): Promise<void> {
+    if (this.shuttingDown || this.starting) return
+    if (this.current?.stopping) return
+    let humans: number
+    try {
+      const guild = await this.client.guilds.fetch(this.cfg.guildId)
+      humans = await this.humanCount(guild)
+    } catch (err) {
+      this.log(`schedule check failed: ${err instanceof Error ? err.message : String(err)}`)
+      return
+    }
+    const opts = { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() }
+    // Back-off bookkeeping: a session that ran long enough recovered; closed windows are forgotten.
+    const cur = this.current
+    if (cur && opts.nowMs - cur.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(cur.key)
+    this.backoff.prune(new Set([...eventsInWindow(events, opts).map(eventKey), ...(cur ? [cur.key] : [])]))
+    const action = decideWindowAction({
+      ...opts,
+      currentEventId: this.currentEventId,
+      currentStartMs: this.current?.eventStartMs ?? null,
+      humans,
+      events,
+    })
+    if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(eventKey(action.event), Date.now())) return
+    if (action.type === 'start') {
+      this.log(`humans present in the window of "${action.event.name}" (${action.event.id}); starting`)
+      await this.start(action.event)
+    } else if (action.type === 'switch') {
+      this.log(`next event "${action.event.name}" (${action.event.id}) is starting; switching`)
+      await this.stop(action.reason)
+      await this.start(action.event)
     }
   }
 
@@ -146,6 +164,7 @@ export class CallRecorder {
     let guild: Guild | null = null
     const abort = async (why: string) => {
       this.log(`not recording ${sessionId}: ${why}`)
+      if (why !== 'shutting down') this.noteFailure(eventKey(event))
       try {
         await capture?.stop()
       } catch {
@@ -188,10 +207,15 @@ export class CallRecorder {
       if (this.shuttingDown) return await abort('shutting down')
 
       // 4. only now start capturing audio
-      const tracker = new StopTracker(startedAtMs, {
-        maxCallMs: this.cfg.maxCallMinutes * 60_000,
-        emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
-      })
+      // Max duration counts from the scheduled start when the session began early.
+      const tracker = new StopTracker(
+        Math.max(startedAtMs, event.scheduledStartMs ?? 0),
+        {
+          maxCallMs: this.cfg.maxCallMinutes * 60_000,
+          emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
+        },
+        event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
+      )
       tracker.observeHumans(await this.humanCount(g), Date.now())
       capture.beginCapture()
 
@@ -203,9 +227,10 @@ export class CallRecorder {
         tracker,
         reminded: new Set(),
         stopping: false,
+        eventStartMs: event.scheduledStartMs,
+        key: eventKey(event),
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
-      this.finished.delete(event.id)
       this.log(`recording "${event.name}" as ${sessionId}`)
     } catch (err) {
       await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -224,6 +249,10 @@ export class CallRecorder {
     if (reason) await this.stop(reason)
   }
 
+  private noteFailure(key: string): void {
+    if (this.backoff.noteFailure(key, Date.now())) this.log(`giving up on event ${key} after repeated failures`)
+  }
+
   /** Stop the current recording. Every step is isolated: a failure in one never skips the rest. */
   async stop(reason: StopReason): Promise<void> {
     const s = this.current
@@ -231,8 +260,9 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
-    if (reason === 'empty' || reason === 'max-duration') {
-      if (s.meta.eventId) this.finished.add(s.meta.eventId)
+    if (isFailureStop(reason)) {
+      if (Date.now() - s.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(s.key) // it had recovered
+      this.noteFailure(s.key)
     }
 
     try {

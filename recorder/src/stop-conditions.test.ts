@@ -55,4 +55,51 @@ describe('StopTracker', () => {
     t.observeHumans(0, 1 * MIN)
     expect(t.check(10 * MIN)).toBe('max-duration')
   })
+
+  describe('no-show protection (event set ACTIVE before anyone arrives)', () => {
+    const start = 18 * 60 * MIN // 18:00 session start
+    const noShowUntil = start + 30 * MIN // scheduled 18:15 + 15
+    const mk = () => new StopTracker(start, limits, noShowUntil)
+
+    it('does not stop as empty at 18:05 when no human has ever been present', () => {
+      const t = mk()
+      t.observeHumans(0, start)
+      expect(t.check(start + 5 * MIN)).toBeNull()
+      expect(t.check(start + 29 * MIN)).toBeNull()
+    })
+
+    it('keeps recording when people arrive at 18:15 and talk on', () => {
+      const t = mk()
+      t.observeHumans(0, start)
+      t.observeHumans(4, start + 15 * MIN)
+      expect(t.check(start + 40 * MIN)).toBeNull()
+    })
+
+    it('applies the normal grace once humans were present and left', () => {
+      const t = mk()
+      t.observeHumans(0, start)
+      t.observeHumans(2, start + 15 * MIN)
+      t.observeHumans(0, start + 20 * MIN)
+      expect(t.check(start + 24 * MIN)).toBeNull()
+      expect(t.check(start + 25 * MIN)).toBe('empty')
+    })
+
+    it('may stop as empty after scheduled start + 15 minutes if nobody ever came', () => {
+      const t = mk()
+      t.observeHumans(0, start)
+      expect(t.check(start + 30 * MIN)).toBe('empty')
+    })
+
+    it('max duration still applies', () => {
+      const t = mk()
+      t.observeHumans(0, start)
+      expect(t.check(start + 120 * MIN)).toBe('max-duration')
+    })
+
+    it('without a deadline (null) the old behaviour holds', () => {
+      const t = new StopTracker(start, limits, null)
+      t.observeHumans(0, start)
+      expect(t.check(start + 5 * MIN)).toBe('empty')
+    })
+  })
 })
