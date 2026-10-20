@@ -5,10 +5,10 @@
  */
 import { createServer } from 'node:http'
 import { mkdirSync } from 'node:fs'
-import { Client, GatewayIntentBits, type GuildScheduledEvent, type PartialGuildScheduledEvent } from 'discord.js'
+import { Client, GatewayIntentBits, type GuildScheduledEvent } from 'discord.js'
 import { generateDependencyReport } from '@discordjs/voice'
 import { loadConfig } from './config.js'
-import { type EventInfo } from './event-lifecycle.js'
+import type { EventInfo } from './event-lifecycle.js'
 import { clearAllStarting, sweepOldSessions } from './finalize.js'
 import { NicknameManager } from './nickname.js'
 import { appOptOutFetcher, OptOutCache } from './optouts.js'
@@ -69,23 +69,13 @@ function toInfo(ev: GuildScheduledEvent): EventInfo {
   }
 }
 
-// One event at a time: start/stop/switch must not interleave.
-// (the chain lives next to the recorder above; stops from ticks and fatal errors use it too)
-async function onEvent(ev: GuildScheduledEvent | PartialGuildScheduledEvent) {
-  const full = ev.partial ? await ev.fetch() : ev
-  if (full.guildId !== cfg.guildId) return
-  await recorder.handleEvent(toInfo(full))
-}
-
-/** Start a recording for humans present in an event's scheduled window (even if the event is not ACTIVE). */
+/** Start a recording for humans present in an event's schedule window (event status is not a trigger). */
 async function scheduleCheck(refetch: boolean) {
   const guild = await client.guilds.fetch(cfg.guildId)
   const events = [...(refetch ? await guild.scheduledEvents.fetch() : guild.scheduledEvents.cache).values()].map(toInfo)
   await recorder.checkSchedule(events)
 }
 
-// Only COMPLETED/CANCELED of the event being recorded matters here; starts come from the schedule window.
-client.on('guildScheduledEventUpdate', (_old, ev) => serial(() => onEvent(ev)))
 client.on('voiceStateUpdate', (o, n) => {
   recorder.onVoiceState(o, n)
   // Someone joined or left the call channel: maybe a call is starting without its event being set ACTIVE.

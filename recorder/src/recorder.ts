@@ -14,9 +14,11 @@ import { VoiceCapture } from './capture.js'
 import type { Config } from './config.js'
 import { consentNotice, lateJoinReminder } from './consent.js'
 import {
-  decideEventAction,
   decideWindowAction,
+  eventKey,
+  eventsInWindow,
   isFailureStop,
+  RECOVERY_MS,
   NO_SHOW_GRACE_MS,
   StartBackoff,
   type EventInfo,
@@ -42,6 +44,8 @@ interface ActiveSession {
   stopping: boolean
   /** Scheduled start of the event being recorded (forward-only switching). */
   eventStartMs: number | null
+  /** eventKey of the event being recorded (back-off bookkeeping). */
+  key: string
 }
 
 export class CallRecorder {
@@ -88,13 +92,6 @@ export class CallRecorder {
 
   // ---- events ----------------------------------------------------------
 
-  /** Status changes: only COMPLETED/CANCELED of the event being recorded matters (starts come from the schedule window). */
-  async handleEvent(info: EventInfo): Promise<void> {
-    if (this.shuttingDown) return
-    const action = decideEventAction(this.currentEventId, info)
-    if (action.type === 'stop') await this.stop(action.reason)
-  }
-
   /**
    * Schedule-window trigger: humans are in the call channel and an event's window covers now,
    * whatever its status. Called from voice-state changes, a periodic check and boot.
@@ -110,16 +107,19 @@ export class CallRecorder {
       this.log(`schedule check failed: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
+    const opts = { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() }
+    // Back-off bookkeeping: a session that ran long enough recovered; closed windows are forgotten.
+    const cur = this.current
+    if (cur && opts.nowMs - cur.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(cur.key)
+    this.backoff.prune(new Set([...eventsInWindow(events, opts).map(eventKey), ...(cur ? [cur.key] : [])]))
     const action = decideWindowAction({
-      callChannelId: this.cfg.callChannelId,
-      maxCallMs: this.cfg.maxCallMinutes * 60_000,
-      nowMs: Date.now(),
+      ...opts,
       currentEventId: this.currentEventId,
       currentStartMs: this.current?.eventStartMs ?? null,
       humans,
       events,
     })
-    if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(action.event.id, Date.now())) return
+    if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(eventKey(action.event), Date.now())) return
     if (action.type === 'start') {
       this.log(`humans present in the window of "${action.event.name}" (${action.event.id}); starting`)
       await this.start(action.event)
@@ -164,7 +164,7 @@ export class CallRecorder {
     let guild: Guild | null = null
     const abort = async (why: string) => {
       this.log(`not recording ${sessionId}: ${why}`)
-      if (why !== 'shutting down') this.noteFailure(event.id)
+      if (why !== 'shutting down') this.noteFailure(eventKey(event))
       try {
         await capture?.stop()
       } catch {
@@ -228,6 +228,7 @@ export class CallRecorder {
         reminded: new Set(),
         stopping: false,
         eventStartMs: event.scheduledStartMs,
+        key: eventKey(event),
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
       this.log(`recording "${event.name}" as ${sessionId}`)
@@ -248,8 +249,8 @@ export class CallRecorder {
     if (reason) await this.stop(reason)
   }
 
-  private noteFailure(eventId: string): void {
-    if (this.backoff.noteFailure(eventId, Date.now())) this.log(`giving up on event ${eventId} after repeated failures`)
+  private noteFailure(key: string): void {
+    if (this.backoff.noteFailure(key, Date.now())) this.log(`giving up on event ${key} after repeated failures`)
   }
 
   /** Stop the current recording. Every step is isolated: a failure in one never skips the rest. */
@@ -259,7 +260,10 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
-    if (isFailureStop(reason) && s.meta.eventId) this.noteFailure(s.meta.eventId)
+    if (isFailureStop(reason)) {
+      if (Date.now() - s.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(s.key) // it had recovered
+      this.noteFailure(s.key)
+    }
 
     try {
       // Latest opt-outs apply to everything captured so far (finalize re-checks that they loaded).

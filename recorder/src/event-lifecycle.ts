@@ -4,8 +4,9 @@
  * Only the schedule window starts or switches a recording: humans are in the call
  * channel and a scheduled event's window covers now. Event status (SCHEDULED /
  * ACTIVE) is not a trigger: the scheduler sets events ACTIVE ~15 minutes early, which
- * would swallow the previous crew's call. COMPLETED / CANCELED of the event being
- * recorded still stops it.
+ * would swallow the previous crew's call. COMPLETED / CANCELED never stops a session
+ * (it only keeps the event from starting one while idle); a session ends by empty
+ * grace, max duration, a forward switch or shutdown.
  */
 import type { StopReason } from './stop-conditions.js'
 
@@ -45,12 +46,6 @@ export const NO_END_WINDOW_MS = 90 * 60_000
 export const RETRY_BACKOFF_MS = 5 * 60_000
 export const MAX_ATTEMPTS = 3
 
-/** Status changes of the event being recorded: COMPLETED/CANCELED stop it, anything else is ignored. */
-export function decideEventAction(currentEventId: string | null, event: EventInfo): EventAction {
-  const ended = event.status === EventStatus.Completed || event.status === EventStatus.Canceled
-  return ended && event.id === currentEventId ? { type: 'stop', reason: 'event-ended' } : { type: 'ignore' }
-}
-
 /**
  * [open, close) of the event's START window, or null if it has no scheduled start. With a
  * scheduled end it closes then; otherwise at the earlier of the next event's scheduled
@@ -80,7 +75,12 @@ export function eventsInWindow(events: EventInfo[], o: LifecycleOptions): EventI
     if (e.channelId !== o.callChannelId) return false
     if (e.status !== EventStatus.Scheduled && e.status !== EventStatus.Active) return false
     const w = eventWindow(e, o, events)
-    return w !== null && o.nowMs >= w.openMs && o.nowMs < w.closeMs
+    if (w !== null && o.nowMs >= w.openMs && o.nowMs < w.closeMs) return true
+    // A host pressed Start late (or the bot restarted mid-call): an ACTIVE event whose start has
+    // passed counts until MAX_CALL_MINUTES after it, even past the normal close. ACTIVE before the
+    // scheduled start is not enough on its own.
+    const start = e.scheduledStartMs
+    return e.status === EventStatus.Active && start !== null && o.nowMs >= start && o.nowMs - start < o.maxCallMs
   })
 }
 
@@ -154,23 +154,40 @@ export function decideWindowAction(i: WindowInput): EventAction {
   return event ? { type: 'switch', event, reason: 'superseded' } : { type: 'ignore' }
 }
 
-/** Per-event retry limiter for failed starts / fatal stops. */
+/** Identity of one occurrence of an event (ids can recur for recurring events). */
+export function eventKey(e: Pick<EventInfo, 'id' | 'scheduledStartMs'>): string {
+  return `${e.id}:${e.scheduledStartMs}`
+}
+
+/** A session that ran this long counts as a recovery and clears its failure count. */
+export const RECOVERY_MS = 3 * 60_000
+
+/** Per-event-occurrence retry limiter for failed starts / fatal stops. */
 export class StartBackoff {
   private readonly m = new Map<string, { failures: number; lastMs: number }>()
 
   /** Record a failure; returns true when this was the one that exhausted the attempts. */
-  noteFailure(eventId: string, nowMs: number): boolean {
-    const s = this.m.get(eventId) ?? { failures: 0, lastMs: 0 }
+  noteFailure(key: string, nowMs: number): boolean {
+    const s = this.m.get(key) ?? { failures: 0, lastMs: 0 }
     s.failures++
     s.lastMs = nowMs
-    this.m.set(eventId, s)
+    this.m.set(key, s)
     return s.failures === MAX_ATTEMPTS
   }
 
-  allows(eventId: string, nowMs: number): boolean {
-    const s = this.m.get(eventId)
+  allows(key: string, nowMs: number): boolean {
+    const s = this.m.get(key)
     if (!s) return true
     return s.failures < MAX_ATTEMPTS && nowMs - s.lastMs >= RETRY_BACKOFF_MS
+  }
+
+  clear(key: string): void {
+    this.m.delete(key)
+  }
+
+  /** Forget everything except the given keys (entries whose window has closed). */
+  prune(keep: Set<string>): void {
+    for (const k of [...this.m.keys()]) if (!keep.has(k)) this.m.delete(k)
   }
 }
 

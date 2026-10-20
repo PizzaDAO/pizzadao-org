@@ -183,14 +183,14 @@ describe('CallRecorder stop paths', () => {
     const w = world()
     await w.optOuts.refresh()
     await begin(w)
-    await w.rec.handleEvent(ev({ status: EventStatus.Completed }))
+    await w.rec.stop('empty')
     await w.rec.drain()
     expect(w.nicknames).toEqual([REC_NICKNAME, 'Pizza Bot'])
     expect(w.rec.currentEventId).toBeNull()
     expect(finalizeSession).toHaveBeenCalledTimes(1)
     const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
     expect(existsSync(path.join(dir, 'starting'))).toBe(false)
-    expect(JSON.parse(readFileSync(path.join(dir, 'session.json'), 'utf8')).endReason).toBe('event-ended')
+    expect(JSON.parse(readFileSync(path.join(dir, 'session.json'), 'utf8')).endReason).toBe('empty')
   })
 
   it('still clears the session, restores the nickname and finalizes when capture.stop throws', async () => {
@@ -271,18 +271,6 @@ describe('CallRecorder stop paths', () => {
     expect(w.serialJobs).toHaveLength(1)
     await w.serialJobs[0]()
     expect(w.rec.currentEventId).toBeNull()
-  })
-})
-
-describe('CallRecorder status handling', () => {
-  it('ACTIVE / SCHEDULED status changes never start or switch a recording', async () => {
-    const w = world()
-    await w.optOuts.refresh()
-    await w.rec.handleEvent(ev()) // ACTIVE
-    expect(calls).toEqual([])
-    await begin(w)
-    await w.rec.handleEvent(ev({ id: '200', name: 'Ops', scheduledStartMs: Date.now() - 1000 }))
-    expect(w.rec.currentEventId).toBe('100')
   })
 })
 
@@ -391,7 +379,6 @@ describe('CallRecorder schedule-window trigger', () => {
     const events = () => day().map((e) => (e.id === 'art' ? { ...e, status: EventStatus.Active } : e))
     at(0)
     await w.rec.checkSchedule(events()) // nobody yet
-    for (const e of events()) await w.rec.handleEvent(e)
     expect(w.rec.currentEventId).toBeNull()
     withHumans(w, 3)
     at(1)
@@ -405,7 +392,6 @@ describe('CallRecorder schedule-window trigger', () => {
     expect(joins()).toBe(2)
     // Creative flagged ACTIVE late: nothing changes
     at(25)
-    await w.rec.handleEvent(sched('creative', 0, { status: EventStatus.Active }))
     await w.rec.checkSchedule(day().map((e) => (e.id === 'creative' ? { ...e, status: EventStatus.Active } : e)))
     expect(w.rec.currentEventId).toBe('art')
     expect(joins()).toBe(2)
@@ -516,13 +502,55 @@ describe('CallRecorder schedule-window trigger', () => {
     expect(w.rec.currentEventId).toBeNull()
   })
 
-  it('COMPLETED of the event being recorded still stops it', async () => {
+  it('COMPLETED / CANCELED never cuts a call: Creative completed at 18:15 keeps recording, Art takes over at 18:30', async () => {
     const w = world()
     await w.optOuts.refresh()
-    withHumans(w, 2)
+    withHumans(w, 3)
+    const events = (done: boolean) =>
+      day().map((e) => (e.id === 'creative' && done ? { ...e, status: EventStatus.Completed } : e))
+    at(-2)
+    await w.rec.checkSchedule(events(false))
+    expect(w.rec.currentEventId).toBe('music') // Music's slot is still running at 18:13
     at(0)
-    await w.rec.checkSchedule(day())
-    await w.rec.handleEvent(sched('creative', 0, { status: EventStatus.Completed }))
+    await w.rec.checkSchedule(events(false))
+    expect(w.rec.currentEventId).toBe('creative')
+    for (let m = 0; m < 30; m++) {
+      at(m)
+      await w.rec.checkSchedule(events(true))
+      expect(w.rec.currentEventId).toBe(m < 15 ? 'creative' : 'art')
+    }
+  })
+
+  it('an idle bot does not start for a COMPLETED or CANCELED event', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 3)
+    at(1)
+    await w.rec.checkSchedule([sched('creative', 0, { status: EventStatus.Canceled })])
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
+  it('late manual Start at 19:50 for an 18:15 event records; a restart 100 min into an ACTIVE call resumes it', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 3)
+    const active = [sched('creative', 0, { status: EventStatus.Active })]
+    at(95) // 19:50
+    await w.rec.checkSchedule(active)
+    expect(w.rec.currentEventId).toBe('creative')
+    await w.rec.stop('shutdown')
+    at(100)
+    await w.rec.checkSchedule(active)
+    expect(w.rec.currentEventId).toBe('creative')
+    expect(joins()).toBe(2)
+  })
+
+  it('a 20:00 event set ACTIVE at 17:00 is ignored even with people present', async () => {
+    const w = world()
+    await w.optOuts.refresh()
+    withHumans(w, 3)
+    at(-75)
+    await w.rec.checkSchedule([sched('re', 105, { status: EventStatus.Active })])
     expect(w.rec.currentEventId).toBeNull()
   })
 
@@ -578,6 +606,42 @@ describe('CallRecorder schedule-window trigger', () => {
         if (joins() > before) retryAt.push(m)
       }
       expect(retryAt).toEqual([6])
+    })
+
+    it('three blips spread over a long call, each followed by a recovery, never give up', async () => {
+      const w = world()
+      await w.optOuts.refresh()
+      withHumans(w, 2)
+      const one = [sched('creative', 0)]
+      at(0)
+      await w.rec.checkSchedule(one)
+      for (const m of [20, 45, 70]) {
+        at(m)
+        fatal.fn('disconnected')
+        await w.serialJobs.pop()!()
+        expect(w.rec.currentEventId).toBeNull()
+        at(m + 5)
+        await w.rec.checkSchedule(one)
+        expect(w.rec.currentEventId).toBe('creative')
+      }
+      expect(joins()).toBe(4)
+    })
+
+    it('the same event id next week is not blocked by this week\'s failures', async () => {
+      captureState.startFails = true
+      const w = world()
+      await w.optOuts.refresh()
+      withHumans(w, 2)
+      for (let m = 0; m <= 30; m++) {
+        at(m)
+        await w.rec.checkSchedule([sched('creative', 0)])
+      }
+      expect(joins()).toBe(3)
+      captureState.startFails = false
+      const week = 7 * 24 * 60
+      at(week + 1)
+      await w.rec.checkSchedule([sched('creative', week)])
+      expect(w.rec.currentEventId).toBe('creative')
     })
 
     it('normal empty stops are not subject to the back-off', async () => {

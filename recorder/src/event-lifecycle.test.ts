@@ -1,8 +1,8 @@
 import { describe, expect, it } from 'vitest'
 import {
   canSwitchTo,
-  decideEventAction,
   decideWindowAction,
+  eventKey,
   eventsInWindow,
   EventStatus,
   isFailureStop,
@@ -49,19 +49,39 @@ const at = (hhmm: string, over: Partial<Parameters<typeof decideWindowAction>[0]
     ...over,
   })
 
-describe('decideEventAction (status changes)', () => {
-  it('stops only when the event being recorded is COMPLETED or CANCELED', () => {
-    const e = sched('a', '18:00', { status: EventStatus.Completed })
-    expect(decideEventAction('a', e)).toEqual({ type: 'stop', reason: 'event-ended' })
-    expect(decideEventAction('a', { ...e, status: EventStatus.Canceled })).toEqual({ type: 'stop', reason: 'event-ended' })
-    expect(decideEventAction('b', e)).toEqual({ type: 'ignore' })
-    expect(decideEventAction(null, e)).toEqual({ type: 'ignore' })
+describe('COMPLETED / CANCELED', () => {
+  it('keep an idle bot from starting a recording', () => {
+    const done = [sched('c', '18:15', { status: EventStatus.Completed }), sched('x', '18:15', { status: EventStatus.Canceled })]
+    expect(at('18:16', { events: done })).toEqual({ type: 'ignore' })
   })
 
-  it('ACTIVE and SCHEDULED are never a start or switch trigger', () => {
-    expect(decideEventAction(null, sched('a', '18:00', { status: EventStatus.Active }))).toEqual({ type: 'ignore' })
-    expect(decideEventAction('b', sched('a', '18:00', { status: EventStatus.Active }))).toEqual({ type: 'ignore' })
-    expect(decideEventAction('a', sched('a', '18:00', { status: EventStatus.Scheduled }))).toEqual({ type: 'ignore' })
+  it('do not disturb a running session; the next slot still takes over at its start, an un-begun one never does', () => {
+    const events = day().map((e) => (e.id === 'creative' ? { ...e, status: EventStatus.Completed } : e))
+    const cur = { currentEventId: 'creative', currentStartMs: d('18:15'), events }
+    expect(at('18:15', cur)).toEqual({ type: 'ignore' })
+    expect(at('18:29', cur)).toEqual({ type: 'ignore' })
+    expect(at('18:30', cur)).toMatchObject({ type: 'switch', event: { id: 'art' } })
+    // provisional current (slot not begun) whose event got CANCELED: still only begun slots can take over
+    const prov = { currentEventId: 'creative', currentStartMs: d('18:15'), events: day().filter((e) => e.id !== 'music') }
+    expect(at('18:05', prov)).toEqual({ type: 'ignore' })
+  })
+})
+
+describe('late manual start / restart mid-call (ACTIVE past its scheduled start)', () => {
+  const act = (id: string, hhmm: string) => sched(id, hhmm, { status: EventStatus.Active })
+  it('host presses Start at 19:50 for an 18:15 event with people present -> records', () => {
+    expect(at('19:50', { events: [act('creative', '18:15')] })).toMatchObject({ type: 'start', event: { id: 'creative' } })
+    // the same event merely SCHEDULED is past its window
+    expect(at('19:50', { events: [sched('creative', '18:15')] })).toEqual({ type: 'ignore' })
+  })
+
+  it('a restart 100 min into an ACTIVE call resumes it, but not after MAX_CALL_MINUTES', () => {
+    expect(at('19:55', { events: [act('creative', '18:15')] })).toMatchObject({ type: 'start' })
+    expect(at('20:16', { events: [act('creative', '18:15')] })).toEqual({ type: 'ignore' })
+  })
+
+  it('ACTIVE before its scheduled start is still ignored outside the lead window', () => {
+    expect(at('17:00', { events: [act('re', '20:00')] })).toEqual({ type: 'ignore' })
   })
 })
 
@@ -231,11 +251,30 @@ describe('StartBackoff', () => {
     expect(b.allows('e', RETRY_BACKOFF_MS - 1)).toBe(false)
     expect(b.allows('e', RETRY_BACKOFF_MS)).toBe(true)
     b.noteFailure('e', RETRY_BACKOFF_MS)
-    expect(b.noteFailure('e', 2 * RETRY_BACKOFF_MS)).toBe(true) // third: gave up (reported once)
+    expect(b.noteFailure('e', 2 * RETRY_BACKOFF_MS)).toBe(true)
     expect(b.allows('e', 100 * RETRY_BACKOFF_MS)).toBe(false)
-    expect(b.noteFailure('e', 101 * RETRY_BACKOFF_MS)).toBe(false) // already reported
+    expect(b.noteFailure('e', 101 * RETRY_BACKOFF_MS)).toBe(false)
     expect(b.allows('other', 0)).toBe(true)
     expect(MAX_ATTEMPTS).toBe(3)
+  })
+
+  it('is keyed by event occurrence: the same id next week is not blocked', () => {
+    const b = new StartBackoff()
+    const thisWeek = eventKey({ id: 'weekly', scheduledStartMs: d('18:15') })
+    const nextWeek = eventKey({ id: 'weekly', scheduledStartMs: d('18:15') + 7 * 24 * 60 * MIN })
+    for (let i = 0; i < 3; i++) b.noteFailure(thisWeek, i * RETRY_BACKOFF_MS)
+    expect(b.allows(thisWeek, 10 * RETRY_BACKOFF_MS)).toBe(false)
+    expect(b.allows(nextWeek, 10 * RETRY_BACKOFF_MS)).toBe(true)
+  })
+
+  it('clear forgets an event; prune drops entries outside the kept set', () => {
+    const b = new StartBackoff()
+    b.noteFailure('a', 0)
+    b.noteFailure('b', 0)
+    b.clear('a')
+    expect(b.allows('a', 1)).toBe(true)
+    b.prune(new Set())
+    expect(b.allows('b', 1)).toBe(true)
   })
 
   it('classifies stop reasons', () => {
