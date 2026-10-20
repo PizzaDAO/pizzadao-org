@@ -96,8 +96,19 @@ export function closestEvent(events: EventInfo[], nowMs: number): EventInfo | nu
   return c[0] ?? null
 }
 
+/**
+ * Idle pick: prefer the in-window event whose slot has already begun (latest scheduled start
+ * <= now; ties: id); only if none has begun, the closest upcoming one.
+ */
 export function pickWindowEvent(events: EventInfo[], o: LifecycleOptions): EventInfo | null {
-  return closestEvent(eventsInWindow(events, o), o.nowMs)
+  const inWindow = eventsInWindow(events, o)
+  const begun = inWindow.filter((e) => (e.scheduledStartMs as number) <= o.nowMs)
+  if (begun.length) {
+    return [...begun].sort(
+      (a, b) => (b.scheduledStartMs as number) - (a.scheduledStartMs as number) || a.id.localeCompare(b.id),
+    )[0]
+  }
+  return closestEvent(inWindow, o.nowMs)
 }
 
 /**
@@ -120,8 +131,7 @@ export interface WindowInput extends LifecycleOptions {
 }
 
 /**
- * The only start / switch decision. Idle + humans + an open window: start (closest scheduled
- * start). Running: switch forward to the latest-started slot that has begun. If the current
+ * The only start / switch decision. Idle + humans + an open window: start (the slot that has begun, else the closest upcoming). Running: switch forward to the latest-started slot that has begun. If the current
  * event's slot has not begun yet (provisional, started in the lead window), it may also switch
  * to an in-window event whose slot is actually running.
  */
@@ -129,7 +139,7 @@ export function decideWindowAction(i: WindowInput): EventAction {
   if (i.humans <= 0) return { type: 'ignore' }
   const inWindow = eventsInWindow(i.events, i)
   if (i.currentEventId === null) {
-    const event = closestEvent(inWindow, i.nowMs)
+    const event = pickWindowEvent(i.events, i)
     return event ? { type: 'start', event } : { type: 'ignore' }
   }
   const provisional = i.currentStartMs !== null && i.nowMs < i.currentStartMs

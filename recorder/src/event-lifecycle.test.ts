@@ -125,6 +125,15 @@ describe('schedule window', () => {
   })
 })
 
+describe('idle pick prefers the slot that has begun', () => {
+  it('18:12 idle: Music (begun) over Creative (closer but upcoming); only upcoming -> closest', () => {
+    expect(at('18:12')).toMatchObject({ type: 'start', event: { id: 'music' } })
+    expect(at('17:20')).toMatchObject({ type: 'start', event: { id: 'music' } })
+    expect(at('18:25')).toMatchObject({ type: 'start', event: { id: 'creative' } })
+    expect(at('18:00', { events: [day()[1], day()[2]] })).toMatchObject({ type: 'start', event: { id: 'creative' } })
+  })
+})
+
 describe('switching', () => {
   const creative = { currentEventId: 'creative', currentStartMs: d('18:15') }
 

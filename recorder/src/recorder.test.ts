@@ -424,16 +424,17 @@ describe('CallRecorder schedule-window trigger', () => {
     expect(w.rec.currentEventId).toBe('music')
   })
 
-  it('a session started before its slot yields to the crew whose slot is running, then moves forward at the start', async () => {
+  it('an idle start at 18:12 records the running Music slot (no Creative flip), then moves forward at 18:15', async () => {
     const w = world()
     await w.optOuts.refresh()
     withHumans(w, 2)
-    at(-3) // 18:12: Creative is closest, Music's slot is still running
+    at(-3) // 18:12: Music's slot is running, Creative is only upcoming -> Music directly
     await w.rec.checkSchedule(day())
-    expect(w.rec.currentEventId).toBe('creative')
+    expect(w.rec.currentEventId).toBe('music')
     at(-2)
     await w.rec.checkSchedule(day())
     expect(w.rec.currentEventId).toBe('music')
+    expect(joins()).toBe(1)
     at(0)
     await w.rec.checkSchedule(day())
     expect(w.rec.currentEventId).toBe('creative')
@@ -444,12 +445,12 @@ describe('CallRecorder schedule-window trigger', () => {
     await w.optOuts.refresh()
     withHumans(w, 2)
     at(75 - 14)
-    await w.rec.checkSchedule(day())
+    await w.rec.checkSchedule([sched('merch', 75)])
     expect(w.rec.currentEventId).toBe('merch')
     at(75 - 7)
     await w.rec.stop('empty')
     at(75)
-    await w.rec.checkSchedule(day())
+    await w.rec.checkSchedule([sched('merch', 75)])
     expect(w.rec.currentEventId).toBe('merch')
   })
 
@@ -505,7 +506,7 @@ describe('CallRecorder schedule-window trigger', () => {
     await w.optOuts.refresh()
     withHumans(w, 2)
     at(-10)
-    await w.rec.checkSchedule(day())
+    await w.rec.checkSchedule([sched('creative', 0)])
     const tick = () => (w.rec as unknown as { onTick(): Promise<void> }).onTick()
     at(110)
     await tick()
