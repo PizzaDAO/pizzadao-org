@@ -113,11 +113,12 @@ export async function searchGuildMembers(query: string, limit = 5) {
     { headers: { Authorization: `Bot ${botToken}` }, cache: "no-store" },
   )
 
-  if (!r.ok) return []
+  // Throw (rather than return []) so callers can tell a Discord outage from "no results".
+  if (!r.ok) throw new Error(`discord_member_search_${r.status}`)
   return await r.json() as Array<{
     nick?: string
     roles: string[]
-    user: { id: string; username: string; global_name?: string }
+    user: { id: string; username: string; global_name?: string | null; bot?: boolean }
   }>
 }
 

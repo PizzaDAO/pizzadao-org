@@ -70,7 +70,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       setState({
         step: "error",
         code: data.status || "unknown",
-        message: t("errorSomethingWrong"),
+        message: data.status === "lookup_failed" ? t("errorLookupFailed") : t("errorSomethingWrong"),
         username: name,
       });
     } catch {
@@ -156,6 +156,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             tone="info"
             message={t("joinFirstMessage")}
           />
+          <p className="text-sm text-foreground/70">{t("useUsernameHint")}</p>
           <div className="grid gap-3">
             <a
               href={DISCORD_INVITE}
@@ -182,6 +183,48 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
               }}
             >
               {t("joinedTryAgainButton")}
+            </button>
+            <button
+              type="button"
+              onClick={() => setState({ step: "form" })}
+              className="btn-pill-lg"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              {t("editNameButton")}
+            </button>
+            <BackLink onBack={onBack} label={t("back")} />
+          </div>
+        </Shell>
+      );
+    }
+
+    if (state.code === "ambiguous") {
+      return (
+        <Shell>
+          <EditorialHeader
+            overline={t("overline")}
+            headline={t("ambiguousHeadline")}
+          />
+          <EditorialNotice
+            tone="info"
+            message={t("ambiguousMessage")}
+          />
+          <div className="grid gap-3">
+            <button
+              type="button"
+              onClick={() => setState({ step: "form" })}
+              className="btn-pill-lg"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              {t("editNameButton")}
             </button>
             <BackLink onBack={onBack} label={t("back")} />
           </div>
