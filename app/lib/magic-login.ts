@@ -18,6 +18,7 @@ export type MagicLoginResult =
   | { status: "sent" }
   | { status: "not_found" }
   | { status: "ambiguous" }
+  | { status: "lookup_failed" }
   | { status: "dm_failed"; error: string }
   | { status: "rate_limited" };
 
@@ -38,7 +39,7 @@ export type LoginMatch =
  * (never the "Pizza Trainee" placeholder) or global display name; login only
  * when exactly one distinct member matches. Bots never match.
  */
-export function pickLoginMember(members: SearchMember[], input: string): LoginMatch {
+export function pickLoginMember(members: SearchMember[], input: string, truncated = false): LoginMatch {
   const q = normalizeLoginName(input).toLowerCase();
   if (!q) return { kind: "none" };
   const humans = members.filter((m) => !m.user.bot);
@@ -52,6 +53,8 @@ export function pickLoginMember(members: SearchMember[], input: string): LoginMa
   const byName = distinct(
     humans.filter((m) => norm(realNick(m.nick)) === q || norm(m.user.global_name) === q),
   );
+  // Search hit its limit: a unique nick/display-name hit may have a twin we never saw.
+  if (truncated && byName.length > 0) return { kind: "ambiguous" };
   if (byName.length === 1) return { kind: "match", member: byName[0] };
   if (byName.length > 1) return { kind: "ambiguous" };
   return { kind: "none" };
@@ -67,8 +70,15 @@ export async function requestMagicLogin(
   // type their server nickname or display name, so fall back to those.
   const query = normalizeLoginName(username);
   if (query.length < 2) return { status: "not_found" };
-  const members = await searchGuildMembers(query, 100);
-  const found = pickLoginMember(members, username);
+  const limit = 100;
+  let members: SearchMember[];
+  try {
+    members = await searchGuildMembers(query, limit);
+  } catch (e) {
+    console.error("Magic login member search failed:", e);
+    return { status: "lookup_failed" };
+  }
+  const found = pickLoginMember(members, username, members.length >= limit);
 
   if (found.kind === "none") return { status: "not_found" };
   if (found.kind === "ambiguous") return { status: "ambiguous" };

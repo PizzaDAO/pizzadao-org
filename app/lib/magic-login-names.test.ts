@@ -58,6 +58,24 @@ describe('login name matching', () => {
     expect((await requestMagicLogin('helper', 'https://app.example')).status).toBe('not_found');
     expect(mocks.sendDM).not.toHaveBeenCalled();
   });
+  it('does not trust a single nick match when the search hit its limit', async () => {
+    const full = Array.from({ length: 99 }, (_, i) => mem(`f${i}`, `filler${i}`));
+    mocks.search.mockResolvedValue([...full, mem('1', 'mush42', { nick: 'Mushroom Tarantino' })]);
+    expect((await requestMagicLogin('mushroom tarantino', 'https://app.example')).status).toBe('ambiguous');
+    expect(mocks.sendDM).not.toHaveBeenCalled();
+  });
+  it('still accepts an exact username within a full result set', async () => {
+    const full = Array.from({ length: 99 }, (_, i) => mem(`f${i}`, `filler${i}`));
+    mocks.search.mockResolvedValue([...full, mem('1', 'mush42')]);
+    expect((await requestMagicLogin('mush42', 'https://app.example')).status).toBe('sent');
+    expect(dmTo()).toEqual(['1']);
+  });
+  it('returns lookup_failed when the Discord search errors', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {});
+    mocks.search.mockRejectedValue(new Error('discord_member_search_500'));
+    expect((await requestMagicLogin('anyone', 'https://app.example')).status).toBe('lookup_failed');
+    expect(mocks.sendDM).not.toHaveBeenCalled();
+  });
   it('returns not_found when nothing matches', async () => {
     mocks.search.mockResolvedValue([mem('1', 'someone', { nick: 'Other' })]);
     expect((await requestMagicLogin('nobody', 'https://app.example')).status).toBe('not_found');

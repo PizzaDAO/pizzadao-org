@@ -70,7 +70,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
       setState({
         step: "error",
         code: data.status || "unknown",
-        message: t("errorSomethingWrong"),
+        message: data.status === "lookup_failed" ? t("errorLookupFailed") : t("errorSomethingWrong"),
         username: name,
       });
     } catch {
@@ -184,6 +184,18 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             >
               {t("joinedTryAgainButton")}
             </button>
+            <button
+              type="button"
+              onClick={() => setState({ step: "form" })}
+              className="btn-pill-lg"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              {t("editNameButton")}
+            </button>
             <BackLink onBack={onBack} label={t("back")} />
           </div>
         </Shell>
@@ -201,7 +213,21 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             tone="info"
             message={t("ambiguousMessage")}
           />
-          <BackLink onBack={onBack} label={t("back")} />
+          <div className="grid gap-3">
+            <button
+              type="button"
+              onClick={() => setState({ step: "form" })}
+              className="btn-pill-lg"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              {t("editNameButton")}
+            </button>
+            <BackLink onBack={onBack} label={t("back")} />
+          </div>
         </Shell>
       );
     }

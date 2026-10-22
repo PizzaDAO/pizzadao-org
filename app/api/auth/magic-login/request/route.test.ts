@@ -36,6 +36,15 @@ describe("magic login request route", () => {
     expect(body.error).toMatch(/exact Discord username/);
     expect(mocks.activation).toHaveBeenCalledWith("login_failed", expect.objectContaining({ code: "ambiguous" }));
   });
+  it("returns 503 on lookup_failed without the join hint", async () => {
+    mocks.request.mockResolvedValue({ status: "lookup_failed" });
+    const res = await call("sam");
+    const body = await res.json();
+    expect(res.status).toBe(503);
+    expect(body.error).toMatch(/busy/);
+    expect(body.error).not.toMatch(/joined/);
+    expect(mocks.activation).toHaveBeenCalledWith("login_failed", expect.objectContaining({ code: "lookup_failed" }));
+  });
   it("keeps 429, 422 and the length check", async () => {
     mocks.request.mockResolvedValue({ status: "rate_limited" });
     expect((await call("sam")).status).toBe(429);
