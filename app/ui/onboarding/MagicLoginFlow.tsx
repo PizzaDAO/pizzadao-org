@@ -156,6 +156,7 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             tone="info"
             message={t("joinFirstMessage")}
           />
+          <p className="text-sm text-foreground/70">{t("useUsernameHint")}</p>
           <div className="grid gap-3">
             <a
               href={DISCORD_INVITE}
@@ -185,6 +186,22 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             </button>
             <BackLink onBack={onBack} label={t("back")} />
           </div>
+        </Shell>
+      );
+    }
+
+    if (state.code === "ambiguous") {
+      return (
+        <Shell>
+          <EditorialHeader
+            overline={t("overline")}
+            headline={t("ambiguousHeadline")}
+          />
+          <EditorialNotice
+            tone="info"
+            message={t("ambiguousMessage")}
+          />
+          <BackLink onBack={onBack} label={t("back")} />
         </Shell>
       );
     }

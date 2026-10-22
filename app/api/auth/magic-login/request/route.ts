@@ -42,8 +42,16 @@ export async function POST(req: Request) {
         return NextResponse.json({ status: "sent" });
       case "not_found":
         return NextResponse.json(
-          { status: "not_found", error: "Username not found in PizzaDAO Discord" },
+          {
+            status: "not_found",
+            error: "No PizzaDAO Discord member found with that name. Use your Discord username (Discord > Settings > My Account), not your display name, and make sure you have joined the server.",
+          },
           { status: 404 },
+        );
+      case "ambiguous":
+        return NextResponse.json(
+          { status: "ambiguous", error: "More than one member matches that name. Please enter your exact Discord username." },
+          { status: 409 },
         );
       case "dm_failed":
         return NextResponse.json(

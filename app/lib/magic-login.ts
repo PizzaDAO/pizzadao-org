@@ -17,8 +17,45 @@ function hashToken(raw: string): string {
 export type MagicLoginResult =
   | { status: "sent" }
   | { status: "not_found" }
+  | { status: "ambiguous" }
   | { status: "dm_failed"; error: string }
   | { status: "rate_limited" };
+
+type SearchMember = Awaited<ReturnType<typeof searchGuildMembers>>[number];
+
+/** Trim, drop a leading "@", collapse inner whitespace. */
+export function normalizeLoginName(input: string): string {
+  return input.trim().replace(/^@+/, "").replace(/\s+/g, " ").trim();
+}
+
+export type LoginMatch =
+  | { kind: "match"; member: SearchMember }
+  | { kind: "none" }
+  | { kind: "ambiguous" };
+
+/**
+ * Exact username (case-insensitive) wins. Otherwise match the real server nick
+ * (never the "Pizza Trainee" placeholder) or global display name; login only
+ * when exactly one distinct member matches. Bots never match.
+ */
+export function pickLoginMember(members: SearchMember[], input: string): LoginMatch {
+  const q = normalizeLoginName(input).toLowerCase();
+  if (!q) return { kind: "none" };
+  const humans = members.filter((m) => !m.user.bot);
+  const distinct = (list: SearchMember[]) => [...new Map(list.map((m) => [m.user.id, m])).values()];
+
+  const byUsername = distinct(humans.filter((m) => m.user.username.toLowerCase() === q));
+  if (byUsername.length === 1) return { kind: "match", member: byUsername[0] };
+  if (byUsername.length > 1) return { kind: "ambiguous" };
+
+  const norm = (v?: string | null) => (v ? v.trim().replace(/\s+/g, " ").toLowerCase() : "");
+  const byName = distinct(
+    humans.filter((m) => norm(realNick(m.nick)) === q || norm(m.user.global_name) === q),
+  );
+  if (byName.length === 1) return { kind: "match", member: byName[0] };
+  if (byName.length > 1) return { kind: "ambiguous" };
+  return { kind: "none" };
+}
 
 export async function requestMagicLogin(
   username: string,
@@ -26,13 +63,16 @@ export async function requestMagicLogin(
   options: { returnTo?: unknown; onboarding?: boolean; signupDraft?: unknown } = {},
 ): Promise<MagicLoginResult> {
   const draft = options.onboarding ? sanitizeSignupDraft(options.signupDraft) : null;
-  // Search guild for exact username match
-  const members = await searchGuildMembers(username, 100);
-  const match = members.find(
-    (m) => m.user.username.toLowerCase() === username.toLowerCase(),
-  );
+  // Discord's member search matches username/nickname prefixes. Members often
+  // type their server nickname or display name, so fall back to those.
+  const query = normalizeLoginName(username);
+  if (query.length < 2) return { status: "not_found" };
+  const members = await searchGuildMembers(query, 100);
+  const found = pickLoginMember(members, username);
 
-  if (!match) return { status: "not_found" };
+  if (found.kind === "none") return { status: "not_found" };
+  if (found.kind === "ambiguous") return { status: "ambiguous" };
+  const match = found.member;
 
   const discordId = match.user.id;
   const nick = realNick(match.nick) || match.user.global_name || match.user.username;

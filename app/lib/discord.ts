@@ -117,7 +117,7 @@ export async function searchGuildMembers(query: string, limit = 5) {
   return await r.json() as Array<{
     nick?: string
     roles: string[]
-    user: { id: string; username: string; global_name?: string }
+    user: { id: string; username: string; global_name?: string | null; bot?: boolean }
   }>
 }
 
