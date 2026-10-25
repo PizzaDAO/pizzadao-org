@@ -2,7 +2,7 @@
  * The per-session manifest (manifest.jsonl): one JSON record per line, appended
  * as the call goes so a crash loses nothing already written. `summarize` is pure.
  */
-import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ManifestRecord, SegmentRecord } from './types.js'
 

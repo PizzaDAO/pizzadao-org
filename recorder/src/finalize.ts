@@ -218,7 +218,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
     const res = await post(payload)
     if (res.ok) {
       // Upload first, prune after: remove only objects the stored row does NOT reference
-      // (leftovers of earlier attempts, e.g. a speaker since purged for opting out).
+      // (leftovers of earlier attempts).
       const ours = [payload.mix?.key, ...payload.speakers.map((sp) => sp.trackKey)].filter((k): k is string => !!k)
       const keep = new Set(res.keys.length ? res.keys : ours)
       try {
