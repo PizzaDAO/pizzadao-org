@@ -1,5 +1,6 @@
 /**
- * The bot shows "PizzaDAO Bot 🔴 REC" as its server nickname while recording.
+ * While recording the bot keeps its own name and appends the red REC mark
+ * (e.g. "Metalhead 🔴 REC"); afterwards its nickname is restored exactly.
  * The previous nickname is saved to disk first and the file is only deleted
  * after a successful restore, so even a crash (or failed restore) mid-call is
  * undone on the next boot.
@@ -7,7 +8,7 @@
 import { existsSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import type { Guild } from 'discord.js'
-import { REC_NICKNAME } from './config.js'
+import { MAX_NICKNAME, REC_MARK } from './config.js'
 
 interface Saved {
   guildId: string
@@ -15,7 +16,23 @@ interface Saved {
 }
 
 const RESTORE_ATTEMPTS = 4
-const REC_MARK = '🔴 REC'
+
+/** Remove any REC mark (and the space before it) so it can never double. */
+export function stripRecMark(name: string): string {
+  return name.replace(/\s*🔴\s*REC/gu, '').trim()
+}
+
+/** "<base> 🔴 REC" within Discord's 32-char limit: the base is truncated, never the mark. */
+export function recNickname(base: string): string {
+  const room = MAX_NICKNAME - REC_MARK.length - 1
+  let b = ''
+  for (const ch of stripRecMark(base)) {
+    if (b.length + ch.length > room) break
+    b += ch
+  }
+  b = b.trimEnd()
+  return b ? `${b} ${REC_MARK}` : REC_MARK
+}
 
 export class NicknameManager {
   private readonly file: string
@@ -34,10 +51,17 @@ export class NicknameManager {
       const me = await guild.members.fetchMe()
       // Never overwrite the saved original with our own REC name (e.g. after a switch or failed restore).
       if (!existsSync(this.file)) {
-        const saved: Saved = { guildId: guild.id, nickname: me.nickname?.includes(REC_MARK) ? null : me.nickname }
+        const saved: Saved = { guildId: guild.id, nickname: me.nickname ? stripRecMark(me.nickname) || null : null }
         writeFileSync(this.file, JSON.stringify(saved))
       }
-      await me.setNickname(REC_NICKNAME, 'Recording the call')
+      let saved: Saved | null = null
+      try {
+        saved = JSON.parse(readFileSync(this.file, 'utf8')) as Saved
+      } catch {
+        /* unreadable: fall back to the current name */
+      }
+      const base = saved?.nickname || stripRecMark(me.nickname ?? '') || me.user?.globalName || me.user?.username || ''
+      await me.setNickname(recNickname(base), 'Recording the call')
       return true
     } catch (err) {
       this.log(`could not set nickname: ${err instanceof Error ? err.message : String(err)}`)
@@ -71,7 +95,7 @@ export class NicknameManager {
 
   /**
    * On boot with no recording running: undo a nickname a crash left behind. If the
-   * saved previous nickname is gone but the bot is still called "... 🔴 REC", reset it.
+   * saved previous nickname is gone but the bot is still called "... 🔴 REC", drop the mark.
    */
   async recoverOnBoot(guild: Guild): Promise<void> {
     if (existsSync(this.file)) {
@@ -81,8 +105,8 @@ export class NicknameManager {
     try {
       const me = await guild.members.fetchMe()
       if (me.nickname?.includes(REC_MARK)) {
-        this.log('bot nickname still says REC with no recording running; resetting it')
-        await me.setNickname(null, 'No call is being recorded')
+        this.log('bot nickname still says REC with no recording running; removing the mark')
+        await me.setNickname(stripRecMark(me.nickname) || null, 'No call is being recorded')
       }
     } catch (err) {
       this.log(`could not check the bot nickname: ${err instanceof Error ? err.message : String(err)}`)

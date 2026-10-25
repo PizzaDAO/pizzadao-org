@@ -3,9 +3,8 @@ import os from 'node:os'
 import path from 'node:path'
 import { describe, expect, it, vi } from 'vitest'
 import { GapFiller } from './gap-filler.js'
-import { appendRecord, purgeUsersInDir, readManifest, summarize } from './manifest.js'
+import { appendRecord, readManifest, summarize } from './manifest.js'
 import { buildMixArgs, buildSpeakerTrackArgs } from './mix-plan.js'
-import { OptOutCache } from './optouts.js'
 import { loadConfig } from './config.js'
 import { finalizeSession, pendingSessions, reconcileOrphans, writeSessionMeta } from './finalize.js'
 import { postIngestWithRetry } from './ingest.js'
@@ -96,54 +95,11 @@ describe('manifest', () => {
     expect(out[1].displayName).toBeNull()
   })
 
-  it('drops purged (opted-out) users and deletes their files', () => {
-    const d = tmp()
-    mkdirSync(path.join(d, 'seg', 'a'), { recursive: true })
-    writeFileSync(path.join(d, 'seg', 'a', '0.ogg'), 'x')
-    appendRecord(d, { t: 'segment', userId: 'a', startMs: 0, endMs: 1000, file: 'seg/a/0.ogg', bytes: 1 })
-    appendRecord(d, { t: 'segment', userId: 'b', startMs: 0, endMs: 1000, file: 'seg/b/0.ogg', bytes: 1 })
-    expect(purgeUsersInDir(d, (u) => u === 'a')).toEqual(['a'])
-    expect(existsSync(path.join(d, 'seg', 'a'))).toBe(false)
-    expect(summarize(readManifest(d)).map((s) => s.userId)).toEqual(['b'])
-  })
-
   it('ignores a torn last line', () => {
     const d = tmp()
     appendRecord(d, { t: 'member', userId: 'a', displayName: 'Ann' })
     writeFileSync(path.join(d, 'manifest.jsonl'), readFileSync(path.join(d, 'manifest.jsonl'), 'utf8') + '{"t":"segm')
     expect(readManifest(d)).toHaveLength(1)
-  })
-})
-
-describe('OptOutCache', () => {
-  it('filters opted-out users and reports newly added ids', async () => {
-    let ids = ['1']
-    const onNew = vi.fn()
-    const c = new OptOutCache(async () => ids, onNew)
-    expect(c.isLoaded).toBe(false)
-    await c.refresh()
-    expect(c.has('1')).toBe(true)
-    expect(c.has('2')).toBe(false)
-    expect(onNew).toHaveBeenLastCalledWith(['1'])
-    ids = ['1', '2']
-    await c.refresh()
-    expect(onNew).toHaveBeenLastCalledWith(['2'])
-    ids = ['2']
-    await c.refresh() // opt-in: '1' removed, nothing new
-    expect(c.has('1')).toBe(false)
-    expect(onNew).toHaveBeenCalledTimes(2)
-  })
-
-  it('keeps the last good list when the app is unreachable', async () => {
-    let fail = false
-    const c = new OptOutCache(async () => {
-      if (fail) throw new Error('down')
-      return ['9']
-    })
-    await c.refresh()
-    fail = true
-    expect(await c.refresh()).toBe(false)
-    expect(c.has('9')).toBe(true)
   })
 })
 

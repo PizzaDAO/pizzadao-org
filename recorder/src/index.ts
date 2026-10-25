@@ -11,7 +11,6 @@ import { loadConfig } from './config.js'
 import type { EventInfo } from './event-lifecycle.js'
 import { clearAllStarting, sweepOldSessions } from './finalize.js'
 import { NicknameManager } from './nickname.js'
-import { appOptOutFetcher, OptOutCache } from './optouts.js'
 import { CallRecorder } from './recorder.js'
 import { createR2Uploader } from './storage.js'
 import { postIngestWithRetry } from './ingest.js'
@@ -35,16 +34,10 @@ function serial(fn: () => Promise<void>) {
 }
 
 let recorder: CallRecorder
-const optOuts = new OptOutCache(
-  appOptOutFetcher(cfg.appBaseUrl, cfg.recorderApiKey),
-  (ids) => recorder?.purgeLive(ids),
-  log,
-)
 const uploader = createR2Uploader(cfg.r2)
 recorder = new CallRecorder(
   client,
   cfg,
-  optOuts,
   new NicknameManager(cfg.dataDir, log),
   {
     appBaseUrl: cfg.appBaseUrl,
@@ -90,8 +83,6 @@ client.once('ready', () => {
   log(`logged in as ${client.user?.tag}`)
   serial(async () => {
     const guild = await client.guilds.fetch(cfg.guildId)
-    await optOuts.refresh()
-    optOuts.start(cfg.optOutRefreshSeconds * 1000)
 
     // Undo a nickname a crash left behind, finish sessions a crash left behind.
     await new NicknameManager(cfg.dataDir, log).recoverOnBoot(guild)
@@ -119,7 +110,6 @@ const server = createServer((req, res) => {
         discord: ready ? 'ready' : 'connecting',
         recording: recorder.status(),
         finalizing: recorder.pendingCount,
-        optOutsLoaded: optOuts.isLoaded,
       }),
     )
     return

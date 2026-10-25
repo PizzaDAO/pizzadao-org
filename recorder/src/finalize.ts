@@ -165,7 +165,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       uploadedTracks.set(t.userId, { key, bytes: await deps.uploader.put(key, t.file, 'audio/ogg') })
     }
 
-    // Only speakers whose track was built (post opt-out purge) are transcribed.
+    // Only speakers whose track was built are transcribed.
     let transcript: IngestPayload['transcript']
     try {
       const transcribe = deps.transcribe ?? transcribeSession

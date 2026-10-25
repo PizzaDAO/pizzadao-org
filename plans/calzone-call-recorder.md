@@ -545,3 +545,12 @@ model CallRecordingOptOut {
 - Railway: service `call-recorder` in project `pizzadao-discord-bot`, deployed with `railway up` from `recorder/` (no GitHub link); volume at `/data`. `DISCORD_BOT_TOKEN` and `DISCORD_GUILD_ID` are references to the `pizzadao-discord-bot` service (bot user: Attendance Crawler, has Administrator).
 - `/record` registered on Onboarding Bot (14 guild commands).
 - First live test: the Music Crew call, 2026-10-20 17:30 UTC, in Pizza Hacking Radio.
+
+## Decision (Snax, 2026-10-25): no opt-out
+
+- Members can no longer opt out of crew-call recording. The `/record optout|optin` command and `GET /api/calls/recorder/optouts` are removed, and the worker no longer fetches or applies an opt-out list.
+- Existing opt-outs are ignored. The `RecordingOptOut` table stays in the schema, unused (no destructive migration).
+- Everyone in the call channel is recorded and transcribed. The in-channel notice says so and asks people who don't want to be recorded not to join (or to leave).
+- Remedy for a public transcript: the reviewer's per-speaker "Hide their lines" on /admin/calls (non-destructive).
+- While recording, the bot keeps its own name and appends the red mark (e.g. `Metalhead 🔴 REC`), restoring the nickname exactly afterwards.
+- Ops follow-up: `/record` is still registered on the live Discord guild until `register-commands.mjs --apply` is run (a stale invocation answers "Unknown command.").

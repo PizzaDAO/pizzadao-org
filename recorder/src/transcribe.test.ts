@@ -289,18 +289,17 @@ describe('finalizeSession with a transcript', () => {
     expect(posted[0].transcript?.segments[0].text).toBe('hi')
   })
 
-  it('only hands speakers with an uploaded track (post-purge) to the transcriber', async () => {
+  it('hands every speaker with an uploaded track to the transcriber (no opt-out filter)', async () => {
     const dir = makeSession([
       { id: '111', startMs: 0, endMs: 2000 },
       { id: '222', startMs: 3000, endMs: 5000 },
     ])
-    appendRecord(dir, { t: 'purge', userId: '222' })
     let ids: string[] = []
     const { deps } = base(dir, {
       transcribe: async (_d: string, _o: string, sp: Array<{ userId: string }>) => ((ids = sp.map((s) => s.userId)), null),
     })
     await finalizeSession(dir, deps)
-    expect(ids).toEqual(['111'])
+    expect(ids).toEqual(['111', '222'])
   })
 
   it('without a Deepgram key it still ingests, with no transcript field', async () => {

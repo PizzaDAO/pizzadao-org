@@ -1,5 +1,5 @@
 // @vitest-environment node
-// calzone-30418: ingest auth/validation, DPR gating, opt-out, crew mapping, reject (hide).
+// calzone-30418: ingest auth/validation, DPR gating, no opt-out, crew mapping, reject (hide).
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
@@ -23,9 +23,7 @@ import { canReviewMission } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
 import { extractEventId, resolveCrewForEvent } from './crew-map'
 import { isRecorderAuthorized } from './recorder-auth'
-import { setRecordingOptOut } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
-import { GET as optoutsGET } from '@/app/api/calls/recorder/optouts/route'
 import { GET as audioGET } from '@/app/api/admin/calls/[id]/audio/route'
 import { POST as rejectPOST } from '@/app/api/admin/calls/[id]/remove/route'
 import { handleInteraction, type HandlerDeps } from '@/app/lib/discord-interactions/handle'
@@ -189,52 +187,19 @@ describe('crew mapping', () => {
   })
 })
 
-describe('GET /api/calls/recorder/optouts', () => {
-  const get = (auth?: string) =>
-    optoutsGET(new Request('https://app.pizzadao.org/api/calls/recorder/optouts', { headers: auth ? { authorization: auth } : {} }))
-  it('401 without the bearer', async () => {
-    expect((await get()).status).toBe(401)
-    expect(db.recordingOptOut.findMany).not.toHaveBeenCalled()
+describe('no recording opt-out (Snax, 2026-10-25)', () => {
+  it('the optouts route is gone and /record is not registered', async () => {
+    const fs = await import('node:fs')
+    expect(fs.existsSync('app/api/calls/recorder/optouts/route.ts')).toBe(false)
+    const { PEP_COMMANDS } = await import('@/app/lib/discord-interactions/commands')
+    expect(PEP_COMMANDS.map((c) => c.name)).not.toContain('record')
   })
-  it('lists opted-out ids', async () => {
-    db.recordingOptOut.findMany.mockResolvedValue([{ discordId: '1' }, { discordId: '2' }])
-    const res = await get('Bearer rec-key')
-    expect(await res.json()).toEqual({ discordIds: ['1', '2'] })
-  })
-})
-
-describe('opt-out writes and /record', () => {
-  it('optout upserts and optin deletes', async () => {
-    await setRecordingOptOut('42', true)
-    expect(db.recordingOptOut.upsert).toHaveBeenCalledWith({ where: { discordId: '42' }, create: { discordId: '42' }, update: {} })
-    await setRecordingOptOut('42', false)
-    expect(db.recordingOptOut.deleteMany).toHaveBeenCalledWith({ where: { discordId: '42' } })
-  })
-
-  const GUILD = '812097286003359764'
-  const slash = (sub: string) => ({
-    type: 2,
-    guild_id: GUILD,
-    member: { user: { id: '42' }, roles: [] },
-    data: { name: 'record', options: [{ name: sub, type: 1, value: undefined }] },
-  })
-  it('/record optout and optin call the dep and reply ephemerally', async () => {
-    const set = vi.fn(async () => undefined)
-    const deps = { guildId: GUILD, setRecordingOptOut: set } as unknown as HandlerDeps
-    const out = await handleInteraction(slash('optout'), deps)
-    expect(set).toHaveBeenLastCalledWith('42', true)
-    expect(out.data?.flags).toBe(64)
-    await handleInteraction(slash('optin'), deps)
-    expect(set).toHaveBeenLastCalledWith('42', false)
-  })
-  it('/record with no subcommand changes nothing', async () => {
-    const set = vi.fn()
+  it('a stale /record invocation is an unknown command', async () => {
     const out = await handleInteraction(
-      { ...slash('x'), data: { name: 'record', options: [] } },
-      { guildId: GUILD, setRecordingOptOut: set } as unknown as HandlerDeps,
+      { type: 2, guild_id: '812097286003359764', member: { user: { id: '42' }, roles: [] }, data: { name: 'record', options: [{ name: 'optout', type: 1, value: undefined }] } },
+      { guildId: '812097286003359764' } as unknown as HandlerDeps,
     )
-    expect(set).not.toHaveBeenCalled()
-    expect(out.data?.flags).toBe(64)
+    expect(JSON.stringify(out)).toMatch(/Unknown command/)
   })
 })
 
