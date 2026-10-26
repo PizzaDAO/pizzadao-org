@@ -18,6 +18,16 @@ export interface TranscriptSegment {
   text: string
 }
 
+/** A message posted in the voice channel's text chat during the recording. */
+export interface IngestChatMessage {
+  discordId: string
+  displayName: string | null
+  text: string
+  /** Milliseconds since the session started. */
+  atMs: number
+  messageId: string
+}
+
 export interface IngestTranscript {
   language: string | null
   segments: TranscriptSegment[]
@@ -36,6 +46,8 @@ export interface IngestPayload {
   speakers: IngestSpeaker[]
   /** Omitted when there is no Deepgram key or nothing could be transcribed. */
   transcript?: IngestTranscript
+  /** Voice-channel text chat during the call, in time order. Omitted when there was none. */
+  chat?: IngestChatMessage[]
 }
 
 /** Written to <session dir>/session.json when a recording starts, updated as it ends. */
@@ -71,4 +83,25 @@ export interface PurgeRecord {
   userId: string
 }
 
-export type ManifestRecord = SegmentRecord | MemberRecord | PurgeRecord
+/** A chat message (append-only; later edits/deletes are separate records). */
+export interface ChatRecord {
+  t: 'chat'
+  messageId: string
+  userId: string
+  displayName: string
+  text: string
+  atMs: number
+}
+
+export interface ChatEditRecord {
+  t: 'chat-edit'
+  messageId: string
+  text: string
+}
+
+export interface ChatDeleteRecord {
+  t: 'chat-delete'
+  messageId: string
+}
+
+export type ManifestRecord = SegmentRecord | MemberRecord | PurgeRecord | ChatRecord | ChatEditRecord | ChatDeleteRecord
