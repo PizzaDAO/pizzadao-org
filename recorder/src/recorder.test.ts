@@ -44,6 +44,7 @@ vi.mock('./finalize.js', async (orig) => ({ ...(await orig<typeof import('./fina
 import { CallRecorder } from './recorder.js'
 import { NicknameManager, recNickname, stripRecMark } from './nickname.js'
 import { consentNotice, lateJoinReminder } from './consent.js'
+import { chatMessages, readManifest } from './manifest.js'
 
 const CHANNEL = '823956905739026442'
 const ev = (over: Partial<EventInfo> = {}): EventInfo => ({
@@ -743,5 +744,93 @@ describe('CallRecorder slot memory', () => {
     at('2026-10-27T18:01:00Z')
     await w.rec.checkSchedule([])
     expect(JSON.parse(readFileSync(path.join(w.dataDir, 'slots.json'), 'utf8'))).toEqual([])
+  })
+})
+
+describe('voice channel chat capture', () => {
+  const msg = (over: Record<string, unknown> = {}) => ({
+    id: String(Math.floor(Math.random() * 1e12) + 1e11),
+    channelId: CHANNEL,
+    content: 'hello',
+    cleanContent: 'hello',
+    createdTimestamp: Date.now() + 1000,
+    system: false,
+    author: { id: '555555555555555555', bot: false, username: 'ann', globalName: 'Ann G' },
+    member: { displayName: 'Ann' },
+    attachments: new Map(),
+    ...over,
+  })
+  const started = async () => {
+    const w = world()
+    await begin(w)
+    const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0]!)
+    return { w, dir }
+  }
+  const chat = (dir: string) => chatMessages(readManifest(dir))
+
+  it('records a message with the author and the time since the session start', async () => {
+    const { w, dir } = await started()
+    w.rec.onMessage(msg({ id: '700000000000000001' }) as never)
+    const [c] = chat(dir)
+    expect(c).toMatchObject({ discordId: '555555555555555555', displayName: 'Ann', text: 'hello', messageId: '700000000000000001' })
+    expect(c!.atMs).toBeGreaterThan(900)
+  })
+
+  it('ignores bots (including the recorder notice), system messages, other channels and messages before the session', async () => {
+    const { w, dir } = await started()
+    w.rec.onMessage(msg({ author: { id: '1', bot: true, username: 'Metalhead' } }) as never)
+    w.rec.onMessage(msg({ system: true }) as never)
+    w.rec.onMessage(msg({ channelId: '999' }) as never)
+    w.rec.onMessage(msg({ createdTimestamp: Date.now() - 60_000 }) as never)
+    expect(chat(dir)).toEqual([])
+  })
+
+  it('does nothing when no session is recording, and after stopping', async () => {
+    const w = world()
+    w.rec.onMessage(msg() as never) // no session: must not throw
+    await begin(w)
+    const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0]!)
+    await w.rec.stop('manual' as never)
+    w.rec.onMessage(msg({ id: '700000000000000009' }) as never)
+    expect(chat(dir)).toEqual([])
+  })
+
+  it('stores the latest edit and drops deleted messages', async () => {
+    const { w, dir } = await started()
+    w.rec.onMessage(msg({ id: '700000000000000001', content: 'first', cleanContent: 'first' }) as never)
+    w.rec.onMessage(msg({ id: '700000000000000002', content: 'oops', cleanContent: 'oops' }) as never)
+    w.rec.onMessageUpdate(msg({ id: '700000000000000001', content: 'edited', cleanContent: 'edited' }) as never)
+    w.rec.onMessageUpdate(msg({ id: '700000000000000001', content: null, cleanContent: null }) as never) // partial: ignored
+    w.rec.onMessageUpdate(msg({ id: '700000000000000077', content: 'never seen', cleanContent: 'never seen' }) as never) // unknown message
+    w.rec.onMessageDelete({ id: '700000000000000002', channelId: CHANNEL } as never)
+    expect(chat(dir).map((c) => [c.messageId, c.text])).toEqual([['700000000000000001', 'edited']])
+  })
+
+  it('applies a delete that arrives after the call ended, until the session is finalized', async () => {
+    const { w, dir } = await started()
+    w.rec.onMessage(msg({ id: '700000000000000001' }) as never)
+    w.rec.onMessage(msg({ id: '700000000000000002', content: 'keep', cleanContent: 'keep' }) as never)
+    await w.rec.stop('manual' as never)
+    w.rec.onMessageDelete({ id: '700000000000000001', channelId: CHANNEL } as never)
+    w.rec.onMessageDelete({ id: '700000000000000555', channelId: CHANNEL } as never) // never captured: ignored
+    expect(chat(dir).map((c) => c.text)).toEqual(['keep'])
+  })
+
+  it('stores attachment URLs as text', async () => {
+    const { w, dir } = await started()
+    w.rec.onMessage(msg({ content: '', cleanContent: '', attachments: new Map([['a', { url: 'https://cdn.example/x.png' }]]) }) as never)
+    expect(chat(dir)[0]!.text).toBe('https://cdn.example/x.png')
+  })
+
+  it('skips empty content (MessageContent intent off) and logs only once', async () => {
+    const logs: string[] = []
+    const w = world()
+    ;(w.rec as unknown as { log: (m: string) => void }).log = (m: string) => logs.push(m)
+    await begin(w)
+    const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0]!)
+    w.rec.onMessage(msg({ content: '', cleanContent: '' }) as never)
+    w.rec.onMessage(msg({ content: '', cleanContent: '' }) as never)
+    expect(chat(dir)).toEqual([])
+    expect(logs.filter((l) => l.includes('MessageContent'))).toHaveLength(1)
   })
 })

@@ -718,6 +718,7 @@
       "chapters": "Chapitres",
       "transcript": "Transcription",
       "transcriptNote": "Transcrite automatiquement et relue par PizzaDAO. Elle peut contenir des erreurs.",
+      "chatLine": "Écrit dans le chat de l'appel",
       "unknownSpeaker": "Intervenant"
     },
     "readRecordings": "Lisez les résumés et transcriptions des appels passés."
@@ -929,6 +930,9 @@
     "chaptersHint": "Une par ligne : heure de début puis titre, par exemple 12:30 Point budget",
     "restoreLines": "Rétablir ses lignes",
     "redactedBadge": "Masqué sur la page publique",
+    "chatLine": "Écrit dans le chat de l'appel",
+    "hideLine": "Masquer cette ligne",
+    "restoreLine": "Rétablir cette ligne",
     "hiddenLine": "[masqué : les lignes de cet intervenant ne sont pas publiques]",
     "unsavedWarning": "Vous avez des modifications non enregistrées qui seront perdues. Continuer ?",
     "tooManyItems": "30 actions au maximum.",
