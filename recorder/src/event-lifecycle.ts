@@ -22,6 +22,8 @@ export interface EventInfo {
   scheduledStartMs: number | null
   /** Epoch ms of the scheduled end, when the event has one. */
   scheduledEndMs?: number | null
+  /** Spacing between occurrences for a simple daily/weekly recurring event; null/absent otherwise. */
+  recurrenceIntervalMs?: number | null
 }
 
 export type EventAction =

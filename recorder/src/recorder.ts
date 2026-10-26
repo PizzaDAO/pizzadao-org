@@ -16,6 +16,7 @@ import { consentNotice, lateJoinReminder } from './consent.js'
 import {
   decideWindowAction,
   eventKey,
+  EventStatus,
   eventsInWindow,
   isFailureStop,
   RECOVERY_MS,
@@ -24,6 +25,7 @@ import {
   type EventInfo,
 } from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
+import { SlotMemory } from './slots.js'
 import { purgeUsersInDir } from './manifest.js'
 import { NicknameManager } from './nickname.js'
 import type { OptOutCache } from './optouts.js'
@@ -56,6 +58,7 @@ export class CallRecorder {
   private readonly queued = new Set<string>()
   private readonly botCache = new Map<string, boolean>()
   private readonly backoff = new StartBackoff()
+  private readonly slots: SlotMemory
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -69,7 +72,9 @@ export class CallRecorder {
     private readonly log: (msg: string) => void,
     /** Runs a job on the event chain (index.ts); default runs it right away. */
     private readonly serial: (fn: () => Promise<void>) => void = (fn) => void fn(),
-  ) {}
+  ) {
+    this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), cfg.callChannelId, log)
+  }
 
   get currentEventId(): string | null {
     return this.current?.meta.eventId ?? null
@@ -96,7 +101,11 @@ export class CallRecorder {
    * Schedule-window trigger: humans are in the call channel and an event's window covers now,
    * whatever its status. Called from voice-state changes, a periodic check and boot.
    */
-  async checkSchedule(events: EventInfo[]): Promise<void> {
+  async checkSchedule(liveEvents: EventInfo[]): Promise<void> {
+    // Remember every occurrence we see: Discord auto-ends an empty ACTIVE event and a recurring one
+    // then jumps to next week, so the live list alone forgets today's slot.
+    this.slots.observe(liveEvents, Date.now())
+    const events = this.slots.merge(liveEvents)
     if (this.shuttingDown || this.starting) return
     if (this.current?.stopping) return
     let humans: number
@@ -120,6 +129,13 @@ export class CallRecorder {
       events,
     })
     if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(eventKey(action.event), Date.now())) return
+    if (action.type === 'start' || action.type === 'switch') {
+      const k = eventKey(action.event)
+      const live = liveEvents.some(
+        (e) => eventKey(e) === k && (e.status === EventStatus.Scheduled || e.status === EventStatus.Active),
+      )
+      if (!live) this.log(`slot from memory: "${action.event.name}" (${k})`)
+    }
     if (action.type === 'start') {
       this.log(`humans present in the window of "${action.event.name}" (${action.event.id}); starting`)
       await this.start(action.event)
