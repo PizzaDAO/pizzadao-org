@@ -8,6 +8,8 @@ import { getUserRoles } from "@/app/lib/discord";
 import { canReviewAnyMission } from "@/app/lib/mission-review-access";
 import { canManageShopRoles } from "@/app/lib/shop-admin-auth";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
+import { disavowEnabled } from "@/app/lib/disavow/constants";
+import { disavowViewer } from "@/app/lib/disavow/access";
 
 export const runtime = "nodejs";
 
@@ -67,6 +69,14 @@ export async function GET() {
     canManageShop = false;
   }
 
+  // Disavow list: only computed while the feature flag is on; fails closed.
+  // Never present (not even false) when the flag is off, so nothing hints at it.
+  let disavowFlags: { canViewDisavow: boolean; canVoteDisavow: boolean } | null = null;
+  if (disavowEnabled()) {
+    const v = await disavowViewer(session.discordId);
+    disavowFlags = { canViewDisavow: v.allowed, canVoteDisavow: v.allowed && v.isDPR };
+  }
+
   // PFP is a quick fs check - include it to avoid a separate request
   let pfpPath: string | null = null;
   if (memberId) {
@@ -94,6 +104,7 @@ export async function GET() {
       isAdmin,
       canReviewMissions,
       canManageShop,
+      ...(disavowFlags ?? {}),
     },
     {
       headers: { "Cache-Control": "private, max-age=300" },

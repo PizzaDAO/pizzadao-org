@@ -420,7 +420,8 @@
     "resources": "Resources",
     "activation": "Member activation",
     "spotlight": "Mafia Spotlight",
-    "spotlightAdmin": "Spotlight queue"
+    "spotlightAdmin": "Spotlight queue",
+    "disavow": "Disavow list"
   },
   "dashboard": {
     "loading": {
@@ -934,5 +935,149 @@
     "tooManyItems": "At most 30 action items.",
     "tooManyChapters": "At most 30 chapters.",
     "badChapter": "Chapter line needs a start time first, like 12:30 Title: {line}"
+  },
+  "disavow": {
+    "overline": "Private · members only",
+    "title": "Disavow list",
+    "dek": "A private warning list for members with a documented track record of harming others. Decided by Dread Pizza Roberts.",
+    "banner": "This list is private. Never share it, screenshot it, or repeat it outside the app. Only factual claims backed by first-hand knowledge or evidence belong here. Every view is logged. Entries expire after 12 months unless re-confirmed.",
+    "nominate": "Nominate someone",
+    "back": "Back to the list",
+    "empty": "Nothing here.",
+    "listedOn": "Listed {date}",
+    "reviewDue": "Review due {date}",
+    "nominatedOn": "Nominated {date}",
+    "page": "Page {page}",
+    "prev": "Previous",
+    "next": "Next",
+    "tabs": {
+      "listed": "Listed",
+      "open": "Open nominations",
+      "suspended": "Suspended",
+      "closed": "Closed"
+    },
+    "reasons": {
+      "SCAM": "Scam",
+      "THEFT_OF_FUNDS": "Theft of funds",
+      "NON_DELIVERY": "Took payment, did not deliver",
+      "IMPERSONATION": "Impersonation",
+      "HARASSMENT": "Harassment",
+      "OTHER": "Other"
+    },
+    "statuses": {
+      "NOMINATED": "Nominated",
+      "LISTED": "Listed",
+      "SUSPENDED": "Suspended",
+      "REJECTED": "Not listed",
+      "WITHDRAWN": "Withdrawn",
+      "REMOVED": "Removed",
+      "EXPIRED": "Expired"
+    },
+    "form": {
+      "title": "Nominate someone",
+      "intro": "Dread Pizza Roberts vote before anything becomes visible. The person is not told about a nomination.",
+      "search": "Find a member",
+      "searchHelp": "Search by name or member ID. Picking a member adds the handles we know for them.",
+      "searchPlaceholder": "Name or member ID",
+      "picked": "Selected: {name}",
+      "clear": "Clear",
+      "name": "Name they go by",
+      "nameHelp": "Required. How people know them.",
+      "xHandle": "X handle (optional)",
+      "discordId": "Discord ID (optional)",
+      "wallet": "Wallet address (optional)",
+      "telegram": "Telegram handle (optional)",
+      "reason": "What happened",
+      "statement": "Factual account",
+      "statementHelp": "What happened, when, amounts, links. No opinions about character. 20 to 1500 characters.",
+      "evidence": "Evidence links (optional)",
+      "evidenceHelp": "Up to 5 https links, one per line.",
+      "attest": "This is accurate to my knowledge and I have first-hand knowledge or evidence.",
+      "submit": "Submit nomination",
+      "submitting": "Submitting...",
+      "cancel": "Cancel",
+      "errorGeneric": "Could not submit. Check the form and try again.",
+      "errorDuplicate": "This person is already nominated or listed.",
+      "viewExisting": "View the existing entry",
+      "errorLimit": "You have reached the nomination limit for now.",
+      "errorSelf": "You cannot nominate yourself.",
+      "errorRate": "Too many requests. Try again shortly."
+    },
+    "detail": {
+      "statement": "Account",
+      "evidence": "Evidence",
+      "response": "Response from the listed member",
+      "noResponse": "No response.",
+      "history": "History",
+      "nominatedBy": "Nominated by a member",
+      "nominator": "Nominator (DPR only)",
+      "redacted": "Parts of this entry were redacted.",
+      "withdraw": "Withdraw nomination",
+      "events": {
+        "NOMINATED": "Nominated",
+        "ROUND_OPENED": "Vote opened",
+        "ROUND_CLOSED": "Vote closed",
+        "LISTED": "Listed",
+        "SUSPENDED": "Suspended",
+        "UNSUSPENDED": "Restored",
+        "WITHDRAWN": "Withdrawn",
+        "REMOVED": "Removed",
+        "EXPIRED": "Expired",
+        "RESPONSE_ADDED": "Response added",
+        "APPEALED": "Appeal filed",
+        "REDACTED": "Redacted",
+        "EDITED": "Edited",
+        "VIEWED": "Viewed"
+      }
+    },
+    "vote": {
+      "title": "DPR vote",
+      "round": {
+        "LIST": "Listing vote",
+        "REMOVE": "Removal vote",
+        "REAFFIRM": "Re-confirmation vote"
+      },
+      "tally": "{yes} yes · {no} no · {abstain} abstain · {recused} recused",
+      "rule": "Needs at least 3 yes and more yes than no, after 72 hours. Closes {date}.",
+      "yes": "Yes",
+      "no": "No",
+      "abstain": "Abstain",
+      "recuse": "Recuse",
+      "comment": "Private comment for DPR (optional)",
+      "submit": "Cast vote",
+      "mine": "Your vote: {choice}",
+      "saved": "Vote recorded.",
+      "closed": "Voting is closed.",
+      "error": "Could not record the vote.",
+      "suspend": "Suspend now",
+      "unsuspend": "Restore listing",
+      "openRemove": "Open removal vote",
+      "actionError": "That did not work.",
+      "comments": "DPR comments"
+    },
+    "response": {
+      "title": "Your listing",
+      "intro": "You are on the disavow list. This is what is recorded. Your response appears beside it for members who can see the list.",
+      "label": "Your response",
+      "help": "Up to 1500 characters.",
+      "save": "Save response",
+      "saved": "Saved.",
+      "appeal": "Appeal",
+      "appealHelp": "Asks Dread Pizza Roberts to vote on removing the listing. You can appeal once every 90 days.",
+      "appealed": "Appeal filed. Dread Pizza Roberts will vote.",
+      "appealOpen": "A vote is already open.",
+      "tooSoon": "You can appeal once every 90 days.",
+      "error": "Something went wrong."
+    },
+    "vouch": {
+      "title": "Disavow list warning",
+      "body": "This person is on the disavow list. Do not share this outside the app. Vouch anyway?",
+      "confirm": "Vouch anyway",
+      "cancel": "Cancel",
+      "view": "View entry"
+    },
+    "chip": {
+      "label": "Disavowed (private)"
+    }
   }
 }

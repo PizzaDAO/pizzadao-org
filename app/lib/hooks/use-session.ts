@@ -16,6 +16,9 @@ export interface SessionData {
   canReviewMissions?: boolean;
   /** May manage the $PEP shop at /admin/shop (admins + Pepperoni Mafia). */
   canManageShop?: boolean;
+  /** Disavow list: only present while the feature flag is on (server-computed). */
+  canViewDisavow?: boolean;
+  canVoteDisavow?: boolean;
 }
 
 export const LOGGED_OUT_SESSION: SessionData = {
