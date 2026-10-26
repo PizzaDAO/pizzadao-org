@@ -13,6 +13,8 @@
 import { readFileSync, existsSync } from 'fs'
 import { basename, resolve } from 'path'
 import { parseDraftsMarkdown } from './lib/parse-drafts.mjs'
+import { canonicalCrewId, crewHasFeature } from '../app/lib/crew-features.mjs'
+import { MAX_DRAFT_TEXT, MAX_NOTES, MAX_URL, isHttpsUrl } from '../app/lib/draft-limits.mjs'
 
 const args = process.argv.slice(2)
 let apply = false
@@ -29,6 +31,11 @@ for (let i = 0; i < args.length; i++) {
     process.exit(1)
   } else files.push(a)
 }
+crew = canonicalCrewId(crew)
+if (!crewHasFeature(crew, 'drafts')) {
+  console.error(`Crew "${crew}" does not have the drafts feature enabled (app/lib/crew-features.mjs).`)
+  process.exit(1)
+}
 if (files.length === 0) {
   console.error('Usage: node scripts/seed-crew-drafts.mjs [--crew comms] [--created-by <discordId>] [--apply] file.md ...')
   process.exit(1)
@@ -41,6 +48,19 @@ for (const f of files) {
     process.exit(1)
   }
   for (const d of parseDraftsMarkdown(readFileSync(f, 'utf-8'), basename(f))) drafts.push({ ...d, file: f })
+}
+
+// Same limits the API enforces.
+const problems = []
+drafts.forEach((d, n) => {
+  const where = `#${n + 1} (${basename(d.file)})`
+  if (d.text.length > MAX_DRAFT_TEXT) problems.push(`${where}: text over ${MAX_DRAFT_TEXT} characters`)
+  if (d.notes && d.notes.length > MAX_NOTES) problems.push(`${where}: notes over ${MAX_NOTES} characters`)
+  if (d.mediaUrl && (d.mediaUrl.length > MAX_URL || !isHttpsUrl(d.mediaUrl))) problems.push(`${where}: media must be an https link`)
+})
+if (problems.length) {
+  console.error(`Refusing to continue:\n  ${problems.join('\n  ')}`)
+  process.exit(1)
 }
 
 console.log(`${apply ? 'APPLY' : 'DRY RUN'}: ${drafts.length} draft(s) for crew "${crew}" from ${files.length} file(s)`)

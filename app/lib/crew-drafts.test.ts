@@ -2,15 +2,15 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { prisma } from './db'
 
 vi.mock('./db')
-vi.mock('./crew-leads', () => ({ isCrewLead: vi.fn() }))
+vi.mock('./crew-leads', () => ({ isCrewLead: vi.fn(), isOnCrewRoster: vi.fn() }))
 vi.mock('./mission-review-access', () => ({ canReviewMission: vi.fn() }))
 vi.mock('./sheets/members-list', () => ({ fetchAllMembers: vi.fn() }))
 
-import { isCrewLead } from './crew-leads'
+import { isCrewLead, isOnCrewRoster } from './crew-leads'
 import { canReviewMission } from './mission-review-access'
 import { fetchAllMembers } from './sheets/members-list'
 import { crewHasFeature } from './crew-features'
-import { createDraft, listDrafts, editDraft, changeDraftStatus, getDraftAccess } from './crew-drafts'
+import { createDraft, listDrafts, editDraft, changeDraftStatus, getDraftAccess, updateDraft } from './crew-drafts'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
 
@@ -19,6 +19,7 @@ function who(role: 'member' | 'lead' | 'dpr' | 'outsider') {
     { discordId: 'u1', crews: role === 'outsider' ? ['Tech'] : ['Comms'] },
   ])
   m(isCrewLead).mockResolvedValue(role === 'lead')
+  m(isOnCrewRoster).mockResolvedValue(false)
   m(canReviewMission).mockResolvedValue(role === 'dpr')
 }
 

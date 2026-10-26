@@ -1,4 +1,5 @@
 // Pure text helpers for crew drafts. Client-safe.
+import { parseTweet } from 'twitter-text'
 
 export const X_LIMIT = 280
 export const X_URL_LENGTH = 23
@@ -8,16 +9,12 @@ export type DraftPlatform = (typeof DRAFT_PLATFORMS)[number]
 export const DRAFT_STATUSES = ['draft', 'ready', 'posted', 'archived'] as const
 export type DraftStatus = (typeof DRAFT_STATUSES)[number]
 
-const URL_RE = /https?:\/\/[^\s]+/gi
-
-/** Weighted-ish length as X counts it: every URL is 23 chars; other chars by code point. */
+/**
+ * Length as X counts it (twitter-text parseTweet): URLs and bare domains are 23,
+ * emoji and CJK/wide characters are 2, trailing punctuation is not part of a URL.
+ */
 export function xLength(text: string): number {
-  let urls = 0
-  const rest = text.replace(URL_RE, () => {
-    urls++
-    return ''
-  })
-  return Array.from(rest).length + urls * X_URL_LENGTH
+  return parseTweet(text).weightedLength
 }
 
 export function xRemaining(text: string): number {
@@ -37,8 +34,9 @@ export function linkedinShareUrl(text: string): string {
 }
 
 /**
- * Split long text into a numbered thread, each part <= limit (X length, with the
- * " n/N" suffix counted). Splits on paragraph, then sentence, then word boundaries.
+ * Split long text into a numbered thread, each part <= limit by X's count (the
+ * " n/N" suffix included). Splits on paragraph, then line, then sentence, then
+ * word boundaries; paragraph breaks and line breaks inside a part are kept.
  * Text that already fits returns a single un-numbered part.
  */
 export function splitThread(text: string, limit = X_LIMIT): string[] {
@@ -54,6 +52,7 @@ export function splitThread(text: string, limit = X_LIMIT): string[] {
       if (cur.trim()) parts.push(cur.trim())
       cur = ''
     }
+    // Add a piece to the current part joined by `sep`; start a new part if it won't fit.
     const append = (piece: string, sep: string) => {
       const next = cur ? cur + sep + piece : piece
       if (xLength(next) <= max) cur = next
@@ -62,28 +61,45 @@ export function splitThread(text: string, limit = X_LIMIT): string[] {
         cur = piece
       }
     }
+    const words = (sentence: string, sep: string) => {
+      let first = true
+      for (const word of sentence.split(/ +/)) {
+        let w = word
+        // A single over-long token (rare): hard-cut it.
+        while (xLength(w) > max) {
+          const chars = Array.from(w)
+          let n = chars.length - 1
+          while (n > 1 && xLength(chars.slice(0, n).join('')) > max) n--
+          append(chars.slice(0, n).join(''), first ? sep : ' ')
+          first = false
+          push()
+          w = chars.slice(n).join('')
+        }
+        if (w) {
+          append(w, first ? sep : ' ')
+          first = false
+        }
+      }
+    }
     for (const para of clean.split(/\n{2,}/)) {
       if (xLength(para) <= max) {
         append(para, '\n\n')
         continue
       }
-      for (const sentence of para.split(/(?<=[.!?])\s+/)) {
-        if (xLength(sentence) <= max) {
-          append(sentence, ' ')
+      let firstLine = true
+      for (const line of para.split('\n')) {
+        const lineSep = firstLine ? '\n\n' : '\n'
+        firstLine = false
+        if (xLength(line) <= max) {
+          append(line, lineSep)
           continue
         }
-        for (const word of sentence.split(/\s+/)) {
-          // A single over-long token (rare): hard-cut it.
-          let w = word
-          while (xLength(w) > max) {
-            const chars = Array.from(w)
-            let n = max
-            while (n > 1 && xLength(chars.slice(0, n).join('')) > max) n--
-            append(chars.slice(0, n).join(''), ' ')
-            push()
-            w = chars.slice(n).join('')
-          }
-          if (w) append(w, ' ')
+        let firstSentence = true
+        for (const sentence of line.split(/(?<=[.!?]) +/)) {
+          const sep = firstSentence ? lineSep : ' '
+          firstSentence = false
+          if (xLength(sentence) <= max) append(sentence, sep)
+          else words(sentence, sep)
         }
       }
     }
@@ -91,10 +107,10 @@ export function splitThread(text: string, limit = X_LIMIT): string[] {
     return parts
   }
 
-  // Suffix " 10/10" is at most 6 chars for <100 parts; iterate until stable.
+  // Reserve room for the " n/N" suffix; iterate until the part count is stable.
   let reserve = 4
   let parts = build(reserve)
-  for (let i = 0; i < 3; i++) {
+  for (let i = 0; i < 4; i++) {
     const suffixLen = ` ${parts.length}/${parts.length}`.length
     if (suffixLen <= reserve) break
     reserve = suffixLen
@@ -121,10 +137,4 @@ export function isLeadOnlyTransition(from: DraftStatus, to: DraftStatus): boolea
   return to === 'posted' || to === 'archived' || (from === 'archived' && to === 'draft')
 }
 
-export function isHttpsUrl(u: string): boolean {
-  try {
-    return new URL(u).protocol === 'https:'
-  } catch {
-    return false
-  }
-}
+export { isHttpsUrl } from './draft-limits.mjs'

@@ -13,8 +13,8 @@ describe('xLength', () => {
     expect(xLength('hi https://t.co/x')).toBe(3 + 23)
     expect(xLength('a http://a.io b https://b.io/long/path')).toBe(2 + 23 + 3 + 23)
   })
-  it('counts emoji as one character', () => {
-    expect(xLength('🍕🍕')).toBe(2)
+  it('counts emoji and CJK as two, like X', () => {
+    expect(xLength('🍕🍕')).toBe(4)
   })
   it('reports remaining against 280', () => {
     expect(xRemaining('x'.repeat(280))).toBe(0)
