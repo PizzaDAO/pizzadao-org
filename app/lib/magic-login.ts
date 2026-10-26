@@ -5,6 +5,7 @@ import { sanitizeSignupDraft, type SignupDraft } from "./signup-draft";
 import { recordActivationLater as recordActivation } from "./activation";
 import { loginReturnPath } from "./login-return";
 import { realNick } from "./trainee-nick";
+import { sanitizeDisplayName } from "./display-name";
 
 const TOKEN_TTL_MS = 10 * 60 * 1000; // 10 minutes
 const RATE_LIMIT_WINDOW_MS = 15 * 60 * 1000; // 15 minutes
@@ -29,6 +30,20 @@ export function normalizeLoginName(input: string): string {
   return input.trim().replace(/^@+/, "").replace(/\s+/g, " ").trim();
 }
 
+const PICTOGRAPHS = /[\p{Extended_Pictographic}\p{S}\u200D\uFE0F\u{1F3FB}-\u{1F3FF}]/gu;
+
+/**
+ * "Loose" form for comparing nicknames/display names: emoji, symbols, skin
+ * tones, ZWJ and variation selectors removed, NFKC-folded, lowercased,
+ * whitespace collapsed. Returns "" when no letter/number remains (such a name
+ * must never match).
+ */
+export function looseName(v?: string | null): string {
+  if (!v) return "";
+  const stripped = v.replace(PICTOGRAPHS, " ");
+  return sanitizeDisplayName(stripped.normalize("NFKC")).toLowerCase().replace(/\s+/g, " ").trim();
+}
+
 export type LoginMatch =
   | { kind: "match"; member: SearchMember }
   | { kind: "none" }
@@ -49,9 +64,12 @@ export function pickLoginMember(members: SearchMember[], input: string, truncate
   if (byUsername.length === 1) return { kind: "match", member: byUsername[0] };
   if (byUsername.length > 1) return { kind: "ambiguous" };
 
-  const norm = (v?: string | null) => (v ? v.trim().replace(/\s+/g, " ").toLowerCase() : "");
+  // Compare loosely (emoji/symbols ignored) so "Enzo Pepperoni" matches "Enzo Pepperoni 🍫".
+  // An input or name with no letters/digits left never matches.
+  const lq = looseName(q);
+  if (!lq) return { kind: "none" };
   const byName = distinct(
-    humans.filter((m) => norm(realNick(m.nick)) === q || norm(m.user.global_name) === q),
+    humans.filter((m) => looseName(realNick(m.nick)) === lq || looseName(m.user.global_name) === lq),
   );
   // Search hit its limit: a unique nick/display-name hit may have a twin we never saw.
   if (truncated && byName.length > 0) return { kind: "ambiguous" };
