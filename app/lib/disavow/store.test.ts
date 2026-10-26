@@ -42,7 +42,14 @@ vi.mock('@/app/lib/db', () => {
     disavowal: { ...state.disavowal.find(d => d.id === r.disavowalId), identifiers: state.identifier.filter(i => i.disavowalId === r.disavowalId) },
   })
   const tx: any = {
-    $queryRaw: async (strings: TemplateStringsArray) => { if (strings.join('?').includes('FOR UPDATE')) { state.locks++; state.order.push('lock') } return [] },
+    // The Neon adapter can't deserialize a void result (pg_advisory_xact_lock) from $queryRaw.
+    $queryRaw: async (strings: TemplateStringsArray) => {
+      const q = strings.join('?')
+      if (q.includes('pg_advisory')) throw new Error('UnsupportedNativeDataType: void (2278)')
+      if (q.includes('FOR UPDATE')) { state.locks++; state.order.push('lock') }
+      return []
+    },
+    $executeRaw: async (strings: TemplateStringsArray) => { if (strings.join('?').includes('pg_advisory_xact_lock')) state.order.push('advisory'); return 0 },
     disavowal: model(() => state.disavowal, {
       create: async ({ data }: any) => {
         const id = `d${++state.seq}`
@@ -81,7 +88,7 @@ vi.mock('@/app/lib/db', () => {
       },
     }),
     disavowSubmission: model(() => state.submission, {
-      findMany: async ({ where }: any) => state.submission.filter(x => match(x, where)).map(x => ({ ...x, disavowal: { status: state.disavowal.find(d => d.id === x.disavowalId)?.status } })),
+      findMany: async ({ where }: any) => state.submission.filter(x => match(x, where)).map(x => ({ ...x, disavowal: { status: state.disavowal.find(d => d.id === x.disavowalId)?.status, rounds: state.round.filter(r => r.disavowalId === x.disavowalId && r.kind === 'LIST') } })),
       findFirst: async ({ where }: any) => state.submission.find(x => match(x, where)) ?? null,
       findUnique: async ({ where }: any) => state.submission.find(x => x.id === where.id) ?? null,
       count: async ({ where }: any) => state.submission.filter(x => x.disavowalId === where.disavowalId && x.withdrawnAt === null).length,
@@ -427,7 +434,8 @@ describe('redaction and audit', () => {
     expect(state.identifier.find(i => i.kind === 'DISCORD_ID')!.value).toBe('subjD')
     expect(state.vote[0].comment).toBe('[redacted]')
     expect(state.vote[1].comment).toBeNull()
-    expect(state.submission.every(x => x.displayName === '[redacted]')).toBe(true)
+    // submitters' own rows get a neutral dash, not the visible marker
+    expect(state.submission.every(x => x.displayName === '\u2014')).toBe(true)
     expect(state.vote).toHaveLength(2)
     const ev = state.event.find(e => e.type === 'REDACTED')!
     expect(ev.actorDiscordId).toBe('admin1')
@@ -573,7 +581,7 @@ describe('nominate hardening', () => {
     expect(state.order.length).toBeGreaterThanOrEqual(0)
     const src = (await import('node:fs')).readFileSync(new URL('./store.ts', import.meta.url), 'utf8')
     const nomBody = src.slice(src.indexOf('export async function nominate'), src.indexOf('async function notifyDpr'))
-    expect(nomBody).toMatch(/pg_advisory_xact_lock/)
+    expect(nomBody).toMatch(/advisoryLock\(tx\)/)
     const inTx = nomBody.slice(nomBody.indexOf('prisma.$transaction'))
     expect(inTx).toMatch(/tx\.disavowEvent\.count/)
     expect(inTx).toMatch(/tx\.disavowIdentifier\.findFirst/)
@@ -612,5 +620,62 @@ describe('lock order', () => {
     state.order.length = 0
     await withdrawSubmission(state.submission.find(x => x.submitterDiscordId === 'z')!.id, 'z')
     expect(state.order.indexOf('lock')).toBeLessThan(state.order.indexOf('disavowal-update'))
+  })
+})
+
+describe('third review fixes', () => {
+  it('the nomination lock uses $executeRaw (a void $queryRaw would 500 on the Neon adapter)', async () => {
+    const r = await nominate(nominateInput())
+    expect(r.ok).toBe(true)
+    expect(state.order).toContain('advisory')
+    const fs = await import('node:fs')
+    const src = fs.readFileSync(new URL('./store.ts', import.meta.url), 'utf8')
+    expect(src).toMatch(/\$executeRaw`SELECT pg_advisory_xact_lock/)
+    expect(src).not.toMatch(/\$queryRaw`SELECT pg_advisory/)
+    // only FOR UPDATE selects may use $queryRaw
+    for (const m of src.matchAll(/\$queryRaw`([^`]*)`/g)) expect(m[1]).toMatch(/FOR UPDATE/)
+  })
+
+  it('withdrawSubmission takes the same advisory lock first, then the round lock, then updates', async () => {
+    await nominate(nominateInput({ nominatorDiscordId: 'z', identifiers: [{ kind: 'NAME', value: 'zed' }] }))
+    state.order.length = 0
+    await withdrawSubmission(state.submission[0].id, 'z')
+    expect(state.order.indexOf('advisory')).toBe(0)
+    expect(state.order.indexOf('advisory')).toBeLessThan(state.order.indexOf('lock'))
+    expect(state.order.indexOf('lock')).toBeLessThan(state.order.indexOf('disavowal-update'))
+  })
+
+  it('submitters are told only when a LIST round closes, not for REMOVE / REAFFIRM rounds', async () => {
+    const { id, later } = await listedEntry()
+    vi.mocked(createNotification).mockClear()
+    await suspend(id, 'dpr1', later)
+    const remove = state.round.find(r => r.kind === 'REMOVE')!
+    await settleRound(remove.id, new Date(later.getTime() + 15 * D))
+    expect(vi.mocked(createNotification).mock.calls.filter(c => c[0].type === 'DISAVOW_ROUND_CLOSED')).toHaveLength(0)
+  })
+
+  it('a duplicate on a SUSPENDED entry stays "submitted" through the removal vote; an original flips to "closed" on the LIST outcome', async () => {
+    const { id, later } = await listedEntry()
+    const original = (await listMySubmissions('nom'))[0]
+    expect(original.status).toBe('closed') // its LIST round closed after it was submitted
+    await suspend(id, 'dpr1', later)
+    const dupAt = new Date()
+    await nominate({ ...nominateInput({ nominatorDiscordId: 'late' }), now: dupAt })
+    const lateSub = state.submission.find(x => x.submitterDiscordId === 'late')!
+    lateSub.createdAt = new Date(later.getTime() + D) // after the LIST round closed (fake clock)
+    expect((await listMySubmissions('late'))[0].status).toBe('submitted')
+    const remove = state.round.find(r => r.kind === 'REMOVE')!
+    await settleRound(remove.id, new Date(later.getTime() + 16 * D)) // closes after the duplicate was submitted
+    expect(state.disavowal[0].status).toBe('LISTED')
+    expect((await listMySubmissions('late'))[0].status).toBe('submitted')
+  })
+
+  it('redaction leaves no marker in a submitter\'s own row', async () => {
+    const n = await nominate(nominateInput())
+    if (!n.ok) throw new Error()
+    await redact(n.id, 'admin1')
+    const row = (await listMySubmissions('nom'))[0]
+    expect(row.displayName).not.toMatch(/redact/i)
+    expect(row.status).toBe('submitted')
   })
 })

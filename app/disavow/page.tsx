@@ -16,7 +16,10 @@ export default async function DisavowPage({ searchParams }: { searchParams: Prom
     const t = await getDisavowTranslator();
     const locale = await getLocale();
     const mineTab = sp.tab === "mine";
-    const data = await listDisavowals(mineTab ? "listed" : sp.tab, sp.page, isDPR, session.discordId);
+    // The "mine" tab needs no list query at all.
+    const data = mineTab
+        ? ({ tab: "listed", page: 1, pageSize: 1, total: 0, items: [] } as unknown as Awaited<ReturnType<typeof listDisavowals>>)
+        : await listDisavowals(sp.tab, sp.page, isDPR, session.discordId);
     const mine = mineTab ? await listMySubmissions(session.discordId) : [];
     const activeTab = mineTab ? "mine" : data.tab;
     const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });

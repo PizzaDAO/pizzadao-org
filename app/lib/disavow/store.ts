@@ -23,6 +23,7 @@ import { tallyRound, windowEnd, type TallyVote } from './tally'
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 type Reason = 'SCAM' | 'THEFT_OF_FUNDS' | 'NON_DELIVERY' | 'IMPERSONATION' | 'HARASSMENT' | 'OTHER'
 
+const NEUTRAL_NAME = '\u2014'
 const ACTIVE_STATUSES = ['NOMINATED', 'LISTED', 'SUSPENDED'] as const
 
 function addMonths(d: Date, months: number): Date {
@@ -40,6 +41,14 @@ function logEvent(tx: Tx, disavowalId: string, type: string, actorDiscordId: str
 /** Row lock so a vote and a settle on the same round serialize. */
 function lockRound(tx: Tx, roundId: string) {
   return tx.$queryRaw`SELECT id FROM "DisavowRound" WHERE id = ${roundId} FOR UPDATE`
+}
+
+/**
+ * Global nomination lock. $executeRaw, not $queryRaw: pg_advisory_xact_lock
+ * returns void, which the Neon adapter can't deserialize in a query result.
+ */
+function advisoryLock(tx: Tx) {
+  return tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext('disavow:nominate'))`
 }
 
 const isUniqueViolation = (e: unknown) => (e as { code?: string })?.code === 'P2002'
@@ -106,7 +115,7 @@ export async function nominate(input: {
   // Cap check, duplicate check and create share one transaction behind a lock, so
   // two concurrent nominations can't both slip past the cap or create twins.
   const result = await prisma.$transaction(async tx => {
-    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('disavow:nominate'))`
+    await advisoryLock(tx)
     // Every attempt counts, including duplicates: each writes a NOMINATED event by this actor.
     const attempts = await tx.disavowEvent.count({
       where: { type: 'NOMINATED', actorDiscordId: input.nominatorDiscordId, createdAt: { gte: since } },
@@ -304,15 +313,15 @@ export async function settleRound(roundId: string, now: Date = new Date()): Prom
   if (!res) return 'pending' // someone else settled it, or it was cancelled
   if (!res.won) return res.outcome
 
-  // Best-effort notifications after commit. No names, no content. Every
-  // submitter (original and duplicate) gets the identical neutral notice, so a
+  // Best-effort notifications after commit. No names, no content. When a LIST
+  // round closes, every submitter (original and duplicate) gets the identical neutral notice, so a
   // duplicate of a hidden entry is indistinguishable here too.
   if (res.kind === 'LIST' && res.passed) {
     for (const id of subjectIds) {
       await notify('DISAVOW_LISTED_SUBJECT', id, 'A notice about you', 'You can see details and respond.', '/disavow/response')
     }
   }
-  for (const id of res.notifyIds) {
+  if (res.kind === 'LIST') for (const id of res.notifyIds) {
     await notify('DISAVOW_ROUND_CLOSED', id, 'A vote has closed', 'A nomination you submitted has closed.', '/disavow?tab=mine')
   }
   return res.outcome
@@ -336,6 +345,7 @@ export async function withdrawSubmission(submissionId: string, actor: string, no
   if (!sub || sub.submitterDiscordId !== actor) return 'not_found'
   if (sub.withdrawnAt) return 'already'
   return prisma.$transaction(async tx => {
+    await advisoryLock(tx) // same lock as nominate, taken first: a withdrawal can't interleave with a nomination
     const open = await tx.disavowRound.findMany({ where: { disavowalId: sub.disavowalId, state: 'OPEN' }, select: { id: true } })
     for (const r of open) await lockRound(tx, r.id)
     const upd = await tx.disavowSubmission.updateMany({ where: { id: submissionId, withdrawnAt: null }, data: { withdrawnAt: now } })
@@ -361,14 +371,22 @@ export async function listMySubmissions(discordId: string) {
   const rows = await prisma.disavowSubmission.findMany({
     where: { submitterDiscordId: discordId },
     orderBy: { createdAt: 'desc' },
-    select: { id: true, displayName: true, createdAt: true, withdrawnAt: true, disavowal: { select: { status: true } } },
+    select: {
+      id: true, displayName: true, createdAt: true, withdrawnAt: true,
+      disavowal: { select: { status: true, rounds: { where: { kind: 'LIST' }, select: { state: true, closedAt: true } } } },
+    },
   })
+  // "closed" only on a LIST-round outcome that happened after this submission
+  // (or the entry being rejected/withdrawn). A removal vote on a suspended
+  // entry, or a re-confirmation, never flips a duplicate submitter's status.
+  const listClosedAfter = (r: (typeof rows)[number]) =>
+    r.disavowal.rounds.some(x => x.state !== 'OPEN' && x.closedAt && x.closedAt.getTime() >= r.createdAt.getTime())
   return rows.map(r => ({
     id: r.id,
     displayName: r.displayName,
     createdAt: r.createdAt,
     status: r.withdrawnAt ? ('withdrawn' as const)
-      : ['NOMINATED', 'LISTED', 'SUSPENDED'].includes(r.disavowal.status) ? ('submitted' as const) : ('closed' as const),
+      : ['REJECTED', 'WITHDRAWN'].includes(r.disavowal.status) || listClosedAfter(r) ? ('closed' as const) : ('submitted' as const),
   }))
 }
 
@@ -484,7 +502,9 @@ export async function redact(id: string, actor: string, now = new Date()): Promi
         await tx.disavowIdentifier.update({ where: { id: i.id }, data: { value: `${REDACTED}:${i.id}` } })
       }
     }
-    await tx.disavowSubmission.updateMany({ where: { disavowalId: id }, data: { displayName: REDACTED } })
+    // Erase the typed name but with a neutral dash, not the marker, so a submitter's
+    // own "My nominations" row doesn't reveal that anything was redacted.
+    await tx.disavowSubmission.updateMany({ where: { disavowalId: id }, data: { displayName: NEUTRAL_NAME } })
     await tx.disavowVote.updateMany({ where: { round: { disavowalId: id }, comment: { not: null } } as never, data: { comment: REDACTED } })
     await logEvent(tx, id, 'REDACTED', actor, { fields })
   })
