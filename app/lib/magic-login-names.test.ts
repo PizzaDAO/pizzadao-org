@@ -113,4 +113,26 @@ describe('login name matching', () => {
     mocks.search.mockResolvedValue([...full, mem('1', 'e', { nick: 'Enzo Pepperoni \u{1F36B}' })]);
     expect((await requestMagicLogin('Enzo Pepperoni', 'https://app.example')).status).toBe('ambiguous');
   });
+  it('exact nickname beats an emoji twin', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: 'Sam' }), mem('2', 'a2', { nick: 'Sam \u{1F355}' })]);
+    expect((await requestMagicLogin('Sam', 'https://app.example')).status).toBe('sent');
+    expect(dmTo()).toEqual(['1']);
+  });
+  it('exact pass still goes ambiguous when truncated', async () => {
+    const full = Array.from({ length: 98 }, (_, i) => mem(`f${i}`, `filler${i}`));
+    mocks.search.mockResolvedValue([...full, mem('1', 'a1', { nick: 'Sam' }), mem('2', 'a2', { nick: 'Sam \u{1F355}' })]);
+    expect((await requestMagicLogin('Sam', 'https://app.example')).status).toBe('ambiguous');
+  });
+  it('folds stylised letters and strips keycaps', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: '\u24C8am' })]);
+    expect((await requestMagicLogin('sam', 'https://app.example')).status).toBe('sent');
+    mocks.search.mockResolvedValue([mem('2', 'a2', { nick: 'Sam 1\uFE0F\u20E3' })]);
+    expect((await requestMagicLogin('sam 1', 'https://app.example')).status).toBe('sent');
+    expect(dmTo()).toEqual(['1', '2']);
+  });
+  it('never matches the Pizza Trainee placeholder with an emoji', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: 'Pizza Trainee \u{1F355}' })]);
+    expect((await requestMagicLogin('Pizza Trainee', 'https://app.example')).status).toBe('not_found');
+    expect(mocks.sendDM).not.toHaveBeenCalled();
+  });
 });
