@@ -10,6 +10,10 @@
 import type { Metadata } from "next";
 import { composeProfileSummary } from "@/app/api/profile-summary/[id]/route";
 import { ProfileClient } from "./ProfileClient";
+import { getSession } from "@/app/lib/session";
+import { disavowEnabled } from "@/app/lib/disavow/constants";
+import { canViewDisavowList } from "@/app/lib/disavow/access";
+import { findActiveListingFor } from "@/app/lib/disavow/match";
 
 export const runtime = "nodejs";
 
@@ -80,5 +84,22 @@ export default async function ProfilePage({
     params: Promise<{ id: string }>;
 }) {
     const { id } = await params;
-    return <ProfileClient id={id} />;
+    return <ProfileClient id={id} disavowWarning={await loadDisavowWarning(id)} />;
+}
+
+/**
+ * Private disavow warning (plans/disavow-list.md). Does nothing, and does not
+ * even read the session, while DISAVOW_ENABLED is off. Only an eligible viewer
+ * ever gets a non-null value; everyone else's page is unchanged.
+ */
+async function loadDisavowWarning(memberId: string): Promise<{ id: string } | null> {
+    if (!disavowEnabled()) return null;
+    try {
+        const session = await getSession();
+        if (!session?.discordId) return null;
+        if (!(await canViewDisavowList(session.discordId))) return null;
+        return await findActiveListingFor(memberId);
+    } catch {
+        return null;
+    }
 }

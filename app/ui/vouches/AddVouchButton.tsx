@@ -1,6 +1,8 @@
 "use client";
 
 import { useState, useEffect } from "react";
+import { useSession } from "@/app/lib/hooks/use-session";
+import { DisavowVouchWarning } from "./DisavowVouchWarning";
 
 type AddVouchButtonProps = {
   targetMemberId: string;
@@ -22,6 +24,9 @@ export function AddVouchButton({
   const [isVouched, setIsVouched] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
+  const [warning, setWarning] = useState<{ id: string } | null>(null);
+  const { data: session } = useSession();
+  const canViewDisavow = session?.canViewDisavow === true;
 
   const shouldShow = !!currentMemberId && currentMemberId !== targetMemberId;
 
@@ -57,7 +62,33 @@ export function AddVouchButton({
     return null;
   }
 
+  // Disavow list: only eligible viewers (server-computed flag, absent for
+  // everyone else) ever call the check or see the dialog. Warn, never block.
   const handleToggle = async () => {
+    if (!isVouched && canViewDisavow) {
+      setActionLoading(true);
+      try {
+        const res = await fetch(
+          `/api/disavow/check?memberId=${encodeURIComponent(targetMemberId)}`,
+          { credentials: "include" },
+        );
+        if (res.ok) {
+          const data = await res.json();
+          if (data.listed && data.id) {
+            setWarning({ id: String(data.id) });
+            setActionLoading(false);
+            return;
+          }
+        }
+      } catch {
+        // A failed check never blocks a vouch.
+      }
+      setActionLoading(false);
+    }
+    await doToggle();
+  };
+
+  const doToggle = async () => {
     setActionLoading(true);
     try {
       const endpoint = isVouched ? "/api/vouches/remove" : "/api/vouches/add";
@@ -110,12 +141,24 @@ export function AddVouchButton({
   }
 
   return (
-    <button
-      onClick={handleToggle}
-      disabled={actionLoading}
-      className={`${baseClass} bg-tomato text-cream border border-tomato hover:bg-tomato-deep hover:border-tomato-deep cursor-pointer disabled:cursor-wait disabled:opacity-60`}
-    >
-      {actionLoading ? "..." : "+ Vouch"}
-    </button>
+    <>
+      <button
+        onClick={handleToggle}
+        disabled={actionLoading}
+        className={`${baseClass} bg-tomato text-cream border border-tomato hover:bg-tomato-deep hover:border-tomato-deep cursor-pointer disabled:cursor-wait disabled:opacity-60`}
+      >
+        {actionLoading ? "..." : "+ Vouch"}
+      </button>
+      {warning && (
+        <DisavowVouchWarning
+          entryId={warning.id}
+          onCancel={() => setWarning(null)}
+          onConfirm={() => {
+            setWarning(null);
+            void doToggle();
+          }}
+        />
+      )}
+    </>
   );
 }
