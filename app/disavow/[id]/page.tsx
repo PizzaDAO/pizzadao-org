@@ -2,6 +2,7 @@ import Link from "next/link";
 import { notFound } from "next/navigation";
 import { getLocale } from "next-intl/server";
 import { getDisavowTranslator } from "@/app/lib/disavow/messages";
+import { checkKeyedRateLimit } from "@/app/lib/rate-limit";
 import { requireDisavowViewerPage } from "@/app/lib/disavow/access";
 import { getDisavowDetail } from "@/app/lib/disavow/detail";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
@@ -13,9 +14,13 @@ export const dynamic = "force-dynamic";
 export default async function DisavowDetailPage({ params }: { params: Promise<{ id: string }> }) {
     const { session, isDPR } = await requireDisavowViewerPage();
     const { id } = await params;
+    const t = await getDisavowTranslator();
+    // Per-user cap on detail views (each one is audit-logged).
+    if (!(await checkKeyedRateLimit("disavow-detail", session.discordId)).success) {
+        return <EditorialPage width="max-w-[820px]"><p role="alert">{t("form.errorRate")}</p></EditorialPage>;
+    }
     const d = await getDisavowDetail(id, { discordId: session.discordId, isDPR });
     if (!d) notFound();
-    const t = await getDisavowTranslator();
     const locale = await getLocale();
     const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
     const dpr = "rounds" in d ? d : null;
@@ -69,10 +74,6 @@ export default async function DisavowDetailPage({ params }: { params: Promise<{ 
                     hasOpenRound={!!openRound}
                 />
             )}
-            {!dpr && d.isNominator && d.status === "NOMINATED" && (
-                <DetailActions disavowalId={d.id} status={d.status} rounds={[]} hasOpenRound={false} nominatorOnly />
-            )}
-
             <section className={`${paperCard} mb-5 grid gap-2 p-5`}>
                 <h2 className="m-0 text-lg font-black">{t("detail.history")}</h2>
                 <ol className="m-0 list-none p-0 text-sm">

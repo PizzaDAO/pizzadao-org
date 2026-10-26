@@ -78,6 +78,12 @@ export type NominateResult =
   | { ok: false; code: 'self' }
   | { ok: false; code: 'duplicate'; existingId: string; existingStatus: string }
 
+/**
+ * `defer` runs the slow follow-up work (DPR notifications and the lookups they
+ * need) after the response, so a new nomination and a duplicate of a hidden
+ * entry take about the same time. The route passes next/server's `after`; by
+ * default the work just runs inline.
+ */
 export async function nominate(input: {
   nominatorDiscordId: string
   displayName: string
@@ -86,34 +92,44 @@ export async function nominate(input: {
   evidenceUrls: string[]
   identifiers: IdentifierInput[]
   now?: Date
+  defer?: (work: () => Promise<void>) => void | Promise<void>
 }): Promise<NominateResult> {
   const now = input.now ?? new Date()
   const since = new Date(now.getTime() - DISAVOW_NOMINATION_WINDOW_DAYS * DAY_MS)
-  // Every attempt counts, including ones that turn out to be duplicates: each
-  // writes a NOMINATED event by this actor (duplicates onto the existing entry).
-  const attempts = await prisma.disavowEvent.count({
-    where: { type: 'NOMINATED', actorDiscordId: input.nominatorDiscordId, createdAt: { gte: since } },
-  })
-  if (attempts >= DISAVOW_NOMINATIONS_PER_WINDOW) return { ok: false, code: 'rate_limited' }
 
   if (await isSubjectOf(input.identifiers, input.nominatorDiscordId)) return { ok: false, code: 'self' }
 
-  const dup = await prisma.disavowIdentifier.findFirst({
-    where: {
-      OR: input.identifiers.map(i => ({ kind: i.kind, value: i.value })),
-      disavowal: { status: { in: [...ACTIVE_STATUSES] } },
-    } as never,
-    select: { disavowalId: true, disavowal: { select: { status: true } } },
-  })
-  if (dup) {
-    await prisma.disavowEvent.create({
-      data: { disavowalId: dup.disavowalId, type: 'NOMINATED', actorDiscordId: input.nominatorDiscordId, data: { duplicate: true } },
-    })
-    return { ok: false, code: 'duplicate', existingId: dup.disavowalId, existingStatus: dup.disavowal.status }
-  }
-
+  // Names and Telegram handles never count as "the same person".
+  const matchable = identifierOr(input.identifiers as IdentifierInput[])
   const closesAt = windowEnd(now, DISAVOW_WINDOW_DAYS)
-  const created = await prisma.$transaction(async tx => {
+
+  // Cap check, duplicate check and create share one transaction behind a lock, so
+  // two concurrent nominations can't both slip past the cap or create twins.
+  const result = await prisma.$transaction(async tx => {
+    await tx.$queryRaw`SELECT pg_advisory_xact_lock(hashtext('disavow:nominate'))`
+    // Every attempt counts, including duplicates: each writes a NOMINATED event by this actor.
+    const attempts = await tx.disavowEvent.count({
+      where: { type: 'NOMINATED', actorDiscordId: input.nominatorDiscordId, createdAt: { gte: since } },
+    })
+    if (attempts >= DISAVOW_NOMINATIONS_PER_WINDOW) return { kind: 'rate_limited' as const }
+
+    const dup = matchable.length
+      ? await tx.disavowIdentifier.findFirst({
+          where: { OR: matchable, disavowal: { status: { in: [...ACTIVE_STATUSES] } } } as never,
+          select: { disavowalId: true, disavowal: { select: { status: true } } },
+        })
+      : null
+    if (dup) {
+      // Keep this person's own record of the submission (so they can see and withdraw it).
+      await tx.disavowSubmission.upsert({
+        where: { disavowalId_submitterDiscordId: { disavowalId: dup.disavowalId, submitterDiscordId: input.nominatorDiscordId } },
+        create: { disavowalId: dup.disavowalId, submitterDiscordId: input.nominatorDiscordId, displayName: input.displayName, isOriginal: false },
+        update: { withdrawnAt: null },
+      })
+      await logEvent(tx, dup.disavowalId, 'NOMINATED', input.nominatorDiscordId, { duplicate: true })
+      return { kind: 'duplicate' as const, existingId: dup.disavowalId, existingStatus: dup.disavowal.status as string }
+    }
+
     const d = await tx.disavowal.create({
       data: {
         displayName: input.displayName,
@@ -123,16 +139,25 @@ export async function nominate(input: {
         nominatorDiscordId: input.nominatorDiscordId,
         identifiers: { create: input.identifiers.map(i => ({ kind: i.kind, value: i.value })) },
         rounds: { create: { kind: 'LIST', openedBy: input.nominatorDiscordId, opensAt: now, closesAt } },
+        submissions: { create: { submitterDiscordId: input.nominatorDiscordId, displayName: input.displayName, isOriginal: true } },
       },
       select: { id: true },
     })
     await logEvent(tx, d.id, 'NOMINATED', input.nominatorDiscordId, { reason: input.reason })
     await logEvent(tx, d.id, 'ROUND_OPENED', input.nominatorDiscordId, { kind: 'LIST' })
-    return d
+    return { kind: 'created' as const, id: d.id }
   })
 
-  await notifyDpr(created.id, [input.nominatorDiscordId, ...(await subjectDiscordIds(input.identifiers))])
-  return { ok: true, id: created.id }
+  if (result.kind === 'rate_limited') return { ok: false, code: 'rate_limited' }
+  if (result.kind === 'duplicate') {
+    return { ok: false, code: 'duplicate', existingId: result.existingId, existingStatus: result.existingStatus }
+  }
+  const work = async () => {
+    await notifyDpr(result.id, [input.nominatorDiscordId, ...(await subjectDiscordIds(input.identifiers))])
+  }
+  if (input.defer) await input.defer(work)
+  else await work()
+  return { ok: true, id: result.id }
 }
 
 async function notifyDpr(disavowalId: string, exclude: string[]) {
@@ -171,6 +196,12 @@ export async function castVote(input: {
   if (input.voterDiscordId === round.disavowal.nominatorDiscordId || (await isSubjectOf(round.disavowal.identifiers, input.voterDiscordId))) {
     return { ok: false, code: 'conflict' }
   }
+  // Anyone who submitted a nomination for this entry (even as a duplicate) can't vote on it.
+  const submitted = await prisma.disavowSubmission.findFirst({
+    where: { disavowalId: round.disavowalId, submitterDiscordId: input.voterDiscordId },
+    select: { id: true },
+  })
+  if (submitted) return { ok: false, code: 'conflict' }
   if (now.getTime() >= round.closesAt.getTime()) {
     await settleRound(round.id, now)
     return { ok: false, code: 'closed' }
@@ -220,11 +251,16 @@ export async function settleRound(roundId: string, now: Date = new Date()): Prom
       include: { votes: true, disavowal: true },
     })
     if (!round || round.state !== 'OPEN') return null
+    const submissions = await tx.disavowSubmission.findMany({
+      where: { disavowalId: round.disavowalId },
+      select: { submitterDiscordId: true, withdrawnAt: true },
+    })
+    const submitterIds = submissions.map(x => x.submitterDiscordId)
     const t = tallyRound(
       round.votes.map(v => ({ voterDiscordId: v.voterDiscordId, choice: v.choice })) as TallyVote[],
-      { nominatorId: round.disavowal.nominatorDiscordId, subjectIds, now, opensAt: round.opensAt, closesAt: round.closesAt },
+      { nominatorId: round.disavowal.nominatorDiscordId, subjectIds, submitterIds, now, opensAt: round.opensAt, closesAt: round.closesAt },
     )
-    if (t.outcome === 'pending') return { outcome: 'pending' as Outcome, won: false }
+    if (t.outcome === 'pending') return { outcome: 'pending' as Outcome, won: false as const }
 
     const passed = t.outcome === 'passed'
     const upd = await tx.disavowRound.updateMany({
@@ -260,22 +296,24 @@ export async function settleRound(roundId: string, now: Date = new Date()): Prom
         await logEvent(tx, d.id, 'EXPIRED', null, { to: 'EXPIRED' })
       }
     }
-    return { outcome: t.outcome as Outcome, won: true, kind: round.kind, passed, nominator: d.nominatorDiscordId }
+    return {
+      outcome: t.outcome as Outcome, won: true as const, kind: round.kind, passed,
+      notifyIds: [...new Set(submissions.filter(x => !x.withdrawnAt).map(x => x.submitterDiscordId))],
+    }
   })
   if (!res) return 'pending' // someone else settled it, or it was cancelled
   if (!res.won) return res.outcome
 
-  // Best-effort notifications after commit. No names, no content.
-  if (res.kind === 'LIST') {
-    if (res.passed) {
-      for (const id of subjectIds) {
-        await notify('DISAVOW_LISTED_SUBJECT', id, 'A notice about you', 'You can see details and respond.', '/disavow/response')
-      }
+  // Best-effort notifications after commit. No names, no content. Every
+  // submitter (original and duplicate) gets the identical neutral notice, so a
+  // duplicate of a hidden entry is indistinguishable here too.
+  if (res.kind === 'LIST' && res.passed) {
+    for (const id of subjectIds) {
+      await notify('DISAVOW_LISTED_SUBJECT', id, 'A notice about you', 'You can see details and respond.', '/disavow/response')
     }
-    await notify(
-      'DISAVOW_ROUND_CLOSED', res.nominator, 'A vote has closed',
-      res.passed ? 'A nomination you made passed.' : 'A nomination you made did not pass.', '/disavow',
-    )
+  }
+  for (const id of res.notifyIds) {
+    await notify('DISAVOW_ROUND_CLOSED', id, 'A vote has closed', 'A nomination you submitted has closed.', '/disavow?tab=mine')
   }
   return res.outcome
 }
@@ -286,19 +324,52 @@ async function load(id: string) {
   return prisma.disavowal.findUnique({ where: { id }, include: { identifiers: true, rounds: { where: { state: 'OPEN' } } } })
 }
 
-export async function withdraw(id: string, actor: string): Promise<'ok' | 'not_found' | 'forbidden' | 'bad_state'> {
-  const d = await load(id)
-  if (!d) return 'not_found'
-  if (d.nominatorDiscordId !== actor) return 'forbidden'
-  if (d.status !== 'NOMINATED') return 'bad_state'
-  const ok = await prisma.$transaction(async tx => {
-    const r = await tx.disavowal.updateMany({ where: { id, status: 'NOMINATED' }, data: { status: 'WITHDRAWN' } })
-    if (r.count === 0) return false
-    await tx.disavowRound.updateMany({ where: { disavowalId: id, state: 'OPEN' }, data: { state: 'CANCELLED', closedAt: new Date() } })
-    await logEvent(tx, id, 'WITHDRAWN', actor, { from: 'NOMINATED', to: 'WITHDRAWN' })
-    return true
+/**
+ * Withdraw the caller's own submission (by submission id: a duplicate submitter
+ * never learns the entry's id). It removes their support; if no active
+ * submitter is left and the entry is still NOMINATED, the entry is withdrawn.
+ * Nothing is deleted: the submission is stamped, the entry changes status, both
+ * audit-logged. Locks the open round first (same order as settleRound).
+ */
+export async function withdrawSubmission(submissionId: string, actor: string, now = new Date()): Promise<'ok' | 'not_found' | 'already'> {
+  const sub = await prisma.disavowSubmission.findUnique({ where: { id: submissionId } })
+  if (!sub || sub.submitterDiscordId !== actor) return 'not_found'
+  if (sub.withdrawnAt) return 'already'
+  return prisma.$transaction(async tx => {
+    const open = await tx.disavowRound.findMany({ where: { disavowalId: sub.disavowalId, state: 'OPEN' }, select: { id: true } })
+    for (const r of open) await lockRound(tx, r.id)
+    const upd = await tx.disavowSubmission.updateMany({ where: { id: submissionId, withdrawnAt: null }, data: { withdrawnAt: now } })
+    if (upd.count === 0) return 'already' as const
+    await logEvent(tx, sub.disavowalId, 'WITHDRAWN', actor, { submission: true, original: sub.isOriginal })
+    const remaining = await tx.disavowSubmission.count({ where: { disavowalId: sub.disavowalId, withdrawnAt: null } })
+    if (remaining === 0) {
+      const r = await tx.disavowal.updateMany({ where: { id: sub.disavowalId, status: 'NOMINATED' }, data: { status: 'WITHDRAWN' } })
+      if (r.count > 0) {
+        await tx.disavowRound.updateMany({ where: { disavowalId: sub.disavowalId, state: 'OPEN' }, data: { state: 'CANCELLED', closedAt: now } })
+        await logEvent(tx, sub.disavowalId, 'WITHDRAWN', actor, { from: 'NOMINATED', to: 'WITHDRAWN' })
+      }
+    }
+    return 'ok' as const
   })
-  return ok ? 'ok' : 'bad_state'
+}
+
+/**
+ * The caller's own submissions and nothing else: a neutral status only
+ * ("submitted" / "closed" / "withdrawn"), never the entry's status or votes.
+ */
+export async function listMySubmissions(discordId: string) {
+  const rows = await prisma.disavowSubmission.findMany({
+    where: { submitterDiscordId: discordId },
+    orderBy: { createdAt: 'desc' },
+    select: { id: true, displayName: true, createdAt: true, withdrawnAt: true, disavowal: { select: { status: true } } },
+  })
+  return rows.map(r => ({
+    id: r.id,
+    displayName: r.displayName,
+    createdAt: r.createdAt,
+    status: r.withdrawnAt ? ('withdrawn' as const)
+      : ['NOMINATED', 'LISTED', 'SUSPENDED'].includes(r.disavowal.status) ? ('submitted' as const) : ('closed' as const),
+  }))
 }
 
 /** A single DPR hides a listing immediately and a REMOVE vote starts. */
@@ -329,6 +400,9 @@ export async function unsuspend(id: string, actor: string): Promise<'ok' | 'not_
   if (!d) return 'not_found'
   if (d.status !== 'SUSPENDED') return 'bad_state'
   const ok = await prisma.$transaction(async tx => {
+    // Lock the open round first, like settleRound, so the two can't deadlock.
+    const open = await tx.disavowRound.findMany({ where: { disavowalId: id, state: 'OPEN' }, select: { id: true } })
+    for (const r of open) await lockRound(tx, r.id)
     const r = await tx.disavowal.updateMany({ where: { id, status: 'SUSPENDED' }, data: { status: 'LISTED' } })
     if (r.count === 0) return false
     await tx.disavowRound.updateMany({ where: { disavowalId: id, kind: 'REMOVE', state: 'OPEN' }, data: { state: 'CANCELLED', closedAt: new Date() } })
@@ -393,7 +467,7 @@ export async function redact(id: string, actor: string, now = new Date()): Promi
   const d = await prisma.disavowal.findUnique({ where: { id }, include: { identifiers: true } })
   if (!d) return 'not_found'
   if (await isSubjectOf(d.identifiers, actor)) return 'conflict'
-  const fields = ['displayName', 'statement', 'evidenceUrls', 'subjectResponse', 'identifiers', 'voteComments']
+  const fields = ['displayName', 'statement', 'evidenceUrls', 'subjectResponse', 'identifiers', 'voteComments', 'submissionNames']
   await prisma.$transaction(async tx => {
     await tx.disavowal.update({
       where: { id },
@@ -410,6 +484,7 @@ export async function redact(id: string, actor: string, now = new Date()): Promi
         await tx.disavowIdentifier.update({ where: { id: i.id }, data: { value: `${REDACTED}:${i.id}` } })
       }
     }
+    await tx.disavowSubmission.updateMany({ where: { disavowalId: id }, data: { displayName: REDACTED } })
     await tx.disavowVote.updateMany({ where: { round: { disavowalId: id }, comment: { not: null } } as never, data: { comment: REDACTED } })
     await logEvent(tx, id, 'REDACTED', actor, { fields })
   })

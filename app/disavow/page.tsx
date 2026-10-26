@@ -3,6 +3,8 @@ import { getLocale } from "next-intl/server";
 import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 import { requireDisavowViewerPage } from "@/app/lib/disavow/access";
 import { listDisavowals } from "@/app/lib/disavow/detail";
+import { listMySubmissions } from "@/app/lib/disavow/store";
+import { WithdrawButton } from "./_components/WithdrawButton";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -13,9 +15,12 @@ export default async function DisavowPage({ searchParams }: { searchParams: Prom
     const sp = await searchParams;
     const t = await getDisavowTranslator();
     const locale = await getLocale();
-    const data = await listDisavowals(sp.tab, sp.page, isDPR, session.discordId);
+    const mineTab = sp.tab === "mine";
+    const data = await listDisavowals(mineTab ? "listed" : sp.tab, sp.page, isDPR, session.discordId);
+    const mine = mineTab ? await listMySubmissions(session.discordId) : [];
+    const activeTab = mineTab ? "mine" : data.tab;
     const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
-    const tabs = isDPR ? ["listed", "open", "suspended", "closed"] : ["listed"];
+    const tabs = isDPR ? ["listed", "open", "suspended", "closed", "mine"] : ["listed", "mine"];
     const pages = Math.max(1, Math.ceil(data.total / data.pageSize));
 
     return (
@@ -28,15 +33,15 @@ export default async function DisavowPage({ searchParams }: { searchParams: Prom
             />
             <p role="note" className={`${paperCard} mb-6 p-4 text-sm`}>{t("banner")}</p>
 
-            {tabs.length > 1 && (
+            {(
                 <div className="mb-5 flex flex-wrap gap-2">
                     {tabs.map((k) => (
                         <Link
                             key={k}
                             href={`/disavow?tab=${k}`}
-                            aria-current={data.tab === k ? "page" : undefined}
+                            aria-current={activeTab === k ? "page" : undefined}
                             className={`inline-flex min-h-9 items-center rounded-full border px-3 py-1.5 text-[13px] font-semibold no-underline ${
-                                data.tab === k ? "border-foreground bg-foreground text-background" : "border-[hsl(var(--rule-warm)/0.65)] bg-card text-foreground"
+                                activeTab === k ? "border-foreground bg-foreground text-background" : "border-[hsl(var(--rule-warm)/0.65)] bg-card text-foreground"
                             }`}
                         >
                             {t(`tabs.${k}`)}
@@ -45,7 +50,27 @@ export default async function DisavowPage({ searchParams }: { searchParams: Prom
                 </div>
             )}
 
-            {data.items.length === 0 ? (
+            {mineTab ? (
+                mine.length === 0 ? (
+                    <EmptyState title={t("empty")} />
+                ) : (
+                    <>
+                        <p className="mb-3 text-sm text-foreground/70">{t("mine.dek")}</p>
+                        <ul className="m-0 flex list-none flex-col gap-3 p-0">
+                            {mine.map((m) => (
+                                <li key={m.id} className={`${paperCard} flex flex-wrap items-center justify-between gap-3 p-4`}>
+                                    <span className="grid gap-1">
+                                        <span className="overline text-tomato-readable">{t(`mine.${m.status}`)}</span>
+                                        <span className="font-display text-lg font-black">{m.displayName}</span>
+                                        <span className="text-sm text-foreground/70">{t("mine.submittedOn", { date: date.format(m.createdAt) })}</span>
+                                    </span>
+                                    {m.status === "submitted" && <WithdrawButton submissionId={m.id} />}
+                                </li>
+                            ))}
+                        </ul>
+                    </>
+                )
+            ) : data.items.length === 0 ? (
                 <EmptyState title={t("empty")} />
             ) : (
                 <ul className="m-0 flex list-none flex-col gap-3 p-0">
@@ -68,7 +93,7 @@ export default async function DisavowPage({ searchParams }: { searchParams: Prom
                 </ul>
             )}
 
-            {pages > 1 && (
+            {!mineTab && pages > 1 && (
                 <nav className="mt-6 flex items-center gap-3" aria-label={t("page", { page: data.page })}>
                     {data.page > 1 && <Link className={pillOutline} href={`/disavow?tab=${data.tab}&page=${data.page - 1}`}>{t("prev")}</Link>}
                     <span className="text-sm">{t("page", { page: data.page })}</span>

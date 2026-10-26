@@ -10,7 +10,7 @@ vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn(async () => []) }))
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn(async () => 9) }))
 vi.mock('@/app/lib/disavow/messages', () => ({ getDisavowTranslator: vi.fn(async () => (k: string) => `T:${k}`) }))
-vi.mock('@/app/lib/disavow/access', () => ({ disavowViewer: vi.fn(async () => ({ allowed: true, isDPR: true })) }))
+vi.mock('@/app/lib/disavow/access', () => ({ disavowViewerCached: vi.fn(async () => ({ allowed: true, isDPR: true })) }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({
   fetchMemberByDiscordId: vi.fn().mockResolvedValue(null),
   fetchMemberById: vi.fn().mockResolvedValue(null),
@@ -35,6 +35,16 @@ describe('/api/session', () => {
     process.env.DISAVOW_ENABLED = 'true'
     const json = await (await sessionGET()).json()
     expect(json).toMatchObject({ canViewDisavow: true, canVoteDisavow: true, disavowNavLabel: 'T:navLabel' })
+  })
+})
+
+describe('/api/session for ineligible viewers', () => {
+  it('has no disavow keys at all (not even false) when the viewer is not allowed', async () => {
+    process.env.DISAVOW_ENABLED = 'true'
+    const { disavowViewerCached } = await import('@/app/lib/disavow/access')
+    vi.mocked(disavowViewerCached).mockResolvedValueOnce({ allowed: false, isDPR: false })
+    const json = await (await sessionGET()).json()
+    expect(Object.keys(json).filter(k => /disavow/i.test(k))).toEqual([])
   })
 })
 

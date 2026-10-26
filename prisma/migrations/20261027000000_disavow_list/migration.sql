@@ -99,3 +99,19 @@ ALTER TABLE "DisavowEvent" ADD CONSTRAINT "DisavowEvent_disavowalId_fkey" FOREIG
 -- At most one OPEN round per disavowal, enforced by the database (Prisma cannot
 -- model partial indexes, so this lives only in SQL).
 CREATE UNIQUE INDEX "DisavowRound_one_open_per_disavowal" ON "DisavowRound"("disavowalId") WHERE "state" = 'OPEN';
+
+-- Per-nominator submission records (original nominator and duplicate submitters).
+CREATE TABLE "DisavowSubmission" (
+    "id" TEXT NOT NULL,
+    "disavowalId" TEXT NOT NULL,
+    "submitterDiscordId" TEXT NOT NULL,
+    "displayName" TEXT NOT NULL,
+    "isOriginal" BOOLEAN NOT NULL DEFAULT false,
+    "withdrawnAt" TIMESTAMP(3),
+    "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+
+    CONSTRAINT "DisavowSubmission_pkey" PRIMARY KEY ("id")
+);
+CREATE UNIQUE INDEX "DisavowSubmission_disavowalId_submitterDiscordId_key" ON "DisavowSubmission"("disavowalId", "submitterDiscordId");
+CREATE INDEX "DisavowSubmission_submitterDiscordId_createdAt_idx" ON "DisavowSubmission"("submitterDiscordId", "createdAt");
+ALTER TABLE "DisavowSubmission" ADD CONSTRAINT "DisavowSubmission_disavowalId_fkey" FOREIGN KEY ("disavowalId") REFERENCES "Disavowal"("id") ON DELETE RESTRICT ON UPDATE CASCADE;

@@ -1,5 +1,6 @@
 import { requireDisavowViewer, disavowNotFound } from '@/app/lib/disavow/access'
 import { getDisavowDetail } from '@/app/lib/disavow/detail'
+import { checkKeyedRateLimit, rateLimitResponse } from '@/app/lib/rate-limit'
 import { out, safe, type Ctx } from '@/app/lib/disavow/http'
 
 export const runtime = 'nodejs'
@@ -9,6 +10,8 @@ export const dynamic = 'force-dynamic'
 export const GET = safe('detail', async (_request: Request, ctx: Ctx) => {
   const g = await requireDisavowViewer()
   if (!g.ok) return g.response
+  const limited = await checkKeyedRateLimit('disavow-detail', g.session.discordId)
+  if (!limited.success) return rateLimitResponse(limited)
   const { id } = await ctx.params
   const d = await getDisavowDetail(id, { discordId: g.session.discordId, isDPR: g.isDPR })
   if (!d) return disavowNotFound()

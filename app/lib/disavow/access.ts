@@ -85,6 +85,24 @@ export async function disavowViewer(discordId: string): Promise<DisavowViewer> {
   }
 }
 
+const VIEWER_CACHE_TTL_MS = 60_000
+const viewerCache = new Map<string, { at: number; v: DisavowViewer }>()
+export function __resetDisavowViewerCache() { viewerCache.clear() }
+
+/**
+ * Same answer as disavowViewer, remembered for 60s per user. ONLY for cosmetic,
+ * frequently polled things (the nav link in /api/session). Every guard that
+ * protects data calls disavowViewer directly, on every request.
+ */
+export async function disavowViewerCached(discordId: string, now = Date.now()): Promise<DisavowViewer> {
+  const hit = viewerCache.get(discordId)
+  if (hit && now - hit.at < VIEWER_CACHE_TTL_MS) return hit.v
+  const v = await disavowViewer(discordId)
+  if (viewerCache.size > 5000) viewerCache.clear()
+  viewerCache.set(discordId, { at: now, v })
+  return v
+}
+
 export async function canViewDisavowList(discordId: string): Promise<boolean> {
   return (await disavowViewer(discordId)).allowed
 }

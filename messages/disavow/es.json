@@ -16,7 +16,8 @@
     "listed": "En la lista",
     "open": "Nominaciones abiertas",
     "suspended": "Suspendidas",
-    "closed": "Cerradas"
+    "closed": "Cerradas",
+    "mine": "Mis nominaciones"
   },
   "reasons": {
     "SCAM": "Estafa",
@@ -74,7 +75,6 @@
     "nominatedBy": "Nominado por un miembro",
     "nominator": "Quién nominó (solo DPR)",
     "redacted": "Partes de esta entrada fueron censuradas.",
-    "withdraw": "Retirar nominación",
     "events": {
       "NOMINATED": "Nominado",
       "ROUND_OPENED": "Votación abierta",
@@ -141,5 +141,13 @@
   "chip": {
     "label": "Desautorizado (privado)"
   },
-  "navLabel": "Lista de desautorizados"
+  "navLabel": "Lista de desautorizados",
+  "mine": {
+    "dek": "Solo tus propios envíos. Aquí no se muestra su resultado.",
+    "submitted": "Enviada",
+    "closed": "Cerrada",
+    "withdrawn": "Retirada",
+    "withdraw": "Retirar",
+    "submittedOn": "Enviada el {date}"
+  }
 }

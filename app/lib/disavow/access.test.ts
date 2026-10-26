@@ -22,7 +22,7 @@ import { getSession } from '@/app/lib/session'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { canReviewMission } from '@/app/lib/mission-review-access'
 import {
-  canViewDisavowList, disavowViewer, requireDisavowDPR, requireDisavowViewer, requireDisavowViewerPage,
+  __resetDisavowViewerCache, canViewDisavowList, disavowViewer, disavowViewerCached, requireDisavowDPR, requireDisavowViewer, requireDisavowViewerPage,
 } from './access'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -30,6 +30,7 @@ const ME = '400000000000000001'
 
 beforeEach(() => {
   vi.clearAllMocks()
+  __resetDisavowViewerCache()
   process.env.DISAVOW_ENABLED = 'true'
   m(getSession).mockResolvedValue({ discordId: ME })
   m(getCurrentLevel).mockResolvedValue(1)
@@ -132,5 +133,21 @@ describe('guards', () => {
     await expect(requireDisavowViewerPage()).rejects.toThrow('NEXT_NOT_FOUND')
     m(getCurrentLevel).mockResolvedValue(5)
     await expect(requireDisavowViewerPage()).resolves.toMatchObject({ isDPR: false })
+  })
+})
+
+describe('disavowViewerCached (nav only)', () => {
+  it('remembers the answer for 60s per user, then looks again; the guards never use it', async () => {
+    m(getCurrentLevel).mockResolvedValue(5)
+    const t0 = 1_000_000
+    expect((await disavowViewerCached(ME, t0)).allowed).toBe(true)
+    m(getCurrentLevel).mockResolvedValue(1)
+    expect((await disavowViewerCached(ME, t0 + 59_000)).allowed).toBe(true)
+    expect((await disavowViewerCached(ME, t0 + 61_000)).allowed).toBe(false)
+    // the guard sees the change immediately
+    m(getCurrentLevel).mockResolvedValue(5)
+    expect((await requireDisavowViewer()).ok).toBe(true)
+    m(getCurrentLevel).mockResolvedValue(1)
+    expect((await requireDisavowViewer()).ok).toBe(false)
   })
 })

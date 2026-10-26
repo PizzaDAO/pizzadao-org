@@ -10,6 +10,8 @@ export interface TallyInput {
   nominatorId: string
   /** Discord ids of the person being voted on (their vote never counts). */
   subjectIds: readonly string[]
+  /** Anyone else who submitted a nomination for this entry (their vote never counts either). */
+  submitterIds?: readonly string[]
   now: Date
   opensAt: Date
   closesAt: Date
@@ -29,7 +31,7 @@ export interface TallyResult {
  * rule serves LIST, REMOVE and REAFFIRM; the caller decides what pass means.
  */
 export function tallyRound(votes: readonly TallyVote[], ctx: TallyInput): TallyResult {
-  const excluded = new Set<string>([ctx.nominatorId, ...ctx.subjectIds])
+  const excluded = new Set<string>([ctx.nominatorId, ...ctx.subjectIds, ...(ctx.submitterIds ?? [])])
   const latest = new Map<string, VoteChoice>()
   for (const v of votes) if (!excluded.has(v.voterDiscordId)) latest.set(v.voterDiscordId, v.choice)
   let yes = 0, no = 0, abstain = 0, recused = 0

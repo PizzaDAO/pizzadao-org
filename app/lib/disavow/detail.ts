@@ -41,6 +41,18 @@ export async function listDisavowals(tabIn: string | null | undefined, pageIn: u
 }
 
 export async function getDisavowDetail(id: string, viewer: { discordId: string; isDPR: boolean }) {
+  // Access checks first, on a light read: nobody who may not see this entry
+  // (its subject, or a non-DPR viewer of a hidden one) can make us settle or log anything.
+  const head = await prisma.disavowal.findUnique({
+    where: { id },
+    select: { id: true, status: true, identifiers: true },
+  })
+  if (!head) return null
+  if (await isSubjectOf(head.identifiers, viewer.discordId)) return null
+  // Non-DPR viewers only ever see LISTED entries. Their own nominations live
+  // under "My nominations", which shows no entry details.
+  if (!viewer.isDPR && head.status !== 'LISTED') return null
+
   const open = await prisma.disavowRound.findMany({ where: { disavowalId: id, state: 'OPEN' }, select: { id: true } })
   for (const r of open) await settleRound(r.id).catch(() => 'pending')
 
@@ -53,11 +65,8 @@ export async function getDisavowDetail(id: string, viewer: { discordId: string; 
     },
   })
   if (!d) return null
-  // The subject of an entry gets a 404 for it, whatever its status.
-  if (await isSubjectOf(d.identifiers, viewer.discordId)) return null
-  const isNominator = d.nominatorDiscordId === viewer.discordId
-  // Non-DPR viewers only ever see LISTED entries (and their own nominations).
-  if (!viewer.isDPR && d.status !== 'LISTED' && !isNominator) return null
+  // Settling may have changed the status (e.g. a removal passed).
+  if (!viewer.isDPR && d.status !== 'LISTED') return null
 
   await recordView(id, viewer.discordId)
 
@@ -75,7 +84,6 @@ export async function getDisavowDetail(id: string, viewer: { discordId: string; 
     listedAt: d.listedAt,
     reviewDueAt: d.reviewDueAt,
     redacted: !!d.redactedAt,
-    isNominator,
     history: d.events
       .filter(e => e.type !== 'VIEWED' && e.type !== 'VOTED' && !(e.data as { duplicate?: boolean } | null)?.duplicate)
       .map(e => ({ type: e.type, at: e.createdAt })),

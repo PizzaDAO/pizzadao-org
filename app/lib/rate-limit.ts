@@ -48,6 +48,7 @@ export const RATE_LIMITS = {
   // Disavow list (plans/disavow-list.md). The real nomination cap is the DB check.
   "disavow-nominate": { limit: 5, windowSec: 60 * 60 },
   "disavow-vote": { limit: 60, windowSec: 10 * 60 },
+  "disavow-detail": { limit: 60, windowSec: 60 },
   "disavow-check": { limit: 120, windowSec: 60 },
 } as const satisfies Record<string, RateLimitRule>;
 

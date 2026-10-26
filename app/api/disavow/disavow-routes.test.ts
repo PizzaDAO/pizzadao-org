@@ -12,7 +12,12 @@ vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
 vi.mock('@/app/lib/mission-review-access', () => ({ DPR_ONLY_MIN_LEVEL: 8, canReviewMission: vi.fn() }))
 vi.mock('@/app/lib/member-utils', () => ({ findMemberByDiscordId: vi.fn(async () => null) }))
 vi.mock('@/app/lib/auth-guards', () => ({ isAdminDiscordId: vi.fn(async () => false) }))
-vi.mock('@/app/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(async () => null) }))
+vi.mock('@/app/lib/rate-limit', () => ({
+  enforceRateLimit: vi.fn(async () => null),
+  checkKeyedRateLimit: vi.fn(async () => ({ success: true, limit: 60, remaining: 59, reset: Date.now() + 1000 })),
+  rateLimitResponse: vi.fn(() => new Response(JSON.stringify({ error: 'slow' }), { status: 429 })),
+}))
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: vi.fn() }))
 vi.mock('@/app/lib/disavow/messages', () => ({
   vouchWarningStrings: vi.fn(async () => ({ title: 't', body: 'b', confirm: 'c', cancel: 'x', view: 'v' })),
 }))
@@ -29,7 +34,7 @@ vi.mock('@/app/lib/disavow/detail', () => ({
   getDisavowDetail: vi.fn(async () => ({ id: 'e1', status: 'LISTED' })),
 }))
 vi.mock('@/app/lib/disavow/store', () => ({
-  nominate: vi.fn(), castVote: vi.fn(), withdraw: vi.fn(), suspend: vi.fn(), unsuspend: vi.fn(),
+  nominate: vi.fn(), castVote: vi.fn(), withdrawSubmission: vi.fn(), listMySubmissions: vi.fn(async () => []), suspend: vi.fn(), unsuspend: vi.fn(),
   openRemoveRound: vi.fn(), redact: vi.fn(), addResponse: vi.fn(), runDisavowCron: vi.fn(),
 }))
 
@@ -38,12 +43,13 @@ import { getSession } from '@/app/lib/session'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { canReviewMission } from '@/app/lib/mission-review-access'
 import { isAdminDiscordId } from '@/app/lib/auth-guards'
-import { enforceRateLimit } from '@/app/lib/rate-limit'
+import { enforceRateLimit, checkKeyedRateLimit } from '@/app/lib/rate-limit'
+import { after } from 'next/server'
 import * as store from '@/app/lib/disavow/store'
 import { GET as listGET, POST as nominatePOST } from './route'
 import { GET as detailGET } from './[id]/route'
 import { POST as votePOST } from './[id]/vote/route'
-import { POST as withdrawPOST } from './[id]/withdraw/route'
+import { POST as withdrawPOST } from './submissions/[sid]/withdraw/route'
 import { POST as suspendPOST } from './[id]/suspend/route'
 import { POST as unsuspendPOST } from './[id]/unsuspend/route'
 import { POST as roundsPOST } from './[id]/rounds/route'
@@ -69,7 +75,7 @@ const ALL: Array<[string, () => Promise<Response>]> = [
   ['POST nominate', () => nominatePOST(req(goodNomination))],
   ['GET detail', () => detailGET(req(), ctx)],
   ['POST vote', () => votePOST(req({ roundId: 'r', choice: 'YES' }), ctx)],
-  ['POST withdraw', () => withdrawPOST(req({}), ctx)],
+  ['POST submission withdraw', () => withdrawPOST(req({}), { params: Promise.resolve({ sid: 's1' }) })],
   ['POST suspend', () => suspendPOST(req({}), ctx)],
   ['POST unsuspend', () => unsuspendPOST(req({}), ctx)],
   ['POST rounds', () => roundsPOST(req({}), ctx)],
@@ -195,6 +201,48 @@ describe('nominate', () => {
     m(enforceRateLimit).mockResolvedValue(new Response('slow', { status: 429 }) as never)
     expect((await nominatePOST(req(goodNomination))).status).toBe(429)
     expect(store.nominate).not.toHaveBeenCalled()
+  })
+})
+
+describe('my nominations and withdrawing', () => {
+  it('the mine tab returns only the caller\'s own submissions (no entry data)', async () => {
+    as(5)
+    m(store.listMySubmissions).mockResolvedValue([{ id: 's1', displayName: 'Randy', createdAt: new Date(), status: 'submitted' }])
+    const r = await listGET(req(undefined, 'https://app.pizzadao.org/api/disavow?tab=mine'))
+    expect(m(store.listMySubmissions).mock.calls[0][0]).toBe(ME)
+    const body = await r.json()
+    expect(body.tab).toBe('mine')
+    expect(Object.keys(body.items[0]).sort()).toEqual(['createdAt', 'displayName', 'id', 'status'])
+  })
+  it('withdrawing: a non-eligible caller gets 404; the owner succeeds; someone else\'s submission is 404', async () => {
+    const sctx = { params: Promise.resolve({ sid: 's1' }) }
+    as(1)
+    expect((await withdrawPOST(req({}), sctx)).status).toBe(404)
+    as(5)
+    m(store.withdrawSubmission).mockResolvedValueOnce('ok')
+    expect((await withdrawPOST(req({}), sctx)).status).toBe(200)
+    expect(m(store.withdrawSubmission).mock.calls[0].slice(0, 2)).toEqual(['s1', ME])
+    m(store.withdrawSubmission).mockResolvedValueOnce('not_found')
+    expect((await withdrawPOST(req({}), sctx)).status).toBe(404)
+  })
+  it('the nomination route defers the slow work with after()', async () => {
+    as(5)
+    m(store.nominate).mockResolvedValue({ ok: true, id: 'n1' })
+    await nominatePOST(req(goodNomination))
+    const arg = m(store.nominate).mock.calls[0][0]
+    expect(typeof arg.defer).toBe('function')
+    const work = vi.fn()
+    arg.defer(work)
+    expect(after).toHaveBeenCalledWith(work)
+  })
+  it('detail views are rate limited per user, after the access check', async () => {
+    as(1)
+    await detailGET(req(), ctx)
+    expect(checkKeyedRateLimit).not.toHaveBeenCalled()
+    as(5)
+    m(checkKeyedRateLimit).mockResolvedValueOnce({ success: false, limit: 60, remaining: 0, reset: Date.now() + 1000 } as never)
+    expect((await detailGET(req(), ctx)).status).toBe(429)
+    expect(checkKeyedRateLimit).toHaveBeenCalledWith('disavow-detail', ME)
   })
 })
 

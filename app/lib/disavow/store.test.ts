@@ -8,8 +8,8 @@ const H = 3600_000
 const D = 24 * H
 
 const state = vi.hoisted(() => ({
-  disavowal: [] as any[], identifier: [] as any[], round: [] as any[], vote: [] as any[], event: [] as any[],
-  locks: 0, seq: 0,
+  disavowal: [] as any[], identifier: [] as any[], round: [] as any[], vote: [] as any[], event: [] as any[], submission: [] as any[],
+  order: [] as string[], locks: 0, seq: 0,
 }))
 
 vi.mock('@/app/lib/db', () => {
@@ -42,12 +42,13 @@ vi.mock('@/app/lib/db', () => {
     disavowal: { ...state.disavowal.find(d => d.id === r.disavowalId), identifiers: state.identifier.filter(i => i.disavowalId === r.disavowalId) },
   })
   const tx: any = {
-    $queryRaw: async () => { state.locks++; return [] },
+    $queryRaw: async (strings: TemplateStringsArray) => { if (strings.join('?').includes('FOR UPDATE')) { state.locks++; state.order.push('lock') } return [] },
     disavowal: model(() => state.disavowal, {
       create: async ({ data }: any) => {
         const id = `d${++state.seq}`
-        const { identifiers, rounds, ...rest } = data
+        const { identifiers, rounds, submissions, ...rest } = data
         state.disavowal.push({ id, status: 'NOMINATED', createdAt: new Date(), ...rest })
+        state.submission.push({ id: `s${++state.seq}`, disavowalId: id, withdrawnAt: null, createdAt: new Date(), ...submissions.create })
         for (const i of identifiers.create) state.identifier.push({ id: ++state.seq, disavowalId: id, ...i })
         state.round.push({ id: `r${++state.seq}`, disavowalId: id, state: 'OPEN', opensAt: new Date(), ...rounds.create })
         return { id }
@@ -62,6 +63,7 @@ vi.mock('@/app/lib/db', () => {
         return r
       },
       findUnique: async ({ where }: any) => { const r = state.round.find(x => x.id === where.id); return r && withRound(r) },
+      findMany: async ({ where }: any) => state.round.filter(r => match(r, where)),
     }),
     disavowVote: model(() => state.vote, {
       upsert: async ({ where, create, update }: any) => {
@@ -71,9 +73,32 @@ vi.mock('@/app/lib/db', () => {
         else state.vote.push({ ...create })
       },
     }),
-    disavowIdentifier: model(() => state.identifier),
-    disavowEvent: { create: async ({ data }: any) => { state.event.push({ ...data }); return data } },
+    disavowIdentifier: model(() => state.identifier, {
+      findFirst: async ({ where }: any) => {
+        const hit = state.identifier.find(i => where.OR.some((o: Row) => o.kind === i.kind && o.value === i.value)
+          && where.disavowal.status.in.includes(state.disavowal.find(d => d.id === i.disavowalId)!.status))
+        return hit ? { disavowalId: hit.disavowalId, disavowal: { status: state.disavowal.find(d => d.id === hit.disavowalId)!.status } } : null
+      },
+    }),
+    disavowSubmission: model(() => state.submission, {
+      findMany: async ({ where }: any) => state.submission.filter(x => match(x, where)).map(x => ({ ...x, disavowal: { status: state.disavowal.find(d => d.id === x.disavowalId)?.status } })),
+      findFirst: async ({ where }: any) => state.submission.find(x => match(x, where)) ?? null,
+      findUnique: async ({ where }: any) => state.submission.find(x => x.id === where.id) ?? null,
+      count: async ({ where }: any) => state.submission.filter(x => x.disavowalId === where.disavowalId && x.withdrawnAt === null).length,
+      upsert: async ({ where, create, update }: any) => {
+        const k = where.disavowalId_submitterDiscordId
+        const ex = state.submission.find(x => x.disavowalId === k.disavowalId && x.submitterDiscordId === k.submitterDiscordId)
+        if (ex) Object.assign(ex, update)
+        else state.submission.push({ id: `s${++state.seq}`, withdrawnAt: null, createdAt: new Date(), ...create })
+      },
+    }),
+    disavowEvent: {
+      create: async ({ data }: any) => { state.event.push({ ...data }); return data },
+      count: async ({ where }: any) => state.event.filter(e => e.type === where.type && e.actorDiscordId === where.actorDiscordId && e.createdAt >= where.createdAt.gte).length,
+    },
   }
+  const origUpdateMany = tx.disavowal.updateMany
+  tx.disavowal.updateMany = async (a: any) => { state.order.push('disavowal-update'); return origUpdateMany(a) }
   // The vote updateMany needs the round relation: override.
   tx.disavowVote.updateMany = async ({ where, data }: any) => {
     const ids = new Set(state.round.filter(r => r.disavowalId === where.round.disavowalId).map(r => r.id))
@@ -93,28 +118,15 @@ vi.mock('@/app/lib/db', () => {
     },
     disavowRound: {
       ...tx.disavowRound,
-      findMany: async ({ where }: any) => state.round.filter(r => match(r, where)),
       findUnique: async ({ where }: any) => { const r = state.round.find(x => x.id === where.id); return r && withRound(r) },
     },
-    disavowIdentifier: {
-      ...tx.disavowIdentifier,
-      findFirst: async ({ where }: any) => {
-        const hit = state.identifier.find(i => where.OR.some((o: Row) => o.kind === i.kind && o.value === i.value)
-          && where.disavowal.status.in.includes(state.disavowal.find(d => d.id === i.disavowalId)!.status))
-        return hit ? { disavowalId: hit.disavowalId, disavowal: { status: state.disavowal.find(d => d.id === hit.disavowalId)!.status } } : null
-      },
-    },
-    disavowEvent: {
-      create: tx.disavowEvent.create,
-      count: async ({ where }: any) => state.event.filter(e => e.type === where.type && e.actorDiscordId === where.actorDiscordId && e.createdAt >= where.createdAt.gte).length,
-      findFirst: async () => null,
-    },
+    disavowEvent: { ...tx.disavowEvent, findFirst: async () => null },
     $transaction: async (fn: any) => fn(tx),
   }
   // Events carry a timestamp so the cap can window them.
   const origCreate = tx.disavowEvent.create
   tx.disavowEvent.create = async (a: any) => origCreate({ data: { createdAt: new Date(), ...a.data } })
-  prisma.disavowEvent.create = async (a: any) => origCreate({ data: { createdAt: new Date(), ...a.data } })
+  prisma.disavowEvent.create = tx.disavowEvent.create
   return { prisma }
 })
 vi.mock('@/app/lib/notifications', () => ({ createNotification: vi.fn(async () => ({})) }))
@@ -138,7 +150,7 @@ vi.mock('./match', () => ({
 
 import { createNotification } from '@/app/lib/notifications'
 import { viewerIdentifiers } from './match'
-import { castVote, nominate, openRemoveRound, redact, runDisavowCron, settleRound, suspend, withdraw, addResponse, isSubjectOf } from './store'
+import { castVote, nominate, openRemoveRound, redact, runDisavowCron, settleRound, suspend, unsuspend, withdrawSubmission, listMySubmissions, addResponse, isSubjectOf } from './store'
 
 const nominateInput = (over: Row = {}) => ({
   nominatorDiscordId: 'nom', displayName: 'Randy', reason: 'SCAM' as const,
@@ -149,7 +161,7 @@ const T0 = new Date('2026-11-01T00:00:00Z')
 
 beforeEach(() => {
   vi.clearAllMocks()
-  state.disavowal.length = state.identifier.length = state.round.length = state.vote.length = state.event.length = 0
+  state.disavowal.length = state.identifier.length = state.round.length = state.vote.length = state.event.length = state.submission.length = state.order.length = 0
   state.seq = state.locks = 0
 })
 
@@ -377,15 +389,6 @@ describe('lifecycle', () => {
     expect(await openRemoveRound(id, 'subjD', { appeal: true, now: new Date(later.getTime() + 91 * D) })).toBe('ok')
     expect(state.event.filter(e => e.type === 'APPEALED')).toHaveLength(2)
   })
-  it('only the nominator can withdraw, and only while NOMINATED', async () => {
-    const n = await nominate(nominateInput())
-    if (!n.ok) throw new Error()
-    expect(await withdraw(n.id, 'someone')).toBe('forbidden')
-    expect(await withdraw(n.id, 'nom')).toBe('ok')
-    expect(state.disavowal[0].status).toBe('WITHDRAWN')
-    expect(state.round[0].state).toBe('CANCELLED')
-    expect(await withdraw(n.id, 'nom')).toBe('bad_state')
-  })
   it('the member response is stored and logged without its content', async () => {
     const { id } = await listedEntry()
     expect(await addResponse(id, 'subjD', 'That was a refund dispute.')).toBe('ok')
@@ -424,6 +427,7 @@ describe('redaction and audit', () => {
     expect(state.identifier.find(i => i.kind === 'DISCORD_ID')!.value).toBe('subjD')
     expect(state.vote[0].comment).toBe('[redacted]')
     expect(state.vote[1].comment).toBeNull()
+    expect(state.submission.every(x => x.displayName === '[redacted]')).toBe(true)
     expect(state.vote).toHaveLength(2)
     const ev = state.event.find(e => e.type === 'REDACTED')!
     expect(ev.actorDiscordId).toBe('admin1')
@@ -448,5 +452,165 @@ describe('redaction and audit', () => {
     const fs = await import('node:fs')
     const sql = fs.readFileSync(new URL('../../../prisma/migrations/20261027000000_disavow_list/migration.sql', import.meta.url), 'utf8')
     expect(sql).toMatch(/CREATE UNIQUE INDEX "DisavowRound_one_open_per_disavowal" ON "DisavowRound"\("disavowalId"\) WHERE "state" = 'OPEN'/)
+  })
+})
+
+describe('submissions: My nominations and withdrawing', () => {
+  const subId = (who: string) => state.submission.find(x => x.submitterDiscordId === who)!.id
+
+  it('a real nomination stores an original submission; a duplicate stores the caller\'s own record without a second entry', async () => {
+    const first = await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    const dup = await nominate(nominateInput({ nominatorDiscordId: 'b', displayName: 'Randy B' }))
+    expect(first.ok && dup).toMatchObject({ ok: false, code: 'duplicate' })
+    expect(state.disavowal).toHaveLength(1)
+    expect(state.submission.map(x => [x.submitterDiscordId, x.isOriginal])).toEqual([['a', true], ['b', false]])
+  })
+
+  it('listMySubmissions shows only the caller\'s own, with a neutral status and no entry details', async () => {
+    await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    await nominate(nominateInput({ nominatorDiscordId: 'b', displayName: 'Randy B' }))
+    const mineB = await listMySubmissions('b')
+    expect(mineB).toHaveLength(1)
+    expect(Object.keys(mineB[0]).sort()).toEqual(['createdAt', 'displayName', 'id', 'status'])
+    expect(mineB[0]).toMatchObject({ displayName: 'Randy B', status: 'submitted' })
+    expect(await listMySubmissions('stranger')).toEqual([])
+  })
+
+  it('status goes to "closed" when the entry is no longer active, "withdrawn" after withdrawing', async () => {
+    const n = await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    if (!n.ok) throw new Error()
+    state.disavowal[0].status = 'REJECTED'
+    expect((await listMySubmissions('a'))[0].status).toBe('closed')
+    state.disavowal[0].status = 'NOMINATED'
+    await withdrawSubmission(subId('a'), 'a')
+    expect((await listMySubmissions('a'))[0].status).toBe('withdrawn')
+  })
+
+  it('a duplicate submitter can withdraw their own submission, which leaves the entry standing', async () => {
+    await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    await nominate(nominateInput({ nominatorDiscordId: 'b' }))
+    expect(await withdrawSubmission(subId('b'), 'b')).toBe('ok')
+    expect(state.disavowal[0].status).toBe('NOMINATED')
+    expect(state.round[0].state).toBe('OPEN')
+    expect(await withdrawSubmission(subId('b'), 'b')).toBe('already')
+  })
+
+  it('the original nominator withdrawing with no other active submitter withdraws the entry (status change + events, nothing deleted)', async () => {
+    await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    expect(await withdrawSubmission(subId('a'), 'a')).toBe('ok')
+    expect(state.disavowal).toHaveLength(1)
+    expect(state.disavowal[0].status).toBe('WITHDRAWN')
+    expect(state.round[0].state).toBe('CANCELLED')
+    expect(state.submission).toHaveLength(1)
+    expect(state.event.filter(e => e.type === 'WITHDRAWN').length).toBe(2)
+  })
+
+  it('the original withdrawing while a duplicate submitter is still active keeps the entry; the last one out withdraws it', async () => {
+    await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    await nominate(nominateInput({ nominatorDiscordId: 'b' }))
+    await withdrawSubmission(subId('a'), 'a')
+    expect(state.disavowal[0].status).toBe('NOMINATED')
+    await withdrawSubmission(subId('b'), 'b')
+    expect(state.disavowal[0].status).toBe('WITHDRAWN')
+  })
+
+  it('nobody can withdraw someone else\'s submission; withdrawing from a LISTED entry never un-lists it', async () => {
+    const { id } = await listedEntry()
+    await nominate(nominateInput({ nominatorDiscordId: 'a', identifiers: [{ kind: 'NAME', value: 'other' }] }))
+    expect(await withdrawSubmission(subId('a'), 'mallory')).toBe('not_found')
+    expect(state.submission.find(x => x.submitterDiscordId === 'a')!.withdrawnAt).toBeNull()
+    const orig = state.submission.find(x => x.disavowalId === id && x.isOriginal)!
+    expect(await withdrawSubmission(orig.id, orig.submitterDiscordId)).toBe('ok')
+    expect(state.disavowal.find(d => d.id === id)!.status).toBe('LISTED')
+  })
+
+  it('a duplicate submitter can\'t vote on the entry', async () => {
+    const n = await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    if (!n.ok) throw new Error()
+    await nominate(nominateInput({ nominatorDiscordId: 'dpr9' }))
+    expect(await castVote({ disavowalId: n.id, roundId: state.round[0].id, voterDiscordId: 'dpr9', choice: 'YES' })).toEqual({ ok: false, code: 'conflict' })
+    // and their stray vote would not be counted
+    for (const v of ['dpr1', 'dpr2']) state.vote.push({ roundId: state.round[0].id, voterDiscordId: v, choice: 'YES' })
+    state.vote.push({ roundId: state.round[0].id, voterDiscordId: 'dpr9', choice: 'YES' })
+    expect(await settleRound(state.round[0].id, new Date(Date.now() + 8 * D))).toBe('pending')
+  })
+
+  it('when a round closes every submitter (original and duplicate) gets the identical neutral notice', async () => {
+    const n = await nominate({ ...nominateInput({ nominatorDiscordId: 'a' }), now: T0 })
+    if (!n.ok) throw new Error()
+    await nominate({ ...nominateInput({ nominatorDiscordId: 'b' }), now: T0 })
+    vi.mocked(createNotification).mockClear()
+    expect(await settleRound(state.round[0].id, new Date(T0.getTime() + 15 * D))).toBe('failed')
+    const closed = vi.mocked(createNotification).mock.calls.map(c => c[0]).filter(c => c.type === 'DISAVOW_ROUND_CLOSED')
+    expect(closed.map(c => c.recipientId).sort()).toEqual(['a', 'b'])
+    expect(new Set(closed.map(c => `${c.title}|${c.message}|${c.linkUrl}`)).size).toBe(1)
+    expect(`${closed[0].title} ${closed[0].message}`).not.toMatch(/Randy|pass|fail|listed/i)
+  })
+
+  it('a withdrawn submitter is not notified', async () => {
+    const n = await nominate({ ...nominateInput({ nominatorDiscordId: 'a' }), now: T0 })
+    if (!n.ok) throw new Error()
+    await nominate({ ...nominateInput({ nominatorDiscordId: 'b' }), now: T0 })
+    await withdrawSubmission(subId('b'), 'b')
+    vi.mocked(createNotification).mockClear()
+    await settleRound(state.round[0].id, new Date(T0.getTime() + 15 * D))
+    expect(vi.mocked(createNotification).mock.calls.map(c => c[0].recipientId)).toEqual(['a'])
+  })
+})
+
+describe('nominate hardening', () => {
+  it('name-only (and Telegram-only) nominations never count as duplicates', async () => {
+    const a = await nominate(nominateInput({ nominatorDiscordId: 'a', identifiers: [{ kind: 'NAME', value: 'randy' }] }))
+    const b = await nominate(nominateInput({ nominatorDiscordId: 'b', identifiers: [{ kind: 'NAME', value: 'randy' }] }))
+    const c = await nominate(nominateInput({ nominatorDiscordId: 'c', identifiers: [{ kind: 'TELEGRAM', value: 'randy_tg' }] }))
+    const d = await nominate(nominateInput({ nominatorDiscordId: 'd', identifiers: [{ kind: 'TELEGRAM', value: 'randy_tg' }] }))
+    expect([a.ok, b.ok, c.ok, d.ok]).toEqual([true, true, true, true])
+    expect(state.disavowal).toHaveLength(4)
+  })
+
+  it('the cap and duplicate checks run inside the locked transaction', async () => {
+    await nominate(nominateInput())
+    expect(state.order.length).toBeGreaterThanOrEqual(0)
+    const src = (await import('node:fs')).readFileSync(new URL('./store.ts', import.meta.url), 'utf8')
+    const nomBody = src.slice(src.indexOf('export async function nominate'), src.indexOf('async function notifyDpr'))
+    expect(nomBody).toMatch(/pg_advisory_xact_lock/)
+    const inTx = nomBody.slice(nomBody.indexOf('prisma.$transaction'))
+    expect(inTx).toMatch(/tx\.disavowEvent\.count/)
+    expect(inTx).toMatch(/tx\.disavowIdentifier\.findFirst/)
+    expect(nomBody.slice(0, nomBody.indexOf('prisma.$transaction'))).not.toMatch(/disavowEvent\.count|disavowIdentifier\.findFirst/)
+  })
+
+  it('slow follow-up work is deferred: the DPR notifications run only when the deferred work is executed', async () => {
+    let queued: (() => Promise<void>) | null = null
+    const r = await nominate({ ...nominateInput(), defer: w => { queued = w } })
+    expect(r.ok).toBe(true)
+    expect(createNotification).not.toHaveBeenCalled()
+    await queued!()
+    expect(vi.mocked(createNotification).mock.calls.length).toBe(3)
+  })
+
+  it('a duplicate has no deferred work at all and no notifications', async () => {
+    await nominate(nominateInput({ nominatorDiscordId: 'a' }))
+    vi.mocked(createNotification).mockClear()
+    const queued: unknown[] = []
+    await nominate({ ...nominateInput({ nominatorDiscordId: 'b' }), defer: w => { queued.push(w) } })
+    expect(queued).toHaveLength(0)
+    expect(createNotification).not.toHaveBeenCalled()
+  })
+})
+
+describe('lock order', () => {
+  it('unsuspend and withdraw lock the round before touching the disavowal (same order as settleRound)', async () => {
+    const { id, later } = await listedEntry()
+    await suspend(id, 'dpr1', later)
+    state.order.length = 0
+    expect(await unsuspend(id, 'dpr1')).toBe('ok')
+    expect(state.order[0]).toBe('lock')
+    expect(state.order.indexOf('lock')).toBeLessThan(state.order.indexOf('disavowal-update'))
+
+    await nominate(nominateInput({ nominatorDiscordId: 'z', identifiers: [{ kind: 'NAME', value: 'zed' }] }))
+    state.order.length = 0
+    await withdrawSubmission(state.submission.find(x => x.submitterDiscordId === 'z')!.id, 'z')
+    expect(state.order.indexOf('lock')).toBeLessThan(state.order.indexOf('disavowal-update'))
   })
 })

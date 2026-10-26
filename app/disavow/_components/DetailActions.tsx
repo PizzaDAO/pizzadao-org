@@ -15,15 +15,14 @@ interface RoundView {
     comments: Array<{ choice: string; comment: string | null }>;
 }
 
-/** DPR voting panel and moderation buttons; nominators only get Withdraw. */
+/** DPR voting panel and moderation buttons. */
 export function DetailActions({
-    disavowalId, status, rounds, hasOpenRound, nominatorOnly = false,
+    disavowalId, status, rounds, hasOpenRound,
 }: {
     disavowalId: string;
     status: string;
     rounds: RoundView[];
     hasOpenRound: boolean;
-    nominatorOnly?: boolean;
 }) {
     const t = useTranslations("disavow");
     const router = useRouter();
@@ -52,17 +51,6 @@ export function DetailActions({
         } finally {
             setBusy(false);
         }
-    }
-
-    if (nominatorOnly) {
-        return (
-            <section className={`${paperCard} mb-5 p-5`}>
-                <button type="button" disabled={busy} className={`${pillOutline} cursor-pointer`} onClick={() => post("withdraw")}>
-                    {t("detail.withdraw")}
-                </button>
-                {message && <p role="alert" className="mb-0 mt-2 text-sm">{message}</p>}
-            </section>
-        );
     }
 
     const open = rounds.filter((r) => r.state === "OPEN");

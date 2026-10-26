@@ -16,7 +16,8 @@
     "listed": "Inscrits",
     "open": "Propositions ouvertes",
     "suspended": "Suspendus",
-    "closed": "Clos"
+    "closed": "Clos",
+    "mine": "Mes propositions"
   },
   "reasons": {
     "SCAM": "Arnaque",
@@ -74,7 +75,6 @@
     "nominatedBy": "Proposé par un membre",
     "nominator": "Auteur de la proposition (DPR uniquement)",
     "redacted": "Des parties de cette entrée ont été caviardées.",
-    "withdraw": "Retirer la proposition",
     "events": {
       "NOMINATED": "Proposé",
       "ROUND_OPENED": "Vote ouvert",
@@ -141,5 +141,13 @@
   "chip": {
     "label": "Désavoué (privé)"
   },
-  "navLabel": "Liste de désaveu"
+  "navLabel": "Liste de désaveu",
+  "mine": {
+    "dek": "Uniquement vos propres envois. Leur issue n'est pas affichée ici.",
+    "submitted": "Envoyée",
+    "closed": "Clôturée",
+    "withdrawn": "Retirée",
+    "withdraw": "Retirer",
+    "submittedOn": "Envoyée le {date}"
+  }
 }

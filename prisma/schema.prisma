@@ -372,9 +372,28 @@ model Disavowal {
   identifiers        DisavowIdentifier[]
   rounds             DisavowRound[]
   events             DisavowEvent[]
+  submissions        DisavowSubmission[]
 
   @@index([status])
   @@index([nominatorDiscordId, createdAt])
+}
+
+// One row per person who submitted a nomination for an entry (the original
+// nominator, plus anyone whose submission was a duplicate of a hidden entry).
+// It is what "My nominations" and withdrawing work from, so a non-DPR member
+// never needs to see the entry itself.
+model DisavowSubmission {
+  id                 String    @id @default(cuid())
+  disavowalId        String
+  submitterDiscordId String
+  displayName        String
+  isOriginal         Boolean   @default(false)
+  withdrawnAt        DateTime?
+  createdAt          DateTime  @default(now())
+  disavowal          Disavowal @relation(fields: [disavowalId], references: [id])
+
+  @@unique([disavowalId, submitterDiscordId])
+  @@index([submitterDiscordId, createdAt])
 }
 
 model DisavowIdentifier {
@@ -388,6 +407,12 @@ model DisavowIdentifier {
   @@index([kind, value])
 }
 
+// NOTE: the database also has a partial unique index that Prisma cannot model:
+//   CREATE UNIQUE INDEX "DisavowRound_one_open_per_disavowal"
+//     ON "DisavowRound"("disavowalId") WHERE "state" = 'OPEN';
+// (at most one OPEN round per disavowal; see migration 20261027000000_disavow_list).
+// It exists only in SQL. `prisma migrate dev` may try to drop it as drift: do not
+// accept that; keep it in every future migration's baseline.
 model DisavowRound {
   id          String            @id @default(cuid())
   disavowalId String

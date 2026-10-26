@@ -16,7 +16,8 @@
     "listed": "Listed",
     "open": "Open nominations",
     "suspended": "Suspended",
-    "closed": "Closed"
+    "closed": "Closed",
+    "mine": "My nominations"
   },
   "reasons": {
     "SCAM": "Scam",
@@ -74,7 +75,6 @@
     "nominatedBy": "Nominated by a member",
     "nominator": "Nominator (DPR only)",
     "redacted": "Parts of this entry were redacted.",
-    "withdraw": "Withdraw nomination",
     "events": {
       "NOMINATED": "Nominated",
       "ROUND_OPENED": "Vote opened",
@@ -141,5 +141,13 @@
   "chip": {
     "label": "Disavowed (private)"
   },
-  "navLabel": "Disavow list"
+  "navLabel": "Disavow list",
+  "mine": {
+    "dek": "Only your own submissions. Their outcome is not shown here.",
+    "submitted": "Submitted",
+    "closed": "Closed",
+    "withdrawn": "Withdrawn",
+    "withdraw": "Withdraw",
+    "submittedOn": "Submitted {date}"
+  }
 }

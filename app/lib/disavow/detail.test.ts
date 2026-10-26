@@ -18,7 +18,7 @@ vi.mock('./match', () => ({
 }))
 
 import { prisma } from '@/app/lib/db'
-import { isSubjectOf, recordView } from './store'
+import { isSubjectOf, recordView, settleRound } from './store'
 import { getDisavowDetail, listDisavowals } from './detail'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -54,10 +54,20 @@ describe('getDisavowDetail', () => {
     expect(d!.history).toHaveLength(1)
     expect(d).not.toHaveProperty('nominatorDiscordId')
   })
-  it('non-DPR cannot see a NOMINATED entry unless they nominated it', async () => {
+  it('non-DPR cannot see a NOMINATED entry, not even the nominator (they use My nominations)', async () => {
     m(prisma.disavowal.findUnique).mockResolvedValue(entry())
     expect(await getDisavowDetail('e1', { discordId: 'viewer', isDPR: false })).toBeNull()
-    expect(await getDisavowDetail('e1', { discordId: 'nom', isDPR: false })).not.toBeNull()
+    expect(await getDisavowDetail('e1', { discordId: 'nom', isDPR: false })).toBeNull()
+    expect(await getDisavowDetail('e1', { discordId: 'dpr', isDPR: true })).not.toBeNull()
+  })
+  it('access is checked before anything is settled or logged', async () => {
+    m(prisma.disavowal.findUnique).mockResolvedValue(entry())
+    m(prisma.disavowRound.findMany).mockResolvedValue([{ id: 'r1' }])
+    m(isSubjectOf).mockResolvedValue(true)
+    await getDisavowDetail('e1', { discordId: 'me', isDPR: true })
+    await getDisavowDetail('e1', { discordId: 'viewer', isDPR: false }) // hidden NOMINATED entry
+    expect(settleRound).not.toHaveBeenCalled()
+    expect(recordView).not.toHaveBeenCalled()
   })
 })
 

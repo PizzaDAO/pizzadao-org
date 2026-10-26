@@ -9,7 +9,7 @@ import { canReviewAnyMission } from "@/app/lib/mission-review-access";
 import { canManageShopRoles } from "@/app/lib/shop-admin-auth";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 import { disavowEnabled } from "@/app/lib/disavow/constants";
-import { disavowViewer } from "@/app/lib/disavow/access";
+import { disavowViewerCached } from "@/app/lib/disavow/access";
 import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 
 export const runtime = "nodejs";
@@ -72,18 +72,18 @@ export async function GET() {
 
   // Disavow list: only computed while the feature flag is on; fails closed.
   // Never present (not even false) when the flag is off, so nothing hints at it.
-  let disavowFlags: { canViewDisavow: boolean; canVoteDisavow: boolean; disavowNavLabel?: string } | null = null;
+  let disavowFlags: { canViewDisavow: true; canVoteDisavow: boolean; disavowNavLabel: string } | null = null;
   if (disavowEnabled()) {
-    const v = await disavowViewer(session.discordId);
-    disavowFlags = { canViewDisavow: v.allowed, canVoteDisavow: v.allowed && v.isDPR };
-    // Localized server-side for eligible viewers only: the disavow strings are
-    // not in the root catalog, so nobody else ever receives them.
+    // Cached 60s per user: this endpoint is polled. Data guards never use the cache.
+    const v = await disavowViewerCached(session.discordId);
     if (v.allowed) {
+      // Present only for eligible viewers (never a `false`), with the label
+      // localized server-side: the disavow strings are not in the root catalog.
+      let label = "Disavow list";
       try {
-        disavowFlags.disavowNavLabel = (await getDisavowTranslator())("navLabel");
-      } catch {
-        disavowFlags.disavowNavLabel = "Disavow list";
-      }
+        label = (await getDisavowTranslator())("navLabel");
+      } catch { /* keep the English fallback */ }
+      disavowFlags = { canViewDisavow: true, canVoteDisavow: v.isDPR, disavowNavLabel: label };
     }
   }
 
