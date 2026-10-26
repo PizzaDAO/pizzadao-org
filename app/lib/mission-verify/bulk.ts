@@ -19,12 +19,12 @@
  * settleLevels WOULD pay.
  */
 import { prisma } from '../db'
-import { paidLevelOf } from '../missions'
+import { computeCurrentLevel, paidLevelOf } from '../missions'
 import { getSheetData } from '../sheets/member-repository'
 import { runVerifiers, type MissionRow, type RunReport } from './engine'
 import { defaultSources } from './sources'
 import { getVerifier } from './verifiers'
-import type { VerifierSources, VerifyCtx, VouchRow } from './types'
+import type { ReceivedVouchRow, VerifierSources, VerifyCtx, VouchRow } from './types'
 
 export interface LevelInfo {
   level: number
@@ -204,12 +204,20 @@ export interface BatchData {
   legacyAuto: Array<{ discordId: string; missionId: number; evidence: string | null }>
   /** Vouches given, by voucher memberId (L5.2 vouch_given). */
   vouches: Map<string, VouchRow[]>
+  /** Vouches received, by the vouched member's memberId (L4.2 vouch_received). */
+  vouchesReceived: Map<string, ReceivedVouchRow[]>
+  /** Active missions (id + level), for the working level of the L5.3 box check. */
+  missions: Array<{ id: number; level: number }>
 }
 
 /** The per-member data for a batch, one query per table. */
-export async function prefetchBatch(discordIds: string[], memberIds: Map<string, string> | null): Promise<BatchData> {
+export async function prefetchBatch(
+  discordIds: string[],
+  memberIds: Map<string, string> | null,
+  missions: Array<{ id: number; level: number }> = [],
+): Promise<BatchData> {
   const members = discordIds.map((d) => memberIds?.get(d)).filter((m): m is string => !!m)
-  const [x, calls, wallets, completions, rewards, vouches] = await Promise.all([
+  const [x, calls, wallets, completions, rewards, vouches, received] = await Promise.all([
     prisma.xAccount.findMany({ where: { discordId: { in: discordIds } }, select: { discordId: true, xUsername: true } }),
     prisma.callAttendance.groupBy({ by: ['discordId', 'crewId'], where: { discordId: { in: discordIds } }, _count: { _all: true } }),
     prisma.memberWallet.findMany({
@@ -230,6 +238,12 @@ export async function prefetchBatch(discordIds: string[], memberIds: Map<string,
           select: { followerId: true, followeeId: true, source: true, createdAt: true },
         })
       : Promise.resolve([]),
+    members.length
+      ? prisma.vouch.findMany({
+          where: { followeeId: { in: members } },
+          select: { followerId: true, followeeId: true, source: true, createdAt: true },
+        })
+      : Promise.resolve([]),
   ])
 
   const data: BatchData = {
@@ -240,6 +254,13 @@ export async function prefetchBatch(discordIds: string[], memberIds: Map<string,
     paidLevels: new Map(),
     legacyAuto: [],
     vouches: new Map(),
+    vouchesReceived: new Map(),
+    missions,
+  }
+  for (const v of received ?? []) {
+    const list = data.vouchesReceived.get(v.followeeId) ?? []
+    list.push({ followerId: v.followerId, source: v.source, createdAt: v.createdAt })
+    data.vouchesReceived.set(v.followeeId, list)
   }
   for (const v of vouches ?? []) {
     const list = data.vouches.get(v.followerId) ?? []
@@ -287,6 +308,10 @@ export function batchSources(base: VerifierSources, data: BatchData, guildRoles:
     getMemberRoles: async (id) => (guildRoles ? (guildRoles.get(id) ?? []) : null),
     countWallets: async (id) => data.wallets.get(id) ?? 0,
     getVouchesGiven: async (memberId) => data.vouches.get(memberId) ?? [],
+    getVouchesReceived: async (memberId) => data.vouchesReceived.get(memberId) ?? [],
+    // The same rule as getCurrentLevel, from the prefetched approvals and payouts.
+    getWorkingLevel: async (id) =>
+      computeCurrentLevel(data.missions, data.approved.get(id) ?? new Set(), data.paidLevels.get(id) ?? new Set()),
   }
 }
 
@@ -319,7 +344,9 @@ export interface CheckManyOptions {
 /** Run the engine for a batch of members (see the module comment). Never throws for one member. */
 export async function checkMany(discordIds: string[], opts: CheckManyOptions): Promise<MemberOutcome[]> {
   const { ctx } = opts
-  const data = await prefetchBatch(discordIds, ctx.memberIds)
+  // The catalog is passed in (no mission query); the working level is computed from it.
+  const missionLevels = ctx.catalog.levels.flatMap((l) => l.missionIds.map((id) => ({ id, level: l.level })))
+  const data = await prefetchBatch(discordIds, ctx.memberIds, missionLevels)
   const sources = batchSources(ctx.sources ?? defaultSources, data, ctx.guildRoles)
   const now = opts.now ?? new Date()
   const levelReward = new Map(ctx.catalog.levels.map((l) => [l.level, l.reward]))

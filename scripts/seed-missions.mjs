@@ -46,11 +46,13 @@ const missions = [
 
   // Level 4 - Do some dirty work (3,141 PEP)
   { level: 4, index: 0, title: 'Make a POAP for a community call', description: 'Create a POAP (Proof of Attendance Protocol) for one of the community calls.', reward: 3141, levelTitle: 'Do some dirty work', verifierKey: 'poap_drop', verifierParams: {}, proofKind: 'URL' },
+  { level: 4, index: 2, title: 'Get vouched by a member', description: 'Get at least one vouch from another PizzaDAO member: ask a member to open your profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.', reward: 3141, levelTitle: 'Do some dirty work', verifierKey: 'vouch_received', verifierParams: { min: 1, sources: ['PIZZADAO'] } },
 
   // Level 5 - Do a favor for the mafia (4,269 PEP)
   { level: 5, index: 0, title: 'Join three crew calls', description: 'Attend three crew calls in total: any crews, and community calls count too.', reward: 4269, levelTitle: 'Do a favor for the mafia', verifierKey: 'attendance_count', verifierParams: { min: 3, crews: 'any', distinct: 'call' } },
   { level: 5, index: 1, title: 'Do a selfie interview', description: 'Record and share a selfie interview about your PizzaDAO experience.', reward: 4269, levelTitle: 'Do a favor for the mafia', verifierKey: 'media_proof', verifierParams: { kinds: ['youtube', 'x', 'drive', 'loom'] }, proofKind: 'URL' },
   { level: 5, index: 2, title: 'Vouch for another member', description: 'Vouch for another PizzaDAO member: open their profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.', reward: 4269, levelTitle: 'Do a favor for the mafia', verifierKey: 'vouch_given', verifierParams: { min: 1, sources: ['PIZZADAO'] } },
+  { level: 5, index: 3, title: 'Own a Rare Pizza Box', description: 'Hold a Rare Pizza Box NFT in a wallet connected to your PizzaDAO profile. Checked automatically once you are on level 5. Get one from the Rare Pizza Box collection on OpenSea (the link is on this mission).', reward: 4269, levelTitle: 'Do a favor for the mafia', verifierKey: 'rare_pizza_box', verifierParams: { minLevel: 5 } },
 
   // Level 6 - Street Muscle (6,942 PEP)
   { level: 6, index: 0, title: 'Join Pepperoni Mafia', description: 'Become a member of the Pepperoni Mafia.', reward: 6942, levelTitle: 'Street Muscle', verifierKey: 'discord_role', verifierParams: { roleIds: ['823266914834841610'] } },

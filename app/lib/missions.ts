@@ -60,6 +60,25 @@ export async function getPaidLevels(discordId: string): Promise<Set<number>> {
 }
 
 /**
+ * What this user was actually paid for missions: the levels paid and the PEP
+ * total, from the MISSION_REWARD ledger (the source of truth for "earned").
+ */
+export async function getPaidSummary(discordId: string): Promise<{ levels: Set<number>; pep: number }> {
+  const rows = await prisma.transaction.findMany({
+    where: { userId: discordId, type: 'MISSION_REWARD' },
+    select: { metadata: true, description: true, amount: true },
+  })
+  const levels = new Set<number>()
+  let pep = 0
+  for (const row of rows ?? []) {
+    const level = paidLevelOf(row)
+    if (level !== null) levels.add(level)
+    pep += Number.isFinite(row.amount) ? row.amount : 0
+  }
+  return { levels, pep }
+}
+
+/**
  * Bulk "has completed `level`" for many members (computeCurrentLevel > level:
  * every level up to it is fully approved or already paid, in order). Three
  * queries per 1000 ids. Returns the ids that completed it.
@@ -255,13 +274,9 @@ export async function submitMissionCompletion(
     )
   }
 
-  // Check that previous levels are completed. (Automatic verification ignores
-  // this gate: it needs no effort from the member, and payouts still go in
-  // level order, see settleLevels.)
-  const currentLevel = await getCurrentLevel(discordId)
-  if (mission.level > currentLevel) {
-    throw new ValidationError(`You must complete Level ${currentLevel} before starting Level ${mission.level}`)
-  }
+  // Any level can be submitted at any time (Community Call, 2026-10-26): the
+  // level itself is still earned in order (computeCurrentLevel stops at the
+  // first incomplete level) and its reward is paid in order (settleLevels).
 
   // Nothing is approved on submit: the submission is PENDING. When automatic
   // verification is on (MISSION_VERIFIERS_ENABLED) the submit route then runs
@@ -651,6 +666,14 @@ export async function settleLevels(discordId: string): Promise<number[]> {
     if (paid.has(level)) continue
     if (!byLevel.get(level)!.every(id => approvedIds.has(id))) break
     if (await checkAndAwardLevelReward(discordId, level)) paidNow.push(level)
+  }
+  if (paidNow.length) {
+    // The member just reached a new level: the verifiers that only run once
+    // they are on it (Rare Pizza Box at level 5) and the vouch check run now,
+    // not at the next nightly. Terminates: a second pass pays nothing new.
+    const recheck = () =>
+      import('./mission-verify/events').then(m => m.emitMissionEvent(discordId, 'level_reached')).catch(() => {})
+    try { after(recheck) } catch { void recheck() }
   }
   return paidNow
 }

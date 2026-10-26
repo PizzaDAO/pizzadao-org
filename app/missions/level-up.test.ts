@@ -33,4 +33,11 @@ describe('levelUpToCelebrate', () => {
     expect(levelUpToCelebrate(snap(5), 4)?.isFinal).toBe(true) // all 4 done
     expect(levelUpToCelebrate(snap(2), 1)).toMatchObject({ level: 2, levelTitle: 'Pizza Noob', reward: 69, isFinal: false })
   })
+
+  it('counts only levels whose reward was really paid (ledger), never an unpaid or old one', () => {
+    // Level 3 is done but its payout has not landed; level 1 was paid and celebrated long ago.
+    expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2] }, 3)).toEqual({ level: 4, levelTitle: null, reward: 0, isFinal: true })
+    expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2, 3] }, 3)).toEqual({ level: 4, levelTitle: null, reward: 1337, isFinal: true })
+    expect(levelUpToCelebrate({ ...snap(4), paidLevels: [1, 2] }, 2)).toMatchObject({ reward: 420 })
+  })
 })

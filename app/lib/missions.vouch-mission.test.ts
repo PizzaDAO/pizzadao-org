@@ -31,7 +31,9 @@ const MISSIONS = MISSION_VERIFIER_CONFIG.map((c) => ({
   isActive: true,
 }))
 const VOUCH = 52
-const BEFORE_VOUCH = MISSIONS.filter((m) => m.level < 5 || m.id === 50 || m.id === 51).map((m) => m.id) // L1-L4 + L5.0 + L5.1
+const BOX = 53 // L5.3 Own a Rare Pizza Box (added later still)
+const GOT_VOUCHED = 42 // L4.2 Get vouched by a member
+const BEFORE_VOUCH = MISSIONS.filter((m) => (m.level < 5 && m.id !== GOT_VOUCHED) || m.id === 50 || m.id === 51).map((m) => m.id) // L1-L4 (without L4.2) + L5.0 + L5.1
 
 let approved: number[]
 let ledger: Array<{ metadata?: unknown; description?: string }>
@@ -56,7 +58,7 @@ beforeEach(() => {
 
 describe('L5.2 vouch mission added to level 5', () => {
   it('the config adds it at L5 index 2 with the shared L5 reward', () => {
-    expect(MISSIONS.filter((m) => m.level === 5).map((m) => [m.id, m.reward])).toEqual([[50, 4269], [51, 4269], [VOUCH, 4269]])
+    expect(MISSIONS.filter((m) => m.level === 5).map((m) => [m.id, m.reward])).toEqual([[50, 4269], [51, 4269], [VOUCH, 4269], [BOX, 4269]])
   })
 
   it('a member already PAID for level 5 stays complete (level 6) and is never paid again', async () => {
@@ -87,7 +89,7 @@ describe('L5.2 vouch mission added to level 5', () => {
     expect(await settleLevels('u')).toEqual([])
     expect(prisma.economy.update).not.toHaveBeenCalled()
 
-    approved = [...BEFORE_VOUCH, VOUCH]
+    approved = [...BEFORE_VOUCH, VOUCH, BOX]
     expect(await getCurrentLevel('u')).toBe(6)
     expect(await settleLevels('u')).toEqual([5])
   })

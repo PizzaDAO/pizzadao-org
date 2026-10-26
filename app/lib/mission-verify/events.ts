@@ -9,6 +9,8 @@
  *
  * No-op while MISSION_VERIFIERS_ENABLED is off. Never throws.
  */
+import { clearBoxCache } from '../rare-pizza-box'
+import { fetchMemberIdByDiscordId } from '../sheets/member-repository'
 import { runVerifiers, type RunReport } from './engine'
 import { announceMissionResults } from './notify'
 import { missionVerifiersEnabled } from './policy'
@@ -17,11 +19,13 @@ import type { MissionEvent } from './types'
 /** Which verifiers an event can change; null = all of them. */
 const EVENT_VERIFIERS: Record<MissionEvent, string[] | null> = {
   x_linked: ['x_linked'],
-  wallet_connected: ['wallet_connected'],
+  wallet_connected: ['wallet_connected', 'rare_pizza_box'],
   attendance_synced: ['attendance_count'],
   crew_joined: null,
   referral_created: ['referral'],
   vouch_created: ['vouch_given'],
+  vouch_received: ['vouch_received'],
+  level_reached: ['rare_pizza_box', 'vouch_received'],
 }
 
 export async function emitMissionEvent(
@@ -32,6 +36,11 @@ export async function emitMissionEvent(
   if (!discordId || !missionVerifiersEnabled()) return null
   try {
     const keys = EVENT_VERIFIERS[event]
+    // A wallet was just connected: a cached "no box" is stale, look again.
+    if (event === 'wallet_connected') {
+      const memberId = opts.memberId ?? (await fetchMemberIdByDiscordId(discordId).catch(() => null))
+      if (memberId) await clearBoxCache(memberId).catch(() => {})
+    }
     const report = await runVerifiers(discordId, {
       trigger: 'event',
       ...(keys ? { verifierKeys: keys } : {}),

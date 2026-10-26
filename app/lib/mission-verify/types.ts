@@ -13,7 +13,7 @@
 export type Trigger = 'on_demand' | 'discord' | 'event' | 'submit' | 'cron' | 'backfill'
 
 /** Events that re-run the verifiers for one member (route hooks). */
-export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created' | 'vouch_created'
+export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created' | 'vouch_created' | 'vouch_received' | 'level_reached'
 
 export interface VerifyCtx {
   discordId: string
@@ -98,6 +98,18 @@ export interface VerifierSources {
    * Discord ID). L5.2 "Vouch for another member".
    */
   getVouchesGiven(memberId: string): Promise<VouchRow[]>
+  /**
+   * Vouches this member received (Vouch, keyed by member ID). L4.2 "Get
+   * vouched by a member".
+   */
+  getVouchesReceived(memberId: string): Promise<ReceivedVouchRow[]>
+  /**
+   * The level the member is working on (getCurrentLevel). The Rare Pizza Box
+   * check (an Alchemy call) only runs once they are at the mission's level.
+   */
+  getWorkingLevel(discordId: string): Promise<number>
+  /** Rare Pizza Box NFT held on any of the member's wallets; 'error' = could not check (never "no"). */
+  holdsRarePizzaBox(memberId: string): Promise<'yes' | 'no' | 'error'>
   /** Duplicate-account signal kinds (AccountSignal) that involve both Discord accounts. */
   sharedSignalKinds(a: string, b: string): Promise<string[]>
   /** Farcaster accounts linked to the member (SocialAccount; fid when resolved). */
@@ -129,6 +141,13 @@ export interface VouchRow {
   /** The member ID vouched for. */
   followeeId: string
   /** VouchSource: PIZZADAO (vouched in the app), FARCASTER / TWITTER (imported follows). */
+  source: string
+  createdAt: Date
+}
+
+export interface ReceivedVouchRow {
+  /** The member ID that vouched. */
+  followerId: string
   source: string
   createdAt: Date
 }

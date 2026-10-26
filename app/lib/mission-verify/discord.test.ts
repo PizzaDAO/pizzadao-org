@@ -163,6 +163,15 @@ describe('renderMissionsEmbed', () => {
     expect(e.description).not.toContain('Link X') // level 1 is done
   })
 
+  it('earned PEP is what the ledger paid, not "levels below the current one"', () => {
+    // Level 2 is current but level 1 was never paid (or was paid a different amount).
+    const paid = buildMissionsView({ ...overview, paidLevels: [], earnedPep: 0 }, report())
+    expect(paid.earned).toBe(0)
+    const some = buildMissionsView({ ...overview, paidLevels: [1], earnedPep: 70 }, report())
+    expect(some.earned).toBe(70)
+    expect(renderMissionsEmbed(some, { currency: '$PEP' }).description).toContain('Earned from missions: $PEP 70')
+  })
+
   it('says so when automatic checks are off', () => {
     const e = renderMissionsEmbed(buildMissionsView(overview, report({ enabled: false, dryRun: true })))
     expect(e.description).toMatch(/not switched on yet/)

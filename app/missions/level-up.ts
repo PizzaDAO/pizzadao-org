@@ -2,15 +2,24 @@
 //
 // `currentLevel` is "highest completed level + 1" and `lastCelebratedLevel`
 // is stored in the same units (the level reached when the last celebration
-// fired), so every level L with lastCelebratedLevel <= L < currentLevel was
-// completed but never celebrated: e.g. approved by a reviewer while the
-// member wasn't on the page. They are folded into ONE modal: the level
-// reached, its title, and the PEP the newly completed levels paid.
+// fired). Every level L with lastCelebratedLevel <= L < currentLevel is a
+// level the member got past since then, e.g. approved by a reviewer while they
+// weren't on the page. They are folded into ONE modal: the level reached, its
+// title, and the PEP those levels actually paid. When the snapshot carries
+// `paidLevels` (the MISSION_REWARD ledger), only levels in it count toward the
+// PEP shown, so a level whose payout is still pending, or a mission added to an
+// already-paid level, is never shown as newly earned.
 
 export type LevelUpSnapshot = {
   levels: ReadonlyArray<{ level: number; title: string | null; reward: number }>;
   currentLevel: number;
   levelTitle: string | null;
+  /**
+   * Levels whose reward was really paid (the ledger). When given, only those
+   * count as newly earned PEP: a level whose missions are done but whose
+   * payout hasn't landed (or was paid long ago) is never shown as earned now.
+   */
+  paidLevels?: ReadonlyArray<number>;
 };
 
 export type LevelUp = {
@@ -31,6 +40,7 @@ export function levelUpToCelebrate(snapshot: LevelUpSnapshot, lastCelebratedLeve
   const from = Math.max(lastCelebratedLevel, 1);
   const reward = levels
     .filter((l) => l.level >= from && l.level < currentLevel)
+    .filter((l) => !snapshot.paidLevels || snapshot.paidLevels.includes(l.level))
     .reduce((sum, l) => sum + (Number.isFinite(l.reward) ? l.reward : 0), 0);
   const maxLevel = levels.reduce((max, l) => Math.max(max, l.level), 0);
 

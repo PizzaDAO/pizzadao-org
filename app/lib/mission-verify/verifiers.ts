@@ -10,6 +10,8 @@
  *   referral          L3.1  a friend this member invited finished onboarding (Phase 4, D4)
  *   discord_role      L6.0  holds the Pepperoni Mafia role; L7.0 holds the "Crew Leader" role
  *                     (D12; MISSION_CREW_LEADER_ROLE overrides). L6+ always needs a human release (D9).
+ *   vouch_received    L4.2  received at least `min` vouches from OTHER members (PizzaDAO-native by default)
+ *   rare_pizza_box    L5.3  holds a Rare Pizza Box NFT (checked once the member is working on level 5)
  *   vouch_given       L5.2  vouched for at least `min` OTHER members (PizzaDAO-native vouches by default)
  *   wallet_connected  catalog: at least one wallet linked
  *   manual            L8.0: never run, always a human (Dread Pizza Roberts)
@@ -238,6 +240,62 @@ export const vouchGiven: Verifier<{ min: number; sources: string[] }> = {
   },
 }
 
+/**
+ * L4.2 "Get vouched by a member". Passes once `min` other members have vouched
+ * for this member (Vouch rows where they are the one vouched for). Self-vouches
+ * never count; `sources` defaults to PIZZADAO only, like vouch_given.
+ */
+export const vouchReceived: Verifier<{ min: number; sources: string[] }> = {
+  key: 'vouch_received',
+  mode: 'auto',
+  stateful: false,
+  parse: vouchGiven.parse,
+  async check(ctx, { min, sources }) {
+    const hint = (left: number) =>
+      `Ask ${left === 1 ? 'a member' : `${left} members`} to vouch for you: they open your profile and tap Vouch. Your vouches are listed on /vouches.`
+    if (!ctx.memberId) return fail('No PizzaDAO member profile yet', 'Finish onboarding first, then ask a member to vouch for you.', { have: 0, need: min })
+    const rows = await ctx.sources.getVouchesReceived(ctx.memberId)
+    const counted = [
+      ...new Set(rows.filter((r) => r.followerId && r.followerId !== ctx.memberId && sources.includes(r.source)).map((r) => r.followerId)),
+    ]
+    if (counted.length >= min) return { status: 'pass', evidence: { vouches: counted.length, need: min, members: counted.slice(0, 5) } }
+    return fail(`${counted.length}/${min} vouches received`, hint(min - counted.length), { have: counted.length, need: min })
+  },
+}
+
+/**
+ * L5.3 "Own a Rare Pizza Box". Passes when a wallet linked to the member holds
+ * a Rare Pizza Box (strict Alchemy check). Fail-safe: a failed lookup is
+ * 'unknown' (nothing written, retried on the next check), never a "no". The
+ * lookup only runs once the member is working on level `minLevel` (default 5),
+ * so lower-level members never cost an Alchemy call.
+ */
+export const rarePizzaBox: Verifier<{ minLevel: number }> = {
+  key: 'rare_pizza_box',
+  mode: 'auto',
+  stateful: true, // selling the box later flags the mission, it never claws back a level
+  parse: (p) => ({ minLevel: positiveInt(asObject(p).minLevel, 'minLevel', 5) }),
+  async check(ctx, { minLevel }) {
+    if (!ctx.memberId) return fail('No PizzaDAO member profile yet', 'Finish onboarding and connect the wallet that holds your Rare Pizza Box.')
+    let level = ctx.memo.get('workingLevel') as number | undefined
+    if (level === undefined) {
+      try {
+        level = await ctx.sources.getWorkingLevel(ctx.discordId)
+      } catch {
+        return { status: 'unknown', reason: 'Could not read your level' }
+      }
+      ctx.memo.set('workingLevel', level)
+    }
+    if (level < minLevel) {
+      return fail(`Not on level ${minLevel} yet`, `Finish the earlier levels first. Then connect the wallet that holds a Rare Pizza Box and check again.`)
+    }
+    const held = await ctx.sources.holdsRarePizzaBox(ctx.memberId)
+    if (held === 'error') return { status: 'unknown', reason: 'Could not check your wallets for a Rare Pizza Box right now. Try again in a minute.' }
+    if (held === 'yes') return { status: 'pass', evidence: { holds: true } }
+    return fail('No Rare Pizza Box found', 'Connect the wallet that holds your Rare Pizza Box to your profile (or get one on OpenSea), then check again.')
+  },
+}
+
 export const walletConnected: Verifier<{ min: number }> = {
   key: 'wallet_connected',
   mode: 'auto',
@@ -269,7 +327,7 @@ async function memberRoles(ctx: VerifyCtx): Promise<string[] | null> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const VERIFIERS: Record<string, Verifier<any>> = Object.fromEntries(
-  [xLinked, attendanceCount, discordRole, discordMessage, referral, vouchGiven, walletConnected, manual, ...SEMI_VERIFIERS].map((v) => [v.key, v]),
+  [xLinked, attendanceCount, discordRole, discordMessage, referral, vouchGiven, vouchReceived, rarePizzaBox, walletConnected, manual, ...SEMI_VERIFIERS].map((v) => [v.key, v]),
 )
 
 export function getVerifier(key: string | null | undefined): Verifier<unknown> | null {

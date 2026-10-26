@@ -41,6 +41,11 @@ describe('POST /api/vouches/add -> vouch_created hook', () => {
     expect(emitMissionEvent).toHaveBeenCalledWith(ME.discordId, 'vouch_created', { memberId: '42' })
   })
 
+  it('also re-runs the vouched member\'s vouch_received verifier (L4.2), so they pass right away', async () => {
+    await POST(req({ targetMemberId: '7' }))
+    expect(emitMissionEvent).toHaveBeenCalledWith('500000000000000007', 'vouch_received', { memberId: '7' })
+  })
+
   it('no hook for a self-vouch, an unknown member or a duplicate', async () => {
     expect((await POST(req({ targetMemberId: '42' }))).status).toBe(400)
     expect((await POST(req({ targetMemberId: '999' }))).status).toBe(404)

@@ -302,3 +302,20 @@ async function fetchAllWalletsFromSheet(): Promise<
     return [];
   }
 }
+
+/**
+ * EVM wallets for a member, strictly read-only: the DB rows, or (when there
+ * are none) the members-sheet wallet. Unlike getWalletForMember it never
+ * caches the sheet wallet into the DB, and a sheet read failure THROWS (the
+ * caller reports "could not check" rather than "no wallet").
+ */
+export async function getEvmWalletsReadOnly(memberId: string): Promise<string[]> {
+  const db = await getEvmWalletsForMember(memberId);
+  if (db.length > 0) return db;
+  const sheet = await getMembersSheet();
+  const idxWallet = membersColumn(sheet, MEMBER_COLUMNS.wallet);
+  if (idxWallet == null) return [];
+  const row = findMemberRow(sheet, memberId);
+  const val = row ? cellText(row.c?.[idxWallet]) : "";
+  return val && val.startsWith("0x") ? [val] : [];
+}

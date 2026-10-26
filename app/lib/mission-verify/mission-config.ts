@@ -14,7 +14,8 @@
  * verifier pre-checks it on submit (MissionCompletion.checkResult) and a
  * reviewer approves with one click. They never approve on their own.
  *
- * Missions added after the seed (L5.2 "Vouch for another member") carry an
+ * Missions added after the seed (L4.2 "Get vouched by a member", L5.2 "Vouch for
+ * another member", L5.3 "Own a Rare Pizza Box") carry an
  * `insert` block: the migration INSERTs the row when (level, index) is
  * missing, so it is idempotent. MISSION_LEVEL_TITLES sets Mission.levelTitle
  * on every row of those levels (the level's display name and the reward
@@ -55,7 +56,10 @@ export const MISSION_LEVEL_TITLES: Readonly<Record<number, string>> = {
   6: 'Street Muscle', // unchanged from prod; pinned so every L6 row carries it
 }
 
-/** L5's shared per-level reward (the new L5.2 row must match it). */
+/** L4's shared per-level reward (the new L4.2 row must match it). */
+export const LEVEL_4_REWARD = 3141
+
+/** L5's shared per-level reward (the new L5.2 and L5.3 rows must match it). */
 export const LEVEL_5_REWARD = 4269
 
 export const PEPPERONI_MAFIA_ROLE_ID = '823266914834841610'
@@ -120,6 +124,18 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     proofKind: 'URL',
   },
   {
+    level: 4,
+    index: 2, // new: not in the seed, INSERTed by the migration
+    seedTitle: 'Get vouched by a member',
+    description:
+      'Get at least one vouch from another PizzaDAO member: ask a member to open your profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.',
+    // Only PizzaDAO-native vouches, like L5.2 (vouch_given).
+    verifierKey: 'vouch_received',
+    verifierParams: { min: 1, sources: ['PIZZADAO'] },
+    proofKind: 'NONE',
+    insert: { reward: LEVEL_4_REWARD },
+  },
+  {
     level: 5,
     index: 0,
     seedTitle: 'Join three crew calls',
@@ -147,6 +163,17 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     // Only PizzaDAO-native vouches: FARCASTER / TWITTER rows are imported follows, not a vouch made here.
     verifierKey: 'vouch_given',
     verifierParams: { min: 1, sources: ['PIZZADAO'] },
+    proofKind: 'NONE',
+    insert: { reward: LEVEL_5_REWARD },
+  },
+  {
+    level: 5,
+    index: 3, // new: not in the seed, INSERTed by the migration
+    seedTitle: 'Own a Rare Pizza Box',
+    description:
+      'Hold a Rare Pizza Box NFT in a wallet connected to your PizzaDAO profile. Checked automatically once you are on level 5. Get one from the Rare Pizza Box collection on OpenSea (the link is on this mission).',
+    verifierKey: 'rare_pizza_box',
+    verifierParams: { minLevel: 5 },
     proofKind: 'NONE',
     insert: { reward: LEVEL_5_REWARD },
   },

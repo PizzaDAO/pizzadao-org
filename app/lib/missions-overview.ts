@@ -7,10 +7,13 @@
  * client refetch after a submission agree.
  */
 
-import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle } from "@/app/lib/missions";
+import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle, getPaidSummary } from "@/app/lib/missions";
 import { getCachedMissionsList, setCachedMissionsList } from "@/app/lib/mission-cache";
+import { acceptsManualSubmission } from "@/app/lib/mission-verify/policy";
 import { getVerifier } from "@/app/lib/mission-verify/verifiers";
 import { PROOF_HINTS } from "@/app/lib/mission-verify/proof-links";
+import { BOX_PURCHASE_URL } from "@/app/lib/box-mafia";
+import { PIZZA_BOX_LINK } from "@/app/lib/rare-pizza-box";
 import { inviteUrl } from "@/app/lib/referral-link";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
@@ -47,11 +50,18 @@ export type MissionsOverview = {
       proofHint?: string;
       /** L3.1 "Invite a friend": the mission that shows the viewer's invite link. */
       referral?: boolean;
+      /** L5.3 "Own a Rare Pizza Box": where to get one (an extra link on the card). */
+      getBoxUrl?: string;
+      /** Checked automatically with nothing to submit: no submit form (the submit API refuses it too). */
+      noManualSubmit?: boolean;
       progress: MissionProgress | null;
     }[];
   }[];
   currentLevel: number;
   levelTitle: string | null;
+  /** Levels whose reward was actually paid (the MISSION_REWARD ledger), and the PEP total. */
+  paidLevels: number[];
+  earnedPep: number;
   isAuthenticated: boolean;
   /** The viewer's personal invite link (/join?ref=<memberId>), when signed in and onboarded. */
   inviteUrl?: string | null;
@@ -62,11 +72,16 @@ export async function getMissionsOverview(discordId: string | null | undefined):
   let currentLevel = 1;
   let levelTitle: string | null = null;
   let myInviteUrl: string | null = null;
+  let paidLevels: number[] = [];
+  let earnedPep = 0;
 
   if (discordId) {
     const progress = await getUserMissionProgress(discordId);
     currentLevel = await getCurrentLevel(discordId);
     levelTitle = await getLevelTitle(currentLevel);
+    const paid = await getPaidSummary(discordId);
+    paidLevels = [...paid.levels].sort((a, b) => a - b);
+    earnedPep = paid.pep;
     const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null);
     myInviteUrl = memberId ? inviteUrl(memberId) : null;
     for (const p of progress) {
@@ -96,11 +111,13 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         ...(getVerifier(m.verifierKey)?.mode === "semi" ? { semiChecked: true } : {}),
         ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
         ...(m.verifierKey === "referral" ? { referral: true } : {}),
+        ...(acceptsManualSubmission({ verifierKey: m.verifierKey, proofKind: m.proofKind }) ? {} : { noManualSubmit: true }),
+        ...(m.verifierKey === "rare_pizza_box" ? { getBoxUrl: BOX_PURCHASE_URL || PIZZA_BOX_LINK } : {}),
         progress: progressMap[m.id] || null,
       })),
     }));
     if (!discordId) setCachedMissionsList(levels);
   }
 
-  return { levels, currentLevel, levelTitle, isAuthenticated: !!discordId, inviteUrl: myInviteUrl };
+  return { levels, currentLevel, levelTitle, paidLevels, earnedPep, isAuthenticated: !!discordId, inviteUrl: myInviteUrl };
 }

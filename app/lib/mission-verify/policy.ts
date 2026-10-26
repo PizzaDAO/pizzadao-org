@@ -1,3 +1,4 @@
+import { getVerifier } from './verifiers'
 /**
  * Rollout flag and payout policy for automatic mission verification.
  *
@@ -56,4 +57,21 @@ export const HOLD_LABEL: Record<MissionHold, string> = {
   NEW_ACCOUNT: 'Discord account under 30 days old',
   HIGH_LEVEL: 'Level 6+ needs a human approval',
   PREVIOUSLY_REJECTED: 'Rejected before; the verifier now passes',
+}
+
+/**
+ * Whether a member may submit this mission by hand. An automatic verifier with
+ * no proof to submit (proofKind NONE: the vouch received, Rare Pizza Box, role,
+ * attendance missions...) is checked by "Check my progress" and the nightly run,
+ * never by a reviewer: a manual submission would only clog the review queue.
+ * L3.1 referral is the exception (its description invites a manual submission
+ * for invites made before referrals were tracked).
+ */
+export function acceptsManualSubmission(mission: {
+  verifierKey: string | null | undefined
+  proofKind: string | null | undefined
+}): boolean {
+  if (!mission.verifierKey || mission.verifierKey === 'referral') return true
+  if ((mission.proofKind ?? 'NONE') !== 'NONE') return true
+  return getVerifier(mission.verifierKey)?.mode !== 'auto'
 }

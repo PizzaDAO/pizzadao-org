@@ -6,6 +6,8 @@ import { prisma } from '../db'
 import { lookupGuildMembership } from '../discord'
 import { getChannel, getChannelMessage, resolveChannelId } from '../discord-channels'
 import { getGuildRoles } from '../discord-interactions/guild-roles'
+import { getCurrentLevel } from '../missions'
+import { checkRarePizzaBox } from '../rare-pizza-box'
 import type { VerifierSources } from './types'
 
 export const defaultSources: VerifierSources = {
@@ -83,6 +85,19 @@ export const defaultSources: VerifierSources = {
       take: 200,
     })
   },
+
+  async getVouchesReceived(memberId) {
+    return prisma.vouch.findMany({
+      where: { followeeId: memberId },
+      select: { followerId: true, source: true, createdAt: true },
+      orderBy: { createdAt: 'asc' },
+      take: 200,
+    })
+  },
+
+  getWorkingLevel: (discordId) => getCurrentLevel(discordId),
+
+  holdsRarePizzaBox: (memberId) => checkRarePizzaBox(memberId),
 
   async sharedSignalKinds(a, b) {
     const rows = await prisma.accountSignal

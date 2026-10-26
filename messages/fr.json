@@ -637,6 +637,11 @@
       "ariaLabel": "Suggestion Box Mafia"
     }
   },
+  "missionLinks": {
+    "boxHint": "Cette mission nécessite une Rare Pizza Box NFT dans un wallet connecté à ton profil.",
+    "getBox": "Obtenir une Rare Pizza Box",
+    "bonus": "Bonus : ce niveau est déjà terminé. Cette mission est facultative et ne rapporte rien de plus."
+  },
   "crewsPage": {
     "joined": "Inscrit",
     "viewCrew": "Voir l’équipe",

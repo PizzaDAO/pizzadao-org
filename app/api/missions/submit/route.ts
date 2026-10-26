@@ -8,7 +8,7 @@ import { UnauthorizedError, ValidationError } from '@/app/lib/errors/api-errors'
 import { invalidateProgressCache } from '@/app/lib/mission-cache'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { runVerifiers } from '@/app/lib/mission-verify/engine'
-import { missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
+import { acceptsManualSubmission, missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
 import { announceMissionResults } from '@/app/lib/mission-verify/notify'
 import { reviewCardsEnabled, syncReviewCardsFor } from '@/app/lib/mission-verify/review-cards'
 import { isPrecheckedMission, precheckProof, storeCheckResult } from '@/app/lib/mission-verify/precheck'
@@ -50,8 +50,11 @@ const POST_HANDLER = async (request: NextRequest) => {
   // reviewer. Missions without a verifier only get a link preview.
   const mission = await prisma.mission.findUnique({
     where: { id: missionId },
-    select: { verifierKey: true, verifierParams: true, isActive: true, level: true },
+    select: { verifierKey: true, verifierParams: true, isActive: true, level: true, proofKind: true },
   })
+  if (mission && !acceptsManualSubmission(mission)) {
+    throw new ValidationError('This mission is checked automatically. Use "Check my progress" once you have done it.')
+  }
   const precheck =
     mission?.isActive && isPrecheckedMission(mission.verifierKey)
       ? await precheckProof({ discordId: session.discordId, memberId: memberId ?? null, mission, evidence })

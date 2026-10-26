@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Each verifier against mocked data sources: no DB, no Discord, no Google.
 import { describe, it, expect, vi, afterEach } from 'vitest'
-import { VERIFIERS, attendanceCount, discordMessage, discordRole, referral, vouchGiven, walletConnected, xLinked, manual } from './verifiers'
+import { VERIFIERS, attendanceCount, discordMessage, discordRole, referral, vouchGiven, vouchReceived, rarePizzaBox, walletConnected, xLinked, manual } from './verifiers'
 import type { VerifierSources, VerifyCtx } from './types'
 
 const ME = '300000000000000001'
@@ -22,6 +22,9 @@ function sources(over: Partial<VerifierSources> = {}): VerifierSources {
     countWallets: vi.fn(async () => 0),
     getReferrals: vi.fn(async () => []),
     getVouchesGiven: vi.fn(async () => []),
+    getVouchesReceived: vi.fn(async () => []),
+    getWorkingLevel: vi.fn(async () => 1),
+    holdsRarePizzaBox: vi.fn(async () => 'no' as const),
     sharedSignalKinds: vi.fn(async () => []),
     getFarcasterAccounts: vi.fn(async () => []),
     getTelegramUsername: vi.fn(async () => null),
@@ -46,7 +49,7 @@ describe('registry', () => {
   it('has the Phase 1 + Phase 4 verifiers; only "manual" is never run, the semi ones never approve', () => {
     expect(Object.keys(VERIFIERS).sort()).toEqual(
       [
-        'attendance_count', 'discord_message', 'discord_role', 'manual', 'referral', 'vouch_given', 'wallet_connected', 'x_linked',
+        'attendance_count', 'discord_message', 'discord_role', 'manual', 'referral', 'vouch_given', 'vouch_received', 'rare_pizza_box', 'wallet_connected', 'x_linked',
         'social_post', 'poap_drop', 'media_proof', 'gpp_host',
       ].sort(),
     )
@@ -311,5 +314,70 @@ describe('vouch_given (L5.2)', () => {
     const src = sources()
     expect(await vouchGiven.check(ctx(src, { memberId: null }), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
     expect(src.getVouchesGiven).not.toHaveBeenCalled()
+  })
+})
+
+describe('vouch_received (L4.2)', () => {
+  const params = vouchReceived.parse({ min: 1, sources: ['PIZZADAO'] })
+  const got = (followerId: string, source = 'PIZZADAO') => ({ followerId, source, createdAt: new Date(0) })
+
+  it('is automatic, stateless, and defaults to PizzaDAO-native vouches', () => {
+    expect(vouchReceived.mode).toBe('auto')
+    expect(vouchReceived.parse({})).toEqual({ min: 1, sources: ['PIZZADAO'] })
+  })
+
+  it('fails with no vouch, passes with one from another member', async () => {
+    expect(await vouchReceived.check(ctx(sources()), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
+    const src = sources({ getVouchesReceived: vi.fn(async () => [got('m-2')]) })
+    expect(await vouchReceived.check(ctx(src), params)).toEqual({ status: 'pass', evidence: { vouches: 1, need: 1, members: ['m-2'] } })
+    expect(src.getVouchesReceived).toHaveBeenCalledWith('m-1')
+  })
+
+  it('ignores self-vouches and imported Farcaster / X follows by default', async () => {
+    const src = sources({ getVouchesReceived: vi.fn(async () => [got('m-1'), got('m-2', 'FARCASTER'), got('m-3', 'TWITTER')]) })
+    expect(await vouchReceived.check(ctx(src), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
+    expect(await vouchReceived.check(ctx(src), vouchReceived.parse({ sources: ['PIZZADAO', 'FARCASTER'] }))).toMatchObject({ status: 'pass' })
+  })
+
+  it('counts a voucher once, and needs a member profile', async () => {
+    const src = sources({ getVouchesReceived: vi.fn(async () => [got('m-2'), got('m-2')]) })
+    expect(await vouchReceived.check(ctx(src), vouchReceived.parse({ min: 2 }))).toMatchObject({ status: 'fail', progress: { have: 1, need: 2 } })
+    const none = sources()
+    expect(await vouchReceived.check(ctx(none, { memberId: null }), params)).toMatchObject({ status: 'fail' })
+    expect(none.getVouchesReceived).not.toHaveBeenCalled()
+  })
+})
+
+describe('rare_pizza_box (L5.3)', () => {
+  const params = rarePizzaBox.parse({ minLevel: 5 })
+
+  it('is automatic and defaults to level 5', () => {
+    expect(rarePizzaBox.mode).toBe('auto')
+    expect(rarePizzaBox.parse({})).toEqual({ minLevel: 5 })
+  })
+
+  it('does not look up the box (no Alchemy call) below level 5', async () => {
+    const src = sources({ getWorkingLevel: vi.fn(async () => 3), holdsRarePizzaBox: vi.fn(async () => 'yes' as const) })
+    expect(await rarePizzaBox.check(ctx(src), params)).toMatchObject({ status: 'fail' })
+    expect(src.holdsRarePizzaBox).not.toHaveBeenCalled()
+  })
+
+  it('passes on level 5 with a box, fails (not unknown) with none', async () => {
+    const yes = sources({ getWorkingLevel: vi.fn(async () => 5), holdsRarePizzaBox: vi.fn(async () => 'yes' as const) })
+    expect(await rarePizzaBox.check(ctx(yes), params)).toEqual({ status: 'pass', evidence: { holds: true } })
+    expect(yes.holdsRarePizzaBox).toHaveBeenCalledWith('m-1')
+    const no = sources({ getWorkingLevel: vi.fn(async () => 5), holdsRarePizzaBox: vi.fn(async () => 'no' as const) })
+    expect(await rarePizzaBox.check(ctx(no), params)).toMatchObject({ status: 'fail', reason: 'No Rare Pizza Box found' })
+  })
+
+  it('a failed lookup is "unknown" (retry), never a "no"', async () => {
+    const src = sources({ getWorkingLevel: vi.fn(async () => 6), holdsRarePizzaBox: vi.fn(async () => 'error' as const) })
+    expect(await rarePizzaBox.check(ctx(src), params)).toMatchObject({ status: 'unknown' })
+    const lvl = sources({ getWorkingLevel: vi.fn(async () => { throw new Error('db') }) })
+    expect(await rarePizzaBox.check(ctx(lvl), params)).toMatchObject({ status: 'unknown' })
+  })
+
+  it('needs a member profile', async () => {
+    expect(await rarePizzaBox.check(ctx(sources(), { memberId: null }), params)).toMatchObject({ status: 'fail' })
   })
 })

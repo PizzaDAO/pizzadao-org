@@ -35,6 +35,8 @@ type MissionData = {
   semiChecked?: boolean;
   proofHint?: string;
   referral?: boolean;
+  getBoxUrl?: string;
+  noManualSubmit?: boolean;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };
 
@@ -49,6 +51,9 @@ type MissionsResponse = {
   levels: LevelData[];
   currentLevel: number;
   levelTitle: string | null;
+  /** Levels whose reward was actually paid (the ledger). */
+  paidLevels?: number[];
+  earnedPep?: number;
   isAuthenticated: boolean;
   verifiersEnabled?: boolean;
   inviteUrl?: string | null;
@@ -692,10 +697,14 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
         {levels.map((levelData, idx) => {
           const isExpanded = expandedLevels.has(levelData.level);
           const isCurrentLevel = levelData.level === currentLevel;
-          const isUnlocked = levelData.level <= currentLevel;
+          // Missions on every level can be submitted (the level itself is still earned in order).
+          const isUnlocked = true;
+          // A level whose reward was already paid stays complete even if a mission was added
+          // to it since (that mission is then an optional bonus, nothing is paid again).
+          const isPaid = (data.paidLevels ?? []).includes(levelData.level);
           const isComplete =
             levelData.missions.length > 0 &&
-            levelData.missions.every((m) => m.progress?.status === "APPROVED");
+            (isPaid || levelData.missions.every((m) => m.progress?.status === "APPROVED"));
 
           const completedCount = levelData.missions.filter(
             (m) => m.progress?.status === "APPROVED"
@@ -873,25 +882,6 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                     borderTop: "1px dashed hsl(var(--rule-warm) / 0.55)",
                   }}
                 >
-                  {!isUnlocked && (
-                    <div
-                      style={{
-                        textAlign: "center",
-                        padding: "18px 14px",
-                        fontSize: 14,
-                        color: "hsl(var(--muted-foreground))",
-                        fontStyle: "italic",
-                      }}
-                    >
-                      <div
-                        className="overline"
-                        style={{ color: "hsl(var(--muted-foreground))", marginBottom: 6 }}
-                      >
-                        § Sealed
-                      </div>
-                      Complete Level {levelData.level - 1} to unlock these missions.
-                    </div>
-                  )}
                   {levelData.missions.map((mission) => (
                     <MissionCard
                       key={mission.id}
@@ -899,6 +889,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                       check={checks[mission.id]}
                       inviteUrl={mission.referral ? (data?.inviteUrl ?? null) : undefined}
                       levelUnlocked={isUnlocked}
+                      bonus={isPaid && mission.progress?.status !== "APPROVED"}
                       onSubmit={handleSubmit}
                     />
                   ))}
