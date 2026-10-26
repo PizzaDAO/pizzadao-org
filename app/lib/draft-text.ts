@@ -1,5 +1,7 @@
 // Pure text helpers for crew drafts. Client-safe.
-import { parseTweet } from 'twitter-text'
+import twitterText from 'twitter-text'
+
+const { parseTweet } = twitterText
 
 export const X_LIMIT = 280
 export const X_URL_LENGTH = 23
