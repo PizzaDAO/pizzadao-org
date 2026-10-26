@@ -1,7 +1,7 @@
 // NFT Leaderboard API - Aggregates NFT holdings by collection across all members
 import { NextResponse } from "next/server";
 import { getNFTContracts, ALCHEMY_CHAIN_URLS } from "@/app/lib/nft-config";
-import { NFTContract } from "@/app/lib/nft-types";
+import type { NFTContract } from "@/app/lib/nft-types";
 import { cacheGet, cacheSet } from "../../lib/cache";
 import { getAllMemberWallets } from "@/app/lib/wallet-lookup";
 import {

@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { fetchPizzaDAONFTs } from "@/app/lib/nft";
-import { NFTDisplayItem, NFTGroupInfo } from "@/app/lib/nft-types";
+import type { NFTDisplayItem, NFTGroupInfo } from "@/app/lib/nft-types";
 import { getEvmWalletsForMember, getWalletForMember } from "@/app/lib/wallet-lookup";
 
 export const runtime = "nodejs";

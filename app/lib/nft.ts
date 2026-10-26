@@ -2,7 +2,7 @@
 // Fetches NFTs from Alchemy API for configured PizzaDAO contracts
 
 import { getContractsByChain, ALCHEMY_CHAIN_URLS } from "./nft-config";
-import { AlchemyNFT, NFTDisplayItem, NFTCollectionResponse, NFTContract } from "./nft-types";
+import type { AlchemyNFT, NFTDisplayItem, NFTCollectionResponse, NFTContract } from "./nft-types";
 import { cacheGetOrSet } from "../api/lib/cache";
 
 const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;

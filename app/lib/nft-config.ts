@@ -4,7 +4,7 @@
 import { fetchGviz } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS } from "@/app/lib/sheets/config";
 import { findColumnIndex } from "@/app/lib/sheet-utils";
-import { NFTContract } from "./nft-types";
+import type { NFTContract } from "./nft-types";
 
 const NFT_CONTRACTS_SHEET_ID = SHEET_IDS.nftContracts;
 

@@ -3,7 +3,7 @@
 import React, { useState, useEffect, useMemo, useCallback } from "react";
 import Link from "next/link";
 import { NFTCard } from "./NFTCard";
-import { NFTCollectionResponse, NFTDisplayItem } from "@/app/lib/nft-types";
+import type { NFTCollectionResponse, NFTDisplayItem } from "@/app/lib/nft-types";
 
 type NFTCollectionProps = {
   memberId: string;
