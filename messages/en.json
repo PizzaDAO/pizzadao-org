@@ -718,6 +718,7 @@
       "chapters": "Chapters",
       "transcript": "Transcript",
       "transcriptNote": "Transcribed automatically and reviewed by PizzaDAO. It may contain errors.",
+      "chatLine": "Written in the call chat",
       "unknownSpeaker": "Speaker"
     },
     "readRecordings": "Read summaries and transcripts of past calls."
@@ -929,6 +930,7 @@
     "chaptersHint": "One per line: start time then title, like 12:30 Budget update",
     "restoreLines": "Restore their lines",
     "redactedBadge": "Hidden from the public page",
+    "chatLine": "Written in the call chat",
     "hiddenLine": "[hidden: this speaker's lines are not public]",
     "unsavedWarning": "You have unsaved edits that will be lost. Continue?",
     "tooManyItems": "At most 30 action items.",

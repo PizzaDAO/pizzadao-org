@@ -9,7 +9,7 @@
  */
 import { mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
-import type { Client, Guild, VoiceBasedChannel, VoiceState } from 'discord.js'
+import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
 import type { Config } from './config.js'
 import { consentNotice, lateJoinReminder } from './consent.js'
@@ -25,6 +25,7 @@ import {
   type EventInfo,
 } from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
+import { appendRecord, MAX_CHAT_TEXT, readManifest } from './manifest.js'
 import { SlotMemory } from './slots.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
@@ -375,6 +376,71 @@ export class CallRecorder {
       const channel = newState.channel
       if (channel) await this.send(channel, lateJoinReminder(newState.id), [newState.id])
     })()
+  }
+
+  // ---- voice channel text chat -----------------------------------------
+
+  private warnedEmptyContent = false
+
+  /** Text of a message for the transcript: its content (mentions resolved) plus attachment URLs. */
+  private chatText(msg: Message | PartialMessage): string {
+    const body = (msg.cleanContent ?? msg.content ?? '').trim()
+    const urls = [...(msg.attachments?.values() ?? [])].map((a) => a.url).filter(Boolean)
+    return [body, ...urls].filter(Boolean).join('\n').slice(0, MAX_CHAT_TEXT)
+  }
+
+  private inSession(msg: Message | PartialMessage): ActiveSession | null {
+    const s = this.current
+    if (!s || s.stopping || msg.channelId !== this.cfg.callChannelId) return null
+    const at = msg.createdTimestamp
+    if (typeof at !== 'number' || at < s.meta.startedAtMs || at > Date.now() + 5000) return null
+    return s
+  }
+
+  /** A message posted in the call channel's chat while recording. Never throws. */
+  onMessage(msg: Message): void {
+    try {
+      const s = this.inSession(msg)
+      if (!s || msg.author?.bot || msg.system) return
+      const text = this.chatText(msg)
+      if (!text) {
+        // Without the MessageContent privileged intent Discord sends empty content.
+        if (!msg.attachments?.size && !this.warnedEmptyContent) {
+          this.warnedEmptyContent = true
+          this.log('chat message arrived with empty content: is the MessageContent intent enabled in the Discord Developer Portal? Skipping empty messages.')
+        }
+        return
+      }
+      const displayName = msg.member?.displayName ?? msg.author?.globalName ?? msg.author?.username ?? ''
+      appendRecord(s.dir, { t: 'chat', messageId: msg.id, userId: msg.author.id, displayName, text, atMs: Math.max(0, msg.createdTimestamp - s.meta.startedAtMs) })
+    } catch (err) {
+      this.log(`chat capture failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  /** An edit of a chat message we captured: store the latest text. */
+  onMessageUpdate(msg: PartialMessage | Message): void {
+    try {
+      const s = this.inSession(msg)
+      if (!s || msg.author?.bot) return
+      if (!readManifest(s.dir).some((r) => r.t === 'chat' && r.messageId === msg.id)) return
+      if (msg.content == null) return // partial update without content
+      const text = this.chatText(msg)
+      if (text) appendRecord(s.dir, { t: 'chat-edit', messageId: msg.id, text })
+    } catch (err) {
+      this.log(`chat edit capture failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
+  }
+
+  /** A deleted chat message is dropped from the transcript. */
+  onMessageDelete(msg: PartialMessage | Message): void {
+    try {
+      const s = this.current
+      if (!s || s.stopping || msg.channelId !== this.cfg.callChannelId) return
+      appendRecord(s.dir, { t: 'chat-delete', messageId: msg.id })
+    } catch (err) {
+      this.log(`chat delete capture failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 
   private async send(channel: VoiceBasedChannel, content: string, users: string[] = []): Promise<boolean> {

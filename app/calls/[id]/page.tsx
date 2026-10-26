@@ -89,15 +89,23 @@ export default async function PublishedCallPage({ params }: Params) {
                     <h2 className="font-display text-xl font-black m-0">{t("transcript")}</h2>
                     <p className="m-0 text-sm text-foreground/60">{t("transcriptNote")}</p>
                     <ol className="m-0 p-0 list-none grid gap-3">
-                        {segments.map((seg, i) => (
-                            <li key={i} className="grid gap-0.5">
-                                <span className="text-sm">
-                                    <strong>{names.get(seg.discordId) ?? t("unknownSpeaker")}</strong>{" "}
-                                    <span className="tabular-nums text-foreground/60">{formatClock(seg.startMs)}</span>
-                                </span>
-                                <span>{seg.text}</span>
-                            </li>
-                        ))}
+                        {segments.map((seg, i) => {
+                            const isChatLine = seg.kind === "chat";
+                            return (
+                                <li key={i} className={`grid gap-0.5 ${isChatLine ? "text-foreground/70" : ""}`}>
+                                    <span className="text-sm">
+                                        {isChatLine && (
+                                            <span role="img" aria-label={t("chatLine")} title={t("chatLine")}>
+                                                💬{" "}
+                                            </span>
+                                        )}
+                                        <strong>{names.get(seg.discordId) ?? seg.name ?? t("unknownSpeaker")}</strong>{" "}
+                                        <span className="tabular-nums text-foreground/60">{formatClock(seg.startMs)}</span>
+                                    </span>
+                                    <span className={isChatLine ? "italic whitespace-pre-wrap break-words" : undefined}>{seg.text}</span>
+                                </li>
+                            );
+                        })}
                     </ol>
                 </section>
             </article>

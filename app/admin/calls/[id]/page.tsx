@@ -98,7 +98,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <ul className="m-0 pl-5 grid gap-1">
                             {rec.speakers.map((s) => {
                                 const lines = segments.filter((seg) => seg.discordId === s.discordId).length;
-                                const missing = rec.status !== "PROCESSING" && s.talkTimeSec >= 10 && lines === 0;
+                                const speechLines = segments.filter((seg) => seg.discordId === s.discordId && seg.kind !== "chat").length;
+                                const missing = rec.status !== "PROCESSING" && s.talkTimeSec >= 10 && speechLines === 0;
                                 return (
                                     <li key={s.id}>
                                         {s.displayName ?? s.discordId}{" "}
@@ -227,10 +228,21 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     ) : (
                         <ol className="m-0 p-0 list-none grid gap-2">
                             {segments.map((seg, i) => (
-                                <li key={i} className={redacted.has(seg.discordId) ? "opacity-50" : undefined}>
+                                <li key={i} className={redacted.has(seg.discordId) ? "opacity-50" : seg.kind === "chat" ? "text-foreground/70" : undefined}>
                                     <span className="tabular-nums text-foreground/60 text-sm">{formatClock(seg.startMs)}</span>{" "}
-                                    <strong>{names.get(seg.discordId) ?? seg.discordId}</strong>:{" "}
-                                    {redacted.has(seg.discordId) ? <em className="text-foreground/60">{t("hiddenLine")}</em> : seg.text}
+                                    {seg.kind === "chat" && (
+                                        <span role="img" aria-label={t("chatLine")} title={t("chatLine")}>
+                                            💬{" "}
+                                        </span>
+                                    )}
+                                    <strong>{names.get(seg.discordId) ?? seg.name ?? seg.discordId}</strong>:{" "}
+                                    {redacted.has(seg.discordId) ? (
+                                        <em className="text-foreground/60">{t("hiddenLine")}</em>
+                                    ) : seg.kind === "chat" ? (
+                                        <em className="whitespace-pre-wrap break-words">{seg.text}</em>
+                                    ) : (
+                                        seg.text
+                                    )}
                                 </li>
                             ))}
                         </ol>

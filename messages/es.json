@@ -718,6 +718,7 @@
       "chapters": "Capítulos",
       "transcript": "Transcripción",
       "transcriptNote": "Transcrita automáticamente y revisada por PizzaDAO. Puede contener errores.",
+      "chatLine": "Escrito en el chat de la llamada",
       "unknownSpeaker": "Orador"
     },
     "readRecordings": "Lee resúmenes y transcripciones de llamadas anteriores."
@@ -929,6 +930,7 @@
     "chaptersHint": "Una por línea: hora de inicio y título, como 12:30 Actualización del presupuesto",
     "restoreLines": "Restaurar sus líneas",
     "redactedBadge": "Oculto en la página pública",
+    "chatLine": "Escrito en el chat de la llamada",
     "hiddenLine": "[oculto: las líneas de este orador no son públicas]",
     "unsavedWarning": "Tienes cambios sin guardar que se perderán. ¿Continuar?",
     "tooManyItems": "Máximo 30 tareas.",

@@ -7,6 +7,7 @@ import { prisma } from '@/app/lib/db'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { resolveCrewForEvent, type CrewRef } from './crew-map'
 import type { IngestPayload, TranscriptSegment } from './ingest-schema'
+import { chatOnlyAuthors, mergeChat } from './chat'
 import { buildSpeakerNames, generateCallSummary } from './summarize'
 
 /**
@@ -35,8 +36,11 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
     select: { id: true, status: true, mixKey: true, speakers: { select: { trackKey: true } } },
   })
   // Everyone in the call is recorded and transcribed (no opt-out since 2026-10-25); reviewers hide speakers per call.
-  const segments: TranscriptSegment[] = p.transcript?.segments ?? []
+  // Voice-channel chat lines are stored in the same JSON (kind: 'chat'), so chat alone also counts as content.
+  const segments: TranscriptSegment[] = mergeChat(p.transcript?.segments ?? [], p.chat)
   const hasTranscript = segments.length > 0
+  // Chat authors who never spoke still get a speaker row (no audio) so a reviewer can hide them.
+  const chatAuthors = chatOnlyAuthors(p.chat, p.speakers.map((s) => s.discordId))
   // The worker deletes any R2 object under the session prefix that is NOT in `keys`
   // (leftovers of earlier attempts), so `keys` is always what the stored row references.
   if (existing) {
@@ -49,6 +53,12 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
         data: { transcript: segments as unknown as Prisma.InputJsonValue, transcriptLanguage: p.transcript?.language ?? null, status: 'PROCESSING' },
       })
       filled = res.count === 1
+      if (filled && chatAuthors.length > 0) {
+        await prisma.callSpeaker.createMany({
+          data: chatAuthors.map((a) => ({ recordingId: existing.id, discordId: a.discordId, displayName: a.displayName, talkTimeSec: 0 })),
+          skipDuplicates: true,
+        })
+      }
     }
     return { id: existing.id, duplicate: true, keys: storedKeys(existing), summarize: filled }
   }
@@ -72,13 +82,16 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
         ? { transcript: segments as unknown as Prisma.InputJsonValue, transcriptLanguage: p.transcript?.language ?? null, status: 'PROCESSING' as const }
         : {}),
       speakers: {
-        create: p.speakers.map((s) => ({
-          discordId: s.discordId,
-          displayName: s.displayName,
-          talkTimeSec: s.talkTimeSec,
-          trackKey: s.trackKey,
-          trackBytes: s.trackBytes,
-        })),
+        create: [
+          ...p.speakers.map((s) => ({
+            discordId: s.discordId,
+            displayName: s.displayName,
+            talkTimeSec: s.talkTimeSec,
+            trackKey: s.trackKey,
+            trackBytes: s.trackBytes,
+          })),
+          ...chatAuthors.map((a) => ({ discordId: a.discordId, displayName: a.displayName, talkTimeSec: 0, trackKey: null, trackBytes: null })),
+        ],
       },
     },
     select: { id: true },

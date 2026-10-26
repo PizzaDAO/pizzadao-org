@@ -5,7 +5,7 @@
  */
 import { createServer } from 'node:http'
 import { mkdirSync } from 'node:fs'
-import { Client, GatewayIntentBits, GuildScheduledEventRecurrenceRuleFrequency, type GuildScheduledEvent } from 'discord.js'
+import { Client, GatewayIntentBits, IntentsBitField, GuildScheduledEventRecurrenceRuleFrequency, type GuildScheduledEvent } from 'discord.js'
 import { generateDependencyReport } from '@discordjs/voice'
 import { loadConfig } from './config.js'
 import type { EventInfo } from './event-lifecycle.js'
@@ -21,10 +21,19 @@ const cfg = loadConfig()
 mkdirSync(cfg.dataDir, { recursive: true })
 log(generateDependencyReport())
 
-// Only what is needed: guilds (channels, events), voice states (who is in the
-// channel), scheduled events. No message content, no members.
+// Guilds (channels, events), voice states (who is in the channel), scheduled events, and guild
+// messages with their content: the voice channel's text chat is added to the call transcript.
+// MessageContent is a PRIVILEGED intent: enable it for the bot in the Discord Developer Portal
+// (Bot > Privileged Gateway Intents). Until it is enabled Discord refuses the login with
+// "Used disallowed intents"; we then retry without it so recording keeps working (chat is skipped).
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildScheduledEvents],
+  intents: [
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildScheduledEvents,
+    GatewayIntentBits.GuildMessages,
+    GatewayIntentBits.MessageContent,
+  ],
 })
 
 // One job at a time: start/stop/switch must not interleave.
@@ -92,6 +101,9 @@ client.on('voiceStateUpdate', (o, n) => {
   if (n.channelId !== cfg.callChannelId && o.channelId !== cfg.callChannelId) return
   serial(() => scheduleCheck(false))
 })
+client.on('messageCreate', (m) => recorder.onMessage(m))
+client.on('messageUpdate', (_o, n) => recorder.onMessageUpdate(n))
+client.on('messageDelete', (m) => recorder.onMessageDelete(m))
 client.on('error', (err) => log(`discord client error: ${err.message}`))
 
 client.once('ready', () => {
@@ -148,4 +160,17 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'))
 process.on('SIGINT', () => void shutdown('SIGINT'))
 process.on('unhandledRejection', (err) => log(`unhandled rejection: ${err instanceof Error ? err.stack : String(err)}`))
 
-await client.login(cfg.discordToken)
+try {
+  await client.login(cfg.discordToken)
+} catch (err) {
+  if (!/disallowed intents/i.test(err instanceof Error ? err.message : String(err))) throw err
+  log('MessageContent intent is NOT enabled for this bot (Developer Portal > Bot > Privileged Gateway Intents): voice chat will not be captured. Logging in without it.')
+  void client.destroy()
+  client.options.intents = new IntentsBitField([
+    GatewayIntentBits.Guilds,
+    GatewayIntentBits.GuildVoiceStates,
+    GatewayIntentBits.GuildScheduledEvents,
+    GatewayIntentBits.GuildMessages,
+  ]).freeze()
+  await client.login(cfg.discordToken)
+}

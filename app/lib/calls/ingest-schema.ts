@@ -27,6 +27,19 @@ export interface TranscriptSegment {
   startMs: number
   endMs: number
   text: string
+  /** Absent (or 'speech') for spoken words; 'chat' for a message from the voice channel's text chat. */
+  kind?: 'speech' | 'chat'
+  /** Author's display name; only set on chat lines (chat authors may never have spoken). */
+  name?: string
+}
+
+/** A voice-channel text chat message, as the worker reports it. */
+export interface IngestChatMessage {
+  discordId: string
+  displayName: string | null
+  text: string
+  atMs: number
+  messageId: string
 }
 
 export interface IngestTranscript {
@@ -35,6 +48,7 @@ export interface IngestTranscript {
 }
 
 export const MAX_TRANSCRIPT_SEGMENTS = 20000
+export const MAX_CHAT_MESSAGES = 5000
 const MAX_SEGMENT_TEXT = 4000
 const MAX_CALL_MS = MAX_SECONDS * 1000
 
@@ -51,6 +65,8 @@ export interface IngestPayload {
   speakers: IngestSpeaker[]
   /** Absent when the worker had no Deepgram key or transcription failed. */
   transcript: IngestTranscript | null
+  /** Voice channel text chat during the call, time-ordered; empty when there was none. */
+  chat: IngestChatMessage[]
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -106,6 +122,28 @@ function parseTranscript(v: unknown, speakerIds: Set<string>): IngestTranscript 
   return { language: str(v.language, 'transcript.language', 20), segments }
 }
 
+function parseChat(v: unknown): IngestChatMessage[] {
+  if (v === undefined || v === null) return []
+  if (!Array.isArray(v)) throw new ValidationError('chat must be an array')
+  if (v.length > MAX_CHAT_MESSAGES) throw new ValidationError(`At most ${MAX_CHAT_MESSAGES} chat messages`)
+  const out: IngestChatMessage[] = []
+  const seen = new Set<string>()
+  v.forEach((raw, i) => {
+    if (!isObj(raw)) throw new ValidationError(`chat[${i}] must be an object`)
+    const discordId = str(raw.discordId, `chat[${i}].discordId`, 25, true)!
+    if (!SNOWFLAKE.test(discordId)) throw new ValidationError(`chat[${i}].discordId must be a Discord id`)
+    const messageId = str(raw.messageId, `chat[${i}].messageId`, 25, true)!
+    if (!SNOWFLAKE.test(messageId)) throw new ValidationError(`chat[${i}].messageId must be a Discord id`)
+    const text = str(raw.text, `chat[${i}].text`, MAX_SEGMENT_TEXT)?.trim()
+    const atMs = int(raw.atMs, `chat[${i}].atMs`, MAX_CALL_MS)
+    const displayName = str(raw.displayName, `chat[${i}].displayName`, 100)
+    if (!text || seen.has(messageId)) return
+    seen.add(messageId)
+    out.push({ discordId, displayName, text, atMs, messageId })
+  })
+  return out.sort((a, b) => a.atMs - b.atMs)
+}
+
 export function parseIngestPayload(body: unknown): IngestPayload {
   if (!isObj(body)) throw new ValidationError('Body must be a JSON object')
 
@@ -159,5 +197,6 @@ export function parseIngestPayload(body: unknown): IngestPayload {
     mix,
     speakers,
     transcript: parseTranscript(body.transcript, seen),
+    chat: parseChat(body.chat),
   }
 }

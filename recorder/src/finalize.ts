@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSummary } from './manifest.js'
+import { chatMessages, readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSummary } from './manifest.js'
 import { buildMixArgs, buildSpeakerTrackPlan, type PlanSegment } from './mix-plan.js'
 import { postIngestWithRetry, type IngestResult } from './ingest.js'
 import { sessionKeys, type Uploader } from './storage.js'
@@ -184,6 +184,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       }
     }
 
+    const chat = chatMessages(readManifest(dir))
     const endedAtMs = meta.endedAtMs ?? statSync(path.join(dir, MANIFEST_FILE)).mtimeMs
     const payload: IngestPayload = {
       sessionId: meta.sessionId,
@@ -205,9 +206,10 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
           trackBytes: uploadedTracks.get(sp.userId)!.bytes,
         })),
       ...(transcript ? { transcript } : {}),
+      ...(chat.length ? { chat } : {}),
     }
 
-    if (payload.speakers.length === 0 && !payload.mix) {
+    if (payload.speakers.length === 0 && !payload.mix && chat.length === 0) {
       deps.log(`session ${meta.sessionId} captured no audio; nothing to ingest`)
       writeFileSync(path.join(dir, UPLOADED), 'empty')
       cleanAudio(dir)
