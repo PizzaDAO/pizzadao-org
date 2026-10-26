@@ -12,14 +12,20 @@ const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
  */
 async function fetchNFTsForContract(
   walletAddress: string,
-  contract: NFTContract
+  contract: NFTContract,
+  strict = false
 ): Promise<AlchemyNFT[]> {
+  // `strict` (holdings that gate something, e.g. the Rare Pizza Box level
+  // gate) throws on any lookup failure instead of returning an empty list,
+  // so "could not check" is never mistaken for "owns none".
   if (!ALCHEMY_API_KEY) {
+    if (strict) throw new Error("ALCHEMY_API_KEY is not set");
     return [];
   }
 
   const baseUrl = ALCHEMY_CHAIN_URLS[contract.chain];
   if (!baseUrl) {
+    if (strict) throw new Error(`No Alchemy endpoint for chain ${contract.chain}`);
     return [];
   }
 
@@ -40,6 +46,7 @@ async function fetchNFTsForContract(
       });
 
       if (!res.ok) {
+        if (strict) throw new Error(`Alchemy ${res.status} for ${contract.chain}`);
         break;
       }
 
@@ -56,8 +63,17 @@ async function fetchNFTsForContract(
 
     return allNfts;
   } catch (error) {
+    if (strict) throw error;
     return allNfts; // Return whatever we got so far
   }
+}
+
+/**
+ * Whether `walletAddress` holds at least one token of `contract`. Strict:
+ * throws when Alchemy can't be reached (never returns false on an error).
+ */
+export async function holdsNFTOfContract(walletAddress: string, contract: NFTContract): Promise<boolean> {
+  return (await fetchNFTsForContract(walletAddress, contract, true)).length > 0;
 }
 
 /**

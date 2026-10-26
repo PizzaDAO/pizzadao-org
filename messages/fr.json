@@ -637,6 +637,22 @@
       "ariaLabel": "Suggestion Box Mafia"
     }
   },
+  "levelGate": {
+    "reqVouch": "Le niveau {level} nécessite le soutien d'un autre membre",
+    "reqBox": "Le niveau {level} nécessite une Rare Pizza Box",
+    "statusOk": "fait",
+    "statusMissing": "pas encore",
+    "statusUnknown": "vérification impossible",
+    "bannerHeld": "Tes missions te mènent au niveau {earned}, mais tu restes au niveau {level} tant que ces conditions ne sont pas remplies.",
+    "noteBody": "Tu peux déjà faire ces missions, mais tu n'atteins ce niveau qu'une fois la condition remplie.",
+    "vouchHint": "Demande à un membre de se porter garant pour toi depuis ton profil ; les vouches apparaissent sur /vouches.",
+    "walletHint": "Vérifie que le wallet qui la contient est connecté à ton profil.",
+    "unknownHint": "Impossible de vérifier pour le moment. Ta progression est en sécurité. Réessaie dans une minute.",
+    "getBox": "Obtenir une Rare Pizza Box",
+    "recheck": "Vérifier à nouveau",
+    "rechecking": "Vérification...",
+    "retry": "Réessayer"
+  },
   "crewsPage": {
     "joined": "Inscrit",
     "viewCrew": "Voir l’équipe",

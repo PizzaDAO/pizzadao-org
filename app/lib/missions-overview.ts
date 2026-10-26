@@ -7,10 +7,12 @@
  * client refetch after a submission agree.
  */
 
-import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle } from "@/app/lib/missions";
+import { getMissionsByLevel, getUserMissionProgress, getMemberLevel, getLevelTitle } from "@/app/lib/missions";
 import { getCachedMissionsList, setCachedMissionsList } from "@/app/lib/mission-cache";
 import { getVerifier } from "@/app/lib/mission-verify/verifiers";
 import { PROOF_HINTS } from "@/app/lib/mission-verify/proof-links";
+import { BOX_MIN_LEVEL, PIZZA_BOX_LINK, VOUCH_MIN_LEVEL, type LevelGate } from "@/app/lib/level-gate";
+import { BOX_PURCHASE_URL } from "@/app/lib/box-mafia";
 import { inviteUrl } from "@/app/lib/referral-link";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
@@ -52,6 +54,22 @@ export type MissionsOverview = {
   }[];
   currentLevel: number;
   levelTitle: string | null;
+  /**
+   * The level gates: level 4 needs a vouch received, level 5 a Rare Pizza
+   * Box. `vouch` / `box` are the viewer's standing; `heldBack` means their
+   * missions earn a higher level than they hold. Missions on every level
+   * can be submitted regardless.
+   */
+  levelGate: {
+    vouchMinLevel: number;
+    boxMinLevel: number;
+    vouch: LevelGate["vouch"];
+    box: LevelGate["box"];
+    heldBack: boolean;
+    earnedLevel: number;
+    /** Where to get a Rare Pizza Box. */
+    boxLink: string;
+  };
   isAuthenticated: boolean;
   /** The viewer's personal invite link (/join?ref=<memberId>), when signed in and onboarded. */
   inviteUrl?: string | null;
@@ -61,11 +79,16 @@ export async function getMissionsOverview(discordId: string | null | undefined):
   const progressMap: Record<number, MissionProgress> = {};
   let currentLevel = 1;
   let levelTitle: string | null = null;
+  let gate: LevelGate = { vouch: "not_needed", box: "not_needed" };
+  let earnedLevel = 1;
   let myInviteUrl: string | null = null;
 
   if (discordId) {
     const progress = await getUserMissionProgress(discordId);
-    currentLevel = await getCurrentLevel(discordId);
+    const member = await getMemberLevel(discordId, { full: true });
+    currentLevel = member.level;
+    earnedLevel = member.earnedLevel;
+    gate = member.gate;
     levelTitle = await getLevelTitle(currentLevel);
     const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null);
     myInviteUrl = memberId ? inviteUrl(memberId) : null;
@@ -102,5 +125,20 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     if (!discordId) setCachedMissionsList(levels);
   }
 
-  return { levels, currentLevel, levelTitle, isAuthenticated: !!discordId, inviteUrl: myInviteUrl };
+  return {
+    levels,
+    currentLevel,
+    levelTitle,
+    levelGate: {
+      vouchMinLevel: VOUCH_MIN_LEVEL,
+      boxMinLevel: BOX_MIN_LEVEL,
+      vouch: gate.vouch,
+      box: gate.box,
+      heldBack: earnedLevel > currentLevel,
+      earnedLevel,
+      boxLink: BOX_PURCHASE_URL || PIZZA_BOX_LINK,
+    },
+    isAuthenticated: !!discordId,
+    inviteUrl: myInviteUrl,
+  };
 }

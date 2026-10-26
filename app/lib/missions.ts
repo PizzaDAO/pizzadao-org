@@ -8,6 +8,10 @@ import { getMembersWithRoles } from './discord'
 import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
 import { DPR_ONLY_MIN_LEVEL, missionReviewerRoleIds } from './mission-review-access'
 import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
+import {
+  applyLevelGate, checkRarePizzaBox, checkVouchReceived, levelGateStart, reqState,
+  BOX_MIN_LEVEL, VOUCH_MIN_LEVEL, type Lookup, type LevelGate,
+} from './level-gate'
 import { approvalNeedsNote, NEW_REVIEW_ROUND } from './mission-verify/review-ids'
 
 // ===== QUERIES =====
@@ -117,7 +121,13 @@ export function paidLevelOf(row: { metadata?: unknown; description?: string | nu
 }
 
 /**
- * Pure level computation: the highest level completed, in order, plus one.
+ * Pure level computation, part 1: the level a member has EARNED from their
+ * missions alone, ignoring the Rare Pizza Box rule: the highest level
+ * completed, in order, plus one ("the level you are working on").
+ *
+ * Missions can be done on any level in any order, but a level only counts once
+ * every level below it is complete too (the loop stops at the first
+ * incomplete level), so finishing level 6 early does not make anyone level 6.
  *
  * Data-driven: the levels are whatever levels the active missions use (no
  * hard-coded 8). A level counts as completed when every active mission in it
@@ -126,7 +136,7 @@ export function paidLevelOf(row: { metadata?: unknown; description?: string | nu
  * marker means it is never paid twice). Returns maxLevel + 1 when everything
  * is done ("MAX").
  */
-export function computeCurrentLevel(
+export function computeEarnedLevel(
   missions: ReadonlyArray<{ id: number; level: number }>,
   approvedMissionIds: ReadonlySet<number>,
   paidLevels: ReadonlySet<number> = new Set(),
@@ -147,16 +157,75 @@ export function computeCurrentLevel(
   return highestCompleted + 1
 }
 
+/** Kept for existing callers (earned level, no vouch / Rare Pizza Box gates). Prefer getMemberLevel. */
+export const computeCurrentLevel = computeEarnedLevel
+
+/** What a member has / was before the gates, as looked up (null = not looked up). */
+export type GateAccess = {
+  vouch: Lookup | null
+  box: Lookup | null
+  /** The highest level they were already paid for before the gates started (grandfathering). */
+  paidBeforeGate?: number
+}
+
+/**
+ * THE level computation (one place): the earned level (computeEarnedLevel)
+ * run through the level gates (applyLevelGate), i.e.
+ *   level = highest L with levels 1..L complete AND (L < 4 OR a vouch was
+ *   received) AND (L < 5 OR a Rare Pizza Box is held),
+ * in this codebase's "level you are working on" units (completed + 1).
+ */
+export function computeMemberLevel(
+  missions: ReadonlyArray<{ id: number; level: number }>,
+  approvedMissionIds: ReadonlySet<number>,
+  paidLevels: ReadonlySet<number>,
+  access: GateAccess,
+): { level: number; earnedLevel: number; gate: LevelGate } {
+  const earnedLevel = computeEarnedLevel(missions, approvedMissionIds, paidLevels)
+  const paidBefore = access.paidBeforeGate ?? 0
+  // Reached level N (paid level N-1) before the gates: keeps it without the requirement.
+  const gate: LevelGate = {
+    vouch: reqState(access.vouch, paidBefore >= VOUCH_MIN_LEVEL - 1),
+    box: reqState(access.box, paidBefore >= BOX_MIN_LEVEL - 1),
+  }
+  return { level: applyLevelGate(earnedLevel, gate), earnedLevel, gate }
+}
+
 /** The highest level used by `missions` (0 when there are none). */
 export function maxMissionLevel(missions: ReadonlyArray<{ level: number }>): number {
   return missions.reduce((max, m) => Math.max(max, m.level), 0)
 }
 
 /**
- * Get the current level for a user (highest fully completed level + 1).
- * See computeCurrentLevel for the rules.
+ * The highest level reward paid before the gates started (0 if none). Level
+ * rewards are paid in order, so the MISSION_REWARD ledger is a dated record of
+ * "reached level N+1" and needs no new table: it is the grandfather pass that
+ * stops the gates from demoting anyone who was already at level 4 / 5.
  */
-export async function getCurrentLevel(discordId: string) {
+export async function highestLevelPaidBefore(discordId: string, before: Date = levelGateStart()): Promise<number> {
+  const rows = await prisma.transaction.findMany({
+    where: { userId: discordId, type: 'MISSION_REWARD', createdAt: { lt: before } },
+    select: { metadata: true, description: true },
+  })
+  return (rows ?? []).reduce((max, r) => Math.max(max, paidLevelOf(r) ?? 0), 0)
+}
+
+export type MemberLevel = {
+  /** The level the member holds (gated). */
+  level: number
+  /** The level their missions alone would give (what the gates held back, if different). */
+  earnedLevel: number
+  gate: LevelGate
+}
+
+/**
+ * The member's level, with the vouch and Rare Pizza Box gates applied. Never
+ * throws because of the lookups: if one fails the member simply is not awarded
+ * the gated level (state 'unknown', for a retry message). A requirement is only
+ * looked up when the missions alone reach its level (or `full`, for the
+ * missions page to show progress on both).
+ */
+export async function getMemberLevel(discordId: string, opts: { full?: boolean } = {}): Promise<MemberLevel> {
   const [completions, missions, paidLevels] = await Promise.all([
     prisma.missionCompletion.findMany({
       where: { discordId, status: 'APPROVED' },
@@ -168,8 +237,29 @@ export async function getCurrentLevel(discordId: string) {
     }),
     getPaidLevels(discordId),
   ])
+  const approved = new Set((completions ?? []).map(c => c.missionId))
+  const earned = computeEarnedLevel(missions ?? [], approved, paidLevels)
 
-  return computeCurrentLevel(missions ?? [], new Set((completions ?? []).map(c => c.missionId)), paidLevels)
+  const access: GateAccess = { vouch: null, box: null }
+  if (opts.full || earned >= VOUCH_MIN_LEVEL) {
+    access.paidBeforeGate = await highestLevelPaidBefore(discordId).catch(() => 0)
+    const [vouch, box] = await Promise.all([
+      checkVouchReceived(discordId),
+      opts.full || earned >= BOX_MIN_LEVEL ? checkRarePizzaBox(discordId) : Promise.resolve(null),
+    ])
+    access.vouch = vouch
+    access.box = box
+  }
+  return computeMemberLevel(missions ?? [], approved, paidLevels, access)
+}
+
+/**
+ * Get the current level for a user (see computeMemberLevel for the rules:
+ * highest fully completed level + 1, held at 3 without a vouch received and
+ * at 4 without a Rare Pizza Box).
+ */
+export async function getCurrentLevel(discordId: string) {
+  return (await getMemberLevel(discordId)).level
 }
 
 /**
@@ -255,13 +345,9 @@ export async function submitMissionCompletion(
     )
   }
 
-  // Check that previous levels are completed. (Automatic verification ignores
-  // this gate: it needs no effort from the member, and payouts still go in
-  // level order, see settleLevels.)
-  const currentLevel = await getCurrentLevel(discordId)
-  if (mission.level > currentLevel) {
-    throw new ValidationError(`You must complete Level ${currentLevel} before starting Level ${mission.level}`)
-  }
+  // Any level can be submitted at any time (Community Call, 2026-10-26): a
+  // member only GAINS a level once every level below it is complete (and, from
+  // level 4, they hold a Rare Pizza Box), see getMemberLevel.
 
   // Nothing is approved on submit: the submission is PENDING. When automatic
   // verification is on (MISSION_VERIFIERS_ENABLED) the submit route then runs
@@ -796,7 +882,7 @@ export async function getUserProgressSummary(discordId: string) {
     }),
   ])
 
-  const currentLevel = await getCurrentLevel(discordId)
+  const { level: currentLevel, gate } = await getMemberLevel(discordId)
   const levelTitle = await getLevelTitle(currentLevel)
 
   // Calculate total missions and approved count
@@ -811,6 +897,8 @@ export async function getUserProgressSummary(discordId: string) {
 
   return {
     currentLevel,
+    /** Vouch / Rare Pizza Box gate standing (see LevelGate). */
+    gate,
     /** Highest level with an active mission; currentLevel > maxLevel means "MAX". */
     maxLevel: maxMissionLevel(missions),
     levelTitle,

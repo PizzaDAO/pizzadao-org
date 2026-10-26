@@ -60,9 +60,7 @@ export function buildMissionsView(overview: OverviewLike, report: RunReport): Mi
               ? hold
                 ? 'awaiting_release'
                 : 'pending'
-              : lvl.level > overview.currentLevel
-                ? 'locked'
-                : 'open'
+              : 'open'
       const line: MissionLine = { missionId: m.id, level: lvl.level, title: m.title, state, holdReason: hold }
       if (c) {
         const r = c.result
