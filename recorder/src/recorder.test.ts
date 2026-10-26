@@ -806,6 +806,16 @@ describe('voice channel chat capture', () => {
     expect(chat(dir).map((c) => [c.messageId, c.text])).toEqual([['700000000000000001', 'edited']])
   })
 
+  it('applies a delete that arrives after the call ended, until the session is finalized', async () => {
+    const { w, dir } = await started()
+    w.rec.onMessage(msg({ id: '700000000000000001' }) as never)
+    w.rec.onMessage(msg({ id: '700000000000000002', content: 'keep', cleanContent: 'keep' }) as never)
+    await w.rec.stop('manual' as never)
+    w.rec.onMessageDelete({ id: '700000000000000001', channelId: CHANNEL } as never)
+    w.rec.onMessageDelete({ id: '700000000000000555', channelId: CHANNEL } as never) // never captured: ignored
+    expect(chat(dir).map((c) => c.text)).toEqual(['keep'])
+  })
+
   it('stores attachment URLs as text', async () => {
     const { w, dir } = await started()
     w.rec.onMessage(msg({ content: '', cleanContent: '', attachments: new Map([['a', { url: 'https://cdn.example/x.png' }]]) }) as never)

@@ -19,7 +19,7 @@ import { after } from 'next/server'
 import { prisma } from '@/app/lib/db'
 import { parseIngestPayload } from './ingest-schema'
 import { buildSpeakerNames, buildTranscriptText, SUMMARY_SYSTEM_PROMPT } from './summarize'
-import { generateAndStoreSummary, getPublishedRecording, publishRecording, setSpeakerRedacted } from './recordings'
+import { generateAndStoreSummary, getPublishedRecording, publishRecording, setSegmentRedacted, setSpeakerRedacted } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -94,6 +94,7 @@ describe('chat in the ingest payload', () => {
     ['bad message id', [{ ...chatMsg(ANN, 1, 'a'), messageId: 'nope' }]],
     ['negative time', [chatMsg(ANN, -5, 'a')]],
     ['text too long', [chatMsg(ANN, 1, 'a'.repeat(4001))]],
+    ['too much total text', Array.from({ length: 300 }, (_, i) => chatMsg(ANN, i, 'a'.repeat(4000), null, String(BigInt('800000000000000000') + BigInt(i))))],
     ['too many messages', Array.from({ length: 5001 }, (_, i) => chatMsg(ANN, i, 'a', null, String(BigInt('800000000000000000') + BigInt(i))))],
   ])('rejects %s', (_n, chat) => {
     expect(() => parseIngestPayload(payload({ chat }))).toThrow()
@@ -146,6 +147,7 @@ describe('merging chat into the transcript', () => {
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     db.callSpeaker.createMany.mockResolvedValue({ count: 1 })
     await ingestPOST(ingestReq(payload({ transcript: undefined, chat: [chatMsg(CAROL, 1000, 'hello', 'Carol')] })))
+    expect(db.$transaction).toHaveBeenCalledTimes(1)
     expect(db.callRecording.updateMany.mock.calls[0][0].data.transcript).toHaveLength(1)
     expect(db.callSpeaker.createMany.mock.calls[0][0].data).toEqual([expect.objectContaining({ recordingId: 'rec1', discordId: CAROL })])
   })
@@ -206,5 +208,47 @@ describe('redaction and the public page with chat', () => {
     expect(await setSpeakerRedacted('rec1', CAROL, true)).toBe(1)
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', summary: 'S', transcript: [stored[1]], redactedSpeakerIds: [CAROL] })
     expect(await publishRecording('rec1', '9')).toBe('incomplete')
+  })
+})
+
+describe('hiding a single line and attachments', () => {
+  const stored = [
+    { discordId: ANN, startMs: 1000, endMs: 4000, text: 'Welcome' },
+    { discordId: ANN, startMs: 2000, endMs: 2000, text: 'see this\nhttps://cdn.discordapp.com/attachments/1/2/pic.png?ex=abc', kind: 'chat', id: 'c:700000000000000001', name: 'Ann' },
+    { discordId: ANN, startMs: 3000, endMs: 3000, text: 'secret', kind: 'chat', id: 'c:700000000000000002', name: 'Ann' },
+  ]
+
+  it('public output replaces attachment CDN links with [attachment]', async () => {
+    db.callRecording.findFirst.mockResolvedValue({ id: 'rec1', transcript: stored, redactedSpeakerIds: [], redactedSegmentIds: [], speakers: [] })
+    const rec = await getPublishedRecording('rec1')
+    expect(rec!.transcript[1]!.text).toBe('see this\n[attachment]')
+    expect(JSON.stringify(rec)).not.toContain('cdn.discordapp')
+  })
+
+  it('a hidden line is dropped from public output and the model input; speech lines use speaker+time keys', async () => {
+    db.callRecording.findFirst.mockResolvedValue({ id: 'rec1', transcript: stored, redactedSpeakerIds: [], redactedSegmentIds: ['c:700000000000000002', `s:${ANN}:1000`], speakers: [] })
+    const rec = await getPublishedRecording('rec1')
+    expect(rec!.transcript.map((s) => s.startMs)).toEqual([2000])
+    expect(JSON.stringify(rec)).not.toContain('secret')
+  })
+
+  it('setSegmentRedacted stores the key, sends a published call back to review, and rejects unknown lines', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: stored, redactedSegmentIds: [] })
+    db.callRecording.update.mockResolvedValue({})
+    expect(await setSegmentRedacted('rec1', 'c:700000000000000002', true)).toBe(true)
+    expect(db.callRecording.update.mock.calls[0][0].data).toMatchObject({ redactedSegmentIds: ['c:700000000000000002'], status: 'IN_REVIEW', publishedAt: null })
+    expect(await setSegmentRedacted('rec1', 'c:999999999999', true)).toBe(false)
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: stored, redactedSegmentIds: ['c:700000000000000002'] })
+    expect(await setSegmentRedacted('rec1', 'c:700000000000000002', false)).toBe(true)
+    expect(db.callRecording.update.mock.calls[1][0].data.redactedSegmentIds).toEqual([])
+  })
+
+  it('merged chat lines carry a stable id', async () => {
+    db.callRecording.findUnique.mockResolvedValueOnce(null)
+    db.callRecording.create.mockResolvedValue({ id: 'rec1' })
+    db.callRecording.findUnique.mockResolvedValueOnce({ id: 'rec1', status: 'PROCESSING', transcript: [], speakers: [] })
+    await ingestPOST(ingestReq(payload({ chat: [chatMsg(ANN, 1500, 'x', null, '700000000000000009')] })))
+    const t = db.callRecording.create.mock.calls[0][0].data.transcript as Array<{ id?: string }>
+    expect(t.find((s) => s.id)!.id).toBe('c:700000000000000009')
   })
 })

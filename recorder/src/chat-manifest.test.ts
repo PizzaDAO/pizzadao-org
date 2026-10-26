@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest'
-import { chatMessages, MAX_CHAT_MESSAGES } from './manifest.js'
+import { chatMessages, MAX_CHAT_MESSAGES, MAX_CHAT_TOTAL_CHARS } from './manifest.js'
 import type { ManifestRecord } from './types.js'
 
 const c = (messageId: string, atMs: number, text = 't', userId = '1'): ManifestRecord => ({ t: 'chat', messageId, userId, displayName: 'Ann', text, atMs })
@@ -16,5 +16,12 @@ describe('chatMessages', () => {
   it('caps the count', () => {
     const recs = Array.from({ length: MAX_CHAT_MESSAGES + 5 }, (_, i) => c(String(i), i))
     expect(chatMessages(recs)).toHaveLength(MAX_CHAT_MESSAGES)
+  })
+  it('keeps the earliest messages within the total text cap', () => {
+    const big = 'x'.repeat(4000)
+    const recs = Array.from({ length: 300 }, (_, i) => c(String(i), i, big))
+    const out = chatMessages(recs)
+    expect(out.length).toBe(Math.floor(MAX_CHAT_TOTAL_CHARS / 4000))
+    expect(out[0]!.messageId).toBe('0')
   })
 })

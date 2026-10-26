@@ -59,6 +59,9 @@ export function summarize(records: ManifestRecord[]): SpeakerSummary[] {
 
 export const MAX_CHAT_MESSAGES = 5000
 export const MAX_CHAT_TEXT = 4000
+/** Total chat text kept per call (earliest messages win); keeps the ingest body well under the host's request limit. */
+export const MAX_CHAT_TOTAL_CHARS = 1_000_000
+export const MIN_CHAT_FOR_TEXT_ONLY = 3
 
 /**
  * The chat to report: latest edit of each message, deleted ones dropped, purged users' messages
@@ -77,10 +80,18 @@ export function chatMessages(records: ManifestRecord[]): IngestChatMessage[] {
       byId.delete(r.messageId)
     }
   }
-  return [...byId.values()]
+  const sorted = [...byId.values()]
     .filter((m) => !purged.has(m.discordId))
     .map((m) => ({ ...m, text: m.text.trim().slice(0, MAX_CHAT_TEXT) }))
     .filter((m) => m.text)
     .sort((a, b) => a.atMs - b.atMs)
     .slice(0, MAX_CHAT_MESSAGES)
+  let total = 0
+  const kept: IngestChatMessage[] = []
+  for (const m of sorted) {
+    total += m.text.length
+    if (total > MAX_CHAT_TOTAL_CHARS) break
+    kept.push(m)
+  }
+  return kept
 }

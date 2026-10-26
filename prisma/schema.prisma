@@ -1106,6 +1106,8 @@ model CallRecording {
   // Speakers whose transcript lines are hidden from everything public and from the summary model.
   // Non-destructive: the stored transcript is complete; this only filters.
   redactedSpeakerIds String[]            @default([])
+  // Single transcript lines hidden the same way (keys from segmentKey(): `c:<messageId>` for chat, `s:<speaker>:<startMs>` for speech).
+  redactedSegmentIds String[]            @default([])
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 

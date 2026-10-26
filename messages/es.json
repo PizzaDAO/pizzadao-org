@@ -931,6 +931,8 @@
     "restoreLines": "Restaurar sus líneas",
     "redactedBadge": "Oculto en la página pública",
     "chatLine": "Escrito en el chat de la llamada",
+    "hideLine": "Ocultar esta línea",
+    "restoreLine": "Restaurar esta línea",
     "hiddenLine": "[oculto: las líneas de este orador no son públicas]",
     "unsavedWarning": "Tienes cambios sin guardar que se perderán. ¿Continuar?",
     "tooManyItems": "Máximo 30 tareas.",

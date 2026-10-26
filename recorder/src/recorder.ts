@@ -7,7 +7,7 @@
  * visible; if neither can be shown the session is deleted without capturing.
  * Event serialization is the caller's job (index.ts passes `serial`).
  */
-import { mkdirSync, rmSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
@@ -25,7 +25,7 @@ import {
   type EventInfo,
 } from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
-import { appendRecord, MAX_CHAT_TEXT, readManifest } from './manifest.js'
+import { appendRecord, MAX_CHAT_TEXT } from './manifest.js'
 import { SlotMemory } from './slots.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
@@ -337,7 +337,8 @@ export class CallRecorder {
     this.pendingCount++
     this.queue = this.queue.then(async () => {
       try {
-        await finalizeSession(dir, this.finalizeDeps)
+        const status = await finalizeSession(dir, this.finalizeDeps)
+        if (status !== 'pending') for (const [id, d] of this.capturedChat) if (d === dir) this.capturedChat.delete(id)
       } catch (err) {
         this.log(`finalize crashed for ${dir}: ${err instanceof Error ? err.message : String(err)}`)
       } finally {
@@ -381,6 +382,12 @@ export class CallRecorder {
   // ---- voice channel text chat -----------------------------------------
 
   private warnedEmptyContent = false
+  /**
+   * Captured chat message id -> its session dir. Kept until that session is finalized, so a delete
+   * that arrives after the call ended (but before ingest) is still applied. After ingest a delete
+   * can no longer be reflected here; the reviewer hides the line instead.
+   */
+  private readonly capturedChat = new Map<string, string>()
 
   /** Text of a message for the transcript: its content (mentions resolved) plus attachment URLs. */
   private chatText(msg: Message | PartialMessage): string {
@@ -412,6 +419,7 @@ export class CallRecorder {
         return
       }
       const displayName = msg.member?.displayName ?? msg.author?.globalName ?? msg.author?.username ?? ''
+      this.capturedChat.set(msg.id, s.dir)
       appendRecord(s.dir, { t: 'chat', messageId: msg.id, userId: msg.author.id, displayName, text, atMs: Math.max(0, msg.createdTimestamp - s.meta.startedAtMs) })
     } catch (err) {
       this.log(`chat capture failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -423,7 +431,7 @@ export class CallRecorder {
     try {
       const s = this.inSession(msg)
       if (!s || msg.author?.bot) return
-      if (!readManifest(s.dir).some((r) => r.t === 'chat' && r.messageId === msg.id)) return
+      if (this.capturedChat.get(msg.id) !== s.dir) return
       if (msg.content == null) return // partial update without content
       const text = this.chatText(msg)
       if (text) appendRecord(s.dir, { t: 'chat-edit', messageId: msg.id, text })
@@ -432,12 +440,13 @@ export class CallRecorder {
     }
   }
 
-  /** A deleted chat message is dropped from the transcript. */
+  /** A deleted chat message is dropped from the transcript (also after the call ended, until ingest). */
   onMessageDelete(msg: PartialMessage | Message): void {
     try {
-      const s = this.current
-      if (!s || s.stopping || msg.channelId !== this.cfg.callChannelId) return
-      appendRecord(s.dir, { t: 'chat-delete', messageId: msg.id })
+      const dir = this.capturedChat.get(msg.id)
+      if (!dir) return
+      this.capturedChat.delete(msg.id)
+      if (existsSync(dir)) appendRecord(dir, { t: 'chat-delete', messageId: msg.id })
     } catch (err) {
       this.log(`chat delete capture failed: ${err instanceof Error ? err.message : String(err)}`)
     }

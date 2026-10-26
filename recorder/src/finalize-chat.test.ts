@@ -40,10 +40,37 @@ describe('chat in the ingest payload', () => {
     expect(posted[0]!.chat).toEqual([{ discordId: '222', displayName: 'Carol', text: 'hola', atMs: 500, messageId: '700000000000000001' }])
   })
 
-  it('a session with chat but no audio is still ingested', async () => {
-    const { status, posted } = await run(session(false))
+  it('a session with enough chat but no audio is still ingested', async () => {
+    const dir = session(false)
+    for (const n of [3, 4]) appendRecord(dir, { t: 'chat', messageId: `70000000000000000${n}`, userId: '222', displayName: 'Carol', text: 'more', atMs: 700 + n })
+    const { status, posted } = await run(dir)
     expect(status).toBe('uploaded')
     expect(posted[0]!.speakers).toEqual([])
-    expect(posted[0]!.chat).toHaveLength(1)
+    expect(posted[0]!.chat).toHaveLength(3)
+  })
+
+  it('no audio and fewer than 3 chat messages is not ingested', async () => {
+    const { status, posted } = await run(session(false))
+    expect(status).toBe('empty')
+    expect(posted).toEqual([])
+  })
+
+  it('a 413 retries once without the chat instead of rejecting the audio', async () => {
+    const posted: IngestPayload[] = []
+    const status = await finalizeSession(session(true), {
+      appBaseUrl: 'a',
+      apiKey: 'k',
+      log: () => {},
+      ffmpeg: async (args: string[]) => writeFileSync(args.at(-1)!, 'a'),
+      uploader: { put: async () => 1, pruneExcept: async () => 0 },
+      postIngest: async (p) => {
+        posted.push(p)
+        return p.chat ? { ok: false, retryable: false, error: 'app answered 413: too large' } : { ok: true, id: 'r', duplicate: false, keys: [] }
+      },
+    })
+    expect(status).toBe('uploaded')
+    expect(posted).toHaveLength(2)
+    expect(posted[1]!.chat).toBeUndefined()
+    expect(posted[1]!.speakers).toHaveLength(1)
   })
 })

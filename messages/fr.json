@@ -931,6 +931,8 @@
     "restoreLines": "Rétablir ses lignes",
     "redactedBadge": "Masqué sur la page publique",
     "chatLine": "Écrit dans le chat de l'appel",
+    "hideLine": "Masquer cette ligne",
+    "restoreLine": "Rétablir cette ligne",
     "hiddenLine": "[masqué : les lignes de cet intervenant ne sont pas publiques]",
     "unsavedWarning": "Vous avez des modifications non enregistrées qui seront perdues. Continuer ?",
     "tooManyItems": "30 actions au maximum.",

@@ -5,6 +5,7 @@
  */
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { publicChatText } from './chat'
 import type { TranscriptSegment } from './ingest-schema'
 
 export const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5.5'
@@ -67,7 +68,7 @@ export function formatClock(ms: number): string {
 export function buildTranscriptText(segments: TranscriptSegment[], names: Record<string, string>): string {
   const text = [...segments]
     .sort((a, b) => a.startMs - b.startMs)
-    .map((s) => `[${formatClock(s.startMs)}] ${s.kind === 'chat' ? '(chat) ' : ''}${names[s.discordId] ?? 'Speaker'}: ${s.text.replace(/\s*\n\s*/g, ' ')}`)
+    .map((s) => `[${formatClock(s.startMs)}] ${s.kind === 'chat' ? '(chat) ' : ''}${names[s.discordId] ?? 'Speaker'}: ${(s.kind === 'chat' ? publicChatText(s.text) : s.text).replace(/\s*\n\s*/g, ' ')}`)
     .join('\n')
   return text.length > MAX_TRANSCRIPT_CHARS ? text.slice(0, MAX_TRANSCRIPT_CHARS) : text
 }

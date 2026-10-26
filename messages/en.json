@@ -931,6 +931,8 @@
     "restoreLines": "Restore their lines",
     "redactedBadge": "Hidden from the public page",
     "chatLine": "Written in the call chat",
+    "hideLine": "Hide this line",
+    "restoreLine": "Restore this line",
     "hiddenLine": "[hidden: this speaker's lines are not public]",
     "unsavedWarning": "You have unsaved edits that will be lost. Continue?",
     "tooManyItems": "At most 30 action items.",
