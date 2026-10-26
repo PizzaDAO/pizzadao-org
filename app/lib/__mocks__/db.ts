@@ -7,6 +7,7 @@ function createModelMock() {
     findFirst: vi.fn(),
     findMany: vi.fn(),
     create: vi.fn(),
+    createMany: vi.fn(),
     update: vi.fn(),
     updateMany: vi.fn(),
     upsert: vi.fn(),
@@ -45,3 +46,7 @@ export const prisma = {
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }
+
+// Default: run an interactive transaction callback against the same mock; array form resolves each op.
+prisma.$transaction.mockImplementation((async (arg: unknown) =>
+  typeof arg === 'function' ? (arg as (tx: unknown) => unknown)(prisma) : Promise.all(arg as unknown[])) as never)

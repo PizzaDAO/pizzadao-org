@@ -5,6 +5,7 @@
  */
 import { generateText, Output } from 'ai'
 import { z } from 'zod'
+import { publicChatText } from './chat'
 import type { TranscriptSegment } from './ingest-schema'
 
 export const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5.5'
@@ -36,9 +37,14 @@ export function buildSpeakerNames(
   segments: TranscriptSegment[],
 ): Record<string, string> {
   const clean = new Map<string, string>()
+  const tidy = (v: string | null | undefined) => (v ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40)
   for (const sp of speakers) {
-    const name = (sp.displayName ?? '').replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 40)
+    const name = tidy(sp.displayName)
     if (name) clean.set(sp.discordId, name)
+  }
+  // Chat lines carry their author's name (chat-only authors may be missing from the speaker list).
+  for (const seg of segments) {
+    if (seg.kind === 'chat' && !clean.has(seg.discordId) && tidy(seg.name)) clean.set(seg.discordId, tidy(seg.name))
   }
   const out: Record<string, string> = {}
   let n = 0
@@ -58,11 +64,11 @@ export function formatClock(ms: number): string {
   return h > 0 ? `${h}:${pad(m)}:${pad(s)}` : `${pad(m)}:${pad(s)}`
 }
 
-/** `[mm:ss] Name: text`, one line per turn, in time order. */
+/** `[mm:ss] Name: text` per spoken turn and `[mm:ss] (chat) Name: text` per typed chat message, in time order. */
 export function buildTranscriptText(segments: TranscriptSegment[], names: Record<string, string>): string {
   const text = [...segments]
     .sort((a, b) => a.startMs - b.startMs)
-    .map((s) => `[${formatClock(s.startMs)}] ${names[s.discordId] ?? 'Speaker'}: ${s.text}`)
+    .map((s) => `[${formatClock(s.startMs)}] ${s.kind === 'chat' ? '(chat) ' : ''}${names[s.discordId] ?? 'Speaker'}: ${(s.kind === 'chat' ? publicChatText(s.text) : s.text).replace(/\s*\n\s*/g, ' ')}`)
     .join('\n')
   return text.length > MAX_TRANSCRIPT_CHARS ? text.slice(0, MAX_TRANSCRIPT_CHARS) : text
 }
@@ -71,6 +77,7 @@ export const SUMMARY_SYSTEM_PROMPT = [
   'You write the public record of a PizzaDAO community call from its transcript.',
   'Rules:',
   '- Say only what the transcript supports. Never invent facts, names, numbers or decisions.',
+  '- Lines marked (chat) were typed in the call\'s text chat, not spoken; people often post ideas there when they are not comfortable speaking English. Treat them as contributions to the discussion and mention them as written in the chat where it matters.',
   '- Attribute a statement only to the speaker the transcript names for it.',
   '- Leave out personal information (addresses, phone numbers, emails, health, finances of individuals) and anything said as a private aside.',
   '- Write the summary and action items in the language the call was spoken in. Always write the title in English.',

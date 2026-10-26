@@ -5,7 +5,7 @@
  */
 import { createServer } from 'node:http'
 import { mkdirSync } from 'node:fs'
-import { Client, GatewayIntentBits, GuildScheduledEventRecurrenceRuleFrequency, type GuildScheduledEvent } from 'discord.js'
+import { Client, GatewayIntentBits, Options, Partials, GuildScheduledEventRecurrenceRuleFrequency, type GuildScheduledEvent } from 'discord.js'
 import { generateDependencyReport } from '@discordjs/voice'
 import { loadConfig } from './config.js'
 import type { EventInfo } from './event-lifecycle.js'
@@ -21,10 +21,20 @@ const cfg = loadConfig()
 mkdirSync(cfg.dataDir, { recursive: true })
 log(generateDependencyReport())
 
-// Only what is needed: guilds (channels, events), voice states (who is in the
-// channel), scheduled events. No message content, no members.
+// Guilds (channels, events), voice states (who is in the channel) and scheduled events. With
+// CAPTURE_VOICE_CHAT (default on) also guild messages with their content: the voice channel's text
+// chat is added to the call transcript. MessageContent is a PRIVILEGED intent: it must be enabled for
+// the bot in the Discord Developer Portal (Bot > Privileged Gateway Intents) or login fails with
+// "Used disallowed intents" (set CAPTURE_VOICE_CHAT=false to run without it).
+const intents = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildScheduledEvents]
+if (cfg.captureVoiceChat) intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent)
 const client = new Client({
-  intents: [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildScheduledEvents],
+  intents,
+  // Deletes/edits of messages we did not cache still fire (as partials); cache few messages, and
+  // drop them quickly: only the call channel's chat matters.
+  partials: cfg.captureVoiceChat ? [Partials.Message] : [],
+  makeCache: Options.cacheWithLimits({ ...Options.DefaultMakeCacheSettings, MessageManager: 50 }),
+  sweepers: { ...Options.DefaultSweeperSettings, messages: { interval: 300, lifetime: 1800 } },
 })
 
 // One job at a time: start/stop/switch must not interleave.
@@ -92,6 +102,10 @@ client.on('voiceStateUpdate', (o, n) => {
   if (n.channelId !== cfg.callChannelId && o.channelId !== cfg.callChannelId) return
   serial(() => scheduleCheck(false))
 })
+client.on('messageCreate', (m) => recorder.onMessage(m))
+client.on('messageUpdate', (_o, n) => recorder.onMessageUpdate(n))
+client.on('messageDelete', (m) => recorder.onMessageDelete(m))
+client.on('messageDeleteBulk', (ms) => ms.forEach((m) => recorder.onMessageDelete(m)))
 client.on('error', (err) => log(`discord client error: ${err.message}`))
 
 client.once('ready', () => {
@@ -148,4 +162,16 @@ process.on('SIGTERM', () => void shutdown('SIGTERM'))
 process.on('SIGINT', () => void shutdown('SIGINT'))
 process.on('unhandledRejection', (err) => log(`unhandled rejection: ${err instanceof Error ? err.stack : String(err)}`))
 
-await client.login(cfg.discordToken)
+try {
+  await client.login(cfg.discordToken)
+} catch (err) {
+  const msg = err instanceof Error ? err.message : String(err)
+  if (/disallowed intents/i.test(msg)) {
+    console.error(
+      `${new Date().toISOString()} FATAL: Discord refused the login (${msg}). Enable "Message Content Intent" for the bot ` +
+        'in the Discord Developer Portal (Bot > Privileged Gateway Intents), or set CAPTURE_VOICE_CHAT=false to run without voice chat capture.',
+    )
+    process.exit(1)
+  }
+  throw err
+}

@@ -15,6 +15,8 @@ import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
 import { ReviewActions } from "../ReviewActions";
 import { RedactSpeaker } from "../RedactSpeaker";
+import { HideLine } from "../HideLine";
+import { segmentKey } from "@/app/lib/calls/chat";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,6 +48,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const clock = (sec: number) => `${Math.floor(sec / 60)}:${String(sec % 60).padStart(2, "0")}`;
     const segments = asSegments(rec.transcript);
     const redacted = new Set(rec.redactedSpeakerIds);
+    const hiddenLines = new Set(rec.redactedSegmentIds);
     const names = new Map(rec.speakers.map((sp) => [sp.discordId, sp.displayName ?? sp.discordId]));
     const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
@@ -98,7 +101,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <ul className="m-0 pl-5 grid gap-1">
                             {rec.speakers.map((s) => {
                                 const lines = segments.filter((seg) => seg.discordId === s.discordId).length;
-                                const missing = rec.status !== "PROCESSING" && s.talkTimeSec >= 10 && lines === 0;
+                                const speechLines = segments.filter((seg) => seg.discordId === s.discordId && seg.kind !== "chat").length;
+                                const missing = rec.status !== "PROCESSING" && s.talkTimeSec >= 10 && speechLines === 0;
                                 return (
                                     <li key={s.id}>
                                         {s.displayName ?? s.discordId}{" "}
@@ -226,14 +230,40 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <p className="text-foreground/60 m-0">{t("transcriptPending")}</p>
                     ) : (
                         <ol className="m-0 p-0 list-none grid gap-2">
-                            {segments.map((seg, i) => (
-                                <li key={i} className={redacted.has(seg.discordId) ? "opacity-50" : undefined}>
-                                    <span className="tabular-nums text-foreground/60 text-sm">{formatClock(seg.startMs)}</span>{" "}
-                                    <strong>{names.get(seg.discordId) ?? seg.discordId}</strong>:{" "}
-                                    {redacted.has(seg.discordId) ? <em className="text-foreground/60">{t("hiddenLine")}</em> : seg.text}
-                                </li>
-                            ))}
-                        </ol>
+                            {segments.map((seg, i) => {
+                                const key = segmentKey(seg);
+                                const hidden = redacted.has(seg.discordId) || hiddenLines.has(key);
+                                return (
+                                    <li key={i} className={hidden ? "opacity-50" : seg.kind === "chat" ? "text-foreground/70" : undefined}>
+                                        <span className="tabular-nums text-foreground/60 text-sm">{formatClock(seg.startMs)}</span>{" "}
+                                        {seg.kind === "chat" && (
+                                            <span role="img" aria-label={t("chatLine")} title={t("chatLine")}>
+                                                💬{" "}
+                                            </span>
+                                        )}
+                                        <strong>{names.get(seg.discordId) ?? seg.name ?? seg.discordId}</strong>:{" "}
+                                        {hidden ? (
+                                            <em className="text-foreground/60">{t("hiddenLine")}</em>
+                                        ) : seg.kind === "chat" ? (
+                                            <em className="whitespace-pre-wrap break-words">{seg.text}</em>
+                                        ) : (
+                                            seg.text
+                                        )}
+                                        {rec.status !== "REJECTED" && rec.status !== "PROCESSING" && !redacted.has(seg.discordId) && (
+                                            <>
+                                                {" "}
+                                                <HideLine
+                                                    recordingId={rec.id}
+                                                    lineKey={key}
+                                                    hidden={hiddenLines.has(key)}
+                                                    labels={{ hide: t("hideLine"), restore: t("restoreLine"), unsaved: t("unsavedWarning"), working: t("working"), error: t("reviewError") }}
+                                                />
+                                            </>
+                                        )}
+                                    </li>
+                                );
+                            })}
+                            </ol>
                     )}
                 </section>
             </div>

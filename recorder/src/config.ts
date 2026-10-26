@@ -17,6 +17,8 @@ export interface Config {
   /** The channel must have had no humans this long before the recording stops. */
   emptyGraceMinutes: number
   port: number
+  /** Capture the voice channel's text chat (needs the MessageContent intent). CAPTURE_VOICE_CHAT=false turns it off. */
+  captureVoiceChat: boolean
   r2: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string }
 }
 
@@ -48,6 +50,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     dataDir: env.DATA_DIR?.trim() || '/data',
     maxCallMinutes: positiveNumber(env.MAX_CALL_MINUTES, 120, 'MAX_CALL_MINUTES', errors),
     emptyGraceMinutes: positiveNumber(env.EMPTY_GRACE_MINUTES, 5, 'EMPTY_GRACE_MINUTES', errors),
+    captureVoiceChat: !/^(0|false|off|no)$/i.test(env.CAPTURE_VOICE_CHAT?.trim() ?? ''),
     port: positiveNumber(env.PORT, 3000, 'PORT', errors),
     r2: {
       endpoint: req('R2_ENDPOINT'),

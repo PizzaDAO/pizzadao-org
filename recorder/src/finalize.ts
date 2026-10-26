@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSummary } from './manifest.js'
+import { chatMessages, MIN_CHAT_FOR_TEXT_ONLY, readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSummary } from './manifest.js'
 import { buildMixArgs, buildSpeakerTrackPlan, type PlanSegment } from './mix-plan.js'
 import { postIngestWithRetry, type IngestResult } from './ingest.js'
 import { sessionKeys, type Uploader } from './storage.js'
@@ -184,6 +184,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       }
     }
 
+    const chat = chatMessages(readManifest(dir))
     const endedAtMs = meta.endedAtMs ?? statSync(path.join(dir, MANIFEST_FILE)).mtimeMs
     const payload: IngestPayload = {
       sessionId: meta.sessionId,
@@ -205,17 +206,24 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
           trackBytes: uploadedTracks.get(sp.userId)!.bytes,
         })),
       ...(transcript ? { transcript } : {}),
+      ...(chat.length ? { chat } : {}),
     }
 
-    if (payload.speakers.length === 0 && !payload.mix) {
-      deps.log(`session ${meta.sessionId} captured no audio; nothing to ingest`)
+    if (payload.speakers.length === 0 && !payload.mix && chat.length < MIN_CHAT_FOR_TEXT_ONLY) {
+      deps.log(`session ${meta.sessionId} captured no audio and ${chat.length} chat message(s); nothing to ingest`)
       writeFileSync(path.join(dir, UPLOADED), 'empty')
       cleanAudio(dir)
       return 'empty'
     }
 
     const post = deps.postIngest ?? ((p: IngestPayload) => postIngestWithRetry(deps.appBaseUrl, deps.apiKey, p))
-    const res = await post(payload)
+    let res = await post(payload)
+    // An oversized body (413) must never cost us the audio: send the call again without the chat.
+    if (!res.ok && /answered 413/.test(res.error) && payload.chat?.length) {
+      deps.log(`ingest of ${meta.sessionId} answered 413; retrying without the chat (${payload.chat.length} message(s) left out)`)
+      const { chat: _dropped, ...withoutChat } = payload
+      res = await post(withoutChat)
+    }
     if (res.ok) {
       // Upload first, prune after: remove only objects the stored row does NOT reference
       // (leftovers of earlier attempts).
