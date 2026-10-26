@@ -5,7 +5,7 @@
  */
 import { createServer } from 'node:http'
 import { mkdirSync } from 'node:fs'
-import { Client, GatewayIntentBits, type GuildScheduledEvent } from 'discord.js'
+import { Client, GatewayIntentBits, GuildScheduledEventRecurrenceRuleFrequency, type GuildScheduledEvent } from 'discord.js'
 import { generateDependencyReport } from '@discordjs/voice'
 import { loadConfig } from './config.js'
 import type { EventInfo } from './event-lifecycle.js'
@@ -51,8 +51,23 @@ recorder = new CallRecorder(
   serial,
 )
 
+const DAY_MS = 86_400_000
+
+/** Interval of a plain daily / weekly rule; null for anything we cannot derive simply. */
+function recurrenceIntervalMs(ev: GuildScheduledEvent): number | null {
+  const r = ev.recurrenceRule
+  if (!r) return null
+  const interval = r.interval > 0 ? r.interval : 1
+  if (r.frequency === GuildScheduledEventRecurrenceRuleFrequency.Daily) return interval * DAY_MS
+  if (r.frequency === GuildScheduledEventRecurrenceRuleFrequency.Weekly && (r.byWeekday?.length ?? 0) <= 1) {
+    return interval * 7 * DAY_MS
+  }
+  return null
+}
+
 function toInfo(ev: GuildScheduledEvent): EventInfo {
   return {
+    recurrenceIntervalMs: recurrenceIntervalMs(ev),
     id: ev.id,
     name: ev.name,
     channelId: ev.channelId,

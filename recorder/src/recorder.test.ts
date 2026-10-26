@@ -55,8 +55,8 @@ const ev = (over: Partial<EventInfo> = {}): EventInfo => ({
   ...over,
 })
 
-function world(opts: { nickFails?: boolean; sendFails?: boolean } = {}) {
-  const dataDir = mkdtempSync(path.join(os.tmpdir(), 'orch-'))
+function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string } = {}) {
+  const dataDir = opts.dataDir ?? mkdtempSync(path.join(os.tmpdir(), 'orch-'))
   const nicknames: Array<string | null> = []
   const me = {
     nickname: BOT as string | null,
@@ -645,5 +645,103 @@ describe('CallRecorder schedule-window trigger', () => {
       await w.rec.checkSchedule([sched('creative', 0)])
       expect(w.rec.currentEventId).toBe('creative')
     })
+  })
+})
+
+describe('CallRecorder slot memory', () => {
+  const OPS = '1392145084845264977'
+  const OPS_START = Date.parse('2026-10-26T18:00:00Z')
+  const WEEK = 7 * 86_400_000
+  const at = (iso: string) => vi.setSystemTime(Date.parse(iso))
+  const ops = (over: Partial<EventInfo> = {}): EventInfo =>
+    ev({ id: OPS, name: 'Ops Crew', status: EventStatus.Scheduled, scheduledStartMs: OPS_START, ...over })
+  const joins = () => calls.filter((c) => c === 'join').length
+
+  beforeEach(() => {
+    vi.useFakeTimers({ toFake: ['Date'] })
+  })
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it('records the remembered slot after Discord moves the recurring event to next week', async () => {
+    const w = world()
+    at('2026-10-26T17:50:00Z')
+    await w.rec.checkSchedule([ops()])
+    expect(existsSync(path.join(w.dataDir, 'slots.json'))).toBe(true)
+    at('2026-10-26T18:07:00Z')
+    withHumans(w, 1)
+    await w.rec.checkSchedule([])
+    expect(w.rec.currentEventId).toBe(OPS)
+    expect(w.rec.status()?.eventName).toBe('Ops Crew')
+  })
+
+  it('records when the live event shows next week and is completed', async () => {
+    const w = world()
+    at('2026-10-26T17:50:00Z')
+    await w.rec.checkSchedule([ops()])
+    at('2026-10-26T18:07:00Z')
+    withHumans(w, 1)
+    await w.rec.checkSchedule([ops({ status: EventStatus.Completed, scheduledStartMs: OPS_START + WEEK })])
+    expect(w.rec.currentEventId).toBe(OPS)
+  })
+
+  it('derives the previous occurrence after a restart with an empty memory', async () => {
+    const w = world()
+    at('2026-10-26T18:10:00Z')
+    withHumans(w, 1)
+    await w.rec.checkSchedule([ops({ scheduledStartMs: OPS_START + WEEK, recurrenceIntervalMs: WEEK })])
+    expect(w.rec.currentEventId).toBe(OPS)
+  })
+
+  it('does not derive without a (simple) recurrence rule', async () => {
+    const w = world()
+    at('2026-10-26T18:10:00Z')
+    withHumans(w, 1)
+    await w.rec.checkSchedule([ops({ scheduledStartMs: OPS_START + WEEK })])
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
+  it('treats a CANCELED occurrence as not happening', async () => {
+    const w = world()
+    at('2026-10-26T17:50:00Z')
+    await w.rec.checkSchedule([ops()])
+    at('2026-10-26T18:07:00Z')
+    withHumans(w, 1)
+    await w.rec.checkSchedule([ops({ status: EventStatus.Canceled })])
+    expect(w.rec.currentEventId).toBeNull()
+    expect(joins()).toBe(0)
+  })
+
+  it('survives a restart through the memory file', async () => {
+    const w1 = world()
+    at('2026-10-26T17:50:00Z')
+    await w1.rec.checkSchedule([ops()])
+    const w2 = world({ dataDir: w1.dataDir })
+    at('2026-10-26T18:10:00Z')
+    withHumans(w2, 1)
+    await w2.rec.checkSchedule([])
+    expect(w2.rec.currentEventId).toBe(OPS)
+  })
+
+  it('does not start twice when the live and remembered copies both exist', async () => {
+    const w = world()
+    at('2026-10-26T17:50:00Z')
+    await w.rec.checkSchedule([ops()])
+    at('2026-10-26T18:07:00Z')
+    withHumans(w, 1)
+    await w.rec.checkSchedule([ops({ status: EventStatus.Active })])
+    await w.rec.checkSchedule([ops({ status: EventStatus.Active })])
+    await w.rec.checkSchedule([])
+    expect(joins()).toBe(1)
+  })
+
+  it('prunes slots older than 24h', async () => {
+    const w = world()
+    at('2026-10-26T17:50:00Z')
+    await w.rec.checkSchedule([ops()])
+    at('2026-10-27T18:01:00Z')
+    await w.rec.checkSchedule([])
+    expect(JSON.parse(readFileSync(path.join(w.dataDir, 'slots.json'), 'utf8'))).toEqual([])
   })
 })
