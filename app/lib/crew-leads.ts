@@ -21,6 +21,23 @@ export async function getCrewLeadMemberIds(crewId: string): Promise<Set<string>>
   return new Set(roster.filter((m) => !!m.id && isLeadStatus(m.status)).map((m) => m.id))
 }
 
+/** Whether this Discord user is on the crew's own sheet roster (any status). Fails closed. */
+export async function isOnCrewRoster(discordId: string, crewId: string | null | undefined): Promise<boolean> {
+  if (!discordId || !crewId) return false
+  try {
+    const memberId = await findMemberIdByDiscordId(discordId)
+    if (!memberId) return false
+    const id = normalizeCrewId(crewId)
+    const { crews } = await getCrewMappings()
+    const crew = crews.find((c) => c.id === id)
+    if (!crew?.sheet) return false
+    const roster = await fetchCrewRoster(crew.sheet, CREW_SHEET_REVALIDATE_SECONDS)
+    return roster.some((m) => m.id === memberId)
+  } catch {
+    return false
+  }
+}
+
 /** Whether this Discord user leads this crew. Fails closed (false) on any error. */
 export async function isCrewLead(discordId: string, crewId: string | null | undefined): Promise<boolean> {
   if (!discordId || !crewId) return false

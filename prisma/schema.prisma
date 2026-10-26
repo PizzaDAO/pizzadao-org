@@ -1314,3 +1314,38 @@ model RecordingOptOut {
   discordId String   @id
   createdAt DateTime @default(now())
 }
+
+// Crew content drafts (tweets, LinkedIn posts, ...) composed on a crew's page.
+// Never hard-deleted: archiving sets status = ARCHIVED.
+enum CrewDraftPlatform {
+  X
+  LINKEDIN
+  DISCORD
+  TELEGRAM
+}
+
+enum CrewDraftStatus {
+  DRAFT
+  READY
+  POSTED
+  ARCHIVED
+}
+
+model CrewDraft {
+  id        Int               @id @default(autoincrement())
+  crewId    String            // Crew-mappings slug (e.g. "comms")
+  platform  CrewDraftPlatform @default(X)
+  text      String
+  mediaUrl  String?           // Optional media link
+  notes     String?           // Optional notes (alt text, timing, ...)
+  status    CrewDraftStatus   @default(DRAFT)
+  createdBy String            // Discord ID
+  updatedBy String            // Discord ID
+  postedBy  String?           // Discord ID of whoever marked it posted
+  postedAt  DateTime?
+  postedUrl String?           // Optional link to the live post
+  createdAt DateTime          @default(now())
+  updatedAt DateTime          @updatedAt
+
+  @@index([crewId, status])
+}
