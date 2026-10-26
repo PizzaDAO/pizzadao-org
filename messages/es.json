@@ -934,5 +934,52 @@
     "tooManyItems": "Máximo 30 tareas.",
     "tooManyChapters": "Máximo 30 capítulos.",
     "badChapter": "La línea del capítulo necesita primero una hora de inicio, como 12:30 Título: {line}"
+  },
+  "crewDrafts": {
+    "title": "Borradores",
+    "intro": "Escribe publicaciones para el crew y publícalas desde tus propias cuentas. Los miembros pueden redactar y marcar como listo; los líderes marcan como publicado.",
+    "showArchived": "Mostrar archivados",
+    "platform": "Plataforma",
+    "platforms": {
+      "x": "X",
+      "linkedin": "LinkedIn",
+      "discord": "Discord",
+      "telegram": "Telegram"
+    },
+    "compose": "Nuevo borrador",
+    "editing": "Editando borrador",
+    "placeholder": "¿Qué queremos decir?",
+    "tooLongHint": "Más de 280: se publicará como un hilo numerado.",
+    "mediaUrl": "Enlace de medios (opcional, https)",
+    "notes": "Notas (opcional)",
+    "preview": "Vista previa",
+    "saveDraft": "Guardar borrador",
+    "saveChanges": "Guardar cambios",
+    "cancelEdit": "Cancelar",
+    "empty": "Aún no hay borradores.",
+    "status": {
+      "draft": "Borrador",
+      "ready": "Listo",
+      "posted": "Publicado",
+      "archived": "Archivado"
+    },
+    "media": "Medios",
+    "viewPost": "Ver publicación",
+    "thread": "Hilo ({count} partes)",
+    "postOnX": "Publicar en X",
+    "postPartOnX": "Publicar {n} en X",
+    "postOnLinkedIn": "Publicar en LinkedIn",
+    "copy": "Copiar",
+    "copied": "Copiado",
+    "copyFailed": "No se pudo copiar. Selecciona el texto y cópialo a mano.",
+    "edit": "Editar",
+    "markReady": "Marcar como listo",
+    "backToDraft": "Volver a borrador",
+    "markPosted": "Marcar como publicado",
+    "postedUrl": "Enlace a la publicación (opcional, https)",
+    "confirmPosted": "Confirmar publicado",
+    "archive": "Archivar",
+    "restore": "Restaurar",
+    "genericError": "Algo salió mal. Inténtalo de nuevo."
   }
 }

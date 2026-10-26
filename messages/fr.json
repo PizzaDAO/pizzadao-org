@@ -934,5 +934,52 @@
     "tooManyItems": "30 actions au maximum.",
     "tooManyChapters": "30 chapitres au maximum.",
     "badChapter": "La ligne du chapitre doit commencer par une heure, comme 12:30 Titre : {line}"
+  },
+  "crewDrafts": {
+    "title": "Brouillons",
+    "intro": "Rédigez des publications pour le crew, puis publiez-les depuis vos propres comptes. Les membres rédigent et marquent comme prêt ; les responsables marquent comme publié.",
+    "showArchived": "Afficher les archivés",
+    "platform": "Plateforme",
+    "platforms": {
+      "x": "X",
+      "linkedin": "LinkedIn",
+      "discord": "Discord",
+      "telegram": "Telegram"
+    },
+    "compose": "Nouveau brouillon",
+    "editing": "Modification du brouillon",
+    "placeholder": "Que voulons-nous dire ?",
+    "tooLongHint": "Plus de 280 : il sera publié sous forme de fil numéroté.",
+    "mediaUrl": "Lien média (facultatif, https)",
+    "notes": "Notes (facultatif)",
+    "preview": "Aperçu",
+    "saveDraft": "Enregistrer le brouillon",
+    "saveChanges": "Enregistrer les modifications",
+    "cancelEdit": "Annuler",
+    "empty": "Aucun brouillon pour le moment.",
+    "status": {
+      "draft": "Brouillon",
+      "ready": "Prêt",
+      "posted": "Publié",
+      "archived": "Archivé"
+    },
+    "media": "Média",
+    "viewPost": "Voir la publication",
+    "thread": "Fil ({count} parties)",
+    "postOnX": "Publier sur X",
+    "postPartOnX": "Publier {n} sur X",
+    "postOnLinkedIn": "Publier sur LinkedIn",
+    "copy": "Copier",
+    "copied": "Copié",
+    "copyFailed": "Copie impossible. Sélectionnez le texte et copiez-le à la main.",
+    "edit": "Modifier",
+    "markReady": "Marquer comme prêt",
+    "backToDraft": "Remettre en brouillon",
+    "markPosted": "Marquer comme publié",
+    "postedUrl": "Lien vers la publication (facultatif, https)",
+    "confirmPosted": "Confirmer la publication",
+    "archive": "Archiver",
+    "restore": "Restaurer",
+    "genericError": "Une erreur s'est produite. Réessayez."
   }
 }

@@ -15,6 +15,8 @@ import {
 } from '@/app/ui/shared-styles'
 import { CrewGettingStarted } from './CrewGettingStarted'
 import { CrewBounties } from './CrewBounties'
+import { CrewDrafts } from './CrewDrafts'
+import { crewHasFeature } from '@/app/lib/crew-features'
 
 // Loading stages to show progress
 const LOADING_STAGES = [
@@ -706,6 +708,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
           {/* Crew bounties (jalapeno-82565) */}
           <CrewBounties crewId={crew.id} crewLabel={crew.label} hideWhenEmpty viewerDiscordId={user?.discordId} />
+
+          {/* Crew drafts (per-crew feature flag; members only) */}
+          {crewHasFeature(crew.id, 'drafts') && <CrewDrafts crewId={crew.id} />}
 
           {/* Recent activity */}
           {recentTaskCloses.length > 0 && (
@@ -1598,6 +1603,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
         {/* Crew bounties (jalapeno-82565) */}
         <CrewBounties crewId={crew.id} crewLabel={crew.label} viewerDiscordId={user?.discordId} />
+
+        {/* Crew drafts (per-crew feature flag; members only) */}
+        {crewHasFeature(crew.id, 'drafts') && <CrewDrafts crewId={crew.id} />}
 
         {/* Manuals */}
         {manuals.length > 0 && (
