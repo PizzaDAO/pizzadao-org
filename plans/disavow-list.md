@@ -412,7 +412,7 @@ Note: per STAGING.md, previews share the **production database**. So:
    notifications enough?
 
 ## Decisions (Snax, 2026-10-26) — these override anything above
-1. **Visibility:** level **5+** and DPR only (not 4+). Listed people never see it; everyone else gets a 404.
+1. **Visibility:** level **5+** and DPR only (not 4+). Level 5 requires a Rare Pizza Box and level 4 a received vouch (Snax, 2026-10-26), so viewers are vouched box holders. Listed people never see it; everyone else gets a 404.
 2. **Votes:** ≥3 DPR yes and yes > no; open ≥72h, closes at 14 days; nominator and subject can't vote.
 3. **Due process:** notify on listing (in-app, no names), response shown beside the listing, appeal once per 90 days → DPR removal vote.
 4. **Vouching:** warn eligible viewers and ask to confirm; allow the vouch. No block.
