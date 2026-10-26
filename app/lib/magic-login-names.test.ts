@@ -82,4 +82,57 @@ describe('login name matching', () => {
     expect((await requestMagicLogin('@', 'https://app.example')).status).toBe('not_found');
     expect(mocks.sendDM).not.toHaveBeenCalled();
   });
+  it('matches a nickname that has a trailing emoji (Discord prefix search still returns it)', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'enzo42', { nick: 'Enzo Pepperoni \u{1F36B}' })]);
+    expect((await requestMagicLogin('Enzo Pepperoni', 'https://app.example')).status).toBe('sent');
+    expect(mocks.search).toHaveBeenCalledWith('Enzo Pepperoni', 100);
+    expect(dmTo()).toEqual(['1']);
+  });
+  it('matches a global_name with emoji, ZWJ and skin tones', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'x1', { user: { global_name: 'Enzo \u{1F468}\u{1F3FD}\u200D\u{1F373} Pepperoni \u2764\uFE0F' } })]);
+    expect((await requestMagicLogin('enzo pepperoni', 'https://app.example')).status).toBe('sent');
+    expect(dmTo()).toEqual(['1']);
+  });
+  it('matches when the user types the emoji too', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'x1', { nick: '\u{1F36B} Enzo' })]);
+    expect((await requestMagicLogin('\u{1F36B} Enzo', 'https://app.example')).status).toBe('sent');
+  });
+  it('never matches emoji-only names', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: '\u{1F36B}\u{1F355}' }), mem('2', 'a2', { user: { global_name: '\u{1F355}' } })]);
+    expect((await requestMagicLogin('\u{1F36B}\u{1F355}', 'https://app.example')).status).toBe('not_found');
+    expect((await requestMagicLogin('\u{1F355}', 'https://app.example')).status).toBe('not_found');
+    expect(mocks.sendDM).not.toHaveBeenCalled();
+  });
+  it('is ambiguous when loose forms collide', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: 'Enzo Pepperoni \u{1F36B}' }), mem('2', 'a2', { nick: 'Enzo Pepperoni \u{1F355}' })]);
+    expect((await requestMagicLogin('Enzo Pepperoni', 'https://app.example')).status).toBe('ambiguous');
+    expect(mocks.sendDM).not.toHaveBeenCalled();
+  });
+  it('still treats a truncated result set as ambiguous for emoji-loose matches', async () => {
+    const full = Array.from({ length: 99 }, (_, i) => mem(`f${i}`, `filler${i}`));
+    mocks.search.mockResolvedValue([...full, mem('1', 'e', { nick: 'Enzo Pepperoni \u{1F36B}' })]);
+    expect((await requestMagicLogin('Enzo Pepperoni', 'https://app.example')).status).toBe('ambiguous');
+  });
+  it('exact nickname beats an emoji twin', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: 'Sam' }), mem('2', 'a2', { nick: 'Sam \u{1F355}' })]);
+    expect((await requestMagicLogin('Sam', 'https://app.example')).status).toBe('sent');
+    expect(dmTo()).toEqual(['1']);
+  });
+  it('exact pass still goes ambiguous when truncated', async () => {
+    const full = Array.from({ length: 98 }, (_, i) => mem(`f${i}`, `filler${i}`));
+    mocks.search.mockResolvedValue([...full, mem('1', 'a1', { nick: 'Sam' }), mem('2', 'a2', { nick: 'Sam \u{1F355}' })]);
+    expect((await requestMagicLogin('Sam', 'https://app.example')).status).toBe('ambiguous');
+  });
+  it('folds stylised letters and strips keycaps', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: '\u24C8am' })]);
+    expect((await requestMagicLogin('sam', 'https://app.example')).status).toBe('sent');
+    mocks.search.mockResolvedValue([mem('2', 'a2', { nick: 'Sam 1\uFE0F\u20E3' })]);
+    expect((await requestMagicLogin('sam 1', 'https://app.example')).status).toBe('sent');
+    expect(dmTo()).toEqual(['1', '2']);
+  });
+  it('never matches the Pizza Trainee placeholder with an emoji', async () => {
+    mocks.search.mockResolvedValue([mem('1', 'a1', { nick: 'Pizza Trainee \u{1F355}' })]);
+    expect((await requestMagicLogin('Pizza Trainee', 'https://app.example')).status).toBe('not_found');
+    expect(mocks.sendDM).not.toHaveBeenCalled();
+  });
 });
