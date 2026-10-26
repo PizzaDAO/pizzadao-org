@@ -9,6 +9,7 @@ vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn(async () => []) }))
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn(async () => 9) }))
+vi.mock('@/app/lib/disavow/messages', () => ({ getDisavowTranslator: vi.fn(async () => (k: string) => `T:${k}`) }))
 vi.mock('@/app/lib/disavow/access', () => ({ disavowViewer: vi.fn(async () => ({ allowed: true, isDPR: true })) }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({
   fetchMemberByDiscordId: vi.fn().mockResolvedValue(null),
@@ -33,7 +34,7 @@ describe('/api/session', () => {
   it('exposes the server-computed flags only when the flag is on', async () => {
     process.env.DISAVOW_ENABLED = 'true'
     const json = await (await sessionGET()).json()
-    expect(json).toMatchObject({ canViewDisavow: true, canVoteDisavow: true })
+    expect(json).toMatchObject({ canViewDisavow: true, canVoteDisavow: true, disavowNavLabel: 'T:navLabel' })
   })
 })
 
@@ -73,8 +74,20 @@ describe('public surfaces do not mention the list', () => {
 })
 
 describe('robots', () => {
-  it('disallows /disavow', () => {
+  it('does not advertise /disavow (noindex + 404 do the work)', () => {
     const rule = (robots().rules as { disallow: string[] }[])[0]
-    expect(rule.disallow).toContain('/disavow')
+    expect(rule.disallow.join(' ')).not.toMatch(/disavow/i)
+  })
+})
+
+describe('root message catalogs carry no disavow text', () => {
+  for (const loc of ['en', 'es', 'fr']) {
+    it(`messages/${loc}.json`, () => {
+      expect(read(`messages/${loc}.json`).toLowerCase()).not.toMatch(/disavow|desautoriz|désaveu/)
+    })
+  }
+  it('the disavow strings are loaded only by the /disavow layout, never by the root layout', () => {
+    expect(read('app/disavow/layout.tsx')).toMatch(/loadDisavowCatalog/)
+    expect(read('app/layout.tsx')).not.toMatch(/disavow/i)
   })
 })

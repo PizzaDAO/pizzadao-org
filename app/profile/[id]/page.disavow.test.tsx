@@ -8,6 +8,7 @@ vi.mock("./ProfileClient", () => ({ ProfileClient: () => null }));
 vi.mock("@/app/lib/session", () => ({ getSession: vi.fn() }));
 vi.mock("@/app/lib/disavow/access", () => ({ canViewDisavowList: vi.fn() }));
 vi.mock("@/app/lib/disavow/match", () => ({ findActiveListingFor: vi.fn() }));
+vi.mock("@/app/lib/disavow/messages", () => ({ getDisavowTranslator: vi.fn(async () => (k: string) => `T:${k}`) }));
 
 import ProfilePage from "./page";
 import { getSession } from "@/app/lib/session";
@@ -28,7 +29,7 @@ afterEach(() => { delete process.env.DISAVOW_ENABLED; });
 
 describe("profile disavow chip", () => {
     it("eligible viewer + listed member gets the warning", async () => {
-        expect((await render()).props.disavowWarning).toEqual({ id: "e1" });
+        expect((await render()).props.disavowWarning).toEqual({ id: "e1", label: "T:chip.label" });
     });
     it("non-eligible viewer gets nothing and the listing is never looked up", async () => {
         m(canViewDisavowList).mockResolvedValue(false);

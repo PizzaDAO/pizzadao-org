@@ -104,7 +104,7 @@ export default function SiteHeader() {
                 </button>
                 {expanded && (
                   <ul id={`nav-${group.key}`} className="absolute left-0 top-full m-0 mt-1 min-w-[230px] list-none rounded-2xl border border-[hsl(var(--rule-warm)/0.55)] bg-card p-2 shadow-lg">
-                    {group.items.map(item => <li key={item.href}><Link href={item.href} aria-current={activeItem(item, pathname) ? "page" : undefined} className={`${linkClass} ${activeItem(item, pathname) ? "font-semibold text-tomato-readable" : "text-foreground"}`}>{t(item.label)}</Link></li>)}
+                    {group.items.map(item => <li key={item.href}><Link href={item.href} aria-current={activeItem(item, pathname) ? "page" : undefined} className={`${linkClass} ${activeItem(item, pathname) ? "font-semibold text-tomato-readable" : "text-foreground"}`}>{item.disavowOnly ? session?.disavowNavLabel : t(item.label)}</Link></li>)}
                   </ul>
                 )}
               </li>
@@ -120,7 +120,7 @@ export default function SiteHeader() {
         <div id="site-nav-mobile" className="max-h-[calc(100svh-4rem)] overflow-y-auto border-t border-[hsl(var(--rule-warm)/0.55)] bg-card lg:hidden">
           <div className="mx-auto grid max-w-[1200px] gap-5 px-4 pb-6 pt-4 sm:px-6">
             <div className="flex flex-wrap items-center gap-2 sm:hidden">{account}</div>
-            {groups.map(group => <section key={group.key} aria-label={t(group.key)}><h2 className="overline m-0 mb-1 text-tomato-readable">{t(group.key)}</h2><ul className="m-0 grid list-none grid-cols-2 gap-x-2 p-0">{group.items.map(item => <li key={item.href}><Link href={item.href} aria-current={activeItem(item, pathname) ? "page" : undefined} className={`${linkClass} ${activeItem(item, pathname) ? "font-semibold text-tomato-readable" : "text-foreground"}`}>{t(item.label)}</Link></li>)}</ul></section>)}
+            {groups.map(group => <section key={group.key} aria-label={t(group.key)}><h2 className="overline m-0 mb-1 text-tomato-readable">{t(group.key)}</h2><ul className="m-0 grid list-none grid-cols-2 gap-x-2 p-0">{group.items.map(item => <li key={item.href}><Link href={item.href} aria-current={activeItem(item, pathname) ? "page" : undefined} className={`${linkClass} ${activeItem(item, pathname) ? "font-semibold text-tomato-readable" : "text-foreground"}`}>{item.disavowOnly ? session?.disavowNavLabel : t(item.label)}</Link></li>)}</ul></section>)}
           </div>
         </div>
       )}

@@ -8,8 +8,12 @@ export const DISAVOW_MIN_LEVEL = 5
 
 /** Votes needed: at least this many DPR "yes" AND yes > no. */
 export const DISAVOW_YES_THRESHOLD = 3
-/** A round cannot pass before it has been open this long. */
-export const DISAVOW_MIN_OPEN_HOURS = 72
+/**
+ * A round is never decided early: nothing is counted until it has been open
+ * this long (dissent needs time to show up). From then on it passes as soon as
+ * the quorum is met, and fails at the window end if it never is.
+ */
+export const DISAVOW_DECISION_DAYS = 7
 /** A round that has not passed by then fails. */
 export const DISAVOW_WINDOW_DAYS = 14
 /** Nominations per person per rolling window. */

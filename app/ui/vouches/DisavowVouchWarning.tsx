@@ -1,23 +1,28 @@
 "use client";
 
 import Link from "next/link";
-import { useTranslations } from "next-intl";
 
 /**
  * Confirm dialog shown before vouching for a person on the private disavow
  * list. Rendered only for eligible viewers (AddVouchButton asks the server).
  * Warn only: "Vouch anyway" proceeds with the vouch.
  */
+export interface VouchWarningStrings {
+    title: string; body: string; confirm: string; cancel: string; view: string;
+}
+
 export function DisavowVouchWarning({
     entryId,
+    strings: t0,
     onConfirm,
     onCancel,
 }: {
     entryId: string;
+    strings: VouchWarningStrings;
     onConfirm: () => void;
     onCancel: () => void;
 }) {
-    const t = useTranslations("disavow.vouch");
+    const t = (k: keyof VouchWarningStrings) => t0[k];
     return (
         <div className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4">
             <div role="dialog" aria-modal="true" aria-labelledby="dv-vouch-title" className="grid w-full max-w-md gap-4 rounded-2xl bg-card p-6 text-card-foreground shadow-lg">

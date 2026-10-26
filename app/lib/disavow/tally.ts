@@ -1,4 +1,4 @@
-import { DAY_MS, DISAVOW_MIN_OPEN_HOURS, DISAVOW_YES_THRESHOLD, HOUR_MS } from './constants'
+import { DAY_MS, DISAVOW_DECISION_DAYS, DISAVOW_YES_THRESHOLD } from './constants'
 
 export type VoteChoice = 'YES' | 'NO' | 'ABSTAIN' | 'RECUSE'
 export interface TallyVote {
@@ -23,8 +23,8 @@ export interface TallyResult {
 }
 
 /**
- * Count a round. Passes when yes >= threshold AND yes > no AND the round has
- * been open 72h. Fails at closesAt otherwise. The nominator's and subject's
+ * Count a round. Nothing is decided before opensAt + 7 days. After that it
+ * passes when yes >= threshold AND yes > no, and fails at closesAt otherwise. The nominator's and subject's
  * votes are ignored even if they got in (the API also rejects them). The same
  * rule serves LIST, REMOVE and REAFFIRM; the caller decides what pass means.
  */
@@ -39,11 +39,13 @@ export function tallyRound(votes: readonly TallyVote[], ctx: TallyInput): TallyR
     else if (c === 'ABSTAIN') abstain++
     else recused++
   }
-  const floor = ctx.opensAt.getTime() + DISAVOW_MIN_OPEN_HOURS * HOUR_MS
-  const passed = yes >= DISAVOW_YES_THRESHOLD && yes > no && ctx.now.getTime() >= floor
+  // Nothing is decided before the fixed decision time, however many votes are in.
+  const decideAt = ctx.opensAt.getTime() + DISAVOW_DECISION_DAYS * DAY_MS
   let outcome: TallyResult['outcome'] = 'pending'
-  if (passed) outcome = 'passed'
-  else if (ctx.now.getTime() >= ctx.closesAt.getTime()) outcome = 'failed'
+  if (ctx.now.getTime() >= decideAt) {
+    if (yes >= DISAVOW_YES_THRESHOLD && yes > no) outcome = 'passed'
+    else if (ctx.now.getTime() >= ctx.closesAt.getTime()) outcome = 'failed'
+  }
   return { yes, no, abstain, recused, outcome }
 }
 

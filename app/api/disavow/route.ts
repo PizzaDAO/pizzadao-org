@@ -2,7 +2,7 @@ import { enforceRateLimit } from '@/app/lib/rate-limit'
 import { requireDisavowViewer } from '@/app/lib/disavow/access'
 import { listDisavowals } from '@/app/lib/disavow/detail'
 import { out, safe } from '@/app/lib/disavow/http'
-import { identifiersForMember } from '@/app/lib/disavow/match'
+import { resolveSubjectIdentifiers } from '@/app/lib/disavow/match'
 import { nominate } from '@/app/lib/disavow/store'
 import { parseNomination, readJson } from '@/app/lib/disavow/validate'
 
@@ -14,7 +14,7 @@ export const GET = safe('list', async (request: Request) => {
   const g = await requireDisavowViewer()
   if (!g.ok) return g.response
   const url = new URL(request.url)
-  return out(await listDisavowals(url.searchParams.get('tab'), url.searchParams.get('page'), g.isDPR))
+  return out(await listDisavowals(url.searchParams.get('tab'), url.searchParams.get('page'), g.isDPR, g.session.discordId))
 })
 
 /** POST /api/disavow — nominate (level 5+ or DPR). */
@@ -27,18 +27,21 @@ export const POST = safe('nominate', async (request: Request) => {
   const parsed = parseNomination(await readJson(request))
   if (!parsed.ok) return out({ error: parsed.error }, 400)
 
-  // A picked member expands to every handle we know (Discord id, wallets, X),
-  // so the listing follows them. Done server-side; the client never sees these.
-  const merged = [...parsed.value.identifiers]
-  for (const i of parsed.value.identifiers.filter(i => i.kind === 'MEMBER_ID')) {
-    for (const extra of await identifiersForMember(i.value)) {
-      if (!merged.some(m => m.kind === extra.kind && m.value === extra.value)) merged.push(extra)
-    }
-  }
+  // Whatever was typed (a wallet, an X handle, a Discord id, a picked member) expands
+  // server-side to the member behind it, so the entry also carries their member id,
+  // Discord id, wallets and X handle and the subject can't slip past the checks.
+  const merged = await resolveSubjectIdentifiers(parsed.value.identifiers)
 
   const r = await nominate({ nominatorDiscordId: g.session.discordId, ...parsed.value, identifiers: merged })
-  if (r.ok) return out({ id: r.id }, 201)
+  // Non-DPR callers get the same answer whether a nomination was created or an
+  // active NOMINATED/SUSPENDED entry already existed (which would otherwise leak
+  // that a nomination exists). Only an existing LISTED entry is revealed, and
+  // they can see those anyway.
+  if (r.ok) return out({ ok: true, ...(g.isDPR ? { id: r.id } : {}) }, 201)
   if (r.code === 'rate_limited') return out({ error: 'Nomination limit reached', code: 'LIMIT' }, 429)
   if (r.code === 'self') return out({ error: 'You cannot nominate yourself' }, 400)
-  return out({ error: 'Already nominated or listed', existingId: r.existingId }, 409)
+  if (g.isDPR || r.existingStatus === 'LISTED') {
+    return out({ error: 'Already nominated or listed', existingId: r.existingId }, 409)
+  }
+  return out({ ok: true }, 201)
 })

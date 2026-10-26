@@ -5,7 +5,8 @@
  */
 import { prisma } from '@/app/lib/db'
 import { DISAVOW_PAGE_SIZE } from './constants'
-import { settleRound, recordView, subjectDiscordIds } from './store'
+import { identifierOr, viewerIdentifiers } from './match'
+import { settleRound, recordView, subjectDiscordIds, isSubjectOf } from './store'
 import { tallyRound } from './tally'
 
 const TABS: Record<string, string[]> = {
@@ -16,11 +17,16 @@ const TABS: Record<string, string[]> = {
 }
 
 /** Paginated list. Non-DPR viewers always get the LISTED tab. Never includes the nominator. */
-export async function listDisavowals(tabIn: string | null | undefined, pageIn: unknown, isDPR: boolean) {
+export async function listDisavowals(tabIn: string | null | undefined, pageIn: unknown, isDPR: boolean, viewerDiscordId: string) {
   let tab = tabIn ?? 'listed'
   if (!(tab in TABS) || (tab !== 'listed' && !isDPR)) tab = 'listed'
   const page = Math.max(1, Math.floor(Number(pageIn) || 1))
-  const where = { status: { in: TABS[tab] } } as never
+  // Never list an entry about the viewer themself (e.g. while they are only NOMINATED).
+  const mine = identifierOr(await viewerIdentifiers(viewerDiscordId))
+  const where = {
+    status: { in: TABS[tab] },
+    ...(mine.length ? { NOT: { identifiers: { some: { OR: mine } } } } : {}),
+  } as never
   const [total, items] = await Promise.all([
     prisma.disavowal.count({ where }),
     prisma.disavowal.findMany({
@@ -47,6 +53,8 @@ export async function getDisavowDetail(id: string, viewer: { discordId: string; 
     },
   })
   if (!d) return null
+  // The subject of an entry gets a 404 for it, whatever its status.
+  if (await isSubjectOf(d.identifiers, viewer.discordId)) return null
   const isNominator = d.nominatorDiscordId === viewer.discordId
   // Non-DPR viewers only ever see LISTED entries (and their own nominations).
   if (!viewer.isDPR && d.status !== 'LISTED' && !isNominator) return null
@@ -69,7 +77,7 @@ export async function getDisavowDetail(id: string, viewer: { discordId: string; 
     redacted: !!d.redactedAt,
     isNominator,
     history: d.events
-      .filter(e => e.type !== 'VIEWED' && e.type !== 'VOTED')
+      .filter(e => e.type !== 'VIEWED' && e.type !== 'VOTED' && !(e.data as { duplicate?: boolean } | null)?.duplicate)
       .map(e => ({ type: e.type, at: e.createdAt })),
   }
   if (!viewer.isDPR) return base

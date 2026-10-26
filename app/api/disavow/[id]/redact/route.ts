@@ -22,5 +22,6 @@ export const POST = safe('redact', async (request: Request, ctx: Ctx) => {
   const { id } = await ctx.params
   const r = await redact(id, session.discordId)
   if (r === 'not_found') return disavowNotFound()
+  if (r === 'conflict') return out({ error: 'You cannot redact an entry about yourself' }, 403)
   return out({ ok: true })
 })

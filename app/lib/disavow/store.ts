@@ -2,19 +2,22 @@
  * Disavow list mutations. Rules (plans/disavow-list.md):
  *  - nothing is ever deleted: status changes and redaction only;
  *  - every mutation runs in one transaction and appends a DisavowEvent;
- *  - settling a round is idempotent (guarded by `state = OPEN` in the update);
+ *  - a round is counted inside a transaction that locks its row, reading fresh
+ *    votes, and closing is guarded by `state = OPEN`, so concurrent votes,
+ *    views and cron runs can't double-settle or slip a vote in after the count;
+ *  - at most one OPEN round per disavowal (partial unique index);
  *  - notifications carry no names or content and are best-effort.
  */
 import { prisma } from '@/app/lib/db'
 import { createNotification } from '@/app/lib/notifications'
 import { getMembersWithRoles } from '@/app/lib/discord'
 import { DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
-import { fetchMemberById, fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import {
   DAY_MS, DISAVOW_APPEAL_COOLDOWN_DAYS, DISAVOW_LISTING_MONTHS, DISAVOW_NOMINATIONS_PER_WINDOW,
   DISAVOW_NOMINATION_WINDOW_DAYS, DISAVOW_WINDOW_DAYS, REDACTED,
 } from './constants'
 import type { IdentifierInput } from './identity'
+import { discordIdsForIdentifiers, identifierOr, viewerIdentifiers } from './match'
 import { tallyRound, windowEnd, type TallyVote } from './tally'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
@@ -34,6 +37,13 @@ function logEvent(tx: Tx, disavowalId: string, type: string, actorDiscordId: str
   })
 }
 
+/** Row lock so a vote and a settle on the same round serialize. */
+function lockRound(tx: Tx, roundId: string) {
+  return tx.$queryRaw`SELECT id FROM "DisavowRound" WHERE id = ${roundId} FOR UPDATE`
+}
+
+const isUniqueViolation = (e: unknown) => (e as { code?: string })?.code === 'P2002'
+
 async function notify(
   type: 'DISAVOW_VOTE_NEEDED' | 'DISAVOW_ROUND_CLOSED' | 'DISAVOW_LISTED_SUBJECT',
   recipientId: string,
@@ -48,26 +58,16 @@ async function notify(
   }
 }
 
-/** Discord ids of the people a disavowal is about (direct, plus via member id). */
-export async function subjectDiscordIds(identifiers: ReadonlyArray<{ kind: string; value: string }>): Promise<string[]> {
-  const out = new Set<string>()
-  for (const i of identifiers) {
-    if (i.kind === 'DISCORD_ID') out.add(i.value)
-    if (i.kind === 'MEMBER_ID') {
-      try {
-        const m = await fetchMemberById(i.value)
-        if (m?.discordId) out.add(m.discordId)
-      } catch { /* ignore */ }
-    }
-  }
-  return [...out]
-}
+/** Discord ids of the people a disavowal is about (every identifier resolved). */
+export const subjectDiscordIds = discordIdsForIdentifiers
 
-/** Whether `discordId` is the subject of these identifiers (Discord id or member id). */
+/**
+ * Whether `discordId` is the subject of these identifiers: matches the person's
+ * Discord id, member id, wallets and X handle (never name or Telegram).
+ */
 export async function isSubjectOf(identifiers: ReadonlyArray<{ kind: string; value: string }>, discordId: string): Promise<boolean> {
-  if (identifiers.some(i => i.kind === 'DISCORD_ID' && i.value === discordId)) return true
-  const memberId = await fetchMemberIdByDiscordId(discordId).catch(() => null)
-  return !!memberId && identifiers.some(i => i.kind === 'MEMBER_ID' && i.value === memberId)
+  const mine = identifierOr(await viewerIdentifiers(discordId))
+  return identifiers.some(i => mine.some(m => m.kind === i.kind && m.value === i.value))
 }
 
 // ---------------------------------------------------------------- nominate
@@ -76,7 +76,7 @@ export type NominateResult =
   | { ok: true; id: string }
   | { ok: false; code: 'rate_limited' }
   | { ok: false; code: 'self' }
-  | { ok: false; code: 'duplicate'; existingId: string }
+  | { ok: false; code: 'duplicate'; existingId: string; existingStatus: string }
 
 export async function nominate(input: {
   nominatorDiscordId: string
@@ -89,10 +89,12 @@ export async function nominate(input: {
 }): Promise<NominateResult> {
   const now = input.now ?? new Date()
   const since = new Date(now.getTime() - DISAVOW_NOMINATION_WINDOW_DAYS * DAY_MS)
-  const recent = await prisma.disavowal.count({
-    where: { nominatorDiscordId: input.nominatorDiscordId, createdAt: { gte: since } },
+  // Every attempt counts, including ones that turn out to be duplicates: each
+  // writes a NOMINATED event by this actor (duplicates onto the existing entry).
+  const attempts = await prisma.disavowEvent.count({
+    where: { type: 'NOMINATED', actorDiscordId: input.nominatorDiscordId, createdAt: { gte: since } },
   })
-  if (recent >= DISAVOW_NOMINATIONS_PER_WINDOW) return { ok: false, code: 'rate_limited' }
+  if (attempts >= DISAVOW_NOMINATIONS_PER_WINDOW) return { ok: false, code: 'rate_limited' }
 
   if (await isSubjectOf(input.identifiers, input.nominatorDiscordId)) return { ok: false, code: 'self' }
 
@@ -101,9 +103,14 @@ export async function nominate(input: {
       OR: input.identifiers.map(i => ({ kind: i.kind, value: i.value })),
       disavowal: { status: { in: [...ACTIVE_STATUSES] } },
     } as never,
-    select: { disavowalId: true },
+    select: { disavowalId: true, disavowal: { select: { status: true } } },
   })
-  if (dup) return { ok: false, code: 'duplicate', existingId: dup.disavowalId }
+  if (dup) {
+    await prisma.disavowEvent.create({
+      data: { disavowalId: dup.disavowalId, type: 'NOMINATED', actorDiscordId: input.nominatorDiscordId, data: { duplicate: true } },
+    })
+    return { ok: false, code: 'duplicate', existingId: dup.disavowalId, existingStatus: dup.disavowal.status }
+  }
 
   const closesAt = windowEnd(now, DISAVOW_WINDOW_DAYS)
   const created = await prisma.$transaction(async tx => {
@@ -161,8 +168,7 @@ export async function castVote(input: {
   })
   if (!round || round.disavowalId !== input.disavowalId) return { ok: false, code: 'not_found' }
   if (round.state !== 'OPEN') return { ok: false, code: 'closed' }
-  const ids = round.disavowal.identifiers
-  if (input.voterDiscordId === round.disavowal.nominatorDiscordId || (await isSubjectOf(ids, input.voterDiscordId))) {
+  if (input.voterDiscordId === round.disavowal.nominatorDiscordId || (await isSubjectOf(round.disavowal.identifiers, input.voterDiscordId))) {
     return { ok: false, code: 'conflict' }
   }
   if (now.getTime() >= round.closesAt.getTime()) {
@@ -170,50 +176,64 @@ export async function castVote(input: {
     return { ok: false, code: 'closed' }
   }
 
-  await prisma.$transaction(async tx => {
+  const accepted = await prisma.$transaction(async tx => {
+    await lockRound(tx, round.id)
+    // Re-check under the lock: the round may have been settled meanwhile.
+    const fresh = await tx.disavowRound.findUnique({ where: { id: round.id }, select: { state: true, closesAt: true } })
+    if (!fresh || fresh.state !== 'OPEN' || now.getTime() >= fresh.closesAt.getTime()) return false
     await tx.disavowVote.upsert({
       where: { roundId_voterDiscordId: { roundId: round.id, voterDiscordId: input.voterDiscordId } },
       create: { roundId: round.id, voterDiscordId: input.voterDiscordId, choice: input.choice, comment: input.comment ?? null },
       update: { choice: input.choice, comment: input.comment ?? null },
     })
     await logEvent(tx, round.disavowalId, 'VOTED', input.voterDiscordId, { roundId: round.id, choice: input.choice })
+    return true
   })
+  if (!accepted) return { ok: false, code: 'closed' }
   const outcome = await settleRound(round.id, now)
   return { ok: true, outcome }
 }
 
 // ------------------------------------------------------------------ settle
 
-/**
- * Close a round if its outcome is decided. Safe to call any number of times and
- * concurrently: the OPEN -> PASSED/FAILED update is the single winner, and only
- * the winner writes events and applies effects.
- */
-export async function settleRound(roundId: string, now: Date = new Date()): Promise<'pending' | 'passed' | 'failed'> {
-  const round = await prisma.disavowRound.findUnique({
-    where: { id: roundId },
-    include: { votes: true, disavowal: { include: { identifiers: true } } },
-  })
-  if (!round || round.state !== 'OPEN') {
-    return round?.state === 'PASSED' ? 'passed' : round?.state === 'FAILED' ? 'failed' : 'pending'
-  }
-  const subjectIds = await subjectDiscordIds(round.disavowal.identifiers)
-  const t = tallyRound(
-    round.votes.map(v => ({ voterDiscordId: v.voterDiscordId, choice: v.choice })) as TallyVote[],
-    { nominatorId: round.disavowal.nominatorDiscordId, subjectIds, now, opensAt: round.opensAt, closesAt: round.closesAt },
-  )
-  if (t.outcome === 'pending') return 'pending'
+type Outcome = 'pending' | 'passed' | 'failed'
 
-  const passed = t.outcome === 'passed'
-  const won = await prisma.$transaction(async tx => {
-    const res = await tx.disavowRound.updateMany({
+/**
+ * Close a round if its outcome is decided (never before opensAt + 7 days). Safe
+ * to call any number of times and concurrently: the count happens in a
+ * transaction holding the round's row lock and reading fresh votes, and only
+ * the OPEN -> PASSED/FAILED winner writes events and applies effects.
+ */
+export async function settleRound(roundId: string, now: Date = new Date()): Promise<Outcome> {
+  const pre = await prisma.disavowRound.findUnique({
+    where: { id: roundId },
+    include: { disavowal: { include: { identifiers: true } } },
+  })
+  if (!pre) return 'pending'
+  if (pre.state !== 'OPEN') return pre.state === 'PASSED' ? 'passed' : pre.state === 'FAILED' ? 'failed' : 'pending'
+  const subjectIds = await subjectDiscordIds(pre.disavowal.identifiers)
+
+  const res = await prisma.$transaction(async tx => {
+    await lockRound(tx, roundId)
+    const round = await tx.disavowRound.findUnique({
+      where: { id: roundId },
+      include: { votes: true, disavowal: true },
+    })
+    if (!round || round.state !== 'OPEN') return null
+    const t = tallyRound(
+      round.votes.map(v => ({ voterDiscordId: v.voterDiscordId, choice: v.choice })) as TallyVote[],
+      { nominatorId: round.disavowal.nominatorDiscordId, subjectIds, now, opensAt: round.opensAt, closesAt: round.closesAt },
+    )
+    if (t.outcome === 'pending') return { outcome: 'pending' as Outcome, won: false }
+
+    const passed = t.outcome === 'passed'
+    const upd = await tx.disavowRound.updateMany({
       where: { id: round.id, state: 'OPEN' },
       data: { state: passed ? 'PASSED' : 'FAILED', closedAt: now },
     })
-    if (res.count === 0) return false
+    if (upd.count === 0) return null
     const d = round.disavowal
-    const tallyData = { roundId: round.id, kind: round.kind, outcome: t.outcome, yes: t.yes, no: t.no }
-    await logEvent(tx, d.id, 'ROUND_CLOSED', null, tallyData)
+    await logEvent(tx, d.id, 'ROUND_CLOSED', null, { roundId: round.id, kind: round.kind, outcome: t.outcome, yes: t.yes, no: t.no })
     if (round.kind === 'LIST') {
       if (passed) {
         await tx.disavowal.updateMany({
@@ -234,32 +254,30 @@ export async function settleRound(roundId: string, now: Date = new Date()): Prom
       }
     } else if (round.kind === 'REAFFIRM') {
       if (passed) {
-        await tx.disavowal.updateMany({
-          where: { id: d.id, status: 'LISTED' },
-          data: { reviewDueAt: addMonths(now, DISAVOW_LISTING_MONTHS) },
-        })
+        await tx.disavowal.updateMany({ where: { id: d.id, status: 'LISTED' }, data: { reviewDueAt: addMonths(now, DISAVOW_LISTING_MONTHS) } })
       } else {
         await tx.disavowal.updateMany({ where: { id: d.id, status: { in: ['LISTED', 'SUSPENDED'] } }, data: { status: 'EXPIRED' } })
         await logEvent(tx, d.id, 'EXPIRED', null, { to: 'EXPIRED' })
       }
     }
-    return true
+    return { outcome: t.outcome as Outcome, won: true, kind: round.kind, passed, nominator: d.nominatorDiscordId }
   })
-  if (!won) return t.outcome
+  if (!res) return 'pending' // someone else settled it, or it was cancelled
+  if (!res.won) return res.outcome
 
   // Best-effort notifications after commit. No names, no content.
-  if (round.kind === 'LIST') {
-    if (passed) {
+  if (res.kind === 'LIST') {
+    if (res.passed) {
       for (const id of subjectIds) {
         await notify('DISAVOW_LISTED_SUBJECT', id, 'A notice about you', 'You can see details and respond.', '/disavow/response')
       }
     }
     await notify(
-      'DISAVOW_ROUND_CLOSED', round.disavowal.nominatorDiscordId, 'A vote has closed',
-      passed ? 'A nomination you made passed.' : 'A nomination you made did not pass.', '/disavow',
+      'DISAVOW_ROUND_CLOSED', res.nominator, 'A vote has closed',
+      res.passed ? 'A nomination you made passed.' : 'A nomination you made did not pass.', '/disavow',
     )
   }
-  return t.outcome
+  return res.outcome
 }
 
 // --------------------------------------------------------- other mutations
@@ -288,17 +306,22 @@ export async function suspend(id: string, actor: string, now = new Date()): Prom
   const d = await load(id)
   if (!d) return 'not_found'
   if (d.status !== 'LISTED') return 'bad_state'
-  const ok = await prisma.$transaction(async tx => {
-    const r = await tx.disavowal.updateMany({ where: { id, status: 'LISTED' }, data: { status: 'SUSPENDED' } })
-    if (r.count === 0) return false
-    await logEvent(tx, id, 'SUSPENDED', actor, { from: 'LISTED', to: 'SUSPENDED' })
-    if (!d.rounds.some(r => r.kind === 'REMOVE')) {
-      await tx.disavowRound.create({ data: { disavowalId: id, kind: 'REMOVE', openedBy: actor, opensAt: now, closesAt: windowEnd(now, DISAVOW_WINDOW_DAYS) } })
-      await logEvent(tx, id, 'ROUND_OPENED', actor, { kind: 'REMOVE' })
-    }
-    return true
-  })
-  return ok ? 'ok' : 'bad_state'
+  try {
+    const ok = await prisma.$transaction(async tx => {
+      const r = await tx.disavowal.updateMany({ where: { id, status: 'LISTED' }, data: { status: 'SUSPENDED' } })
+      if (r.count === 0) return false
+      await logEvent(tx, id, 'SUSPENDED', actor, { from: 'LISTED', to: 'SUSPENDED' })
+      if (!d.rounds.some(r => r.kind === 'REMOVE')) {
+        await tx.disavowRound.create({ data: { disavowalId: id, kind: 'REMOVE', openedBy: actor, opensAt: now, closesAt: windowEnd(now, DISAVOW_WINDOW_DAYS) } })
+        await logEvent(tx, id, 'ROUND_OPENED', actor, { kind: 'REMOVE' })
+      }
+      return true
+    })
+    return ok ? 'ok' : 'bad_state'
+  } catch (e) {
+    if (isUniqueViolation(e)) return 'bad_state' // another round opened concurrently; transaction rolled back
+    throw e
+  }
 }
 
 export async function unsuspend(id: string, actor: string): Promise<'ok' | 'not_found' | 'bad_state'> {
@@ -329,14 +352,21 @@ export async function openRemoveRound(
   if (opts.appeal && d.lastAppealAt && now.getTime() - d.lastAppealAt.getTime() < DISAVOW_APPEAL_COOLDOWN_DAYS * DAY_MS) {
     return 'too_soon'
   }
-  await prisma.$transaction(async tx => {
-    if (opts.appeal) {
-      await tx.disavowal.update({ where: { id }, data: { lastAppealAt: now } })
-      await logEvent(tx, id, 'APPEALED', actor)
-    }
-    await tx.disavowRound.create({ data: { disavowalId: id, kind: 'REMOVE', openedBy: actor, opensAt: now, closesAt: windowEnd(now, DISAVOW_WINDOW_DAYS) } })
-    await logEvent(tx, id, 'ROUND_OPENED', actor, { kind: 'REMOVE', appeal: !!opts.appeal })
-  })
+  try {
+    await prisma.$transaction(async tx => {
+      // Create first: the partial unique index rejects a second OPEN round and
+      // rolls back the appeal bookkeeping with it.
+      await tx.disavowRound.create({ data: { disavowalId: id, kind: 'REMOVE', openedBy: actor, opensAt: now, closesAt: windowEnd(now, DISAVOW_WINDOW_DAYS) } })
+      if (opts.appeal) {
+        await tx.disavowal.update({ where: { id }, data: { lastAppealAt: now } })
+        await logEvent(tx, id, 'APPEALED', actor)
+      }
+      await logEvent(tx, id, 'ROUND_OPENED', actor, { kind: 'REMOVE', appeal: !!opts.appeal })
+    })
+  } catch (e) {
+    if (isUniqueViolation(e)) return 'already_open'
+    throw e
+  }
   await notifyDpr(id, [d.nominatorDiscordId, ...(await subjectDiscordIds(d.identifiers))])
   return 'ok'
 }
@@ -354,14 +384,16 @@ export async function addResponse(id: string, actor: string, text: string, now =
 }
 
 /**
- * Overwrite the text and name/handle/wallet identifiers with a marker (legal or
- * erasure request). The row, status, and audit trail stay; the event names the
- * fields but never their contents.
+ * Overwrite the text, the name/handle/wallet identifiers and every DPR vote
+ * comment with a marker (legal or erasure request). The row, status, votes and
+ * audit trail stay; the event names the fields but never their contents. An
+ * admin who is the subject can't redact their own entry.
  */
-export async function redact(id: string, actor: string, now = new Date()): Promise<'ok' | 'not_found'> {
+export async function redact(id: string, actor: string, now = new Date()): Promise<'ok' | 'not_found' | 'conflict'> {
   const d = await prisma.disavowal.findUnique({ where: { id }, include: { identifiers: true } })
   if (!d) return 'not_found'
-  const fields = ['displayName', 'statement', 'evidenceUrls', 'subjectResponse', 'identifiers']
+  if (await isSubjectOf(d.identifiers, actor)) return 'conflict'
+  const fields = ['displayName', 'statement', 'evidenceUrls', 'subjectResponse', 'identifiers', 'voteComments']
   await prisma.$transaction(async tx => {
     await tx.disavowal.update({
       where: { id },
@@ -378,6 +410,7 @@ export async function redact(id: string, actor: string, now = new Date()): Promi
         await tx.disavowIdentifier.update({ where: { id: i.id }, data: { value: `${REDACTED}:${i.id}` } })
       }
     }
+    await tx.disavowVote.updateMany({ where: { round: { disavowalId: id }, comment: { not: null } } as never, data: { comment: REDACTED } })
     await logEvent(tx, id, 'REDACTED', actor, { fields })
   })
   return 'ok'
@@ -400,7 +433,7 @@ export async function recordView(id: string, viewer: string, now = new Date()): 
 
 // -------------------------------------------------------------------- cron
 
-/** Settle due rounds and open REAFFIRM rounds for listings past their review date. */
+/** Settle rounds that are decided (never before day 7) and open REAFFIRM rounds past their review date. */
 export async function runDisavowCron(now: Date = new Date()) {
   const open = await prisma.disavowRound.findMany({ where: { state: 'OPEN' }, select: { id: true } })
   let settled = 0
@@ -417,12 +450,16 @@ export async function runDisavowCron(now: Date = new Date()) {
   })
   let reaffirmOpened = 0
   for (const d of due) {
-    await prisma.$transaction(async tx => {
-      await tx.disavowRound.create({ data: { disavowalId: d.id, kind: 'REAFFIRM', openedBy: 'system', opensAt: now, closesAt: windowEnd(now, DISAVOW_WINDOW_DAYS) } })
-      await logEvent(tx, d.id, 'ROUND_OPENED', null, { kind: 'REAFFIRM' })
-    })
-    reaffirmOpened++
-    await notifyDpr(d.id, [])
+    try {
+      await prisma.$transaction(async tx => {
+        await tx.disavowRound.create({ data: { disavowalId: d.id, kind: 'REAFFIRM', openedBy: 'system', opensAt: now, closesAt: windowEnd(now, DISAVOW_WINDOW_DAYS) } })
+        await logEvent(tx, d.id, 'ROUND_OPENED', null, { kind: 'REAFFIRM' })
+      })
+      reaffirmOpened++
+      await notifyDpr(d.id, [])
+    } catch (e) {
+      if (!isUniqueViolation(e)) console.error('[cron/disavow] reaffirm failed', d.id, (e as Error)?.name)
+    }
   }
   return { settled, reaffirmOpened }
 }

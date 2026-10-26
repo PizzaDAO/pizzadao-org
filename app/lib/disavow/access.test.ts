@@ -9,7 +9,13 @@ vi.mock('@/app/lib/db', () => ({
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
 vi.mock('@/app/lib/mission-review-access', () => ({ DPR_ONLY_MIN_LEVEL: 8, canReviewMission: vi.fn() }))
-vi.mock('@/app/lib/member-utils', () => ({ findMemberByDiscordId: vi.fn(async () => ({ memberId: '77', name: 'M' })) }))
+vi.mock('@/app/lib/disavow/match', () => ({
+  identifierOr: (ids: Array<{ kind: string; value: string }>) => ids,
+  viewerIdentifiers: vi.fn(async (d: string) => [
+    { kind: 'DISCORD_ID', value: d }, { kind: 'MEMBER_ID', value: '77' },
+    { kind: 'WALLET', value: '0xabc' }, { kind: 'X_HANDLE', value: 'me' },
+  ]),
+}))
 
 import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
@@ -50,14 +56,33 @@ describe('canViewDisavowList', () => {
     m(prisma.disavowIdentifier.findFirst).mockResolvedValue({ id: 1 })
     expect(await canViewDisavowList(ME)).toBe(false)
   })
-  it('subject lookup matches by Discord id and member id, only for active statuses', async () => {
+  it('subject lookup matches Discord id, member id, wallets and X handle, only for LISTED/SUSPENDED', async () => {
     await canViewDisavowList(ME)
     const where = m(prisma.disavowIdentifier.findFirst).mock.calls[0][0].where
     expect(where.OR).toEqual([
       { kind: 'DISCORD_ID', value: ME },
       { kind: 'MEMBER_ID', value: '77' },
+      { kind: 'WALLET', value: '0xabc' },
+      { kind: 'X_HANDLE', value: 'me' },
     ])
-    expect(where.disavowal.status.in).toEqual(['NOMINATED', 'LISTED', 'SUSPENDED'])
+    expect(where.disavowal.status.in).toEqual(['LISTED', 'SUSPENDED'])
+  })
+  it('a merely NOMINATED person keeps access and the same canViewDisavow (no tell)', async () => {
+    m(getCurrentLevel).mockResolvedValue(6)
+    const before = await disavowViewer(ME)
+    // the only entry about them is NOMINATED: the LISTED/SUSPENDED query finds nothing
+    m(prisma.disavowIdentifier.findFirst).mockImplementation(async ({ where }: { where: { disavowal: { status: { in: string[] } } } }) =>
+      where.disavowal.status.in.includes('NOMINATED') ? { id: 1 } : null)
+    expect(await disavowViewer(ME)).toEqual(before)
+    expect(before.allowed).toBe(true)
+  })
+  it('a LISTED or SUSPENDED person is locked out', async () => {
+    m(getCurrentLevel).mockResolvedValue(6)
+    for (const status of ['LISTED', 'SUSPENDED']) {
+      m(prisma.disavowIdentifier.findFirst).mockImplementation(async ({ where }: { where: { disavowal: { status: { in: string[] } } } }) =>
+        where.disavowal.status.in.includes(status) ? { id: 1 } : null)
+      expect((await disavowViewer(ME)).allowed).toBe(false)
+    }
   })
   it('fails closed on lookup errors', async () => {
     m(prisma.disavowIdentifier.findFirst).mockRejectedValue(new Error('db down'))

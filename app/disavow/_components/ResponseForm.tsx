@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { paperCard, pillInk, pillOutline } from "@/app/ui/shared/Editorial";
 
-export function ResponseForm({ initial, hasOpenRound }: { initial: string; hasOpenRound: boolean }) {
+export function ResponseForm({ entryId, initial, hasOpenRound }: { entryId: string; initial: string; hasOpenRound: boolean }) {
     const t = useTranslations("disavow.response");
     const router = useRouter();
     const [text, setText] = useState(initial);
@@ -21,7 +21,7 @@ export function ResponseForm({ initial, hasOpenRound }: { initial: string; hasOp
             const res = await fetch("/api/disavow/me/response", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ text }),
+                body: JSON.stringify({ id: entryId, text }),
             });
             setMessage(res.ok ? t("saved") : t("error"));
             if (res.ok) router.refresh();
@@ -36,7 +36,11 @@ export function ResponseForm({ initial, hasOpenRound }: { initial: string; hasOp
         setBusy(true);
         setMessage(null);
         try {
-            const res = await fetch("/api/disavow/me/appeal", { method: "POST" });
+            const res = await fetch("/api/disavow/me/appeal", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ id: entryId }),
+            });
             if (res.ok) {
                 setAppealed(true);
                 setMessage(t("appealed"));

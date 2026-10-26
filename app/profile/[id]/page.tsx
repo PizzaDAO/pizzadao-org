@@ -14,6 +14,7 @@ import { getSession } from "@/app/lib/session";
 import { disavowEnabled } from "@/app/lib/disavow/constants";
 import { canViewDisavowList } from "@/app/lib/disavow/access";
 import { findActiveListingFor } from "@/app/lib/disavow/match";
+import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 
 export const runtime = "nodejs";
 
@@ -92,13 +93,16 @@ export default async function ProfilePage({
  * even read the session, while DISAVOW_ENABLED is off. Only an eligible viewer
  * ever gets a non-null value; everyone else's page is unchanged.
  */
-async function loadDisavowWarning(memberId: string): Promise<{ id: string } | null> {
+async function loadDisavowWarning(memberId: string): Promise<{ id: string; label: string } | null> {
     if (!disavowEnabled()) return null;
     try {
         const session = await getSession();
         if (!session?.discordId) return null;
         if (!(await canViewDisavowList(session.discordId))) return null;
-        return await findActiveListingFor(memberId);
+        const hit = await findActiveListingFor(memberId);
+        if (!hit) return null;
+        // Translated here, for this viewer only (disavow text is not in the root catalog).
+        return { id: hit.id, label: (await getDisavowTranslator())("chip.label") };
     } catch {
         return null;
     }

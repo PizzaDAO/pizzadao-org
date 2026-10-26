@@ -66,7 +66,8 @@ export function NominateForm() {
                 }),
             });
             const data = await res.json().catch(() => ({}));
-            if (res.status === 201) return router.push(`/disavow/${data.id}`);
+            // Same landing for every outcome, so a duplicate of a hidden entry looks like any accepted nomination.
+            if (res.status === 201) return router.push(data.id ? `/disavow/${data.id}` : "/disavow");
             if (res.status === 409) {
                 setExistingId(data.existingId ?? null);
                 setError(t("errorDuplicate"));

@@ -1,10 +1,12 @@
 /**
  * Who may see or use the disavow list (plans/disavow-list.md, Snax 2026-10-26):
- * level 5+ or Dread Pizza Roberts. Anyone named on the list (nominated, listed
- * or suspended) is locked out, whatever their level. Everyone who is not
- * allowed gets a 404 with no body that hints the feature exists, and the same
- * 404 when DISAVOW_ENABLED is off. Every check runs per request (no cached
- * grant), and every lookup failure fails closed.
+ * level 5+ or Dread Pizza Roberts. Anyone LISTED or SUSPENDED is locked out
+ * completely, whatever their level. Someone who is merely NOMINATED keeps
+ * normal access (so they can't infer it from losing the nav link) but gets a
+ * 404 for their own entry everywhere (see detail.ts) and can't vote on it.
+ * Everyone who is not allowed gets a 404 with no body that hints the feature
+ * exists, and the same 404 when DISAVOW_ENABLED is off. Every check runs per
+ * request (no cached grant), and every lookup failure fails closed.
  */
 import { NextResponse } from 'next/server'
 import { notFound } from 'next/navigation'
@@ -12,44 +14,44 @@ import { prisma } from '@/app/lib/db'
 import { getSession, type Session } from '@/app/lib/session'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { canReviewMission, DPR_ONLY_MIN_LEVEL } from '@/app/lib/mission-review-access'
-import { findMemberByDiscordId } from '@/app/lib/member-utils'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { DISAVOW_MIN_LEVEL, disavowEnabled } from './constants'
+import { identifierOr, viewerIdentifiers } from './match'
 
-/** Statuses in which a person is "on the list" for access purposes. */
-const SUBJECT_STATUSES = ['NOMINATED', 'LISTED', 'SUSPENDED'] as const
+const LOCKOUT_STATUSES = ['LISTED', 'SUSPENDED'] as const
 
 export function isDisavowDPR(discordId: string): Promise<boolean> {
   return canReviewMission(discordId, DPR_ONLY_MIN_LEVEL).catch(() => false)
 }
 
+/** Matches every identifier we know for the viewer: Discord id, member id, wallets, X. */
 async function subjectWhere(discordId: string, statuses: readonly string[]) {
-  const member = await findMemberByDiscordId(discordId).catch(() => null)
-  const or: Array<{ kind: 'DISCORD_ID' | 'MEMBER_ID'; value: string }> = [{ kind: 'DISCORD_ID', value: discordId }]
-  if (member?.memberId) or.push({ kind: 'MEMBER_ID', value: String(member.memberId) })
+  const or = identifierOr(await viewerIdentifiers(discordId))
   return { OR: or, disavowal: { status: { in: [...statuses] } } }
 }
 
-/** Whether this person is named on a nomination or listing. Throws on DB errors. */
+/** Whether this person is LISTED or SUSPENDED. Throws on DB errors. */
 export async function isDisavowSubject(discordId: string): Promise<boolean> {
   const hit = await prisma.disavowIdentifier.findFirst({
-    where: (await subjectWhere(discordId, SUBJECT_STATUSES)) as never,
+    where: (await subjectWhere(discordId, LOCKOUT_STATUSES)) as never,
     select: { id: true },
   })
   return !!hit
 }
 
-/** The viewer's own LISTED/SUSPENDED entry (the only thing a subject can reach). */
-export async function findSubjectDisavowal(discordId: string) {
-  if (!disavowEnabled()) return null
+/** The viewer's own LISTED/SUSPENDED entries: the only things a subject can reach. */
+export async function findSubjectDisavowals(discordId: string) {
+  if (!disavowEnabled()) return []
   try {
-    const hit = await prisma.disavowIdentifier.findFirst({
-      where: (await subjectWhere(discordId, ['LISTED', 'SUSPENDED'])) as never,
+    const hits = await prisma.disavowIdentifier.findMany({
+      where: (await subjectWhere(discordId, LOCKOUT_STATUSES)) as never,
       select: { disavowalId: true },
     })
-    if (!hit) return null
-    return await prisma.disavowal.findUnique({
-      where: { id: hit.disavowalId },
+    const ids = [...new Set(hits.map((h: { disavowalId: string }) => h.disavowalId))]
+    if (ids.length === 0) return []
+    return await prisma.disavowal.findMany({
+      where: { id: { in: ids } },
+      orderBy: { createdAt: 'asc' },
       select: {
         id: true, status: true, displayName: true, reason: true, statement: true, evidenceUrls: true,
         subjectResponse: true, respondedAt: true, listedAt: true, reviewDueAt: true, lastAppealAt: true,
@@ -57,7 +59,7 @@ export async function findSubjectDisavowal(discordId: string) {
       },
     })
   } catch {
-    return null
+    return []
   }
 }
 

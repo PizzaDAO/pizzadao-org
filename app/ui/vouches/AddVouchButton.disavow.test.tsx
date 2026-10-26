@@ -18,7 +18,7 @@ beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: RequestInit) => {
         calls.push(`${init?.method ?? "GET"} ${url}`);
         if (url.startsWith("/api/vouches?")) return new Response(JSON.stringify({ vouches: [] }), { status: 200 });
-        if (url.startsWith("/api/disavow/check")) return new Response(JSON.stringify(listed ? { listed: true, id: "e1" } : { listed: false }), { status: 200 });
+        if (url.startsWith("/api/disavow/check")) return new Response(JSON.stringify(listed ? { listed: true, id: "e1", strings: { title: "Disavow list warning", body: "On the list. Vouch anyway?", confirm: "Vouch anyway", cancel: "Cancel", view: "View entry" } } : { listed: false }), { status: 200 });
         if (url === "/api/vouches/add") return new Response("{}", { status: 200 });
         return new Response("{}", { status: 404 });
     }));

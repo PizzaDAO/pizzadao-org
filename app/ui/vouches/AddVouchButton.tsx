@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/app/lib/hooks/use-session";
-import { DisavowVouchWarning } from "./DisavowVouchWarning";
+import { DisavowVouchWarning, type VouchWarningStrings } from "./DisavowVouchWarning";
 
 type AddVouchButtonProps = {
   targetMemberId: string;
@@ -24,7 +24,7 @@ export function AddVouchButton({
   const [isVouched, setIsVouched] = useState(false);
   const [loading, setLoading] = useState(true);
   const [actionLoading, setActionLoading] = useState(false);
-  const [warning, setWarning] = useState<{ id: string } | null>(null);
+  const [warning, setWarning] = useState<{ id: string; strings: VouchWarningStrings } | null>(null);
   const { data: session } = useSession();
   const canViewDisavow = session?.canViewDisavow === true;
 
@@ -74,8 +74,8 @@ export function AddVouchButton({
         );
         if (res.ok) {
           const data = await res.json();
-          if (data.listed && data.id) {
-            setWarning({ id: String(data.id) });
+          if (data.listed && data.id && data.strings) {
+            setWarning({ id: String(data.id), strings: data.strings });
             setActionLoading(false);
             return;
           }
@@ -152,6 +152,7 @@ export function AddVouchButton({
       {warning && (
         <DisavowVouchWarning
           entryId={warning.id}
+          strings={warning.strings}
           onCancel={() => setWarning(null)}
           onConfirm={() => {
             setWarning(null);

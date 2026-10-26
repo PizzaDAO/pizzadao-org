@@ -20,3 +20,10 @@ export function safe<A extends unknown[]>(label: string, fn: (...args: A) => Pro
 
 type Ctx = { params: Promise<{ id: string }> }
 export type { Ctx }
+
+/** Which of a member's own entries a request is about: the only one, or the `id` in the body. */
+export function pickEntry<T extends { id: string }>(mine: T[], body: unknown): T | null {
+  if (mine.length === 1) return mine[0]
+  const id = typeof body === 'object' && body !== null ? (body as { id?: unknown }).id : undefined
+  return mine.find(m => m.id === id) ?? null
+}

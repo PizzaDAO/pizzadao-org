@@ -1,6 +1,7 @@
 import Link from "next/link";
 import { notFound } from "next/navigation";
-import { getLocale, getTranslations } from "next-intl/server";
+import { getLocale } from "next-intl/server";
+import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 import { requireDisavowViewerPage } from "@/app/lib/disavow/access";
 import { getDisavowDetail } from "@/app/lib/disavow/detail";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
@@ -14,7 +15,7 @@ export default async function DisavowDetailPage({ params }: { params: Promise<{ 
     const { id } = await params;
     const d = await getDisavowDetail(id, { discordId: session.discordId, isDPR });
     if (!d) notFound();
-    const t = await getTranslations("disavow");
+    const t = await getDisavowTranslator();
     const locale = await getLocale();
     const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
     const dpr = "rounds" in d ? d : null;

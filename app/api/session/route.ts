@@ -10,6 +10,7 @@ import { canManageShopRoles } from "@/app/lib/shop-admin-auth";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
 import { disavowEnabled } from "@/app/lib/disavow/constants";
 import { disavowViewer } from "@/app/lib/disavow/access";
+import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 
 export const runtime = "nodejs";
 
@@ -71,10 +72,19 @@ export async function GET() {
 
   // Disavow list: only computed while the feature flag is on; fails closed.
   // Never present (not even false) when the flag is off, so nothing hints at it.
-  let disavowFlags: { canViewDisavow: boolean; canVoteDisavow: boolean } | null = null;
+  let disavowFlags: { canViewDisavow: boolean; canVoteDisavow: boolean; disavowNavLabel?: string } | null = null;
   if (disavowEnabled()) {
     const v = await disavowViewer(session.discordId);
     disavowFlags = { canViewDisavow: v.allowed, canVoteDisavow: v.allowed && v.isDPR };
+    // Localized server-side for eligible viewers only: the disavow strings are
+    // not in the root catalog, so nobody else ever receives them.
+    if (v.allowed) {
+      try {
+        disavowFlags.disavowNavLabel = (await getDisavowTranslator())("navLabel");
+      } catch {
+        disavowFlags.disavowNavLabel = "Disavow list";
+      }
+    }
   }
 
   // PFP is a quick fs check - include it to avoid a separate request

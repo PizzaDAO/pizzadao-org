@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('NEXT_NOT_FOUND') } }))
 vi.mock('@/app/lib/db', () => ({
-  prisma: { disavowIdentifier: { findFirst: vi.fn() }, disavowal: { findUnique: vi.fn(), count: vi.fn(async () => 0), findMany: vi.fn(async () => []) } },
+  prisma: { disavowIdentifier: { findFirst: vi.fn(), findMany: vi.fn(async () => []) }, disavowal: { findUnique: vi.fn(), count: vi.fn(async () => 0), findMany: vi.fn(async () => []) } },
 }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
@@ -13,8 +13,15 @@ vi.mock('@/app/lib/mission-review-access', () => ({ DPR_ONLY_MIN_LEVEL: 8, canRe
 vi.mock('@/app/lib/member-utils', () => ({ findMemberByDiscordId: vi.fn(async () => null) }))
 vi.mock('@/app/lib/auth-guards', () => ({ isAdminDiscordId: vi.fn(async () => false) }))
 vi.mock('@/app/lib/rate-limit', () => ({ enforceRateLimit: vi.fn(async () => null) }))
+vi.mock('@/app/lib/disavow/messages', () => ({
+  vouchWarningStrings: vi.fn(async () => ({ title: 't', body: 'b', confirm: 'c', cancel: 'x', view: 'v' })),
+}))
 vi.mock('@/app/lib/disavow/match', () => ({
-  identifiersForMember: vi.fn(async (id: string) => [{ kind: 'MEMBER_ID', value: id }, { kind: 'DISCORD_ID', value: '999000999' }]),
+  identifierOr: (ids: unknown[]) => ids,
+  viewerIdentifiers: vi.fn(async (d: string) => [{ kind: 'DISCORD_ID', value: d }]),
+  // expands whatever was typed to the member behind it
+  resolveSubjectIdentifiers: vi.fn(async (ids: Array<{ kind: string; value: string }>) =>
+    [...ids, { kind: 'MEMBER_ID', value: '7' }, { kind: 'DISCORD_ID', value: '999000999' }]),
   findActiveListingFor: vi.fn(async (id: string) => (id === '7' ? { id: 'entry1' } : null)),
 }))
 vi.mock('@/app/lib/disavow/detail', () => ({
@@ -68,7 +75,7 @@ const ALL: Array<[string, () => Promise<Response>]> = [
   ['POST rounds', () => roundsPOST(req({}), ctx)],
   ['POST redact', () => redactPOST(req({ confirm: true }), ctx)],
   ['POST me/response', () => responsePOST(req({ text: 'hi' }))],
-  ['POST me/appeal', () => appealPOST()],
+  ['POST me/appeal', () => appealPOST(req({}))],
   ['GET check', () => checkGET(req(undefined, 'https://app.pizzadao.org/api/disavow/check?memberId=7'))],
 ]
 
@@ -125,15 +132,20 @@ describe('eligible responses are no-store', () => {
 })
 
 describe('nominate', () => {
-  it('level 5 can nominate; 201 with the new id; picked members expand server-side', async () => {
+  it('level 5 can nominate; every identifier expands server-side; a non-DPR gets no entry id back', async () => {
     as(5)
     m(store.nominate).mockResolvedValue({ ok: true, id: 'new1' })
-    const r = await nominatePOST(req({ ...goodNomination, identifiers: [{ kind: 'MEMBER_ID', value: '7' }] }))
+    const r = await nominatePOST(req({ ...goodNomination, identifiers: [{ kind: 'WALLET', value: '0x' + 'a'.repeat(40) }] }))
     expect(r.status).toBe(201)
-    expect(await r.json()).toEqual({ id: 'new1' })
+    expect(await r.json()).toEqual({ ok: true })
     const arg = m(store.nominate).mock.calls[0][0]
     expect(arg.nominatorDiscordId).toBe(ME)
     expect(arg.identifiers).toEqual(expect.arrayContaining([{ kind: 'MEMBER_ID', value: '7' }, { kind: 'DISCORD_ID', value: '999000999' }]))
+  })
+  it('a DPR gets the new id back', async () => {
+    as(1, { dpr: true })
+    m(store.nominate).mockResolvedValue({ ok: true, id: 'new1' })
+    expect(await (await nominatePOST(req(goodNomination))).json()).toEqual({ ok: true, id: 'new1' })
   })
   it('rejects bad input with 400 before touching the store', async () => {
     as(5)
@@ -146,12 +158,32 @@ describe('nominate', () => {
     ]) expect((await nominatePOST(req(bad))).status).toBe(400)
     expect(store.nominate).not.toHaveBeenCalled()
   })
-  it('duplicate gives 409 with a link to the existing entry; limit gives 429', async () => {
+  it('non-DPR: a duplicate of a hidden (NOMINATED/SUSPENDED) entry is indistinguishable from an accepted nomination', async () => {
     as(5)
-    m(store.nominate).mockResolvedValueOnce({ ok: false, code: 'duplicate', existingId: 'old1' })
-    const dup = await nominatePOST(req(goodNomination))
-    expect(dup.status).toBe(409)
-    expect((await dup.json()).existingId).toBe('old1')
+    m(store.nominate).mockResolvedValueOnce({ ok: true, id: 'new1' })
+    const normal = await nominatePOST(req(goodNomination))
+    for (const existingStatus of ['NOMINATED', 'SUSPENDED']) {
+      m(store.nominate).mockResolvedValueOnce({ ok: false, code: 'duplicate', existingId: 'old1', existingStatus })
+      const dup = await nominatePOST(req(goodNomination))
+      expect(dup.status).toBe(normal.status)
+      expect(await dup.json()).toEqual(await normal.clone().json())
+      expect(dup.headers.get('Cache-Control')).toBe(normal.headers.get('Cache-Control'))
+    }
+  })
+  it('non-DPR: a duplicate of a LISTED entry points to it (409); DPR see any existing entry', async () => {
+    as(5)
+    m(store.nominate).mockResolvedValueOnce({ ok: false, code: 'duplicate', existingId: 'old1', existingStatus: 'LISTED' })
+    const listed = await nominatePOST(req(goodNomination))
+    expect(listed.status).toBe(409)
+    expect((await listed.json()).existingId).toBe('old1')
+    as(1, { dpr: true })
+    m(store.nominate).mockResolvedValueOnce({ ok: false, code: 'duplicate', existingId: 'old2', existingStatus: 'NOMINATED' })
+    const dpr = await nominatePOST(req(goodNomination))
+    expect(dpr.status).toBe(409)
+    expect((await dpr.json()).existingId).toBe('old2')
+  })
+  it('the cap gives 429', async () => {
+    as(5)
     m(store.nominate).mockResolvedValueOnce({ ok: false, code: 'rate_limited' })
     expect((await nominatePOST(req(goodNomination))).status).toBe(429)
   })
@@ -199,6 +231,11 @@ describe('redact', () => {
     expect((await redactPOST(req({ confirm: true }), ctx)).status).toBe(404)
     expect(store.redact).not.toHaveBeenCalled()
   })
+  it('an admin who is the subject of the entry is refused (403)', async () => {
+    as(1, { admin: true })
+    m(store.redact).mockResolvedValue('conflict')
+    expect((await redactPOST(req({ confirm: true }), ctx)).status).toBe(403)
+  })
   it('an admin must confirm, then it redacts', async () => {
     as(1, { admin: true })
     expect((await redactPOST(req({}), ctx)).status).toBe(400)
@@ -214,30 +251,41 @@ describe('check', () => {
     const url = 'https://app.pizzadao.org/api/disavow/check?memberId=7'
     expect((await checkGET(req(undefined, url))).status).toBe(404)
     as(5)
-    expect(await (await checkGET(req(undefined, url))).json()).toEqual({ listed: true, id: 'entry1' })
+    expect(await (await checkGET(req(undefined, url))).json()).toMatchObject({ listed: true, id: 'entry1', strings: { title: 't' } })
     expect(await (await checkGET(req(undefined, 'https://x/api/disavow/check?memberId=8'))).json()).toEqual({ listed: false })
   })
 })
 
 describe('listed member surface', () => {
-  it('response and appeal only work for a member with a LISTED entry', async () => {
+  const entries = (...ids: string[]) => {
+    m(prisma.disavowIdentifier.findMany).mockResolvedValue(ids.map(disavowalId => ({ disavowalId })))
+    m(prisma.disavowal.findMany).mockResolvedValue(ids.map(id => ({ id, rounds: [] })))
+  }
+  it('response and appeal only work for a member with a LISTED/SUSPENDED entry', async () => {
     as(1)
-    m(prisma.disavowIdentifier.findFirst).mockResolvedValue(null)
+    entries()
     expect((await responsePOST(req({ text: 'hello' }))).status).toBe(404)
-    expect((await appealPOST()).status).toBe(404)
+    expect((await appealPOST(req({}))).status).toBe(404)
   })
-  it('a listed member can respond and appeal (via the subject lookup)', async () => {
+  it('a listed member can respond and appeal', async () => {
     as(1)
-    m(getSession).mockResolvedValue({ discordId: ME })
-    m(prisma.disavowIdentifier.findFirst).mockResolvedValue({ disavowalId: 'e1' })
-    m(prisma.disavowal.findUnique).mockResolvedValue({ id: 'e1', rounds: [] })
+    entries('e1')
     m(store.addResponse).mockResolvedValue('ok')
     m(store.openRemoveRound).mockResolvedValue('ok')
     expect((await responsePOST(req({ text: 'That was a refund dispute.' }))).status).toBe(200)
     expect((await responsePOST(req({ text: 'x'.repeat(1501) }))).status).toBe(400)
-    expect((await appealPOST()).status).toBe(201)
+    expect((await appealPOST(req({}))).status).toBe(201)
     expect(m(store.openRemoveRound).mock.calls[0][2]).toEqual({ appeal: true })
     m(store.openRemoveRound).mockResolvedValue('too_soon')
-    expect((await appealPOST()).status).toBe(429)
+    expect((await appealPOST(req({}))).status).toBe(429)
+  })
+  it('with several entries the request must say which one', async () => {
+    as(1)
+    entries('e1', 'e2')
+    m(store.addResponse).mockResolvedValue('ok')
+    expect((await responsePOST(req({ text: 'hello' }))).status).toBe(400)
+    expect((await responsePOST(req({ id: 'e2', text: 'hello' }))).status).toBe(200)
+    expect(m(store.addResponse).mock.calls[0][0]).toBe('e2')
+    expect((await responsePOST(req({ id: 'nope', text: 'hello' }))).status).toBe(400)
   })
 })

@@ -37,7 +37,7 @@ interface ProfileClientProps {
      * disavow list AND this member is listed. Never fetched client-side, so
      * everyone else sees exactly the page they always did.
      */
-    disavowWarning?: { id: string } | null;
+    disavowWarning?: { id: string; label: string } | null;
 }
 
 export function ProfileClient({ id, disavowWarning = null }: ProfileClientProps) {
@@ -133,7 +133,7 @@ export function ProfileClient({ id, disavowWarning = null }: ProfileClientProps)
                     </button>
                 </div>
 
-                {disavowWarning && <DisavowChip id={disavowWarning.id} />}
+                {disavowWarning && <DisavowChip id={disavowWarning.id} label={disavowWarning.label} />}
 
                 <ProfileHero
                     memberId={id}

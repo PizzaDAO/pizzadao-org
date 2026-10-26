@@ -1,5 +1,6 @@
 import Link from "next/link";
-import { getLocale, getTranslations } from "next-intl/server";
+import { getLocale } from "next-intl/server";
+import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 import { requireDisavowViewerPage } from "@/app/lib/disavow/access";
 import { listDisavowals } from "@/app/lib/disavow/detail";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
@@ -8,11 +9,11 @@ export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
 
 export default async function DisavowPage({ searchParams }: { searchParams: Promise<{ tab?: string; page?: string }> }) {
-    const { isDPR } = await requireDisavowViewerPage();
+    const { session, isDPR } = await requireDisavowViewerPage();
     const sp = await searchParams;
-    const t = await getTranslations("disavow");
+    const t = await getDisavowTranslator();
     const locale = await getLocale();
-    const data = await listDisavowals(sp.tab, sp.page, isDPR);
+    const data = await listDisavowals(sp.tab, sp.page, isDPR, session.discordId);
     const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
     const tabs = isDPR ? ["listed", "open", "suspended", "closed"] : ["listed"];
     const pages = Math.max(1, Math.ceil(data.total / data.pageSize));

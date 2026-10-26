@@ -95,3 +95,7 @@ ALTER TABLE "DisavowIdentifier" ADD CONSTRAINT "DisavowIdentifier_disavowalId_fk
 ALTER TABLE "DisavowRound" ADD CONSTRAINT "DisavowRound_disavowalId_fkey" FOREIGN KEY ("disavowalId") REFERENCES "Disavowal"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "DisavowVote" ADD CONSTRAINT "DisavowVote_roundId_fkey" FOREIGN KEY ("roundId") REFERENCES "DisavowRound"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
 ALTER TABLE "DisavowEvent" ADD CONSTRAINT "DisavowEvent_disavowalId_fkey" FOREIGN KEY ("disavowalId") REFERENCES "Disavowal"("id") ON DELETE RESTRICT ON UPDATE CASCADE;
+
+-- At most one OPEN round per disavowal, enforced by the database (Prisma cannot
+-- model partial indexes, so this lives only in SQL).
+CREATE UNIQUE INDEX "DisavowRound_one_open_per_disavowal" ON "DisavowRound"("disavowalId") WHERE "state" = 'OPEN';

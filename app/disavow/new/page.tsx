@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { getTranslations } from "next-intl/server";
+import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 import { requireDisavowViewerPage } from "@/app/lib/disavow/access";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
 import { NominateForm } from "../_components/NominateForm";
@@ -9,7 +9,7 @@ export const dynamic = "force-dynamic";
 
 export default async function NewDisavowPage() {
     await requireDisavowViewerPage();
-    const t = await getTranslations("disavow");
+    const t = await getDisavowTranslator();
     return (
         <EditorialPage width="max-w-[720px]">
             <EditorialMasthead overline={t("overline")} title={t("form.title")} dek={t("form.intro")} />
