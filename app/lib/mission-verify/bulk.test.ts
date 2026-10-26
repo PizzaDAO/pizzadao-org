@@ -129,7 +129,22 @@ describe('batchSources', () => {
     paidLevels: new Map(),
     legacyAuto: [],
     vouches: new Map([['m-a', [{ followeeId: 'm-b', source: 'PIZZADAO', createdAt: new Date(0) }]]]),
+    vouchesReceived: new Map([['m-b', [{ followerId: 'm-a', source: 'PIZZADAO', createdAt: new Date(0) }]]]),
+    missions: [
+      { id: 1, level: 1 },
+      { id: 2, level: 2 },
+    ],
   }
+  it('answers vouches received and the working level from the prefetch (no per-member queries)', async () => {
+    const s = batchSources(base, { ...data, approved: new Map([[OLD_A, new Set([1])]]), paidLevels: new Map() }, null)
+    expect(await s.getVouchesReceived('m-b')).toEqual([{ followerId: 'm-a', source: 'PIZZADAO', createdAt: new Date(0) }])
+    expect(await s.getVouchesReceived('m-z')).toEqual([])
+    expect(await s.getWorkingLevel(OLD_A)).toBe(2) // level 1 approved
+    expect(await s.getWorkingLevel(OLD_B)).toBe(1)
+    const paid = batchSources(base, { ...data, approved: new Map(), paidLevels: new Map([[OLD_B, new Set([1, 2])]]) }, null)
+    expect(await paid.getWorkingLevel(OLD_B)).toBe(3) // paid levels count as complete
+  })
+
   it('answers from the prefetch, never per member upstream', async () => {
     const s = batchSources(base, data, new Map([[OLD_A, [MAFIA]]]))
     expect(await s.getXAccount(OLD_A)).toEqual({ xUsername: 'alice' })

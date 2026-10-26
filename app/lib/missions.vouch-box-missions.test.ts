@@ -12,10 +12,12 @@ vi.mock('./economy', async (importOriginal) => ({
 vi.mock('./transactions', () => ({ logTransaction: vi.fn().mockResolvedValue({}) }))
 vi.mock('./notifications', () => ({ createNotification: vi.fn().mockResolvedValue(undefined) }))
 vi.mock('./discord', () => ({ getMembersWithRoles: vi.fn().mockResolvedValue([]) }))
+vi.mock('./mission-verify/events', () => ({ emitMissionEvent: vi.fn(async () => null) }))
 
 import { computeCurrentLevel, getCurrentLevel, settleLevels, submitMissionCompletion, getPaidSummary } from './missions'
 import { MISSION_VERIFIER_CONFIG, LEVEL_4_REWARD, LEVEL_5_REWARD } from './mission-verify/mission-config'
 import { prisma } from './db'
+import { emitMissionEvent } from './mission-verify/events'
 
 const mockFn = (f: unknown) => f as ReturnType<typeof vi.fn>
 const REWARDS: Record<number, number> = { 1: 69, 2: 420, 3: 1337, 4: LEVEL_4_REWARD, 5: LEVEL_5_REWARD, 6: 6942, 7: 31415, 8: 69420 }
@@ -109,6 +111,21 @@ describe('rewards follow the missions', () => {
   it('levels are earned in order even when higher missions are done first', () => {
     const vouchAndBoxOnly = new Set([GOT_VOUCHED, BOX])
     expect(computeCurrentLevel(MISSIONS, vouchAndBoxOnly)).toBe(1)
+  })
+})
+
+describe('reaching a new level re-runs the level-5 checks', () => {
+  it('paying a level asks for a level_reached re-check (box / vouch missions), paying nothing asks for none', async () => {
+    ledger = [1, 2, 3].map((level) => ({ metadata: { level } }))
+    approved = upTo(4)
+    expect(await settleLevels('u')).toEqual([4])
+    await vi.waitFor(() => expect(emitMissionEvent).toHaveBeenCalledWith('u', 'level_reached'))
+
+    vi.mocked(emitMissionEvent).mockClear()
+    ledger = [1, 2, 3, 4].map((level) => ({ metadata: { level } }))
+    expect(await settleLevels('u')).toEqual([])
+    await new Promise((r) => setTimeout(r, 10))
+    expect(emitMissionEvent).not.toHaveBeenCalled()
   })
 })
 

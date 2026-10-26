@@ -667,6 +667,14 @@ export async function settleLevels(discordId: string): Promise<number[]> {
     if (!byLevel.get(level)!.every(id => approvedIds.has(id))) break
     if (await checkAndAwardLevelReward(discordId, level)) paidNow.push(level)
   }
+  if (paidNow.length) {
+    // The member just reached a new level: the verifiers that only run once
+    // they are on it (Rare Pizza Box at level 5) and the vouch check run now,
+    // not at the next nightly. Terminates: a second pass pays nothing new.
+    const recheck = () =>
+      import('./mission-verify/events').then(m => m.emitMissionEvent(discordId, 'level_reached')).catch(() => {})
+    try { after(recheck) } catch { void recheck() }
+  }
   return paidNow
 }
 

@@ -11,7 +11,7 @@
 //
 // Prior history: garlic-68749 (Phase 4b token migration).
 
-import { GetBoxLink } from "./GetBoxLink";
+import { GetBoxLink, BonusNote } from "./GetBoxLink";
 import { useState } from "react";
 import { input } from "../shared-styles";
 
@@ -46,6 +46,8 @@ type MissionData = {
   proofHint?: string;
   /** L5.3 "Own a Rare Pizza Box": where to get one. */
   getBoxUrl?: string;
+  /** Checked automatically, nothing to submit. */
+  noManualSubmit?: boolean;
   progress: MissionProgress | null;
 };
 
@@ -61,6 +63,8 @@ type Props = {
   /** L3.1: the viewer's personal invite link (null = not onboarded yet). */
   inviteUrl?: string | null;
   levelUnlocked: boolean;
+  /** The level is already complete and paid: this mission is an optional bonus (pays nothing extra). */
+  bonus?: boolean;
   onSubmit: (missionId: number, evidence?: string, notes?: string) => Promise<void>;
 };
 
@@ -124,7 +128,7 @@ function statusPillStyle(variant: StatusVariant) {
   };
 }
 
-export function MissionCard({ mission, levelUnlocked, onSubmit, check, inviteUrl }: Props) {
+export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [evidence, setEvidence] = useState("");
   const [notes, setNotes] = useState("");
@@ -135,7 +139,7 @@ export function MissionCard({ mission, levelUnlocked, onSubmit, check, inviteUrl
   const isPending = status === "PENDING";
   const isRejected = status === "REJECTED";
   // A rejected submission can be resubmitted (the server caps attempts).
-  const canSubmit = (!status || isRejected) && levelUnlocked;
+  const canSubmit = (!status || isRejected) && levelUnlocked && !mission.noManualSubmit;
   const isLocked = !levelUnlocked && !status;
 
   // Status pill: approved (emerald), pending (butter), rejected (tomato),
@@ -299,6 +303,7 @@ export function MissionCard({ mission, levelUnlocked, onSubmit, check, inviteUrl
             </div>
           )}
           {inviteUrl !== undefined && !isCompleted && <InviteLink url={inviteUrl} />}
+          {bonus && !isCompleted && <BonusNote />}
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
           {isPending && mission.progress?.holdReason && (
             <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>

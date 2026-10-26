@@ -36,6 +36,7 @@ type MissionData = {
   proofHint?: string;
   referral?: boolean;
   getBoxUrl?: string;
+  noManualSubmit?: boolean;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };
 
@@ -698,9 +699,12 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
           const isCurrentLevel = levelData.level === currentLevel;
           // Missions on every level can be submitted (the level itself is still earned in order).
           const isUnlocked = true;
+          // A level whose reward was already paid stays complete even if a mission was added
+          // to it since (that mission is then an optional bonus, nothing is paid again).
+          const isPaid = (data.paidLevels ?? []).includes(levelData.level);
           const isComplete =
             levelData.missions.length > 0 &&
-            levelData.missions.every((m) => m.progress?.status === "APPROVED");
+            (isPaid || levelData.missions.every((m) => m.progress?.status === "APPROVED"));
 
           const completedCount = levelData.missions.filter(
             (m) => m.progress?.status === "APPROVED"
@@ -885,6 +889,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                       check={checks[mission.id]}
                       inviteUrl={mission.referral ? (data?.inviteUrl ?? null) : undefined}
                       levelUnlocked={isUnlocked}
+                      bonus={isPaid && mission.progress?.status !== "APPROVED"}
                       onSubmit={handleSubmit}
                     />
                   ))}

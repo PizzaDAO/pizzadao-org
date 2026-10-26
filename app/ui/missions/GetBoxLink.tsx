@@ -4,6 +4,15 @@
 
 import { useTranslations } from "next-intl";
 
+export function BonusNote() {
+  const t = useTranslations("missionLinks");
+  return (
+    <div data-testid="mission-bonus" style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginTop: 6 }}>
+      {t("bonus")}
+    </div>
+  );
+}
+
 export function GetBoxLink({ url }: { url: string }) {
   const t = useTranslations("missionLinks");
   const external = /^https?:\/\//.test(url);

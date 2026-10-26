@@ -13,7 +13,7 @@
 export type Trigger = 'on_demand' | 'discord' | 'event' | 'submit' | 'cron' | 'backfill'
 
 /** Events that re-run the verifiers for one member (route hooks). */
-export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created' | 'vouch_created' | 'vouch_received'
+export type MissionEvent = 'x_linked' | 'wallet_connected' | 'crew_joined' | 'attendance_synced' | 'referral_created' | 'vouch_created' | 'vouch_received' | 'level_reached'
 
 export interface VerifyCtx {
   discordId: string

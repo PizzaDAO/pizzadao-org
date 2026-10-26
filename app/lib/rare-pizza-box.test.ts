@@ -70,6 +70,22 @@ describe('checkRarePizzaBox', () => {
     expect(await checkRarePizzaBox('m1')).toBe('no')
   })
 
+  it('a partial failure with no hit is "error", never "no" (the failed lookup might have held the box)', async () => {
+    m(getEvmWalletsReadOnly).mockResolvedValue(['0xa', '0xb'])
+    m(holdsNFTOfContract).mockImplementation(async (w: string) => {
+      if (w === '0xa') throw new Error('alchemy 500')
+      return false
+    })
+    expect(await checkRarePizzaBox('m1')).toBe('error')
+    expect(cacheSet).toHaveBeenCalledWith('pizzabox:m1', 'error', BOX_TTL_SECONDS.error)
+    // ...but a hit still wins over a failure.
+    m(holdsNFTOfContract).mockImplementation(async (w: string) => {
+      if (w === '0xa') throw new Error('alchemy 500')
+      return true
+    })
+    expect(await checkRarePizzaBox('m2')).toBe('yes')
+  })
+
   it('error only when every contract fails (all unsupported or all erroring)', async () => {
     m(getNFTContracts).mockResolvedValue([{ ...base, chain: 'solana' }])
     m(holdsNFTOfContract).mockRejectedValue(new UnsupportedChainError('solana'))

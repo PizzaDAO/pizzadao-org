@@ -2,10 +2,13 @@
 //
 // `currentLevel` is "highest completed level + 1" and `lastCelebratedLevel`
 // is stored in the same units (the level reached when the last celebration
-// fired), so every level L with lastCelebratedLevel <= L < currentLevel was
-// completed but never celebrated: e.g. approved by a reviewer while the
-// member wasn't on the page. They are folded into ONE modal: the level
-// reached, its title, and the PEP the newly completed levels paid.
+// fired). Every level L with lastCelebratedLevel <= L < currentLevel is a
+// level the member got past since then, e.g. approved by a reviewer while they
+// weren't on the page. They are folded into ONE modal: the level reached, its
+// title, and the PEP those levels actually paid. When the snapshot carries
+// `paidLevels` (the MISSION_REWARD ledger), only levels in it count toward the
+// PEP shown, so a level whose payout is still pending, or a mission added to an
+// already-paid level, is never shown as newly earned.
 
 export type LevelUpSnapshot = {
   levels: ReadonlyArray<{ level: number; title: string | null; reward: number }>;

@@ -9,6 +9,7 @@
 
 import { getMissionsByLevel, getUserMissionProgress, getCurrentLevel, getLevelTitle, getPaidSummary } from "@/app/lib/missions";
 import { getCachedMissionsList, setCachedMissionsList } from "@/app/lib/mission-cache";
+import { acceptsManualSubmission } from "@/app/lib/mission-verify/policy";
 import { getVerifier } from "@/app/lib/mission-verify/verifiers";
 import { PROOF_HINTS } from "@/app/lib/mission-verify/proof-links";
 import { BOX_PURCHASE_URL } from "@/app/lib/box-mafia";
@@ -51,6 +52,8 @@ export type MissionsOverview = {
       referral?: boolean;
       /** L5.3 "Own a Rare Pizza Box": where to get one (an extra link on the card). */
       getBoxUrl?: string;
+      /** Checked automatically with nothing to submit: no submit form (the submit API refuses it too). */
+      noManualSubmit?: boolean;
       progress: MissionProgress | null;
     }[];
   }[];
@@ -108,6 +111,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         ...(getVerifier(m.verifierKey)?.mode === "semi" ? { semiChecked: true } : {}),
         ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
         ...(m.verifierKey === "referral" ? { referral: true } : {}),
+        ...(acceptsManualSubmission({ verifierKey: m.verifierKey, proofKind: m.proofKind }) ? {} : { noManualSubmit: true }),
         ...(m.verifierKey === "rare_pizza_box" ? { getBoxUrl: BOX_PURCHASE_URL || PIZZA_BOX_LINK } : {}),
         progress: progressMap[m.id] || null,
       })),

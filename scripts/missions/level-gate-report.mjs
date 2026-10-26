@@ -13,8 +13,12 @@
  * marker), whatever missions the level has now. This report shows:
  *   - members already PAST level 4 / 5 (reward paid): safe, and how many of
  *     them have no vouch received / no Rare Pizza Box (information only);
- *   - members who finished the OTHER missions of level 4 / 5 but are NOT paid
- *     yet: they now wait for the new mission (the people the change affects).
+ *   - WOULD-BE DEMOTIONS: members who counted as past level 4 / 5 under the old
+ *     rules (every old mission approved) but have no ledger row for that level.
+ *     The "paid level stays complete" rule does not protect them, so they would
+ *     drop back until they complete the new mission: decide on them before deploy;
+ *   - members who finished the other missions of a level early (not past it yet,
+ *     earlier levels may still be open).
  *
  * Usage:
  *   DATABASE_URL=... node scripts/missions/level-gate-report.mjs
@@ -22,7 +26,7 @@
  *
  * Options:
  *   --check-boxes   also look up Rare Pizza Boxes (strict, uncached, read-only;
- *                   one lookup per member who is past or waiting on level 5; slow).
+ *                   one lookup per member past level 5 or a would-be demotion; slow).
  */
 import { createRequire } from "node:module";
 import { ensureTsRuntime, importApp } from "../unbelievaboat/run-ts.mjs";
@@ -34,7 +38,7 @@ const args = parseArgs(process.argv.slice(2), { booleans: ["check-boxes", "help"
 if (!process.env.DATABASE_URL) die("DATABASE_URL is not set");
 
 const { prisma } = await importApp("app/lib/db.ts");
-const { paidLevelOf } = await importApp("app/lib/missions.ts");
+const { paidLevelOf, computeCurrentLevel } = await importApp("app/lib/missions.ts");
 const { checkRarePizzaBox } = await importApp("app/lib/rare-pizza-box.ts");
 const { loadMemberIds } = await importApp("app/lib/mission-verify/bulk.ts");
 
@@ -72,43 +76,59 @@ try {
       ? (await prisma.vouch.count({ where: { followeeId: memberId, followerId: { not: memberId }, source: "PIZZADAO" } })) > 0
       : false;
 
-  const out = { past4: 0, past4NoVouch: 0, wait4: 0, wait4NoVouch: 0, past5: 0, past5NoBox: 0, past5Unchecked: 0, wait5: 0, wait5NoBox: 0 };
+  const oldMissions = missions.filter((m) => !newIds.has(m.id));
+  const out = {
+    past4: 0, past4NoVouch: 0, demoted4: 0, demoted4NoVouch: 0, early4: 0,
+    past5: 0, past5Unchecked: 0, past5NoBox: 0, demoted5: 0, demoted5NoBox: 0, early5: 0,
+  };
   const ids = new Set([...approvedBy.keys(), ...paidBy.keys()]);
   for (const id of ids) {
     const paid = paidBy.get(id) ?? new Set();
     const done = approvedBy.get(id) ?? new Set();
     const memberId = memberIds?.get(id) ?? null;
     const doneOthers = (list) => list.length > 0 && list.every((m) => done.has(m));
-    const prior = [1, 2, 3].every((l) => paid.has(l));
+    // The level the member counted as BEFORE the new missions existed (old missions only, same rules).
+    const oldLevel = computeCurrentLevel(oldMissions, done, paid);
+    const noVouch = async () => !(await gotVouch(memberId));
+    const noBox = async () => {
+      if (!args["check-boxes"]) return void out.past5Unchecked++;
+      return !memberId || (await checkRarePizzaBox(memberId, { cache: false })) === "no";
+    };
+
+    // Level 4
     if (paid.has(4)) {
       out.past4++;
-      if (!(await gotVouch(memberId))) out.past4NoVouch++;
-    } else if (prior && doneOthers(l4)) {
-      out.wait4++;
-      if (!(await gotVouch(memberId))) out.wait4NoVouch++;
+      if (await noVouch()) out.past4NoVouch++;
+    } else if (oldLevel > 4) {
+      // Past level 4 under the old rules but no level-4 ledger row: the new mission would
+      // push them back (the would-be demotions the "paid level stays complete" rule does NOT cover).
+      out.demoted4++;
+      if (await noVouch()) out.demoted4NoVouch++;
+    } else if (doneOthers(l4)) {
+      out.early4++; // finished level 4 early (any-level submissions); not past it yet
     }
-    const checkBox = async (bump) => {
-      if (!args["check-boxes"]) return void out.past5Unchecked++;
-      if (!memberId) return void bump();
-      if ((await checkRarePizzaBox(memberId, { cache: false })) === "no") bump();
-    };
+    // Level 5
     if (paid.has(5)) {
       out.past5++;
-      await checkBox(() => out.past5NoBox++);
-    } else if (paid.has(4) && doneOthers(l5)) {
-      out.wait5++;
-      await checkBox(() => out.wait5NoBox++);
+      if ((await noBox()) === true) out.past5NoBox++;
+    } else if (oldLevel > 5) {
+      out.demoted5++;
+      if ((await noBox()) === true) out.demoted5NoBox++;
+    } else if (doneOthers(l5)) {
+      out.early5++;
     }
   }
   console.log(`Members already past level 4 (reward paid, keep their level): ${out.past4}`);
   console.log(`  ...with no vouch received (information only): ${out.past4NoVouch}`);
-  console.log(`Members who finished the other level 4 missions but are not paid yet: ${out.wait4}`);
-  console.log(`  ...of those, no vouch received yet (held until vouched): ${out.wait4NoVouch}`);
+  console.log(`WOULD-BE DEMOTIONS at level 4 (all old missions done, no level-4 ledger row): ${out.demoted4}`);
+  console.log(`  ...of those with no vouch received: ${out.demoted4NoVouch}`);
+  console.log(`Finished the other level 4 missions early, not past level 4 yet (L1-L3 may be unpaid): ${out.early4}`);
   console.log(`Members already past level 5 (reward paid, keep their level): ${out.past5}`);
-  console.log(`Members who finished the other level 5 missions but are not paid yet: ${out.wait5}`);
+  console.log(`WOULD-BE DEMOTIONS at level 5 (all old missions done, no level-5 ledger row): ${out.demoted5}`);
+  console.log(`Finished the other level 5 missions early, not past level 5 yet: ${out.early5}`);
   if (args["check-boxes"]) {
     console.log(`  past level 5 with no Rare Pizza Box (information only): ${out.past5NoBox}`);
-    console.log(`  waiting on level 5 with no Rare Pizza Box (held until they own one): ${out.wait5NoBox}`);
+    console.log(`  would-be demotions at level 5 with no Rare Pizza Box: ${out.demoted5NoBox}`);
   } else {
     console.log("  (Rare Pizza Boxes not checked: pass --check-boxes)");
   }

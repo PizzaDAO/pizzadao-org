@@ -13,7 +13,7 @@
  * Strictly read-only toward the database (no wallet caching).
  */
 
-import { cacheGet, cacheSet } from '../api/lib/cache'
+import { cacheDel, cacheGet, cacheSet } from '../api/lib/cache'
 import { getNFTContracts } from './nft-config'
 import { holdsNFTOfContract, UnsupportedChainError } from './nft'
 import { getEvmWalletsReadOnly } from './wallet-lookup'
@@ -30,6 +30,11 @@ export const RARE_PIZZA_BOX_CONTRACT_NAME =
 export type Lookup = 'yes' | 'no' | 'error'
 
 export const BOX_TTL_SECONDS = { yes: 60 * 60, no: 2 * 60, error: 60 } as const
+
+/** Forget the cached answer (a wallet was just connected: look again). */
+export async function clearBoxCache(memberId: string): Promise<void> {
+  await cacheDel(`pizzabox:${memberId}`)
+}
 
 /**
  * Does this member hold a Rare Pizza Box on any of their EVM wallets? Never
@@ -59,6 +64,7 @@ export async function checkRarePizzaBox(memberId: string, opts: { cache?: boolea
     if (contracts.length === 0) return remember('error')
 
     let succeeded = 0
+    let failed = 0
     for (const contract of contracts) {
       for (const wallet of wallets) {
         try {
@@ -70,12 +76,14 @@ export async function checkRarePizzaBox(memberId: string, opts: { cache?: boolea
             console.warn(`[rare-pizza-box] skipping ${contract.name} on unsupported chain ${contract.chain}`)
             break
           }
-          // A failed lookup (Alchemy down, bad response): try the others; error only if all fail.
+          // A failed lookup (Alchemy down, bad response): keep looking, but a "no" is only
+          // trustworthy if nothing failed, so any failure without a hit becomes 'error'.
+          failed++
         }
       }
     }
-    // Error only when nothing could be checked at all; "no" needs at least one real answer.
-    return remember(succeeded === 0 ? 'error' : 'no')
+    // "no" needs at least one real answer and no failure: a partly failed lookup might have missed the box.
+    return remember(succeeded === 0 || failed > 0 ? 'error' : 'no')
   } catch {
     return 'error'
   }
