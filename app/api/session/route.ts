@@ -8,6 +8,9 @@ import { getUserRoles } from "@/app/lib/discord";
 import { canReviewAnyMission } from "@/app/lib/mission-review-access";
 import { canManageShopRoles } from "@/app/lib/shop-admin-auth";
 import { ADMIN_ROLE_IDS } from "@/app/ui/constants";
+import { disavowEnabled } from "@/app/lib/disavow/constants";
+import { disavowViewerCached } from "@/app/lib/disavow/access";
+import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 
 export const runtime = "nodejs";
 
@@ -67,6 +70,23 @@ export async function GET() {
     canManageShop = false;
   }
 
+  // Disavow list: only computed while the feature flag is on; fails closed.
+  // Never present (not even false) when the flag is off, so nothing hints at it.
+  let disavowFlags: { canViewDisavow: true; canVoteDisavow: boolean; disavowNavLabel: string } | null = null;
+  if (disavowEnabled()) {
+    // Cached 60s per user: this endpoint is polled. Data guards never use the cache.
+    const v = await disavowViewerCached(session.discordId);
+    if (v.allowed) {
+      // Present only for eligible viewers (never a `false`), with the label
+      // localized server-side: the disavow strings are not in the root catalog.
+      let label = "Disavow list";
+      try {
+        label = (await getDisavowTranslator())("navLabel");
+      } catch { /* keep the English fallback */ }
+      disavowFlags = { canViewDisavow: true, canVoteDisavow: v.isDPR, disavowNavLabel: label };
+    }
+  }
+
   // PFP is a quick fs check - include it to avoid a separate request
   let pfpPath: string | null = null;
   if (memberId) {
@@ -94,6 +114,7 @@ export async function GET() {
       isAdmin,
       canReviewMissions,
       canManageShop,
+      ...(disavowFlags ?? {}),
     },
     {
       headers: { "Cache-Control": "private, max-age=300" },

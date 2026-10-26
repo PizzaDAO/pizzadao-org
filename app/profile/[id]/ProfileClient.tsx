@@ -27,13 +27,20 @@ import { CollectionsLazy } from "../../ui/profile/CollectionsLazy";
 import { AttendanceCard } from "../../ui/attendance-card";
 import { useProfileSummary } from "../../lib/hooks/use-api";
 import { norm } from "../../lib/strings";
+import { DisavowChip } from "../../disavow/_components/DisavowChip";
 
 
 interface ProfileClientProps {
     id: string;
+    /**
+     * Set by the server page only when the viewer is eligible for the private
+     * disavow list AND this member is listed. Never fetched client-side, so
+     * everyone else sees exactly the page they always did.
+     */
+    disavowWarning?: { id: string; label: string } | null;
 }
 
-export function ProfileClient({ id }: ProfileClientProps) {
+export function ProfileClient({ id, disavowWarning = null }: ProfileClientProps) {
     const router = useRouter();
     const searchParams = useSearchParams();
     const asVisitor = searchParams?.get("as") === "visitor";
@@ -125,6 +132,8 @@ export function ProfileClient({ id }: ProfileClientProps) {
                         ← Back
                     </button>
                 </div>
+
+                {disavowWarning && <DisavowChip id={disavowWarning.id} label={disavowWarning.label} />}
 
                 <ProfileHero
                     memberId={id}

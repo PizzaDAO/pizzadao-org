@@ -277,6 +277,182 @@ enum NotificationType {
   LEVEL_COMPLETED    // All missions in a level completed, reward paid
   VOUCH_ADDED @map("FRIEND_ADDED") // Someone vouched for you
   ARTICLE_COMMENT    // New comment on your article
+  DISAVOW_VOTE_NEEDED     // A disavow nomination needs a DPR vote (no names)
+  DISAVOW_ROUND_CLOSED    // A disavow round you opened has closed (no names)
+  DISAVOW_LISTED_SUBJECT  // You were listed (no names or content)
+}
+
+// ---------------------------------------------------------------------------
+// Disavow list (plans/disavow-list.md): private, DPR-voted warning list.
+// Nothing here is ever deleted: status changes and redaction only.
+// ---------------------------------------------------------------------------
+
+enum DisavowStatus {
+  NOMINATED
+  LISTED
+  SUSPENDED
+  REJECTED
+  WITHDRAWN
+  REMOVED
+  EXPIRED
+}
+
+enum DisavowRoundKind {
+  LIST
+  REMOVE
+  REAFFIRM
+}
+
+enum DisavowRoundState {
+  OPEN
+  PASSED
+  FAILED
+  CANCELLED
+}
+
+enum DisavowVoteChoice {
+  YES
+  NO
+  ABSTAIN
+  RECUSE
+}
+
+enum DisavowReason {
+  SCAM
+  THEFT_OF_FUNDS
+  NON_DELIVERY
+  IMPERSONATION
+  HARASSMENT
+  OTHER
+}
+
+enum DisavowIdKind {
+  MEMBER_ID
+  DISCORD_ID
+  X_HANDLE
+  WALLET
+  TELEGRAM
+  NAME
+}
+
+enum DisavowEventType {
+  NOMINATED
+  VOTED
+  ROUND_OPENED
+  ROUND_CLOSED
+  LISTED
+  SUSPENDED
+  UNSUSPENDED
+  WITHDRAWN
+  REMOVED
+  EXPIRED
+  RESPONSE_ADDED
+  APPEALED
+  REDACTED
+  EDITED
+  VIEWED
+}
+
+model Disavowal {
+  id                 String        @id @default(cuid())
+  status             DisavowStatus @default(NOMINATED)
+  displayName        String
+  reason             DisavowReason
+  statement          String
+  evidenceUrls       String[]
+  nominatorDiscordId String
+  subjectResponse    String?
+  respondedAt        DateTime?
+  listedAt           DateTime?
+  reviewDueAt        DateTime?
+  lastAppealAt       DateTime?
+  redactedAt         DateTime?
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+  identifiers        DisavowIdentifier[]
+  rounds             DisavowRound[]
+  events             DisavowEvent[]
+  submissions        DisavowSubmission[]
+
+  @@index([status])
+  @@index([nominatorDiscordId, createdAt])
+}
+
+// One row per person who submitted a nomination for an entry (the original
+// nominator, plus anyone whose submission was a duplicate of a hidden entry).
+// It is what "My nominations" and withdrawing work from, so a non-DPR member
+// never needs to see the entry itself.
+model DisavowSubmission {
+  id                 String    @id @default(cuid())
+  disavowalId        String
+  submitterDiscordId String
+  displayName        String
+  isOriginal         Boolean   @default(false)
+  withdrawnAt        DateTime?
+  createdAt          DateTime  @default(now())
+  disavowal          Disavowal @relation(fields: [disavowalId], references: [id])
+
+  @@unique([disavowalId, submitterDiscordId])
+  @@index([submitterDiscordId, createdAt])
+}
+
+model DisavowIdentifier {
+  id          Int           @id @default(autoincrement())
+  disavowalId String
+  kind        DisavowIdKind
+  value       String
+  disavowal   Disavowal     @relation(fields: [disavowalId], references: [id])
+
+  @@unique([disavowalId, kind, value])
+  @@index([kind, value])
+}
+
+// NOTE: the database also has a partial unique index that Prisma cannot model:
+//   CREATE UNIQUE INDEX "DisavowRound_one_open_per_disavowal"
+//     ON "DisavowRound"("disavowalId") WHERE "state" = 'OPEN';
+// (at most one OPEN round per disavowal; see migration 20261027000000_disavow_list).
+// It exists only in SQL. `prisma migrate dev` may try to drop it as drift: do not
+// accept that; keep it in every future migration's baseline.
+model DisavowRound {
+  id          String            @id @default(cuid())
+  disavowalId String
+  kind        DisavowRoundKind
+  state       DisavowRoundState @default(OPEN)
+  openedBy    String
+  opensAt     DateTime          @default(now())
+  closesAt    DateTime
+  closedAt    DateTime?
+  disavowal   Disavowal         @relation(fields: [disavowalId], references: [id])
+  votes       DisavowVote[]
+
+  @@index([disavowalId, state])
+  @@index([state, closesAt])
+}
+
+model DisavowVote {
+  id             Int               @id @default(autoincrement())
+  roundId        String
+  voterDiscordId String
+  choice         DisavowVoteChoice
+  comment        String?
+  createdAt      DateTime          @default(now())
+  updatedAt      DateTime          @updatedAt
+  round          DisavowRound      @relation(fields: [roundId], references: [id])
+
+  @@unique([roundId, voterDiscordId])
+}
+
+// Append-only audit log: never updated or deleted.
+model DisavowEvent {
+  id             Int              @id @default(autoincrement())
+  disavowalId    String
+  type           DisavowEventType
+  actorDiscordId String?
+  data           Json?
+  createdAt      DateTime         @default(now())
+  disavowal      Disavowal        @relation(fields: [disavowalId], references: [id])
+
+  @@index([disavowalId, createdAt])
 }
 
 model Notification {
