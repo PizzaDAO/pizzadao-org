@@ -11,6 +11,12 @@ export type LevelUpSnapshot = {
   levels: ReadonlyArray<{ level: number; title: string | null; reward: number }>;
   currentLevel: number;
   levelTitle: string | null;
+  /**
+   * Levels whose reward was really paid (the ledger). When given, only those
+   * count as newly earned PEP: a level whose missions are done but whose
+   * payout hasn't landed (or was paid long ago) is never shown as earned now.
+   */
+  paidLevels?: ReadonlyArray<number>;
 };
 
 export type LevelUp = {
@@ -31,6 +37,7 @@ export function levelUpToCelebrate(snapshot: LevelUpSnapshot, lastCelebratedLeve
   const from = Math.max(lastCelebratedLevel, 1);
   const reward = levels
     .filter((l) => l.level >= from && l.level < currentLevel)
+    .filter((l) => !snapshot.paidLevels || snapshot.paidLevels.includes(l.level))
     .reduce((sum, l) => sum + (Number.isFinite(l.reward) ? l.reward : 0), 0);
   const maxLevel = levels.reduce((max, l) => Math.max(max, l.level), 0);
 

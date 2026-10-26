@@ -11,6 +11,7 @@
 //
 // Prior history: garlic-68749 (Phase 4b token migration).
 
+import { GetBoxLink } from "./GetBoxLink";
 import { useState } from "react";
 import { input } from "../shared-styles";
 
@@ -43,6 +44,8 @@ type MissionData = {
   semiChecked?: boolean;
   /** Placeholder for the proof link. */
   proofHint?: string;
+  /** L5.3 "Own a Rare Pizza Box": where to get one. */
+  getBoxUrl?: string;
   progress: MissionProgress | null;
 };
 
@@ -296,6 +299,7 @@ export function MissionCard({ mission, levelUnlocked, onSubmit, check, inviteUrl
             </div>
           )}
           {inviteUrl !== undefined && !isCompleted && <InviteLink url={inviteUrl} />}
+          {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
           {isPending && mission.progress?.holdReason && (
             <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>
               {HOLD_COPY[mission.progress.holdReason] ?? "Verified. Awaiting a reviewer's release."}

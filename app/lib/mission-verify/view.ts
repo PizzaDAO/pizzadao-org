@@ -36,6 +36,10 @@ export interface MissionsView {
 type OverviewLike = {
   currentLevel: number
   levelTitle: string | null
+  /** PEP actually paid for missions (the MISSION_REWARD ledger). */
+  earnedPep?: number
+  /** Levels whose reward was actually paid. */
+  paidLevels?: number[]
   levels: Array<{
     level: number
     reward: number
@@ -77,7 +81,12 @@ export function buildMissionsView(overview: OverviewLike, report: RunReport): Mi
     }
   }
   const maxLevel = overview.levels.reduce((mx, l) => Math.max(mx, l.level), 0)
-  const earned = overview.levels.filter((l) => l.level < overview.currentLevel).reduce((s, l) => s + l.reward, 0)
+  // What the member really earned: the ledger, not "levels below the current one"
+  // (a completed level can still be waiting on a payout, and rewards change).
+  const paid = new Set(overview.paidLevels ?? [])
+  const earned =
+    overview.earnedPep ??
+    overview.levels.filter((l) => paid.has(l.level) || (!overview.paidLevels && l.level < overview.currentLevel)).reduce((s, l) => s + l.reward, 0)
   const titleOf = (id: number) => missions.find((x) => x.missionId === id)?.title ?? `Mission ${id}`
   return {
     enabled: report.enabled,

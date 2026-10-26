@@ -63,8 +63,14 @@ export async function POST(req: NextRequest) {
     const voucherMemberId = currentUser.memberId;
     after(() => emitMissionEvent(voucherDiscordId, "vouch_created", { memberId: voucherMemberId }).then(() => undefined));
 
-    // Notify the target (non-blocking)
+    // L4.2 "Get vouched by a member": re-check the vouched member's
+    // vouch_received mission right away (they pass and the level pays out).
     const targetDiscordId = targetMember.discordId;
+    if (targetDiscordId) {
+      after(() => emitMissionEvent(targetDiscordId, "vouch_received", { memberId: targetMemberId }).then(() => undefined));
+    }
+
+    // Notify the target (non-blocking)
     if (targetDiscordId) {
       notifyVouchAdded(
         targetMemberId,

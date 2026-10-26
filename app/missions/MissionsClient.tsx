@@ -23,7 +23,6 @@ import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
 import { MissionCompleteCelebration } from "../ui/missions/MissionCompleteCelebration";
 import { LevelUpModal } from "../ui/missions/LevelUpModal";
 import { VouchPromptCard } from "../ui/missions/VouchPromptCard";
-import { LevelGateBanner, LevelGateNote, type LevelGateInfo } from "../ui/missions/LevelGateNotice";
 import { levelUpToCelebrate, type LevelUp } from "./level-up";
 
 type MissionData = {
@@ -36,6 +35,7 @@ type MissionData = {
   semiChecked?: boolean;
   proofHint?: string;
   referral?: boolean;
+  getBoxUrl?: string;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };
 
@@ -50,7 +50,9 @@ type MissionsResponse = {
   levels: LevelData[];
   currentLevel: number;
   levelTitle: string | null;
-  levelGate?: LevelGateInfo;
+  /** Levels whose reward was actually paid (the ledger). */
+  paidLevels?: number[];
+  earnedPep?: number;
   isAuthenticated: boolean;
   verifiersEnabled?: boolean;
   inviteUrl?: string | null;
@@ -132,7 +134,6 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
   // "Check my progress" (POST /api/missions/check): per-mission verifier hints.
   const [checking, setChecking] = useState(false);
   const [checks, setChecks] = useState<Record<number, MissionCheckInfo>>({});
-  const [recheckingBox, setRecheckingBox] = useState(false);
 
   const levelUpClaimInFlight = useRef(false);
   const initialCelebrationChecked = useRef(false);
@@ -153,9 +154,9 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
     // eslint-disable-next-line react-hooks/exhaustive-deps -- runs once, when both are loaded
   }, [data, celebrationState]);
 
-  async function fetchMissions(recheckBox = false) {
+  async function fetchMissions() {
     try {
-      const res = await fetch(recheckBox ? "/api/missions?recheckBox=1" : "/api/missions", { cache: "no-store" });
+      const res = await fetch("/api/missions", { cache: "no-store" });
       if (!res.ok) throw new Error("Failed to load missions");
       const json: MissionsResponse = await res.json();
 
@@ -180,15 +181,6 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
       setError(e instanceof Error ? e.message : "Unknown error");
     } finally {
       setLoading(false);
-    }
-  }
-
-  async function recheckPizzaBox() {
-    setRecheckingBox(true);
-    try {
-      await fetchMissions(true);
-    } finally {
-      setRecheckingBox(false);
     }
   }
 
@@ -691,16 +683,6 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
           </div>
         )}
 
-        {/* Level gates (vouch for 4, Rare Pizza Box for 5): only when they hold the member's level back */}
-        {isAuthenticated && data.levelGate && (
-          <LevelGateBanner
-            info={data.levelGate}
-            currentLevel={currentLevel}
-            rechecking={recheckingBox}
-            onRecheck={recheckPizzaBox}
-          />
-        )}
-
         {/* Vouch prompt — shown once after first-ever mission completion */}
         {isAuthenticated && showVouchPrompt && (
           <VouchPromptCard onDismiss={handleVouchDismiss} />
@@ -896,9 +878,6 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                     borderTop: "1px dashed hsl(var(--rule-warm) / 0.55)",
                   }}
                 >
-                  {isAuthenticated && data.levelGate && (
-                    <LevelGateNote info={data.levelGate} level={levelData.level} />
-                  )}
                   {levelData.missions.map((mission) => (
                     <MissionCard
                       key={mission.id}

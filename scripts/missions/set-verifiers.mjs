@@ -12,7 +12,7 @@
  *            L3.1 referral (now real) with a description that explains the
  *            invite link
  *   New      INSERTs missions that are not in the seed (config entries with
- *            `insert`, e.g. L5.2 "Vouch for another member", vouch_given,
+ *            `insert`, e.g. L4.2 "Get vouched by a member" (vouch_received), L5.2 "Vouch for another member" (vouch_given), L5.3 "Own a Rare Pizza Box" (rare_pizza_box),
  *            reward 4269) when their (level, index) row is missing
  *   Titles   sets Mission.levelTitle on every row of the levels in
  *            MISSION_LEVEL_TITLES (L3-L6); --level-titles overrides / adds

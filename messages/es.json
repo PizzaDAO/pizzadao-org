@@ -637,21 +637,9 @@
       "ariaLabel": "Sugerencia de Box Mafia"
     }
   },
-  "levelGate": {
-    "reqVouch": "El nivel {level} requiere el aval de otro miembro",
-    "reqBox": "El nivel {level} requiere una Rare Pizza Box",
-    "statusOk": "listo",
-    "statusMissing": "todavía no",
-    "statusUnknown": "no se pudo comprobar",
-    "bannerHeld": "Tus misiones ya alcanzan el nivel {earned}, pero te quedas en el nivel {level} hasta cumplir esto.",
-    "noteBody": "Puedes completar estas misiones ya, pero solo alcanzas este nivel cuando se cumpla el requisito.",
-    "vouchHint": "Pide a un miembro que te avale desde tu perfil; los avales aparecen en /vouches.",
-    "walletHint": "Asegúrate de que la wallet que la contiene esté conectada a tu perfil.",
-    "unknownHint": "No pudimos comprobarlo ahora. Tu progreso está a salvo. Inténtalo de nuevo en un minuto.",
-    "getBox": "Consigue una Rare Pizza Box",
-    "recheck": "Comprobar de nuevo",
-    "rechecking": "Comprobando...",
-    "retry": "Reintentar"
+  "missionLinks": {
+    "boxHint": "Esta misión necesita una Rare Pizza Box NFT en una wallet conectada a tu perfil.",
+    "getBox": "Consigue una Rare Pizza Box"
   },
   "crewsPage": {
     "joined": "Inscrito",

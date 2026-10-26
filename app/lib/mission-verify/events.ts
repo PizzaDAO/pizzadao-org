@@ -17,11 +17,12 @@ import type { MissionEvent } from './types'
 /** Which verifiers an event can change; null = all of them. */
 const EVENT_VERIFIERS: Record<MissionEvent, string[] | null> = {
   x_linked: ['x_linked'],
-  wallet_connected: ['wallet_connected'],
+  wallet_connected: ['wallet_connected', 'rare_pizza_box'],
   attendance_synced: ['attendance_count'],
   crew_joined: null,
   referral_created: ['referral'],
   vouch_created: ['vouch_given'],
+  vouch_received: ['vouch_received'],
 }
 
 export async function emitMissionEvent(

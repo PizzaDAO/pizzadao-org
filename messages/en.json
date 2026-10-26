@@ -637,21 +637,9 @@
       "ariaLabel": "Box Mafia suggestion"
     }
   },
-  "levelGate": {
-    "reqVouch": "Level {level} requires a vouch from another member",
-    "reqBox": "Level {level} requires a Rare Pizza Box",
-    "statusOk": "done",
-    "statusMissing": "not yet",
-    "statusUnknown": "could not check",
-    "bannerHeld": "Your missions are ready for level {earned}, but you stay at level {level} until these are met.",
-    "noteBody": "You can complete these missions now, but you only reach this level once the requirement is met.",
-    "vouchHint": "Ask a member to vouch for you from your profile; vouches show on /vouches.",
-    "walletHint": "Make sure the wallet that holds it is connected to your profile.",
-    "unknownHint": "We could not check right now. Your progress is safe. Try again in a minute.",
-    "getBox": "Get a Rare Pizza Box",
-    "recheck": "Check again",
-    "rechecking": "Checking...",
-    "retry": "Try again"
+  "missionLinks": {
+    "boxHint": "This mission needs a Rare Pizza Box NFT in a wallet connected to your profile.",
+    "getBox": "Get a Rare Pizza Box"
   },
   "crewsPage": {
     "joined": "Joined",

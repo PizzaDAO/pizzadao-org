@@ -12,20 +12,14 @@ const ALCHEMY_API_KEY = process.env.ALCHEMY_API_KEY;
  */
 async function fetchNFTsForContract(
   walletAddress: string,
-  contract: NFTContract,
-  strict = false
+  contract: NFTContract
 ): Promise<AlchemyNFT[]> {
-  // `strict` (holdings that gate something, e.g. the Rare Pizza Box level
-  // gate) throws on any lookup failure instead of returning an empty list,
-  // so "could not check" is never mistaken for "owns none".
   if (!ALCHEMY_API_KEY) {
-    if (strict) throw new Error("ALCHEMY_API_KEY is not set");
     return [];
   }
 
   const baseUrl = ALCHEMY_CHAIN_URLS[contract.chain];
   if (!baseUrl) {
-    if (strict) throw new Error(`No Alchemy endpoint for chain ${contract.chain}`);
     return [];
   }
 
@@ -46,7 +40,6 @@ async function fetchNFTsForContract(
       });
 
       if (!res.ok) {
-        if (strict) throw new Error(`Alchemy ${res.status} for ${contract.chain}`);
         break;
       }
 
@@ -63,17 +56,8 @@ async function fetchNFTsForContract(
 
     return allNfts;
   } catch (error) {
-    if (strict) throw error;
     return allNfts; // Return whatever we got so far
   }
-}
-
-/**
- * Whether `walletAddress` holds at least one token of `contract`. Strict:
- * throws when Alchemy can't be reached (never returns false on an error).
- */
-export async function holdsNFTOfContract(walletAddress: string, contract: NFTContract): Promise<boolean> {
-  return (await fetchNFTsForContract(walletAddress, contract, true)).length > 0;
 }
 
 /**
@@ -141,4 +125,34 @@ export async function fetchPizzaDAONFTs(
     },
     2 * 60 * 60 // 2 hours — NFT holdings change rarely
   );
+}
+
+/** The contract's chain has no Alchemy endpoint here: skip it (it can never be checked). */
+export class UnsupportedChainError extends Error {
+  constructor(chain: string) {
+    super(`No Alchemy endpoint for chain ${chain}`);
+    this.name = "UnsupportedChainError";
+  }
+}
+
+/**
+ * Whether `walletAddress` holds at least one token of `contract`. Strict: it
+ * throws when Alchemy can't be asked or answers badly (never returns false on
+ * an error), and UnsupportedChainError for a chain without an endpoint. Asks
+ * for a single token without metadata, so it stops at the first match and
+ * costs one small call.
+ */
+export async function holdsNFTOfContract(walletAddress: string, contract: NFTContract): Promise<boolean> {
+  const baseUrl = ALCHEMY_CHAIN_URLS[contract.chain];
+  if (!baseUrl) throw new UnsupportedChainError(contract.chain);
+  if (!ALCHEMY_API_KEY) throw new Error("ALCHEMY_API_KEY is not set");
+
+  const url =
+    `${baseUrl}/${ALCHEMY_API_KEY}/getNFTsForOwner?owner=${encodeURIComponent(walletAddress)}` +
+    `&contractAddresses[]=${contract.address}&withMetadata=false&pageSize=1`;
+  const res = await fetch(url, { cache: "no-store", headers: { Accept: "application/json" } });
+  if (!res.ok) throw new Error(`Alchemy ${res.status} for ${contract.chain}`);
+  const data = await res.json();
+  if (!data || !Array.isArray(data.ownedNfts)) throw new Error("Unexpected Alchemy response");
+  return data.ownedNfts.length > 0;
 }
