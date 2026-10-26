@@ -1130,7 +1130,8 @@ model CallSpeaker {
   @@index([discordId])
 }
 
-// Members who ran /record optout: the worker never subscribes to their audio.
+// UNUSED since 2026-10-25 (calzone-30418): the /record optout command was removed and existing
+// rows are ignored. Kept (no destructive migration); reviewers hide speakers per call instead.
 model RecordingOptOut {
   discordId String   @id
   createdAt DateTime @default(now())

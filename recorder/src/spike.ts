@@ -63,7 +63,6 @@ const capture = new VoiceCapture({
     return bots.get(id)!
   },
   displayName: async (id) => (await guild.members.fetch(id)).displayName,
-  isOptedOut: () => false,
   log,
   onFatal: (reason) => {
     fatal = reason

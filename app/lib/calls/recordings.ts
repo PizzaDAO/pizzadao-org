@@ -1,5 +1,5 @@
 /**
- * Call recordings: ingest (worker), review queries (/admin/calls), opt-outs.
+ * Call recordings: ingest (worker), review queries (/admin/calls).
  * Audio is private and kept forever; the app never writes or deletes in R2 (see r2.ts).
  */
 import { Prisma } from '@prisma/client'
@@ -34,12 +34,8 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
     where: { sessionId: p.sessionId },
     select: { id: true, status: true, mixKey: true, speakers: { select: { trackKey: true } } },
   })
-  // Opted-out people are never transcribed by the worker; drop their words here too, whatever arrives.
-  let segments: TranscriptSegment[] = []
-  if (p.transcript?.segments.length) {
-    const optedOut = new Set(await listOptOutIds())
-    segments = p.transcript.segments.filter((seg) => !optedOut.has(seg.discordId))
-  }
+  // Everyone in the call is recorded and transcribed (no opt-out since 2026-10-25); reviewers hide speakers per call.
+  const segments: TranscriptSegment[] = p.transcript?.segments ?? []
   const hasTranscript = segments.length > 0
   // The worker deletes any R2 object under the session prefix that is NOT in `keys`
   // (leftovers of earlier attempts), so `keys` is always what the stored row references.
@@ -138,21 +134,6 @@ export async function rejectRecording(id: string, reviewerDiscordId: string, now
     data: { status: 'REJECTED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: null },
   })
   return true
-}
-
-/** Discord ids the worker must never record. */
-export async function listOptOutIds(): Promise<string[]> {
-  const rows = await prisma.recordingOptOut.findMany({ select: { discordId: true } })
-  return rows.map((r) => r.discordId)
-}
-
-/** /record optout (true) and /record optin (false). Both are idempotent. */
-export async function setRecordingOptOut(discordId: string, optedOut: boolean): Promise<void> {
-  if (optedOut) {
-    await prisma.recordingOptOut.upsert({ where: { discordId }, create: { discordId }, update: {} })
-  } else {
-    await prisma.recordingOptOut.deleteMany({ where: { discordId } })
-  }
 }
 
 // ---- Phase 2: summary, review edits, publish ----

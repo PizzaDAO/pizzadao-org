@@ -26,9 +26,7 @@ import {
 } from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
 import { SlotMemory } from './slots.js'
-import { purgeUsersInDir } from './manifest.js'
 import { NicknameManager } from './nickname.js'
-import type { OptOutCache } from './optouts.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
 import type { SessionMeta } from './types.js'
 
@@ -66,7 +64,6 @@ export class CallRecorder {
   constructor(
     private readonly client: Client,
     private readonly cfg: Config,
-    private readonly optOuts: OptOutCache,
     private readonly nick: NicknameManager,
     private readonly finalizeDeps: FinalizeDeps,
     private readonly log: (msg: string) => void,
@@ -203,7 +200,6 @@ export class CallRecorder {
         t0: startedAtMs,
         isBot: (id) => this.isBot(id),
         displayName: async (id) => (await g.members.fetch(id)).displayName,
-        isOptedOut: (id) => this.optOuts.has(id),
         log: (m) => this.log(`[${sessionId}] ${m}`),
         onFatal: (reason) => this.serial(() => this.stop(reason as StopReason)),
       })
@@ -282,12 +278,7 @@ export class CallRecorder {
     }
 
     try {
-      // Latest opt-outs apply to everything captured so far (finalize re-checks that they loaded).
-      await this.step('refresh opt-outs', () => this.optOuts.refresh())
       if (!(await this.step('stop capture', () => s.capture.stop()))) s.capture.degraded = true
-      await this.step('purge opted-out audio', async () => {
-        for (const id of purgeUsersInDir(s.dir, (u) => this.optOuts.has(u))) this.log(`dropped audio of opted-out ${id}`)
-      })
     } finally {
       this.current = null
       await this.step('write session record', async () => {
@@ -345,14 +336,6 @@ export class CallRecorder {
     this.pendingCount++
     this.queue = this.queue.then(async () => {
       try {
-        // Nothing is uploaded unless the opt-out list loaded just now: otherwise an opted-out
-        // member's audio could reach R2. The session stays pending and is retried.
-        const fresh = await this.optOuts.refresh()
-        if (!fresh || !this.optOuts.isLoaded) {
-          this.log(`opt-out list unavailable; keeping ${path.basename(dir)} pending`)
-          return
-        }
-        purgeUsersInDir(dir, (u) => this.optOuts.has(u))
         await finalizeSession(dir, this.finalizeDeps)
       } catch (err) {
         this.log(`finalize crashed for ${dir}: ${err instanceof Error ? err.message : String(err)}`)
@@ -417,12 +400,5 @@ export class CallRecorder {
     let humans = 0
     for (const id of ids) if (!(await this.isBot(id))) humans++
     return humans
-  }
-
-  /** Opt-outs that arrive mid-call: stop recording those members and delete what exists. */
-  purgeLive(ids: string[]): void {
-    const s = this.current
-    if (!s) return
-    for (const id of ids) s.capture.purgeUser(id)
   }
 }

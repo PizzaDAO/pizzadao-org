@@ -6,9 +6,8 @@
  * map every utterance back to call time with an offset map, then merge all
  * speakers into turns ordered by start time.
  *
- * Only the speakers handed in are transcribed. finalizeSession passes the
- * post-purge speaker list, so an opted-out member (purged from the manifest
- * before finalize) is never sent to Deepgram.
+ * Only the speakers handed in are transcribed. finalizeSession passes every
+ * speaker with a track (legacy purge records in old manifests still drop users).
  */
 import { execFile } from 'node:child_process'
 import { existsSync, readFileSync, writeFileSync } from 'node:fs'

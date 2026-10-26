@@ -105,8 +105,6 @@ export interface HandlerDeps {
   }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
-  /** /record optout (true) and /record optin (false). */
-  setRecordingOptOut?: (discordId: string, optedOut: boolean) => Promise<void>
 }
 
 /** What the deferred /missions follow-up needs. */
@@ -309,22 +307,6 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       if (!item) return out.error(`No shop item called "${escapeMd(raw)}".`, 'See /shop.')
       const r = await deps.buy(userId, item.id, quantity)
       return out.ok('Purchase complete!', `🛍️ You bought ${r.quantity}x **${escapeMd(r.item)}** for ${pep(r.totalCost)}.`, { ephemeral: true })
-    }
-
-    case 'record': {
-      // /record optout | optin (calzone-30418): the call recorder never
-      // captures an opted-out member's audio. Ephemeral confirmation.
-      if (!deps.setRecordingOptOut) return out.error('Recording preferences are not available right now.')
-      const sub = i.data.options?.[0]?.name
-      if (sub !== 'optout' && sub !== 'optin') return out.error('Use /record optout or /record optin.')
-      await deps.setRecordingOptOut(userId, sub === 'optout')
-      return sub === 'optout'
-        ? out.ok(
-            'You are opted out of call recordings.',
-            'The PizzaDAO bot will not capture your voice on future calls. It takes effect within a minute, even mid-call. Change your mind with /record optin.',
-            { ephemeral: true },
-          )
-        : out.ok('You are opted back in.', 'Your voice may be recorded on future calls. Opt out any time with /record optout.', { ephemeral: true })
     }
 
     case 'add-money':

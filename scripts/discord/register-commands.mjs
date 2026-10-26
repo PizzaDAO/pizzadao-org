@@ -4,8 +4,7 @@
  * as GUILD commands of the PizzaDAO Discord application. DRY RUN BY DEFAULT.
  *
  * Commands: /balance /work /collect-income /pay /leaderboard /blackjack
- * /roulette /slots /shop /buy /add-money /remove-money /missions /record
- * (/record optout|optin: call recording preference). The games
+ * /roulette /slots /shop /buy /add-money /remove-money /missions. The games
  * answer "not enabled yet" until PEP_GAMES_ENABLED=1 (Vercel env), so
  * registering them all up front is safe. /missions only shows progress (a dry
  * run) until MISSION_VERIFIERS_ENABLED=1.

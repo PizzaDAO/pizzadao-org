@@ -9,15 +9,15 @@ A small Node service (discord.js 14 + `@discordjs/voice` 0.19.2 with DAVE) that 
    After a failed start (could not join, no indicator) or a fatal stop (e.g. disconnected), the same event occurrence (id + scheduled start) is not retried for 5 minutes, and is given up on after 3 failures (logged once). A session that ran 3+ minutes clears its failure count, and entries for events whose window has closed are dropped. Normal empty/max-duration stops are not affected.
    Starting a recording:
    - joins the channel (not deafened, self-muted);
-   - sets its server nickname to `PizzaDAO Bot 🔴 REC` (the old nickname is saved to disk and restored afterwards, even after a crash);
+   - keeps its own name and adds the red mark to its server nickname (e.g. `Metalhead 🔴 REC`; built from the current nickname, else the global name or username, truncated to Discord's 32 characters without ever cutting the mark). The old nickname is saved to disk and restored exactly afterwards, even after a crash;
    - posts the recording notice in the voice channel's text chat.
    - Only then does it start capturing audio (order: join, nickname, notice, capture). If neither the nickname nor the notice can be shown it leaves without recording and deletes the session folder.
-3. Records one Ogg/Opus stream per speaker, written to `DATA_DIR/<sessionId>/seg/<userId>/` as it goes. Bots are skipped. Members who ran `/record optout` are never subscribed to (list fetched from the app, refreshed every `OPTOUT_REFRESH_SECONDS`; an opt-out mid-call deletes what was captured of that member).
+3. Records one Ogg/Opus stream per speaker, written to `DATA_DIR/<sessionId>/seg/<userId>/` as it goes. Bots are skipped. There is no opt-out (Snax, 2026-10-25): everyone in the call channel is recorded and transcribed, and any old opt-outs are ignored. The channel notice says so and asks people who don't want to be recorded not to join (or to leave). Reviewers can still hide a speaker's lines from a public transcript on /admin/calls.
 4. Stops on the first of: no humans in the channel for 5 minutes (not before any human has been present until the event's scheduled start + 15 minutes, so a session started early on an empty channel survives until people arrive), `MAX_CALL_MINUTES` (default 120, counted from the later of the session start and the event's scheduled start). COMPLETED/CANCELED never ends a session (a COMPLETED/CANCELED event only cannot start one); a session ends by empty grace, max duration, a forward switch or shutdown. Switching to another event happens only through the schedule window and is forward-only at that event's scheduled start: an event that starts later than the current one takes over once its slot has begun (back-to-back crew calls share the channel). An early ACTIVE flag never cuts a call. Provisional rule: a session started in the lead window, before its own slot began, may switch to an in-window event whose slot is actually running; once its slot has begun it never switches backward.
 5. On stop: ffmpeg builds one aligned Opus track per speaker and one mono m4a mix; everything is uploaded to the private R2 bucket under `calls/<sessionId>/`; the app's ingest API is called with the metadata (event, channel, times, speakers with Discord ids, display names, talk time, R2 keys). The nickname is restored.
 6. `GET /health` (200 once Discord is ready) for Railway.
 
-Uploads wait for a fresh opt-out list: if the app cannot be reached when a call ends, nothing is uploaded and the session stays on the volume (retried every 10 minutes). A 401/403/404 from the ingest API is treated as a misconfiguration (wrong `RECORDER_API_KEY`, route not deployed): logged loudly and retried, never discarded. Only a payload the app rejects as invalid (other 4xx) is dropped; its R2 objects are left in place (a row might reference them) and logged for a human to check. After a successful ingest the worker uploads first, then deletes only the objects under `calls/<sessionId>/` that the stored row does not reference (leftovers of earlier attempts, e.g. a member who opted out in between). The app returns the row's keys in the ingest response for this.
+If the app cannot be reached when a call ends, the session stays on the volume and is retried every 10 minutes. A 401/403/404 from the ingest API is treated as a misconfiguration (wrong `RECORDER_API_KEY`, route not deployed): logged loudly and retried, never discarded. Only a payload the app rejects as invalid (other 4xx) is dropped; its R2 objects are left in place (a row might reference them) and logged for a human to check. After a successful ingest the worker uploads first, then deletes only the objects under `calls/<sessionId>/` that the stored row does not reference (leftovers of earlier attempts). The app returns the row's keys in the ingest response for this.
 
 Resilience: auto-rejoin on disconnect (backoff, 5 tries); sessions live on the volume, so on boot any session without an `uploaded` marker is finalized and ingested (ingest is idempotent on the session id); a restart mid-call rejoins the still-active event as a new session.
 
@@ -40,11 +40,10 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `R2_BUCKET_NAME` | yes | | Private bucket for call audio. |
 | `DEEPGRAM_API_KEY` | no | | Deepgram Nova-3 transcription of each speaker's speech. Unset: calls are ingested without a transcript (logged once). |
 | `CALL_VOICE_CHANNEL_ID` | no | `823956905739026442` | |
-| `APP_BASE_URL` | no | `https://app.pizzadao.org` | Ingest and opt-out API host. |
+| `APP_BASE_URL` | no | `https://app.pizzadao.org` | Ingest API host. |
 | `DATA_DIR` | no | `/data` | Mount the Railway volume here. |
 | `MAX_CALL_MINUTES` | no | `120` | |
 | `EMPTY_GRACE_MINUTES` | no | `5` | Humans-absent time before stopping. |
-| `OPTOUT_REFRESH_SECONDS` | no | `60` | |
 | `PORT` | no | `3000` (Railway sets it) | `/health` |
 
 ## R2 bucket and tokens

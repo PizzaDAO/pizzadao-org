@@ -1,7 +1,8 @@
 /** Environment configuration. `loadConfig` throws one error listing everything missing. */
 
 export const DEFAULT_CALL_VOICE_CHANNEL_ID = '823956905739026442'
-export const REC_NICKNAME = 'PizzaDAO Bot 🔴 REC'
+export const REC_MARK = '🔴 REC'
+export const MAX_NICKNAME = 32
 
 export interface Config {
   discordToken: string
@@ -15,7 +16,6 @@ export interface Config {
   maxCallMinutes: number
   /** The channel must have had no humans this long before the recording stops. */
   emptyGraceMinutes: number
-  optOutRefreshSeconds: number
   port: number
   r2: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string }
 }
@@ -48,7 +48,6 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     dataDir: env.DATA_DIR?.trim() || '/data',
     maxCallMinutes: positiveNumber(env.MAX_CALL_MINUTES, 120, 'MAX_CALL_MINUTES', errors),
     emptyGraceMinutes: positiveNumber(env.EMPTY_GRACE_MINUTES, 5, 'EMPTY_GRACE_MINUTES', errors),
-    optOutRefreshSeconds: positiveNumber(env.OPTOUT_REFRESH_SECONDS, 60, 'OPTOUT_REFRESH_SECONDS', errors),
     port: positiveNumber(env.PORT, 3000, 'PORT', errors),
     r2: {
       endpoint: req('R2_ENDPOINT'),

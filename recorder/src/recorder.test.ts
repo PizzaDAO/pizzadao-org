@@ -4,7 +4,10 @@ import path from 'node:path'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { EventInfo } from './event-lifecycle.js'
 import { EventStatus } from './event-lifecycle.js'
-import { REC_NICKNAME, type Config } from './config.js'
+import type { Config } from './config.js'
+
+const BOT = 'Metalhead'
+const REC_NICKNAME = 'Metalhead 🔴 REC'
 
 const { calls, captureState, finalizeSession, fatal } = vi.hoisted(() => ({
   calls: [] as string[],
@@ -34,14 +37,13 @@ vi.mock('./capture.js', () => ({
       calls.push('capture.stop')
       if (captureState.stopThrows) throw new Error('stop boom')
     }
-    purgeUser() {}
   },
 }))
 vi.mock('./finalize.js', async (orig) => ({ ...(await orig<typeof import('./finalize.js')>()), finalizeSession }))
 
 import { CallRecorder } from './recorder.js'
-import { NicknameManager } from './nickname.js'
-import { OptOutCache } from './optouts.js'
+import { NicknameManager, recNickname, stripRecMark } from './nickname.js'
+import { consentNotice, lateJoinReminder } from './consent.js'
 
 const CHANNEL = '823956905739026442'
 const ev = (over: Partial<EventInfo> = {}): EventInfo => ({
@@ -57,7 +59,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
   const dataDir = opts.dataDir ?? mkdtempSync(path.join(os.tmpdir(), 'orch-'))
   const nicknames: Array<string | null> = []
   const me = {
-    nickname: 'Pizza Bot' as string | null,
+    nickname: BOT as string | null,
     setNickname: vi.fn(async (n: string | null) => {
       if (opts.nickFails && n === REC_NICKNAME) throw new Error('Missing Permissions')
       calls.push(`nick:${n}`)
@@ -81,23 +83,17 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
   }
   const client = { guilds: { fetch: async () => guild }, users: { fetch: async () => ({ bot: false }) } }
   const cfg = { dataDir, guildId: 'g1', callChannelId: CHANNEL, maxCallMinutes: 120, emptyGraceMinutes: 5 } as Config
-  let listOk = true
-  const optOuts = new OptOutCache(async () => {
-    if (!listOk) throw new Error('app down')
-    return []
-  })
   const nick = new NicknameManager(dataDir, () => {}, async () => {})
   const serialJobs: Array<() => Promise<void>> = []
   const rec = new CallRecorder(
     client as never,
     cfg,
-    optOuts,
     nick,
     { appBaseUrl: 'x', apiKey: 'k', uploader: {} as never, log: () => {} },
     () => {},
     (fn) => void serialJobs.push(fn),
   )
-  return { rec, dataDir, me, nicknames, channel, guild, optOuts, setListOk: (v: boolean) => (listOk = v), serialJobs }
+  return { rec, dataDir, me, nicknames, channel, guild, serialJobs }
 }
 
 beforeEach(() => {
@@ -123,7 +119,6 @@ const require_readdir = (d: string) => readdirSync(d).filter((n) => !n.endsWith(
 describe('CallRecorder indicator rule', () => {
   it('orders join -> nickname -> notice -> capture', async () => {
     const w = world()
-    await w.optOuts.refresh()
     await begin(w)
     expect(calls).toEqual(['join', `nick:${REC_NICKNAME}`, 'notice', 'begin'])
     expect(w.rec.currentEventId).toBe('100')
@@ -159,7 +154,6 @@ describe('CallRecorder indicator rule', () => {
 
   it('marks the dir as starting before anything else, so recovery skips it', async () => {
     const w = world()
-    await w.optOuts.refresh()
     await begin(w)
     const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
     expect(existsSync(path.join(dir, 'starting'))).toBe(true)
@@ -181,11 +175,10 @@ describe('CallRecorder indicator rule', () => {
 describe('CallRecorder stop paths', () => {
   it('stops: restores the nickname, clears the marker and queues finalize', async () => {
     const w = world()
-    await w.optOuts.refresh()
     await begin(w)
     await w.rec.stop('empty')
     await w.rec.drain()
-    expect(w.nicknames).toEqual([REC_NICKNAME, 'Pizza Bot'])
+    expect(w.nicknames).toEqual([REC_NICKNAME, BOT])
     expect(w.rec.currentEventId).toBeNull()
     expect(finalizeSession).toHaveBeenCalledTimes(1)
     const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
@@ -195,13 +188,12 @@ describe('CallRecorder stop paths', () => {
 
   it('still clears the session, restores the nickname and finalizes when capture.stop throws', async () => {
     const w = world()
-    await w.optOuts.refresh()
     await begin(w)
     captureState.stopThrows = true
     await w.rec.stop('empty')
     await w.rec.drain()
     expect(w.rec.currentEventId).toBeNull()
-    expect(w.nicknames.at(-1)).toBe('Pizza Bot')
+    expect(w.nicknames.at(-1)).toBe(BOT)
     expect(finalizeSession).toHaveBeenCalledTimes(1)
     const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
     expect(JSON.parse(readFileSync(path.join(dir, 'session.json'), 'utf8')).partial).toBe(true)
@@ -209,7 +201,6 @@ describe('CallRecorder stop paths', () => {
 
   it('clears the starting marker even when the session record cannot be written', async () => {
     const w = world()
-    await w.optOuts.refresh()
     await begin(w)
     const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
     rmSync(path.join(dir, 'session.json'))
@@ -217,54 +208,32 @@ describe('CallRecorder stop paths', () => {
     await w.rec.stop('empty')
     expect(existsSync(path.join(dir, 'starting'))).toBe(false)
     expect(w.rec.currentEventId).toBeNull()
-    expect(w.nicknames.at(-1)).toBe('Pizza Bot')
+    expect(w.nicknames.at(-1)).toBe(BOT)
   })
 
   it('shutdown with a throwing capture still restores the nickname and leaves the session for the next boot', async () => {
     const w = world()
-    await w.optOuts.refresh()
     await begin(w)
     captureState.stopThrows = true
     await w.rec.shutdown()
     expect(w.rec.currentEventId).toBeNull()
-    expect(w.nicknames.at(-1)).toBe('Pizza Bot')
+    expect(w.nicknames.at(-1)).toBe(BOT)
     const dir = path.join(w.dataDir, sessionDirs(w.dataDir)[0])
     expect(existsSync(path.join(dir, 'starting'))).toBe(false)
     expect(JSON.parse(readFileSync(path.join(dir, 'session.json'), 'utf8')).endReason).toBe('shutdown')
     expect(finalizeSession).not.toHaveBeenCalled()
   })
 
-  it('does not upload while the opt-out list is unavailable, and uploads once it is back', async () => {
+  it('finalizes without contacting any opt-out endpoint, even for a previously opted-out member', async () => {
     const w = world()
-    w.setListOk(false) // never loaded
     await begin(w)
     await w.rec.stop('empty')
-    await w.rec.drain()
-    expect(finalizeSession).not.toHaveBeenCalled()
-
-    w.rec.recoverPending() // the dir is pending (no uploaded marker)
-    await w.rec.drain()
-    expect(finalizeSession).not.toHaveBeenCalled()
-
-    w.setListOk(true)
-    w.rec.recoverPending()
     await w.rec.drain()
     expect(finalizeSession).toHaveBeenCalledTimes(1)
   })
 
-  it('does not upload when the list loaded earlier but is stale at finalize time', async () => {
-    const w = world()
-    await w.optOuts.refresh() // loaded once
-    await begin(w)
-    w.setListOk(false)
-    await w.rec.stop('empty')
-    await w.rec.drain()
-    expect(finalizeSession).not.toHaveBeenCalled()
-  })
-
   it('routes a fatal capture error through the serial chain', async () => {
     const w = world()
-    await w.optOuts.refresh()
     await begin(w)
     fatal.fn('disconnected')
     expect(w.rec.currentEventId).toBe('100') // not stopped inline
@@ -282,7 +251,7 @@ describe('NicknameManager', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'nick-'))
     let fails = 2
     const me = {
-      nickname: 'Pizza Bot' as string | null,
+      nickname: BOT as string | null,
       setNickname: vi.fn(async (n: string | null) => {
         if (n !== REC_NICKNAME && fails-- > 0) throw new Error('rate limited')
         me.nickname = n
@@ -292,7 +261,7 @@ describe('NicknameManager', () => {
     const nm = new NicknameManager(dir, () => {}, async (ms) => void sleeps.push(ms))
     await nm.acquire(guildWith(me))
     expect(await nm.release(guildWith(me))).toBe(true)
-    expect(me.nickname).toBe('Pizza Bot')
+    expect(me.nickname).toBe(BOT)
     expect(sleeps).toHaveLength(2)
     expect(existsSync(path.join(dir, 'nickname-restore.json'))).toBe(false)
   })
@@ -301,7 +270,7 @@ describe('NicknameManager', () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'nick-'))
     let broken = true
     const me = {
-      nickname: 'Pizza Bot' as string | null,
+      nickname: BOT as string | null,
       setNickname: vi.fn(async (n: string | null) => {
         if (n !== REC_NICKNAME && broken) throw new Error('down')
         me.nickname = n
@@ -310,24 +279,65 @@ describe('NicknameManager', () => {
     const nm = new NicknameManager(dir, () => {}, async () => {})
     await nm.acquire(guildWith(me))
     expect(await nm.release(guildWith(me))).toBe(false)
-    expect(JSON.parse(readFileSync(path.join(dir, 'nickname-restore.json'), 'utf8')).nickname).toBe('Pizza Bot')
+    expect(JSON.parse(readFileSync(path.join(dir, 'nickname-restore.json'), 'utf8')).nickname).toBe(BOT)
     broken = false
     await new NicknameManager(dir, () => {}, async () => {}).recoverOnBoot(guildWith(me))
-    expect(me.nickname).toBe('Pizza Bot')
+    expect(me.nickname).toBe(BOT)
   })
 
-  it('on boot resets a leftover REC nickname even with no saved file', async () => {
+  it('on boot removes the leftover REC mark even with no saved file', async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'nick-'))
     const me = { nickname: REC_NICKNAME as string | null, setNickname: vi.fn(async (n: string | null) => void (me.nickname = n)) }
     await new NicknameManager(dir, () => {}, async () => {}).recoverOnBoot(guildWith(me))
-    expect(me.nickname).toBeNull()
+    expect(me.nickname).toBe('Metalhead')
   })
 
-  it('never saves the REC name as the "previous" nickname', async () => {
+  it('keeps the bot name, appends the REC mark, and restores exactly', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'nick-'))
+    const me = { nickname: 'Metalhead' as string | null, setNickname: vi.fn(async (n: string | null) => void (me.nickname = n)) }
+    const nm = new NicknameManager(dir, () => {}, async () => {})
+    await nm.acquire(guildWith(me))
+    expect(me.nickname).toBe('Metalhead 🔴 REC')
+    await nm.release(guildWith(me))
+    expect(me.nickname).toBe('Metalhead')
+  })
+
+  it('falls back to the global name, then the username, and restores to no nickname', async () => {
+    const dir = mkdtempSync(path.join(os.tmpdir(), 'nick-'))
+    const me = { nickname: null as string | null, user: { globalName: 'PizzaBot', username: 'pizzabot' }, setNickname: vi.fn(async (n: string | null) => void (me.nickname = n)) }
+    const nm = new NicknameManager(dir, () => {}, async () => {})
+    await nm.acquire(guildWith(me))
+    expect(me.nickname).toBe('PizzaBot 🔴 REC')
+    await nm.release(guildWith(me))
+    expect(me.nickname).toBeNull()
+    const me2 = { nickname: null as string | null, user: { globalName: null, username: 'pizzabot' }, setNickname: vi.fn(async (n: string | null) => void (me2.nickname = n)) }
+    await new NicknameManager(mkdtempSync(path.join(os.tmpdir(), 'nick-')), () => {}, async () => {}).acquire(guildWith(me2))
+    expect(me2.nickname).toBe('pizzabot 🔴 REC')
+  })
+
+  it('never doubles the mark and never exceeds 32 characters (the base is truncated, not the mark)', () => {
+    expect(recNickname('Metalhead 🔴 REC')).toBe('Metalhead 🔴 REC')
+    const long = recNickname('A'.repeat(60))
+    expect(long.length).toBeLessThanOrEqual(32)
+    expect(long.endsWith(' 🔴 REC')).toBe(true)
+    expect(long.startsWith('AAAA')).toBe(true)
+    expect(stripRecMark('Metalhead 🔴 REC')).toBe('Metalhead')
+  })
+
+  it('never saves the REC mark in the "previous" nickname', async () => {
     const dir = mkdtempSync(path.join(os.tmpdir(), 'nick-'))
     const me = { nickname: REC_NICKNAME as string | null, setNickname: vi.fn(async () => undefined) }
     await new NicknameManager(dir, () => {}, async () => {}).acquire(guildWith(me))
-    expect(JSON.parse(readFileSync(path.join(dir, 'nickname-restore.json'), 'utf8')).nickname).toBeNull()
+    expect(JSON.parse(readFileSync(path.join(dir, 'nickname-restore.json'), 'utf8')).nickname).toBe('Metalhead')
+  })
+})
+
+describe('consent text', () => {
+  it('says the call is recorded and transcribed and never mentions opt-out', () => {
+    for (const t of [consentNotice(), lateJoinReminder('1')]) {
+      expect(t).toMatch(/recorded and transcribed/)
+      expect(t).not.toMatch(/opt|\/record/i)
+    }
   })
 })
 
@@ -353,7 +363,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('starts for a SCHEDULED event when humans are present, and not when the channel is empty', async () => {
     const w = world()
-    await w.optOuts.refresh()
     at(0)
     await w.rec.checkSchedule(day())
     expect(w.rec.currentEventId).toBeNull()
@@ -366,7 +375,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('does not record humans when no event window covers now', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 2)
     at(-300)
     await w.rec.checkSchedule(day())
@@ -375,7 +383,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('idle at 18:15, Art set ACTIVE, Creative crew joins 18:16: records Creative; one switch to Art at 18:30', async () => {
     const w = world()
-    await w.optOuts.refresh()
     const events = () => day().map((e) => (e.id === 'art' ? { ...e, status: EventStatus.Active } : e))
     at(0)
     await w.rec.checkSchedule(events()) // nobody yet
@@ -399,7 +406,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('a 20:00 event set ACTIVE at 17:00 with nobody present records nothing; people at 17:30 get Music', async () => {
     const w = world()
-    await w.optOuts.refresh()
     const events = day().map((e) => (e.id === 're' ? { ...e, status: EventStatus.Active } : e))
     at(-75) // 17:00
     await w.rec.checkSchedule(events)
@@ -412,7 +418,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('an idle start at 18:12 records the running Music slot (no Creative flip), then moves forward at 18:15', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 2)
     at(-3) // 18:12: Music's slot is running, Creative is only upcoming -> Music directly
     await w.rec.checkSchedule(day())
@@ -428,7 +433,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('a lead-window drop-in stopped empty does not block the real call', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 2)
     at(75 - 14)
     await w.rec.checkSchedule([sched('merch', 75)])
@@ -442,7 +446,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('a mid-call empty stop after audio was captured restarts as a new session when people return', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 2)
     at(75)
     await w.rec.checkSchedule(day())
@@ -457,7 +460,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('Real Estate: no new session long after the call, but a restart after a short empty stop', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 2)
     at(105)
     await w.rec.checkSchedule(day())
@@ -476,7 +478,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('a running session is not cut by its window closing', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 2)
     at(105)
     await w.rec.checkSchedule(day())
@@ -489,7 +490,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('max duration counts from the scheduled start when the session began early', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 2)
     at(-10)
     await w.rec.checkSchedule([sched('creative', 0)])
@@ -504,7 +504,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('COMPLETED / CANCELED never cuts a call: Creative completed at 18:15 keeps recording, Art takes over at 18:30', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 3)
     const events = (done: boolean) =>
       day().map((e) => (e.id === 'creative' && done ? { ...e, status: EventStatus.Completed } : e))
@@ -523,7 +522,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('an idle bot does not start for a COMPLETED or CANCELED event', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 3)
     at(1)
     await w.rec.checkSchedule([sched('creative', 0, { status: EventStatus.Canceled })])
@@ -532,7 +530,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('late manual Start at 19:50 for an 18:15 event records; a restart 100 min into an ACTIVE call resumes it', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 3)
     const active = [sched('creative', 0, { status: EventStatus.Active })]
     at(95) // 19:50
@@ -547,7 +544,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
   it('a 20:00 event set ACTIVE at 17:00 is ignored even with people present', async () => {
     const w = world()
-    await w.optOuts.refresh()
     withHumans(w, 3)
     at(-75)
     await w.rec.checkSchedule([sched('re', 105, { status: EventStatus.Active })])
@@ -558,7 +554,6 @@ describe('CallRecorder schedule-window trigger', () => {
     it('repeated aborted starts: at most 3 attempts, spaced at least 5 minutes', async () => {
       captureState.startFails = true
       const w = world()
-      await w.optOuts.refresh()
       withHumans(w, 2)
       const attempts: number[] = []
       for (let m = 0; m <= 60; m++) {
@@ -573,7 +568,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
     it('no duplicate consent notices within the back-off when no indicator can be shown', async () => {
       const w = world({ nickFails: true, sendFails: true })
-      await w.optOuts.refresh()
       withHumans(w, 2)
       for (let m = 0; m <= 4; m++) {
         at(m)
@@ -589,7 +583,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
     it('a fatal error mid-call retries once after 5 minutes, not every minute', async () => {
       const w = world()
-      await w.optOuts.refresh()
       withHumans(w, 2)
       at(0)
       await w.rec.checkSchedule([sched('creative', 0)])
@@ -610,7 +603,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
     it('three blips spread over a long call, each followed by a recovery, never give up', async () => {
       const w = world()
-      await w.optOuts.refresh()
       withHumans(w, 2)
       const one = [sched('creative', 0)]
       at(0)
@@ -630,7 +622,6 @@ describe('CallRecorder schedule-window trigger', () => {
     it('the same event id next week is not blocked by this week\'s failures', async () => {
       captureState.startFails = true
       const w = world()
-      await w.optOuts.refresh()
       withHumans(w, 2)
       for (let m = 0; m <= 30; m++) {
         at(m)
@@ -646,7 +637,6 @@ describe('CallRecorder schedule-window trigger', () => {
 
     it('normal empty stops are not subject to the back-off', async () => {
       const w = world()
-      await w.optOuts.refresh()
       withHumans(w, 2)
       at(0)
       await w.rec.checkSchedule([sched('creative', 0)])
@@ -676,7 +666,6 @@ describe('CallRecorder slot memory', () => {
 
   it('records the remembered slot after Discord moves the recurring event to next week', async () => {
     const w = world()
-    await w.optOuts.refresh()
     at('2026-10-26T17:50:00Z')
     await w.rec.checkSchedule([ops()])
     expect(existsSync(path.join(w.dataDir, 'slots.json'))).toBe(true)
@@ -689,7 +678,6 @@ describe('CallRecorder slot memory', () => {
 
   it('records when the live event shows next week and is completed', async () => {
     const w = world()
-    await w.optOuts.refresh()
     at('2026-10-26T17:50:00Z')
     await w.rec.checkSchedule([ops()])
     at('2026-10-26T18:07:00Z')
@@ -700,7 +688,6 @@ describe('CallRecorder slot memory', () => {
 
   it('derives the previous occurrence after a restart with an empty memory', async () => {
     const w = world()
-    await w.optOuts.refresh()
     at('2026-10-26T18:10:00Z')
     withHumans(w, 1)
     await w.rec.checkSchedule([ops({ scheduledStartMs: OPS_START + WEEK, recurrenceIntervalMs: WEEK })])
@@ -709,7 +696,6 @@ describe('CallRecorder slot memory', () => {
 
   it('does not derive without a (simple) recurrence rule', async () => {
     const w = world()
-    await w.optOuts.refresh()
     at('2026-10-26T18:10:00Z')
     withHumans(w, 1)
     await w.rec.checkSchedule([ops({ scheduledStartMs: OPS_START + WEEK })])
@@ -718,7 +704,6 @@ describe('CallRecorder slot memory', () => {
 
   it('treats a CANCELED occurrence as not happening', async () => {
     const w = world()
-    await w.optOuts.refresh()
     at('2026-10-26T17:50:00Z')
     await w.rec.checkSchedule([ops()])
     at('2026-10-26T18:07:00Z')
@@ -733,7 +718,6 @@ describe('CallRecorder slot memory', () => {
     at('2026-10-26T17:50:00Z')
     await w1.rec.checkSchedule([ops()])
     const w2 = world({ dataDir: w1.dataDir })
-    await w2.optOuts.refresh()
     at('2026-10-26T18:10:00Z')
     withHumans(w2, 1)
     await w2.rec.checkSchedule([])
@@ -742,7 +726,6 @@ describe('CallRecorder slot memory', () => {
 
   it('does not start twice when the live and remembered copies both exist', async () => {
     const w = world()
-    await w.optOuts.refresh()
     at('2026-10-26T17:50:00Z')
     await w.rec.checkSchedule([ops()])
     at('2026-10-26T18:07:00Z')

@@ -4,7 +4,7 @@
  * a manifest line per finished segment. Used by the recorder and by the Phase 0
  * spike (`npm run spike`).
  *
- * - Bots are never recorded; opted-out members are never subscribed to.
+ * - Bots are never recorded; everyone else in the channel is.
  * - Segments hit disk as they stream, so a crash loses only the last packets.
  * - DAVE: the patched @discordjs/voice (patches/) recovers a session whose
  *   decryption never starts (upstream #11653). On top of that a per-user
@@ -42,7 +42,6 @@ export interface CaptureDeps {
   t0: number
   isBot: (userId: string) => Promise<boolean>
   displayName: (userId: string) => Promise<string>
-  isOptedOut: (userId: string) => boolean
   log: (msg: string) => void
   /** Called when the connection cannot be re-established; the session should stop. */
   onFatal: (reason: string) => void
@@ -84,7 +83,6 @@ export class VoiceCapture {
   private readonly pending = new Set<string>()
   private readonly bots = new Set<string>()
   private readonly named = new Set<string>()
-  private readonly purged = new Set<string>()
   private readonly emptyStreak = new Map<string, number>()
   private lastTroubleRejoin = 0
   private consecutiveRejoinFailures = 0
@@ -182,15 +180,14 @@ export class VoiceCapture {
 
   private async onSpeakingStart(userId: string): Promise<void> {
     if (!this.capturing || this.stopping || this.open.has(userId) || this.pending.has(userId)) return
-    if (this.purged.has(userId) || this.d.isOptedOut(userId) || this.bots.has(userId)) return
+    if (this.bots.has(userId)) return
     this.pending.add(userId)
     try {
       if (await this.d.isBot(userId)) {
         this.bots.add(userId)
         return
       }
-      // Re-check: the opt-out list may have changed while we looked the user up.
-      if (this.stopping || this.purged.has(userId) || this.d.isOptedOut(userId)) return
+      if (this.stopping) return
       await this.nameOnce(userId)
       this.openSegment(userId)
     } catch (err) {
@@ -316,20 +313,6 @@ export class VoiceCapture {
 
   private closeAllSegments(): void {
     for (const seg of [...this.open.values()]) seg.opus.destroy()
-  }
-
-  /** Opt-out arrived mid-call: stop recording this member and delete what was captured. */
-  purgeUser(userId: string): void {
-    this.purged.add(userId)
-    const seg = this.open.get(userId)
-    if (seg) {
-      seg.discard = true
-      seg.opus.destroy()
-    }
-    rmSync(path.join(this.d.dir, 'seg', userId), { recursive: true, force: true })
-    this.stats.delete(userId)
-    appendRecord(this.d.dir, { t: 'purge', userId })
-    this.d.log(`purged ${userId} (opted out)`)
   }
 
   /** Leave the channel and finish writing open segments. */

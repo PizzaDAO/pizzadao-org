@@ -1,5 +1,5 @@
 // @vitest-environment node
-// calzone-30418 phase 2: transcript ingest, opt-out exclusion, summary (model mocked),
+// calzone-30418 phase 2: transcript ingest, summary (model mocked),
 // publish gating, and "only published calls are public; audio never is".
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { existsSync } from 'node:fs'
@@ -120,7 +120,6 @@ describe('parseIngestPayload transcript', () => {
 describe('POST /api/calls/recorder/ingest with a transcript', () => {
   it('stores it, marks the call PROCESSING and schedules the summary after the response', async () => {
     db.callRecording.findUnique.mockResolvedValueOnce(null) // not a duplicate
-    db.recordingOptOut.findMany.mockResolvedValue([])
     db.callRecording.create.mockResolvedValue({ id: 'rec1' })
     // generateAndStoreSummary's own lookup
     db.callRecording.findUnique.mockResolvedValueOnce({ id: 'rec1', status: 'PROCESSING', transcript: [], speakers: [] })
@@ -133,14 +132,15 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
     expect(after).toHaveBeenCalledTimes(1)
   })
 
-  it('never stores words of someone on the opt-out list, even if the worker sent them', async () => {
+  it('stores the words of a previously opted-out member (opt-outs are ignored)', async () => {
     db.callRecording.findUnique.mockResolvedValueOnce(null)
-    db.recordingOptOut.findMany.mockResolvedValue([{ discordId: BOB }])
+    db.recordingOptOut.findMany.mockResolvedValue([{ discordId: BOB }]) // legacy row: must be ignored
     db.callRecording.create.mockResolvedValue({ id: 'rec1' })
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: [], speakers: [] })
     await ingestPOST(ingestReq(payload()))
     const stored = db.callRecording.create.mock.calls[0][0].data.transcript as Array<{ discordId: string }>
-    expect(stored.map((s) => s.discordId)).toEqual([ANN])
+    expect(stored.map((s) => s.discordId)).toEqual([ANN, BOB])
+    expect(db.recordingOptOut.findMany).not.toHaveBeenCalled()
   })
 
   it('without a transcript the call stays RECORDED and nothing is summarized', async () => {
@@ -155,7 +155,6 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
 
   it('a duplicate ingest of an untouched RECORDED row fills the missing transcript and summarizes', async () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'RECORDED', mixKey: null, speakers: [] })
-    db.recordingOptOut.findMany.mockResolvedValue([])
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     const res = await ingestPOST(ingestReq(payload()))
     expect(res.status).toBe(200)
@@ -168,7 +167,6 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
 
   it('a duplicate whose row is already past RECORDED is never touched', async () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', mixKey: null, speakers: [] })
-    db.recordingOptOut.findMany.mockResolvedValue([])
     await ingestPOST(ingestReq(payload()))
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
     expect(after).not.toHaveBeenCalled()
@@ -176,7 +174,6 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
 
   it('a duplicate ingest neither overwrites the transcript nor re-summarizes', async () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', mixKey: null, speakers: [] })
-    db.recordingOptOut.findMany.mockResolvedValue([])
     const res = await ingestPOST(ingestReq(payload()))
     expect(res.status).toBe(200)
     expect(db.callRecording.create).not.toHaveBeenCalled()

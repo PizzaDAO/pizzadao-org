@@ -2,7 +2,7 @@
  * The per-session manifest (manifest.jsonl): one JSON record per line, appended
  * as the call goes so a crash loses nothing already written. `summarize` is pure.
  */
-import { appendFileSync, existsSync, readFileSync, rmSync } from 'node:fs'
+import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
 import type { ManifestRecord, SegmentRecord } from './types.js'
 
@@ -25,18 +25,6 @@ export function readManifest(dir: string): ManifestRecord[] {
     }
   }
   return out
-}
-
-/** Delete everything captured from these users in a session dir (opt-out). Returns who had audio. */
-export function purgeUsersInDir(dir: string, isOptedOut: (userId: string) => boolean): string[] {
-  const purged: string[] = []
-  for (const sp of summarize(readManifest(dir))) {
-    if (!isOptedOut(sp.userId)) continue
-    rmSync(path.join(dir, 'seg', sp.userId), { recursive: true, force: true })
-    appendRecord(dir, { t: 'purge', userId: sp.userId })
-    purged.push(sp.userId)
-  }
-  return purged
 }
 
 export interface SpeakerSummary {
