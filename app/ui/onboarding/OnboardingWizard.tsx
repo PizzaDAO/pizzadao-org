@@ -4,6 +4,8 @@
 "use client";
 
 import { trackActivation } from "@/app/lib/activation-client";
+import { filmCode, rerollCode, toppingCode } from "@/app/lib/mafia-funnel";
+import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useRouter } from "next/navigation";
@@ -134,6 +136,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // --- Name generation state ---
   const [generatingNames, setGeneratingNames] = useState(false);
   const [lastGenParams, setLastGenParams] = useState<{ topping: string; movie: string; style: string } | null>(null);
+  const rerollsRef = useRef(0);
 
   // --- Persist data to localStorage ---
   useEffect(() => {
@@ -433,9 +436,21 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
       const result = (await res.json()) as NamegenResponse | any;
       if (!res.ok) throw new Error(result?.error || t("errorGenerateNames"));
 
+      // Funnel (ActivationEvent dedupes per actor + event + code).
+      if (lastGenParams?.topping !== currentParams.topping) trackActivation("topping_picked", data.sessionId, toppingCode(currentParams.topping));
+      if (lastGenParams?.movie !== currentParams.movie) trackActivation("film_picked", data.sessionId, filmCode(currentParams.movie));
+      if (shouldForce && data.suggestions?.length) {
+        rerollsRef.current += 1;
+        trackActivation("name_rerolled", data.sessionId, rerollCode(rerollsRef.current));
+      } else {
+        trackActivation("names_generated", data.sessionId, "ok");
+      }
+
       setData((p) => ({
         ...p,
         suggestions: result.suggestions,
+        origins: result.origins,
+        sigs: result.sigs,
         resolvedMovieTitle: result.resolvedMovieTitle,
         tmdbMovieId: result.tmdbMovieId,
         releaseDate: result.releaseDate,
@@ -655,12 +670,20 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // The "Continue to dashboard" CTA inside the scene routes when the user
   // is ready; we don't auto-redirect because the animation IS the reward.
   if (flow.type === "success") {
+    const filmTitle = data.resolvedMovieTitle || data.mafiaMovieTitle;
+    const claimFilm = MAFIA_FILMS.find((f) => f.title.toLowerCase() === filmTitle?.trim().toLowerCase());
     return (
       <FinaleScene
         mafiaName={data.mafiaName || data.discordNick || "Made"}
         memberId={data.memberId}
         dashboardHref={flow.redirectTo}
         topping={data.topping || undefined}
+        filmId={claimFilm?.id}
+        filmTitle={claimFilm?.title ?? (filmTitle || undefined)}
+        tmdbMovieId={data.tmdbMovieId}
+        origin={data.mafiaOrigin}
+        originSig={data.mafiaSig}
+        candidates={data.seenNames.slice(-60)}
         turtles={data.turtles}
         crews={data.crews}
       />
@@ -820,6 +843,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             releaseDate={data.releaseDate}
             mediaType={data.mediaType}
             seenNames={data.seenNames}
+            origins={data.origins}
             mafiaName={data.mafiaName}
             isUpdate={flow.isUpdate}
             existingName={data.existingData?.mafiaName}
@@ -828,7 +852,17 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             onChange={(updates) => setData((p) => ({ ...p, ...updates }))}
             onGenerate={generateNames}
             onPickName={(name) => {
-              setData((p) => ({ ...p, mafiaName: name, seenNames: mergeSeen(p.seenNames, [name]) }));
+              setData((p) => {
+                const origin = p.origins?.[name];
+                const film = p.resolvedMovieTitle || p.mafiaMovieTitle;
+                return {
+                  ...p,
+                  mafiaName: name,
+                  mafiaOrigin: origin && film ? { ...origin, film } : undefined,
+                  mafiaSig: origin && film ? p.sigs?.[name] : undefined,
+                  seenNames: mergeSeen(p.seenNames, [name]),
+                };
+              });
               goToStep(2);
             }}
             onKeepExisting={() => {
@@ -836,7 +870,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 flow.isUpdate ? data.existingData?.mafiaName : data.discordNick,
               );
               if (!nameToKeep) return;
-              setData((p) => ({ ...p, mafiaName: nameToKeep }));
+              setData((p) => ({ ...p, mafiaName: nameToKeep, mafiaOrigin: undefined, mafiaSig: undefined }));
               goToStep(2);
             }}
             onBack={() => {
@@ -855,6 +889,10 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
               setData((p) => ({
                 ...p,
                 suggestions: undefined,
+                origins: undefined,
+                sigs: undefined,
+                mafiaOrigin: undefined,
+                mafiaSig: undefined,
                 resolvedMovieTitle: undefined,
                 tmdbMovieId: undefined,
                 releaseDate: undefined,

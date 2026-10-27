@@ -13,6 +13,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useLocale, useTranslations } from "next-intl";
+import { originLine, type NameOriginWithFilm } from "@/app/lib/name-origin";
 
 // --- Archive number ---------------------------------------------------------
 // Deterministic per-name + per-day, matching the mockup's familyArchiveNo.
@@ -90,12 +91,34 @@ type Props = {
   memberId?: string;
   dashboardHref: string;
   topping?: string;
+  // Recorded with the claim behind the public /made/[id] page.
+  filmId?: string;
+  filmTitle?: string;
+  tmdbMovieId?: string;
+  origin?: NameOriginWithFilm;
+  /** namegen's signature for the picked suggestion; absent for typed/kept names. */
+  originSig?: string;
+  candidates?: string[];
   turtles?: string[];
   crews?: string[];
 };
 
-export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, turtles, crews }: Props) {
+export function FinaleScene({
+  mafiaName,
+  memberId,
+  dashboardHref,
+  topping,
+  filmId,
+  filmTitle,
+  tmdbMovieId,
+  origin,
+  originSig,
+  candidates,
+  turtles,
+  crews,
+}: Props) {
   const t = useTranslations("onboarding.finale");
+  const tName = useTranslations("onboarding.name");
   const locale = useLocale();
   const reducedMotion = usePrefersReducedMotion();
   const [phase, setPhase] = useState<number>(reducedMotion ? 6 : 0);
@@ -181,6 +204,39 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, turtl
     void drawPortrait(0);
   }, [drawPortrait]);
 
+  // --- Claim ----------------------------------------------------------------
+  // Record the claimed name (idempotent per member + name) on mount, without
+  // waiting for the portrait, and again when a portrait lands or is redrawn.
+  // For a suggested name the response is the public /made/[id] page that Share
+  // on X points at; typed or kept names are stored but get no public page.
+  const [claimId, setClaimId] = useState<string | null>(null);
+  const claimRef = useRef({ mafiaName, topping, filmId, filmTitle, tmdbMovieId, origin, originSig, candidates });
+  claimRef.current = { mafiaName, topping, filmId, filmTitle, tmdbMovieId, origin, originSig, candidates };
+  useEffect(() => {
+    const c = claimRef.current;
+    fetch("/api/mafia-name/claim", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        name: c.mafiaName,
+        topping: c.topping,
+        filmId: c.filmId,
+        filmTitle: c.filmTitle,
+        tmdbMovieId: c.tmdbMovieId,
+        origin: c.origin,
+        originSig: c.originSig,
+        candidates: c.candidates,
+        portraitUrl: portrait.url ?? undefined,
+      }),
+    })
+      .then((res) => (res.ok ? res.json() : null))
+      .then((data: { id?: string; public?: boolean } | null) => {
+        // Only unmount cancels: a response for an older portrait still carries the same id.
+        if (mountedRef.current && data?.public === true && typeof data.id === "string") setClaimId(data.id);
+      })
+      .catch(() => {});
+  }, [portrait.url]);
+
   const showToast = (msg: string) => {
     setShareToast(msg);
     window.setTimeout(() => setShareToast(null), 2400);
@@ -225,7 +281,8 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, turtl
 
   const handleShareX = () => {
     const text = t("shareXText", { name: mafiaName });
-    const url = `${window.location.origin}/join`;
+    // The public certificate once the claim is saved; /join if it could not be.
+    const url = `${window.location.origin}${claimId ? `/made/${claimId}` : "/join"}`;
     window.open(
       `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
       "_blank",
@@ -302,6 +359,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, turtl
     transition: `opacity ${ms}ms var(--ease-editorial), transform ${ms}ms var(--ease-editorial), filter ${ms}ms var(--ease-editorial)`,
   });
 
+  const originText = originLine(tName, origin, origin?.film);
   const redrawDisabled = portrait.loading || portrait.variant >= 4 || portrait.remaining === 0;
 
   return (
@@ -561,6 +619,20 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, turtl
               >
                 {t("descriptor")}
               </p>
+              {originText && (
+                <p
+                  style={{
+                    marginTop: 8,
+                    fontSize: "clamp(13px, 1.3vw, 15px)",
+                    fontStyle: "italic",
+                    color: "hsl(var(--foreground) / 0.65)",
+                    ...transition(700),
+                    opacity: phase >= 5 ? 1 : 0,
+                  }}
+                >
+                  {originText}
+                </p>
+              )}
             </div>
           </div>
 

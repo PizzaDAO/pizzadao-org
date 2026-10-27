@@ -36,6 +36,7 @@ import { toppingDescriptorFor } from "@/app/lib/topping-images";
 import { FilmPoster } from "@/app/ui/onboarding/FilmPoster";
 import { ToppingPicker } from "@/app/ui/onboarding/ToppingPicker";
 import { sanitizeDisplayName } from "@/app/lib/display-name";
+import { originLine, type NameOrigin } from "@/app/lib/name-origin";
 
 type Props = {
   // Form data
@@ -43,6 +44,8 @@ type Props = {
   mafiaMovieTitle: string;
   style: "balanced" | "serious" | "goofy";
   suggestions?: string[];
+  /** Where each suggestion came from, keyed by name (namegen `origins`). */
+  origins?: Record<string, NameOrigin>;
   resolvedMovieTitle?: string;
   releaseDate?: string;
   mediaType?: "movie" | "tv";
@@ -154,6 +157,7 @@ export function NameStep({
   mafiaMovieTitle,
   style: _style,
   suggestions,
+  origins,
   resolvedMovieTitle,
   releaseDate,
   mediaType,
@@ -444,6 +448,7 @@ export function NameStep({
                   name={name}
                   persona={CARD_PERSONALITIES[i]!}
                   topping={topping}
+                  originText={originLine(t, origins?.[name], resolvedMovieTitle || mafiaMovieTitle)}
                   isSelected={selectedIdx === i}
                   anySelected={selectedIdx !== null}
                   fileLabel={t("familyFileLabel", { fileNo: CARD_PERSONALITIES[i]!.fileNo })}
@@ -714,6 +719,7 @@ function FamilyFileCard({
   name,
   persona,
   topping,
+  originText,
   isSelected,
   anySelected,
   fileLabel,
@@ -722,6 +728,7 @@ function FamilyFileCard({
   name: string;
   persona: Persona;
   topping: string;
+  originText: string;
   isSelected: boolean;
   anySelected: boolean;
   fileLabel: string;
@@ -829,6 +836,12 @@ function FamilyFileCard({
           }}
         />
       </h3>
+
+      {originText && (
+        <p className="relative mt-3 text-[14px] italic leading-snug text-foreground/75">
+          {originText}
+        </p>
+      )}
 
       {flavor && (
         <p className="ui relative mt-3 text-[13px] uppercase tracking-[0.08em] text-foreground/70">

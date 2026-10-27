@@ -3,12 +3,15 @@ import { requireAdmin } from "@/app/lib/auth-guards";
 import { prisma } from "@/app/lib/db";
 import { ACTIVATION_STAGES } from "@/app/lib/activation";
 
+// Stage and error events only; mafia-name funnel events would crowd out the 20k row cap.
+const REPORT_EVENTS = [...ACTIVATION_STAGES, "login_failed", "profile_save_failed", "client_error"];
+
 export async function GET() {
   const auth = await requireAdmin();
   if (!auth.ok) return auth.response;
   try {
     const since = new Date(Date.now() - 30 * 86400000);
-    const rows = await prisma.activationEvent.findMany({ where: { createdAt: { gte: since } }, select: { actor: true, event: true, code: true }, take: 20001, orderBy: { createdAt: "desc" } });
+    const rows = await prisma.activationEvent.findMany({ where: { createdAt: { gte: since }, event: { in: REPORT_EVENTS } }, select: { actor: true, event: true, code: true }, take: 20001, orderBy: { createdAt: "desc" } });
     const starters = new Set(rows.filter(r => r.event === "signup_started").map(r => r.actor));
     const stages = ACTIVATION_STAGES.map(event => ({ event, count: new Set(rows.filter(r => r.event === event && starters.has(r.actor)).map(r => r.actor)).size }));
     const failures = new Map<string, Set<string>>();

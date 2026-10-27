@@ -1,0 +1,124 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`POST /api/namegen > names are unchanged: godfather 1`] = `
+{
+  "candidatePool": [
+    "Pepperoni Corleone",
+    "Pepperoni Ford Coppola",
+    "Francis Pepperoni",
+    "Pepperoni Brando",
+    "Marlon Pepperoni",
+    "Vito Pepperoni",
+    "Pepperoni Pacino",
+    "Al Pepperoni",
+    "Michael Pepperoni",
+    "Pepperoni Caan",
+    "James Pepperoni",
+    "Sonny Pepperoni",
+    "Pepperoni Duvall",
+    "Robert Pepperoni",
+    "Pepperoni Hagen",
+    "Tom Pepperoni",
+    "Pepperoni De Niro",
+    "Pepperoni Keaton",
+    "Diane Pepperoni",
+    "Pepperoni Lettieri",
+    "Pepperoni Sollozzo",
+    "Virgil Pepperoni",
+  ],
+  "resolvedMovieTitle": "The Godfather",
+  "suggestions": [
+    "Pepperoni Corleone",
+    "Pepperoni Ford Coppola",
+    "Francis Pepperoni",
+  ],
+  "tmdbMovieId": "238",
+  "topping": "Pepperoni",
+}
+`;
+
+exports[`POST /api/namegen > names are unchanged: godfather excluding first batch 1`] = `
+{
+  "candidatePool": [
+    "Pepperoni Corleone",
+    "Pepperoni Ford Coppola",
+    "Francis Pepperoni",
+    "Pepperoni Brando",
+    "Marlon Pepperoni",
+    "Vito Pepperoni",
+    "Pepperoni Pacino",
+    "Al Pepperoni",
+    "Michael Pepperoni",
+    "Pepperoni Caan",
+    "James Pepperoni",
+    "Sonny Pepperoni",
+    "Pepperoni Duvall",
+    "Robert Pepperoni",
+    "Pepperoni Hagen",
+    "Tom Pepperoni",
+    "Pepperoni De Niro",
+    "Pepperoni Keaton",
+    "Diane Pepperoni",
+    "Pepperoni Lettieri",
+    "Pepperoni Sollozzo",
+    "Virgil Pepperoni",
+  ],
+  "resolvedMovieTitle": "The Godfather",
+  "suggestions": [
+    "Pepperoni Ford Coppola",
+    "Pepperoni Brando",
+    "Marlon Pepperoni",
+  ],
+  "tmdbMovieId": "238",
+  "topping": "Pepperoni",
+}
+`;
+
+exports[`POST /api/namegen > names are unchanged: obscure 1`] = `
+{
+  "candidatePool": [
+    "Olive Kitano",
+    "Takeshi Olive",
+    "Olive Murakawa",
+    "Murakawa Olive",
+    "Olive Beat",
+    "Olive Takeshi",
+  ],
+  "resolvedMovieTitle": "Sonatine",
+  "suggestions": [
+    "Olive Kitano",
+    "Takeshi Olive",
+    "Olive Murakawa",
+  ],
+  "tmdbMovieId": "5",
+  "topping": "Olive",
+}
+`;
+
+exports[`POST /api/namegen > names are unchanged: sopranos tv 1`] = `
+{
+  "candidatePool": [
+    "Basil Soprano",
+    "Basil Chase",
+    "David Basil",
+    "Basil Gandolfini",
+    "James Basil",
+    "Tony Basil",
+    "Basil Falco",
+    "Edie Basil",
+    "Carmela Basil",
+    "Basil Van Damme",
+    "Jean-Claude Basil",
+    "Basil Al",
+    "Al Basil",
+  ],
+  "resolvedMovieTitle": "The Sopranos",
+  "suggestions": [
+    "Basil Soprano",
+    "Basil Chase",
+    "David Basil",
+  ],
+  "tmdbMovieId": "1398",
+  "topping": "Basil",
+}
+`;
