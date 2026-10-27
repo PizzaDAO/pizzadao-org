@@ -273,11 +273,20 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
           mafiaMovieTitle: prefill.filmTitle,
           resolvedMovieTitle: prefill.origin?.film ?? prefill.filmTitle,
           suggestions: [prefill.name],
-          origins: prefill.origin ? { [prefill.name]: { kind: prefill.origin.kind, person: prefill.origin.person } } : undefined,
-          sigs: prefill.sig ? { [prefill.name]: prefill.sig } : undefined,
+          // The origin line is not shown on the card (the link is untrusted);
+          // it rides along with its signature and the claim route verifies it.
+          origins: undefined,
+          mafiaOrigin: prefill.origin,
+          mafiaSig: prefill.sig,
+          originFromLink: Boolean(prefill.origin && prefill.sig),
+          sigs: undefined,
           seenNames: mergeSeen(p.seenNames, [prefill.name]),
         }));
         trackActivation("mafia_page", data.sessionId, "join_arrived");
+        // Do not leave the hand-off in the address bar, history or shares.
+        try {
+          window.history.replaceState(null, "", url.pathname);
+        } catch {}
       }
       setFlow(initialFlow);
       return;
@@ -702,6 +711,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         tmdbMovieId={data.tmdbMovieId}
         origin={data.mafiaOrigin}
         originSig={data.mafiaSig}
+        originUnverified={data.originFromLink}
         candidates={data.seenNames.slice(-60)}
         turtles={data.turtles}
         crews={data.crews}
@@ -875,12 +885,15 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
               setData((p) => {
                 const origin = p.origins?.[name];
                 const film = p.resolvedMovieTitle || p.mafiaMovieTitle;
+                // The hand-off's own (still unverified) origin survives picking its name.
+                const linked = !origin && p.originFromLink && p.prefilledName === name;
                 return {
                   ...p,
                   mafiaName: name,
                   prefilledName: undefined,
-                  mafiaOrigin: origin && film ? { ...origin, film } : undefined,
-                  mafiaSig: origin && film ? p.sigs?.[name] : undefined,
+                  originFromLink: linked,
+                  mafiaOrigin: linked ? p.mafiaOrigin : origin && film ? { ...origin, film } : undefined,
+                  mafiaSig: linked ? p.mafiaSig : origin && film ? p.sigs?.[name] : undefined,
                   seenNames: mergeSeen(p.seenNames, [name]),
                 };
               });
@@ -913,6 +926,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 origins: undefined,
                 sigs: undefined,
                 prefilledName: undefined,
+                originFromLink: undefined,
                 mafiaOrigin: undefined,
                 mafiaSig: undefined,
                 resolvedMovieTitle: undefined,

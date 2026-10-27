@@ -27,6 +27,13 @@ export const PIZZA_TOPPINGS = [
   "Chili crisp", "Burrata", "Oregano", "Parmesan", "Tomato", "Spicy salami",
 ];
 
+/** True for one of the catalog toppings (case-insensitive); free text is not. */
+export function isKnownTopping(topping: unknown): boolean {
+  if (typeof topping !== "string") return false;
+  const t = topping.trim().toLowerCase();
+  return PIZZA_TOPPINGS.some((k) => k.toLowerCase() === t);
+}
+
 export const TOPPING_EMOJI: Record<string, string> = {
   Pepperoni: "🍕", Mushroom: "🍄", Basil: "🌿", Mozzarella: "🧀", Anchovy: "🐟",
   Sausage: "🌭", "Hot honey": "🍯", Ricotta: "🥛", Garlic: "🧄", Onion: "🧅",

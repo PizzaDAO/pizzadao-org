@@ -108,6 +108,11 @@ type Props = {
    * family" button, and shares point at the public page.
    */
   mode?: "member" | "public";
+  /**
+   * The origin came from a /join link rather than from namegen, so it is not
+   * shown until the server has verified it (the claim comes back public).
+   */
+  originUnverified?: boolean;
   /** Anonymous browser id (public mode), for the funnel and to own the claim. */
   actor?: string;
   /** Public mode: fired when "Join the family" is clicked. */
@@ -130,6 +135,7 @@ export function FinaleScene({
   turtles,
   crews,
   mode = "member",
+  originUnverified,
   actor,
   onJoin,
   onRestart,
@@ -191,7 +197,7 @@ export function FinaleScene({
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(
             isPublic
-              ? { name: mafiaName, topping, variant, actor }
+              ? { name: mafiaName, topping, variant, actor, origin, originSig }
               : { name: mafiaName, topping, turtles, crews, variant },
           ),
           signal: ctrl.signal,
@@ -216,7 +222,7 @@ export function FinaleScene({
       }
       if (mountedRef.current) setPortrait((p) => ({ ...p, ...next, loading: false }));
     },
-    [mafiaName, topping, turtles, crews, isPublic, actor],
+    [mafiaName, topping, turtles, crews, isPublic, actor, origin, originSig],
   );
 
   const startedRef = useRef(false);
@@ -383,7 +389,8 @@ export function FinaleScene({
     transition: `opacity ${ms}ms var(--ease-editorial), transform ${ms}ms var(--ease-editorial), filter ${ms}ms var(--ease-editorial)`,
   });
 
-  const originText = originLine(tName, origin, origin?.film);
+  const originText =
+    originUnverified && !claimId ? "" : originLine(tName, origin, origin?.film);
   const redrawDisabled = portrait.loading || portrait.variant >= 4 || portrait.remaining === 0;
 
   return (

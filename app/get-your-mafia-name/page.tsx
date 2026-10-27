@@ -18,8 +18,20 @@ export async function generateMetadata(): Promise<Metadata> {
     title,
     description,
     alternates: { canonical: PATH },
-    openGraph: { type: "website", siteName: "PizzaDAO", title, description, url: PATH },
-    twitter: { card: "summary_large_image", title, description },
+    openGraph: {
+      type: "website",
+      siteName: "PizzaDAO",
+      title,
+      description,
+      url: PATH,
+      images: [{ url: `${PATH}/opengraph-image`, width: 1200, height: 630, alt: t("ogAlt") }],
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+      images: [{ url: `${PATH}/opengraph-image`, alt: t("ogAlt") }],
+    },
   };
 }
 

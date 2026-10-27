@@ -71,6 +71,8 @@ export type WizardData = {
   seenNames: string[];
   /** Name handed over from /get-your-mafia-name; NameStep opens with it selected. */
   prefilledName?: string;
+  /** mafiaOrigin/mafiaSig came from a /join link: shown only once verified. */
+  originFromLink?: boolean;
 
   // Step 2: City
   city: string;

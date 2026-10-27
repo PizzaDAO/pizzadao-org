@@ -99,7 +99,8 @@ export async function POST(req: Request) {
   if (body.portraitUrl) {
     const portrait = await prisma.mafiaPortrait.findFirst({
       // Only a portrait this member drew (or one with no owner: legacy or anonymous).
-      where: { url: body.portraitUrl, OR: discordId ? [{ discordId }, { discordId: null }] : [{ discordId: null }] },
+      // ...and only one drawn for this very name.
+      where: { url: body.portraitUrl, name: { equals: name, mode: "insensitive" }, OR: discordId ? [{ discordId }, { discordId: null }] : [{ discordId: null }] },
       select: { id: true },
     });
     portraitId = portrait?.id;

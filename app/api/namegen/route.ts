@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { internalError } from "@/app/lib/errors/error-response";
 import type { NameOrigin } from "@/app/lib/name-origin";
+import { isKnownTopping } from "@/app/lib/topping-images";
 import { signNameOrigin } from "@/app/lib/name-origin-sig";
 
 export const runtime = "nodejs";
@@ -498,8 +499,10 @@ export async function POST(req: Request) {
     for (const { name, origin } of [...pool, ...picked]) origins[name] ??= origin;
 
     // Proof each name + origin came from here (checked by the claim route).
+    // Only for a catalog topping: a free-text topping is attacker-chosen text
+    // that ends up inside the names, and signed names become public.
     const sigs: Record<string, string> = {};
-    for (const [name, origin] of Object.entries(origins)) {
+    for (const [name, origin] of isKnownTopping(toppingRaw) ? Object.entries(origins) : []) {
       const sig = signNameOrigin(name, { ...origin, film: resolvedTitle });
       if (sig) sigs[name] = sig;
     }

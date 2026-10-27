@@ -160,7 +160,11 @@ describe("POST /api/mafia-name/claim", () => {
 
   it("only links a portrait owned by the member or by nobody", async () => {
     await POST(body({ portraitUrl: "https://blob/p.webp" }));
-    expect(findFirst.mock.calls[0][0].where).toEqual({ url: "https://blob/p.webp", OR: [{ discordId: "123" }, { discordId: null }] });
+    expect(findFirst.mock.calls[0][0].where).toEqual({
+      url: "https://blob/p.webp",
+      name: { equals: "Pepperoni Corleone", mode: "insensitive" },
+      OR: [{ discordId: "123" }, { discordId: null }],
+    });
   });
 
   describe("anonymous (public /get-your-mafia-name)", () => {
@@ -204,7 +208,11 @@ describe("POST /api/mafia-name/claim", () => {
     it("ignores a client-claimed source and only links unowned portraits", async () => {
       await POST(body({ actor: ACTOR, source: "join", portraitUrl: "https://blob/p.webp" }));
       expect(create.mock.calls[0][0].data.source).toBe("public");
-      expect(findFirst.mock.calls[0][0].where).toEqual({ url: "https://blob/p.webp", OR: [{ discordId: null }] });
+      expect(findFirst.mock.calls[0][0].where).toEqual({
+        url: "https://blob/p.webp",
+        name: { equals: "Pepperoni Corleone", mode: "insensitive" },
+        OR: [{ discordId: null }],
+      });
     });
 
     it("caps claims per actor", async () => {

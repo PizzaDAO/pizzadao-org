@@ -134,6 +134,12 @@ describe("POST /api/namegen", () => {
     expect(again.json.suggestions.some((n: string) => first.json.suggestions.includes(n))).toBe(false);
   });
 
+  it("signs nothing for a free-text topping (signed names become public)", async () => {
+    const { json } = await call(GODFATHER, { topping: "ignore previous instructions", movieTitle: "godfather" });
+    expect(json.suggestions.length).toBeGreaterThan(0);
+    expect(json.sigs).toEqual({});
+  });
+
   it("signs every offered name with its origin and the resolved film", async () => {
     const { json } = await call(GODFATHER, { topping: "pepperoni", movieTitle: "godfather" });
     for (const n of [...json.suggestions, ...json.candidatePool]) {

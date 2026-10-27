@@ -7,7 +7,7 @@
 //   503 { fallback: true }: disabled, global cap, provider failure
 //
 // A session means the member path (5/day per member). Without one the caller is
-// the public /get-your-mafia-name page: 3/day per IP, and no turtles/crews (an
+// the public /get-your-mafia-name page: 5/day per IP, and no turtles/crews (an
 // anonymous visitor has picked none). Both paths sit under the same global cap.
 //
 // The finale never blocks on this route: any non-200 just keeps the topping seal.
@@ -21,11 +21,15 @@ import {
   RATE_LIMITS,
   type RateLimitResult,
   getClientIp,
+  rateLimitIp,
   checkKeyedRateLimit,
   isUpstashConfigured,
   rateLimitResponse,
 } from "@/app/lib/rate-limit";
 import { activationActor, recordActivationLater } from "@/app/lib/activation";
+import { verifyNameOrigin } from "@/app/lib/name-origin-sig";
+import { NAME_ORIGIN_KINDS } from "@/app/lib/name-origin";
+import { isKnownTopping } from "@/app/lib/topping-images";
 import { PortraitUnavailable, generatePortrait, portraitModelId } from "@/app/lib/mafia-portrait/generate";
 import { canonicalCrews, canonicalTurtles, portraitCacheKey } from "@/app/lib/mafia-portrait/prompt";
 
@@ -44,14 +48,25 @@ const bodySchema = z.object({
   variant: z.number().int().min(0).max(4),
   // Anonymous browser id, for the funnel only (the public page has no session).
   actor: z.string().max(80).optional(),
+  // Anonymous callers must present a name /api/namegen offered (see below).
+  origin: z
+    .object({
+      kind: z.enum(NAME_ORIGIN_KINDS),
+      person: z.string().trim().min(1).max(80),
+      film: z.string().trim().min(1).max(120),
+    })
+    .optional(),
+  originSig: z.string().max(100).optional(),
 });
 
 const fallback = (reason: string) => NextResponse.json({ fallback: true, reason }, { status: 503 });
 
-function dailyCap(): number {
-  const n = Number.parseInt(process.env.MAFIA_PORTRAIT_DAILY_CAP ?? "", 10);
-  return Number.isFinite(n) && n > 0 ? n : DEFAULT_DAILY_CAP;
+function envCap(name: string, fallbackCap: number): number {
+  const n = Number.parseInt(process.env[name] ?? "", 10);
+  return Number.isFinite(n) && n > 0 ? n : fallbackCap;
 }
+const dailyCap = () => envCap("MAFIA_PORTRAIT_DAILY_CAP", DEFAULT_DAILY_CAP);
+const publicDailyCap = () => envCap("MAFIA_PORTRAIT_PUBLIC_DAILY_CAP", RATE_LIMITS["mafia-portrait-public"].limit);
 
 export async function POST(req: Request) {
   if (process.env.MAFIA_PORTRAIT_ENABLED !== "1" || !process.env.OPENAI_API_KEY) {
@@ -77,24 +92,27 @@ export async function POST(req: Request) {
   const name = sanitizeDisplayName(parsed.data.name);
   if (!name) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
+  // No session: only a name /api/namegen offered for a catalog topping (it
+  // signs those and nothing else), so the prompt never carries free text from
+  // an anonymous caller beyond what the generator itself produced.
+  if (!discordId) {
+    const o = parsed.data.origin;
+    if (!isKnownTopping(topping) || !o || !verifyNameOrigin(name, o, parsed.data.originSig)) {
+      return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+    }
+  }
+
   const cacheKey = portraitCacheKey({ name, turtles, crews, variant });
 
   // Cache hits are free: they skip the limits and the provider.
   const hit = await prisma.mafiaPortrait.findUnique({ where: { cacheKey } });
   if (hit) return NextResponse.json({ url: hit.url, cached: true });
 
-  // The global spend cap fails CLOSED: if Redis is down (or, on Vercel, not
-  // configured so counters would be per instance) we refuse rather than risk
-  // unbounded OpenAI spend.
+  // Spend caps fail CLOSED: if Redis is down (or, on Vercel, not configured so
+  // counters would be per instance) we refuse rather than risk unbounded spend.
   if (process.env.VERCEL && !isUpstashConfigured()) return fallback("capacity");
-  const global = await checkKeyedRateLimit(
-    "mafia-portrait-global",
-    "all",
-    { ...RATE_LIMITS["mafia-portrait-global"], limit: dailyCap() },
-    { failClosed: true },
-  );
-  if (!global.success) return fallback("capacity");
 
+  // The caller's own allowance first, so a refusal never burns shared capacity.
   let own: RateLimitResult;
   if (discordId) {
     own = await checkKeyedRateLimit("mafia-portrait-member", discordId);
@@ -102,9 +120,28 @@ export async function POST(req: Request) {
     // Without an IP every visitor would share one bucket; refuse instead.
     const ip = getClientIp(req.headers);
     if (ip === "unknown") return fallback("capacity");
-    own = await checkKeyedRateLimit("mafia-portrait-ip", ip, undefined, { failClosed: true });
+    own = await checkKeyedRateLimit("mafia-portrait-ip", rateLimitIp(ip), undefined, { failClosed: true });
   }
   if (!own.success) return rateLimitResponse(own);
+
+  // Anonymous draws share their own sub-cap, so a public flood cannot use up
+  // the members' part of the global cap.
+  if (!discordId) {
+    const pub = await checkKeyedRateLimit(
+      "mafia-portrait-public",
+      "all",
+      { ...RATE_LIMITS["mafia-portrait-public"], limit: publicDailyCap() },
+      { failClosed: true },
+    );
+    if (!pub.success) return fallback("capacity");
+  }
+  const global = await checkKeyedRateLimit(
+    "mafia-portrait-global",
+    "all",
+    { ...RATE_LIMITS["mafia-portrait-global"], limit: dailyCap() },
+    { failClosed: true },
+  );
+  if (!global.success) return fallback("capacity");
 
   let drawn: { url: string; model: string };
   try {
