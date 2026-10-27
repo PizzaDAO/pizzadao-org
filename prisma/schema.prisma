@@ -904,6 +904,13 @@ model MemberProfileExtras {
   profileCompletedCelebratedAt DateTime?             // null = not yet shown; backfilled for already-complete members
   // ===== Timezone (pizzaiolo-13628) — the Crew sheet has no Timezone column =====
   timezone                 String?   @db.VarChar(64) // IANA ID resolved from the onboarding city, e.g. "America/New_York"
+  // ===== Re-engagement email (task/reengage-emails) =====
+  // Emails are collected in the app (never in the publicly readable Crew sheet).
+  // The digest goes only to an address that is verified AND opted in.
+  email                    String?   @db.VarChar(254)
+  emailVerifiedAt          DateTime?                  // set by the signed confirmation link; reset when the address changes
+  emailConfirmSentAt       DateTime?                  // last confirmation email (throttle)
+  reengageEmailOptIn       Boolean   @default(false)  // explicit opt-in to the weekly digest
   updatedAt                DateTime  @updatedAt
   createdAt                DateTime  @default(now())
 }
@@ -1420,6 +1427,37 @@ model MafiaNameClaim {
   @@unique([discordId, name])
   @@unique([actor, name])
   @@index([createdAt])
+}
+
+// Weekly re-engagement digest (app/lib/reengage). One row per member per ISO week:
+// the unique key is the idempotency claim, written before the send so concurrent
+// cron runs never double-send. status: SENDING -> SENT | FAILED, or SKIPPED when
+// the digest had nothing to say. Rows are kept (no retry within the week).
+model ReengageEmailSend {
+  id        String   @id @default(cuid())
+  memberId  String
+  weekKey   String   @db.VarChar(10) // e.g. "2026-W44"
+  status    String   @default("SENDING") @db.VarChar(10)
+  locale    String   @default("en") @db.VarChar(5)
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+
+  @@unique([memberId, weekKey])
+  @@index([weekKey])
+}
+
+// Confirmation-email send log: backs the per-member / per-address / per-IP
+// caps on /api/email-prefs (anti mail-bomb). Address and IP are stored hashed.
+model EmailConfirmSend {
+  id        String   @id @default(cuid())
+  memberId  String
+  emailHash String   @db.VarChar(64) // sha256 of the lowercased address
+  ipHash    String   @db.VarChar(64)
+  createdAt DateTime @default(now())
+
+  @@index([memberId, createdAt])
+  @@index([emailHash, createdAt])
+  @@index([ipHash, createdAt])
 }
 
 // One pre-call agenda post per Discord scheduled-event occurrence (idempotency record for

@@ -1,0 +1,50 @@
+// @vitest-environment node
+import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
+import { NextRequest } from "next/server";
+
+const upsert = vi.hoisted(() => vi.fn(async () => ({ email: "Shared@x.io" })));
+const updateMany = vi.hoisted(() => vi.fn(async () => ({ count: 2 })));
+vi.mock("@/app/lib/db", () => ({ prisma: { memberProfileExtras: { upsert, updateMany } } }));
+
+import { POST } from "./route";
+import { signUnsubscribe } from "@/app/lib/reengage/unsub-sig";
+
+let saved: string | undefined;
+beforeEach(() => { vi.clearAllMocks(); saved = process.env.SESSION_SECRET; process.env.SESSION_SECRET = "s"; });
+afterEach(() => { if (saved === undefined) delete process.env.SESSION_SECRET; else process.env.SESSION_SECRET = saved; });
+
+const post = (qs: string, type?: string, body?: string) =>
+  new NextRequest(`https://app.pizzadao.org/api/email/unsubscribe?${qs}`, {
+    method: "POST",
+    headers: type ? { "content-type": type } : {},
+    body,
+  });
+
+describe("POST /api/email/unsubscribe", () => {
+  it("mail-client one-click (List-Unsubscribe=One-Click) returns 200 and flips the opt-in off", async () => {
+    const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", "List-Unsubscribe=One-Click"));
+    expect(res.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { memberId: "42" }, update: { reengageEmailOptIn: false } }));
+  });
+  it("unsubscribes the address on every member row (case-insensitive)", async () => {
+    await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", "List-Unsubscribe=One-Click"));
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { email: { equals: "Shared@x.io", mode: "insensitive" } },
+      data: { reengageEmailOptIn: false },
+    });
+  });
+  it("a browser form post is redirected back to the confirmation page", async () => {
+    const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", ""));
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toContain("/email/unsubscribe");
+  });
+  it("returns JSON for other callers", async () => {
+    const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`));
+    expect(await res.json()).toEqual({ ok: true });
+  });
+  it("rejects a bad or foreign signature without writing", async () => {
+    expect((await POST(post(`m=43&s=${signUnsubscribe("42")}`))).status).toBe(400);
+    expect((await POST(post("m=42"))).status).toBe(400);
+    expect(upsert).not.toHaveBeenCalled();
+  });
+});
