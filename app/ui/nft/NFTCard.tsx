@@ -2,7 +2,7 @@
 
 import React, { useState } from "react";
 import Image from "next/image";
-import { NFTDisplayItem } from "@/app/lib/nft-types";
+import type { NFTDisplayItem } from "@/app/lib/nft-types";
 
 type NFTCardProps = {
   nft: NFTDisplayItem;
