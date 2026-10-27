@@ -9,7 +9,9 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { listRecordings } from "@/app/lib/calls/recordings";
+import { loadPostFilter } from "@/app/lib/calls/post-filters";
 import AgendaPreview from "./AgendaPreview";
+import { PostFilters } from "./PostFilters";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -42,6 +44,7 @@ export default async function AdminCallsPage() {
     }
 
     const rows = await listRecordings();
+    const postFilter = await loadPostFilter().catch(() => null);
     const when = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
 
     return (
@@ -52,6 +55,25 @@ export default async function AdminCallsPage() {
                     <h1 className="font-[family-name:var(--font-display)] font-black text-3xl m-0">{t("title")}</h1>
                     <p className="m-0 text-foreground/70">{t("description")}</p>
                 </header>
+
+                {postFilter ? (
+                    <PostFilters
+                        initial={postFilter}
+                        labels={{
+                            title: t("filtersTitle"),
+                            description: t("filtersDescription"),
+                            crewIds: t("filtersCrewIds"),
+                            crewLabelTerms: t("filtersCrewLabelTerms"),
+                            blockedTerms: t("filtersBlockedTerms"),
+                            save: t("filtersSave"),
+                            saving: t("filtersSaving"),
+                            saved: t("filtersSaved"),
+                            error: t("filtersError"),
+                        }}
+                    />
+                ) : (
+                    <p className="text-tomato">{t("filtersUnavailable")}</p>
+                )}
 
                 <AgendaPreview />
 

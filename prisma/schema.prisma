@@ -1529,3 +1529,14 @@ model CallAgendaPost {
   @@unique([eventId, startsAt])
   @@index([crewId, startsAt])
 }
+
+// Private editorial filters for Metalhead's automated call posts (pre-call agendas, post-call
+// recaps). Single row (id = 1), edited by call reviewers on /admin/calls. Values are data, never code.
+model CallPostFilter {
+  id                     Int      @id @default(1)
+  excludedCrewIds        String[] @default([])
+  excludedCrewLabelTerms String[] @default([])
+  blockedTerms           String[] @default([])
+  updatedAt              DateTime @updatedAt
+  updatedBy              String?
+}

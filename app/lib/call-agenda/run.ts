@@ -15,6 +15,7 @@ import { getCrewMappings, fetchOpenCrewTasksResult, type CrewOption } from '@/ap
 import { resolveCrewForEvent } from '@/app/lib/calls/crew-map'
 import { getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
+import { isCrewExcluded, loadPostFilter, mentionsBlockedTerm, type PostFilter } from '@/app/lib/calls/post-filters'
 import { SITE_URL } from '@/app/lib/site-url'
 import { buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
@@ -116,6 +117,10 @@ export interface PlannedAgenda {
   alreadyPosted: boolean
   /** The crew sheet could not be read (as opposed to having no urgent tasks). */
   sheetError: boolean
+  /** The crew is excluded from automated posts (see calls/post-filters.ts): never posted. */
+  excluded: boolean
+  /** Tasks / last-call items left out of the agenda by the blocked-term filter. */
+  filteredOut: number
 }
 
 /** A rescheduled event keeps its id but changes startsAt; treat a post within this of the new start as the same call. */
@@ -126,8 +131,10 @@ export function crewPageUrl(crewId: string): string {
 }
 
 /** Build the agendas for upcoming calls within `horizonMs`. Never posts. */
-export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?: typeof fetch }): Promise<PlannedAgenda[]> {
+export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?: typeof fetch; filter?: PostFilter }): Promise<PlannedAgenda[]> {
   const now = o.now ?? new Date()
+  // Throws when the filter cannot be read: better no agenda than an unfiltered one.
+  const filter = o.filter ?? (await loadPostFilter())
   const events = await fetchUpcomingEvents({ now, horizonMs: o.horizonMs, fetchImpl: o.fetchImpl })
   if (!events.length) return []
   const { crews } = await getCrewMappings()
@@ -137,6 +144,14 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     const hit = resolveCrewForEvent(crews.map((c) => ({ id: c.id, label: c.label, event: c.event })), { eventId: ev.id, eventName: ev.name })
     const crew = hit ? byId.get(hit.crewId) : undefined
     if (!crew) continue
+    if (isCrewExcluded(crew, filter)) {
+      plans.push({
+        eventId: ev.id, eventName: ev.name, startsAt: ev.startsAt, crewId: crew.id, crewLabel: crew.label,
+        channelRaw: crew.channel ?? null, crewUrl: crewPageUrl(crew.id), bullets: [], message: '',
+        alreadyPosted: false, sheetError: false, excluded: true, filteredOut: 0,
+      })
+      continue
+    }
     const start = ev.startsAt.getTime()
     const [sheet, actionItems, posted] = await Promise.all([
       crew.sheet ? fetchOpenCrewTasksResult(crew.sheet) : Promise.resolve({ tasks: [], error: false }),
@@ -146,8 +161,11 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
         select: { id: true },
       }),
     ])
-    const tasks = sheet.tasks
-    const bullets = buildAgendaBullets({ tasks, actionItems, now })
+    // Drop tasks / last-call items that mention a blocked term before ranking.
+    const tasks = sheet.tasks.filter((t) => !mentionsBlockedTerm(t.label, filter))
+    const items = actionItems.filter((a) => !mentionsBlockedTerm(a.text, filter) && !mentionsBlockedTerm(a.owner, filter))
+    const filteredOut = sheet.tasks.length - tasks.length + actionItems.length - items.length
+    const bullets = buildAgendaBullets({ tasks, actionItems: items, now })
     const crewUrl = crewPageUrl(crew.id)
     plans.push({
       eventId: ev.id,
@@ -161,6 +179,8 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
       message: formatAgendaMessage({ crewLabel: crew.label, startsAt: ev.startsAt, bullets, crewUrl }),
       alreadyPosted: !!posted,
       sheetError: sheet.error,
+      excluded: false,
+      filteredOut,
     })
   }
   return plans
@@ -169,7 +189,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
 export type AgendaOutcome = {
   eventId: string
   crewId: string
-  status: 'posted' | 'already-posted' | 'no-items' | 'no-channel' | 'sheet-error' | 'failed' | 'post-uncertain' | 'error'
+  status: 'posted' | 'excluded' | 'already-posted' | 'no-items' | 'no-channel' | 'sheet-error' | 'failed' | 'post-uncertain' | 'error'
   messageId?: string | null
 }
 
@@ -192,6 +212,7 @@ const SUPPRESS_EMBEDS = 4
 
 async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutcome> {
   const base = { eventId: p.eventId, crewId: p.crewId }
+  if (p.excluded) return { ...base, status: 'excluded' }
   if (p.alreadyPosted) return { ...base, status: 'already-posted' }
   // Sheet unreadable: do not claim, so the next run retries (an empty list from a healthy sheet is 'no-items').
   if (p.sheetError) return { ...base, status: 'sheet-error' }
