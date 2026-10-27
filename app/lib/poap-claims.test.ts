@@ -3,9 +3,11 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 const attFind = vi.fn();
 const linkFindFirst = vi.fn();
 const linkUpdateMany = vi.fn();
+const queryRaw = vi.fn();
 vi.mock("@/app/lib/db", () => ({
   prisma: {
     callAttendance: { findFirst: (...a: unknown[]) => attFind(...a), findMany: vi.fn() },
+    $queryRaw: (...a: unknown[]) => queryRaw(...a),
     poapMintLink: {
       findFirst: (...a: unknown[]) => linkFindFirst(...a),
       updateMany: (...a: unknown[]) => linkUpdateMany(...a),
@@ -20,6 +22,7 @@ describe("mint link parsing", () => {
   it("accepts https poap hosts only", () => {
     expect(isAllowedMintLink("https://poap.xyz/claim/abc123")).toBe(true);
     expect(isAllowedMintLink("https://app.poap.xyz/claim/abc")).toBe(true);
+    expect(isAllowedMintLink("https://poap.website/claim/abc")).toBe(false);
     expect(isAllowedMintLink("http://poap.xyz/claim/abc")).toBe(false);
     expect(isAllowedMintLink("https://evil.com/poap.xyz")).toBe(false);
     expect(isAllowedMintLink("https://notpoap.xyz/claim/abc")).toBe(false);
@@ -49,6 +52,7 @@ describe("claimPoap", () => {
     attFind.mockReset();
     linkFindFirst.mockReset();
     linkUpdateMany.mockReset();
+    queryRaw.mockReset();
   });
 
   it("refuses members who did not attend", async () => {
@@ -68,28 +72,25 @@ describe("claimPoap", () => {
     expect(linkUpdateMany).not.toHaveBeenCalled();
   });
 
-  it("claims one unused link", async () => {
+  it("claims one unused link in a single statement", async () => {
     attFind.mockResolvedValue({ id: 1 });
-    linkFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: 7, link: "https://poap.xyz/claim/x" });
-    linkUpdateMany.mockResolvedValue({ count: 1 });
+    linkFindFirst.mockResolvedValueOnce(null);
+    queryRaw.mockResolvedValue([{ link: "https://poap.xyz/claim/x" }]);
     expect(await claimPoap("1", "ops", "2026-10-29")).toEqual({ ok: true, link: "https://poap.xyz/claim/x", alreadyClaimed: false });
-    expect(linkUpdateMany.mock.calls[0][0].where).toEqual({ id: 7, claimedBy: null });
+    expect(queryRaw).toHaveBeenCalledTimes(1);
   });
 
-  it("retries when another member wins the row, then reports none left", async () => {
+  it("returns the member's own link when a parallel double-click hits the unique index", async () => {
     attFind.mockResolvedValue({ id: 1 });
-    linkFindFirst
-      .mockResolvedValueOnce(null)
-      .mockResolvedValueOnce({ id: 7, link: "a" })
-      .mockResolvedValueOnce({ id: 8, link: "b" })
-      .mockResolvedValueOnce(null);
-    linkUpdateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 });
-    expect(await claimPoap("1", "ops", "2026-10-29")).toMatchObject({ ok: true, link: "b" });
+    linkFindFirst.mockResolvedValueOnce(null).mockResolvedValueOnce({ link: "https://poap.xyz/claim/mine" });
+    queryRaw.mockRejectedValue(new Error("duplicate key value violates unique constraint (23505)"));
+    expect(await claimPoap("1", "ops", "2026-10-29")).toEqual({ ok: true, link: "https://poap.xyz/claim/mine", alreadyClaimed: true });
   });
 
   it("reports none_left on an empty pool", async () => {
     attFind.mockResolvedValue({ id: 1 });
     linkFindFirst.mockResolvedValue(null);
+    queryRaw.mockResolvedValue([]);
     expect(await claimPoap("1", "ops", "2026-10-29")).toEqual({ ok: false, reason: "none_left" });
   });
 });

@@ -12,5 +12,4 @@ CREATE TABLE IF NOT EXISTS "PoapMintLink" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "PoapMintLink_link_key" ON "PoapMintLink"("link");
 CREATE UNIQUE INDEX IF NOT EXISTS "PoapMintLink_crewId_callDay_claimedBy_key" ON "PoapMintLink"("crewId", "callDay", "claimedBy");
-CREATE INDEX IF NOT EXISTS "PoapMintLink_crewId_callDay_claimedBy_idx" ON "PoapMintLink"("crewId", "callDay", "claimedBy");
 CREATE INDEX IF NOT EXISTS "PoapMintLink_claimedBy_idx" ON "PoapMintLink"("claimedBy");

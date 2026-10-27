@@ -25,9 +25,9 @@ export default function AdminPoapsClient() {
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({ crewId, callDay, links }),
     });
-    const json = (await res.json().catch(() => ({}))) as { added?: number; duplicates?: number; invalid?: string[]; error?: string };
+    const json = (await res.json().catch(() => ({}))) as { added?: number; duplicates?: number; invalid?: string[]; error?: string; warning?: string };
     if (res.ok) {
-      setMsg(`Added ${json.added}, ${json.duplicates} duplicate, ${json.invalid?.length ?? 0} invalid.`);
+      setMsg(`Added ${json.added}, ${json.duplicates} duplicate, ${json.invalid?.length ?? 0} invalid.${json.warning ? ` Warning: ${json.warning}` : ""}`);
       setLinks("");
       void load();
     } else {

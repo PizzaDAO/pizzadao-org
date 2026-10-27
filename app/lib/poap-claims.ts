@@ -4,7 +4,7 @@
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 
-export const POAP_LINK_HOSTS = ["poap.xyz", "poap.delivery", "poap.website", "poap.in"];
+export const POAP_LINK_HOSTS = ["poap.xyz", "poap.delivery"];
 
 export type PoapClaimItem = {
   crewId: string;
@@ -104,26 +104,34 @@ export async function claimPoap(discordId: string, crewId: string, callDay: stri
   const existing = await prisma.poapMintLink.findFirst({ where: { crewId, callDay: day, claimedBy: discordId }, select: { link: true } });
   if (existing) return { ok: true, link: existing.link, alreadyClaimed: true };
 
-  // A few tries: another member may win the same row between our read and write.
-  for (let i = 0; i < 5; i++) {
-    const candidate = await prisma.poapMintLink.findFirst({ where: { crewId, callDay: day, claimedBy: null }, orderBy: { id: "asc" }, select: { id: true, link: true } });
-    if (!candidate) return { ok: false, reason: "none_left" };
-    try {
-      const res = await prisma.poapMintLink.updateMany({
-        where: { id: candidate.id, claimedBy: null },
-        data: { claimedBy: discordId, claimedAt: new Date() },
-      });
-      if (res.count === 1) return { ok: true, link: candidate.link, alreadyClaimed: false };
-    } catch (e) {
-      // Unique (crewId, callDay, claimedBy): a parallel request from this member already claimed one.
-      if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
-        const mineNow = await prisma.poapMintLink.findFirst({ where: { crewId, callDay: day, claimedBy: discordId }, select: { link: true } });
-        if (mineNow) return { ok: true, link: mineNow.link, alreadyClaimed: true };
-      }
-      throw e;
+  // One statement: the row is picked and locked atomically, so concurrent claimers
+  // each skip rows another transaction holds instead of racing for the same one.
+  try {
+    const rows = await prisma.$queryRaw<{ link: string }[]>`
+      UPDATE "PoapMintLink" SET "claimedBy" = ${discordId}, "claimedAt" = now()
+      WHERE id = (
+        SELECT id FROM "PoapMintLink"
+        WHERE "crewId" = ${crewId} AND "callDay" = ${callDay}::date AND "claimedBy" IS NULL
+        ORDER BY id LIMIT 1 FOR UPDATE SKIP LOCKED
+      )
+      RETURNING link`;
+    if (rows.length === 0) return { ok: false, reason: "none_left" };
+    return { ok: true, link: rows[0].link, alreadyClaimed: false };
+  } catch (e) {
+    // Unique (crewId, callDay, claimedBy): a parallel request from this member already claimed one.
+    if (isUniqueViolation(e)) {
+      const mineNow = await prisma.poapMintLink.findFirst({ where: { crewId, callDay: day, claimedBy: discordId }, select: { link: true } });
+      if (mineNow) return { ok: true, link: mineNow.link, alreadyClaimed: true };
     }
+    throw e;
   }
-  return { ok: false, reason: "none_left" };
+}
+
+function isUniqueViolation(e: unknown): boolean {
+  if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") return true;
+  // Raw queries surface the Postgres error code in the message/meta.
+  const msg = e instanceof Error ? e.message : "";
+  return /P2002|23505|unique constraint/i.test(msg);
 }
 
 /** Activation code for the poap_claimed event (matches /^[a-z0-9_]{1,48}$/). */

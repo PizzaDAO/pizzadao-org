@@ -36,5 +36,10 @@ export async function POST(req: Request) {
     data: valid.map((link) => ({ crewId, callDay: new Date(`${body.callDay}T00:00:00Z`), link })),
     skipDuplicates: true,
   });
-  return NextResponse.json({ added: res.count, duplicates: valid.length - res.count, invalid });
+  const day = new Date(`${body.callDay}T00:00:00Z`);
+  const attendees = await prisma.callAttendance.count({
+    where: { crewId, callDate: { gte: day, lt: new Date(day.getTime() + 86400000) } },
+  });
+  const warning = attendees === 0 ? "No attendance recorded for this crewId and day yet; check the crew id and date." : undefined;
+  return NextResponse.json({ added: res.count, duplicates: valid.length - res.count, invalid, ...(warning ? { warning } : {}) });
 }
