@@ -1,8 +1,8 @@
 // app/api/mafia-portrait/route.ts
 // AI portrait for the onboarding finale (plans/mafia-name-port.md, Phase 1).
 //
-// POST { name, topping, filmId?, filmTitle?, variant }
-//   200 { url, animal, cached, remaining? }
+// POST { name, topping?, turtles?, crews?, variant }
+//   200 { url, cached, remaining? }
 //   400 invalid input | 401 no session | 429 member limit
 //   503 { fallback: true }: disabled, global cap, provider failure
 //
@@ -13,7 +13,6 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { getSession } from "@/app/lib/session";
 import { sanitizeDisplayName } from "@/app/lib/display-name";
-import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import {
   RATE_LIMITS,
   checkKeyedRateLimit,
@@ -22,7 +21,7 @@ import {
 } from "@/app/lib/rate-limit";
 import { recordActivationLater } from "@/app/lib/activation";
 import { PortraitUnavailable, generatePortrait, portraitModelId } from "@/app/lib/mafia-portrait/generate";
-import { portraitCacheKey } from "@/app/lib/mafia-portrait/prompt";
+import { canonicalCrews, canonicalTurtles, portraitCacheKey } from "@/app/lib/mafia-portrait/prompt";
 
 export const runtime = "nodejs";
 export const maxDuration = 60;
@@ -31,9 +30,11 @@ const DEFAULT_DAILY_CAP = 300;
 
 const bodySchema = z.object({
   name: z.string().max(60),
-  topping: z.string().trim().min(1).max(50),
-  filmId: z.string().max(60).optional(),
-  filmTitle: z.string().max(120).optional(),
+  // Stored as metadata only; the prompt does not use it.
+  topping: z.string().trim().max(50).optional(),
+  // Unknown turtles / crews are dropped by canonicalTurtles / canonicalCrews.
+  turtles: z.array(z.string().max(40)).max(12).optional(),
+  crews: z.array(z.string().max(60)).max(30).optional(),
   variant: z.number().int().min(0).max(4),
 });
 
@@ -59,21 +60,18 @@ export async function POST(req: Request) {
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
-  const { topping, filmId, filmTitle, variant } = parsed.data;
+  const { variant } = parsed.data;
+  const topping = parsed.data.topping ?? "";
+  const turtles = canonicalTurtles(parsed.data.turtles);
+  const crews = canonicalCrews(parsed.data.crews);
   const name = sanitizeDisplayName(parsed.data.name);
   if (!name) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  if (filmId && !MAFIA_FILMS.some((f) => f.id === filmId)) {
-    return NextResponse.json({ error: "Invalid request" }, { status: 400 });
-  }
 
-  // Only the known film id (or "custom") keys the cache: a free-text title
-  // never reaches the prompt, so it must not split the cache either.
-  const filmKey = (filmId || "custom").slice(0, 120);
-  const cacheKey = portraitCacheKey({ name, topping, filmKey, variant });
+  const cacheKey = portraitCacheKey({ name, turtles, crews, variant });
 
   // Cache hits are free: they skip the limits and the provider.
   const hit = await prisma.mafiaPortrait.findUnique({ where: { cacheKey } });
-  if (hit) return NextResponse.json({ url: hit.url, animal: hit.animal, cached: true });
+  if (hit) return NextResponse.json({ url: hit.url, cached: true });
 
   // The global spend cap fails CLOSED: if Redis is down (or, on Vercel, not
   // configured so counters would be per instance) we refuse rather than risk
@@ -90,9 +88,9 @@ export async function POST(req: Request) {
   const member = await checkKeyedRateLimit("mafia-portrait-member", discordId);
   if (!member.success) return rateLimitResponse(member);
 
-  let drawn: { url: string; animal: string; model: string };
+  let drawn: { url: string; model: string };
   try {
-    drawn = await generatePortrait({ name, topping, filmId });
+    drawn = await generatePortrait({ name, turtles, crews });
   } catch (e) {
     const cause = e instanceof PortraitUnavailable ? e.cause : e;
     const info = cause as { name?: string; message?: string; statusCode?: number; status?: number; code?: string } | undefined;
@@ -118,9 +116,9 @@ export async function POST(req: Request) {
         cacheKey,
         name: name.slice(0, 80),
         topping,
-        filmKey,
+        filmKey: "",
         variant,
-        animal: drawn.animal,
+        animal: "",
         model: drawn.model || portraitModelId(),
         url: drawn.url,
         discordId,
@@ -130,7 +128,7 @@ export async function POST(req: Request) {
     // Lost a race on the unique key: serve the winner's portrait.
     if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === "P2002") {
       const winner = await prisma.mafiaPortrait.findUnique({ where: { cacheKey } });
-      if (winner) return NextResponse.json({ url: winner.url, animal: winner.animal, cached: true });
+      if (winner) return NextResponse.json({ url: winner.url, cached: true });
     }
     console.error("[mafia-portrait] could not store portrait row");
     // The image exists; still show it to this member.
@@ -139,7 +137,6 @@ export async function POST(req: Request) {
   recordActivationLater("portrait_generated", { discordId, code: "ok" });
   return NextResponse.json({
     url: drawn.url,
-    animal: drawn.animal,
     cached: false,
     remaining: member.remaining,
   });

@@ -90,11 +90,11 @@ type Props = {
   memberId?: string;
   dashboardHref: string;
   topping?: string;
-  filmId?: string;
-  filmTitle?: string;
+  turtles?: string[];
+  crews?: string[];
 };
 
-export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmId, filmTitle }: Props) {
+export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, turtles, crews }: Props) {
   const t = useTranslations("onboarding.finale");
   const locale = useLocale();
   const reducedMotion = usePrefersReducedMotion();
@@ -103,7 +103,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
 
   const [portrait, setPortrait] = useState<Portrait>({
     url: null,
-    loading: !!topping,
+    loading: true,
     notice: null,
     remaining: null,
     variant: 0,
@@ -140,7 +140,6 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
   // --- Portrait -----------------------------------------------------------
   const drawPortrait = useCallback(
     async (variant: number) => {
-      if (!topping) return;
       setPortrait((p) => ({ ...p, loading: true, notice: null }));
       const ctrl = new AbortController();
       const timer = window.setTimeout(() => ctrl.abort(), PORTRAIT_CLIENT_TIMEOUT_MS);
@@ -149,7 +148,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
         const res = await fetch("/api/mafia-portrait", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: mafiaName, topping, filmId, filmTitle, variant }),
+          body: JSON.stringify({ name: mafiaName, topping, turtles, crews, variant }),
           signal: ctrl.signal,
         });
         if (res.ok) {
@@ -172,7 +171,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
       }
       if (mountedRef.current) setPortrait((p) => ({ ...p, ...next, loading: false }));
     },
-    [mafiaName, topping, filmId, filmTitle],
+    [mafiaName, topping, turtles, crews],
   );
 
   const startedRef = useRef(false);
@@ -646,8 +645,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
           </button>
         </div>
 
-        {/* Portrait controls — only when portraits are on for this scene */}
-        {topping && (
+        {/* Portrait controls */}
           <div
             style={{
               marginTop: 14,
@@ -690,7 +688,6 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
               </>
             )}
           </div>
-        )}
 
         {/* Tiny editorial footnote — fades in last alongside CTAs */}
         <p

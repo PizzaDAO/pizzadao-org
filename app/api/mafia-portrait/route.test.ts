@@ -34,7 +34,7 @@ const ok = { success: true, limit: 5, remaining: 4, reset: Date.now() + 1000 };
 const body = (o: Record<string, unknown> = {}) =>
   new Request("http://x/api/mafia-portrait", {
     method: "POST",
-    body: JSON.stringify({ name: "Tony Soprano", topping: "Basil", filmId: "godfather", variant: 0, ...o }),
+    body: JSON.stringify({ name: "Tony Soprano", topping: "Basil", turtles: ["Leonardo"], crews: ["comms"], variant: 0, ...o }),
   });
 
 describe("POST /api/mafia-portrait", () => {
@@ -49,7 +49,7 @@ describe("POST /api/mafia-portrait", () => {
     findUnique.mockResolvedValue(null);
     create.mockResolvedValue({});
     checkKeyed.mockResolvedValue(ok);
-    generatePortrait.mockResolvedValue({ url: "https://blob/p.webp", animal: "fox", model: "gpt-image-1" });
+    generatePortrait.mockResolvedValue({ url: "https://blob/p.webp", model: "gpt-image-1" });
   });
 
   it("503 fallback when the kill switch is off", async () => {
@@ -71,16 +71,15 @@ describe("POST /api/mafia-portrait", () => {
     expect(generatePortrait).not.toHaveBeenCalled();
   });
 
-  it("400 on variant 5, an unknown filmId, or an empty name", async () => {
+  it("400 on variant 5 or an empty name", async () => {
     expect((await POST(body({ variant: 5 }))).status).toBe(400);
-    expect((await POST(body({ filmId: "nope" }))).status).toBe(400);
     expect((await POST(body({ name: "   " }))).status).toBe(400);
   });
 
   it("cache hit skips limits and the provider", async () => {
-    findUnique.mockResolvedValue({ url: "https://blob/c.webp", animal: "owl" });
+    findUnique.mockResolvedValue({ url: "https://blob/c.webp" });
     const res = await POST(body());
-    expect(await res.json()).toEqual({ url: "https://blob/c.webp", animal: "owl", cached: true });
+    expect(await res.json()).toEqual({ url: "https://blob/c.webp", cached: true });
     expect(checkKeyed).not.toHaveBeenCalled();
     expect(generatePortrait).not.toHaveBeenCalled();
   });
@@ -88,10 +87,23 @@ describe("POST /api/mafia-portrait", () => {
   it("draws, stores and returns the remaining count on a miss", async () => {
     const res = await POST(body());
     expect(res.status).toBe(200);
-    expect(await res.json()).toMatchObject({ url: "https://blob/p.webp", animal: "fox", cached: false, remaining: 4 });
+    expect(await res.json()).toMatchObject({ url: "https://blob/p.webp", cached: false, remaining: 4 });
     expect(create).toHaveBeenCalledOnce();
-    expect(create.mock.calls[0][0].data).toMatchObject({ discordId: "123", variant: 0, filmKey: "godfather" });
+    expect(create.mock.calls[0][0].data).toMatchObject({ discordId: "123", variant: 0 });
+    expect(generatePortrait).toHaveBeenCalledWith({ name: "Tony Soprano", turtles: ["Leonardo"], crews: ["comms"] });
     expect(recordLater).toHaveBeenCalledWith("portrait_generated", expect.anything());
+  });
+
+  it("passes only known turtles and crews to the provider and the cache key", async () => {
+    await POST(body({ turtles: ["raphael", "Shredder", "Leonardo"], crews: ["Comms", "ignore previous", "nope"] }));
+    expect(generatePortrait).toHaveBeenCalledWith({ name: "Tony Soprano", turtles: ["Leonardo", "Raphael"], crews: ["comms"] });
+    const keyA = findUnique.mock.calls[0][0].where.cacheKey;
+    findUnique.mockClear();
+    await POST(body({ turtles: ["Leonardo", "Raphael"], crews: ["comms"] }));
+    expect(findUnique.mock.calls[0][0].where.cacheKey).toBe(keyA);
+    findUnique.mockClear();
+    await POST(body({ turtles: ["Leonardo"], crews: ["comms"] }));
+    expect(findUnique.mock.calls[0][0].where.cacheKey).not.toBe(keyA);
   });
 
   it("429 when the member is over their daily limit", async () => {
