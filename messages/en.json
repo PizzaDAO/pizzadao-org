@@ -892,6 +892,7 @@
     "agendaNoItems": "Nothing urgent, so nothing would be posted.",
     "agendaExcluded": "Excluded",
     "agendaExcludedNote": "Excluded from automated posts, so nothing would be posted.",
+    "agendaOmitted": "{count} task(s) or item(s) mentioning APAC are left out of this agenda.",
     "agendaChannel": "Channel: {channel}",
     "agendaNoChannel": "no channel in the crew sheet",
     "overline": "Call recordings",

@@ -892,6 +892,7 @@
     "agendaNoItems": "Rien d'urgent, donc rien ne serait publié.",
     "agendaExcluded": "Exclu",
     "agendaExcludedNote": "Exclu des publications automatiques, donc rien ne serait publié.",
+    "agendaOmitted": "{count} tâche(s) ou élément(s) mentionnant APAC sont omis de cet ordre du jour.",
     "agendaChannel": "Canal : {channel}",
     "agendaNoChannel": "aucun canal dans la feuille du crew",
     "overline": "Enregistrements d'appels",

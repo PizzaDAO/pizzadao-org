@@ -16,7 +16,7 @@ import { resolveCrewForEvent } from '@/app/lib/calls/crew-map'
 import { getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { SITE_URL } from '@/app/lib/site-url'
-import { isCrewExcluded } from '@/app/lib/calls/excluded-crews'
+import { isCrewExcluded, mentionsApac } from '@/app/lib/calls/excluded-crews'
 import { buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
 const API = 'https://discord.com/api/v10'
@@ -119,6 +119,8 @@ export interface PlannedAgenda {
   sheetError: boolean
   /** The crew is excluded from automated posts (see calls/excluded-crews.ts): never posted. */
   excluded: boolean
+  /** Tasks / last-call items left out of the agenda because they mention APAC. */
+  apacOmitted: number
 }
 
 /** A rescheduled event keeps its id but changes startsAt; treat a post within this of the new start as the same call. */
@@ -144,7 +146,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
       plans.push({
         eventId: ev.id, eventName: ev.name, startsAt: ev.startsAt, crewId: crew.id, crewLabel: crew.label,
         channelRaw: crew.channel ?? null, crewUrl: crewPageUrl(crew.id), bullets: [], message: '',
-        alreadyPosted: false, sheetError: false, excluded: true,
+        alreadyPosted: false, sheetError: false, excluded: true, apacOmitted: 0,
       })
       continue
     }
@@ -157,8 +159,11 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
         select: { id: true },
       }),
     ])
-    const tasks = sheet.tasks
-    const bullets = buildAgendaBullets({ tasks, actionItems, now })
+    // Nothing about APAC in any other crew's agenda: drop those tasks / items before ranking.
+    const tasks = sheet.tasks.filter((t) => !mentionsApac(t.label))
+    const items = actionItems.filter((a) => !mentionsApac(a.text) && !mentionsApac(a.owner))
+    const apacOmitted = sheet.tasks.length - tasks.length + actionItems.length - items.length
+    const bullets = buildAgendaBullets({ tasks, actionItems: items, now })
     const crewUrl = crewPageUrl(crew.id)
     plans.push({
       eventId: ev.id,
@@ -173,6 +178,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
       alreadyPosted: !!posted,
       sheetError: sheet.error,
       excluded: false,
+      apacOmitted,
     })
   }
   return plans

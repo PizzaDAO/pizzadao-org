@@ -34,6 +34,7 @@ export default async function AgendaPreview() {
                                 <span className="text-sm">{p.excluded ? t("agendaExcluded") : p.alreadyPosted ? t("agendaPosted") : t("agendaPending")}</span>
                                 <span className="text-sm text-foreground/60">{t("agendaChannel", { channel: p.channelRaw ?? t("agendaNoChannel") })}</span>
                             </header>
+                            {p.apacOmitted > 0 && <p className="m-0 text-sm text-tomato">{t("agendaOmitted", { count: p.apacOmitted })}</p>}
                             {p.excluded ? (
                                 <p className="m-0 text-foreground/60">{t("agendaExcludedNote")}</p>
                             ) : p.bullets.length === 0 ? (

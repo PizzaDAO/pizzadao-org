@@ -240,4 +240,18 @@ describe('runCallAgenda', () => {
     expect(r.outcomes[0].status).toBe('excluded')
     expect(postDiscordMessage).not.toHaveBeenCalled()
   })
+
+  it('drops APAC tasks and last-call items from any other crew agenda and counts them', async () => {
+    vi.mocked(fetchOpenCrewTasksResult).mockResolvedValue({
+      tasks: [task('Ship thing', { priority: 'Top' }), task('Sync with APAC team', { priority: 'Top' })],
+      error: false,
+    })
+    vi.mocked(prisma.callRecording.findMany).mockResolvedValue([{ actionItems: [{ text: 'Call the apac leads' }, { text: 'Book venue' }] }] as never)
+    const { planAgendas } = await import('./run')
+    const [plan] = await planAgendas({ now: NOW, horizonMs: 30 * 60 * 1000, fetchImpl: fetchEvents })
+    expect(plan.apacOmitted).toBe(2)
+    expect(plan.message.toLowerCase()).not.toContain('apac')
+    expect(plan.message).toContain('Ship thing')
+    expect(plan.message).toContain('Book venue')
+  })
 })
