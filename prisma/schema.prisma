@@ -757,6 +757,23 @@ model Vouch {
 // ===== CREW CALL ATTENDANCE =====
 
 // Individual attendance records — one per person per call
+// POAP mint-link pool. An admin pastes mint links per call (crewId + UTC day);
+// a member who attended claims one. Unique (crewId, callDay, claimedBy) keeps it
+// to one claim per member per call (NULLs are distinct, so unclaimed rows coexist).
+model PoapMintLink {
+  id        Int       @id @default(autoincrement())
+  crewId    String    // Crew slug or "community_call" (matches CallAttendance.crewId)
+  callDay   DateTime  @db.Date // UTC calendar day of the call
+  link      String    @unique
+  claimedBy String?   // Discord ID of the member who claimed it
+  claimedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([crewId, callDay, claimedBy])
+  @@index([crewId, callDay, claimedBy])
+  @@index([claimedBy])
+}
+
 model CallAttendance {
   id          Int      @id @default(autoincrement())
   discordId   String   // Discord User ID of attendee
