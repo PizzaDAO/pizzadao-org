@@ -1,0 +1,128 @@
+import { describe, it, expect, vi, beforeEach } from "vitest";
+
+const getSession = vi.fn();
+const findUnique = vi.fn();
+const create = vi.fn();
+const checkKeyed = vi.fn();
+const generatePortrait = vi.fn();
+const recordLater = vi.fn();
+let upstash = true;
+
+vi.mock("@/app/lib/session", () => ({ getSession: () => getSession() }));
+vi.mock("@/app/lib/db", () => ({
+  prisma: { mafiaPortrait: { findUnique: (...a: unknown[]) => findUnique(...a), create: (...a: unknown[]) => create(...a) } },
+}));
+vi.mock("@/app/lib/activation", () => ({ recordActivationLater: (...a: unknown[]) => recordLater(...a) }));
+vi.mock("@/app/lib/mafia-portrait/generate", () => ({
+  generatePortrait: (...a: unknown[]) => generatePortrait(...a),
+  portraitModelId: () => "gpt-image-1",
+}));
+vi.mock("@/app/lib/rate-limit", async (orig) => {
+  const actual = await orig<typeof import("@/app/lib/rate-limit")>();
+  return {
+    ...actual,
+    checkKeyedRateLimit: (...a: unknown[]) => checkKeyed(...a),
+    isUpstashConfigured: () => upstash,
+  };
+});
+
+import { POST } from "./route";
+
+const ok = { success: true, limit: 5, remaining: 4, reset: Date.now() + 1000 };
+const body = (o: Record<string, unknown> = {}) =>
+  new Request("http://x/api/mafia-portrait", {
+    method: "POST",
+    body: JSON.stringify({ name: "Tony Soprano", topping: "Basil", filmId: "godfather", variant: 0, ...o }),
+  });
+
+describe("POST /api/mafia-portrait", () => {
+  beforeEach(() => {
+    for (const m of [getSession, findUnique, create, checkKeyed, generatePortrait, recordLater]) m.mockReset();
+    process.env.MAFIA_PORTRAIT_ENABLED = "1";
+    process.env.OPENAI_API_KEY = "test-key";
+    delete process.env.VERCEL;
+    delete process.env.MAFIA_PORTRAIT_DAILY_CAP;
+    upstash = true;
+    getSession.mockResolvedValue({ discordId: "123" });
+    findUnique.mockResolvedValue(null);
+    create.mockResolvedValue({});
+    checkKeyed.mockResolvedValue(ok);
+    generatePortrait.mockResolvedValue({ url: "https://blob/p.webp", animal: "fox", model: "gpt-image-1" });
+  });
+
+  it("503 fallback when the kill switch is off", async () => {
+    process.env.MAFIA_PORTRAIT_ENABLED = "0";
+    const res = await POST(body());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ fallback: true });
+    expect(generatePortrait).not.toHaveBeenCalled();
+  });
+
+  it("503 fallback when there is no OpenAI key", async () => {
+    delete process.env.OPENAI_API_KEY;
+    expect((await POST(body())).status).toBe(503);
+  });
+
+  it("401 without a session", async () => {
+    getSession.mockResolvedValue(null);
+    expect((await POST(body())).status).toBe(401);
+    expect(generatePortrait).not.toHaveBeenCalled();
+  });
+
+  it("400 on variant 5, an unknown filmId, or an empty name", async () => {
+    expect((await POST(body({ variant: 5 }))).status).toBe(400);
+    expect((await POST(body({ filmId: "nope" }))).status).toBe(400);
+    expect((await POST(body({ name: "   " }))).status).toBe(400);
+  });
+
+  it("cache hit skips limits and the provider", async () => {
+    findUnique.mockResolvedValue({ url: "https://blob/c.webp", animal: "owl" });
+    const res = await POST(body());
+    expect(await res.json()).toEqual({ url: "https://blob/c.webp", animal: "owl", cached: true });
+    expect(checkKeyed).not.toHaveBeenCalled();
+    expect(generatePortrait).not.toHaveBeenCalled();
+  });
+
+  it("draws, stores and returns the remaining count on a miss", async () => {
+    const res = await POST(body());
+    expect(res.status).toBe(200);
+    expect(await res.json()).toMatchObject({ url: "https://blob/p.webp", animal: "fox", cached: false, remaining: 4 });
+    expect(create).toHaveBeenCalledOnce();
+    expect(create.mock.calls[0][0].data).toMatchObject({ discordId: "123", variant: 0, filmKey: "godfather" });
+    expect(recordLater).toHaveBeenCalledWith("portrait_generated", expect.anything());
+  });
+
+  it("429 when the member is over their daily limit", async () => {
+    checkKeyed.mockResolvedValueOnce({ success: false, limit: 5, remaining: 0, reset: Date.now() + 60_000 });
+    const res = await POST(body());
+    expect(res.status).toBe(429);
+    expect(generatePortrait).not.toHaveBeenCalled();
+    expect(checkKeyed).toHaveBeenCalledTimes(1);
+  });
+
+  it("503 when the global cap is spent, using MAFIA_PORTRAIT_DAILY_CAP and failing closed", async () => {
+    process.env.MAFIA_PORTRAIT_DAILY_CAP = "7";
+    checkKeyed.mockResolvedValueOnce(ok).mockResolvedValueOnce({ ...ok, success: false, remaining: 0 });
+    const res = await POST(body());
+    expect(res.status).toBe(503);
+    const [name, key, rule, opts] = checkKeyed.mock.calls[1];
+    expect([name, key, rule.limit, opts]).toEqual(["mafia-portrait-global", "all", 7, { failClosed: true }]);
+    expect(generatePortrait).not.toHaveBeenCalled();
+  });
+
+  it("503 on Vercel when Upstash is not configured (global cap cannot be enforced)", async () => {
+    process.env.VERCEL = "1";
+    upstash = false;
+    expect((await POST(body())).status).toBe(503);
+    expect(generatePortrait).not.toHaveBeenCalled();
+  });
+
+  it("provider failure returns the fallback and records it", async () => {
+    generatePortrait.mockRejectedValue(new Error("boom"));
+    const res = await POST(body());
+    expect(res.status).toBe(503);
+    expect(await res.json()).toMatchObject({ fallback: true });
+    expect(create).not.toHaveBeenCalled();
+    expect(recordLater).toHaveBeenCalledWith("portrait_failed", expect.anything());
+  });
+});

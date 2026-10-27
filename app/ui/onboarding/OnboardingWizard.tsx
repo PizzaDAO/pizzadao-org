@@ -17,6 +17,7 @@ import { LoadingScreen } from "./LoadingScreen";
 import { ClaimFlow } from "./ClaimFlow";
 import { MagicLoginFlow } from "./MagicLoginFlow";
 import { FinaleScene } from "./FinaleScene";
+import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { WelcomeStep } from "./steps/WelcomeStep";
 import { NameStep } from "./steps/NameStep";
 import { CityStep } from "./steps/CityStep";
@@ -655,11 +656,16 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
   // The "Continue to dashboard" CTA inside the scene routes when the user
   // is ready; we don't auto-redirect because the animation IS the reward.
   if (flow.type === "success") {
+    const finaleTitle = (data.resolvedMovieTitle || data.mafiaMovieTitle || "").trim();
+    const finaleFilm = MAFIA_FILMS.find((f) => f.title.toLowerCase() === finaleTitle.toLowerCase());
     return (
       <FinaleScene
         mafiaName={data.mafiaName || data.discordNick || "Made"}
         memberId={data.memberId}
         dashboardHref={flow.redirectTo}
+        topping={data.topping || undefined}
+        filmId={finaleFilm?.id}
+        filmTitle={finaleTitle || undefined}
       />
 
     );

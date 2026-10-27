@@ -386,6 +386,18 @@
       "member": "Member",
       "continueButton": "Continue to dashboard",
       "shareButton": "Share my name",
+      "portraitDeveloping": "Developing your portrait…",
+      "portraitUnavailable": "Portrait unavailable right now.",
+      "portraitAlt": "Cartoon portrait for {name}",
+      "redraw": "Redraw",
+      "redrawsLeft": "{count} left today",
+      "redrawLimit": "You’ve used today’s redraws.",
+      "download": "Download",
+      "copyImage": "Copy image",
+      "imageCopied": "Image copied.",
+      "copyImageFailed": "Couldn’t copy the image. Try Download.",
+      "shareX": "Share on X",
+      "shareXText": "Just got made. {name} 🍕",
       "footnote": "Filed in the family record · {year}"
     }
   },

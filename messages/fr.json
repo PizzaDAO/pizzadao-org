@@ -386,6 +386,18 @@
       "member": "Membre",
       "continueButton": "Aller au tableau de bord",
       "shareButton": "Partager mon nom",
+      "portraitDeveloping": "Développement de ton portrait…",
+      "portraitUnavailable": "Portrait indisponible pour le moment.",
+      "portraitAlt": "Portrait dessiné de {name}",
+      "redraw": "Redessiner",
+      "redrawsLeft": "{count} restants aujourd’hui",
+      "redrawLimit": "Tu as utilisé les dessins du jour.",
+      "download": "Télécharger",
+      "copyImage": "Copier l’image",
+      "imageCopied": "Image copiée.",
+      "copyImageFailed": "Impossible de copier l’image. Essaie Télécharger.",
+      "shareX": "Partager sur X",
+      "shareXText": "Je viens d’être intronisé. {name} 🍕",
       "footnote": "Classé dans le registre familial · {year}"
     }
   },

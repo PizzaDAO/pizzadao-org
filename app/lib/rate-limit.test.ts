@@ -14,6 +14,7 @@ vi.mock('@upstash/redis', () => ({ Redis: class {} }))
 import {
   getClientIp,
   checkRateLimit,
+  checkKeyedRateLimit,
   enforceRateLimit,
   rateLimitResponse,
   memoryLimit,
@@ -104,6 +105,16 @@ describe('upstash backend', () => {
     upstashLimit.mockRejectedValue(new Error('redis down'))
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     expect(await enforceRateLimit(req(), 'namegen')).toBeNull()
+    spy.mockRestore()
+  })
+
+  it('keyed limit fails open by default and closed with failClosed', async () => {
+    upstashLimit.mockRejectedValue(new Error('redis down'))
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect((await checkKeyedRateLimit('mafia-portrait-member', 'u1')).success).toBe(true)
+    const closed = await checkKeyedRateLimit('mafia-portrait-global', 'all', undefined, { failClosed: true })
+    expect(closed.success).toBe(false)
+    expect(closed.remaining).toBe(0)
     spy.mockRestore()
   })
 })

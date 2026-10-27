@@ -50,6 +50,10 @@ export const RATE_LIMITS = {
   "disavow-vote": { limit: 60, windowSec: 10 * 60 },
   "disavow-detail": { limit: 60, windowSec: 60 },
   "disavow-check": { limit: 120, windowSec: 60 },
+  // AI finale portrait (plans/mafia-name-port.md). The global cap is overridden
+  // from MAFIA_PORTRAIT_DAILY_CAP in the route and is checked fail-closed.
+  "mafia-portrait-member": { limit: 5, windowSec: 24 * 60 * 60 },
+  "mafia-portrait-global": { limit: 300, windowSec: 24 * 60 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -185,11 +189,14 @@ export async function checkRateLimit(
 /**
  * Check (and consume) one request against the named limit for an arbitrary
  * key, e.g. a Discord id for per-member limits. The key is hashed like IPs.
+ * `failClosed` denies the request when Redis errors (cost caps), instead of
+ * the default fail-open.
  */
 export async function checkKeyedRateLimit(
   name: RateLimitName,
   key: string,
   rule: RateLimitRule = RATE_LIMITS[name],
+  opts: { failClosed?: boolean } = {},
 ): Promise<RateLimitResult> {
   const id = ipKey(`key:${key}`);
   if (isUpstashConfigured()) {
@@ -197,6 +204,10 @@ export async function checkKeyedRateLimit(
       const r = await getUpstashLimiter(name, rule).limit(id);
       return { success: r.success, limit: r.limit, remaining: r.remaining, reset: r.reset };
     } catch (e) {
+      if (opts.failClosed) {
+        console.error(`[rate-limit] Upstash error for ${name}, denying request:`, e);
+        return { success: false, limit: rule.limit, remaining: 0, reset: Date.now() + 60_000 };
+      }
       console.error(`[rate-limit] Upstash error for ${name}, allowing request:`, e);
       return { success: true, limit: rule.limit, remaining: rule.limit, reset: Date.now() };
     }
