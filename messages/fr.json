@@ -402,7 +402,10 @@
       "copyImageFailed": "Impossible de copier l’image. Essaie Télécharger.",
       "shareX": "Partager sur X",
       "shareXText": "Je fais désormais partie de la famille. {name} 🍕",
-      "footnote": "Classé dans le registre familial · {year}"
+      "footnote": "Classé dans le registre familial · {year}",
+      "sharePublicText": "Voici le nom que la famille m’a donné : {name}.",
+      "joinButton": "Rejoindre la famille",
+      "tryAnother": "Essayer un autre nom"
     }
   },
   "nav": {
@@ -1018,5 +1021,13 @@
     "ctaBody": "Choisissez votre garniture, choisissez votre film, obtenez votre propre nom de mafia.",
     "ctaButton": "Rejoindre la famille",
     "ogTagline": "Officiellement dans la famille."
+  },
+  "mafiaPublic": {
+    "metaTitle": "Obtenez votre nom de mafia",
+    "metaDescription": "Choisissez une garniture de pizza et un film de mafia, et obtenez un nom de mafia et un portrait dessiné. Gratuit, sans compte. Puis rejoignez PizzaDAO.",
+    "overline": "PizzaDAO · Registre familial",
+    "intro": "Choisissez une garniture, choisissez un film, obtenez un nom. Sans compte.",
+    "footnote": "Gratuit et sans compte. Le portrait est dessiné par une IA et il y en a peu par jour.",
+    "ogAlt": "Obtenez votre nom de mafia PizzaDAO"
   }
 }

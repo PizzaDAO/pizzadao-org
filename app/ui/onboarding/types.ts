@@ -69,6 +69,8 @@ export type WizardData = {
   /** Signature of the picked suggestion; undefined for kept/typed names. */
   mafiaSig?: string;
   seenNames: string[];
+  /** Name handed over from /get-your-mafia-name; NameStep opens with it selected. */
+  prefilledName?: string;
 
   // Step 2: City
   city: string;

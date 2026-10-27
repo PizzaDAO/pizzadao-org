@@ -10,10 +10,13 @@ import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { PIZZA_TOPPINGS } from "@/app/lib/topping-images";
 
 /** Events the browser may report (name_claimed is written server-side). */
-export const FUNNEL_CLIENT_EVENTS = ["topping_picked", "film_picked", "names_generated", "name_rerolled"] as const;
+export const FUNNEL_CLIENT_EVENTS = ["topping_picked", "film_picked", "names_generated", "name_rerolled", "mafia_page"] as const;
 export type FunnelClientEvent = (typeof FUNNEL_CLIENT_EVENTS)[number];
 
 export const MAX_REROLL_CODE = 10;
+
+/** Public /get-your-mafia-name milestones (event "mafia_page"). */
+export const MAFIA_PAGE_CODES = ["viewed", "name_picked", "join_clicked", "join_arrived"] as const;
 
 const slug = (s: string) => s.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "");
 
@@ -53,5 +56,7 @@ export function isValidFunnelCode(event: FunnelClientEvent, code: unknown): bool
       return code === "ok";
     case "name_rerolled":
       return /^r([1-9]|10)$/.test(code);
+    case "mafia_page":
+      return (MAFIA_PAGE_CODES as readonly string[]).includes(code);
   }
 }

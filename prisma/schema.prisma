@@ -1372,7 +1372,8 @@ model MafiaPortrait {
 /// public page shows only name, origin, topping and portrait, never discordId.
 model MafiaNameClaim {
   id          String   @id                // short unguessable public id (10 chars) for /made/[id]
-  discordId   String
+  discordId   String?                     // null for a public (anonymous) claim
+  actor       String?  @db.VarChar(80)    // anonymous browser id of a public claim
   name        String   @db.VarChar(80)
   origin      Json?                       // { kind, person, film }
   topping     String   @db.VarChar(50)
@@ -1388,5 +1389,6 @@ model MafiaNameClaim {
   updatedAt   DateTime @default(now()) @updatedAt
 
   @@unique([discordId, name])
+  @@unique([actor, name])
   @@index([createdAt])
 }

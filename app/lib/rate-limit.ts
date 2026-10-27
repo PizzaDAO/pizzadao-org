@@ -55,6 +55,10 @@ export const RATE_LIMITS = {
   // from MAFIA_PORTRAIT_DAILY_CAP in the route and is checked fail-closed.
   "mafia-portrait-member": { limit: 5, windowSec: 24 * 60 * 60 },
   "mafia-portrait-global": { limit: 300, windowSec: 24 * 60 * 60 },
+  // Public /get-your-mafia-name (Phase 3), keyed by IP: no session, so the
+  // 3-per-IP portrait cap stands in for the member cap. Claims are cheap rows.
+  "mafia-portrait-ip": { limit: 3, windowSec: 24 * 60 * 60 },
+  "mafia-name-claim-public": { limit: 40, windowSec: 24 * 60 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

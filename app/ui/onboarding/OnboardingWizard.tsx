@@ -4,6 +4,8 @@
 "use client";
 
 import { trackActivation } from "@/app/lib/activation-client";
+import { requestNamegen } from "@/app/lib/namegen-client";
+import { parseMafiaJoinParams } from "@/app/lib/mafia-join-params";
 import { filmCode, rerollCode, toppingCode } from "@/app/lib/mafia-funnel";
 import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
@@ -35,7 +37,6 @@ import {
   WizardData,
   WizardStep,
   CrewOption,
-  NamegenResponse,
   LS_KEY,
   PENDING_CLAIM_KEY,
   uuidLike,
@@ -256,6 +257,28 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     // still win — explicit redirects (?loginError=...) override this.
     if (initialFlow) {
       hasProcessedParams.current = true;
+      // Hand-off from the public /get-your-mafia-name page: seed the picks
+      // (sanitized, validated) and open the name step with that name selected.
+      // Absent or invalid params leave /join exactly as it was.
+      const prefill =
+        initialFlow.type === "wizard" && initialFlow.step === 1 && !initialFlow.isUpdate
+          ? parseMafiaJoinParams(url.searchParams)
+          : null;
+      if (prefill) {
+        setData((p) => ({
+          ...p,
+          mafiaName: prefill.name,
+          prefilledName: prefill.name,
+          topping: prefill.topping,
+          mafiaMovieTitle: prefill.filmTitle,
+          resolvedMovieTitle: prefill.origin?.film ?? prefill.filmTitle,
+          suggestions: [prefill.name],
+          origins: prefill.origin ? { [prefill.name]: { kind: prefill.origin.kind, person: prefill.origin.person } } : undefined,
+          sigs: prefill.sig ? { [prefill.name]: prefill.sig } : undefined,
+          seenNames: mergeSeen(p.seenNames, [prefill.name]),
+        }));
+        trackActivation("mafia_page", data.sessionId, "join_arrived");
+      }
       setFlow(initialFlow);
       return;
     }
@@ -421,20 +444,16 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     const shouldForce = force || (sameParams && data.suggestions && data.suggestions.length > 0);
 
     try {
-      const res = await fetch("/api/namegen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const result = await requestNamegen(
+        {
           topping: data.topping,
           movieTitle: data.mafiaMovieTitle,
           style: data.style,
-          force: shouldForce,
+          force: !!shouldForce,
           exclude: shouldForce ? data.seenNames : [],
-        }),
-      });
-
-      const result = (await res.json()) as NamegenResponse | any;
-      if (!res.ok) throw new Error(result?.error || t("errorGenerateNames"));
+        },
+        t("errorGenerateNames"),
+      );
 
       // Funnel (ActivationEvent dedupes per actor + event + code).
       if (lastGenParams?.topping !== currentParams.topping) trackActivation("topping_picked", data.sessionId, toppingCode(currentParams.topping));
@@ -844,6 +863,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             mediaType={data.mediaType}
             seenNames={data.seenNames}
             origins={data.origins}
+            preselectName={data.prefilledName}
             mafiaName={data.mafiaName}
             isUpdate={flow.isUpdate}
             existingName={data.existingData?.mafiaName}
@@ -858,6 +878,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 return {
                   ...p,
                   mafiaName: name,
+                  prefilledName: undefined,
                   mafiaOrigin: origin && film ? { ...origin, film } : undefined,
                   mafiaSig: origin && film ? p.sigs?.[name] : undefined,
                   seenNames: mergeSeen(p.seenNames, [name]),
@@ -891,6 +912,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 suggestions: undefined,
                 origins: undefined,
                 sigs: undefined,
+                prefilledName: undefined,
                 mafiaOrigin: undefined,
                 mafiaSig: undefined,
                 resolvedMovieTitle: undefined,

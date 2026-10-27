@@ -3,8 +3,12 @@
 //
 // POST { name, topping?, turtles?, crews?, variant }
 //   200 { url, cached, remaining? }
-//   400 invalid input | 401 no session | 429 member limit
+//   400 invalid input | 429 member limit (session) or IP limit (anonymous)
 //   503 { fallback: true }: disabled, global cap, provider failure
+//
+// A session means the member path (5/day per member). Without one the caller is
+// the public /get-your-mafia-name page: 3/day per IP, and no turtles/crews (an
+// anonymous visitor has picked none). Both paths sit under the same global cap.
 //
 // The finale never blocks on this route: any non-200 just keeps the topping seal.
 import { NextResponse } from "next/server";
@@ -15,11 +19,13 @@ import { getSession } from "@/app/lib/session";
 import { sanitizeDisplayName } from "@/app/lib/display-name";
 import {
   RATE_LIMITS,
+  type RateLimitResult,
+  getClientIp,
   checkKeyedRateLimit,
   isUpstashConfigured,
   rateLimitResponse,
 } from "@/app/lib/rate-limit";
-import { recordActivationLater } from "@/app/lib/activation";
+import { activationActor, recordActivationLater } from "@/app/lib/activation";
 import { PortraitUnavailable, generatePortrait, portraitModelId } from "@/app/lib/mafia-portrait/generate";
 import { canonicalCrews, canonicalTurtles, portraitCacheKey } from "@/app/lib/mafia-portrait/prompt";
 
@@ -36,6 +42,8 @@ const bodySchema = z.object({
   turtles: z.array(z.string().max(40)).max(12).optional(),
   crews: z.array(z.string().max(60)).max(30).optional(),
   variant: z.number().int().min(0).max(4),
+  // Anonymous browser id, for the funnel only (the public page has no session).
+  actor: z.string().max(80).optional(),
 });
 
 const fallback = (reason: string) => NextResponse.json({ fallback: true, reason }, { status: 503 });
@@ -50,20 +58,22 @@ export async function POST(req: Request) {
     return fallback("disabled");
   }
 
+  // A valid session always takes the member path, so signing out is the only
+  // way onto the IP path (which has the smaller allowance).
   const session = await getSession();
-  if (!session?.discordId) {
-    return NextResponse.json({ error: "Not signed in" }, { status: 401 });
-  }
-  const discordId = session.discordId;
+  const discordId = session?.discordId || undefined;
 
   const parsed = bodySchema.safeParse(await req.json().catch(() => null));
   if (!parsed.success) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
   const { variant } = parsed.data;
+  const actor = activationActor(parsed.data.actor);
   const topping = parsed.data.topping ?? "";
-  const turtles = canonicalTurtles(parsed.data.turtles);
-  const crews = canonicalCrews(parsed.data.crews);
+  // Anonymous callers get no turtles/crews: the same name then shares one cache
+  // entry (and one free hit) with a member who has picked none.
+  const turtles = canonicalTurtles(discordId ? parsed.data.turtles : undefined);
+  const crews = canonicalCrews(discordId ? parsed.data.crews : undefined);
   const name = sanitizeDisplayName(parsed.data.name);
   if (!name) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
 
@@ -85,8 +95,16 @@ export async function POST(req: Request) {
   );
   if (!global.success) return fallback("capacity");
 
-  const member = await checkKeyedRateLimit("mafia-portrait-member", discordId);
-  if (!member.success) return rateLimitResponse(member);
+  let own: RateLimitResult;
+  if (discordId) {
+    own = await checkKeyedRateLimit("mafia-portrait-member", discordId);
+  } else {
+    // Without an IP every visitor would share one bucket; refuse instead.
+    const ip = getClientIp(req.headers);
+    if (ip === "unknown") return fallback("capacity");
+    own = await checkKeyedRateLimit("mafia-portrait-ip", ip, undefined, { failClosed: true });
+  }
+  if (!own.success) return rateLimitResponse(own);
 
   let drawn: { url: string; model: string };
   try {
@@ -106,7 +124,7 @@ export async function POST(req: Request) {
         : e instanceof PortraitUnavailable && e.message.includes("upload")
           ? "upload"
           : "provider";
-    recordActivationLater("portrait_failed", { discordId, code: reason });
+    recordActivationLater("portrait_failed", { discordId, actor, code: reason });
     return fallback("provider");
   }
 
@@ -121,7 +139,7 @@ export async function POST(req: Request) {
         animal: "",
         model: drawn.model || portraitModelId(),
         url: drawn.url,
-        discordId,
+        discordId: discordId ?? null,
       },
     });
   } catch (e) {
@@ -134,10 +152,10 @@ export async function POST(req: Request) {
     // The image exists; still show it to this member.
   }
 
-  recordActivationLater("portrait_generated", { discordId, code: "ok" });
+  recordActivationLater("portrait_generated", { discordId, actor, code: "ok" });
   return NextResponse.json({
     url: drawn.url,
     cached: false,
-    remaining: member.remaining,
+    remaining: own.remaining,
   });
 }
