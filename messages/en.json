@@ -879,6 +879,17 @@
     "sentBack": "Sent back: {note}"
   },
   "adminCalls": {
+    "agendaTitle": "Next call agendas",
+    "agendaDescription": "What Metalhead would post in each crew channel about 30 minutes before the next calls (next 48 hours). Preview only.",
+    "agendaOn": "Posting is ON (CALL_AGENDA_POST_ENABLED).",
+    "agendaOff": "Posting is OFF. Set CALL_AGENDA_POST_ENABLED=true to enable.",
+    "agendaNone": "No crew calls scheduled in the next 48 hours.",
+    "agendaError": "Could not load scheduled events.",
+    "agendaPosted": "Already posted",
+    "agendaPending": "Not posted yet",
+    "agendaNoItems": "Nothing urgent, so nothing would be posted.",
+    "agendaChannel": "Channel: {channel}",
+    "agendaNoChannel": "no channel in the crew sheet",
     "overline": "Call recordings",
     "title": "Recorded calls",
     "description": "Crew calls captured by the PizzaDAO bot. Audio is private to reviewers.",
