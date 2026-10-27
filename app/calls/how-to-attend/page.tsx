@@ -84,10 +84,10 @@ export default async function HowToAttendPage() {
         <p className="m-0 text-foreground/80">{t("recordedBody")}</p>
       </section>
 
-      <section className={`${paperCard} p-4 sm:p-5 mb-8`} aria-label={t("poapTitle")}>
-        <h2 className="font-display text-xl font-black mt-0 mb-1">{t("poapTitle")}</h2>
-        <p className="mt-0 mb-3 text-foreground/80">{t("poapBody")}</p>
-        <Link href="/poaps" className={pillOutline}>{t("poapCta")}</Link>
+      <section className={`${paperCard} p-4 sm:p-5 mb-8`} aria-label={t("sliceTitle")}>
+        <h2 className="font-display text-xl font-black mt-0 mb-1">{t("sliceTitle")}</h2>
+        <p className="mt-0 mb-3 text-foreground/80">{t("sliceBody")}</p>
+        <Link href="/slices" className={pillOutline}>{t("sliceCta")}</Link>
       </section>
 
       <section className="ink-bottom rounded-[var(--radius)] bg-foreground text-background p-5 sm:p-6" aria-label={t("nextTitle")}>

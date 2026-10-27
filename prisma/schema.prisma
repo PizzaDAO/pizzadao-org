@@ -759,6 +759,7 @@ model Vouch {
 // POAP mint-link pool. An admin pastes mint links per call (crewId + UTC day);
 // a member who attended claims one. Unique (crewId, callDay, claimedBy) keeps it
 // to one claim per member per call (NULLs are distinct, so unclaimed rows coexist).
+// LEGACY: unused since Call Slices replaced POAP claim links (no links were ever loaded). Left in place; harmless.
 model PoapMintLink {
   id        Int       @id @default(autoincrement())
   crewId    String    // Crew slug or "community_call" (matches CallAttendance.crewId)
@@ -770,6 +771,60 @@ model PoapMintLink {
 
   @@unique([crewId, callDay, claimedBy])
   @@index([claimedBy])
+}
+
+// Call Slices (plans/call-attendance-nfts.md): ERC-1155 attendance NFTs on Base.
+// One AttendanceNftCall per (crew, UTC call day); its id IS the on-chain token id.
+// Never delete these rows: token ids must stay stable once minted.
+model AttendanceNftCall {
+  id        Int      @id @default(autoincrement())
+  crewId    String
+  crewLabel String
+  callDay   DateTime @db.Date
+  imageUrl  String?  // rendered PNG in Vercel Blob
+  createdAt DateTime @default(now())
+  claims    AttendanceNftClaim[]
+
+  @@unique([crewId, callDay])
+}
+
+// One claim per member per call. status: AWAITING_WALLET | QUEUED | SUBMITTED | MINTED | FAILED.
+// The on-chain claim key is keccak256("callslice:" + id), so retries can never double-mint.
+model AttendanceNftClaim {
+  id          String    @id @default(cuid())
+  discordId   String
+  memberId    String?
+  callId      Int
+  call        AttendanceNftCall @relation(fields: [callId], references: [id])
+  status      String
+  recipient   String?
+  txHash      String?
+  chainId     Int?
+  attempts    Int       @default(0)
+  lastError   String?
+  claimedAt   DateTime  @default(now())
+  submittedAt DateTime?
+  mintedAt    DateTime?
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([discordId, callId])
+  @@index([status, claimedAt])
+  @@index([memberId])
+}
+
+// Per-crew slice template art (admin upload). Crews without a row use the default template.
+model SliceCrewArt {
+  crewId    String   @id
+  imageUrl  String
+  updatedAt DateTime @updatedAt
+}
+
+// One lease row PER CHAIN (id = chain id) so only one serverless invocation sends transactions at a time (no nonce clashes).
+model SliceMintLease {
+  id          Int       @id
+  holder      String?
+  leaseUntil  DateTime  @default(now()) @db.Timestamptz(3)
+  lastAlertAt DateTime? @db.Timestamptz(3)
 }
 
 // Individual attendance records — one per person per call

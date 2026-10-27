@@ -62,6 +62,8 @@ export const RATE_LIMITS = {
   // so a public flood cannot eat the members' share of the global cap.
   "mafia-portrait-public": { limit: 100, windowSec: 24 * 60 * 60 },
   "mafia-name-claim-public": { limit: 40, windowSec: 24 * 60 * 60 },
+  // Call Slices claims, per member (Discord id). "Claim all" counts as one request.
+  "slices-claim": { limit: 30, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

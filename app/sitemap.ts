@@ -20,6 +20,7 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: "d
   { path: "/turtles", priority: 0.5, changeFrequency: "monthly" },
   { path: "/tech/projects", priority: 0.5, changeFrequency: "weekly" },
   { path: "/nfts", priority: 0.4, changeFrequency: "monthly" },
+  { path: "/slices", priority: 0.4, changeFrequency: "weekly" },
   { path: "/poaps", priority: 0.4, changeFrequency: "weekly" },
 ];
 
