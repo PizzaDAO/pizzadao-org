@@ -1,4 +1,5 @@
 import { norm } from "@/app/lib/strings";
+import type { NameOrigin, NameOriginWithFilm } from "@/app/lib/name-origin";
 // app/ui/onboarding/types.ts
 // Shared types for the onboarding wizard
 
@@ -58,7 +59,11 @@ export type WizardData = {
   releaseDate?: string;
   mediaType?: "movie" | "tv";
   suggestions?: string[];
+  /** Where each name in the current batch came from (namegen `origins`). */
+  origins?: Record<string, NameOrigin>;
   mafiaName?: string;
+  /** Origin of the picked name; undefined for kept/typed names. */
+  mafiaOrigin?: NameOriginWithFilm;
   seenNames: string[];
 
   // Step 2: City
@@ -110,6 +115,7 @@ export type NamegenResponse = {
   mediaType?: "movie" | "tv";
   style: "balanced" | "serious" | "goofy";
   suggestions: string[];
+  origins?: Record<string, NameOrigin>;
 };
 
 export type CityPrediction = {

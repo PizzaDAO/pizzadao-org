@@ -92,7 +92,11 @@
       "displayNamePreview": "Will be saved as: <b>{name}</b>",
       "displayNameEmpty": "Use at least one letter or number",
       "useDisplayName": "Use this name",
-      "orGenerateName": "Or make a pizza-inspired name"
+      "orGenerateName": "Or make a pizza-inspired name",
+      "originCharacter": "From {person} · {film}",
+      "originActor": "From {person} · {film}",
+      "originDirector": "From director {person} · {film}",
+      "originIconic": "From the {person} family · {film}"
     },
     "city": {
       "overline": "§ 02 · Your block",
@@ -1002,5 +1006,16 @@
     "archive": "Archive",
     "restore": "Restore",
     "genericError": "Something went wrong. Try again."
+  },
+  "made": {
+    "metaTitle": "{name} is made",
+    "metaDescription": "{name} just got made in PizzaDAO.",
+    "portraitAlt": "Cartoon portrait for {name}",
+    "record": "PizzaDAO · Family Record",
+    "madeStatus": "Status · Made",
+    "filed": "Filed in the family record · {date}",
+    "ctaHeading": "Join the family",
+    "ctaBody": "Pick your topping, pick your film, get your own mafia name.",
+    "ctaButton": "Join the family"
   }
 }

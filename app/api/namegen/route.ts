@@ -4,6 +4,7 @@
 import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { internalError } from "@/app/lib/errors/error-response";
+import type { NameOrigin } from "@/app/lib/name-origin";
 
 export const runtime = "nodejs";
 
@@ -224,6 +225,16 @@ const ICONIC_FAMILIES: Record<string, string[]> = {
   "sons of anarchy": ["Teller", "Morrow"],
 };
 
+type CastName = {
+  firstName: string;
+  lastName: string;
+  source: "actor" | "character";
+  /** Who the name came from, for the origin line. Never affects the name. */
+  origin: NameOrigin;
+};
+
+const originPerson = (s: string) => s.trim().replace(/\s+/g, " ").slice(0, 80);
+
 /**
  * Generate pizza mafia names algorithmically:
  * - Pattern A: "<Topping> <LastName>" (e.g., "Pepperoni Barksdale")
@@ -237,29 +248,29 @@ const ICONIC_FAMILIES: Record<string, string[]> = {
  */
 function generateNames(
   topping: string,
-  castNames: { firstName: string; lastName: string; source: "actor" | "character" }[],
+  castNames: CastName[],
   excludeSet: Set<string>,
   count: number = 3,
   resolvedTitle?: string
-): string[] {
-  const results: string[] = [];
+): { name: string; origin: NameOrigin }[] {
+  const results: { name: string; origin: NameOrigin }[] = [];
   const used = new Set<string>();
 
   // Build candidate pool: both patterns for each cast member
   // Keep them in order (TMDB billing order = screentime order)
-  const candidates: string[] = [];
+  const candidates: { name: string; origin: NameOrigin }[] = [];
 
-  for (const { firstName, lastName } of castNames) {
+  for (const { firstName, lastName, origin } of castNames) {
     const cleanFirst = cleanNamePart(firstName);
     const cleanLast = cleanNamePart(lastName);
 
     if (cleanLast && cleanLast.length > 1) {
       // Pattern A: "Topping LastName"
-      candidates.push(`${topping} ${cleanLast}`);
+      candidates.push({ name: `${topping} ${cleanLast}`, origin });
     }
     if (cleanFirst && cleanFirst.length > 1) {
       // Pattern B: "FirstName Topping"
-      candidates.push(`${cleanFirst} ${topping}`);
+      candidates.push({ name: `${cleanFirst} ${topping}`, origin });
     }
   }
 
@@ -268,21 +279,27 @@ function generateNames(
   const iconicFamilies = ICONIC_FAMILIES[titleKey] || [];
 
   // Partition candidates: iconic family names first, then rest in billing order
-  const iconicCandidates: string[] = [];
-  const otherCandidates: string[] = [];
+  const iconicCandidates: { name: string; origin: NameOrigin }[] = [];
+  const otherCandidates: { name: string; origin: NameOrigin }[] = [];
 
   for (const candidate of candidates) {
     // Check if this candidate contains an iconic family name
-    const isIconic = iconicFamilies.some((family) => {
-      const familyLower = family.toLowerCase();
-      const candidateLower = candidate.toLowerCase();
+    const family = iconicFamilies.find((f) => {
+      const familyLower = f.toLowerCase();
+      const candidateLower = candidate.name.toLowerCase();
       // Check if the family name appears as a word in the candidate
       // e.g., "Pepperoni Soprano" contains "Soprano"
       return candidateLower.includes(familyLower);
     });
 
-    if (isIconic) {
-      iconicCandidates.push(candidate);
+    if (family) {
+      // A character keeps its own full name ("Vito Corleone"); a promoted
+      // name that came from a cast member or director credits the family.
+      iconicCandidates.push(
+        candidate.origin.kind === "character"
+          ? candidate
+          : { name: candidate.name, origin: { kind: "iconic", person: family } },
+      );
     } else {
       otherCandidates.push(candidate);
     }
@@ -292,10 +309,10 @@ function generateNames(
   const prioritized = [...iconicCandidates, ...otherCandidates];
 
   // Pick names that aren't excluded or duplicated
-  for (const name of prioritized) {
+  for (const { name, origin } of prioritized) {
     const normalized = name.toLowerCase();
     if (!excludeSet.has(normalized) && !used.has(normalized)) {
-      results.push(name);
+      results.push({ name, origin });
       used.add(normalized);
       if (results.length >= count) break;
     }
@@ -421,7 +438,7 @@ export async function POST(req: Request) {
     const crew: TMDBCreditsCrew[] = Array.isArray(credits?.crew) ? credits.crew : [];
 
     // Extract names from cast (actors + characters) and directors
-    const castNames: { firstName: string; lastName: string; source: "actor" | "character" }[] = [];
+    const castNames: CastName[] = [];
 
     // Add directors first (high priority)
     // For directors, keep full "last name" (e.g., "Ford Coppola" not just "Coppola")
@@ -432,6 +449,7 @@ export async function POST(req: Request) {
           firstName: getFirstName(d.name),
           lastName: getDirectorLastName(d.name),
           source: "actor",
+          origin: { kind: "director", person: originPerson(d.name) },
         });
       }
     }
@@ -449,6 +467,7 @@ export async function POST(req: Request) {
           firstName: getFirstName(c.name),
           lastName: getLastName(c.name),
           source: "actor",
+          origin: { kind: "actor", person: originPerson(c.name) },
         });
       }
       // Character name (handles both movie and TV formats)
@@ -459,15 +478,23 @@ export async function POST(req: Request) {
           firstName: getFirstName(character),
           lastName: getLastName(character),
           source: "character",
+          origin: { kind: "character", person: originPerson(character) },
         });
       }
     }
 
     // Generate names algorithmically with iconic family prioritization
-    const suggestions = generateNames(toppingPhrase, castNames, excludeSet, 3, resolvedTitle);
+    const picked = generateNames(toppingPhrase, castNames, excludeSet, 3, resolvedTitle);
+    const suggestions = picked.map((p) => p.name);
 
     // Generate a larger pool for the UI (also prioritized)
-    const allNames = generateNames(toppingPhrase, castNames, new Set(), 30, resolvedTitle);
+    const pool = generateNames(toppingPhrase, castNames, new Set(), 30, resolvedTitle);
+    const allNames = pool.map((p) => p.name);
+
+    // Where each offered name came from. Built from the same passes, so a
+    // name's origin is always its first (highest priority) source.
+    const origins: Record<string, NameOrigin> = {};
+    for (const { name, origin } of [...pool, ...picked]) origins[name] ??= origin;
 
     if (suggestions.length < 3) {
       // Fallback: if we can't get 3 unique names, use what we have
@@ -492,6 +519,7 @@ export async function POST(req: Request) {
       style: "balanced",
       suggestions,
       candidatePool: allNames,
+      origins,
     };
 
     return new NextResponse(JSON.stringify(payload), {

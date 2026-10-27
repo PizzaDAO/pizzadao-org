@@ -92,7 +92,11 @@
       "displayNamePreview": "Se guardará como: <b>{name}</b>",
       "displayNameEmpty": "Usa al menos una letra o un número",
       "useDisplayName": "Usar este nombre",
-      "orGenerateName": "O crea un nombre inspirado en la pizza"
+      "orGenerateName": "O crea un nombre inspirado en la pizza",
+      "originCharacter": "De {person} · {film}",
+      "originActor": "De {person} · {film}",
+      "originDirector": "Dirección de {person} · {film}",
+      "originIconic": "De la familia {person} · {film}"
     },
     "city": {
       "overline": "§ 02 · Tu barrio",
@@ -1002,5 +1006,16 @@
     "archive": "Archivar",
     "restore": "Restaurar",
     "genericError": "Algo salió mal. Inténtalo de nuevo."
+  },
+  "made": {
+    "metaTitle": "{name} ya es de la familia",
+    "metaDescription": "{name} acaba de entrar en PizzaDAO.",
+    "portraitAlt": "Retrato de dibujo animado de {name}",
+    "record": "PizzaDAO · Registro familiar",
+    "madeStatus": "Estado · Miembro",
+    "filed": "Archivado en el registro familiar · {date}",
+    "ctaHeading": "Únete a la familia",
+    "ctaBody": "Elige tu ingrediente, elige tu película y consigue tu propio nombre de mafia.",
+    "ctaButton": "Únete a la familia"
   }
 }

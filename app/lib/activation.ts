@@ -3,7 +3,7 @@ import { createHmac } from "crypto";
 import { prisma } from "./db";
 
 export const ACTIVATION_STAGES = ["signup_started", "dm_sent", "discord_verified", "profile_created", "first_contribution"] as const;
-export type ActivationEventName = typeof ACTIVATION_STAGES[number] | "login_failed" | "profile_save_failed" | "client_error" | "portrait_generated" | "portrait_failed";
+export type ActivationEventName = typeof ACTIVATION_STAGES[number] | "login_failed" | "profile_save_failed" | "client_error" | "portrait_generated" | "portrait_failed" | "topping_picked" | "film_picked" | "names_generated" | "name_rerolled" | "name_claimed";
 export const activationActor = (value: unknown) => typeof value === "string" && /^[a-zA-Z0-9_-]{8,80}$/.test(value) ? value : undefined;
 
 /** Best effort and deduplicated; never make onboarding depend on analytics. */
