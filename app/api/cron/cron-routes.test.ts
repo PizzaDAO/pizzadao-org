@@ -17,6 +17,11 @@ vi.mock('@/app/lib/mission-verify/sla', () => ({
   runSlaDigest: vi.fn(async () => ({ status: 'posted', day: '2026-10-03', overdue: 2, messageId: '1', roles: [] })),
 }))
 
+vi.mock('@/app/lib/slices/mint-queue', () => ({
+  processMintQueue: vi.fn(async () => ({ status: 'skipped', reason: 'disabled' })),
+}))
+vi.mock('@/app/lib/slices/claims', () => ({ sweepAwaitingWallet: vi.fn(async () => 0) }))
+
 vi.mock('@/app/lib/trainee-nick-run', () => ({
   runTraineeNicks: vi.fn(async ({ dryRun }: { dryRun: boolean }) => ({ status: 'finished', dryRun })),
 }))
@@ -26,6 +31,8 @@ import { GET as missionsGET } from './missions/route'
 import { GET as attendanceGET } from './attendance/route'
 import { GET as missionSlaGET } from './mission-sla/route'
 import { GET as traineeNicksGET } from './trainee-nicks/route'
+import { GET as slicesMintGET } from './slices-mint/route'
+import { processMintQueue } from '@/app/lib/slices/mint-queue'
 import { runTraineeNicks } from '@/app/lib/trainee-nick-run'
 import { runSlaDigest } from '@/app/lib/mission-verify/sla'
 import { runNightlyMissions } from '@/app/lib/mission-verify/nightly'
@@ -50,6 +57,7 @@ describe.each([
   ['/api/cron/attendance', attendanceGET, () => syncAllCrewAttendance],
   ['/api/cron/mission-sla', missionSlaGET, () => runSlaDigest],
   ['/api/cron/trainee-nicks', traineeNicksGET, () => runTraineeNicks],
+  ['/api/cron/slices-mint', slicesMintGET, () => processMintQueue],
 ] as const)('%s auth', (path, GET, work) => {
   it('401 without the bearer token, and does no work', async () => {
     const res = await GET(req(path))
@@ -155,6 +163,27 @@ describe('/api/cron/mission-sla', () => {
     vi.mocked(runSlaDigest).mockRejectedValueOnce(new Error('Discord down'))
     const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
     const res = await missionSlaGET(req('/api/cron/mission-sla', 'Bearer cron-secret'))
+    expect(res.status).toBe(500)
+    spy.mockRestore()
+  })
+})
+
+describe('/api/cron/slices-mint', () => {
+  it('is scheduled every 5 minutes in vercel.json', async () => {
+    const { readFileSync } = await import('node:fs')
+    const crons = JSON.parse(readFileSync('vercel.json', 'utf8')).crons as Array<{ path: string; schedule: string }>
+    expect(crons.filter((c) => c.path === '/api/cron/slices-mint')).toEqual([{ path: '/api/cron/slices-mint', schedule: '*/5 * * * *' }])
+  })
+
+  it('returns the queue result', async () => {
+    const res = await slicesMintGET(req('/api/cron/slices-mint', 'Bearer cron-secret'))
+    expect(await res.json()).toEqual({ promoted: 0, status: 'skipped', reason: 'disabled' })
+  })
+
+  it('500 (logged) when the queue throws', async () => {
+    vi.mocked(processMintQueue).mockRejectedValueOnce(new Error('rpc down'))
+    const spy = vi.spyOn(console, 'error').mockImplementation(() => {})
+    const res = await slicesMintGET(req('/api/cron/slices-mint', 'Bearer cron-secret'))
     expect(res.status).toBe(500)
     spy.mockRestore()
   })

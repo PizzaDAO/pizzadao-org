@@ -39,7 +39,7 @@ import {
 } from "../../lib/hooks/use-api";
 import { HeroBlock } from "./components/HeroBlock";
 import { YourCrews, type CrewOption } from "./components/YourCrews";
-import { PoapClaimsCard } from "../../ui/poap/PoapClaims";
+import { SliceClaimsCard } from "../../ui/slices/SliceClaims";
 import { NextActionPanel } from "./components/NextActionPanel";
 import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
 import { RecentActivity } from "./components/RecentActivity";
@@ -269,7 +269,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         <NextActionPanel nextAction={summary.nextAction} />
                     )}
 
-                    <PoapClaimsCard />
+                    <SliceClaimsCard />
                     <Link href="/calls/how-to-attend" className="inline-block min-h-11 py-2 underline text-sm">{t("howToAttend")}</Link>
 
                     {/* ── 1.6. Box Mafia suggestion (woodfired-65373) ── */}

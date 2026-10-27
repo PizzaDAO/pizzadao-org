@@ -12,6 +12,19 @@ import {
   getWalletForMember,
 } from "@/app/lib/wallet-lookup";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
+import { promoteAwaitingWallet } from "@/app/lib/slices/claims";
+import { processMintQueueSafe } from "@/app/lib/slices/mint-queue";
+
+/** A newly linked EVM wallet releases any Call Slices claims that were waiting for one. */
+function releaseSliceClaims(discordId: string) {
+  after(async () => {
+    try {
+      if ((await promoteAwaitingWallet(discordId)) > 0) await processMintQueueSafe();
+    } catch (e) {
+      console.error("[slices] wallet promote failed:", e instanceof Error ? e.message : e);
+    }
+  });
+}
 
 export const runtime = "nodejs";
 
@@ -169,6 +182,7 @@ export async function POST(request: NextRequest) {
     // Re-check missions that look at wallets (background, no-op unless enabled).
     const walletDiscordId = session.discordId;
     after(() => emitMissionEvent(walletDiscordId, "wallet_connected", { memberId: String(memberId) }).then(() => undefined));
+    if (chainType === "evm") releaseSliceClaims(walletDiscordId);
 
     return NextResponse.json({
       success: true,
@@ -225,6 +239,7 @@ export async function PUT(request: NextRequest) {
       await setPrimaryWallet(String(memberId), walletId);
       // Sync new primary to sheet
       await syncPrimaryToSheet(String(memberId));
+      releaseSliceClaims(session.discordId);
     }
 
     // Update label if provided (can be set alongside isPrimary)
