@@ -41,6 +41,7 @@ export const prisma = {
   memberWallet: createModelMock(),
   vouch: createModelMock(),
   callRecording: createModelMock(),
+  callAgendaPost: createModelMock(),
   callSpeaker: createModelMock(),
   recordingOptOut: createModelMock(),
   crewDraft: createModelMock(),

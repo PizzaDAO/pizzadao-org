@@ -70,7 +70,44 @@ function extractUrlFromText(text: string): string | undefined {
   return undefined;
 }
 
-async function fetchCrewTasks(sheetUrl: string, forceRefresh = false): Promise<{ tasks: CrewTask[]; totalCount: number }> {
+/** One open task with everything the call agenda ranks on. */
+export type CrewTaskDetail = {
+  label: string;
+  url?: string;
+  /** "Top" | "High" | "Mid" | "Low" | raw sheet value. */
+  priority?: string;
+  stage: string;
+  /** ISO date (YYYY-MM-DD) from the sheet's Due column, when it parses. */
+  due?: string;
+  isActive: boolean;
+};
+
+/** A gviz date cell: `Date(2026,9,30)` (month is 0-based) or a formatted string. */
+export function parseSheetDue(cell: { v?: unknown; f?: unknown } | undefined): string | undefined {
+  if (!cell) return undefined;
+  const m = String(cell.v ?? "").match(/^Date\((\d{4}),\s*(\d{1,2}),\s*(\d{1,2})/);
+  if (m) return `${m[1]}-${String(+m[2] + 1).padStart(2, "0")}-${m[3].padStart(2, "0")}`;
+  const raw = String(cell.f ?? cell.v ?? "").trim();
+  const d = /^\d{4}-\d{2}-\d{2}/.test(raw) || /^\d{1,2}\/\d{1,2}\/\d{4}$/.test(raw) ? new Date(raw) : null;
+  return d && !Number.isNaN(d.getTime()) ? d.toISOString().slice(0, 10) : undefined;
+}
+
+/** Every open (not done/skipped) task of a crew sheet, in sheet-ranked order. Empty on any sheet error. */
+export async function fetchOpenCrewTasks(sheetUrl: string): Promise<CrewTaskDetail[]> {
+  return (await fetchOpenCrewTasksResult(sheetUrl)).tasks;
+}
+
+/** Like fetchOpenCrewTasks, but `error` is true when the sheet could not be read (vs. genuinely no open tasks). */
+export async function fetchOpenCrewTasksResult(sheetUrl: string): Promise<{ tasks: CrewTaskDetail[]; error: boolean }> {
+  const r = await fetchCrewTasks(sheetUrl, false, true);
+  return { tasks: r.all ?? [], error: !!r.error };
+}
+
+async function fetchCrewTasks(
+  sheetUrl: string,
+  forceRefresh = false,
+  detail = false,
+): Promise<{ tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[]; error?: boolean }> {
   const id = extractSheetId(sheetUrl);
   if (!id) return { tasks: [], totalCount: 0 };
 
@@ -132,10 +169,11 @@ async function fetchCrewTasks(sheetUrl: string, forceRefresh = false): Promise<{
 
     const headerRow = rows[headerRowIdx]?.c || [];
     const priorityIdx = headerRow.findIndex((c: any) => String(c?.v || "").toLowerCase().includes("priority"));
+    const dueIdx = headerRow.findIndex((c: any) => String(c?.v || "").toLowerCase().trim() === "due");
 
     const htmlLinkMap = await getTaskLinks(id);
 
-    const allTasks: { label: string; url?: string; priority: string; isActive: boolean }[] = [];
+    const allTasks: { label: string; url?: string; priority: string; isActive: boolean; stage: string; due?: string }[] = [];
     for (let i = headerRowIdx + 1; i < rows.length; i++) {
       const r = rows[i]?.c || [];
       const stage = stageIdx !== -1 ? String(r[stageIdx]?.v || "").trim().toLowerCase() : "";
@@ -154,7 +192,7 @@ async function fetchCrewTasks(sheetUrl: string, forceRefresh = false): Promise<{
       const isActive = stage === "now" || stage === "doing" || stage === "in progress" || stage === "todo" || stage.includes("progress");
 
       if (taskLabel) {
-        allTasks.push({ label: taskLabel, url: taskUrl, priority, isActive });
+        allTasks.push({ label: taskLabel, url: taskUrl, priority, isActive, stage, due: dueIdx !== -1 ? parseSheetDue(r[dueIdx]) : undefined });
       }
     }
 
@@ -192,9 +230,12 @@ async function fetchCrewTasks(sheetUrl: string, forceRefresh = false): Promise<{
       priority: getPriorityLabel(t.priority)
     }));
 
-    return { tasks: topTasks, totalCount };
+    const all = detail
+      ? allTasks.map((t) => ({ label: t.label, url: t.url, priority: getPriorityLabel(t.priority), stage: t.stage, due: t.due, isActive: t.isActive }))
+      : undefined;
+    return { tasks: topTasks, totalCount, all };
   } catch (e) {
-    return { tasks: [], totalCount: 0 };
+    return { tasks: [], totalCount: 0, error: true };
   }
 }
 

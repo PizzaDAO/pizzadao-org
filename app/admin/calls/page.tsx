@@ -9,6 +9,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { listRecordings } from "@/app/lib/calls/recordings";
+import AgendaPreview from "./AgendaPreview";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -51,6 +52,8 @@ export default async function AdminCallsPage() {
                     <h1 className="font-[family-name:var(--font-display)] font-black text-3xl m-0">{t("title")}</h1>
                     <p className="m-0 text-foreground/70">{t("description")}</p>
                 </header>
+
+                <AgendaPreview />
 
                 {rows.length === 0 ? (
                     <p className="text-foreground/60">{t("empty")}</p>
