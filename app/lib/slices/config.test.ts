@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { planFees, addressUrl, contractAddress, dailyCap, explorerBase, maxGasGwei, minBalanceWei, sliceChain, slicesEnabled, slicesReady, txUrl } from "./config";
+import { chainWhere, planFees, addressUrl, contractAddress, dailyCap, explorerBase, maxGasGwei, minBalanceWei, sliceChain, slicesEnabled, slicesReady, txUrl } from "./config";
 import { claimKeyFor, scrubError } from "./minter";
 
 const ADDR = "0x" + "ab".repeat(20);
@@ -36,9 +36,10 @@ describe("slices config", () => {
 
   it("picks Base by default and Base Sepolia on request, with matching explorer links", () => {
     expect(sliceChain(env({})).id).toBe(8453);
-    expect(sliceChain(env({ SLICES_CHAIN_ID: "84532" })).id).toBe(84532);
+    expect(sliceChain(env({ SLICES_CHAIN_ID: "84532" })).id).toBe(8453); // ignored without the local override
+    expect(sliceChain(env({ SLICES_CHAIN_ID: "84532", SLICES_ALLOW_NON_PROD: "true" })).id).toBe(84532);
     expect(explorerBase(env({}))).toBe("https://basescan.org");
-    expect(txUrl("0x1", env({ SLICES_CHAIN_ID: "84532" }))).toBe("https://sepolia.basescan.org/tx/0x1");
+    expect(txUrl("0x1", env({ SLICES_CHAIN_ID: "84532", SLICES_ALLOW_NON_PROD: "true" }))).toBe("https://sepolia.basescan.org/tx/0x1");
     expect(addressUrl(ADDR, env({}))).toBe(`https://basescan.org/address/${ADDR}`);
     expect(contractAddress(env({ SLICES_CONTRACT_ADDRESS: ADDR }))).toBe(ADDR);
   });
@@ -64,7 +65,15 @@ describe("claim key and error scrubbing", () => {
 describe("planFees", () => {
   it("is 2x base + tip, capped at the ceiling, null when base + tip exceeds it", () => {
     expect(planFees(BigInt(6_000_000), BigInt(1_000_000), 0.5)).toEqual({ maxFee: BigInt(13_000_000), priority: BigInt(1_000_000) });
-    expect(planFees(BigInt(400_000_000), BigInt(1_000_000), 0.5)?.maxFee).toBe(BigInt(500_000_000));
-    expect(planFees(BigInt(500_000_000), BigInt(1_000_000), 0.5)).toBeNull();
+    // first sends are capped at ceiling/1.3 so a +30% replacement always fits
+    expect(planFees(BigInt(300_000_000), BigInt(1_000_000), 0.5)?.maxFee).toBe(BigInt(384_615_384));
+    expect(planFees(BigInt(400_000_000), BigInt(1_000_000), 0.5)).toBeNull();
+  });
+});
+
+describe("chainWhere", () => {
+  it("treats NULL chainId rows as the production chain only", () => {
+    expect(chainWhere(env({}))).toEqual({ OR: [{ chainId: 8453 }, { chainId: null }] });
+    expect(chainWhere(env({ SLICES_ALLOW_NON_PROD: "true", SLICES_CHAIN_ID: "84532" }))).toEqual({ OR: [{ chainId: 84532 }] });
   });
 });

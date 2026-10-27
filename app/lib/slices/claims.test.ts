@@ -124,9 +124,9 @@ describe("promoteAwaitingWallet / retry", () => {
     expect(db.attendanceNftClaim.updateMany).not.toHaveBeenCalled();
   });
 
-  it("retryClaim only touches FAILED rows", async () => {
+  it("retryClaim only touches FAILED or skipped rows", async () => {
     db.attendanceNftClaim.updateMany.mockResolvedValue({ count: 1 });
     expect(await retryClaim("c1")).toBe(true);
-    expect(db.attendanceNftClaim.updateMany.mock.calls[0][0].where).toEqual({ id: "c1", status: "FAILED" });
+    expect(db.attendanceNftClaim.updateMany.mock.calls[0][0].where).toEqual({ id: "c1", status: { in: ["FAILED", "SKIPPED_ALREADY_HELD"] } });
   });
 });

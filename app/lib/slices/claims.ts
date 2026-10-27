@@ -196,7 +196,7 @@ export async function sweepAwaitingWallet(limit = 25): Promise<number> {
 /** Admin: put a FAILED claim back in the queue (resets attempts). */
 export async function retryClaim(claimId: string): Promise<boolean> {
   const res = await prisma.attendanceNftClaim.updateMany({
-    where: { id: claimId, status: "FAILED" },
+    where: { id: claimId, status: { in: ["FAILED", "SKIPPED_ALREADY_HELD"] } },
     data: { status: "QUEUED", attempts: 0, lastError: null, txHash: null },
   });
   return res.count > 0;

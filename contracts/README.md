@@ -57,7 +57,7 @@ Never paste a private key into chat or a file. Everything below runs on your mac
    ```
 6. **Set env vars in Vercel** (names only here; `vercel env add <NAME> production`):
    `SLICES_CONTRACT_ADDRESS`, `SLICES_MINTER_PRIVATE_KEY` (Sensitive), `BASE_RPC_URL`, and optionally
-   `SLICES_DAILY_CAP`, `SLICES_MAX_GAS_GWEI`, `SLICES_MIN_BALANCE_ETH`, `SLICES_CHAIN_ID`.
+   `SLICES_DAILY_CAP`, `SLICES_MAX_GAS_GWEI`, `SLICES_MIN_BALANCE_ETH`. (Do not set `SLICES_CHAIN_ID` in production; it is ignored without `SLICES_ALLOW_NON_PROD=true`.)
    Leave `SLICES_ENABLED` unset. `CRON_SECRET`, `PEP_ADMIN_LOG_CHANNEL_ID` and `DISCORD_BOT_TOKEN` already exist.
 7. **Apply the migration** `20261030000000_call_slices` (merging to main does this if migrations auto-apply; it is additive).
 8. **Upload crew template art** on `/admin/slices` (optional; crews without art use the default pizza template).

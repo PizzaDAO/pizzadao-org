@@ -4,7 +4,8 @@
 //   SLICES_CONTRACT_ADDRESS   deployed CallSlices contract
 //   SLICES_MINTER_PRIVATE_KEY hot key holding MINTER_ROLE only (Sensitive, Production)
 //   BASE_RPC_URL              Base JSON-RPC endpoint
-//   SLICES_CHAIN_ID           8453 (Base, default) or 84532 (Base Sepolia, for Preview)
+//   SLICES_CHAIN_ID           84532 selects Base Sepolia, but ONLY together with SLICES_ALLOW_NON_PROD=true
+//                             (local testnet QA). Otherwise the chain is always Base (8453).
 //   SLICES_DAILY_CAP          max mints per rolling 24h (default 1000)
 //   SLICES_MAX_GAS_GWEI       skip a run while maxFeePerGas is above this (default 0.5)
 //   SLICES_MIN_BALANCE_ETH    alert + pause below this minter balance (default 0.003)
@@ -20,7 +21,8 @@ export function slicesEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
 }
 
 export function sliceChain(env: NodeJS.ProcessEnv = process.env) {
-  return env.SLICES_CHAIN_ID?.trim() === "84532" ? baseSepolia : base;
+  // A stray SLICES_CHAIN_ID (e.g. on a preview) must never move claims off the production chain.
+  return env.SLICES_ALLOW_NON_PROD?.trim() === "true" && env.SLICES_CHAIN_ID?.trim() === "84532" ? baseSepolia : base;
 }
 
 export function explorerBase(env: NodeJS.ProcessEnv = process.env): string {
@@ -63,9 +65,16 @@ export function slicesReady(env: NodeJS.ProcessEnv = process.env): SlicesStatus 
   return { ok: true };
 }
 
-/** Fee plan: 2x base fee + tip, never above the gwei ceiling. null when even base + tip exceeds it. */
+/** Prisma filter for "claims on the current chain". Rows with a NULL chainId predate stamping and belong to Base. */
+export function chainWhere(env: NodeJS.ProcessEnv = process.env): { OR: ({ chainId: number } | { chainId: null })[] } {
+  const id = sliceChain(env).id;
+  return { OR: id === base.id ? [{ chainId: id }, { chainId: null }] : [{ chainId: id }] };
+}
+
+/** Fee plan: 2x base fee + tip, never above ceiling/1.3. null when even base + tip exceeds that. */
 export function planFees(baseFee: bigint, priority: bigint, ceilingGwei: number): { maxFee: bigint; priority: bigint } | null {
-  const ceiling = BigInt(Math.floor(ceilingGwei * 1e9));
+  // First sends stay at or below ceiling/1.3 so a +30% replacement bump always fits under the ceiling.
+  const ceiling = (BigInt(Math.floor(ceilingGwei * 1e9)) * BigInt(100)) / BigInt(130);
   if (baseFee + priority > ceiling) return null;
   const want = baseFee * BigInt(2) + priority;
   return { maxFee: want > ceiling ? ceiling : want, priority };

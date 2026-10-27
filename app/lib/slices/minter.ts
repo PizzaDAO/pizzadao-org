@@ -8,6 +8,7 @@ import { contractAddress, sliceChain } from "./config";
 export const CALL_SLICES_ABI = parseAbi([
   "function mintMany(address[] to, uint256[] ids, bytes32[] claimKeys) returns (uint256 minted)",
   "function claimUsed(bytes32) view returns (bool)",
+  "function hasRole(bytes32 role, address account) view returns (bool)",
   "function balanceOf(address account, uint256 id) view returns (uint256)",
   "event SliceMinted(address indexed to, uint256 indexed id, bytes32 indexed claimKey)",
 ]);
@@ -81,27 +82,36 @@ export async function sendMintMany(
   });
 }
 
+export type ReplaceResult = { kind: "replaced"; hash: Hex } | { kind: "still_pending" } | { kind: "gone" };
+
 /**
- * If `hash` is still pending in the mempool (pending nonce > latest), resend the identical call data
- * at the SAME nonce with a bumped fee (at least +30%, capped by `ceilingMaxFee`). Returns the new hash,
- * or null when the tx is not replaceable (unknown/dropped/mined, or the bump would exceed the ceiling).
+ * Deal with a tx that has no receipt after the stuck window.
+ * - replaced: it is pending in the mempool; the identical call data was resent at the SAME nonce with a
+ *   bumped fee (+30%, never above `ceilingMaxFee`).
+ * - still_pending: we cannot tell it is gone (still pending but a bump would exceed the ceiling, or the
+ *   node simply does not know it while other minter txs are pending). Leave it alone.
+ * - gone: clearly dropped (the node does not know it and the minter has nothing pending, or its nonce was
+ *   already used by another tx). Safe to requeue.
  */
-export async function replaceStuckTx(hash: Hex, ceilingMaxFee: bigint): Promise<Hex | null> {
+export async function replaceStuckTx(hash: Hex, ceilingMaxFee: bigint): Promise<ReplaceResult> {
   const pc = publicClient();
+  const me = account().address;
   const tx = await pc.getTransaction({ hash }).catch(() => null);
-  if (!tx || tx.blockNumber) return null;
   const [latest, pending] = await Promise.all([
-    pc.getTransactionCount({ address: tx.from, blockTag: "latest" }),
-    pc.getTransactionCount({ address: tx.from, blockTag: "pending" }),
+    pc.getTransactionCount({ address: me, blockTag: "latest" }),
+    pc.getTransactionCount({ address: me, blockTag: "pending" }),
   ]);
-  if (!(pending > latest) || tx.nonce < latest) return null;
+  if (!tx) return pending <= latest ? { kind: "gone" } : { kind: "still_pending" };
+  if (tx.blockNumber) return { kind: "still_pending" }; // mined: the receipt shows up on the next run
+  if (tx.nonce < latest) return { kind: "gone" }; // the nonce was consumed by a different tx
+  if (!(pending > latest)) return { kind: "still_pending" };
   const oldMax = tx.maxFeePerGas ?? tx.gasPrice ?? BigInt(0);
   const bumped = (oldMax * BigInt(130)) / BigInt(100) + BigInt(1);
-  if (bumped > ceilingMaxFee) return null;
+  if (bumped > ceilingMaxFee) return { kind: "still_pending" };
   const oldTip = tx.maxPriorityFeePerGas ?? PRIORITY_FEE;
   const tip = (oldTip * BigInt(130)) / BigInt(100) + BigInt(1);
   const wallet = createWalletClient({ account: account(), chain: sliceChain(), transport: http(rpcUrl()) });
-  return wallet.sendTransaction({
+  const newHash = await wallet.sendTransaction({
     to: tx.to!,
     data: tx.input,
     nonce: tx.nonce,
@@ -109,6 +119,27 @@ export async function replaceStuckTx(hash: Hex, ceilingMaxFee: bigint): Promise<
     maxPriorityFeePerGas: tip < bumped ? tip : bumped,
     gas: tx.gas,
   });
+  return { kind: "replaced", hash: newHash };
+}
+
+const MINTER_ROLE = keccak256(stringToHex("MINTER_ROLE"));
+
+/** Shared failure causes (as opposed to a bad row): contract missing at the address, or minter lost its role. */
+export async function checkMinterSetup(): Promise<{ ok: true } | { ok: false; problem: string }> {
+  try {
+    const pc = publicClient();
+    const code = await pc.getCode({ address: contract() });
+    if (!code || code === "0x") return { ok: false, problem: "no contract code at SLICES_CONTRACT_ADDRESS" };
+    const has = await pc.readContract({ address: contract(), abi: CALL_SLICES_ABI, functionName: "hasRole", args: [MINTER_ROLE, account().address] });
+    if (!has) return { ok: false, problem: "minter address does not hold MINTER_ROLE" };
+    return { ok: true };
+  } catch (e) {
+    return { ok: false, problem: `setup check failed: ${scrubError(e)}` };
+  }
+}
+
+export async function getBalanceOf(owner: `0x${string}`, id: number): Promise<bigint> {
+  return publicClient().readContract({ address: contract(), abi: CALL_SLICES_ABI, functionName: "balanceOf", args: [owner, BigInt(id)] });
 }
 
 export type ReceiptInfo = { state: ReceiptState; blockNumber?: bigint; mintedKeys?: Set<string> };

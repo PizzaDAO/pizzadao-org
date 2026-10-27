@@ -7,6 +7,7 @@ let leaseFree = true;
 
 const matches = (r: Row, where: Record<string, unknown> = {}): boolean => {
   for (const [k, v] of Object.entries(where)) {
+    if (k === "AND") { if (!(v as Record<string, unknown>[]).every((w) => matches(r, w))) return false; continue; }
     if (k === "OR") { if (!(v as Record<string, unknown>[]).some((w) => matches(r, w))) return false; continue; }
     const val = (r as unknown as Record<string, unknown>)[k];
     if (v && typeof v === "object" && !(v instanceof Date)) {
@@ -31,7 +32,14 @@ vi.mock("@/app/lib/db", () => ({
     $queryRaw: vi.fn(async () => (leaseFree ? [{ id: 1 }] : [])),
     sliceMintLease: { updateMany: vi.fn(async () => ({ count: 1 })) },
     attendanceNftClaim: {
-      findMany: vi.fn(async (a: { where: Record<string, unknown>; take?: number }) => rows.filter((r) => matches(r, a.where)).slice(0, a.take ?? 1e9)),
+      findMany: vi.fn(async (a: { where: Record<string, unknown>; take?: number; distinct?: string[] }) => {
+        let hit = rows.filter((r) => matches(r, a.where));
+        if (a.distinct) {
+          const seen = new Set<unknown>();
+          hit = hit.filter((r) => { const v = (r as unknown as Record<string, unknown>)[a.distinct![0]]; if (seen.has(v)) return false; seen.add(v); return true; });
+        }
+        return hit.slice(0, a.take ?? 1e9);
+      }),
       count: vi.fn(async (a: { where: Record<string, unknown> }) => rows.filter((r) => matches(r, a.where)).length),
       updateMany: vi.fn(async (a: { where: Record<string, unknown>; data: Record<string, unknown> }) => {
         const hit = rows.filter((r) => matches(r, a.where));
@@ -55,6 +63,8 @@ const minter = vi.hoisted(() => ({
   getReceiptInfo: vi.fn(),
   isClaimUsed: vi.fn(),
   replaceStuckTx: vi.fn(),
+  checkMinterSetup: vi.fn(),
+  getBalanceOf: vi.fn(),
 }));
 vi.mock("./minter", () => ({
   ...minter,
@@ -83,7 +93,9 @@ beforeEach(() => {
   minter.sendMintMany.mockResolvedValue("0xhash");
   minter.waitForReceipt.mockResolvedValue({ state: "success" });
   minter.getReceiptInfo.mockResolvedValue({ state: "pending" });
-  minter.replaceStuckTx.mockResolvedValue(null);
+  minter.replaceStuckTx.mockResolvedValue({ kind: "gone" });
+  minter.checkMinterSetup.mockResolvedValue({ ok: true });
+  minter.getBalanceOf.mockResolvedValue(BigInt(1));
   minter.isClaimUsed.mockResolvedValue(false);
 });
 afterEach(() => { process.env = { ...saved }; });
@@ -106,11 +118,11 @@ describe("processMintQueue", () => {
     expect(await processMintQueue()).toMatchObject({ status: "ran" });
   });
 
-  it("only touches claims stamped with its own chain", async () => {
+  it("only touches claims on its own chain; NULL chainId rows count as the production chain", async () => {
     rows = [mk("a", { chainId: 84532 }), mk("b", { chainId: null }), mk("c")];
     const res = await processMintQueue();
-    expect(res).toMatchObject({ status: "ran", submitted: 1 });
-    expect(rows.map((r) => r.status)).toEqual(["QUEUED", "QUEUED", "MINTED"]);
+    expect(res).toMatchObject({ status: "ran", submitted: 2 });
+    expect(rows.map((r) => r.status)).toEqual(["QUEUED", "MINTED", "MINTED"]);
   });
 
   it("uses 2x base fee + tip as maxFee, capped by the gwei ceiling", async () => {
@@ -125,6 +137,45 @@ describe("processMintQueue", () => {
     await processMintQueue();
     expect(rows.map((r) => r.status)).toEqual(["MINTED", "SKIPPED_ALREADY_HELD"]);
     expect(rows[1].lastError).toMatch(/already held/);
+  });
+
+  it("a shared failure (minter lost its role) holds the queue: no bisect, no FAILED, alert", async () => {
+    minter.sendMintMany.mockRejectedValue(new Error("execution reverted: AccessControl"));
+    minter.checkMinterSetup.mockResolvedValue({ ok: false, problem: "minter address does not hold MINTER_ROLE" });
+    rows = [mk("a"), mk("b"), mk("c")];
+    await processMintQueue();
+    expect(minter.sendMintMany).toHaveBeenCalledTimes(1);
+    expect(rows.map((r) => r.status)).toEqual(["QUEUED", "QUEUED", "QUEUED"]);
+    expect(rows[0].lastError).toMatch(/MINTER_ROLE/);
+    expect(alert).toHaveBeenCalledTimes(1);
+  });
+
+  it("aborts without sending when the lease was lost", async () => {
+    const { prisma } = await import("@/app/lib/db");
+    vi.mocked(prisma.sliceMintLease.updateMany).mockResolvedValueOnce({ count: 0 });
+    rows = [mk("a")];
+    await processMintQueue();
+    expect(minter.sendMintMany).not.toHaveBeenCalled();
+    expect(rows[0].status).toBe("QUEUED");
+  });
+
+  it("starts no new send once the cooperative budget is spent", async () => {
+    rows = [mk("a")];
+    await processMintQueue({ budgetMs: -1 });
+    expect(minter.sendMintMany).not.toHaveBeenCalled();
+  });
+
+  it("leaves a row SUBMITTED when the settle read fails; FAILED when nothing was minted and nothing is held", async () => {
+    minter.waitForReceipt.mockResolvedValue({ state: "success", mintedKeys: new Set() });
+    minter.isClaimUsed.mockRejectedValueOnce(new Error("rpc"));
+    rows = [mk("a")];
+    await processMintQueue();
+    expect(rows[0].status).toBe("SUBMITTED");
+
+    minter.getBalanceOf.mockResolvedValue(BigInt(0));
+    rows = [mk("b")];
+    await processMintQueue();
+    expect(rows[0].status).toBe("FAILED");
   });
 
   it("bisects a batch the node rejects so only the bad row is FAILED", async () => {
@@ -278,11 +329,27 @@ describe("processMintQueue", () => {
     });
 
     it("replaces a stuck pending tx at the same nonce instead of requeueing it", async () => {
-      minter.replaceStuckTx.mockResolvedValue("0xnew");
+      minter.replaceStuckTx.mockResolvedValue({ kind: "replaced", hash: "0xnew" });
       rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: old, attempts: 1 })];
       await processMintQueue();
       expect(rows[0]).toMatchObject({ status: "SUBMITTED", txHash: "0xnew", attempts: 1 });
       expect(minter.sendMintMany).not.toHaveBeenCalled();
+    });
+
+    it("a stuck tx that cannot be replaced stays SUBMITTED (no requeue) and raises an alert", async () => {
+      minter.replaceStuckTx.mockResolvedValue({ kind: "still_pending" });
+      rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: old, attempts: 2 })];
+      await processMintQueue();
+      expect(rows[0]).toMatchObject({ status: "SUBMITTED", txHash: "0xt", attempts: 2 });
+      expect(alert).toHaveBeenCalledTimes(1);
+      expect(minter.isClaimUsed).not.toHaveBeenCalled();
+    });
+
+    it("reconciles every row of a hash even when the batch is larger than the reconcile limit", async () => {
+      minter.getReceiptInfo.mockResolvedValue({ state: "success" });
+      rows = Array.from({ length: 30 }, (_, i) => mk(`s${i}`, { status: "SUBMITTED", txHash: "0xsame", submittedAt: new Date() }));
+      await processMintQueue();
+      expect(rows.every((r) => r.status === "MINTED")).toBe(true);
     });
 
     it("a dropped tx that is requeued does not burn an attempt", async () => {

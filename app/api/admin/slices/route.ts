@@ -5,7 +5,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/auth-guards";
 import { prisma } from "@/app/lib/db";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
-import { dailyCap, minBalanceWei, slicesEnabled, slicesReady, addressUrl, contractAddress } from "@/app/lib/slices/config";
+import { chainWhere, dailyCap, minBalanceWei, slicesEnabled, slicesReady, addressUrl, contractAddress } from "@/app/lib/slices/config";
 import { dayKey, retryClaim } from "@/app/lib/slices/claims";
 import { mintedLast24h, processMintQueue } from "@/app/lib/slices/mint-queue";
 import { getMinterBalance, minterAddress, scrubError } from "@/app/lib/slices/minter";
@@ -30,15 +30,15 @@ export async function GET() {
   }
 
   const [grouped, failed, stuck, calls, arts, failing] = await Promise.all([
-    prisma.attendanceNftClaim.groupBy({ by: ["status"], _count: { _all: true } }),
+    prisma.attendanceNftClaim.groupBy({ by: ["status"], where: chainWhere(), _count: { _all: true } }),
     prisma.attendanceNftClaim.findMany({
-      where: { status: "FAILED" },
+      where: { status: { in: ["FAILED", "SKIPPED_ALREADY_HELD"] }, ...chainWhere() },
       orderBy: { updatedAt: "desc" },
       take: 50,
       select: { id: true, discordId: true, callId: true, attempts: true, lastError: true },
     }),
     prisma.attendanceNftClaim.findMany({
-      where: { status: "SUBMITTED", submittedAt: { lt: new Date(Date.now() - 10 * 60_000) } },
+      where: { status: "SUBMITTED", ...chainWhere(), submittedAt: { lt: new Date(Date.now() - 10 * 60_000) } },
       take: 50,
       select: { id: true, callId: true, txHash: true, submittedAt: true },
     }),
@@ -50,7 +50,7 @@ export async function GET() {
     prisma.sliceCrewArt.findMany(),
     // Still queued but the last send attempt errored: shows why a row is not moving.
     prisma.attendanceNftClaim.findMany({
-      where: { status: "QUEUED", lastError: { not: null } },
+      where: { status: "QUEUED", ...chainWhere(), lastError: { not: null } },
       orderBy: { updatedAt: "desc" },
       take: 50,
       select: { id: true, discordId: true, callId: true, attempts: true, lastError: true },
