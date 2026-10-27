@@ -26,7 +26,7 @@ describe("mafia portrait prompt", () => {
     expect(pickAnimal("Tony Soprano", "Pepperoni")).toBe(a);
     expect(ANIMAL_FAMILIES).toContain(a);
     expect(ANIMAL_FAMILIES).toHaveLength(16);
-    expect(a).toBe(ANIMAL_FAMILIES[hashString("tony soprano|pepperoni") % 16]);
+    expect(a).toBe(ANIMAL_FAMILIES[hashString("tony soprano|Pepperoni") % 16]);
   });
 
   it("never puts the name, a custom topping or a custom film title in the prompt", () => {
