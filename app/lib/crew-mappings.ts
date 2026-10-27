@@ -94,14 +94,20 @@ export function parseSheetDue(cell: { v?: unknown; f?: unknown } | undefined): s
 
 /** Every open (not done/skipped) task of a crew sheet, in sheet-ranked order. Empty on any sheet error. */
 export async function fetchOpenCrewTasks(sheetUrl: string): Promise<CrewTaskDetail[]> {
-  return (await fetchCrewTasks(sheetUrl, false, true)).all ?? [];
+  return (await fetchOpenCrewTasksResult(sheetUrl)).tasks;
+}
+
+/** Like fetchOpenCrewTasks, but `error` is true when the sheet could not be read (vs. genuinely no open tasks). */
+export async function fetchOpenCrewTasksResult(sheetUrl: string): Promise<{ tasks: CrewTaskDetail[]; error: boolean }> {
+  const r = await fetchCrewTasks(sheetUrl, false, true);
+  return { tasks: r.all ?? [], error: !!r.error };
 }
 
 async function fetchCrewTasks(
   sheetUrl: string,
   forceRefresh = false,
   detail = false,
-): Promise<{ tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[] }> {
+): Promise<{ tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[]; error?: boolean }> {
   const id = extractSheetId(sheetUrl);
   if (!id) return { tasks: [], totalCount: 0 };
 
@@ -229,7 +235,7 @@ async function fetchCrewTasks(
       : undefined;
     return { tasks: topTasks, totalCount, all };
   } catch (e) {
-    return { tasks: [], totalCount: 0 };
+    return { tasks: [], totalCount: 0, error: true };
   }
 }
 

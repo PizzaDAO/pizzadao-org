@@ -11,10 +11,10 @@
  *    either way (it never posts).
  */
 import { prisma } from '@/app/lib/db'
-import { getCrewMappings, fetchOpenCrewTasks, type CrewOption } from '@/app/lib/crew-mappings'
+import { getCrewMappings, fetchOpenCrewTasksResult, type CrewOption } from '@/app/lib/crew-mappings'
 import { resolveCrewForEvent } from '@/app/lib/calls/crew-map'
-import { resolveChannelId } from '@/app/lib/discord-channels'
-import { postDiscordMessage } from '@/app/lib/discord-rest'
+import { getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
+import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { SITE_URL } from '@/app/lib/site-url'
 import { buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
@@ -70,12 +70,22 @@ export async function fetchUpcomingEvents(
 export async function resolveCrewChannel(raw: string | undefined): Promise<string | null> {
   const v = (raw ?? '').trim()
   if (!v) return null
-  if (SNOWFLAKE.test(v)) return v
-  const link = v.match(/discord(?:app)?\.com\/channels\/\d+\/(\d+)/)
-  if (link) return link[1]
+  // Every route goes through the guild's own channel list: an id from another server (or a
+  // typo) must never be claimed or posted to. Names match exactly (no suffix guessing).
+  const channels = await getGuildChannels()
+  if (!channels) return null
+  const usable = channels.filter((c) => c.type === 0 || c.type === 5)
+  const byId = (id: string) => usable.find((c) => c.id === id)?.id ?? null
+  if (SNOWFLAKE.test(v)) return byId(v)
+  const link = v.match(/discord(?:app)?\.com\/channels\/(\d+)\/(\d+)/)
+  if (link) {
+    const guild = process.env.DISCORD_GUILD_ID?.trim()
+    return guild && link[1] !== guild ? null : byId(link[2])
+  }
   const mention = v.match(/^<#(\d+)>$/)
-  if (mention) return mention[1]
-  return resolveChannelId(v)
+  if (mention) return byId(mention[1])
+  const want = normalizeChannelName(v)
+  return want ? (usable.find((c) => normalizeChannelName(c.name) === want)?.id ?? null) : null
 }
 
 /** Action items of the crew's latest published call that has any. */
@@ -104,7 +114,12 @@ export interface PlannedAgenda {
   bullets: AgendaBullet[]
   message: string
   alreadyPosted: boolean
+  /** The crew sheet could not be read (as opposed to having no urgent tasks). */
+  sheetError: boolean
 }
+
+/** A rescheduled event keeps its id but changes startsAt; treat a post within this of the new start as the same call. */
+export const RESCHEDULE_WINDOW_MS = 6 * 60 * 60 * 1000
 
 export function crewPageUrl(crewId: string): string {
   return `${SITE_URL}/crew/${encodeURIComponent(crewId)}`
@@ -122,11 +137,16 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     const hit = resolveCrewForEvent(crews.map((c) => ({ id: c.id, label: c.label, event: c.event })), { eventId: ev.id, eventName: ev.name })
     const crew = hit ? byId.get(hit.crewId) : undefined
     if (!crew) continue
-    const [tasks, actionItems, posted] = await Promise.all([
-      crew.sheet ? fetchOpenCrewTasks(crew.sheet) : Promise.resolve([]),
+    const start = ev.startsAt.getTime()
+    const [sheet, actionItems, posted] = await Promise.all([
+      crew.sheet ? fetchOpenCrewTasksResult(crew.sheet) : Promise.resolve({ tasks: [], error: false }),
       previousActionItems(crew.id).catch(() => []),
-      prisma.callAgendaPost.findUnique({ where: { eventId_startsAt: { eventId: ev.id, startsAt: ev.startsAt } }, select: { id: true } }),
+      prisma.callAgendaPost.findFirst({
+        where: { eventId: ev.id, startsAt: { gte: new Date(start - RESCHEDULE_WINDOW_MS), lte: new Date(start + RESCHEDULE_WINDOW_MS) } },
+        select: { id: true },
+      }),
     ])
+    const tasks = sheet.tasks
     const bullets = buildAgendaBullets({ tasks, actionItems, now })
     const crewUrl = crewPageUrl(crew.id)
     plans.push({
@@ -140,12 +160,18 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
       bullets,
       message: formatAgendaMessage({ crewLabel: crew.label, startsAt: ev.startsAt, bullets, crewUrl }),
       alreadyPosted: !!posted,
+      sheetError: sheet.error,
     })
   }
   return plans
 }
 
-export type AgendaOutcome = { eventId: string; crewId: string; status: 'posted' | 'already-posted' | 'no-items' | 'no-channel' | 'failed'; messageId?: string | null }
+export type AgendaOutcome = {
+  eventId: string
+  crewId: string
+  status: 'posted' | 'already-posted' | 'no-items' | 'no-channel' | 'sheet-error' | 'failed' | 'post-uncertain' | 'error'
+  messageId?: string | null
+}
 
 export interface RunResult {
   status: 'disabled' | 'ran'
@@ -156,48 +182,62 @@ function isUniqueViolation(err: unknown): boolean {
   return typeof err === 'object' && err !== null && (err as { code?: string }).code === 'P2002'
 }
 
+/** Discord posts we can be sure did NOT land: the claim is safe to release. 5xx / timeout / network may have posted. */
+export function postDefinitelyFailed(err: unknown): boolean {
+  return err instanceof DiscordPostError && [400, 403, 404, 429].includes(err.status)
+}
+
+export const POST_TIMEOUT_MS = 10_000
+const SUPPRESS_EMBEDS = 4
+
+async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutcome> {
+  const base = { eventId: p.eventId, crewId: p.crewId }
+  if (p.alreadyPosted) return { ...base, status: 'already-posted' }
+  // Sheet unreadable: do not claim, so the next run retries (an empty list from a healthy sheet is 'no-items').
+  if (p.sheetError) return { ...base, status: 'sheet-error' }
+  // Nothing urgent: say nothing rather than post filler. Not recorded, so it is re-checked next run.
+  if (p.bullets.length === 0) return { ...base, status: 'no-items' }
+  const channelId = await resolveCrewChannel(p.channelRaw ?? undefined)
+  if (!channelId) return { ...base, status: 'no-channel' }
+  // Claim first: concurrent or repeated runs lose the unique constraint and skip.
+  try {
+    await prisma.callAgendaPost.create({ data: { eventId: p.eventId, startsAt: p.startsAt, crewId: p.crewId, channelId } })
+  } catch (err) {
+    if (isUniqueViolation(err)) return { ...base, status: 'already-posted' }
+    throw err
+  }
+  const where = { eventId_startsAt: { eventId: p.eventId, startsAt: p.startsAt } }
+  try {
+    const { id } = await postDiscordMessage(
+      { kind: 'bot', channelId, botToken: token },
+      { content: p.message, allowed_mentions: { parse: [] }, flags: SUPPRESS_EMBEDS },
+      { fetchImpl: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(POST_TIMEOUT_MS) }) },
+    )
+    await prisma.callAgendaPost.update({ where, data: { messageId: id } }).catch(() => {})
+    return { ...base, status: 'posted', messageId: id }
+  } catch (err) {
+    console.error('[call-agenda] post failed', p.eventId, err instanceof Error ? err.message : err)
+    if (postDefinitelyFailed(err)) {
+      await prisma.callAgendaPost.delete({ where }).catch(() => {})
+      return { ...base, status: 'failed' }
+    }
+    // The message may have been delivered; keep the claim rather than risk a double post.
+    return { ...base, status: 'post-uncertain' }
+  }
+}
+
 export async function runCallAgenda(o: { now?: Date; fetchImpl?: typeof fetch } = {}): Promise<RunResult> {
   if (!callAgendaEnabled()) return { status: 'disabled', outcomes: [] }
   const token = process.env.DISCORD_BOT_TOKEN?.trim() ?? ''
   const plans = await planAgendas({ now: o.now, horizonMs: POST_LEAD_MS, fetchImpl: o.fetchImpl })
   const outcomes: AgendaOutcome[] = []
   for (const p of plans) {
-    const base = { eventId: p.eventId, crewId: p.crewId }
-    if (p.alreadyPosted) {
-      outcomes.push({ ...base, status: 'already-posted' })
-      continue
-    }
-    // Nothing urgent: say nothing rather than post filler. Not recorded, so it is re-checked next run.
-    if (p.bullets.length === 0) {
-      outcomes.push({ ...base, status: 'no-items' })
-      continue
-    }
-    const channelId = await resolveCrewChannel(p.channelRaw ?? undefined)
-    if (!channelId) {
-      outcomes.push({ ...base, status: 'no-channel' })
-      continue
-    }
-    // Claim first: concurrent or repeated runs lose the unique constraint and skip.
     try {
-      await prisma.callAgendaPost.create({ data: { eventId: p.eventId, startsAt: p.startsAt, crewId: p.crewId, channelId } })
+      outcomes.push(await processPlan(p, token))
     } catch (err) {
-      if (isUniqueViolation(err)) {
-        outcomes.push({ ...base, status: 'already-posted' })
-        continue
-      }
-      throw err
-    }
-    try {
-      const { id } = await postDiscordMessage(
-        { kind: 'bot', channelId, botToken: token },
-        { content: p.message, allowed_mentions: { parse: [] } },
-      )
-      await prisma.callAgendaPost.update({ where: { eventId_startsAt: { eventId: p.eventId, startsAt: p.startsAt } }, data: { messageId: id } }).catch(() => {})
-      outcomes.push({ ...base, status: 'posted', messageId: id })
-    } catch (err) {
-      console.error('[call-agenda] post failed', p.eventId, err instanceof Error ? err.message : err)
-      await prisma.callAgendaPost.delete({ where: { eventId_startsAt: { eventId: p.eventId, startsAt: p.startsAt } } }).catch(() => {})
-      outcomes.push({ ...base, status: 'failed' })
+      // One crew's failure must not stop the others.
+      console.error('[call-agenda] crew failed', p.crewId, err instanceof Error ? err.message : err)
+      outcomes.push({ eventId: p.eventId, crewId: p.crewId, status: 'error' })
     }
   }
   return { status: 'ran', outcomes }

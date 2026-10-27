@@ -27,7 +27,9 @@ const DAY_MS = 24 * 60 * 60 * 1000
 
 function clip(s: string): string {
   const t = s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
-  return t.length > MAX_LEN ? `${t.slice(0, MAX_LEN - 1).trimEnd()}…` : t
+  const clipped = t.length > MAX_LEN ? `${t.slice(0, MAX_LEN - 1).trimEnd()}…` : t
+  // Escape Discord markdown so sheet text cannot format or break the post.
+  return clipped.replace(/([\\*_~`|>[\]<])/g, '\\$1')
 }
 
 function priorityRank(p?: string): number {
@@ -39,12 +41,28 @@ function priorityRank(p?: string): number {
   return 4
 }
 
+/** Zone "today" is computed in (env CALL_AGENDA_TZ, default America/New_York). */
+export function agendaTimeZone(env: NodeJS.ProcessEnv = process.env): string {
+  const tz = env.CALL_AGENDA_TZ?.trim() || 'America/New_York'
+  try {
+    new Intl.DateTimeFormat('en-US', { timeZone: tz })
+    return tz
+  } catch {
+    return 'America/New_York'
+  }
+}
+
+/** YYYY-MM-DD of `now` in `tz`. */
+export function localDate(now: Date, tz: string): string {
+  return new Intl.DateTimeFormat('en-CA', { timeZone: tz, year: 'numeric', month: '2-digit', day: '2-digit' }).format(now)
+}
+
 /** Whole days a task is overdue at `now` (UTC dates), 0 when not overdue or no due date. */
-export function daysOverdue(due: string | undefined, now: Date): number {
+export function daysOverdue(due: string | undefined, now: Date, tz: string = agendaTimeZone()): number {
   if (!due) return 0
   const t = Date.parse(`${due}T00:00:00Z`)
   if (Number.isNaN(t)) return 0
-  const today = Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate())
+  const today = Date.parse(`${localDate(now, tz)}T00:00:00Z`)
   return Math.max(0, Math.floor((today - t) / DAY_MS))
 }
 
