@@ -127,6 +127,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     level: 4,
     index: 2, // new: not in the seed, INSERTed by the migration
     seedTitle: 'Get vouched by a member',
+    title: 'Get vouched for',
     description:
       'Get at least one vouch from another PizzaDAO member: ask a member to open your profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.',
     // Only PizzaDAO-native vouches, like L5.2 (vouch_given).
