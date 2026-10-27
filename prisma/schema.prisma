@@ -888,6 +888,8 @@ model MemberProfileExtras {
   profileCompletedCelebratedAt DateTime?             // null = not yet shown; backfilled for already-complete members
   // ===== Timezone (pizzaiolo-13628) — the Crew sheet has no Timezone column =====
   timezone                 String?   @db.VarChar(64) // IANA ID resolved from the onboarding city, e.g. "America/New_York"
+  // ===== Re-engagement email (task/reengage-emails) =====
+  reengageEmailOptOut      Boolean   @default(false) // true = never send the weekly digest
   updatedAt                DateTime  @updatedAt
   createdAt                DateTime  @default(now())
 }
@@ -1391,4 +1393,21 @@ model MafiaNameClaim {
   @@unique([discordId, name])
   @@unique([actor, name])
   @@index([createdAt])
+}
+
+// Weekly re-engagement digest (app/lib/reengage). One row per member per ISO week:
+// the unique key is the idempotency claim, written before the send so concurrent
+// cron runs never double-send. status: SENDING -> SENT | FAILED, or SKIPPED when
+// the digest had nothing to say. Rows are kept (no retry within the week).
+model ReengageEmailSend {
+  id        String   @id @default(cuid())
+  memberId  String
+  weekKey   String   @db.VarChar(10) // e.g. "2026-W44"
+  status    String   @default("SENDING") @db.VarChar(10)
+  locale    String   @default("en") @db.VarChar(5)
+  createdAt DateTime @default(now())
+  sentAt    DateTime?
+
+  @@unique([memberId, weekKey])
+  @@index([weekKey])
 }

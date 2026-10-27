@@ -1029,5 +1029,40 @@
     "intro": "Pick a topping, pick a film, get a name. No login needed.",
     "footnote": "Free and no account needed. Your portrait is drawn by AI and a few are drawn per day.",
     "ogAlt": "Get your mafia name from PizzaDAO"
+  },
+  "reengage": {
+    "subjectMission": "Your next mission: {title}",
+    "subjectDefault": "Your week at PizzaDAO",
+    "preheader": "Your next mission, your crew calls, and how close you are to the next level.",
+    "greeting": "Hey {name},",
+    "intro": "Here's what's cooking at PizzaDAO this week.",
+    "missionHeading": "Your next mission",
+    "missionBody": "Level {level}: {title}",
+    "missionCta": "Open missions",
+    "levelProgress": "You're {remaining, plural, one {# mission} other {# missions}} away from Level {nextLevel}.",
+    "levelProgressTitled": "You're {remaining, plural, one {# mission} other {# missions}} away from Level {nextLevel}, {levelTitle}.",
+    "allCaught": "You've cleared every mission available right now. Nice work.",
+    "callsHeading": "Your crew calls in the next 7 days",
+    "callLine": "{crew}: {when}",
+    "openApp": "Open PizzaDAO",
+    "footerWhy": "You get this weekly note because you're a PizzaDAO member with an email on file.",
+    "unsubscribe": "Unsubscribe",
+    "manage": "Email settings",
+    "unsub": {
+      "title": "Unsubscribe from PizzaDAO emails",
+      "body": "Stop the weekly PizzaDAO digest for this member?",
+      "button": "Unsubscribe",
+      "doneTitle": "You're unsubscribed",
+      "doneBody": "You won't get the weekly digest anymore. You can turn it back on in your profile settings.",
+      "invalid": "This unsubscribe link isn't valid. Open your profile settings to change your email preferences.",
+      "home": "Back to PizzaDAO"
+    },
+    "prefs": {
+      "sectionTitle": "Email",
+      "description": "A short weekly note with your next mission, crew calls and level progress.",
+      "label": "Send me the weekly PizzaDAO email",
+      "saveError": "Couldn't save your email preference. Try again?",
+      "saved": "Saved"
+    }
   }
 }

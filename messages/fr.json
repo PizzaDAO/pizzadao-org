@@ -1029,5 +1029,40 @@
     "intro": "Choisissez une garniture, choisissez un film, obtenez un nom. Sans compte.",
     "footnote": "Gratuit et sans compte. Le portrait est dessiné par une IA et il y en a peu par jour.",
     "ogAlt": "Obtenez votre nom de mafia PizzaDAO"
+  },
+  "reengage": {
+    "subjectMission": "Ta prochaine mission : {title}",
+    "subjectDefault": "Ta semaine chez PizzaDAO",
+    "preheader": "Ta prochaine mission, les appels de tes crews et ce qu'il te reste avant le niveau suivant.",
+    "greeting": "Salut {name},",
+    "intro": "Voici ce qui mijote chez PizzaDAO cette semaine.",
+    "missionHeading": "Ta prochaine mission",
+    "missionBody": "Niveau {level} : {title}",
+    "missionCta": "Ouvrir les missions",
+    "levelProgress": "Il te reste {remaining, plural, one {# mission} other {# missions}} avant le niveau {nextLevel}.",
+    "levelProgressTitled": "Il te reste {remaining, plural, one {# mission} other {# missions}} avant le niveau {nextLevel}, {levelTitle}.",
+    "allCaught": "Tu as terminé toutes les missions disponibles pour l'instant. Bravo.",
+    "callsHeading": "Les appels de tes crews dans les 7 prochains jours",
+    "callLine": "{crew} : {when}",
+    "openApp": "Ouvrir PizzaDAO",
+    "footerWhy": "Tu reçois cette note hebdomadaire parce que tu es membre de PizzaDAO et que nous avons ton e-mail.",
+    "unsubscribe": "Se désabonner",
+    "manage": "Réglages e-mail",
+    "unsub": {
+      "title": "Se désabonner des e-mails PizzaDAO",
+      "body": "Arrêter le résumé hebdomadaire PizzaDAO pour ce membre ?",
+      "button": "Se désabonner",
+      "doneTitle": "Tu es désabonné",
+      "doneBody": "Tu ne recevras plus le résumé hebdomadaire. Tu peux le réactiver dans les réglages de ton profil.",
+      "invalid": "Ce lien de désabonnement n'est pas valide. Ouvre les réglages de ton profil pour changer tes préférences e-mail.",
+      "home": "Retour à PizzaDAO"
+    },
+    "prefs": {
+      "sectionTitle": "E-mail",
+      "description": "Une courte note hebdomadaire avec ta prochaine mission, les appels de tes crews et ta progression de niveau.",
+      "label": "M'envoyer l'e-mail hebdomadaire PizzaDAO",
+      "saveError": "Impossible d'enregistrer ta préférence e-mail. Réessayer ?",
+      "saved": "Enregistré"
+    }
   }
 }
