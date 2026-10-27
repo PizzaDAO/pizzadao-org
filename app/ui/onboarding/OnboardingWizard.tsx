@@ -450,6 +450,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         ...p,
         suggestions: result.suggestions,
         origins: result.origins,
+        sigs: result.sigs,
         resolvedMovieTitle: result.resolvedMovieTitle,
         tmdbMovieId: result.tmdbMovieId,
         releaseDate: result.releaseDate,
@@ -681,6 +682,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         filmTitle={claimFilm?.title ?? (filmTitle || undefined)}
         tmdbMovieId={data.tmdbMovieId}
         origin={data.mafiaOrigin}
+        originSig={data.mafiaSig}
         candidates={data.seenNames.slice(-60)}
         turtles={data.turtles}
         crews={data.crews}
@@ -857,6 +859,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                   ...p,
                   mafiaName: name,
                   mafiaOrigin: origin && film ? { ...origin, film } : undefined,
+                  mafiaSig: origin && film ? p.sigs?.[name] : undefined,
                   seenNames: mergeSeen(p.seenNames, [name]),
                 };
               });
@@ -867,7 +870,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 flow.isUpdate ? data.existingData?.mafiaName : data.discordNick,
               );
               if (!nameToKeep) return;
-              setData((p) => ({ ...p, mafiaName: nameToKeep, mafiaOrigin: undefined }));
+              setData((p) => ({ ...p, mafiaName: nameToKeep, mafiaOrigin: undefined, mafiaSig: undefined }));
               goToStep(2);
             }}
             onBack={() => {
@@ -887,7 +890,9 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 ...p,
                 suggestions: undefined,
                 origins: undefined,
+                sigs: undefined,
                 mafiaOrigin: undefined,
+                mafiaSig: undefined,
                 resolvedMovieTitle: undefined,
                 tmdbMovieId: undefined,
                 releaseDate: undefined,

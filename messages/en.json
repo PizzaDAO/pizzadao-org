@@ -1014,8 +1014,9 @@
     "record": "PizzaDAO · Family Record",
     "madeStatus": "Status · Made",
     "filed": "Filed in the family record · {date}",
-    "ctaHeading": "Join the family",
+    "ctaHeading": "Your name is waiting",
     "ctaBody": "Pick your topping, pick your film, get your own mafia name.",
-    "ctaButton": "Join the family"
+    "ctaButton": "Join the family",
+    "ogTagline": "Officially made."
   }
 }

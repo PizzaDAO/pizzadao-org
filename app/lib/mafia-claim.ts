@@ -2,6 +2,7 @@
 // Public view of a claimed mafia name (plans/mafia-name-port.md, Phase 2).
 // Only what /made/[id] may show: never discordId, never the real name.
 import { randomBytes } from "crypto";
+import { cache } from "react";
 import { prisma } from "@/app/lib/db";
 import { NAME_ORIGIN_KINDS, type NameOriginWithFilm } from "@/app/lib/name-origin";
 
@@ -34,12 +35,14 @@ function readOrigin(raw: unknown): NameOriginWithFilm | null {
   return { kind: o.kind as NameOriginWithFilm["kind"], person: o.person, film: o.film };
 }
 
-export async function getPublicClaim(id: string): Promise<PublicClaim | null> {
+/** Deduped per request: the page and generateMetadata both call it. */
+export const getPublicClaim = cache(async (id: string): Promise<PublicClaim | null> => {
   if (!isClaimId(id)) return null;
   const row = await prisma.mafiaNameClaim.findUnique({
     where: { id },
     select: {
       id: true,
+      public: true,
       name: true,
       topping: true,
       filmTitle: true,
@@ -48,7 +51,8 @@ export async function getPublicClaim(id: string): Promise<PublicClaim | null> {
       portrait: { select: { url: true } },
     },
   });
-  if (!row) return null;
+  // Names that were typed, kept or taken from Discord are never published.
+  if (!row || !row.public) return null;
   return {
     id: row.id,
     name: row.name,
@@ -58,4 +62,4 @@ export async function getPublicClaim(id: string): Promise<PublicClaim | null> {
     portraitUrl: row.portrait?.url ?? null,
     createdAt: row.createdAt,
   };
-}
+});

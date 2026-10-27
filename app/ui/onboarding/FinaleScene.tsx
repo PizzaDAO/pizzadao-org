@@ -96,6 +96,8 @@ type Props = {
   filmTitle?: string;
   tmdbMovieId?: string;
   origin?: NameOriginWithFilm;
+  /** namegen's signature for the picked suggestion; absent for typed/kept names. */
+  originSig?: string;
   candidates?: string[];
   turtles?: string[];
   crews?: string[];
@@ -110,6 +112,7 @@ export function FinaleScene({
   filmTitle,
   tmdbMovieId,
   origin,
+  originSig,
   candidates,
   turtles,
   crews,
@@ -202,16 +205,15 @@ export function FinaleScene({
   }, [drawPortrait]);
 
   // --- Claim ----------------------------------------------------------------
-  // Record the claimed name (idempotent per member + name) on mount and again
-  // when a portrait lands or is redrawn. The id it returns is the public
-  // /made/[id] page that Share on X points at.
+  // Record the claimed name (idempotent per member + name) on mount, without
+  // waiting for the portrait, and again when a portrait lands or is redrawn.
+  // For a suggested name the response is the public /made/[id] page that Share
+  // on X points at; typed or kept names are stored but get no public page.
   const [claimId, setClaimId] = useState<string | null>(null);
-  const claimRef = useRef({ mafiaName, topping, filmId, filmTitle, tmdbMovieId, origin, candidates });
-  claimRef.current = { mafiaName, topping, filmId, filmTitle, tmdbMovieId, origin, candidates };
+  const claimRef = useRef({ mafiaName, topping, filmId, filmTitle, tmdbMovieId, origin, originSig, candidates });
+  claimRef.current = { mafiaName, topping, filmId, filmTitle, tmdbMovieId, origin, originSig, candidates };
   useEffect(() => {
-    if (portrait.loading) return; // wait for the draw so a portrait is linked on the first write
     const c = claimRef.current;
-    let cancelled = false;
     fetch("/api/mafia-name/claim", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -222,19 +224,18 @@ export function FinaleScene({
         filmTitle: c.filmTitle,
         tmdbMovieId: c.tmdbMovieId,
         origin: c.origin,
+        originSig: c.originSig,
         candidates: c.candidates,
         portraitUrl: portrait.url ?? undefined,
       }),
     })
       .then((res) => (res.ok ? res.json() : null))
-      .then((data: { id?: string } | null) => {
-        if (!cancelled && typeof data?.id === "string") setClaimId(data.id);
+      .then((data: { id?: string; public?: boolean } | null) => {
+        // Only unmount cancels: a response for an older portrait still carries the same id.
+        if (mountedRef.current && data?.public === true && typeof data.id === "string") setClaimId(data.id);
       })
       .catch(() => {});
-    return () => {
-      cancelled = true;
-    };
-  }, [portrait.loading, portrait.url]);
+  }, [portrait.url]);
 
   const showToast = (msg: string) => {
     setShareToast(msg);

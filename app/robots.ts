@@ -17,6 +17,7 @@ export default function robots(): MetadataRoute.Robots {
           "/articles/new",
           "/articles/*/edit",
           "/vote/",
+          "/made/",
         ],
       },
     ],

@@ -95,7 +95,7 @@
       "orGenerateName": "Ou créez un nom inspiré de la pizza",
       "originCharacter": "De {person} · {film}",
       "originActor": "De {person} · {film}",
-      "originDirector": "Réalisation de {person} · {film}",
+      "originDirector": "Réalisé par {person} · {film}",
       "originIconic": "De la famille {person} · {film}"
     },
     "city": {
@@ -1012,10 +1012,11 @@
     "metaDescription": "{name} vient de rejoindre PizzaDAO.",
     "portraitAlt": "Portrait dessiné de {name}",
     "record": "PizzaDAO · Registre familial",
-    "madeStatus": "Statut · Membre",
+    "madeStatus": "Statut · Initié",
     "filed": "Classé dans le registre familial · {date}",
-    "ctaHeading": "Rejoignez la famille",
+    "ctaHeading": "Votre nom vous attend",
     "ctaBody": "Choisissez votre garniture, choisissez votre film, obtenez votre propre nom de mafia.",
-    "ctaButton": "Rejoindre la famille"
+    "ctaButton": "Rejoindre la famille",
+    "ogTagline": "Officiellement dans la famille."
   }
 }

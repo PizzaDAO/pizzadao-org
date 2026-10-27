@@ -6,8 +6,10 @@
 // portrait file itself as their share image; see the page metadata.)
 //
 // Text is Latin-only in the renderer's bundled font: names outside it fall back
-// to the generic glyph boxes, which is acceptable for a share card.
+// to the generic glyph boxes, which is acceptable for a share card. The card is
+// a share asset, not a page: it is marked noindex.
 import { ImageResponse } from "next/og";
+import { getTranslations } from "next-intl/server";
 import { getPublicClaim } from "@/app/lib/mafia-claim";
 import { toppingImageFor } from "@/app/lib/topping-images";
 
@@ -18,6 +20,7 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
   const claim = await getPublicClaim(id);
   if (!claim) return new Response("Not found", { status: 404 });
 
+  const t = await getTranslations("made");
   const toppingPath = claim.topping ? toppingImageFor(claim.topping) : undefined;
   const toppingUrl = toppingPath ? new URL(toppingPath, req.url).toString() : undefined;
   const size = claim.name.length > 28 ? 64 : 84;
@@ -59,13 +62,13 @@ export async function GET(req: Request, { params }: { params: Promise<{ id: stri
         </div>
         <div style={{ display: "flex", flexDirection: "column", marginLeft: 56, flex: 1 }}>
           <div style={{ display: "flex", fontSize: 28, letterSpacing: 4, color: "#b3321e", textTransform: "uppercase" }}>
-            PizzaDAO · Family Record
+            {t("record")}
           </div>
           <div style={{ display: "flex", fontSize: size, fontWeight: 900, lineHeight: 1, marginTop: 20 }}>{claim.name}</div>
-          <div style={{ display: "flex", fontSize: 32, marginTop: 28, color: "#6b5545" }}>Officially made.</div>
+          <div style={{ display: "flex", fontSize: 32, marginTop: 28, color: "#6b5545" }}>{t("ogTagline")}</div>
         </div>
       </div>
     ),
-    { width: 1200, height: 630 },
+    { width: 1200, height: 630, headers: { "X-Robots-Tag": "noindex" } },
   );
 }

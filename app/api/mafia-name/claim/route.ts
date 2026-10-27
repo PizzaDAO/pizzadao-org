@@ -2,8 +2,12 @@
 // Records a member's claimed mafia name (plans/mafia-name-port.md, Phase 2) and
 // returns the public id behind /made/[id].
 //
-// POST { name, topping?, filmId?, filmTitle?, tmdbMovieId?, origin?, candidates?, portraitUrl? }
-//   200 { id } | 400 invalid | 401 no session | 429 too many claims
+// POST { name, topping?, filmId?, filmTitle?, tmdbMovieId?, origin?, originSig?, candidates?, portraitUrl? }
+//   200 { id, public } | 400 invalid | 401 no session | 413 too large | 429 limited
+//
+// Every name gets a claim row, but only a name /api/namegen actually offered
+// (originSig verifies) is `public`, i.e. gets a /made/[id] page. Typed, kept or
+// Discord-nick names are stored privately, with no origin.
 //
 // Idempotent per member + name: the finale calls it on mount and again when the
 // portrait (or a redraw) is ready, which only updates the same row.
@@ -14,6 +18,8 @@ import { prisma } from "@/app/lib/db";
 import { getSession } from "@/app/lib/session";
 import { sanitizeDisplayName } from "@/app/lib/display-name";
 import { recordActivationLater } from "@/app/lib/activation";
+import { enforceRateLimit } from "@/app/lib/rate-limit";
+import { verifyNameOrigin } from "@/app/lib/name-origin-sig";
 import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { NAME_ORIGIN_KINDS } from "@/app/lib/name-origin";
 import { newClaimId } from "@/app/lib/mafia-claim";
@@ -36,16 +42,28 @@ const bodySchema = z.object({
       film: z.string().trim().min(1).max(120),
     })
     .optional(),
+  originSig: z.string().max(100).optional(),
   candidates: z.array(z.string().trim().min(1).max(80)).max(60).optional(),
   portraitUrl: z.string().max(500).optional(),
 });
 
+const MAX_BODY_BYTES = 16 * 1024;
+
 export async function POST(req: Request) {
+  const limited = await enforceRateLimit(req, "mafia-name-claim");
+  if (limited) return limited;
+
   const session = await getSession();
   if (!session?.discordId) return NextResponse.json({ error: "Not signed in" }, { status: 401 });
   const discordId = session.discordId;
 
-  const parsed = bodySchema.safeParse(await req.json().catch(() => null));
+  const text = await req.text().catch(() => "");
+  if (text.length > MAX_BODY_BYTES) return NextResponse.json({ error: "Too large" }, { status: 413 });
+  let json: unknown = null;
+  try {
+    json = JSON.parse(text);
+  } catch {}
+  const parsed = bodySchema.safeParse(json);
   if (!parsed.success) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   const body = parsed.data;
   const name = sanitizeDisplayName(body.name);
@@ -54,12 +72,18 @@ export async function POST(req: Request) {
   const film = body.filmId ? MAFIA_FILMS.find((f) => f.id === body.filmId) : undefined;
   const filmTitle = film?.title ?? body.filmTitle ?? "";
 
+  // The signature covers name + origin as namegen issued them (film = its
+  // resolved title). Verify first, then prefer the catalog's own title.
+  const verified = Boolean(body.origin && verifyNameOrigin(name, body.origin, body.originSig));
+  const origin = verified && body.origin ? { ...body.origin, film: film?.title ?? body.origin.film } : null;
+
   // Only link a portrait that /api/mafia-portrait issued (the url is the key; a
   // cache hit hands the same url to a member with identical inputs).
   let portraitId: string | undefined;
   if (body.portraitUrl) {
     const portrait = await prisma.mafiaPortrait.findFirst({
-      where: { url: body.portraitUrl },
+      // Only a portrait this member drew (or a legacy row with no owner).
+      where: { url: body.portraitUrl, OR: [{ discordId }, { discordId: null }] },
       select: { id: true },
     });
     portraitId = portrait?.id;
@@ -70,7 +94,8 @@ export async function POST(req: Request) {
     filmId: film?.id ?? null,
     filmTitle,
     tmdbMovieId: body.tmdbMovieId ?? null,
-    origin: body.origin ?? Prisma.DbNull,
+    origin: origin ?? Prisma.DbNull,
+    public: verified,
     candidates: body.candidates ?? [],
     ...(portraitId ? { portraitId } : {}),
   };
@@ -97,5 +122,5 @@ export async function POST(req: Request) {
   }
 
   recordActivationLater("name_claimed", { discordId, code: "ok" });
-  return NextResponse.json({ id: existing.id });
+  return NextResponse.json({ id: existing.id, public: verified });
 }

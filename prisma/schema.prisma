@@ -1381,6 +1381,7 @@ model MafiaNameClaim {
   tmdbMovieId String?  @db.VarChar(20)
   candidates  Json                        // names shown to the member, incl. rerolls
   source      String   @default("join") @db.VarChar(16)
+  public      Boolean  @default(false)    // true only for a name namegen offered (signed); gates /made/[id]
   portraitId  String?
   portrait    MafiaPortrait? @relation(fields: [portraitId], references: [id], onDelete: SetNull)
   createdAt   DateTime @default(now())

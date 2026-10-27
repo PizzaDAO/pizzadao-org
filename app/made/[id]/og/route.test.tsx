@@ -4,6 +4,7 @@ const getPublicClaim = vi.fn();
 const imageResponse = vi.fn();
 
 vi.mock("@/app/lib/mafia-claim", () => ({ getPublicClaim: (...a: unknown[]) => getPublicClaim(...a) }));
+vi.mock("next-intl/server", () => ({ getTranslations: async () => (key: string) => `t:${key}` }));
 vi.mock("next/og", () => ({
   ImageResponse: class {
     constructor(...args: unknown[]) {
@@ -34,9 +35,11 @@ describe("GET /made/[id]/og", () => {
     const res = await call("abcdefghij");
     expect(res.headers.get("content-type")).toBe("image/png");
     const [jsx, opts] = imageResponse.mock.calls[0];
-    expect(opts).toMatchObject({ width: 1200, height: 630 });
+    expect(opts).toMatchObject({ width: 1200, height: 630, headers: { "X-Robots-Tag": "noindex" } });
     const json = JSON.stringify(jsx);
     expect(json).toContain("Pepperoni Corleone");
     expect(json).toContain("https://app.example/toppings/pepperoni.jpg");
+    expect(json).toContain("t:record");
+    expect(json).toContain("t:ogTagline");
   });
 });

@@ -20,10 +20,16 @@ vi.mock("@/app/lib/db", () => ({
     mafiaPortrait: { findFirst: (...a: unknown[]) => findFirst(...a) },
   },
 }));
+vi.mock("@/app/lib/rate-limit", () => ({ enforceRateLimit: async () => null }));
 vi.mock("@/app/lib/activation", () => ({ recordActivationLater: (...a: unknown[]) => recordLater(...a) }));
 
 import { Prisma } from "@prisma/client";
 import { POST } from "./route";
+import { signNameOrigin } from "@/app/lib/name-origin-sig";
+
+process.env.SESSION_SECRET = "test-secret";
+const ORIGIN = { kind: "character" as const, person: "Vito Corleone", film: "The Godfather" };
+const sig = (name = "Pepperoni Corleone") => signNameOrigin(name, ORIGIN)!;
 
 const body = (o: Record<string, unknown> = {}) =>
   new Request("http://x/api/mafia-name/claim", {
@@ -33,7 +39,8 @@ const body = (o: Record<string, unknown> = {}) =>
       topping: "Pepperoni",
       filmId: "godfather",
       tmdbMovieId: "238",
-      origin: { kind: "character", person: "Vito Corleone", film: "The Godfather" },
+      origin: ORIGIN,
+      originSig: sig(),
       candidates: ["Pepperoni Corleone", "Francis Pepperoni"],
       ...o,
     }),
@@ -94,7 +101,7 @@ describe("POST /api/mafia-name/claim", () => {
     findUnique.mockResolvedValue({ id: "abcdefghij" });
     findFirst.mockResolvedValue({ id: "portrait-2" });
     const res = await POST(body({ portraitUrl: "https://blob/p2.webp" }));
-    expect(await res.json()).toEqual({ id: "abcdefghij" });
+    expect(await res.json()).toEqual({ id: "abcdefghij", public: true });
     expect(create).not.toHaveBeenCalled();
     expect(update).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ portraitId: "portrait-2" }) }));
   });
@@ -109,12 +116,48 @@ describe("POST /api/mafia-name/claim", () => {
     findUnique.mockResolvedValueOnce(null).mockResolvedValueOnce({ id: "winnerid01" });
     create.mockRejectedValue(new Prisma.PrismaClientKnownRequestError("dup", { code: "P2002", clientVersion: "x" }));
     const res = await POST(body());
-    expect(await res.json()).toEqual({ id: "winnerid01" });
+    expect(await res.json()).toEqual({ id: "winnerid01", public: true });
   });
 
   it("429 once a member has too many claims", async () => {
     count.mockResolvedValue(20);
     expect((await POST(body())).status).toBe(429);
     expect(create).not.toHaveBeenCalled();
+  });
+
+  it("marks a signed suggestion public and keeps its origin", async () => {
+    const res = await POST(body());
+    expect(await res.json()).toMatchObject({ public: true });
+    expect(create.mock.calls[0][0].data).toMatchObject({ public: true, origin: ORIGIN });
+  });
+
+  it("stores typed/kept names privately with no origin (no signature)", async () => {
+    const res = await POST(body({ originSig: undefined }));
+    expect(await res.json()).toMatchObject({ public: false });
+    const data = create.mock.calls[0][0].data;
+    expect(data.public).toBe(false);
+    expect(data.origin).toBe(Prisma.DbNull);
+  });
+
+  it("rejects a forged origin or a signature for a different name", async () => {
+    await POST(body({ origin: { ...ORIGIN, person: "Forged Person" } }));
+    await POST(body({ name: "Some Other Name" }));
+    expect(create).toHaveBeenCalledTimes(2);
+    for (const [call] of create.mock.calls) expect(call.data).toMatchObject({ public: false, origin: Prisma.DbNull });
+  });
+
+  it("derives origin.film from the catalog when the film id is known", async () => {
+    const o = { ...ORIGIN, film: "Godfather" };
+    await POST(body({ origin: o, originSig: signNameOrigin("Pepperoni Corleone", o)! }));
+    expect(create.mock.calls[0][0].data.origin.film).toBe("The Godfather");
+  });
+
+  it("only links a portrait owned by the member or by nobody", async () => {
+    await POST(body({ portraitUrl: "https://blob/p.webp" }));
+    expect(findFirst.mock.calls[0][0].where).toEqual({ url: "https://blob/p.webp", OR: [{ discordId: "123" }, { discordId: null }] });
+  });
+
+  it("413 for an oversized body", async () => {
+    expect((await POST(body({ candidates: ["x".repeat(20000)] }))).status).toBe(413);
   });
 });

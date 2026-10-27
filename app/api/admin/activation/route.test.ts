@@ -24,6 +24,9 @@ describe('activation report', () => {
     expect(report.stages.find((s: { event: string }) => s.event === 'first_contribution').count).toBe(1);
     expect(report.failures).toEqual([{ code: 'login_failed:dm_failed', count: 1 }]);
     expect(response.headers.get('cache-control')).toBe('no-store');
+    const where = mocks.findMany.mock.calls[0][0].where;
+    expect(where.event.in).toEqual(expect.arrayContaining(['signup_started', 'login_failed', 'client_error']));
+    expect(where.event.in).not.toContain('topping_picked');
     expect(JSON.stringify(report)).not.toContain('returning');
   });
 });

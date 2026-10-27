@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { enforceRateLimit } from "@/app/lib/rate-limit";
 import { internalError } from "@/app/lib/errors/error-response";
 import type { NameOrigin } from "@/app/lib/name-origin";
+import { signNameOrigin } from "@/app/lib/name-origin-sig";
 
 export const runtime = "nodejs";
 
@@ -496,6 +497,13 @@ export async function POST(req: Request) {
     const origins: Record<string, NameOrigin> = {};
     for (const { name, origin } of [...pool, ...picked]) origins[name] ??= origin;
 
+    // Proof each name + origin came from here (checked by the claim route).
+    const sigs: Record<string, string> = {};
+    for (const [name, origin] of Object.entries(origins)) {
+      const sig = signNameOrigin(name, { ...origin, film: resolvedTitle });
+      if (sig) sigs[name] = sig;
+    }
+
     if (suggestions.length < 3) {
       // Fallback: if we can't get 3 unique names, use what we have
       // This should be rare but prevents the "Could not generate" error
@@ -520,6 +528,7 @@ export async function POST(req: Request) {
       suggestions,
       candidatePool: allNames,
       origins,
+      sigs,
     };
 
     return new NextResponse(JSON.stringify(payload), {

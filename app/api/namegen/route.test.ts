@@ -7,6 +7,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 vi.mock("@/app/lib/rate-limit", () => ({ enforceRateLimit: async () => null }));
 
 import { POST } from "./route";
+import { verifyNameOrigin } from "@/app/lib/name-origin-sig";
 
 type Fx = { search: unknown; credits: unknown };
 
@@ -85,6 +86,7 @@ const cases: [string, Fx, Record<string, unknown>][] = [
 describe("POST /api/namegen", () => {
   beforeEach(() => {
     process.env.TMDB_API_KEY = "test";
+    process.env.SESSION_SECRET = "test-secret";
   });
   afterEach(() => vi.unstubAllGlobals());
 
@@ -130,5 +132,17 @@ describe("POST /api/namegen", () => {
     const again = await call(GODFATHER, { topping: "pepperoni", movieTitle: "godfather", force: true, exclude: first.json.suggestions });
     for (const n of again.json.suggestions) expect(again.json.origins[n]).toEqual(first.json.origins[n] ?? again.json.origins[n]);
     expect(again.json.suggestions.some((n: string) => first.json.suggestions.includes(n))).toBe(false);
+  });
+
+  it("signs every offered name with its origin and the resolved film", async () => {
+    const { json } = await call(GODFATHER, { topping: "pepperoni", movieTitle: "godfather" });
+    for (const n of [...json.suggestions, ...json.candidatePool]) {
+      expect(verifyNameOrigin(n, { ...json.origins[n], film: "The Godfather" }, json.sigs[n]), n).toBe(true);
+    }
+    // A forged origin, name or film does not verify.
+    const n = json.suggestions[0];
+    expect(verifyNameOrigin(n, { kind: "actor", person: "Someone Else", film: "The Godfather" }, json.sigs[n])).toBe(false);
+    expect(verifyNameOrigin("Forged Name", { ...json.origins[n], film: "The Godfather" }, json.sigs[n])).toBe(false);
+    expect(verifyNameOrigin(n, { ...json.origins[n], film: "Other" }, json.sigs[n])).toBe(false);
   });
 });

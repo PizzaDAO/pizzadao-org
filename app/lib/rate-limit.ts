@@ -50,6 +50,7 @@ export const RATE_LIMITS = {
   "disavow-vote": { limit: 60, windowSec: 10 * 60 },
   "disavow-detail": { limit: 60, windowSec: 60 },
   "disavow-check": { limit: 120, windowSec: 60 },
+  "mafia-name-claim": { limit: 30, windowSec: 10 * 60 },
   // AI finale portrait (plans/mafia-name-port.md). The global cap is overridden
   // from MAFIA_PORTRAIT_DAILY_CAP in the route and is checked fail-closed.
   "mafia-portrait-member": { limit: 5, windowSec: 24 * 60 * 60 },
