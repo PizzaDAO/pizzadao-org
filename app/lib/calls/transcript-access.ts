@@ -10,9 +10,8 @@ export const CALL_TRANSCRIPT_MIN_LEVEL = 6
 
 export async function canViewCallTranscript(discordId: string): Promise<boolean> {
   if (!discordId) return false
-  const [level, dpr] = await Promise.all([
-    getCurrentLevel(discordId).then((l) => (typeof l === 'number' ? l : 0)).catch(() => 0),
-    canReviewMission(discordId, DPR_ONLY_MIN_LEVEL).catch(() => false),
-  ])
-  return dpr || level >= CALL_TRANSCRIPT_MIN_LEVEL
+  // Level first: only fall back to the (slower) Discord role lookup below it.
+  const level = await getCurrentLevel(discordId).catch(() => 0)
+  if (level >= CALL_TRANSCRIPT_MIN_LEVEL) return true
+  return canReviewMission(discordId, DPR_ONLY_MIN_LEVEL).catch(() => false)
 }

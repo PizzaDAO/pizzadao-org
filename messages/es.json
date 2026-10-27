@@ -745,7 +745,7 @@
       "chapters": "Capítulos",
       "transcript": "Transcripción",
       "transcriptNote": "Transcrita automáticamente y revisada por PizzaDAO. Puede contener errores.",
-      "transcriptRestricted": "La transcripción completa está disponible para los miembros de nivel 6 o superior.",
+      "transcriptRestricted": "La transcripción completa está disponible para los miembros de nivel {level} o superior.",
       "chatLine": "Escrito en el chat de la llamada",
       "unknownSpeaker": "Orador"
     },

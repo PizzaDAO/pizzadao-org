@@ -12,7 +12,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { asSegments, getPublishedRecording } from "@/app/lib/calls/recordings";
-import { canViewCallTranscript } from "@/app/lib/calls/transcript-access";
+import { CALL_TRANSCRIPT_MIN_LEVEL, canViewCallTranscript } from "@/app/lib/calls/transcript-access";
 import { getSession } from "@/app/lib/session";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
@@ -93,7 +93,7 @@ export default async function PublishedCallPage({ params }: Params) {
                 <section className="grid gap-3">
                     <h2 className="font-display text-xl font-black m-0">{t("transcript")}</h2>
                     {!showTranscript ? (
-                        <p className="m-0 text-sm text-foreground/60">{t("transcriptRestricted")}</p>
+                        <p className="m-0 text-sm text-foreground/60">{t("transcriptRestricted", { level: CALL_TRANSCRIPT_MIN_LEVEL })}</p>
                     ) : (<>
                     <p className="m-0 text-sm text-foreground/60">{t("transcriptNote")}</p>
                     <ol className="m-0 p-0 list-none grid gap-3">
