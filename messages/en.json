@@ -654,7 +654,8 @@
       "cta": "Get a box",
       "notNow": "Not now",
       "ariaLabel": "Box Mafia suggestion"
-    }
+    },
+    "howToAttend": "How to attend a call"
   },
   "missionLinks": {
     "boxHint": "This mission needs a Rare Pizza Box NFT in a wallet connected to your profile.",
@@ -701,7 +702,8 @@
     "dayThursday": "Thursday",
     "dayFriday": "Friday",
     "daySaturday": "Saturday",
-    "daySunday": "Sunday"
+    "daySunday": "Sunday",
+    "howToAttend": "How to attend a call"
   },
   "callsPage": {
     "overline": "The Call Log",
@@ -879,6 +881,17 @@
     "sentBack": "Sent back: {note}"
   },
   "adminCalls": {
+    "agendaTitle": "Next call agendas",
+    "agendaDescription": "What Metalhead would post in each crew channel about 30 minutes before the next calls (next 48 hours). Preview only.",
+    "agendaOn": "Posting is ON (CALL_AGENDA_POST_ENABLED).",
+    "agendaOff": "Posting is OFF. Set CALL_AGENDA_POST_ENABLED=true to enable.",
+    "agendaNone": "No crew calls scheduled in the next 48 hours.",
+    "agendaError": "Could not load scheduled events.",
+    "agendaPosted": "Already posted",
+    "agendaPending": "Not posted yet",
+    "agendaNoItems": "Nothing urgent, so nothing would be posted.",
+    "agendaChannel": "Channel: {channel}",
+    "agendaNoChannel": "no channel in the crew sheet",
     "overline": "Call recordings",
     "title": "Recorded calls",
     "description": "Crew calls captured by the PizzaDAO bot. Audio is private to reviewers.",
@@ -1029,6 +1042,71 @@
     "intro": "Pick a topping, pick a film, get a name. No login needed.",
     "footnote": "Free and no account needed. Your portrait is drawn by AI and a few are drawn per day.",
     "ogAlt": "Get your mafia name from PizzaDAO"
+  },
+  "poapClaims": {
+    "overline": "§ POAPs",
+    "title": "Claim your POAPs",
+    "intro": "Show up to a crew call, then come back here and claim your POAP. It is not automatic.",
+    "cardAria": "POAPs to claim",
+    "cardTitle": "{count, plural, one {You have # POAP to claim} other {You have # POAPs to claim}}",
+    "cardBody": "You showed up. Claim your proof of attendance.",
+    "cardCta": "Claim now",
+    "listAria": "Your POAP claims",
+    "loginPrompt": "Log in to claim the POAPs you earned on calls.",
+    "login": "Log in",
+    "empty": "No calls on record yet. Join a crew call and your POAP will show up here.",
+    "howTo": "How to attend a call",
+    "claim": "Claim POAP",
+    "claiming": "Claiming…",
+    "openLink": "Open mint link",
+    "unavailable": "No POAP for this call",
+    "claimError": "Could not claim. Try again.",
+    "noneLeft": "All POAPs for this call have been claimed.",
+    "loadError": "Could not load your POAPs."
+  },
+  "howToAttend": {
+    "metaTitle": "How to attend a call",
+    "metaDescription": "Join a PizzaDAO crew call in Discord, what to expect, and your next mission.",
+    "overline": "§ The Call Guide",
+    "titlePrefix": "How to",
+    "titleAccent": "attend a call",
+    "dek": "Crew calls are open to every member. Here is how to join one.",
+    "pages": "Related pages",
+    "crews": "Crews",
+    "callLog": "Call history",
+    "step": "Step {n}",
+    "steps": {
+      "find": {
+        "title": "Pick a call",
+        "body": "Every crew meets weekly. Find your crew's time in the schedule below, or on the Crews page, and put it in your calendar."
+      },
+      "discord": {
+        "title": "Open PizzaDAO Discord",
+        "body": "Calls happen in the PizzaDAO Discord server. Make sure you have joined and verified."
+      },
+      "voice": {
+        "title": "Join the voice channel",
+        "body": "A few minutes before start time, open the crew's voice channel (look under Voice Channels) and click it to join. You can listen quietly or speak up."
+      },
+      "stay": {
+        "title": "Say hi and stay to the end",
+        "body": "Introduce yourself in the call chat. Attendance is taken from who is in the channel, and that is how you earn your POAP."
+      }
+    },
+    "openDiscord": "Open Discord",
+    "scheduleTitle": "Weekly schedule",
+    "recordedTitle": "Calls are recorded and transcribed",
+    "recordedBody": "Calls are recorded and transcribed so members who miss them can catch up. By joining the voice channel you agree to this.",
+    "poapTitle": "Claim your POAP",
+    "poapBody": "After you attend, visit the POAPs page and claim your proof of attendance.",
+    "poapCta": "My POAPs",
+    "nextTitle": "Your next mission",
+    "nextAnon": "Log in to see the mission you should do next.",
+    "login": "Log in",
+    "nextLevel": "Level {level}",
+    "nextCta": "Start this mission",
+    "nextNone": "You have finished every mission available to you. Nice work.",
+    "nextCtaAll": "See all missions"
   },
   "reengage": {
     "subjectMission": "Your next mission: {title}",

@@ -654,7 +654,8 @@
       "cta": "Obtenir une boîte",
       "notNow": "Pas maintenant",
       "ariaLabel": "Suggestion Box Mafia"
-    }
+    },
+    "howToAttend": "Comment participer à un appel"
   },
   "missionLinks": {
     "boxHint": "Cette mission nécessite une Rare Pizza Box NFT dans un wallet connecté à ton profil.",
@@ -701,7 +702,8 @@
     "dayThursday": "Jeudi",
     "dayFriday": "Vendredi",
     "daySaturday": "Samedi",
-    "daySunday": "Dimanche"
+    "daySunday": "Dimanche",
+    "howToAttend": "Comment participer à un appel"
   },
   "callsPage": {
     "overline": "Journal des appels",
@@ -879,6 +881,17 @@
     "sentBack": "Renvoyée : {note}"
   },
   "adminCalls": {
+    "agendaTitle": "Ordres du jour des prochains appels",
+    "agendaDescription": "Ce que Metalhead publierait dans le canal de chaque crew environ 30 minutes avant les prochains appels (48 prochaines heures). Aperçu seulement.",
+    "agendaOn": "La publication est ACTIVÉE (CALL_AGENDA_POST_ENABLED).",
+    "agendaOff": "La publication est DÉSACTIVÉE. Définissez CALL_AGENDA_POST_ENABLED=true pour l'activer.",
+    "agendaNone": "Aucun appel de crew prévu dans les 48 prochaines heures.",
+    "agendaError": "Impossible de charger les événements programmés.",
+    "agendaPosted": "Déjà publié",
+    "agendaPending": "Pas encore publié",
+    "agendaNoItems": "Rien d'urgent, donc rien ne serait publié.",
+    "agendaChannel": "Canal : {channel}",
+    "agendaNoChannel": "aucun canal dans la feuille du crew",
     "overline": "Enregistrements d'appels",
     "title": "Appels enregistrés",
     "description": "Appels de crew capturés par le bot PizzaDAO. L'audio est privé pour les relecteurs.",
@@ -1029,6 +1042,71 @@
     "intro": "Choisissez une garniture, choisissez un film, obtenez un nom. Sans compte.",
     "footnote": "Gratuit et sans compte. Le portrait est dessiné par une IA et il y en a peu par jour.",
     "ogAlt": "Obtenez votre nom de mafia PizzaDAO"
+  },
+  "poapClaims": {
+    "overline": "§ POAPs",
+    "title": "Réclamez vos POAPs",
+    "intro": "Participez à un appel de crew, puis revenez ici réclamer votre POAP. Ce n'est pas automatique.",
+    "cardAria": "POAPs à réclamer",
+    "cardTitle": "{count, plural, one {Vous avez # POAP à réclamer} other {Vous avez # POAPs à réclamer}}",
+    "cardBody": "Vous étiez là. Réclamez votre preuve de présence.",
+    "cardCta": "Réclamer",
+    "listAria": "Vos POAPs à réclamer",
+    "loginPrompt": "Connectez-vous pour réclamer les POAPs gagnés pendant les appels.",
+    "login": "Se connecter",
+    "empty": "Aucun appel enregistré pour l'instant. Rejoignez un appel de crew et votre POAP apparaîtra ici.",
+    "howTo": "Comment participer à un appel",
+    "claim": "Réclamer le POAP",
+    "claiming": "Réclamation…",
+    "openLink": "Ouvrir le lien de mint",
+    "unavailable": "Pas de POAP pour cet appel",
+    "claimError": "Impossible de réclamer. Réessayez.",
+    "noneLeft": "Tous les POAPs de cet appel ont été réclamés.",
+    "loadError": "Impossible de charger vos POAPs."
+  },
+  "howToAttend": {
+    "metaTitle": "Comment participer à un appel",
+    "metaDescription": "Rejoignez un appel de crew PizzaDAO sur Discord, à quoi s'attendre et votre prochaine mission.",
+    "overline": "§ Le guide des appels",
+    "titlePrefix": "Comment",
+    "titleAccent": "participer à un appel",
+    "dek": "Les appels de crew sont ouverts à tous les membres. Voici comment en rejoindre un.",
+    "pages": "Pages liées",
+    "crews": "Crews",
+    "callLog": "Historique des appels",
+    "step": "Étape {n}",
+    "steps": {
+      "find": {
+        "title": "Choisissez un appel",
+        "body": "Chaque crew se réunit chaque semaine. Trouvez l'horaire de votre crew ci-dessous ou sur la page Crews et ajoutez-le à votre agenda."
+      },
+      "discord": {
+        "title": "Ouvrez le Discord PizzaDAO",
+        "body": "Les appels ont lieu sur le serveur Discord de PizzaDAO. Assurez-vous de l'avoir rejoint et d'être vérifié."
+      },
+      "voice": {
+        "title": "Rejoignez le salon vocal",
+        "body": "Quelques minutes avant l'heure, ouvrez le salon vocal du crew (sous Salons vocaux) et cliquez pour rejoindre. Vous pouvez écouter en silence ou prendre la parole."
+      },
+      "stay": {
+        "title": "Dites bonjour et restez jusqu'à la fin",
+        "body": "Présentez-vous dans le chat de l'appel. La présence est relevée selon qui est dans le salon, et c'est ainsi que vous gagnez votre POAP."
+      }
+    },
+    "openDiscord": "Ouvrir Discord",
+    "scheduleTitle": "Horaires hebdomadaires",
+    "recordedTitle": "Les appels sont enregistrés et transcrits",
+    "recordedBody": "Les appels sont enregistrés et transcrits pour que ceux qui les manquent puissent se rattraper. En rejoignant le salon vocal, vous l'acceptez.",
+    "poapTitle": "Réclamez votre POAP",
+    "poapBody": "Après avoir participé, rendez-vous sur la page POAPs pour réclamer votre preuve de présence.",
+    "poapCta": "Mes POAPs",
+    "nextTitle": "Votre prochaine mission",
+    "nextAnon": "Connectez-vous pour voir la mission à faire ensuite.",
+    "login": "Se connecter",
+    "nextLevel": "Niveau {level}",
+    "nextCta": "Commencer cette mission",
+    "nextNone": "Vous avez terminé toutes les missions disponibles. Bravo.",
+    "nextCtaAll": "Voir toutes les missions"
   },
   "reengage": {
     "subjectMission": "Ta prochaine mission : {title}",

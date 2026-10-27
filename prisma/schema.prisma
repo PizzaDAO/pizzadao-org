@@ -756,6 +756,22 @@ model Vouch {
 
 // ===== CREW CALL ATTENDANCE =====
 
+// POAP mint-link pool. An admin pastes mint links per call (crewId + UTC day);
+// a member who attended claims one. Unique (crewId, callDay, claimedBy) keeps it
+// to one claim per member per call (NULLs are distinct, so unclaimed rows coexist).
+model PoapMintLink {
+  id        Int       @id @default(autoincrement())
+  crewId    String    // Crew slug or "community_call" (matches CallAttendance.crewId)
+  callDay   DateTime  @db.Date // UTC calendar day of the call
+  link      String    @unique
+  claimedBy String?   // Discord ID of the member who claimed it
+  claimedAt DateTime?
+  createdAt DateTime  @default(now())
+
+  @@unique([crewId, callDay, claimedBy])
+  @@index([claimedBy])
+}
+
 // Individual attendance records — one per person per call
 model CallAttendance {
   id          Int      @id @default(autoincrement())
@@ -1429,4 +1445,19 @@ model EmailConfirmSend {
   @@index([memberId, createdAt])
   @@index([emailHash, createdAt])
   @@index([ipHash, createdAt])
+}
+
+// One pre-call agenda post per Discord scheduled-event occurrence (idempotency record for
+// /api/cron/call-agenda). Claimed before posting; released again if the post fails.
+model CallAgendaPost {
+  id        String   @id @default(cuid())
+  eventId   String // Discord scheduled event id
+  startsAt  DateTime // the occurrence start
+  crewId    String
+  channelId String
+  messageId String?
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, startsAt])
+  @@index([crewId, startsAt])
 }
