@@ -5,7 +5,7 @@
 enable transfers. The server holds only `MINTER_ROLE` (mint only). `DEFAULT_ADMIN_ROLE` is a separate address
 you pass at deploy time (hardware wallet or a Safe) and it can rotate minters, change URIs and toggle transfers.
 
-- `mintMany(to[], ids[], claimKeys[])` is idempotent: used claim keys and existing holders are skipped, never reverted.
+- `mintMany(to[], ids[], claimKeys[])` is idempotent: used claim keys and existing holders are skipped, never reverted. It does not call the ERC-1155 receiver hook, so a contract recipient can never revert a batch. `setApprovalForAll` reverts while non-transferable.
 - Name `Call Slices`, symbol `SLICE`, `uri(id) = <base>/<id>`, `contractURI()` for OpenSea.
 
 ## Layout and dependencies
@@ -16,7 +16,7 @@ clone with no network. To bump OpenZeppelin: `npm pack @openzeppelin/contracts@<
 
 ```bash
 cd contracts
-forge test            # 26 tests incl. fuzz
+forge test            # 27 tests incl. fuzz
 forge test --gas-report
 ```
 
@@ -26,7 +26,7 @@ Gas for `mintMany` (first mint of an id, new holders): about 120k for 1, 625k fo
 
 Never paste a private key into chat or a file. Everything below runs on your machine.
 
-1. **Admin address.** Decide which address gets `DEFAULT_ADMIN_ROLE` (hardware wallet or a Safe on Base).
+1. **Admin address.** `DEFAULT_ADMIN_ROLE` **must be a Safe or Snax's hardware wallet**, never a hot key or an app/server wallet: it can grant minters, set URIs and enable transfers.
    Only the public address is needed: `ADMIN_ADDRESS=0x...`.
 2. **Create the minter wallet.** The key goes straight into the keychain, never to the screen:
    ```bash
@@ -47,7 +47,7 @@ Never paste a private key into chat or a file. Everything below runs on your mac
    forge script script/Deploy.s.sol --rpc-url $BASE_RPC_URL --broadcast --ledger   # real deploy (or --account <keystore>)
    ```
    Optional overrides: `SLICES_BASE_URI`, `SLICES_CONTRACT_URI` (default to `https://app.pizzadao.org/api/slices/...`).
-   Test first on Base Sepolia (`--rpc-url https://sepolia.base.org`, separate minter key, `SLICES_CHAIN_ID=84532` in Preview).
+   Test first on Base Sepolia locally (`--rpc-url https://sepolia.base.org`, separate minter key, `SLICES_CHAIN_ID=84532`, `SLICES_ALLOW_NON_PROD=true`, a throwaway local DB). Never use a Vercel preview: previews share the production DB, and minting refuses to run unless `VERCEL_ENV=production`.
 5. **Verify on Basescan** (Etherscan v2 API key):
    ```bash
    forge verify-contract <CONTRACT_ADDRESS> src/CallSlices.sol:CallSlices --chain base \

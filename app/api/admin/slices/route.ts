@@ -29,7 +29,7 @@ export async function GET() {
     }
   }
 
-  const [grouped, failed, stuck, calls, arts] = await Promise.all([
+  const [grouped, failed, stuck, calls, arts, failing] = await Promise.all([
     prisma.attendanceNftClaim.groupBy({ by: ["status"], _count: { _all: true } }),
     prisma.attendanceNftClaim.findMany({
       where: { status: "FAILED" },
@@ -48,6 +48,13 @@ export async function GET() {
       select: { id: true, crewId: true, crewLabel: true, callDay: true, imageUrl: true, _count: { select: { claims: true } } },
     }),
     prisma.sliceCrewArt.findMany(),
+    // Still queued but the last send attempt errored: shows why a row is not moving.
+    prisma.attendanceNftClaim.findMany({
+      where: { status: "QUEUED", lastError: { not: null } },
+      orderBy: { updatedAt: "desc" },
+      take: 50,
+      select: { id: true, discordId: true, callId: true, attempts: true, lastError: true },
+    }),
   ]);
 
   let crews: { id: string; label: string }[] = [{ id: "community_call", label: "Community Call" }];
@@ -70,6 +77,7 @@ export async function GET() {
     daily: { used: await mintedLast24h().catch(() => 0), cap: dailyCap() },
     counts: Object.fromEntries(grouped.map((g) => [g.status, g._count._all])),
     failed,
+    failing,
     stuck,
     calls: calls.map((c) => ({ id: c.id, crewId: c.crewId, crewLabel: c.crewLabel, callDay: dayKey(c.callDay), imageUrl: c.imageUrl, claims: c._count.claims })),
     crews: crews.map((c) => ({ ...c, artUrl: artBy.get(c.id) ?? null })),

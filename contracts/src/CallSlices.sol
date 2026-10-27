@@ -61,7 +61,14 @@ contract CallSlices is ERC1155, ERC1155Burnable, ERC1155Supply, AccessControl {
             bytes32 key = claimKeys[i];
             if (claimUsed[key] || to[i] == address(0) || balanceOf(to[i], ids[i]) > 0) continue;
             claimUsed[key] = true;
-            _mint(to[i], ids[i], 1, "");
+            // _update directly (not _mint): no ERC1155Receiver acceptance callback. Slices are
+            // soulbound, and one contract recipient without onERC1155Received (or with a
+            // reverting one) must never be able to revert the whole batch.
+            uint256[] memory idArr = new uint256[](1);
+            uint256[] memory valArr = new uint256[](1);
+            idArr[0] = ids[i];
+            valArr[0] = 1;
+            _update(address(0), to[i], idArr, valArr);
             emit SliceMinted(to[i], ids[i], key);
             minted++;
         }
@@ -72,7 +79,6 @@ contract CallSlices is ERC1155, ERC1155Burnable, ERC1155Supply, AccessControl {
     /// @notice Set the base URI. uri(id) = base + decimal id. Can later point at IPFS.
     function setURI(string calldata newBase) external onlyRole(DEFAULT_ADMIN_ROLE) {
         _baseTokenURI = newBase;
-        emit URI(newBase, 0);
     }
 
     function setContractURI(string calldata newURI) external onlyRole(DEFAULT_ADMIN_ROLE) {
@@ -95,9 +101,11 @@ contract CallSlices is ERC1155, ERC1155Burnable, ERC1155Supply, AccessControl {
         return _contractURI;
     }
 
-    /// @notice ERC-5192-style lock flag so wallets can show the slice as soulbound.
-    function locked(uint256) external view returns (bool) {
-        return !transferable;
+    /// @dev While slices are non-transferable, approvals are pointless and misleading
+    ///      (marketplaces/phishing sites ask for them), so they are refused.
+    function setApprovalForAll(address operator, bool approved) public override {
+        if (!transferable) revert NonTransferable();
+        super.setApprovalForAll(operator, approved);
     }
 
     // ----------------------------------------------------------------- internals
@@ -112,6 +120,6 @@ contract CallSlices is ERC1155, ERC1155Burnable, ERC1155Supply, AccessControl {
     }
 
     function supportsInterface(bytes4 interfaceId) public view override(ERC1155, AccessControl) returns (bool) {
-        return interfaceId == 0xb45a3c0e /* IERC5192 */ || super.supportsInterface(interfaceId);
+        return super.supportsInterface(interfaceId);
     }
 }

@@ -138,7 +138,7 @@ Gas prices sampled live 2026-10-27 with `cast gas-price` (ETH $2,344, POL $0.092
 
 At 50-300 claims/week, every L2 is effectively free (a 0.02 ETH float, about $47, lasts more than a year on Base). So the choice is about ecosystem: **Base**. Backfill of all historical attendance (likely a few thousand rows) costs single-digit dollars.
 
-Testnet: **Base Sepolia** (84532) for local and Vercel Preview, with a separate contract and a separate testnet minter key.
+Testnet: **Base Sepolia** (84532) for LOCAL QA only (never Vercel Preview: previews share the prod DB), with a separate contract and a separate testnet minter key.
 
 ### 6. Minter key custody, rate limits, spend cap
 
@@ -151,7 +151,7 @@ Testnet: **Base Sepolia** (84532) for local and Vercel Preview, with a separate 
   - `STAMPS_MINTING_ENABLED` (kill switch, default off)
   - `STAMPS_DAILY_MINT_CAP` (default 1000)
   - `STAMPS_MIN_BALANCE_WEI` (alert threshold)
-  - Preview gets its own `STAMPS_MINTER_PRIVATE_KEY` for Sepolia (Preview scope).
+  - Do NOT set the minter key in Preview scope: previews share the prod DB and the code refuses to mint off production.
 - Never log the key. Load it only in `app/lib/stamps/minter.ts` (server-only import guard `import "server-only"`).
 - Alternatives:
   - **Coinbase CDP Server Wallet (v2)**: the key lives in Coinbase's TEE, with an API call to send txs, nonce management, and optional gas sponsorship on Base. This is the best upgrade path if Snax doesn't want a raw key in Vercel. It costs an API key + secret instead (same custody class, smaller blast radius), and adds a vendor dependency. Suggested as Phase 4 or as the v1 choice if Snax prefers (D3).
@@ -249,7 +249,7 @@ Token ids must be stable once minted. Never delete `AttendanceNftCall` rows. Pro
 2. `contracts/` Foundry project: `src/PizzaStamps.sol`, `test/PizzaStamps.t.sol`, `script/Deploy.s.sol` (constructor args: admin, minter, baseURI, contractURI, transferable), `foundry.toml`, `README.md` (deploy and verify steps). Exclude it in `tsconfig.json`/`eslint.config.mjs`/`vitest.config.ts`.
 3. Deploy to **Base Sepolia** with a throwaway deployer, then `forge verify-contract` (Basescan/Etherscan v2 API key).
 
-**Phase 1: backend on Sepolia (Preview)**
+**Phase 1: backend on Sepolia (local DB, not Preview)**
 4. Prisma migration + schema (models above, seed `MintLease` id=1).
 5. `app/lib/stamps/{config,minter,mint-queue,claims,art}.ts`
 6. Routes: `api/stamps`, `api/stamps/claim`, `api/stamps/metadata/[id]`, `api/stamps/contract-metadata`, `api/cron/stamps`, `api/admin/stamps` (+ art upload, retry, re-render)
@@ -295,8 +295,8 @@ Token ids must be stable once minted. Never delete `AttendanceNftCall` rows. Pro
 
 - `forge test -vv` + `forge snapshot` (gas for `mintMany` 1/10/50) in `contracts/`.
 - `npm run lint`, `npx tsc --noEmit`, `npx vitest run app/lib/stamps app/api/stamps app/api/cron` (+ existing activation, dashboard, and i18n tests).
-- **Vercel Preview (Base Sepolia):** run `vercel-deploy` (preview) with Preview env vars set to the Sepolia contract and key and `STAMPS_MINTING_ENABLED=true`. Then:
-  1. Sign in as a test member who has a `CallAttendance` row in the preview DB (seed one with a script if needed).
+- **Local / forked DB on Base Sepolia (NEVER a Vercel preview):** Vercel previews share the production database and the code refuses to mint unless `VERCEL_ENV=production`. For testnet QA run `npm run dev` locally against a throwaway/forked Postgres (not the prod `DATABASE_URL`), with `SLICES_ENABLED=true`, `SLICES_ALLOW_NON_PROD=true`, `SLICES_CHAIN_ID=84532`, a Sepolia contract, a separate Sepolia minter key and a Sepolia RPC in `BASE_RPC_URL`. Claims are stamped with their chain id and queue/lease/daily-cap queries are per chain, so even a stray testnet claim cannot be picked up by the mainnet minter. Then:
+  1. Sign in as a test member who has a `CallAttendance` row in that local DB (seed one with a script if needed).
   2. `/stamps` shows "Claim". Click it. The item goes through "Baking…" to "Minted" within about 10 s, and the Sepolia Basescan link shows the `StampMinted` event.
   3. Double-click and parallel claims (two tabs) produce one DB row and one token. `balanceOf` = 1.
   4. "Claim all" with 5+ calls produces one tx containing all ids.
@@ -332,3 +332,4 @@ Token ids must be stable once minted. Never delete `AttendanceNftCall` rows. Pro
 - Migration `20261030000000_call_slices` is additive. `PoapMintLink` is left in place (unused, harmless).
 - Contract, tests and the exact launch runbook (minter wallet, funding, deploy, verify, env, sheet row): `contracts/README.md`.
 - Env var names: `SLICES_ENABLED`, `SLICES_CONTRACT_ADDRESS`, `SLICES_MINTER_PRIVATE_KEY`, `BASE_RPC_URL`, `SLICES_CHAIN_ID`, `SLICES_DAILY_CAP`, `SLICES_MAX_GAS_GWEI`, `SLICES_MIN_BALANCE_ETH` (documented in `.env.example`).
+- Review fixes: minting requires `VERCEL_ENV=production` (or local `SLICES_ALLOW_NON_PROD=true`); claims carry a chain id and the lease row is per chain; `mintMany` skips the ERC-1155 receiver callback; failed batches bisect; stuck txs are replaced at the same nonce.

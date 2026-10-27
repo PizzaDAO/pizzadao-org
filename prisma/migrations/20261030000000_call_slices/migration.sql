@@ -43,8 +43,8 @@ CREATE TABLE IF NOT EXISTS "SliceCrewArt" (
 CREATE TABLE IF NOT EXISTS "SliceMintLease" (
   "id" INTEGER NOT NULL,
   "holder" TEXT,
-  "leaseUntil" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
-  "lastAlertAt" TIMESTAMP(3),
+  "leaseUntil" TIMESTAMPTZ(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  "lastAlertAt" TIMESTAMPTZ(3),
   CONSTRAINT "SliceMintLease_pkey" PRIMARY KEY ("id")
 );
-INSERT INTO "SliceMintLease" ("id") VALUES (1) ON CONFLICT ("id") DO NOTHING;
+-- Lease rows are created on demand, one per chain id (8453 / 84532).

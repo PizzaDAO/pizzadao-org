@@ -19,7 +19,7 @@ import { processMintQueueSafe } from "@/app/lib/slices/mint-queue";
 function releaseSliceClaims(discordId: string) {
   after(async () => {
     try {
-      if ((await promoteAwaitingWallet(discordId)) > 0) await processMintQueueSafe();
+      if ((await promoteAwaitingWallet(discordId)) > 0) await processMintQueueSafe(20_000);
     } catch (e) {
       console.error("[slices] wallet promote failed:", e instanceof Error ? e.message : e);
     }

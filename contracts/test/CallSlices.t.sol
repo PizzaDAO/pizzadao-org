@@ -5,6 +5,14 @@ import {Test} from "forge-std/Test.sol";
 import {CallSlices} from "../src/CallSlices.sol";
 import {IAccessControl} from "@openzeppelin/contracts/access/IAccessControl.sol";
 
+contract NonReceiver {}
+
+contract RevertingReceiver {
+    function onERC1155Received(address, address, uint256, uint256, bytes calldata) external pure returns (bytes4) {
+        revert("nope");
+    }
+}
+
 contract CallSlicesTest is Test {
     CallSlices slices;
     address admin = makeAddr("admin");
@@ -193,17 +201,38 @@ contract CallSlicesTest is Test {
         slices.setContractURI("evil");
     }
 
-    function test_locked_followsToggle() public {
-        assertTrue(slices.locked(1));
+    function test_setApprovalForAll_revertsWhileNonTransferable() public {
+        vm.prank(alice);
+        vm.expectRevert(CallSlices.NonTransferable.selector);
+        slices.setApprovalForAll(bob, true);
         vm.prank(admin);
         slices.setTransferable(true);
-        assertFalse(slices.locked(1));
+        vm.prank(alice);
+        slices.setApprovalForAll(bob, true);
+        assertTrue(slices.isApprovedForAll(alice, bob));
+    }
+
+    function test_mint_toNonReceiverContract_doesNotRevertBatch() public {
+        NonReceiver bad = new NonReceiver();
+        RevertingReceiver bad2 = new RevertingReceiver();
+        address[] memory a = new address[](4);
+        uint256[] memory i = new uint256[](4);
+        bytes32[] memory k = new bytes32[](4);
+        (a[0], i[0], k[0]) = (alice, 1, keccak256("g1"));
+        (a[1], i[1], k[1]) = (address(bad), 1, keccak256("bad1"));
+        (a[2], i[2], k[2]) = (address(bad2), 1, keccak256("bad2"));
+        (a[3], i[3], k[3]) = (bob, 1, keccak256("g2"));
+        vm.prank(minter);
+        assertEq(slices.mintMany(a, i, k), 4);
+        assertEq(slices.balanceOf(address(bad), 1), 1);
+        assertEq(slices.balanceOf(address(bad2), 1), 1);
+        assertEq(slices.balanceOf(alice, 1), 1);
+        assertEq(slices.balanceOf(bob, 1), 1);
     }
 
     function test_supportsInterface() public view {
         assertTrue(slices.supportsInterface(0xd9b67a26)); // ERC1155
         assertTrue(slices.supportsInterface(0x7965db0b)); // AccessControl
-        assertTrue(slices.supportsInterface(0xb45a3c0e)); // ERC5192
         assertTrue(slices.supportsInterface(0x01ffc9a7)); // ERC165
     }
 

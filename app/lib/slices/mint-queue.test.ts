@@ -1,7 +1,7 @@
 // @vitest-environment node
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
-type Row = { id: string; status: string; recipient: string | null; callId: number; attempts: number; claimedAt: Date; txHash: string | null; submittedAt: Date | null; mintedAt: Date | null; lastError: string | null };
+type Row = { chainId: number | null; id: string; status: string; recipient: string | null; callId: number; attempts: number; claimedAt: Date; txHash: string | null; submittedAt: Date | null; mintedAt: Date | null; lastError: string | null };
 let rows: Row[] = [];
 let leaseFree = true;
 
@@ -49,11 +49,12 @@ vi.mock("@/app/lib/db", () => ({
 
 const minter = vi.hoisted(() => ({
   getMinterBalance: vi.fn(),
-  getMaxFeePerGas: vi.fn(),
+  getFeeQuote: vi.fn(),
   sendMintMany: vi.fn(),
   waitForReceipt: vi.fn(),
-  getReceiptState: vi.fn(),
+  getReceiptInfo: vi.fn(),
   isClaimUsed: vi.fn(),
+  replaceStuckTx: vi.fn(),
 }));
 vi.mock("./minter", () => ({
   ...minter,
@@ -67,7 +68,7 @@ import { processMintQueue } from "./mint-queue";
 
 const ADDR = "0x" + "ab".repeat(20);
 const mk = (id: string, over: Partial<Row> = {}): Row => ({
-  id, status: "QUEUED", recipient: ADDR, callId: 1, attempts: 0, claimedAt: new Date(Date.now() - 1000), txHash: null, submittedAt: null, mintedAt: null, lastError: null, ...over,
+  chainId: 8453, id, status: "QUEUED", recipient: ADDR, callId: 1, attempts: 0, claimedAt: new Date(Date.now() - 1000), txHash: null, submittedAt: null, mintedAt: null, lastError: null, ...over,
 });
 
 const saved = { ...process.env };
@@ -75,13 +76,14 @@ beforeEach(() => {
   vi.clearAllMocks();
   rows = [];
   leaseFree = true;
-  Object.assign(process.env, { SLICES_ENABLED: "true", SLICES_CONTRACT_ADDRESS: ADDR, SLICES_MINTER_PRIVATE_KEY: "k", BASE_RPC_URL: "https://rpc" });
+  Object.assign(process.env, { VERCEL_ENV: "production", SLICES_ENABLED: "true", SLICES_CONTRACT_ADDRESS: ADDR, SLICES_MINTER_PRIVATE_KEY: "k", BASE_RPC_URL: "https://rpc" });
   delete process.env.SLICES_DAILY_CAP;
   minter.getMinterBalance.mockResolvedValue(BigInt("20000000000000000"));
-  minter.getMaxFeePerGas.mockResolvedValue(BigInt(6_000_000)); // 0.006 gwei
+  minter.getFeeQuote.mockResolvedValue({ baseFee: BigInt(6_000_000), priority: BigInt(1_000_000) }); // 0.006 gwei base
   minter.sendMintMany.mockResolvedValue("0xhash");
   minter.waitForReceipt.mockResolvedValue({ state: "success" });
-  minter.getReceiptState.mockResolvedValue("pending");
+  minter.getReceiptInfo.mockResolvedValue({ state: "pending" });
+  minter.replaceStuckTx.mockResolvedValue(null);
   minter.isClaimUsed.mockResolvedValue(false);
 });
 afterEach(() => { process.env = { ...saved }; });
@@ -93,6 +95,72 @@ describe("processMintQueue", () => {
     expect(await processMintQueue()).toEqual({ status: "skipped", reason: "disabled" });
     expect(minter.sendMintMany).not.toHaveBeenCalled();
     expect(rows[0].status).toBe("QUEUED");
+  });
+
+  it("refuses to mint outside a production deploy (previews share the prod DB)", async () => {
+    process.env.VERCEL_ENV = "preview";
+    rows = [mk("a")];
+    expect(await processMintQueue()).toEqual({ status: "skipped", reason: "not_production" });
+    expect(minter.sendMintMany).not.toHaveBeenCalled();
+    process.env.SLICES_ALLOW_NON_PROD = "true"; // local dev override
+    expect(await processMintQueue()).toMatchObject({ status: "ran" });
+  });
+
+  it("only touches claims stamped with its own chain", async () => {
+    rows = [mk("a", { chainId: 84532 }), mk("b", { chainId: null }), mk("c")];
+    const res = await processMintQueue();
+    expect(res).toMatchObject({ status: "ran", submitted: 1 });
+    expect(rows.map((r) => r.status)).toEqual(["QUEUED", "QUEUED", "MINTED"]);
+  });
+
+  it("uses 2x base fee + tip as maxFee, capped by the gwei ceiling", async () => {
+    rows = [mk("a")];
+    await processMintQueue();
+    expect(minter.sendMintMany.mock.calls[0][1]).toEqual({ maxFee: BigInt(13_000_000), priority: BigInt(1_000_000) });
+  });
+
+  it("only marks rows with a SliceMinted event as MINTED; others are SKIPPED_ALREADY_HELD", async () => {
+    minter.waitForReceipt.mockResolvedValue({ state: "success", mintedKeys: new Set(["0xkey-a"]) });
+    rows = [mk("a"), mk("b")];
+    await processMintQueue();
+    expect(rows.map((r) => r.status)).toEqual(["MINTED", "SKIPPED_ALREADY_HELD"]);
+    expect(rows[1].lastError).toMatch(/already held/);
+  });
+
+  it("bisects a batch the node rejects so only the bad row is FAILED", async () => {
+    minter.sendMintMany.mockImplementation(async (b: { key: string }[]) => {
+      if (b.some((x) => x.key === "0xkey-bad")) throw new Error("execution reverted: boom");
+      return "0xhash";
+    });
+    rows = [mk("a"), mk("bad"), mk("c"), mk("d")];
+    await processMintQueue();
+    expect(rows.map((r) => [r.id, r.status])).toEqual([["a", "MINTED"], ["bad", "FAILED"], ["c", "MINTED"], ["d", "MINTED"]]);
+    expect(rows[1].lastError).toMatch(/reverted/);
+  });
+
+  it("does not bisect on transient errors", async () => {
+    minter.sendMintMany.mockRejectedValue(new Error("fetch failed"));
+    rows = [mk("a"), mk("b")];
+    await processMintQueue();
+    expect(minter.sendMintMany).toHaveBeenCalledTimes(1);
+    expect(rows.map((r) => r.status)).toEqual(["QUEUED", "QUEUED"]);
+  });
+
+  it("keeps the tx hash even when the SUBMITTED write fails once", async () => {
+    const { prisma } = await import("@/app/lib/db");
+    const um = vi.mocked(prisma.attendanceNftClaim.updateMany);
+    const orig = um.getMockImplementation()!;
+    let failed = false;
+    um.mockImplementation((async (a: { data: { status?: string } }) => {
+      if (!failed && a.data.status === "SUBMITTED") { failed = true; throw new Error("db blip"); }
+      return orig(a as never);
+    }) as never);
+    const spy = vi.spyOn(console, "error").mockImplementation(() => {});
+    rows = [mk("a")];
+    await processMintQueue();
+    spy.mockRestore();
+    um.mockImplementation(orig);
+    expect(rows[0].txHash).toBe("0xhash");
   });
 
   it("skips when env is incomplete", async () => {
@@ -150,7 +218,7 @@ describe("processMintQueue", () => {
   });
 
   it("skips while gas is above the ceiling", async () => {
-    minter.getMaxFeePerGas.mockResolvedValue(BigInt(2_000_000_000)); // 2 gwei
+    minter.getFeeQuote.mockResolvedValue({ baseFee: BigInt(2_000_000_000), priority: BigInt(1_000_000) }); // 2 gwei
     rows = [mk("a")];
     expect(await processMintQueue()).toMatchObject({ status: "skipped", reason: "gas_too_high" });
     expect(minter.sendMintMany).not.toHaveBeenCalled();
@@ -180,14 +248,14 @@ describe("processMintQueue", () => {
   describe("reconcile", () => {
     const old = new Date(Date.now() - 20 * 60_000);
     it("confirms a successful receipt", async () => {
-      minter.getReceiptState.mockResolvedValue("success");
+      minter.getReceiptInfo.mockResolvedValue({ state: "success" });
       rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: new Date() })];
       await processMintQueue();
       expect(rows[0].status).toBe("MINTED");
     });
 
     it("a reverted tx whose claim key is used on-chain is MINTED", async () => {
-      minter.getReceiptState.mockResolvedValue("reverted");
+      minter.getReceiptInfo.mockResolvedValue({ state: "reverted" });
       minter.isClaimUsed.mockResolvedValue(true);
       rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: new Date() })];
       await processMintQueue();
@@ -195,7 +263,7 @@ describe("processMintQueue", () => {
     });
 
     it("a reverted tx with an unused key is requeued", async () => {
-      minter.getReceiptState.mockResolvedValue("reverted");
+      minter.getReceiptInfo.mockResolvedValue({ state: "reverted" });
       rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: new Date(), attempts: 1 })];
       await processMintQueue();
       // requeued during reconcile, then sent again in the same run
@@ -207,6 +275,28 @@ describe("processMintQueue", () => {
       rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: old })];
       await processMintQueue();
       expect(rows[0].status).toBe("MINTED");
+    });
+
+    it("replaces a stuck pending tx at the same nonce instead of requeueing it", async () => {
+      minter.replaceStuckTx.mockResolvedValue("0xnew");
+      rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: old, attempts: 1 })];
+      await processMintQueue();
+      expect(rows[0]).toMatchObject({ status: "SUBMITTED", txHash: "0xnew", attempts: 1 });
+      expect(minter.sendMintMany).not.toHaveBeenCalled();
+    });
+
+    it("a dropped tx that is requeued does not burn an attempt", async () => {
+      process.env.SLICES_DAILY_CAP = "0.4"; // floor 0 -> daily_cap blocks the resend so we see the requeued row
+      rows = [mk("a", { status: "SUBMITTED", txHash: "0xt", submittedAt: old, attempts: 2 })];
+      await processMintQueue();
+      expect(rows[0]).toMatchObject({ status: "QUEUED", attempts: 1, txHash: null });
+    });
+
+    it("reconciles at most 25 rows per run", async () => {
+      minter.getReceiptInfo.mockResolvedValue({ state: "success" });
+      rows = Array.from({ length: 30 }, (_, i) => mk(`s${i}`, { status: "SUBMITTED", txHash: `0xt${i}`, submittedAt: new Date() }));
+      await processMintQueue();
+      expect(rows.filter((r) => r.status === "MINTED")).toHaveLength(25);
     });
 
     it("a young pending tx is left alone", async () => {

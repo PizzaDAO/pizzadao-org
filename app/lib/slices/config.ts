@@ -8,6 +8,8 @@
 //   SLICES_DAILY_CAP          max mints per rolling 24h (default 1000)
 //   SLICES_MAX_GAS_GWEI       skip a run while maxFeePerGas is above this (default 0.5)
 //   SLICES_MIN_BALANCE_ETH    alert + pause below this minter balance (default 0.003)
+//   SLICES_ALLOW_NON_PROD     "true" lets a NON-production deploy (local dev only!) mint. Vercel
+//                             previews share the production DB, so they must never mint.
 import { base, baseSepolia } from "viem/chains";
 
 export const SLICES_BATCH_SIZE = 50;
@@ -46,15 +48,27 @@ export function minBalanceWei(env: NodeJS.ProcessEnv = process.env): bigint {
   return BigInt(Math.round(posNumber(env.SLICES_MIN_BALANCE_ETH, 0.003) * 1e9)) * BigInt(1_000_000_000);
 }
 
-export type SlicesStatus = { ok: true } | { ok: false; reason: "disabled" | "misconfigured" };
+export type SlicesStatus = { ok: true } | { ok: false; reason: "disabled" | "misconfigured" | "not_production" };
 
 /** Whether the minter can run at all (kill switch + required env present). */
 export function slicesReady(env: NodeJS.ProcessEnv = process.env): SlicesStatus {
   if (!slicesEnabled(env)) return { ok: false, reason: "disabled" };
+  // Previews share the production database: a preview minting would drain the real queue.
+  if (env.VERCEL_ENV !== "production" && env.SLICES_ALLOW_NON_PROD?.trim() !== "true") {
+    return { ok: false, reason: "not_production" };
+  }
   if (!contractAddress(env) || !env.SLICES_MINTER_PRIVATE_KEY?.trim() || !env.BASE_RPC_URL?.trim()) {
     return { ok: false, reason: "misconfigured" };
   }
   return { ok: true };
+}
+
+/** Fee plan: 2x base fee + tip, never above the gwei ceiling. null when even base + tip exceeds it. */
+export function planFees(baseFee: bigint, priority: bigint, ceilingGwei: number): { maxFee: bigint; priority: bigint } | null {
+  const ceiling = BigInt(Math.floor(ceilingGwei * 1e9));
+  if (baseFee + priority > ceiling) return null;
+  const want = baseFee * BigInt(2) + priority;
+  return { maxFee: want > ceiling ? ceiling : want, priority };
 }
 
 export const txUrl = (hash: string, env: NodeJS.ProcessEnv = process.env) => `${explorerBase(env)}/tx/${hash}`;

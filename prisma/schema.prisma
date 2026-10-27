@@ -819,12 +819,12 @@ model SliceCrewArt {
   updatedAt DateTime @updatedAt
 }
 
-// Single-row lease so only one serverless invocation sends transactions at a time (no nonce clashes).
+// One lease row PER CHAIN (id = chain id) so only one serverless invocation sends transactions at a time (no nonce clashes).
 model SliceMintLease {
   id          Int       @id
   holder      String?
-  leaseUntil  DateTime  @default(now())
-  lastAlertAt DateTime?
+  leaseUntil  DateTime  @default(now()) @db.Timestamptz(3)
+  lastAlertAt DateTime? @db.Timestamptz(3)
 }
 
 // Individual attendance records — one per person per call

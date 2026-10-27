@@ -58,7 +58,9 @@ export async function ensureCallImage(callId: number, force = false): Promise<st
   if (call.imageUrl && !force) return call.imageUrl;
   const art = await prisma.sliceCrewArt.findUnique({ where: { crewId: call.crewId } });
   const png = await renderSliceImage({ id: call.id, crewLabel: call.crewLabel, day: dayKey(call.callDay), templateUrl: art?.imageUrl ?? null });
-  const blob = await put(`slices/${call.id}-${Date.now()}.png`, Buffer.from(png), { access: "public", addRandomSuffix: false, contentType: "image/png" });
+  // Deterministic path + overwrite: concurrent renders of the same call converge on one blob URL
+  // instead of leaving orphans. Short CDN cache so a "re-render" shows up quickly.
+  const blob = await put(`slices/${call.id}.png`, Buffer.from(png), { access: "public", addRandomSuffix: false, allowOverwrite: true, cacheControlMaxAge: 300, contentType: "image/png" });
   await prisma.attendanceNftCall.update({ where: { id: call.id }, data: { imageUrl: blob.url } });
   return blob.url;
 }

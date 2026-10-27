@@ -50,7 +50,7 @@ describe("claimSlices", () => {
   it("queues the claim for a member with a wallet", async () => {
     const res = await claimSlices("d1", [{ crewId: "ops", callDay: "2026-10-27" }]);
     expect(res).toMatchObject({ ok: true, claimed: 1, already: 0, hasWallet: true });
-    expect(db.attendanceNftClaim.create).toHaveBeenCalledWith({ data: { discordId: "d1", memberId: "m1", callId: 7, status: "QUEUED", recipient: WALLET } });
+    expect(db.attendanceNftClaim.create).toHaveBeenCalledWith({ data: { discordId: "d1", memberId: "m1", callId: 7, status: "QUEUED", recipient: WALLET, chainId: 8453 } });
   });
 
   it("claims without a wallet as AWAITING_WALLET", async () => {

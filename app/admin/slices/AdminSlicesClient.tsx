@@ -4,11 +4,12 @@ import { useCallback, useEffect, useState } from "react";
 
 type Status = {
   enabled: boolean;
-  ready: "ok" | "disabled" | "misconfigured";
+  ready: "ok" | "disabled" | "misconfigured" | "not_production";
   contract: { address: string; url: string } | null;
   minter: { address: string; balanceEth: string; low: boolean } | null;
   daily: { used: number; cap: number };
   counts: Record<string, number>;
+  failing: { id: string; discordId: string; callId: number; attempts: number; lastError: string | null }[];
   failed: { id: string; discordId: string; callId: number; attempts: number; lastError: string | null }[];
   stuck: { id: string; callId: number; txHash: string | null; submittedAt: string | null }[];
   calls: { id: number; crewId: string; crewLabel: string; callDay: string; imageUrl: string | null; claims: number }[];
@@ -64,6 +65,7 @@ export default function AdminSlicesClient() {
         <p className="m-0">
           Kill switch: <strong>{s.enabled ? "ON (minting)" : "OFF (claims queue, nothing mints)"}</strong>
           {s.ready === "misconfigured" && " - env incomplete (contract / minter key / RPC)"}
+          {s.ready === "not_production" && " - this is not a production deploy; minting is refused here"}
         </p>
         {s.contract && <p className="m-0 text-sm">Contract: <a className="underline" href={s.contract.url} target="_blank" rel="noopener noreferrer">{s.contract.address}</a></p>}
         {s.minter && (
@@ -82,7 +84,7 @@ export default function AdminSlicesClient() {
         </div>
       </section>
 
-      {(s.failed.length > 0 || s.stuck.length > 0) && (
+      {(s.failed.length > 0 || s.failing.length > 0 || s.stuck.length > 0) && (
         <section className="grid gap-2">
           <h2 className="text-xl font-black m-0">Needs attention</h2>
           {s.failed.map((f) => (
@@ -90,6 +92,9 @@ export default function AdminSlicesClient() {
               <span>Failed: call #{f.callId}, member {f.discordId}, {f.attempts} attempts. {f.lastError ?? ""}</span>
               <button type="button" className={btn} onClick={() => act({ action: "retry", claimId: f.id }, "Retry")}>Retry</button>
             </div>
+          ))}
+          {s.failing.map((f) => (
+            <div key={f.id} className="border-t border-foreground/10 pt-2 text-sm">Retrying: call #{f.callId}, member {f.discordId}, attempt {f.attempts}. Last error: {f.lastError}</div>
           ))}
           {s.stuck.map((x) => (
             <div key={x.id} className="border-t border-foreground/10 pt-2 text-sm">Stuck over 10 min: call #{x.callId} {x.txHash}. The next queue run reconciles it.</div>

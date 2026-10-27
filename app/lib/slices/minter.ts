@@ -1,7 +1,7 @@
 // Server-side viem minter for Call Slices. SERVER ONLY: this is the only module
 // that touches SLICES_MINTER_PRIVATE_KEY. It never logs the key, and errors are
 // scrubbed (scrubError) before they are stored or posted anywhere.
-import { createPublicClient, createWalletClient, http, keccak256, parseAbi, stringToHex, type Hex } from "viem";
+import { createPublicClient, createWalletClient, http, keccak256, parseAbi, parseEventLogs, stringToHex, type Hex } from "viem";
 import { privateKeyToAccount } from "viem/accounts";
 import { contractAddress, sliceChain } from "./config";
 
@@ -60,43 +60,86 @@ export async function getMinterBalance(): Promise<bigint> {
   return publicClient().getBalance({ address: account().address });
 }
 
-/** Current max fee per gas (wei) the network wants. */
-export async function getMaxFeePerGas(): Promise<bigint> {
-  const fees = await publicClient().estimateFeesPerGas();
-  return fees.maxFeePerGas ?? (await publicClient().getGasPrice());
+/** Latest block base fee and the tip we pay (wei). */
+export async function getFeeQuote(): Promise<{ baseFee: bigint; priority: bigint }> {
+  const block = await publicClient().getBlock();
+  return { baseFee: block.baseFeePerGas ?? (await publicClient().getGasPrice()), priority: PRIORITY_FEE };
 }
 
 export async function sendMintMany(
   batch: { to: `0x${string}`; id: number; key: Hex }[],
-  maxFeePerGas: bigint,
+  fees: { maxFee: bigint; priority: bigint },
 ): Promise<Hex> {
-  const acct = account();
-  const chain = sliceChain();
-  const wallet = createWalletClient({ account: acct, chain, transport: http(rpcUrl()) });
+  const wallet = createWalletClient({ account: account(), chain: sliceChain(), transport: http(rpcUrl()) });
   return wallet.writeContract({
     address: contract(),
     abi: CALL_SLICES_ABI,
     functionName: "mintMany",
     args: [batch.map((b) => b.to), batch.map((b) => BigInt(b.id)), batch.map((b) => b.key)],
-    maxFeePerGas,
-    maxPriorityFeePerGas: maxFeePerGas < PRIORITY_FEE ? maxFeePerGas : PRIORITY_FEE,
+    maxFeePerGas: fees.maxFee,
+    maxPriorityFeePerGas: fees.priority < fees.maxFee ? fees.priority : fees.maxFee,
   });
 }
 
-export async function getReceiptState(hash: Hex): Promise<ReceiptState> {
+/**
+ * If `hash` is still pending in the mempool (pending nonce > latest), resend the identical call data
+ * at the SAME nonce with a bumped fee (at least +30%, capped by `ceilingMaxFee`). Returns the new hash,
+ * or null when the tx is not replaceable (unknown/dropped/mined, or the bump would exceed the ceiling).
+ */
+export async function replaceStuckTx(hash: Hex, ceilingMaxFee: bigint): Promise<Hex | null> {
+  const pc = publicClient();
+  const tx = await pc.getTransaction({ hash }).catch(() => null);
+  if (!tx || tx.blockNumber) return null;
+  const [latest, pending] = await Promise.all([
+    pc.getTransactionCount({ address: tx.from, blockTag: "latest" }),
+    pc.getTransactionCount({ address: tx.from, blockTag: "pending" }),
+  ]);
+  if (!(pending > latest) || tx.nonce < latest) return null;
+  const oldMax = tx.maxFeePerGas ?? tx.gasPrice ?? BigInt(0);
+  const bumped = (oldMax * BigInt(130)) / BigInt(100) + BigInt(1);
+  if (bumped > ceilingMaxFee) return null;
+  const oldTip = tx.maxPriorityFeePerGas ?? PRIORITY_FEE;
+  const tip = (oldTip * BigInt(130)) / BigInt(100) + BigInt(1);
+  const wallet = createWalletClient({ account: account(), chain: sliceChain(), transport: http(rpcUrl()) });
+  return wallet.sendTransaction({
+    to: tx.to!,
+    data: tx.input,
+    nonce: tx.nonce,
+    maxFeePerGas: bumped,
+    maxPriorityFeePerGas: tip < bumped ? tip : bumped,
+    gas: tx.gas,
+  });
+}
+
+export type ReceiptInfo = { state: ReceiptState; blockNumber?: bigint; mintedKeys?: Set<string> };
+
+function toInfo(r: { status: string; blockNumber: bigint; logs: readonly { data: Hex; topics: readonly Hex[]; address: string }[] }): ReceiptInfo {
+  const keys = new Set<string>();
+  const target = contractAddress()?.toLowerCase();
+  for (const log of r.logs) {
+    if (log.address.toLowerCase() !== target) continue;
+    try {
+      const ev = parseEventLogs({ abi: CALL_SLICES_ABI, eventName: "SliceMinted", logs: [log as never] });
+      for (const e of ev) keys.add(String((e as { args: { claimKey: string } }).args.claimKey).toLowerCase());
+    } catch {
+      // not a SliceMinted log
+    }
+  }
+  return { state: r.status === "success" ? "success" : "reverted", blockNumber: r.blockNumber, mintedKeys: keys };
+}
+
+export async function getReceiptInfo(hash: Hex): Promise<ReceiptInfo> {
   try {
-    const r = await publicClient().getTransactionReceipt({ hash });
-    return r.status === "success" ? "success" : "reverted";
+    return toInfo(await publicClient().getTransactionReceipt({ hash }));
   } catch {
-    return "pending"; // TransactionReceiptNotFoundError
+    return { state: "pending" }; // TransactionReceiptNotFoundError
   }
 }
 
 /** Wait up to `timeoutMs` for the receipt; "pending" if it did not land in time. */
-export async function waitForReceipt(hash: Hex, timeoutMs = 30_000): Promise<{ state: ReceiptState; blockNumber?: bigint }> {
+export async function waitForReceipt(hash: Hex, timeoutMs = 30_000): Promise<ReceiptInfo> {
   try {
-    const r = await publicClient().waitForTransactionReceipt({ hash, timeout: timeoutMs });
-    return { state: r.status === "success" ? "success" : "reverted", blockNumber: r.blockNumber };
+    return toInfo(await publicClient().waitForTransactionReceipt({ hash, timeout: timeoutMs }));
   } catch {
     return { state: "pending" };
   }

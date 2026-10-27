@@ -6,7 +6,7 @@ import { Prisma } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { getEvmWalletsReadOnly } from "@/app/lib/wallet-lookup";
-import { isEvmAddress, txUrl } from "./config";
+import { isEvmAddress, sliceChain, txUrl } from "./config";
 
 export type SliceStatus = "claimable" | "awaiting_wallet" | "queued" | "minting" | "minted" | "failed";
 
@@ -47,6 +47,7 @@ const STATUS_MAP: Record<string, SliceStatus> = {
   QUEUED: "queued",
   SUBMITTED: "minting",
   MINTED: "minted",
+  SKIPPED_ALREADY_HELD: "minted", // the recipient already held this slice on-chain
   FAILED: "failed",
 };
 
@@ -153,7 +154,7 @@ export async function claimSlices(discordId: string, targets: { crewId: string; 
     if (created || !call.imageUrl) newCallIds.push(call.id);
     try {
       await prisma.attendanceNftClaim.create({
-        data: { discordId, memberId, callId: call.id, status: recipient ? "QUEUED" : "AWAITING_WALLET", recipient },
+        data: { discordId, memberId, callId: call.id, status: recipient ? "QUEUED" : "AWAITING_WALLET", recipient, chainId: sliceChain().id },
       });
       claimed++;
       claimedKeys.push(t);

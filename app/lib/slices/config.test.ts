@@ -1,6 +1,6 @@
 // @vitest-environment node
 import { describe, it, expect } from "vitest";
-import { addressUrl, contractAddress, dailyCap, explorerBase, maxGasGwei, minBalanceWei, sliceChain, slicesEnabled, slicesReady, txUrl } from "./config";
+import { planFees, addressUrl, contractAddress, dailyCap, explorerBase, maxGasGwei, minBalanceWei, sliceChain, slicesEnabled, slicesReady, txUrl } from "./config";
 import { claimKeyFor, scrubError } from "./minter";
 
 const ADDR = "0x" + "ab".repeat(20);
@@ -15,10 +15,14 @@ describe("slices config", () => {
 
   it("slicesReady reports disabled, misconfigured, ok", () => {
     expect(slicesReady(env({}))).toEqual({ ok: false, reason: "disabled" });
-    expect(slicesReady(env({ SLICES_ENABLED: "true" }))).toEqual({ ok: false, reason: "misconfigured" });
-    const full = { SLICES_ENABLED: "true", SLICES_CONTRACT_ADDRESS: ADDR, SLICES_MINTER_PRIVATE_KEY: "k", BASE_RPC_URL: "https://rpc" };
+    expect(slicesReady(env({ SLICES_ENABLED: "true", VERCEL_ENV: "production" }))).toEqual({ ok: false, reason: "misconfigured" });
+    const full = { VERCEL_ENV: "production", SLICES_ENABLED: "true", SLICES_CONTRACT_ADDRESS: ADDR, SLICES_MINTER_PRIVATE_KEY: "k", BASE_RPC_URL: "https://rpc" };
     expect(slicesReady(env(full))).toEqual({ ok: true });
     expect(slicesReady(env({ ...full, SLICES_CONTRACT_ADDRESS: "nope" }))).toEqual({ ok: false, reason: "misconfigured" });
+    // previews and local runs never mint unless explicitly overridden
+    expect(slicesReady(env({ ...full, VERCEL_ENV: "preview" }))).toEqual({ ok: false, reason: "not_production" });
+    expect(slicesReady(env({ ...full, VERCEL_ENV: "" }))).toEqual({ ok: false, reason: "not_production" });
+    expect(slicesReady(env({ ...full, VERCEL_ENV: "preview", SLICES_ALLOW_NON_PROD: "true" }))).toEqual({ ok: true });
   });
 
   it("defaults and overrides for caps", () => {
@@ -54,5 +58,13 @@ describe("claim key and error scrubbing", () => {
     delete process.env.BASE_RPC_URL;
     expect(out).not.toContain(key);
     expect(out).not.toContain("SECRETKEY");
+  });
+});
+
+describe("planFees", () => {
+  it("is 2x base + tip, capped at the ceiling, null when base + tip exceeds it", () => {
+    expect(planFees(BigInt(6_000_000), BigInt(1_000_000), 0.5)).toEqual({ maxFee: BigInt(13_000_000), priority: BigInt(1_000_000) });
+    expect(planFees(BigInt(400_000_000), BigInt(1_000_000), 0.5)?.maxFee).toBe(BigInt(500_000_000));
+    expect(planFees(BigInt(500_000_000), BigInt(1_000_000), 0.5)).toBeNull();
   });
 });

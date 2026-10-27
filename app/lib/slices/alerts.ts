@@ -3,6 +3,7 @@
 // (throttled through SliceMintLease.lastAlertAt so serverless instances agree).
 import { prisma } from "@/app/lib/db";
 import { postDiscordMessage } from "@/app/lib/discord-rest";
+import { sliceChain } from "./config";
 
 export const ALERT_COOLDOWN_MS = 6 * 60 * 60 * 1000;
 
@@ -13,7 +14,7 @@ export async function postSliceAlert(message: string, now = new Date()): Promise
     const botToken = process.env.DISCORD_BOT_TOKEN?.trim();
     // Claim the cooldown slot atomically: only one caller per window wins.
     const won = await prisma.sliceMintLease.updateMany({
-      where: { id: 1, OR: [{ lastAlertAt: null }, { lastAlertAt: { lt: new Date(now.getTime() - ALERT_COOLDOWN_MS) } }] },
+      where: { id: sliceChain().id, OR: [{ lastAlertAt: null }, { lastAlertAt: { lt: new Date(now.getTime() - ALERT_COOLDOWN_MS) } }] },
       data: { lastAlertAt: now },
     });
     if (won.count === 0) return false;
