@@ -418,7 +418,7 @@ describe('reviewer edits', () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
     expect((await patch({ title: ' New ' })).status).toBe(200)
-    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ title: 'New', summaryEditedAt: expect.any(Date) })
+    expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ title: 'New' })
   })
 
   it('accepts action items and chapters, dropping blank entries', async () => {

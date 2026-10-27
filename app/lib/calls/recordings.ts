@@ -246,6 +246,8 @@ export function visibleSegments(
  * and moves a fresh call to review so a human can retry.
  */
 export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: boolean; unlessEdited?: boolean } = {}): Promise<boolean> {
+  // Taken BEFORE the row is read: a redaction made while the model runs is stamped later than this, so it still counts as newer than the summary.
+  const startedAt = new Date()
   const rec = await prisma.callRecording.findUnique({
     where: { id },
     select: { id: true, status: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
@@ -267,14 +269,15 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
       chapters: out.chapters as unknown as Prisma.InputJsonValue,
       status: 'IN_REVIEW' as const,
       publishedAt: null,
-      summaryGeneratedAt: new Date(),
+      summaryGeneratedAt: startedAt,
       summaryEditedAt: null,
     }
     // REJECTED is excluded in the WHERE, so a reject that lands during generation stays rejected.
     // unlessEdited: automatic runs never replace text a reviewer edited (summaryEditedAt), even if the edit landed mid-generation.
     const where = {
       id,
-      status: { not: 'REJECTED' as const },
+      // Automatic runs (unlessEdited) also leave PUBLISHED rows alone: publishing a call freezes its public text.
+      status: opts.unlessEdited ? { notIn: ['REJECTED' as const, 'PUBLISHED' as const] } : { not: 'REJECTED' as const },
       ...(opts.onlyIfEmpty ? { summary: null } : {}),
       ...(opts.unlessEdited ? { summaryEditedAt: null } : {}),
     }
@@ -332,13 +335,19 @@ export type EditResult = 'ok' | 'not-found' | 'invalid'
  * call; a PUBLISHED call may not lose its title or summary.
  */
 export async function updateRecordingText(id: string, edit: RecordingTextEdit): Promise<EditResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true } })
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, actionItems: true, chapters: true } })
   if (!rec || rec.status === 'REJECTED') return 'not-found'
   if (rec.status === 'PROCESSING') return 'invalid'
   if (rec.status === 'PUBLISHED' && (edit.title === null || edit.summary === null)) return 'invalid'
   const data: Prisma.CallRecordingUpdateInput = {}
   // A reviewer's words: automatic transcription/summary runs must never overwrite them.
-  if (edit.title !== undefined || edit.summary !== undefined || edit.actionItems !== undefined || edit.chapters !== undefined) data.summaryEditedAt = new Date()
+  // Only a real change of the summary / action items / chapters text counts (a title-only or no-op save does not).
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  const textChanged =
+    (edit.summary !== undefined && !same(rec.summary, edit.summary)) ||
+    (edit.actionItems !== undefined && !same(rec.actionItems ?? [], edit.actionItems)) ||
+    (edit.chapters !== undefined && !same(rec.chapters ?? [], edit.chapters))
+  if (textChanged) data.summaryEditedAt = new Date()
   if (edit.title !== undefined) data.title = edit.title
   if (edit.summary !== undefined) data.summary = edit.summary
   if (edit.actionItems !== undefined) data.actionItems = edit.actionItems as unknown as Prisma.InputJsonValue

@@ -23,9 +23,11 @@ export const TURN_GAP_MS = 1500
 const OPENAI_URL = 'https://api.openai.com/v1/audio/transcriptions'
 /** Statuses where machine text may still be replaced; a published or rejected call is never touched. */
 export const TRANSCRIBABLE_STATUSES = ['RECORDED', 'PROCESSING', 'IN_REVIEW'] as const
-const CLAIMED = 'claimed'
+export const CLAIMED = 'claimed'
 const PROGRESS = 'progress'
 const SUMMARY_STUCK_MS = 15 * 60 * 1000
+/** transcribeError of a call whose every track is over the upload limit (retrying cannot help). */
+export const TOO_LARGE_ERROR = 'failed: every track is larger than the upload limit'
 const RETRY_AFTER_FAILURE_MS = 6 * 3600 * 1000
 
 export interface WhisperSegment {
@@ -199,6 +201,10 @@ export interface TranscribeDeps {
   summarize?: typeof generateAndStoreSummary
   now?: Date
   clock?: () => number
+  /** When the surrounding run started (the cron shares one start across recordings so budgets are absolute). */
+  startedMs?: number
+  /** Incremented before every OpenAI call, so a caller can tell a run spent money even if it ended 'busy' / 'already-had-speech'. */
+  usage?: { calls: number }
   log?: (msg: string) => void
 }
 
@@ -234,8 +240,8 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   const log = deps.log ?? (() => {})
   if (!apiKey) return 'no-key'
   const clock = deps.clock ?? Date.now
-  const startedMs = clock()
-  const now = deps.now ?? new Date(startedMs)
+  const startedMs = deps.startedMs ?? clock()
+  const now = deps.now ?? new Date(clock())
 
   const rec = await prisma.callRecording.findUnique({
     where: { id },
@@ -264,11 +270,34 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   const lastAttempt = (rec.transcribeAttempts ?? 0) + 1 >= MAX_ATTEMPTS
 
   const download = deps.download ?? ((key: string) => getObjectBytes(key, MAX_UPLOAD_BYTES))
-  const send = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number) => transcribeAudio(bytes, key, { deadline }))
+  const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number) => transcribeAudio(bytes, key, { deadline }))
+  const send: typeof rawSend = (bytes, key, deadline) => {
+    if (deps.usage) deps.usage.calls++
+    return rawSend(bytes, key, deadline)
+  }
   const saved = parseTrackResults(rec.transcribeTracks)
   const todo = tracks.filter((t) => !(t.discordId in saved))
   const errors: string[] = []
   let progressed = 0
+  // Track results are written one at a time, each carrying everything saved so far, so commits cannot land out of order and drop a track.
+  let chain: Promise<unknown> = Promise.resolve()
+  const persist = () => {
+    const next = chain.then(() => prisma.callRecording.updateMany({ where: { id }, data: { transcribeTracks: JSON.parse(JSON.stringify(saved)) as Prisma.InputJsonValue } }))
+    chain = next.catch(() => {})
+    return next
+  }
+  const commit = async (discordId: string, result: TrackResult): Promise<boolean> => {
+    saved[discordId] = result
+    try {
+      await persist()
+      progressed++
+      return true
+    } catch (err) {
+      delete saved[discordId]
+      errors.push(`${discordId}: could not save result: ${err instanceof Error ? err.message : String(err)}`.slice(0, 200))
+      return false
+    }
+  }
   await pool(todo, 3, async (t) => {
     if (clock() - startedMs > START_BUDGET_MS) return
     try {
@@ -277,20 +306,15 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
         bytes = await download(t.trackKey)
       } catch (err) {
         if (err instanceof Error && /\(limit \d+\)/.test(err.message)) {
-          saved[t.discordId] = { skipped: 'too-large' }
-          progressed++
-          await prisma.callRecording.updateMany({ where: { id }, data: { transcribeTracks: saved as unknown as Prisma.InputJsonValue } })
-          errors.push(`${t.discordId}: track is larger than ${MAX_UPLOAD_BYTES} bytes`)
+          await commit(t.discordId, { skipped: 'too-large' })
           return
         }
         throw err
       }
       if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new Error(`track is ${bytes.byteLength} bytes (limit ${MAX_UPLOAD_BYTES})`)
       const r = await send(bytes, apiKey, startedMs + HARD_DEADLINE_MS)
-      saved[t.discordId] = { utterances: cleanSegments(r.segments), language: r.language, talkTimeSec: t.talkTimeSec }
-      progressed++
       // Persist now: a killed run must not make the next one pay for this track again.
-      await prisma.callRecording.updateMany({ where: { id }, data: { transcribeTracks: saved as unknown as Prisma.InputJsonValue } })
+      await commit(t.discordId, { utterances: cleanSegments(r.segments), language: r.language, talkTimeSec: t.talkTimeSec })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       log(`track for ${t.discordId} failed: ${msg}`)
@@ -306,16 +330,20 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   const tooLargeOnly = remaining.length === 0 && usable.length === 0 && tracks.some((t) => 'skipped' in (saved[t.discordId] ?? {}))
   if (tooLargeOnly) {
     // Nothing can ever be sent to OpenAI as it is: permanent failure, no more attempts.
-    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: 'failed: every track is larger than the upload limit', transcribeAttempts: MAX_ATTEMPTS } })
+    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: TOO_LARGE_ERROR, transcribeAttempts: MAX_ATTEMPTS, transcribeTracks: JSON.parse(JSON.stringify(saved)) as Prisma.InputJsonValue } })
+    await parkForReview(id, deps.summarize)
     return 'failed'
   }
   if (remaining.length > 0 && !(lastAttempt && usable.length > 0)) {
     if (progressed > 0 && !lastAttempt) {
       // Made headway (budget ran out): resume on the next run without spending an attempt.
-      await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: PROGRESS, transcribeAttempts: { decrement: 1 } } })
+      // Refund the attempt only while we still hold our own claim, and never below zero.
+      await prisma.callRecording.updateMany({ where: { id, transcribedAt: null, transcribeError: CLAIMED, transcribeAttempts: { gt: 0 } }, data: { transcribeError: PROGRESS, transcribeAttempts: { decrement: 1 }, transcribeTracks: JSON.parse(JSON.stringify(saved)) as Prisma.InputJsonValue } })
       return 'progress'
     }
-    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: `failed: ${errors[0] ?? 'time budget exhausted'}`.slice(0, 300) } })
+    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: `failed: ${errors[0] ?? 'time budget exhausted'}`.slice(0, 300), transcribeTracks: JSON.parse(JSON.stringify(saved)) as Prisma.InputJsonValue } })
+    // Out of attempts: hand the call to the reviewers (with a chat-only summary if there is chat) instead of leaving it parked.
+    if (lastAttempt) await parkForReview(id, deps.summarize)
     return 'failed'
   }
 
@@ -363,7 +391,25 @@ export async function listPendingTranscription(sinceDays = 14, take = 10, now = 
   })
 }
 
-/** Transcribed recordings whose summary never got written (the run died mid-summary). */
+/**
+ * Move a call that automatic transcription gave up on out of RECORDED/PROCESSING into review, summarizing
+ * whatever text exists (chat), so an admin can act (retry, edit, reject).
+ */
+async function parkForReview(id: string, summarize: typeof generateAndStoreSummary = generateAndStoreSummary): Promise<void> {
+  try {
+    await summarize(id, { onlyIfEmpty: true, unlessEdited: true })
+  } catch {
+    // the status move below is what matters
+  }
+  await prisma.callRecording.updateMany({ where: { id, status: { in: ['RECORDED', 'PROCESSING'] } }, data: { status: 'IN_REVIEW' } })
+}
+
+/**
+ * Transcribed recordings whose summary never got written (the run died mid-summary).
+ * Known limit: this sweep only covers `summary: null`. A call that already had a (chat-only) summary
+ * when its transcript arrived, and whose regeneration then died, keeps that old summary until a
+ * reviewer clicks Regenerate; it is not stuck, just stale.
+ */
 export async function listNeedingSummary(now = new Date(), take = 3) {
   return prisma.callRecording.findMany({
     where: {

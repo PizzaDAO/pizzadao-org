@@ -17,6 +17,7 @@ import { RemoveRecording } from "../RemoveRecording";
 import { ReviewActions } from "../ReviewActions";
 import { RedactSpeaker } from "../RedactSpeaker";
 import { RetryTranscription } from "../RetryTranscription";
+import { TOO_LARGE_ERROR } from "@/app/lib/calls/transcribe";
 import { HideLine } from "../HideLine";
 import { segmentKey } from "@/app/lib/calls/chat";
 
@@ -62,7 +63,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
     const recapEnabled = recapPostingEnabled();
     const recapStale = redactionsNewerThanSummary(rec);
-    const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3;
+    const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3 && rec.transcribeError !== TOO_LARGE_ERROR;
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (

@@ -23,11 +23,15 @@ export async function GET(request: NextRequest) {
   if (!process.env.OPENAI_API_KEY?.trim()) return NextResponse.json({ skipped: 'no-openai-key' })
   try {
     const started = Date.now()
+    const usage = { calls: 0 }
     const results: Array<{ id: string; outcome: string }> = []
     for (const rec of await listPendingTranscription(14, 10)) {
-      const outcome = await transcribeRecording(rec.id, { log: (m) => console.warn('[cron/call-transcripts]', m) })
+      // Never begin another recording late in the run: the budgets inside transcribeRecording are measured from `started`.
+      if (Date.now() - started > 30_000) break
+      const outcome = await transcribeRecording(rec.id, { startedMs: started, usage, log: (m) => console.warn('[cron/call-transcripts]', m) })
       results.push({ id: rec.id, outcome })
-      if (USED_OPENAI.has(outcome)) break
+      // `usage` catches runs that paid for OpenAI but ended 'busy' / 'already-had-speech'.
+      if (usage.calls > 0 || USED_OPENAI.has(outcome)) break
     }
     // Only with time to spare: a summary is one model call (30-90 s).
     if (Date.now() - started < 150_000) {
