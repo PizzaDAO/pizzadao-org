@@ -20,6 +20,7 @@ import { getCrewMappings, fetchOpenCrewTasksResult } from '@/app/lib/crew-mappin
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { getGuildChannels } from '@/app/lib/discord-channels'
 import { buildAgendaBullets, daysOverdue, parseActionItems, formatAgendaMessage, agendaTimeZone } from './rank'
+import { clearPostFilterCache } from '@/app/lib/calls/post-filters'
 import { runCallAgenda, resolveCrewChannel, fetchUpcomingEvents } from './run'
 
 const NOW = new Date('2026-10-29T15:00:00Z')
@@ -123,6 +124,8 @@ describe('runCallAgenda', () => {
   const saved = { ...process.env }
   beforeEach(() => {
     vi.clearAllMocks()
+    clearPostFilterCache()
+    vi.mocked(prisma.callPostFilter.findUnique).mockResolvedValue(null)
     process.env.DISCORD_BOT_TOKEN = 'tok'
     process.env.DISCORD_GUILD_ID = '1'
     process.env.CALL_AGENDA_POST_ENABLED = 'true'
@@ -220,5 +223,53 @@ describe('runCallAgenda', () => {
     const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
     expect(r.outcomes[0].status).toBe('no-items')
     expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
+  })
+
+  const setFilter = (f: Partial<{ excludedCrewIds: string[]; excludedCrewLabelTerms: string[]; blockedTerms: string[] }>) =>
+    vi.mocked(prisma.callPostFilter.findUnique).mockResolvedValue({ id: 1, excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ...f } as never)
+
+  it('skips an excluded crew entirely: outcome excluded, no sheet read, no claim, no post', async () => {
+    setFilter({ excludedCrewIds: ['crew_x'] })
+    vi.mocked(getCrewMappings).mockResolvedValue({
+      cached: false,
+      crews: [{ id: 'crew_x', label: 'Crew X', turtles: [], event: '111111111111111111', channel: '555555555555555555', sheet: 'https://docs.google.com/spreadsheets/d/abc/edit' }],
+    })
+    const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    expect(r.outcomes).toEqual([{ eventId: '111111111111111111', crewId: 'crew_x', status: 'excluded' }])
+    expect(fetchOpenCrewTasksResult).not.toHaveBeenCalled()
+    expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
+    expect(postDiscordMessage).not.toHaveBeenCalled()
+  })
+
+  it('excludes a crew by label word', async () => {
+    setFilter({ excludedCrewLabelTerms: ['ZETA'] })
+    vi.mocked(getCrewMappings).mockResolvedValue({
+      cached: false,
+      crews: [{ id: 'ops', label: 'Zeta Ops', turtles: [], event: '111111111111111111', channel: '555555555555555555', sheet: 'https://docs.google.com/spreadsheets/d/abc/edit' }],
+    })
+    expect((await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })).outcomes[0].status).toBe('excluded')
+    expect(postDiscordMessage).not.toHaveBeenCalled()
+  })
+
+  it('posts nothing when the filter cannot be read', async () => {
+    vi.mocked(prisma.callPostFilter.findUnique).mockRejectedValue(new Error('db down'))
+    await expect(runCallAgenda({ now: NOW, fetchImpl: fetchEvents })).rejects.toThrow('db down')
+    expect(postDiscordMessage).not.toHaveBeenCalled()
+    expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
+  })
+
+  it('drops tasks and last-call items with a blocked term and counts them', async () => {
+    setFilter({ blockedTerms: ['ZETA'] })
+    vi.mocked(fetchOpenCrewTasksResult).mockResolvedValue({
+      tasks: [task('Ship thing', { priority: 'Top' }), task('Sync with zeta team', { priority: 'Top' })],
+      error: false,
+    })
+    vi.mocked(prisma.callRecording.findMany).mockResolvedValue([{ actionItems: [{ text: 'Call the Zeta leads' }, { text: 'Book venue' }] }] as never)
+    const { planAgendas } = await import('./run')
+    const [plan] = await planAgendas({ now: NOW, horizonMs: 30 * 60 * 1000, fetchImpl: fetchEvents })
+    expect(plan.filteredOut).toBe(2)
+    expect(plan.message.toLowerCase()).not.toContain('zeta')
+    expect(plan.message).toContain('Ship thing')
+    expect(plan.message).toContain('Book venue')
   })
 })

@@ -7,7 +7,8 @@ vi.mock('@/app/lib/discord-channels', () => ({ resolveChannelId: vi.fn(async () 
 
 import { prisma } from '@/app/lib/db'
 import { DiscordPostError } from '@/app/lib/discord-rest'
-import { buildRecapText, channelIdFromCell, parseChannelCell, postCallRecap, recapBullets, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
+import { clearPostFilterCache, type PostFilter } from './post-filters'
+import { buildRecapText, channelIdFromCell, parseChannelCell, postCallRecap, recapBullets, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
 
 const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
 const base = 'https://example.org'
@@ -20,7 +21,11 @@ const rec = {
   chapters: [],
 }
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  clearPostFilterCache()
+  db.callPostFilter.findUnique.mockResolvedValue(null)
+})
 
 describe('recap text', () => {
   it('has title, bullets, action items with owners and the link', () => {
@@ -168,5 +173,51 @@ describe('postCallRecap', () => {
     expect(await postCallRecap('abc123', { env: { CALL_RECAP_POST_ENABLED: '1' } })).toBe('no-token')
     db.callRecording.findUnique.mockResolvedValue({ ...published, crewId: null })
     expect(await postCallRecap('abc123', { env, post: vi.fn() })).toBe('no-channel')
+  })
+})
+
+describe('post filters', () => {
+  const filter: PostFilter = { excludedCrewIds: ['crew_x'], excludedCrewLabelTerms: ['ZETA'], blockedTerms: ['ZETA'] }
+  const marked = {
+    ...rec,
+    summary: 'We reviewed the launch plan. The ZETA group wants a separate budget. Ann will own the vendor list. Next call moves to Thursday.',
+    actionItems: [{ text: 'Send the deck', owner: 'Ann' }, { text: 'Ping the zeta leads' }, { text: 'Hand off', owner: 'Team Zeta' }],
+  }
+  it('drops blocked bullets and action items from the Discord text only', () => {
+    const t = buildRecapText(marked, base, filter)
+    expect(t.toLowerCase()).not.toContain('zeta')
+    expect(t).toContain('- We reviewed the launch plan.')
+    expect(t).toContain('- Send the deck (Ann)')
+    expect(marked.summary).toContain('ZETA') // stored summary untouched
+    expect(recapFilteredCount(marked, filter)).toBe(3)
+    expect(recapFilteredCount(rec, filter)).toBe(0)
+  })
+  it('matches whole words only', () => {
+    expect(buildRecapText({ ...rec, summary: 'Zetamax shipped. Alpha done. Beta done. Gamma done.' }, base, filter)).toContain('Zetamax shipped.')
+  })
+  it('drops blocked chapter titles in the chapter fallback', () => {
+    expect(recapBullets('Short.', [{ title: 'Budget' }, { title: 'ZETA plans' }, { title: 'Launch' }, { title: 'Venue' }], filter)).toEqual(['Budget', 'Launch', 'Venue'])
+  })
+  const published = { ...rec, status: 'PUBLISHED', crewId: 'community_call', eventName: null, recapPostedAt: null, redactionsUpdatedAt: null, summaryGeneratedAt: null, summaryEditedAt: null }
+  const env = { CALL_RECAP_POST_ENABLED: '1', DISCORD_BOT_TOKEN: 'tok' }
+  it('never posts a recap for an excluded crew, by id or label word', async () => {
+    db.callPostFilter.findUnique.mockResolvedValue({ id: 1, ...filter })
+    const post = vi.fn()
+    db.callRecording.findUnique.mockResolvedValue({ ...published, crewId: 'crew_x', crewLabel: 'Whatever' })
+    expect(await postCallRecap('abc123', { env, post })).toBe('excluded')
+    clearPostFilterCache()
+    db.callRecording.findUnique.mockResolvedValue({ ...published, crewId: 'xyz', crewLabel: 'Team Zeta' })
+    expect(await postCallRecap('abc123', { env, post })).toBe('excluded')
+    expect(post).not.toHaveBeenCalled()
+    expect(db.callRecording.updateMany).not.toHaveBeenCalled()
+  })
+  it('posts nothing (and claims nothing) when the filter cannot be read', async () => {
+    db.callPostFilter.findUnique.mockRejectedValue(new Error('db down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    db.callRecording.findUnique.mockResolvedValue(published)
+    const post = vi.fn()
+    expect(await postCallRecap('abc123', { env, post })).toBe('failed')
+    expect(post).not.toHaveBeenCalled()
+    expect(db.callRecording.updateMany).not.toHaveBeenCalled()
   })
 })
