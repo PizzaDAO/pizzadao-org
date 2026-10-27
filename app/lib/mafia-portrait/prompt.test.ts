@@ -117,4 +117,9 @@ describe("portraitCacheKey", () => {
     expect(portraitCacheKey({ ...base, crews: ["ops"] })).not.toBe(k);
     expect(portraitCacheKey({ ...base, variant: 1 })).not.toBe(k);
   });
+
+  it("keeps apostrophes in names", () => {
+    expect(sanitizeCharacterName("Mikey O\u2019Malley")).toBe("Mikey O'Malley")
+    expect(sanitizeCharacterName("Ma'am \"Ricotta\"")).toBe("Ma'am Ricotta")
+  })
 });

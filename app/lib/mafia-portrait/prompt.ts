@@ -8,11 +8,13 @@
 import { createHash } from "crypto";
 import { normalizeCrewId } from "@/app/lib/crew-id";
 
-/** Strip anything that could break out of the quoted name slot. */
+/** Strip anything that could break out of the quoted name slot. Apostrophes
+ * stay (O'Malley) as a plain ' since the slot is double-quoted. */
 export function sanitizeCharacterName(input: unknown): string {
   return String(input ?? "")
     .replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]/g, " ")
-    .replace(/["'`\u2018\u2019\u201a\u201b\u201c\u201d\u201e\u201f\u00ab\u00bb*#<>{}\\]/g, "")
+    .replace(/[\u2018\u2019\u201b]/g, "'")
+    .replace(/["`\u201a\u201c\u201d\u201e\u201f\u00ab\u00bb*#<>{}\\]/g, "")
     .replace(/\s+/g, " ")
     .trim()
     .slice(0, 60)
