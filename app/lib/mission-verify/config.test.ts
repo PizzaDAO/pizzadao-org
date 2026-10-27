@@ -140,7 +140,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
     expect(plan.errors).toEqual([])
     expect(plan.missing).toEqual([])
     expect(plan.inserts.map((i) => [`L${i.level}.${i.index}`, i.data.title, i.data.reward, i.data.verifierKey, i.data.verifierParams, i.data.levelTitle])).toEqual([
-      ['L4.2', 'Get vouched by a member', 3141, 'vouch_received', { min: 1, sources: ['PIZZADAO'] }, 'Do some dirty work'],
+      ['L4.2', 'Get vouched for', 3141, 'vouch_received', { min: 1, sources: ['PIZZADAO'] }, 'Do some dirty work'],
       ['L5.2', 'Vouch for another member', 4269, 'vouch_given', { min: 1, sources: ['PIZZADAO'] }, 'Do a favor for the mafia'],
       ['L5.3', 'Own a Rare Pizza Box', 4269, 'rare_pizza_box', { minLevel: 5 }, 'Do a favor for the mafia'],
     ])
