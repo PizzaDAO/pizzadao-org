@@ -52,9 +52,9 @@ export function accentColors(turtles: string[]): [string, string, string] | null
 // Crews not listed here (e.g. regional ones) get no prop.
 export const CREW_PROPS: Record<string, string> = {
   ops: "a clipboard",
-  tech: "a briefcase made of a circuit board",
+  tech: "a chunky vintage keyboard",
   comms: "a vintage microphone",
-  events: "a megaphone and a handful of party poppers",
+  events: "a fan of golden party tickets held like a winning poker hand",
   design: "a paint brush",
   design_art: "a paint brush",
   creative: "a paint brush",
@@ -63,7 +63,7 @@ export const CREW_PROPS: Record<string, string> = {
   music: "a battered trumpet",
   governance: "a judge's gavel",
   real_estate: "a ring of keys",
-  community: "a pizza box tucked under one arm",
+  community: "a tall stack of pizza delivery boxes",
 };
 
 /** Known crews only, deduped, sorted (so the prop and cache key are order-independent). */
