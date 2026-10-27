@@ -21,7 +21,7 @@ import {
   rateLimitResponse,
 } from "@/app/lib/rate-limit";
 import { recordActivationLater } from "@/app/lib/activation";
-import { generatePortrait, portraitModelId } from "@/app/lib/mafia-portrait/generate";
+import { PortraitUnavailable, generatePortrait, portraitModelId } from "@/app/lib/mafia-portrait/generate";
 import { portraitCacheKey } from "@/app/lib/mafia-portrait/prompt";
 
 export const runtime = "nodejs";
@@ -66,15 +66,14 @@ export async function POST(req: Request) {
     return NextResponse.json({ error: "Invalid request" }, { status: 400 });
   }
 
-  const filmKey = (filmId || filmTitle?.trim() || "").slice(0, 120);
+  // Only the known film id (or "custom") keys the cache: a free-text title
+  // never reaches the prompt, so it must not split the cache either.
+  const filmKey = (filmId || "custom").slice(0, 120);
   const cacheKey = portraitCacheKey({ name, topping, filmKey, variant });
 
   // Cache hits are free: they skip the limits and the provider.
   const hit = await prisma.mafiaPortrait.findUnique({ where: { cacheKey } });
   if (hit) return NextResponse.json({ url: hit.url, animal: hit.animal, cached: true });
-
-  const member = await checkKeyedRateLimit("mafia-portrait-member", discordId);
-  if (!member.success) return rateLimitResponse(member);
 
   // The global spend cap fails CLOSED: if Redis is down (or, on Vercel, not
   // configured so counters would be per instance) we refuse rather than risk
@@ -88,12 +87,28 @@ export async function POST(req: Request) {
   );
   if (!global.success) return fallback("capacity");
 
+  const member = await checkKeyedRateLimit("mafia-portrait-member", discordId);
+  if (!member.success) return rateLimitResponse(member);
+
   let drawn: { url: string; animal: string; model: string };
   try {
     drawn = await generatePortrait({ name, topping, filmId });
   } catch (e) {
-    console.error("[mafia-portrait] generation failed", e instanceof Error ? e.name : "unknown");
-    recordActivationLater("portrait_failed", { discordId, code: "provider" });
+    const cause = e instanceof PortraitUnavailable ? e.cause : e;
+    const info = cause as { name?: string; message?: string; statusCode?: number; status?: number; code?: string } | undefined;
+    console.error("[mafia-portrait] generation failed", {
+      reason: info?.name,
+      message: String(info?.message ?? "").slice(0, 200),
+      status: info?.statusCode ?? info?.status,
+      code: info?.code,
+    });
+    const reason =
+      info?.name === "TimeoutError" || info?.name === "AbortError"
+        ? "timeout"
+        : e instanceof PortraitUnavailable && e.message.includes("upload")
+          ? "upload"
+          : "provider";
+    recordActivationLater("portrait_failed", { discordId, code: reason });
     return fallback("provider");
   }
 

@@ -390,14 +390,14 @@
       "portraitUnavailable": "Portrait indisponible pour le moment.",
       "portraitAlt": "Portrait dessiné de {name}",
       "redraw": "Redessiner",
-      "redrawsLeft": "{count} restants aujourd’hui",
+      "redrawsLeft": "{count, plural, one {# restant} other {# restants}} aujourd’hui",
       "redrawLimit": "Tu as utilisé les dessins du jour.",
       "download": "Télécharger",
       "copyImage": "Copier l’image",
       "imageCopied": "Image copiée.",
       "copyImageFailed": "Impossible de copier l’image. Essaie Télécharger.",
       "shareX": "Partager sur X",
-      "shareXText": "Je viens d’être intronisé. {name} 🍕",
+      "shareXText": "Je fais désormais partie de la famille. {name} 🍕",
       "footnote": "Classé dans le registre familial · {year}"
     }
   },

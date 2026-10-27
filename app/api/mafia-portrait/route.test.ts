@@ -14,6 +14,7 @@ vi.mock("@/app/lib/db", () => ({
 }));
 vi.mock("@/app/lib/activation", () => ({ recordActivationLater: (...a: unknown[]) => recordLater(...a) }));
 vi.mock("@/app/lib/mafia-portrait/generate", () => ({
+  PortraitUnavailable: class PortraitUnavailable extends Error {},
   generatePortrait: (...a: unknown[]) => generatePortrait(...a),
   portraitModelId: () => "gpt-image-1",
 }));
@@ -27,6 +28,7 @@ vi.mock("@/app/lib/rate-limit", async (orig) => {
 });
 
 import { POST } from "./route";
+import { PortraitUnavailable } from "@/app/lib/mafia-portrait/generate";
 
 const ok = { success: true, limit: 5, remaining: 4, reset: Date.now() + 1000 };
 const body = (o: Record<string, unknown> = {}) =>
@@ -93,19 +95,20 @@ describe("POST /api/mafia-portrait", () => {
   });
 
   it("429 when the member is over their daily limit", async () => {
-    checkKeyed.mockResolvedValueOnce({ success: false, limit: 5, remaining: 0, reset: Date.now() + 60_000 });
+    checkKeyed.mockResolvedValueOnce(ok).mockResolvedValueOnce({ success: false, limit: 5, remaining: 0, reset: Date.now() + 60_000 });
     const res = await POST(body());
     expect(res.status).toBe(429);
     expect(generatePortrait).not.toHaveBeenCalled();
-    expect(checkKeyed).toHaveBeenCalledTimes(1);
+    expect(checkKeyed.mock.calls.map((c) => c[0])).toEqual(["mafia-portrait-global", "mafia-portrait-member"]);
   });
 
   it("503 when the global cap is spent, using MAFIA_PORTRAIT_DAILY_CAP and failing closed", async () => {
     process.env.MAFIA_PORTRAIT_DAILY_CAP = "7";
-    checkKeyed.mockResolvedValueOnce(ok).mockResolvedValueOnce({ ...ok, success: false, remaining: 0 });
+    checkKeyed.mockResolvedValueOnce({ ...ok, success: false, remaining: 0 });
     const res = await POST(body());
     expect(res.status).toBe(503);
-    const [name, key, rule, opts] = checkKeyed.mock.calls[1];
+    expect(checkKeyed).toHaveBeenCalledTimes(1);
+    const [name, key, rule, opts] = checkKeyed.mock.calls[0];
     expect([name, key, rule.limit, opts]).toEqual(["mafia-portrait-global", "all", 7, { failClosed: true }]);
     expect(generatePortrait).not.toHaveBeenCalled();
   });
@@ -118,11 +121,11 @@ describe("POST /api/mafia-portrait", () => {
   });
 
   it("provider failure returns the fallback and records it", async () => {
-    generatePortrait.mockRejectedValue(new Error("boom"));
+    generatePortrait.mockRejectedValue(new PortraitUnavailable("Portrait generation failed", { cause: new DOMException("t", "TimeoutError") }));
     const res = await POST(body());
     expect(res.status).toBe(503);
     expect(await res.json()).toMatchObject({ fallback: true });
     expect(create).not.toHaveBeenCalled();
-    expect(recordLater).toHaveBeenCalledWith("portrait_failed", expect.anything());
+    expect(recordLater).toHaveBeenCalledWith("portrait_failed", expect.objectContaining({ code: "timeout" }));
   });
 });

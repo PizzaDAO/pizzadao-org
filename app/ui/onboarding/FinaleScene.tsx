@@ -306,7 +306,7 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
   const redrawDisabled = portrait.loading || portrait.variant >= 4 || portrait.remaining === 0;
 
   return (
-    <section style={overlay} aria-live="polite">
+    <section style={overlay}>
       <style>{`
         @keyframes finale-portrait-in { from { opacity: 0; } to { opacity: 1; } }
         @keyframes finale-portrait-shimmer { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.6; } }
@@ -475,6 +475,8 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, filmI
                     width: "100%",
                     height: "100%",
                     objectFit: "cover",
+                    // Undo the seal's -11deg tilt; scale so the corners stay covered.
+                    transform: "rotate(11deg) scale(1.25)",
                     zIndex: 2,
                   }}
                 />

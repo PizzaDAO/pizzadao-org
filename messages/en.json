@@ -390,7 +390,7 @@
       "portraitUnavailable": "Portrait unavailable right now.",
       "portraitAlt": "Cartoon portrait for {name}",
       "redraw": "Redraw",
-      "redrawsLeft": "{count} left today",
+      "redrawsLeft": "{count, plural, one {# left} other {# left}} today",
       "redrawLimit": "You’ve used today’s redraws.",
       "download": "Download",
       "copyImage": "Copy image",

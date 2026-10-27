@@ -79,23 +79,24 @@ export const TOPPING_MOTIF: Record<string, string> = {
 export const GENERIC_MOTIF = "a small pizza slice pin on the lapel, warm tomato-red and cream palette, friendly neighborhood pizza-shop charm";
 const GENERIC_TOPPING_LABEL = "a house-special pizza";
 
-// MAFIA_FILMS tone tags -> mood phrase. Unknown tags are ignored.
-export const TONE_MOOD: Record<string, string> = {
-  operatic: "cinematic operatic gravitas, lodge-hall stillness",
-  sicilian: "old-country sicilian warmth, sun-faded social club",
-  brooklyn: "brooklyn corner-shop swagger",
-  noir: "moody noir shadows, single bare bulb",
-  yakuza: "stoic poise, quiet ceremony",
-  triad: "neon-tinted late-night cool",
-  prohibition: "1920s prohibition speakeasy hush",
-  miami: "80s miami pastel heat, faded awning",
-  irish: "neighborhood pub grit",
-  french: "smoky cafe-noir cool",
-  naples: "naples back-alley warmth",
-  camorra: "naples back-alley warmth",
-  rio: "rio street-corner heat",
-  favela: "rio street-corner heat",
-};
+// MAFIA_FILMS tone tags -> mood phrase. A tag matches a rule when it contains
+// one of the rule's keys (so "irish-italian" and "las vegas" both resolve).
+// Rules are checked in order; the first matching tag of a film wins.
+export const TONE_MOOD_RULES: { keys: string[]; mood: string }[] = [
+  { keys: ["operatic", "epic", "patriarchal", "elegiac"], mood: "cinematic operatic gravitas, lodge-hall stillness" },
+  { keys: ["sicilian", "cosa nostra", "calabria", "ndrangheta", "rome", "milan", "cousins"], mood: "old-country sicilian warmth, sun-faded social club" },
+  { keys: ["naples", "camorra", "little italy", "greenwich"], mood: "naples back-alley warmth" },
+  { keys: ["brooklyn", "queens", "bronx", "wiseguy", "irish-italian", "fugazi", "stoop", "new york", "lower east side", "hells kitchen", "puerto rican"], mood: "brooklyn corner-shop swagger" },
+  { keys: ["noir", "heist", "melville", "lawmen", "mother fixation", "racetrack", "kubrick", "silent setpiece", "minimal", "cool"], mood: "moody noir shadows, single bare bulb" },
+  { keys: ["yakuza", "tokyo", "okinawa", "hiroshima", "kitano", "meditative", "deadpan", "martial arts", "balletic", "stylized", "jakarta"], mood: "stoic poise, quiet ceremony" },
+  { keys: ["triad", "hong kong", "moles", "tense", "undercover", "informant"], mood: "neon-tinted late-night cool" },
+  { keys: ["prohibition", "pre-code", "cagney", "robinson", "classic", "depression-era", "30s-40s", "postwar", "chicago", "jewish mob", "nostalgic", "painterly"], mood: "1920s prohibition speakeasy hush" },
+  { keys: ["miami", "cuban", "cocaine", "excess", "80s", "las vegas", "neon", "glamour", "high roller", "downfall", "dreamer", "ferrara", "pop", "costa del sol", "europop"], mood: "80s miami pastel heat, faded awning" },
+  { keys: ["irish", "ira", "london", "cockney", "brit", "boston", "philly", "teamsters", "russian", "coen", "ethics", "political", "trial", "corruption"], mood: "neighborhood pub grit" },
+  { keys: ["french", "paris", "corsican", "gabin", "outlaw", "audacious", "exile", "prison"], mood: "smoky cafe-noir cool" },
+  { keys: ["rio", "favela", "youth", "verite", "copenhagen", "scandi", "raw", "gritty", "brutal"], mood: "rio street-corner heat" },
+  { keys: ["harlem", "blaxploitation", "funk", "heroin", "crack era", "kingpin", "70s", "90s", "60s", "rise", "ascent", "ruthless", "scheme", "drug debt", "low-level", "tattoos", "cold", "menace", "retired", "regret", "tragic", "redemption", "betrayal", "loyalty", "honor", "mentor", "father-son", "coming of age", "robin hood", "explosive", "kinetic", "scorsese", "stylish"], mood: "1970s street-level hustle, flickering neon sign" },
+];
 export const DEFAULT_MOOD = "quiet pizza-lodge gravitas";
 
 export const ANIMAL_FAMILIES = [
@@ -112,7 +113,7 @@ export function hashString(s: string): number {
 
 /** Deterministic animal per name+topping so redraws and re-opens stay coherent. */
 export function pickAnimal(name: string, topping: string): string {
-  return ANIMAL_FAMILIES[hashString(`${name}|${topping}`) % ANIMAL_FAMILIES.length];
+  return ANIMAL_FAMILIES[hashString(`${name.toLowerCase()}|${topping}`) % ANIMAL_FAMILIES.length];
 }
 
 /** Canonical topping name (case-insensitive) or null for free text. */
@@ -124,8 +125,9 @@ export function canonicalTopping(topping: string): string | null {
 export function moodForFilm(filmId?: string | null): string {
   const film = filmId ? MAFIA_FILMS.find((f) => f.id === filmId) : undefined;
   for (const tag of film?.tone ?? []) {
-    const mood = TONE_MOOD[tag.toLowerCase()];
-    if (mood) return mood;
+    const t = tag.toLowerCase();
+    const rule = TONE_MOOD_RULES.find((r) => r.keys.some((k) => t.includes(k)));
+    if (rule) return rule.mood;
   }
   return DEFAULT_MOOD;
 }

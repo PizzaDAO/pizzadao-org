@@ -26,7 +26,7 @@ describe("mafia portrait prompt", () => {
     expect(pickAnimal("Tony Soprano", "Pepperoni")).toBe(a);
     expect(ANIMAL_FAMILIES).toContain(a);
     expect(ANIMAL_FAMILIES).toHaveLength(16);
-    expect(a).toBe(ANIMAL_FAMILIES[hashString("Tony Soprano|Pepperoni") % 16]);
+    expect(a).toBe(ANIMAL_FAMILIES[hashString("tony soprano|pepperoni") % 16]);
   });
 
   it("never puts the name, a custom topping or a custom film title in the prompt", () => {
@@ -49,7 +49,11 @@ describe("mafia portrait prompt", () => {
     expect(moodForFilm("sonatine")).toContain("stoic");
     expect(moodForFilm(undefined)).toBe(DEFAULT_MOOD);
     expect(moodForFilm("nope")).toBe(DEFAULT_MOOD);
-    for (const f of MAFIA_FILMS) expect(moodForFilm(f.id)).toBeTruthy();
+    for (const f of MAFIA_FILMS) expect(moodForFilm(f.id), f.id).not.toBe(DEFAULT_MOOD);
+  });
+
+  it("picks the same animal for any casing of the name", () => {
+    expect(pickAnimal("TONY", "Basil")).toBe(pickAnimal("tony", "Basil"));
   });
 
   it("builds a stable, case-insensitive cache key that varies with each input", () => {
