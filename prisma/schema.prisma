@@ -1408,3 +1408,18 @@ model MafiaNameClaim {
   @@unique([actor, name])
   @@index([createdAt])
 }
+
+// One pre-call agenda post per Discord scheduled-event occurrence (idempotency record for
+// /api/cron/call-agenda). Claimed before posting; released again if the post fails.
+model CallAgendaPost {
+  id        String   @id @default(cuid())
+  eventId   String // Discord scheduled event id
+  startsAt  DateTime // the occurrence start
+  crewId    String
+  channelId String
+  messageId String?
+  createdAt DateTime @default(now())
+
+  @@unique([eventId, startsAt])
+  @@index([crewId, startsAt])
+}

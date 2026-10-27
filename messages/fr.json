@@ -881,6 +881,17 @@
     "sentBack": "Renvoyée : {note}"
   },
   "adminCalls": {
+    "agendaTitle": "Ordres du jour des prochains appels",
+    "agendaDescription": "Ce que Metalhead publierait dans le canal de chaque crew environ 30 minutes avant les prochains appels (48 prochaines heures). Aperçu seulement.",
+    "agendaOn": "La publication est ACTIVÉE (CALL_AGENDA_POST_ENABLED).",
+    "agendaOff": "La publication est DÉSACTIVÉE. Définissez CALL_AGENDA_POST_ENABLED=true pour l'activer.",
+    "agendaNone": "Aucun appel de crew prévu dans les 48 prochaines heures.",
+    "agendaError": "Impossible de charger les événements programmés.",
+    "agendaPosted": "Déjà publié",
+    "agendaPending": "Pas encore publié",
+    "agendaNoItems": "Rien d'urgent, donc rien ne serait publié.",
+    "agendaChannel": "Canal : {channel}",
+    "agendaNoChannel": "aucun canal dans la feuille du crew",
     "overline": "Enregistrements d'appels",
     "title": "Appels enregistrés",
     "description": "Appels de crew capturés par le bot PizzaDAO. L'audio est privé pour les relecteurs.",
