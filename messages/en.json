@@ -1059,10 +1059,33 @@
     },
     "prefs": {
       "sectionTitle": "Email",
-      "description": "A short weekly note with your next mission, crew calls and level progress.",
+      "description": "A short weekly note with your next mission, crew calls and level progress. Sent only to a confirmed address you opt in with.",
       "label": "Send me the weekly PizzaDAO email",
       "saveError": "Couldn't save your email preference. Try again?",
-      "saved": "Saved"
+      "saved": "Saved",
+      "emailLabel": "Email address",
+      "optIn": "Get a weekly PizzaDAO digest",
+      "save": "Save",
+      "verified": "Confirmed",
+      "pending": "Check your inbox to confirm this address.",
+      "resend": "Resend confirmation",
+      "invalidEmail": "Enter a valid email address.",
+      "tooSoon": "A confirmation was just sent. Try again in a few minutes.",
+      "sendFailed": "Saved, but we couldn't send the confirmation. Try again later."
+    },
+    "confirm": {
+      "subject": "Confirm your email for the PizzaDAO weekly digest",
+      "intro": "Confirm this address to get the weekly PizzaDAO digest (your next mission, crew calls and level progress).",
+      "cta": "Confirm my email",
+      "ignore": "If you didn't ask for this, ignore this email and nothing will be sent."
+    },
+    "confirmPage": {
+      "title": "Confirm your email",
+      "body": "Confirm this address for the weekly PizzaDAO digest?",
+      "button": "Confirm",
+      "doneTitle": "Email confirmed",
+      "doneBody": "You're all set. You'll get the weekly digest.",
+      "invalid": "This confirmation link is invalid or has expired. Request a new one from your profile settings."
     }
   }
 }

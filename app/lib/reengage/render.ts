@@ -8,6 +8,7 @@ import es from "../../../messages/es.json";
 import fr from "../../../messages/fr.json";
 import type { SupportedLocale } from "@/app/lib/i18n/locales";
 import type { Digest } from "./digest";
+import { oneLine } from "./mailer";
 
 const CATALOGS = { en, es, fr } as const;
 
@@ -15,6 +16,8 @@ export interface RenderOptions {
   siteUrl: string;
   /** Visible unsubscribe page; omitted when links can't be signed (no SESSION_SECRET). */
   unsubscribeUrl?: string | null;
+  /** Sender's physical postal address (CAN-SPAM), printed in both footers. */
+  postalAddress?: string | null;
 }
 
 export interface RenderedEmail {
@@ -56,9 +59,9 @@ export function renderDigestEmail(d: Digest, opts: RenderOptions): RenderedEmail
   const missionsUrl = `${site}/missions`;
   const profileEditUrl = `${site}/profile/${encodeURIComponent(d.memberId)}/edit`;
 
-  const subject = d.nextMission
-    ? t("subjectMission", { title: d.nextMission.title })
-    : t("subjectDefault");
+  const subject = oneLine(
+    d.nextMission ? t("subjectMission", { title: d.nextMission.title }) : t("subjectDefault"),
+  );
 
   // Sections as plain data, rendered twice (text + html).
   const lines: { kind: "p" | "h"; text: string }[] = [];
@@ -100,6 +103,7 @@ export function renderDigestEmail(d: Digest, opts: RenderOptions): RenderedEmail
     t("footerWhy"),
     `${t("manage")}: ${profileEditUrl}`,
     ...(opts.unsubscribeUrl ? [`${t("unsubscribe")}: ${opts.unsubscribeUrl}`] : []),
+    ...(opts.postalAddress ? [opts.postalAddress] : []),
   ].join("\n\n").replace(/\n{3,}/g, "\n\n");
 
   const body = lines
@@ -125,8 +129,38 @@ ${body}
     opts.unsubscribeUrl
       ? ` &middot; <a href="${esc(opts.unsubscribeUrl)}" style="color:#6b6358">${esc(t("unsubscribe"))}</a>`
       : ""
-  }</p>
+  }</p>${opts.postalAddress ? `
+<p style="margin:8px 0 0;font-size:12px;color:#6b6358">${esc(opts.postalAddress)}</p>` : ""}
 </td></tr></table></td></tr></table></body></html>`;
 
+  return { subject, html, text };
+}
+
+/**
+ * The one-off address confirmation mail. Sent only when the member asks for the
+ * digest with this address; carries no marketing, just the signed link.
+ */
+export function renderConfirmEmail(
+  locale: SupportedLocale,
+  confirmUrl: string,
+  opts: Pick<RenderOptions, "postalAddress">,
+): RenderedEmail {
+  const t = translator(locale);
+  const subject = oneLine(t("confirm.subject"));
+  const text = [
+    t("confirm.intro"),
+    `${t("confirm.cta")}: ${confirmUrl}`,
+    t("confirm.ignore"),
+    ...(opts.postalAddress ? [opts.postalAddress] : []),
+  ].join("\n\n");
+  const html = `<!doctype html>
+<html lang="${locale}"><head><meta charset="utf-8"><title>${esc(subject)}</title></head>
+<body style="margin:0;padding:24px 12px;background:#f6f1e7;font-family:-apple-system,Segoe UI,Helvetica,Arial,sans-serif;color:#1d1a16">
+<div style="max-width:560px;margin:0 auto;background:#ffffff;border-radius:16px;padding:28px">
+<p style="margin:0 0 16px;font-size:16px;line-height:1.5">${esc(t("confirm.intro"))}</p>
+<p style="margin:0 0 16px"><a href="${esc(confirmUrl)}" style="display:inline-block;background:#c0392b;color:#ffffff;text-decoration:none;font-weight:700;padding:12px 22px;border-radius:999px">${esc(t("confirm.cta"))}</a></p>
+<p style="margin:0;font-size:12px;color:#6b6358">${esc(t("confirm.ignore"))}</p>${opts.postalAddress ? `
+<p style="margin:8px 0 0;font-size:12px;color:#6b6358">${esc(opts.postalAddress)}</p>` : ""}
+</div></body></html>`;
   return { subject, html, text };
 }

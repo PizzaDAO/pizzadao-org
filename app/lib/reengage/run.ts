@@ -2,31 +2,33 @@
 //
 // The weekly re-engagement run (called by /api/cron/reengage).
 //
-//  - Eligible: a members-sheet row with a valid email, not opted out
-//    (MemberProfileExtras.reengageEmailOptOut), with nothing recorded yet for
-//    this ISO week in ReengageEmailSend.
+//  - Eligible: a member who entered an email in the app, verified it with the
+//    signed confirmation link, and explicitly opted in
+//    (MemberProfileExtras.email / emailVerifiedAt / reengageEmailOptIn). The
+//    Crew sheet is public, so it is never read for addresses.
 //  - Idempotent: a (memberId, weekKey) row is claimed BEFORE sending (unique
 //    key, createMany skipDuplicates), so overlapping/retried cron runs never
-//    double-send. A failed or interrupted send keeps its row (no retry within
-//    the week) so one bad address can't eat every batch.
-//  - Batch-limited: at most `limit` sends per run; the cron fires several
-//    times on its day and each run takes the next members in sheet order.
-//  - Gated: nothing is sent or written unless REENGAGE_EMAIL_ENABLED=true and
-//    the run is not a dry run. Dry runs only count what would be sent.
+//    double-send. A permanent failure keeps its row (no retry within the week);
+//    a retryable one (429/5xx/timeout) releases it so a later run tries again.
+//  - Fair: members are ordered least-recently-emailed first, and one address is
+//    used at most once per run (case-insensitive), so the batch cap starves nobody.
+//  - Gated: nothing is sent or written unless REENGAGE_EMAIL_ENABLED=true, the
+//    run is not a dry run, and RESEND_API_KEY and REENGAGE_POSTAL_ADDRESS are set
+//    (checked before any claim).
 //
 // Logs counts only, never addresses.
 import { prisma } from "@/app/lib/db";
-import { getSheetData, type MemberSheetData } from "@/app/lib/sheets/member-repository";
+import { getSheetData } from "@/app/lib/sheets/member-repository";
 import { SITE_URL } from "@/app/lib/site-url";
 import { loadDigests, parseCrewNames, type DigestCandidate } from "./digest";
 import { renderDigestEmail } from "./render";
-import { sendEmail } from "./mailer";
+import { sendEmail, postalAddress } from "./mailer";
 import { unsubscribePageUrl, unsubscribePostUrl } from "./unsub-sig";
 
 export const DEFAULT_BATCH = 60;
 const MAX_BATCH = 300;
 
-const EMAIL_RE = /^[^\s@<>,;]+@[^\s@<>,;]+\.[^\s@<>,;]+$/;
+export const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 
 export function reengageEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
   return env.REENGAGE_EMAIL_ENABLED?.trim().toLowerCase() === "true";
@@ -42,68 +44,67 @@ export function weekKey(d: Date): string {
   return `${t.getUTCFullYear()}-W${String(week).padStart(2, "0")}`;
 }
 
-/** The email cell of a member row (header "Email"/"E-mail", any case), or null if absent/invalid. */
-export function memberEmail(row: MemberSheetData): string | null {
-  for (const [k, v] of Object.entries(row)) {
-    if (!/^e-?mail( address)?$/i.test(k.trim())) continue;
-    const s = String(v ?? "").trim();
-    return EMAIL_RE.test(s) ? s : null;
-  }
-  return null;
-}
-
-function rowMemberId(row: MemberSheetData): string {
-  for (const k of ["ID", "Id", "id", "Member ID", "MemberID", "CrewID", "Crew ID"]) {
-    const v = row[k];
-    if (v !== undefined && String(v).trim()) return String(v).trim();
-  }
-  return "";
-}
-
-function rowName(row: MemberSheetData): string {
-  return String(row["Name"] || row["Mafia Name"] || "").trim();
-}
-
 export interface Eligible extends DigestCandidate {
   email: string;
 }
 
-/** Eligible members not yet handled this week, in sheet order (before the batch limit). */
-export async function listEligible(week: string): Promise<{ eligible: Eligible[]; withEmail: number; optedOut: number }> {
-  const [sheet, optedOutRows, sentRows] = await Promise.all([
+/**
+ * Eligible members not yet handled this week, least-recently-emailed first, one
+ * per address (before the batch limit).
+ */
+export async function listEligible(week: string): Promise<{ eligible: Eligible[]; optedIn: number; duplicates: number }> {
+  const [sheet, optedInRows, sentRows, lastSent] = await Promise.all([
     getSheetData(),
-    prisma.memberProfileExtras.findMany({ where: { reengageEmailOptOut: true }, select: { memberId: true } }),
+    prisma.memberProfileExtras.findMany({
+      where: { reengageEmailOptIn: true, emailVerifiedAt: { not: null }, email: { not: null } },
+      select: { memberId: true, email: true },
+    }),
     prisma.reengageEmailSend.findMany({ where: { weekKey: week }, select: { memberId: true } }),
+    prisma.reengageEmailSend.groupBy({ by: ["memberId"], where: { status: "SENT" }, _max: { sentAt: true } }),
   ]);
-  const optedOut = new Set(optedOutRows.map((r) => r.memberId));
   const done = new Set(sentRows.map((r) => r.memberId));
+  const last = new Map(lastSent.map((r) => [r.memberId, r._max.sentAt?.getTime() ?? 0]));
 
-  const eligible: Eligible[] = [];
-  let withEmail = 0;
-  for (const row of sheet.rows) {
-    const memberId = rowMemberId(row);
-    const email = memberEmail(row);
-    if (!memberId || !email) continue;
-    withEmail++;
-    if (optedOut.has(memberId) || done.has(memberId)) continue;
-    eligible.push({
-      memberId,
+  const pool: Eligible[] = [];
+  for (const r of optedInRows) {
+    const email = (r.email ?? "").trim();
+    if (!EMAIL_RE.test(email) || done.has(r.memberId)) continue;
+    const idx = sheet.memberToIdx.get(r.memberId);
+    if (idx === undefined) continue;
+    const row = sheet.rows[idx];
+    pool.push({
+      memberId: r.memberId,
       email,
       discordId: String(row.discordId ?? "").trim(),
-      name: rowName(row),
+      name: String(row["Name"] || row["Mafia Name"] || "").trim(),
       crewNames: parseCrewNames(row["Crews"]),
     });
   }
-  return { eligible, withEmail, optedOut: optedOut.size };
+  pool.sort((a, b) => (last.get(a.memberId) ?? 0) - (last.get(b.memberId) ?? 0) || a.memberId.localeCompare(b.memberId));
+
+  const seen = new Set<string>();
+  const eligible: Eligible[] = [];
+  let duplicates = 0;
+  for (const e of pool) {
+    const key = e.email.toLowerCase();
+    if (seen.has(key)) { duplicates++; continue; }
+    seen.add(key);
+    eligible.push(e);
+  }
+  return { eligible, optedIn: optedInRows.length, duplicates };
 }
 
 export interface ReengageResult {
   week: string;
   dryRun: boolean;
   enabled: boolean;
-  withEmail: number;
-  optedOut: number;
+  optedIn: number;
+  duplicates: number;
   eligible: number;
+  /** Set when a real run was refused before claiming anything. */
+  blocked?: "no_api_key" | "no_postal_address";
+  /** Claims released after a retryable provider failure (429/5xx/timeout). */
+  released: number;
   /** Members in this batch whose digest had something to say. */
   batch: number;
   skippedEmpty: number;
@@ -131,11 +132,18 @@ export async function runReengage(opts: ReengageOptions = {}): Promise<ReengageR
   const dryRun = opts.dryRun === true || !enabled;
   const limit = clampBatch(opts.limit);
 
-  const { eligible, withEmail, optedOut } = await listEligible(week);
+  const { eligible, optedIn, duplicates } = await listEligible(week);
   const result: ReengageResult = {
-    week, dryRun, enabled, withEmail, optedOut,
-    eligible: eligible.length, batch: 0, skippedEmpty: 0, sent: 0, failed: 0, alreadyClaimed: 0,
+    week, dryRun, enabled, optedIn, duplicates,
+    eligible: eligible.length, batch: 0, skippedEmpty: 0, sent: 0, failed: 0, alreadyClaimed: 0, released: 0,
   };
+
+  // Refuse before claiming anything if the mail could not go out compliantly.
+  const postal = postalAddress();
+  if (!dryRun) {
+    if (!process.env.RESEND_API_KEY?.trim()) return { ...result, blocked: "no_api_key" };
+    if (!postal) return { ...result, blocked: "no_postal_address" };
+  }
 
   const batch = eligible.slice(0, limit);
   const digests = await loadDigests(batch, now);
@@ -173,7 +181,7 @@ export async function runReengage(opts: ReengageOptions = {}): Promise<ReengageR
     const email = byId.get(digest.memberId)!.email;
     const page = unsubscribePageUrl(digest.memberId);
     const post = unsubscribePostUrl(digest.memberId);
-    const rendered = renderDigestEmail(digest, { siteUrl: SITE_URL, unsubscribeUrl: page });
+    const rendered = renderDigestEmail(digest, { siteUrl: SITE_URL, unsubscribeUrl: page, postalAddress: postal });
     const sent = await sendEmail({
       to: email,
       subject: rendered.subject,
@@ -190,6 +198,13 @@ export async function runReengage(opts: ReengageOptions = {}): Promise<ReengageR
         where: { memberId: digest.memberId, weekKey: week },
         data: { status: "SENT", sentAt: new Date() },
       });
+    } else if (sent.retryable) {
+      // Provider is throttling/down: free the claim so a later run retries.
+      result.released++;
+      await prisma.reengageEmailSend.deleteMany({
+        where: { memberId: digest.memberId, weekKey: week, status: "SENDING" },
+      });
+      if (sent.rateLimited) break;
     } else {
       result.failed++;
       await prisma.reengageEmailSend.updateMany({

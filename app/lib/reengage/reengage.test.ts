@@ -6,18 +6,18 @@ const db = vi.hoisted(() => ({
   missionCompletion: { findMany: vi.fn() },
   transaction: { findMany: vi.fn() },
   memberProfileExtras: { findMany: vi.fn(), upsert: vi.fn() },
-  reengageEmailSend: { findMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn() },
+  reengageEmailSend: { findMany: vi.fn(), createMany: vi.fn(), updateMany: vi.fn(), deleteMany: vi.fn(), groupBy: vi.fn() },
 }));
 vi.mock("@/app/lib/db", () => ({ prisma: db }));
 vi.mock("@/app/lib/sheets/member-repository", () => ({ getSheetData: vi.fn() }));
 vi.mock("@/app/lib/crew-mappings", () => ({ getCrewMappings: vi.fn(async () => ({ crews: [] })) }));
 
 import { getSheetData } from "@/app/lib/sheets/member-repository";
-import { signUnsubscribe, verifyUnsubscribe, unsubscribePostUrl } from "./unsub-sig";
+import { signUnsubscribe, verifyUnsubscribe, unsubscribePostUrl, signConfirm, verifyConfirm } from "./unsub-sig";
 import { computeDigest, type DigestInput } from "./digest";
 import { renderDigestEmail } from "./render";
-import { weekKey, memberEmail, runReengage } from "./run";
-import { sendEmail } from "./mailer";
+import { weekKey, runReengage } from "./run";
+import { sendEmail, __setMinInterval, oneLine } from "./mailer";
 
 const NOW = new Date("2026-10-27T16:00:00Z"); // a Tuesday
 const missions = [
@@ -35,13 +35,18 @@ let saved: Record<string, string | undefined> = {};
 beforeEach(() => {
   vi.clearAllMocks();
   savedSecret = process.env.SESSION_SECRET;
-  saved = { e: process.env.REENGAGE_EMAIL_ENABLED, k: process.env.RESEND_API_KEY };
+  saved = { e: process.env.REENGAGE_EMAIL_ENABLED, k: process.env.RESEND_API_KEY, p: process.env.REENGAGE_POSTAL_ADDRESS, u: process.env.UNSUBSCRIBE_SECRET };
   process.env.SESSION_SECRET = "test-secret";
+  delete process.env.UNSUBSCRIBE_SECRET;
+  process.env.REENGAGE_POSTAL_ADDRESS = "PizzaDAO, 1 Slice St, New York, NY 10001";
+  __setMinInterval(0);
 });
 afterEach(() => {
   if (savedSecret === undefined) delete process.env.SESSION_SECRET; else process.env.SESSION_SECRET = savedSecret;
   if (saved.e === undefined) delete process.env.REENGAGE_EMAIL_ENABLED; else process.env.REENGAGE_EMAIL_ENABLED = saved.e;
   if (saved.k === undefined) delete process.env.RESEND_API_KEY; else process.env.RESEND_API_KEY = saved.k;
+  if (saved.p === undefined) delete process.env.REENGAGE_POSTAL_ADDRESS; else process.env.REENGAGE_POSTAL_ADDRESS = saved.p;
+  if (saved.u === undefined) delete process.env.UNSUBSCRIBE_SECRET; else process.env.UNSUBSCRIBE_SECRET = saved.u;
   vi.unstubAllGlobals();
 });
 
@@ -53,7 +58,24 @@ describe("unsubscribe signature", () => {
     expect(verifyUnsubscribe("m1", sig + "x")).toBe(false);
     expect(verifyUnsubscribe("m1", undefined)).toBe(false);
   });
-  it("fails closed without SESSION_SECRET", () => {
+  it("prefers UNSUBSCRIBE_SECRET over SESSION_SECRET", () => {
+    const viaSession = signUnsubscribe("m1")!;
+    process.env.UNSUBSCRIBE_SECRET = "dedicated";
+    const dedicated = signUnsubscribe("m1")!;
+    expect(dedicated).not.toBe(viaSession);
+    expect(verifyUnsubscribe("m1", dedicated)).toBe(true);
+    expect(verifyUnsubscribe("m1", viaSession)).toBe(false);
+  });
+  it("confirm tokens bind member, address (case-insensitively) and expiry", () => {
+    const t = signConfirm("m1", "A@x.io", 1000)!;
+    expect(verifyConfirm("m1", "a@x.io", t, 2000)).toBe(true);
+    expect(verifyConfirm("m2", "a@x.io", t, 2000)).toBe(false);
+    expect(verifyConfirm("m1", "other@x.io", t, 2000)).toBe(false);
+    expect(verifyConfirm("m1", "a@x.io", t, 1000 + 8 * 24 * 3600 * 1000)).toBe(false);
+    expect(verifyConfirm("m1", "a@x.io", "garbage", 2000)).toBe(false);
+  });
+  it("fails closed without a secret", () => {
+    delete process.env.UNSUBSCRIBE_SECRET;
     delete process.env.SESSION_SECRET;
     expect(signUnsubscribe("m1")).toBeNull();
     expect(verifyUnsubscribe("m1", "anything")).toBe(false);
@@ -117,84 +139,132 @@ describe("helpers", () => {
     expect(weekKey(new Date("2026-11-01T23:59:00Z"))).toBe("2026-W44");
     expect(weekKey(new Date("2027-01-01T12:00:00Z"))).toBe("2026-W53");
   });
-  it("memberEmail finds the column case-insensitively and validates", () => {
-    expect(memberEmail({ discordId: "1", Email: " a@b.co " })).toBe("a@b.co");
-    expect(memberEmail({ discordId: "1", "E-mail": "nope" })).toBeNull();
-    expect(memberEmail({ discordId: "1", Name: "x" })).toBeNull();
-  });
 });
 
-function sheet(rows: Record<string, string>[]) {
-  vi.mocked(getSheetData).mockResolvedValue({ rows } as never);
+const sheetRows = [
+  { ID: "1", discordId: "d1", Name: "A", Crews: "" },
+  { ID: "2", discordId: "d2", Name: "B", Crews: "" },
+  { ID: "4", discordId: "d4", Name: "D", Crews: "" },
+  { ID: "5", discordId: "d5", Name: "E", Crews: "" },
+];
+function sheet() {
+  vi.mocked(getSheetData).mockResolvedValue({
+    rows: sheetRows,
+    memberToIdx: new Map(sheetRows.map((r, i) => [r.ID, i])),
+  } as never);
 }
-function setupDb({ sent = [] as string[], optedOut = [] as string[] } = {}) {
+type Opt = { memberId: string; email: string };
+function setupDb({ optedIn, sent = [] as string[], lastSent = {} as Record<string, number> }: { optedIn: Opt[]; sent?: string[]; lastSent?: Record<string, number> }) {
   db.mission.findMany.mockResolvedValue(missions);
   db.missionCompletion.findMany.mockResolvedValue([]);
   db.transaction.findMany.mockResolvedValue([]);
-  db.memberProfileExtras.findMany.mockImplementation(async (a: { where: { reengageEmailOptOut?: boolean } }) =>
-    a.where.reengageEmailOptOut ? optedOut.map((memberId) => ({ memberId })) : [],
+  db.memberProfileExtras.findMany.mockImplementation(async (a: { where: { reengageEmailOptIn?: boolean } }) =>
+    a.where.reengageEmailOptIn ? optedIn : [],
   );
   db.reengageEmailSend.findMany.mockResolvedValue(sent.map((memberId) => ({ memberId })));
+  db.reengageEmailSend.groupBy.mockResolvedValue(
+    Object.entries(lastSent).map(([memberId, t]) => ({ memberId, _max: { sentAt: new Date(t) } })),
+  );
   db.reengageEmailSend.createMany.mockResolvedValue({ count: 1 });
 }
-const rows = [
-  { ID: "1", discordId: "d1", Name: "A", Email: "a@x.io", Crews: "" },
-  { ID: "2", discordId: "d2", Name: "B", Email: "b@x.io", Crews: "" },
-  { ID: "3", discordId: "d3", Name: "C", Email: "", Crews: "" },
-  { ID: "4", discordId: "d4", Name: "D", Email: "d@x.io", Crews: "" },
+const optedIn: Opt[] = [
+  { memberId: "1", email: "a@x.io" },
+  { memberId: "2", email: "b@x.io" },
+  { memberId: "4", email: "D@x.io" },
+  { memberId: "5", email: "d@X.io" }, // same address as member 4, different case
 ];
+const ok = () => vi.fn(async () => new Response(JSON.stringify({ id: "x" }), { status: 200 }));
+const live = () => { process.env.REENGAGE_EMAIL_ENABLED = "true"; process.env.RESEND_API_KEY = "k"; };
+const sentTo = (f: ReturnType<typeof vi.fn>) =>
+  f.mock.calls.map((c) => JSON.parse((c as unknown as [string, { body: string }])[1].body).to[0].toLowerCase());
 
 describe("runReengage", () => {
   it("is a dry run (no writes, no sends) while REENGAGE_EMAIL_ENABLED is off", async () => {
     delete process.env.REENGAGE_EMAIL_ENABLED;
-    sheet(rows); setupDb();
+    sheet(); setupDb({ optedIn });
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     const r = await runReengage({ now: NOW });
-    expect(r).toMatchObject({ dryRun: true, enabled: false, eligible: 3, batch: 3, sent: 0 });
+    expect(r).toMatchObject({ dryRun: true, enabled: false, optedIn: 4, eligible: 3, duplicates: 1, batch: 3, sent: 0 });
     expect(db.reengageEmailSend.createMany).not.toHaveBeenCalled();
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("excludes opted-out members and members already handled this week, and honors the batch limit", async () => {
-    process.env.REENGAGE_EMAIL_ENABLED = "true"; process.env.RESEND_API_KEY = "k";
-    sheet(rows); setupDb({ sent: ["1"], optedOut: ["2"] });
-    const fetchMock = vi.fn(async () => new Response(JSON.stringify({ id: "x" }), { status: 200 }));
-    vi.stubGlobal("fetch", fetchMock);
-    const r = await runReengage({ now: NOW, limit: 5 });
-    expect(r).toMatchObject({ withEmail: 3, optedOut: 1, eligible: 1, sent: 1, failed: 0 });
-    expect(fetchMock).toHaveBeenCalledTimes(1);
+  it("skips members handled this week, dedupes addresses, and sets unsubscribe headers and footer address", async () => {
+    live();
+    sheet(); setupDb({ optedIn, sent: ["1"] });
+    const fetchMock = ok(); vi.stubGlobal("fetch", fetchMock);
+    const r = await runReengage({ now: NOW, limit: 10 });
+    expect(r).toMatchObject({ eligible: 2, duplicates: 1, sent: 2 });
+    expect(sentTo(fetchMock)).toEqual(["b@x.io", "d@x.io"]);
     const [, init] = fetchMock.mock.calls[0] as unknown as [string, { body: string; headers: Record<string, string> }];
     const body = JSON.parse(init.body);
-    expect(body.to).toEqual(["d@x.io"]);
-    expect(body.headers["List-Unsubscribe"]).toMatch(/^<https:\/\/.+\/api\/email\/unsubscribe\?m=4&s=.+>$/);
+    expect(body.headers["List-Unsubscribe"]).toMatch(/^<https:\/\/.+\/api\/email\/unsubscribe\?m=2&s=.+>$/);
     expect(body.headers["List-Unsubscribe-Post"]).toBe("List-Unsubscribe=One-Click");
-    expect(init.headers["Idempotency-Key"]).toBe("reengage-4-2026-W44");
+    expect(body.html).toContain("1 Slice St");
+    expect(body.text).toContain("1 Slice St");
+    expect(init.headers["Idempotency-Key"]).toBe("reengage-2-2026-W44");
   });
 
-  it("limits the batch and does not send when the claim was already taken", async () => {
-    process.env.REENGAGE_EMAIL_ENABLED = "true"; process.env.RESEND_API_KEY = "k";
-    sheet(rows); setupDb();
+  it("orders least-recently-emailed first so the batch cap starves nobody", async () => {
+    live();
+    sheet(); setupDb({ optedIn, lastSent: { "1": 300, "2": 100, "4": 0 } });
+    const fetchMock = ok(); vi.stubGlobal("fetch", fetchMock);
+    await runReengage({ now: NOW, limit: 2 });
+    expect(sentTo(fetchMock)).toEqual(["d@x.io", "b@x.io"]); // never-sent (4), then oldest (2)
+  });
+
+  it("refuses before claiming when RESEND_API_KEY or the postal address is missing", async () => {
+    live(); delete process.env.RESEND_API_KEY;
+    sheet(); setupDb({ optedIn });
+    expect((await runReengage({ now: NOW })).blocked).toBe("no_api_key");
+    process.env.RESEND_API_KEY = "k"; delete process.env.REENGAGE_POSTAL_ADDRESS;
+    expect((await runReengage({ now: NOW })).blocked).toBe("no_postal_address");
+    expect(db.reengageEmailSend.createMany).not.toHaveBeenCalled();
+  });
+
+  it("does not send when the claim was already taken", async () => {
+    live();
+    sheet(); setupDb({ optedIn });
     db.reengageEmailSend.createMany.mockResolvedValue({ count: 0 });
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     const r = await runReengage({ now: NOW, limit: 2 });
-    expect(r.batch).toBe(2);
     expect(r.alreadyClaimed).toBe(2);
     expect(fetchMock).not.toHaveBeenCalled();
   });
 
-  it("marks a provider failure FAILED and never throws", async () => {
-    process.env.REENGAGE_EMAIL_ENABLED = "true"; process.env.RESEND_API_KEY = "k";
-    sheet([rows[0]]); setupDb();
-    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 500 })));
-    const r = await runReengage({ now: NOW });
-    expect(r).toMatchObject({ sent: 0, failed: 1 });
+  it("releases the claim on 5xx so a later run retries, and keeps it on a permanent failure", async () => {
+    live();
+    sheet(); setupDb({ optedIn: [optedIn[0]] });
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("no", { status: 503 })));
+    let r = await runReengage({ now: NOW });
+    expect(r).toMatchObject({ sent: 0, released: 1, failed: 0 });
+    expect(db.reengageEmailSend.deleteMany).toHaveBeenCalledTimes(1);
+    vi.stubGlobal("fetch", vi.fn(async () => new Response("bad", { status: 422 })));
+    r = await runReengage({ now: NOW });
+    expect(r).toMatchObject({ released: 0, failed: 1 });
     expect(db.reengageEmailSend.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { status: "FAILED" } }));
   });
 
+  it("stops the batch on 429 and releases that claim", async () => {
+    live();
+    sheet(); setupDb({ optedIn });
+    const fetchMock = vi.fn(async () => new Response("slow", { status: 429 })); vi.stubGlobal("fetch", fetchMock);
+    const r = await runReengage({ now: NOW, limit: 10 });
+    expect(r.released).toBe(1);
+    expect(fetchMock).toHaveBeenCalledTimes(1);
+  });
+
+  it("releases the claim when the request times out", async () => {
+    live();
+    sheet(); setupDb({ optedIn: [optedIn[0]] });
+    vi.stubGlobal("fetch", vi.fn(async () => { throw new DOMException("timed out", "TimeoutError"); }));
+    expect((await runReengage({ now: NOW })).released).toBe(1);
+  });
+
   it("does not send mail it cannot sign an unsubscribe link for", async () => {
-    process.env.REENGAGE_EMAIL_ENABLED = "true"; process.env.RESEND_API_KEY = "k";
+    live();
     delete process.env.SESSION_SECRET;
-    sheet([rows[0]]); setupDb();
+    sheet(); setupDb({ optedIn: [optedIn[0]] });
     const fetchMock = vi.fn(); vi.stubGlobal("fetch", fetchMock);
     const r = await runReengage({ now: NOW });
     expect(r.failed).toBe(1);
@@ -202,8 +272,8 @@ describe("runReengage", () => {
   });
 
   it("explicit dryRun wins even when enabled", async () => {
-    process.env.REENGAGE_EMAIL_ENABLED = "true";
-    sheet(rows); setupDb();
+    live();
+    sheet(); setupDb({ optedIn });
     const r = await runReengage({ now: NOW, dryRun: true });
     expect(r.dryRun).toBe(true);
     expect(db.reengageEmailSend.createMany).not.toHaveBeenCalled();
@@ -213,7 +283,23 @@ describe("runReengage", () => {
 describe("sendEmail", () => {
   it("fails without an API key and never calls fetch", async () => {
     const f = vi.fn();
-    expect(await sendEmail({ to: "a@b.c", subject: "s", html: "h", text: "t" }, {} as NodeJS.ProcessEnv, f as never)).toEqual({ ok: false, reason: "no_api_key" });
+    expect(await sendEmail({ to: "a@b.c", subject: "s", html: "h", text: "t" }, {} as NodeJS.ProcessEnv, f as never)).toMatchObject({ ok: false, reason: "no_api_key" });
     expect(f).not.toHaveBeenCalled();
+  });
+  it("passes an abort signal and strips CR/LF from the subject", async () => {
+    const f = vi.fn(async () => new Response("{}", { status: 200 }));
+    await sendEmail({ to: "a@b.c", subject: "Hi\r\nBcc: evil@x.io", html: "h", text: "t" }, { RESEND_API_KEY: "k" } as never, f as never);
+    const init = (f.mock.calls[0] as unknown as [string, { signal: AbortSignal; body: string }])[1];
+    expect(init.signal).toBeInstanceOf(AbortSignal);
+    expect(JSON.parse(init.body).subject).toBe("Hi Bcc: evil@x.io");
+    expect(oneLine("a\nb")).toBe("a b");
+  });
+  it("spaces requests to stay under 2 req/s", async () => {
+    __setMinInterval(50);
+    const f = vi.fn(async () => new Response("{}", { status: 200 }));
+    const t0 = Date.now();
+    for (let i = 0; i < 3; i++) await sendEmail({ to: "a@b.c", subject: "s", html: "h", text: "t" }, { RESEND_API_KEY: "k" } as never, f as never);
+    expect(Date.now() - t0).toBeGreaterThanOrEqual(90);
+    __setMinInterval(0);
   });
 });

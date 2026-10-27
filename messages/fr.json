@@ -1059,10 +1059,33 @@
     },
     "prefs": {
       "sectionTitle": "E-mail",
-      "description": "Une courte note hebdomadaire avec ta prochaine mission, les appels de tes crews et ta progression de niveau.",
+      "description": "Une courte note hebdomadaire avec ta prochaine mission, les appels de tes crews et ta progression de niveau. Envoyée uniquement à une adresse confirmée pour laquelle tu t'inscris.",
       "label": "M'envoyer l'e-mail hebdomadaire PizzaDAO",
       "saveError": "Impossible d'enregistrer ta préférence e-mail. Réessayer ?",
-      "saved": "Enregistré"
+      "saved": "Enregistré",
+      "emailLabel": "Adresse e-mail",
+      "optIn": "Recevoir un résumé hebdomadaire PizzaDAO",
+      "save": "Enregistrer",
+      "verified": "Confirmée",
+      "pending": "Vérifie ta boîte de réception pour confirmer cette adresse.",
+      "resend": "Renvoyer la confirmation",
+      "invalidEmail": "Saisis une adresse e-mail valide.",
+      "tooSoon": "Une confirmation vient d'être envoyée. Réessaie dans quelques minutes.",
+      "sendFailed": "Enregistré, mais l'envoi de la confirmation a échoué. Réessaie plus tard."
+    },
+    "confirm": {
+      "subject": "Confirme ton e-mail pour le résumé hebdomadaire PizzaDAO",
+      "intro": "Confirme cette adresse pour recevoir le résumé hebdomadaire PizzaDAO (ta prochaine mission, les appels de tes crews et ta progression de niveau).",
+      "cta": "Confirmer mon e-mail",
+      "ignore": "Si tu n'as rien demandé, ignore cet e-mail et rien ne sera envoyé."
+    },
+    "confirmPage": {
+      "title": "Confirme ton e-mail",
+      "body": "Confirmer cette adresse pour le résumé hebdomadaire PizzaDAO ?",
+      "button": "Confirmer",
+      "doneTitle": "E-mail confirmé",
+      "doneBody": "C'est bon. Tu recevras le résumé hebdomadaire.",
+      "invalid": "Ce lien de confirmation est invalide ou a expiré. Demande-en un nouveau depuis les réglages de ton profil."
     }
   }
 }

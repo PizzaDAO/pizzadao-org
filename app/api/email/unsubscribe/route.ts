@@ -1,11 +1,11 @@
 // app/api/email/unsubscribe/route.ts
 //
 // POST /api/email/unsubscribe?m=<memberId>&s=<sig>
-// The target of the List-Unsubscribe header (RFC 8058 one-click: mail clients
-// POST "List-Unsubscribe=One-Click" here) and of the confirm button on
-// /email/unsubscribe. No login: the HMAC in `s` (SESSION_SECRET) proves the link
-// came from us for this member. A browser form post (urlencoded/multipart) is
-// redirected back to the confirmation page; anything else gets JSON.
+// The target of the List-Unsubscribe header (RFC 8058 one-click: the mail
+// client POSTs the body "List-Unsubscribe=One-Click" and expects a 2xx) and of
+// the confirm button on /email/unsubscribe (a browser form post, which is
+// redirected back to the confirmation page). No login: the HMAC in `s`
+// proves the link came from us for this member. Flips the opt-in OFF.
 // Idempotent. GET is deliberately not supported (link scanners prefetch GETs).
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
@@ -22,14 +22,19 @@ export async function POST(req: NextRequest) {
   if (!verifyUnsubscribe(memberId, sig)) {
     return NextResponse.json({ error: "Invalid link" }, { status: 400 });
   }
+  const body = await req.text().catch(() => "");
   try {
     await prisma.memberProfileExtras.upsert({
       where: { memberId: memberId! },
-      create: { memberId: memberId!, reengageEmailOptOut: true },
-      update: { reengageEmailOptOut: true },
+      create: { memberId: memberId!, reengageEmailOptIn: false },
+      update: { reengageEmailOptIn: false },
     });
   } catch (err) {
     return internalError(err, "email/unsubscribe", "Couldn't unsubscribe");
+  }
+  // Mail-client one-click wins over the content type: always a plain 200.
+  if (body.includes("List-Unsubscribe=One-Click")) {
+    return NextResponse.json({ ok: true }, { status: 200 });
   }
   const type = req.headers.get("content-type") ?? "";
   if (type.includes("application/x-www-form-urlencoded") || type.includes("multipart/form-data")) {

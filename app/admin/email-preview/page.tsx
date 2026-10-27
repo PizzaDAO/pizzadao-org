@@ -12,6 +12,7 @@ import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { loadDigests, parseCrewNames } from "@/app/lib/reengage/digest";
 import { renderDigestEmail } from "@/app/lib/reengage/render";
 import { reengageEnabled } from "@/app/lib/reengage/run";
+import { postalAddress } from "@/app/lib/reengage/mailer";
 import { SITE_URL } from "@/app/lib/site-url";
 import { isSupportedLocale, SUPPORTED_LOCALES } from "@/app/lib/i18n/locales";
 
@@ -67,7 +68,7 @@ export default async function AdminEmailPreviewPage({
             ]);
             const d = isSupportedLocale(locale) ? { ...digest, locale } : digest;
             hasContent = d.hasContent;
-            rendered = renderDigestEmail(d, { siteUrl: SITE_URL, unsubscribeUrl: "#" });
+            rendered = renderDigestEmail(d, { siteUrl: SITE_URL, unsubscribeUrl: "#", postalAddress: postalAddress() });
         }
     }
 

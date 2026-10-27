@@ -889,7 +889,12 @@ model MemberProfileExtras {
   // ===== Timezone (pizzaiolo-13628) — the Crew sheet has no Timezone column =====
   timezone                 String?   @db.VarChar(64) // IANA ID resolved from the onboarding city, e.g. "America/New_York"
   // ===== Re-engagement email (task/reengage-emails) =====
-  reengageEmailOptOut      Boolean   @default(false) // true = never send the weekly digest
+  // Emails are collected in the app (never in the publicly readable Crew sheet).
+  // The digest goes only to an address that is verified AND opted in.
+  email                    String?   @db.VarChar(254)
+  emailVerifiedAt          DateTime?                  // set by the signed confirmation link; reset when the address changes
+  emailConfirmSentAt       DateTime?                  // last confirmation email (throttle)
+  reengageEmailOptIn       Boolean   @default(false)  // explicit opt-in to the weekly digest
   updatedAt                DateTime  @updatedAt
   createdAt                DateTime  @default(now())
 }

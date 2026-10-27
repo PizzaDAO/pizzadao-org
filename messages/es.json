@@ -1059,10 +1059,33 @@
     },
     "prefs": {
       "sectionTitle": "Correo",
-      "description": "Una nota semanal breve con tu próxima misión, las llamadas de tus crews y tu progreso de nivel.",
+      "description": "Una nota semanal breve con tu próxima misión, las llamadas de tus crews y tu progreso de nivel. Solo se envía a una dirección confirmada con tu consentimiento.",
       "label": "Enviarme el correo semanal de PizzaDAO",
       "saveError": "No pudimos guardar tu preferencia de correo. ¿Intentas de nuevo?",
-      "saved": "Guardado"
+      "saved": "Guardado",
+      "emailLabel": "Correo electrónico",
+      "optIn": "Recibir un resumen semanal de PizzaDAO",
+      "save": "Guardar",
+      "verified": "Confirmado",
+      "pending": "Revisa tu bandeja de entrada para confirmar esta dirección.",
+      "resend": "Reenviar confirmación",
+      "invalidEmail": "Introduce un correo válido.",
+      "tooSoon": "Acabamos de enviar una confirmación. Inténtalo de nuevo en unos minutos.",
+      "sendFailed": "Guardado, pero no pudimos enviar la confirmación. Inténtalo más tarde."
+    },
+    "confirm": {
+      "subject": "Confirma tu correo para el resumen semanal de PizzaDAO",
+      "intro": "Confirma esta dirección para recibir el resumen semanal de PizzaDAO (tu próxima misión, las llamadas de tus crews y tu progreso de nivel).",
+      "cta": "Confirmar mi correo",
+      "ignore": "Si no lo pediste, ignora este correo y no se enviará nada."
+    },
+    "confirmPage": {
+      "title": "Confirma tu correo",
+      "body": "¿Confirmar esta dirección para el resumen semanal de PizzaDAO?",
+      "button": "Confirmar",
+      "doneTitle": "Correo confirmado",
+      "doneBody": "Todo listo. Recibirás el resumen semanal.",
+      "invalid": "Este enlace de confirmación no es válido o ha caducado. Pide uno nuevo desde los ajustes de tu perfil."
     }
   }
 }

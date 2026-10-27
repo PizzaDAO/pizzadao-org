@@ -12,20 +12,25 @@ let saved: string | undefined;
 beforeEach(() => { vi.clearAllMocks(); saved = process.env.SESSION_SECRET; process.env.SESSION_SECRET = "s"; });
 afterEach(() => { if (saved === undefined) delete process.env.SESSION_SECRET; else process.env.SESSION_SECRET = saved; });
 
-const post = (qs: string, type?: string) =>
+const post = (qs: string, type?: string, body?: string) =>
   new NextRequest(`https://app.pizzadao.org/api/email/unsubscribe?${qs}`, {
     method: "POST",
     headers: type ? { "content-type": type } : {},
-    body: type ? "List-Unsubscribe=One-Click" : undefined,
+    body,
   });
 
 describe("POST /api/email/unsubscribe", () => {
-  it("opts the member out with a valid signature (one-click)", async () => {
-    const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded"));
-    expect(res.status).toBe(303); // form posts go back to the confirmation page
-    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { memberId: "42" }, update: { reengageEmailOptOut: true } }));
+  it("mail-client one-click (List-Unsubscribe=One-Click) returns 200 and flips the opt-in off", async () => {
+    const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", "List-Unsubscribe=One-Click"));
+    expect(res.status).toBe(200);
+    expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { memberId: "42" }, update: { reengageEmailOptIn: false } }));
   });
-  it("returns JSON for non-form callers", async () => {
+  it("a browser form post is redirected back to the confirmation page", async () => {
+    const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", ""));
+    expect(res.status).toBe(303);
+    expect(res.headers.get("location")).toContain("/email/unsubscribe");
+  });
+  it("returns JSON for other callers", async () => {
     const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`));
     expect(await res.json()).toEqual({ ok: true });
   });

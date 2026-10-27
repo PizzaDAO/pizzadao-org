@@ -1,5 +1,8 @@
 -- Weekly re-engagement email (task/reengage-emails). ADDITIVE ONLY; re-runnable.
-ALTER TABLE "MemberProfileExtras" ADD COLUMN IF NOT EXISTS "reengageEmailOptOut" BOOLEAN NOT NULL DEFAULT false;
+ALTER TABLE "MemberProfileExtras" ADD COLUMN IF NOT EXISTS "email" VARCHAR(254);
+ALTER TABLE "MemberProfileExtras" ADD COLUMN IF NOT EXISTS "emailVerifiedAt" TIMESTAMP(3);
+ALTER TABLE "MemberProfileExtras" ADD COLUMN IF NOT EXISTS "emailConfirmSentAt" TIMESTAMP(3);
+ALTER TABLE "MemberProfileExtras" ADD COLUMN IF NOT EXISTS "reengageEmailOptIn" BOOLEAN NOT NULL DEFAULT false;
 
 CREATE TABLE IF NOT EXISTS "ReengageEmailSend" (
   "id" TEXT NOT NULL,
