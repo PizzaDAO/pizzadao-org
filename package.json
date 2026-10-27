@@ -15,6 +15,7 @@
     "e2e:activation": "playwright test -c e2e/playwright.activation.config.ts"
   },
   "dependencies": {
+    "@ai-sdk/openai": "^4.0.103",
     "@aws-sdk/client-s3": "^3.1152.0",
     "@aws-sdk/s3-request-presigner": "^3.1152.0",
     "@cloudflare/blindrsa-ts": "^0.4.4",

@@ -10,7 +10,7 @@
 // their final state on first render, no transitions, no animation.
 "use client";
 
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import type { CSSProperties } from "react";
 import { useLocale, useTranslations } from "next-intl";
 
@@ -53,18 +53,68 @@ function usePrefersReducedMotion(): boolean {
 //   6 (3100ms) CTAs lift into place
 const PHASE_TIMINGS = [200, 700, 1300, 1900, 2500, 3100];
 
+// AI portrait (plans/mafia-name-port.md, Phase 1). Generation takes ~5-15s, so
+// the scene never waits on it: the seal shows its text until the portrait lands.
+const PORTRAIT_CLIENT_TIMEOUT_MS = 50_000;
+
+type Portrait = {
+  url: string | null;
+  loading: boolean;
+  /** Set when the last attempt failed or hit the limit; the previous url (if any) stays on screen. */
+  notice: "unavailable" | "limited" | null;
+  /** Draws left today, known once the server has told us. */
+  remaining: number | null;
+  variant: number;
+};
+
+// "Name Here" -> "Name_Here" for download filenames.
+function fileSafe(name: string): string {
+  return name.replace(/[^\p{L}\p{N}_-]+/gu, "_").replace(/^_+|_+$/g, "").slice(0, 60) || "mafia";
+}
+
+// Clipboard image writes only reliably accept PNG, and the portrait is WebP.
+async function toPng(blob: Blob): Promise<Blob> {
+  if (blob.type === "image/png") return blob;
+  const bitmap = await createImageBitmap(blob);
+  const canvas = document.createElement("canvas");
+  canvas.width = bitmap.width;
+  canvas.height = bitmap.height;
+  canvas.getContext("2d")?.drawImage(bitmap, 0, 0);
+  return new Promise((resolve, reject) =>
+    canvas.toBlob((b) => (b ? resolve(b) : reject(new Error("png"))), "image/png"),
+  );
+}
+
 type Props = {
   mafiaName: string;
   memberId?: string;
   dashboardHref: string;
+  topping?: string;
+  turtles?: string[];
+  crews?: string[];
 };
 
-export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
+export function FinaleScene({ mafiaName, memberId, dashboardHref, topping, turtles, crews }: Props) {
   const t = useTranslations("onboarding.finale");
   const locale = useLocale();
   const reducedMotion = usePrefersReducedMotion();
   const [phase, setPhase] = useState<number>(reducedMotion ? 6 : 0);
   const [shareToast, setShareToast] = useState<string | null>(null);
+
+  const [portrait, setPortrait] = useState<Portrait>({
+    url: null,
+    loading: true,
+    notice: null,
+    remaining: null,
+    variant: 0,
+  });
+  const mountedRef = useRef(true);
+  useEffect(() => {
+    mountedRef.current = true;
+    return () => {
+      mountedRef.current = false;
+    };
+  }, []);
 
   // Stable archive number, scoped to the name + today's date.
   const archiveNo = useMemo(
@@ -86,6 +136,102 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
       timers.forEach((id) => window.clearTimeout(id));
     };
   }, [reducedMotion]);
+
+  // --- Portrait -----------------------------------------------------------
+  const drawPortrait = useCallback(
+    async (variant: number) => {
+      setPortrait((p) => ({ ...p, loading: true, notice: null }));
+      const ctrl = new AbortController();
+      const timer = window.setTimeout(() => ctrl.abort(), PORTRAIT_CLIENT_TIMEOUT_MS);
+      let next: Partial<Portrait> = { notice: "unavailable" };
+      try {
+        const res = await fetch("/api/mafia-portrait", {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify({ name: mafiaName, topping, turtles, crews, variant }),
+          signal: ctrl.signal,
+        });
+        if (res.ok) {
+          const data = (await res.json()) as { url?: string; remaining?: number };
+          if (typeof data.url === "string") {
+            next = {
+              url: data.url,
+              notice: null,
+              variant,
+              ...(typeof data.remaining === "number" ? { remaining: data.remaining } : {}),
+            };
+          }
+        } else if (res.status === 429) {
+          next = { notice: "limited", remaining: 0 };
+        }
+      } catch {
+        // timeout / network: keep whatever is on screen
+      } finally {
+        window.clearTimeout(timer);
+      }
+      if (mountedRef.current) setPortrait((p) => ({ ...p, ...next, loading: false }));
+    },
+    [mafiaName, topping, turtles, crews],
+  );
+
+  const startedRef = useRef(false);
+  useEffect(() => {
+    if (startedRef.current) return;
+    startedRef.current = true;
+    void drawPortrait(0);
+  }, [drawPortrait]);
+
+  const showToast = (msg: string) => {
+    setShareToast(msg);
+    window.setTimeout(() => setShareToast(null), 2400);
+  };
+
+  const fetchPortraitBlob = async (): Promise<Blob> => {
+    const res = await fetch(portrait.url!);
+    if (!res.ok) throw new Error("fetch");
+    return res.blob();
+  };
+
+  const handleDownload = async () => {
+    if (!portrait.url) return;
+    try {
+      const blob = await fetchPortraitBlob();
+      const ext = blob.type === "image/png" ? "png" : "webp";
+      const href = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = href;
+      a.download = `${fileSafe(mafiaName)}_pizzadao.${ext}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      window.setTimeout(() => URL.revokeObjectURL(href), 1000);
+    } catch {
+      window.open(portrait.url, "_blank", "noopener,noreferrer");
+    }
+  };
+
+  const handleCopyImage = async () => {
+    if (!portrait.url) return;
+    try {
+      if (typeof ClipboardItem === "undefined" || !navigator.clipboard?.write) throw new Error("unsupported");
+      // Pass a promise so Safari keeps the user gesture while we fetch + convert.
+      const png = fetchPortraitBlob().then(toPng);
+      await navigator.clipboard.write([new ClipboardItem({ "image/png": png })]);
+      showToast(t("imageCopied"));
+    } catch {
+      showToast(t("copyImageFailed"));
+    }
+  };
+
+  const handleShareX = () => {
+    const text = t("shareXText", { name: mafiaName });
+    const url = `${window.location.origin}/join`;
+    window.open(
+      `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
+      "_blank",
+      "noopener,noreferrer",
+    );
+  };
 
   // --- Share action -------------------------------------------------------
   // Tries the native share sheet first (mobile), falls back to clipboard.
@@ -156,8 +302,19 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
     transition: `opacity ${ms}ms var(--ease-editorial), transform ${ms}ms var(--ease-editorial), filter ${ms}ms var(--ease-editorial)`,
   });
 
+  const redrawDisabled = portrait.loading || portrait.variant >= 4 || portrait.remaining === 0;
+
   return (
-    <section style={overlay} aria-live="polite">
+    <section style={overlay}>
+      <style>{`
+        @keyframes finale-portrait-in { from { opacity: 0; } to { opacity: 1; } }
+        @keyframes finale-portrait-shimmer { 0%, 100% { opacity: 0.15; } 50% { opacity: 0.6; } }
+        .finale-portrait-in { animation: finale-portrait-in 700ms var(--ease-editorial) both; }
+        .finale-portrait-shimmer { animation: finale-portrait-shimmer 1.6s ease-in-out infinite; }
+        @media (prefers-reduced-motion: reduce) {
+          .finale-portrait-in, .finale-portrait-shimmer { animation: none; }
+        }
+      `}</style>
       {/* Cinematic vignette — Phase 1 */}
       <div aria-hidden style={vignette} />
 
@@ -238,9 +395,9 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
           >
             {/* Phase 2 — circular seal stamp */}
             <div
-              aria-hidden
               style={{
                 position: "relative",
+                overflow: "hidden",
                 aspectRatio: "1 / 1",
                 width: "100%",
                 borderRadius: "48% 52% 53% 47% / 51% 48% 52% 49%",
@@ -259,12 +416,15 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
               }}
             >
               <div
+                aria-hidden
                 style={{
                   textAlign: "center",
                   lineHeight: 1.05,
                   position: "relative",
                   zIndex: 1,
                   padding: 6,
+                  opacity: portrait.url ? 0 : 1,
+                  transition: reducedMotion ? "none" : "opacity 700ms var(--ease-editorial)",
                 }}
               >
                 <div
@@ -301,6 +461,37 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
                   PizzaDAO
                 </div>
               </div>
+              {portrait.url && (
+                // eslint-disable-next-line @next/next/no-img-element
+                <img
+                  key={portrait.url}
+                  src={portrait.url}
+                  alt={t("portraitAlt", { name: mafiaName })}
+                  className={reducedMotion ? undefined : "finale-portrait-in"}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    width: "100%",
+                    height: "100%",
+                    objectFit: "cover",
+                    // Undo the seal's -11deg tilt; scale so the corners stay covered.
+                    transform: "rotate(11deg) scale(1.25)",
+                    zIndex: 2,
+                  }}
+                />
+              )}
+              {portrait.loading && (
+                <div
+                  aria-hidden
+                  className={reducedMotion ? undefined : "finale-portrait-shimmer"}
+                  style={{
+                    position: "absolute",
+                    inset: 0,
+                    zIndex: 3,
+                    background: "hsl(var(--cream) / 0.18)",
+                  }}
+                />
+              )}
             </div>
 
             {/* Right column — phases 3/4/5 */}
@@ -439,7 +630,64 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
           >
             {t("shareButton")}
           </button>
+          <button
+            type="button"
+            onClick={handleShareX}
+            className="btn-pill-lg"
+            style={{
+              background: "transparent",
+              color: "hsl(var(--foreground))",
+              border: "1px solid hsl(var(--foreground) / 0.3)",
+              cursor: "pointer",
+            }}
+          >
+            {t("shareX")}
+          </button>
         </div>
+
+        {/* Portrait controls */}
+          <div
+            style={{
+              marginTop: 14,
+              display: "flex",
+              flexWrap: "wrap",
+              gap: 8,
+              justifyContent: "center",
+              alignItems: "center",
+              ...transition(500),
+              opacity: phase >= 6 ? 1 : 0,
+            }}
+          >
+            {portrait.loading && (
+              <p className="overline" role="status" style={{ color: "hsl(var(--foreground) / 0.6)" }}>
+                {t("portraitDeveloping")}
+              </p>
+            )}
+            {!portrait.loading && portrait.notice && (
+              <p className="overline" role="status" style={{ color: "hsl(var(--foreground) / 0.6)" }}>
+                {portrait.notice === "limited" ? t("redrawLimit") : t("portraitUnavailable")}
+              </p>
+            )}
+            {portrait.url && (
+              <>
+                <button
+                  type="button"
+                  onClick={() => void drawPortrait(portrait.variant + 1)}
+                  disabled={redrawDisabled}
+                  style={portraitButton(redrawDisabled)}
+                >
+                  {t("redraw")}
+                  {portrait.remaining !== null && ` · ${t("redrawsLeft", { count: portrait.remaining })}`}
+                </button>
+                <button type="button" onClick={handleDownload} style={portraitButton(false)}>
+                  {t("download")}
+                </button>
+                <button type="button" onClick={handleCopyImage} style={portraitButton(false)}>
+                  {t("copyImage")}
+                </button>
+              </>
+            )}
+          </div>
 
         {/* Tiny editorial footnote — fades in last alongside CTAs */}
         <p
@@ -480,6 +728,20 @@ export function FinaleScene({ mafiaName, memberId, dashboardHref }: Props) {
       </div>
     </section>
   );
+}
+
+function portraitButton(disabled: boolean): CSSProperties {
+  return {
+    background: "transparent",
+    color: "hsl(var(--foreground))",
+    border: "1px solid hsl(var(--foreground) / 0.25)",
+    borderRadius: 999,
+    padding: "8px 14px",
+    fontSize: 13,
+    fontWeight: 600,
+    cursor: disabled ? "not-allowed" : "pointer",
+    opacity: disabled ? 0.5 : 1,
+  };
 }
 
 function DossierField({ label, value }: { label: string; value: string }) {

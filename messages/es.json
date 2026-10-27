@@ -386,6 +386,18 @@
       "member": "Miembro",
       "continueButton": "Ir al panel",
       "shareButton": "Compartir mi nombre",
+      "portraitDeveloping": "Revelando tu retrato…",
+      "portraitUnavailable": "El retrato no está disponible ahora.",
+      "portraitAlt": "Retrato de dibujo animado de {name}",
+      "redraw": "Volver a dibujar",
+      "redrawsLeft": "{count, plural, one {# restante} other {# restantes}} hoy",
+      "redrawLimit": "Ya usaste los dibujos de hoy.",
+      "download": "Descargar",
+      "copyImage": "Copiar imagen",
+      "imageCopied": "Imagen copiada.",
+      "copyImageFailed": "No se pudo copiar la imagen. Prueba Descargar.",
+      "shareX": "Compartir en X",
+      "shareXText": "Ya soy de la familia. {name} 🍕",
       "footnote": "Archivado en el registro familiar · {year}"
     }
   },

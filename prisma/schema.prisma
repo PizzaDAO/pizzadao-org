@@ -1349,3 +1349,20 @@ model CrewDraft {
 
   @@index([crewId, status])
 }
+
+// AI finale portrait cache (plans/mafia-name-port.md, Phase 1).
+model MafiaPortrait {
+  id        String   @id @default(cuid())
+  cacheKey  String   @unique            // sha256(lower(name)|topping|film|variant)
+  name      String   @db.VarChar(80)
+  topping   String   @db.VarChar(50)
+  filmKey   String   @db.VarChar(120)   // MAFIA_FILMS id or clamped title
+  variant   Int      @default(0)
+  animal    String   @db.VarChar(40)
+  model     String   @db.VarChar(80)
+  url       String                      // Vercel Blob public URL
+  discordId String?                     // null for anonymous (Phase 3)
+  createdAt DateTime @default(now())
+
+  @@index([discordId, createdAt])
+}

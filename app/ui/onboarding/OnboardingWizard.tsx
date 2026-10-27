@@ -660,6 +660,9 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         mafiaName={data.mafiaName || data.discordNick || "Made"}
         memberId={data.memberId}
         dashboardHref={flow.redirectTo}
+        topping={data.topping || undefined}
+        turtles={data.turtles}
+        crews={data.crews}
       />
 
     );
