@@ -1281,11 +1281,17 @@ model CallRecording {
   publishedAt        DateTime?
   // Server-side transcription (call-recap): set once the per-speaker tracks were transcribed (or found already transcribed).
   transcribedAt      DateTime?
-  transcribeError    String? // last failure, so a retry is visible to reviewers
+  transcribeError    String? // null | 'claimed' (running) | 'progress' (budget hit, resume now) | 'failed: ...' (retry after 6h)
+  transcribeAttempts Int                 @default(0) // gives up (permanent failure, manual retry) at 3
+  transcribeTracks   Json? // per-track results so a retry only does the remaining tracks: {discordId: {utterances, language, talkTimeSec} | {skipped}}
+  summaryGeneratedAt DateTime? // when the AI summary was last generated
+  summaryEditedAt    DateTime? // set when a reviewer edits title/summary/actions/chapters; blocks automatic regeneration
+  redactionsUpdatedAt DateTime? // last time a speaker or line was hidden/restored
   // Discord recap (call-recap): claimed (recapPostedAt) before posting so a publish never double-posts.
   recapPostedAt      DateTime?
   recapChannelId     String?
   recapMessageId     String?
+  recapError         String?
   // Speakers whose transcript lines are hidden from everything public and from the summary model.
   // Non-destructive: the stored transcript is complete; this only filters.
   redactedSpeakerIds String[]            @default([])

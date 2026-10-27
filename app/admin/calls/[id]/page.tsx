@@ -10,12 +10,13 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
-import { buildRecapText, recapPostingEnabled, resolveRecapChannel } from "@/app/lib/calls/recap";
+import { buildRecapText, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
 import { ReviewActions } from "../ReviewActions";
 import { RedactSpeaker } from "../RedactSpeaker";
+import { RetryTranscription } from "../RetryTranscription";
 import { HideLine } from "../HideLine";
 import { segmentKey } from "@/app/lib/calls/chat";
 
@@ -60,6 +61,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
             : null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
     const recapEnabled = recapPostingEnabled();
+    const recapStale = redactionsNewerThanSummary(rec);
+    const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3;
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -100,6 +103,13 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <p className="text-foreground/60 m-0">{t("noAudio")}</p>
                     )}
                 </section>
+
+                {transcribeGaveUp && (
+                    <section className="grid gap-2">
+                        <p className="m-0 text-tomato">{t("transcribeFailed", { count: rec.transcribeAttempts, error: rec.transcribeError ?? "" })}</p>
+                        <RetryTranscription recordingId={rec.id} labels={{ retry: t("transcribeRetry"), working: t("working"), error: t("reviewError") }} />
+                    </section>
+                )}
 
                 <section className="grid gap-3">
                     <h2 className="text-xl font-bold m-0">{t("speakersHeading")}</h2>
@@ -214,6 +224,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                             {!recapEnabled ? ` ${t("recapDisabled")}` : ""}
                             {rec.recapPostedAt ? ` ${t("recapPosted")}` : ""}
                         </p>
+                        {recapStale && <p className="m-0 text-sm text-tomato">{t("recapStale")}</p>}
+                        {rec.recapError && <p className="m-0 text-sm text-tomato">{t("recapError", { error: rec.recapError })}</p>}
                         <pre className="m-0 whitespace-pre-wrap break-words rounded-xl border p-3 bg-card text-sm" style={{ borderColor: "hsl(var(--rule-warm) / 0.65)" }}>
                             {recapText}
                         </pre>

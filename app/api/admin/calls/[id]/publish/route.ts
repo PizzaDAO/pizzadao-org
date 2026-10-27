@@ -32,6 +32,7 @@ export const POST = withErrorHandling(async (request: Request, ctx: { params: Pr
   if (result === 'incomplete') throw new ConflictError('A transcript and a summary are required before publishing')
   // Publishing is the human approval: only now may the recap go to Discord (gated by CALL_RECAP_POST_ENABLED, once per call).
   let recap: RecapResult | null = null
-  if (body.action === 'publish') recap = await postCallRecap(id).catch((err) => { console.error('[calls/publish] recap failed:', err instanceof Error ? err.message : err); return 'failed' as const })
+  // Only a fresh publish posts: re-clicking Publish on an already-published call ('already') never does.
+  if (body.action === 'publish' && result === 'ok') recap = await postCallRecap(id).catch((err) => { console.error('[calls/publish] recap failed:', err instanceof Error ? err.message : err); return 'failed' as const })
   return NextResponse.json({ success: true, recap })
 })

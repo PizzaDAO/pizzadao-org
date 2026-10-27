@@ -168,15 +168,15 @@ export async function getChannelMessage(channelId: string, messageId: string, op
   return { id: String(m.id), channelId: String(m.channel_id ?? channelId), authorId: String(m.author.id), timestamp: m.timestamp ?? null }
 }
 
-export type ChannelInfo = { id: string; parentId: string | null; guildId: string | null }
+export type ChannelInfo = { id: string; parentId: string | null; guildId: string | null; type?: number }
 
 /** One channel (or thread), or null / "unknown" as above. */
 export async function getChannel(channelId: string, opts: DiscordOpts = {}): Promise<ChannelInfo | null | 'unknown'> {
   if (!SNOWFLAKE.test(channelId)) return null
   const r = await getJson(`/channels/${channelId}`, opts)
   if (!r.ok) return r.status === 404 || r.status === 403 ? null : 'unknown'
-  const c = r.json as { id?: string; parent_id?: string | null; guild_id?: string | null }
-  return { id: String(c.id ?? channelId), parentId: c.parent_id ? String(c.parent_id) : null, guildId: c.guild_id ? String(c.guild_id) : null }
+  const c = r.json as { id?: string; parent_id?: string | null; guild_id?: string | null; type?: number }
+  return { id: String(c.id ?? channelId), parentId: c.parent_id ? String(c.parent_id) : null, guildId: c.guild_id ? String(c.guild_id) : null, type: c.type }
 }
 
 /**

@@ -1,8 +1,10 @@
 /**
  * Discord recap of a published call (call-recap). Nothing is posted until an admin publishes the
  * call on /admin/calls; posting is then gated by CALL_RECAP_POST_ENABLED (off by default). The text
- * is built from the stored (reviewed) title / summary / action items, which were generated from the
- * transcript with redactions applied, so redacted speakers and lines are never in it.
+ * is built from the stored (reviewed) title / summary / action items. The AI summary is generated
+ * from the transcript with redactions applied, but a redaction made AFTER the summary was generated
+ * (or last edited by a reviewer) is not reflected in it, so posting is blocked until the summary is
+ * regenerated or edited (see redactionsNewerThanSummary).
  *
  * Channel: Community Call -> the announcements channel (same as the pre-call announcement);
  * every other crew -> the crew's `Channel` cell in the Crew Mappings sheet (id, discord.com/channels
@@ -11,8 +13,8 @@
 import { prisma } from '@/app/lib/db'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { DEFAULT_ANNOUNCE_CHANNEL_ID } from '@/app/lib/announce/run'
-import { resolveChannelId } from '@/app/lib/discord-channels'
-import { DISCORD_MESSAGE_LIMIT, postDiscordMessage } from '@/app/lib/discord-rest'
+import { getChannel, getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
+import { DISCORD_MESSAGE_LIMIT, DiscordPostError, postDiscordMessage } from '@/app/lib/discord-rest'
 import { SITE_URL } from '@/app/lib/site-url'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
@@ -85,16 +87,22 @@ export function buildRecapText(rec: RecapInput, base: string = SITE_URL): string
 
 const SNOWFLAKE = /^\d{5,25}$/
 
-/** The channel id inside a crew's `Channel` cell (bare id or discord.com/channels/<guild>/<channel> link), else null. */
-export function channelIdFromCell(cell: string | null | undefined): string | null {
+/** The channel (and guild, when the cell is a link) inside a crew's `Channel` cell, else null. */
+export function parseChannelCell(cell: string | null | undefined): { channelId: string; guildId: string | null } | null {
   const raw = (cell ?? '').trim()
   if (!raw) return null
-  if (SNOWFLAKE.test(raw)) return raw
-  const link = raw.match(/discord(?:app)?\.com\/channels\/\d+\/(\d{5,25})/)
-  if (link) return link[1]
+  if (SNOWFLAKE.test(raw)) return { channelId: raw, guildId: null }
+  const link = raw.match(/discord(?:app)?\.com\/channels\/(\d{5,25})\/(\d{5,25})/)
+  if (link) return { channelId: link[2], guildId: link[1] }
   const mention = raw.match(/^<#(\d{5,25})>$/)
-  return mention ? mention[1] : null
+  return mention ? { channelId: mention[1], guildId: null } : null
 }
+
+/** Kept for callers that only want the id. */
+export const channelIdFromCell = (cell: string | null | undefined): string | null => parseChannelCell(cell)?.channelId ?? null
+
+/** Text (0) and announcement (5) channels only: the only kinds a recap can be posted to. */
+const POSTABLE_TYPES = new Set([0, 5])
 
 export interface RecapChannel {
   channelId: string
@@ -103,11 +111,30 @@ export interface RecapChannel {
 
 export interface RecapDeps {
   crews?: () => Promise<Array<{ id: string; channel?: string }>>
+  /** Exact-name lookup among the guild's text/announcement channels. */
   resolveName?: (name: string) => Promise<string | null>
+  /** The guild and type of a channel id, or null when it is unknown. */
+  lookupChannel?: (id: string) => Promise<{ guildId: string | null; type?: number } | null>
   env?: Record<string, string | undefined>
 }
 
-/** Where this call's recap goes, or null when the crew has no usable channel. */
+async function defaultResolveName(name: string): Promise<string | null> {
+  const channels = await getGuildChannels()
+  const want = normalizeChannelName(name)
+  if (!channels || !want) return null
+  return channels.find((c) => POSTABLE_TYPES.has(c.type) && normalizeChannelName(c.name) === want)?.id ?? null
+}
+
+async function defaultLookupChannel(id: string): Promise<{ guildId: string | null; type?: number } | null> {
+  const c = await getChannel(id)
+  return c && c !== 'unknown' ? { guildId: c.guildId, type: c.type } : null
+}
+
+/**
+ * Where this call's recap goes, or null when the crew has no usable channel. A sheet cell is
+ * untrusted: links must point into our guild, bare ids are verified to be a text/announcement
+ * channel of our guild, and names must match a channel name exactly (no suffix guessing).
+ */
 export async function resolveRecapChannel(crewId: string | null, deps: RecapDeps = {}): Promise<RecapChannel | null> {
   const env = deps.env ?? process.env
   if (crewId === COMMUNITY_CALL_CREW_ID) {
@@ -115,17 +142,31 @@ export async function resolveRecapChannel(crewId: string | null, deps: RecapDeps
     return id ? { channelId: id, label: '#announcements' } : null
   }
   if (!crewId) return null
+  const guild = env.DISCORD_GUILD_ID?.trim()
+  if (!guild) return null
   const crews = await (deps.crews ?? (async () => (await getCrewMappings()).crews))()
   const cell = crews.find((c) => c.id === crewId)?.channel
-  const direct = channelIdFromCell(cell)
-  if (direct) return { channelId: direct, label: `#${direct}` }
+  const parsed = parseChannelCell(cell)
+  if (parsed) {
+    if (parsed.guildId && parsed.guildId !== guild) return null
+    const info = await (deps.lookupChannel ?? defaultLookupChannel)(parsed.channelId)
+    if (!info || info.guildId !== guild || (info.type !== undefined && !POSTABLE_TYPES.has(info.type))) return null
+    return { channelId: parsed.channelId, label: `#${parsed.channelId}` }
+  }
   const name = (cell ?? '').replace(/^#/, '').trim()
   if (!name) return null
-  const id = await (deps.resolveName ?? ((n: string) => resolveChannelId(n)))(name)
+  const id = await (deps.resolveName ?? defaultResolveName)(name)
   return id ? { channelId: id, label: `#${name}` } : null
 }
 
-export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'no-channel' | 'no-token' | 'failed'
+/** True when a speaker/line was hidden or restored after the summary was last generated or edited. */
+export function redactionsNewerThanSummary(rec: { redactionsUpdatedAt?: Date | null; summaryGeneratedAt?: Date | null; summaryEditedAt?: Date | null }): boolean {
+  if (!rec.redactionsUpdatedAt) return false
+  const fresh = Math.max(rec.summaryGeneratedAt?.getTime() ?? 0, rec.summaryEditedAt?.getTime() ?? 0)
+  return rec.redactionsUpdatedAt.getTime() > fresh
+}
+
+export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'stale-redactions' | 'no-channel' | 'no-token' | 'failed'
 
 export interface PostRecapDeps extends RecapDeps {
   post?: typeof postDiscordMessage
@@ -134,7 +175,9 @@ export interface PostRecapDeps extends RecapDeps {
 
 /**
  * Post the recap of a PUBLISHED call, at most once. The row is claimed (recapPostedAt) before the
- * post so a double click or republish cannot double-post; a failed post releases the claim.
+ * post. The claim is released only when Discord definitely refused (a 4xx incl. 429: nothing was
+ * posted); on a 5xx or network error the message may exist, so the claim stays and the error is
+ * recorded for a human to look at.
  */
 export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promise<RecapResult> {
   const env = deps.env ?? process.env
@@ -143,24 +186,48 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
   if (!botToken) return 'no-token'
   const rec = await prisma.callRecording.findUnique({
     where: { id },
-    select: { id: true, status: true, crewId: true, crewLabel: true, eventName: true, title: true, summary: true, actionItems: true, chapters: true, recapPostedAt: true },
+    select: {
+      id: true,
+      status: true,
+      crewId: true,
+      crewLabel: true,
+      eventName: true,
+      title: true,
+      summary: true,
+      actionItems: true,
+      chapters: true,
+      recapPostedAt: true,
+      redactionsUpdatedAt: true,
+      summaryGeneratedAt: true,
+      summaryEditedAt: true,
+    },
   })
   if (!rec || rec.status !== 'PUBLISHED' || !rec.summary?.trim()) return 'not-published'
   if (rec.recapPostedAt) return 'already-posted'
+  if (redactionsNewerThanSummary(rec)) return 'stale-redactions'
   const channel = await resolveRecapChannel(rec.crewId, deps)
   if (!channel) return 'no-channel'
-  const claim = await prisma.callRecording.updateMany({ where: { id, recapPostedAt: null, status: 'PUBLISHED' }, data: { recapPostedAt: new Date(), recapChannelId: channel.channelId } })
+  const claim = await prisma.callRecording.updateMany({ where: { id, recapPostedAt: null, status: 'PUBLISHED' }, data: { recapPostedAt: new Date(), recapChannelId: channel.channelId, recapError: null } })
   if (claim.count !== 1) return 'already-posted'
+  let messageId: string | null
   try {
     const sent = await (deps.post ?? postDiscordMessage)(
       { kind: 'bot', channelId: channel.channelId, botToken },
       { content: buildRecapText(rec, deps.base), allowed_mentions: { parse: [] }, flags: 4 /* SUPPRESS_EMBEDS */ },
     )
-    if (sent.id) await prisma.callRecording.update({ where: { id }, data: { recapMessageId: sent.id } })
-    return 'posted'
+    messageId = sent.id
   } catch (err) {
-    console.error('[calls/recap] post failed:', err instanceof Error ? err.message : err)
-    await prisma.callRecording.updateMany({ where: { id }, data: { recapPostedAt: null, recapChannelId: null } })
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[calls/recap] post failed:', msg)
+    if (err instanceof DiscordPostError && err.status >= 400 && err.status < 500) {
+      await prisma.callRecording.updateMany({ where: { id }, data: { recapPostedAt: null, recapChannelId: null, recapError: msg.slice(0, 300) } })
+    } else {
+      // Unknown outcome: the message may have been posted. Keep the claim (no automatic repost).
+      await prisma.callRecording.updateMany({ where: { id }, data: { recapError: `unknown outcome: ${msg}`.slice(0, 300) } })
+    }
     return 'failed'
   }
+  // The post succeeded; bookkeeping trouble must never release the claim or look like a failed post.
+  if (messageId) await prisma.callRecording.update({ where: { id }, data: { recapMessageId: messageId } }).catch((e) => console.error('[calls/recap] could not store message id:', e instanceof Error ? e.message : e))
+  return 'posted'
 }

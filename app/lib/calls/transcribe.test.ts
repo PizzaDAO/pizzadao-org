@@ -7,7 +7,8 @@ vi.mock('./r2', () => ({ getObjectBytes: vi.fn() }))
 vi.mock('ai', () => ({ generateText: vi.fn(), Output: { object: vi.fn() } }))
 
 import { prisma } from '@/app/lib/db'
-import { cleanSegments, dropRepeatRuns, mergeSpeakerTurns, transcribeAudio, transcribeRecording } from './transcribe'
+import { cleanSegments, dropRepeatRuns, mergeSpeakerTurns, transcribeAudio, transcribeRecording, USED_OPENAI } from './transcribe'
+import { publishRecording, setSpeakerRedacted, updateRecordingText } from './recordings'
 
 const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
 const ANN = '111111111111111111'
@@ -70,8 +71,11 @@ describe('transcribeRecording', () => {
     status: 'RECORDED',
     transcript: null,
     transcribedAt: null,
-    reviewedBy: null,
-    summary: null,
+    transcribeAttempts: 0,
+    transcribeTracks: null,
+    redactedSpeakerIds: [],
+    summaryEditedAt: null,
+    updatedAt: new Date('2026-10-28T12:00:00Z'),
     speakers: [
       { discordId: ANN, trackKey: 'calls/s/tracks/a.ogg', talkTimeSec: 60 },
       { discordId: BOB, trackKey: 'calls/s/tracks/b.ogg', talkTimeSec: 30 },
@@ -79,55 +83,106 @@ describe('transcribeRecording', () => {
     ...over,
   })
   const seg = (text: string) => ({ start: 1, end: 2, text, avg_logprob: -0.2, no_speech_prob: 0.01, compression_ratio: 1.1 })
+  const ok = (text = 'hello') => async () => ({ segments: [seg(text)], language: 'en' })
+  const writes = () => db.callRecording.updateMany.mock.calls.map((c) => c[0])
+  const finalWrite = () => writes().find((a) => a.data.transcribedAt && !a.where.OR)
+
+  beforeEach(() => {
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+  })
 
   it('does nothing without an OpenAI key', async () => {
     expect(await transcribeRecording('r1', { apiKey: '' })).toBe('no-key')
   })
-  it('transcribes each track, merges with existing chat, and summarizes', async () => {
+
+  it('transcribes each track, merges with chat, summarizes without touching reviewer edits', async () => {
     const chat = { discordId: BOB, startMs: 1500, endMs: 1500, text: 'link', kind: 'chat', id: 'c:1' }
     db.callRecording.findUnique.mockResolvedValue(rec({ transcript: [chat] }))
-    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     const summarize = vi.fn(async () => true)
-    const out = await transcribeRecording('r1', {
-      apiKey: 'k',
-      download: async () => new Uint8Array([1]),
-      transcribe: async () => ({ segments: [seg('hello')], language: 'en' }),
-      summarize,
-    })
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: ok(), summarize })
     expect(out).toBe('transcribed')
-    const write = db.callRecording.updateMany.mock.calls.map((c) => c[0]).find((a) => a.data.transcript)
-    const stored = write.data.transcript as Array<{ discordId: string; text: string; kind?: string }>
+    const w = finalWrite()
+    const stored = w.data.transcript as Array<{ discordId: string; kind?: string }>
     expect(stored.filter((s) => s.kind !== 'chat').map((s) => s.discordId).sort()).toEqual([ANN, BOB])
     expect(stored.some((s) => s.kind === 'chat')).toBe(true)
-    expect(write.data.transcribedAt).toBeInstanceOf(Date)
-    expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: false })
+    expect(w.data.transcriptLanguage).toBe('en')
+    expect(w.data.status).toBeUndefined() // never parks the row in PROCESSING
+    expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: false, unlessEdited: true })
   })
-  it('keeps a reviewer-edited summary', async () => {
-    db.callRecording.findUnique.mockResolvedValue(rec({ reviewedBy: '9', summary: 'mine', status: 'IN_REVIEW' }))
-    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+
+  it('never auto-regenerates a summary a reviewer edited', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec({ summaryEditedAt: new Date(), status: 'IN_REVIEW' }))
     const summarize = vi.fn(async () => true)
-    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: async () => ({ segments: [seg('hi')], language: null }), summarize })
-    expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: true })
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: ok(), summarize })
+    expect(summarize).not.toHaveBeenCalled()
   })
-  it('skips published calls and ones that already have spoken lines', async () => {
-    db.callRecording.findUnique.mockResolvedValue(rec({ status: 'PUBLISHED' }))
-    expect(await transcribeRecording('r1', { apiKey: 'k' })).toBe('not-eligible')
-    db.callRecording.findUnique.mockResolvedValue(rec({ transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'hi' }] }))
-    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+
+  it('does not overwrite a language with null', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec())
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: async () => ({ segments: [seg('x')], language: null }), summarize: vi.fn() })
+    expect('transcriptLanguage' in finalWrite().data).toBe(false)
+  })
+
+  it('does not even download the tracks of already-redacted speakers', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec({ redactedSpeakerIds: [BOB] }))
+    const download = vi.fn(async () => new Uint8Array([1]))
+    await transcribeRecording('r1', { apiKey: 'k', download, transcribe: ok(), summarize: vi.fn() })
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(download).toHaveBeenCalledWith('calls/s/tracks/a.ogg')
+  })
+
+  it('saves each finished track, and a retry only does the remaining ones', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec())
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: ok(), summarize: vi.fn() })
+    expect(writes().filter((a) => a.data.transcribeTracks && typeof a.data.transcribeTracks === 'object' && ANN in a.data.transcribeTracks).length).toBeGreaterThan(0)
+
+    db.callRecording.updateMany.mockClear()
+    db.callRecording.findUnique.mockResolvedValue(rec({ transcribeAttempts: 1, transcribeTracks: { [ANN]: { utterances: [{ startMs: 0, endMs: 1000, text: 'saved' }], language: 'en', talkTimeSec: 60 } } }))
+    const download = vi.fn(async () => new Uint8Array([1]))
+    const out = await transcribeRecording('r1', { apiKey: 'k', download, transcribe: ok('new'), summarize: vi.fn() })
+    expect(out).toBe('transcribed')
+    expect(download).toHaveBeenCalledTimes(1)
+    expect(download).toHaveBeenCalledWith('calls/s/tracks/b.ogg')
+    const texts = (finalWrite().data.transcript as Array<{ text: string }>).map((s) => s.text)
+    expect(texts).toContain('saved')
+  })
+
+  it('stops starting tracks after the budget and resumes next run without spending an attempt', async () => {
+    const speakers = [ANN, BOB, '333333333333333333', '444444444444444444'].map((d) => ({ discordId: d, trackKey: `calls/s/tracks/${d}.ogg`, talkTimeSec: 10 }))
+    db.callRecording.findUnique.mockResolvedValue(rec({ speakers }))
+    const clock = vi.fn().mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValue(200_000)
+    const download = vi.fn(async () => new Uint8Array([1]))
+    const out = await transcribeRecording('r1', { apiKey: 'k', clock, download, transcribe: ok(), summarize: vi.fn() })
+    expect(out).toBe('progress')
+    expect(download).toHaveBeenCalledTimes(3)
+    expect(writes().at(-1).data).toMatchObject({ transcribeError: 'progress', transcribeAttempts: { decrement: 1 } })
+  })
+
+  it('gives up permanently after 3 attempts and never calls OpenAI again', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec({ transcribeAttempts: 3 }))
     const transcribe = vi.fn()
-    expect(await transcribeRecording('r1', { apiKey: 'k', transcribe })).toBe('already-had-speech')
+    expect(await transcribeRecording('r1', { apiKey: 'k', transcribe })).toBe('failed')
     expect(transcribe).not.toHaveBeenCalled()
+    expect(db.callRecording.updateMany).not.toHaveBeenCalled()
   })
-  it('returns busy when another runner holds the claim', async () => {
+
+  it('claims with an attempt increment and only when the 6 hour backoff allows', async () => {
     db.callRecording.findUnique.mockResolvedValue(rec())
     db.callRecording.updateMany.mockResolvedValue({ count: 0 })
     const transcribe = vi.fn()
     expect(await transcribeRecording('r1', { apiKey: 'k', transcribe })).toBe('busy')
+    const claim = writes()[0]
+    expect(claim.data).toMatchObject({ transcribeError: 'claimed', transcribeAttempts: { increment: 1 } })
+    expect(claim.where.transcribeAttempts).toEqual({ lt: 3 })
+    const or = claim.where.OR as Array<Record<string, unknown>>
+    expect(or).toContainEqual({ transcribeError: null })
+    expect(or.some((c) => 'updatedAt' in c)).toBe(true) // a stale 'claimed' / 'failed' waits for the backoff, not 15 minutes
+    expect(or.some((c) => c.transcribeError === 'claimed')).toBe(false)
     expect(transcribe).not.toHaveBeenCalled()
   })
-  it('records a failure when every track fails, and leaves the row retryable', async () => {
+
+  it('records a failure when every track fails, without transcribedAt', async () => {
     db.callRecording.findUnique.mockResolvedValue(rec())
-    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     const out = await transcribeRecording('r1', {
       apiKey: 'k',
       download: async () => new Uint8Array([1]),
@@ -137,16 +192,90 @@ describe('transcribeRecording', () => {
       summarize: vi.fn(),
     })
     expect(out).toBe('failed')
-    const last = db.callRecording.updateMany.mock.calls.at(-1)![0]
+    const last = writes().at(-1)
     expect(last.data.transcribeError).toMatch(/^failed:/)
     expect(last.data.transcribedAt).toBeUndefined()
   })
-  it('rejects tracks over the upload limit', async () => {
+
+  it('on the last attempt keeps what it has (partial) instead of failing', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec({ transcribeAttempts: 2 }))
+    let n = 0
+    const out = await transcribeRecording('r1', {
+      apiKey: 'k',
+      download: async () => new Uint8Array([1]),
+      transcribe: async () => {
+        if (n++ === 0) return { segments: [seg('ok')], language: 'en' }
+        throw new Error('boom')
+      },
+      summarize: vi.fn(),
+    })
+    expect(out).toBe('transcribed')
+    expect(finalWrite().data.transcribeError).toMatch(/^partial:/)
+  })
+
+  it('marks calls whose tracks are all over the upload limit as permanently failed', async () => {
     db.callRecording.findUnique.mockResolvedValue(rec())
-    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     const transcribe = vi.fn()
-    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array(25 * 1024 * 1024), transcribe, summarize: vi.fn() })
+    const out = await transcribeRecording('r1', {
+      apiKey: 'k',
+      download: async () => {
+        throw new Error('Object is 99999999 bytes (limit 25165824)')
+      },
+      transcribe,
+      summarize: vi.fn(),
+    })
     expect(out).toBe('failed')
     expect(transcribe).not.toHaveBeenCalled()
+    expect(writes().at(-1).data).toMatchObject({ transcribeAttempts: 3 })
+  })
+
+  it('does not overwrite a spoken transcript that appeared during the run, and guards the write on updatedAt', async () => {
+    const t0 = new Date('2026-10-28T12:00:00Z')
+    db.callRecording.findUnique.mockResolvedValueOnce(rec()).mockResolvedValueOnce({ transcript: null, updatedAt: t0 })
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: ok(), summarize: vi.fn() })
+    expect(finalWrite().where.updatedAt).toBe(t0)
+
+    db.callRecording.updateMany.mockClear()
+    db.callRecording.findUnique
+      .mockResolvedValueOnce(rec())
+      .mockResolvedValueOnce({ transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'from the worker' }], updatedAt: t0 })
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: ok(), summarize: vi.fn() })
+    expect(out).toBe('already-had-speech')
+    expect(writes().some((a) => a.data.transcript)).toBe(false)
+  })
+
+  it('skips published calls and ones that already have spoken lines', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec({ status: 'PUBLISHED' }))
+    expect(await transcribeRecording('r1', { apiKey: 'k' })).toBe('not-eligible')
+    db.callRecording.findUnique.mockResolvedValue(rec({ transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'hi' }] }))
+    const transcribe = vi.fn()
+    expect(await transcribeRecording('r1', { apiKey: 'k', transcribe })).toBe('already-had-speech')
+    expect(transcribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('cron stop rule', () => {
+  it('stops after any run that called OpenAI, including an empty result, but not after a no-op', () => {
+    for (const o of ['transcribed', 'empty-transcript', 'progress', 'failed'] as const) expect(USED_OPENAI.has(o)).toBe(true)
+    for (const o of ['nothing-to-transcribe', 'already-had-speech', 'busy', 'not-eligible'] as const) expect(USED_OPENAI.has(o)).toBe(false)
+  })
+})
+
+describe('reviewer edits and redactions leave markers', () => {
+  it('updateRecordingText sets summaryEditedAt', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'r1', status: 'IN_REVIEW' })
+    db.callRecording.update.mockResolvedValue({})
+    expect(await updateRecordingText('r1', { summary: 'mine' })).toBe('ok')
+    expect(db.callRecording.update.mock.calls[0][0].data.summaryEditedAt).toBeInstanceOf(Date)
+  })
+  it('hiding a speaker sets redactionsUpdatedAt', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'r1', status: 'IN_REVIEW', transcript: [], redactedSpeakerIds: [] })
+    db.callRecording.update.mockResolvedValue({})
+    await setSpeakerRedacted('r1', ANN, true)
+    expect(db.callRecording.update.mock.calls[0][0].data.redactionsUpdatedAt).toBeInstanceOf(Date)
+  })
+  it('publishing an already-published call reports "already" (so no second recap)', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'r1', status: 'PUBLISHED' })
+    expect(await publishRecording('r1', '9')).toBe('already')
   })
 })

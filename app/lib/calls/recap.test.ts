@@ -6,7 +6,8 @@ vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn(async () => (
 vi.mock('@/app/lib/discord-channels', () => ({ resolveChannelId: vi.fn(async () => null) }))
 
 import { prisma } from '@/app/lib/db'
-import { buildRecapText, channelIdFromCell, postCallRecap, recapBullets, recapPostingEnabled, resolveRecapChannel } from './recap'
+import { DiscordPostError } from '@/app/lib/discord-rest'
+import { buildRecapText, channelIdFromCell, parseChannelCell, postCallRecap, recapBullets, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
 
 const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
 const base = 'https://example.org'
@@ -46,9 +47,13 @@ describe('recap text', () => {
 })
 
 describe('channel resolution', () => {
+  const GUILD = '555555555555555555'
+  const env = { DISCORD_GUILD_ID: GUILD }
+  const crewsOf = (channel: string) => async () => [{ id: 'ops', channel }]
+
   it('parses ids, links and mentions', () => {
     expect(channelIdFromCell('123456789012345678')).toBe('123456789012345678')
-    expect(channelIdFromCell('https://discord.com/channels/111111111111111111/222222222222222222')).toBe('222222222222222222')
+    expect(parseChannelCell('https://discord.com/channels/111111111111111111/222222222222222222')).toEqual({ guildId: '111111111111111111', channelId: '222222222222222222' })
     expect(channelIdFromCell('<#333333333333333333>')).toBe('333333333333333333')
     expect(channelIdFromCell('ops')).toBeNull()
   })
@@ -56,17 +61,31 @@ describe('channel resolution', () => {
     expect((await resolveRecapChannel('community_call', { env: {} }))?.channelId).toBe('812143244149915679')
     expect((await resolveRecapChannel('community_call', { env: { ANNOUNCE_DISCORD_CHANNEL_ID: '999999999999999999' } }))?.channelId).toBe('999999999999999999')
   })
-  it('uses the crew channel cell, by name when needed, else null', async () => {
-    const crews = async () => [{ id: 'ops', channel: '#ops-chat' }, { id: 'art', channel: '' }]
-    expect(await resolveRecapChannel('ops', { crews, resolveName: async (n) => (n === 'ops-chat' ? '444444444444444444' : null), env: {} })).toMatchObject({ channelId: '444444444444444444' })
-    expect(await resolveRecapChannel('art', { crews, env: {} })).toBeNull()
-    expect(await resolveRecapChannel(null, { env: {} })).toBeNull()
+  it('rejects a link into another guild without even looking the channel up', async () => {
+    const lookupChannel = vi.fn()
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf('https://discord.com/channels/111111111111111111/222222222222222222'), lookupChannel })).toBeNull()
+    expect(lookupChannel).not.toHaveBeenCalled()
+  })
+  it('verifies bare ids belong to our guild and are text/announcement channels', async () => {
+    const id = '222222222222222222'
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf(id), lookupChannel: async () => ({ guildId: GUILD, type: 0 }) })).toMatchObject({ channelId: id })
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf(id), lookupChannel: async () => ({ guildId: '111111111111111111', type: 0 }) })).toBeNull()
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf(id), lookupChannel: async () => ({ guildId: GUILD, type: 2 }) })).toBeNull() // voice
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf(id), lookupChannel: async () => null })).toBeNull()
+    expect(await resolveRecapChannel('ops', { env: {}, crews: crewsOf(id), lookupChannel: async () => ({ guildId: GUILD, type: 0 }) })).toBeNull() // no guild configured
+  })
+  it('resolves names exactly (no suffix guessing) and returns null when there is no channel', async () => {
+    const resolveName = vi.fn(async (n: string) => (n === 'ops-chat' ? '444444444444444444' : null))
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf('#ops-chat'), resolveName })).toMatchObject({ channelId: '444444444444444444' })
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf('chat'), resolveName })).toBeNull()
+    expect(await resolveRecapChannel('ops', { env, crews: crewsOf(''), resolveName })).toBeNull()
+    expect(await resolveRecapChannel(null, { env })).toBeNull()
   })
 })
 
 describe('postCallRecap', () => {
   const env = { CALL_RECAP_POST_ENABLED: '1', DISCORD_BOT_TOKEN: 'tok' }
-  const published = { ...rec, status: 'PUBLISHED', crewId: 'community_call', eventName: null, recapPostedAt: null }
+  const published = { ...rec, status: 'PUBLISHED', crewId: 'community_call', eventName: null, recapPostedAt: null, redactionsUpdatedAt: null, summaryGeneratedAt: null, summaryEditedAt: null }
 
   it('is off by default and touches nothing', async () => {
     expect(recapPostingEnabled({})).toBe(false)
@@ -82,6 +101,7 @@ describe('postCallRecap', () => {
   it('posts once with no mentions, and records the message id', async () => {
     db.callRecording.findUnique.mockResolvedValue(published)
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.update.mockResolvedValue({})
     const post = vi.fn(async () => ({ id: 'm1' }))
     expect(await postCallRecap('abc123', { env, post, base })).toBe('posted')
     const [target, body] = post.mock.calls[0] as unknown as [{ kind: string; channelId: string }, { content: string; allowed_mentions: unknown }]
@@ -99,15 +119,50 @@ describe('postCallRecap', () => {
     expect(await postCallRecap('abc123', { env, post })).toBe('already-posted')
     expect(post).not.toHaveBeenCalled()
   })
-  it('releases the claim when Discord fails so a later publish can retry', async () => {
+  it('releases the claim only when Discord definitely refused (4xx incl. 429)', async () => {
     db.callRecording.findUnique.mockResolvedValue(published)
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
-    const post = vi.fn(async () => {
-      throw new Error('boom')
-    })
     vi.spyOn(console, 'error').mockImplementation(() => {})
-    expect(await postCallRecap('abc123', { env, post })).toBe('failed')
-    expect(db.callRecording.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abc123' }, data: { recapPostedAt: null, recapChannelId: null } })
+    for (const status of [403, 429]) {
+      db.callRecording.updateMany.mockClear()
+      db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+      const post = vi.fn(async () => {
+        throw new DiscordPostError('refused', status)
+      })
+      expect(await postCallRecap('abc123', { env, post })).toBe('failed')
+      expect(db.callRecording.updateMany).toHaveBeenLastCalledWith({ where: { id: 'abc123' }, data: expect.objectContaining({ recapPostedAt: null, recapChannelId: null }) })
+    }
+  })
+  it('keeps the claim and records the error on a 5xx or a network failure (the message may exist)', async () => {
+    db.callRecording.findUnique.mockResolvedValue(published)
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    for (const err of [new DiscordPostError('boom', 502), new Error('socket hang up')]) {
+      db.callRecording.updateMany.mockClear()
+      db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+      expect(await postCallRecap('abc123', { env, post: async () => Promise.reject(err) })).toBe('failed')
+      const last = db.callRecording.updateMany.mock.calls.at(-1)![0]
+      expect(last.data.recapPostedAt).toBeUndefined() // not released
+      expect(last.data.recapError).toMatch(/^unknown outcome/)
+    }
+  })
+  it('a failure storing the message id after a successful post does not release the claim or fail', async () => {
+    db.callRecording.findUnique.mockResolvedValue(published)
+    db.callRecording.updateMany.mockClear()
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.update.mockRejectedValue(new Error('db down'))
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    expect(await postCallRecap('abc123', { env, post: async () => ({ id: 'm9' }) })).toBe('posted')
+    expect(db.callRecording.updateMany).toHaveBeenCalledTimes(1) // only the claim
+  })
+  it('blocks posting when a redaction is newer than the summary', async () => {
+    const post = vi.fn()
+    db.callRecording.findUnique.mockResolvedValue({ ...published, summaryGeneratedAt: new Date('2026-10-28T10:00:00Z'), redactionsUpdatedAt: new Date('2026-10-28T11:00:00Z') })
+    expect(await postCallRecap('abc123', { env, post })).toBe('stale-redactions')
+    expect(post).not.toHaveBeenCalled()
+    // Regenerating or editing after the redaction clears the block.
+    expect(redactionsNewerThanSummary({ summaryGeneratedAt: new Date('2026-10-28T12:00:00Z'), redactionsUpdatedAt: new Date('2026-10-28T11:00:00Z') })).toBe(false)
+    expect(redactionsNewerThanSummary({ summaryGeneratedAt: new Date('2026-10-28T10:00:00Z'), summaryEditedAt: new Date('2026-10-28T12:00:00Z'), redactionsUpdatedAt: new Date('2026-10-28T11:00:00Z') })).toBe(false)
+    expect(redactionsNewerThanSummary({ redactionsUpdatedAt: null })).toBe(false)
   })
   it('reports a missing token or channel', async () => {
     expect(await postCallRecap('abc123', { env: { CALL_RECAP_POST_ENABLED: '1' } })).toBe('no-token')
