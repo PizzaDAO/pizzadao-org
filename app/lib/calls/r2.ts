@@ -35,3 +35,12 @@ export async function signedAudioUrl(key: string, ttlSec = SIGNED_URL_TTL_SEC): 
   const { client, bucket } = r2()
   return getSignedUrl(client, new GetObjectCommand({ Bucket: bucket, Key: key }), { expiresIn: ttlSec })
 }
+
+/** Download one object (read only). Throws when it is missing or larger than maxBytes. */
+export async function getObjectBytes(key: string, maxBytes = 200 * 1024 * 1024): Promise<Uint8Array> {
+  const { client, bucket } = r2()
+  const res = await client.send(new GetObjectCommand({ Bucket: bucket, Key: key }))
+  if (typeof res.ContentLength === 'number' && res.ContentLength > maxBytes) throw new Error(`Object is ${res.ContentLength} bytes (limit ${maxBytes})`)
+  if (!res.Body) throw new Error('Empty R2 object')
+  return res.Body.transformToByteArray()
+}

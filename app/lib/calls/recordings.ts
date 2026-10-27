@@ -30,7 +30,7 @@ async function loadCrews(): Promise<CrewRef[]> {
  * session returns the existing row untouched (so a reviewer's status changes
  * are never clobbered by a worker retry).
  */
-export async function ingestRecording(p: IngestPayload): Promise<{ id: string; duplicate: boolean; keys: string[]; summarize: boolean }> {
+export async function ingestRecording(p: IngestPayload): Promise<{ id: string; duplicate: boolean; keys: string[]; summarize: boolean; transcribe: boolean }> {
   const existing = await prisma.callRecording.findUnique({
     where: { sessionId: p.sessionId },
     select: { id: true, status: true, mixKey: true, speakers: { select: { trackKey: true } } },
@@ -52,7 +52,13 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
       filled = await prisma.$transaction(async (tx) => {
         const res = await tx.callRecording.updateMany({
           where: { id: existing.id, status: 'RECORDED', transcript: { equals: Prisma.DbNull } },
-          data: { transcript: segments as unknown as Prisma.InputJsonValue, transcriptLanguage: p.transcript?.language ?? null, status: 'PROCESSING' },
+          data: {
+            transcript: segments as unknown as Prisma.InputJsonValue,
+            transcriptLanguage: p.transcript?.language ?? null,
+            status: 'PROCESSING',
+            // A worker-provided spoken transcript must never be replaced by server-side transcription.
+            ...((p.transcript?.segments.length ?? 0) > 0 ? { transcribedAt: new Date() } : {}),
+          },
         })
         if (res.count === 1 && chatAuthors.length > 0) {
           await tx.callSpeaker.createMany({
@@ -63,8 +69,11 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
         return res.count === 1
       })
     }
-    return { id: existing.id, duplicate: true, keys: storedKeys(existing), summarize: filled }
+    return { id: existing.id, duplicate: true, keys: storedKeys(existing), summarize: filled, transcribe: false }
   }
+  const hasSpeech = (p.transcript?.segments.length ?? 0) > 0
+  // No spoken transcript from the worker but there are speaker tracks: the app transcribes them (cron + after()).
+  const needsTranscription = !hasSpeech && p.speakers.some((sp) => sp.trackKey && sp.talkTimeSec > 0)
   const crew = resolveCrewForEvent(await loadCrews(), { eventId: p.eventId, eventName: p.eventName })
   const created = await prisma.callRecording.create({
     data: {
@@ -81,6 +90,7 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
       partial: p.partial,
       mixKey: p.mix?.key ?? null,
       mixBytes: p.mix?.bytes ?? null,
+      ...(hasSpeech ? { transcribedAt: new Date() } : {}),
       ...(hasTranscript
         ? { transcript: segments as unknown as Prisma.InputJsonValue, transcriptLanguage: p.transcript?.language ?? null, status: 'PROCESSING' as const }
         : {}),
@@ -104,6 +114,7 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
     duplicate: false,
     keys: storedKeys({ mixKey: p.mix?.key ?? null, speakers: p.speakers.map((s) => ({ trackKey: s.trackKey })) }),
     summarize: hasTranscript,
+    transcribe: needsTranscription,
   }
 }
 
@@ -234,7 +245,9 @@ export function visibleSegments(
  * so it never overwrites a reviewer's work. A model failure keeps the transcript
  * and moves a fresh call to review so a human can retry.
  */
-export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: boolean } = {}): Promise<boolean> {
+export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: boolean; unlessEdited?: boolean } = {}): Promise<boolean> {
+  // Taken BEFORE the row is read: a redaction made while the model runs is stamped later than this, so it still counts as newer than the summary.
+  const startedAt = new Date()
   const rec = await prisma.callRecording.findUnique({
     where: { id },
     select: { id: true, status: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
@@ -256,9 +269,18 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
       chapters: out.chapters as unknown as Prisma.InputJsonValue,
       status: 'IN_REVIEW' as const,
       publishedAt: null,
+      summaryGeneratedAt: startedAt,
+      summaryEditedAt: null,
     }
     // REJECTED is excluded in the WHERE, so a reject that lands during generation stays rejected.
-    const where = opts.onlyIfEmpty ? { id, summary: null, status: { not: 'REJECTED' as const } } : { id, status: { not: 'REJECTED' as const } }
+    // unlessEdited: automatic runs never replace text a reviewer edited (summaryEditedAt), even if the edit landed mid-generation.
+    const where = {
+      id,
+      // Automatic runs (unlessEdited) also leave PUBLISHED rows alone: publishing a call freezes its public text.
+      status: opts.unlessEdited ? { notIn: ['REJECTED' as const, 'PUBLISHED' as const] } : { not: 'REJECTED' as const },
+      ...(opts.onlyIfEmpty ? { summary: null } : {}),
+      ...(opts.unlessEdited ? { summaryEditedAt: null } : {}),
+    }
     const res = await prisma.callRecording.updateMany({ where, data })
     if (res.count === 1) return true
     // Matched nothing (a summary appeared meanwhile, or the call was rejected): still unstick a fresh row.
@@ -271,13 +293,13 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
   }
 }
 
-export type PublishResult = 'ok' | 'not-found' | 'not-allowed' | 'incomplete'
+export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete'
 
 /** IN_REVIEW -> PUBLISHED (needs a transcript and a summary). Rejected calls cannot be published. */
 export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<PublishResult> {
   const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true } })
   if (!rec) return 'not-found'
-  if (rec.status === 'PUBLISHED') return 'ok'
+  if (rec.status === 'PUBLISHED') return 'already'
   if (rec.status !== 'IN_REVIEW') return 'not-allowed'
   if (!rec.summary?.trim() || visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds).length === 0) return 'incomplete'
   await prisma.callRecording.update({
@@ -313,11 +335,19 @@ export type EditResult = 'ok' | 'not-found' | 'invalid'
  * call; a PUBLISHED call may not lose its title or summary.
  */
 export async function updateRecordingText(id: string, edit: RecordingTextEdit): Promise<EditResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true } })
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, actionItems: true, chapters: true } })
   if (!rec || rec.status === 'REJECTED') return 'not-found'
   if (rec.status === 'PROCESSING') return 'invalid'
   if (rec.status === 'PUBLISHED' && (edit.title === null || edit.summary === null)) return 'invalid'
   const data: Prisma.CallRecordingUpdateInput = {}
+  // A reviewer's words: automatic transcription/summary runs must never overwrite them.
+  // Only a real change of the summary / action items / chapters text counts (a title-only or no-op save does not).
+  const same = (a: unknown, b: unknown) => JSON.stringify(a ?? null) === JSON.stringify(b ?? null)
+  const textChanged =
+    (edit.summary !== undefined && !same(rec.summary, edit.summary)) ||
+    (edit.actionItems !== undefined && !same(rec.actionItems ?? [], edit.actionItems)) ||
+    (edit.chapters !== undefined && !same(rec.chapters ?? [], edit.chapters))
+  if (textChanged) data.summaryEditedAt = new Date()
   if (edit.title !== undefined) data.title = edit.title
   if (edit.summary !== undefined) data.summary = edit.summary
   if (edit.actionItems !== undefined) data.actionItems = edit.actionItems as unknown as Prisma.InputJsonValue
@@ -342,7 +372,7 @@ export async function setSpeakerRedacted(id: string, discordId: string, redacted
     // On a PUBLISHED call the public text changes, so it goes back to review before it can be republished.
     await prisma.callRecording.update({
       where: { id },
-      data: { redactedSpeakerIds: next, ...(rec.status === 'PUBLISHED' ? { status: 'IN_REVIEW' as const, publishedAt: null } : {}) },
+      data: { redactedSpeakerIds: next, redactionsUpdatedAt: new Date(), ...(rec.status === 'PUBLISHED' ? { status: 'IN_REVIEW' as const, publishedAt: null } : {}) },
     })
   }
   return asSegments(rec.transcript).filter((seg) => seg.discordId === discordId).length
@@ -362,7 +392,7 @@ export async function setSegmentRedacted(id: string, key: string, redacted: bool
   if (next.length !== current.length) {
     await prisma.callRecording.update({
       where: { id },
-      data: { redactedSegmentIds: next, ...(rec.status === 'PUBLISHED' ? { status: 'IN_REVIEW' as const, publishedAt: null } : {}) },
+      data: { redactedSegmentIds: next, redactionsUpdatedAt: new Date(), ...(rec.status === 'PUBLISHED' ? { status: 'IN_REVIEW' as const, publishedAt: null } : {}) },
     })
   }
   return true

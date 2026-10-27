@@ -124,7 +124,7 @@ describe('merging chat into the transcript', () => {
     db.callRecording.findUnique.mockResolvedValueOnce(null)
     db.callRecording.create.mockResolvedValue({ id: 'rec1' })
     db.callRecording.findUnique.mockResolvedValueOnce({ id: 'rec1', status: 'PROCESSING', transcript: [], speakers: [] })
-    await ingestPOST(ingestReq(payload({ transcript: undefined, chat: [chatMsg(ANN, 1000, 'hi all')] })))
+    await ingestPOST(ingestReq(payload({ transcript: undefined, speakers: [], chat: [chatMsg(ANN, 1000, 'hi all')] })))
     const data = db.callRecording.create.mock.calls[0][0].data
     expect(data.status).toBe('PROCESSING')
     expect(data.transcriptLanguage).toBeNull()

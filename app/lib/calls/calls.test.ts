@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { NextRequest } from 'next/server'
 
 vi.mock('@/app/lib/db')
+vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/server')>()), after: vi.fn() }))
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn() }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/mission-review-access', () => ({
