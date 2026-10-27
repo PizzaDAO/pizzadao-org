@@ -1416,3 +1416,17 @@ model ReengageEmailSend {
   @@unique([memberId, weekKey])
   @@index([weekKey])
 }
+
+// Confirmation-email send log: backs the per-member / per-address / per-IP
+// caps on /api/email-prefs (anti mail-bomb). Address and IP are stored hashed.
+model EmailConfirmSend {
+  id        String   @id @default(cuid())
+  memberId  String
+  emailHash String   @db.VarChar(64) // sha256 of the lowercased address
+  ipHash    String   @db.VarChar(64)
+  createdAt DateTime @default(now())
+
+  @@index([memberId, createdAt])
+  @@index([emailHash, createdAt])
+  @@index([ipHash, createdAt])
+}

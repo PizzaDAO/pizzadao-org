@@ -2,8 +2,9 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 
-const upsert = vi.hoisted(() => vi.fn(async () => ({})));
-vi.mock("@/app/lib/db", () => ({ prisma: { memberProfileExtras: { upsert } } }));
+const upsert = vi.hoisted(() => vi.fn(async () => ({ email: "Shared@x.io" })));
+const updateMany = vi.hoisted(() => vi.fn(async () => ({ count: 2 })));
+vi.mock("@/app/lib/db", () => ({ prisma: { memberProfileExtras: { upsert, updateMany } } }));
 
 import { POST } from "./route";
 import { signUnsubscribe } from "@/app/lib/reengage/unsub-sig";
@@ -24,6 +25,13 @@ describe("POST /api/email/unsubscribe", () => {
     const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", "List-Unsubscribe=One-Click"));
     expect(res.status).toBe(200);
     expect(upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { memberId: "42" }, update: { reengageEmailOptIn: false } }));
+  });
+  it("unsubscribes the address on every member row (case-insensitive)", async () => {
+    await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", "List-Unsubscribe=One-Click"));
+    expect(updateMany).toHaveBeenCalledWith({
+      where: { email: { equals: "Shared@x.io", mode: "insensitive" } },
+      data: { reengageEmailOptIn: false },
+    });
   });
   it("a browser form post is redirected back to the confirmation page", async () => {
     const res = await POST(post(`m=42&s=${signUnsubscribe("42")}`, "application/x-www-form-urlencoded", ""));

@@ -1071,7 +1071,9 @@
       "resend": "Renvoyer la confirmation",
       "invalidEmail": "Saisis une adresse e-mail valide.",
       "tooSoon": "Une confirmation vient d'être envoyée. Réessaie dans quelques minutes.",
-      "sendFailed": "Enregistré, mais l'envoi de la confirmation a échoué. Réessaie plus tard."
+      "sendFailed": "Enregistré, mais l'envoi de la confirmation a échoué. Réessaie plus tard.",
+      "loadError": "Impossible de charger tes réglages e-mail. Recharge la page pour réessayer.",
+      "tooMany": "Trop d'e-mails de confirmation. Réessaie demain."
     },
     "confirm": {
       "subject": "Confirme ton e-mail pour le résumé hebdomadaire PizzaDAO",

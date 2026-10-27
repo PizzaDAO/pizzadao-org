@@ -24,11 +24,22 @@ export async function POST(req: NextRequest) {
     if (!row?.email || !verifyConfirm(memberId, row.email, token)) {
       return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });
     }
+    // One verified owner per address: refuse a second claim with a generic error
+    // (the DB also has a partial unique index on lower(email) for the race).
+    const other = await prisma.memberProfileExtras.findFirst({
+      where: { email: { equals: row.email, mode: "insensitive" }, emailVerifiedAt: { not: null }, NOT: { memberId } },
+      select: { memberId: true },
+    });
+    if (other) return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });
     await prisma.memberProfileExtras.update({
       where: { memberId },
       data: { emailVerifiedAt: new Date() },
+      select: { memberId: true },
     });
   } catch (err) {
+    if ((err as { code?: string })?.code === "P2002") {
+      return NextResponse.json({ error: "Invalid or expired link" }, { status: 400 });
+    }
     return internalError(err, "email/confirm", "Couldn't confirm");
   }
   const back = new URL("/email/confirm", req.url);

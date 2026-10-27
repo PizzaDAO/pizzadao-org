@@ -1071,7 +1071,9 @@
       "resend": "Reenviar confirmación",
       "invalidEmail": "Introduce un correo válido.",
       "tooSoon": "Acabamos de enviar una confirmación. Inténtalo de nuevo en unos minutos.",
-      "sendFailed": "Guardado, pero no pudimos enviar la confirmación. Inténtalo más tarde."
+      "sendFailed": "Guardado, pero no pudimos enviar la confirmación. Inténtalo más tarde.",
+      "loadError": "No pudimos cargar tus ajustes de correo. Recarga la página para intentarlo de nuevo.",
+      "tooMany": "Demasiados correos de confirmación. Inténtalo de nuevo mañana."
     },
     "confirm": {
       "subject": "Confirma tu correo para el resumen semanal de PizzaDAO",

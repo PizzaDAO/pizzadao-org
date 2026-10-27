@@ -17,6 +17,7 @@ export function EmailPrefsEditor() {
     const [busy, setBusy] = useState(false);
     const [note, setNote] = useState<string | null>(null);
     const [error, setError] = useState<string | null>(null);
+    const [loadError, setLoadError] = useState(false);
 
     function apply(p: Prefs) {
         setPrefs(p);
@@ -29,9 +30,13 @@ export function EmailPrefsEditor() {
         fetch("/api/email-prefs")
             .then((r) => (r.ok ? r.json() : null))
             .then((j) => {
-                if (alive && j && typeof j.optIn === "boolean") apply(j);
+                if (!alive) return;
+                if (j && typeof j.optIn === "boolean") apply(j);
+                else setLoadError(true);
             })
-            .catch(() => undefined);
+            .catch(() => {
+                if (alive) setLoadError(true);
+            });
         return () => {
             alive = false;
         };
@@ -56,6 +61,7 @@ export function EmailPrefsEditor() {
             apply(j);
             if (j.confirmation === "sent") setNote(t("pending"));
             else if (j.confirmation === "too_soon") setNote(t("tooSoon"));
+            else if (j.confirmation === "too_many") setNote(t("tooMany"));
             else if (j.confirmation === "failed") setError(t("sendFailed"));
             else if (j.optIn && j.email && !j.verified) setNote(t("pending"));
             else setNote(t("saved"));
@@ -72,7 +78,9 @@ export function EmailPrefsEditor() {
             style={{ display: "grid", gap: 10 }}
             onSubmit={(e) => {
                 e.preventDefault();
-                void submit({ email, optIn });
+                const addr = email.trim();
+                // An empty field removes the address (and opts out).
+                void submit(addr ? { email: addr, optIn } : { email: null });
             }}
         >
             <label style={{ display: "grid", gap: 4, fontSize: 14 }}>
@@ -97,7 +105,7 @@ export function EmailPrefsEditor() {
                 {t("optIn")}
             </label>
             <div style={{ display: "flex", flexWrap: "wrap", alignItems: "center", gap: 10 }}>
-                <button type="submit" disabled={busy || !loaded || (optIn && !email.trim())} className="btn-pill">
+                <button type="submit" disabled={busy || !loaded} className="btn-pill">
                     {t("save")}
                 </button>
                 {prefs?.email && prefs.verified ? (
@@ -109,6 +117,11 @@ export function EmailPrefsEditor() {
                     </button>
                 ) : null}
             </div>
+            {loadError ? (
+                <div role="alert" style={{ fontSize: 13, color: "hsl(var(--destructive))" }}>
+                    {t("loadError")}
+                </div>
+            ) : null}
             {note ? <div role="status" style={{ fontSize: 13 }}>{note}</div> : null}
             {error ? (
                 <div role="alert" style={{ fontSize: 13, color: "hsl(var(--destructive))" }}>

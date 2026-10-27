@@ -1071,7 +1071,9 @@
       "resend": "Resend confirmation",
       "invalidEmail": "Enter a valid email address.",
       "tooSoon": "A confirmation was just sent. Try again in a few minutes.",
-      "sendFailed": "Saved, but we couldn't send the confirmation. Try again later."
+      "sendFailed": "Saved, but we couldn't send the confirmation. Try again later.",
+      "loadError": "Couldn't load your email settings. Reload the page to try again.",
+      "tooMany": "Too many confirmation emails. Try again tomorrow."
     },
     "confirm": {
       "subject": "Confirm your email for the PizzaDAO weekly digest",

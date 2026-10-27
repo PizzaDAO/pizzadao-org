@@ -17,3 +17,21 @@ CREATE TABLE IF NOT EXISTS "ReengageEmailSend" (
 
 CREATE UNIQUE INDEX IF NOT EXISTS "ReengageEmailSend_memberId_weekKey_key" ON "ReengageEmailSend"("memberId", "weekKey");
 CREATE INDEX IF NOT EXISTS "ReengageEmailSend_weekKey_idx" ON "ReengageEmailSend"("weekKey");
+
+-- Confirmation-email send log (caps per member / address / IP; address and IP hashed).
+CREATE TABLE IF NOT EXISTS "EmailConfirmSend" (
+  "id" TEXT NOT NULL,
+  "memberId" TEXT NOT NULL,
+  "emailHash" VARCHAR(64) NOT NULL,
+  "ipHash" VARCHAR(64) NOT NULL,
+  "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
+  CONSTRAINT "EmailConfirmSend_pkey" PRIMARY KEY ("id")
+);
+CREATE INDEX IF NOT EXISTS "EmailConfirmSend_memberId_createdAt_idx" ON "EmailConfirmSend"("memberId", "createdAt");
+CREATE INDEX IF NOT EXISTS "EmailConfirmSend_emailHash_createdAt_idx" ON "EmailConfirmSend"("emailHash", "createdAt");
+CREATE INDEX IF NOT EXISTS "EmailConfirmSend_ipHash_createdAt_idx" ON "EmailConfirmSend"("ipHash", "createdAt");
+
+-- One verified owner per address (case-insensitive). Not expressible in schema.prisma;
+-- the confirm route maps a violation (P2002) to a generic error.
+CREATE UNIQUE INDEX IF NOT EXISTS "MemberProfileExtras_email_verified_key"
+  ON "MemberProfileExtras" (lower("email")) WHERE "emailVerifiedAt" IS NOT NULL;
