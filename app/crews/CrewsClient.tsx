@@ -359,6 +359,9 @@ export default function CrewsClient({ initialCrews }: { initialCrews: CrewOption
           <Link href="/crew" className={pillOutline}>
             {t('members')}
           </Link>
+          <Link href="/calls/how-to-attend" className={pillOutline}>
+            {t('howToAttend')}
+          </Link>
           <Link href="/manuals" className="btn-pill min-h-11 no-underline bg-butter text-ink border border-transparent hover:opacity-90">
             {t('manuals')}
           </Link>
