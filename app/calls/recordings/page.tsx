@@ -1,12 +1,16 @@
 // app/calls/recordings/page.tsx
 //
-// Public list of published calls (calzone-30418 phase 2): summaries and
-// transcripts only. Audio is never public.
+// Members-only list of published calls. Signed-out visitors are sent to login
+// before anything is loaded; the page is noindex. Full transcripts are gated
+// separately on each call's page (level 6+ or Dread Pizza Roberts). Audio is
+// never published.
 
 import type { Metadata } from "next";
 import Link from "next/link";
+import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { listPublishedRecordings } from "@/app/lib/calls/recordings";
+import { getSession } from "@/app/lib/session";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -14,10 +18,12 @@ export const dynamic = "force-dynamic";
 
 export async function generateMetadata(): Promise<Metadata> {
     const t = await getTranslations("callsPage.recording");
-    return { title: t("listTitle"), description: t("listDescription") };
+    return { title: t("listTitle"), description: t("listDescription"), robots: { index: false, follow: false } };
 }
 
 export default async function PublishedCallsPage() {
+    const session = await getSession().catch(() => null);
+    if (!session?.discordId) redirect(`/login?returnTo=${encodeURIComponent("/calls/recordings")}`);
     const t = await getTranslations("callsPage.recording");
     const locale = await getLocale();
     const rows = await listPublishedRecordings();
