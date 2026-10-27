@@ -12,7 +12,7 @@ function sign(name: string, o: NameOriginWithFilm): string | null {
   const secret = process.env.SESSION_SECRET;
   if (!secret) return null;
   return createHmac("sha256", secret)
-    .update(`mafia-name-origin\n${name}|${o.kind}|${o.person}|${o.film}`)
+    .update(`mafia-name-origin-v2\n${name}|${o.kind}|${o.person}|${o.film}`)
     .digest("base64url");
 }
 
