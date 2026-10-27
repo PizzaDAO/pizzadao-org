@@ -138,6 +138,15 @@ We keep our name generation exactly as it is: `app/api/namegen/route.ts` (TMDB c
    - **Recommended:** ask infi1trate to replace their route with a redirect to `https://app.pizzadao.org/get-your-mafia-name` (client-side `window.location.replace`, keeping the query string), and to delete their two edge functions so their Lovable AI spend stops.
    - **Later alternative:** if pizzadao.org ever moves behind a Cloudflare zone or Vercel project we control, use a server-side 301 rule for that path.
    - Nothing is changed in this task.
+   - **What infi1trate must do (once Phase 3 is live):** (1) replace their `/get-your-mafia-name` route with a redirect to `https://app.pizzadao.org/get-your-mafia-name`, keeping the query string; (2) delete their two AI edge functions (name and portrait) so their Lovable AI spend stops. Nothing on our side, DNS included, changes.
+
+### Phase 3 as built
+- `/get-your-mafia-name` (`app/get-your-mafia-name/page.tsx`, flow in `app/ui/mafia-name/MafiaNameFlow.tsx`) reuses `NameStep` (`mode="public"`: no typed-name box, no keep offers) and `FinaleScene` (`mode="public"`). en/es/fr under `mafiaPublic` and `onboarding.finale`. Listed in the sitemap; default share card in `opengraph-image.tsx`.
+- Anonymous portraits: `/api/mafia-portrait` without a session. Order: kill switch, cache (free), global 300/day fail-closed, then the caller own limit first (member 5/day, or `mafia-portrait-ip` 5/day per IPv4 or IPv6 /64, fail-closed; unknown IP refused), then an anonymous sub-cap `mafia-portrait-public` (100/day, `MAFIA_PORTRAIT_PUBLIC_DAILY_CAP`), then global 300/day. Anonymous draws also need a namegen-signed name and a catalog topping (namegen signs nothing for a free-text topping). A session always takes the member path (5/day), and anonymous prompts carry no turtles or crews. Residual: a member who signs out gets the IP allowance on top (at most 5 more, still under the global cap).
+- Anonymous claims: `/api/mafia-name/claim` without a session needs a valid `actor` id, is limited to 40/day per IP (`mafia-name-claim-public`) and 20 claims per actor, stores `source: "public"` with `discordId` null, and is public only when the namegen signature verifies. Schema change: migration `20261028200000_mafia_name_claims_public` (`discordId` nullable, new `actor`, unique `(actor, name)`).
+- Hand-off: `/join?from=mafia-name&name=&topping=&film=&o=` parsed by `app/lib/mafia-join-params.ts` (name sanitized, topping known-or-50-char text, film a `MAFIA_FILMS` id or 120-char text, `o` an optional signed origin). The wizard seeds the name step with that name selected; absent or invalid params change nothing.
+- Funnel: new client event `mafia_page` with codes `viewed`, `name_picked`, `join_clicked`, `join_arrived`; the actor id is the `/join` wizard's own `sessionId`, so the page and signup are one actor.
+- `/made/[id]` "Join the family" now points at `/get-your-mafia-name`.
 
 ## Data model (Prisma, Neon; the migration runs against prod before merge because previews share the DB)
 

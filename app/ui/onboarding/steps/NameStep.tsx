@@ -51,6 +51,13 @@ type Props = {
   mediaType?: "movie" | "tv";
   seenNames: string[];
   mafiaName?: string;
+  /** Open with this suggestion already selected (the /join hand-off). */
+  preselectName?: string;
+  /**
+   * "public" is the /get-your-mafia-name page: no typed-name box and no
+   * keep-existing / keep-Discord offers, only names the generator suggests.
+   */
+  mode?: "wizard" | "public";
 
   // For keep-name options
   isUpdate?: boolean;
@@ -163,6 +170,8 @@ export function NameStep({
   mediaType,
   seenNames,
   mafiaName,
+  preselectName,
+  mode = "wizard",
   isUpdate,
   existingName,
   discordNick,
@@ -204,18 +213,22 @@ export function NameStep({
 
   // Reset selection whenever a fresh batch of suggestions arrives.
   useEffect(() => {
-    setSelectedIdx(null);
+    const idx = preselectName ? (suggestions ?? []).slice(0, 3).indexOf(preselectName) : -1;
+    setSelectedIdx(idx >= 0 ? idx : null);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- preselect only applies to the batch it arrived with
   }, [suggestions]);
 
   const canGenerate =
     topping.trim().length > 0 && mafiaMovieTitle.trim().length > 0;
 
-  const showKeepExisting = Boolean(isUpdate && existingName);
+  const isPublic = mode === "public";
+  const showKeepExisting = Boolean(!isPublic && isUpdate && existingName);
   // Discord nicks often carry emoji / decorations; offer the normalised
   // form, and only when something usable survives sanitisation.
   const keepableDiscordNick = sanitizeDisplayName(discordNick);
   const showKeepDiscord = Boolean(
-    !isUpdate &&
+    !isPublic &&
+      !isUpdate &&
       keepableDiscordNick &&
       (mafiaName === discordNick || mafiaName === keepableDiscordNick || !mafiaName),
   );
@@ -302,7 +315,7 @@ export function NameStep({
         </header>
       )}
 
-      {!suggestions && !submitting && (
+      {!isPublic && !suggestions && !submitting && (
         <section className="grid gap-3" aria-label={t("displayNameLabel")}>
           <label htmlFor="onboarding-display-name" className="text-sm font-semibold text-foreground">{t("displayNameLabel")}</label>
           <input id="onboarding-display-name" type="text" autoComplete="nickname" maxLength={128} value={mafiaName || ""} onChange={event => onChange({ mafiaName: event.target.value })} placeholder={t("displayNamePlaceholder")} className="min-h-12 w-full rounded-xl border border-[hsl(var(--rule-warm)/0.65)] bg-background px-4 text-base text-foreground focus-visible:outline-2 focus-visible:outline-tomato-readable" />

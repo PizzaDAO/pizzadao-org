@@ -55,6 +55,13 @@ export const RATE_LIMITS = {
   // from MAFIA_PORTRAIT_DAILY_CAP in the route and is checked fail-closed.
   "mafia-portrait-member": { limit: 5, windowSec: 24 * 60 * 60 },
   "mafia-portrait-global": { limit: 300, windowSec: 24 * 60 * 60 },
+  // Public /get-your-mafia-name (Phase 3), keyed by IP: no session, so the
+  // 3-per-IP portrait cap stands in for the member cap. Claims are cheap rows.
+  "mafia-portrait-ip": { limit: 5, windowSec: 24 * 60 * 60 },
+  // Sub-cap for ALL anonymous draws (override: MAFIA_PORTRAIT_PUBLIC_DAILY_CAP),
+  // so a public flood cannot eat the members' share of the global cap.
+  "mafia-portrait-public": { limit: 100, windowSec: 24 * 60 * 60 },
+  "mafia-name-claim-public": { limit: 40, windowSec: 24 * 60 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -81,6 +88,21 @@ export function getClientIp(headers: Headers): string {
   const real = headers.get("x-real-ip")?.trim();
   if (real) return real;
   return "unknown";
+}
+
+/**
+ * Rate-limit identity of a client: IPv4 as is, IPv6 reduced to its /64 (one
+ * subscriber typically owns a whole /64, so per-address keys are free to rotate).
+ */
+export function rateLimitIp(ip: string): string {
+  if (!ip.includes(":") || ip.includes(".")) return ip; // IPv4, "unknown", IPv4-mapped
+  const bare = ip.split("%")[0]!.toLowerCase();
+  const [head, tail] = bare.split("::");
+  const h = head ? head.split(":") : [];
+  const t = tail ? tail.split(":") : [];
+  const groups = bare.includes("::") ? [...h, ...Array(Math.max(0, 8 - h.length - t.length)).fill("0"), ...t] : h;
+  if (groups.length !== 8) return ip;
+  return `${groups.slice(0, 4).map((g) => g.replace(/^0+(?=.)/, "")).join(":")}::/64`;
 }
 
 /** Hash the IP so raw addresses never land in Redis keys. */
@@ -171,7 +193,7 @@ export async function checkRateLimit(
   name: RateLimitName,
   rule: RateLimitRule = RATE_LIMITS[name],
 ): Promise<RateLimitResult> {
-  const id = ipKey(getClientIp(req.headers));
+  const id = ipKey(rateLimitIp(getClientIp(req.headers)));
 
   if (isUpstashConfigured()) {
     try {

@@ -12,6 +12,7 @@ vi.mock('@upstash/ratelimit', () => {
 vi.mock('@upstash/redis', () => ({ Redis: class {} }))
 
 import {
+  rateLimitIp,
   getClientIp,
   checkRateLimit,
   checkKeyedRateLimit,
@@ -126,5 +127,20 @@ describe('rateLimitResponse', () => {
     expect(res.headers.get('Retry-After')).toBe('2')
     const res2 = rateLimitResponse({ success: false, limit: 1, remaining: 0, reset: now - 10 }, now)
     expect(res2.headers.get('Retry-After')).toBe('1')
+  })
+})
+
+describe('rateLimitIp', () => {
+  it('leaves IPv4 and unknown alone', () => {
+    expect(rateLimitIp('203.0.113.9')).toBe('203.0.113.9')
+    expect(rateLimitIp('unknown')).toBe('unknown')
+    expect(rateLimitIp('::ffff:203.0.113.9')).toBe('::ffff:203.0.113.9')
+  })
+  it('reduces IPv6 to its /64, however it is written', () => {
+    const want = '2001:db8:1:2::/64'
+    expect(rateLimitIp('2001:db8:1:2:aaaa:bbbb:cccc:dddd')).toBe(want)
+    expect(rateLimitIp('2001:0DB8:0001:0002::1')).toBe(want)
+    expect(rateLimitIp('2001:db8:1:2::')).toBe(want)
+    expect(rateLimitIp('2001:db8:1:3::1')).not.toBe(want)
   })
 })

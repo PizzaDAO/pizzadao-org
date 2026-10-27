@@ -141,7 +141,7 @@ export default async function MadePage({ params }: Params) {
           <h2 className="m-0 font-[family-name:var(--font-display)] text-2xl font-black">{t("ctaHeading")}</h2>
           <p className="m-0 max-w-[40ch] text-foreground/70">{t("ctaBody")}</p>
           <Link
-            href="/join"
+            href="/get-your-mafia-name"
             className="btn-pill-lg no-underline"
             style={{
               background: "hsl(var(--tomato-deep))",

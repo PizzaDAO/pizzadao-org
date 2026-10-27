@@ -1,7 +1,7 @@
 import { describe, it, expect, vi, beforeEach } from "vitest";
 import { MAFIA_FILMS } from "./mafia-films";
 import { PIZZA_TOPPINGS } from "./topping-images";
-import { filmCode, isValidFunnelCode, rerollCode, toppingCode } from "./mafia-funnel";
+import { MAFIA_PAGE_CODES, filmCode, isFunnelClientEvent, isValidFunnelCode, rerollCode, toppingCode } from "./mafia-funnel";
 import { originLine } from "./name-origin";
 
 const ACTIVATION_CODE = /^[a-z0-9_]{1,48}$/; // what recordActivation accepts
@@ -53,5 +53,17 @@ describe("originLine", () => {
     expect(originLine(t, undefined, "The Godfather")).toBe("");
     expect(originLine(t, { kind: "actor", person: "Al Pacino" }, " ")).toBe("");
     expect(t).not.toHaveBeenCalled();
+  });
+});
+
+describe("mafia_page (public /get-your-mafia-name)", () => {
+  it("is a client event with a closed code vocabulary that activation accepts", () => {
+    expect(isFunnelClientEvent("mafia_page")).toBe(true);
+    for (const code of MAFIA_PAGE_CODES) {
+      expect(isValidFunnelCode("mafia_page", code)).toBe(true);
+      expect(code).toMatch(ACTIVATION_CODE);
+    }
+    expect(isValidFunnelCode("mafia_page", "anything_else")).toBe(false);
+    expect(isValidFunnelCode("mafia_page", undefined)).toBe(false);
   });
 });

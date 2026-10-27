@@ -44,7 +44,7 @@ describe("/made/[id]", () => {
     expect(screen.getByRole("heading", { level: 1 }).textContent).toBe("Pepperoni Corleone");
     expect(screen.getByText(/originCharacter\(Vito Corleone\|The Godfather\)/)).toBeTruthy();
     expect(screen.getByRole("img").getAttribute("src")).toBe("https://blob.example/p.webp");
-    expect(screen.getByRole("link", { name: "ctaButton" }).getAttribute("href")).toBe("/join");
+    expect(screen.getByRole("link", { name: "ctaButton" }).getAttribute("href")).toBe("/get-your-mafia-name");
   });
 
   it("falls back to the topping picture and omits the origin when there is none", async () => {

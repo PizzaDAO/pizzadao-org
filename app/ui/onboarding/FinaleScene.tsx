@@ -101,6 +101,24 @@ type Props = {
   candidates?: string[];
   turtles?: string[];
   crews?: string[];
+  /**
+   * "public" is the /get-your-mafia-name page (plans/mafia-name-port.md, Phase 3):
+   * no session, so portraits and the claim go out as anonymous (per-IP limits,
+   * no turtles/crews), `dashboardHref` is the /join link behind a "Join the
+   * family" button, and shares point at the public page.
+   */
+  mode?: "member" | "public";
+  /**
+   * The origin came from a /join link rather than from namegen, so it is not
+   * shown until the server has verified it (the claim comes back public).
+   */
+  originUnverified?: boolean;
+  /** Anonymous browser id (public mode), for the funnel and to own the claim. */
+  actor?: string;
+  /** Public mode: fired when "Join the family" is clicked. */
+  onJoin?: () => void;
+  /** Public mode: go back and pick another name. */
+  onRestart?: () => void;
 };
 
 export function FinaleScene({
@@ -116,7 +134,13 @@ export function FinaleScene({
   candidates,
   turtles,
   crews,
+  mode = "member",
+  originUnverified,
+  actor,
+  onJoin,
+  onRestart,
 }: Props) {
+  const isPublic = mode === "public";
   const t = useTranslations("onboarding.finale");
   const tName = useTranslations("onboarding.name");
   const locale = useLocale();
@@ -171,7 +195,11 @@ export function FinaleScene({
         const res = await fetch("/api/mafia-portrait", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({ name: mafiaName, topping, turtles, crews, variant }),
+          body: JSON.stringify(
+            isPublic
+              ? { name: mafiaName, topping, variant, actor, origin, originSig }
+              : { name: mafiaName, topping, turtles, crews, variant },
+          ),
           signal: ctrl.signal,
         });
         if (res.ok) {
@@ -194,7 +222,7 @@ export function FinaleScene({
       }
       if (mountedRef.current) setPortrait((p) => ({ ...p, ...next, loading: false }));
     },
-    [mafiaName, topping, turtles, crews],
+    [mafiaName, topping, turtles, crews, isPublic, actor, origin, originSig],
   );
 
   const startedRef = useRef(false);
@@ -227,6 +255,7 @@ export function FinaleScene({
         originSig: c.originSig,
         candidates: c.candidates,
         portraitUrl: portrait.url ?? undefined,
+        ...(isPublic ? { actor, source: "public" } : {}),
       }),
     })
       .then((res) => (res.ok ? res.json() : null))
@@ -235,7 +264,7 @@ export function FinaleScene({
         if (mountedRef.current && data?.public === true && typeof data.id === "string") setClaimId(data.id);
       })
       .catch(() => {});
-  }, [portrait.url]);
+  }, [portrait.url, actor, isPublic]);
 
   const showToast = (msg: string) => {
     setShareToast(msg);
@@ -282,7 +311,7 @@ export function FinaleScene({
   const handleShareX = () => {
     const text = t("shareXText", { name: mafiaName });
     // The public certificate once the claim is saved; /join if it could not be.
-    const url = `${window.location.origin}${claimId ? `/made/${claimId}` : "/join"}`;
+    const url = `${window.location.origin}${claimId ? `/made/${claimId}` : isPublic ? "/get-your-mafia-name" : "/join"}`;
     window.open(
       `https://x.com/intent/post?text=${encodeURIComponent(text)}&url=${encodeURIComponent(url)}`,
       "_blank",
@@ -293,14 +322,15 @@ export function FinaleScene({
   // --- Share action -------------------------------------------------------
   // Tries the native share sheet first (mobile), falls back to clipboard.
   const shareUrlRef = useRef<string>("");
+  const shareTarget = isPublic ? (claimId ? `/made/${claimId}` : "/get-your-mafia-name") : dashboardHref;
   useEffect(() => {
     if (typeof window === "undefined") return;
-    shareUrlRef.current = window.location.origin + dashboardHref;
-  }, [dashboardHref]);
+    shareUrlRef.current = window.location.origin + shareTarget;
+  }, [shareTarget]);
 
   const handleShare = async () => {
-    const url = shareUrlRef.current || dashboardHref;
-    const text = t("shareText", { name: mafiaName });
+    const url = shareUrlRef.current || shareTarget;
+    const text = isPublic ? t("sharePublicText", { name: mafiaName }) : t("shareText", { name: mafiaName });
     try {
       if (typeof navigator !== "undefined" && navigator.share) {
         await navigator.share({ title: mafiaName, text, url });
@@ -359,7 +389,8 @@ export function FinaleScene({
     transition: `opacity ${ms}ms var(--ease-editorial), transform ${ms}ms var(--ease-editorial), filter ${ms}ms var(--ease-editorial)`,
   });
 
-  const originText = originLine(tName, origin, origin?.film);
+  const originText =
+    originUnverified && !claimId ? "" : originLine(tName, origin, origin?.film);
   const redrawDisabled = portrait.loading || portrait.variant >= 4 || portrait.remaining === 0;
 
   return (
@@ -679,6 +710,7 @@ export function FinaleScene({
         >
           <a
             href={dashboardHref}
+            onClick={isPublic ? onJoin : undefined}
             className="btn-pill-lg"
             style={{
               background: "hsl(var(--tomato-deep))",
@@ -687,7 +719,7 @@ export function FinaleScene({
               textDecoration: "none",
             }}
           >
-            {t("continueButton")}
+            {isPublic ? t("joinButton") : t("continueButton")}
           </a>
           <button
             type="button"
@@ -774,6 +806,19 @@ export function FinaleScene({
         >
           § {t("footnote", { year: new Date().getFullYear() })}
         </p>
+
+        {isPublic && onRestart && (
+          <div style={{ textAlign: "center", marginTop: 12, ...transition(500), opacity: phase >= 6 ? 1 : 0 }}>
+            <button
+              type="button"
+              onClick={onRestart}
+              className="overline"
+              style={{ background: "none", border: 0, cursor: "pointer", textDecoration: "underline", color: "hsl(var(--foreground) / 0.7)" }}
+            >
+              {t("tryAnother")}
+            </button>
+          </div>
+        )}
 
         {shareToast && (
           <div

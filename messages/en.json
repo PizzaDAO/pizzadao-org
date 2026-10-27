@@ -402,7 +402,10 @@
       "copyImageFailed": "Couldn’t copy the image. Try Download.",
       "shareX": "Share on X",
       "shareXText": "Just got made. {name} 🍕",
-      "footnote": "Filed in the family record · {year}"
+      "footnote": "Filed in the family record · {year}",
+      "sharePublicText": "Look what the family named me: {name}.",
+      "joinButton": "Join the family",
+      "tryAnother": "Try another name"
     }
   },
   "nav": {
@@ -1018,5 +1021,13 @@
     "ctaBody": "Pick your topping, pick your film, get your own mafia name.",
     "ctaButton": "Join the family",
     "ogTagline": "Officially made."
+  },
+  "mafiaPublic": {
+    "metaTitle": "Get your mafia name",
+    "metaDescription": "Pick a pizza topping and a mafia film, and get a mafia name and a cartoon portrait. Free, no login. Then join PizzaDAO.",
+    "overline": "PizzaDAO · Family Record",
+    "intro": "Pick a topping, pick a film, get a name. No login needed.",
+    "footnote": "Free and no account needed. Your portrait is drawn by AI and a few are drawn per day.",
+    "ogAlt": "Get your mafia name from PizzaDAO"
   }
 }

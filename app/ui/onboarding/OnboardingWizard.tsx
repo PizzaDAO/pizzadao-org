@@ -4,6 +4,8 @@
 "use client";
 
 import { trackActivation } from "@/app/lib/activation-client";
+import { requestNamegen } from "@/app/lib/namegen-client";
+import { parseMafiaJoinParams } from "@/app/lib/mafia-join-params";
 import { filmCode, rerollCode, toppingCode } from "@/app/lib/mafia-funnel";
 import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { sanitizeSignupDraft } from "@/app/lib/signup-draft";
@@ -35,7 +37,6 @@ import {
   WizardData,
   WizardStep,
   CrewOption,
-  NamegenResponse,
   LS_KEY,
   PENDING_CLAIM_KEY,
   uuidLike,
@@ -256,6 +257,37 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     // still win — explicit redirects (?loginError=...) override this.
     if (initialFlow) {
       hasProcessedParams.current = true;
+      // Hand-off from the public /get-your-mafia-name page: seed the picks
+      // (sanitized, validated) and open the name step with that name selected.
+      // Absent or invalid params leave /join exactly as it was.
+      const prefill =
+        initialFlow.type === "wizard" && initialFlow.step === 1 && !initialFlow.isUpdate
+          ? parseMafiaJoinParams(url.searchParams)
+          : null;
+      if (prefill) {
+        setData((p) => ({
+          ...p,
+          mafiaName: prefill.name,
+          prefilledName: prefill.name,
+          topping: prefill.topping,
+          mafiaMovieTitle: prefill.filmTitle,
+          resolvedMovieTitle: prefill.origin?.film ?? prefill.filmTitle,
+          suggestions: [prefill.name],
+          // The origin line is not shown on the card (the link is untrusted);
+          // it rides along with its signature and the claim route verifies it.
+          origins: undefined,
+          mafiaOrigin: prefill.origin,
+          mafiaSig: prefill.sig,
+          originFromLink: Boolean(prefill.origin && prefill.sig),
+          sigs: undefined,
+          seenNames: mergeSeen(p.seenNames, [prefill.name]),
+        }));
+        trackActivation("mafia_page", data.sessionId, "join_arrived");
+        // Do not leave the hand-off in the address bar, history or shares.
+        try {
+          window.history.replaceState(null, "", url.pathname);
+        } catch {}
+      }
       setFlow(initialFlow);
       return;
     }
@@ -421,20 +453,16 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
     const shouldForce = force || (sameParams && data.suggestions && data.suggestions.length > 0);
 
     try {
-      const res = await fetch("/api/namegen", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
+      const result = await requestNamegen(
+        {
           topping: data.topping,
           movieTitle: data.mafiaMovieTitle,
           style: data.style,
-          force: shouldForce,
+          force: !!shouldForce,
           exclude: shouldForce ? data.seenNames : [],
-        }),
-      });
-
-      const result = (await res.json()) as NamegenResponse | any;
-      if (!res.ok) throw new Error(result?.error || t("errorGenerateNames"));
+        },
+        t("errorGenerateNames"),
+      );
 
       // Funnel (ActivationEvent dedupes per actor + event + code).
       if (lastGenParams?.topping !== currentParams.topping) trackActivation("topping_picked", data.sessionId, toppingCode(currentParams.topping));
@@ -683,6 +711,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
         tmdbMovieId={data.tmdbMovieId}
         origin={data.mafiaOrigin}
         originSig={data.mafiaSig}
+        originUnverified={data.originFromLink}
         candidates={data.seenNames.slice(-60)}
         turtles={data.turtles}
         crews={data.crews}
@@ -844,6 +873,7 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
             mediaType={data.mediaType}
             seenNames={data.seenNames}
             origins={data.origins}
+            preselectName={data.prefilledName}
             mafiaName={data.mafiaName}
             isUpdate={flow.isUpdate}
             existingName={data.existingData?.mafiaName}
@@ -855,11 +885,15 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
               setData((p) => {
                 const origin = p.origins?.[name];
                 const film = p.resolvedMovieTitle || p.mafiaMovieTitle;
+                // The hand-off's own (still unverified) origin survives picking its name.
+                const linked = !origin && p.originFromLink && p.prefilledName === name;
                 return {
                   ...p,
                   mafiaName: name,
-                  mafiaOrigin: origin && film ? { ...origin, film } : undefined,
-                  mafiaSig: origin && film ? p.sigs?.[name] : undefined,
+                  prefilledName: undefined,
+                  originFromLink: linked,
+                  mafiaOrigin: linked ? p.mafiaOrigin : origin && film ? { ...origin, film } : undefined,
+                  mafiaSig: linked ? p.mafiaSig : origin && film ? p.sigs?.[name] : undefined,
                   seenNames: mergeSeen(p.seenNames, [name]),
                 };
               });
@@ -891,6 +925,8 @@ export function OnboardingWizard({ initialFlow }: OnboardingWizardProps = {}) {
                 suggestions: undefined,
                 origins: undefined,
                 sigs: undefined,
+                prefilledName: undefined,
+                originFromLink: undefined,
                 mafiaOrigin: undefined,
                 mafiaSig: undefined,
                 resolvedMovieTitle: undefined,
