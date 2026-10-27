@@ -16,6 +16,7 @@ import { resolveCrewForEvent } from '@/app/lib/calls/crew-map'
 import { getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { SITE_URL } from '@/app/lib/site-url'
+import { isCrewExcluded } from '@/app/lib/calls/excluded-crews'
 import { buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
 const API = 'https://discord.com/api/v10'
@@ -116,6 +117,8 @@ export interface PlannedAgenda {
   alreadyPosted: boolean
   /** The crew sheet could not be read (as opposed to having no urgent tasks). */
   sheetError: boolean
+  /** The crew is excluded from automated posts (see calls/excluded-crews.ts): never posted. */
+  excluded: boolean
 }
 
 /** A rescheduled event keeps its id but changes startsAt; treat a post within this of the new start as the same call. */
@@ -137,6 +140,14 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     const hit = resolveCrewForEvent(crews.map((c) => ({ id: c.id, label: c.label, event: c.event })), { eventId: ev.id, eventName: ev.name })
     const crew = hit ? byId.get(hit.crewId) : undefined
     if (!crew) continue
+    if (isCrewExcluded(crew)) {
+      plans.push({
+        eventId: ev.id, eventName: ev.name, startsAt: ev.startsAt, crewId: crew.id, crewLabel: crew.label,
+        channelRaw: crew.channel ?? null, crewUrl: crewPageUrl(crew.id), bullets: [], message: '',
+        alreadyPosted: false, sheetError: false, excluded: true,
+      })
+      continue
+    }
     const start = ev.startsAt.getTime()
     const [sheet, actionItems, posted] = await Promise.all([
       crew.sheet ? fetchOpenCrewTasksResult(crew.sheet) : Promise.resolve({ tasks: [], error: false }),
@@ -161,6 +172,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
       message: formatAgendaMessage({ crewLabel: crew.label, startsAt: ev.startsAt, bullets, crewUrl }),
       alreadyPosted: !!posted,
       sheetError: sheet.error,
+      excluded: false,
     })
   }
   return plans
@@ -169,7 +181,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
 export type AgendaOutcome = {
   eventId: string
   crewId: string
-  status: 'posted' | 'already-posted' | 'no-items' | 'no-channel' | 'sheet-error' | 'failed' | 'post-uncertain' | 'error'
+  status: 'posted' | 'excluded' | 'already-posted' | 'no-items' | 'no-channel' | 'sheet-error' | 'failed' | 'post-uncertain' | 'error'
   messageId?: string | null
 }
 
@@ -192,6 +204,7 @@ const SUPPRESS_EMBEDS = 4
 
 async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutcome> {
   const base = { eventId: p.eventId, crewId: p.crewId }
+  if (p.excluded) return { ...base, status: 'excluded' }
   if (p.alreadyPosted) return { ...base, status: 'already-posted' }
   // Sheet unreadable: do not claim, so the next run retries (an empty list from a healthy sheet is 'no-items').
   if (p.sheetError) return { ...base, status: 'sheet-error' }

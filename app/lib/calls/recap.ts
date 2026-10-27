@@ -15,6 +15,7 @@ import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { DEFAULT_ANNOUNCE_CHANNEL_ID } from '@/app/lib/announce/run'
 import { getChannel, getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
 import { DISCORD_MESSAGE_LIMIT, DiscordPostError, postDiscordMessage } from '@/app/lib/discord-rest'
+import { isCrewExcluded, mentionsApac } from '@/app/lib/calls/excluded-crews'
 import { SITE_URL } from '@/app/lib/site-url'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
@@ -44,13 +45,29 @@ export function recapBullets(summary: string | null, chapters: unknown): string[
   const sentences = oneLine(summary ?? '')
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
-    .filter((s) => s.length > 3)
+    .filter((s) => s.length > 3 && !mentionsApac(s))
   if (sentences.length >= 3) return sentences.slice(0, MAX_BULLETS).map((s) => clip(s, BULLET_CHARS))
   const titles = (Array.isArray(chapters) ? chapters : [])
     .map((c) => (c && typeof c === 'object' && typeof (c as { title?: unknown }).title === 'string' ? oneLine((c as { title: string }).title) : ''))
-    .filter(Boolean)
+    .filter((t) => t && !mentionsApac(t))
   if (titles.length >= 3) return titles.slice(0, MAX_BULLETS + 1).map((s) => clip(s, BULLET_CHARS))
   return sentences.slice(0, MAX_BULLETS).map((s) => clip(s, BULLET_CHARS))
+}
+
+/** How many summary sentences / chapter titles / action items the Discord text leaves out because they mention APAC (the stored summary is untouched). */
+export function recapApacOmissions(rec: Pick<RecapInput, 'summary' | 'actionItems' | 'chapters'>): number {
+  const sentences = oneLine(rec.summary ?? '').split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 3 && mentionsApac(s)).length
+  const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []).filter((c) => mentionsApac((c as { title?: unknown })?.title as string)).length
+  const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : []).filter((a) => {
+    const o = a as { text?: unknown; owner?: unknown }
+    return mentionsApac(typeof o?.text === 'string' ? o.text : '') || mentionsApac(typeof o?.owner === 'string' ? o.owner : '')
+  }).length
+  return sentences + chapters + actions
+}
+
+/** A recap is never posted for an excluded crew (default: PizzaDAO APAC). */
+export function recapCrewExcluded(rec: { crewId?: string | null; crewLabel?: string | null }, env?: Record<string, string | undefined>): boolean {
+  return isCrewExcluded({ id: rec.crewId, label: rec.crewLabel }, env)
 }
 
 export function recapUrl(id: string, base: string = SITE_URL): string {
@@ -66,7 +83,7 @@ export function buildRecapText(rec: RecapInput, base: string = SITE_URL): string
       const o = a as { text?: unknown; owner?: unknown }
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
-      return text ? `${clip(text, BULLET_CHARS)}${owner ? ` (${clip(owner, 40)})` : ''}` : ''
+      return text && !mentionsApac(text) && !mentionsApac(owner) ? `${clip(text, BULLET_CHARS)}${owner ? ` (${clip(owner, 40)})` : ''}` : ''
     })
     .filter(Boolean)
     .slice(0, MAX_ACTIONS)
@@ -166,7 +183,7 @@ export function redactionsNewerThanSummary(rec: { redactionsUpdatedAt?: Date | n
   return rec.redactionsUpdatedAt.getTime() > fresh
 }
 
-export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'stale-redactions' | 'no-channel' | 'no-token' | 'failed'
+export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'excluded' | 'stale-redactions' | 'no-channel' | 'no-token' | 'failed'
 
 export interface PostRecapDeps extends RecapDeps {
   post?: typeof postDiscordMessage
@@ -202,6 +219,7 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
       summaryEditedAt: true,
     },
   })
+  if (rec && recapCrewExcluded(rec, env)) return 'excluded'
   if (!rec || rec.status !== 'PUBLISHED' || !rec.summary?.trim()) return 'not-published'
   if (rec.recapPostedAt) return 'already-posted'
   if (redactionsNewerThanSummary(rec)) return 'stale-redactions'

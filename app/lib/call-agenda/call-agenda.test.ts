@@ -221,4 +221,23 @@ describe('runCallAgenda', () => {
     expect(r.outcomes[0].status).toBe('no-items')
     expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
   })
+
+  it('skips an excluded (APAC) crew entirely: outcome excluded, no sheet read, no claim, no post', async () => {
+    vi.mocked(getCrewMappings).mockResolvedValue({
+      cached: false,
+      crews: [{ id: 'pizzadao_apac', label: 'PizzaDAO APAC', turtles: [], event: '111111111111111111', channel: '555555555555555555', sheet: 'https://docs.google.com/spreadsheets/d/abc/edit' }],
+    })
+    const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    expect(r.outcomes).toEqual([{ eventId: '111111111111111111', crewId: 'pizzadao_apac', status: 'excluded' }])
+    expect(fetchOpenCrewTasksResult).not.toHaveBeenCalled()
+    expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
+    expect(postDiscordMessage).not.toHaveBeenCalled()
+  })
+
+  it('CALL_POST_EXCLUDED_CREWS replaces the default list', async () => {
+    process.env.CALL_POST_EXCLUDED_CREWS = 'ops'
+    const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    expect(r.outcomes[0].status).toBe('excluded')
+    expect(postDiscordMessage).not.toHaveBeenCalled()
+  })
 })

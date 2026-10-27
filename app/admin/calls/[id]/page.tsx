@@ -10,7 +10,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
-import { buildRecapText, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
+import { buildRecapText, recapApacOmissions, recapCrewExcluded, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
@@ -62,6 +62,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
             : null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
     const recapEnabled = recapPostingEnabled();
+    const recapExcluded = recapCrewExcluded(rec);
+    const recapOmitted = recapApacOmissions(rec);
     const recapStale = redactionsNewerThanSummary(rec);
     const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3 && rec.transcribeError !== TOO_LARGE_ERROR;
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
@@ -225,6 +227,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                             {!recapEnabled ? ` ${t("recapDisabled")}` : ""}
                             {rec.recapPostedAt ? ` ${t("recapPosted")}` : ""}
                         </p>
+                        {recapExcluded && <p className="m-0 text-sm text-tomato">{t("recapExcluded")}</p>}
+                        {recapOmitted > 0 && <p className="m-0 text-sm text-tomato">{t("recapOmitted", { count: recapOmitted })}</p>}
                         {recapStale && <p className="m-0 text-sm text-tomato">{t("recapStale")}</p>}
                         {rec.recapError && <p className="m-0 text-sm text-tomato">{t("recapError", { error: rec.recapError })}</p>}
                         <pre className="m-0 whitespace-pre-wrap break-words rounded-xl border p-3 bg-card text-sm" style={{ borderColor: "hsl(var(--rule-warm) / 0.65)" }}>

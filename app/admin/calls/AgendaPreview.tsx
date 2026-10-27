@@ -31,10 +31,12 @@ export default async function AgendaPreview() {
                             <header className="flex flex-wrap items-baseline gap-x-3">
                                 <strong>{p.crewLabel}</strong>
                                 <span className="text-sm text-foreground/60">{when.format(p.startsAt)}</span>
-                                <span className="text-sm">{p.alreadyPosted ? t("agendaPosted") : t("agendaPending")}</span>
+                                <span className="text-sm">{p.excluded ? t("agendaExcluded") : p.alreadyPosted ? t("agendaPosted") : t("agendaPending")}</span>
                                 <span className="text-sm text-foreground/60">{t("agendaChannel", { channel: p.channelRaw ?? t("agendaNoChannel") })}</span>
                             </header>
-                            {p.bullets.length === 0 ? (
+                            {p.excluded ? (
+                                <p className="m-0 text-foreground/60">{t("agendaExcludedNote")}</p>
+                            ) : p.bullets.length === 0 ? (
                                 <p className="m-0 text-foreground/60">{t("agendaNoItems")}</p>
                             ) : (
                                 <pre className="m-0 whitespace-pre-wrap text-sm font-sans">{p.message}</pre>

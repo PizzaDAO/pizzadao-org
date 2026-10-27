@@ -7,7 +7,7 @@ vi.mock('@/app/lib/discord-channels', () => ({ resolveChannelId: vi.fn(async () 
 
 import { prisma } from '@/app/lib/db'
 import { DiscordPostError } from '@/app/lib/discord-rest'
-import { buildRecapText, channelIdFromCell, parseChannelCell, postCallRecap, recapBullets, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
+import { buildRecapText, channelIdFromCell, parseChannelCell, postCallRecap, recapApacOmissions, recapBullets, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
 
 const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
 const base = 'https://example.org'
@@ -43,6 +43,29 @@ describe('recap text', () => {
   })
   it('flattens newlines so a title cannot inject lines', () => {
     expect(buildRecapText({ ...rec, title: 'A\n@everyone' }, base)).toContain('**Call recap: A @everyone**')
+  })
+})
+
+describe('APAC filtering', () => {
+  const apac = {
+    ...rec,
+    summary: 'We reviewed the launch plan. The APAC crew wants a separate budget. Ann will own the vendor list. Next call moves to Thursday.',
+    actionItems: [{ text: 'Send the deck', owner: 'Ann' }, { text: 'Ping the apac leads' }, { text: 'Hand off', owner: 'PizzaDAO APAC' }],
+  }
+  it('drops APAC bullets and action items from the Discord text only', () => {
+    const t = buildRecapText(apac, base)
+    expect(t.toLowerCase()).not.toContain('apac')
+    expect(t).toContain('- We reviewed the launch plan.')
+    expect(t).toContain('- Send the deck (Ann)')
+    expect(apac.summary).toContain('APAC') // stored summary untouched
+  })
+  it('counts omissions for the admin preview', () => {
+    expect(recapApacOmissions(apac)).toBe(3)
+    expect(recapApacOmissions(rec)).toBe(0)
+  })
+  it('drops APAC chapter titles in the chapter fallback', () => {
+    const t = recapBullets('Short.', [{ title: 'Budget' }, { title: 'APAC plans' }, { title: 'Launch' }, { title: 'Venue' }])
+    expect(t).toEqual(['Budget', 'Launch', 'Venue'])
   })
 })
 
@@ -163,6 +186,17 @@ describe('postCallRecap', () => {
     expect(redactionsNewerThanSummary({ summaryGeneratedAt: new Date('2026-10-28T12:00:00Z'), redactionsUpdatedAt: new Date('2026-10-28T11:00:00Z') })).toBe(false)
     expect(redactionsNewerThanSummary({ summaryGeneratedAt: new Date('2026-10-28T10:00:00Z'), summaryEditedAt: new Date('2026-10-28T12:00:00Z'), redactionsUpdatedAt: new Date('2026-10-28T11:00:00Z') })).toBe(false)
     expect(redactionsNewerThanSummary({ redactionsUpdatedAt: null })).toBe(false)
+  })
+  it('never posts a recap for an excluded (APAC) crew, by id or label, even when published', async () => {
+    const post = vi.fn()
+    db.callRecording.findUnique.mockResolvedValue({ ...published, crewId: 'pizzadao_apac', crewLabel: 'PizzaDAO APAC' })
+    expect(await postCallRecap('abc123', { env, post })).toBe('excluded')
+    db.callRecording.findUnique.mockResolvedValue({ ...published, crewId: 'xyz', crewLabel: 'PizzaDAO APAC' })
+    expect(await postCallRecap('abc123', { env, post })).toBe('excluded')
+    db.callRecording.findUnique.mockResolvedValue({ ...published, crewId: 'ops', crewLabel: 'Ops' })
+    expect(await postCallRecap('abc123', { env: { ...env, CALL_POST_EXCLUDED_CREWS: 'ops' }, post })).toBe('excluded')
+    expect(post).not.toHaveBeenCalled()
+    expect(db.callRecording.updateMany).not.toHaveBeenCalled()
   })
   it('reports a missing token or channel', async () => {
     expect(await postCallRecap('abc123', { env: { CALL_RECAP_POST_ENABLED: '1' } })).toBe('no-token')
