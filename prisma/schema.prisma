@@ -1279,6 +1279,13 @@ model CallRecording {
   reviewedBy         String? // Discord id
   reviewedAt         DateTime?
   publishedAt        DateTime?
+  // Server-side transcription (call-recap): set once the per-speaker tracks were transcribed (or found already transcribed).
+  transcribedAt      DateTime?
+  transcribeError    String? // last failure, so a retry is visible to reviewers
+  // Discord recap (call-recap): claimed (recapPostedAt) before posting so a publish never double-posts.
+  recapPostedAt      DateTime?
+  recapChannelId     String?
+  recapMessageId     String?
   // Speakers whose transcript lines are hidden from everything public and from the summary model.
   // Non-destructive: the stored transcript is complete; this only filters.
   redactedSpeakerIds String[]            @default([])

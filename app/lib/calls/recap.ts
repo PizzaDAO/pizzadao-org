@@ -1,0 +1,166 @@
+/**
+ * Discord recap of a published call (call-recap). Nothing is posted until an admin publishes the
+ * call on /admin/calls; posting is then gated by CALL_RECAP_POST_ENABLED (off by default). The text
+ * is built from the stored (reviewed) title / summary / action items, which were generated from the
+ * transcript with redactions applied, so redacted speakers and lines are never in it.
+ *
+ * Channel: Community Call -> the announcements channel (same as the pre-call announcement);
+ * every other crew -> the crew's `Channel` cell in the Crew Mappings sheet (id, discord.com/channels
+ * link or channel name).
+ */
+import { prisma } from '@/app/lib/db'
+import { getCrewMappings } from '@/app/lib/crew-mappings'
+import { DEFAULT_ANNOUNCE_CHANNEL_ID } from '@/app/lib/announce/run'
+import { resolveChannelId } from '@/app/lib/discord-channels'
+import { DISCORD_MESSAGE_LIMIT, postDiscordMessage } from '@/app/lib/discord-rest'
+import { SITE_URL } from '@/app/lib/site-url'
+
+export const COMMUNITY_CALL_CREW_ID = 'community_call'
+const MAX_BULLETS = 5
+const MAX_ACTIONS = 5
+const BULLET_CHARS = 220
+
+export function recapPostingEnabled(env: Record<string, string | undefined> = process.env): boolean {
+  return /^(1|true|yes|on)$/i.test(env.CALL_RECAP_POST_ENABLED?.trim() ?? '')
+}
+
+export interface RecapInput {
+  id: string
+  title: string | null
+  eventName?: string | null
+  crewLabel: string | null
+  summary: string | null
+  actionItems: unknown
+  chapters?: unknown
+}
+
+const oneLine = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, " ").replace(/\s+/g, " ").trim()
+const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1).trimEnd()}…`)
+
+/** 3-6 short bullets: the summary's first sentences, or the chapter titles when the summary is too short to split. */
+export function recapBullets(summary: string | null, chapters: unknown): string[] {
+  const sentences = oneLine(summary ?? '')
+    .split(/(?<=[.!?])\s+/)
+    .map((s) => s.trim())
+    .filter((s) => s.length > 3)
+  if (sentences.length >= 3) return sentences.slice(0, MAX_BULLETS).map((s) => clip(s, BULLET_CHARS))
+  const titles = (Array.isArray(chapters) ? chapters : [])
+    .map((c) => (c && typeof c === 'object' && typeof (c as { title?: unknown }).title === 'string' ? oneLine((c as { title: string }).title) : ''))
+    .filter(Boolean)
+  if (titles.length >= 3) return titles.slice(0, MAX_BULLETS + 1).map((s) => clip(s, BULLET_CHARS))
+  return sentences.slice(0, MAX_BULLETS).map((s) => clip(s, BULLET_CHARS))
+}
+
+export function recapUrl(id: string, base: string = SITE_URL): string {
+  return `${base.replace(/\/$/, '')}/calls/${encodeURIComponent(id)}`
+}
+
+/** The Discord message text. Always within Discord's 2000-character limit. */
+export function buildRecapText(rec: RecapInput, base: string = SITE_URL): string {
+  const title = clip(oneLine(rec.title ?? rec.eventName ?? rec.crewLabel ?? 'Call recap'), 120)
+  const bullets = recapBullets(rec.summary, rec.chapters)
+  const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : [])
+    .map((a) => {
+      const o = a as { text?: unknown; owner?: unknown }
+      const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
+      const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
+      return text ? `${clip(text, BULLET_CHARS)}${owner ? ` (${clip(owner, 40)})` : ''}` : ''
+    })
+    .filter(Boolean)
+    .slice(0, MAX_ACTIONS)
+  const url = recapUrl(rec.id, base)
+  const lines = [`**Call recap: ${title}**`]
+  if (bullets.length) lines.push('', ...bullets.map((b) => `- ${b}`))
+  if (actions.length) lines.push('', '**Action items**', ...actions.map((a) => `- ${a}`))
+  lines.push('', `Full summary and transcript: ${url}`)
+  let text = lines.join('\n')
+  // Safety net: drop trailing bullets until it fits (the link line must survive).
+  while (text.length > DISCORD_MESSAGE_LIMIT && lines.length > 3) {
+    const at = lines.length - 3
+    lines.splice(at, 1)
+    text = lines.join('\n')
+  }
+  return text.length > DISCORD_MESSAGE_LIMIT ? `**Call recap: ${clip(title, 80)}**\n\nFull summary and transcript: ${url}` : text
+}
+
+const SNOWFLAKE = /^\d{5,25}$/
+
+/** The channel id inside a crew's `Channel` cell (bare id or discord.com/channels/<guild>/<channel> link), else null. */
+export function channelIdFromCell(cell: string | null | undefined): string | null {
+  const raw = (cell ?? '').trim()
+  if (!raw) return null
+  if (SNOWFLAKE.test(raw)) return raw
+  const link = raw.match(/discord(?:app)?\.com\/channels\/\d+\/(\d{5,25})/)
+  if (link) return link[1]
+  const mention = raw.match(/^<#(\d{5,25})>$/)
+  return mention ? mention[1] : null
+}
+
+export interface RecapChannel {
+  channelId: string
+  label: string
+}
+
+export interface RecapDeps {
+  crews?: () => Promise<Array<{ id: string; channel?: string }>>
+  resolveName?: (name: string) => Promise<string | null>
+  env?: Record<string, string | undefined>
+}
+
+/** Where this call's recap goes, or null when the crew has no usable channel. */
+export async function resolveRecapChannel(crewId: string | null, deps: RecapDeps = {}): Promise<RecapChannel | null> {
+  const env = deps.env ?? process.env
+  if (crewId === COMMUNITY_CALL_CREW_ID) {
+    const id = (env.ANNOUNCE_DISCORD_CHANNEL_ID?.trim() || DEFAULT_ANNOUNCE_CHANNEL_ID).replace(/\D/g, '')
+    return id ? { channelId: id, label: '#announcements' } : null
+  }
+  if (!crewId) return null
+  const crews = await (deps.crews ?? (async () => (await getCrewMappings()).crews))()
+  const cell = crews.find((c) => c.id === crewId)?.channel
+  const direct = channelIdFromCell(cell)
+  if (direct) return { channelId: direct, label: `#${direct}` }
+  const name = (cell ?? '').replace(/^#/, '').trim()
+  if (!name) return null
+  const id = await (deps.resolveName ?? ((n: string) => resolveChannelId(n)))(name)
+  return id ? { channelId: id, label: `#${name}` } : null
+}
+
+export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'no-channel' | 'no-token' | 'failed'
+
+export interface PostRecapDeps extends RecapDeps {
+  post?: typeof postDiscordMessage
+  base?: string
+}
+
+/**
+ * Post the recap of a PUBLISHED call, at most once. The row is claimed (recapPostedAt) before the
+ * post so a double click or republish cannot double-post; a failed post releases the claim.
+ */
+export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promise<RecapResult> {
+  const env = deps.env ?? process.env
+  if (!recapPostingEnabled(env)) return 'disabled'
+  const botToken = env.DISCORD_BOT_TOKEN?.trim()
+  if (!botToken) return 'no-token'
+  const rec = await prisma.callRecording.findUnique({
+    where: { id },
+    select: { id: true, status: true, crewId: true, crewLabel: true, eventName: true, title: true, summary: true, actionItems: true, chapters: true, recapPostedAt: true },
+  })
+  if (!rec || rec.status !== 'PUBLISHED' || !rec.summary?.trim()) return 'not-published'
+  if (rec.recapPostedAt) return 'already-posted'
+  const channel = await resolveRecapChannel(rec.crewId, deps)
+  if (!channel) return 'no-channel'
+  const claim = await prisma.callRecording.updateMany({ where: { id, recapPostedAt: null, status: 'PUBLISHED' }, data: { recapPostedAt: new Date(), recapChannelId: channel.channelId } })
+  if (claim.count !== 1) return 'already-posted'
+  try {
+    const sent = await (deps.post ?? postDiscordMessage)(
+      { kind: 'bot', channelId: channel.channelId, botToken },
+      { content: buildRecapText(rec, deps.base), allowed_mentions: { parse: [] }, flags: 4 /* SUPPRESS_EMBEDS */ },
+    )
+    if (sent.id) await prisma.callRecording.update({ where: { id }, data: { recapMessageId: sent.id } })
+    return 'posted'
+  } catch (err) {
+    console.error('[calls/recap] post failed:', err instanceof Error ? err.message : err)
+    await prisma.callRecording.updateMany({ where: { id }, data: { recapPostedAt: null, recapChannelId: null } })
+    return 'failed'
+  }
+}

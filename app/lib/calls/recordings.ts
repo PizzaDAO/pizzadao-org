@@ -30,7 +30,7 @@ async function loadCrews(): Promise<CrewRef[]> {
  * session returns the existing row untouched (so a reviewer's status changes
  * are never clobbered by a worker retry).
  */
-export async function ingestRecording(p: IngestPayload): Promise<{ id: string; duplicate: boolean; keys: string[]; summarize: boolean }> {
+export async function ingestRecording(p: IngestPayload): Promise<{ id: string; duplicate: boolean; keys: string[]; summarize: boolean; transcribe: boolean }> {
   const existing = await prisma.callRecording.findUnique({
     where: { sessionId: p.sessionId },
     select: { id: true, status: true, mixKey: true, speakers: { select: { trackKey: true } } },
@@ -63,8 +63,11 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
         return res.count === 1
       })
     }
-    return { id: existing.id, duplicate: true, keys: storedKeys(existing), summarize: filled }
+    return { id: existing.id, duplicate: true, keys: storedKeys(existing), summarize: filled, transcribe: false }
   }
+  const hasSpeech = (p.transcript?.segments.length ?? 0) > 0
+  // No spoken transcript from the worker but there are speaker tracks: the app transcribes them (cron + after()).
+  const needsTranscription = !hasSpeech && p.speakers.some((sp) => sp.trackKey && sp.talkTimeSec > 0)
   const crew = resolveCrewForEvent(await loadCrews(), { eventId: p.eventId, eventName: p.eventName })
   const created = await prisma.callRecording.create({
     data: {
@@ -81,6 +84,7 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
       partial: p.partial,
       mixKey: p.mix?.key ?? null,
       mixBytes: p.mix?.bytes ?? null,
+      ...(hasSpeech ? { transcribedAt: new Date() } : {}),
       ...(hasTranscript
         ? { transcript: segments as unknown as Prisma.InputJsonValue, transcriptLanguage: p.transcript?.language ?? null, status: 'PROCESSING' as const }
         : {}),
@@ -104,6 +108,7 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
     duplicate: false,
     keys: storedKeys({ mixKey: p.mix?.key ?? null, speakers: p.speakers.map((s) => ({ trackKey: s.trackKey })) }),
     summarize: hasTranscript,
+    transcribe: needsTranscription,
   }
 }
 

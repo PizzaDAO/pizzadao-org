@@ -143,14 +143,15 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
     expect(db.recordingOptOut.findMany).not.toHaveBeenCalled()
   })
 
-  it('without a transcript the call stays RECORDED and nothing is summarized', async () => {
+  it('without a transcript the call stays RECORDED; server-side transcription (not the summary) is scheduled', async () => {
     db.callRecording.findUnique.mockResolvedValueOnce(null)
     db.callRecording.create.mockResolvedValue({ id: 'rec1' })
     await ingestPOST(ingestReq(payload({ transcript: undefined })))
     const data = db.callRecording.create.mock.calls[0][0].data
     expect(data.status).toBeUndefined()
     expect(data.transcript).toBeUndefined()
-    expect(after).not.toHaveBeenCalled()
+    expect(after).toHaveBeenCalledTimes(1) // transcribeRecording (a no-op here: no OPENAI_API_KEY)
+    expect(m(generateText)).not.toHaveBeenCalled()
   })
 
   it('a duplicate ingest of an untouched RECORDED row fills the missing transcript and summarizes', async () => {
