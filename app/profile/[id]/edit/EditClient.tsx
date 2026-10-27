@@ -37,6 +37,7 @@ import { TelegramLinker } from "../../../ui/telegram/TelegramLinker";
 import { TaglineEditor } from "../../../dashboard/[id]/components/TaglineEditor";
 import { useUserData, useXAccount } from "../../../lib/hooks/use-api";
 import { LanguageEditor } from "../../../ui/profile/LanguageEditor";
+import { EmailPrefsEditor } from "./EmailPrefsEditor";
 
 const FONT_SANS = "var(--font-sans), system-ui, sans-serif";
 const FONT_DISPLAY =
@@ -485,6 +486,19 @@ function LanguageSection({ memberId }: { memberId: string }) {
     );
 }
 
+function EmailSection() {
+    const t = useTranslations("reengage.prefs");
+    return (
+        <EditorialSection
+            overline="§ 05b · Email"
+            title={t("sectionTitle")}
+            description={t("description")}
+        >
+            <EmailPrefsEditor />
+        </EditorialSection>
+    );
+}
+
 // ---------------------------------------------------------------------------
 // EditClient — the page body.
 // ---------------------------------------------------------------------------
@@ -691,6 +705,9 @@ export function EditClient({ memberId }: { memberId: string }) {
 
                 {/* Language preference — wired via /api/profile-extras */}
                 <LanguageSection memberId={memberId} />
+
+                {/* Weekly re-engagement email opt-out — /api/email-prefs */}
+                <EmailSection />
 
                 {/* Wallets pointer */}
                 <EditorialSection

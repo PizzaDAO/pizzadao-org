@@ -142,6 +142,7 @@ describe('saveMemberTimezone', () => {
       where: { memberId: '42' },
       create: { memberId: '42', timezone: 'Europe/Paris' },
       update: { timezone: 'Europe/Paris' },
+      select: { memberId: true },
     })
   })
 

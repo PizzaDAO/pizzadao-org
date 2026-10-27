@@ -153,6 +153,7 @@ export async function saveMemberTimezone(memberId: string, timezone: unknown): P
       where: { memberId },
       create: { memberId, timezone },
       update: { timezone },
+      select: { memberId: true },
     });
     return true;
   } catch {

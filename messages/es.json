@@ -1107,5 +1107,65 @@
     "nextCta": "Empezar esta misión",
     "nextNone": "Terminaste todas las misiones disponibles. Buen trabajo.",
     "nextCtaAll": "Ver todas las misiones"
+  },
+  "reengage": {
+    "subjectMission": "Tu próxima misión: {title}",
+    "subjectDefault": "Tu semana en PizzaDAO",
+    "preheader": "Tu próxima misión, las llamadas de tus crews y cuánto te falta para el siguiente nivel.",
+    "greeting": "Hola {name},",
+    "intro": "Esto es lo que se cocina esta semana en PizzaDAO.",
+    "missionHeading": "Tu próxima misión",
+    "missionBody": "Nivel {level}: {title}",
+    "missionCta": "Abrir misiones",
+    "levelProgress": "Te {remaining, plural, one {falta # misión} other {faltan # misiones}} para el nivel {nextLevel}.",
+    "levelProgressTitled": "Te {remaining, plural, one {falta # misión} other {faltan # misiones}} para el nivel {nextLevel}, {levelTitle}.",
+    "allCaught": "Has completado todas las misiones disponibles por ahora. Buen trabajo.",
+    "callsHeading": "Las llamadas de tus crews en los próximos 7 días",
+    "callLine": "{crew}: {when}",
+    "openApp": "Abrir PizzaDAO",
+    "footerWhy": "Recibes esta nota semanal porque eres miembro de PizzaDAO y tenemos tu correo.",
+    "unsubscribe": "Darme de baja",
+    "manage": "Ajustes de correo",
+    "unsub": {
+      "title": "Darte de baja de los correos de PizzaDAO",
+      "body": "¿Dejar de enviar el resumen semanal de PizzaDAO a este miembro?",
+      "button": "Darme de baja",
+      "doneTitle": "Te has dado de baja",
+      "doneBody": "Ya no recibirás el resumen semanal. Puedes volver a activarlo en los ajustes de tu perfil.",
+      "invalid": "Este enlace de baja no es válido. Abre los ajustes de tu perfil para cambiar tus preferencias de correo.",
+      "home": "Volver a PizzaDAO"
+    },
+    "prefs": {
+      "sectionTitle": "Correo",
+      "description": "Una nota semanal breve con tu próxima misión, las llamadas de tus crews y tu progreso de nivel. Solo se envía a una dirección confirmada con tu consentimiento.",
+      "label": "Enviarme el correo semanal de PizzaDAO",
+      "saveError": "No pudimos guardar tu preferencia de correo. ¿Intentas de nuevo?",
+      "saved": "Guardado",
+      "emailLabel": "Correo electrónico",
+      "optIn": "Recibir un resumen semanal de PizzaDAO",
+      "save": "Guardar",
+      "verified": "Confirmado",
+      "pending": "Revisa tu bandeja de entrada para confirmar esta dirección.",
+      "resend": "Reenviar confirmación",
+      "invalidEmail": "Introduce un correo válido.",
+      "tooSoon": "Acabamos de enviar una confirmación. Inténtalo de nuevo en unos minutos.",
+      "sendFailed": "Guardado, pero no pudimos enviar la confirmación. Inténtalo más tarde.",
+      "loadError": "No pudimos cargar tus ajustes de correo. Recarga la página para intentarlo de nuevo.",
+      "tooMany": "Demasiados correos de confirmación. Inténtalo de nuevo mañana."
+    },
+    "confirm": {
+      "subject": "Confirma tu correo para el resumen semanal de PizzaDAO",
+      "intro": "Confirma esta dirección para recibir el resumen semanal de PizzaDAO (tu próxima misión, las llamadas de tus crews y tu progreso de nivel).",
+      "cta": "Confirmar mi correo",
+      "ignore": "Si no lo pediste, ignora este correo y no se enviará nada."
+    },
+    "confirmPage": {
+      "title": "Confirma tu correo",
+      "body": "¿Confirmar esta dirección para el resumen semanal de PizzaDAO?",
+      "button": "Confirmar",
+      "doneTitle": "Correo confirmado",
+      "doneBody": "Todo listo. Recibirás el resumen semanal.",
+      "invalid": "Este enlace de confirmación no es válido o ha caducado. Pide uno nuevo desde los ajustes de tu perfil."
+    }
   }
 }
