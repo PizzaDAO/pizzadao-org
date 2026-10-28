@@ -59,13 +59,13 @@ function applyPlan(rows: MissionDbRow[], plan: VerifierMigrationPlan): MissionDb
 const at = (level: number, index: number) => (r: { level: number; index: number }) => r.level === level && r.index === index
 
 describe('planVerifierMigration', () => {
-  it('maps every seeded mission by (level, index); 10 automatic, 4 semi (proof link), 1 manual', () => {
+  it('maps every seeded mission by (level, index); 12 automatic, 4 semi (proof link), 1 manual', () => {
     const plan = planVerifierMigration(seedRows())
     expect(plan.errors).toEqual([])
     expect(plan.updates).toHaveLength(12)
-    expect(plan.inserts.map((i) => `L${i.level}.${i.index}`)).toEqual(['L4.2', 'L5.2', 'L5.3'])
+    expect(plan.inserts.map((i) => `L${i.level}.${i.index}`)).toEqual(['L4.2', 'L5.2', 'L5.3', 'L6.2', 'L8.1'])
     const auto = MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey && VERIFIERS[c.verifierKey]?.mode === 'auto')
-    expect(auto.map((c) => `L${c.level}.${c.index}`)).toEqual(['L1.1', 'L2.0', 'L3.0', 'L3.1', 'L4.2', 'L5.0', 'L5.2', 'L5.3', 'L6.0', 'L7.0'])
+    expect(auto.map((c) => `L${c.level}.${c.index}`)).toEqual(['L1.1', 'L2.0', 'L3.0', 'L3.1', 'L4.2', 'L5.0', 'L5.2', 'L5.3', 'L6.0', 'L6.2', 'L7.0', 'L8.1'])
     const semi = MISSION_VERIFIER_CONFIG.filter((c) => c.verifierKey && VERIFIERS[c.verifierKey]?.mode === 'semi')
     expect(semi.map((c) => `L${c.level}.${c.index}:${c.verifierKey}`)).toEqual(['L2.1:social_post', 'L4.1:poap_drop', 'L5.1:media_proof', 'L6.1:gpp_host'])
     expect(semi.every((c) => c.proofKind === 'URL')).toBe(true)
@@ -108,7 +108,7 @@ describe('planVerifierMigration', () => {
     const again = planVerifierMigration(applyPlan(rows, planVerifierMigration(rows)))
     expect(again.updates).toEqual([])
     expect(again.inserts).toEqual([])
-    expect(again.unchanged).toHaveLength(15)
+    expect(again.unchanged).toHaveLength(17)
   })
 
   it('aborts on a title that differs from the seed (rows edited by hand)', () => {
@@ -143,6 +143,8 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
       ['L4.2', 'Get vouched for', 3141, 'vouch_received', { min: 1, sources: ['PIZZADAO'] }, 'Do some dirty work'],
       ['L5.2', 'Vouch for another member', 4269, 'vouch_given', { min: 1, sources: ['PIZZADAO'] }, 'Do a favor for the mafia'],
       ['L5.3', 'Own a Rare Pizza Box', 4269, 'rare_pizza_box', { minLevel: 5 }, 'Do a favor for the mafia'],
+      ['L6.2', 'Get vouched by 5 members', 6942, 'vouch_received', { min: 5, sources: ['PIZZADAO'] }, 'Street Muscle'],
+      ['L8.1', 'Get vouched by 10 members', 69420, 'vouch_received', { min: 10, sources: ['PIZZADAO'] }, 'Don of Dons'],
     ])
     expect(plan.inserts.every((i) => i.data.isActive && i.data.proofKind === 'NONE' && i.data.description.length > 20)).toBe(true)
     expect(plan.updates.map((u) => [`L${u.level}.${u.index}`, u.data, u.changes])).toEqual([
@@ -159,7 +161,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
     const after = applyPlan(prodRows(), planVerifierMigration(prodRows()))
     const again = planVerifierMigration(after)
     expect(again).toMatchObject({ updates: [], inserts: [], errors: [], missing: [] })
-    expect(again.unchanged).toHaveLength(15)
+    expect(again.unchanged).toHaveLength(17)
     const l5 = after.filter((r) => r.level === 5)
     expect(l5.map((r) => [r.index, r.levelTitle, r.reward])).toEqual([
       [0, 'Do a favor for the mafia', 4269],
@@ -167,7 +169,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
       [2, 'Do a favor for the mafia', 4269],
       [3, 'Do a favor for the mafia', 4269],
     ])
-    expect(after.filter((r) => r.level === 6).map((r) => r.levelTitle)).toEqual(['Street Muscle', 'Street Muscle'])
+    expect(after.filter((r) => r.level === 6).map((r) => r.levelTitle)).toEqual(['Street Muscle', 'Street Muscle', 'Street Muscle'])
   })
 
   it('a level row outside the config (e.g. an inactive one) still gets its level title', () => {
@@ -182,7 +184,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
       expect.stringMatching(/^L5\.2: reward 4269 differs from level 5's shared reward 5000/),
       expect.stringMatching(/^L5\.3: reward 4269 differs/),
     ])
-    expect(plan.inserts.map((i) => `L${i.level}.${i.index}`)).toEqual(['L4.2'])
+    expect(plan.inserts.map((i) => `L${i.level}.${i.index}`)).toEqual(['L4.2', 'L6.2', 'L8.1'])
   })
 
   it('--level-titles overrides / adds titles (one command to rename later)', () => {
