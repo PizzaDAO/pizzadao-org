@@ -4,20 +4,28 @@
  * (speaker attribution for free) and segment times need no remapping. Merged by start time, the
  * speech is combined with any voice-channel chat lines already stored on the recording.
  *
- * Whisper hallucinates on silence ("Thank you.", repeated sentences). We ask for verbose_json (per
- * segment no_speech_prob / avg_logprob / compression_ratio), drop low-confidence segments, and drop
- * exact-repeat runs. Runs on a Vercel route (the recorder on Railway has no OpenAI key); one call to
- * OpenAI per speaker, a few in parallel, under the function's 300 s limit.
+ * Whisper hallucinates on silence ("Thank you.", repeated sentences), and a speaker track is mostly
+ * silence (it is padded to the call length). So each track is decoded and only its speech is sent
+ * (see speech.ts): speech regions are packed into chunks of at most 10 minutes, and segment times are
+ * mapped back to call time. A track that cannot be decoded falls back to sending the whole file.
+ * We still ask for verbose_json (per segment no_speech_prob / avg_logprob / compression_ratio), drop
+ * low-confidence segments, and drop exact-repeat runs. Runs on a Vercel route (the recorder on
+ * Railway has no OpenAI key); a few tracks in parallel, under the function's 300 s limit.
  */
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { getObjectBytes } from './r2'
 import { asSegments, generateAndStoreSummaryResult, type SummaryResult } from './recordings'
 import type { TranscriptSegment } from './ingest-schema'
+import { decodeOggOpus, mapChunkSegments, planSpeech, renderChunkWav, type DecodedTrack } from './speech'
 
 export const DEFAULT_TRANSCRIBE_MODEL = 'whisper-1'
 /** OpenAI rejects uploads over 25 MB. */
 export const MAX_UPLOAD_BYTES = 24 * 1024 * 1024
+/** Largest track downloaded (only the speech is uploaded, so a track may be bigger than the upload limit). */
+export const MAX_TRACK_DOWNLOAD_BYTES = 100 * 1024 * 1024
+/** Chunks of one track sent to OpenAI at once. */
+const CHUNK_CONCURRENCY = 2
 /** A new turn starts when the speaker changes or after a pause this long (same as the recorder). */
 export const TURN_GAP_MS = 1500
 const OPENAI_URL = 'https://api.openai.com/v1/audio/transcriptions'
@@ -211,7 +219,8 @@ export async function transcribeAudio(
     }
     try {
       const form = new FormData()
-      form.append('file', new Blob([bytes as BlobPart], { type: 'audio/ogg' }), 'track.ogg')
+      const wav = isWav(bytes)
+      form.append('file', new Blob([bytes as BlobPart], { type: wav ? 'audio/wav' : 'audio/ogg' }), wav ? 'speech.wav' : 'track.ogg')
       form.append('model', opts.model ?? transcribeModel())
       form.append('response_format', 'verbose_json')
       form.append('temperature', '0')
@@ -237,6 +246,12 @@ export async function transcribeAudio(
     else break
   }
   throw new Error(lastErr)
+}
+
+/** True for a RIFF/WAVE file (speech chunks); anything else is sent as the recorder's Ogg. */
+export function isWav(bytes: Uint8Array): boolean {
+  const tag = (o: number) => String.fromCharCode(...bytes.subarray(o, o + 4))
+  return bytes.length >= 12 && tag(0) === 'RIFF' && tag(8) === 'WAVE'
 }
 
 /** At most `limit` async jobs at once. */
@@ -268,6 +283,8 @@ export interface TranscribeDeps {
   apiKey?: string
   download?: (key: string) => Promise<Uint8Array>
   transcribe?: (bytes: Uint8Array, apiKey: string, deadline: number, opts: { language: string | null }) => Promise<WhisperResult>
+  /** Track decoder (Ogg/Opus to 16 kHz frames); a throw sends the whole track instead. */
+  decode?: (bytes: Uint8Array) => Promise<DecodedTrack>
   summarize?: (id: string, opts: { onlyIfEmpty?: boolean; unlessEdited?: boolean; budgetMs?: number }) => Promise<boolean | SummaryResult | void>
   /** Whisper language hint; undefined reads CALL_TRANSCRIBE_LANGUAGE, null sends none. */
   language?: string | null
@@ -282,7 +299,23 @@ export interface TranscribeDeps {
 
 const hasSpeech = (segs: TranscriptSegment[]) => segs.some((s) => s.kind !== 'chat')
 
-type TrackResult = { utterances: Utterance[]; language: string | null; talkTimeSec: number; stats?: CleanStats } | { skipped: string }
+/** Per-track counts saved in transcribeStats (never text). */
+export interface TrackStats extends CleanStats {
+  /** 'speech': only VAD speech was sent; 'whole-track': the file as is (decoding failed). */
+  mode: 'speech' | 'whole-track'
+  /** Seconds of audio found to be speech (and sent); 0 in whole-track mode. */
+  speechSec: number
+  /** Chunks sent (1 in whole-track mode). */
+  chunks: number
+  /** OpenAI requests made for this track (each may retry internally). */
+  requests: number
+  /** Opus frames the decoder could not decode. */
+  decodeErrors?: number
+  /** Why the speech path was not used. */
+  fallback?: 'decode-failed'
+}
+
+type TrackResult = { utterances: Utterance[]; language: string | null; talkTimeSec: number; stats?: TrackStats | CleanStats } | { skipped: string }
 type TrackResults = Record<string, TrackResult>
 
 function parseTrackResults(v: unknown): TrackResults {
@@ -341,7 +374,8 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   if (claim.count !== 1) return 'busy'
   const lastAttempt = (rec.transcribeAttempts ?? 0) + 1 >= MAX_ATTEMPTS
 
-  const download = deps.download ?? ((key: string) => getObjectBytes(key, MAX_UPLOAD_BYTES))
+  const download = deps.download ?? ((key: string) => getObjectBytes(key, MAX_TRACK_DOWNLOAD_BYTES))
+  const decode = deps.decode ?? decodeOggOpus
   const hint = deps.language === undefined ? transcribeLanguage() : deps.language
   const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number, o: { language: string | null }) => transcribeAudio(bytes, key, { deadline, language: o.language }))
   const send = (bytes: Uint8Array, key: string, deadline: number) => {
@@ -384,12 +418,53 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
         }
         throw err
       }
-      if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new Error(`track is ${bytes.byteLength} bytes (limit ${MAX_UPLOAD_BYTES})`)
-      const r = await send(bytes, apiKey, startedMs + HARD_DEADLINE_MS)
+      // Decode and find the speech; on failure send the whole file as before.
+      let decoded: DecodedTrack | null = null
+      try {
+        decoded = await decode(bytes)
+      } catch (err) {
+        log(`track for ${t.discordId} could not be decoded (${err instanceof Error ? err.message : String(err)}); sending the whole track`)
+      }
+      const deadline = startedMs + HARD_DEADLINE_MS
+      let segments: WhisperSegment[] = []
+      let language: string | null = null
+      let extra: Omit<TrackStats, keyof CleanStats>
+      if (decoded) {
+        const plan = planSpeech(decoded)
+        const track = decoded
+        const perChunk: WhisperSegment[][] = []
+        let requests = 0
+        // A track counts only when every chunk succeeded; after the first failure no more chunks are sent.
+        let failure: unknown = null
+        await pool(plan.chunks.map((c, i) => ({ c, i })), CHUNK_CONCURRENCY, async ({ c, i }) => {
+          if (failure) return
+          try {
+            requests++
+            const r = await send(renderChunkWav(track, c), apiKey, deadline)
+            perChunk[i] = mapChunkSegments(c, r.segments)
+            language ??= r.language
+          } catch (err) {
+            failure ??= err
+          }
+        })
+        if (failure) throw failure
+        segments = perChunk.flat()
+        extra = { mode: 'speech', speechSec: Math.round(plan.speechMs / 1000), chunks: plan.chunks.length, requests, decodeErrors: track.decodeErrors }
+      } else {
+        if (bytes.byteLength > MAX_UPLOAD_BYTES) {
+          await commit(t.discordId, { skipped: 'too-large' })
+          return
+        }
+        const r = await send(bytes, apiKey, deadline)
+        segments = r.segments
+        language = r.language
+        extra = { mode: 'whole-track', speechSec: 0, chunks: 1, requests: 1, fallback: 'decode-failed' }
+      }
       // Persist now: a killed run must not make the next one pay for this track again.
-      const cleaned = cleanSegmentsWithStats(r.segments)
-      log(`track stats: talk=${t.talkTimeSec}s raw=${cleaned.stats.rawSegments} kept=${cleaned.stats.kept} dubious=${cleaned.stats.droppedDubious} repeats=${cleaned.stats.droppedRepeats} words=${cleaned.stats.words} lastEnd=${cleaned.stats.lastEndSec}s hint=${hint ?? 'auto'}`)
-      await commit(t.discordId, { utterances: cleaned.utterances, language: hint ? languageName(hint) : r.language, talkTimeSec: t.talkTimeSec, stats: cleaned.stats })
+      const cleaned = cleanSegmentsWithStats(segments)
+      const stats: TrackStats = { ...cleaned.stats, ...extra }
+      log(`track stats: mode=${stats.mode} talk=${t.talkTimeSec}s speech=${stats.speechSec}s chunks=${stats.chunks} requests=${stats.requests} raw=${stats.rawSegments} kept=${stats.kept} dubious=${stats.droppedDubious} repeats=${stats.droppedRepeats} words=${stats.words} lastEnd=${stats.lastEndSec}s hint=${hint ?? 'auto'}`)
+      await commit(t.discordId, { utterances: cleaned.utterances, language: hint ? languageName(hint) : language, talkTimeSec: t.talkTimeSec, stats })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       log(`track for ${t.discordId} failed: ${msg}`)

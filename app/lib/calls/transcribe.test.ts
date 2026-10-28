@@ -7,7 +7,8 @@ vi.mock('./r2', () => ({ getObjectBytes: vi.fn() }))
 vi.mock('ai', () => ({ generateText: vi.fn(), Output: { object: vi.fn() } }))
 
 import { prisma } from '@/app/lib/db'
-import { cleanSegments, dropRepeatRuns, mergeSpeakerTurns, transcribeAudio, transcribeRecording, USED_OPENAI } from './transcribe'
+import { cleanSegments, dropRepeatRuns, isWav, MAX_UPLOAD_BYTES, mergeSpeakerTurns, transcribeAudio, transcribeRecording, USED_OPENAI, type WhisperResult } from './transcribe'
+import { FRAME_MS, SILENT_DB, renderChunkWav, type DecodedTrack } from './speech'
 import { generateAndStoreSummary, publishRecording, setSpeakerRedacted, updateRecordingText } from './recordings'
 import { generateText } from 'ai'
 
@@ -400,5 +401,135 @@ describe('second review fixes', () => {
     const out = await transcribeRecording('r1', { apiKey: 'k', usage, download: async () => new Uint8Array([1]), transcribe: async () => ({ segments: [seg('x')], language: 'en' }), summarize: vi.fn() })
     expect(out).toBe('busy')
     expect(usage.calls).toBe(2)
+  })
+})
+
+describe('speech-only transcription', () => {
+  const rec = () => ({
+    id: 'r1',
+    status: 'RECORDED',
+    transcript: null,
+    transcribedAt: null,
+    transcribeAttempts: 0,
+    transcribeTracks: null,
+    redactedSpeakerIds: [],
+    summaryEditedAt: null,
+    updatedAt: new Date('2026-10-28T12:00:00Z'),
+    speakers: [{ discordId: ANN, trackKey: 'calls/s/tracks/a.ogg', talkTimeSec: 60 }],
+  })
+  const seg = (start: number, end: number, text: string) => ({ start, end, text, avg_logprob: -0.2, no_speech_prob: 0.01, compression_ratio: 1.1 })
+  /** A decoded track of `sec` seconds that is loud only in the given [startSec, endSec) ranges. */
+  const track = (sec: number, loud: Array<[number, number]>): DecodedTrack => {
+    const frameDb = new Float32Array(Math.ceil((sec * 1000) / FRAME_MS)).fill(SILENT_DB)
+    for (const [a, b] of loud) frameDb.fill(-20, Math.round((a * 1000) / FRAME_MS), Math.round((b * 1000) / FRAME_MS))
+    return { frameDb, frames: new Map(), totalSamples: sec * 16000, decodeErrors: 0 }
+  }
+  const finalWrite = () => db.callRecording.updateMany.mock.calls.map((c) => c[0]).find((a) => a.data.transcribedAt && !a.where.OR)
+  const statsOf = () => (finalWrite().data.transcribeStats as Record<string, Record<string, unknown>>)[ANN]
+
+  beforeEach(() => {
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.findUnique.mockResolvedValue(rec())
+  })
+
+  it('sends only the speech as WAV and maps segment times back to call time', async () => {
+    const sent: Uint8Array[] = []
+    const transcribe = vi.fn(async (bytes: Uint8Array) => {
+      sent.push(bytes)
+      // Chunk layout (300 ms padding): call [100.2 s, 110.7 s] at 0 s, 0.5 s of silence, call [500.7 s, 519.3 s] at 11 s.
+      return { segments: [seg(1, 3, 'first point'), seg(12, 13.5, 'second point')], language: 'english' }
+    })
+    const usage = { calls: 0 }
+    const out = await transcribeRecording('r1', { apiKey: 'k', usage, download: async () => new Uint8Array([9]), decode: async () => track(1200, [[100.5, 110.4], [501, 519]]), transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('transcribed')
+    expect(transcribe).toHaveBeenCalledTimes(1)
+    expect(usage.calls).toBe(1)
+    expect(isWav(sent[0])).toBe(true)
+    // About 31 s of 16-bit 16 kHz audio instead of a 20 minute file.
+    expect(sent[0].byteLength).toBeLessThan(32 * 16000 * 2)
+    const stored = finalWrite().data.transcript as Array<{ startMs: number; text: string }>
+    expect(stored.map((s) => [s.startMs, s.text])).toEqual([
+      [101200, 'first point'],
+      [501700, 'second point'],
+    ])
+    expect(statsOf()).toMatchObject({ mode: 'speech', chunks: 1, requests: 1, kept: 2, decodeErrors: 0, speechSec: 29 })
+    expect(statsOf().fallback).toBeUndefined()
+  })
+
+  it('sends one request per chunk and saves the track only when every chunk worked', async () => {
+    // Five stretches of ~5 minutes: two fit in one 10 minute chunk, so three chunks.
+    const decoded = track(3600, [[0, 299], [600, 899], [1200, 1499], [1800, 2099], [2400, 2699]])
+    const ok = vi.fn(async () => ({ segments: [seg(1, 2, 'words')], language: 'english' }))
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), decode: async () => decoded, transcribe: ok, summarize: vi.fn(async () => true) })
+    expect(ok).toHaveBeenCalledTimes(3)
+    expect(statsOf().chunks).toBe(ok.mock.calls.length)
+    expect(statsOf().requests).toBe(ok.mock.calls.length)
+
+    vi.clearAllMocks()
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.findUnique.mockResolvedValue(rec())
+    let n = 0
+    const flaky = vi.fn(async () => {
+      if (n++ === 1) throw new Error('OpenAI answered 500: oops')
+      return { segments: [seg(1, 2, 'words')], language: 'english' }
+    })
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), decode: async () => decoded, transcribe: flaky, summarize: vi.fn(async () => true) })
+    expect(out).toBe('failed')
+    expect(finalWrite()).toBeUndefined()
+    const trackWrites = db.callRecording.updateMany.mock.calls.map((c) => c[0]).filter((a) => a.data.transcribeTracks && typeof a.data.transcribeTracks === 'object' && ANN in a.data.transcribeTracks)
+    expect(trackWrites).toHaveLength(0)
+  })
+
+  it('a track without speech costs no OpenAI call', async () => {
+    const transcribe = vi.fn()
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), decode: async () => track(600, []), transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('empty-transcript')
+    expect(transcribe).not.toHaveBeenCalled()
+    expect(statsOf()).toMatchObject({ mode: 'speech', speechSec: 0, chunks: 0, requests: 0 })
+  })
+
+  it('falls back to the whole track when decoding fails, and says so in the stats', async () => {
+    const bytes = new Uint8Array([7, 7, 7])
+    const transcribe = vi.fn<(bytes: Uint8Array) => Promise<WhisperResult>>(async () => ({ segments: [seg(5, 6, 'hello')], language: 'english' }))
+    const logs: string[] = []
+    const decode = async (): Promise<DecodedTrack> => {
+      throw new Error('bad ogg')
+    }
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => bytes, decode, transcribe, summarize: vi.fn(async () => true), log: (m) => logs.push(m) })
+    expect(transcribe.mock.calls[0][0]).toBe(bytes)
+    expect((finalWrite().data.transcript as Array<{ startMs: number }>)[0].startMs).toBe(5000)
+    expect(statsOf()).toMatchObject({ mode: 'whole-track', fallback: 'decode-failed', chunks: 1, requests: 1, speechSec: 0 })
+    expect(logs.some((l) => l.includes('could not be decoded'))).toBe(true)
+  })
+
+  it('a whole-track fallback over the upload limit is skipped as too large', async () => {
+    const transcribe = vi.fn()
+    const decode = async (): Promise<DecodedTrack> => {
+      throw new Error('bad ogg')
+    }
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array(MAX_UPLOAD_BYTES + 1), decode, transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('failed')
+    expect(transcribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('upload format', () => {
+  it('names a WAV chunk as wav and the recorder file as ogg', async () => {
+    const forms: FormData[] = []
+    const fetchImpl = vi.fn(async (_url: string, init: { body: FormData }) => {
+      forms.push(init.body)
+      return { ok: true, json: async () => ({ segments: [] }) }
+    })
+    const wav = renderChunkWav(
+      { frameDb: new Float32Array(10), frames: new Map(), totalSamples: 4800, decodeErrors: 0 },
+      { pieces: [{ srcStartMs: 0, srcEndMs: 300, chunkStartMs: 0 }], durationMs: 300 },
+    )
+    expect(isWav(wav)).toBe(true)
+    expect(isWav(new Uint8Array([1, 2, 3]))).toBe(false)
+    await transcribeAudio(wav, 'k', { fetchImpl: fetchImpl as unknown as typeof fetch, language: 'en' })
+    await transcribeAudio(new Uint8Array([1]), 'k', { fetchImpl: fetchImpl as unknown as typeof fetch, language: 'en' })
+    expect((forms[0].get('file') as File).name).toBe('speech.wav')
+    expect((forms[0].get('file') as File).type).toBe('audio/wav')
+    expect((forms[1].get('file') as File).name).toBe('track.ogg')
   })
 })
