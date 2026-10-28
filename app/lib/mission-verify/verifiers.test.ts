@@ -330,7 +330,7 @@ describe('vouch_received (L4.2)', () => {
     expect(await vouchReceived.check(ctx(sources()), params)).toMatchObject({ status: 'fail', progress: { have: 0, need: 1 } })
     const src = sources({ getVouchesReceived: vi.fn(async () => [got('m-2')]) })
     expect(await vouchReceived.check(ctx(src), params)).toEqual({ status: 'pass', evidence: { vouches: 1, need: 1, members: ['m-2'] } })
-    expect(src.getVouchesReceived).toHaveBeenCalledWith('m-1')
+    expect(src.getVouchesReceived).toHaveBeenCalledWith('m-1', ['PIZZADAO'])
   })
 
   it('ignores self-vouches and imported Farcaster / X follows by default', async () => {

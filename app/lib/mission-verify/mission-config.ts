@@ -15,7 +15,8 @@
  * reviewer approves with one click. They never approve on their own.
  *
  * Missions added after the seed (L4.2 "Get vouched by a member", L5.2 "Vouch for
- * another member", L5.3 "Own a Rare Pizza Box") carry an
+ * another member", L5.3 "Own a Rare Pizza Box", L6.2 "Get vouched by 5 members",
+ * L8.1 "Get vouched by 10 members") carry an
  * `insert` block: the migration INSERTs the row when (level, index) is
  * missing, so it is idempotent. MISSION_LEVEL_TITLES sets Mission.levelTitle
  * on every row of those levels (the level's display name and the reward
@@ -61,6 +62,12 @@ export const LEVEL_4_REWARD = 3141
 
 /** L5's shared per-level reward (the new L5.2 and L5.3 rows must match it). */
 export const LEVEL_5_REWARD = 4269
+
+/** L6's shared per-level reward (the new L6.2 row must match it). */
+export const LEVEL_6_REWARD = 6942
+
+/** L8's shared per-level reward (the new L8.1 row must match it). */
+export const LEVEL_8_REWARD = 69420
 
 export const PEPPERONI_MAFIA_ROLE_ID = '823266914834841610'
 export const DREAD_PIZZA_ROBERTS_ROLE_ID = '812131585327235113'
@@ -197,6 +204,18 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     proofKind: 'URL',
   },
   {
+    level: 6,
+    index: 2, // new: not in the seed, INSERTed by the migration
+    seedTitle: 'Get vouched by 5 members',
+    description:
+      'Get at least 5 vouches from other PizzaDAO members: ask members to open your profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.',
+    // Only PizzaDAO-native vouches, like L4.2.
+    verifierKey: 'vouch_received',
+    verifierParams: { min: 5, sources: ['PIZZADAO'] },
+    proofKind: 'NONE',
+    insert: { reward: LEVEL_6_REWARD },
+  },
+  {
     level: 7,
     index: 0,
     seedTitle: 'Become a Crew Leader',
@@ -211,6 +230,17 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'manual',
     verifierParams: null,
     proofKind: 'NONE',
+  },
+  {
+    level: 8,
+    index: 1, // new: not in the seed, INSERTed by the migration (automatic: needs no reviewer, unlike L8.0)
+    seedTitle: 'Get vouched by 10 members',
+    description:
+      'Get at least 10 vouches from other PizzaDAO members: ask members to open your profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.',
+    verifierKey: 'vouch_received',
+    verifierParams: { min: 10, sources: ['PIZZADAO'] },
+    proofKind: 'NONE',
+    insert: { reward: LEVEL_8_REWARD },
   },
 ]
 

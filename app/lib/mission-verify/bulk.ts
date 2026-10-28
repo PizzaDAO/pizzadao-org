@@ -309,6 +309,7 @@ export function batchSources(base: VerifierSources, data: BatchData, guildRoles:
     countWallets: async (id) => data.wallets.get(id) ?? 0,
     getVouchesGiven: async (memberId) => data.vouches.get(memberId) ?? [],
     getVouchesReceived: async (memberId) => data.vouchesReceived.get(memberId) ?? [],
+    getPaidLevels: async (id) => new Set(data.paidLevels.get(id) ?? []),
     // The same rule as getCurrentLevel, from the prefetched approvals and payouts.
     getWorkingLevel: async (id) =>
       computeCurrentLevel(data.missions, data.approved.get(id) ?? new Set(), data.paidLevels.get(id) ?? new Set()),

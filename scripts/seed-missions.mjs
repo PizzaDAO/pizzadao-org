@@ -57,12 +57,14 @@ const missions = [
   // Level 6 - Street Muscle (6,942 PEP)
   { level: 6, index: 0, title: 'Join Pepperoni Mafia', description: 'Become a member of the Pepperoni Mafia.', reward: 6942, levelTitle: 'Street Muscle', verifierKey: 'discord_role', verifierParams: { roleIds: ['823266914834841610'] } },
   { level: 6, index: 1, title: 'Onboard a Bitcoin Pizza Day city', description: 'Help onboard a new city for Bitcoin Pizza Day celebrations.', reward: 6942, levelTitle: 'Street Muscle', verifierKey: 'gpp_host', verifierParams: { eventType: 'gpp', statuses: ['approved', 'listed'] }, proofKind: 'URL' },
+  { level: 6, index: 2, title: 'Get vouched by 5 members', description: 'Get at least 5 vouches from other PizzaDAO members: ask members to open your profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.', reward: 6942, levelTitle: 'Street Muscle', verifierKey: 'vouch_received', verifierParams: { min: 5, sources: ['PIZZADAO'] } },
 
   // Level 7 - Made Mafia (31,415 PEP)
   { level: 7, index: 0, title: 'Become a Crew Leader', description: 'Step up and become a leader of one of the PizzaDAO crews.', reward: 31415, levelTitle: 'Made Mafia', verifierKey: 'discord_role', verifierParams: { roleNames: ['Crew Leader'], roleEnv: 'MISSION_CREW_LEADER_ROLE' } },
 
   // Level 8 - Don of Dons (69,420 PEP)
   { level: 8, index: 0, title: 'Called upon by Dread Pizza Roberts', description: 'Receive a special mission from Dread Pizza Roberts.', reward: 69420, levelTitle: 'Don of Dons', verifierKey: 'manual' },
+  { level: 8, index: 1, title: 'Get vouched by 10 members', description: 'Get at least 10 vouches from other PizzaDAO members: ask members to open your profile and tap Vouch. Checked automatically. Vouching for yourself and follows imported from Farcaster or X do not count.', reward: 69420, levelTitle: 'Don of Dons', verifierKey: 'vouch_received', verifierParams: { min: 10, sources: ['PIZZADAO'] } },
 ]
 
 async function seed() {

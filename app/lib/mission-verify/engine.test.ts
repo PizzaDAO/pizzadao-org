@@ -248,17 +248,77 @@ describe('runVerifiers', () => {
   })
 
   describe('human release (D9)', () => {
+    const atL6 = () => sources({ getWorkingLevel: vi.fn(async () => 6) })
+
     it('holds an L6+ pass for a release instead of approving it', async () => {
-      const report = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA] })
+      const report = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: atL6() })
       expect(report.held).toEqual([6])
       expect(report.approved).toEqual([])
       expect(row(6)).toMatchObject({ status: 'PENDING', holdReason: 'HIGH_LEVEL', source: 'AUTO', reviewedBy: null })
       expect(events).toEqual([expect.objectContaining({ action: 'AUTO_HELD', actorId: 'auto:discord_role' })])
       expect(notifyReviewers).toHaveBeenCalled()
       // ...and leaves it alone afterwards.
-      const again = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA] })
+      const again = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: atL6() })
       expect(again.checks[0].outcome).toBe('awaiting_release')
       expect(events).toHaveLength(1)
+    })
+
+    it('a pass on a level the member was already paid for is recorded silently: APPROVED, no hold, no ping, no card, no payout', async () => {
+      const report = await run(OLD, {
+        missionIds: [6],
+        interactionRoles: [MAFIA],
+        sources: sources({ getPaidLevels: vi.fn(async () => new Set([1, 2, 3, 4, 5, 6])) }),
+      })
+      expect(report.checks[0].outcome).toBe('recorded')
+      expect(report.held).toEqual([])
+      expect(report.approved).toEqual([])
+      expect(row(6)).toMatchObject({ status: 'APPROVED', holdReason: null, source: 'AUTO', reviewedBy: 'auto:discord_role' })
+      expect(notifyReviewers).not.toHaveBeenCalled()
+      expect(createNotification).not.toHaveBeenCalled()
+      expect(settleLevels).toHaveBeenCalledTimes(1) // settleLevels itself skips paid levels
+    })
+
+    it('a pass above the member\'s level is locked: nothing written, nobody pinged; it lands once they reach the level', async () => {
+      const low = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: sources({ getWorkingLevel: vi.fn(async () => 2) }) })
+      expect(low.checks[0].outcome).toBe('locked')
+      expect(low.held).toEqual([])
+      expect(rows).toEqual([])
+      expect(events).toEqual([])
+      expect(notifyReviewers).not.toHaveBeenCalled()
+
+      const later = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: atL6() })
+      expect(later.held).toEqual([6])
+      expect(row(6)).toMatchObject({ status: 'PENDING', holdReason: 'HIGH_LEVEL' })
+    })
+
+    it('only HIGH_LEVEL holds are deferred: a young account above its level is held (NEW_ACCOUNT) exactly as before', async () => {
+      const calls = sources({ countCallsAttended: vi.fn(async () => ({ total: 1, calls: 1, byCrew: {} })), getWorkingLevel: vi.fn(async () => 1) })
+      const report = await run(YOUNG, { missionIds: [2], sources: calls })
+      expect(report.held).toEqual([2])
+      expect(row(2, YOUNG)).toMatchObject({ status: 'PENDING', holdReason: 'NEW_ACCOUNT' })
+      expect(calls.getWorkingLevel).not.toHaveBeenCalled()
+    })
+
+    it('a getPaidLevels or getWorkingLevel error is not_yet with the error in report.errors, nothing written', async () => {
+      const paidErr = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: sources({ getPaidLevels: vi.fn(async () => { throw new Error('ledger down') }) }) })
+      expect(paidErr.checks[0].outcome).toBe('not_yet')
+      expect(paidErr.errors[0]).toMatch(/ledger down/)
+      const levelErr = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: sources({ getWorkingLevel: vi.fn(async () => { throw new Error('db down') }) }) })
+      expect(levelErr.checks[0].outcome).toBe('not_yet')
+      expect(levelErr.errors[0]).toMatch(/db down/)
+      expect(rows).toEqual([])
+      expect(notifyReviewers).not.toHaveBeenCalled()
+    })
+
+    it('dry run: a pass on a paid level is would_record, not would_approve', async () => {
+      const report = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], enabled: false, sources: sources({ getPaidLevels: vi.fn(async () => new Set([6])) }) })
+      expect(report.checks[0].outcome).toBe('would_record')
+      expect(rows).toEqual([])
+    })
+
+    it('a pass that needs no release is not deferred by level', async () => {
+      const report = await run(OLD, { missionIds: [2], sources: sources({ countCallsAttended: vi.fn(async () => ({ total: 1, calls: 1, byCrew: {} })), getWorkingLevel: vi.fn(async () => 1) }) })
+      expect(report.approved).toEqual([2])
     })
 
     it('holds any pass for a Discord account younger than 30 days, and lifts it once the account is old enough', async () => {
@@ -275,9 +335,11 @@ describe('runVerifiers', () => {
     })
   })
 
-  it('verifies out of order (banking): an L6 pass is recorded even at level 1', async () => {
+  it('verifies out of order only when no human release is needed: an L6 pass waits (locked) while the member is at level 1', async () => {
     const report = await run(OLD, { interactionRoles: [MAFIA], sources: sources({ getXAccount: vi.fn(async () => null) }) })
-    expect(report.held).toEqual([6])
+    expect(report.held).toEqual([])
+    expect(report.checks.find((c) => c.missionId === 6)?.outcome).toBe('locked')
+    expect(row(6)).toBeUndefined()
     expect(row(1)).toBeUndefined()
   })
 
@@ -312,7 +374,7 @@ describe('runVerifiers', () => {
     const report = await runVerifiers(OLD, { trigger: 'on_demand', now: NOW, memberId: null, sources: sources(), interactionRoles: [MAFIA] })
     expect(report).toMatchObject({ enabled: false, dryRun: true, approved: [], levelsPaid: [] })
     expect(report.checks.find((c) => c.missionId === 1)?.outcome).toBe('would_approve')
-    expect(report.checks.find((c) => c.missionId === 6)?.outcome).toBe('would_hold')
+    expect(report.checks.find((c) => c.missionId === 6)?.outcome).toBe('locked') // working level 1
     expect(rows).toEqual([])
     expect(settleLevels).not.toHaveBeenCalled()
   })

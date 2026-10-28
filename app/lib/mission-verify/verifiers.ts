@@ -254,11 +254,11 @@ export const vouchReceived: Verifier<{ min: number; sources: string[] }> = {
     const hint = (left: number) =>
       `Ask ${left === 1 ? 'a member' : `${left} members`} to vouch for you: they open your profile and tap Vouch. Your vouches are listed on /vouches.`
     if (!ctx.memberId) return fail('No PizzaDAO member profile yet', 'Finish onboarding first, then ask a member to vouch for you.', { have: 0, need: min })
-    const rows = await ctx.sources.getVouchesReceived(ctx.memberId)
+    const rows = await ctx.sources.getVouchesReceived(ctx.memberId, sources)
     const counted = [
       ...new Set(rows.filter((r) => r.followerId && r.followerId !== ctx.memberId && sources.includes(r.source)).map((r) => r.followerId)),
     ]
-    if (counted.length >= min) return { status: 'pass', evidence: { vouches: counted.length, need: min, members: counted.slice(0, 5) } }
+    if (counted.length >= min) return { status: 'pass', evidence: { vouches: counted.length, need: min, members: counted.slice(0, 50) } }
     return fail(`${counted.length}/${min} vouches received`, hint(min - counted.length), { have: counted.length, need: min })
   },
 }

@@ -34,6 +34,8 @@ export interface RunStats {
   /** Dry runs: what a live run would have done. */
   wouldApprove: number
   wouldHold: number
+  /** Passes on already-paid levels a live run would record silently. */
+  wouldRecord: number
   wouldReopen: number
   wouldFlag: number
   wouldUnflag: number
@@ -61,6 +63,7 @@ export function emptyStats(): RunStats {
     pepPaid: 0,
     wouldApprove: 0,
     wouldHold: 0,
+    wouldRecord: 0,
     wouldReopen: 0,
     wouldFlag: 0,
     wouldUnflag: 0,
@@ -90,6 +93,7 @@ export function addOutcome(stats: RunStats, o: MemberOutcome): RunStats {
     for (const c of r.checks) {
       if (c.outcome === 'would_approve') stats.wouldApprove++
       if (c.outcome === 'would_hold') stats.wouldHold++
+      if (c.outcome === 'would_record') stats.wouldRecord++
       if (c.outcome === 'rejected' && c.result.status === 'pass') stats.wouldReopen++
     }
     stats.wouldFlag += r.wouldFlag.length

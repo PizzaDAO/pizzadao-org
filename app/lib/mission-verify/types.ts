@@ -102,12 +102,14 @@ export interface VerifierSources {
    * Vouches this member received (Vouch, keyed by member ID). L4.2 "Get
    * vouched by a member".
    */
-  getVouchesReceived(memberId: string): Promise<ReceivedVouchRow[]>
+  getVouchesReceived(memberId: string, sources?: readonly string[]): Promise<ReceivedVouchRow[]>
   /**
    * The level the member is working on (getCurrentLevel). The Rare Pizza Box
    * check (an Alchemy call) only runs once they are at the mission's level.
    */
   getWorkingLevel(discordId: string): Promise<number>
+  /** Levels whose reward this member was already paid (optional: absent = no paid-level handling). */
+  getPaidLevels?(discordId: string): Promise<Set<number>>
   /** Rare Pizza Box NFT held on any of the member's wallets; 'error' = could not check (never "no"). */
   holdsRarePizzaBox(memberId: string): Promise<'yes' | 'no' | 'error'>
   /** Duplicate-account signal kinds (AccountSignal) that involve both Discord accounts. */

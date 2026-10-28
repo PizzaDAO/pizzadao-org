@@ -13,7 +13,8 @@
  *            invite link
  *   New      INSERTs missions that are not in the seed (config entries with
  *            `insert`, e.g. L4.2 "Get vouched by a member" (vouch_received), L5.2 "Vouch for another member" (vouch_given), L5.3 "Own a Rare Pizza Box" (rare_pizza_box),
- *            reward 4269) when their (level, index) row is missing
+ *            L6.2 "Get vouched by 5 members" and L8.1 "Get vouched by 10 members" (vouch_received),
+ *            each at its level's shared reward) when their (level, index) row is missing
  *   Titles   sets Mission.levelTitle on every row of the levels in
  *            MISSION_LEVEL_TITLES (L3-L6); --level-titles overrides / adds
  * and marks the grandfathered no-proof approvals (reviewedBy = 'auto', D6) as

@@ -212,7 +212,7 @@ describe('checkMany', () => {
       { level: 1, reward: 69 },
       { level: 2, reward: 420 },
     ])
-    expect(b.report?.checks.find((c) => c.missionId === 6)).toMatchObject({ outcome: 'would_hold', holdReason: 'HIGH_LEVEL' })
+    expect(b.report?.checks.find((c) => c.missionId === 6)).toMatchObject({ outcome: 'locked' }) // working level 2: waits until level 6
     expect(y.report?.checks.find((c) => c.missionId === 1)).toMatchObject({ outcome: 'would_hold', holdReason: 'NEW_ACCOUNT' })
     expect(y.payouts).toEqual([])
   })

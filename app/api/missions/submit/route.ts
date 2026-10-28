@@ -89,7 +89,7 @@ const POST_HANDLER = async (request: NextRequest) => {
         memberId: memberId ?? null,
       })
       const c = report.checks.find((x) => x.missionId === missionId)
-      if (c?.outcome === 'approved') status = 'APPROVED'
+      if (c?.outcome === 'approved' || c?.outcome === 'recorded') status = 'APPROVED'
       levelsPaid = report.levelsPaid
       if (report.levelsPaid.length) {
         const discordId = session.discordId
