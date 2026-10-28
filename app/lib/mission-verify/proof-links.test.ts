@@ -285,6 +285,13 @@ describe('precheckProof (submit route)', () => {
     })
   })
 
+  it('storeCheckResult labels the hold event with the policy it is given (no second settings read)', async () => {
+    vi.mocked(prisma.appSetting.findMany).mockClear()
+    await storeCheckResult(9, { verifier: 'gpp_host', summary: 's', confidence: 'high', checks: [], data: {}, checkedAt: 'now', autoVerified: true }, true, 'HIGH_LEVEL', { humanReleaseMinLevel: 5, newAccountDays: 30 })
+    expect(prisma.missionReviewEvent.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ note: 'Level 5+ needs a human approval' }) })
+    expect(prisma.appSetting.findMany).not.toHaveBeenCalled()
+  })
+
   it('storeCheckResult writes only onto a PENDING row (source SEMI for verifier-backed checks)', async () => {
     await storeCheckResult(7, { verifier: 'poap_drop', summary: 's', confidence: 'high', checks: [], data: {}, checkedAt: 'now' }, true)
     expect(prisma.missionCompletion.updateMany).toHaveBeenCalledWith({

@@ -3,10 +3,12 @@
  * titles and re-activating a mission. NOT editable here: verifierKey, proofKind, level, index,
  * creating or deleting missions (code / script changes).
  *
- * Stricter-only from the UI (Snax's decision 1: loosening needs a PR), enforced here, server side:
- *   - numeric minimums (min, minReplies, minLikes, minLevel) can only be RAISED;
- *   - every other verifier param (roles, sources, kinds, crews...) is read-only;
- *   - a level reward can only be LOWERED or kept;
+ * Stricter-only from the UI (Snax's decision 1: loosening needs a PR), enforced here, server side.
+ * The bound is the CODE value (mission-config.ts), not the current value, so a typo can be undone:
+ *   - numeric minimums (min, minReplies, minLikes) may be anywhere at or above the code value;
+ *   - every other verifier param (roles, sources, kinds, crews, minLevel...) is read-only;
+ *   - a level reward may be anywhere at or below the code reward (LEVEL_REWARD_CEILING);
+ *   - every params or reward change needs a confirmation that shows old -> new;
  *   - a mission can be re-activated but not deactivated (an inactive mission makes the level count
  *     as complete, which would pay everyone and skip the holds).
  *
@@ -18,6 +20,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { clearMissionCaches } from '@/app/lib/mission-cache'
+import { LEVEL_REWARD_CEILING, MISSION_VERIFIER_CONFIG } from '@/app/lib/mission-verify/mission-config'
 import { getVerifier } from '@/app/lib/mission-verify/verifiers'
 import { jsonOrDbNull } from '@/app/lib/settings/json'
 
@@ -86,6 +89,8 @@ export interface AdminMission {
   isActive: boolean
   verifierKey: string | null
   verifierParams: unknown
+  /** The code (seed) params: numeric minimums can't go below these. */
+  codeParams: Plain | null
   proofKind: string
 }
 
@@ -95,6 +100,8 @@ export interface AdminLevel {
   /** The shared reward; null when the level's rows disagree (flagged in the UI). */
   reward: number | null
   rewardsDisagree: boolean
+  /** The code reward: the reward can't go above this. */
+  rewardCeiling: number | null
   missions: AdminMission[]
 }
 
@@ -115,9 +122,10 @@ export async function listAdminLevels(): Promise<AdminLevel[]> {
       levelTitle: list.find((r) => r.levelTitle)?.levelTitle ?? null,
       reward: rewards.length === 1 ? (rewards[0] as number) : null,
       rewardsDisagree: rewards.length > 1,
+      rewardCeiling: LEVEL_REWARD_CEILING[level] ?? null,
       missions: list.map((r) => ({
         id: r.id, level: r.level, index: r.index, title: r.title, description: r.description, isActive: r.isActive,
-        verifierKey: r.verifierKey, verifierParams: r.verifierParams, proofKind: String(r.proofKind),
+        verifierKey: r.verifierKey, verifierParams: r.verifierParams, codeParams: codeParamsOf(r.level, r.index), proofKind: String(r.proofKind),
       })),
     }
   })
@@ -137,22 +145,38 @@ const stable = (v: unknown): string =>
     val && typeof val === 'object' && !Array.isArray(val) ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => a.localeCompare(b))) : val,
   )
 
-/** Numeric thresholds: the only params an admin may change (raise). */
-export const isMinimumKey = (key: string) => /^min([A-Z]\w*)?$/.test(key)
+/** Numeric thresholds an admin may change. `minLevel` is NOT one: raising it above the mission's own level makes it impossible. */
+export const isMinimumKey = (key: string) => /^min(?!Level$)([A-Z]\w*)?$/.test(key)
 
-/** Throws unless `next` differs from `current` only by RAISED numeric minimums. */
-export function assertStricterParams(current: unknown, next: Plain): void {
+/** The code (seed) params of a mission, from mission-config.ts. */
+export function codeParamsOf(level: number, index: number): Plain | null {
+  const c = MISSION_VERIFIER_CONFIG.find((x) => x.level === level && x.index === index)
+  return c && isPlainObject(c.verifierParams) ? c.verifierParams : null
+}
+
+/**
+ * Throws unless `next` differs from `current` only in numeric minimums that stay at or above the
+ * code value (`code`; a key the code doesn't set can't go below its current value).
+ */
+export function assertStricterParams(current: unknown, next: Plain, code: Plain | null = null): void {
   const cur = isPlainObject(current) ? current : {}
   for (const k of new Set([...Object.keys(cur), ...Object.keys(next)])) {
     const a = cur[k]
     const b = next[k]
     if (stable(a) === stable(b)) continue
     if (isMinimumKey(k) && typeof a === 'number' && typeof b === 'number') {
-      if (b > a) continue
-      throw new MissionEditError(400, `${k} can only be raised here; lowering it needs a PR`)
+      const floor = typeof code?.[k] === 'number' ? Math.min(code[k] as number, a) : a
+      if (b >= floor) continue
+      throw new MissionEditError(400, `${k} can't go below ${floor}, the code value; lowering it further needs a PR`)
     }
-    throw new MissionEditError(400, `${k} can't be changed here; only raising a numeric minimum is allowed (other changes need a PR)`)
+    throw new MissionEditError(400, `${k} can't be changed here; only numeric minimums (at or above the code value) are editable (other changes need a PR)`)
   }
+}
+
+/** "min 5 -> 6, minLikes 10 -> 12" */
+function describeParamChange(current: unknown, next: Plain): string {
+  const cur = isPlainObject(current) ? current : {}
+  return Object.keys(next).filter((k) => stable(cur[k]) !== stable(next[k])).map((k) => `${k} ${String(cur[k])} -> ${String(next[k])}`).join(', ')
 }
 
 /** Edit one mission. Only the given fields change; unchanged values write nothing and no audit row. */
@@ -194,13 +218,18 @@ export async function updateMission(
     }
     set('isActive', current.isActive, patch.isActive)
   }
+  let confirmText: string | null = null
   if (patch.verifierParams !== undefined) {
     const params = validateVerifierParams(current.verifierKey ?? null, patch.verifierParams)
-    assertStricterParams(current.verifierParams, params)
+    assertStricterParams(current.verifierParams, params, codeParamsOf(current.level, current.index))
+    if (!sameJson(current.verifierParams, params)) {
+      confirmText = `Level ${current.level} requirement changes (${describeParamChange(current.verifierParams, params)}). Members who now meet it pass on their next check; members who no longer meet it are not clawed back.`
+    }
     set('verifierParams', current.verifierParams, params)
   }
 
   if (audit.length === 0) return { changed: [] }
+  if (confirmText && opts.confirm !== true) throw new MissionEditError(409, 'Confirmation required', confirmText)
 
   const note = typeof opts.note === 'string' && opts.note.trim() ? opts.note.trim().slice(0, 300) : null
   await prisma.$transaction(async (tx) => {
@@ -209,7 +238,9 @@ export async function updateMission(
     const stale = !fresh || audit.some((a) => stable((fresh as Record<string, unknown>)[a.field]) !== stable(a.oldValue))
     if (stale) throw new MissionEditError(409, 'Mission changed while saving; reload and retry')
     const n = await tx.mission.updateMany({
-      where: { id, level: current.level, index: current.index, ...Object.fromEntries(audit.filter((a) => a.field !== 'verifierParams').map((a) => [a.field, a.oldValue])) },
+      where: { id, level: current.level, index: current.index, ...Object.fromEntries(audit.filter((a) => a.field !== 'verifierParams').map((a) => [a.field, a.oldValue])),
+        ...(audit.some((a) => a.field === 'verifierParams') && current.verifierParams != null ? { verifierParams: { equals: current.verifierParams } } : {}),
+      },
       data: data as never,
     })
     if (n.count !== 1) throw new MissionEditError(409, 'Mission changed while saving; reload and retry')
@@ -236,7 +267,7 @@ export async function updateLevel(
   opts: { confirm?: boolean; note?: unknown } = {},
 ): Promise<{ changed: string[] }> {
   if (!Number.isInteger(level) || level < 1) throw new MissionEditError(400, 'Invalid level')
-  const rows = await prisma.mission.findMany({ where: { level }, select: { id: true, reward: true, levelTitle: true } })
+  const rows = await prisma.mission.findMany({ where: { level }, orderBy: { id: 'asc' }, select: { id: true, reward: true, levelTitle: true } })
   if (rows.length === 0) throw new MissionEditError(404, 'Level not found')
 
   const data: Record<string, unknown> = {}
@@ -248,7 +279,8 @@ export async function updateLevel(
       throw new MissionEditError(400, `reward must be a whole number from ${REWARD_MIN} to ${REWARD_MAX}`)
     }
     const rewards = [...new Set(rows.map((x) => x.reward))]
-    if (r > Math.min(...rewards)) throw new MissionEditError(400, 'A reward can only be lowered here; raising it needs a PR')
+    const ceiling = LEVEL_REWARD_CEILING[level] ?? Math.max(...rewards)
+    if (r > ceiling) throw new MissionEditError(400, `A reward can't go above ${ceiling}, the code value; raising it further needs a PR`)
     if (rewards.length !== 1 || rewards[0] !== r) {
       data.reward = r
       audit.push({ field: 'reward', oldValue: rewards.length === 1 ? rewards[0] : rewards, newValue: r })
@@ -267,13 +299,14 @@ export async function updateLevel(
   }
   if (audit.length === 0) return { changed: [] }
   if (data.reward !== undefined && opts.confirm !== true) {
-    throw new MissionEditError(409, 'Confirmation required', 'Applies to levels completed from now on; already-paid levels are not topped up or clawed back.')
+    const old = audit.find((a) => a.field === 'reward')!.oldValue
+    throw new MissionEditError(409, 'Confirmation required', `Level ${level} reward ${Array.isArray(old) ? old.join(' / ') : String(old)} -> ${String(data.reward)}. Applies to levels completed from now on; already-paid levels are not topped up or clawed back.`)
   }
 
   const note = typeof opts.note === 'string' && opts.note.trim() ? opts.note.trim().slice(0, 300) : null
   await prisma.$transaction(async (tx) => {
     // Concurrency guard: the level's rows must be exactly as read (same ids, rewards and titles).
-    const fresh = await tx.mission.findMany({ where: { level }, select: { id: true, reward: true, levelTitle: true } })
+    const fresh = await tx.mission.findMany({ where: { level }, orderBy: { id: 'asc' }, select: { id: true, reward: true, levelTitle: true } })
     if (stable(fresh.map((x) => [x.id, x.reward, x.levelTitle])) !== stable(rows.map((x) => [x.id, x.reward, x.levelTitle]))) {
       throw new MissionEditError(409, 'Level changed while saving; reload and retry')
     }

@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import {
   MISSION_LEVEL_TITLES,
   MISSION_VERIFIER_CONFIG,
+  LEVEL_REWARD_CEILING,
   parseLevelTitlesArg,
   planVerifierMigration,
   type MissionDbRow,
@@ -260,6 +261,12 @@ describe('planVerifierMigration never reverts admin edits (default mode)', () =>
     const rows = edited().filter((r) => !(r.level === 6 && r.index === 2)).map((r, i) => (r.level === 6 && i % 2 ? { ...r, reward: 1 } : r))
     const plan = planVerifierMigration(rows)
     expect(plan.errors.length === 1 ? plan.errors[0] : '').toMatch(/L6\.2: level 6 rows disagree/)
+  })
+})
+
+describe('code reward ceiling', () => {
+  it('matches the shared seed rewards (the admin editor cannot raise above these)', () => {
+    expect(LEVEL_REWARD_CEILING).toEqual(REWARDS)
   })
 })
 

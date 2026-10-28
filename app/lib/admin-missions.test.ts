@@ -57,7 +57,7 @@ describe('validateVerifierParams (each verifier\'s own parse + bounds)', () => {
 
 describe('updateMission', () => {
   it('saves valid params, audits who/old/new in the same transaction and clears the caches', async () => {
-    const r = await updateMission(7, { verifierParams: { min: 6, sources: ['PIZZADAO'] } }, ADMIN)
+    const r = await updateMission(7, { verifierParams: { min: 6, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })
     expect(r.changed).toEqual(['verifierParams'])
     expect(prisma.$transaction).toHaveBeenCalledTimes(1)
     expect(prisma.mission.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { verifierParams: { min: 6, sources: ['PIZZADAO'] } } }))
@@ -74,9 +74,35 @@ describe('updateMission', () => {
     expect(clearMissionCaches).not.toHaveBeenCalled()
   })
 
-  it('lowering a numeric minimum is refused: loosening needs a PR', async () => {
-    await expect(updateMission(7, { verifierParams: { min: 2, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/only be raised.*PR/) })
+  it('a minimum cannot go below the CODE value (5 for this mission), even with confirm', async () => {
+    await expect(updateMission(7, { verifierParams: { min: 4, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/can't go below 5.*PR/) })
     expect(prisma.mission.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('every params change shows old -> new in a 409 confirm, and writes nothing until confirmed', async () => {
+    const err = await updateMission(7, { verifierParams: { min: 6, sources: ['PIZZADAO'] } }, ADMIN).catch((e) => e)
+    expect(err).toMatchObject({ status: 409 })
+    expect(err.needsConfirm).toMatch(/min 5 -> 6/)
+    expect(prisma.mission.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('a typo can be undone: from 9 back down to the code value 5 is allowed (with confirm)', async () => {
+    m(prisma.mission.findUnique).mockResolvedValue({ ...vouch, verifierParams: { min: 9, sources: ['PIZZADAO'] } })
+    const err = await updateMission(7, { verifierParams: { min: 5, sources: ['PIZZADAO'] } }, ADMIN).catch((e) => e)
+    expect(err.needsConfirm).toMatch(/min 9 -> 5/)
+    await expect(updateMission(7, { verifierParams: { min: 5, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })).resolves.toEqual({ changed: ['verifierParams'] })
+    await expect(updateMission(7, { verifierParams: { min: 4, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('minLevel is read-only (raising it above the mission level would make it impossible)', async () => {
+    m(prisma.mission.findUnique).mockResolvedValue({ ...vouch, level: 5, index: 3, verifierKey: 'rare_pizza_box', verifierParams: { minLevel: 5 } })
+    await expect(updateMission(7, { verifierParams: { minLevel: 6 } }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/minLevel can't be changed/) })
+    await expect(updateMission(7, { verifierParams: { minLevel: 4 } }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400 })
+  })
+
+  it('the verifierParams guard is part of the update\'s where clause', async () => {
+    await updateMission(7, { verifierParams: { min: 6, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })
+    expect(prisma.mission.updateMany).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ verifierParams: { equals: vouch.verifierParams } }) }))
   })
 
   it('non-numeric params are read-only: sources, roles, added or removed keys', async () => {
@@ -86,16 +112,19 @@ describe('updateMission', () => {
     expect(prisma.mission.updateMany).not.toHaveBeenCalled()
   })
 
-  it('assertStricterParams: only raised numeric minimums pass', () => {
-    expect(() => assertStricterParams({ min: 1, minLikes: 2 }, { minLikes: 3, min: 1 })).not.toThrow()
-    expect(() => assertStricterParams({ minLevel: 5 }, { minLevel: 4 })).toThrow(/raised/)
+  it('assertStricterParams: only numeric minimums at or above the code value pass', () => {
+    const code = { min: 1, minLikes: 10 }
+    expect(() => assertStricterParams({ min: 1, minLikes: 12 }, { minLikes: 11, min: 1 }, code)).not.toThrow()
+    expect(() => assertStricterParams({ min: 1, minLikes: 12 }, { minLikes: 10, min: 1 }, code)).not.toThrow()
+    expect(() => assertStricterParams({ min: 1, minLikes: 12 }, { minLikes: 9, min: 1 }, code)).toThrow(/can't go below 10/)
+    expect(() => assertStricterParams({ minLevel: 5 }, { minLevel: 6 })).toThrow(/can't be changed/)
     expect(() => assertStricterParams({ roleIds: ['1'] }, { roleIds: ['2'] })).toThrow(/can't be changed/)
     expect(() => assertStricterParams({ min: 1, crews: 'any' }, { min: 1, crews: 'all' })).toThrow()
     expect(() => assertStricterParams({ min: 1 }, { min: '2' as never })).toThrow()
   })
 
-  it('raising a count is allowed without confirmation', async () => {
-    await expect(updateMission(7, { verifierParams: { min: 9, sources: ['PIZZADAO'] } }, ADMIN)).resolves.toMatchObject({ changed: ['verifierParams'] })
+  it('raising a count is allowed once confirmed', async () => {
+    await expect(updateMission(7, { verifierParams: { min: 9, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })).resolves.toMatchObject({ changed: ['verifierParams'] })
   })
 
   it('edits title and description, one audit row per changed field', async () => {
@@ -168,10 +197,20 @@ describe('updateLevel', () => {
     expect(clearMissionCaches).toHaveBeenCalled()
   })
 
-  it('a reward can only be lowered or kept, never raised', async () => {
-    await expect(updateLevel(6, { reward: 6943 }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/only be lowered.*PR/) })
+  it('a reward may go anywhere at or below the code value, never above it', async () => {
+    await expect(updateLevel(6, { reward: 6943 }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/above 6942.*PR/) })
     await expect(updateLevel(6, { reward: 6942 }, ADMIN, { confirm: true })).resolves.toEqual({ changed: [] })
-    expect(prisma.mission.updateMany).not.toHaveBeenCalled()
+    // A typo can be undone: from a lowered reward back up to the code value.
+    m(prisma.mission.findMany).mockResolvedValue(rows.map((x) => ({ ...x, reward: 100 })))
+    const err = await updateLevel(6, { reward: 6942 }, ADMIN).catch((e) => e)
+    expect(err.needsConfirm).toMatch(/100 -> 6942/)
+    await expect(updateLevel(6, { reward: 6942 }, ADMIN, { confirm: true })).resolves.toEqual({ changed: ['reward'] })
+  })
+
+  it('both reads are ordered by id so the concurrency compare is stable', async () => {
+    await updateLevel(6, { levelTitle: 'X' }, ADMIN)
+    for (const call of m(prisma.mission.findMany).mock.calls) expect(call[0].orderBy).toEqual({ id: 'asc' })
+    expect(m(prisma.mission.findMany).mock.calls.length).toBe(2)
   })
 
   it('409 when the level changed since it was read', async () => {

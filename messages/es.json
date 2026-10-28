@@ -1266,7 +1266,7 @@
     "verifier": "Verificador",
     "manualVerifier": "Ninguno (revisión manual)",
     "params": "Parámetros del verificador",
-    "paramsHelp": "Solo se puede subir un mínimo numérico; los demás parámetros son de solo lectura y cambiarlos requiere un PR.",
+    "paramsHelp": "Solo se pueden editar los mínimos numéricos iguales o superiores al valor del código; los demás parámetros son de solo lectura y cambiarlos requiere un PR.",
     "saveMission": "Guardar misión",
     "saving": "Guardando",
     "saved": "Guardado",
@@ -1278,7 +1278,7 @@
     "noHistory": "Aún no hay cambios.",
     "errorGeneric": "No se pudo guardar. Revisa los valores e inténtalo de nuevo.",
     "loadError": "No se pudieron cargar las misiones.",
-    "rewardLowerOnly": "Aquí las recompensas solo se pueden bajar; subirlas requiere un PR.",
+    "rewardLowerOnly": "Las recompensas se pueden bajar, o subir de nuevo hasta el valor del código; superarlo requiere un PR.",
     "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR."
   }
 }

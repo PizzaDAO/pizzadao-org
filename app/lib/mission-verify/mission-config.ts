@@ -58,6 +58,14 @@ export const MISSION_LEVEL_TITLES: Readonly<Record<number, string>> = {
   6: 'Street Muscle', // unchanged from prod; pinned so every L6 row carries it
 }
 
+/**
+ * The code (seed) reward of every level. The admin editor may move a level's reward anywhere at or
+ * below this value (lowering, and raising back up to it); going above needs a PR.
+ */
+export const LEVEL_REWARD_CEILING: Readonly<Record<number, number>> = {
+  1: 69, 2: 420, 3: 1337, 4: 3141, 5: 4269, 6: 6942, 7: 31415, 8: 69420,
+}
+
 /** L4's shared per-level reward (the new L4.2 row must match it). */
 export const LEVEL_4_REWARD = 3141
 

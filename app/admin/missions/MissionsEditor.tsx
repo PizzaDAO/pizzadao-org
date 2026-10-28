@@ -46,6 +46,7 @@ interface AdminMission {
     isActive: boolean;
     verifierKey: string | null;
     verifierParams: unknown;
+    codeParams: Record<string, unknown> | null;
     proofKind: string;
 }
 interface AdminLevel {
@@ -53,6 +54,7 @@ interface AdminLevel {
     levelTitle: string | null;
     reward: number | null;
     rewardsDisagree: boolean;
+    rewardCeiling: number | null;
     missions: AdminMission[];
 }
 interface Change {
@@ -141,7 +143,7 @@ function LevelBox({ lvl, labels, onSaved }: { lvl: AdminLevel; labels: MissionsL
                 </label>
                 <label className="grid gap-1">
                     <span className="text-foreground/50">{labels.reward}</span>
-                    <input type="number" min={1} max={lvl.reward ?? 1000000} value={reward} onChange={(e) => setReward(e.target.value)} className="w-32 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
+                    <input type="number" min={1} max={lvl.rewardCeiling ?? lvl.reward ?? 1000000} value={reward} onChange={(e) => setReward(e.target.value)} className="w-32 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
                 </label>
                 <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder={labels.notePlaceholder} aria-label={labels.notePlaceholder} className="min-w-40 flex-1 rounded-lg border bg-background px-2 py-1" style={border} />
                 <button type="button" disabled={!dirty || saver.state === "saving"} onClick={() => saver.run(body)} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
@@ -168,21 +170,26 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
 
     // Only raising a numeric minimum is editable; everything else is shown read-only.
     const current = (m.verifierParams && typeof m.verifierParams === "object" && !Array.isArray(m.verifierParams) ? m.verifierParams : {}) as Record<string, unknown>;
-    const minKeys = Object.entries(current).filter(([k, v]) => /^min([A-Z]\w*)?$/.test(k) && typeof v === "number") as Array<[string, number]>;
-    const [raised, setRaised] = useState<Record<string, string>>({});
-    const raisedParams: Record<string, number> = {};
+    const minKeys = Object.entries(current).filter(([k, v]) => /^min(?!Level$)([A-Z]\w*)?$/.test(k) && typeof v === "number") as Array<[string, number]>;
+    // A minimum may move anywhere at or above the code value (so a typo can be undone).
+    const floorOf = (k: string, v: number) => {
+        const c = m.codeParams?.[k];
+        return typeof c === "number" ? Math.min(c, v) : v;
+    };
+    const [edited, setEdited] = useState<Record<string, string>>({});
+    const changedParams: Record<string, number> = {};
     for (const [k, v] of minKeys) {
-        const n = Number(raised[k]);
-        if (raised[k] !== undefined && raised[k] !== "" && Number.isFinite(n) && n > v) raisedParams[k] = n;
+        const n = Number(edited[k]);
+        if (edited[k] !== undefined && edited[k] !== "" && Number.isFinite(n) && n !== v && n >= floorOf(k, v)) changedParams[k] = n;
     }
-    const paramsChanged = Object.keys(raisedParams).length > 0;
+    const paramsChanged = Object.keys(changedParams).length > 0;
 
     const body: Record<string, unknown> = {
         missionId: m.id,
         ...(title.trim() !== m.title ? { title: title.trim() } : {}),
         ...(description.trim() !== (m.description ?? "") ? { description: description.trim() || null } : {}),
         ...(active !== m.isActive ? { isActive: active } : {}),
-        ...(paramsChanged ? { verifierParams: { ...current, ...raisedParams } } : {}),
+        ...(paramsChanged ? { verifierParams: { ...current, ...changedParams } } : {}),
         note,
     };
     const dirty = Object.keys(body).some((k) => k !== "missionId" && k !== "note");
@@ -213,7 +220,7 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
                             {minKeys.map(([k, v]) => (
                                 <label key={k} className="grid gap-1">
                                     <span className="text-xs text-foreground/50">{k}</span>
-                                    <input type="number" min={v + 1} placeholder={String(v)} value={raised[k] ?? ""} onChange={(e) => setRaised({ ...raised, [k]: e.target.value })} className="w-24 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
+                                    <input type="number" min={floorOf(k, v)} placeholder={String(v)} value={edited[k] ?? ""} onChange={(e) => setEdited({ ...edited, [k]: e.target.value })} className="w-24 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
                                 </label>
                             ))}
                         </div>

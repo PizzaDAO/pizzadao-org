@@ -1266,7 +1266,7 @@
     "verifier": "Vérificateur",
     "manualVerifier": "Aucun (examen manuel)",
     "params": "Paramètres du vérificateur",
-    "paramsHelp": "Seul un minimum numérique peut être relevé ; les autres paramètres sont en lecture seule et les modifier demande une PR.",
+    "paramsHelp": "Seuls les minimums numériques supérieurs ou égaux à la valeur du code sont modifiables ; les autres paramètres sont en lecture seule et les modifier demande une PR.",
     "saveMission": "Enregistrer la mission",
     "saving": "Enregistrement",
     "saved": "Enregistré",
@@ -1278,7 +1278,7 @@
     "noHistory": "Aucun changement pour l'instant.",
     "errorGeneric": "Enregistrement impossible. Vérifiez les valeurs et réessayez.",
     "loadError": "Impossible de charger les missions.",
-    "rewardLowerOnly": "Ici, les récompenses ne peuvent que baisser ; les augmenter demande une PR.",
+    "rewardLowerOnly": "Les récompenses peuvent baisser, ou remonter jusqu'à la valeur du code ; la dépasser demande une PR.",
     "activeOnlyEnable": "Ici, on peut seulement activer ; désactiver demande une PR."
   }
 }
