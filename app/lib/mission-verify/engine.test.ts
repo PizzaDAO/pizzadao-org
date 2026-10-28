@@ -291,6 +291,31 @@ describe('runVerifiers', () => {
       expect(row(6)).toMatchObject({ status: 'PENDING', holdReason: 'HIGH_LEVEL' })
     })
 
+    it('only HIGH_LEVEL holds are deferred: a young account above its level is held (NEW_ACCOUNT) exactly as before', async () => {
+      const calls = sources({ countCallsAttended: vi.fn(async () => ({ total: 1, calls: 1, byCrew: {} })), getWorkingLevel: vi.fn(async () => 1) })
+      const report = await run(YOUNG, { missionIds: [2], sources: calls })
+      expect(report.held).toEqual([2])
+      expect(row(2, YOUNG)).toMatchObject({ status: 'PENDING', holdReason: 'NEW_ACCOUNT' })
+      expect(calls.getWorkingLevel).not.toHaveBeenCalled()
+    })
+
+    it('a getPaidLevels or getWorkingLevel error is not_yet with the error in report.errors, nothing written', async () => {
+      const paidErr = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: sources({ getPaidLevels: vi.fn(async () => { throw new Error('ledger down') }) }) })
+      expect(paidErr.checks[0].outcome).toBe('not_yet')
+      expect(paidErr.errors[0]).toMatch(/ledger down/)
+      const levelErr = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], sources: sources({ getWorkingLevel: vi.fn(async () => { throw new Error('db down') }) }) })
+      expect(levelErr.checks[0].outcome).toBe('not_yet')
+      expect(levelErr.errors[0]).toMatch(/db down/)
+      expect(rows).toEqual([])
+      expect(notifyReviewers).not.toHaveBeenCalled()
+    })
+
+    it('dry run: a pass on a paid level is would_record, not would_approve', async () => {
+      const report = await run(OLD, { missionIds: [6], interactionRoles: [MAFIA], enabled: false, sources: sources({ getPaidLevels: vi.fn(async () => new Set([6])) }) })
+      expect(report.checks[0].outcome).toBe('would_record')
+      expect(rows).toEqual([])
+    })
+
     it('a pass that needs no release is not deferred by level', async () => {
       const report = await run(OLD, { missionIds: [2], sources: sources({ countCallsAttended: vi.fn(async () => ({ total: 1, calls: 1, byCrew: {} })), getWorkingLevel: vi.fn(async () => 1) }) })
       expect(report.approved).toEqual([2])

@@ -66,6 +66,7 @@ export type CheckOutcome =
   | 'reopened' //       a human rejection went back to review
   | 'would_approve' //  dry run
   | 'would_hold' //     dry run
+  | 'would_record' //   dry run: a silent record on an already-paid level
   | 'already_approved'
   | 'awaiting_release'
   | 'pending_review'
@@ -298,8 +299,8 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       }
     }
     // A pass that would need a human release, above the member's level: don't queue it (and ping
-    // reviewers) yet. Nothing is written; the level_reached event and the nightly run re-check it.
-    if (hold && !silent) {
+    // reviewers) yet (HIGH_LEVEL only: a NEW_ACCOUNT hold is stored as before). Nothing is written; the level_reached event and the nightly run re-check it.
+    if (hold === 'HIGH_LEVEL' && !silent) {
       try {
         const working = await (opts.sources ?? defaultSources).getWorkingLevel(discordId)
         if (m.level > working) {
@@ -313,7 +314,7 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       }
     }
     if (dryRun) {
-      report.checks.push({ ...base, result: r, outcome: hold ? 'would_hold' : 'would_approve', holdReason: hold })
+      report.checks.push({ ...base, result: r, outcome: silent ? 'would_record' : hold ? 'would_hold' : 'would_approve', holdReason: hold })
       continue
     }
 
@@ -332,7 +333,7 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
     // Discord review cards (Phase 3): post one for a new hold / reopen, and
     // update an existing card the verifier just approved or held.
     const cardMissions = report.checks
-      .filter((c) => c.outcome === 'approved' || c.outcome === 'held' || c.outcome === 'reopened')
+      .filter((c) => c.outcome === 'approved' || c.outcome === 'recorded' || c.outcome === 'held' || c.outcome === 'reopened')
       .map((c) => c.missionId)
     if (cardMissions.length && reviewCardsEnabled()) queueReviewCardSync(() => syncReviewCardsFor(discordId, cardMissions))
   }

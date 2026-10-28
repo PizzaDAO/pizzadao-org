@@ -16,7 +16,7 @@
  */
 import type { MemberOutcome, MissionCatalog } from './bulk'
 
-export type BackfillAction = 'approve' | 'hold' | 'reopen' | 'pay' | 'flag' | 'legacy_auto_would_fail'
+export type BackfillAction = 'approve' | 'record' | 'hold' | 'reopen' | 'pay' | 'flag' | 'legacy_auto_would_fail'
 
 export interface BackfillRow {
   discordId: string
@@ -35,7 +35,7 @@ export interface BackfillSummary {
   membersWithChanges: number
   /** Members with something to apply (approve / hold / reopen / pay / flag), in discordId order. */
   applyMembers: string[]
-  perMission: Array<{ missionId: number; level: number; index: number; title: string; approve: number; hold: number; reopen: number; flag: number; legacyWouldFail: number }>
+  perMission: Array<{ missionId: number; level: number; index: number; title: string; approve: number; record: number; hold: number; reopen: number; flag: number; legacyWouldFail: number }>
   perLevel: Array<{ level: number; members: number; reward: number; pep: number }>
   held: { HIGH_LEVEL: number; NEW_ACCOUNT: number; PREVIOUSLY_REJECTED: number }
   totalPep: number
@@ -55,6 +55,7 @@ export function backfillRows(outcomes: readonly MemberOutcome[], catalog: Missio
         const detail = c.result.status === 'pass' ? JSON.stringify(c.result.evidence) : ''
         const row = { ...base, level: c.level, mission: c.title, missionId: c.missionId, pep: 0, detail }
         if (c.outcome === 'would_approve') rows.push({ ...row, action: 'approve', holdReason: '' })
+        else if (c.outcome === 'would_record') rows.push({ ...row, action: 'record', holdReason: '' })
         else if (c.outcome === 'would_hold') rows.push({ ...row, action: 'hold', holdReason: c.holdReason ?? '' })
         else if (c.outcome === 'rejected' && c.result.status === 'pass') rows.push({ ...row, action: 'reopen', holdReason: 'PREVIOUSLY_REJECTED' })
       }
@@ -77,7 +78,7 @@ export function summarizeBackfill(outcomes: readonly MemberOutcome[], catalog: M
   const rows = backfillRows(outcomes, catalog)
   const perMission = new Map<number, BackfillSummary['perMission'][number]>()
   for (const m of catalog.verifierMissions) {
-    perMission.set(m.id, { missionId: m.id, level: m.level, index: m.index, title: m.title, approve: 0, hold: 0, reopen: 0, flag: 0, legacyWouldFail: 0 })
+    perMission.set(m.id, { missionId: m.id, level: m.level, index: m.index, title: m.title, approve: 0, record: 0, hold: 0, reopen: 0, flag: 0, legacyWouldFail: 0 })
   }
   const perLevel = new Map<number, { level: number; members: number; reward: number; pep: number }>()
   const held = { HIGH_LEVEL: 0, NEW_ACCOUNT: 0, PREVIOUSLY_REJECTED: 0 }
@@ -92,6 +93,7 @@ export function summarizeBackfill(outcomes: readonly MemberOutcome[], catalog: M
       const pm = perMission.get(r.missionId)
       if (pm) {
         if (r.action === 'approve') pm.approve++
+        if (r.action === 'record') pm.record++
         if (r.action === 'hold') pm.hold++
         if (r.action === 'reopen') pm.reopen++
         if (r.action === 'flag') pm.flag++
