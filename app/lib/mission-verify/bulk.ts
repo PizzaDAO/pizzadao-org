@@ -22,6 +22,7 @@ import { prisma } from '../db'
 import { computeCurrentLevel, paidLevelOf } from '../missions'
 import { getSheetData } from '../sheets/member-repository'
 import { runVerifiers, type MissionRow, type RunReport } from './engine'
+import { loadHoldPolicy } from './policy'
 import { defaultSources } from './sources'
 import { getVerifier } from './verifiers'
 import type { ReceivedVouchRow, VerifierSources, VerifyCtx, VouchRow } from './types'
@@ -350,6 +351,7 @@ export async function checkMany(discordIds: string[], opts: CheckManyOptions): P
   const data = await prefetchBatch(discordIds, ctx.memberIds, missionLevels)
   const sources = batchSources(ctx.sources ?? defaultSources, data, ctx.guildRoles)
   const now = opts.now ?? new Date()
+  const policy = await loadHoldPolicy()
   const levelReward = new Map(ctx.catalog.levels.map((l) => [l.level, l.reward]))
   const out = new Map<string, MemberOutcome>()
 
@@ -366,6 +368,7 @@ export async function checkMany(discordIds: string[], opts: CheckManyOptions): P
         now,
         sources,
         missions: ctx.catalog.verifierMissions,
+        policy,
       })
       o.report = report
       if (report.dryRun) {

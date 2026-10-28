@@ -7,7 +7,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn(async () => ({ cached: true, crews: [] })) }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
-vi.mock('@/app/lib/mission-review-access', () => ({ DPR_ONLY_MIN_LEVEL: 8, canReviewMission: vi.fn() }))
+vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('ai', () => ({
   generateText: vi.fn(),
   Output: { object: vi.fn((o: unknown) => ({ kind: 'object', ...(o as object) })) },

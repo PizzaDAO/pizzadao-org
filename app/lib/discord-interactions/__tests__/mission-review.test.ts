@@ -4,6 +4,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('../../discord', () => ({ getUserRoles: vi.fn(async () => []) }))
+vi.mock('../../db', () => ({ prisma: { appSetting: { findMany: vi.fn(async () => []) } } }))
 
 import { handleInteraction, type HandlerDeps, type Interaction } from '../handle'
 import type { MissionReviewDeps, ReviewTarget } from '../mission-review'

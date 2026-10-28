@@ -1,7 +1,7 @@
 // Crew drafts (tweets / posts composed on a crew page).
 //
 // Permissions: crew members create, edit and mark ready; crew leads and Dread
-// Pizza Roberts (canReviewMission(id, 8)) also mark posted / archive / restore.
+// Pizza Roberts (isDreadPizzaRoberts) also mark posted / archive / restore.
 // Everyone else sees nothing. Drafts are never hard-deleted (archive instead).
 // Every check FAILS CLOSED.
 import { prisma } from './db'
@@ -9,7 +9,7 @@ import { canonicalCrewId, crewHasFeature } from './crew-features'
 import { MAX_DRAFT_TEXT, MAX_NOTES, MAX_URL } from './draft-limits.mjs'
 import { isCrewLead, isOnCrewRoster } from './crew-leads'
 import { fetchAllMembers } from './sheets/members-list'
-import { canReviewMission } from './mission-review-access'
+import { isDreadPizzaRoberts } from './mission-review-access'
 import { ForbiddenError, NotFoundError, ValidationError } from './errors/api-errors'
 import {
   DRAFT_PLATFORMS,
@@ -40,7 +40,7 @@ export async function isCrewMember(discordId: string, crewId: string): Promise<b
 export async function isDraftManager(discordId: string, crewId: string): Promise<boolean> {
   if (await isCrewLead(discordId, canonicalCrewId(crewId))) return true
   try {
-    return await canReviewMission(discordId, 8)
+    return await isDreadPizzaRoberts(discordId)
   } catch {
     return false
   }

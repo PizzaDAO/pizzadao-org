@@ -3,11 +3,11 @@ import { prisma } from './db'
 
 vi.mock('./db')
 vi.mock('./crew-leads', () => ({ isCrewLead: vi.fn(), isOnCrewRoster: vi.fn() }))
-vi.mock('./mission-review-access', () => ({ canReviewMission: vi.fn() }))
+vi.mock('./mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('./sheets/members-list', () => ({ fetchAllMembers: vi.fn() }))
 
 import { isCrewLead, isOnCrewRoster } from './crew-leads'
-import { canReviewMission } from './mission-review-access'
+import { isDreadPizzaRoberts } from './mission-review-access'
 import { fetchAllMembers } from './sheets/members-list'
 import { crewHasFeature } from './crew-features'
 import { createDraft, listDrafts, editDraft, changeDraftStatus, getDraftAccess, updateDraft } from './crew-drafts'
@@ -20,7 +20,7 @@ function who(role: 'member' | 'lead' | 'dpr' | 'outsider') {
   ])
   m(isCrewLead).mockResolvedValue(role === 'lead')
   m(isOnCrewRoster).mockResolvedValue(false)
-  m(canReviewMission).mockResolvedValue(role === 'dpr')
+  m(isDreadPizzaRoberts).mockResolvedValue(role === 'dpr')
 }
 
 const row = (over: Record<string, unknown> = {}) => ({
@@ -87,14 +87,14 @@ describe('permissions', () => {
   it('Dread Pizza Roberts (non-member) can manage', async () => {
     m(fetchAllMembers).mockResolvedValue([])
     m(isCrewLead).mockResolvedValue(false)
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
     expect(await getDraftAccess('u1', 'comms')).toEqual({ member: true, manager: true })
-    expect(canReviewMission).toHaveBeenCalledWith('u1', 8)
+    expect(isDreadPizzaRoberts).toHaveBeenCalledWith('u1')
   })
   it('fails closed when the member lookup errors', async () => {
     m(fetchAllMembers).mockRejectedValue(new Error('sheet down'))
     m(isCrewLead).mockResolvedValue(false)
-    m(canReviewMission).mockResolvedValue(false)
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
     expect(await getDraftAccess('u1', 'comms')).toEqual({ member: false, manager: false })
   })
 })

@@ -3,7 +3,7 @@
  * Every threshold lives here so it is easy to change.
  */
 
-/** Level needed to view AND nominate (DPR can always do both). Snax: level 5+. */
+/** Code default for the setting `disavow.minLevel`: level needed to view AND nominate (DPR can always do both). */
 export const DISAVOW_MIN_LEVEL = 5
 
 /** Votes needed: at least this many DPR "yes" AND yes > no. */

@@ -8,8 +8,7 @@ vi.mock('next/server', async (orig) => ({ ...(await orig<typeof import('next/ser
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn() }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/mission-review-access', () => ({
-  DPR_ONLY_MIN_LEVEL: 8,
-  canReviewMission: vi.fn(),
+  isDreadPizzaRoberts: vi.fn(),
 }))
 vi.mock('./r2', () => ({
   signedAudioUrl: vi.fn(async (k: string) => `https://r2.example/${k}?sig=1`),
@@ -20,7 +19,7 @@ import { prisma } from '@/app/lib/db'
 import { signedAudioUrl } from './r2'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { getSession } from '@/app/lib/session'
-import { canReviewMission } from '@/app/lib/mission-review-access'
+import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
 import { extractEventId, resolveCrewForEvent } from './crew-map'
 import { isRecorderAuthorized } from './recorder-auth'
@@ -222,15 +221,15 @@ describe('GET /api/admin/calls/[id]/audio (Dread Pizza Roberts only)', () => {
   })
   it('403 for a signed-in non-DPR member, with no R2 access', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(false)
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
     const res = await call()
     expect(res.status).toBe(403)
-    expect(canReviewMission).toHaveBeenCalledWith('9', 8) // the L8 (DPR-only) gate
+    expect(isDreadPizzaRoberts).toHaveBeenCalledWith('9') // the L8 (DPR-only) gate
     expect(db.callRecording.findUnique).not.toHaveBeenCalled()
   })
   it('returns signed URLs for a reviewer', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
     db.callRecording.findUnique.mockResolvedValue(rec())
     const body = await (await call()).json()
     expect(body.mix).toContain('calls/s/mix.m4a')
@@ -239,13 +238,13 @@ describe('GET /api/admin/calls/[id]/audio (Dread Pizza Roberts only)', () => {
   })
   it('404 for an unknown recording', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
     db.callRecording.findUnique.mockResolvedValue(null)
     expect((await call()).status).toBe(404)
   })
   it('410 only when the recording has no stored audio, however old it is', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
     db.callRecording.findUnique.mockResolvedValue(rec({ mixKey: null, speakers: [{ discordId: '1', displayName: 'Ann', trackKey: null }] }))
     expect((await call()).status).toBe(410)
     db.callRecording.findUnique.mockResolvedValue(rec({ endedAt: new Date(Date.now() - 400 * 86_400_000) }))
@@ -262,14 +261,14 @@ describe('POST /api/admin/calls/[id]/remove (reject / hide)', () => {
     )
   const asReviewer = () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
   }
 
   it('401 without a session and 403 for a non-reviewer, changing nothing', async () => {
     m(getSession).mockResolvedValue(null)
     expect((await call()).status).toBe(401)
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(false)
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
     expect((await call()).status).toBe(403)
     expect(db.callRecording.update).not.toHaveBeenCalled()
   })

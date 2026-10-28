@@ -26,7 +26,7 @@ import { prisma } from '../db'
 import { defaultSources } from './sources'
 import { unfurlProof, type ProofPreview, type UnfurlDeps } from './unfurl'
 import { getVerifier } from './verifiers'
-import { HOLD_LABEL, releaseHoldFor } from './policy'
+import { holdLabel, loadHoldPolicy, releaseHoldFor, type HoldPolicy } from './policy'
 import { recordReviewEvent } from '../missions'
 import type { Confidence, SemiCheck, VerifierSources, VerifyCtx } from './types'
 
@@ -49,6 +49,8 @@ export interface PrecheckOutcome {
   checkResult?: SemiCheckResult
   /** checkResult.autoVerified and D9 needs a human: hold the PENDING row for a release. */
   hold?: MissionHold | null
+  /** The hold rules the hold was computed with (storeCheckResult labels the event with them). */
+  policy?: HoldPolicy
 }
 
 export interface PrecheckInput {
@@ -109,9 +111,14 @@ export async function precheckProof(input: PrecheckInput): Promise<PrecheckOutco
   if (r.status === 'needs_review') {
     const checkResult: SemiCheckResult = { ...base, summary: r.summary, confidence: r.confidence, checks: r.checks, data: r.evidence }
     if (!r.autoVerified) return { checkResult }
+    const policy = await loadHoldPolicy()
+    if (policy.readFailed) {
+      // Settings unreadable: don't mark it auto-verified or store a fallback-derived hold; a reviewer sees a normal pre-check.
+      return { checkResult }
+    }
     checkResult.autoVerified = true
-    const hold = typeof input.mission.level === 'number' ? releaseHoldFor(input.mission.level, input.discordId, now) : null
-    return { checkResult, hold }
+    const hold = typeof input.mission.level === 'number' ? releaseHoldFor(input.mission.level, input.discordId, now, policy) : null
+    return { checkResult, hold, policy }
   }
   if (r.status === 'pass') {
     // Semi verifiers don't pass; treat a pass like an all-green review.
@@ -133,6 +140,7 @@ export async function storeCheckResult(
   checkResult: SemiCheckResult,
   verifierBacked: boolean,
   hold: MissionHold | null = null,
+  policy?: HoldPolicy,
 ): Promise<boolean> {
   try {
     const data = {
@@ -152,7 +160,7 @@ export async function storeCheckResult(
         actorId: `auto:${checkResult.verifier ?? 'semi'}`,
         action: 'AUTO_HELD',
         via: 'submit',
-        note: HOLD_LABEL[hold],
+        note: holdLabel(hold, policy ?? (await loadHoldPolicy())),
         metadata: { holdReason: hold, summary: checkResult.summary },
       })
       return true

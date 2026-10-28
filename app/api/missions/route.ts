@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { getMissionsOverview } from '@/app/lib/missions-overview'
-import { missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
+import { loadHoldPolicy, missionVerifiersEnabled } from '@/app/lib/mission-verify/policy'
 
 export const runtime = 'nodejs'
 
@@ -13,7 +13,8 @@ export async function GET() {
     const session = await getSession()
     const overview = await getMissionsOverview(session?.discordId)
 
-    return NextResponse.json({ ...overview, verifiersEnabled: missionVerifiersEnabled() }, {
+    const { humanReleaseMinLevel } = await loadHoldPolicy()
+    return NextResponse.json({ ...overview, verifiersEnabled: missionVerifiersEnabled(), humanReleaseMinLevel }, {
       headers: {
         'Cache-Control': session?.discordId
           ? 'private, no-store'

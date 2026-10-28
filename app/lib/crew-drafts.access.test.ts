@@ -3,11 +3,11 @@ import { prisma } from './db'
 
 vi.mock('./db')
 vi.mock('./crew-leads', () => ({ isCrewLead: vi.fn(), isOnCrewRoster: vi.fn() }))
-vi.mock('./mission-review-access', () => ({ canReviewMission: vi.fn() }))
+vi.mock('./mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('./sheets/members-list', () => ({ fetchAllMembers: vi.fn() }))
 
 import { isCrewLead, isOnCrewRoster } from './crew-leads'
-import { canReviewMission } from './mission-review-access'
+import { isDreadPizzaRoberts } from './mission-review-access'
 import { fetchAllMembers } from './sheets/members-list'
 import { createDraft, getDraftAccess, updateDraft } from './crew-drafts'
 
@@ -22,7 +22,7 @@ const row = (over: Record<string, unknown> = {}) => ({
 function setup(opts: { sheetCrews?: string[]; lead?: boolean; dpr?: boolean; roster?: boolean }) {
   m(fetchAllMembers).mockResolvedValue(opts.sheetCrews ? [{ discordId: 'u1', crews: opts.sheetCrews }] : [])
   m(isCrewLead).mockResolvedValue(!!opts.lead)
-  m(canReviewMission).mockResolvedValue(!!opts.dpr)
+  m(isDreadPizzaRoberts).mockResolvedValue(!!opts.dpr)
   m(isOnCrewRoster).mockResolvedValue(!!opts.roster)
 }
 

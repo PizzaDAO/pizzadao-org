@@ -1544,3 +1544,29 @@ model CallPostFilter {
   updatedAt              DateTime @updatedAt
   updatedBy              String?
 }
+
+// Admin-editable rules (plans/app-settings.md). A row exists only for an overridden setting; with
+// no row the code default applies. Values are validated by the code registry (app/lib/settings) on
+// read AND write. updatedBy is a Discord id.
+model AppSetting {
+  key       String   @id
+  value     Json
+  updatedAt DateTime @updatedAt
+  updatedBy String
+}
+
+// Audit log for every admin write: settings (key = the setting key) and mission edits
+// (key = "mission:<id>:<field>" or "missionLevel:<level>:<field>"). null oldValue = was default,
+// null newValue = reset to default.
+model AppSettingChange {
+  id        Int      @id @default(autoincrement())
+  key       String
+  oldValue  Json?
+  newValue  Json?
+  changedBy String
+  changedAt DateTime @default(now())
+  note      String?
+
+  @@index([key, changedAt])
+  @@index([changedAt])
+}

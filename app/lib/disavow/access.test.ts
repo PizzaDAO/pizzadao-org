@@ -7,8 +7,9 @@ vi.mock('@/app/lib/db', () => ({
   prisma: { disavowIdentifier: { findFirst: vi.fn() }, disavowal: { findUnique: vi.fn() } },
 }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
+vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn() }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
-vi.mock('@/app/lib/mission-review-access', () => ({ DPR_ONLY_MIN_LEVEL: 8, canReviewMission: vi.fn() }))
+vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('@/app/lib/disavow/match', () => ({
   identifierOr: (ids: Array<{ kind: string; value: string }>) => ids,
   viewerIdentifiers: vi.fn(async (d: string) => [
@@ -19,8 +20,9 @@ vi.mock('@/app/lib/disavow/match', () => ({
 
 import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
+import { getSetting } from '@/app/lib/settings'
 import { getCurrentLevel } from '@/app/lib/missions'
-import { canReviewMission } from '@/app/lib/mission-review-access'
+import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import {
   __resetDisavowViewerCache, canViewDisavowList, disavowViewer, disavowViewerCached, requireDisavowDPR, requireDisavowViewer, requireDisavowViewerPage,
 } from './access'
@@ -34,12 +36,22 @@ beforeEach(() => {
   process.env.DISAVOW_ENABLED = 'true'
   m(getSession).mockResolvedValue({ discordId: ME })
   m(getCurrentLevel).mockResolvedValue(1)
-  m(canReviewMission).mockResolvedValue(false)
+  m(getSetting).mockResolvedValue(5)
+  m(isDreadPizzaRoberts).mockResolvedValue(false)
   m(prisma.disavowIdentifier.findFirst).mockResolvedValue(null)
 })
 afterEach(() => { delete process.env.DISAVOW_ENABLED })
 
 describe('canViewDisavowList', () => {
+  it('follows the disavow.minLevel setting', async () => {
+    m(getSetting).mockResolvedValue(3)
+    m(getCurrentLevel).mockResolvedValue(3)
+    expect(await canViewDisavowList(ME)).toBe(true)
+    expect(getSetting).toHaveBeenCalledWith('disavow.minLevel')
+    m(getSetting).mockResolvedValue(7)
+    m(getCurrentLevel).mockResolvedValue(6)
+    expect(await canViewDisavowList(ME)).toBe(false)
+  })
   it('level 4 is denied, level 5 allowed', async () => {
     m(getCurrentLevel).mockResolvedValue(4)
     expect(await canViewDisavowList(ME)).toBe(false)
@@ -47,13 +59,13 @@ describe('canViewDisavowList', () => {
     expect(await canViewDisavowList(ME)).toBe(true)
   })
   it('DPR at level 1 is allowed, and flagged DPR', async () => {
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
     expect(await disavowViewer(ME)).toEqual({ allowed: true, isDPR: true })
-    expect(canReviewMission).toHaveBeenCalledWith(ME, 8)
+    expect(isDreadPizzaRoberts).toHaveBeenCalledWith(ME)
   })
   it('a listed/nominated person is denied whatever their level, even DPR', async () => {
     m(getCurrentLevel).mockResolvedValue(8)
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
     m(prisma.disavowIdentifier.findFirst).mockResolvedValue({ id: 1 })
     expect(await canViewDisavowList(ME)).toBe(false)
   })
@@ -91,17 +103,17 @@ describe('canViewDisavowList', () => {
     expect(await canViewDisavowList(ME)).toBe(false)
     m(prisma.disavowIdentifier.findFirst).mockResolvedValue(null)
     m(getCurrentLevel).mockRejectedValue(new Error('x'))
-    m(canReviewMission).mockResolvedValue(false)
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
     expect(await canViewDisavowList(ME)).toBe(false)
   })
   it('a Discord lookup error means DPR-only actions are denied', async () => {
-    m(canReviewMission).mockRejectedValue(new Error('discord'))
+    m(isDreadPizzaRoberts).mockRejectedValue(new Error('discord'))
     const g = await requireDisavowDPR()
     expect(g.ok).toBe(false)
   })
   it('is off entirely without the flag', async () => {
     delete process.env.DISAVOW_ENABLED
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
     expect(await canViewDisavowList(ME)).toBe(false)
     expect((await requireDisavowViewer()).ok).toBe(false)
   })

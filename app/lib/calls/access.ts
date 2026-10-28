@@ -1,14 +1,15 @@
 /**
  * Who may review call recordings: Dread Pizza Roberts only (Snax, 2026-10-18),
- * through the same check as L8 mission review (DPR_ONLY_MIN_LEVEL), so the two
- * can never drift apart. Fails closed on Discord lookup errors.
+ * through isDreadPizzaRoberts, which is pinned to the role id and does NOT follow the mission
+ * DPR-only level setting, so editing that setting never changes who can publish calls. Fails closed
+ * on Discord lookup errors.
  */
 import { NextResponse } from 'next/server'
-import { canReviewMission, DPR_ONLY_MIN_LEVEL } from '@/app/lib/mission-review-access'
+import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { requireSession, type GuardResult } from '@/app/lib/auth-guards'
 
 export function canReviewCalls(discordId: string): Promise<boolean> {
-  return canReviewMission(discordId, DPR_ONLY_MIN_LEVEL)
+  return isDreadPizzaRoberts(discordId)
 }
 
 /** 401 without a session, 403 unless Dread Pizza Roberts. */

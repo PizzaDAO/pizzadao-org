@@ -9,7 +9,7 @@ import { NextRequest } from 'next/server'
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn(async () => ({ cached: true, crews: [] })) }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
-vi.mock('@/app/lib/mission-review-access', () => ({ DPR_ONLY_MIN_LEVEL: 8, canReviewMission: vi.fn() }))
+vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('ai', () => ({
   generateText: vi.fn(),
   Output: { object: vi.fn((o: unknown) => ({ kind: 'object', ...(o as object) })) },
@@ -20,7 +20,7 @@ import { generateText } from 'ai'
 import { after } from 'next/server'
 import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
-import { canReviewMission } from '@/app/lib/mission-review-access'
+import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
 import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
 import { sanitizeSummaryError, generateAndStoreSummary, generateAndStoreSummaryResult, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
@@ -438,23 +438,23 @@ describe('publish gating', () => {
     publishPOST(new Request('https://app.pizzadao.org/api/admin/calls/rec1/publish', { method: 'POST', body: JSON.stringify({ action }) }), ctx)
   const asReviewer = () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
   }
 
   it('401 without a session, 403 for non-reviewers (L8 gate), changing nothing', async () => {
     m(getSession).mockResolvedValue(null)
     expect((await call()).status).toBe(401)
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(false)
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
     expect((await call()).status).toBe(403)
-    expect(canReviewMission).toHaveBeenCalledWith('9', 8)
+    expect(isDreadPizzaRoberts).toHaveBeenCalledWith('9')
     expect(db.callRecording.findUnique).not.toHaveBeenCalled()
     expect(db.callRecording.update).not.toHaveBeenCalled()
   })
 
   it('the edit and regenerate routes are gated the same way', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(false)
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
     const edit = await summaryPATCH(new Request('https://x/api', { method: 'PATCH', body: JSON.stringify({ title: 't', summary: 's' }) }), ctx)
     const regen = await regeneratePOST(new Request('https://x/api', { method: 'POST' }), ctx)
     expect([edit.status, regen.status]).toEqual([403, 403])
@@ -538,7 +538,7 @@ describe('reviewer edits', () => {
   const ctx = { params: Promise.resolve({ id: 'rec1' }) }
   const asReviewer = () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
   }
   const patch = (body: unknown) => summaryPATCH(new Request('https://x/api', { method: 'PATCH', body: JSON.stringify(body) }), ctx)
 
@@ -593,12 +593,12 @@ describe('redact a speaker (non-destructive)', () => {
   const seg = (discordId: string, text: string) => ({ discordId, startMs: 0, endMs: 1, text })
   const asReviewer = () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(true)
+    m(isDreadPizzaRoberts).mockResolvedValue(true)
   }
 
   it('is DPR-gated', async () => {
     m(getSession).mockResolvedValue({ discordId: '9' })
-    m(canReviewMission).mockResolvedValue(false)
+    m(isDreadPizzaRoberts).mockResolvedValue(false)
     expect((await call({ discordId: BOB, confirm: true })).status).toBe(403)
     expect(db.callRecording.update).not.toHaveBeenCalled()
   })

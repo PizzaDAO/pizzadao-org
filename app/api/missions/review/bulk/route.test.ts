@@ -12,7 +12,7 @@ vi.mock('@/app/lib/mission-verify/review-cards', () => ({ reviewCardsEnabled: ()
 vi.mock('@/app/lib/mission-verify/notify', () => ({ announceMissionResults: vi.fn(async () => undefined) }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn() }))
-vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: vi.fn(async () => []) } } }))
 vi.mock('@/app/lib/mission-cache', () => ({ invalidateProgressCache: vi.fn() }))
 vi.mock('@/app/lib/missions', async () => {
   const { ConflictError } = await import('@/app/lib/errors/api-errors')

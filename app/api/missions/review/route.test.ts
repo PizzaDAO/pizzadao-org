@@ -12,7 +12,7 @@ vi.mock('@/app/lib/mission-verify/review-cards', async (importOriginal) => ({
 }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn() }))
-vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: vi.fn(async () => []) } } }))
 vi.mock('@/app/lib/mission-cache', () => ({ invalidateProgressCache: vi.fn() }))
 // Names: the sheet knows member-1 (member #42); Discord knows member-2; nobody knows the rest.
 vi.mock('@/app/lib/people', () => ({

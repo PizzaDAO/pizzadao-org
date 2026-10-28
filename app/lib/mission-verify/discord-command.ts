@@ -13,6 +13,7 @@ import type { Embed } from '../discord-interactions/embeds'
 import { makeEmbed } from '../discord-interactions/embeds'
 import type { MissionsJob } from '../discord-interactions/handle'
 import type { RunReport } from './engine'
+import { loadHoldPolicy, type HoldPolicy } from './policy'
 import { buildMissionsView, renderMissionsEmbed, type MissionsView } from './view'
 
 const API = 'https://discord.com/api/v10'
@@ -26,6 +27,8 @@ export interface MissionsCommandDeps {
   fetchImpl?: typeof fetch
   currency?: string
   appUrl?: string
+  /** The hold rules for the reply's copy; omitted: read from the admin settings. */
+  holdPolicy?: () => Promise<HoldPolicy>
 }
 
 export function editOriginalUrl(applicationId: string, token: string): string {
@@ -53,7 +56,7 @@ export async function runMissionsCommand(job: MissionsJob, deps: MissionsCommand
     }
     const report = await deps.run(job.discordId, job.roles)
     const view = buildMissionsView(await deps.overview(job.discordId), report)
-    await editOriginal(job, renderMissionsEmbed(view, { author: job.author, currency: deps.currency, appUrl: deps.appUrl }), fetchImpl)
+    await editOriginal(job, renderMissionsEmbed(view, { author: job.author, currency: deps.currency, appUrl: deps.appUrl, holdPolicy: await (deps.holdPolicy ?? loadHoldPolicy)() }), fetchImpl)
     if (!report.dryRun && (report.levelsPaid.length || report.approved.length)) {
       await deps.announce(view, job.discordId).catch((err) => console.error('[/missions] announce failed:', err))
     }

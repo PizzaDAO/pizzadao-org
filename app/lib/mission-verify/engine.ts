@@ -34,7 +34,7 @@ import { invalidateProgressCache } from '../mission-cache'
 import { fetchMemberIdByDiscordId } from '../sheets/member-repository'
 import { getVerifier } from './verifiers'
 import { defaultSources } from './sources'
-import { HOLD_LABEL, missionVerifiersEnabled, releaseHoldFor } from './policy'
+import { holdLabel, loadHoldPolicy, missionVerifiersEnabled, releaseHoldFor, type HoldPolicy } from './policy'
 import type { Trigger, VerifierSources, VerifyCtx, VerifyResult } from './types'
 
 export interface RunOptions {
@@ -58,6 +58,8 @@ export interface RunOptions {
    * once per batch instead of once per member). Filtered like the query below.
    */
   missions?: MissionRow[]
+  /** The hold rules in force, already loaded (bulk runs); omitted: read from the admin settings. */
+  policy?: HoldPolicy
 }
 
 export type CheckOutcome =
@@ -150,6 +152,7 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
   const enabled = opts.enabled ?? missionVerifiersEnabled()
   const dryRun = !enabled || !!opts.dryRun
   const now = opts.now ?? new Date()
+  const policy = opts.policy ?? (await loadHoldPolicy())
   const report: RunReport = {
     discordId,
     enabled,
@@ -263,11 +266,11 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
 
     // ---- PENDING with a hold: waits for a human, except NEW_ACCOUNT once the account is old enough.
     if (row?.status === 'PENDING' && row.holdReason) {
-      const liftable = row.holdReason === 'NEW_ACCOUNT' && releaseHoldFor(m.level, discordId, now) === null
+      const liftable = row.holdReason === 'NEW_ACCOUNT' && releaseHoldFor(m.level, discordId, now, policy) === null
       if (!liftable) {
         report.checks.push({
           ...base,
-          result: { status: 'skipped', reason: HOLD_LABEL[row.holdReason] },
+          result: { status: 'skipped', reason: holdLabel(row.holdReason, policy) },
           outcome: 'awaiting_release',
           holdReason: row.holdReason,
         })
@@ -281,7 +284,14 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       report.checks.push({ ...base, result: r, outcome: row?.status === 'PENDING' ? 'pending_review' : 'not_yet', holdReason: row?.holdReason ?? null })
       continue
     }
-    let hold = releaseHoldFor(m.level, discordId, now)
+    if (policy.readFailed) {
+      // The hold rules could not be read: approving would skip a hold, and holding would store a
+      // fallback-derived hold that never lifts. Write nothing, ping nobody; the next run retries.
+      report.errors.push(`mission ${m.id}: settings unreadable; verifier pass not applied`)
+      report.checks.push({ ...base, result: r, outcome: 'not_yet' })
+      continue
+    }
+    let hold = releaseHoldFor(m.level, discordId, now, policy)
     // A level the member was already paid for: record the pass silently (no hold, no reviewer
     // ping, no review card, no payout: settleLevels skips paid levels).
     let silent = false
@@ -318,7 +328,7 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       continue
     }
 
-    const outcome = await applyPass(row, m, discordId, memberId, v.key, r.evidence, hold, opts.trigger)
+    const outcome = await applyPass(row, m, discordId, memberId, v.key, r.evidence, hold, opts.trigger, policy)
     if (outcome === 'approved' && !silent) report.approved.push(m.id)
     if (outcome === 'held') report.held.push(m.id)
     report.checks.push({ ...base, result: r, outcome: outcome === 'approved' && silent ? 'recorded' : outcome, holdReason: outcome === 'held' ? hold : null })
@@ -329,7 +339,7 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
     if (report.approved.length || report.held.length || report.reopened.length || report.levelsPaid.length || report.checks.some((c) => c.outcome === 'recorded')) {
       invalidateProgressCache(discordId)
     }
-    notifyInApp(discordId, report)
+    notifyInApp(discordId, report, policy)
     // Discord review cards (Phase 3): post one for a new hold / reopen, and
     // update an existing card the verifier just approved or held.
     const cardMissions = report.checks
@@ -354,6 +364,7 @@ async function applyPass(
   evidence: Record<string, unknown>,
   hold: MissionHold | null,
   via: Trigger,
+  policy: HoldPolicy,
 ): Promise<CheckOutcome> {
   const actor = `auto:${key}`
   const decided = hold
@@ -363,7 +374,7 @@ async function applyPass(
     actorId: actor,
     action: hold ? ('AUTO_HELD' as const) : ('AUTO_APPROVED' as const),
     via,
-    note: hold ? HOLD_LABEL[hold] : null,
+    note: hold ? holdLabel(hold, policy) : null,
     metadata: json({ evidence, ...(hold ? { holdReason: hold } : {}) }),
   }
 
@@ -476,7 +487,7 @@ async function maybeFlag(row: Row, r: VerifyResult, m: MissionRow, report: RunRe
 }
 
 /** In-app notifications (DB only). Discord DMs and #work posts: ./notify.ts. */
-function notifyInApp(discordId: string, report: RunReport) {
+function notifyInApp(discordId: string, report: RunReport, policy: HoldPolicy) {
   for (const c of report.checks) {
     if (c.outcome === 'approved') {
       createNotification({
@@ -490,7 +501,7 @@ function notifyInApp(discordId: string, report: RunReport) {
       }).catch(() => {})
     }
     if (c.outcome === 'held' || c.outcome === 'reopened') {
-      const why = c.holdReason ? HOLD_LABEL[c.holdReason] : 'needs a reviewer'
+      const why = c.holdReason ? holdLabel(c.holdReason, policy) : 'needs a reviewer'
       notifyReviewers(discordId, c.title, c.level, `"${c.title.slice(0, 50)}" was auto-verified and needs your approval (${why}).`).catch(
         () => {},
       )

@@ -29,10 +29,12 @@ import { postDiscordMessage, type DiscordMessageBody } from '../discord-rest'
 import { makeEmbed } from '../discord-interactions/embeds'
 import { PIZZA_CAPO_ROLE_ID } from '@/app/ui/constants'
 import { reviewCardsEnabled, missionLabel } from './review-cards'
+import { loadSettings } from '../settings'
 
+/** Code default for `missions.slaHours`. */
 export const SLA_HOURS = 48
 const SLA_MS = SLA_HOURS * 3_600_000
-/** Lines listed in the digest; the rest are counted. */
+/** Code default for `missions.slaDigestMaxLines`: lines listed in the digest; the rest are counted. */
 export const DIGEST_MAX_LINES = 15
 
 export interface SlaCandidate {
@@ -80,6 +82,13 @@ export interface SlaDeps {
   post: (channelId: string, body: DiscordMessageBody) => Promise<{ id: string | null }>
   guildId: () => string | null
   appUrl: () => string
+  /** The review target and digest length; omitted: read from the admin settings. */
+  rules?: () => Promise<{ slaHours: number; maxLines: number }>
+}
+
+export async function loadSlaRules(): Promise<{ slaHours: number; maxLines: number }> {
+  const s = await loadSettings()
+  return { slaHours: s.get('missions.slaHours'), maxLines: s.get('missions.slaDigestMaxLines') }
 }
 
 export type SlaResult =
@@ -100,9 +109,14 @@ export function rolesToPing(items: Array<{ level: number }>): string[] {
 }
 
 /** The digest message. Pure. */
-export function renderSlaDigest(items: OverdueItem[], opts: { guildId: string | null; appUrl: string }): DiscordMessageBody {
+export function renderSlaDigest(
+  items: OverdueItem[],
+  opts: { guildId: string | null; appUrl: string; slaHours?: number; maxLines?: number },
+): DiscordMessageBody {
+  const slaHours = opts.slaHours ?? SLA_HOURS
+  const maxLines = opts.maxLines ?? DIGEST_MAX_LINES
   const roles = rolesToPing(items)
-  const lines = items.slice(0, DIGEST_MAX_LINES).map((it) => {
+  const lines = items.slice(0, maxLines).map((it) => {
     const link =
       it.reviewMsgId && it.reviewChannelId && opts.guildId
         ? `https://discord.com/channels/${opts.guildId}/${it.reviewChannelId}/${it.reviewMsgId}`
@@ -110,13 +124,13 @@ export function renderSlaDigest(items: OverdueItem[], opts: { guildId: string | 
     const hold = it.holdReason ? ' · needs approval' : ''
     return `**${missionLabel(it)}** · <@${it.discordId}> · waiting ${fmtWait(it.waitingMs)}${hold} · [review](<${link}>)`
   })
-  const more = items.length > DIGEST_MAX_LINES ? `\n…and ${items.length - DIGEST_MAX_LINES} more in [the app](<${opts.appUrl}/missions>).` : ''
+  const more = items.length > maxLines ? `\n…and ${items.length - maxLines} more in [the app](<${opts.appUrl}/missions>).` : ''
   const n = items.length
   const embed = makeEmbed(
     'cooldown',
-    `${n} mission review${n === 1 ? ' is' : 's are'} past the ${SLA_HOURS}h target`,
+    `${n} mission review${n === 1 ? ' is' : 's are'} past the ${slaHours}h target`,
     `${lines.map((l, i) => `${i + 1} - ${l}`).join('\n')}${more}`,
-    { footer: { text: `Daily review digest · decisions within ${SLA_HOURS} hours` } },
+    { footer: { text: `Daily review digest · decisions within ${slaHours} hours` } },
   )
   return {
     content: roles.map((r) => `<@&${r}>`).join(' '),
@@ -128,7 +142,8 @@ export function renderSlaDigest(items: OverdueItem[], opts: { guildId: string | 
 export async function runSlaDigest(deps: SlaDeps = defaultSlaDeps, now = new Date()): Promise<SlaResult> {
   if (!deps.enabled()) return { status: 'disabled' }
   const pending = await deps.pending()
-  const overdue = selectOverdue(pending, now)
+  const rules = await (deps.rules ?? loadSlaRules)()
+  const overdue = selectOverdue(pending, now, rules.slaHours * 3_600_000)
   if (overdue.length === 0) return { status: 'none', pending: pending.length }
 
   const day = dayKey(now)
@@ -140,7 +155,7 @@ export async function runSlaDigest(deps: SlaDeps = defaultSlaDeps, now = new Dat
     console.warn('[mission-sla] no #work channel (set MISSION_REVIEW_CHANNEL_ID); digest not posted')
     return { status: 'no_channel', overdue: overdue.length }
   }
-  const body = renderSlaDigest(overdue, { guildId: deps.guildId(), appUrl: deps.appUrl() })
+  const body = renderSlaDigest(overdue, { guildId: deps.guildId(), appUrl: deps.appUrl(), slaHours: rules.slaHours, maxLines: rules.maxLines })
   let posted: { id: string | null }
   try {
     posted = await deps.post(channelId, body)

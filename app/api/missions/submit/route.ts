@@ -73,7 +73,7 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   if (precheck.checkResult) {
     // An auto-verified pre-check (L6.1 host confirmed by rsv.pizza) is held for a release (D9).
-    await storeCheckResult(completion.id, precheck.checkResult, !!mission?.verifierKey, precheck.hold ?? null)
+    await storeCheckResult(completion.id, precheck.checkResult, !!mission?.verifierKey, precheck.hold ?? null, precheck.policy)
   }
 
   // Missions with an automatic verifier are checked right away (e.g. the
