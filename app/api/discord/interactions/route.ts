@@ -45,7 +45,7 @@ import { announceMissionResults } from "@/app/lib/mission-verify/notify";
 import { getMissionsOverview } from "@/app/lib/missions-overview";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { approveMission, getCompletionForReview, rejectMission } from "@/app/lib/missions";
-import { canReviewMission } from "@/app/lib/mission-review-access";
+import { canReviewMission, dprOnlyMinLevel } from "@/app/lib/mission-review-access";
 import { invalidateProgressCache } from "@/app/lib/mission-cache";
 import { reviewCardsEnabled, syncReviewCard } from "@/app/lib/mission-verify/review-cards";
 import { postEphemeralFollowup, runReviewDecision, type ReviewDecisionJob } from "@/app/lib/mission-verify/review-decision";
@@ -126,6 +126,7 @@ const missionReview: MissionReviewDeps = {
   enabled: () => reviewCardsEnabled(),
   target: getCompletionForReview,
   canReview: (roles, level) => canReviewMission(roles, level),
+  dprOnlyMinLevel,
   decide: decideReview,
   refresh: (id, card) => after(() => syncReviewCard(id, undefined, card).then(() => undefined)),
   appUrl: appUrl(),

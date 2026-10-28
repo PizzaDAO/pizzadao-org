@@ -1,10 +1,12 @@
 // Mission reviewer authorization (plans/mission-verification.md §5.1, D10).
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('./db', () => ({ prisma: {} }))
+vi.mock('./db', () => ({ prisma: { appSetting: { findMany: vi.fn(async () => []) } } }))
 vi.mock('./discord', () => ({ getUserRoles: vi.fn() }))
 
-import { canReviewMission, canReviewAnyMission, missionReviewScope, missionReviewerRoleIds } from './mission-review-access'
+import { canReviewMission, canReviewAnyMission, isDreadPizzaRoberts, missionReviewScope, missionReviewerRoleIds } from './mission-review-access'
+import { clearSettingsCache } from './settings'
+import { prisma } from './db'
 import { getUserRoles } from './discord'
 import { ADMIN_ROLE_IDS, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
@@ -16,7 +18,57 @@ const RANDOM = '999999999999999999'
 
 const roles = vi.mocked(getUserRoles)
 
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  clearSettingsCache({ all: true })
+  vi.mocked(prisma.appSetting.findMany).mockResolvedValue([] as never)
+})
+
+const setDprOnlyLevel = (value: unknown) => vi.mocked(prisma.appSetting.findMany).mockResolvedValue([{ key: 'missions.dprOnlyMinLevel', value }] as never)
+
+describe('isDreadPizzaRoberts (pinned to the role id)', () => {
+  it('is true only for the DPR role', async () => {
+    await expect(isDreadPizzaRoberts([DPR])).resolves.toBe(true)
+    for (const r of [LEONARDO, CAPO, PEP_MAFIA, RANDOM]) await expect(isDreadPizzaRoberts([r])).resolves.toBe(false)
+    await expect(isDreadPizzaRoberts([])).resolves.toBe(false)
+  })
+  it('by Discord id, and fails closed when the role lookup throws', async () => {
+    roles.mockResolvedValue([DPR])
+    await expect(isDreadPizzaRoberts('u1')).resolves.toBe(true)
+    roles.mockRejectedValue(new Error('discord down'))
+    await expect(isDreadPizzaRoberts('u1')).resolves.toBe(false)
+  })
+  it('does not move when the mission DPR-only level setting is edited', async () => {
+    setDprOnlyLevel(5)
+    await expect(isDreadPizzaRoberts([DPR])).resolves.toBe(true)
+    await expect(isDreadPizzaRoberts([CAPO])).resolves.toBe(false)
+    await expect(isDreadPizzaRoberts([LEONARDO])).resolves.toBe(false)
+  })
+})
+
+describe('the DPR-only level follows the missions.dprOnlyMinLevel setting', () => {
+  it('lowered to 5: L5-L7 become DPR-only, L4 is unchanged', async () => {
+    setDprOnlyLevel(5)
+    await expect(canReviewMission([CAPO], 4)).resolves.toBe(true)
+    for (const level of [5, 6, 7, 8]) {
+      await expect(canReviewMission([CAPO], level)).resolves.toBe(false)
+      await expect(canReviewMission([DPR], level)).resolves.toBe(true)
+    }
+    const scope = await missionReviewScope([CAPO])
+    expect(scope?.(4)).toBe(true)
+    expect(scope?.(5)).toBe(false)
+  })
+  it('an invalid stored value fails to the strictest (DPR-only from level 1)', async () => {
+    setDprOnlyLevel(9) // loosening is not allowed
+    await expect(canReviewMission([CAPO], 1)).resolves.toBe(false)
+    await expect(canReviewMission([DPR], 1)).resolves.toBe(true)
+  })
+  it('settings unreadable: strictest as well', async () => {
+    vi.mocked(prisma.appSetting.findMany).mockRejectedValue(new Error('db down'))
+    await expect(canReviewMission([LEONARDO], 2)).resolves.toBe(false)
+    await expect(canReviewMission([DPR], 2)).resolves.toBe(true)
+  })
+})
 
 describe('canReviewMission (by role list)', () => {
   it.each([

@@ -247,6 +247,27 @@ describe('runVerifiers', () => {
     })
   })
 
+  describe('hold rules unreadable (settings read failed)', () => {
+    const failed = { humanReleaseMinLevel: 1, newAccountDays: 365, readFailed: true }
+
+    it('a verifier pass neither approves nor holds: nothing written, nobody pinged, error recorded', async () => {
+      const report = await run(OLD, { missionIds: [1], policy: failed })
+      expect(report.approved).toEqual([])
+      expect(report.held).toEqual([])
+      expect(report.checks[0].outcome).toBe('not_yet')
+      expect(report.errors).toEqual([expect.stringMatching(/settings unreadable/)])
+      expect(rows).toEqual([])
+      expect(events).toEqual([])
+      expect(notifyReviewers).not.toHaveBeenCalled()
+      expect(createNotification).not.toHaveBeenCalled()
+    })
+
+    it('once the settings read again the same pass is applied normally', async () => {
+      const report = await run(OLD, { missionIds: [1], policy: { humanReleaseMinLevel: 6, newAccountDays: 30 } })
+      expect(report.approved).toEqual([1])
+    })
+  })
+
   describe('human release (D9)', () => {
     const atL6 = () => sources({ getWorkingLevel: vi.fn(async () => 6) })
 

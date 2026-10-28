@@ -16,13 +16,23 @@
 import { getUserRoles } from './discord'
 import { isPepAdmin } from './pep-admin'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
+import { getSetting } from './settings'
 
-/** Levels at or above this one may only be approved by Dread Pizza Roberts. */
+/**
+ * Code default for the setting `missions.dprOnlyMinLevel`: levels at or above this one may only be
+ * approved by Dread Pizza Roberts. The live value comes from the admin setting (it can only be
+ * made stricter, i.e. lower). NOT a "who is DPR" check: use isDreadPizzaRoberts for that.
+ */
 export const DPR_ONLY_MIN_LEVEL = 8
 
+/** The current DPR-only level (admin setting; fails to the strictest value if unreadable). */
+export function dprOnlyMinLevel(): Promise<number> {
+  return getSetting('missions.dprOnlyMinLevel')
+}
+
 /** Roles that may review a mission of `level`. */
-export function missionReviewerRoleIds(level: number): readonly string[] {
-  if (level >= DPR_ONLY_MIN_LEVEL) return [DREAD_PIZZA_ROBERTS_ROLE_ID]
+export function missionReviewerRoleIds(level: number, dprOnlyFrom: number = DPR_ONLY_MIN_LEVEL): readonly string[] {
+  if (level >= dprOnlyFrom) return [DREAD_PIZZA_ROBERTS_ROLE_ID]
   return [...new Set<string>([...ADMIN_ROLE_IDS, ...MISSION_REVIEWER_ROLE_IDS])]
 }
 
@@ -46,10 +56,24 @@ function holdsAny(roles: readonly string[], allowed: readonly string[]): Promise
   return isPepAdmin(roles, { baseRoleIds: allowed, config: { ids: [], names: [] } })
 }
 
+/**
+ * Whether `who` holds the Dread Pizza Roberts role. Pinned to the role id in code and independent
+ * of every setting, so it gates the call-review, disavow and admin-settings surfaces without
+ * moving when the mission DPR-only level is edited. Fails closed.
+ */
+export async function isDreadPizzaRoberts(who: Reviewer): Promise<boolean> {
+  try {
+    return await holdsAny(await resolveRoles(who), [DREAD_PIZZA_ROBERTS_ROLE_ID])
+  } catch {
+    return false
+  }
+}
+
 /** Whether `who` may approve or reject a submission for a mission of `level`. */
 export async function canReviewMission(who: Reviewer, level: number): Promise<boolean> {
   if (!Number.isInteger(level) || level < 1) return false
-  return holdsAny(await resolveRoles(who), missionReviewerRoleIds(level))
+  const [roles, dprFrom] = await Promise.all([resolveRoles(who), dprOnlyMinLevel()])
+  return holdsAny(roles, missionReviewerRoleIds(level, dprFrom))
 }
 
 /**
@@ -57,14 +81,14 @@ export async function canReviewMission(who: Reviewer, level: number): Promise<bo
  * `null` = none (hide the review panel); otherwise a predicate on the level.
  */
 export async function missionReviewScope(who: Reviewer): Promise<((level: number) => boolean) | null> {
-  const roles = await resolveRoles(who)
+  const [roles, dprFrom] = await Promise.all([resolveRoles(who), dprOnlyMinLevel()])
   const [low, high] = await Promise.all([
-    holdsAny(roles, missionReviewerRoleIds(1)),
-    holdsAny(roles, missionReviewerRoleIds(DPR_ONLY_MIN_LEVEL)),
+    holdsAny(roles, missionReviewerRoleIds(1, dprFrom)),
+    holdsAny(roles, missionReviewerRoleIds(dprFrom, dprFrom)),
   ])
   if (!low && !high) return null
   return (level: number) =>
-    Number.isInteger(level) && level >= 1 && (level >= DPR_ONLY_MIN_LEVEL ? high : low)
+    Number.isInteger(level) && level >= 1 && (level >= dprFrom ? high : low)
 }
 
 /** Whether `who` may review at least one level (shows the review panel). */

@@ -13,15 +13,16 @@ import { notFound } from 'next/navigation'
 import { prisma } from '@/app/lib/db'
 import { getSession, type Session } from '@/app/lib/session'
 import { getCurrentLevel } from '@/app/lib/missions'
-import { canReviewMission, DPR_ONLY_MIN_LEVEL } from '@/app/lib/mission-review-access'
+import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
-import { DISAVOW_MIN_LEVEL, disavowEnabled } from './constants'
+import { getSetting } from '@/app/lib/settings'
+import { disavowEnabled } from './constants'
 import { identifierOr, viewerIdentifiers } from './match'
 
 const LOCKOUT_STATUSES = ['LISTED', 'SUSPENDED'] as const
 
 export function isDisavowDPR(discordId: string): Promise<boolean> {
-  return canReviewMission(discordId, DPR_ONLY_MIN_LEVEL).catch(() => false)
+  return isDreadPizzaRoberts(discordId).catch(() => false)
 }
 
 /** Matches every identifier we know for the viewer: Discord id, member id, wallets, X. */
@@ -73,13 +74,14 @@ const DENIED: DisavowViewer = { allowed: false, isDPR: false }
 export async function disavowViewer(discordId: string): Promise<DisavowViewer> {
   if (!disavowEnabled() || !discordId) return DENIED
   try {
-    const [subject, dpr, level] = await Promise.all([
+    const [subject, dpr, level, minLevel] = await Promise.all([
       isDisavowSubject(discordId),
       isDisavowDPR(discordId),
       getCurrentLevel(discordId).catch(() => 0),
+      getSetting('disavow.minLevel'),
     ])
     if (subject) return DENIED
-    return { allowed: dpr || level >= DISAVOW_MIN_LEVEL, isDPR: dpr }
+    return { allowed: dpr || level >= minLevel, isDPR: dpr }
   } catch {
     return DENIED
   }

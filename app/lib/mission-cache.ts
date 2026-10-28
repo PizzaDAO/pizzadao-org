@@ -73,7 +73,7 @@ export function registerProgressAlias(discordId: string, memberId: string) {
 // ===== Missions list cache (rarely changes) =====
 
 let missionsListCache: { data: any; timestamp: number } | null = null
-const MISSIONS_LIST_CACHE_TTL = 10 * 60 * 1000 // 10 minutes (definitions rarely change)
+const MISSIONS_LIST_CACHE_TTL = 60 * 1000 // 60s: admin edits (/admin/missions) must reach every instance quickly
 
 export function getCachedMissionsList() {
   if (missionsListCache && Date.now() - missionsListCache.timestamp < MISSIONS_LIST_CACHE_TTL) {
@@ -85,4 +85,10 @@ export function getCachedMissionsList() {
 
 export function setCachedMissionsList(data: any) {
   missionsListCache = { data, timestamp: Date.now() }
+}
+
+/** After an admin edit of missions: drop the list and every member's cached progress in this instance. */
+export function clearMissionCaches() {
+  missionsListCache = null
+  progressCache.clear()
 }

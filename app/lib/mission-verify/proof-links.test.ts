@@ -7,7 +7,7 @@ vi.mock('../db', () => {
   const missionCompletion = { updateMany: vi.fn(async () => ({ count: 1 })) }
   const missionReviewEvent = { create: vi.fn(async () => ({})) }
   const tx = { missionCompletion, missionReviewEvent }
-  return { prisma: { ...tx, $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)) } }
+  return { prisma: { ...tx, appSetting: { findMany: vi.fn(async () => []) }, $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)) } }
 })
 
 import { parseFarcasterCast, parseHttpsUrl, parseMediaLink, parsePoapProof, parseRsvPizzaUrl, parseXPost } from './proof-links'
@@ -256,6 +256,22 @@ describe('precheckProof (submit route)', () => {
     expect(noKey.hold).toBeUndefined()
   })
 
+  it('settings unreadable: an auto-verified pre-check is not marked auto-verified and carries no hold', async () => {
+    vi.mocked(prisma.appSetting.findMany).mockRejectedValueOnce(new Error('db down'))
+    const { clearSettingsCache } = await import('../settings')
+    clearSettingsCache({ all: true })
+    const event = { slug: 'lisbon', city: 'Lisbon', status: 'approved', type: 'gpp', date: null, role: 'host', matchedBy: ['telegram'] }
+    const f = (async (input: RequestInfo | URL) =>
+      String(input).includes('/api/service/')
+        ? new Response(JSON.stringify({ ok: true, matched: true, events: [event] }))
+        : new Response(JSON.stringify({ event: { customUrl: 'lisbon', city: 'Lisbon', underbossStatus: 'approved' } }))) as unknown as typeof fetch
+    const src = { ...sources(f), rsvPizzaServiceKey: () => 'k', getTelegramUsername: vi.fn(async () => 'cityhost') }
+    const out = await precheckProof({ discordId: '300000000000000001', memberId: null, mission: { verifierKey: 'gpp_host', verifierParams: {}, level: 6 }, evidence: 'https://rsv.pizza/lisbon', sources: src, unfurl: async () => null })
+    expect(out.checkResult?.autoVerified).toBeUndefined()
+    expect(out.hold).toBeUndefined()
+    clearSettingsCache({ all: true })
+  })
+
   it('storeCheckResult with a hold sets holdReason and records AUTO_HELD in one transaction', async () => {
     vi.mocked(prisma.missionCompletion.updateMany).mockClear()
     const ok = await storeCheckResult(9, { verifier: 'gpp_host', summary: 's', confidence: 'high', checks: [], data: {}, checkedAt: 'now', autoVerified: true }, true, 'HIGH_LEVEL')
@@ -267,6 +283,13 @@ describe('precheckProof (submit route)', () => {
     expect(prisma.missionReviewEvent.create).toHaveBeenCalledWith({
       data: expect.objectContaining({ completionId: 9, actorId: 'auto:gpp_host', action: 'AUTO_HELD', via: 'submit' }),
     })
+  })
+
+  it('storeCheckResult labels the hold event with the policy it is given (no second settings read)', async () => {
+    vi.mocked(prisma.appSetting.findMany).mockClear()
+    await storeCheckResult(9, { verifier: 'gpp_host', summary: 's', confidence: 'high', checks: [], data: {}, checkedAt: 'now', autoVerified: true }, true, 'HIGH_LEVEL', { humanReleaseMinLevel: 5, newAccountDays: 30 })
+    expect(prisma.missionReviewEvent.create).toHaveBeenLastCalledWith({ data: expect.objectContaining({ note: 'Level 5+ needs a human approval' }) })
+    expect(prisma.appSetting.findMany).not.toHaveBeenCalled()
   })
 
   it('storeCheckResult writes only onto a PENDING row (source SEMI for verifier-backed checks)', async () => {

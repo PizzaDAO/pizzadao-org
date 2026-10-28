@@ -3,9 +3,10 @@
  * id (plans/mission-verification.md §1, §8). Used by the data migration
  * scripts/missions/set-verifiers.mjs and by the seed scripts.
  *
- * `seedTitle` is the title scripts/seed-missions.mjs inserted. The migration
- * refuses to touch a row whose title is neither the seed title nor the new
- * title set here (the production rows may have been edited by hand).
+ * These values are code DEFAULTS. Once /admin/missions ships the database is the source of truth:
+ * the migration only INSERTs missing rows and fills NULLs, so re-running it never reverts an admin
+ * edit (verifierParams, rewards, titles, active). `--force-params` restores the code values; that
+ * mode refuses to touch a row whose title is neither `seedTitle` nor the new title set here.
  *
  * Automatic verifiers: x_linked, attendance_count, discord_message,
  * referral (Phase 4: real referral capture), discord_role; manual for L8.
@@ -55,6 +56,14 @@ export const MISSION_LEVEL_TITLES: Readonly<Record<number, string>> = {
   4: 'Do some dirty work',
   5: 'Do a favor for the mafia',
   6: 'Street Muscle', // unchanged from prod; pinned so every L6 row carries it
+}
+
+/**
+ * The code (seed) reward of every level. The admin editor may move a level's reward anywhere at or
+ * below this value (lowering, and raising back up to it); going above needs a PR.
+ */
+export const LEVEL_REWARD_CEILING: Readonly<Record<number, number>> = {
+  1: 69, 2: 420, 3: 1337, 4: 3141, 5: 4269, 6: 6942, 7: 31415, 8: 69420,
 }
 
 /** L4's shared per-level reward (the new L4.2 row must match it). */
@@ -310,19 +319,45 @@ const stable = (v: unknown): string => JSON.stringify(v, (_k, val) =>
 
 const labelOf = (r: { level: number; index: number }) => `L${r.level}.${r.index}`
 
+export interface PlanOptions {
+  /**
+   * Restore the code values (verifier, params, proofKind, title, description, level titles) even
+   * where the row differs, aborting on a title or reward mismatch. Without it the database is the
+   * source of truth (admin edits on /admin/missions are never reverted): see below.
+   */
+  force?: boolean
+  /**
+   * Also fill an EMPTY description or levelTitle on existing rows (the old default). Off by default:
+   * an admin may have cleared one on purpose, so only rows inserted in the run get them.
+   */
+  fillEmpty?: boolean
+  /** Level titles named explicitly on the command line: these overwrite the row's levelTitle. */
+  overrideLevelTitles?: Readonly<Record<number, string>>
+}
+
 /**
  * Pure: what the data migration would change. Idempotent (a second run finds
- * nothing to do):
+ * nothing to do).
  *
+ * Default (the database is the source of truth once the admin editor ships), it only
+ *   - INSERTs missing missions, at the level's CURRENT database reward,
+ *   - fills NULLs: verifierKey (with its proofKind) and verifierParams (description / levelTitle only
+ *     with `fillEmpty`),
+ *   - rewords a title that is still the untouched seed title,
+ * and never overwrites a value an admin may have edited (verifierParams, rewards, titles, active).
+ *
+ * With `force` (the CLI's --force-params) it restores the code values:
  *   - configured rows: verifier, title, description (title-guarded)
- *   - `insert` entries with no row: a new mission row
+ *   - `insert` entries with no row: a new mission row (reward-guarded)
  *   - level titles: levelTitle on every row of the listed levels
  */
 export function planVerifierMigration(
   rows: readonly MissionDbRow[],
   config: readonly MissionVerifierConfig[] = MISSION_VERIFIER_CONFIG,
   levelTitles: Readonly<Record<number, string>> = MISSION_LEVEL_TITLES,
+  opts: PlanOptions = {},
 ): VerifierMigrationPlan {
+  const force = !!opts.force
   const plan: VerifierMigrationPlan = { updates: [], inserts: [], unchanged: [], missing: [], errors: [] }
   const updates = new Map<number, MissionUpdate>()
   const updateFor = (row: MissionDbRow): MissionUpdate => {
@@ -348,10 +383,18 @@ export function planVerifierMigration(
         continue
       }
       const levelRewards = [...new Set(rows.filter((r) => r.level === c.level && typeof r.reward === 'number').map((r) => r.reward))]
-      const reward = c.insert.reward
-      if (levelRewards.some((r) => r !== reward)) {
-        plan.errors.push(`${label}: reward ${c.insert.reward} differs from level ${c.level}'s shared reward ${levelRewards.join(' / ')}`)
+      let reward = c.insert.reward
+      if (force) {
+        if (levelRewards.some((r) => r !== reward)) {
+          plan.errors.push(`${label}: reward ${c.insert.reward} differs from level ${c.level}'s shared reward ${levelRewards.join(' / ')}`)
+          continue
+        }
+      } else if (levelRewards.length > 1) {
+        // The shared-reward invariant (settleLevels) is already broken in the database: don't add to it.
+        plan.errors.push(`${label}: level ${c.level} rows disagree on the reward (${levelRewards.join(' / ')}); fix them on /admin/missions first`)
         continue
+      } else if (levelRewards.length === 1) {
+        reward = levelRewards[0] as number // the level's current database reward, which an admin may have edited
       }
       plan.inserts.push({
         level: c.level,
@@ -361,8 +404,10 @@ export function planVerifierMigration(
           index: c.index,
           title: c.title ?? c.seedTitle,
           description: c.description,
-          reward: c.insert.reward,
-          levelTitle: levelTitles[c.level] ?? rows.find((r) => r.level === c.level && r.levelTitle)?.levelTitle ?? null,
+          reward,
+          levelTitle: force
+            ? (levelTitles[c.level] ?? rows.find((r) => r.level === c.level && r.levelTitle)?.levelTitle ?? null)
+            : (rows.find((r) => r.level === c.level && r.levelTitle)?.levelTitle ?? levelTitles[c.level] ?? null),
           isActive: true,
           verifierKey: c.verifierKey,
           verifierParams: c.verifierParams,
@@ -372,32 +417,56 @@ export function planVerifierMigration(
       continue
     }
     const accepted = [c.seedTitle, c.title].filter(Boolean)
-    if (!accepted.includes(row.title)) {
+    if (force && !accepted.includes(row.title)) {
       plan.errors.push(`${label}: title is "${row.title}", expected "${c.seedTitle}"${c.title ? ` or "${c.title}"` : ''}`)
       continue
     }
     okRows.push({ label, id: row.id })
     const data: MissionUpdate['data'] = {}
     const changes: string[] = []
-    if (c.title && row.title !== c.title) {
-      data.title = c.title
-      changes.push(`title -> "${c.title}"`)
-    }
-    if (c.description && row.description !== c.description) {
-      data.description = c.description
-      changes.push('description')
-    }
-    if (row.verifierKey !== c.verifierKey) {
-      data.verifierKey = c.verifierKey
-      changes.push(`verifierKey ${row.verifierKey ?? 'null'} -> ${c.verifierKey ?? 'null'}`)
-    }
-    if (stable(row.verifierParams ?? null) !== stable(c.verifierParams)) {
-      data.verifierParams = c.verifierParams
-      changes.push(`verifierParams -> ${stable(c.verifierParams)}`)
-    }
-    if (row.proofKind !== c.proofKind) {
-      data.proofKind = c.proofKind
-      changes.push(`proofKind ${row.proofKind} -> ${c.proofKind}`)
+    if (force) {
+      if (c.title && row.title !== c.title) {
+        data.title = c.title
+        changes.push(`title -> "${c.title}"`)
+      }
+      if (c.description && row.description !== c.description) {
+        data.description = c.description
+        changes.push('description')
+      }
+      if (row.verifierKey !== c.verifierKey) {
+        data.verifierKey = c.verifierKey
+        changes.push(`verifierKey ${row.verifierKey ?? 'null'} -> ${c.verifierKey ?? 'null'}`)
+      }
+      if (stable(row.verifierParams ?? null) !== stable(c.verifierParams)) {
+        data.verifierParams = c.verifierParams
+        changes.push(`verifierParams -> ${stable(c.verifierParams)}`)
+      }
+      if (row.proofKind !== c.proofKind) {
+        data.proofKind = c.proofKind
+        changes.push(`proofKind ${row.proofKind} -> ${c.proofKind}`)
+      }
+    } else {
+      // The database wins: reword only an untouched seed title, fill only what is empty.
+      if (c.title && row.title === c.seedTitle && row.title !== c.title) {
+        data.title = c.title
+        changes.push(`title -> "${c.title}"`)
+      }
+      if (opts.fillEmpty && c.description && !row.description) {
+        data.description = c.description
+        changes.push('description')
+      }
+      if (row.verifierKey == null && c.verifierKey != null) {
+        data.verifierKey = c.verifierKey
+        changes.push(`verifierKey null -> ${c.verifierKey}`)
+        if (row.proofKind !== c.proofKind) {
+          data.proofKind = c.proofKind
+          changes.push(`proofKind ${row.proofKind} -> ${c.proofKind}`)
+        }
+      }
+      if (row.verifierParams == null && c.verifierParams != null && (row.verifierKey == null || row.verifierKey === c.verifierKey)) {
+        data.verifierParams = c.verifierParams
+        changes.push(`verifierParams -> ${stable(c.verifierParams)}`)
+      }
     }
     if (changes.length) {
       const u = updateFor(row)
@@ -409,7 +478,8 @@ export function planVerifierMigration(
   // Level titles go on every row of the level, configured or not: the UI and
   // the reward ledger description read the level's first row.
   for (const row of rows) {
-    const want = levelTitles[row.level]
+    const explicit = opts.overrideLevelTitles?.[row.level]
+    const want = force || explicit !== undefined ? (explicit ?? levelTitles[row.level]) : opts.fillEmpty && (row.levelTitle ?? null) === null ? levelTitles[row.level] : undefined
     if (want === undefined || (row.levelTitle ?? null) === want) continue
     const u = updateFor(row)
     u.data.levelTitle = want
