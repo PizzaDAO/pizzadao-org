@@ -61,6 +61,8 @@ export interface MissionReviewDeps {
   target: (completionId: number) => Promise<ReviewTarget | null>
   /** canReviewMission(roles, level). */
   canReview: (roles: string[], level: number) => Promise<boolean>
+  /** The level from which only Dread Pizza Roberts reviews (setting missions.dprOnlyMinLevel); omitted: 8. */
+  dprOnlyMinLevel?: () => Promise<number>
   /** Schedule the decision after the response (route: after()). Must not block. */
   decide: (job: ReviewDecisionJob) => void
   /** Schedule a card refresh (a stale card was clicked). Must not block. */
@@ -69,6 +71,14 @@ export interface MissionReviewDeps {
 }
 
 type Refuse = (headline: string, body?: string) => InteractionResponse
+
+const DEFAULT_DPR_ONLY_LEVEL = 8
+const TOP_LEVEL = 8
+
+/** Refusal copy built from the setting, never a literal level. */
+export function dprOnlyText(from: number): string {
+  return `Only Dread Pizza Roberts reviews ${from >= TOP_LEVEL ? `Level ${TOP_LEVEL}` : `Levels ${from}-${TOP_LEVEL}`} missions.`
+}
 
 export const REJECT_REASON_MIN = 3
 export const REJECT_REASON_MAX = 500
@@ -94,7 +104,8 @@ async function check(
   const target = await deps.target(completionId)
   if (!target) return { ok: false, res: refuse('That submission no longer exists.') }
   if (!(await deps.canReview(i.member?.roles ?? [], target.level))) {
-    const who = target.level >= 8 ? 'Only Dread Pizza Roberts reviews Level 8 missions.' : 'Mission reviewers are Leonardo, Dread Pizza Roberts, Pizza Capo and Pepperoni Mafia.'
+    const dprFrom = await (deps.dprOnlyMinLevel?.() ?? Promise.resolve(DEFAULT_DPR_ONLY_LEVEL))
+    const who = target.level >= dprFrom ? dprOnlyText(dprFrom) : 'Mission reviewers are Leonardo, Dread Pizza Roberts, Pizza Capo and Pepperoni Mafia.'
     return { ok: false, res: refuse(`You can't review Level ${target.level} missions.`, who) }
   }
   if (target.discordId === userId) return { ok: false, res: refuse("You can't review your own submission.") }

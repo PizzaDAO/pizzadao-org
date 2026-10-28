@@ -6,7 +6,8 @@ import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
 import { getMembersWithRoles } from './discord'
 import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
-import { DPR_ONLY_MIN_LEVEL, missionReviewerRoleIds } from './mission-review-access'
+import { dprOnlyMinLevel, missionReviewerRoleIds } from './mission-review-access'
+import { getSetting } from './settings'
 import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
 import { approvalNeedsNote, NEW_REVIEW_ROUND } from './mission-verify/review-ids'
 
@@ -268,9 +269,10 @@ export async function submitMissionCompletion(
   if (existing && existing.status !== 'REJECTED') {
     throw new ConflictError('You have already submitted this mission')
   }
-  if (existing && attemptsSoFar(existing) >= MAX_MISSION_ATTEMPTS) {
+  const maxAttempts = existing ? await loadMaxAttempts() : MAX_MISSION_ATTEMPTS
+  if (existing && attemptsSoFar(existing) >= maxAttempts) {
     throw new ValidationError(
-      `This mission has been rejected ${MAX_MISSION_ATTEMPTS} times. Ask a reviewer in Discord before trying again.`,
+      `This mission has been rejected ${maxAttempts} times. Ask a reviewer in Discord before trying again.`,
     )
   }
 
@@ -395,7 +397,13 @@ async function resubmitRejected(
 // legacy blocks are still read (and carried over), not migrated.
 
 /** Submissions per mission, counting the first one (plan §5.1: cap of 3). */
+/** Code default for the setting `missions.maxAttempts`. */
 export const MAX_MISSION_ATTEMPTS = 3
+
+/** Rejections before a mission locks (admin setting). */
+export function loadMaxAttempts(): Promise<number> {
+  return getSetting('missions.maxAttempts')
+}
 
 const REVIEW_HISTORY_MARKER = '--- Review history ---'
 const NOTES_MAX = 1000
@@ -857,7 +865,8 @@ export async function notifyReviewers(
   level: number,
   message = `New submission for "${truncate(missionTitle, 50)}" needs approval.`,
 ) {
-  const roleIds = level >= DPR_ONLY_MIN_LEVEL ? missionReviewerRoleIds(level) : MISSION_REVIEWER_ROLE_IDS
+  const dprFrom = await dprOnlyMinLevel()
+  const roleIds = level >= dprFrom ? missionReviewerRoleIds(level, dprFrom) : MISSION_REVIEWER_ROLE_IDS
   const reviewerIds = await getMembersWithRoles(roleIds)
 
   await Promise.allSettled(

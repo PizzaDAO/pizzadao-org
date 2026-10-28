@@ -46,6 +46,8 @@ export const prisma = {
   callSpeaker: createModelMock(),
   recordingOptOut: createModelMock(),
   crewDraft: createModelMock(),
+  appSetting: createModelMock(),
+  appSettingChange: createModelMock(),
   $queryRaw: vi.fn(),
   $transaction: vi.fn(),
 }

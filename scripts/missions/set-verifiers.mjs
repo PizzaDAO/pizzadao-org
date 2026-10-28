@@ -2,6 +2,15 @@
 /**
  * Mission data migration (verifiers, new missions, level titles). DRY RUN BY DEFAULT.
  *
+ * The database is the source of truth once /admin/missions ships, so by default this ONLY
+ * INSERTs missing missions (at the level's current database reward) and fills NULLs
+ * (verifierKey with its proofKind, verifierParams, description, levelTitle), and rewords a title
+ * that is still the untouched seed title. Re-running it never reverts an admin edit to
+ * verifierParams, rewards, titles or the active flag. To restore the code values on purpose:
+ *   --force-params   overwrite verifier, params, proofKind, titles, descriptions and level titles
+ *                    from mission-config.ts (this mode keeps the title/reward abort described below)
+ *   --level-titles   (explicit) always overwrites the named levels' levelTitle
+ *
  * Sets Mission.verifierKey / verifierParams / proofKind (and the reworded
  * titles / descriptions) on the seeded missions, keyed by (level, index), per
  * app/lib/mission-verify/mission-config.ts:
@@ -20,10 +29,11 @@
  * and marks the grandfathered no-proof approvals (reviewedBy = 'auto', D6) as
  * source = 'AUTO'.
  *
- * It ABORTS, changing nothing, if any (level, index) row has a title that is
+ * With --force-params it ABORTS, changing nothing, if any (level, index) row has a title that is
  * neither the seed title nor the new title (production rows may have been
  * edited by hand: export them first, see plans/mission-verification.md §1),
- * or if a new mission's reward differs from its level's shared reward.
+ * or if a new mission's reward differs from its level's shared reward. In the default mode it
+ * only aborts when a level's existing rows disagree on the reward.
  * Idempotent: a second run reports nothing to do.
  *
  * Requires Migration A (prisma/migrations/20261006000000_mission_verifiers)
@@ -48,7 +58,7 @@ import { parseArgs, die, loadDotenv } from "../unbelievaboat/args.mjs";
 ensureTsRuntime(import.meta.url);
 loadDotenv(createRequire(import.meta.url));
 
-const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help"] });
+const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help", "force-params"] });
 if (args.help) {
   console.log(readFileSync(new URL(import.meta.url), "utf8").split("*/")[0]);
   process.exit(0);
@@ -62,10 +72,12 @@ const { prisma } = await importApp("app/lib/db.ts");
 const { Prisma } = await import("@prisma/client");
 
 let levelTitles = MISSION_LEVEL_TITLES;
+let overrideLevelTitles;
 if (args["level-titles"] !== undefined) {
   if (args["level-titles"] === true) die('--level-titles needs a value, e.g. --level-titles \'3="Title",4="Title"\'');
   try {
-    levelTitles = { ...MISSION_LEVEL_TITLES, ...parseLevelTitlesArg(String(args["level-titles"])) };
+    overrideLevelTitles = parseLevelTitlesArg(String(args["level-titles"]));
+    levelTitles = { ...MISSION_LEVEL_TITLES, ...overrideLevelTitles };
   } catch (err) {
     die(err.message);
   }
@@ -89,7 +101,11 @@ try {
     },
     orderBy: [{ level: "asc" }, { index: "asc" }],
   });
-  const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, levelTitles);
+  const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, levelTitles, {
+    force: !!args["force-params"],
+    overrideLevelTitles,
+  });
+  console.log(args["force-params"] ? "Mode: --force-params (restoring code values)" : "Mode: safe (insert missing, fill empty; admin edits are kept)");
   const legacyAuto = await prisma.missionCompletion.count({ where: { reviewedBy: "auto", source: { not: "AUTO" } } });
 
   console.log(`\n${rows.length} mission rows.`);

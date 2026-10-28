@@ -9,7 +9,7 @@ vi.mock('@/app/lib/db', () => ({
 }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
-vi.mock('@/app/lib/mission-review-access', () => ({ DPR_ONLY_MIN_LEVEL: 8, canReviewMission: vi.fn() }))
+vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('@/app/lib/member-utils', () => ({ findMemberByDiscordId: vi.fn(async () => null) }))
 vi.mock('@/app/lib/auth-guards', () => ({ isAdminDiscordId: vi.fn(async () => false) }))
 vi.mock('@/app/lib/rate-limit', () => ({
@@ -41,7 +41,7 @@ vi.mock('@/app/lib/disavow/store', () => ({
 import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
 import { getCurrentLevel } from '@/app/lib/missions'
-import { canReviewMission } from '@/app/lib/mission-review-access'
+import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { isAdminDiscordId } from '@/app/lib/auth-guards'
 import { enforceRateLimit, checkKeyedRateLimit } from '@/app/lib/rate-limit'
 import { after } from 'next/server'
@@ -88,7 +88,7 @@ const ALL: Array<[string, () => Promise<Response>]> = [
 function as(level: number, opts: { dpr?: boolean; subject?: boolean; admin?: boolean } = {}) {
   m(getSession).mockResolvedValue({ discordId: ME })
   m(getCurrentLevel).mockResolvedValue(level)
-  m(canReviewMission).mockResolvedValue(!!opts.dpr)
+  m(isDreadPizzaRoberts).mockResolvedValue(!!opts.dpr)
   m(prisma.disavowIdentifier.findFirst).mockResolvedValue(opts.subject ? { id: 1 } : null)
   m(isAdminDiscordId).mockResolvedValue(!!opts.admin)
 }

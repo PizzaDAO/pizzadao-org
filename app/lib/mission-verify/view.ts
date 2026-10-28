@@ -6,7 +6,7 @@
 import type { MissionHold } from '@prisma/client'
 import { makeEmbed, type Embed, type EmbedAuthor } from '../discord-interactions/embeds'
 import type { RunReport } from './engine'
-import { HOLD_LABEL } from './policy'
+import { holdLabel, type HoldPolicy } from './policy'
 
 export type MissionState = 'approved' | 'pending' | 'awaiting_release' | 'rejected' | 'open' | 'locked'
 
@@ -110,9 +110,9 @@ const ICON: Record<MissionState, string> = {
   locked: '🔒',
 }
 
-function lineText(l: MissionLine): string {
+function lineText(l: MissionLine, policy?: HoldPolicy): string {
   let text = `${ICON[l.state]} ${l.title}`
-  if (l.state === 'awaiting_release') text += ` (verified, awaiting a reviewer's release${l.holdReason ? `: ${HOLD_LABEL[l.holdReason]}` : ''})`
+  if (l.state === 'awaiting_release') text += ` (verified, awaiting a reviewer's release${l.holdReason ? `: ${holdLabel(l.holdReason, policy)}` : ''})`
   else if (l.state === 'pending') text += ' (pending review)'
   else if (l.state !== 'approved' && l.check?.status === 'fail') {
     const p = l.check.progress ? ` ${l.check.progress.have}/${l.check.progress.need}` : ''
@@ -122,7 +122,7 @@ function lineText(l: MissionLine): string {
 }
 
 /** The /missions reply. */
-export function renderMissionsEmbed(view: MissionsView, opts: { author?: EmbedAuthor; currency?: string; appUrl?: string } = {}): Embed {
+export function renderMissionsEmbed(view: MissionsView, opts: { author?: EmbedAuthor; currency?: string; appUrl?: string; holdPolicy?: HoldPolicy } = {}): Embed {
   const cur = opts.currency ?? '$PEP'
   const n = (v: number) => v.toLocaleString('en-US')
   const done = view.currentLevel > view.maxLevel
@@ -141,7 +141,7 @@ export function renderMissionsEmbed(view: MissionsView, opts: { author?: EmbedAu
   const body: string[] = [...head]
   for (const [level, lines] of [...byLevel.entries()].sort((a, b) => a[0] - b[0])) {
     if (level < view.currentLevel && lines.every((l) => l.state === 'approved')) continue // finished levels: skip
-    body.push('', `**Level ${level}**`, ...lines.map(lineText))
+    body.push('', `**Level ${level}**`, ...lines.map((l) => lineText(l, opts.holdPolicy)))
   }
   if (opts.appUrl) body.push('', `[Open missions](<${opts.appUrl}/missions>)`)
 

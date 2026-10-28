@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { attemptsSoFar, getPendingSubmissions, reviewHistory } from '@/app/lib/missions'
-import { HOLD_LABEL } from '@/app/lib/mission-verify/policy'
+import { holdLabel, loadHoldPolicy } from '@/app/lib/mission-verify/policy'
 import { missionReviewScope } from '@/app/lib/mission-review-access'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
@@ -33,6 +33,7 @@ const GET_HANDLER = async () => {
     throw new ForbiddenError('Only mission reviewers can view pending submissions')
   }
 
+  const holdPolicy = await loadHoldPolicy()
   const pending = (await getPendingSubmissions()).filter(
     p => canReviewLevel(p.mission.level) && p.discordId !== session.discordId,
   )
@@ -84,7 +85,7 @@ const GET_HANDLER = async () => {
         // Auto-verified, held for a human release (D9): the reviewer "releases" it (approve).
         source: p.source ?? 'MANUAL',
         holdReason: p.holdReason ?? null,
-        holdLabel: p.holdReason ? HOLD_LABEL[p.holdReason] : null,
+        holdLabel: p.holdReason ? holdLabel(p.holdReason, holdPolicy) : null,
         checkResult: p.checkResult ?? null,
         // What an automatic verifier saw, with role / channel / member names instead of IDs.
         checkItems: autoChecks[i] ? labels.describe(autoChecks[i]) : [],

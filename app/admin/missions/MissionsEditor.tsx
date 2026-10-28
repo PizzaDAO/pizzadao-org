@@ -1,0 +1,295 @@
+"use client";
+
+// app/admin/missions/MissionsEditor.tsx
+//
+// Per-level reward/title and per-mission title, description, active flag and verifier params.
+// Params are JSON, with a number input for each numeric key (vouch counts etc.) that edits the
+// JSON. The server runs each verifier's own parse() and re-validates everything on save.
+
+import { useCallback, useEffect, useState } from "react";
+
+export interface MissionsLabels {
+    nonProdBanner: string;
+    level: string;
+    levelTitle: string;
+    reward: string;
+    rewardsDisagree: string;
+    saveLevel: string;
+    missionTitle: string;
+    missionDescription: string;
+    active: string;
+    verifier: string;
+    manualVerifier: string;
+    params: string;
+    paramsHelp: string;
+    saveMission: string;
+    saving: string;
+    saved: string;
+    notePlaceholder: string;
+    confirmTitle: string;
+    confirmYes: string;
+    confirmNo: string;
+    recent: string;
+    noHistory: string;
+    errorGeneric: string;
+    loadError: string;
+}
+
+interface AdminMission {
+    id: number;
+    level: number;
+    index: number;
+    title: string;
+    description: string | null;
+    isActive: boolean;
+    verifierKey: string | null;
+    verifierParams: unknown;
+    proofKind: string;
+}
+interface AdminLevel {
+    level: number;
+    levelTitle: string | null;
+    reward: number | null;
+    rewardsDisagree: boolean;
+    missions: AdminMission[];
+}
+interface Change {
+    id: number;
+    key: string;
+    oldValue: unknown;
+    newValue: unknown;
+    changedBy: string;
+    changedAt: string;
+    note: string | null;
+}
+
+const border = { borderColor: "hsl(var(--rule-warm) / 0.55)" };
+const fill = (tpl: string, vars: Record<string, string>) => tpl.replace(/\{(\w+)\}/g, (_, k: string) => vars[k] ?? "");
+
+async function patch(body: unknown): Promise<{ ok: boolean; status: number; data: Record<string, unknown> }> {
+    const res = await fetch("/api/admin/missions", {
+        method: "PATCH",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(body),
+        cache: "no-store",
+    });
+    return { ok: res.ok, status: res.status, data: (await res.json().catch(() => ({}))) as Record<string, unknown> };
+}
+
+/** Save with the shared confirm step: the first try without `confirm`, then again after "Yes". */
+function useSaver(labels: MissionsLabels, onSaved: () => void) {
+    const [state, setState] = useState<"idle" | "saving" | "saved">("idle");
+    const [error, setError] = useState<string | null>(null);
+    const [pending, setPending] = useState<{ text: string; body: Record<string, unknown> } | null>(null);
+
+    async function run(body: Record<string, unknown>, confirm = false) {
+        setError(null);
+        setState("saving");
+        const r = await patch({ ...body, confirm });
+        if (r.status === 409 && typeof r.data.needsConfirm === "string") {
+            setPending({ text: r.data.needsConfirm, body });
+            setState("idle");
+            return;
+        }
+        if (!r.ok) {
+            setError(typeof r.data.error === "string" ? r.data.error : labels.errorGeneric);
+            setState("idle");
+            return;
+        }
+        setPending(null);
+        setState("saved");
+        onSaved();
+    }
+    return { state, error, pending, run, cancel: () => setPending(null) };
+}
+
+function ConfirmBox({ labels, text, onYes, onNo }: { labels: MissionsLabels; text: string; onYes: () => void; onNo: () => void }) {
+    return (
+        <div role="alertdialog" aria-label={labels.confirmTitle} className="grid gap-2 rounded-xl border border-tomato p-3 text-sm">
+            <strong>{labels.confirmTitle}</strong>
+            <span>{text}</span>
+            <span className="flex gap-2">
+                <button type="button" onClick={onYes} className="rounded-lg bg-tomato px-3 py-1 font-bold text-white">{labels.confirmYes}</button>
+                <button type="button" onClick={onNo} className="rounded-lg border px-3 py-1" style={border}>{labels.confirmNo}</button>
+            </span>
+        </div>
+    );
+}
+
+function LevelBox({ lvl, labels, onSaved }: { lvl: AdminLevel; labels: MissionsLabels; onSaved: () => void }) {
+    const [reward, setReward] = useState(lvl.reward === null ? "" : String(lvl.reward));
+    const [title, setTitle] = useState(lvl.levelTitle ?? "");
+    const [note, setNote] = useState("");
+    const saver = useSaver(labels, onSaved);
+
+    const body = {
+        level: lvl.level,
+        ...(reward.trim() !== "" && Number(reward) !== lvl.reward ? { reward: Number(reward) } : {}),
+        ...(title.trim() !== (lvl.levelTitle ?? "") ? { levelTitle: title.trim() || null } : {}),
+        note,
+    };
+    const dirty = "reward" in body || "levelTitle" in body;
+
+    return (
+        <div className="grid gap-2">
+            <div className="flex flex-wrap items-end gap-3 text-sm">
+                <label className="grid gap-1">
+                    <span className="text-foreground/50">{labels.levelTitle}</span>
+                    <input value={title} maxLength={60} onChange={(e) => setTitle(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
+                </label>
+                <label className="grid gap-1">
+                    <span className="text-foreground/50">{labels.reward}</span>
+                    <input type="number" min={1} max={1000000} value={reward} onChange={(e) => setReward(e.target.value)} className="w-32 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
+                </label>
+                <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder={labels.notePlaceholder} aria-label={labels.notePlaceholder} className="min-w-40 flex-1 rounded-lg border bg-background px-2 py-1" style={border} />
+                <button type="button" disabled={!dirty || saver.state === "saving"} onClick={() => saver.run(body)} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
+                    {saver.state === "saving" ? labels.saving : labels.saveLevel}
+                </button>
+                {saver.state === "saved" && <span role="status" className="text-foreground/60">{labels.saved}</span>}
+            </div>
+            {lvl.rewardsDisagree && <p role="alert" className="m-0 text-sm text-tomato">{labels.rewardsDisagree}</p>}
+            {saver.pending && <ConfirmBox labels={labels} text={saver.pending.text} onYes={() => saver.run(saver.pending!.body, true)} onNo={saver.cancel} />}
+            {saver.error && <p role="alert" className="m-0 text-sm text-tomato">{saver.error}</p>}
+        </div>
+    );
+}
+
+const prettyParams = (v: unknown) => (v === null || v === undefined ? "" : JSON.stringify(v, null, 2));
+
+function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsLabels; onSaved: () => void }) {
+    const [title, setTitle] = useState(m.title);
+    const [description, setDescription] = useState(m.description ?? "");
+    const [active, setActive] = useState(m.isActive);
+    const [params, setParams] = useState(prettyParams(m.verifierParams));
+    const [note, setNote] = useState("");
+    const saver = useSaver(labels, onSaved);
+
+    let parsed: { ok: true; value: Record<string, unknown> } | { ok: false } | null = null;
+    if (m.verifierKey && params.trim() !== "") {
+        try {
+            const v = JSON.parse(params) as unknown;
+            parsed = v && typeof v === "object" && !Array.isArray(v) ? { ok: true, value: v as Record<string, unknown> } : { ok: false };
+        } catch {
+            parsed = { ok: false };
+        }
+    }
+    const numericKeys = parsed?.ok ? Object.entries(parsed.value).filter(([, v]) => typeof v === "number") : [];
+    const setNumber = (key: string, raw: string) => {
+        if (!parsed?.ok) return;
+        setParams(JSON.stringify({ ...parsed.value, [key]: raw === "" ? "" : Number(raw) }, null, 2));
+    };
+
+    const paramsChanged = m.verifierKey != null && parsed?.ok === true && JSON.stringify(parsed.value) !== JSON.stringify(m.verifierParams ?? null);
+    const body: Record<string, unknown> = {
+        missionId: m.id,
+        ...(title.trim() !== m.title ? { title: title.trim() } : {}),
+        ...(description.trim() !== (m.description ?? "") ? { description: description.trim() || null } : {}),
+        ...(active !== m.isActive ? { isActive: active } : {}),
+        ...(paramsChanged && parsed?.ok ? { verifierParams: parsed.value } : {}),
+        note,
+    };
+    const dirty = Object.keys(body).some((k) => k !== "missionId" && k !== "note");
+
+    return (
+        <li className="grid gap-2 rounded-xl border p-3" style={border}>
+            <div className="flex flex-wrap items-baseline justify-between gap-2 text-xs text-foreground/50">
+                <span>L{m.level}.{m.index} #{m.id}</span>
+                <span>{labels.verifier}: {m.verifierKey ?? labels.manualVerifier}</span>
+            </div>
+            <label className="grid gap-1 text-sm">
+                <span className="text-foreground/50">{labels.missionTitle}</span>
+                <input value={title} maxLength={120} onChange={(e) => setTitle(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
+            </label>
+            <label className="grid gap-1 text-sm">
+                <span className="text-foreground/50">{labels.missionDescription}</span>
+                <textarea value={description} maxLength={1000} rows={2} onChange={(e) => setDescription(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
+            </label>
+            <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
+                {labels.active}
+            </label>
+            {m.verifierKey && (
+                <div className="grid gap-1 text-sm">
+                    <span className="text-foreground/50">{labels.params}</span>
+                    {numericKeys.length > 0 && (
+                        <div className="flex flex-wrap gap-3">
+                            {numericKeys.map(([k, v]) => (
+                                <label key={k} className="grid gap-1">
+                                    <span className="text-xs text-foreground/50">{k}</span>
+                                    <input type="number" value={String(v)} onChange={(e) => setNumber(k, e.target.value)} className="w-24 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
+                                </label>
+                            ))}
+                        </div>
+                    )}
+                    <textarea value={params} rows={Math.min(8, Math.max(3, params.split("\n").length))} spellCheck={false} onChange={(e) => setParams(e.target.value)} className="rounded-lg border bg-background px-2 py-1 font-mono text-xs" style={border} />
+                    <span className="text-xs text-foreground/50">{labels.paramsHelp}</span>
+                    {parsed && !parsed.ok && <span role="alert" className="text-xs text-tomato">{labels.errorGeneric}</span>}
+                </div>
+            )}
+            <div className="flex flex-wrap items-center gap-3 text-sm">
+                <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder={labels.notePlaceholder} aria-label={labels.notePlaceholder} className="min-w-40 flex-1 rounded-lg border bg-background px-2 py-1" style={border} />
+                <button type="button" disabled={!dirty || (m.verifierKey != null && parsed?.ok === false) || saver.state === "saving"} onClick={() => saver.run(body)} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
+                    {saver.state === "saving" ? labels.saving : labels.saveMission}
+                </button>
+                {saver.state === "saved" && <span role="status" className="text-foreground/60">{labels.saved}</span>}
+            </div>
+            {saver.pending && <ConfirmBox labels={labels} text={saver.pending.text} onYes={() => saver.run(saver.pending!.body, true)} onNo={saver.cancel} />}
+            {saver.error && <p role="alert" className="m-0 text-sm text-tomato">{saver.error}</p>}
+        </li>
+    );
+}
+
+export function MissionsEditor({ labels }: { labels: MissionsLabels }) {
+    const [levels, setLevels] = useState<AdminLevel[] | null>(null);
+    const [changes, setChanges] = useState<Change[]>([]);
+    const [nonProd, setNonProd] = useState(false);
+    const [failed, setFailed] = useState(false);
+
+    const load = useCallback(async () => {
+        const res = await fetch("/api/admin/missions", { cache: "no-store" });
+        if (!res.ok) return setFailed(true);
+        const data = (await res.json()) as { levels: AdminLevel[]; changes: Change[]; nonProduction?: boolean };
+        setFailed(false);
+        setLevels(data.levels);
+        setChanges(data.changes);
+        setNonProd(data.nonProduction === true);
+    }, []);
+
+    useEffect(() => {
+        void load();
+    }, [load]);
+
+    if (failed) return <p role="alert" className="text-tomato">{labels.loadError}</p>;
+    if (!levels) return null;
+
+    return (
+        <div className="grid gap-6">
+            {nonProd && <p role="alert" className="m-0 rounded-xl border border-tomato bg-tomato/10 p-3 text-sm font-bold">{labels.nonProdBanner}</p>}
+            {levels.map((lvl) => (
+                <section key={lvl.level} className="grid gap-3 rounded-2xl border p-4" style={border}>
+                    <h2 className="m-0 font-[family-name:var(--font-display)] text-xl font-black">{fill(labels.level, { level: String(lvl.level) })}</h2>
+                    <LevelBox key={`${lvl.reward}:${lvl.levelTitle}`} lvl={lvl} labels={labels} onSaved={load} />
+                    <ul className="m-0 grid list-none gap-3 p-0">
+                        {lvl.missions.map((m) => (
+                            <MissionBox key={`${m.id}:${JSON.stringify([m.title, m.description, m.isActive, m.verifierParams])}`} m={m} labels={labels} onSaved={load} />
+                        ))}
+                    </ul>
+                </section>
+            ))}
+            <section className="grid gap-2">
+                <h2 className="m-0 font-[family-name:var(--font-display)] text-xl font-black">{labels.recent}</h2>
+                {changes.length === 0 ? (
+                    <p className="m-0 text-sm text-foreground/60">{labels.noHistory}</p>
+                ) : (
+                    <ul className="m-0 grid list-none gap-1 p-0 text-sm text-foreground/70">
+                        {changes.map((c) => (
+                            <li key={c.id}>
+                                <code>{c.key}</code>: {JSON.stringify(c.oldValue)} {"->"} {JSON.stringify(c.newValue)} ({c.changedBy}, {new Date(c.changedAt).toLocaleString()})
+                            </li>
+                        ))}
+                    </ul>
+                )}
+            </section>
+        </div>
+    );
+}

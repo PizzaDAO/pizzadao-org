@@ -95,7 +95,7 @@ describe('planVerifierMigration', () => {
       if (['social_post', 'poap_drop', 'media_proof', 'gpp_host', 'referral'].includes(c.verifierKey ?? '')) Object.assign(r, { description: 'old' })
       if (!['social_post', 'poap_drop', 'media_proof', 'gpp_host'].includes(c.verifierKey ?? '')) Object.assign(r, { verifierKey: c.verifierKey, verifierParams: c.verifierParams })
     }
-    const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, {}) // level titles: covered below
+    const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, {}, { force: true }) // level titles: covered below
     expect(plan.errors).toEqual([])
     expect(plan.updates.map((u) => `L${u.level}.${u.index}`)).toEqual(['L2.1', 'L3.1', 'L4.1', 'L5.1', 'L6.1'])
     expect(plan.updates.find((u) => u.level === 2)!.changes).toContain('verifierKey null -> social_post')
@@ -114,7 +114,7 @@ describe('planVerifierMigration', () => {
   it('aborts on a title that differs from the seed (rows edited by hand)', () => {
     const rows = seedRows()
     rows[5].title = 'Make a POAP (edited)'
-    const plan = planVerifierMigration(rows)
+    const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { force: true })
     expect(plan.errors).toEqual([expect.stringMatching(/^L4\.1: title is "Make a POAP \(edited\)"/)])
   })
 
@@ -179,7 +179,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
 
   it('aborts when the new mission\'s reward differs from the level\'s shared reward', () => {
     const rows = prodRows().map((r) => (r.level === 5 ? { ...r, reward: 5000 } : r))
-    const plan = planVerifierMigration(rows)
+    const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { force: true })
     expect(plan.errors).toEqual([
       expect.stringMatching(/^L5\.2: reward 4269 differs from level 5's shared reward 5000/),
       expect.stringMatching(/^L5\.3: reward 4269 differs/),
@@ -200,6 +200,59 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
     const titles = { ...MISSION_LEVEL_TITLES, ...parseLevelTitlesArg('4="Capo"') }
     const plan = planVerifierMigration(prodRows(), MISSION_VERIFIER_CONFIG, titles)
     expect(plan.updates.find((u) => u.level === 4)!.data).toEqual({ levelTitle: 'Capo' })
+  })
+})
+
+describe('planVerifierMigration never reverts admin edits (default mode)', () => {
+  /** A database where the migration ran, then an admin edited params, rewards, titles and active. */
+  const edited = () => {
+    const rows = applyPlan(prodRows(), planVerifierMigration(prodRows()))
+    return rows.map((r) => {
+      if (r.level === 6 && r.index === 2) return { ...r, verifierParams: { min: 4, sources: ['PIZZADAO'] }, title: 'Edited title', description: 'Edited', levelTitle: 'Edited level', reward: 7000 }
+      if (r.level === 6) return { ...r, levelTitle: 'Edited level', reward: 7000 }
+      return r
+    })
+  }
+
+  it('re-running changes nothing: edited params, titles, descriptions and rewards stay', () => {
+    const plan = planVerifierMigration(edited())
+    expect(plan.errors).toEqual([])
+    expect(plan.updates).toEqual([])
+    expect(plan.inserts).toEqual([])
+  })
+
+  it('--force-params restores the code values (and still aborts on an edited title)', () => {
+    const forced = planVerifierMigration(edited(), MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { force: true })
+    expect(forced.errors).toEqual([expect.stringMatching(/^L6\.2: title is "Edited title"/)])
+  })
+
+  it('an inserted mission takes the level\'s CURRENT database reward, not the code reward', () => {
+    const rows = edited().filter((r) => !(r.level === 6 && r.index === 2))
+    const plan = planVerifierMigration(rows)
+    expect(plan.errors).toEqual([])
+    const ins = plan.inserts.find((i) => i.level === 6 && i.index === 2)!
+    expect(ins.data.reward).toBe(7000)
+    expect(ins.data.levelTitle).toBe('Edited level')
+  })
+
+  it('fills NULLs only: a missing verifier, params and description are set; a set verifier is left alone', () => {
+    const rows = edited().map((r) => (r.level === 2 && r.index === 0 ? { ...r, verifierKey: null, verifierParams: null, description: null, proofKind: 'URL' } : r))
+    const plan = planVerifierMigration(rows)
+    const u = plan.updates.find((x) => x.level === 2 && x.index === 0)!
+    expect(u.data).toMatchObject({ verifierKey: 'attendance_count', verifierParams: { min: expect.any(Number) }, proofKind: 'NONE' })
+    expect(plan.updates).toHaveLength(1)
+  })
+
+  it('an explicit --level-titles still overwrites that level', () => {
+    const plan = planVerifierMigration(edited(), MISSION_VERIFIER_CONFIG, { ...MISSION_LEVEL_TITLES, 6: 'Chosen' }, { overrideLevelTitles: { 6: 'Chosen' } })
+    expect(plan.updates.filter((u) => u.level === 6).every((u) => u.data.levelTitle === 'Chosen')).toBe(true)
+    expect(plan.updates.some((u) => u.level !== 6)).toBe(false)
+  })
+
+  it('a level whose rows disagree on the reward blocks the insert', () => {
+    const rows = edited().filter((r) => !(r.level === 6 && r.index === 2)).map((r, i) => (r.level === 6 && i % 2 ? { ...r, reward: 1 } : r))
+    const plan = planVerifierMigration(rows)
+    expect(plan.errors.length === 1 ? plan.errors[0] : '').toMatch(/L6\.2: level 6 rows disagree/)
   })
 })
 

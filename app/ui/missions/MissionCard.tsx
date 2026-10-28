@@ -51,11 +51,13 @@ type MissionData = {
   progress: MissionProgress | null;
 };
 
-const HOLD_COPY: Record<string, string> = {
+const DEFAULT_HUMAN_RELEASE_MIN_LEVEL = 6;
+
+const holdCopy = (humanReleaseMinLevel: number): Record<string, string> => ({
   NEW_ACCOUNT: "Verified. New Discord accounts get a reviewer's release first.",
-  HIGH_LEVEL: "Verified. A reviewer releases Level 6+ rewards.",
+  HIGH_LEVEL: `Verified. A reviewer releases Level ${humanReleaseMinLevel}+ rewards.`,
   PREVIOUSLY_REJECTED: "Verified now. A reviewer will take another look.",
-};
+});
 
 type Props = {
   mission: MissionData;
@@ -63,6 +65,8 @@ type Props = {
   /** L3.1: the viewer's personal invite link (null = not onboarded yet). */
   inviteUrl?: string | null;
   levelUnlocked: boolean;
+  /** The setting missions.humanReleaseMinLevel, for the hold copy (omitted: the default). */
+  humanReleaseMinLevel?: number;
   /** The level is already complete and paid: this mission is an optional bonus (pays nothing extra). */
   bonus?: boolean;
   onSubmit: (missionId: number, evidence?: string, notes?: string) => Promise<void>;
@@ -128,7 +132,7 @@ function statusPillStyle(variant: StatusVariant) {
   };
 }
 
-export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl }: Props) {
+export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, inviteUrl, humanReleaseMinLevel }: Props) {
   const [expanded, setExpanded] = useState(false);
   const [evidence, setEvidence] = useState("");
   const [notes, setNotes] = useState("");
@@ -307,7 +311,7 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
           {isPending && mission.progress?.holdReason && (
             <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>
-              {HOLD_COPY[mission.progress.holdReason] ?? "Verified. Awaiting a reviewer's release."}
+              {holdCopy(humanReleaseMinLevel ?? DEFAULT_HUMAN_RELEASE_MIN_LEVEL)[mission.progress.holdReason] ?? "Verified. Awaiting a reviewer's release."}
             </div>
           )}
           {check && !isCompleted && check.status === "fail" && (check.hint || check.reason) && (

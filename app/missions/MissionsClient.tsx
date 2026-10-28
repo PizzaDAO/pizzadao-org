@@ -56,6 +56,8 @@ type MissionsResponse = {
   earnedPep?: number;
   isAuthenticated: boolean;
   verifiersEnabled?: boolean;
+  /** Levels from this one up wait for a reviewer's release (admin setting). */
+  humanReleaseMinLevel?: number;
   inviteUrl?: string | null;
 };
 
@@ -890,6 +892,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                       inviteUrl={mission.referral ? (data?.inviteUrl ?? null) : undefined}
                       levelUnlocked={isUnlocked}
                       bonus={isPaid && mission.progress?.status !== "APPROVED"}
+                      humanReleaseMinLevel={data?.humanReleaseMinLevel}
                       onSubmit={handleSubmit}
                     />
                   ))}

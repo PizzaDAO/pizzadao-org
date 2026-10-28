@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn() }))
-vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: vi.fn(async () => []) } } }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({
   fetchMemberByDiscordId: vi.fn().mockResolvedValue(null),
   fetchMemberById: vi.fn().mockResolvedValue(null),

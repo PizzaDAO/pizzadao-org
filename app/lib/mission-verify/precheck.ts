@@ -26,7 +26,7 @@ import { prisma } from '../db'
 import { defaultSources } from './sources'
 import { unfurlProof, type ProofPreview, type UnfurlDeps } from './unfurl'
 import { getVerifier } from './verifiers'
-import { HOLD_LABEL, releaseHoldFor } from './policy'
+import { holdLabel, loadHoldPolicy, releaseHoldFor } from './policy'
 import { recordReviewEvent } from '../missions'
 import type { Confidence, SemiCheck, VerifierSources, VerifyCtx } from './types'
 
@@ -110,7 +110,7 @@ export async function precheckProof(input: PrecheckInput): Promise<PrecheckOutco
     const checkResult: SemiCheckResult = { ...base, summary: r.summary, confidence: r.confidence, checks: r.checks, data: r.evidence }
     if (!r.autoVerified) return { checkResult }
     checkResult.autoVerified = true
-    const hold = typeof input.mission.level === 'number' ? releaseHoldFor(input.mission.level, input.discordId, now) : null
+    const hold = typeof input.mission.level === 'number' ? releaseHoldFor(input.mission.level, input.discordId, now, await loadHoldPolicy()) : null
     return { checkResult, hold }
   }
   if (r.status === 'pass') {
@@ -152,7 +152,7 @@ export async function storeCheckResult(
         actorId: `auto:${checkResult.verifier ?? 'semi'}`,
         action: 'AUTO_HELD',
         via: 'submit',
-        note: HOLD_LABEL[hold],
+        note: holdLabel(hold, await loadHoldPolicy()),
         metadata: { holdReason: hold, summary: checkResult.summary },
       })
       return true

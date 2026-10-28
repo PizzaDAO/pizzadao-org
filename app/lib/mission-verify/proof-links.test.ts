@@ -7,7 +7,7 @@ vi.mock('../db', () => {
   const missionCompletion = { updateMany: vi.fn(async () => ({ count: 1 })) }
   const missionReviewEvent = { create: vi.fn(async () => ({})) }
   const tx = { missionCompletion, missionReviewEvent }
-  return { prisma: { ...tx, $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)) } }
+  return { prisma: { ...tx, appSetting: { findMany: vi.fn(async () => []) }, $transaction: vi.fn(async (fn: (t: typeof tx) => unknown) => fn(tx)) } }
 })
 
 import { parseFarcasterCast, parseHttpsUrl, parseMediaLink, parsePoapProof, parseRsvPizzaUrl, parseXPost } from './proof-links'

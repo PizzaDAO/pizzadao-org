@@ -36,9 +36,9 @@ import { prisma } from '../db'
 import { resolveChannelId } from '../discord-channels'
 import { editDiscordMessage, postDiscordMessage } from '../discord-rest'
 import { makeEmbed, type Embed, type EmbedField, type Tone } from '../discord-interactions/embeds'
-import { attemptsSoFar, MAX_MISSION_ATTEMPTS } from '../missions'
+import { attemptsSoFar, loadMaxAttempts, MAX_MISSION_ATTEMPTS } from '../missions'
 import { CHECK_ID_KEYS, mentionFor } from './check-labels'
-import { HOLD_LABEL } from './policy'
+import { DEFAULT_HOLD_POLICY, holdLabel, loadHoldPolicy, type HoldPolicy } from './policy'
 import { getSignalViews, type AccountSignalView } from './review-extras'
 import { reviewButtonId, type CardRef } from './review-ids'
 
@@ -185,7 +185,10 @@ function decisionLine(v: ReviewCardView): string | null {
 }
 
 /** The card: an embed in the Pepperoni Bot style plus the button row. Pure. */
-export function renderReviewCard(v: ReviewCardView, opts: { appUrl: string }): CardMessage {
+export function renderReviewCard(
+  v: ReviewCardView,
+  opts: { appUrl: string; holdPolicy?: HoldPolicy; maxAttempts?: number },
+): CardMessage {
   const decided = v.status !== 'PENDING'
   const label = missionLabel(v)
   let tone: Tone = 'cooldown'
@@ -198,13 +201,14 @@ export function renderReviewCard(v: ReviewCardView, opts: { appUrl: string }): C
     headline = `Rejected: ${label}`
   }
 
-  const attempts = `attempt ${Math.min(v.attempts, MAX_MISSION_ATTEMPTS)} of ${MAX_MISSION_ATTEMPTS}`
+  const maxAttempts = opts.maxAttempts ?? MAX_MISSION_ATTEMPTS
+  const attempts = `attempt ${Math.min(v.attempts, maxAttempts)} of ${maxAttempts}`
   const body = [`<@${v.discordId}> · Level ${v.level} · ${attempts}`, `Waiting since ${ts(v.queuedAt)}`]
   const decision = decisionLine(v)
   if (decision) body.push('', decision)
 
   const fields: EmbedField[] = [{ name: 'Evidence', value: evidenceField(v.evidence) }]
-  if (v.holdReason) fields.push({ name: 'Approval needed', value: HOLD_LABEL[v.holdReason] })
+  if (v.holdReason) fields.push({ name: 'Approval needed', value: holdLabel(v.holdReason, opts.holdPolicy ?? DEFAULT_HOLD_POLICY) })
   const checks = checkLines(v.checkResult)
   if (checks) fields.push({ name: 'Verifier saw', value: checks })
   if (v.signals.length) {
@@ -270,6 +274,7 @@ export async function syncReviewCard(completionId: number, deps: ReviewCardDeps 
     const v = await deps.load(completionId)
     if (!v) return 'missing'
     const appUrl = deps.appUrl()
+    const rules = { holdPolicy: await loadHoldPolicy(), maxAttempts: await loadMaxAttempts() }
 
     let card: CardRef | null = v.reviewMsgId && v.reviewChannelId ? { channelId: v.reviewChannelId, messageId: v.reviewMsgId } : null
     if (!card && hint) {
@@ -277,7 +282,7 @@ export async function syncReviewCard(completionId: number, deps: ReviewCardDeps 
       card = hint
     }
     if (card) {
-      await deps.edit(card, renderReviewCard(v, { appUrl }))
+      await deps.edit(card, renderReviewCard(v, { appUrl, ...rules }))
       return 'edited'
     }
 
@@ -293,7 +298,7 @@ export async function syncReviewCard(completionId: number, deps: ReviewCardDeps 
     }
     let posted: { id: string | null }
     try {
-      posted = await deps.post(channelId, renderReviewCard(v, { appUrl }))
+      posted = await deps.post(channelId, renderReviewCard(v, { appUrl, ...rules }))
     } catch (err) {
       await deps.unclaim(completionId)
       throw err
@@ -305,7 +310,7 @@ export async function syncReviewCard(completionId: number, deps: ReviewCardDeps 
     // Decided (or held) while the card was being posted: show the current state.
     const fresh = await deps.load(completionId)
     if (fresh && (fresh.status !== v.status || fresh.holdReason !== v.holdReason)) {
-      await deps.edit(ref, renderReviewCard(fresh, { appUrl }))
+      await deps.edit(ref, renderReviewCard(fresh, { appUrl, ...rules }))
     }
     return 'posted'
   } catch (err) {
