@@ -108,7 +108,7 @@ describe('transcribeRecording', () => {
     expect(stored.some((s) => s.kind === 'chat')).toBe(true)
     expect(w.data.transcriptLanguage).toBe('english') // the 'en' hint is the default
     expect(w.data.status).toBeUndefined() // never parks the row in PROCESSING
-    expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: false, unlessEdited: true })
+    expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: false, unlessEdited: true, budgetMs: expect.any(Number) })
   })
 
   it('never auto-regenerates a summary a reviewer edited', async () => {
@@ -305,7 +305,7 @@ describe('second review fixes', () => {
       vi.mocked(generateText).mockResolvedValue({ output: { title: 'T', summary: 'S', actionItems: [], chapters: [] } } as never)
       db.callRecording.updateMany.mockResolvedValue({ count: 1 })
       await generateAndStoreSummary('r1')
-      expect(db.callRecording.updateMany.mock.calls[0][0].data.summaryGeneratedAt).toEqual(new Date('2026-10-28T10:00:00Z'))
+      expect(db.callRecording.updateMany.mock.calls[1][0].data.summaryGeneratedAt).toEqual(new Date('2026-10-28T10:00:00Z'))
     } finally {
       vi.useRealTimers()
     }
@@ -316,7 +316,7 @@ describe('second review fixes', () => {
     vi.mocked(generateText).mockResolvedValue({ output: { title: 'T', summary: 'S', actionItems: [], chapters: [] } } as never)
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     await generateAndStoreSummary('r1', { onlyIfEmpty: true, unlessEdited: true })
-    const where = db.callRecording.updateMany.mock.calls[0][0].where
+    const where = db.callRecording.updateMany.mock.calls[1][0].where // [0] is the attempt claim
     expect(where.status).toEqual({ notIn: ['REJECTED', 'PUBLISHED'] })
     expect(where.summaryEditedAt).toBeNull()
   })
@@ -337,7 +337,7 @@ describe('second review fixes', () => {
     const summarize = vi.fn(async () => true)
     const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: async () => { throw new Error('500') }, summarize })
     expect(out).toBe('failed')
-    expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: true, unlessEdited: true })
+    expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: true, unlessEdited: true, budgetMs: expect.any(Number) })
     expect(writes().some((a) => a.data.status === 'IN_REVIEW' && a.where.status.in.includes('RECORDED'))).toBe(true)
   })
 

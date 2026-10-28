@@ -1,60 +1,29 @@
 # Call processing gaps: missing summaries, thin transcripts, wrong language
 
-Investigation date: 2026-10-28. Read-only: production DB (counts and timings only), Vercel logs,
-Railway env var names. No code or data was changed.
+Read-only investigation (counts and timings only). No code or data was changed.
 
 ## Goal
 
 Every recorded call ends up with a full transcript, a correct language label and an AI
 title, summary, action items and chapters. When a step fails, the error is saved on the row and
-the step is retried. The three recordings from the last 14 days get processed again without
+the step is retried. The affected recordings from the last 14 days get processed again without
 overwriting any reviewer edits.
 
-## What happened (evidence)
+## What happened (summary of findings)
 
-Note on timestamps: the ad-hoc read-only query reads `timestamp without time zone` columns as
-local time (EDT), so it shows them 4 h late. The real UTC times are 4 h earlier, and they match
-the Vercel logs to the second.
-
-| Call | Length | Tracks | Transcribed (UTC) | Run history |
-|---|---|---|---|---|
-| A (community, Oct 25) | 32 min | 6 | 10-28 02:45 | 10-27 20:15 `progress` (largest track: "operation was aborted due to timeout"); 20:30 `failed` (same track, same timeout, then a 6 h backoff); 02:45 `transcribed` |
-| B (Oct 26) | 36 min | 2 | 10-27 20:45 | `transcribed` on the first run |
-| C (Oct 26, partial, endReason shutdown) | 3.6 min | 2 | 10-27 21:00 | `transcribed` on the first run |
-
-Every `transcribed` run also logged
-`[calls/summary] generation failed: Free tier users do not have access to this model. Upgrade to paid credits ...`.
-The row's `updatedAt` lands 6 to 105 s after `transcribedAt`. That gap is the failed model call,
-followed by `toReview()` moving the row from RECORDED to IN_REVIEW.
-
-Transcript coverage per track (spoken words compared with the recorder's `talkTimeSec`):
-
-- Call A: the dominant track (about 790 s of talk) has about 1,500 words, which is normal. Three
-  tracks with 4 to 112 s of talk have **0 words**. A track with 70 s of talk has 2 words. A track
-  with 99 s of talk is normal.
-- Call B: one track (about 1,005 s of talk, about 1,400 words) is normal. The other track (about
-  573 s of talk) has **160 words, and all of them fall in the first 306 s** of a 2,164 s call.
-  About 80% of that speaker is missing.
-- Call C: both tracks look normal.
-- A local whisper.cpp run (large-v3-turbo, `-l en`, per track) on the same call B audio produced
-  far more lines.
-- `transcriptLanguage` is chosen by talk time (`transcribe.ts:357-359`). For call A to come out
-  `welsh`, the dominant track itself must have been detected as Welsh, because the other five
-  tracks together have only 333 s of talk. Its text is English.
-- The 14-day window has no reviewer edits and no redactions on any of the three rows
-  (`summaryEditedAt` null, 0 redacted speakers or lines).
-
-Env: Vercel production has `OPENAI_API_KEY` but no `CALL_SUMMARY_MODEL` and no
-`AI_GATEWAY_API_KEY` (the gateway uses OIDC). The Railway recorder has **no
-`DEEPGRAM_API_KEY`**. Because of that, the worker never transcribes, and every call goes through
-the Whisper fallback.
+- Every transcription run logged a model-access error from the summary step, and the row still
+  ended up in review with no summary and no visible error.
+- Some tracks that are mostly silence came back with few or no words, and one speaker's text
+  stopped early in a long call. The language label could come out wrong for English speech.
+- The largest track of one long call hit the per-track timeout twice, which added hours of backoff.
+- No reviewer edits or redactions existed on the affected rows.
 
 ## Root causes
 
 ### 1. Summaries: the gateway refuses the model, the error is swallowed, and nothing retries
 
-1. `summarize.ts:11`: the default model `anthropic/claude-sonnet-5.5` is not available on the
-   team's AI Gateway free tier. `generateText` (`summarize.ts:96`) throws within seconds.
+1. `summarize.ts:11`: the default model `anthropic/claude-sonnet-5.5` was refused by the AI
+   Gateway for the account's plan. `generateText` (`summarize.ts:96`) throws within seconds.
 2. `recordings.ts:289-292`: the catch only calls `console.error` and `toReview()`. No error column
    exists, so the row shows nothing.
 3. `transcribe.ts:376-377`: the boolean result of the summary is ignored and the outcome is still
@@ -78,7 +47,7 @@ the Whisper fallback.
   real speech inside those segments. That fits: tracks that are mostly silence came back empty, and
   one speaker was lost after minute 5.
 - The same silence makes Whisper slow. The 32-minute dominant track hit `TRACK_TIMEOUT_MS = 120 s`
-  (`transcribe.ts:127`) twice, which added about 6.5 h of backoff before call A was done.
+  (`transcribe.ts:127`) twice, which added hours of backoff.
 - The local run that worked used the same per-track audio with `-l en`. So the per-track design is
   sound, and the missing language hint is the main difference.
 - I could not confirm this per track. `transcribeTracks` (which held each track's language and
@@ -94,18 +63,12 @@ the Whisper fallback.
 
 ### 3. Few recordings (brief)
 
-- The recorder only watches one voice channel (`recorder/src/config.ts:46`,
-  `CALL_VOICE_CHANNEL_ID` / default). Crew calls held in other voice channels are never recorded
-  by design. Since the #179 deploy (Railway, 10-26 19:23Z), it recorded the two scheduled calls in
-  that channel (B and C) and nothing on 10-27 or 10-28.
-- Call B ended `superseded` when call C's event started in the same channel, at the moment
-  call C began. Call C ended `shutdown` after 3.6 min. There was no Railway deploy at that time,
-  so the container received SIGTERM: a restart, crash or OOM. Check the Railway metrics or
-  restarts.
-- The Railway logs hold only startup lines; the recorder logs almost nothing about slots or
-  sessions. To confirm misses, compare Discord scheduled events in the call channel for
-  10-26 to 10-28 against the rows. A follow-up could add one log line per slot decision
-  (start, skip, supersede).
+- The recorder only watches one voice channel (`recorder/src/config.ts:46`). Calls held in other
+  voice channels are never recorded by design.
+- A recording can end early (`superseded` when the next event starts in the same channel, or
+  `shutdown` when the container restarts). Check the recorder host's restart metrics.
+- The recorder logs almost nothing about slots or sessions. A follow-up could add one log line per
+  slot decision (start, skip, supersede).
 
 ## Proposed fix
 
@@ -114,11 +77,10 @@ the Whisper fallback.
 Pick one:
 
 - (a) Add AI Gateway credits for the team (simplest; the code is unchanged); or
-- (b) set `CALL_SUMMARY_MODEL` on Vercel to a model the free tier allows (check in the gateway
-  dashboard first); or
+- (b) set `CALL_SUMMARY_MODEL` to a model the plan allows (check in the gateway dashboard first); or
 - (c) apply code fix 1e.
 
-Optionally set `DEEPGRAM_API_KEY` on Railway. The recorder's primary path already concatenates
+Optionally enable the recorder's Deepgram path. It primary path already concatenates
 speech only, with an offset map (`recorder/src/transcribe.ts:1-10`), and uses `language=multi`,
 which avoids problem 2 entirely.
 
@@ -161,7 +123,7 @@ which avoids problem 2 entirely.
   - `gpt-4o-transcribe` gives no segment timestamps.
   - Dropping the filters lets hallucinations into public text.
 
-### Step 3: re-run the three rows safely
+### Step 3: re-run the affected rows safely
 
 The existing tools cannot re-transcribe them:
 
@@ -182,18 +144,17 @@ one guarded `updateMany`, it should:
   because speech segment keys (`s:<speaker>:<startMs>`) change on re-transcription.
 
 Then `--apply` runs `transcribeRecording`, which also regenerates the summary with
-`unlessEdited`. The cron would also pick the rows up within 15 minutes, because all three are
-inside the 14-day window: A until 11-08, B and C until 11-09.
+`unlessEdited`. The cron also picks reset rows up within 15 minutes.
 
 Order:
 
 1. Step 0, and deploy steps 1 and 2a to 2d.
-2. Re-check that `summaryEditedAt` is still null and there are no redactions on all three rows.
-3. Run `--retranscribe` on A, B and C (cost: about 70 min of whisper-1 audio, a few cents).
+2. Re-check that `summaryEditedAt` is still null and there are no redactions on each affected row.
+3. Run `--retranscribe` on each affected row (cost: about 70 min of whisper-1 audio, a few cents).
 4. Verify (below).
 
 If the owner wants summaries before the transcription fix ships, run Regenerate on the current
-transcripts once Step 0 is done. That is safe today because none of the three rows has edits.
+transcripts once Step 0 is done. That is safe today because none of the affected rows has edits.
 But the Regenerate route does not pass `unlessEdited`, so check `summaryEditedAt` first.
 
 ## Files to change

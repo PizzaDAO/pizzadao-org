@@ -22,8 +22,8 @@ import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
 import { canReviewMission } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
-import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
-import { sanitizeSummaryError, generateAndStoreSummary, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
+import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
+import { sanitizeSummaryError, generateAndStoreSummary, generateAndStoreSummaryResult, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { POST as publishPOST } from '@/app/api/admin/calls/[id]/publish/route'
 import { PATCH as summaryPATCH } from '@/app/api/admin/calls/[id]/summary/route'
@@ -183,6 +183,8 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
 })
 
 describe('summary generation', () => {
+  // the attempt claim made before the model call is not one of the result writes
+  const writes = () => db.callRecording.updateMany.mock.calls.filter((c) => Object.keys(c[0].data).join() !== 'summaryAttempts')
   const segments = [
     { discordId: ANN, startMs: 65_000, endMs: 70_000, text: 'We ship on Friday' },
     { discordId: BOB, startMs: 3_725_000, endMs: 3_730_000, text: 'I will test it' },
@@ -220,7 +222,7 @@ describe('summary generation', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [{ discordId: ANN, displayName: 'Ann' }] })
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     expect(await generateAndStoreSummary('rec1')).toBe(true)
-    const arg = db.callRecording.updateMany.mock.calls[0][0]
+    const arg = writes()[0][0]
     expect(arg.data).toMatchObject({ title: 'Release planning', summary: 'They ship Friday.', status: 'IN_REVIEW' })
     expect(arg.where).toEqual({ id: 'rec1', status: { not: 'REJECTED' } })
   })
@@ -230,7 +232,7 @@ describe('summary generation', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })
     db.callRecording.updateMany.mockResolvedValue({ count: 0 }) // WHERE status != REJECTED matched nothing
     expect(await generateAndStoreSummary('rec1')).toBe(false)
-    for (const call of db.callRecording.updateMany.mock.calls) {
+    for (const call of writes()) {
       const st = call[0].where.status
       expect(JSON.stringify(st)).toMatch(/REJECTED|PROCESSING/)
       expect(call[0].data.status === 'PUBLISHED').toBe(false)
@@ -243,7 +245,7 @@ describe('summary generation', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PUBLISHED', transcript: segments, speakers: [] })
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     await generateAndStoreSummary('rec1')
-    expect(db.callRecording.updateMany.mock.calls[0][0].data).toMatchObject({ status: 'IN_REVIEW', publishedAt: null })
+    expect(writes()[0][0].data).toMatchObject({ status: 'IN_REVIEW', publishedAt: null })
   })
 
   it('the automatic run writes only while the summary is still empty', async () => {
@@ -251,10 +253,10 @@ describe('summary generation', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })
     db.callRecording.updateMany.mockResolvedValue({ count: 0 })
     expect(await generateAndStoreSummary('rec1', { onlyIfEmpty: true })).toBe(false)
-    expect(db.callRecording.updateMany.mock.calls[0][0].where).toEqual({ id: 'rec1', summary: null, status: { not: 'REJECTED' } })
+    expect(writes()[0][0].where).toEqual({ id: 'rec1', summary: null, status: { not: 'REJECTED' } })
     expect(db.callRecording.update).not.toHaveBeenCalled()
     // ...but a row still PROCESSING is moved to review rather than left stuck
-    const unstick = db.callRecording.updateMany.mock.calls[1][0]
+    const unstick = writes()[1][0]
     expect(unstick.where).toEqual({ id: 'rec1', status: { in: ['PROCESSING', 'RECORDED'] } })
     expect(unstick.data).toEqual({ status: 'IN_REVIEW' })
   })
@@ -298,13 +300,13 @@ describe('summary generation', () => {
     m(generateText).mockRejectedValue(new Error('gateway down'))
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })
     expect(await generateAndStoreSummary('rec1')).toBe(false)
-    expect(db.callRecording.updateMany).toHaveBeenCalledTimes(2)
+    expect(writes()).toHaveLength(2)
     // the failure is recorded on the row (no URLs, capped) and counted, but only while no summary exists
-    const rec = db.callRecording.updateMany.mock.calls[0][0]
+    const rec = writes()[0][0]
     expect(rec.where).toEqual({ id: 'rec1', summary: null, summaryEditedAt: null })
-    expect(rec.data).toEqual({ summaryError: 'gateway down', summaryAttempts: { increment: 1 } })
-    expect(db.callRecording.updateMany.mock.calls[1][0].data).toEqual({ status: 'IN_REVIEW' })
-    expect(db.callRecording.updateMany.mock.calls[1][0].where.status).toEqual({ in: ['PROCESSING', 'RECORDED'] })
+    expect(rec.data).toEqual({ summaryError: 'gateway down' })
+    expect(writes()[1][0].data).toEqual({ status: 'IN_REVIEW' })
+    expect(writes()[1][0].where.status).toEqual({ in: ['PROCESSING', 'RECORDED'] })
   })
 
   it('error text saved on the row has URLs removed and is capped at 300 characters', () => {
@@ -337,8 +339,76 @@ describe('summary generation', () => {
     vi.stubEnv('OPENAI_API_KEY', 'sk-test')
     vi.spyOn(console, 'warn').mockImplementation(() => undefined)
     m(generateText).mockClear()
+    m(generateText).mockRejectedValue(Object.assign(new Error('gateway down'), { statusCode: 503 }))
     await expect(generateCallSummary(segments, {})).rejects.toThrow(/gateway: gateway down; openai fallback: gateway down/)
     vi.unstubAllEnvs()
+  })
+
+  it('claims an attempt before the model call, so a killed run still counts', async () => {
+    m(generateText).mockImplementation(async () => {
+      // by the time the model is called the claim has been written
+      expect(db.callRecording.updateMany.mock.calls[0][0].data).toEqual({ summaryAttempts: { increment: 1 } })
+      expect(db.callRecording.updateMany.mock.calls[0][0].where).toEqual({ id: 'rec1', summary: null, summaryEditedAt: null })
+      return { output: good }
+    })
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: segments, speakers: [] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    await generateAndStoreSummary('rec1')
+    expect(m(generateText)).toHaveBeenCalledTimes(1)
+  })
+
+  it('aborts model calls to fit the time budget and skips the fallback when little time is left', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    m(generateText).mockRejectedValue(Object.assign(new Error('forbidden'), { statusCode: 403 }))
+    // 25 s budget; the gateway attempt "takes" 16 s, leaving 9 s < the 20 s minimum, so no fallback
+    const now = vi.spyOn(Date, 'now')
+    now.mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(16_000)
+    await expect(generateCallSummary(segments, {}, undefined, { budgetMs: 25_000 })).rejects.toThrow('forbidden')
+    expect(m(generateText)).toHaveBeenCalledTimes(1)
+    expect(m(generateText).mock.calls[0][0].abortSignal).toBeInstanceOf(AbortSignal)
+    now.mockRestore()
+    await expect(generateCallSummary(segments, {}, undefined, { budgetMs: 5_000 })).rejects.toThrow(/not enough time/)
+    expect(m(generateText)).toHaveBeenCalledTimes(1)
+    vi.unstubAllEnvs()
+  })
+
+  it('falls back on access/availability errors but not on schema errors', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    for (const err of [Object.assign(new Error('x'), { statusCode: 403 }), Object.assign(new Error('x'), { statusCode: 429 }), Object.assign(new Error('x'), { statusCode: 502 }), new Error('Free tier users do not have access to this model')]) {
+      expect(isFallbackWorthy(err)).toBe(true)
+    }
+    for (const err of [Object.assign(new Error('bad'), { statusCode: 400 }), Object.assign(new Error('no object'), { name: 'AI_NoObjectGeneratedError' }), new Error('something odd')]) {
+      expect(isFallbackWorthy(err)).toBe(false)
+    }
+    // schema-parse failure from the gateway's output: no second call
+    m(generateText).mockResolvedValue({ output: { title: '', summary: 'x', actionItems: [], chapters: [] } })
+    await expect(generateCallSummary(segments, {})).rejects.toThrow()
+    expect(m(generateText)).toHaveBeenCalledTimes(1)
+    // access error: second call happens
+    m(generateText).mockClear()
+    m(generateText).mockRejectedValueOnce(Object.assign(new Error('nope'), { statusCode: 403 })).mockResolvedValueOnce({ output: good })
+    await generateCallSummary(segments, {})
+    expect(m(generateText)).toHaveBeenCalledTimes(2)
+    vi.unstubAllEnvs()
+  })
+
+  it('redacts keys and bearer tokens from saved errors', () => {
+    expect(sanitizeSummaryError('bad key sk-proj_AbC123*xyz.9 and Bearer abc.def-123 here')).toBe('bad key and here')
+  })
+
+  it('a guarded write that matches nothing is a skip, not a failure', async () => {
+    vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    m(generateText).mockResolvedValue({ output: good })
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: segments, speakers: [] })
+    db.callRecording.updateMany.mockImplementation(async (a: { data: Record<string, unknown> }) => ({ count: 'title' in a.data ? 0 : 1 }))
+    expect(await generateAndStoreSummaryResult('rec1', { unlessEdited: true })).toBe('skipped')
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    expect(await generateAndStoreSummaryResult('rec1')).toBe('ok')
+    m(generateText).mockRejectedValue(new Error('boom'))
+    vi.spyOn(console, 'error').mockImplementation(() => undefined)
+    expect(await generateAndStoreSummaryResult('rec1')).toBe('failed')
   })
 
   it('CALL_SUMMARY_FALLBACK_MODEL overrides the fallback model', () => {
@@ -350,7 +420,7 @@ describe('summary generation', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: [], speakers: [] })
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     expect(await generateAndStoreSummary('rec1')).toBe(false)
-    expect(db.callRecording.updateMany.mock.calls[0][0].data).toMatchObject({ summaryError: 'no transcript text to summarize', summaryAttempts: { increment: 1 } })
+    expect(writes()[0][0].data).toMatchObject({ summaryError: 'no transcript text to summarize', summaryAttempts: { increment: 1 } })
   })
 
   it('a successful summary clears any earlier error', async () => {
@@ -358,7 +428,7 @@ describe('summary generation', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: segments, speakers: [] })
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     await generateAndStoreSummary('rec1')
-    expect(db.callRecording.updateMany.mock.calls[0][0].data).toMatchObject({ summaryError: null })
+    expect(writes()[0][0].data).toMatchObject({ summaryError: null })
   })
 })
 

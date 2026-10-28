@@ -17,6 +17,7 @@
  *   node scripts/calls/backfill-transcripts.mjs --retranscribe <id>            # show what would be reset
  *   node scripts/calls/backfill-transcripts.mjs --retranscribe <id> --apply    # reset, then transcribe + summarize now
  *   node scripts/calls/backfill-transcripts.mjs --retranscribe <id> --apply --reset-only   # reset only; the cron redoes it within 15 min
+ * Add --force-worker to also replace spoken lines that have no server transcription stats (e.g. a recorder-provided transcript).
  * Refuses a row with a reviewer-edited summary, a reviewer id, redacted lines or speakers, or status
  * PUBLISHED / REJECTED. Typed chat lines are kept; spoken lines are replaced.
  *
@@ -33,7 +34,7 @@ import { parseArgs, die, loadDotenv } from "../unbelievaboat/args.mjs";
 ensureTsRuntime(import.meta.url);
 loadDotenv(createRequire(import.meta.url));
 
-const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help", "reset-only"] });
+const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help", "reset-only", "force-worker"] });
 if (args.help) {
   console.log(readFileSync(new URL(import.meta.url), "utf8").split("*/")[0]);
   process.exit(0);
@@ -63,8 +64,9 @@ if (args.retranscribe !== undefined) {
         if (!process.env[name]?.trim()) die(`--apply needs ${name} in the environment (or add --reset-only)`);
       }
     }
-    const res = await resetForRetranscribe(id, { apply });
+    const res = await resetForRetranscribe(id, { apply, forceWorker: !!args["force-worker"] });
     if (!res.ok) die(`${id}: ${res.reason}${res.details.length ? ` (${res.details.join("; ")})` : ""}`);
+    console.log(`${id}: ${res.tracks} audio track(s) to re-transcribe`);
     console.log(`${id}: ${res.speechLines} spoken line(s) ${apply ? "removed" : "would be removed"}, ${res.chatLines} chat line(s) kept`);
     if (!apply) {
       console.log("Re-run with --apply to reset and re-transcribe.");

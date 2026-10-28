@@ -11,6 +11,8 @@ import {
   cleanSegmentsWithStats,
   languageName,
   listNeedingSummary,
+  listPendingTranscription,
+  resetLanguageWarning,
   MAX_SUMMARY_ATTEMPTS,
   transcribeAudio,
   transcribeLanguage,
@@ -18,6 +20,7 @@ import {
   USED_OPENAI,
 } from './transcribe'
 import { resetForRetranscribe } from './retranscribe'
+import { publishRecording } from './recordings'
 
 const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
 const ANN = '111111111111111111'
@@ -151,6 +154,69 @@ describe('transcribeRecording diagnostics', () => {
   })
 })
 
+describe('language validation', () => {
+  it('accepts two-letter codes and auto, otherwise warns once and uses en', () => {
+    const warn = vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    resetLanguageWarning()
+    expect(transcribeLanguage({ CALL_TRANSCRIBE_LANGUAGE: 'fr' })).toBe('fr')
+    expect(transcribeLanguage({ CALL_TRANSCRIBE_LANGUAGE: 'auto' })).toBeNull()
+    expect(transcribeLanguage({ CALL_TRANSCRIBE_LANGUAGE: 'english' })).toBe('en')
+    expect(transcribeLanguage({ CALL_TRANSCRIBE_LANGUAGE: 'e1' })).toBe('en')
+    expect(warn).toHaveBeenCalledTimes(1)
+    warn.mockRestore()
+  })
+})
+
+describe('pending list and summary budget', () => {
+  it('picks up rows reset by the re-transcribe tool whatever their age', async () => {
+    db.callRecording.findMany.mockResolvedValue([])
+    const now = new Date('2026-10-28T12:00:00Z')
+    await listPendingTranscription(14, 10, now)
+    const where = db.callRecording.findMany.mock.calls[0][0].where
+    expect(where.AND[0].OR).toEqual([{ startedAt: { gte: new Date('2026-10-14T12:00:00Z') } }, { retranscribeRequestedAt: { not: null } }])
+  })
+
+  it('gives the end-of-run summary a time budget and treats a deliberate skip as not a failure', async () => {
+    const base = {
+      id: 'r1', status: 'RECORDED', transcript: null, transcribedAt: null, transcribeAttempts: 0, transcribeTracks: null, redactedSpeakerIds: [], summaryEditedAt: null,
+      updatedAt: new Date('2026-10-28T12:00:00Z'), speakers: [{ discordId: ANN, trackKey: 'k', talkTimeSec: 60 }],
+    }
+    db.callRecording.findUnique.mockResolvedValue(base)
+    const logs: string[] = []
+    const summarize = vi.fn(async () => 'skipped' as const)
+    const run = () => transcribeRecording('r1', { apiKey: 'k', startedMs: Date.now() - 100_000, download: async () => new Uint8Array([1]), transcribe: async () => ({ segments: [seg('ok')], language: 'english' }), summarize, log: (m) => logs.push(m) })
+    expect(await run()).toBe('transcribed')
+    const budget = (summarize.mock.calls[0] as unknown as [string, { budgetMs: number }])[1].budgetMs
+    expect(budget).toBeGreaterThan(150_000)
+    expect(budget).toBeLessThanOrEqual(190_000)
+    expect(logs.some((l) => l.includes('skipped on purpose'))).toBe(true)
+    const final = db.callRecording.updateMany.mock.calls.map((c) => c[0]).find((a) => a.data.transcribedAt && !a.where.OR)
+    expect(final.data.retranscribeRequestedAt).toBeNull()
+    summarize.mockResolvedValue('failed' as never)
+    expect(await run()).toBe('transcribed-no-summary')
+  })
+})
+
+describe('publishing waits for transcription', () => {
+  const row = (over: Record<string, unknown> = {}) => ({
+    id: 'r1', status: 'IN_REVIEW', summary: 'S', transcript: [{ discordId: BOB, startMs: 0, endMs: 1, text: 'typed', kind: 'chat', id: 'c:1' }],
+    redactedSpeakerIds: [], redactedSegmentIds: [], transcribedAt: null, transcribeAttempts: 0,
+    speakers: [{ discordId: ANN, trackKey: 'k', talkTimeSec: 60 }], ...over,
+  })
+  it('blocks while transcription is due', async () => {
+    db.callRecording.findUnique.mockResolvedValue(row())
+    expect(await publishRecording('r1', '9')).toBe('transcribing')
+    expect(db.callRecording.update).not.toHaveBeenCalled()
+  })
+  it('does not block once transcribed, with no transcribable tracks, after giving up, or with spoken lines', async () => {
+    db.callRecording.update.mockResolvedValue({})
+    for (const over of [{ transcribedAt: new Date() }, { speakers: [] }, { speakers: [{ discordId: ANN, trackKey: 'k', talkTimeSec: 60 }], redactedSpeakerIds: [ANN] }, { transcribeAttempts: 3 }, { transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'spoken' }] }]) {
+      db.callRecording.findUnique.mockResolvedValue(row(over))
+      expect(await publishRecording('r1', '9')).toBe('ok')
+    }
+  })
+})
+
 describe('listNeedingSummary sweep eligibility', () => {
   it('lists in-review rows with a transcript, no summary, no edit, under the attempt cap, after a backoff', async () => {
     db.callRecording.findMany.mockResolvedValue([])
@@ -189,12 +255,14 @@ describe('resetForRetranscribe', () => {
     redactedSegmentIds: [],
     redactedSpeakerIds: [],
     updatedAt: new Date('2026-10-28T12:00:00Z'),
+    transcribeStats: { [ANN]: { talkTimeSec: 10 } },
+    speakers: [{ discordId: ANN, trackKey: 'calls/s/tracks/a.ogg', talkTimeSec: 60 }],
     ...over,
   })
 
   it('dry run reports counts and writes nothing', async () => {
     db.callRecording.findUnique.mockResolvedValue(row())
-    expect(await resetForRetranscribe('r1')).toEqual({ ok: true, dryRun: true, speechLines: 1, chatLines: 1 })
+    expect(await resetForRetranscribe('r1')).toEqual({ ok: true, dryRun: true, speechLines: 1, chatLines: 1, tracks: 1 })
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
   })
 
@@ -205,11 +273,27 @@ describe('resetForRetranscribe', () => {
     ['redacted speakers', { redactedSpeakerIds: [ANN] }],
     ['PUBLISHED status', { status: 'PUBLISHED' }],
     ['REJECTED status', { status: 'REJECTED' }],
+    ['no speaker with an audio track', { speakers: [{ discordId: ANN, trackKey: null, talkTimeSec: 60 }] }],
+    ['only a redacted speaker with a track', { redactedSpeakerIds: [ANN] }],
+    ['no track with talk time', { speakers: [{ discordId: ANN, trackKey: 'k', talkTimeSec: 0 }] }],
+    ['a recorder-provided transcript (no server stats)', { transcribeStats: null }],
   ])('refuses a row with %s, even with apply', async (_name, over) => {
     db.callRecording.findUnique.mockResolvedValue(row(over))
     const res = await resetForRetranscribe('r1', { apply: true })
     expect(res).toMatchObject({ ok: false, reason: 'refused' })
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('--force-worker lets a recorder-provided transcript be replaced', async () => {
+    db.callRecording.findUnique.mockResolvedValue(row({ transcribeStats: null }))
+    expect(await resetForRetranscribe('r1', { apply: true, forceWorker: true })).toMatchObject({ ok: true, dryRun: false })
+  })
+
+  it('a dry-run refusal explains why', async () => {
+    db.callRecording.findUnique.mockResolvedValue(row({ speakers: [] }))
+    const res = await resetForRetranscribe('r1')
+    expect(res).toMatchObject({ ok: false, reason: 'refused' })
+    expect(JSON.stringify(res)).toContain('nothing could be re-transcribed')
   })
 
   it('reports a missing row', async () => {
@@ -220,7 +304,7 @@ describe('resetForRetranscribe', () => {
   it('apply does one guarded update that keeps chat and resets the transcription fields', async () => {
     db.callRecording.findUnique.mockResolvedValue(row())
     const res = await resetForRetranscribe('r1', { apply: true })
-    expect(res).toEqual({ ok: true, dryRun: false, speechLines: 1, chatLines: 1 })
+    expect(res).toEqual({ ok: true, dryRun: false, speechLines: 1, chatLines: 1, tracks: 1 })
     expect(db.callRecording.updateMany).toHaveBeenCalledTimes(1)
     const arg = db.callRecording.updateMany.mock.calls[0][0]
     expect(arg.where).toEqual({
@@ -233,7 +317,7 @@ describe('resetForRetranscribe', () => {
       updatedAt: new Date('2026-10-28T12:00:00Z'),
     })
     expect(arg.data.transcript).toEqual([expect.objectContaining({ kind: 'chat', id: 'c:1' })])
-    expect(arg.data).toMatchObject({ transcribedAt: null, transcribeError: null, transcribeAttempts: 0, summaryError: null, summaryAttempts: 0 })
+    expect(arg.data).toMatchObject({ transcribedAt: null, transcribeError: null, transcribeAttempts: 0, summaryError: null, summaryAttempts: 0, retranscribeRequestedAt: expect.any(Date) })
     expect(arg.data.transcribeTracks).toBe(Prisma.DbNull)
     expect(arg.data.transcribeStats).toBe(Prisma.DbNull)
   })

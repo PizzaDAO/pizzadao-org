@@ -1366,6 +1366,7 @@ model CallRecording {
   summaryEditedAt    DateTime? // set when a reviewer edits title/summary/actions/chapters; blocks automatic regeneration
   summaryError       String? // last automatic summary failure (no URLs, max 300 chars); cleared on success
   summaryAttempts    Int                 @default(0) // failed automatic summary attempts; the sweep gives up at 3
+  retranscribeRequestedAt DateTime? // set by the re-transcribe tool so the cron picks the row up whatever its age; cleared when transcription finishes
   transcribeStats    Json? // per-track counts from the last transcription (talk seconds, words, dropped by filter); never text
   redactionsUpdatedAt DateTime? // last time a speaker or line was hidden/restored
   // Discord recap (call-recap): claimed (recapPostedAt) before posting so a publish never double-posts.

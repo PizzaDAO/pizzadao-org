@@ -12,7 +12,7 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { getObjectBytes } from './r2'
-import { asSegments, generateAndStoreSummary } from './recordings'
+import { asSegments, generateAndStoreSummaryResult, type SummaryResult } from './recordings'
 import type { TranscriptSegment } from './ingest-schema'
 
 export const DEFAULT_TRANSCRIBE_MODEL = 'whisper-1'
@@ -55,7 +55,18 @@ export interface Utterance {
 export function transcribeLanguage(env: Record<string, string | undefined> = process.env): string | null {
   const v = env.CALL_TRANSCRIBE_LANGUAGE?.trim().toLowerCase()
   if (!v) return 'en'
-  return v === 'auto' ? null : v
+  if (v === 'auto') return null
+  if (/^[a-z]{2}$/.test(v)) return v
+  if (!warnedBadLanguage) {
+    warnedBadLanguage = true
+    console.warn('[calls/transcribe] CALL_TRANSCRIBE_LANGUAGE must be a two-letter code or "auto"; using "en"')
+  }
+  return 'en'
+}
+let warnedBadLanguage = false
+/** Test hook: lets the once-only warning fire again. */
+export function resetLanguageWarning() {
+  warnedBadLanguage = false
 }
 
 /** Lower-case English language name (what Whisper reports, e.g. 'english') for an ISO-639-1 code. */
@@ -178,6 +189,8 @@ export const START_BUDGET_MS = 150_000
 /** Every OpenAI call (retries included) is over by this long into a run, leaving room for the summary inside maxDuration 300. */
 export const HARD_DEADLINE_MS = 210_000
 /** Per-track OpenAI call limit; each call is also capped by what is left of HARD_DEADLINE_MS. */
+/** The cron route's maxDuration. */
+export const FUNCTION_LIMIT_MS = 300_000
 const TRACK_TIMEOUT_MS = 170_000
 
 /** Transcribe one audio file with OpenAI. Retries 429 and 5xx while the deadline allows; errors carry the status, never the key. */
@@ -255,7 +268,7 @@ export interface TranscribeDeps {
   apiKey?: string
   download?: (key: string) => Promise<Uint8Array>
   transcribe?: (bytes: Uint8Array, apiKey: string, deadline: number, opts: { language: string | null }) => Promise<WhisperResult>
-  summarize?: typeof generateAndStoreSummary
+  summarize?: (id: string, opts: { onlyIfEmpty?: boolean; unlessEdited?: boolean; budgetMs?: number }) => Promise<boolean | SummaryResult | void>
   /** Whisper language hint; undefined reads CALL_TRANSCRIBE_LANGUAGE, null sends none. */
   language?: string | null
   now?: Date
@@ -312,7 +325,7 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   })
   if (!rec || !(TRANSCRIBABLE_STATUSES as readonly string[]).includes(rec.status) || rec.transcribedAt) return 'not-eligible'
   const done = async (outcome: TranscribeOutcome): Promise<TranscribeOutcome> => {
-    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribedAt: now } })
+    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribedAt: now, retranscribeRequestedAt: null } })
     return outcome
   }
   if (hasSpeech(asSegments(rec.transcript))) return done('already-had-speech')
@@ -439,6 +452,7 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
       transcribeError: failedTracks ? `partial: ${failedTracks} track(s) could not be transcribed${tooLarge ? ` (${tooLarge} too large)` : ''}` : null,
       transcribeTracks: Prisma.DbNull,
       transcribeStats: stats as Prisma.InputJsonValue,
+      retranscribeRequestedAt: null,
     },
   })
   if (res.count !== 1) return 'busy'
@@ -446,8 +460,12 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   // A reviewer-edited summary is never regenerated automatically. Past the hard deadline the
   // summary is left to the cron's sweep (the row has transcribedAt and no summary).
   if (!rec.summaryEditedAt && clock() - startedMs < HARD_DEADLINE_MS) {
-    const ok = await (deps.summarize ?? generateAndStoreSummary)(id, { onlyIfEmpty: false, unlessEdited: true })
-    if (ok === false) return 'transcribed-no-summary'
+    // Abort the model calls in time for the function limit (maxDuration 300 s, 10 s margin).
+    const budgetMs = FUNCTION_LIMIT_MS - (clock() - startedMs) - 10_000
+    const r = await (deps.summarize ?? generateAndStoreSummaryResult)(id, { onlyIfEmpty: false, unlessEdited: true, budgetMs })
+    if (r === 'skipped') log('summary skipped on purpose (nothing was written)')
+    // false (mocks / older callers) and 'failed' both mean the model did not produce a summary; 'skipped' is not a failure.
+    if (r === false || r === 'failed') return 'transcribed-no-summary'
   }
   return 'transcribed'
 }
@@ -457,7 +475,8 @@ export async function listPendingTranscription(sinceDays = 14, take = 10, now = 
   return prisma.callRecording.findMany({
     where: {
       ...eligibleWhere(now),
-      startedAt: { gte: new Date(now.getTime() - sinceDays * 86_400_000) },
+      // Rows reset by the re-transcribe tool are picked up whatever their age.
+      AND: [{ OR: [{ startedAt: { gte: new Date(now.getTime() - sinceDays * 86_400_000) } }, { retranscribeRequestedAt: { not: null } }] }],
       speakers: { some: { trackKey: { not: null }, talkTimeSec: { gt: 0 } } },
     },
     orderBy: { startedAt: 'asc' },
@@ -470,9 +489,9 @@ export async function listPendingTranscription(sinceDays = 14, take = 10, now = 
  * Move a call that automatic transcription gave up on out of RECORDED/PROCESSING into review, summarizing
  * whatever text exists (chat), so an admin can act (retry, edit, reject).
  */
-async function parkForReview(id: string, summarize: typeof generateAndStoreSummary = generateAndStoreSummary): Promise<void> {
+async function parkForReview(id: string, summarize: NonNullable<TranscribeDeps['summarize']> = generateAndStoreSummaryResult): Promise<void> {
   try {
-    await summarize(id, { onlyIfEmpty: true, unlessEdited: true })
+    await summarize(id, { onlyIfEmpty: true, unlessEdited: true, budgetMs: 60_000 })
   } catch {
     // the status move below is what matters
   }

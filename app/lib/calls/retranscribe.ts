@@ -13,13 +13,13 @@ import { asSegments } from './recordings'
 import { TRANSCRIBABLE_STATUSES } from './transcribe'
 
 export type RetranscribeResult =
-  | { ok: true; dryRun: boolean; speechLines: number; chatLines: number }
+  | { ok: true; dryRun: boolean; speechLines: number; chatLines: number; tracks: number }
   | { ok: false; reason: 'not-found' | 'refused' | 'changed'; details: string[] }
 
-export async function resetForRetranscribe(id: string, opts: { apply?: boolean } = {}): Promise<RetranscribeResult> {
+export async function resetForRetranscribe(id: string, opts: { apply?: boolean; forceWorker?: boolean } = {}): Promise<RetranscribeResult> {
   const rec = await prisma.callRecording.findUnique({
     where: { id },
-    select: { status: true, transcript: true, summaryEditedAt: true, reviewedBy: true, redactedSegmentIds: true, redactedSpeakerIds: true, updatedAt: true },
+    select: { status: true, transcript: true, summaryEditedAt: true, reviewedBy: true, transcribeStats: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } }, redactedSegmentIds: true, redactedSpeakerIds: true, updatedAt: true },
   })
   if (!rec) return { ok: false, reason: 'not-found', details: [] }
   const details: string[] = []
@@ -28,11 +28,20 @@ export async function resetForRetranscribe(id: string, opts: { apply?: boolean }
   if (rec.reviewedBy) details.push('a reviewer has edited this call')
   if ((rec.redactedSegmentIds ?? []).length > 0) details.push('has redacted lines')
   if ((rec.redactedSpeakerIds ?? []).length > 0) details.push('has redacted speakers')
-  if (details.length > 0) return { ok: false, reason: 'refused', details }
+
+  const hidden = new Set(rec.redactedSpeakerIds ?? [])
+  const tracks = (rec.speakers ?? []).filter((sp) => !!sp.trackKey && sp.talkTimeSec > 0 && !hidden.has(sp.discordId)).length
+  // Without audio tracks the pipeline could not rebuild the speech this reset deletes.
+  if (tracks === 0) details.push('no non-redacted speaker has an audio track with talk time, so nothing could be re-transcribed')
 
   const all = asSegments(rec.transcript)
   const chat = all.filter((s) => s.kind === 'chat')
-  const counts = { speechLines: all.length - chat.length, chatLines: chat.length }
+  const counts = { speechLines: all.length - chat.length, chatLines: chat.length, tracks }
+  // Speech with no transcribeStats did not come from the server pipeline this tool re-runs (it may be the recorder worker's own transcript).
+  if (counts.speechLines > 0 && !rec.transcribeStats && !opts.forceWorker) {
+    details.push('spoken lines have no server transcription stats (possibly a recorder-provided transcript); pass --force-worker to replace them anyway')
+  }
+  if (details.length > 0) return { ok: false, reason: 'refused', details }
   if (!opts.apply) return { ok: true, dryRun: true, ...counts }
 
   // One guarded write: matches nothing if anything changed since the read above.
@@ -53,6 +62,7 @@ export async function resetForRetranscribe(id: string, opts: { apply?: boolean }
       transcribeTracks: Prisma.DbNull,
       transcribeStats: Prisma.DbNull,
       transcribeAttempts: 0,
+      retranscribeRequestedAt: new Date(),
       summaryError: null,
       summaryAttempts: 0,
     },
