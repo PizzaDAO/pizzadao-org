@@ -18,7 +18,7 @@ import { RemoveRecording } from "../RemoveRecording";
 import { ReviewActions } from "../ReviewActions";
 import { RedactSpeaker } from "../RedactSpeaker";
 import { RetryTranscription } from "../RetryTranscription";
-import { TOO_LARGE_ERROR } from "@/app/lib/calls/transcribe";
+import { PERMANENT_TRANSCRIBE_ERRORS, PROGRESS } from "@/app/lib/calls/transcribe";
 import { HideLine } from "../HideLine";
 import { segmentKey } from "@/app/lib/calls/chat";
 
@@ -67,7 +67,12 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const recapExcluded = postFilter ? recapCrewExcluded(rec, postFilter) : false;
     const recapOmitted = postFilter ? recapFilteredCount(rec, postFilter) : 0;
     const recapStale = redactionsNewerThanSummary(rec);
-    const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3 && rec.transcribeError !== TOO_LARGE_ERROR;
+    const transcribeGaveUp = !rec.transcribedAt && rec.transcribeAttempts >= 3 && !PERMANENT_TRANSCRIBE_ERRORS.includes(rec.transcribeError ?? "");
+    // A run that stopped mid-track after a failed chunk leaves the (sanitized) error here; the next run resumes.
+    const progressError =
+        !rec.transcribedAt && rec.transcribeError === PROGRESS
+            ? ((rec.transcribeStats as { _progress?: { lastError?: unknown } } | null)?._progress?.lastError as string | undefined) ?? null
+            : null;
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -112,6 +117,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                 {rec.summaryError && !rec.summary && (
                     <p className="m-0 text-tomato">{t("summaryFailed", { count: rec.summaryAttempts, error: rec.summaryError })}</p>
                 )}
+
+                {progressError && <p className="m-0 text-foreground/70">{t("transcribeProgressError", { error: progressError })}</p>}
 
                 {transcribeGaveUp && (
                     <section className="grid gap-2">

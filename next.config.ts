@@ -75,6 +75,9 @@ const SECURITY_HEADERS = [
 ];
 
 const nextConfig: NextConfig = {
+  // Call transcription decodes Ogg/Opus with a WebAssembly decoder whose optional Web Worker code
+  // does not bundle; load it from node_modules at runtime instead (it is still traced into the function).
+  serverExternalPackages: ["ogg-opus-decoder"],
   images: {
     remotePatterns: REMOTE_IMAGE_PATTERNS,
   },

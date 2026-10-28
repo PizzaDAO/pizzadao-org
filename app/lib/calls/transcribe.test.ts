@@ -7,7 +7,8 @@ vi.mock('./r2', () => ({ getObjectBytes: vi.fn() }))
 vi.mock('ai', () => ({ generateText: vi.fn(), Output: { object: vi.fn() } }))
 
 import { prisma } from '@/app/lib/db'
-import { cleanSegments, dropRepeatRuns, mergeSpeakerTurns, transcribeAudio, transcribeRecording, USED_OPENAI } from './transcribe'
+import { cleanSegments, dropRepeatRuns, isWav, MAX_UPLOAD_BYTES, mergeSpeakerTurns, transcribeAudio, transcribeRecording, START_BUDGET_MS, TOO_MUCH_AUDIO_ERROR, USED_OPENAI, type WhisperResult } from './transcribe'
+import { FRAME_MS, SILENT_DB, renderChunkWav, type Region, type TrackLevels } from './speech'
 import { generateAndStoreSummary, publishRecording, setSpeakerRedacted, updateRecordingText } from './recordings'
 import { generateText } from 'ai'
 
@@ -400,5 +401,260 @@ describe('second review fixes', () => {
     const out = await transcribeRecording('r1', { apiKey: 'k', usage, download: async () => new Uint8Array([1]), transcribe: async () => ({ segments: [seg('x')], language: 'en' }), summarize: vi.fn() })
     expect(out).toBe('busy')
     expect(usage.calls).toBe(2)
+  })
+})
+
+describe('speech-only transcription', () => {
+  const rec = (over: Record<string, unknown> = {}) => ({
+    id: 'r1',
+    status: 'RECORDED',
+    transcript: null,
+    transcribedAt: null,
+    transcribeAttempts: 0,
+    transcribeTracks: null,
+    redactedSpeakerIds: [],
+    summaryEditedAt: null,
+    updatedAt: new Date('2026-10-28T12:00:00Z'),
+    speakers: [{ discordId: ANN, trackKey: 'calls/s/tracks/a.ogg', talkTimeSec: 60 }],
+    ...over,
+  })
+  const seg = (start: number, end: number, text: string) => ({ start, end, text, avg_logprob: -0.2, no_speech_prob: 0.01, compression_ratio: 1.1 })
+  /** Levels of a track of `sec` seconds that is loud only in the given [startSec, endSec) ranges. */
+  const track = (sec: number, loud: Array<[number, number]>): TrackLevels => {
+    const frameDb = new Float32Array(Math.ceil((sec * 1000) / FRAME_MS)).fill(SILENT_DB)
+    for (const [a, b] of loud) frameDb.fill(-20, Math.round((a * 1000) / FRAME_MS), Math.round((b * 1000) / FRAME_MS))
+    return { frameDb, totalSamples: sec * 16000, decodeErrors: 0 }
+  }
+  const audio = (levels: TrackLevels) => ({ decode: async () => levels, extract: vi.fn(async () => [] as Array<Int16Array | undefined>) })
+  const writes = () => db.callRecording.updateMany.mock.calls.map((c) => c[0])
+  const finalWrite = () => writes().find((a) => a.data.transcribedAt && !a.where.OR)
+  const statsOf = () => (finalWrite().data.transcribeStats as Record<string, Record<string, unknown>>)[ANN]
+  const lastTracks = () => [...writes()].reverse().find((a) => a.data.transcribeTracks && typeof a.data.transcribeTracks === 'object')?.data.transcribeTracks as Record<string, unknown> | undefined
+
+  beforeEach(() => {
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.findUnique.mockResolvedValue(rec())
+  })
+
+  it('sends only the speech as WAV and maps segment times back to call time', async () => {
+    const sent: Uint8Array[] = []
+    const transcribe = vi.fn(async (bytes: Uint8Array) => {
+      sent.push(bytes)
+      // Chunk layout (300 ms padding): call [100.2 s, 110.7 s] at 0 s, 1.5 s of silence, call [500.7 s, 519.3 s] at 12 s.
+      return { segments: [seg(1, 3, 'first point'), seg(13, 14.5, 'second point')], language: 'english' }
+    })
+    const usage = { calls: 0 }
+    const out = await transcribeRecording('r1', { apiKey: 'k', usage, download: async () => new Uint8Array([9]), ...audio(track(1200, [[100.5, 110.4], [501, 519]])), transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('transcribed')
+    expect(transcribe).toHaveBeenCalledTimes(1)
+    expect(usage.calls).toBe(1)
+    expect(isWav(sent[0])).toBe(true)
+    // About 30 s of 16-bit 16 kHz audio instead of a 20 minute file.
+    expect(sent[0].byteLength).toBeLessThan(32 * 16000 * 2)
+    const stored = finalWrite().data.transcript as Array<{ startMs: number; text: string }>
+    expect(stored.map((s) => [s.startMs, s.text])).toEqual([
+      [101200, 'first point'],
+      [501700, 'second point'],
+    ])
+    expect(statsOf()).toMatchObject({ mode: 'speech', chunks: 1, requests: 1, kept: 2, decodeErrors: 0, speechSec: 29, splitSegments: 0, cappedSegments: 0 })
+    expect(statsOf().fallback).toBeUndefined()
+  })
+
+  it('splits a segment that runs across two regions using word times', async () => {
+    const transcribe = vi.fn(async () => ({
+      segments: [seg(9, 13.6, 'so the plan is pizza')],
+      words: [
+        { word: 'so', start: 9, end: 9.3 },
+        { word: 'the', start: 9.3, end: 9.6 },
+        { word: 'plan', start: 9.6, end: 10.1 },
+        { word: 'is', start: 12.1, end: 12.4 },
+        { word: 'pizza', start: 12.4, end: 13.0 },
+      ],
+      language: 'english',
+    }))
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), ...audio(track(1200, [[100.5, 110.4], [501, 519]])), transcribe, summarize: vi.fn(async () => true) })
+    const stored = finalWrite().data.transcript as Array<{ startMs: number; endMs: number; text: string }>
+    expect(stored.map((s) => [s.startMs, s.endMs, s.text])).toEqual([
+      [109200, 110300, 'so the plan'],
+      [500800, 501700, 'is pizza'],
+    ])
+    expect(statsOf()).toMatchObject({ splitSegments: 1, cappedSegments: 0 })
+  })
+
+  it('sends one request per chunk and keeps paid chunks when another chunk fails', async () => {
+    // Five stretches of ~5 minutes: two fit in one 10 minute chunk, so three chunks.
+    const levels = track(3600, [[0, 290], [600, 890], [1200, 1490], [1800, 2090], [2400, 2690]])
+    let m = 0
+    const ok = vi.fn(async () => ({ segments: [seg(1, 2, `part ${m++}`)], language: 'english' }))
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), ...audio(levels), transcribe: ok, summarize: vi.fn(async () => true) })
+    expect(ok).toHaveBeenCalledTimes(3)
+    expect(statsOf()).toMatchObject({ chunks: 3, requests: 3, kept: 3 })
+
+    vi.clearAllMocks()
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.findUnique.mockResolvedValue(rec())
+    let n = 0
+    const flaky = vi.fn<(bytes: Uint8Array, key: string, deadline: number, opts: unknown) => Promise<WhisperResult>>(async () => {
+      if (n++ === 1) throw new Error('OpenAI answered 500: oops Bearer sk-secret https://api.example/x')
+      return { segments: [{ ...seg(1, 2, `earlier ${n}`), tokens: [1, 2, 3], seek: 0, temperature: 0 }], language: 'english' }
+    })
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), ...audio(levels), transcribe: flaky, summarize: vi.fn(async () => true) })
+    expect(out).toBe('progress') // the paid chunk is headway: no attempt is spent
+    expect(finalWrite()).toBeUndefined()
+    const tracksJson = lastTracks()!
+    expect(ANN in tracksJson).toBe(false) // the track itself is not done
+    const progress = (tracksJson._chunks as Record<string, { done: Record<string, unknown>; requests: number }>)[ANN]
+    const doneBefore = Object.keys(progress.done).length
+    const paidRequests = progress.requests
+    expect(doneBefore).toBeGreaterThanOrEqual(1)
+    expect(flaky.mock.calls[0][3]).toEqual({ language: 'en', words: true }) // word times only on speech chunks
+    // Saved progress keeps only what the filters need (no tokens etc.).
+    expect(Object.keys((Object.values(progress.done)[0] as object[])[0]).sort()).toEqual(['avg_logprob', 'compression_ratio', 'end', 'no_speech_prob', 'start', 'text'])
+    // The chunk error is visible (sanitized) while the call waits for the next run.
+    const progressWrite = writes().find((a) => a.data.transcribeError === 'progress')
+    const lastError = (progressWrite.data.transcribeStats as { _progress: { lastError: string } })._progress.lastError
+    expect(lastError).toContain('500')
+    expect(lastError).not.toMatch(/sk-secret|https:|Bearer/)
+
+    // The next run resumes: only the chunks not yet paid for are sent.
+    vi.clearAllMocks()
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.findUnique.mockResolvedValue(rec({ transcribeTracks: tracksJson, transcribeError: 'progress' }))
+    let k = 0
+    const resumed = vi.fn(async () => ({ segments: [seg(1, 2, `point ${k++}`)], language: 'english' }))
+    expect(await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), ...audio(levels), transcribe: resumed, summarize: vi.fn(async () => true) })).toBe('transcribed')
+    expect(resumed).toHaveBeenCalledTimes(3 - doneBefore)
+    expect((finalWrite().data.transcript as unknown[]).length).toBe(3)
+    expect(statsOf()).toMatchObject({ chunks: 3, requests: paidRequests + 3 - doneBefore })
+  })
+
+  it('stops starting chunks after the start budget and resumes on the next run', async () => {
+    const levels = track(3600, [[0, 290], [600, 890], [1200, 1490], [1800, 2090], [2400, 2690]])
+    let now = 1_000_000
+    const transcribe = vi.fn(async () => {
+      now += START_BUDGET_MS + 1 // the first request uses up the budget
+      return { segments: [seg(1, 2, 'words')], language: 'english' }
+    })
+    const out = await transcribeRecording('r1', { apiKey: 'k', clock: () => now, startedMs: now, download: async () => new Uint8Array([9]), ...audio(levels), transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('progress')
+    expect(transcribe).toHaveBeenCalledTimes(1)
+    const progress = (lastTracks()!._chunks as Record<string, { done: Record<string, unknown> }>)[ANN]
+    expect(Object.keys(progress.done)).toEqual(['0'])
+  })
+
+  it('a track without speech costs no OpenAI call', async () => {
+    const transcribe = vi.fn()
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), ...audio(track(600, [])), transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('empty-transcript')
+    expect(transcribe).not.toHaveBeenCalled()
+    expect(statsOf()).toMatchObject({ mode: 'speech', speechSec: 0, chunks: 0, requests: 0 })
+  })
+
+  it('does not attempt a track with more than the speech cap', async () => {
+    const transcribe = vi.fn()
+    const a = audio(track(4 * 3600, [[0, 4 * 3600]]))
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), ...a, transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('failed')
+    expect(transcribe).not.toHaveBeenCalled()
+    expect(a.extract).not.toHaveBeenCalled()
+    expect((lastTracks()![ANN] as { skipped: string }).skipped).toBe('too-much-audio')
+    expect(writes().some((a) => a.data.transcribeError === TOO_MUCH_AUDIO_ERROR)).toBe(true)
+  })
+
+  it('names tracks with too much speech in the partial error', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec({ speakers: [
+      { discordId: ANN, trackKey: 'calls/s/tracks/a.ogg', talkTimeSec: 60 },
+      { discordId: BOB, trackKey: 'calls/s/tracks/b.ogg', talkTimeSec: 60 },
+    ] }))
+    const short = track(600, [[10, 20]])
+    const huge = track(4 * 3600, [[0, 4 * 3600]])
+    await transcribeRecording('r1', {
+      apiKey: 'k',
+      download: async (key) => new Uint8Array([key.endsWith('b.ogg') ? 2 : 1]),
+      decode: async (b) => (b[0] === 2 ? huge : short),
+      extract: async () => [],
+      transcribe: async () => ({ segments: [seg(1, 2, 'hi')], language: 'english' }),
+      summarize: vi.fn(async () => true),
+    })
+    expect(finalWrite().data.transcribeError).toBe('partial: 1 track(s) could not be transcribed (1 with too much speech)')
+  })
+
+  it('ignores saved chunk progress from a different chunk plan', async () => {
+    const levels = track(3600, [[0, 290], [600, 890], [1200, 1490], [1800, 2090], [2400, 2690]])
+    const stale = { _chunks: { [ANN]: { plan: 'some-other-plan', done: { 0: [seg(1, 2, 'stale words')] }, language: 'english', requests: 1, split: 0, capped: 0 } } }
+    db.callRecording.findUnique.mockResolvedValue(rec({ transcribeTracks: stale }))
+    let k = 0
+    const transcribe = vi.fn(async () => ({ segments: [seg(1, 2, `fresh ${k++}`)], language: 'english' }))
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), ...audio(levels), transcribe, summarize: vi.fn(async () => true) })
+    expect(transcribe).toHaveBeenCalledTimes(3)
+    const texts = (finalWrite().data.transcript as Array<{ text: string }>).map((t) => t.text).join(' ')
+    expect(texts).not.toContain('stale')
+  })
+
+  it('decodes one track at a time and extracts only the regions it will send', async () => {
+    db.callRecording.findUnique.mockResolvedValue(rec({ speakers: [
+      { discordId: ANN, trackKey: 'calls/s/tracks/a.ogg', talkTimeSec: 60 },
+      { discordId: BOB, trackKey: 'calls/s/tracks/b.ogg', talkTimeSec: 60 },
+    ] }))
+    let active = 0
+    let maxActive = 0
+    const levels = track(600, [[10, 20], [100, 110]])
+    const decode = async () => {
+      active++
+      maxActive = Math.max(maxActive, active)
+      await new Promise((r) => setTimeout(r, 5))
+      active--
+      return levels
+    }
+    const extract = vi.fn(async (_b: Uint8Array, regions: Array<Region | null>) => regions.map(() => undefined))
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([9]), decode, extract, transcribe: async () => ({ segments: [seg(1, 2, 'x')], language: 'english' }), summarize: vi.fn(async () => true) })
+    expect(maxActive).toBe(1)
+    expect(extract).toHaveBeenCalledTimes(2)
+    expect(extract.mock.calls[0][1].filter(Boolean)).toHaveLength(2)
+  })
+
+  it('falls back to the whole track when decoding fails, and says so in the stats', async () => {
+    const bytes = new Uint8Array([7, 7, 7])
+    const transcribe = vi.fn<(bytes: Uint8Array) => Promise<WhisperResult>>(async () => ({ segments: [seg(5, 6, 'hello')], language: 'english' }))
+    const logs: string[] = []
+    const decode = async (): Promise<TrackLevels> => {
+      throw new Error('bad ogg')
+    }
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => bytes, decode, transcribe, summarize: vi.fn(async () => true), log: (m) => logs.push(m) })
+    expect(transcribe.mock.calls[0][0]).toBe(bytes)
+    expect((finalWrite().data.transcript as Array<{ startMs: number }>)[0].startMs).toBe(5000)
+    expect(statsOf()).toMatchObject({ mode: 'whole-track', fallback: 'decode-failed', chunks: 1, requests: 1, speechSec: 0 })
+    expect(logs.some((l) => l.includes('could not be decoded'))).toBe(true)
+  })
+
+  it('a whole-track fallback over the upload limit is skipped as too large', async () => {
+    const transcribe = vi.fn()
+    const decode = async (): Promise<TrackLevels> => {
+      throw new Error('bad ogg')
+    }
+    const out = await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array(MAX_UPLOAD_BYTES + 1), decode, transcribe, summarize: vi.fn(async () => true) })
+    expect(out).toBe('failed')
+    expect(transcribe).not.toHaveBeenCalled()
+  })
+})
+
+describe('upload format', () => {
+  it('names a WAV chunk as wav and the recorder file as ogg, and asks for word times', async () => {
+    const forms: FormData[] = []
+    const fetchImpl = vi.fn(async (_url: string, init: { body: FormData }) => {
+      forms.push(init.body)
+      return { ok: true, json: async () => ({ segments: [], words: [{ word: 'hi', start: 0, end: 0.2 }] }) }
+    })
+    const wav = renderChunkWav({ pieces: [{ region: 0, srcStartMs: 0, srcEndMs: 300, chunkStartMs: 0 }], durationMs: 300 }, [])
+    expect(isWav(wav)).toBe(true)
+    expect(isWav(new Uint8Array([1, 2, 3]))).toBe(false)
+    const r = await transcribeAudio(wav, 'k', { fetchImpl: fetchImpl as unknown as typeof fetch, language: 'en', words: true })
+    await transcribeAudio(new Uint8Array([1]), 'k', { fetchImpl: fetchImpl as unknown as typeof fetch, language: 'en' })
+    expect((forms[0].get('file') as File).name).toBe('speech.wav')
+    expect((forms[0].get('file') as File).type).toBe('audio/wav')
+    expect((forms[1].get('file') as File).name).toBe('track.ogg')
+    expect(forms[0].getAll('timestamp_granularities[]')).toEqual(['word', 'segment'])
+    expect(forms[1].getAll('timestamp_granularities[]')).toEqual([]) // whole-track fallback: no word times
+    expect(r.words).toEqual([{ word: 'hi', start: 0, end: 0.2 }])
   })
 })
