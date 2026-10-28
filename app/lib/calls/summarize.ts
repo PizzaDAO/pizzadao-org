@@ -20,7 +20,7 @@ export const summarySchema = z.object({
   title: z.string().min(1).max(120).describe('Short English title for the call'),
   summary: z.string().min(1).describe('Plain-text summary (short paragraphs, no Markdown) of what was discussed and decided, in the call language'),
   actionItems: z
-    .array(z.object({ text: z.string().min(1), owner: z.string().optional().describe('Speaker name, only if they clearly took it on') }))
+    .array(z.object({ text: z.string().min(1), owner: z.string().nullable().describe('Speaker name, only if they clearly took it on; otherwise null') }))
     .max(30),
   chapters: z.array(z.object({ startMs: z.number().int().min(0), title: z.string().min(1) })).max(30),
 })
