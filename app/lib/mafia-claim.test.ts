@@ -12,7 +12,7 @@ const row = {
   topping: "Pepperoni",
   filmTitle: "The Godfather",
   origin: { kind: "character", person: "Vito Corleone", film: "The Godfather" },
-  createdAt: new Date(),
+  createdAt: new Date("2026-01-01T00:00:00.000Z"),
   portrait: { url: "https://blob/p.webp" },
 };
 
