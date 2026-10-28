@@ -203,15 +203,38 @@ describe('publishing waits for transcription', () => {
     redactedSpeakerIds: [], redactedSegmentIds: [], transcribedAt: null, transcribeAttempts: 0,
     speakers: [{ discordId: ANN, trackKey: 'k', talkTimeSec: 60 }], ...over,
   })
-  it('blocks while transcription is due', async () => {
-    db.callRecording.findUnique.mockResolvedValue(row())
+  const recent = () => ({ startedAt: new Date(Date.now() - 86_400_000) })
+  it('blocks while transcription is due (cron window or flagged, and OpenAI configured)', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    db.callRecording.findUnique.mockResolvedValue(row(recent()))
     expect(await publishRecording('r1', '9')).toBe('transcribing')
-    expect(db.callRecording.update).not.toHaveBeenCalled()
+    db.callRecording.findUnique.mockResolvedValue(row({ startedAt: new Date('2020-01-01'), retranscribeRequestedAt: new Date() }))
+    expect(await publishRecording('r1', '9')).toBe('transcribing')
+    expect(db.callRecording.updateMany).not.toHaveBeenCalled()
+  })
+  it('does not block when the cron will not pick the row up (too old and unflagged, or no OpenAI key)', async () => {
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    db.callRecording.findUnique.mockResolvedValue(row({ startedAt: new Date('2020-01-01'), retranscribeRequestedAt: null }))
+    expect(await publishRecording('r1', '9')).toBe('ok')
+    vi.stubEnv('OPENAI_API_KEY', '')
+    db.callRecording.findUnique.mockResolvedValue(row(recent()))
+    expect(await publishRecording('r1', '9')).toBe('ok')
+  })
+  it('publishes with a write guarded on updatedAt and reports a conflict when it matches nothing', async () => {
+    const updatedAt = new Date('2026-10-28T12:00:00Z')
+    db.callRecording.findUnique.mockResolvedValue(row({ updatedAt }))
+    db.callRecording.updateMany.mockResolvedValue({ count: 0 })
+    expect(await publishRecording('r1', '9')).toBe('conflict')
+    expect(db.callRecording.updateMany.mock.calls[0][0].where).toEqual({ id: 'r1', status: 'IN_REVIEW', updatedAt })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    expect(await publishRecording('r1', '9')).toBe('ok')
   })
   it('does not block once transcribed, with no transcribable tracks, after giving up, or with spoken lines', async () => {
-    db.callRecording.update.mockResolvedValue({})
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
     for (const over of [{ transcribedAt: new Date() }, { speakers: [] }, { speakers: [{ discordId: ANN, trackKey: 'k', talkTimeSec: 60 }], redactedSpeakerIds: [ANN] }, { transcribeAttempts: 3 }, { transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'spoken' }] }]) {
-      db.callRecording.findUnique.mockResolvedValue(row(over))
+      db.callRecording.findUnique.mockResolvedValue(row({ ...recent(), ...over }))
       expect(await publishRecording('r1', '9')).toBe('ok')
     }
   })

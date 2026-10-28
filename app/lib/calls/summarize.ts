@@ -112,7 +112,8 @@ export function isFallbackWorthy(err: unknown): boolean {
   const name = e?.name ?? ''
   if (/NoObjectGenerated|TypeValidation|JSONParse|InvalidPrompt|ZodError/i.test(name)) return false
   const status = e?.statusCode ?? e?.status
-  if (typeof status === 'number') return [401, 402, 403, 404, 408, 429].includes(status) || status >= 500
+  if (typeof status === 'number' && ([401, 402, 403, 404, 408, 424, 429].includes(status) || status >= 500)) return true
+  // A gateway can wrap an access problem in a generic status (e.g. 400), so the message counts too.
   return /free tier|do not have access|not available|no access|unauthori[sz]ed|forbidden|payment|credit|quota|rate.?limit|too many requests|overloaded|unavailable|timed? ?out|fetch failed|ECONN|ENOTFOUND|\b(401|402|403|404|429|50\d)\b/i.test(e?.message ?? '')
 }
 

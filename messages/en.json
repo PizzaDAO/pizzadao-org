@@ -997,7 +997,7 @@
     "recapStale": "A speaker or line was hidden after this summary was written, so the recap will not be posted. Regenerate the summary (or edit and save it) first.",
     "recapError": "Last Discord error: {error}",
     "transcribeFailed": "Automatic transcription gave up after {count} attempts. {error}",
-    "summaryFailed": "Automatic summary failed ({count} attempts so far): {error}",
+    "summaryFailed": "Automatic summary failed ({count} summary attempts so far): {error}",
     "transcribeRetry": "Retry transcription",
     "unsavedWarning": "You have unsaved edits that will be lost. Continue?",
     "tooManyItems": "At most 30 action items.",

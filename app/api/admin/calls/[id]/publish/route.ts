@@ -29,6 +29,7 @@ export const POST = withErrorHandling(async (request: Request, ctx: { params: Pr
       : await unpublishRecording(id, auth.session.discordId)
   if (result === 'not-found') throw new NotFoundError('Recording')
   if (result === 'not-allowed') throw new ConflictError('This recording is not in a state that can be changed that way')
+  if (result === 'conflict') throw new ConflictError('This recording changed while publishing; reload and check it again')
   if (result === 'transcribing') throw new ConflictError('Transcription is still pending for this call; publish once it has finished')
   if (result === 'incomplete') throw new ConflictError('A transcript and a summary are required before publishing')
   // Publishing is the human approval: only now may the recap go to Discord (gated by CALL_RECAP_POST_ENABLED, once per call).

@@ -326,11 +326,14 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
   }
 }
 
-export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete' | 'transcribing'
+/** How far back the transcription cron looks (rows reset by the re-transcribe tool are picked up whatever their age). */
+export const PENDING_WINDOW_DAYS = 14
+
+export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete' | 'transcribing' | 'conflict'
 
 /** IN_REVIEW -> PUBLISHED (needs a transcript and a summary). Rejected calls cannot be published. */
 export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<PublishResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, transcribedAt: true, transcribeAttempts: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } } } })
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, transcribedAt: true, transcribeAttempts: true, startedAt: true, retranscribeRequestedAt: true, updatedAt: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } } } })
   if (!rec) return 'not-found'
   if (rec.status === 'PUBLISHED') return 'already'
   if (rec.status !== 'IN_REVIEW') return 'not-allowed'
@@ -338,13 +341,16 @@ export async function publishRecording(id: string, reviewerDiscordId: string, no
   const hidden = new Set(rec.redactedSpeakerIds ?? [])
   const transcribable = (rec.speakers ?? []).some((sp) => !!sp.trackKey && sp.talkTimeSec > 0 && !hidden.has(sp.discordId))
   const hasSpeech = asSegments(rec.transcript).some((s) => s.kind !== 'chat')
-  if (!rec.transcribedAt && transcribable && !hasSpeech && (rec.transcribeAttempts ?? 0) < 3) return 'transcribing'
+  // Only when the cron will really pick the row up (inside its window or flagged by the tool, and OpenAI configured); otherwise waiting would block publishing forever.
+  const cronWillRun = !!process.env.OPENAI_API_KEY?.trim() && (!!rec.retranscribeRequestedAt || (rec.startedAt?.getTime() ?? 0) >= now.getTime() - PENDING_WINDOW_DAYS * 86_400_000)
+  if (!rec.transcribedAt && transcribable && !hasSpeech && (rec.transcribeAttempts ?? 0) < 3 && cronWillRun) return 'transcribing'
   if (!rec.summary?.trim() || visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds).length === 0) return 'incomplete'
-  await prisma.callRecording.update({
-    where: { id },
+  // Guarded on the row we just checked: if anything changed meanwhile (a redaction, a regenerated summary, a transcript), nothing is published.
+  const res = await prisma.callRecording.updateMany({
+    where: { id, status: 'IN_REVIEW', updatedAt: rec.updatedAt },
     data: { status: 'PUBLISHED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: now },
   })
-  return 'ok'
+  return res.count === 1 ? 'ok' : 'conflict'
 }
 
 /** PUBLISHED -> IN_REVIEW. Nothing is deleted. */

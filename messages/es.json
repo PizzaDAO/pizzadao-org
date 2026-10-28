@@ -997,7 +997,7 @@
     "recapStale": "Se ocultó un orador o una línea después de escribir este resumen, así que el resumen no se publicará. Regenera el resumen (o edítalo y guárdalo) primero.",
     "recapError": "Último error de Discord: {error}",
     "transcribeFailed": "La transcripción automática se rindió tras {count} intentos. {error}",
-    "summaryFailed": "El resumen automático falló ({count} intentos hasta ahora): {error}",
+    "summaryFailed": "El resumen automático falló ({count} intentos de resumen hasta ahora): {error}",
     "transcribeRetry": "Reintentar la transcripción",
     "unsavedWarning": "Tienes cambios sin guardar que se perderán. ¿Continuar?",
     "tooManyItems": "Máximo 30 tareas.",

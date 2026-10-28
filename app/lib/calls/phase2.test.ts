@@ -379,6 +379,11 @@ describe('summary generation', () => {
     for (const err of [Object.assign(new Error('x'), { statusCode: 403 }), Object.assign(new Error('x'), { statusCode: 429 }), Object.assign(new Error('x'), { statusCode: 502 }), new Error('Free tier users do not have access to this model')]) {
       expect(isFallbackWorthy(err)).toBe(true)
     }
+    // a gateway error with a generic 400 status but an access message still falls back; 424 counts too
+    expect(isFallbackWorthy(Object.assign(new Error('Free tier users do not have access to this model'), { name: 'GatewayError', statusCode: 400 }))).toBe(true)
+    expect(isFallbackWorthy(Object.assign(new Error('x'), { statusCode: 424 }))).toBe(true)
+    // schema errors by name win even with an access-looking message
+    expect(isFallbackWorthy(Object.assign(new Error('forbidden'), { name: 'AI_NoObjectGeneratedError' }))).toBe(false)
     for (const err of [Object.assign(new Error('bad'), { statusCode: 400 }), Object.assign(new Error('no object'), { name: 'AI_NoObjectGeneratedError' }), new Error('something odd')]) {
       expect(isFallbackWorthy(err)).toBe(false)
     }
@@ -470,8 +475,9 @@ describe('publish gating', () => {
   it('publishes an IN_REVIEW call that has a summary and transcript', async () => {
     asReviewer()
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', summary: 'S', transcript: [{ discordId: ANN, startMs: 0, endMs: 1, text: 'a' }] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     expect((await call()).status).toBe(200)
-    const data = db.callRecording.update.mock.calls[0][0].data
+    const data = db.callRecording.updateMany.mock.calls[0][0].data
     expect(data).toMatchObject({ status: 'PUBLISHED', reviewedBy: '9' })
     expect(data.publishedAt).toBeInstanceOf(Date)
   })
