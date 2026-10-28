@@ -1265,8 +1265,8 @@
     "active": "Active",
     "verifier": "Verifier",
     "manualVerifier": "None (reviewed by hand)",
-    "params": "Verifier params (JSON)",
-    "paramsHelp": "Checked by the verifier before saving.",
+    "params": "Verifier params",
+    "paramsHelp": "Only raising a numeric minimum is editable; other params are read-only and changing them needs a PR.",
     "saveMission": "Save mission",
     "saving": "Saving",
     "saved": "Saved",
@@ -1277,6 +1277,8 @@
     "recent": "Recent changes",
     "noHistory": "No changes yet.",
     "errorGeneric": "Could not save. Check the values and try again.",
-    "loadError": "Could not load the missions."
+    "loadError": "Could not load the missions.",
+    "rewardLowerOnly": "Rewards can only be lowered here; raising one needs a PR.",
+    "activeOnlyEnable": "Can only be switched on here; deactivating needs a PR."
   }
 }

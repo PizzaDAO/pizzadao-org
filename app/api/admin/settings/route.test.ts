@@ -145,6 +145,22 @@ describe('DELETE', () => {
     expect(prisma.appSettingChange.create).toHaveBeenCalledWith({ data: expect.objectContaining({ key: 'missions.maxAttempts', changedBy: ME }) })
   })
 
+  it('resetting a stricter-only setting back toward its looser default needs confirmation', async () => {
+    m(prisma.appSetting.findMany).mockResolvedValue([{ key: 'missions.dprOnlyMinLevel', value: 6, updatedAt: new Date(), updatedBy: ME }])
+    m(prisma.appSetting.findUnique).mockResolvedValue({ key: 'missions.dprOnlyMinLevel', value: 6, updatedAt: new Date() })
+    const ask = await DELETE(req('DELETE', { key: 'missions.dprOnlyMinLevel' }))
+    expect(ask.status).toBe(409)
+    expect((await ask.json()).needsConfirm).toMatch(/loosens/)
+    expect(prisma.appSetting.delete).not.toHaveBeenCalled()
+    expect((await DELETE(req('DELETE', { key: 'missions.dprOnlyMinLevel', confirm: true }))).status).toBe(200)
+  })
+
+  it('moving a stricter-only setting back toward the default needs confirmation on PUT too', async () => {
+    m(prisma.appSetting.findMany).mockResolvedValue([{ key: 'missions.newAccountDays', value: 90, updatedAt: new Date(), updatedBy: ME }])
+    expect((await PUT(req('PUT', { key: 'missions.newAccountDays', value: 45 }))).status).toBe(409)
+    expect((await PUT(req('PUT', { key: 'missions.newAccountDays', value: 120 }))).status).toBe(200)
+  })
+
   it('an unknown key is a 400; resetting a setting with no override writes nothing', async () => {
     expect((await DELETE(req('DELETE', { key: 'nope' }))).status).toBe(400)
     const r = await DELETE(req('DELETE', { key: 'missions.maxAttempts' }))

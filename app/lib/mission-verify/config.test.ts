@@ -136,7 +136,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
   })
 
   it('dry run: inserts L5.2 and sets levelTitle on every L3, L4 and L5 row, nothing else', () => {
-    const plan = planVerifierMigration(prodRows())
+    const plan = planVerifierMigration(prodRows(), MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { fillEmpty: true })
     expect(plan.errors).toEqual([])
     expect(plan.missing).toEqual([])
     expect(plan.inserts.map((i) => [`L${i.level}.${i.index}`, i.data.title, i.data.reward, i.data.verifierKey, i.data.verifierParams, i.data.levelTitle])).toEqual([
@@ -158,8 +158,8 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
   })
 
   it('apply, then re-run: nothing to do (idempotent), and every L5 row shares the title and reward', () => {
-    const after = applyPlan(prodRows(), planVerifierMigration(prodRows()))
-    const again = planVerifierMigration(after)
+    const after = applyPlan(prodRows(), planVerifierMigration(prodRows(), MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { fillEmpty: true }))
+    const again = planVerifierMigration(after, MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { fillEmpty: true })
     expect(again).toMatchObject({ updates: [], inserts: [], errors: [], missing: [] })
     expect(again.unchanged).toHaveLength(17)
     const l5 = after.filter((r) => r.level === 5)
@@ -174,7 +174,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
 
   it('a level row outside the config (e.g. an inactive one) still gets its level title', () => {
     const rows = [...prodRows(), { ...prodRows()[0], id: 999, level: 5, index: 9, title: 'Old', levelTitle: null }]
-    expect(planVerifierMigration(rows).updates.find((u) => u.id === 999)?.data).toEqual({ levelTitle: 'Do a favor for the mafia' })
+    expect(planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { fillEmpty: true }).updates.find((u) => u.id === 999)?.data).toEqual({ levelTitle: 'Do a favor for the mafia' })
   })
 
   it('aborts when the new mission\'s reward differs from the level\'s shared reward', () => {
@@ -198,7 +198,7 @@ describe('planVerifierMigration on production: L5.2 vouch mission + level titles
     expect(() => parseLevelTitlesArg('x="nope"')).toThrow()
     expect(() => parseLevelTitlesArg('3=""')).toThrow()
     const titles = { ...MISSION_LEVEL_TITLES, ...parseLevelTitlesArg('4="Capo"') }
-    const plan = planVerifierMigration(prodRows(), MISSION_VERIFIER_CONFIG, titles)
+    const plan = planVerifierMigration(prodRows(), MISSION_VERIFIER_CONFIG, titles, { overrideLevelTitles: { 4: 'Capo' } })
     expect(plan.updates.find((u) => u.level === 4)!.data).toEqual({ levelTitle: 'Capo' })
   })
 })
@@ -241,6 +241,13 @@ describe('planVerifierMigration never reverts admin edits (default mode)', () =>
     const u = plan.updates.find((x) => x.level === 2 && x.index === 0)!
     expect(u.data).toMatchObject({ verifierKey: 'attendance_count', verifierParams: { min: expect.any(Number) }, proofKind: 'NONE' })
     expect(plan.updates).toHaveLength(1)
+  })
+
+  it('does not refill a description or level title an admin cleared (only with --fill-empty)', () => {
+    const rows = edited().map((r) => (r.level === 3 && r.index === 0 ? { ...r, description: null, levelTitle: null } : r))
+    expect(planVerifierMigration(rows).updates.filter((u) => u.id === rows.find((r) => r.level === 3 && r.index === 0)!.id)).toEqual([])
+    const filled = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, MISSION_LEVEL_TITLES, { fillEmpty: true })
+    expect(filled.updates.some((u) => u.level === 3 && u.index === 0)).toBe(true)
   })
 
   it('an explicit --level-titles still overwrites that level', () => {

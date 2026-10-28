@@ -318,6 +318,11 @@ export interface PlanOptions {
    * source of truth (admin edits on /admin/missions are never reverted): see below.
    */
   force?: boolean
+  /**
+   * Also fill an EMPTY description or levelTitle on existing rows (the old default). Off by default:
+   * an admin may have cleared one on purpose, so only rows inserted in the run get them.
+   */
+  fillEmpty?: boolean
   /** Level titles named explicitly on the command line: these overwrite the row's levelTitle. */
   overrideLevelTitles?: Readonly<Record<number, string>>
 }
@@ -328,7 +333,8 @@ export interface PlanOptions {
  *
  * Default (the database is the source of truth once the admin editor ships), it only
  *   - INSERTs missing missions, at the level's CURRENT database reward,
- *   - fills NULLs: verifierKey (with its proofKind), verifierParams, description, levelTitle,
+ *   - fills NULLs: verifierKey (with its proofKind) and verifierParams (description / levelTitle only
+ *     with `fillEmpty`),
  *   - rewords a title that is still the untouched seed title,
  * and never overwrites a value an admin may have edited (verifierParams, rewards, titles, active).
  *
@@ -437,7 +443,7 @@ export function planVerifierMigration(
         data.title = c.title
         changes.push(`title -> "${c.title}"`)
       }
-      if (c.description && !row.description) {
+      if (opts.fillEmpty && c.description && !row.description) {
         data.description = c.description
         changes.push('description')
       }
@@ -465,7 +471,7 @@ export function planVerifierMigration(
   // the reward ledger description read the level's first row.
   for (const row of rows) {
     const explicit = opts.overrideLevelTitles?.[row.level]
-    const want = force || explicit !== undefined ? (explicit ?? levelTitles[row.level]) : (row.levelTitle ?? null) === null ? levelTitles[row.level] : undefined
+    const want = force || explicit !== undefined ? (explicit ?? levelTitles[row.level]) : opts.fillEmpty && (row.levelTitle ?? null) === null ? levelTitles[row.level] : undefined
     if (want === undefined || (row.levelTitle ?? null) === want) continue
     const u = updateFor(row)
     u.data.levelTitle = want

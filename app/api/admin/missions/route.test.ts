@@ -9,7 +9,11 @@ vi.mock('@/app/lib/admin-missions', async (orig) => ({
   updateMission: vi.fn(),
   updateLevel: vi.fn(),
 }))
-vi.mock('@/app/lib/settings/store', () => ({ listChanges: vi.fn(async () => []) }))
+vi.mock('@/app/lib/settings/store', () => ({
+  listChanges: vi.fn(async () => [
+    { id: 1, key: 'mission:3:title' }, { id: 2, key: 'missionLevel:4:reward' }, { id: 3, key: 'missions.maxAttempts' }, { id: 4, key: 'missionary' },
+  ]),
+}))
 
 import { getSession } from '@/app/lib/session'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
@@ -45,6 +49,11 @@ describe('/api/admin/missions', () => {
     expect((await GET()).status).toBe(403)
     expect(updateMission).not.toHaveBeenCalled()
     expect(updateLevel).not.toHaveBeenCalled()
+  })
+
+  it('history lists only the exact mission audit prefixes', async () => {
+    const j = await (await GET()).json()
+    expect(j.changes.map((c: { key: string }) => c.key)).toEqual(['mission:3:title', 'missionLevel:4:reward'])
   })
 
   it('rejects non-JSON and cross-origin writes', async () => {

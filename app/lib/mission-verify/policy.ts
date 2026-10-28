@@ -34,6 +34,12 @@ export const NEW_ACCOUNT_DAYS = 30
 export interface HoldPolicy {
   humanReleaseMinLevel: number
   newAccountDays: number
+  /**
+   * True when the settings could not be read (or a stored value was invalid), so the numbers above
+   * are the strictest fallback, not the real rules. Automatic passes must then neither approve nor
+   * create a hold: nothing is written and nobody is pinged until the settings read again.
+   */
+  readFailed?: boolean
 }
 
 export const DEFAULT_HOLD_POLICY: HoldPolicy = {
@@ -47,7 +53,12 @@ export const DEFAULT_HOLD_POLICY: HoldPolicy = {
  */
 export async function loadHoldPolicy(): Promise<HoldPolicy> {
   const s = await loadSettings()
-  return { humanReleaseMinLevel: s.get('missions.humanReleaseMinLevel'), newAccountDays: s.get('missions.newAccountDays') }
+  const invalid = s.invalidKeys.some((k) => k === 'missions.humanReleaseMinLevel' || k === 'missions.newAccountDays')
+  return {
+    humanReleaseMinLevel: s.get('missions.humanReleaseMinLevel'),
+    newAccountDays: s.get('missions.newAccountDays'),
+    ...(s.readFailed || invalid ? { readFailed: true } : {}),
+  }
 }
 
 const DISCORD_EPOCH_MS = BigInt(1420070400000)

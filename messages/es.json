@@ -1265,8 +1265,8 @@
     "active": "Activa",
     "verifier": "Verificador",
     "manualVerifier": "Ninguno (revisión manual)",
-    "params": "Parámetros del verificador (JSON)",
-    "paramsHelp": "El verificador los comprueba antes de guardar.",
+    "params": "Parámetros del verificador",
+    "paramsHelp": "Solo se puede subir un mínimo numérico; los demás parámetros son de solo lectura y cambiarlos requiere un PR.",
     "saveMission": "Guardar misión",
     "saving": "Guardando",
     "saved": "Guardado",
@@ -1277,6 +1277,8 @@
     "recent": "Cambios recientes",
     "noHistory": "Aún no hay cambios.",
     "errorGeneric": "No se pudo guardar. Revisa los valores e inténtalo de nuevo.",
-    "loadError": "No se pudieron cargar las misiones."
+    "loadError": "No se pudieron cargar las misiones.",
+    "rewardLowerOnly": "Aquí las recompensas solo se pueden bajar; subirlas requiere un PR.",
+    "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR."
   }
 }

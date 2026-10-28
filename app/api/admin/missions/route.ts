@@ -7,8 +7,9 @@ export const dynamic = 'force-dynamic'
 
 /**
  * GET / PATCH /api/admin/missions
- * Dread Pizza Roberts only. Edits verifier params (validated by each verifier's own parse()),
- * per-level rewards and titles, mission titles/descriptions and the active flag. No creating or
+ * Dread Pizza Roberts only. Stricter-only: numeric minimums can be raised, rewards lowered, a
+ * mission re-activated (never deactivated); other params are read-only. Also level titles and
+ * mission titles/descriptions. No creating or
  * deleting missions, and no changing a mission's verifier. Never cached.
  *
  *   GET                                         levels + missions + recent changes
@@ -19,7 +20,7 @@ export async function GET() {
   const auth = await requireDpr()
   if (!auth.ok) return auth.response
   const [levels, changes] = await Promise.all([listAdminLevels(), listChanges({ limit: 100 })])
-  return json({ levels, changes: changes.filter((c) => c.key.startsWith('mission')), nonProduction: isNonProductionDeploy() })
+  return json({ levels, changes: changes.filter((c) => c.key.startsWith('mission:') || c.key.startsWith('missionLevel:')), nonProduction: isNonProductionDeploy() })
 }
 
 export async function PATCH(request: Request) {

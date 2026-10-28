@@ -256,6 +256,22 @@ describe('precheckProof (submit route)', () => {
     expect(noKey.hold).toBeUndefined()
   })
 
+  it('settings unreadable: an auto-verified pre-check is not marked auto-verified and carries no hold', async () => {
+    vi.mocked(prisma.appSetting.findMany).mockRejectedValueOnce(new Error('db down'))
+    const { clearSettingsCache } = await import('../settings')
+    clearSettingsCache({ all: true })
+    const event = { slug: 'lisbon', city: 'Lisbon', status: 'approved', type: 'gpp', date: null, role: 'host', matchedBy: ['telegram'] }
+    const f = (async (input: RequestInfo | URL) =>
+      String(input).includes('/api/service/')
+        ? new Response(JSON.stringify({ ok: true, matched: true, events: [event] }))
+        : new Response(JSON.stringify({ event: { customUrl: 'lisbon', city: 'Lisbon', underbossStatus: 'approved' } }))) as unknown as typeof fetch
+    const src = { ...sources(f), rsvPizzaServiceKey: () => 'k', getTelegramUsername: vi.fn(async () => 'cityhost') }
+    const out = await precheckProof({ discordId: '300000000000000001', memberId: null, mission: { verifierKey: 'gpp_host', verifierParams: {}, level: 6 }, evidence: 'https://rsv.pizza/lisbon', sources: src, unfurl: async () => null })
+    expect(out.checkResult?.autoVerified).toBeUndefined()
+    expect(out.hold).toBeUndefined()
+    clearSettingsCache({ all: true })
+  })
+
   it('storeCheckResult with a hold sets holdReason and records AUTO_HELD in one transaction', async () => {
     vi.mocked(prisma.missionCompletion.updateMany).mockClear()
     const ok = await storeCheckResult(9, { verifier: 'gpp_host', summary: 's', confidence: 'high', checks: [], data: {}, checkedAt: 'now', autoVerified: true }, true, 'HIGH_LEVEL')

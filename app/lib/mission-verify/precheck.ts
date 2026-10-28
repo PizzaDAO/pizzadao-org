@@ -109,8 +109,13 @@ export async function precheckProof(input: PrecheckInput): Promise<PrecheckOutco
   if (r.status === 'needs_review') {
     const checkResult: SemiCheckResult = { ...base, summary: r.summary, confidence: r.confidence, checks: r.checks, data: r.evidence }
     if (!r.autoVerified) return { checkResult }
+    const policy = await loadHoldPolicy()
+    if (policy.readFailed) {
+      // Settings unreadable: don't mark it auto-verified or store a fallback-derived hold; a reviewer sees a normal pre-check.
+      return { checkResult }
+    }
     checkResult.autoVerified = true
-    const hold = typeof input.mission.level === 'number' ? releaseHoldFor(input.mission.level, input.discordId, now, await loadHoldPolicy()) : null
+    const hold = typeof input.mission.level === 'number' ? releaseHoldFor(input.mission.level, input.discordId, now, policy) : null
     return { checkResult, hold }
   }
   if (r.status === 'pass') {

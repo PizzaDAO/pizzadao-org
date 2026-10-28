@@ -7,7 +7,7 @@ vi.mock('@/app/lib/mission-cache', () => ({ clearMissionCaches: vi.fn() }))
 import { prisma } from '@/app/lib/db'
 import { clearMissionCaches } from '@/app/lib/mission-cache'
 import { clearSettingsCache } from '@/app/lib/settings'
-import { MissionEditError, updateLevel, updateMission, validateVerifierParams } from './admin-missions'
+import { assertStricterParams, MissionEditError, updateLevel, updateMission, validateVerifierParams } from './admin-missions'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
 const ADMIN = '400000000000000001'
@@ -74,24 +74,56 @@ describe('updateMission', () => {
     expect(clearMissionCaches).not.toHaveBeenCalled()
   })
 
-  it('lowering a count needs confirmation, with copy built from the human-release setting', async () => {
-    const err = await updateMission(7, { verifierParams: { min: 2, sources: ['PIZZADAO'] } }, ADMIN).catch((e) => e)
-    expect(err).toMatchObject({ status: 409 })
-    expect(err.needsConfirm).toMatch(/pass on their next check.*Level 6 passes still wait.*from Level 6/)
+  it('lowering a numeric minimum is refused: loosening needs a PR', async () => {
+    await expect(updateMission(7, { verifierParams: { min: 2, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/only be raised.*PR/) })
     expect(prisma.mission.updateMany).not.toHaveBeenCalled()
-    const ok = await updateMission(7, { verifierParams: { min: 2, sources: ['PIZZADAO'] } }, ADMIN, { confirm: true })
-    expect(ok.changed).toEqual(['verifierParams'])
   })
 
-  it('raising a count needs no confirmation', async () => {
+  it('non-numeric params are read-only: sources, roles, added or removed keys', async () => {
+    await expect(updateMission(7, { verifierParams: { min: 5, sources: ['PIZZADAO', 'OTHER'] } }, ADMIN)).rejects.toMatchObject({ status: 400 })
+    await expect(updateMission(7, { verifierParams: { min: 5 } }, ADMIN)).rejects.toMatchObject({ status: 400 })
+    await expect(updateMission(7, { verifierParams: { min: 5, sources: ['PIZZADAO'], minLikes: 2 } }, ADMIN)).rejects.toMatchObject({ status: 400 })
+    expect(prisma.mission.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('assertStricterParams: only raised numeric minimums pass', () => {
+    expect(() => assertStricterParams({ min: 1, minLikes: 2 }, { minLikes: 3, min: 1 })).not.toThrow()
+    expect(() => assertStricterParams({ minLevel: 5 }, { minLevel: 4 })).toThrow(/raised/)
+    expect(() => assertStricterParams({ roleIds: ['1'] }, { roleIds: ['2'] })).toThrow(/can't be changed/)
+    expect(() => assertStricterParams({ min: 1, crews: 'any' }, { min: 1, crews: 'all' })).toThrow()
+    expect(() => assertStricterParams({ min: 1 }, { min: '2' as never })).toThrow()
+  })
+
+  it('raising a count is allowed without confirmation', async () => {
     await expect(updateMission(7, { verifierParams: { min: 9, sources: ['PIZZADAO'] } }, ADMIN)).resolves.toMatchObject({ changed: ['verifierParams'] })
   })
 
-  it('edits title, description and the active flag, one audit row per changed field', async () => {
-    const r = await updateMission(7, { title: ' New title ', description: null, isActive: false }, ADMIN)
-    expect(r.changed.sort()).toEqual(['description', 'isActive', 'title'])
-    expect(prisma.mission.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { title: 'New title', description: null, isActive: false } }))
-    expect(prisma.appSettingChange.create).toHaveBeenCalledTimes(3)
+  it('edits title and description, one audit row per changed field', async () => {
+    const r = await updateMission(7, { title: ' New title ', description: null }, ADMIN)
+    expect(r.changed.sort()).toEqual(['description', 'title'])
+    expect(prisma.mission.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: { title: 'New title', description: null } }))
+    expect(prisma.appSettingChange.create).toHaveBeenCalledTimes(2)
+  })
+
+  it('refuses to deactivate (an inactive mission makes the level count as complete); re-activating is fine', async () => {
+    await expect(updateMission(7, { isActive: false }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Deactivating a mission needs a PR/) })
+    expect(prisma.mission.updateMany).not.toHaveBeenCalled()
+    m(prisma.mission.findUnique).mockResolvedValue({ ...vouch, isActive: false })
+    await expect(updateMission(7, { isActive: true }, ADMIN)).resolves.toEqual({ changed: ['isActive'] })
+    // Already inactive and staying inactive is a no-op, not an error.
+    await expect(updateMission(7, { isActive: false }, ADMIN)).resolves.toEqual({ changed: [] })
+  })
+
+  it('409 when another admin changed the field since it was read, and writes nothing', async () => {
+    m(prisma.mission.findUnique).mockResolvedValueOnce(vouch).mockResolvedValueOnce({ ...vouch, title: 'Someone else' })
+    await expect(updateMission(7, { title: 'Mine' }, ADMIN)).rejects.toMatchObject({ status: 409 })
+    expect(prisma.mission.updateMany).not.toHaveBeenCalled()
+    expect(prisma.appSettingChange.create).not.toHaveBeenCalled()
+  })
+
+  it('409 when the guarded update matches no row', async () => {
+    m(prisma.mission.updateMany).mockResolvedValue({ count: 0 })
+    await expect(updateMission(7, { title: 'Mine' }, ADMIN)).rejects.toMatchObject({ status: 409 })
   })
 
   it('an unchanged value writes nothing', async () => {
@@ -122,18 +154,30 @@ describe('updateLevel', () => {
   beforeEach(() => m(prisma.mission.findMany).mockResolvedValue(rows))
 
   it('a reward change needs confirmation (going forward only) and is written to every row of the level', async () => {
-    const err = await updateLevel(6, { reward: 7000 }, ADMIN).catch((e) => e)
+    const err = await updateLevel(6, { reward: 6000 }, ADMIN).catch((e) => e)
     expect(err).toMatchObject({ status: 409 })
     expect(err.needsConfirm).toMatch(/completed from now on.*not topped up or clawed back/)
     expect(prisma.mission.updateMany).not.toHaveBeenCalled()
 
-    const r = await updateLevel(6, { reward: 7000 }, ADMIN, { confirm: true })
+    const r = await updateLevel(6, { reward: 6000 }, ADMIN, { confirm: true })
     expect(r.changed).toEqual(['reward'])
-    expect(prisma.mission.updateMany).toHaveBeenCalledWith({ where: { level: 6 }, data: { reward: 7000 } })
+    expect(prisma.mission.updateMany).toHaveBeenCalledWith({ where: { level: 6, id: { in: [1, 2, 3] } }, data: { reward: 6000 } })
     expect(prisma.appSettingChange.create).toHaveBeenCalledWith({
-      data: expect.objectContaining({ key: 'missionLevel:6:reward', oldValue: 6942, newValue: 7000, changedBy: ADMIN }),
+      data: expect.objectContaining({ key: 'missionLevel:6:reward', oldValue: 6942, newValue: 6000, changedBy: ADMIN }),
     })
     expect(clearMissionCaches).toHaveBeenCalled()
+  })
+
+  it('a reward can only be lowered or kept, never raised', async () => {
+    await expect(updateLevel(6, { reward: 6943 }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/only be lowered.*PR/) })
+    await expect(updateLevel(6, { reward: 6942 }, ADMIN, { confirm: true })).resolves.toEqual({ changed: [] })
+    expect(prisma.mission.updateMany).not.toHaveBeenCalled()
+  })
+
+  it('409 when the level changed since it was read', async () => {
+    m(prisma.mission.findMany).mockResolvedValueOnce(rows).mockResolvedValueOnce(rows.map((x) => ({ ...x, reward: 5000 })))
+    await expect(updateLevel(6, { reward: 6000 }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 409 })
+    expect(prisma.mission.updateMany).not.toHaveBeenCalled()
   })
 
   it('bounds the reward and the level title', async () => {
@@ -144,7 +188,7 @@ describe('updateLevel', () => {
 
   it('a title change needs no confirmation', async () => {
     await expect(updateLevel(6, { levelTitle: 'New' }, ADMIN)).resolves.toEqual({ changed: ['levelTitle'] })
-    expect(prisma.mission.updateMany).toHaveBeenCalledWith({ where: { level: 6 }, data: { levelTitle: 'New' } })
+    expect(prisma.mission.updateMany).toHaveBeenCalledWith({ where: { level: 6, id: { in: [1, 2, 3] } }, data: { levelTitle: 'New' } })
   })
 
   it('an unknown level is a 404', async () => {

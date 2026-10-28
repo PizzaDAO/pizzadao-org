@@ -53,6 +53,8 @@ export default async function AdminMissionsPage() {
         manualVerifier: t("manualVerifier"),
         params: t("params"),
         paramsHelp: t("paramsHelp"),
+        rewardLowerOnly: t("rewardLowerOnly"),
+        activeOnlyEnable: t("activeOnlyEnable"),
         saveMission: t("saveMission"),
         saving: t("saving"),
         saved: t("saved"),

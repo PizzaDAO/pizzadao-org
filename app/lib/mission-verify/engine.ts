@@ -284,6 +284,13 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       report.checks.push({ ...base, result: r, outcome: row?.status === 'PENDING' ? 'pending_review' : 'not_yet', holdReason: row?.holdReason ?? null })
       continue
     }
+    if (policy.readFailed) {
+      // The hold rules could not be read: approving would skip a hold, and holding would store a
+      // fallback-derived hold that never lifts. Write nothing, ping nobody; the next run retries.
+      report.errors.push(`mission ${m.id}: settings unreadable; verifier pass not applied`)
+      report.checks.push({ ...base, result: r, outcome: 'not_yet' })
+      continue
+    }
     let hold = releaseHoldFor(m.level, discordId, now, policy)
     // A level the member was already paid for: record the pass silently (no hold, no reviewer
     // ping, no review card, no payout: settleLevels skips paid levels).

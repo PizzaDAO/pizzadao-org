@@ -26,6 +26,11 @@ beforeEach(() => {
 })
 
 describe('hold policy', () => {
+  it('an invalid stored hold value also counts as unreadable', async () => {
+    rows({ 'missions.humanReleaseMinLevel': 9 })
+    expect((await loadHoldPolicy()).readFailed).toBe(true)
+  })
+
   it('with no rows it equals the defaults, and the copy is byte-identical to the old literals', async () => {
     findMany.mockResolvedValue([])
     expect(await loadHoldPolicy()).toEqual(DEFAULT_HOLD_POLICY)
@@ -57,12 +62,13 @@ describe('hold policy', () => {
   it('a loosening value in the database is rejected on read: strictest rules apply', async () => {
     rows({ 'missions.humanReleaseMinLevel': 8, 'missions.newAccountDays': 3 })
     const policy = await loadHoldPolicy()
-    expect(policy).toEqual({ humanReleaseMinLevel: 1, newAccountDays: 365 })
+    expect(policy).toEqual({ humanReleaseMinLevel: 1, newAccountDays: 365, readFailed: true })
   })
 
-  it('settings unreadable: every auto-pass waits for a human', async () => {
+  it('settings unreadable: flagged readFailed (callers must not approve or persist a hold) and strictest values', async () => {
     findMany.mockRejectedValue(new Error('db down'))
     const policy = await loadHoldPolicy()
+    expect(policy.readFailed).toBe(true)
     expect(releaseHoldFor(1, old, now, policy)).toBe('HIGH_LEVEL')
     expect(releaseHoldFor(1, old, now)).toBeNull()
   })

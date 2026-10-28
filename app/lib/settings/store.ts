@@ -137,6 +137,11 @@ export async function listSettingViews(): Promise<SettingView[]> {
 
 /** The confirmation text for a change (null = save without asking). */
 export function confirmationFor(key: SettingKey, from: unknown, to: unknown): string | null {
-  const c = SETTINGS[key].confirm as ((a: unknown, b: unknown) => string | null) | undefined
+  const def = SETTINGS[key]
+  if (def.stricterOnly && typeof from === 'number' && typeof to === 'number') {
+    const loosened = def.looserWhen === 'lower' ? to < from : to > from
+    if (loosened) return 'This loosens a stricter rule back toward its code default. Anything held back by it will no longer be.'
+  }
+  const c = def.confirm as ((a: unknown, b: unknown) => string | null) | undefined
   return c ? c(from, to) : null
 }

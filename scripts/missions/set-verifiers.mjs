@@ -4,11 +4,13 @@
  *
  * The database is the source of truth once /admin/missions ships, so by default this ONLY
  * INSERTs missing missions (at the level's current database reward) and fills NULLs
- * (verifierKey with its proofKind, verifierParams, description, levelTitle), and rewords a title
+ * (verifierKey with its proofKind, verifierParams), and rewords a title
  * that is still the untouched seed title. Re-running it never reverts an admin edit to
  * verifierParams, rewards, titles or the active flag. To restore the code values on purpose:
  *   --force-params   overwrite verifier, params, proofKind, titles, descriptions and level titles
  *                    from mission-config.ts (this mode keeps the title/reward abort described below)
+ *   --fill-empty     also fill an EMPTY description / levelTitle on existing rows (off by default: an
+ *                    admin may have cleared one on purpose; inserted rows always get theirs)
  *   --level-titles   (explicit) always overwrites the named levels' levelTitle
  *
  * Sets Mission.verifierKey / verifierParams / proofKind (and the reworded
@@ -58,7 +60,7 @@ import { parseArgs, die, loadDotenv } from "../unbelievaboat/args.mjs";
 ensureTsRuntime(import.meta.url);
 loadDotenv(createRequire(import.meta.url));
 
-const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help", "force-params"] });
+const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help", "force-params", "fill-empty"] });
 if (args.help) {
   console.log(readFileSync(new URL(import.meta.url), "utf8").split("*/")[0]);
   process.exit(0);
@@ -104,6 +106,7 @@ try {
   const plan = planVerifierMigration(rows, MISSION_VERIFIER_CONFIG, levelTitles, {
     force: !!args["force-params"],
     overrideLevelTitles,
+    fillEmpty: !!args["fill-empty"],
   });
   console.log(args["force-params"] ? "Mode: --force-params (restoring code values)" : "Mode: safe (insert missing, fill empty; admin edits are kept)");
   const legacyAuto = await prisma.missionCompletion.count({ where: { reviewedBy: "auto", source: { not: "AUTO" } } });

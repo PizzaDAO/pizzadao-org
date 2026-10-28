@@ -1265,8 +1265,8 @@
     "active": "Active",
     "verifier": "Vérificateur",
     "manualVerifier": "Aucun (examen manuel)",
-    "params": "Paramètres du vérificateur (JSON)",
-    "paramsHelp": "Contrôlés par le vérificateur avant l'enregistrement.",
+    "params": "Paramètres du vérificateur",
+    "paramsHelp": "Seul un minimum numérique peut être relevé ; les autres paramètres sont en lecture seule et les modifier demande une PR.",
     "saveMission": "Enregistrer la mission",
     "saving": "Enregistrement",
     "saved": "Enregistré",
@@ -1277,6 +1277,8 @@
     "recent": "Changements récents",
     "noHistory": "Aucun changement pour l'instant.",
     "errorGeneric": "Enregistrement impossible. Vérifiez les valeurs et réessayez.",
-    "loadError": "Impossible de charger les missions."
+    "loadError": "Impossible de charger les missions.",
+    "rewardLowerOnly": "Ici, les récompenses ne peuvent que baisser ; les augmenter demande une PR.",
+    "activeOnlyEnable": "Ici, on peut seulement activer ; désactiver demande une PR."
   }
 }

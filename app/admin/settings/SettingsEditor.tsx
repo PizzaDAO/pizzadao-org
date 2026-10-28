@@ -82,6 +82,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
     const [state, setState] = useState<"idle" | "saving" | "saved" | "resetting">("idle");
     const [error, setError] = useState<string | null>(null);
     const [confirm, setConfirm] = useState<string | null>(null);
+    const [confirmIsReset, setConfirmIsReset] = useState(false);
     const [history, setHistory] = useState<Change[] | null>(null);
 
     const num = Number(text);
@@ -93,6 +94,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
         const r = await api("PUT", { key: s.key, value: num, note, confirm: confirmed, expectedUpdatedAt: s.updatedAt });
         if (r.status === 409 && typeof r.data.needsConfirm === "string") {
             setConfirm(r.data.needsConfirm);
+            setConfirmIsReset(false);
             setState("idle");
             return;
         }
@@ -107,16 +109,23 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
         onChanged();
     }
 
-    async function reset() {
+    async function reset(confirmed = false) {
         setError(null);
         setState("resetting");
-        const r = await api("DELETE", { key: s.key, note });
+        const r = await api("DELETE", { key: s.key, note, confirm: confirmed });
+        if (r.status === 409 && typeof r.data.needsConfirm === "string") {
+            setConfirm(r.data.needsConfirm);
+            setConfirmIsReset(true);
+            setState("idle");
+            return;
+        }
         if (!r.ok) {
             setError(typeof r.data.error === "string" ? r.data.error : labels.errorGeneric);
             setState("idle");
             return;
         }
         setNote("");
+        setConfirm(null);
         setState("saved");
         onChanged();
     }
@@ -172,7 +181,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                     {state === "saving" ? labels.saving : labels.save}
                 </button>
                 {s.modified && (
-                    <button type="button" onClick={reset} disabled={state === "resetting"} className="rounded-lg border px-3 py-1.5" style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}>
+                    <button type="button" onClick={() => reset()} disabled={state === "resetting"} className="rounded-lg border px-3 py-1.5" style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}>
                         {state === "resetting" ? labels.resetting : labels.reset}
                     </button>
                 )}
@@ -183,7 +192,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                     <strong>{labels.confirmTitle}</strong>
                     <span>{confirm}</span>
                     <span className="flex gap-2">
-                        <button type="button" onClick={() => save(true)} className="rounded-lg bg-tomato px-3 py-1 font-bold text-white">{labels.confirmYes}</button>
+                        <button type="button" onClick={() => (confirmIsReset ? reset(true) : save(true))} className="rounded-lg bg-tomato px-3 py-1 font-bold text-white">{labels.confirmYes}</button>
                         <button type="button" onClick={() => setConfirm(null)} className="rounded-lg border px-3 py-1" style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}>{labels.confirmNo}</button>
                     </span>
                 </div>

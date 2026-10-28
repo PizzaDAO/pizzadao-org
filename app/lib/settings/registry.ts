@@ -35,6 +35,8 @@ export interface SettingDef<T> {
   confirm?: (from: T, to: T) => string | null
   /** True when the code bound deliberately stops at today's value (loosening needs a PR). */
   stricterOnly?: boolean
+  /** For stricter-only settings: which direction is looser (moving back toward the default asks for confirmation). */
+  looserWhen?: 'higher' | 'lower'
   /** Editorial values: only ever sent to the settings page and its API. */
   private?: boolean
 }
@@ -51,6 +53,7 @@ function intSetting(o: {
   onReadFailure?: FailureMode<number>
   confirm?: (from: number, to: number) => string | null
   stricterOnly?: boolean
+  looserWhen?: 'higher' | 'lower'
 }): SettingDef<number> {
   const { min, max } = o
   return {
@@ -64,6 +67,7 @@ function intSetting(o: {
     input: { type: 'int', min, max, ...(o.unit ? { unit: o.unit } : {}) },
     confirm: o.confirm,
     stricterOnly: o.stricterOnly,
+    looserWhen: o.looserWhen,
   }
 }
 
@@ -88,6 +92,7 @@ export const SETTINGS = {
     default: 6,
     onReadFailure: { value: 1 },
     stricterOnly: true,
+    looserWhen: 'higher',
   }),
   'missions.newAccountDays': intSetting({
     key: 'missions.newAccountDays',
@@ -100,6 +105,7 @@ export const SETTINGS = {
     unit: 'days',
     onReadFailure: { value: 365 },
     stricterOnly: true,
+    looserWhen: 'lower',
   }),
   'missions.dprOnlyMinLevel': intSetting({
     key: 'missions.dprOnlyMinLevel',
@@ -111,6 +117,7 @@ export const SETTINGS = {
     default: 8,
     onReadFailure: { value: 1 },
     stricterOnly: true,
+    looserWhen: 'higher',
     confirm: (from, to) => (to < from ? 'Fewer roles will be able to approve missions at these levels.' : null),
   }),
   'missions.slaHours': intSetting({

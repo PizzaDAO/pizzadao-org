@@ -1,7 +1,14 @@
 /**
- * Admin mission editor (plans/app-settings.md 4.7): verifier params, per-level rewards, titles and
- * the active flag. NOT editable here: verifierKey, proofKind, level, index, creating or deleting
- * missions (code / script changes).
+ * Admin mission editor (plans/app-settings.md 4.7): requirement thresholds, per-level rewards,
+ * titles and re-activating a mission. NOT editable here: verifierKey, proofKind, level, index,
+ * creating or deleting missions (code / script changes).
+ *
+ * Stricter-only from the UI (Snax's decision 1: loosening needs a PR), enforced here, server side:
+ *   - numeric minimums (min, minReplies, minLikes, minLevel) can only be RAISED;
+ *   - every other verifier param (roles, sources, kinds, crews...) is read-only;
+ *   - a level reward can only be LOWERED or kept;
+ *   - a mission can be re-activated but not deactivated (an inactive mission makes the level count
+ *     as complete, which would pay everyone and skip the holds).
  *
  * Every write is validated (verifier params by the verifier's own parse(), plus numeric bounds),
  * audited in AppSettingChange (key `mission:<id>:<field>` / `missionLevel:<level>:<field>`) in the
@@ -12,7 +19,6 @@
 import { prisma } from '@/app/lib/db'
 import { clearMissionCaches } from '@/app/lib/mission-cache'
 import { getVerifier } from '@/app/lib/mission-verify/verifiers'
-import { loadHoldPolicy } from '@/app/lib/mission-verify/policy'
 import { jsonOrDbNull } from '@/app/lib/settings/json'
 
 export class MissionEditError extends Error {
@@ -126,13 +132,27 @@ export interface MissionPatch {
   verifierParams?: unknown
 }
 
-/** Confirmation text for a params edit that lowers a count (members who already meet it pass next check). */
-async function lowerMinWarning(level: number, oldP: unknown, newP: Plain): Promise<string | null> {
-  const oldO = isPlainObject(oldP) ? oldP : {}
-  const lowered = COUNT_KEYS.some((k) => typeof oldO[k] === 'number' && typeof newP[k] === 'number' && (newP[k] as number) < (oldO[k] as number))
-  if (!lowered) return null
-  const { humanReleaseMinLevel } = await loadHoldPolicy()
-  return `Members who already meet the new count pass on their next check. Level ${level} passes ${level >= humanReleaseMinLevel ? 'still wait' : 'do not wait'} for a human release (from Level ${humanReleaseMinLevel}).`
+const stable = (v: unknown): string =>
+  JSON.stringify(v ?? null, (_k, val) =>
+    val && typeof val === 'object' && !Array.isArray(val) ? Object.fromEntries(Object.entries(val).sort(([a], [b]) => a.localeCompare(b))) : val,
+  )
+
+/** Numeric thresholds: the only params an admin may change (raise). */
+export const isMinimumKey = (key: string) => /^min([A-Z]\w*)?$/.test(key)
+
+/** Throws unless `next` differs from `current` only by RAISED numeric minimums. */
+export function assertStricterParams(current: unknown, next: Plain): void {
+  const cur = isPlainObject(current) ? current : {}
+  for (const k of new Set([...Object.keys(cur), ...Object.keys(next)])) {
+    const a = cur[k]
+    const b = next[k]
+    if (stable(a) === stable(b)) continue
+    if (isMinimumKey(k) && typeof a === 'number' && typeof b === 'number') {
+      if (b > a) continue
+      throw new MissionEditError(400, `${k} can only be raised here; lowering it needs a PR`)
+    }
+    throw new MissionEditError(400, `${k} can't be changed here; only raising a numeric minimum is allowed (other changes need a PR)`)
+  }
 }
 
 /** Edit one mission. Only the given fields change; unchanged values write nothing and no audit row. */
@@ -169,22 +189,29 @@ export async function updateMission(
   }
   if (patch.isActive !== undefined) {
     if (typeof patch.isActive !== 'boolean') throw new MissionEditError(400, 'isActive must be true or false')
+    if (patch.isActive === false && current.isActive) {
+      throw new MissionEditError(400, 'Deactivating a mission needs a PR: an inactive mission makes the level count as complete and pays out without the holds')
+    }
     set('isActive', current.isActive, patch.isActive)
   }
-  let warning: string | null = null
   if (patch.verifierParams !== undefined) {
     const params = validateVerifierParams(current.verifierKey ?? null, patch.verifierParams)
-    if (!sameJson(current.verifierParams, params)) warning = await lowerMinWarning(current.level, current.verifierParams, params)
+    assertStricterParams(current.verifierParams, params)
     set('verifierParams', current.verifierParams, params)
   }
 
   if (audit.length === 0) return { changed: [] }
-  if (warning && opts.confirm !== true) throw new MissionEditError(409, 'Confirmation required', warning)
 
   const note = typeof opts.note === 'string' && opts.note.trim() ? opts.note.trim().slice(0, 300) : null
   await prisma.$transaction(async (tx) => {
-    // Re-assert the row is unchanged since the read (concurrent admin edit).
-    const n = await tx.mission.updateMany({ where: { id, level: current.level, index: current.index }, data: data as never })
+    // Concurrency guard: the fields being changed must still hold the values we read (another admin may have saved).
+    const fresh = await tx.mission.findUnique({ where: { id } })
+    const stale = !fresh || audit.some((a) => stable((fresh as Record<string, unknown>)[a.field]) !== stable(a.oldValue))
+    if (stale) throw new MissionEditError(409, 'Mission changed while saving; reload and retry')
+    const n = await tx.mission.updateMany({
+      where: { id, level: current.level, index: current.index, ...Object.fromEntries(audit.filter((a) => a.field !== 'verifierParams').map((a) => [a.field, a.oldValue])) },
+      data: data as never,
+    })
     if (n.count !== 1) throw new MissionEditError(409, 'Mission changed while saving; reload and retry')
     for (const a of audit) {
       await tx.appSettingChange.create({
@@ -221,6 +248,7 @@ export async function updateLevel(
       throw new MissionEditError(400, `reward must be a whole number from ${REWARD_MIN} to ${REWARD_MAX}`)
     }
     const rewards = [...new Set(rows.map((x) => x.reward))]
+    if (r > Math.min(...rewards)) throw new MissionEditError(400, 'A reward can only be lowered here; raising it needs a PR')
     if (rewards.length !== 1 || rewards[0] !== r) {
       data.reward = r
       audit.push({ field: 'reward', oldValue: rewards.length === 1 ? rewards[0] : rewards, newValue: r })
@@ -244,7 +272,12 @@ export async function updateLevel(
 
   const note = typeof opts.note === 'string' && opts.note.trim() ? opts.note.trim().slice(0, 300) : null
   await prisma.$transaction(async (tx) => {
-    await tx.mission.updateMany({ where: { level }, data: data as never })
+    // Concurrency guard: the level's rows must be exactly as read (same ids, rewards and titles).
+    const fresh = await tx.mission.findMany({ where: { level }, select: { id: true, reward: true, levelTitle: true } })
+    if (stable(fresh.map((x) => [x.id, x.reward, x.levelTitle])) !== stable(rows.map((x) => [x.id, x.reward, x.levelTitle]))) {
+      throw new MissionEditError(409, 'Level changed while saving; reload and retry')
+    }
+    await tx.mission.updateMany({ where: { level, id: { in: rows.map((x) => x.id) } }, data: data as never })
     for (const a of audit) {
       await tx.appSettingChange.create({
         data: { key: `missionLevel:${level}:${a.field}`, oldValue: jsonOrDbNull(a.oldValue), newValue: jsonOrDbNull(a.newValue), changedBy: actor, note },

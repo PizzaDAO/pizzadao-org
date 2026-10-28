@@ -22,6 +22,8 @@ export interface MissionsLabels {
     manualVerifier: string;
     params: string;
     paramsHelp: string;
+    rewardLowerOnly: string;
+    activeOnlyEnable: string;
     saveMission: string;
     saving: string;
     saved: string;
@@ -139,7 +141,7 @@ function LevelBox({ lvl, labels, onSaved }: { lvl: AdminLevel; labels: MissionsL
                 </label>
                 <label className="grid gap-1">
                     <span className="text-foreground/50">{labels.reward}</span>
-                    <input type="number" min={1} max={1000000} value={reward} onChange={(e) => setReward(e.target.value)} className="w-32 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
+                    <input type="number" min={1} max={lvl.reward ?? 1000000} value={reward} onChange={(e) => setReward(e.target.value)} className="w-32 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
                 </label>
                 <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder={labels.notePlaceholder} aria-label={labels.notePlaceholder} className="min-w-40 flex-1 rounded-lg border bg-background px-2 py-1" style={border} />
                 <button type="button" disabled={!dirty || saver.state === "saving"} onClick={() => saver.run(body)} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
@@ -147,6 +149,7 @@ function LevelBox({ lvl, labels, onSaved }: { lvl: AdminLevel; labels: MissionsL
                 </button>
                 {saver.state === "saved" && <span role="status" className="text-foreground/60">{labels.saved}</span>}
             </div>
+            <p className="m-0 text-xs text-foreground/50">{labels.rewardLowerOnly}</p>
             {lvl.rewardsDisagree && <p role="alert" className="m-0 text-sm text-tomato">{labels.rewardsDisagree}</p>}
             {saver.pending && <ConfirmBox labels={labels} text={saver.pending.text} onYes={() => saver.run(saver.pending!.body, true)} onNo={saver.cancel} />}
             {saver.error && <p role="alert" className="m-0 text-sm text-tomato">{saver.error}</p>}
@@ -160,32 +163,26 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
     const [title, setTitle] = useState(m.title);
     const [description, setDescription] = useState(m.description ?? "");
     const [active, setActive] = useState(m.isActive);
-    const [params, setParams] = useState(prettyParams(m.verifierParams));
-    const [note, setNote] = useState("");
+      const [note, setNote] = useState("");
     const saver = useSaver(labels, onSaved);
 
-    let parsed: { ok: true; value: Record<string, unknown> } | { ok: false } | null = null;
-    if (m.verifierKey && params.trim() !== "") {
-        try {
-            const v = JSON.parse(params) as unknown;
-            parsed = v && typeof v === "object" && !Array.isArray(v) ? { ok: true, value: v as Record<string, unknown> } : { ok: false };
-        } catch {
-            parsed = { ok: false };
-        }
+    // Only raising a numeric minimum is editable; everything else is shown read-only.
+    const current = (m.verifierParams && typeof m.verifierParams === "object" && !Array.isArray(m.verifierParams) ? m.verifierParams : {}) as Record<string, unknown>;
+    const minKeys = Object.entries(current).filter(([k, v]) => /^min([A-Z]\w*)?$/.test(k) && typeof v === "number") as Array<[string, number]>;
+    const [raised, setRaised] = useState<Record<string, string>>({});
+    const raisedParams: Record<string, number> = {};
+    for (const [k, v] of minKeys) {
+        const n = Number(raised[k]);
+        if (raised[k] !== undefined && raised[k] !== "" && Number.isFinite(n) && n > v) raisedParams[k] = n;
     }
-    const numericKeys = parsed?.ok ? Object.entries(parsed.value).filter(([, v]) => typeof v === "number") : [];
-    const setNumber = (key: string, raw: string) => {
-        if (!parsed?.ok) return;
-        setParams(JSON.stringify({ ...parsed.value, [key]: raw === "" ? "" : Number(raw) }, null, 2));
-    };
+    const paramsChanged = Object.keys(raisedParams).length > 0;
 
-    const paramsChanged = m.verifierKey != null && parsed?.ok === true && JSON.stringify(parsed.value) !== JSON.stringify(m.verifierParams ?? null);
     const body: Record<string, unknown> = {
         missionId: m.id,
         ...(title.trim() !== m.title ? { title: title.trim() } : {}),
         ...(description.trim() !== (m.description ?? "") ? { description: description.trim() || null } : {}),
         ...(active !== m.isActive ? { isActive: active } : {}),
-        ...(paramsChanged && parsed?.ok ? { verifierParams: parsed.value } : {}),
+        ...(paramsChanged ? { verifierParams: { ...current, ...raisedParams } } : {}),
         note,
     };
     const dirty = Object.keys(body).some((k) => k !== "missionId" && k !== "note");
@@ -205,30 +202,29 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
                 <textarea value={description} maxLength={1000} rows={2} onChange={(e) => setDescription(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
             </label>
             <label className="flex items-center gap-2 text-sm">
-                <input type="checkbox" checked={active} onChange={(e) => setActive(e.target.checked)} />
-                {labels.active}
+                <input type="checkbox" checked={active} disabled={m.isActive} onChange={(e) => setActive(e.target.checked)} />
+                {labels.active}{m.isActive ? <span className="text-xs text-foreground/50"> ({labels.activeOnlyEnable})</span> : null}
             </label>
             {m.verifierKey && (
                 <div className="grid gap-1 text-sm">
                     <span className="text-foreground/50">{labels.params}</span>
-                    {numericKeys.length > 0 && (
+                    {minKeys.length > 0 && (
                         <div className="flex flex-wrap gap-3">
-                            {numericKeys.map(([k, v]) => (
+                            {minKeys.map(([k, v]) => (
                                 <label key={k} className="grid gap-1">
                                     <span className="text-xs text-foreground/50">{k}</span>
-                                    <input type="number" value={String(v)} onChange={(e) => setNumber(k, e.target.value)} className="w-24 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
+                                    <input type="number" min={v + 1} placeholder={String(v)} value={raised[k] ?? ""} onChange={(e) => setRaised({ ...raised, [k]: e.target.value })} className="w-24 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
                                 </label>
                             ))}
                         </div>
                     )}
-                    <textarea value={params} rows={Math.min(8, Math.max(3, params.split("\n").length))} spellCheck={false} onChange={(e) => setParams(e.target.value)} className="rounded-lg border bg-background px-2 py-1 font-mono text-xs" style={border} />
+                    <pre className="m-0 overflow-x-auto rounded-lg border bg-background px-2 py-1 font-mono text-xs" style={border}>{prettyParams(m.verifierParams)}</pre>
                     <span className="text-xs text-foreground/50">{labels.paramsHelp}</span>
-                    {parsed && !parsed.ok && <span role="alert" className="text-xs text-tomato">{labels.errorGeneric}</span>}
                 </div>
             )}
             <div className="flex flex-wrap items-center gap-3 text-sm">
                 <input value={note} maxLength={300} onChange={(e) => setNote(e.target.value)} placeholder={labels.notePlaceholder} aria-label={labels.notePlaceholder} className="min-w-40 flex-1 rounded-lg border bg-background px-2 py-1" style={border} />
-                <button type="button" disabled={!dirty || (m.verifierKey != null && parsed?.ok === false) || saver.state === "saving"} onClick={() => saver.run(body)} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
+                <button type="button" disabled={!dirty || saver.state === "saving"} onClick={() => saver.run(body)} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
                     {saver.state === "saving" ? labels.saving : labels.saveMission}
                 </button>
                 {saver.state === "saved" && <span role="status" className="text-foreground/60">{labels.saved}</span>}
