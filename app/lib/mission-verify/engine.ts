@@ -71,6 +71,8 @@ export type CheckOutcome =
   | 'pending_review'
   | 'rejected'
   | 'not_yet'
+  | 'recorded' //       passed on a level already paid: APPROVED silently (no hold, ping, card or payout)
+  | 'locked' //         would need a human release, but the member has not reached this level yet: nothing written, re-checked later
 
 export interface MissionCheck {
   missionId: number
@@ -278,21 +280,52 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
       report.checks.push({ ...base, result: r, outcome: row?.status === 'PENDING' ? 'pending_review' : 'not_yet', holdReason: row?.holdReason ?? null })
       continue
     }
-    const hold = releaseHoldFor(m.level, discordId, now)
+    let hold = releaseHoldFor(m.level, discordId, now)
+    // A level the member was already paid for: record the pass silently (no hold, no reviewer
+    // ping, no review card, no payout: settleLevels skips paid levels).
+    let silent = false
+    if (opts.sources?.getPaidLevels || !opts.sources) {
+      try {
+        const paid = await (opts.sources ?? defaultSources).getPaidLevels?.(discordId)
+        if (paid?.has(m.level)) {
+          silent = true
+          hold = null
+        }
+      } catch (e) {
+        report.errors.push(`mission ${m.id}: paid levels: ${e instanceof Error ? e.message : String(e)}`)
+        report.checks.push({ ...base, result: r, outcome: 'not_yet' })
+        continue
+      }
+    }
+    // A pass that would need a human release, above the member's level: don't queue it (and ping
+    // reviewers) yet. Nothing is written; the level_reached event and the nightly run re-check it.
+    if (hold && !silent) {
+      try {
+        const working = await (opts.sources ?? defaultSources).getWorkingLevel(discordId)
+        if (m.level > working) {
+          report.checks.push({ ...base, result: r, outcome: 'locked' })
+          continue
+        }
+      } catch (e) {
+        report.errors.push(`mission ${m.id}: working level: ${e instanceof Error ? e.message : String(e)}`)
+        report.checks.push({ ...base, result: r, outcome: 'not_yet' })
+        continue
+      }
+    }
     if (dryRun) {
       report.checks.push({ ...base, result: r, outcome: hold ? 'would_hold' : 'would_approve', holdReason: hold })
       continue
     }
 
     const outcome = await applyPass(row, m, discordId, memberId, v.key, r.evidence, hold, opts.trigger)
-    if (outcome === 'approved') report.approved.push(m.id)
+    if (outcome === 'approved' && !silent) report.approved.push(m.id)
     if (outcome === 'held') report.held.push(m.id)
-    report.checks.push({ ...base, result: r, outcome, holdReason: outcome === 'held' ? hold : null })
+    report.checks.push({ ...base, result: r, outcome: outcome === 'approved' && silent ? 'recorded' : outcome, holdReason: outcome === 'held' ? hold : null })
   }
 
   if (!dryRun) {
     report.levelsPaid = await settleLevels(discordId)
-    if (report.approved.length || report.held.length || report.reopened.length || report.levelsPaid.length) {
+    if (report.approved.length || report.held.length || report.reopened.length || report.levelsPaid.length || report.checks.some((c) => c.outcome === 'recorded')) {
       invalidateProgressCache(discordId)
     }
     notifyInApp(discordId, report)

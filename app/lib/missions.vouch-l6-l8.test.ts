@@ -83,7 +83,7 @@ describe('the new missions are in the config', () => {
 
 describe('no demotion: members already paid for the level keep it', () => {
   it('paid for level 6 before L6.2 existed: still past level 6 (level 7), never paid again', async () => {
-    approved = without(upTo(6), VOUCH_5, 82)
+    approved = without(upTo(6), VOUCH_5)
     ledger = [1, 2, 3, 4, 5, 6].map((level) => ({ metadata: { level } }))
     expect(computeCurrentLevel(MISSIONS, new Set(approved), new Set([1, 2, 3, 4, 5, 6]))).toBe(7)
     expect(await getCurrentLevel('u')).toBe(7)

@@ -25,7 +25,8 @@ const EVENT_VERIFIERS: Record<MissionEvent, string[] | null> = {
   referral_created: ['referral'],
   vouch_created: ['vouch_given'],
   vouch_received: ['vouch_received'],
-  level_reached: ['rare_pizza_box', 'vouch_received'],
+  // Also the automatic passes that wait (outcome 'locked') until the member reaches the mission's level.
+  level_reached: ['rare_pizza_box', 'vouch_received', 'discord_role'],
 }
 
 export async function emitMissionEvent(

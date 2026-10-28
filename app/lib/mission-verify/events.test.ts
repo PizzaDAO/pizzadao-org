@@ -32,9 +32,9 @@ describe('emitMissionEvent -> which verifiers re-run', () => {
     expect(clearBoxCache).toHaveBeenCalledTimes(2)
   })
 
-  it('level_reached re-runs only the box and vouch-received missions', async () => {
+  it('level_reached re-runs only the box, vouch-received and role missions', async () => {
     await emitMissionEvent('d1', 'level_reached')
-    expect(runVerifiers).toHaveBeenCalledWith('d1', { trigger: 'event', verifierKeys: ['rare_pizza_box', 'vouch_received'] })
+    expect(runVerifiers).toHaveBeenCalledWith('d1', { trigger: 'event', verifierKeys: ['rare_pizza_box', 'vouch_received', 'discord_role'] })
   })
 
   it('giving a vouch still re-checks vouch_given (L5.2)', async () => {
