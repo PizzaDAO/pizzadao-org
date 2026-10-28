@@ -8,15 +8,18 @@ import {
   CHUNK_GAP_MS,
   DEFAULT_VAD,
   FRAME_MS,
-  FrameCollector,
+  LevelMeter,
   MAX_CHUNK_MS,
   SAMPLE_RATE,
   SILENT_DB,
+  SpeechExtractor,
+  analyzeTrack,
   callToChunkMs,
   chunkToCallMs,
-  decodeOggOpus,
   detectSpeech,
-  mapChunkSegments,
+  downmix,
+  extractSpeech,
+  mapChunkResult,
   planChunks,
   planSpeech,
   renderChunkWav,
@@ -52,23 +55,49 @@ function synth(parts: Part[]): Float32Array {
   return out
 }
 
-function collect(pcm: Float32Array, pieceSize = 1234) {
-  const c = new FrameCollector()
-  for (let i = 0; i < pcm.length; i += pieceSize) c.push(pcm.subarray(i, i + pieceSize))
-  return c.finish()
+/** Feed PCM in odd-sized pieces, like the decoder does. */
+function feed(pcm: Float32Array, sink: { push(p: Float32Array): void }, pieceSize = 1234) {
+  for (let i = 0; i < pcm.length; i += pieceSize) sink.push(pcm.subarray(i, i + pieceSize))
+}
+function levels(pcm: Float32Array) {
+  const m = new LevelMeter()
+  feed(pcm, m)
+  return m.finish()
 }
 
 const near = (actual: number, expected: number, tol = FRAME_MS) => expect(Math.abs(actual - expected)).toBeLessThanOrEqual(tol)
+const FIXTURE = path.join(__dirname, '__fixtures__', 'tone-noise.ogg')
 
-describe('frame collection', () => {
-  it('keeps samples only for frames that are not digital silence', () => {
-    const t = collect(synth([{ sec: 3, kind: 'zero' }, { sec: 1, kind: 'tone' }, { sec: 2, kind: 'zero' }]))
+describe('level meter', () => {
+  it('keeps one level per 30 ms frame and marks digital silence', () => {
+    const t = levels(synth([{ sec: 3, kind: 'zero' }, { sec: 1, kind: 'tone' }, { sec: 2, kind: 'zero' }]))
     expect(t.totalSamples).toBe(6 * SAMPLE_RATE)
+    expect(t.frameDb).toBeInstanceOf(Float32Array)
     expect(t.frameDb.length).toBe(200)
-    expect(t.frames.size).toBeGreaterThanOrEqual(33)
-    expect(t.frames.size).toBeLessThanOrEqual(35)
     expect(t.frameDb[0]).toBe(SILENT_DB)
     expect(t.frameDb[110]).toBeGreaterThan(-15) // 0.3 amplitude sine is about -13 dBFS
+  })
+
+  it('averages channels when downmixing', () => {
+    const out = downmix([Float32Array.from([1, 0.5, 0]), Float32Array.from([0, 0.5, 1])], 3)
+    expect([...out]).toEqual([0.5, 0.5, 0.5])
+    const mono = Float32Array.from([0.1, 0.2, 0.3])
+    expect(downmix([mono], 2)).toEqual(mono.subarray(0, 2))
+    expect(downmix([], 0).length).toBe(0)
+  })
+})
+
+describe('speech extraction', () => {
+  it('keeps samples only inside the wanted regions', () => {
+    const pcm = synth([{ sec: 1, kind: 'zero' }, { sec: 1, kind: 'tone' }, { sec: 1, kind: 'zero' }, { sec: 1, kind: 'tone' }])
+    const ex = new SpeechExtractor([{ startMs: 1000, endMs: 2000 }, null, { startMs: 3000, endMs: 3500 }])
+    feed(pcm, ex, 777)
+    const [a, skipped, c] = ex.finish()
+    expect(skipped).toBeUndefined()
+    expect(a!.length).toBe(SAMPLE_RATE)
+    expect(c!.length).toBe(SAMPLE_RATE / 2)
+    expect(a![123]).toBe(Math.round(pcm[SAMPLE_RATE + 123] * 32767))
+    expect(c![c!.length - 1]).toBe(Math.round(pcm[3.5 * SAMPLE_RATE - 1] * 32767))
   })
 })
 
@@ -85,7 +114,7 @@ describe('VAD', () => {
       { sec: 1.9, kind: 'zero' },
       { sec: 2, kind: 'tone' }, // 12-14 s, runs to the end of the track
     ])
-    const regions = detectSpeech(collect(pcm).frameDb)
+    const regions = detectSpeech(levels(pcm).frameDb)
     expect(regions).toHaveLength(2)
     near(regions[0].startMs, 3000 - DEFAULT_VAD.padMs)
     near(regions[0].endMs, 7000 + DEFAULT_VAD.padMs)
@@ -95,12 +124,12 @@ describe('VAD', () => {
 
   it('keeps a pause of a second or more as two regions', () => {
     const pcm = synth([{ sec: 1, kind: 'noise' }, { sec: 1, kind: 'tone' }, { sec: 2, kind: 'noise' }, { sec: 1, kind: 'tone' }, { sec: 1, kind: 'noise' }])
-    expect(detectSpeech(collect(pcm).frameDb)).toHaveLength(2)
+    expect(detectSpeech(levels(pcm).frameDb)).toHaveLength(2)
   })
 
   it('finds nothing in an all-silent or all-background track', () => {
-    expect(detectSpeech(collect(synth([{ sec: 5, kind: 'zero' }])).frameDb)).toEqual([])
-    expect(detectSpeech(collect(synth([{ sec: 5, kind: 'noise' }])).frameDb)).toEqual([])
+    expect(detectSpeech(levels(synth([{ sec: 5, kind: 'zero' }])).frameDb)).toEqual([])
+    expect(detectSpeech(levels(synth([{ sec: 5, kind: 'noise' }])).frameDb)).toEqual([])
   })
 
   it('clamps the threshold between the configured bounds', () => {
@@ -125,7 +154,7 @@ describe('chunking', () => {
   it('packs regions into chunks of at most the limit, with a gap between regions', () => {
     const regions: Region[] = Array.from({ length: 40 }, (_, i) => ({ startMs: i * 120_000, endMs: i * 120_000 + 50_000 }))
     const chunks = planChunks(regions)
-    expect(chunks.length).toBe(4) // 11 regions fit in 600 s (11 * 50 s + 10 gaps)
+    expect(chunks.length).toBe(4) // 11 regions fit in 600 s (11 * 50 s + 10 gaps of 1.5 s)
     for (const c of chunks) {
       expect(c.durationMs).toBeLessThanOrEqual(MAX_CHUNK_MS)
       for (let i = 1; i < c.pieces.length; i++) {
@@ -133,16 +162,18 @@ describe('chunking', () => {
         expect(c.pieces[i].chunkStartMs).toBe(prev.chunkStartMs + prev.srcEndMs - prev.srcStartMs + CHUNK_GAP_MS)
       }
     }
-    expect(chunks.flatMap((c) => c.pieces).map((p) => p.srcStartMs)).toEqual(regions.map((r) => r.startMs))
+    const pieces = chunks.flatMap((c) => c.pieces)
+    expect(pieces.map((p) => p.srcStartMs)).toEqual(regions.map((r) => r.startMs))
+    expect(pieces.map((p) => p.region)).toEqual(regions.map((_, i) => i))
     expect(planChunks([])).toEqual([])
     expect(() => planChunks([{ startMs: 0, endMs: MAX_CHUNK_MS + 1 }])).toThrow()
   })
 
   it('every chunk renders under the 25 MB upload limit', () => {
     const frameDb = new Float32Array(Math.ceil(3_600_000 / FRAME_MS)).fill(-20)
-    const plan = planSpeech({ frameDb, frames: new Map(), totalSamples: 3600 * SAMPLE_RATE, decodeErrors: 0 })
+    const plan = planSpeech({ frameDb })
     expect(plan.chunks.length).toBe(6)
-    for (const c of plan.chunks) expect(renderChunkWav({ frameDb, frames: new Map(), totalSamples: 3600 * SAMPLE_RATE, decodeErrors: 0 }, c).byteLength).toBeLessThan(25 * 1024 * 1024)
+    for (const c of plan.chunks) expect(renderChunkWav(c, []).byteLength).toBeLessThan(25 * 1024 * 1024)
   })
 })
 
@@ -156,35 +187,64 @@ describe('offset map', () => {
   it('round-trips call time through chunk time', () => {
     for (const t of [10_000, 11_234, 12_000, 30_000, 30_500, 90_000, 94_999]) expect(chunkToCallMs(chunk, callToChunkMs(chunk, t)!, 'start')).toBe(t)
     expect(callToChunkMs(chunk, 20_000)).toBeNull()
-    expect(chunk.pieces.map((p) => p.chunkStartMs)).toEqual([0, 2500, 4000])
+    expect(chunk.pieces.map((p) => p.chunkStartMs)).toEqual([0, 3500, 6000])
   })
 
   it('snaps times in the inserted silence to the nearest speech edge', () => {
-    expect(chunkToCallMs(chunk, 2200, 'start')).toBe(30_000)
-    expect(chunkToCallMs(chunk, 2200, 'end')).toBe(12_000)
+    expect(chunkToCallMs(chunk, 2500, 'start')).toBe(30_000)
+    expect(chunkToCallMs(chunk, 2500, 'end')).toBe(12_000)
     expect(chunkToCallMs(chunk, 99_999, 'end')).toBe(95_000)
   })
 
-  it('maps Whisper segments back to call seconds', () => {
-    const mapped = mapChunkSegments(chunk, [
+  it('maps segments inside one region, including ones ending in the following silence', () => {
+    const out = mapChunkResult(chunk, [
       { start: 0.5, end: 1.5, text: 'a' },
-      { start: 1.8, end: 3.0, text: 'b' }, // spans the gap into the second region
-      { start: 4.0, end: 9.0, text: 'c' },
+      { start: 1.8, end: 2.6, text: 'b' }, // ends in the gap: cut at its region's end
+      { start: 6.0, end: 11.0, text: 'c' },
     ])
-    expect(mapped.map((s) => [s.start, s.end, s.text])).toEqual([
+    expect(out.segments.map((s) => [s.start, s.end, s.text])).toEqual([
       [10.5, 11.5, 'a'],
-      [11.8, 30.5, 'b'],
+      [11.8, 12, 'b'],
       [90, 95, 'c'],
     ])
+    expect(out.split).toBe(0)
+    expect(out.capped).toBe(0)
+  })
+
+  it('splits a segment that runs into the next region at the boundary, using word times', () => {
+    const seg = { start: 1.2, end: 4.2, text: 'we should order more pizza', avg_logprob: -0.2 }
+    const words = [
+      { word: 'we', start: 1.2, end: 1.4 },
+      { word: 'should', start: 1.4, end: 1.9 },
+      { word: 'order', start: 3.5, end: 3.8 },
+      { word: 'more', start: 3.8, end: 4.0 },
+      { word: 'pizza', start: 4.0, end: 4.2 },
+      { word: 'later', start: 6.5, end: 6.9 }, // another segment's word
+    ]
+    const out = mapChunkResult(chunk, [seg], words)
+    expect(out.segments.map((s) => [s.start, s.end, s.text])).toEqual([
+      [11.2, 11.9, 'we should'],
+      [30, 30.7, 'order more pizza'],
+    ])
+    expect(out.segments[1].avg_logprob).toBe(-0.2) // confidence fields carry over to both parts
+    expect(out.split).toBe(1)
+  })
+
+  it('without word times, cuts a crossing segment at the end of its first region', () => {
+    const out = mapChunkResult(chunk, [{ start: 1.2, end: 4.2, text: 'we should order more pizza' }])
+    expect(out.segments.map((s) => [s.start, s.end])).toEqual([[11.2, 12]])
+    expect(out.capped).toBe(1)
   })
 })
 
 describe('WAV rendering', () => {
   it('writes a 16 kHz mono 16-bit WAV with the pieces in place and silence between them', () => {
     const pcm = synth([{ sec: 1, kind: 'zero' }, { sec: 1, kind: 'tone' }, { sec: 1, kind: 'zero' }, { sec: 1, kind: 'tone' }])
-    const track = collect(pcm)
-    const chunk = planChunks([{ startMs: 1000, endMs: 2000 }, { startMs: 3000, endMs: 4000 }])[0]
-    const wav = renderChunkWav(track, chunk)
+    const regions = [{ startMs: 1000, endMs: 2000 }, { startMs: 3000, endMs: 4000 }]
+    const ex = new SpeechExtractor(regions)
+    feed(pcm, ex)
+    const chunk = planChunks(regions)[0]
+    const wav = renderChunkWav(chunk, ex.finish())
     const view = new DataView(wav.buffer)
     expect(String.fromCharCode(...wav.subarray(0, 4))).toBe('RIFF')
     expect(String.fromCharCode(...wav.subarray(8, 12))).toBe('WAVE')
@@ -192,29 +252,50 @@ describe('WAV rendering', () => {
     expect(view.getUint16(22, true)).toBe(1)
     expect(view.getUint16(34, true)).toBe(16)
     const samples = new Int16Array(wav.buffer, 44)
-    expect(samples.length).toBe(2.5 * SAMPLE_RATE)
+    const gap = (CHUNK_GAP_MS / 1000) * SAMPLE_RATE
+    expect(samples.length).toBe(2 * SAMPLE_RATE + gap)
     expect(samples[100]).toBe(Math.round(pcm[SAMPLE_RATE + 100] * 32767))
-    expect(samples.subarray(SAMPLE_RATE, 1.5 * SAMPLE_RATE).every((s) => s === 0)).toBe(true)
-    expect(samples[1.5 * SAMPLE_RATE + 7]).toBe(Math.round(pcm[3 * SAMPLE_RATE + 7] * 32767))
+    expect(samples.subarray(SAMPLE_RATE, SAMPLE_RATE + gap).every((s) => s === 0)).toBe(true)
+    expect(samples[SAMPLE_RATE + gap + 7]).toBe(Math.round(pcm[3 * SAMPLE_RATE + 7] * 32767))
   })
 })
 
-function hasFfmpeg(): boolean {
-  try {
-    execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' })
-    return true
-  } catch {
-    return false
-  }
-}
-
 describe('decoding a real Ogg/Opus track', () => {
   it('rejects bytes that are not Ogg/Opus', async () => {
-    await expect(decodeOggOpus(new Uint8Array([1, 2, 3]))).rejects.toThrow()
+    await expect(analyzeTrack(new Uint8Array([1, 2, 3]))).rejects.toThrow()
   })
 
-  // Builds a track the way the recorder does (silence-padded, libopus 32k mono). Skipped without ffmpeg.
-  it.skipIf(!hasFfmpeg())('decodes to call-aligned 16 kHz frames and finds the speech', async () => {
+  // Checked-in synthetic fixture (no voices): 7 s, a tone at 2-3 s and noise at 4.5-6 s, libopus 16k mono.
+  it('decodes the fixture to call-aligned 16 kHz levels, finds the sounds and extracts them', async () => {
+    const bytes = new Uint8Array(readFileSync(FIXTURE))
+    const levels = await analyzeTrack(bytes)
+    near(levels.totalSamples / SAMPLE_RATE, 7, 0.05)
+    const plan = planSpeech(levels)
+    expect(plan.regions).toHaveLength(2)
+    near(plan.regions[0].startMs, 2000 - DEFAULT_VAD.padMs, 60)
+    near(plan.regions[0].endMs, 3000 + DEFAULT_VAD.padMs, 60)
+    near(plan.regions[1].startMs, 4500 - DEFAULT_VAD.padMs, 60)
+    near(plan.regions[1].endMs, 6000 + DEFAULT_VAD.padMs, 60)
+    const pcm = await extractSpeech(bytes, [plan.regions[0], null])
+    expect(pcm[1]).toBeUndefined()
+    const tone = pcm[0]!
+    expect(tone.length).toBe(Math.round(((plan.regions[0].endMs - plan.regions[0].startMs) / 1000) * SAMPLE_RATE))
+    let peak = 0
+    for (const s of tone) peak = Math.max(peak, Math.abs(s))
+    expect(peak).toBeGreaterThan(1000) // the tone (sine at 1/8 amplitude, volume 0.3: peak ~1230) is in there
+  })
+
+  function hasFfmpeg(): boolean {
+    try {
+      execFileSync('ffmpeg', ['-version'], { stdio: 'ignore' })
+      return true
+    } catch {
+      return false
+    }
+  }
+
+  // A longer track built the way the recorder does (silence-padded, libopus 32k). Skipped without ffmpeg.
+  it.skipIf(!hasFfmpeg())('finds the speech in a 90 s silence-padded track', async () => {
     const dir = mkdtempSync(path.join(tmpdir(), 'speech-test-'))
     try {
       const file = path.join(dir, 'track.ogg')
@@ -225,16 +306,11 @@ describe('decoding a real Ogg/Opus track', () => {
         '-filter_complex', '[0:a]adelay=20000:all=1[a];[1:a]volume=0.3,adelay=60000:all=1[b];[a][b]amix=inputs=2:normalize=0:duration=longest,apad=whole_dur=90[out]',
         '-map', '[out]', '-ac', '1', '-c:a', 'libopus', '-b:a', '32k', file,
       ])
-      const track = await decodeOggOpus(new Uint8Array(readFileSync(file)))
-      near(track.totalSamples / SAMPLE_RATE, 90, 0.05)
-      const plan = planSpeech(track)
+      const plan = planSpeech(await analyzeTrack(new Uint8Array(readFileSync(file))))
       expect(plan.regions).toHaveLength(2)
       near(plan.regions[0].startMs, 20_000 - DEFAULT_VAD.padMs, 60)
-      near(plan.regions[0].endMs, 28_000 + DEFAULT_VAD.padMs, 60)
-      near(plan.regions[1].startMs, 60_000 - DEFAULT_VAD.padMs, 60)
       near(plan.regions[1].endMs, 65_000 + DEFAULT_VAD.padMs, 60)
       expect(plan.chunks).toHaveLength(1)
-      near(plan.speechMs, 13_000 + 4 * DEFAULT_VAD.padMs, 200)
     } finally {
       rmSync(dir, { recursive: true, force: true })
     }
