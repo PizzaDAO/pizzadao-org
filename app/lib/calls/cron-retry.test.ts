@@ -76,7 +76,16 @@ describe('retry route', () => {
     const flat = JSON.stringify(where.AND)
     expect(flat).toContain('claimed')
     expect(flat).toContain('every track is larger')
-    expect(db.callRecording.updateMany.mock.calls[0][0].data).toEqual({ transcribeAttempts: 0, transcribeError: null })
+    expect(db.callRecording.updateMany.mock.calls[0][0].data).toEqual({ transcribeAttempts: 0, transcribeError: null, retranscribeRequestedAt: expect.any(Date) })
+  })
+  it('flags a never-processed row outside the cron window so the cron picks it up', async () => {
+    db.callRecording.updateMany.mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 })
+    expect((await call('old1')).status).toBe(200)
+    const second = db.callRecording.updateMany.mock.calls[1][0]
+    expect(second.where).toMatchObject({ transcribedAt: null, transcribeAttempts: 0, transcribeError: null, retranscribeRequestedAt: null })
+    expect(second.where.startedAt.lt).toBeInstanceOf(Date)
+    expect(second.where.speakers).toEqual({ some: { trackKey: { not: null }, talkTimeSec: { gt: 0 } } })
+    expect(second.data).toEqual({ retranscribeRequestedAt: expect.any(Date) })
   })
   it('refuses when no row matches', async () => {
     db.callRecording.updateMany.mockResolvedValue({ count: 0 })

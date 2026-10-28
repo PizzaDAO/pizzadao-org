@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isCronAuthorized } from '@/app/lib/cron-auth'
 import { internalError } from '@/app/lib/errors/error-response'
-import { generateAndStoreSummary } from '@/app/lib/calls/recordings'
+import { generateAndStoreSummaryResult } from '@/app/lib/calls/recordings'
 import { listNeedingSummary, listPendingTranscription, transcribeRecording, USED_OPENAI } from '@/app/lib/calls/transcribe'
 
 export const runtime = 'nodejs'
@@ -36,8 +36,8 @@ export async function GET(request: NextRequest) {
     // Only with time to spare: a summary is one model call (30-90 s).
     if (Date.now() - started < 150_000) {
       for (const rec of await listNeedingSummary()) {
-        const ok = await generateAndStoreSummary(rec.id, { onlyIfEmpty: true, unlessEdited: true })
-        results.push({ id: rec.id, outcome: ok ? 'summarized' : 'summary-skipped' })
+        const r = await generateAndStoreSummaryResult(rec.id, { onlyIfEmpty: true, unlessEdited: true, budgetMs: Math.max(0, 290_000 - (Date.now() - started)) })
+        results.push({ id: rec.id, outcome: r === 'ok' ? 'summarized' : r === 'skipped' ? 'summary-skipped' : 'summary-failed' })
         if (Date.now() - started > 150_000) break
       }
     }

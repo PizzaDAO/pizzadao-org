@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCallReviewer } from '@/app/lib/calls/access'
 import { CLAIMED, MAX_ATTEMPTS, TOO_LARGE_ERROR, TRANSCRIBABLE_STATUSES } from '@/app/lib/calls/transcribe'
+import { PENDING_WINDOW_DAYS } from '@/app/lib/calls/recordings'
 import { prisma } from '@/app/lib/db'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ConflictError } from '@/app/lib/errors/api-errors'
@@ -38,8 +39,25 @@ export const POST = withErrorHandling(async (_request: Request, ctx: { params: P
         { OR: [{ transcribeError: null }, { transcribeError: { not: CLAIMED } }, { updatedAt: { lt: new Date(now - CLAIM_STALE_MS) } }] },
       ],
     },
-    data: { transcribeAttempts: 0, transcribeError: null },
+    data: { transcribeAttempts: 0, transcribeError: null, retranscribeRequestedAt: new Date(now) },
   })
+  if (res.count !== 1) {
+    // Never-processed row outside the cron window (0 attempts): flag it so the cron picks it up whatever its age.
+    const old = await prisma.callRecording.updateMany({
+      where: {
+        id,
+        transcribedAt: null,
+        status: { in: [...TRANSCRIBABLE_STATUSES] },
+        transcribeAttempts: 0,
+        transcribeError: null,
+        retranscribeRequestedAt: null,
+        startedAt: { lt: new Date(now - PENDING_WINDOW_DAYS * 86_400_000) },
+        speakers: { some: { trackKey: { not: null }, talkTimeSec: { gt: 0 } } },
+      },
+      data: { retranscribeRequestedAt: new Date(now) },
+    })
+    if (old.count === 1) return NextResponse.json({ success: true })
+  }
   if (res.count !== 1) throw new ConflictError('This recording cannot be re-transcribed')
   return NextResponse.json({ success: true })
 })

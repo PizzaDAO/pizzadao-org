@@ -13,6 +13,14 @@
  *   node scripts/calls/backfill-transcripts.mjs --days 14 --limit 20
  *   node scripts/calls/backfill-transcripts.mjs --apply            # transcribe + summarize
  *
+ * Re-transcribe ONE recording that already has a machine transcript (dry run unless --apply):
+ *   node scripts/calls/backfill-transcripts.mjs --retranscribe <id>            # show what would be reset
+ *   node scripts/calls/backfill-transcripts.mjs --retranscribe <id> --apply    # reset, then transcribe + summarize now
+ *   node scripts/calls/backfill-transcripts.mjs --retranscribe <id> --apply --reset-only   # reset only; the cron redoes it within 15 min
+ * Add --force-worker to also replace spoken lines that have no server transcription stats (e.g. a recorder-provided transcript).
+ * Refuses a row with a reviewer-edited summary, a reviewer id, redacted lines or speakers, or status
+ * PUBLISHED / REJECTED. Typed chat lines are kept; spoken lines are replaced.
+ *
  * Needs (from a vercel env pull kept OUTSIDE the repo): DATABASE_URL, and for --apply OPENAI_API_KEY,
  * R2_ENDPOINT, R2_ACCESS_KEY_ID, R2_SECRET_ACCESS_KEY, R2_BUCKET_NAME and the AI Gateway credentials
  * the summary uses (AI_GATEWAY_API_KEY, since there is no Vercel OIDC locally).
@@ -26,7 +34,7 @@ import { parseArgs, die, loadDotenv } from "../unbelievaboat/args.mjs";
 ensureTsRuntime(import.meta.url);
 loadDotenv(createRequire(import.meta.url));
 
-const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help"] });
+const args = parseArgs(process.argv.slice(2), { booleans: ["apply", "help", "reset-only", "force-worker"] });
 if (args.help) {
   console.log(readFileSync(new URL(import.meta.url), "utf8").split("*/")[0]);
   process.exit(0);
@@ -44,6 +52,35 @@ const apply = !!args.apply;
 
 const { listPendingTranscription, transcribeRecording } = await importApp("app/lib/calls/transcribe.ts");
 const { prisma } = await importApp("app/lib/db.ts");
+
+if (args.retranscribe !== undefined) {
+  const id = args.retranscribe;
+  if (typeof id !== "string" || !id) die("--retranscribe needs a recording id");
+  const { resetForRetranscribe } = await importApp("app/lib/calls/retranscribe.ts");
+  try {
+    console.log(apply ? "Mode: APPLY (resets, then re-transcribes)" : "Mode: DRY RUN (writes nothing)");
+    if (apply && !args["reset-only"]) {
+      for (const name of ["OPENAI_API_KEY", "R2_ENDPOINT", "R2_ACCESS_KEY_ID", "R2_SECRET_ACCESS_KEY", "R2_BUCKET_NAME"]) {
+        if (!process.env[name]?.trim()) die(`--apply needs ${name} in the environment (or add --reset-only)`);
+      }
+    }
+    const res = await resetForRetranscribe(id, { apply, forceWorker: !!args["force-worker"] });
+    if (!res.ok) die(`${id}: ${res.reason}${res.details.length ? ` (${res.details.join("; ")})` : ""}`);
+    console.log(`${id}: ${res.tracks} audio track(s) to re-transcribe`);
+    console.log(`${id}: ${res.speechLines} spoken line(s) ${apply ? "removed" : "would be removed"}, ${res.chatLines} chat line(s) kept`);
+    if (!apply) {
+      console.log("Re-run with --apply to reset and re-transcribe.");
+    } else if (args["reset-only"]) {
+      console.log("Reset done. The cron picks it up within 15 minutes.");
+    } else {
+      const outcome = await transcribeRecording(id, { log: (m) => console.warn("  ", m) });
+      console.log(`${id}: ${outcome}`);
+    }
+  } finally {
+    await prisma.$disconnect?.();
+  }
+  process.exit(0);
+}
 
 try {
   console.log(apply ? "Mode: APPLY (transcribes and summarizes)" : "Mode: DRY RUN (writes nothing)");

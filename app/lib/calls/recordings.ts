@@ -8,7 +8,7 @@ import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { resolveCrewForEvent, type CrewRef } from './crew-map'
 import type { IngestPayload, TranscriptSegment } from './ingest-schema'
 import { chatOnlyAuthors, mergeChat, publicChatText, segmentKey } from './chat'
-import { buildSpeakerNames, generateCallSummary } from './summarize'
+import { buildSpeakerNames, DEFAULT_SUMMARY_BUDGET_MS, generateCallSummary } from './summarize'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -236,6 +236,14 @@ export function visibleSegments(
   return asSegments(transcript).filter((seg) => !hidden.has(seg.discordId) && !hiddenLines.has(segmentKey(seg)))
 }
 
+/** Error text safe to store and show: URLs removed, one line, at most 300 characters. */
+export function sanitizeSummaryError(message: string): string {
+  return message
+    .replace(/https?:\/\/\S+/gi, '')
+    .replace(/Bearer\s+\S+/gi, '')
+    .replace(/sk-[A-Za-z0-9_*.-]+/g, '').replace(/\s+/g, ' ').trim().slice(0, 300) || 'summary generation failed'
+}
+
 /**
  * Generate (or regenerate) the AI title/summary/chapters/action items from the
  * stored transcript. The result always goes back to IN_REVIEW with publishedAt
@@ -245,23 +253,41 @@ export function visibleSegments(
  * so it never overwrites a reviewer's work. A model failure keeps the transcript
  * and moves a fresh call to review so a human can retry.
  */
-export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: boolean; unlessEdited?: boolean } = {}): Promise<boolean> {
+export type SummaryResult = 'ok' | 'skipped' | 'failed'
+
+export async function generateAndStoreSummary(id: string, opts: SummaryOptions = {}): Promise<boolean> {
+  return (await generateAndStoreSummaryResult(id, opts)) === 'ok'
+}
+
+export interface SummaryOptions {
+  onlyIfEmpty?: boolean
+  unlessEdited?: boolean
+  /** Time left in the surrounding function run; the model calls are aborted to fit (default 180 s). */
+  budgetMs?: number
+}
+
+/** Like generateAndStoreSummary, but tells a deliberate skip (nothing to write, guarded write matched nothing) from a failure. */
+export async function generateAndStoreSummaryResult(id: string, opts: SummaryOptions = {}): Promise<SummaryResult> {
   // Taken BEFORE the row is read: a redaction made while the model runs is stamped later than this, so it still counts as newer than the summary.
   const startedAt = new Date()
   const rec = await prisma.callRecording.findUnique({
     where: { id },
     select: { id: true, status: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
   })
-  if (!rec || rec.status === 'REJECTED') return false
+  if (!rec || rec.status === 'REJECTED') return 'skipped'
   // Never leave a fresh row stuck in PROCESSING/RECORDED; never touch a row rejected meanwhile.
   const toReview = () => prisma.callRecording.updateMany({ where: { id, status: { in: ['PROCESSING', 'RECORDED'] } }, data: { status: 'IN_REVIEW' } })
   const segments = visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds)
   if (segments.length === 0) {
+    // Nothing to summarize: count it as an attempt so the retry sweep gives up instead of looking at this row forever.
+    await prisma.callRecording.updateMany({ where: { id, summary: null, summaryEditedAt: null }, data: { summaryError: 'no transcript text to summarize', summaryAttempts: { increment: 1 } } }).catch(() => {})
     await toReview()
-    return false
+    return 'failed'
   }
+  // Claim an attempt BEFORE the model call: if the function is killed mid-call, the attempt is still counted and the sweep cannot loop forever.
+  await prisma.callRecording.updateMany({ where: { id, summary: null, summaryEditedAt: null }, data: { summaryAttempts: { increment: 1 } } }).catch(() => {})
   try {
-    const out = await generateCallSummary(segments, buildSpeakerNames(rec.speakers, segments))
+    const out = await generateCallSummary(segments, buildSpeakerNames(rec.speakers, segments), undefined, { budgetMs: opts.budgetMs ?? DEFAULT_SUMMARY_BUDGET_MS })
     const data = {
       title: out.title,
       summary: out.summary,
@@ -271,6 +297,7 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
       publishedAt: null,
       summaryGeneratedAt: startedAt,
       summaryEditedAt: null,
+      summaryError: null,
     }
     // REJECTED is excluded in the WHERE, so a reject that lands during generation stays rejected.
     // unlessEdited: automatic runs never replace text a reviewer edited (summaryEditedAt), even if the edit landed mid-generation.
@@ -282,31 +309,48 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
       ...(opts.unlessEdited ? { summaryEditedAt: null } : {}),
     }
     const res = await prisma.callRecording.updateMany({ where, data })
-    if (res.count === 1) return true
-    // Matched nothing (a summary appeared meanwhile, or the call was rejected): still unstick a fresh row.
+    if (res.count === 1) return 'ok'
+    // Matched nothing (a summary appeared meanwhile, a reviewer edited, or the call was rejected/published): a deliberate skip, not a failure. Still unstick a fresh row.
+    console.log('[calls/summary] skipped: guarded write matched nothing')
     await toReview()
-    return false
+    return 'skipped'
   } catch (err) {
-    console.error('[calls/summary] generation failed:', err instanceof Error ? err.message : err)
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[calls/summary] generation failed:', message)
+    // Remember why (and how often) so the admin page shows it and the cron sweep can retry with a cap. Never touches a row that already has a summary.
+    await prisma.callRecording
+      .updateMany({ where: { id, summary: null, summaryEditedAt: null }, data: { summaryError: sanitizeSummaryError(message) } })
+      .catch(() => {})
     await toReview()
-    return false
+    return 'failed'
   }
 }
 
-export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete'
+/** How far back the transcription cron looks (rows reset by the re-transcribe tool are picked up whatever their age). */
+export const PENDING_WINDOW_DAYS = 14
+
+export type PublishResult = 'ok' | 'already' | 'not-found' | 'not-allowed' | 'incomplete' | 'transcribing' | 'conflict'
 
 /** IN_REVIEW -> PUBLISHED (needs a transcript and a summary). Rejected calls cannot be published. */
 export async function publishRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<PublishResult> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true } })
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, status: true, summary: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, transcribedAt: true, transcribeAttempts: true, startedAt: true, retranscribeRequestedAt: true, updatedAt: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } } } })
   if (!rec) return 'not-found'
   if (rec.status === 'PUBLISHED') return 'already'
   if (rec.status !== 'IN_REVIEW') return 'not-allowed'
+  // Not while a (re-)transcription is still due: the public text would be a partial or stale transcript. A call automatic transcription gave up on (3 attempts) can still be published by hand.
+  const hidden = new Set(rec.redactedSpeakerIds ?? [])
+  const transcribable = (rec.speakers ?? []).some((sp) => !!sp.trackKey && sp.talkTimeSec > 0 && !hidden.has(sp.discordId))
+  const hasSpeech = asSegments(rec.transcript).some((s) => s.kind !== 'chat')
+  // Only when the cron will really pick the row up (inside its window or flagged by the tool, and OpenAI configured); otherwise waiting would block publishing forever.
+  const cronWillRun = !!process.env.OPENAI_API_KEY?.trim() && (!!rec.retranscribeRequestedAt || (rec.startedAt?.getTime() ?? 0) >= now.getTime() - PENDING_WINDOW_DAYS * 86_400_000)
+  if (!rec.transcribedAt && transcribable && !hasSpeech && (rec.transcribeAttempts ?? 0) < 3 && cronWillRun) return 'transcribing'
   if (!rec.summary?.trim() || visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds).length === 0) return 'incomplete'
-  await prisma.callRecording.update({
-    where: { id },
+  // Guarded on the row we just checked: if anything changed meanwhile (a redaction, a regenerated summary, a transcript), nothing is published.
+  const res = await prisma.callRecording.updateMany({
+    where: { id, status: 'IN_REVIEW', updatedAt: rec.updatedAt },
     data: { status: 'PUBLISHED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: now },
   })
-  return 'ok'
+  return res.count === 1 ? 'ok' : 'conflict'
 }
 
 /** PUBLISHED -> IN_REVIEW. Nothing is deleted. */
