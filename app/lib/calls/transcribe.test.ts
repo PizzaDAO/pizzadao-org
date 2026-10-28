@@ -106,7 +106,7 @@ describe('transcribeRecording', () => {
     const stored = w.data.transcript as Array<{ discordId: string; kind?: string }>
     expect(stored.filter((s) => s.kind !== 'chat').map((s) => s.discordId).sort()).toEqual([ANN, BOB])
     expect(stored.some((s) => s.kind === 'chat')).toBe(true)
-    expect(w.data.transcriptLanguage).toBe('en')
+    expect(w.data.transcriptLanguage).toBe('english') // the 'en' hint is the default
     expect(w.data.status).toBeUndefined() // never parks the row in PROCESSING
     expect(summarize).toHaveBeenCalledWith('r1', { onlyIfEmpty: false, unlessEdited: true })
   })
@@ -120,7 +120,7 @@ describe('transcribeRecording', () => {
 
   it('does not overwrite a language with null', async () => {
     db.callRecording.findUnique.mockResolvedValue(rec())
-    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: async () => ({ segments: [seg('x')], language: null }), summarize: vi.fn() })
+    await transcribeRecording('r1', { apiKey: 'k', download: async () => new Uint8Array([1]), transcribe: async () => ({ segments: [seg('x')], language: null }), summarize: vi.fn(), language: null })
     expect('transcriptLanguage' in finalWrite().data).toBe(false)
   })
 

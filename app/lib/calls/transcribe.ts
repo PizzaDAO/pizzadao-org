@@ -26,6 +26,9 @@ export const TRANSCRIBABLE_STATUSES = ['RECORDED', 'PROCESSING', 'IN_REVIEW'] as
 export const CLAIMED = 'claimed'
 const PROGRESS = 'progress'
 const SUMMARY_STUCK_MS = 15 * 60 * 1000
+const SUMMARY_RETRY_MS = 60 * 60 * 1000
+/** The sweep stops retrying a summary after this many recorded failures. */
+export const MAX_SUMMARY_ATTEMPTS = 3
 /** transcribeError of a call whose every track is over the upload limit (retrying cannot help). */
 export const TOO_LARGE_ERROR = 'failed: every track is larger than the upload limit'
 const RETRY_AFTER_FAILURE_MS = 6 * 3600 * 1000
@@ -43,6 +46,25 @@ export interface Utterance {
   startMs: number
   endMs: number
   text: string
+}
+
+/**
+ * Language hint sent to Whisper (ISO-639-1). Silent stretches make auto-detection guess odd
+ * languages, so the default is 'en'; CALL_TRANSCRIBE_LANGUAGE='auto' sends no hint.
+ */
+export function transcribeLanguage(env: Record<string, string | undefined> = process.env): string | null {
+  const v = env.CALL_TRANSCRIBE_LANGUAGE?.trim().toLowerCase()
+  if (!v) return 'en'
+  return v === 'auto' ? null : v
+}
+
+/** Lower-case English language name (what Whisper reports, e.g. 'english') for an ISO-639-1 code. */
+export function languageName(code: string): string {
+  try {
+    return new Intl.DisplayNames(['en'], { type: 'language' }).of(code)?.toLowerCase() ?? code
+  } catch {
+    return code
+  }
 }
 
 export function transcribeModel(env: Record<string, string | undefined> = process.env): string {
@@ -86,13 +108,44 @@ export function dropRepeatRuns(utterances: Utterance[]): Utterance[] {
   return out
 }
 
-/** Whisper segments to clean call-time utterances. */
-export function cleanSegments(raw: WhisperSegment[]): Utterance[] {
-  const kept = raw
-    .filter((s) => typeof s.text === 'string' && s.text.trim().length > 0 && !isDubious(s))
+export interface CleanStats {
+  rawSegments: number
+  empty: number
+  droppedDubious: number
+  droppedRepeats: number
+  kept: number
+  words: number
+  /** End of the last kept utterance, in seconds (compare with talk time to spot a track that stops early). */
+  lastEndSec: number
+}
+
+const wordCount = (utterances: Utterance[]) => utterances.reduce((n, u) => n + (u.text.match(/\S+/g)?.length ?? 0), 0)
+
+/** Whisper segments to clean call-time utterances, plus counts of what the filters dropped (no text). */
+export function cleanSegmentsWithStats(raw: WhisperSegment[]): { utterances: Utterance[]; stats: CleanStats } {
+  const nonEmpty = raw.filter((s) => typeof s.text === 'string' && s.text.trim().length > 0)
+  const kept = nonEmpty
+    .filter((s) => !isDubious(s))
     .map((s) => ({ startMs: Math.max(0, Math.round(s.start * 1000)), endMs: Math.max(0, Math.round(s.end * 1000)), text: s.text.trim() }))
     .sort((a, b) => a.startMs - b.startMs)
-  return dropRepeatRuns(kept)
+  const utterances = dropRepeatRuns(kept)
+  return {
+    utterances,
+    stats: {
+      rawSegments: raw.length,
+      empty: raw.length - nonEmpty.length,
+      droppedDubious: nonEmpty.length - kept.length,
+      droppedRepeats: kept.length - utterances.length,
+      kept: utterances.length,
+      words: wordCount(utterances),
+      lastEndSec: utterances.length ? Math.round(Math.max(...utterances.map((u) => u.endMs)) / 1000) : 0,
+    },
+  }
+}
+
+/** Whisper segments to clean call-time utterances. */
+export function cleanSegments(raw: WhisperSegment[]): Utterance[] {
+  return cleanSegmentsWithStats(raw).utterances
 }
 
 /** Merge all speakers into turns ordered by start time (same rule as the recorder worker). */
@@ -124,13 +177,14 @@ export const MAX_ATTEMPTS = 3
 export const START_BUDGET_MS = 150_000
 /** Every OpenAI call (retries included) is over by this long into a run, leaving room for the summary inside maxDuration 300. */
 export const HARD_DEADLINE_MS = 210_000
-const TRACK_TIMEOUT_MS = 120_000
+/** Per-track OpenAI call limit; each call is also capped by what is left of HARD_DEADLINE_MS. */
+const TRACK_TIMEOUT_MS = 170_000
 
 /** Transcribe one audio file with OpenAI. Retries 429 and 5xx while the deadline allows; errors carry the status, never the key. */
 export async function transcribeAudio(
   bytes: Uint8Array,
   apiKey: string,
-  opts: { model?: string; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; attempts?: number; deadline?: number } = {},
+  opts: { model?: string; language?: string | null; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; attempts?: number; deadline?: number } = {},
 ): Promise<WhisperResult> {
   const doFetch = opts.fetchImpl ?? fetch
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
@@ -148,6 +202,8 @@ export async function transcribeAudio(
       form.append('model', opts.model ?? transcribeModel())
       form.append('response_format', 'verbose_json')
       form.append('temperature', '0')
+      const language = opts.language === undefined ? transcribeLanguage() : opts.language
+      if (language) form.append('language', language)
       const res = await doFetch(OPENAI_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -182,6 +238,7 @@ async function pool<T>(items: T[], limit: number, fn: (item: T) => Promise<void>
 
 export type TranscribeOutcome =
   | 'transcribed'
+  | 'transcribed-no-summary' // transcript saved, but the summary failed (error saved on the row; the sweep retries)
   | 'already-had-speech'
   | 'nothing-to-transcribe' // no usable tracks; OpenAI was not called
   | 'empty-transcript' // OpenAI was called and heard no speech
@@ -192,13 +249,15 @@ export type TranscribeOutcome =
   | 'no-key'
 
 /** Outcomes that mean this run spent OpenAI calls (the cron stops after one of them). */
-export const USED_OPENAI: ReadonlySet<TranscribeOutcome> = new Set(['transcribed', 'empty-transcript', 'progress', 'failed'])
+export const USED_OPENAI: ReadonlySet<TranscribeOutcome> = new Set(['transcribed', 'transcribed-no-summary', 'empty-transcript', 'progress', 'failed'])
 
 export interface TranscribeDeps {
   apiKey?: string
   download?: (key: string) => Promise<Uint8Array>
-  transcribe?: (bytes: Uint8Array, apiKey: string, deadline: number) => Promise<WhisperResult>
+  transcribe?: (bytes: Uint8Array, apiKey: string, deadline: number, opts: { language: string | null }) => Promise<WhisperResult>
   summarize?: typeof generateAndStoreSummary
+  /** Whisper language hint; undefined reads CALL_TRANSCRIBE_LANGUAGE, null sends none. */
+  language?: string | null
   now?: Date
   clock?: () => number
   /** When the surrounding run started (the cron shares one start across recordings so budgets are absolute). */
@@ -210,7 +269,7 @@ export interface TranscribeDeps {
 
 const hasSpeech = (segs: TranscriptSegment[]) => segs.some((s) => s.kind !== 'chat')
 
-type TrackResult = { utterances: Utterance[]; language: string | null; talkTimeSec: number } | { skipped: string }
+type TrackResult = { utterances: Utterance[]; language: string | null; talkTimeSec: number; stats?: CleanStats } | { skipped: string }
 type TrackResults = Record<string, TrackResult>
 
 function parseTrackResults(v: unknown): TrackResults {
@@ -270,10 +329,11 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   const lastAttempt = (rec.transcribeAttempts ?? 0) + 1 >= MAX_ATTEMPTS
 
   const download = deps.download ?? ((key: string) => getObjectBytes(key, MAX_UPLOAD_BYTES))
-  const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number) => transcribeAudio(bytes, key, { deadline }))
-  const send: typeof rawSend = (bytes, key, deadline) => {
+  const hint = deps.language === undefined ? transcribeLanguage() : deps.language
+  const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number, o: { language: string | null }) => transcribeAudio(bytes, key, { deadline, language: o.language }))
+  const send = (bytes: Uint8Array, key: string, deadline: number) => {
     if (deps.usage) deps.usage.calls++
-    return rawSend(bytes, key, deadline)
+    return rawSend(bytes, key, deadline, { language: hint })
   }
   const saved = parseTrackResults(rec.transcribeTracks)
   const todo = tracks.filter((t) => !(t.discordId in saved))
@@ -314,7 +374,9 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
       if (bytes.byteLength > MAX_UPLOAD_BYTES) throw new Error(`track is ${bytes.byteLength} bytes (limit ${MAX_UPLOAD_BYTES})`)
       const r = await send(bytes, apiKey, startedMs + HARD_DEADLINE_MS)
       // Persist now: a killed run must not make the next one pay for this track again.
-      await commit(t.discordId, { utterances: cleanSegments(r.segments), language: r.language, talkTimeSec: t.talkTimeSec })
+      const cleaned = cleanSegmentsWithStats(r.segments)
+      log(`track stats: talk=${t.talkTimeSec}s raw=${cleaned.stats.rawSegments} kept=${cleaned.stats.kept} dubious=${cleaned.stats.droppedDubious} repeats=${cleaned.stats.droppedRepeats} words=${cleaned.stats.words} lastEnd=${cleaned.stats.lastEndSec}s hint=${hint ?? 'auto'}`)
+      await commit(t.discordId, { utterances: cleaned.utterances, language: hint ? languageName(hint) : r.language, talkTimeSec: t.talkTimeSec, stats: cleaned.stats })
     } catch (err) {
       const msg = err instanceof Error ? err.message : String(err)
       log(`track for ${t.discordId} failed: ${msg}`)
@@ -358,22 +420,35 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   for (const u of usable) if (u.r.language) langWeight.set(u.r.language, (langWeight.get(u.r.language) ?? 0) + u.r.talkTimeSec)
   const language = [...langWeight.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
   const merged = [...freshSegs, ...speech].sort((a, b) => a.startMs - b.startMs)
-  const failedTracks = remaining.length
+  const tooLarge = tracks.filter((t) => 'skipped' in (saved[t.discordId] ?? {})).length
+  const failedTracks = remaining.length + tooLarge
+  // Per-track diagnostics (counts only, never text), keyed by speaker id.
+  const stats = Object.fromEntries(
+    tracks.flatMap((t) => {
+      const r = saved[t.discordId]
+      if (!r) return []
+      return [[t.discordId, 'skipped' in r ? { talkTimeSec: t.talkTimeSec, skipped: r.skipped } : { talkTimeSec: t.talkTimeSec, language: r.language, ...(r.stats ?? {}) }]]
+    }),
+  )
   const res = await prisma.callRecording.updateMany({
     where: { id, transcribedAt: null, status: { in: [...TRANSCRIBABLE_STATUSES] }, updatedAt: fresh.updatedAt },
     data: {
       ...(merged.length > 0 ? { transcript: merged as unknown as Prisma.InputJsonValue } : {}),
       ...(language ? { transcriptLanguage: language } : {}),
       transcribedAt: now,
-      transcribeError: failedTracks ? `partial: ${failedTracks} track(s) could not be transcribed` : null,
+      transcribeError: failedTracks ? `partial: ${failedTracks} track(s) could not be transcribed${tooLarge ? ` (${tooLarge} too large)` : ''}` : null,
       transcribeTracks: Prisma.DbNull,
+      transcribeStats: stats as Prisma.InputJsonValue,
     },
   })
   if (res.count !== 1) return 'busy'
   if (speech.length === 0) return 'empty-transcript'
   // A reviewer-edited summary is never regenerated automatically. Past the hard deadline the
   // summary is left to the cron's sweep (the row has transcribedAt and no summary).
-  if (!rec.summaryEditedAt && clock() - startedMs < HARD_DEADLINE_MS) await (deps.summarize ?? generateAndStoreSummary)(id, { onlyIfEmpty: false, unlessEdited: true })
+  if (!rec.summaryEditedAt && clock() - startedMs < HARD_DEADLINE_MS) {
+    const ok = await (deps.summarize ?? generateAndStoreSummary)(id, { onlyIfEmpty: false, unlessEdited: true })
+    if (ok === false) return 'transcribed-no-summary'
+  }
   return 'transcribed'
 }
 
@@ -405,7 +480,9 @@ async function parkForReview(id: string, summarize: typeof generateAndStoreSumma
 }
 
 /**
- * Transcribed recordings whose summary never got written (the run died mid-summary).
+ * Recordings with a transcript but no summary: the run died mid-summary, or the model failed (the row is
+ * then in review with summaryError set; retried hourly, at most 3 times). Rows a reviewer edited, rows with
+ * a summary, and published or rejected rows are never listed.
  * Known limit: this sweep only covers `summary: null`. A call that already had a (chat-only) summary
  * when its transcript arrived, and whose regeneration then died, keeps that old summary until a
  * reviewer clicks Regenerate; it is not stuck, just stale.
@@ -413,12 +490,23 @@ async function parkForReview(id: string, summarize: typeof generateAndStoreSumma
 export async function listNeedingSummary(now = new Date(), take = 3) {
   return prisma.callRecording.findMany({
     where: {
-      transcribedAt: { not: null },
       summary: null,
       summaryEditedAt: null,
-      status: { in: ['RECORDED', 'PROCESSING'] },
+      summaryGeneratedAt: null,
+      summaryAttempts: { lt: MAX_SUMMARY_ATTEMPTS },
+      status: { in: [...TRANSCRIBABLE_STATUSES] },
       transcript: { not: Prisma.DbNull },
-      updatedAt: { lt: new Date(now.getTime() - SUMMARY_STUCK_MS) },
+      AND: [
+        // Transcribed by the server, or already handed to review (a failed summary moves the row there).
+        { OR: [{ transcribedAt: { not: null } }, { status: 'IN_REVIEW' }] },
+        // A run that died mid-summary is picked up after 15 minutes; a recorded failure waits an hour.
+        {
+          OR: [
+            { summaryError: null, updatedAt: { lt: new Date(now.getTime() - SUMMARY_STUCK_MS) } },
+            { summaryError: { not: null }, updatedAt: { lt: new Date(now.getTime() - SUMMARY_RETRY_MS) } },
+          ],
+        },
+      ],
     },
     orderBy: { startedAt: 'asc' },
     take,

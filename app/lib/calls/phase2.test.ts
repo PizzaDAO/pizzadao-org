@@ -22,8 +22,8 @@ import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
 import { canReviewMission } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
-import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_MODEL, generateCallSummary, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
-import { generateAndStoreSummary, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
+import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
+import { sanitizeSummaryError, generateAndStoreSummary, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { POST as publishPOST } from '@/app/api/admin/calls/[id]/publish/route'
 import { PATCH as summaryPATCH } from '@/app/api/admin/calls/[id]/summary/route'
@@ -298,9 +298,67 @@ describe('summary generation', () => {
     m(generateText).mockRejectedValue(new Error('gateway down'))
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })
     expect(await generateAndStoreSummary('rec1')).toBe(false)
-    expect(db.callRecording.updateMany).toHaveBeenCalledTimes(1)
-    expect(db.callRecording.updateMany.mock.calls[0][0].data).toEqual({ status: 'IN_REVIEW' })
-    expect(db.callRecording.updateMany.mock.calls[0][0].where.status).toEqual({ in: ['PROCESSING', 'RECORDED'] })
+    expect(db.callRecording.updateMany).toHaveBeenCalledTimes(2)
+    // the failure is recorded on the row (no URLs, capped) and counted, but only while no summary exists
+    const rec = db.callRecording.updateMany.mock.calls[0][0]
+    expect(rec.where).toEqual({ id: 'rec1', summary: null, summaryEditedAt: null })
+    expect(rec.data).toEqual({ summaryError: 'gateway down', summaryAttempts: { increment: 1 } })
+    expect(db.callRecording.updateMany.mock.calls[1][0].data).toEqual({ status: 'IN_REVIEW' })
+    expect(db.callRecording.updateMany.mock.calls[1][0].where.status).toEqual({ in: ['PROCESSING', 'RECORDED'] })
+  })
+
+  it('error text saved on the row has URLs removed and is capped at 300 characters', () => {
+    expect(sanitizeSummaryError('Free tier. Upgrade at https://vercel.com/x?y=1 now')).toBe('Free tier. Upgrade at now')
+    expect(sanitizeSummaryError('x'.repeat(500))).toHaveLength(300)
+  })
+
+  it('falls back to OpenAI when the gateway call fails, and says which provider answered', async () => {
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    vi.stubEnv('CALL_SUMMARY_FALLBACK_MODEL', '')
+    const log = vi.spyOn(console, 'log').mockImplementation(() => undefined)
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    m(generateText).mockRejectedValueOnce(new Error('Free tier users do not have access to this model')).mockResolvedValueOnce({ output: good })
+    const out = await generateCallSummary(segments, { [ANN]: 'Ann', [BOB]: 'Bob' })
+    expect(out).toEqual(good)
+    expect(m(generateText)).toHaveBeenCalledTimes(2)
+    expect(m(generateText).mock.calls[0][0].model).toBe('anthropic/claude-sonnet-5.5')
+    const second = m(generateText).mock.calls[1][0].model as { modelId?: string; provider?: string }
+    expect(second.modelId).toBe(DEFAULT_SUMMARY_FALLBACK_MODEL)
+    expect(String(second.provider)).toContain('openai')
+    expect(log).toHaveBeenCalledWith('[calls/summary] provider=openai-fallback')
+    vi.unstubAllEnvs()
+  })
+
+  it('does not fall back without an OpenAI key, and reports both errors when both fail', async () => {
+    vi.stubEnv('OPENAI_API_KEY', '')
+    m(generateText).mockRejectedValue(new Error('gateway down'))
+    await expect(generateCallSummary(segments, {})).rejects.toThrow('gateway down')
+    expect(m(generateText)).toHaveBeenCalledTimes(1)
+    vi.stubEnv('OPENAI_API_KEY', 'sk-test')
+    vi.spyOn(console, 'warn').mockImplementation(() => undefined)
+    m(generateText).mockClear()
+    await expect(generateCallSummary(segments, {})).rejects.toThrow(/gateway: gateway down; openai fallback: gateway down/)
+    vi.unstubAllEnvs()
+  })
+
+  it('CALL_SUMMARY_FALLBACK_MODEL overrides the fallback model', () => {
+    expect(summaryFallbackModel({})).toBe('gpt-4.1')
+    expect(summaryFallbackModel({ CALL_SUMMARY_FALLBACK_MODEL: 'gpt-4o' })).toBe('gpt-4o')
+  })
+
+  it('an empty visible transcript counts as an attempt so the sweep gives up', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: [], speakers: [] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    expect(await generateAndStoreSummary('rec1')).toBe(false)
+    expect(db.callRecording.updateMany.mock.calls[0][0].data).toMatchObject({ summaryError: 'no transcript text to summarize', summaryAttempts: { increment: 1 } })
+  })
+
+  it('a successful summary clears any earlier error', async () => {
+    m(generateText).mockResolvedValue({ output: good })
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', transcript: segments, speakers: [] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    await generateAndStoreSummary('rec1')
+    expect(db.callRecording.updateMany.mock.calls[0][0].data).toMatchObject({ summaryError: null })
   })
 })
 

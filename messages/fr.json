@@ -997,6 +997,7 @@
     "recapStale": "Un intervenant ou une ligne a été masqué après la rédaction de ce résumé, le récap ne sera donc pas publié. Régénérez le résumé (ou modifiez-le et enregistrez-le) d'abord.",
     "recapError": "Dernière erreur Discord : {error}",
     "transcribeFailed": "La transcription automatique a abandonné après {count} tentatives. {error}",
+    "summaryFailed": "Le résumé automatique a échoué ({count} tentatives jusqu'ici) : {error}",
     "transcribeRetry": "Réessayer la transcription",
     "unsavedWarning": "Vous avez des modifications non enregistrées qui seront perdues. Continuer ?",
     "tooManyItems": "30 actions au maximum.",

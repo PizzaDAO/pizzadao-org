@@ -109,6 +109,10 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     )}
                 </section>
 
+                {rec.summaryError && !rec.summary && (
+                    <p className="m-0 text-tomato">{t("summaryFailed", { count: rec.summaryAttempts, error: rec.summaryError })}</p>
+                )}
+
                 {transcribeGaveUp && (
                     <section className="grid gap-2">
                         <p className="m-0 text-tomato">{t("transcribeFailed", { count: rec.transcribeAttempts, error: rec.transcribeError ?? "" })}</p>

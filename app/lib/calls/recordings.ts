@@ -236,6 +236,11 @@ export function visibleSegments(
   return asSegments(transcript).filter((seg) => !hidden.has(seg.discordId) && !hiddenLines.has(segmentKey(seg)))
 }
 
+/** Error text safe to store and show: URLs removed, one line, at most 300 characters. */
+export function sanitizeSummaryError(message: string): string {
+  return message.replace(/https?:\/\/\S+/gi, '').replace(/\s+/g, ' ').trim().slice(0, 300) || 'summary generation failed'
+}
+
 /**
  * Generate (or regenerate) the AI title/summary/chapters/action items from the
  * stored transcript. The result always goes back to IN_REVIEW with publishedAt
@@ -257,6 +262,8 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
   const toReview = () => prisma.callRecording.updateMany({ where: { id, status: { in: ['PROCESSING', 'RECORDED'] } }, data: { status: 'IN_REVIEW' } })
   const segments = visibleSegments(rec.transcript, rec.redactedSpeakerIds, rec.redactedSegmentIds)
   if (segments.length === 0) {
+    // Nothing to summarize: count it as an attempt so the retry sweep gives up instead of looking at this row forever.
+    await prisma.callRecording.updateMany({ where: { id, summary: null, summaryEditedAt: null }, data: { summaryError: 'no transcript text to summarize', summaryAttempts: { increment: 1 } } }).catch(() => {})
     await toReview()
     return false
   }
@@ -271,6 +278,7 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
       publishedAt: null,
       summaryGeneratedAt: startedAt,
       summaryEditedAt: null,
+      summaryError: null,
     }
     // REJECTED is excluded in the WHERE, so a reject that lands during generation stays rejected.
     // unlessEdited: automatic runs never replace text a reviewer edited (summaryEditedAt), even if the edit landed mid-generation.
@@ -287,7 +295,12 @@ export async function generateAndStoreSummary(id: string, opts: { onlyIfEmpty?: 
     await toReview()
     return false
   } catch (err) {
-    console.error('[calls/summary] generation failed:', err instanceof Error ? err.message : err)
+    const message = err instanceof Error ? err.message : String(err)
+    console.error('[calls/summary] generation failed:', message)
+    // Remember why (and how often) so the admin page shows it and the cron sweep can retry with a cap. Never touches a row that already has a summary.
+    await prisma.callRecording
+      .updateMany({ where: { id, summary: null, summaryEditedAt: null }, data: { summaryError: sanitizeSummaryError(message), summaryAttempts: { increment: 1 } } })
+      .catch(() => {})
     await toReview()
     return false
   }
