@@ -15,9 +15,9 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { getObjectBytes } from './r2'
-import { asSegments, generateAndStoreSummaryResult, type SummaryResult } from './recordings'
+import { asSegments, generateAndStoreSummaryResult, sanitizeSummaryError, type SummaryResult } from './recordings'
 import type { TranscriptSegment } from './ingest-schema'
-import { analyzeTrack, extractSpeech, mapChunkResult, planSpeech, renderChunkWav, type Region, type TrackLevels, type WordTime } from './speech'
+import { analyzeTrack, extractSpeech, mapChunkResult, planSpeech, renderChunkWav, wordJoiner, type Region, type TrackLevels, type WordTime } from './speech'
 
 export const DEFAULT_TRANSCRIBE_MODEL = 'whisper-1'
 /** OpenAI rejects uploads over 25 MB. */
@@ -36,13 +36,19 @@ const OPENAI_URL = 'https://api.openai.com/v1/audio/transcriptions'
 /** Statuses where machine text may still be replaced; a published or rejected call is never touched. */
 export const TRANSCRIBABLE_STATUSES = ['RECORDED', 'PROCESSING', 'IN_REVIEW'] as const
 export const CLAIMED = 'claimed'
-const PROGRESS = 'progress'
+export const PROGRESS = 'progress'
 const SUMMARY_STUCK_MS = 15 * 60 * 1000
 const SUMMARY_RETRY_MS = 60 * 60 * 1000
 /** The sweep stops retrying a summary after this many recorded failures. */
 export const MAX_SUMMARY_ATTEMPTS = 3
 /** transcribeError of a call whose every track is over the upload limit (retrying cannot help). */
 export const TOO_LARGE_ERROR = 'failed: every track is larger than the upload limit'
+/** transcribeError of a call whose every track has more speech than MAX_SPEECH_MS. */
+export const TOO_MUCH_AUDIO_ERROR = 'failed: every track has more speech than the limit'
+/** transcribeError of a call whose tracks are each either too large or have too much speech. */
+export const UNTRANSCRIBABLE_ERROR = 'failed: every track is too large or has too much speech'
+/** Permanent failures: retrying cannot help, so the admin retry is not offered. */
+export const PERMANENT_TRANSCRIBE_ERRORS: readonly string[] = [TOO_LARGE_ERROR, TOO_MUCH_AUDIO_ERROR, UNTRANSCRIBABLE_ERROR]
 const RETRY_AFTER_FAILURE_MS = 6 * 3600 * 1000
 
 export interface WhisperSegment {
@@ -211,7 +217,7 @@ const TRACK_TIMEOUT_MS = 170_000
 export async function transcribeAudio(
   bytes: Uint8Array,
   apiKey: string,
-  opts: { model?: string; language?: string | null; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; attempts?: number; deadline?: number } = {},
+  opts: { model?: string; language?: string | null; words?: boolean; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; attempts?: number; deadline?: number } = {},
 ): Promise<WhisperResult> {
   const doFetch = opts.fetchImpl ?? fetch
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
@@ -230,8 +236,11 @@ export async function transcribeAudio(
       form.append('model', opts.model ?? transcribeModel())
       form.append('response_format', 'verbose_json')
       form.append('temperature', '0')
-      form.append('timestamp_granularities[]', 'word')
-      form.append('timestamp_granularities[]', 'segment')
+      if (opts.words) {
+        // Word times let a segment that spans two speech regions be split at the boundary.
+        form.append('timestamp_granularities[]', 'word')
+        form.append('timestamp_granularities[]', 'segment')
+      }
       const language = opts.language === undefined ? transcribeLanguage() : opts.language
       if (language) form.append('language', language)
       const res = await doFetch(OPENAI_URL, {
@@ -254,6 +263,15 @@ export async function transcribeAudio(
     else break
   }
   throw new Error(lastErr)
+}
+
+/** Only the fields the filters use (drops tokens and the like before segments are saved as progress). */
+export function slimSegment(s: WhisperSegment): WhisperSegment {
+  const out: WhisperSegment = { start: s.start, end: s.end, text: s.text }
+  if (typeof s.avg_logprob === 'number') out.avg_logprob = s.avg_logprob
+  if (typeof s.no_speech_prob === 'number') out.no_speech_prob = s.no_speech_prob
+  if (typeof s.compression_ratio === 'number') out.compression_ratio = s.compression_ratio
+  return out
 }
 
 /** True for a RIFF/WAVE file (speech chunks); anything else is sent as the recorder's Ogg. */
@@ -290,7 +308,8 @@ export const USED_OPENAI: ReadonlySet<TranscribeOutcome> = new Set(['transcribed
 export interface TranscribeDeps {
   apiKey?: string
   download?: (key: string) => Promise<Uint8Array>
-  transcribe?: (bytes: Uint8Array, apiKey: string, deadline: number, opts: { language: string | null }) => Promise<WhisperResult>
+  /** opts.words: also ask for word times (speech chunks only). */
+  transcribe?: (bytes: Uint8Array, apiKey: string, deadline: number, opts: { language: string | null; words?: boolean }) => Promise<WhisperResult>
   /** First decoding pass (per-frame levels); a throw sends the whole track instead. */
   decode?: (bytes: Uint8Array) => Promise<TrackLevels>
   /** Second decoding pass: 16-bit samples of the wanted speech regions. */
@@ -334,9 +353,8 @@ type TrackResults = Record<string, TrackResult>
 
 /** Chunks of an unfinished track already paid for; a later run resumes at the next chunk. */
 interface ChunkProgress {
-  /** Plan fingerprint: the progress is used only if the track plans to the same chunks again. */
-  chunks: number
-  speechMs: number
+  /** planFingerprint of the chunk layout: the progress is used only if the track plans to exactly the same chunks again. */
+  plan: string
   /** Chunk index -> segments already mapped to call time. */
   done: Record<string, WhisperSegment[]>
   language: string | null
@@ -415,10 +433,10 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
     return p
   }
   const hint = deps.language === undefined ? transcribeLanguage() : deps.language
-  const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number, o: { language: string | null }) => transcribeAudio(bytes, key, { deadline, language: o.language }))
-  const send = (bytes: Uint8Array, key: string, deadline: number) => {
+  const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number, o: { language: string | null; words?: boolean }) => transcribeAudio(bytes, key, { deadline, language: o.language, words: o.words }))
+  const send = (bytes: Uint8Array, key: string, deadline: number, words = false) => {
     if (deps.usage) deps.usage.calls++
-    return rawSend(bytes, key, deadline, { language: hint })
+    return rawSend(bytes, key, deadline, words ? { language: hint, words: true } : { language: hint })
   }
   const { saved, progress } = parseTrackResults(rec.transcribeTracks)
   const snapshot = () =>
@@ -445,6 +463,7 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
       return false
     }
   }
+  let lastChunkError: string | null = null
   /** Save one paid chunk of an unfinished track (best effort: a lost write only costs that chunk again). */
   const saveChunk = async (): Promise<void> => {
     try {
@@ -481,9 +500,9 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
         const plan = planSpeech(levels)
         if (plan.speechMs > MAX_SPEECH_MS) return { levels, plan, tooMuch: true as const }
         const state: ChunkProgress =
-          prior && prior.chunks === plan.chunks.length && prior.speechMs === plan.speechMs
+          prior && prior.plan === plan.fingerprint
             ? prior
-            : { chunks: plan.chunks.length, speechMs: plan.speechMs, done: {}, language: null, requests: 0, split: 0, capped: 0 }
+            : { plan: plan.fingerprint, done: {}, language: null, requests: 0, split: 0, capped: 0 }
         const wanted: Array<Region | null> = plan.regions.map(() => null)
         for (const [i, c] of plan.chunks.entries()) if (!(i in state.done)) for (const p of c.pieces) wanted[p.region] = plan.regions[p.region]
         const pcm = wanted.some(Boolean) ? await extract(bytes!, wanted) : []
@@ -513,10 +532,10 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
           }
           try {
             state.requests++
-            const r = await send(renderChunkWav(c, pcm), apiKey, deadline)
+            const r = await send(renderChunkWav(c, pcm), apiKey, deadline, true)
             for (const p of c.pieces) pcm[p.region] = undefined
-            const mapped = mapChunkResult(c, r.segments, r.words)
-            state.done[i] = mapped.segments
+            const mapped = mapChunkResult(c, r.segments, r.words, wordJoiner(hint ?? r.language))
+            state.done[i] = mapped.segments.map(slimSegment)
             state.split += mapped.split
             state.capped += mapped.capped
             state.language ??= r.language
@@ -526,6 +545,7 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
             }
           } catch (err) {
             failure ??= err
+            lastChunkError = sanitizeSummaryError(err instanceof Error ? err.message : String(err))
           }
         })
         if (failure) throw failure
@@ -571,7 +591,9 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   const tooLargeOnly = remaining.length === 0 && usable.length === 0 && tracks.some((t) => 'skipped' in (saved[t.discordId] ?? {}))
   if (tooLargeOnly) {
     // Nothing can ever be sent to OpenAI as it is: permanent failure, no more attempts.
-    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: TOO_LARGE_ERROR, transcribeAttempts: MAX_ATTEMPTS, transcribeTracks: snapshot() } })
+    const reasons = new Set(tracks.map((t) => (saved[t.discordId] as { skipped?: string } | undefined)?.skipped))
+    const permanent = reasons.size === 1 && reasons.has('too-large') ? TOO_LARGE_ERROR : reasons.size === 1 && reasons.has('too-much-audio') ? TOO_MUCH_AUDIO_ERROR : UNTRANSCRIBABLE_ERROR
+    await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: permanent, transcribeAttempts: MAX_ATTEMPTS, transcribeTracks: snapshot() } })
     await parkForReview(id, deps.summarize)
     return 'failed'
   }
@@ -579,7 +601,7 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
     if (progressed > 0 && !lastAttempt) {
       // Made headway (budget ran out): resume on the next run without spending an attempt.
       // Refund the attempt only while we still hold our own claim, and never below zero.
-      await prisma.callRecording.updateMany({ where: { id, transcribedAt: null, transcribeError: CLAIMED, transcribeAttempts: { gt: 0 } }, data: { transcribeError: PROGRESS, transcribeAttempts: { decrement: 1 }, transcribeTracks: snapshot() } })
+      await prisma.callRecording.updateMany({ where: { id, transcribedAt: null, transcribeError: CLAIMED, transcribeAttempts: { gt: 0 } }, data: { transcribeError: PROGRESS, transcribeAttempts: { decrement: 1 }, transcribeTracks: snapshot(), transcribeStats: lastChunkError ? { _progress: { lastError: lastChunkError } } : Prisma.DbNull } })
       return 'progress'
     }
     await prisma.callRecording.updateMany({ where: { id, transcribedAt: null }, data: { transcribeError: `failed: ${errors[0] ?? 'time budget exhausted'}`.slice(0, 300), transcribeTracks: snapshot() } })
@@ -599,8 +621,11 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
   for (const u of usable) if (u.r.language) langWeight.set(u.r.language, (langWeight.get(u.r.language) ?? 0) + u.r.talkTimeSec)
   const language = [...langWeight.entries()].sort((a, b) => b[1] - a[1])[0]?.[0] ?? null
   const merged = [...freshSegs, ...speech].sort((a, b) => a.startMs - b.startMs)
-  const tooLarge = tracks.filter((t) => 'skipped' in (saved[t.discordId] ?? {})).length
-  const failedTracks = remaining.length + tooLarge
+  const skippedAs = (reason: string) => tracks.filter((t) => (saved[t.discordId] as { skipped?: string } | undefined)?.skipped === reason).length
+  const tooLarge = skippedAs('too-large')
+  const tooMuch = skippedAs('too-much-audio')
+  const skippedNotes = [tooLarge ? `${tooLarge} too large` : '', tooMuch ? `${tooMuch} with too much speech` : ''].filter(Boolean).join(', ')
+  const failedTracks = remaining.length + tracks.filter((t) => 'skipped' in (saved[t.discordId] ?? {})).length
   // Per-track diagnostics (counts only, never text), keyed by speaker id.
   const stats = Object.fromEntries(
     tracks.flatMap((t) => {
@@ -615,7 +640,7 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
       ...(merged.length > 0 ? { transcript: merged as unknown as Prisma.InputJsonValue } : {}),
       ...(language ? { transcriptLanguage: language } : {}),
       transcribedAt: now,
-      transcribeError: failedTracks ? `partial: ${failedTracks} track(s) could not be transcribed${tooLarge ? ` (${tooLarge} too large)` : ''}` : null,
+      transcribeError: failedTracks ? `partial: ${failedTracks} track(s) could not be transcribed${skippedNotes ? ` (${skippedNotes})` : ''}` : null,
       transcribeTracks: Prisma.DbNull,
       transcribeStats: stats as Prisma.InputJsonValue,
       retranscribeRequestedAt: null,

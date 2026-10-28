@@ -1,6 +1,6 @@
 import { NextResponse } from 'next/server'
 import { requireCallReviewer } from '@/app/lib/calls/access'
-import { CLAIMED, MAX_ATTEMPTS, TOO_LARGE_ERROR, TRANSCRIBABLE_STATUSES } from '@/app/lib/calls/transcribe'
+import { CLAIMED, MAX_ATTEMPTS, PERMANENT_TRANSCRIBE_ERRORS, TRANSCRIBABLE_STATUSES } from '@/app/lib/calls/transcribe'
 import { PENDING_WINDOW_DAYS } from '@/app/lib/calls/recordings'
 import { prisma } from '@/app/lib/db'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
@@ -35,7 +35,7 @@ export const POST = withErrorHandling(async (_request: Request, ctx: { params: P
       status: { in: [...TRANSCRIBABLE_STATUSES] },
       transcribeAttempts: { gte: MAX_ATTEMPTS },
       AND: [
-        { OR: [{ transcribeError: null }, { transcribeError: { not: TOO_LARGE_ERROR } }] },
+        { OR: [{ transcribeError: null }, { transcribeError: { notIn: [...PERMANENT_TRANSCRIBE_ERRORS] } }] },
         { OR: [{ transcribeError: null }, { transcribeError: { not: CLAIMED } }, { updatedAt: { lt: new Date(now - CLAIM_STALE_MS) } }] },
       ],
     },

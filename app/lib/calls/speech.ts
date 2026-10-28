@@ -19,6 +19,8 @@
  * sides; it happens at most once per 10 minutes of uninterrupted speech, so it is accepted.
  */
 
+import { createHash } from 'node:crypto'
+
 export const SAMPLE_RATE = 16_000
 export const FRAME_MS = 30
 export const FRAME_SAMPLES = (SAMPLE_RATE * FRAME_MS) / 1000
@@ -390,52 +392,91 @@ export interface WordTime {
   end: number
 }
 
+/** Languages written without spaces between words (ISO-639-1 codes or Whisper's language names). */
+const NO_SPACE_LANGUAGES = new Set(['ja', 'zh', 'th', 'japanese', 'chinese', 'thai'])
+
+/** Separator used to rebuild text from Whisper words for a language ('' for ja / zh / th). */
+export function wordJoiner(language: string | null | undefined): string {
+  return language && NO_SPACE_LANGUAGES.has(language.toLowerCase()) ? '' : ' '
+}
+
+const TRAILING_PUNCT = /[.?!,;:…。？！、]+$/u
+
 /**
- * Whisper segments of one chunk mapped back to call time (seconds). A segment that runs from one
- * piece into a later one is split at the boundary using the word times (each part mapped through its
- * own piece); without word times it is cut at the end of its first piece.
+ * Whisper segments of one chunk mapped back to call time (seconds).
+ *
+ * Every word is assigned once, to the segment whose span holds its midpoint (else the nearest one),
+ * so a split never drops or repeats a word. A segment whose words all fall in one piece keeps
+ * Whisper's own text; its times are clamped to that piece. A segment whose words fall in several
+ * pieces (it ran across the silence between two regions) is split per piece, each part rebuilt
+ * from its words and mapped through its own piece; the segment's final punctuation stays on the
+ * last part. A segment without words that runs into a later piece is cut at the end of its first.
  */
 export function mapChunkResult<T extends { start: number; end: number; text: string }>(
   chunk: Chunk,
   segments: T[],
   words: WordTime[] = [],
+  joiner = ' ',
 ): { segments: T[]; split: number; capped: number } {
   const out: T[] = []
   let split = 0
   let capped = 0
-  const map = (s: T, startMs: number, endMs: number, text = s.text) => {
-    const start = chunkToCallMs(chunk, startMs, 'start')
-    const end = Math.max(start, chunkToCallMs(chunk, endMs, 'end'))
+  const ps = chunk.pieces
+  const pieceEnd = (i: number) => ps[i].chunkStartMs + pieceLen(ps[i])
+  const clampTo = (i: number, tMs: number) => Math.min(pieceEnd(i), Math.max(ps[i].chunkStartMs, tMs))
+  const emit = (s: T, piece: number, startMs: number, endMs: number, text = s.text) => {
+    const start = chunkToCallMs(chunk, clampTo(piece, startMs), 'start')
+    const end = Math.max(start, chunkToCallMs(chunk, clampTo(piece, endMs), 'end'))
     out.push({ ...s, start: start / 1000, end: end / 1000, text })
   }
-  for (const s of segments) {
+
+  // Each word goes to exactly one segment.
+  const assigned: WordTime[][] = segments.map(() => [])
+  for (const w of words) {
+    if (segments.length === 0) break
+    const mid = (w.start + w.end) / 2
+    let best = 0
+    let bestDist = Infinity
+    for (let k = 0; k < segments.length; k++) {
+      const d = mid < segments[k].start ? segments[k].start - mid : mid > segments[k].end ? mid - segments[k].end : 0
+      if (d < bestDist) {
+        bestDist = d
+        best = k
+      }
+      if (d === 0) break
+    }
+    assigned[best].push(w)
+  }
+
+  segments.forEach((s, k) => {
     const sMs = s.start * 1000
     const eMs = s.end * 1000
-    const first = pieceAt(chunk, sMs)
-    const next = chunk.pieces[first + 1]
-    // Ending in the gap after its piece is fine (it maps to the piece end); reaching a later piece is not.
-    if (!next || eMs <= next.chunkStartMs) {
-      map(s, sMs, eMs)
-      continue
-    }
-    const inside = words.filter((w) => w.start * 1000 >= sMs - 20 && w.start * 1000 < eMs)
-    if (inside.length === 0) {
-      const p = chunk.pieces[first]
-      map(s, sMs, p.chunkStartMs + pieceLen(p))
-      capped++
-      continue
+    const ws = assigned[k]
+    if (ws.length === 0) {
+      const first = pieceAt(chunk, sMs)
+      const next = ps[first + 1]
+      if (next && eMs > next.chunkStartMs) capped++
+      emit(s, first, sMs, eMs)
+      return
     }
     const groups = new Map<number, WordTime[]>()
-    for (const w of inside) {
+    for (const w of ws) {
       const g = pieceAt(chunk, ((w.start + w.end) / 2) * 1000)
       groups.set(g, [...(groups.get(g) ?? []), w])
     }
-    for (const ws of groups.values()) {
-      const text = ws.map((w) => w.word.trim()).filter(Boolean).join(' ')
-      if (text) map(s, ws[0].start * 1000, ws[ws.length - 1].end * 1000, text)
+    if (groups.size === 1) {
+      emit(s, [...groups.keys()][0], sMs, eMs)
+      return
     }
-    if (groups.size > 1) split++
-  }
+    split++
+    const punct = s.text.trim().match(TRAILING_PUNCT)?.[0] ?? ''
+    const parts = [...groups.entries()].sort((a, b) => a[0] - b[0])
+    parts.forEach(([piece, gw], n) => {
+      let text = gw.map((w) => w.word.trim()).filter(Boolean).join(joiner)
+      if (n === parts.length - 1 && punct && !text.endsWith(punct)) text += punct
+      emit(s, piece, gw[0].start * 1000, gw[gw.length - 1].end * 1000, text)
+    })
+  })
   return { segments: out, split, capped }
 }
 
@@ -443,10 +484,28 @@ export interface SpeechPlan {
   regions: Region[]
   chunks: Chunk[]
   speechMs: number
+  /** Identifies the chunk layout; saved chunk progress is reused only on an exact match. */
+  fingerprint: string
+}
+
+/** Bump when the way chunks are built or mapped changes, so saved progress from older code is not reused. */
+export const PLAN_VERSION = 1
+
+/** Hash of everything that decides the chunk layout: the regions, the gap, the chunk limit and the plan version. */
+export function planFingerprint(regions: Region[], maxChunkMs = MAX_CHUNK_MS, gapMs = CHUNK_GAP_MS): string {
+  const h = createHash('sha256')
+  h.update(`v${PLAN_VERSION};gap${gapMs};max${maxChunkMs};`)
+  for (const r of regions) h.update(`${r.startMs}-${r.endMs},`)
+  return h.digest('hex').slice(0, 32)
 }
 
 /** VAD + chunking for an analyzed track. */
 export function planSpeech(levels: Pick<TrackLevels, 'frameDb'>, opts: VadOptions = DEFAULT_VAD, maxChunkMs = MAX_CHUNK_MS): SpeechPlan {
   const regions = splitLongRegions(detectSpeech(levels.frameDb, opts), levels.frameDb, maxChunkMs)
-  return { regions, chunks: planChunks(regions, maxChunkMs), speechMs: regions.reduce((n, r) => n + r.endMs - r.startMs, 0) }
+  return {
+    regions,
+    chunks: planChunks(regions, maxChunkMs),
+    speechMs: regions.reduce((n, r) => n + r.endMs - r.startMs, 0),
+    fingerprint: planFingerprint(regions, maxChunkMs),
+  }
 }

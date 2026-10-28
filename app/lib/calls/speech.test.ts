@@ -21,6 +21,8 @@ import {
   extractSpeech,
   mapChunkResult,
   planChunks,
+  planFingerprint,
+  wordJoiner,
   planSpeech,
   renderChunkWav,
   speechThresholdDb,
@@ -211,23 +213,75 @@ describe('offset map', () => {
     expect(out.capped).toBe(0)
   })
 
-  it('splits a segment that runs into the next region at the boundary, using word times', () => {
-    const seg = { start: 1.2, end: 4.2, text: 'we should order more pizza', avg_logprob: -0.2 }
-    const words = [
-      { word: 'we', start: 1.2, end: 1.4 },
-      { word: 'should', start: 1.4, end: 1.9 },
-      { word: 'order', start: 3.5, end: 3.8 },
-      { word: 'more', start: 3.8, end: 4.0 },
-      { word: 'pizza', start: 4.0, end: 4.2 },
-      { word: 'later', start: 6.5, end: 6.9 }, // another segment's word
-    ]
-    const out = mapChunkResult(chunk, [seg], words)
+  // Realistic Whisper output: segment times are a few tenths off the word times, words carry no
+  // punctuation, segment text does.
+  const realistic = {
+    segments: [
+      { start: 0.0, end: 1.4, text: ' Hello there.', avg_logprob: -0.1 },
+      { start: 1.4, end: 4.5, text: ' We should order more pizza.', avg_logprob: -0.2 }, // runs from region 1 into region 2
+      { start: 6.2, end: 8.0, text: ' See you!', avg_logprob: -0.3 },
+    ],
+    words: [
+      { word: 'Hello', start: 0.2, end: 0.5 },
+      { word: 'there', start: 0.5, end: 1.0 },
+      { word: 'We', start: 1.6, end: 1.8 },
+      { word: 'should', start: 1.8, end: 1.95 },
+      { word: 'order', start: 3.7, end: 3.9 },
+      { word: 'more', start: 3.9, end: 4.1 },
+      { word: 'pizza', start: 4.1, end: 4.4 },
+      { word: 'See', start: 6.5, end: 6.8 },
+      { word: 'you', start: 6.8, end: 7.3 },
+    ],
+  }
+
+  it('splits only the segment that crosses a region boundary, by word times, keeping other text as is', () => {
+    const out = mapChunkResult(chunk, realistic.segments, realistic.words)
     expect(out.segments.map((s) => [s.start, s.end, s.text])).toEqual([
-      [11.2, 11.9, 'we should'],
-      [30, 30.7, 'order more pizza'],
+      [10, 11.4, ' Hello there.'], // untouched text, punctuation kept
+      [11.6, 11.95, 'We should'],
+      [30.2, 30.9, 'order more pizza.'], // the segment's final punctuation stays on the last part
+      [90.2, 92, ' See you!'],
     ])
-    expect(out.segments[1].avg_logprob).toBe(-0.2) // confidence fields carry over to both parts
+    expect(out.segments[2].avg_logprob).toBe(-0.2) // confidence fields carry over to both parts
     expect(out.split).toBe(1)
+    expect(out.capped).toBe(0)
+    // No word dropped or repeated across the parts.
+    const said = out.segments.flatMap((s) => s.text.replace(/[.!]/g, '').trim().split(/\s+/))
+    expect(said).toEqual(realistic.words.map((w) => w.word))
+  })
+
+  it('gives a word outside every segment span to the nearest segment instead of dropping it', () => {
+    // The segment ends at 4.2 s but its last two words run to 4.45 s.
+    const words = [...realistic.words.slice(2, 7), { word: 'now', start: 4.4, end: 4.45 }]
+    const out = mapChunkResult(chunk, [{ start: 1.4, end: 4.2, text: ' We should order more pizza now.' }], words)
+    expect(out.segments.map((s) => s.text)).toEqual(['We should', 'order more pizza now.'])
+  })
+
+  it('joins words without spaces for languages written without them', () => {
+    expect(wordJoiner('ja')).toBe('')
+    expect(wordJoiner('chinese')).toBe('')
+    expect(wordJoiner('en')).toBe(' ')
+    expect(wordJoiner(null)).toBe(' ')
+    const out = mapChunkResult(
+      chunk,
+      [{ start: 1.5, end: 4.2, text: '今日はピザです。' }],
+      [
+        { word: '今日', start: 1.6, end: 1.8 },
+        { word: 'は', start: 1.8, end: 1.9 },
+        { word: 'ピザ', start: 3.6, end: 3.9 },
+        { word: 'です', start: 3.9, end: 4.1 },
+      ],
+      wordJoiner('ja'),
+    )
+    expect(out.segments.map((s) => s.text)).toEqual(['今日は', 'ピザです。'])
+  })
+
+  it('the plan fingerprint changes with the regions', () => {
+    const a = planFingerprint([{ startMs: 0, endMs: 1000 }])
+    expect(planFingerprint([{ startMs: 0, endMs: 1000 }])).toBe(a)
+    expect(planFingerprint([{ startMs: 0, endMs: 1030 }])).not.toBe(a)
+    expect(planFingerprint([{ startMs: 0, endMs: 1000 }], MAX_CHUNK_MS / 2)).not.toBe(a)
+    expect(planFingerprint([{ startMs: 0, endMs: 1000 }], MAX_CHUNK_MS, CHUNK_GAP_MS + 1)).not.toBe(a)
   })
 
   it('without word times, cuts a crossing segment at the end of its first region', () => {
