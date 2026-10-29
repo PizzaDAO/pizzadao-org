@@ -33,6 +33,7 @@ export interface SettingsLabels {
     fromDefault: string;
     toDefault: string;
     loadError: string;
+    empty: string;
     nonProdBanner: string;
 }
 
@@ -42,11 +43,15 @@ interface SettingView {
     areaLabel: string;
     label: string;
     help: string;
-    input: { type: "int"; min: number; max: number; unit?: string };
+    input:
+        | { type: "int"; min: number; max: number; unit?: string }
+        | { type: "text"; maxLength: number; multiline?: boolean; placeholder?: string }
+        | { type: "date" }
+        | { type: "url"; maxLength: number };
     stricterOnly: boolean;
-    default: number;
-    value: number;
-    override: number | null;
+    default: number | string;
+    value: number | string;
+    override: number | string | null;
     modified: boolean;
     invalid: boolean;
     updatedAt: string | null;
@@ -85,13 +90,16 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
     const [confirmIsReset, setConfirmIsReset] = useState(false);
     const [history, setHistory] = useState<Change[] | null>(null);
 
+    const isInt = s.input.type === "int";
     const num = Number(text);
-    const dirty = text.trim() !== "" && num !== s.value;
+    // Text-like settings may be saved empty (= unset); numbers may not.
+    const dirty = isInt ? text.trim() !== "" && num !== s.value : text.trim() !== String(s.value);
+    const sendValue = isInt ? num : text.trim();
 
     async function save(confirmed: boolean) {
         setError(null);
         setState("saving");
-        const r = await api("PUT", { key: s.key, value: num, note, confirm: confirmed, expectedUpdatedAt: s.updatedAt });
+        const r = await api("PUT", { key: s.key, value: sendValue, note, confirm: confirmed, expectedUpdatedAt: s.updatedAt });
         if (r.status === 409 && typeof r.data.needsConfirm === "string") {
             setConfirm(r.data.needsConfirm);
             setConfirmIsReset(false);
@@ -148,24 +156,48 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
             <div className="flex flex-wrap items-end gap-4 text-sm">
                 <div>
                     <div className="text-foreground/50">{labels.codeDefault}</div>
-                    <div className="font-bold tabular-nums">{s.default}{s.input.unit ? ` ${s.input.unit}` : ""}</div>
+                    <div className="font-bold tabular-nums">
+                        {s.default === "" ? labels.empty : String(s.default)}
+                        {s.input.type === "int" && s.input.unit ? ` ${s.input.unit}` : ""}
+                    </div>
                 </div>
                 <label className="grid gap-1">
                     <span className="text-foreground/50">
-                        {labels.current} ({s.input.min}-{s.input.max})
+                        {labels.current}{s.input.type === "int" ? ` (${s.input.min}-${s.input.max})` : ""}
                         {s.modified && <span className="ml-2 rounded bg-tomato/15 px-1.5 py-0.5 text-xs text-tomato">{labels.modified}</span>}
                     </span>
-                    <input
-                        type="number"
-                        inputMode="numeric"
-                        min={s.input.min}
-                        max={s.input.max}
-                        step={1}
-                        value={text}
-                        onChange={(e) => setText(e.target.value)}
-                        className="w-28 rounded-lg border bg-background px-2 py-1 tabular-nums"
-                        style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
-                    />
+                    {s.input.type === "int" ? (
+                        <input
+                            type="number"
+                            inputMode="numeric"
+                            min={s.input.min}
+                            max={s.input.max}
+                            step={1}
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            className="w-28 rounded-lg border bg-background px-2 py-1 tabular-nums"
+                            style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
+                        />
+                    ) : s.input.type === "text" && s.input.multiline ? (
+                        <textarea
+                            rows={5}
+                            maxLength={s.input.maxLength}
+                            placeholder={s.input.placeholder}
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            className="w-80 max-w-full rounded-lg border bg-background px-2 py-1"
+                            style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
+                        />
+                    ) : (
+                        <input
+                            type={s.input.type === "date" ? "date" : s.input.type === "url" ? "url" : "text"}
+                            maxLength={s.input.type === "date" ? undefined : s.input.maxLength}
+                            value={text}
+                            onChange={(e) => setText(e.target.value)}
+                            className="w-80 max-w-full rounded-lg border bg-background px-2 py-1"
+                            style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
+                        />
+                    )}
                 </label>
                 <input
                     type="text"
@@ -219,8 +251,8 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
 function changeText(c: Change, labels: SettingsLabels): string {
     return fill(labels.changeLine, {
         key: c.key,
-        from: c.oldValue === null || c.oldValue === undefined ? labels.fromDefault : String(c.oldValue),
-        to: c.newValue === null || c.newValue === undefined ? labels.toDefault : String(c.newValue),
+        from: c.oldValue === null || c.oldValue === undefined ? labels.fromDefault : String(c.oldValue).slice(0, 120),
+        to: c.newValue === null || c.newValue === undefined ? labels.toDefault : String(c.newValue).slice(0, 120),
         who: c.changedBy,
     });
 }

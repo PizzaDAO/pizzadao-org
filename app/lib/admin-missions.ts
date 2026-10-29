@@ -1,6 +1,6 @@
 /**
  * Admin mission editor (plans/app-settings.md 4.7): requirement thresholds, per-level rewards,
- * titles and re-activating a mission. NOT editable here: verifierKey, proofKind, level, index,
+ * titles, the "how to do this" handbook link and re-activating a mission. NOT editable here: verifierKey, proofKind, level, index,
  * creating or deleting missions (code / script changes).
  *
  * Stricter-only from the UI (Snax's decision 1: loosening needs a PR), enforced here, server side.
@@ -23,6 +23,8 @@ import { clearMissionCaches } from '@/app/lib/mission-cache'
 import { LEVEL_REWARD_CEILING, MISSION_VERIFIER_CONFIG } from '@/app/lib/mission-verify/mission-config'
 import { getVerifier } from '@/app/lib/mission-verify/verifiers'
 import { jsonOrDbNull } from '@/app/lib/settings/json'
+import { parseGuideHref } from '@/app/lib/guide-href'
+import { isHandbookSlug } from '@/content/handbook'
 
 export class MissionEditError extends Error {
   constructor(
@@ -92,6 +94,8 @@ export interface AdminMission {
   /** The code (seed) params: numeric minimums can't go below these. */
   codeParams: Plain | null
   proofKind: string
+  /** Handbook page that explains the mission (internal path), or null. */
+  guideHref: string | null
 }
 
 export interface AdminLevel {
@@ -110,7 +114,7 @@ export async function listAdminLevels(): Promise<AdminLevel[]> {
     orderBy: [{ level: 'asc' }, { index: 'asc' }],
     select: {
       id: true, level: true, index: true, title: true, description: true, isActive: true, reward: true,
-      levelTitle: true, verifierKey: true, verifierParams: true, proofKind: true,
+      levelTitle: true, verifierKey: true, verifierParams: true, proofKind: true, guideHref: true,
     },
   })
   const byLevel = new Map<number, typeof rows>()
@@ -125,7 +129,7 @@ export async function listAdminLevels(): Promise<AdminLevel[]> {
       rewardCeiling: LEVEL_REWARD_CEILING[level] ?? null,
       missions: list.map((r) => ({
         id: r.id, level: r.level, index: r.index, title: r.title, description: r.description, isActive: r.isActive,
-        verifierKey: r.verifierKey, verifierParams: r.verifierParams, codeParams: codeParamsOf(r.level, r.index), proofKind: String(r.proofKind),
+        verifierKey: r.verifierKey, verifierParams: r.verifierParams, codeParams: codeParamsOf(r.level, r.index), proofKind: String(r.proofKind), guideHref: r.guideHref ?? null,
       })),
     }
   })
@@ -138,6 +142,7 @@ export interface MissionPatch {
   description?: unknown
   isActive?: unknown
   verifierParams?: unknown
+  guideHref?: unknown
 }
 
 const stable = (v: unknown): string =>
@@ -210,6 +215,13 @@ export async function updateMission(
     }
     const d = typeof patch.description === 'string' ? patch.description.trim() || null : null
     set('description', current.description, d)
+  }
+  if (patch.guideHref !== undefined) {
+    const g = parseGuideHref(patch.guideHref)
+    if (!g.ok) throw new MissionEditError(400, g.error)
+    const slug = g.value?.match(/^\/handbook\/([a-z0-9-]+)/)?.[1]
+    if (slug && !isHandbookSlug(slug)) throw new MissionEditError(400, `guideHref: there is no handbook page "${slug}"`)
+    set('guideHref', current.guideHref ?? null, g.value)
   }
   if (patch.isActive !== undefined) {
     if (typeof patch.isActive !== 'boolean') throw new MissionEditError(400, 'isActive must be true or false')

@@ -557,6 +557,9 @@ model Mission {
   verifierKey    String?   // registry key, e.g. "x_linked" (app/lib/mission-verify/verifiers)
   verifierParams Json?     // parsed by the verifier's params parser
   proofKind      ProofKind @default(NONE) // what the submit form asks for
+  // Handbook page that explains how to do this mission (internal path, e.g. /handbook/levels#vouching).
+  // Editable in /admin/missions; null = no link.
+  guideHref      String?   @db.VarChar(120)
   completions MissionCompletion[]
   @@unique([level, index])
 }

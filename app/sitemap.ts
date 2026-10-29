@@ -2,6 +2,7 @@ import type { MetadataRoute } from "next";
 import { SITE_URL } from "@/app/lib/site-url";
 import { prisma } from "@/app/lib/db";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { HANDBOOK_PAGES } from "@/content/handbook";
 
 // Regenerate at most hourly; dynamic sections are best-effort so a DB or
 // sheet outage still yields the static routes.
@@ -16,6 +17,8 @@ const STATIC_ROUTES: Array<{ path: string; priority: number; changeFrequency: "d
   { path: "/articles", priority: 0.8, changeFrequency: "daily" },
   { path: "/missions", priority: 0.6, changeFrequency: "weekly" },
   { path: "/calls", priority: 0.6, changeFrequency: "daily" },
+  { path: "/handbook", priority: 0.7, changeFrequency: "monthly" },
+  ...HANDBOOK_PAGES.map((p) => ({ path: `/handbook/${p.slug}`, priority: 0.7, changeFrequency: "monthly" as const })),
   { path: "/manuals", priority: 0.6, changeFrequency: "weekly" },
   { path: "/turtles", priority: 0.5, changeFrequency: "monthly" },
   { path: "/tech/projects", priority: 0.5, changeFrequency: "weekly" },

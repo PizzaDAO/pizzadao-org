@@ -22,6 +22,7 @@ import { MissionCard, type MissionCheckInfo } from "../ui/missions/MissionCard";
 import { MissionReviewPanel } from "../ui/missions/MissionReviewPanel";
 import { MissionCompleteCelebration } from "../ui/missions/MissionCompleteCelebration";
 import { LevelUpModal } from "../ui/missions/LevelUpModal";
+import { HowLevelsWorkLink } from "../ui/missions/GuideLink";
 import { VouchPromptCard } from "../ui/missions/VouchPromptCard";
 import { levelUpToCelebrate, type LevelUp } from "./level-up";
 
@@ -36,6 +37,7 @@ type MissionData = {
   proofHint?: string;
   referral?: boolean;
   getBoxUrl?: string;
+  guideHref?: string;
   noManualSubmit?: boolean;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };
@@ -544,6 +546,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
             <span style={{ color: "hsl(var(--tomato))", fontWeight: 700 }}>$PEP</span>{" "}
             rewards. Each one is its own little case file.
           </p>
+          <HowLevelsWorkLink />
 
           {/* Handwritten margin scribble — flavor, hidden on small screens. */}
           <span

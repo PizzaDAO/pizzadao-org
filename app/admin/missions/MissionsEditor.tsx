@@ -17,6 +17,8 @@ export interface MissionsLabels {
     saveLevel: string;
     missionTitle: string;
     missionDescription: string;
+    guideLink: string;
+    guideLinkHelp: string;
     active: string;
     verifier: string;
     manualVerifier: string;
@@ -48,6 +50,7 @@ interface AdminMission {
     verifierParams: unknown;
     codeParams: Record<string, unknown> | null;
     proofKind: string;
+    guideHref: string | null;
 }
 interface AdminLevel {
     level: number;
@@ -164,6 +167,7 @@ const prettyParams = (v: unknown) => (v === null || v === undefined ? "" : JSON.
 function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsLabels; onSaved: () => void }) {
     const [title, setTitle] = useState(m.title);
     const [description, setDescription] = useState(m.description ?? "");
+    const [guideHref, setGuideHref] = useState(m.guideHref ?? "");
     const [active, setActive] = useState(m.isActive);
       const [note, setNote] = useState("");
     const saver = useSaver(labels, onSaved);
@@ -188,6 +192,7 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
         missionId: m.id,
         ...(title.trim() !== m.title ? { title: title.trim() } : {}),
         ...(description.trim() !== (m.description ?? "") ? { description: description.trim() || null } : {}),
+        ...(guideHref.trim() !== (m.guideHref ?? "") ? { guideHref: guideHref.trim() || null } : {}),
         ...(active !== m.isActive ? { isActive: active } : {}),
         ...(paramsChanged ? { verifierParams: { ...current, ...changedParams } } : {}),
         note,
@@ -207,6 +212,11 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
             <label className="grid gap-1 text-sm">
                 <span className="text-foreground/50">{labels.missionDescription}</span>
                 <textarea value={description} maxLength={1000} rows={2} onChange={(e) => setDescription(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
+            </label>
+            <label className="grid gap-1 text-sm">
+                <span className="text-foreground/50">{labels.guideLink}</span>
+                <input value={guideHref} maxLength={120} placeholder="/handbook/levels#vouching" onChange={(e) => setGuideHref(e.target.value)} className="rounded-lg border bg-background px-2 py-1" style={border} />
+                <span className="text-xs text-foreground/50">{labels.guideLinkHelp}</span>
             </label>
             <label className="flex items-center gap-2 text-sm">
                 <input type="checkbox" checked={active} disabled={m.isActive} onChange={(e) => setActive(e.target.checked)} />
@@ -274,7 +284,7 @@ export function MissionsEditor({ labels }: { labels: MissionsLabels }) {
                     <LevelBox key={`${lvl.reward}:${lvl.levelTitle}`} lvl={lvl} labels={labels} onSaved={load} />
                     <ul className="m-0 grid list-none gap-3 p-0">
                         {lvl.missions.map((m) => (
-                            <MissionBox key={`${m.id}:${JSON.stringify([m.title, m.description, m.isActive, m.verifierParams])}`} m={m} labels={labels} onSaved={load} />
+                            <MissionBox key={`${m.id}:${JSON.stringify([m.title, m.description, m.guideHref, m.isActive, m.verifierParams])}`} m={m} labels={labels} onSaved={load} />
                         ))}
                     </ul>
                 </section>

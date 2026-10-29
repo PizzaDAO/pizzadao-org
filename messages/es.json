@@ -30,7 +30,7 @@
       "appetiteNote": "ven con hambre",
       "explore": "Explorar PizzaDAO",
       "stories": "Leer nuestras historias",
-      "guides": "Ver guías"
+      "guides": "Lee la guía"
     },
     "name": {
       "heroPrefix": "Reclama tu",
@@ -419,7 +419,7 @@
     "articles": "Historias",
     "calls": "Historial de llamadas",
     "chats": "Chats",
-    "manuals": "Guías",
+    "manuals": "Manuales de crews",
     "turtles": "Roles (Turtles)",
     "techProjects": "Proyectos tech",
     "nfts": "NFTs",
@@ -440,7 +440,8 @@
     "resources": "Recursos",
     "activation": "Activación de miembros",
     "spotlight": "Foco de la Mafia",
-    "spotlightAdmin": "Cola de Spotlight"
+    "spotlightAdmin": "Cola de Spotlight",
+    "handbook": "Guía de PizzaDAO"
   },
   "dashboard": {
     "loading": {
@@ -633,7 +634,8 @@
         "heading": "Nivel {level}",
         "reward": "+{amount, number} $PEP ganados",
         "finalBody": "Llegaste a la cima. Eres un auténtico Pizza Don.",
-        "continue": "Continuar"
+        "continue": "Continuar",
+        "whatsNext": "Qué sigue"
       }
     },
     "optionalSetup": {
@@ -656,12 +658,16 @@
       "notNow": "Ahora no",
       "ariaLabel": "Sugerencia de Box Mafia"
     },
-    "howToAttend": "Cómo asistir a una llamada"
+    "howToAttend": "Cómo asistir a una llamada",
+    "gettingStarted": "Primeros pasos",
+    "handbook": "Guía de PizzaDAO"
   },
   "missionLinks": {
     "boxHint": "Esta misión necesita una Rare Pizza Box NFT en una wallet conectada a tu perfil.",
     "getBox": "Consigue una Rare Pizza Box",
-    "bonus": "Extra: este nivel ya está completo. Esta misión es opcional y no da más recompensa."
+    "bonus": "Extra: este nivel ya está completo. Esta misión es opcional y no da más recompensa.",
+    "howTo": "Cómo hacerlo",
+    "howLevelsWork": "Cómo funcionan los niveles"
   },
   "crewsPage": {
     "joined": "Inscrito",
@@ -1147,7 +1153,8 @@
     "nextLevel": "Nivel {level}",
     "nextCta": "Empezar esta misión",
     "nextNone": "Terminaste todas las misiones disponibles. Buen trabajo.",
-    "nextCtaAll": "Ver todas las misiones"
+    "nextCtaAll": "Ver todas las misiones",
+    "handbook": "Guía de PizzaDAO"
   },
   "reengage": {
     "subjectMission": "Tu próxima misión: {title}",
@@ -1244,7 +1251,8 @@
     "changeLine": "{key}: {from} a {to} por {who}",
     "fromDefault": "valor por defecto",
     "toDefault": "valor por defecto",
-    "loadError": "No se pudieron cargar los ajustes."
+    "loadError": "No se pudieron cargar los ajustes.",
+    "empty": "(vacío)"
   },
   "adminMissions": {
     "title": "Editor de misiones",
@@ -1281,7 +1289,9 @@
     "errorGeneric": "No se pudo guardar. Revisa los valores e inténtalo de nuevo.",
     "loadError": "No se pudieron cargar las misiones.",
     "rewardLowerOnly": "Las recompensas se pueden bajar, o subir de nuevo hasta el valor del código; superarlo requiere un PR.",
-    "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR."
+    "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR.",
+    "guideLink": "Enlace a la guía",
+    "guideLinkHelp": "Opcional. Muestra un enlace \"Cómo hacerlo\" en la tarjeta de la misión. Solo rutas internas del manual, por ejemplo /handbook/levels#vouching. Déjalo vacío para no mostrar enlace."
   },
   "passport": {
     "overline": "Pasaporte Pizza",
@@ -1326,5 +1336,49 @@
       "not_found": "No encontramos esta pizzería."
     },
     "alreadyCounted": "Ya registraste una visita aquí hace poco. Vuelve otro día para sumar una visita."
+  },
+  "handbook": {
+    "metaTitle": "Guía de PizzaDAO",
+    "metaDescription": "Todo lo que necesita un nuevo miembro o anfitrión de PizzaDAO: primeros pasos, niveles y misiones, organizar una fiesta y crear un POAP.",
+    "overline": "Guía de PizzaDAO",
+    "titlePrefix": "La guía de",
+    "titleAccent": "PizzaDAO",
+    "dek": "Cómo funcionan las cosas, siempre actualizado en un solo lugar. Elige un capítulo o empieza por Primeros pasos.",
+    "pages": "Capítulos de la guía",
+    "back": "Guía de PizzaDAO",
+    "open": "Leer",
+    "groups": {
+      "newMember": "Nuevos miembros",
+      "hosting": "Organizar",
+      "takingPart": "Participar"
+    },
+    "chapters": {
+      "attend": {
+        "title": "Cómo asistir a una llamada",
+        "dek": "Encuentra la llamada de tu crew, entra al canal de voz de Discord y sabe qué esperar."
+      },
+      "crewManuals": {
+        "title": "Manuales de crews",
+        "dek": "Las guías de trabajo que cada crew mantiene para sus propias tareas."
+      }
+    },
+    "lastReviewed": "Última revisión: {date}",
+    "outdated": "Esta página se revisó por última vez hace más de un año y puede estar desactualizada.",
+    "notTranslated": "Esta página aún no está traducida a tu idioma, por eso se muestra en inglés.",
+    "wrong": "¿Algo no está bien?",
+    "wrongCta": "Avísanos",
+    "next": {
+      "title": "Tu próxima misión",
+      "level": "Nivel {level}",
+      "cta": "Abrir misiones",
+      "login": "Inicia sesión para ver tu próxima misión"
+    },
+    "levels": {
+      "tableTitle": "Niveles y misiones",
+      "level": "Nivel {n}",
+      "reward": "Recompensa: {pep, number} PEP",
+      "unavailable": "La lista de niveles en vivo no está disponible ahora.",
+      "seeMissions": "Ver todas las misiones"
+    }
   }
 }

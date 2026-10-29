@@ -12,13 +12,26 @@
  */
 import { z } from 'zod'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
-export const AREA_LABELS: Record<SettingArea, string> = { missions: 'Missions', calls: 'Calls', disavow: 'Disavow list', passport: 'Pizza Passport' }
+export const AREA_LABELS: Record<SettingArea, string> = {
+  missions: 'Missions',
+  calls: 'Calls',
+  disavow: 'Disavow list',
+  passport: 'Pizza Passport',
+  guide: 'Handbook facts',
+}
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
 export type FailureMode<T> = { value: T } | 'lastKnownGood' | 'throw'
+
+/** How the admin page edits a value. Text-like inputs allow an empty string (= unset). */
+export type SettingInput =
+  | { type: 'int'; min: number; max: number; unit?: string }
+  | { type: 'text'; maxLength: number; multiline?: boolean; placeholder?: string }
+  | { type: 'date' }
+  | { type: 'url'; maxLength: number }
 
 export interface SettingDef<T> {
   key: string
@@ -29,8 +42,8 @@ export interface SettingDef<T> {
   schema: z.ZodType<T>
   default: T
   onReadFailure: FailureMode<T>
-  /** Shown in the UI (number inputs); the schema is the authority. */
-  input: { type: 'int'; min: number; max: number; unit?: string }
+  /** Shown in the UI; the schema is the authority. */
+  input: SettingInput
   /** Non-null text makes the admin page ask for confirmation before saving. */
   confirm?: (from: T, to: T) => string | null
   /** True when the code bound deliberately stops at today's value (loosening needs a PR). */
@@ -68,6 +81,84 @@ function intSetting(o: {
     confirm: o.confirm,
     stricterOnly: o.stricterOnly,
     looserWhen: o.looserWhen,
+  }
+}
+
+const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
+
+export function textSetting(o: {
+  key: string
+  area: SettingArea
+  label: string
+  help: string
+  maxLength: number
+  multiline?: boolean
+  default?: string
+  placeholder?: string
+  /** Extra validation on the trimmed value (runs on write and on read). */
+  check?: (value: string) => boolean
+  checkMessage?: string
+  onReadFailure?: FailureMode<string>
+}): SettingDef<string> {
+  const base = z.string().trim().max(o.maxLength)
+  const check = o.check
+  const schema = check ? base.refine(check, o.checkMessage ?? 'Invalid value') : base
+  return {
+    key: o.key,
+    area: o.area,
+    label: o.label,
+    help: o.help,
+    schema,
+    default: o.default ?? '',
+    onReadFailure: o.onReadFailure ?? { value: o.default ?? '' },
+    input: {
+      type: 'text',
+      maxLength: o.maxLength,
+      ...(o.multiline ? { multiline: true } : {}),
+      ...(o.placeholder ? { placeholder: o.placeholder } : {}),
+    },
+  }
+}
+
+/** ISO `YYYY-MM-DD` that is a real calendar date, or empty (= unset). */
+function dateSetting(o: { key: string; area: SettingArea; label: string; help: string; default?: string }): SettingDef<string> {
+  return {
+    key: o.key,
+    area: o.area,
+    label: o.label,
+    help: o.help,
+    schema: z.string().refine((v) => {
+      if (v === '') return true
+      if (!ISO_DATE.test(v)) return false
+      const d = new Date(`${v}T00:00:00Z`)
+      return !Number.isNaN(d.getTime()) && d.toISOString().slice(0, 10) === v
+    }, 'Use a real date as YYYY-MM-DD, or leave empty'),
+    default: o.default ?? '',
+    onReadFailure: { value: o.default ?? '' },
+    input: { type: 'date' },
+  }
+}
+
+/** https-only URL (no credentials), or empty (= unset, and whatever links to it is hidden). */
+function urlSetting(o: { key: string; area: SettingArea; label: string; help: string; default?: string }): SettingDef<string> {
+  const maxLength = 300
+  return {
+    key: o.key,
+    area: o.area,
+    label: o.label,
+    help: o.help,
+    schema: z.string().trim().max(maxLength).refine((v) => {
+      if (v === '') return true
+      try {
+        const u = new URL(v)
+        return u.protocol === 'https:' && !u.username && !u.password && !!u.hostname
+      } catch {
+        return false
+      }
+    }, 'Use a full https:// address, or leave empty').transform((v) => (v === '' ? '' : new URL(v).href)),
+    default: o.default ?? '',
+    onReadFailure: { value: o.default ?? '' },
+    input: { type: 'url', maxLength },
   }
 }
 
@@ -227,7 +318,81 @@ export const SETTINGS = {
     default: 900,
     unit: 'km/h',
   }),
-} as const satisfies Record<string, SettingDef<number>>
+  // Handbook facts (plans/onboarding-guide.md). Everything defaults to unset, and the handbook text
+  // that depends on a value is hidden until an admin fills it in here.
+  'guide.discordUrl': urlSetting({
+    key: 'guide.discordUrl',
+    area: 'guide',
+    label: 'Discord invite link',
+    help: 'Public invite link shown in Getting started. Empty hides the sentence.',
+  }),
+  'guide.eventsUrl': urlSetting({
+    key: 'guide.eventsUrl',
+    area: 'guide',
+    label: 'Events site link',
+    help: 'Where hosts list their party. Empty hides the sentence.',
+  }),
+  'guide.gppDate': dateSetting({
+    key: 'guide.gppDate',
+    area: 'guide',
+    label: 'Global Pizza Party date',
+    help: 'Next Global Pizza Party date (YYYY-MM-DD). Empty hides the date. Shown formatted for each reader\'s language.',
+  }),
+  'guide.gppEdition': intSetting({
+    key: 'guide.gppEdition',
+    area: 'guide',
+    label: 'Global Pizza Party edition number',
+    help: 'Edition number of the next Global Pizza Party. 0 hides it.',
+    min: 0,
+    max: 50,
+    default: 0,
+    onReadFailure: { value: 0 },
+  }),
+  'guide.hostCapUsd': intSetting({
+    key: 'guide.hostCapUsd',
+    area: 'guide',
+    label: 'Host contribution cap (USD)',
+    help: 'Most the DAO contributes per hosted party, shown on Host a party. 0 hides the cap sentence.',
+    min: 0,
+    max: 100000,
+    default: 0,
+    unit: 'USD',
+    onReadFailure: { value: 0 },
+  }),
+  'guide.budgetTemplateUrl': urlSetting({
+    key: 'guide.budgetTemplateUrl',
+    area: 'guide',
+    label: 'Event budget template link',
+    help: 'Link to the budget spreadsheet hosts copy. Empty hides the link.',
+  }),
+  'guide.paymentFormUrl': urlSetting({
+    key: 'guide.paymentFormUrl',
+    area: 'guide',
+    label: 'Payment form link',
+    help: 'Link to the form hosts use to request reimbursement. Empty hides the link.',
+  }),
+  'guide.hostPlaybookUrl': urlSetting({
+    key: 'guide.hostPlaybookUrl',
+    area: 'guide',
+    label: 'Host playbook link',
+    help: 'Link to the host playbook document. Empty hides the link.',
+  }),
+  'guide.hashtags': textSetting({
+    key: 'guide.hashtags',
+    area: 'guide',
+    label: 'Hashtags',
+    help: 'Hashtags hosts should use when posting. Empty hides the sentence.',
+    maxLength: 200,
+  }),
+  'guide.hostDeadlines': textSetting({
+    key: 'guide.hostDeadlines',
+    area: 'guide',
+    label: 'Host deadlines',
+    help: 'Markdown list of this year\'s host deadlines (for example "- Budget submitted: 1 March"). Empty hides the section.',
+    maxLength: 1000,
+    multiline: true,
+  }),
+} as const satisfies Record<string, SettingDef<number> | SettingDef<string>>
 
 export type SettingKey = keyof typeof SETTINGS
 export type SettingValue<K extends SettingKey> = z.infer<(typeof SETTINGS)[K]['schema']>

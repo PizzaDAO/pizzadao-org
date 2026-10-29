@@ -23,6 +23,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/tech/projects", label: "techProjects" },
   ] },
   { key: "resources", items: [
+    { href: "/handbook", label: "handbook" },
     { href: "/manuals", label: "manuals" },
     { href: "/turtles", label: "turtles" },
     { href: "/calls", label: "calls" },

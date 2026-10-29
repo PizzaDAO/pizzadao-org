@@ -26,9 +26,13 @@ describe('settings registry', () => {
       const def = SETTINGS[key]
       expect(parseSetting(key, def.default).ok).toBe(true)
       // A failure value may sit outside the editable bounds on purpose (the strictest value, e.g. level 1).
-      if (typeof def.onReadFailure === 'object') expect(Number.isInteger(def.onReadFailure.value)).toBe(true)
-      expect(def.input.min).toBeLessThanOrEqual(def.default)
-      expect(def.input.max).toBeGreaterThanOrEqual(def.default)
+      if (def.input.type === 'int') {
+        if (typeof def.onReadFailure === 'object') expect(Number.isInteger(def.onReadFailure.value)).toBe(true)
+        expect(def.input.min).toBeLessThanOrEqual(def.default as number)
+        expect(def.input.max).toBeGreaterThanOrEqual(def.default as number)
+      } else {
+        expect(typeof def.default).toBe('string')
+      }
     }
   })
 
@@ -42,7 +46,7 @@ describe('settings registry', () => {
     expect(SETTINGS['missions.slaDigestMaxLines'].default).toBe(DIGEST_MAX_LINES)
     expect(SETTINGS['missions.maxAttempts'].default).toBe(MAX_MISSION_ATTEMPTS)
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.')).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['missions.humanReleaseMinLevel', 6],
       ['missions.newAccountDays', 30],
@@ -102,6 +106,53 @@ describe('settings registry', () => {
     expect(c(6, 8)).toBeNull()
     expect(SETTINGS['disavow.minLevel'].confirm!(5, 3)).not.toBeNull()
     expect(SETTINGS['disavow.minLevel'].confirm!(5, 7)).toBeNull()
+  })
+
+  it('guide settings ship unset so unconfirmed handbook facts stay hidden', () => {
+    const guide = SETTING_KEYS.filter((k) => k.startsWith('guide.'))
+    expect(guide.length).toBeGreaterThan(0)
+    for (const k of guide) {
+      expect(SETTINGS[k].area).toBe('guide')
+      expect([0, '']).toContain(SETTINGS[k].default)
+      expect(SETTINGS[k].private).toBeFalsy()
+    }
+  })
+
+  it('url settings accept https only (or empty)', () => {
+    const k = 'guide.budgetTemplateUrl'
+    expect(parseSetting(k, '').ok).toBe(true)
+    expect(parseSetting(k, 'https://example.org/a?b=1').ok).toBe(true)
+    expect(parseSetting(k, 'http://example.org').ok).toBe(false)
+    expect(parseSetting(k, 'javascript:alert(1)').ok).toBe(false)
+    expect(parseSetting(k, 'data:text/html,hi').ok).toBe(false)
+    expect(parseSetting(k, 'https://user:pw@example.org').ok).toBe(false)
+    expect(parseSetting(k, 'not a url').ok).toBe(false)
+    expect(parseSetting(k, 'https://example.org/' + 'a'.repeat(300)).ok).toBe(false)
+    expect(parseSetting(k, 5).ok).toBe(false)
+  })
+
+  it('url settings store the canonical href (trimmed, backslashes normalised)', () => {
+    const k = 'guide.budgetTemplateUrl'
+    expect(parseSetting(k, ' https://example.org ')).toEqual({ ok: true, value: 'https://example.org/' })
+    expect(parseSetting(k, 'https://example.org/a\\b')).toEqual({ ok: true, value: 'https://example.org/a/b' })
+    expect(parseSetting(k, '')).toEqual({ ok: true, value: '' })
+  })
+
+  it('date settings accept real ISO dates (or empty) only', () => {
+    const k = 'guide.gppDate'
+    expect(parseSetting(k, '').ok).toBe(true)
+    expect(parseSetting(k, '2027-05-22').ok).toBe(true)
+    expect(parseSetting(k, '2027-02-30').ok).toBe(false)
+    expect(parseSetting(k, '22/05/2027').ok).toBe(false)
+    expect(parseSetting(k, '2027-5-22').ok).toBe(false)
+    expect(parseSetting(k, 20270522).ok).toBe(false)
+  })
+
+  it('text settings are trimmed and length-bounded', () => {
+    expect(parseSetting('guide.hashtags', '  #one #two ')).toEqual({ ok: true, value: '#one #two' })
+    expect(parseSetting('guide.hashtags', 'x'.repeat(201)).ok).toBe(false)
+    expect(parseSetting('guide.hostDeadlines', 'x'.repeat(1000)).ok).toBe(true)
+    expect(parseSetting('guide.hostDeadlines', 'x'.repeat(1001)).ok).toBe(false)
   })
 
   it('isSettingKey rejects unknown and prototype keys', () => {
