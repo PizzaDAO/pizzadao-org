@@ -363,3 +363,31 @@ Vercel preview (each PR, via `/ship`):
   Alternative: a code map keyed by verifierKey (no migration, but needs a PR to change).
 - **D9 Stats in the host page.** **Omit city and attendance numbers unless you supply verified figures**
   (optionally as `guide.*` settings with an "as of" date).
+
+## 10. Implementation notes (PRs 1-4, branch feat/handbook)
+
+Snax took every recommended default in section 9 and said "do it". Built: PRs 1-4. Not built: PR 5
+(Proposals and Posting, still blocked on D5), PR 6 (Drive pointers, by hand), PR 7 (DB overrides).
+
+Where the build differs from the plan above:
+
+- **Unconfirmed settings ship empty, not at a guessed default.** All `guide.*` settings default to unset
+  (empty string, or 0 for the numbers), including `discordUrl`, `eventsUrl`, `gppDate`, `gppEdition` and
+  `hostCapUsd`. Text that depends on a value is hidden until DPR fills it in /admin/settings ("Handbook
+  facts"). `guide.proposalTiers` was not added (PR 5).
+- **Placeholder syntax.** `{{name}}` inline; a paragraph (or list line) with an empty value is dropped;
+  `::if name` ... `::end` hides a whole section (no nesting).
+- **No ISR.** The reader's language comes from a cookie, so the pages are `force-dynamic` (like the call
+  guide) rather than `revalidate = 300`. Facts are still cached ~30s by the settings reader, and the
+  mission list by its own cache.
+- **Language names.** The nav and page title read "Handbook" / "Manual" / "Manuel".
+- **ES and FR are drafts.** A fluent member (LATAM community for ES, a French speaker for FR) should read
+  them on the preview before merge. Mission titles inside the levels table stay English (R6).
+- **Mission links.** `Mission.guideHref` (migration `20261102300000_mission_guide_href`, additive, not
+  applied). Defaults are seeded by `scripts/missions/set-guide-links.mjs` (dry run by default, fills NULLs
+  only). The L2 "Post about PizzaDAO" mission has no default link until the Posting page (PR 5) exists.
+- **Pizza math (D6).** The Host a party page states the budget template's rule: an order about every 45
+  minutes, roughly one pizza per one and a half guests.
+- **No city or attendance numbers (D9).**
+- **Needs a person (Snax):** fill the `guide.*` settings listed in the PR description, run the migration,
+  then `set-guide-links.mjs` (dry run first), then do the Drive pointer edits in section 7.

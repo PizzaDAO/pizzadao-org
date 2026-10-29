@@ -37,6 +37,8 @@ export const HANDBOOK_PAGES = [
     levelsTable: true,
     dynamicAnchors: ['level-1', 'level-2', 'level-3', 'level-4', 'level-5', 'level-6', 'level-7', 'level-8', 'level-9'],
   },
+  { slug: 'host-a-party', group: 'hosting' },
+  { slug: 'make-a-poap', group: 'takingPart' },
 ] as const satisfies readonly HandbookPageDef[]
 
 export type HandbookSlug = (typeof HANDBOOK_PAGES)[number]['slug']
@@ -53,6 +55,16 @@ export const HANDBOOK_LOADERS: Loaders = {
     en: () => import('./levels/en'),
     es: () => import('./levels/es'),
     fr: () => import('./levels/fr'),
+  },
+  'host-a-party': {
+    en: () => import('./host-a-party/en'),
+    es: () => import('./host-a-party/es'),
+    fr: () => import('./host-a-party/fr'),
+  },
+  'make-a-poap': {
+    en: () => import('./make-a-poap/en'),
+    es: () => import('./make-a-poap/es'),
+    fr: () => import('./make-a-poap/fr'),
   },
 }
 

@@ -147,6 +147,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'poap_drop', // drop info from POAP Compass; a reviewer confirms authorship
     verifierParams: {},
     proofKind: 'URL',
+    guideHref: '/handbook/make-a-poap',
   },
   {
     level: 4,
@@ -226,6 +227,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'gpp_host', // D14: rsv.pizza event link + Telegram; Phase 5 adds a service endpoint
     verifierParams: { eventType: 'gpp', statuses: ['approved', 'listed'] },
     proofKind: 'URL',
+    guideHref: '/handbook/host-a-party',
   },
   {
     level: 6,
