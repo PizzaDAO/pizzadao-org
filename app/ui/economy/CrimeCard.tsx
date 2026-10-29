@@ -3,7 +3,7 @@
 // app/ui/economy/CrimeCard.tsx
 //
 // "Commit a crime": UnbelievaBoat's /crime on the web. Calls
-// POST /api/economy/crime (live only with PEP_CRIME_ENABLED=1; the /pep page
+// POST /api/economy/crime (live only with crime.enabled on; the /pep page
 // renders this card only when /api/economy/features says crime is on) and
 // shows the outcome plus a countdown while on cooldown.
 

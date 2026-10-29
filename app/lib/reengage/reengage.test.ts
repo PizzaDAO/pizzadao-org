@@ -2,6 +2,7 @@
 import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 const db = vi.hoisted(() => ({
+  appSetting: { findMany: async () => [] },
   mission: { findMany: vi.fn() },
   missionCompletion: { findMany: vi.fn() },
   transaction: { findMany: vi.fn() },

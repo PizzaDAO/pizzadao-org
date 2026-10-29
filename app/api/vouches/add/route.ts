@@ -58,7 +58,7 @@ export async function POST(req: NextRequest) {
     await addVouch(currentUser.memberId, targetMemberId);
 
     // L5.2 "Vouch for another member": re-check the voucher's vouch_given
-    // mission after the response (no-op while MISSION_VERIFIERS_ENABLED is off).
+    // mission after the response (no-op while missions.verifiersEnabled is off).
     const voucherDiscordId = session.discordId;
     const voucherMemberId = currentUser.memberId;
     after(() => emitMissionEvent(voucherDiscordId, "vouch_created", { memberId: voucherMemberId }).then(() => undefined));

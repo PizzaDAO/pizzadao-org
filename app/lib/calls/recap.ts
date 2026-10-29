@@ -1,6 +1,6 @@
 /**
  * Discord recap of a published call (call-recap). Nothing is posted until an admin publishes the
- * call on /admin/calls; posting is then gated by CALL_RECAP_POST_ENABLED (off by default). The text
+ * call on /admin/calls; posting is then gated by calls.recapPostEnabled (off by default). The text
  * is built from the stored (reviewed) title / summary / action items. The AI summary is generated
  * from the transcript with redactions applied, but a redaction made AFTER the summary was generated
  * (or last edited by a reviewer) is not reflected in it, so posting is blocked until the summary is
@@ -17,14 +17,20 @@ import { getChannel, getGuildChannels, normalizeChannelName } from '@/app/lib/di
 import { DISCORD_MESSAGE_LIMIT, DiscordPostError, postDiscordMessage } from '@/app/lib/discord-rest'
 import { EMPTY_POST_FILTER, isCrewExcluded, loadPostFilter, mentionsBlockedTerm, type PostFilter } from '@/app/lib/calls/post-filters'
 import { SITE_URL } from '@/app/lib/site-url'
+import { savedChannelId } from '@/app/lib/settings/channels'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
 const MAX_BULLETS = 5
 const MAX_ACTIONS = 5
 const BULLET_CHARS = 220
 
-export function recapPostingEnabled(env: Record<string, string | undefined> = process.env): boolean {
-  return /^(1|true|yes|on)$/i.test(env.CALL_RECAP_POST_ENABLED?.trim() ?? '')
+/**
+ * Whether recaps are posted: the admin setting `calls.recapPostEnabled`, with CALL_RECAP_POST_ENABLED
+ * as the fallback while none is saved and, set to off, a kill switch. Unreadable settings: off.
+ */
+export function recapPostingEnabled(env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  return toggleEnabled('calls.recapPostEnabled', env)
 }
 
 export interface RecapInput {
@@ -155,7 +161,7 @@ async function defaultLookupChannel(id: string): Promise<{ guildId: string | nul
 export async function resolveRecapChannel(crewId: string | null, deps: RecapDeps = {}): Promise<RecapChannel | null> {
   const env = deps.env ?? process.env
   if (crewId === COMMUNITY_CALL_CREW_ID) {
-    const id = (env.ANNOUNCE_DISCORD_CHANNEL_ID?.trim() || DEFAULT_ANNOUNCE_CHANNEL_ID).replace(/\D/g, '')
+    const id = ((await savedChannelId('discord.announceChannelId')) || env.ANNOUNCE_DISCORD_CHANNEL_ID?.trim() || DEFAULT_ANNOUNCE_CHANNEL_ID).replace(/\D/g, '')
     return id ? { channelId: id, label: '#announcements' } : null
   }
   if (!crewId) return null
@@ -198,7 +204,7 @@ export interface PostRecapDeps extends RecapDeps {
  */
 export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promise<RecapResult> {
   const env = deps.env ?? process.env
-  if (!recapPostingEnabled(env)) return 'disabled'
+  if (!(await recapPostingEnabled(env))) return 'disabled'
   const botToken = env.DISCORD_BOT_TOKEN?.trim()
   if (!botToken) return 'no-token'
   // Fail-safe: if the filter cannot be read, post nothing rather than an unfiltered recap.

@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { commitCrime } from '@/app/lib/pep-earn/crime'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError } from '@/app/lib/errors/api-errors'
@@ -8,11 +9,11 @@ export const runtime = 'nodejs'
 
 /**
  * POST /api/economy/crime: UnbelievaBoat's /crime, on the web.
- * Off (404) unless PEP_CRIME_ENABLED=1, so merging this does not launch it.
+ * Off (404) unless the setting crime.enabled (or PEP_CRIME_ENABLED=1) turns it on, so merging this does not launch it.
  * 429 with `readyAt` while on cooldown.
  */
 const POST_HANDLER = async () => {
-  if (process.env.PEP_CRIME_ENABLED !== '1') {
+  if (!(await toggleEnabled('crime.enabled'))) {
     return NextResponse.json({ error: 'Not found' }, { status: 404 })
   }
   const session = await getSession()

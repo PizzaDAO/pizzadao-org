@@ -4,7 +4,7 @@
 // overwrite /admin/shop edits. The secret is still checked first.
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
-vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: async () => [] } } }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/shop', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/shop')>()),
@@ -70,9 +70,9 @@ describe('POST /api/shop/sync', () => {
     expect(await (await GET()).json()).toMatchObject({ enabled: true })
   })
 
-  it('shopSheetSyncEnabled only accepts "1"', () => {
-    expect(shopSheetSyncEnabled({})).toBe(false)
-    expect(shopSheetSyncEnabled({ SHOP_SHEET_SYNC_ENABLED: ' 1 ' })).toBe(true)
-    expect(shopSheetSyncEnabled({ SHOP_SHEET_SYNC_ENABLED: 'true' })).toBe(false)
+  it('shopSheetSyncEnabled only accepts "1"', async () => {
+    expect(await shopSheetSyncEnabled({})).toBe(false)
+    expect(await shopSheetSyncEnabled({ SHOP_SHEET_SYNC_ENABLED: ' 1 ' })).toBe(true)
+    expect(await shopSheetSyncEnabled({ SHOP_SHEET_SYNC_ENABLED: 'true' })).toBe(false)
   })
 })

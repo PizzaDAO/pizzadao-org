@@ -5,7 +5,7 @@ import { cooldown, gameSession, jsonBody } from '../guard'
 
 export const runtime = 'nodejs'
 
-/** POST { bet, space }: one roulette spin. Off unless PEP_GAMES_ENABLED=1. */
+/** POST { bet, space }: one roulette spin. Off unless games.enabled */
 const POST_HANDLER = async (req: Request) => {
   const s = await gameSession()
   if ('off' in s) return s.off

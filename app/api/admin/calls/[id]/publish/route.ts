@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
  * Dread Pizza Roberts only. Publishing exposes ONLY the title, summary,
  * chapters, action items and transcript; audio is never public. Unpublishing
  * returns the call to review and deletes nothing. A first publish also posts the Discord recap
- * when CALL_RECAP_POST_ENABLED is on (see calls/recap.ts).
+ * when calls.recapPostEnabled is on (see calls/recap.ts).
  */
 export const POST = withErrorHandling(async (request: Request, ctx: { params: Promise<{ id: string }> }) => {
   const auth = await requireCallReviewer()
@@ -32,7 +32,7 @@ export const POST = withErrorHandling(async (request: Request, ctx: { params: Pr
   if (result === 'conflict') throw new ConflictError('This recording changed while publishing; reload and check it again')
   if (result === 'transcribing') throw new ConflictError('Transcription is still pending for this call; publish once it has finished')
   if (result === 'incomplete') throw new ConflictError('A transcript and a summary are required before publishing')
-  // Publishing is the human approval: only now may the recap go to Discord (gated by CALL_RECAP_POST_ENABLED, once per call).
+  // Publishing is the human approval: only now may the recap go to Discord (gated by calls.recapPostEnabled, once per call).
   let recap: RecapResult | null = null
   // Only a fresh publish posts: re-clicking Publish on an already-published call ('already') never does.
   if (body.action === 'publish' && result === 'ok') recap = await postCallRecap(id).catch((err) => { console.error('[calls/publish] recap failed:', err instanceof Error ? err.message : err); return 'failed' as const })

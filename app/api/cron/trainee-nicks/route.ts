@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { isCronAuthorized } from '@/app/lib/cron-auth'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { internalError } from '@/app/lib/errors/error-response'
 import { runTraineeNicks } from '@/app/lib/trainee-nick-run'
 
@@ -14,7 +15,7 @@ export const maxDuration = 120
  * role) and removes Pizza Noob after missions Level 2. See
  * app/lib/trainee-nick-run.ts and plans/anchovy-52918.md.
  *
- * Dry run (no Discord writes) unless TRAINEE_NICK_ENABLED=true; `?dryRun=1`
+ * Dry run (no Discord writes) unless the setting onboarding.traineeNickEnabled (or TRAINEE_NICK_ENABLED=true) is on; `?dryRun=1`
  * forces a dry run even then.
  */
 export async function GET(request: NextRequest) {
@@ -22,7 +23,7 @@ export async function GET(request: NextRequest) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
   const dryRun =
-    process.env.TRAINEE_NICK_ENABLED !== 'true' || request.nextUrl.searchParams.get('dryRun') === '1'
+    !(await toggleEnabled('onboarding.traineeNickEnabled')) || request.nextUrl.searchParams.get('dryRun') === '1'
   try {
     const result = await runTraineeNicks({ dryRun })
     console.log('[cron/trainee-nicks]', JSON.stringify(result))

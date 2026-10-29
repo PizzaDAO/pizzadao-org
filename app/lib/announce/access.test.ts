@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 const getSession = vi.fn();
 const hasAnyRole = vi.fn();
+vi.mock("@/app/lib/db");
 vi.mock("@/app/lib/session", () => ({ getSession: () => getSession() }));
 vi.mock("@/app/lib/discord", () => ({ hasAnyRole: (...a: unknown[]) => hasAnyRole(...a) }));
 
@@ -92,5 +93,14 @@ describe("announce access", () => {
     const r = await requireAnnouncer();
     expect(r.ok).toBe(false);
     expect(hasAnyRole).toHaveBeenCalledWith(LEGACY_ANNOUNCE_DISCORD_IDS[0], ["222222"]);
+  });
+
+  it("a saved announce-roles setting wins over the env chain; empty keeps the env chain", () => {
+    expect(getAnnounceAccessConfig({ ANNOUNCE_ROLE_IDS: "111111" }, ["333333"])).toEqual({
+      mode: "roles",
+      source: "settings",
+      roleIds: ["333333", "812131585327235113"], // Dread Pizza Roberts is always included
+    });
+    expect(getAnnounceAccessConfig({ ANNOUNCE_ROLE_IDS: "111111" }, [])).toMatchObject({ source: "ANNOUNCE_ROLE_IDS" });
   });
 });

@@ -125,10 +125,10 @@
     "save": "Save response",
     "saved": "Saved.",
     "appeal": "Appeal",
-    "appealHelp": "Asks Dread Pizza Roberts to vote on removing the listing. You can appeal once every 90 days.",
+    "appealHelp": "Asks Dread Pizza Roberts to vote on removing the listing. You can appeal once every {days} days.",
     "appealed": "Appeal filed. Dread Pizza Roberts will vote.",
     "appealOpen": "A vote is already open.",
-    "tooSoon": "You can appeal once every 90 days.",
+    "tooSoon": "You can appeal once every {days} days.",
     "error": "Something went wrong."
   },
   "vouch": {

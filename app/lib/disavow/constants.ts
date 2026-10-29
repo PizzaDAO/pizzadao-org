@@ -2,6 +2,7 @@
  * Disavow list rules (plans/disavow-list.md, with Snax's 2026-10-26 decisions).
  * Every threshold lives here so it is easy to change.
  */
+import { toggleEnabled } from '../settings/toggles'
 
 /** Code default for the setting `disavow.minLevel`: level needed to view AND nominate (DPR can always do both). */
 export const DISAVOW_MIN_LEVEL = 5
@@ -33,10 +34,13 @@ export const DISAVOW_PAGE_SIZE = 50
 
 export const REDACTED = '[redacted]'
 
-/** The whole feature is off unless DISAVOW_ENABLED is "true"/"1". */
-export function disavowEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  const v = env.DISAVOW_ENABLED?.trim().toLowerCase()
-  return v === 'true' || v === '1'
+/**
+ * The whole feature is off unless the setting disavow.enabled is on, or (no setting saved)
+ * DISAVOW_ENABLED is "true"/"1". The env var set to off always wins; unreadable settings mean off
+ * (every surface then answers as if the feature did not exist).
+ */
+export function disavowEnabled(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  return toggleEnabled('disavow.enabled', env)
 }
 
 export const HOUR_MS = 60 * 60 * 1000

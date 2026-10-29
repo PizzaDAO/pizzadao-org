@@ -4,7 +4,7 @@
  * commands). Only commands with a handler are listed.
  *
  * The games are registered like the rest but answer "not enabled yet" until
- * PEP_GAMES_ENABLED=1.
+ * games.enabled on.
  *
  * /add-money and /remove-money are visible to everyone (no
  * default_member_permissions, so Pepperoni Mafia holders without Administrator

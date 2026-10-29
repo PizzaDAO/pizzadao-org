@@ -6,7 +6,7 @@
  * re-checks the stateful ones (roles) on APPROVED rows to flag / unflag them
  * (never claw back, D17), and refreshes the duplicate-account signals.
  *
- *   - MISSION_VERIFIERS_ENABLED off: a DRY run. The VerifierRun records what
+ *   - missions.verifiersEnabled off: a DRY run. The VerifierRun records what
  *     WOULD be approved, held, flagged and paid; nothing is written to any
  *     completion and nothing is paid. (Duplicate signals are still refreshed:
  *     they are reviewer information only.)
@@ -22,7 +22,7 @@
  * paying more than MISSIONS_RUN_PEP_ALERT PEP (default 50,000) also posts an
  * alert to PEP_ADMIN_LOG_CHANNEL_ID.
  */
-import { resolveChannelId } from '../discord-channels'
+import { resolveConfiguredChannel } from '../settings/channels'
 import { postDiscordMessage } from '../discord-rest'
 import {
   checkMany,
@@ -47,7 +47,7 @@ export const MIN_GAP_MS = 12 * HOUR
 
 export interface NightlyDeps {
   store: RunStore
-  enabled: () => boolean
+  enabled: () => boolean | Promise<boolean>
   clock: () => number
   loadContext: () => Promise<BulkContext>
   listMembers: (ctx: BulkContext) => Promise<string[]>
@@ -125,7 +125,7 @@ export async function runNightlyMissions(opts: NightlyOptions = {}): Promise<Nig
   const batchSize = opts.batchSize ?? envInt('MISSIONS_CRON_BATCH', 100)
   const startedAt = d.clock()
   const now = new Date(startedAt)
-  const dryRun = !d.enabled()
+  const dryRun = !(await d.enabled())
 
   let run: RunRow | null = await d.store.findOpen('nightly', new Date(startedAt - RUN_WINDOW_MS))
   let flipped = false
@@ -188,7 +188,7 @@ export async function runNightlyMissions(opts: NightlyOptions = {}): Promise<Nig
 
 /** The one Discord post per finished live run (see the module comment). */
 export async function announceRun({ runId, dryRun, stats }: NightlySummary): Promise<void> {
-  if (dryRun || !missionVerifiersEnabled()) return
+  if (dryRun || !(await missionVerifiersEnabled())) return
   const botToken = process.env.DISCORD_BOT_TOKEN?.trim()
   if (!botToken) return
   const signals = stats.signals as { created?: number } | undefined
@@ -197,7 +197,7 @@ export async function announceRun({ runId, dryRun, stats }: NightlySummary): Pro
   const alertAt = envInt('MISSIONS_RUN_PEP_ALERT', 50_000)
 
   if (stats.flagged || stats.held || stats.reopened || newSignals) {
-    const channelId = await resolveChannelId('work', 'MISSION_REVIEW_CHANNEL_ID')
+    const channelId = await resolveConfiguredChannel('discord.missionReviewChannelId', 'work', 'MISSION_REVIEW_CHANNEL_ID')
     if (channelId) {
       const lines = [
         `🍕 Nightly mission check (run ${runId}): ${stats.members.toLocaleString('en-US')} members checked.`,

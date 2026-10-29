@@ -12,7 +12,7 @@
 //    a retryable one (429/5xx/timeout) releases it so a later run tries again.
 //  - Fair: members are ordered least-recently-emailed first, and one address is
 //    used at most once per run (case-insensitive), so the batch cap starves nobody.
-//  - Gated: nothing is sent or written unless REENGAGE_EMAIL_ENABLED=true, the
+//  - Gated: nothing is sent or written unless reengage.enabled is on, the
 //    run is not a dry run, and RESEND_API_KEY and REENGAGE_POSTAL_ADDRESS are set
 //    (checked before any claim).
 //
@@ -28,10 +28,16 @@ import { unsubscribePageUrl, unsubscribePostUrl } from "./unsub-sig";
 export const DEFAULT_BATCH = 60;
 const MAX_BATCH = 300;
 
+import { toggleEnabled } from "@/app/lib/settings/toggles";
+
 export const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 
-export function reengageEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return env.REENGAGE_EMAIL_ENABLED?.trim().toLowerCase() === "true";
+/**
+ * Whether emails are sent: the admin setting `reengage.enabled`, with REENGAGE_EMAIL_ENABLED as the
+ * fallback while none is saved and, set to off, a kill switch. Unreadable settings: off (dry run).
+ */
+export function reengageEnabled(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  return toggleEnabled("reengage.enabled", env);
 }
 
 /** ISO 8601 week key in UTC, e.g. "2026-W44". */
@@ -128,7 +134,7 @@ export function clampBatch(limit: number | undefined, env: NodeJS.ProcessEnv = p
 export async function runReengage(opts: ReengageOptions = {}): Promise<ReengageResult> {
   const now = opts.now ?? new Date();
   const week = weekKey(now);
-  const enabled = reengageEnabled();
+  const enabled = await reengageEnabled();
   const dryRun = opts.dryRun === true || !enabled;
   const limit = clampBatch(opts.limit);
 

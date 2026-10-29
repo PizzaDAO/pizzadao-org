@@ -1,6 +1,8 @@
 // @vitest-environment node
 // Data-migration plan, payout policy, Discord channel helpers, keyed rate limits.
 import { describe, it, expect, vi, beforeEach } from 'vitest'
+
+vi.mock('../db') // no saved settings: the env switch decides
 import {
   MISSION_LEVEL_TITLES,
   MISSION_VERIFIER_CONFIG,
@@ -292,12 +294,12 @@ describe('policy (D9)', () => {
     expect(releaseHoldFor(1, young, now)).toBe('NEW_ACCOUNT')
   })
 
-  it('MISSION_VERIFIERS_ENABLED defaults off', () => {
+  it('MISSION_VERIFIERS_ENABLED defaults off', async () => {
     const env = (v?: string) => (v === undefined ? {} : { MISSION_VERIFIERS_ENABLED: v }) as NodeJS.ProcessEnv
-    expect(missionVerifiersEnabled(env())).toBe(false)
-    expect(missionVerifiersEnabled(env('0'))).toBe(false)
-    expect(missionVerifiersEnabled(env('1'))).toBe(true)
-    expect(missionVerifiersEnabled(env('true'))).toBe(true)
+    expect(await missionVerifiersEnabled(env())).toBe(false)
+    expect(await missionVerifiersEnabled(env('0'))).toBe(false)
+    expect(await missionVerifiersEnabled(env('1'))).toBe(true)
+    expect(await missionVerifiersEnabled(env('true'))).toBe(true)
   })
 })
 

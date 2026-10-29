@@ -80,7 +80,7 @@ export interface HandlerDeps {
   collectIncome: (discordId: string, roleIds: string[]) => Promise<IncomeResult & { unresolved?: string[] }>
   pay: (fromId: string, toId: string, amount: number) => Promise<unknown>
   leaderboard: () => Promise<Array<{ userId: string; balance: number }>>
-  gamesEnabled: () => boolean
+  gamesEnabled: () => boolean | Promise<boolean>
   startBlackjack: (discordId: string, bet: number) => Promise<BlackjackStart>
   blackjackAction: (discordId: string, gameId: string, action: 'hit' | 'stand') => Promise<BlackjackMove>
   roulette: (discordId: string, bet: number, space: string) => Spin<{ landed: number; color: string; space: string; multiplier: number }>
@@ -273,7 +273,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
     }
 
     case 'blackjack': {
-      if (!deps.gamesEnabled()) return out.error("Games aren't enabled yet.")
+      if (!(await deps.gamesEnabled())) return out.error("Games aren't enabled yet.")
       const r = await deps.startBlackjack(userId, Number(opt(i, 'bet')))
       if (!r.ok && r.reason === 'cooldown') return out.wait('Slow down.', `You can play again ${rel(r.readyAt)}.`)
       if (!r.ok) return out.wait('You already have a hand in play.', renderBlackjack(r.game, cur).lines.join('\n'), blackjackButtons(r.game))
@@ -284,7 +284,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
     }
 
     case 'roulette': {
-      if (!deps.gamesEnabled()) return out.error("Games aren't enabled yet.")
+      if (!(await deps.gamesEnabled())) return out.error("Games aren't enabled yet.")
       const r = await deps.roulette(userId, Number(opt(i, 'bet')), String(opt(i, 'space') ?? ''))
       if (!r.ok) return out.wait('Slow down.', `You can play again ${rel(r.readyAt)}.`)
       const dot = r.color === 'red' ? '🔴' : r.color === 'black' ? '⚫' : '🟢'
@@ -293,7 +293,7 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
     }
 
     case 'slots': {
-      if (!deps.gamesEnabled()) return out.error("Games aren't enabled yet.")
+      if (!(await deps.gamesEnabled())) return out.error("Games aren't enabled yet.")
       const r = await deps.slots(userId, Number(opt(i, 'bet')))
       if (!r.ok) return out.wait('Slow down.', `You can play again ${rel(r.readyAt)}.`)
       const reels = r.reels.map((s) => SLOT_EMOJI[s as SlotSymbol] ?? s).join(' | ')
@@ -383,7 +383,7 @@ async function component(i: Interaction, userId: string, deps: HandlerDeps, cur:
   }
   const m =/^bj:(hit|stand):([a-z0-9]{10,40})$/.exec(i.data?.custom_id ?? '')
   if (!m) return out.error('Unknown button.')
-  if (!deps.gamesEnabled()) return out.error("Games aren't enabled right now.")
+  if (!(await deps.gamesEnabled())) return out.error("Games aren't enabled right now.")
   const r = await deps.blackjackAction(userId, m[2], m[1] as 'hit' | 'stand')
   if (!r.ok) return out.error(r.reason === 'not_yours' ? "That's not your hand." : 'That hand is gone.', r.reason === 'not_yours' ? 'Start your own with /blackjack.' : undefined)
   return out.update(blackjackEmbed(r.game, cur, out, r.balance, userId), blackjackButtons(r.game))

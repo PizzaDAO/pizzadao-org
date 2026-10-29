@@ -13,7 +13,7 @@ export const maxDuration = 300
  * GET /api/cron/missions — the nightly mission verification run (Vercel Cron,
  * `Authorization: Bearer $CRON_SECRET`). See app/lib/mission-verify/nightly.ts.
  * Dry (records what would happen, approves and pays nothing) while
- * MISSION_VERIFIERS_ENABLED is off.
+ * missions.verifiersEnabled is off.
  */
 export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request.headers.get('authorization'))) {

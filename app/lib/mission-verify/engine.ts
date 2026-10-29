@@ -21,7 +21,7 @@
  * complete level in order through the race-safe checkAndAwardLevelReward, so
  * parallel runs for the same member pay each level exactly once.
  *
- * Behind MISSION_VERIFIERS_ENABLED (default off): when off, every run is a
+ * Behind missions.verifiersEnabled (default off): when off, every run is a
  * dry run that only reports progress.
  */
 import { Prisma, type MissionHold } from '@prisma/client'
@@ -47,7 +47,7 @@ export interface RunOptions {
   memberId?: string | null
   /** Roles from a Discord interaction payload (fresh and free). */
   interactionRoles?: string[]
-  /** Report only, write nothing. Forced on while MISSION_VERIFIERS_ENABLED is off. */
+  /** Report only, write nothing. Forced on while missions.verifiersEnabled is off. */
   dryRun?: boolean
   now?: Date
   sources?: VerifierSources
@@ -149,7 +149,7 @@ const isP2002 = (e: unknown) => (e as { code?: string })?.code === 'P2002'
 const json = (v: unknown) => JSON.parse(JSON.stringify(v ?? null)) as Prisma.InputJsonValue
 
 export async function runVerifiers(discordId: string, opts: RunOptions): Promise<RunReport> {
-  const enabled = opts.enabled ?? missionVerifiersEnabled()
+  const enabled = opts.enabled ?? (await missionVerifiersEnabled())
   const dryRun = !enabled || !!opts.dryRun
   const now = opts.now ?? new Date()
   const policy = opts.policy ?? (await loadHoldPolicy())
@@ -345,7 +345,7 @@ export async function runVerifiers(discordId: string, opts: RunOptions): Promise
     const cardMissions = report.checks
       .filter((c) => c.outcome === 'approved' || c.outcome === 'recorded' || c.outcome === 'held' || c.outcome === 'reopened')
       .map((c) => c.missionId)
-    if (cardMissions.length && reviewCardsEnabled()) queueReviewCardSync(() => syncReviewCardsFor(discordId, cardMissions))
+    if (cardMissions.length && (await reviewCardsEnabled())) queueReviewCardSync(() => syncReviewCardsFor(discordId, cardMissions))
   }
   return report
 }

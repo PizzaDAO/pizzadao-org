@@ -17,6 +17,8 @@ const FAILURE_CACHE_MS = 5_000
 
 export interface Settings {
   get<K extends SettingKey>(key: K): SettingValue<K>
+  /** True when a valid override row exists for the key (false: the code default, or env for a switch, applies). */
+  isSet(key: SettingKey): boolean
   /** True when the whole read failed (database unreachable). */
   readFailed: boolean
   /** Keys whose stored value failed validation (treated as a read failure for that key). */
@@ -51,10 +53,16 @@ function failureValue(key: SettingKey): unknown {
   return mode.value
 }
 
-function snapshot(values: Map<SettingKey, unknown>, readFailed: boolean, invalidKeys: SettingKey[]): Settings {
+function snapshot(
+  values: Map<SettingKey, unknown>,
+  readFailed: boolean,
+  invalidKeys: SettingKey[],
+  overrides: ReadonlySet<SettingKey> = new Set(),
+): Settings {
   return {
     readFailed,
     invalidKeys,
+    isSet: (key) => overrides.has(key),
     get<K extends SettingKey>(key: K): SettingValue<K> {
       if (values.has(key)) return values.get(key) as SettingValue<K>
       return failureValue(key) as SettingValue<K>
@@ -76,6 +84,7 @@ async function readAll(): Promise<{ settings: Settings; ttl: number }> {
   const stored = new Map<string, unknown>(rows.map((r) => [r.key, r.value]))
   const values = new Map<SettingKey, unknown>()
   const invalid: SettingKey[] = []
+  const overrides = new Set<SettingKey>()
   for (const key of SETTING_KEYS) {
     if (!stored.has(key)) {
       values.set(key, SETTINGS[key].default)
@@ -85,6 +94,7 @@ async function readAll(): Promise<{ settings: Settings; ttl: number }> {
     const parsed = (SETTINGS[key].schema as { safeParse(v: unknown): { success: boolean; data?: unknown } }).safeParse(stored.get(key))
     if (parsed.success) {
       values.set(key, parsed.data)
+      overrides.add(key)
       lastKnownGood.set(key, parsed.data)
     } else {
       invalid.push(key)
@@ -93,7 +103,7 @@ async function readAll(): Promise<{ settings: Settings; ttl: number }> {
   }
   // Unknown keys (e.g. written by a newer deploy sharing this database) are ignored.
   for (const k of stored.keys()) if (!isSettingKey(k)) warnOnce(`unknown:${k}`, `ignoring unknown setting key ${k}`)
-  return { settings: snapshot(values, false, invalid), ttl: SETTINGS_CACHE_MS }
+  return { settings: snapshot(values, false, invalid, overrides), ttl: SETTINGS_CACHE_MS }
 }
 
 /** All settings (cached ~30s). Never rejects. */

@@ -65,7 +65,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
             ? buildRecapText({ id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters }, undefined, postFilter)
             : null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
-    const recapEnabled = recapPostingEnabled();
+    const recapEnabled = await recapPostingEnabled();
     const recapExcluded = postFilter ? recapCrewExcluded(rec, postFilter) : false;
     const recapOmitted = postFilter ? recapFilteredCount(rec, postFilter) : 0;
     const recapStale = redactionsNewerThanSummary(rec);

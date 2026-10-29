@@ -1,7 +1,7 @@
 // @vitest-environment node
 // Store rules against a small in-memory Prisma fake: voting conflicts, fixed day-7
 // decision, idempotent settlement, nomination caps, audit log, redaction, no deletes.
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 type Row = Record<string, any>
 const H = 3600_000
@@ -157,6 +157,8 @@ vi.mock('./match', () => ({
 
 import { createNotification } from '@/app/lib/notifications'
 import { viewerIdentifiers } from './match'
+import * as rulesModule from './rules'
+import { DEFAULT_DISAVOW_RULES } from './rules'
 import { castVote, nominate, openRemoveRound, redact, runDisavowCron, settleRound, suspend, unsuspend, withdrawSubmission, listMySubmissions, addResponse, isSubjectOf } from './store'
 
 const nominateInput = (over: Row = {}) => ({
@@ -228,6 +230,72 @@ describe('nominate', () => {
     const dup = await nominate(nominateInput({ nominatorDiscordId: 'someone', identifiers: [{ kind: 'DISCORD_ID', value: 'subjD' }] }))
     expect(dup).toMatchObject({ ok: false, code: 'duplicate', existingId: first.ok ? first.id : '', existingStatus: 'NOMINATED' })
     expect(await nominate(nominateInput({ nominatorDiscordId: 'subjD', identifiers: [{ kind: 'MEMBER_ID', value: '77' }] }))).toEqual({ ok: false, code: 'self' })
+  })
+})
+
+describe('configurable voting rules', () => {
+  const spies: Array<{ mockRestore: () => void }> = []
+  const withRules = (over: Partial<typeof DEFAULT_DISAVOW_RULES>) => {
+    const spy = vi.spyOn(rulesModule, 'loadDisavowRules').mockResolvedValue({ ...DEFAULT_DISAVOW_RULES, ...over })
+    spies.push(spy)
+    return spy
+  }
+  afterEach(() => { while (spies.length) spies.pop()!.mockRestore() })
+
+  it('a new round snapshots the rules it opens under (with the defaults: 3 votes, 7 days)', async () => {
+    await nominate({ ...nominateInput(), now: T0 })
+    expect(state.round[0]).toMatchObject({ yesThreshold: 3, decisionDays: 7 })
+    expect(state.round[0].closesAt.getTime()).toBe(T0.getTime() + 14 * D)
+  })
+
+  it('custom rules set the snapshot and the close time; changing them later does not move an open round', async () => {
+    withRules({ yesThreshold: 2, decisionDays: 3, windowDays: 10 })
+    const n = await nominate({ ...nominateInput(), now: T0 })
+    if (!n.ok) throw new Error()
+    const round = state.round[0]
+    expect(round).toMatchObject({ yesThreshold: 2, decisionDays: 3 })
+    expect(round.closesAt.getTime()).toBe(T0.getTime() + 10 * D)
+    // The settings are tightened afterwards: the open round still counts under its own rules.
+    withRules({ yesThreshold: 9, decisionDays: 20, windowDays: 40 })
+    for (const v of ['dpr1', 'dpr2']) await castVote({ disavowalId: n.id, roundId: round.id, voterDiscordId: v, choice: 'YES', now: new Date(T0.getTime() + D) })
+    expect(await settleRound(round.id, new Date(T0.getTime() + 2 * D))).toBe('pending') // before its own day 3
+    expect(await settleRound(round.id, new Date(T0.getTime() + 3 * D))).toBe('passed') // 2 yes is enough for this round
+  })
+
+  it('a round with no snapshot (opened before it existed) keeps 3 votes and 7 days whatever the settings say', async () => {
+    const n = await nominate({ ...nominateInput(), now: T0 })
+    if (!n.ok) throw new Error()
+    const round = state.round[0]
+    round.yesThreshold = null
+    round.decisionDays = null
+    withRules({ yesThreshold: 2, decisionDays: 1, windowDays: 5 })
+    for (const v of ['dpr1', 'dpr2']) await castVote({ disavowalId: n.id, roundId: round.id, voterDiscordId: v, choice: 'YES', now: new Date(T0.getTime() + D) })
+    expect(await settleRound(round.id, new Date(T0.getTime() + 8 * D))).toBe('pending') // 2 yes is not enough under the old rule
+  })
+
+  it('the nominations limit and window follow the settings', async () => {
+    withRules({ nominationsPerWindow: 1 })
+    expect((await nominate(nominateInput({ identifiers: [{ kind: 'NAME', value: 'a' }] }))).ok).toBe(true)
+    expect(await nominate(nominateInput({ identifiers: [{ kind: 'NAME', value: 'b' }] }))).toEqual({ ok: false, code: 'rate_limited' })
+  })
+
+  it('the listing length follows the setting', async () => {
+    withRules({ listingMonths: 3 })
+    const n = await nominate({ ...nominateInput(), now: T0 })
+    if (!n.ok) throw new Error()
+    const round = state.round[0]
+    for (const v of ['dpr1', 'dpr2', 'dpr3']) await castVote({ disavowalId: n.id, roundId: round.id, voterDiscordId: v, choice: 'YES', now: new Date(T0.getTime() + D) })
+    await settleRound(round.id, new Date(T0.getTime() + 8 * D))
+    const d = state.disavowal[0]
+    expect(d.reviewDueAt.getTime() - d.listedAt.getTime()).toBeLessThan(100 * D)
+    expect(d.reviewDueAt.getTime() - d.listedAt.getTime()).toBeGreaterThan(85 * D)
+  })
+
+  it('the appeal cooldown follows the setting', async () => {
+    const { id } = await listedEntry()
+    withRules({ appealCooldownDays: 7 })
+    state.disavowal[0].lastAppealAt = new Date(T0.getTime() + 10 * D)
+    expect(await openRemoveRound(id, 'subj', { appeal: true, now: new Date(T0.getTime() + 20 * D) })).toBe('ok')
   })
 })
 

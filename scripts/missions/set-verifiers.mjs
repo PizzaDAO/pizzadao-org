@@ -46,7 +46,7 @@
  *   DATABASE_URL=... node scripts/missions/set-verifiers.mjs --apply    # writes, in one transaction
  *   ... --level-titles '3="Title",4="Other title"'                      # rename levels without a code change
  *
- * Automatic approval stays off until MISSION_VERIFIERS_ENABLED=1 is set in
+ * Automatic approval stays off until missions.verifiersEnabled is set in
  * Vercel, and the semi verifiers never approve on their own, so applying this
  * alone changes no member's status or balance (a member who already finished
  * a level stays complete: a paid level counts as complete, and is never paid

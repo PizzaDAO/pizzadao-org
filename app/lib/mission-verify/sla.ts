@@ -19,12 +19,12 @@
  * queue: submit, resubmit, auto-hold, reopen), falling back to `submittedAt`
  * for rows from before Phase 3.
  *
- * Gated by MISSION_REVIEW_CARDS_ENABLED like the review cards (default off).
+ * Gated by missions.reviewCardsEnabled like the review cards (default off).
  * Tests inject SlaDeps.
  */
 import type { MissionHold } from '@prisma/client'
 import { prisma } from '../db'
-import { resolveChannelId } from '../discord-channels'
+import { resolveConfiguredChannel } from '../settings/channels'
 import { postDiscordMessage, type DiscordMessageBody } from '../discord-rest'
 import { makeEmbed } from '../discord-interactions/embeds'
 import { PIZZA_CAPO_ROLE_ID } from '@/app/ui/constants'
@@ -70,7 +70,7 @@ export function selectOverdue(rows: SlaCandidate[], now: Date, slaMs = SLA_MS): 
 export const dayKey = (now: Date) => now.toISOString().slice(0, 10)
 
 export interface SlaDeps {
-  enabled: () => boolean
+  enabled: () => boolean | Promise<boolean>
   /** Every PENDING completion (the queue is small). */
   pending: () => Promise<SlaCandidate[]>
   /** Insert today's MissionSlaDigest row; false when it already exists. */
@@ -83,12 +83,23 @@ export interface SlaDeps {
   guildId: () => string | null
   appUrl: () => string
   /** The review target and digest length; omitted: read from the admin settings. */
-  rules?: () => Promise<{ slaHours: number; maxLines: number }>
+  rules?: () => Promise<SlaRules>
 }
 
-export async function loadSlaRules(): Promise<{ slaHours: number; maxLines: number }> {
+export interface SlaRules {
+  slaHours: number
+  maxLines: number
+  /** The role the digest tags (the setting missions.slaPingRoleId, else the built-in role). */
+  pingRoleId: string
+}
+
+export async function loadSlaRules(): Promise<SlaRules> {
   const s = await loadSettings()
-  return { slaHours: s.get('missions.slaHours'), maxLines: s.get('missions.slaDigestMaxLines') }
+  return {
+    slaHours: s.get('missions.slaHours'),
+    maxLines: s.get('missions.slaDigestMaxLines'),
+    pingRoleId: s.get('missions.slaPingRoleId') || PIZZA_CAPO_ROLE_ID,
+  }
 }
 
 export type SlaResult =
@@ -103,19 +114,19 @@ const fmtWait = (ms: number) => {
   return h >= 48 ? `${Math.floor(h / 24)}d ${h % 24}h` : `${h}h`
 }
 
-/** The digest tags only the Pizza Capo role, whatever the items' levels. */
-export function rolesToPing(items: Array<{ level: number }>): string[] {
-  return items.length ? [PIZZA_CAPO_ROLE_ID] : []
+/** The digest tags only one role (by default Pizza Capo), whatever the items' levels. */
+export function rolesToPing(items: Array<{ level: number }>, pingRoleId: string = PIZZA_CAPO_ROLE_ID): string[] {
+  return items.length ? [pingRoleId] : []
 }
 
 /** The digest message. Pure. */
 export function renderSlaDigest(
   items: OverdueItem[],
-  opts: { guildId: string | null; appUrl: string; slaHours?: number; maxLines?: number },
+  opts: { guildId: string | null; appUrl: string; slaHours?: number; maxLines?: number; pingRoleId?: string },
 ): DiscordMessageBody {
   const slaHours = opts.slaHours ?? SLA_HOURS
   const maxLines = opts.maxLines ?? DIGEST_MAX_LINES
-  const roles = rolesToPing(items)
+  const roles = rolesToPing(items, opts.pingRoleId)
   const lines = items.slice(0, maxLines).map((it) => {
     const link =
       it.reviewMsgId && it.reviewChannelId && opts.guildId
@@ -140,7 +151,7 @@ export function renderSlaDigest(
 }
 
 export async function runSlaDigest(deps: SlaDeps = defaultSlaDeps, now = new Date()): Promise<SlaResult> {
-  if (!deps.enabled()) return { status: 'disabled' }
+  if (!(await deps.enabled())) return { status: 'disabled' }
   const pending = await deps.pending()
   const rules = await (deps.rules ?? loadSlaRules)()
   const overdue = selectOverdue(pending, now, rules.slaHours * 3_600_000)
@@ -155,7 +166,7 @@ export async function runSlaDigest(deps: SlaDeps = defaultSlaDeps, now = new Dat
     console.warn('[mission-sla] no #work channel (set MISSION_REVIEW_CHANNEL_ID); digest not posted')
     return { status: 'no_channel', overdue: overdue.length }
   }
-  const body = renderSlaDigest(overdue, { guildId: deps.guildId(), appUrl: deps.appUrl(), slaHours: rules.slaHours, maxLines: rules.maxLines })
+  const body = renderSlaDigest(overdue, { guildId: deps.guildId(), appUrl: deps.appUrl(), slaHours: rules.slaHours, maxLines: rules.maxLines, pingRoleId: rules.pingRoleId })
   let posted: { id: string | null }
   try {
     posted = await deps.post(channelId, body)
@@ -172,7 +183,7 @@ export async function runSlaDigest(deps: SlaDeps = defaultSlaDeps, now = new Dat
 }
 
 export const defaultSlaDeps: SlaDeps = {
-  enabled: () => reviewCardsEnabled() && !!process.env.DISCORD_BOT_TOKEN?.trim(),
+  enabled: async () => (await reviewCardsEnabled()) && !!process.env.DISCORD_BOT_TOKEN?.trim(),
   async pending() {
     const rows = await prisma.missionCompletion.findMany({
       where: { status: 'PENDING' },
@@ -207,7 +218,7 @@ export const defaultSlaDeps: SlaDeps = {
   async markNotified(ids, now) {
     if (ids.length) await prisma.missionCompletion.updateMany({ where: { id: { in: ids } }, data: { slaNotifiedAt: now } })
   },
-  resolveChannel: () => resolveChannelId('work', 'MISSION_REVIEW_CHANNEL_ID'),
+  resolveChannel: () => resolveConfiguredChannel('discord.missionReviewChannelId', 'work', 'MISSION_REVIEW_CHANNEL_ID'),
   async post(channelId, body) {
     return postDiscordMessage({ kind: 'bot', channelId, botToken: process.env.DISCORD_BOT_TOKEN?.trim() ?? '' }, body)
   },

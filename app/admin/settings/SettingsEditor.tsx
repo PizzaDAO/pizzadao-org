@@ -35,6 +35,14 @@ export interface SettingsLabels {
     loadError: string;
     empty: string;
     nonProdBanner: string;
+    on: string;
+    off: string;
+    emptyDefault: string;
+    envForcedOff: string;
+    envFallback: string;
+    inForce: string;
+    idPlaceholder: string;
+    idsPlaceholder: string;
 }
 
 interface SettingView {
@@ -45,17 +53,37 @@ interface SettingView {
     help: string;
     input:
         | { type: "int"; min: number; max: number; unit?: string }
+        | { type: "bool" }
+        | { type: "channel"; kind: "text" | "voice" }
+        | { type: "role" }
+        | { type: "roleList" }
         | { type: "text"; maxLength: number; multiline?: boolean; placeholder?: string }
         | { type: "date" }
         | { type: "url"; maxLength: number };
     stricterOnly: boolean;
-    default: number | string;
-    value: number | string;
-    override: number | string | null;
+    default: SettingValue;
+    value: SettingValue;
+    override: SettingValue | null;
     modified: boolean;
     invalid: boolean;
     updatedAt: string | null;
     updatedBy: string | null;
+    toggle?: { env: string; envKill: boolean; envOn: boolean; effective: boolean };
+    names?: Record<string, string>;
+}
+
+type SettingValue = number | boolean | string | string[];
+
+/** How a value reads in the page: numbers with their unit, on/off, ids with their resolved names. */
+function show(s: SettingView, v: SettingValue, labels: SettingsLabels): string {
+    const names = s.names ?? {};
+    if (typeof v === "boolean") return v ? labels.on : labels.off;
+    if (Array.isArray(v)) return v.length === 0 ? labels.emptyDefault : v.map((id) => (names[id] ? `${names[id]} (${id})` : id)).join(", ");
+    if (typeof v === "string") {
+        if (v === "") return s.input.type === "channel" || s.input.type === "role" ? labels.emptyDefault : labels.empty;
+        return names[v] ? `${names[v]} (${v})` : v;
+    }
+    return `${v}${s.input.type === "int" && s.input.unit ? ` ${s.input.unit}` : ""}`;
 }
 
 interface Change {
@@ -82,7 +110,10 @@ async function api(method: string, body?: unknown, query = ""): Promise<{ ok: bo
 }
 
 function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels; onChanged: () => void }) {
-    const [text, setText] = useState(String(s.value));
+    const [text, setText] = useState(Array.isArray(s.value) ? s.value.join(", ") : String(s.value));
+    // For a switch, s.value is what is in force (env may have it on), so the box starts there and Save
+    // stays disabled until the choice differs from it.
+    const [flag, setFlag] = useState(typeof s.value === "boolean" ? s.value : false);
     const [note, setNote] = useState("");
     const [state, setState] = useState<"idle" | "saving" | "saved" | "resetting">("idle");
     const [error, setError] = useState<string | null>(null);
@@ -90,16 +121,21 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
     const [confirmIsReset, setConfirmIsReset] = useState(false);
     const [history, setHistory] = useState<Change[] | null>(null);
 
-    const isInt = s.input.type === "int";
-    const num = Number(text);
-    // Text-like settings may be saved empty (= unset); numbers may not.
-    const dirty = isInt ? text.trim() !== "" && num !== s.value : text.trim() !== String(s.value);
-    const sendValue = isInt ? num : text.trim();
+    // The value to send, by input kind.
+    const next: SettingValue =
+        s.input.type === "int" ? Number(text)
+        : s.input.type === "bool" ? flag
+        : s.input.type === "roleList" ? text.split(",").map((x) => x.trim()).filter(Boolean)
+        : text.trim();
+    const dirty =
+        s.input.type === "int" ? text.trim() !== "" && next !== s.value
+        : s.input.type === "bool" ? next !== s.value
+        : JSON.stringify(next) !== JSON.stringify(s.value);
 
     async function save(confirmed: boolean) {
         setError(null);
         setState("saving");
-        const r = await api("PUT", { key: s.key, value: sendValue, note, confirm: confirmed, expectedUpdatedAt: s.updatedAt });
+        const r = await api("PUT", { key: s.key, value: next, note, confirm: confirmed, expectedUpdatedAt: s.updatedAt });
         if (r.status === 409 && typeof r.data.needsConfirm === "string") {
             setConfirm(r.data.needsConfirm);
             setConfirmIsReset(false);
@@ -153,14 +189,22 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
             <p className="m-0 text-sm text-foreground/70">{s.help}</p>
             {s.stricterOnly && <p className="m-0 text-xs text-foreground/60">{labels.stricterOnly}</p>}
             {s.invalid && <p role="alert" className="m-0 text-sm text-tomato">{labels.invalid}</p>}
+            {s.toggle?.envKill && <p className="m-0 text-sm font-bold text-tomato">{fill(labels.envForcedOff, { env: s.toggle.env })}</p>}
+            {s.toggle && !s.toggle.envKill && !s.modified && <p className="m-0 text-xs text-foreground/60">{fill(labels.envFallback, { env: s.toggle.env })}</p>}
+            {s.modified && (s.input.type === "channel" || s.input.type === "role" || s.input.type === "roleList") && (
+                <p className="m-0 text-xs text-foreground/60">{show(s, s.value, labels)}</p>
+            )}
             <div className="flex flex-wrap items-end gap-4 text-sm">
                 <div>
                     <div className="text-foreground/50">{labels.codeDefault}</div>
-                    <div className="font-bold tabular-nums">
-                        {s.default === "" ? labels.empty : String(s.default)}
-                        {s.input.type === "int" && s.input.unit ? ` ${s.input.unit}` : ""}
-                    </div>
+                    <div className="font-bold tabular-nums">{show(s, s.default, labels)}</div>
                 </div>
+                {s.toggle && (
+                    <div>
+                        <div className="text-foreground/50">{labels.inForce}</div>
+                        <div className="font-bold">{s.toggle.effective ? labels.on : labels.off}</div>
+                    </div>
+                )}
                 <label className="grid gap-1">
                     <span className="text-foreground/50">
                         {labels.current}{s.input.type === "int" ? ` (${s.input.min}-${s.input.max})` : ""}
@@ -178,6 +222,8 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                             className="w-28 rounded-lg border bg-background px-2 py-1 tabular-nums"
                             style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
                         />
+                    ) : s.input.type === "bool" ? (
+                        <input type="checkbox" checked={flag} onChange={(e) => setFlag(e.target.checked)} aria-label={s.label} className="h-5 w-5" />
                     ) : s.input.type === "text" && s.input.multiline ? (
                         <textarea
                             rows={5}
@@ -191,10 +237,16 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                     ) : (
                         <input
                             type={s.input.type === "date" ? "date" : s.input.type === "url" ? "url" : "text"}
-                            maxLength={s.input.type === "date" ? undefined : s.input.maxLength}
+                            maxLength={s.input.type === "text" || s.input.type === "url" ? s.input.maxLength : undefined}
+                            placeholder={
+                                s.input.type === "roleList" ? labels.idsPlaceholder
+                                : s.input.type === "channel" || s.input.type === "role" ? labels.idPlaceholder
+                                : s.input.type === "text" ? s.input.placeholder
+                                : undefined
+                            }
                             value={text}
                             onChange={(e) => setText(e.target.value)}
-                            className="w-80 max-w-full rounded-lg border bg-background px-2 py-1"
+                            className={`${s.input.type === "channel" || s.input.type === "role" || s.input.type === "roleList" ? "w-72 font-mono text-xs" : "w-80"} max-w-full rounded-lg border bg-background px-2 py-1`}
                             style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
                         />
                     )}

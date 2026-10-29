@@ -19,7 +19,7 @@ export default async function AgendaPreview() {
         <section className="grid gap-3">
             <h2 className="font-[family-name:var(--font-display)] font-black text-xl m-0">{t("agendaTitle")}</h2>
             <p className="m-0 text-foreground/70">{t("agendaDescription")}</p>
-            <p className="m-0 text-sm">{callAgendaEnabled() ? t("agendaOn") : t("agendaOff")}</p>
+            <p className="m-0 text-sm">{(await callAgendaEnabled()) ? t("agendaOn") : t("agendaOff")}</p>
             {plans === null ? (
                 <p className="text-foreground/60">{t("agendaError")}</p>
             ) : plans.length === 0 ? (

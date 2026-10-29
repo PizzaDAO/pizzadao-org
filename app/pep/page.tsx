@@ -452,7 +452,7 @@ export default function PepDashboard() {
     setWalletKey((k) => k + 1);
   };
 
-  // Flag-gated cards (PEP_CRIME_ENABLED / PEP_GAMES_ENABLED): hidden unless on.
+  // Flag-gated cards (crime.enabled / games.enabled): hidden unless on.
   const [features, setFeatures] = useState<{ crime: boolean; games: boolean }>({ crime: false, games: false });
   useEffect(() => {
     if (!meData?.authenticated) return;

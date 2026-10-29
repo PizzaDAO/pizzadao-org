@@ -11,7 +11,7 @@ export const dynamic = 'force-dynamic'
  * Cron, `Authorization: Bearer $CRON_SECRET`). Posts one card in #work listing
  * submissions waiting more than 48 hours and pings the reviewer roles, at most
  * once per UTC day. See app/lib/mission-verify/sla.ts. Does nothing while
- * MISSION_REVIEW_CARDS_ENABLED is off.
+ * missions.reviewCardsEnabled is off.
  */
 export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request.headers.get('authorization'))) {

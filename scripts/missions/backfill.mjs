@@ -32,7 +32,7 @@
  * Usage:
  *   DATABASE_URL=... node scripts/missions/backfill.mjs                       # dry run -> CSV + summary
  *   DATABASE_URL=... node scripts/missions/backfill.mjs --max-level 2         # only approve missions up to L2
- *   DATABASE_URL=... MISSION_VERIFIERS_ENABLED=1 \
+ *   DATABASE_URL=... missions.verifiersEnabled \
  *     node scripts/missions/backfill.mjs --apply --confirm-total 12345        # after the owner signed off
  *
  * Options:
@@ -92,8 +92,8 @@ try {
   })();
   console.log(`Database host: ${host}`);
   console.log(apply ? "Mode: APPLY (writes approvals and pays PEP)" : "Mode: DRY RUN (writes nothing)");
-  if (apply && !missionVerifiersEnabled()) {
-    die("--apply needs MISSION_VERIFIERS_ENABLED=1 in the environment (the automatic-verification kill switch).");
+  if (apply && !(await missionVerifiersEnabled())) {
+    die("--apply needs automatic verification switched on (the admin setting missions.verifiersEnabled, or MISSION_VERIFIERS_ENABLED=1 in the environment). MISSION_VERIFIERS_ENABLED=0 always blocks it.");
   }
   if (!process.env.DISCORD_BOT_TOKEN || !process.env.DISCORD_GUILD_ID) {
     console.warn("WARNING: DISCORD_BOT_TOKEN / DISCORD_GUILD_ID not set: role missions (L6.0, L7.0) are left undecided.");

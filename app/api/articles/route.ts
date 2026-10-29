@@ -1,7 +1,7 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
 import { hasAnyRole } from '@/app/lib/discord'
-import { ARTICLE_AUTHOR_ROLE_IDS } from '@/app/ui/constants'
+import { articleAuthorRoleIds } from '@/app/lib/settings/roles'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, ForbiddenError } from '@/app/lib/errors/api-errors'
 import { createArticle, getPublishedArticles, extractFirstImage } from '@/app/lib/articles'
@@ -45,7 +45,7 @@ const POST_HANDLER = async (request: NextRequest) => {
     throw new UnauthorizedError()
   }
 
-  const canAuthor = await hasAnyRole(session.discordId, ARTICLE_AUTHOR_ROLE_IDS)
+  const canAuthor = await hasAnyRole(session.discordId, await articleAuthorRoleIds())
   if (!canAuthor) {
     throw new ForbiddenError('You do not have permission to create articles')
   }

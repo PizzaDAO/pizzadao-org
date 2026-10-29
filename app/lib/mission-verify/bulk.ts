@@ -14,7 +14,7 @@
  * Each member then goes through runVerifiers(), so every write is the same
  * idempotent, race-safe path the "Check my progress" button uses, and payouts
  * go through settleLevels() -> checkAndAwardLevelReward() (exactly once per
- * level, in level order). Dry runs (MISSION_VERIFIERS_ENABLED off, or a
+ * level, in level order). Dry runs (missions.verifiersEnabled off, or a
  * backfill dry run) write nothing; for them checkMany projects what
  * settleLevels WOULD pay.
  */
@@ -330,9 +330,9 @@ export interface MemberOutcome {
 
 export interface CheckManyOptions {
   trigger: 'cron' | 'backfill'
-  /** Write nothing (forced while MISSION_VERIFIERS_ENABLED is off). */
+  /** Write nothing (forced while missions.verifiersEnabled is off). */
   dryRun?: boolean
-  /** Override MISSION_VERIFIERS_ENABLED (tests; the backfill checks the flag itself). */
+  /** Override missions.verifiersEnabled (tests; the backfill checks the flag itself). */
   enabled?: boolean
   /** Only these missions (backfill --max-level). */
   missionIds?: number[]

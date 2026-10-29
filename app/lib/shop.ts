@@ -1,5 +1,6 @@
 import { prisma } from './db'
 import { assertPepAmount, debitInTx, getOrCreateEconomy } from './economy'
+import { toggleEnabled } from './settings/toggles'
 import { ConflictError, NotFoundError, ValidationError } from './errors/api-errors'
 
 /**
@@ -177,12 +178,15 @@ export async function removeFromInventory(userId: string, itemId: number, quanti
 // ===== Sync from Google Sheets =====
 //
 // RETIRED: the shop is managed at /admin/shop (app/lib/shop-admin.ts). POST
-// /api/shop/sync is a no-op unless SHOP_SHEET_SYNC_ENABLED=1, so a stray
+// /api/shop/sync is a no-op unless shop.sheetSyncEnabled is on, so a stray
 // Apps Script push can't overwrite admin edits.
 
-/** The sheet sync only runs when SHOP_SHEET_SYNC_ENABLED is exactly "1". */
+/**
+ * The sheet sync only runs when the setting shop.sheetSyncEnabled is on, or (no setting saved)
+ * SHOP_SHEET_SYNC_ENABLED is exactly "1"; the env var set to off always wins.
+ */
 export const shopSheetSyncEnabled = (env: Record<string, string | undefined> = process.env) =>
-  env.SHOP_SHEET_SYNC_ENABLED?.trim() === '1'
+  toggleEnabled('shop.sheetSyncEnabled', env)
 
 interface ShopItemData {
   name: string

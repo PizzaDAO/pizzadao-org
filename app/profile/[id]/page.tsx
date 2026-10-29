@@ -90,11 +90,11 @@ export default async function ProfilePage({
 
 /**
  * Private disavow warning (plans/disavow-list.md). Does nothing, and does not
- * even read the session, while DISAVOW_ENABLED is off. Only an eligible viewer
+ * even read the session, while the disavow feature is off. Only an eligible viewer
  * ever gets a non-null value; everyone else's page is unchanged.
  */
 async function loadDisavowWarning(memberId: string): Promise<{ id: string; label: string } | null> {
-    if (!disavowEnabled()) return null;
+    if (!(await disavowEnabled())) return null;
     try {
         const session = await getSession();
         if (!session?.discordId) return null;

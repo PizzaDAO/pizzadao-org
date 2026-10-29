@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server'
 import { gamesEnabled } from '@/app/lib/pep-games/config'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -10,7 +11,7 @@ export const dynamic = 'force-dynamic'
  */
 export async function GET() {
   return NextResponse.json({
-    crime: process.env.PEP_CRIME_ENABLED === '1',
-    games: gamesEnabled(),
+    crime: await toggleEnabled('crime.enabled'),
+    games: await gamesEnabled(),
   })
 }

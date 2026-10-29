@@ -1,4 +1,5 @@
 import { prisma } from './db'
+import { toggleEnabled } from './settings/toggles'
 import {
   getBotUserId,
   getGuildInfo,
@@ -471,7 +472,7 @@ export async function runTraineeNicks(opts: {
 
 /**
  * Hook for the missions Level 2 payout: remove Pizza Noob from this member.
- * Dry-run until TRAINEE_NICK_ENABLED=true. Never throws; on any problem it
+ * Dry-run until the setting onboarding.traineeNickEnabled (or TRAINEE_NICK_ENABLED=true) turns it on. Never throws; on any problem it
  * logs and returns, and the 10-minute sweep retries.
  */
 export async function removePizzaNoobOnGraduate(
@@ -499,7 +500,7 @@ export async function removePizzaNoobOnGraduate(
     const joined = got.member.joined_at ? Date.parse(got.member.joined_at) : NaN
     if (!Number.isFinite(joined) || joined < since) return 'skipped'
 
-    if (env.TRAINEE_NICK_ENABLED !== 'true') {
+    if (!(await toggleEnabled('onboarding.traineeNickEnabled', env))) {
       console.log(`[trainee-nicks] would remove Pizza Noob from ${discordId}`)
       return 'skipped'
     }

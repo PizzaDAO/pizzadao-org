@@ -93,7 +93,7 @@ describe('postCallRecap', () => {
   const published = { ...rec, status: 'PUBLISHED', crewId: 'community_call', eventName: null, recapPostedAt: null, redactionsUpdatedAt: null, summaryGeneratedAt: null, summaryEditedAt: null }
 
   it('is off by default and touches nothing', async () => {
-    expect(recapPostingEnabled({})).toBe(false)
+    expect(await recapPostingEnabled({})).toBe(false)
     expect(await postCallRecap('abc123', { env: {} })).toBe('disabled')
     expect(db.callRecording.findUnique).not.toHaveBeenCalled()
   })

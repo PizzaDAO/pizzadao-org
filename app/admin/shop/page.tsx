@@ -3,7 +3,7 @@
 // $PEP shop admin. Server-side gate with the /add-money rule (isPepAdmin:
 // admin roles + Pepperoni Mafia); every /api/admin/shop/* route checks it
 // again. Replaces the Google-Sheet shop sync, which is now off unless
-// SHOP_SHEET_SYNC_ENABLED=1.
+// the shop.sheetSyncEnabled setting is on.
 
 import type { Metadata } from "next";
 import Link from "next/link";

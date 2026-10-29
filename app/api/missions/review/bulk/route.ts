@@ -47,7 +47,7 @@ const POST_HANDLER = async (request: NextRequest) => {
         if (r.discordId && r.levelsPaid?.length) {
           await announceMissionResults({ discordId: r.discordId, trigger: 'review', approvedTitles: [], levelsPaid: r.levelsPaid }).catch(() => undefined)
         }
-        if (reviewCardsEnabled()) await syncReviewCard(r.id)
+        if (await reviewCardsEnabled()) await syncReviewCard(r.id)
       }
     })
   }

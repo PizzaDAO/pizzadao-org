@@ -15,6 +15,12 @@ export interface TallyInput {
   now: Date
   opensAt: Date
   closesAt: Date
+  /**
+   * The rules the round opened under (snapshotted on the round). Omitted: the code defaults, which
+   * is what rounds opened before the snapshot existed were opened under.
+   */
+  yesThreshold?: number | null
+  decisionDays?: number | null
 }
 export interface TallyResult {
   yes: number
@@ -42,10 +48,11 @@ export function tallyRound(votes: readonly TallyVote[], ctx: TallyInput): TallyR
     else recused++
   }
   // Nothing is decided before the fixed decision time, however many votes are in.
-  const decideAt = ctx.opensAt.getTime() + DISAVOW_DECISION_DAYS * DAY_MS
+  const decideAt = ctx.opensAt.getTime() + (ctx.decisionDays ?? DISAVOW_DECISION_DAYS) * DAY_MS
+  const threshold = ctx.yesThreshold ?? DISAVOW_YES_THRESHOLD
   let outcome: TallyResult['outcome'] = 'pending'
   if (ctx.now.getTime() >= decideAt) {
-    if (yes >= DISAVOW_YES_THRESHOLD && yes > no) outcome = 'passed'
+    if (yes >= threshold && yes > no) outcome = 'passed'
     else if (ctx.now.getTime() >= ctx.closesAt.getTime()) outcome = 'failed'
   }
   return { yes, no, abstain, recused, outcome }

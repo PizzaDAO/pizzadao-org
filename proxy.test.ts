@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 import { NextRequest } from "next/server";
 import { readFileSync } from "node:fs";
 
+vi.mock("@/app/lib/db");
 vi.mock("@/app/lib/session", () => ({ COOKIE_NAME: "pizzadao_session", verifySession: vi.fn() }));
 vi.mock("@/app/lib/disavow/access", () => ({ disavowViewer: vi.fn(), findSubjectDisavowals: vi.fn() }));
 

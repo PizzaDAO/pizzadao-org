@@ -2,7 +2,7 @@
  * Shop admin (/admin/shop): create, edit, hide, restock and (rarely) delete
  * $PEP shop items, and grant / remove items to / from members. Replaces the
  * Google-Sheet sync (POST /api/shop/sync, now off unless
- * SHOP_SHEET_SYNC_ENABLED=1) as the way the shop is managed.
+ * shop.sheetSyncEnabled on) as the way the shop is managed.
  *
  * Every change commits in ONE transaction together with its ShopAdminEvent
  * audit row, so the log can't miss a change or record one that rolled back.

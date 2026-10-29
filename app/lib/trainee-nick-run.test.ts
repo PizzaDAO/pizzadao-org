@@ -1,6 +1,6 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
-vi.mock('./db', () => ({ prisma: {} }))
+vi.mock('./db', () => ({ prisma: { appSetting: { findMany: async () => [] } } }))
 vi.mock('./missions', () => ({ completedLevelBy: vi.fn() }))
 vi.mock('./member-registration', () => ({ readSignedUpMembers: vi.fn() }))
 

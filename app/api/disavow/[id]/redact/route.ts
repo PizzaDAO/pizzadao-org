@@ -14,7 +14,7 @@ export const dynamic = 'force-dynamic'
  * trail. Anyone who is not an admin gets the same 404 as the rest of the list.
  */
 export const POST = safe('redact', async (request: Request, ctx: Ctx) => {
-  if (!disavowEnabled()) return disavowNotFound()
+  if (!(await disavowEnabled())) return disavowNotFound()
   const session = await getSession().catch(() => null)
   if (!session?.discordId || !(await isAdminDiscordId(session.discordId))) return disavowNotFound()
   const body = (await request.json().catch(() => null)) as { confirm?: unknown } | null

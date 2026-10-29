@@ -9,10 +9,10 @@
 // Env: DISCORD_PUBLIC_KEY (hex, Developer Portal > General Information),
 //      DISCORD_GUILD_ID, DISCORD_BOT_TOKEN (guild role names for
 //      /collect-income), optional PEP_EMOJI (e.g. <:pepperoni:973304305979367444>).
-// Flags: PEP_GAMES_ENABLED=1 (games).
+// Flags: games.enabled (games).
 // /missions: deferred reply, then the verifier run (dry run unless
-//      MISSION_VERIFIERS_ENABLED=1) is edited in via the interaction webhook.
-// Mission review cards (MISSION_REVIEW_CARDS_ENABLED=1): Approve / Release /
+//      missions.verifiersEnabled is edited in via the interaction webhook.
+// Mission review cards (missions.reviewCardsEnabled on): Approve / Release /
 //      Reject buttons on the #work cards and the Reject modal. Checked with
 //      canReviewMission(member.roles, level), never your own; deferred update,
 //      then approveMission / rejectMission in after(). See
