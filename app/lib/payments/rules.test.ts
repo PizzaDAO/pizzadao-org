@@ -25,6 +25,7 @@ const ctx = (over: Partial<RuleContext> = {}, req: Partial<RuleContext['req']> =
   attachments: [],
   reusedAttachment: false,
   sharedPayee: false,
+  sharedPayeeFormRow: false,
   priorFraud: false,
   claimedFraudHint: false,
   restrictedMatches: [],
@@ -97,6 +98,13 @@ describe('rule flags', () => {
   it('a form row is unmatched whatever was typed; a verified requester is not', () => {
     expect(ids(ctx({}, { source: 'FORM', requesterDiscordId: null, requesterMemberId: null }))).toEqual(['unverified_requester', 'unmatched_requester'])
     expect(ids(ctx({}, { source: 'APP', requesterDiscordId: '100000000000000001', requesterMemberId: null }))).toEqual([])
+  })
+
+  it('a verified request whose payee also appears on a form row gets a hint, not a block', () => {
+    const f = computeRuleFlags(ctx({ sharedPayeeFormRow: true }))
+    expect(f.map((x) => [x.id, x.severity, x.hardBlock ?? false])).toEqual([['shared_payee_form_row', 'medium', false]])
+    // A real shared payee wins; the hint is not added on top.
+    expect(ids(ctx({ sharedPayee: true, sharedPayeeFormRow: true }))).toEqual(['shared_payee'])
   })
 
   it('a claimed id with a fraud history is a medium hint, not a block', () => {

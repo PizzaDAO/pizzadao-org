@@ -13,7 +13,7 @@ import { disavowEnabled } from '@/app/lib/disavow/constants'
 import { identifierOr, identifiersForMember, viewerIdentifiers } from '@/app/lib/disavow/match'
 import { snowflakeCreatedAt } from '@/app/lib/mission-verify/policy'
 import { getSetting } from '@/app/lib/settings'
-import { countApprovals, linkedDiscordIds } from './decide'
+import { attachmentMarker, countApprovals, linkedDiscordIds } from './decide'
 import { chooseLane } from './lane'
 import { loadPaymentPolicy, type PaymentPolicy } from './policy'
 import { signalsFor, type TrackSignals } from './signals'
@@ -100,6 +100,9 @@ export async function evaluateRequest(id: string, deps: EvalDeps = {}): Promise<
 }
 
 async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | null> {
+  // Taken BEFORE anything is read: anything that changes the request after this makes the save below
+  // conflict (it bumps updatedAt), so checkedAt never claims to cover later changes.
+  const startedAt = deps.now ?? (await prisma.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`)[0].now
   const req = await loadRequest(id)
   if (!req) return null
   // APPROVED requests get their flags refreshed (shown again at "mark paid"); the lane and the approval
@@ -121,11 +124,18 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
   const requesters = [identity, ...linked].filter((x): x is string => !!x)
   const claimOnly = !verified && !!req.claimedDiscordId
 
-  const [reused, shared, fraud, restricted, newAccountDays, siblings, signals, aiChecks, claimedFraud] = await Promise.all([
+  const [reused, shared, fraud, restricted, newAccountDays, siblings, signals, aiChecks, claimedFraud, sharedFormRow] = await Promise.all([
     hashes.length ? prisma.paymentAttachment.findFirst({ where: { sha256: { in: hashes }, requestId: { not: id } }, select: { id: true } }) : null,
+    // A payee used by someone else is a hard block. For a verified request only VERIFIED rows of other
+    // people count; for a form row (claim only) nothing is excluded, since a claim cannot exempt the
+    // payee's real owner's rows.
     req.payeeHash
       ? prisma.paymentRequest.findFirst({
-          where: { payeeHash: req.payeeHash, id: { not: id }, ...(identity ? { NOT: { OR: [{ requesterDiscordId: identity }, { claimedDiscordId: identity }] } } : {}) },
+          where: {
+            payeeHash: req.payeeHash,
+            id: { not: id },
+            ...(verified ? { AND: [{ requesterDiscordId: { not: null } }, { requesterDiscordId: { notIn: verifiedIds } }] } : {}),
+          },
           select: { id: true },
         })
       : null,
@@ -141,6 +151,8 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
     approved ? ({ rsvFlagged: false, fastEligible: false } as TrackSignals) : (deps.signals ?? signalsFor)(req, policy).catch((): TrackSignals => ({ rsvFlagged: false, fastEligible: false })),
     prisma.paymentCheck.findMany({ where: { requestId: id, kind: 'AI_RECEIPT' }, orderBy: { createdAt: 'desc' }, take: 5, select: { kind: true, result: true } }),
     claimOnly ? prisma.paymentRequest.findFirst({ where: { rejectedAsFraud: true, requesterDiscordId: req.claimedDiscordId }, select: { id: true } }) : null,
+    // A verified request whose payee also appears on a public-form row: worth a look, not a block.
+    verified && req.payeeHash ? prisma.paymentRequest.findFirst({ where: { payeeHash: req.payeeHash, id: { not: id }, requesterDiscordId: null }, select: { id: true } }) : null,
   ])
 
   const created = identity ? snowflakeCreatedAt(identity) : null
@@ -165,6 +177,7 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
     attachments: req.attachments,
     reusedAttachment: !!reused,
     sharedPayee: !!shared,
+    sharedPayeeFormRow: !!sharedFormRow,
     priorFraud: !!fraud,
     claimedFraudHint: !!claimedFraud,
     restrictedMatches: restricted.ids,
@@ -203,15 +216,16 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
         })
       }
     }
-    // checkedAt uses the database clock (like createdAt and file upload times), so "checked after the
-    // latest file" is compared on one clock. Tests inject `now`.
-    const checkedAt = deps.now ?? (await tx.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`)[0].now
+    const checkedAt = startedAt
+    // What this check saw, recorded so decisions can require a check that covers everything present now.
+    const approvalCount = await tx.paymentDecision.count({ where: { requestId: id, action: 'APPROVE' } })
+    const marker = { attachments: attachmentMarker(req.attachments), approvals: approvalCount }
     const saved = await tx.paymentRequest.updateMany({
       where: { id, updatedAt: req.updatedAt },
       data: { flags: flags as never, riskScore, lane, approvalsNeeded, checkedAt },
     })
     if (saved.count !== 1) throw new CheckConflict()
-    await tx.paymentCheck.create({ data: { requestId: id, kind: 'RULES', version: RULES_VERSION, result: { flags, riskScore, lane } as never } })
+    await tx.paymentCheck.create({ data: { requestId: id, kind: 'RULES', version: RULES_VERSION, result: { flags, riskScore, lane, marker } as never } })
     for (const c of signals.checks ?? []) {
       await tx.paymentCheck.create({ data: { requestId: id, kind: c.kind, version: c.version, result: c.result as never } })
     }

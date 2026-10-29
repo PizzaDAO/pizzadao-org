@@ -93,12 +93,18 @@ describe('evaluateDecision: approvals', () => {
 
 describe('evaluateDecision: checks, claims and resets', () => {
   const NOW = new Date('2026-11-05T00:00:00Z')
-  it('approval is refused until the checks have run, and after a newer file arrived', () => {
+  it('approval is refused until a check has run (a new file clears checkedAt)', () => {
     expect(code(evaluateDecision(snapshot({ checkedAt: null }), [], actor(A), { action: 'APPROVE' }, p))).toBe('not_checked')
-    const stale = snapshot({ checkedAt: new Date('2026-11-04T00:00:00Z'), newestAttachmentAt: NOW })
-    expect(code(evaluateDecision(stale, [], actor(A), { action: 'APPROVE' }, p))).toBe('not_checked')
-    const fresh = snapshot({ checkedAt: NOW, newestAttachmentAt: new Date('2026-11-04T00:00:00Z') })
-    expect(ok(evaluateDecision(fresh, [], actor(A), { action: 'APPROVE' }, p)).nextStatus).toBe('APPROVED')
+    expect(code(evaluateDecision(snapshot({ checkedAt: null, checkMarker: null }), [], actor(A), { action: 'APPROVE' }, p))).toBe('not_checked')
+  })
+
+  it('a file that arrives while a check is running: the check did not see it, so approval is refused until a new check', () => {
+    // The check recorded 1 file; by the time of the decision there are 2 (checkedAt is set, from the in-flight check).
+    const raced = snapshot({ checkedAt: NOW, checkMarker: { attachments: '1:2026-11-04T00:00:00.000Z', approvals: 0 }, currentMarker: { attachments: '2:2026-11-05T00:00:00.000Z', approvals: 0 } })
+    expect(code(evaluateDecision(raced, [], actor(A), { action: 'APPROVE' }, p))).toBe('not_checked')
+    // After a new check has seen both files, approval works. No clock comparison is involved.
+    const rechecked = snapshot({ checkedAt: new Date('2026-01-01T00:00:00Z'), checkMarker: { attachments: '2:2026-11-05T00:00:00.000Z', approvals: 0 }, currentMarker: { attachments: '2:2026-11-05T00:00:00.000Z', approvals: 0 } })
+    expect(ok(evaluateDecision(rechecked, [], actor(A), { action: 'APPROVE' }, p)).nextStatus).toBe('APPROVED')
   })
 
   it('approval is refused while the restricted-list check could not run', () => {
@@ -128,12 +134,12 @@ describe('evaluateDecision: checks, claims and resets', () => {
 describe('evaluateDecision: marking paid', () => {
   const ENV = { PAYMENTS_HASH_SECRET: 'test-secret-value' } as unknown as NodeJS.ProcessEnv
   const PAYEE = '0x1234567890abcdef1234567890abcdef12345678'
-  const approvedAt = new Date('2026-11-03T00:00:00Z')
-  const base = (over = {}) => snapshot({ status: 'APPROVED', lastApprovedAt: approvedAt, checkedAt: new Date('2026-11-04T00:00:00Z'), payeeHash: hashPayee(PAYEE, ENV), ...over })
+  const base = (over = {}) => snapshot({ status: 'APPROVED', checkedAt: new Date('2026-11-04T00:00:00Z'), checkMarker: { attachments: '0:', approvals: 1 }, currentMarker: { attachments: '0:', approvals: 1 }, payeeHash: hashPayee(PAYEE, ENV), ...over })
   const pay = { action: 'MARK_PAID' as const, proofRef: '0xabc123abc123', paidTo: PAYEE }
 
-  it('needs a check that ran after the approval', () => {
-    expect(code(evaluateDecision(base({ checkedAt: new Date('2026-11-02T00:00:00Z') }), [], DPR(), pay, p, ENV))).toBe('recheck_required')
+  it('needs a check that saw every approval and every file', () => {
+    expect(code(evaluateDecision(base({ checkMarker: { attachments: '0:', approvals: 0 } }), [], DPR(), pay, p, ENV))).toBe('recheck_required')
+    expect(code(evaluateDecision(base({ checkMarker: { attachments: '0:', approvals: 1 }, currentMarker: { attachments: '1:2026-11-05T00:00:00.000Z', approvals: 1 } }), [], DPR(), pay, p, ENV))).toBe('recheck_required')
     expect(code(evaluateDecision(base({ checkedAt: null }), [], DPR(), pay, p, ENV))).toBe('recheck_required')
     expect(ok(evaluateDecision(base(), [], DPR(), pay, p, ENV)).nextStatus).toBe('PAID')
   })
@@ -228,7 +234,7 @@ describe('evaluateDecision: other actions', () => {
 describe('applyDecision (database)', () => {
   const row = (over: Record<string, unknown> = {}) => ({
     id: 'req1', status: 'RECEIVED', lane: 'STANDARD', riskScore: 0, flags: [], approvalsNeeded: 1, requesterDiscordId: '100000000000000001', claimedDiscordId: null,
-    checkedAt: new Date('2026-11-02T00:00:00Z'), payeeHash: null, attachments: [],
+    checkedAt: new Date('2026-11-02T00:00:00Z'), payeeHash: null, attachments: [], checks: [{ result: { marker: { attachments: '0:', approvals: 0 } } }],
     proposalUrl: null, amountUsdCents: 20000, updatedAt: new Date('2026-11-01T00:00:00Z'), decisions: [], ...over,
   })
   let tx: Record<string, Record<string, ReturnType<typeof vi.fn>>>

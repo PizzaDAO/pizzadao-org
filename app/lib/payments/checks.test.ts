@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/app/lib/db', () => {
-  const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn() })
+  const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn(), count: vi.fn() })
   const prisma = {
     paymentRequest: model(),
     paymentAttachment: model(),
@@ -51,6 +51,7 @@ beforeEach(() => {
   m(prisma.disavowIdentifier.findMany).mockResolvedValue([])
   m(prisma.paymentDecision.findMany).mockResolvedValue([])
   m(prisma.paymentDecision.create).mockResolvedValue({})
+  m(prisma.paymentDecision.count).mockResolvedValue(0)
   m(prisma.paymentRequest.updateMany).mockResolvedValue({ count: 1 })
   m(prisma.$queryRaw).mockResolvedValue([{ now: new Date('2026-11-11T12:00:00Z') }])
 })
@@ -172,9 +173,41 @@ describe('evaluateRequest: claims, resets, approved requests, AI', () => {
     await expect(evaluateRequest('req1', { policy: policy() })).rejects.toThrow(/kept changing/)
   })
 
-  it('checkedAt comes from the database clock unless a time is injected', async () => {
+  it('checkedAt is taken before anything is read (database clock unless a time is injected)', async () => {
+    const order: string[] = []
+    m(prisma.$queryRaw).mockImplementation(async () => (order.push('clock'), [{ now: new Date('2026-11-11T12:00:00Z') }]))
+    m(prisma.paymentRequest.findUnique).mockImplementation(async () => (order.push('read'), base()))
     await evaluateRequest('req1', { policy: policy() })
+    expect(order.slice(0, 2)).toEqual(['clock', 'read'])
     expect(saved().checkedAt).toEqual(new Date('2026-11-11T12:00:00Z'))
+  })
+
+  it('records what the check saw (files and approvals) so a decision can require a check that covers them', async () => {
+    m(prisma.paymentDecision.count).mockResolvedValue(2)
+    await evaluateRequest('req1', { policy: policy() })
+    const result = m(prisma.paymentCheck.create).mock.calls[0][0].data.result
+    expect(result.marker).toEqual({ attachments: expect.stringMatching(/^1:/), approvals: 2 })
+  })
+
+  it('shared payee: a verified request is blocked only by VERIFIED rows of other people; form rows are a hint', async () => {
+    m(prisma.paymentRequest.findFirst).mockImplementation(async (a: { where: Record<string, unknown> }) =>
+      a.where.payeeHash ? (a.where.requesterDiscordId === null ? { id: 'formrow' } : null) : null)
+    const r = await evaluateRequest('req1', { policy: policy() })
+    const hard = m(prisma.paymentRequest.findFirst).mock.calls.find((c) => c[0].where.payeeHash && c[0].where.AND)
+    expect(JSON.stringify(hard?.[0].where.AND)).toContain('"not":null')
+    expect(r?.flags.map((f) => f.id)).toContain('shared_payee_form_row')
+    expect(r?.flags.map((f) => f.id)).not.toContain('shared_payee')
+    expect(r?.flags.find((f) => f.id === 'shared_payee_form_row')?.hardBlock).toBeUndefined()
+  })
+
+  it('shared payee: a form row (claim only) excludes nothing, so a claim cannot exempt the payee owner\'s rows', async () => {
+    m(prisma.paymentRequest.findUnique).mockResolvedValue(base({ source: 'FORM', requesterDiscordId: null, claimedDiscordId: '200000000000000007', requesterMemberId: null }))
+    m(prisma.paymentRequest.findFirst).mockImplementation(async (a: { where: Record<string, unknown> }) => (a.where.payeeHash ? { id: 'owner-row' } : null))
+    const r = await evaluateRequest('req1', { policy: policy() })
+    const q = m(prisma.paymentRequest.findFirst).mock.calls.find((c) => c[0].where.payeeHash)
+    expect(q?.[0].where).toEqual({ payeeHash: 'abc', id: { not: 'req1' } })
+    expect(r?.flags.find((f) => f.id === 'shared_payee')).toMatchObject({ severity: 'high', hardBlock: true })
+    expect(r?.lane).toBe('HIGH_RISK')
   })
 
   it('says so when the restricted list is switched off', async () => {

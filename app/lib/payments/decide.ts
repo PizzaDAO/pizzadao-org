@@ -35,8 +35,9 @@ export interface RequestSnapshot {
   claimedDiscordId?: string | null
   /** When the automated checks last ran, and when the newest file / the last approval arrived. */
   checkedAt?: Date | null
-  newestAttachmentAt?: Date | null
-  lastApprovedAt?: Date | null
+  /** What the last RULES check saw (attachments and approvals), and what is there now. */
+  checkMarker?: CheckMarker | null
+  currentMarker?: CheckMarker
   payeeHash?: string | null
   /** Reviewers who entered this request's dollar value: they cannot also approve it. */
   usdAmountSetBy?: string[]
@@ -83,6 +84,19 @@ const fail = (status: DecisionFailure['status'], code: string, message: string):
 
 const MAX_NOTE = 2000
 const needsAck = (f: PaymentFlag) => f.severity !== 'info'
+
+/** What a check looked at. A decision may only rely on a check that saw everything that is there now. */
+export interface CheckMarker {
+  /** `${count}:${newest createdAt ISO}` of the attachments. */
+  attachments: string
+  /** Total APPROVE decisions on the request. */
+  approvals: number
+}
+
+export function attachmentMarker(list: ReadonlyArray<{ createdAt: Date }>): string {
+  const newest = list.reduce((t: Date | null, a) => (!t || a.createdAt > t ? a.createdAt : t), null as Date | null)
+  return `${list.length}:${newest ? newest.toISOString() : ''}`
+}
 
 /** Distinct approvers since the last reset. */
 export function countApprovals(decisions: readonly Pick<DecisionRow, 'action' | 'actorDiscordId' | 'actorIsDpr'>[]): { actors: Set<string>; hasDpr: boolean } {
@@ -142,8 +156,15 @@ export function evaluateDecision(
 
   const risky = isHighRisk(req.riskScore, req.flags, policy)
   const restricted = req.flags.some((f) => f.restricted)
-  // Money only moves on checks that ran after the last file arrived (and, to pay, after the approval).
-  const checkedSince = (t: Date | null | undefined) => !!req.checkedAt && (!t || req.checkedAt.getTime() >= t.getTime())
+  // Money only moves on a check that saw every file now on the request (and, to pay, every approval).
+  // Compared by what the check recorded, not by wall-clock time, so clock differences cannot matter. A
+  // new file also clears checkedAt in the same transaction that stores it.
+  const checkCurrent = (forPay: boolean) =>
+    !!req.checkedAt &&
+    !!req.checkMarker &&
+    !!req.currentMarker &&
+    req.checkMarker.attachments === req.currentMarker.attachments &&
+    (!forPay || req.checkMarker.approvals === req.currentMarker.approvals)
 
   switch (action) {
     case 'APPROVE': {
@@ -151,7 +172,7 @@ export function evaluateDecision(
       if (req.amountUsdCents <= 0) return fail(400, 'no_amount', 'The request has no amount')
       if (restricted && !actor.isDpr) return fail(403, 'restricted', 'Restricted: ask the top review role')
       if (req.usdAmountSetBy?.includes(actor.discordId)) return fail(403, 'self_review', 'You entered the dollar value, so someone else has to approve this request')
-      if (!checkedSince(req.newestAttachmentAt)) return fail(409, 'not_checked', 'The automated checks have not run on the latest version of this request. Re-check first.')
+      if (!checkCurrent(false)) return fail(409, 'not_checked', 'The automated checks have not run on the latest version of this request. Re-check first.')
       if (req.flags.some((f) => f.id === 'restricted_check_failed')) return fail(409, 'check_failed', 'The restricted-list check could not run. Re-check before approving.')
 
       const open = req.flags.filter(needsAck)
@@ -210,7 +231,7 @@ export function evaluateDecision(
     }
     case 'MARK_PAID': {
       if (req.status !== 'APPROVED') return fail(409, 'bad_state', 'Only an approved request can be marked paid')
-      if (!checkedSince(req.newestAttachmentAt) || !checkedSince(req.lastApprovedAt)) {
+      if (!checkCurrent(true)) {
         return fail(409, 'recheck_required', 'Re-check this request first: the checks must run after the approval, so you see today\'s flags.')
       }
       // Anything the checks found since approval must be looked at again before money is sent.
@@ -274,7 +295,11 @@ export async function applyDecision(
   return prisma.$transaction(async (tx) => {
     const row = await tx.paymentRequest.findUnique({
       where: { id: requestId },
-      include: { decisions: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] }, attachments: { select: { createdAt: true } } },
+      include: {
+        decisions: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+        attachments: { select: { createdAt: true } },
+        checks: { where: { kind: 'RULES' }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { result: true } },
+      },
     })
     if (!row) return { ok: false as const, status: 404 as const, code: 'not_found' as const, message: 'Not found' }
     if (opts.expectedUpdatedAt && opts.expectedUpdatedAt !== row.updatedAt.toISOString()) {
@@ -283,12 +308,11 @@ export async function applyDecision(
     const flags = (Array.isArray(row.flags) ? row.flags : []) as unknown as PaymentFlag[]
     const linked = row.requesterDiscordId ? await linkedDiscordIds(tx, row.requesterDiscordId) : []
     const decisions = row.decisions as unknown as DecisionRow[]
-    const approvals = decisions.filter((d) => d.action === 'APPROVE')
-    const newestFile = (row.attachments ?? []).reduce((t: Date | null, a: { createdAt: Date }) => (!t || a.createdAt > t ? a.createdAt : t), null as Date | null)
+    const seen = (row.checks?.[0]?.result as { marker?: CheckMarker } | undefined)?.marker
     const snap: RequestSnapshot = {
       checkedAt: row.checkedAt,
-      newestAttachmentAt: newestFile,
-      lastApprovedAt: approvals.length ? approvals[approvals.length - 1].createdAt : null,
+      checkMarker: seen && typeof seen.attachments === 'string' && typeof seen.approvals === 'number' ? seen : null,
+      currentMarker: { attachments: attachmentMarker(row.attachments ?? []), approvals: decisions.filter((d) => d.action === 'APPROVE').length },
       payeeHash: row.payeeHash,
       usdAmountSetBy: (row.decisions as Array<{ checklist: unknown; actorDiscordId: string }>)
         .filter((d) => (d.checklist as { usdAmountSet?: unknown } | null)?.usdAmountSet !== undefined)

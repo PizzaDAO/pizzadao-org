@@ -33,8 +33,10 @@ export interface RuleContext {
   attachments: Array<{ kind: string; createdAt: Date }>
   /** An attachment's sha256 is already on another request. */
   reusedAttachment: boolean
-  /** The same payee hash is used by a different requester. */
+  /** The same payee hash is used by a different requester (verified rows only, for a verified request). */
   sharedPayee: boolean
+  /** A verified request's payee also appears on a public-form row: a hint, never a block. */
+  sharedPayeeFormRow: boolean
   /** The (verified) requester, or a linked account, has a request rejected as fraud. */
   priorFraud: boolean
   /** A form row's CLAIMED id belongs to someone with a fraud rejection: a hint, never a block. */
@@ -65,6 +67,7 @@ export function computeRuleFlags(c: RuleContext): PaymentFlag[] {
 
   if (c.reusedAttachment) add({ id: 'reused_attachment', severity: 'high', hardBlock: true, detail: 'A file attached here was already used on another request.' })
   if (c.sharedPayee) add({ id: 'shared_payee', severity: 'high', hardBlock: true, detail: 'The same payee reference is used by a different requester.' })
+  if (c.sharedPayeeFormRow && !c.sharedPayee) add({ id: 'shared_payee_form_row', severity: 'medium', detail: 'The same payee reference also appears on a public-form request. Form rows are unverified, so this is a hint to look into, not a block.' })
   if (c.priorFraud) add({ id: 'prior_fraud', severity: 'high', hardBlock: true, detail: 'The requester, or a linked account, has a request rejected as fraud.' })
   if (c.claimedFraudHint) add({ id: 'claimed_id_history', severity: 'medium', detail: 'The Discord id typed into this form belongs to someone with a fraud rejection. It is only a claim, so this is a hint to look into, not a block.' })
   if (c.restrictedMatches.length > 0) {

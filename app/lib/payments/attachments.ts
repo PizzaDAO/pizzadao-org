@@ -32,9 +32,15 @@ export async function addAttachment(args: {
   if (count >= MAX_ATTACHMENTS_PER_REQUEST) return { ok: false, status: 409, error: 'Too many files on this request' }
   try {
     const up = await uploadPrivate(args.bytes, `payments/${args.requestId}`)
-    const row = await prisma.paymentAttachment.create({
-      data: { requestId: args.requestId, kind: args.kind, blobPath: up.pathname, sha256: up.sha256, sizeBytes: up.sizeBytes, mime: up.mime, uploadedBy: args.uploadedBy },
-      select: { id: true },
+    // One transaction: the file is stored AND the request's check is cleared (which also bumps updatedAt, so
+    // a check running right now conflicts and repeats). Approval stays blocked until a check has seen the file.
+    const row = await prisma.$transaction(async (tx) => {
+      const created = await tx.paymentAttachment.create({
+        data: { requestId: args.requestId, kind: args.kind, blobPath: up.pathname, sha256: up.sha256, sizeBytes: up.sizeBytes, mime: up.mime, uploadedBy: args.uploadedBy },
+        select: { id: true },
+      })
+      await tx.paymentRequest.update({ where: { id: args.requestId }, data: { checkedAt: null } })
+      return created
     })
     // A new file can change the flags (reused file, receipts present).
     await evaluateRequest(args.requestId).catch((e) => console.error('[payments] check failed:', e instanceof Error ? e.message : e))
