@@ -7,7 +7,11 @@ vi.mock('@/app/lib/db', () => ({
   prisma: { disavowIdentifier: { findFirst: vi.fn() }, disavowal: { findUnique: vi.fn() } },
 }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
-vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn() }))
+vi.mock('@/app/lib/settings', () => ({
+  getSetting: vi.fn(),
+  // no saved switches: the env var decides, as before
+  loadSettings: vi.fn(async () => ({ readFailed: false, invalidKeys: [], isSet: () => false, get: () => undefined })),
+}))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
 vi.mock('@/app/lib/mission-review-access', () => ({ isDreadPizzaRoberts: vi.fn() }))
 vi.mock('@/app/lib/disavow/match', () => ({

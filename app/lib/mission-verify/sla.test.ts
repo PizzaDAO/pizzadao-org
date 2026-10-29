@@ -66,6 +66,13 @@ describe('renderSlaDigest', () => {
     expect(d).toContain('waiting 2d 12h')
   })
 
+  it('the ping role can be changed by the setting (default: Pizza Capo)', () => {
+    expect(rolesToPing([{ level: 2 }], '900000000000000003')).toEqual(['900000000000000003'])
+    const body = renderSlaDigest(selectOverdue([row(1)], NOW), { guildId: null, appUrl: 'https://x.test', pingRoleId: '900000000000000003' })
+    expect(body.content).toBe('<@&900000000000000003>')
+    expect(body.allowed_mentions).toEqual({ parse: [], roles: ['900000000000000003'] })
+  })
+
   it('every level, L8 included, pings only Pizza Capo; nothing overdue pings no one', () => {
     expect(rolesToPing([{ level: 8 }])).toEqual([CAPO])
     expect(rolesToPing([{ level: 8 }, { level: 2 }])).toEqual([CAPO])

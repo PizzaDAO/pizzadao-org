@@ -10,13 +10,13 @@ export const dynamic = 'force-dynamic'
 /**
  * GET /api/cron/disavow — daily (Vercel Cron, Bearer CRON_SECRET). Settles
  * rounds that are decided or past closesAt and opens REAFFIRM rounds for
- * listings past their review date. Does nothing while DISAVOW_ENABLED is off.
+ * listings past their review date. Does nothing while the disavow feature is off.
  */
 export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!disavowEnabled()) return NextResponse.json({ skipped: 'disabled' })
+  if (!(await disavowEnabled())) return NextResponse.json({ skipped: 'disabled' })
   try {
     const result = await runDisavowCron()
     console.log('[cron/disavow]', JSON.stringify(result))

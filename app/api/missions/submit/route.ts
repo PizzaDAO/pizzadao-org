@@ -81,7 +81,7 @@ const POST_HANDLER = async (request: NextRequest) => {
   // anything else leaves the submission PENDING for a reviewer.
   let status: string = completion.status
   let levelsPaid: number[] = []
-  if (missionVerifiersEnabled() && completion.mission.verifierKey && !isPrecheckedMission(completion.mission.verifierKey)) {
+  if ((await missionVerifiersEnabled()) && completion.mission.verifierKey && !isPrecheckedMission(completion.mission.verifierKey)) {
     try {
       const report = await runVerifiers(session.discordId, {
         trigger: 'submit',
@@ -108,8 +108,8 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   // Still waiting for a human (submission, resubmission, or a hold): post the
   // Discord review card in #work, after the response. Independent of
-  // MISSION_VERIFIERS_ENABLED; gated by MISSION_REVIEW_CARDS_ENABLED.
-  if (status !== 'APPROVED' && reviewCardsEnabled()) {
+  // missions.verifiersEnabled; gated by missions.reviewCardsEnabled.
+  if (status !== 'APPROVED' && (await reviewCardsEnabled())) {
     const discordId = session.discordId
     after(() => syncReviewCardsFor(discordId, [missionId]).then(() => undefined))
   }

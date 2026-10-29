@@ -14,7 +14,7 @@ export async function GET() {
     const overview = await getMissionsOverview(session?.discordId)
 
     const { humanReleaseMinLevel } = await loadHoldPolicy()
-    return NextResponse.json({ ...overview, verifiersEnabled: missionVerifiersEnabled(), humanReleaseMinLevel }, {
+    return NextResponse.json({ ...overview, verifiersEnabled: await missionVerifiersEnabled(), humanReleaseMinLevel }, {
       headers: {
         'Cache-Control': session?.discordId
           ? 'private, no-store'

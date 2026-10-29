@@ -5,7 +5,7 @@ import { useRouter } from "next/navigation";
 import { useTranslations } from "next-intl";
 import { paperCard, pillInk, pillOutline } from "@/app/ui/shared/Editorial";
 
-export function ResponseForm({ entryId, initial, hasOpenRound }: { entryId: string; initial: string; hasOpenRound: boolean }) {
+export function ResponseForm({ entryId, initial, hasOpenRound, appealDays }: { entryId: string; initial: string; hasOpenRound: boolean; appealDays: number }) {
     const t = useTranslations("disavow.response");
     const router = useRouter();
     const [text, setText] = useState(initial);
@@ -45,7 +45,7 @@ export function ResponseForm({ entryId, initial, hasOpenRound }: { entryId: stri
                 setAppealed(true);
                 setMessage(t("appealed"));
             } else {
-                setMessage(res.status === 429 ? t("tooSoon") : res.status === 409 ? t("appealOpen") : t("error"));
+                setMessage(res.status === 429 ? t("tooSoon", { days: appealDays }) : res.status === 409 ? t("appealOpen") : t("error"));
             }
         } catch {
             setMessage(t("error"));
@@ -64,7 +64,7 @@ export function ResponseForm({ entryId, initial, hasOpenRound }: { entryId: stri
                 <div><button type="submit" disabled={busy} className={`${pillInk} cursor-pointer`}>{t("save")}</button></div>
             </form>
             <div className={`${paperCard} grid gap-3 p-5`}>
-                <p className="m-0 text-sm">{t("appealHelp")}</p>
+                <p className="m-0 text-sm">{t("appealHelp", { days: appealDays })}</p>
                 <div><button type="button" disabled={busy || appealed} className={`${pillOutline} cursor-pointer disabled:opacity-60`} onClick={appeal}>{t("appeal")}</button></div>
             </div>
             {message && <p role="status" className="m-0 text-sm font-semibold">{message}</p>}

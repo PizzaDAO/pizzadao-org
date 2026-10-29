@@ -7,7 +7,7 @@
  *    occurrence as scheduled_start_time, so (eventId, start) is one occurrence.
  *  - Idempotency: a CallAgendaPost row (unique eventId + startsAt) is claimed
  *    BEFORE posting; a failed post releases the claim so the next run retries.
- *  - Off unless CALL_AGENDA_POST_ENABLED is "true"/"1". The admin preview works
+ *  - Off unless calls.agendaPostEnabled is "true"/"1". The admin preview works
  *    either way (it never posts).
  */
 import { prisma } from '@/app/lib/db'
@@ -17,6 +17,8 @@ import { getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channe
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { isCrewExcluded, loadPostFilter, mentionsBlockedTerm, type PostFilter } from '@/app/lib/calls/post-filters'
 import { SITE_URL } from '@/app/lib/site-url'
+import { savedChannelId } from '@/app/lib/settings/channels'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
 const API = 'https://discord.com/api/v10'
@@ -25,9 +27,12 @@ export const DEFAULT_CALL_VOICE_CHANNEL_ID = '823956905739026442'
 export const POST_LEAD_MS = 30 * 60 * 1000
 const SNOWFLAKE = /^\d{5,25}$/
 
-export function callAgendaEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  const v = env.CALL_AGENDA_POST_ENABLED?.trim().toLowerCase()
-  return v === 'true' || v === '1'
+/**
+ * Whether agendas are posted: the admin setting `calls.agendaPostEnabled`, with CALL_AGENDA_POST_ENABLED
+ * as the fallback while none is saved and, set to off, a kill switch. Unreadable settings: off.
+ */
+export function callAgendaEnabled(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  return toggleEnabled('calls.agendaPostEnabled', env)
 }
 
 export interface ScheduledEvent {
@@ -46,7 +51,7 @@ export async function fetchUpcomingEvents(
   const token = env.DISCORD_BOT_TOKEN?.trim()
   const guild = env.DISCORD_GUILD_ID?.trim()
   if (!token || !guild) throw new Error('DISCORD_BOT_TOKEN / DISCORD_GUILD_ID not configured')
-  const callChannel = env.CALL_VOICE_CHANNEL_ID?.trim() || DEFAULT_CALL_VOICE_CHANNEL_ID
+  const callChannel = (await savedChannelId('discord.callVoiceChannelId')) || env.CALL_VOICE_CHANNEL_ID?.trim() || DEFAULT_CALL_VOICE_CHANNEL_ID
   const res = await (o.fetchImpl ?? fetch)(`${API}/guilds/${guild}/scheduled-events`, {
     headers: { Authorization: `Bot ${token}` },
     signal: AbortSignal.timeout(8000),
@@ -248,7 +253,7 @@ async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutco
 }
 
 export async function runCallAgenda(o: { now?: Date; fetchImpl?: typeof fetch } = {}): Promise<RunResult> {
-  if (!callAgendaEnabled()) return { status: 'disabled', outcomes: [] }
+  if (!(await callAgendaEnabled())) return { status: 'disabled', outcomes: [] }
   const token = process.env.DISCORD_BOT_TOKEN?.trim() ?? ''
   const plans = await planAgendas({ now: o.now, horizonMs: POST_LEAD_MS, fetchImpl: o.fetchImpl })
   const outcomes: AgendaOutcome[] = []

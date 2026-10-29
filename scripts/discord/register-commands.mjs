@@ -5,9 +5,9 @@
  *
  * Commands: /balance /work /collect-income /pay /leaderboard /blackjack
  * /roulette /slots /shop /buy /add-money /remove-money /missions. The games
- * answer "not enabled yet" until PEP_GAMES_ENABLED=1 (Vercel env), so
+ * answer "not enabled yet" until games.enabled (Vercel env), so
  * registering them all up front is safe. /missions only shows progress (a dry
- * run) until MISSION_VERIFIERS_ENABLED=1.
+ * run) until missions.verifiersEnabled
  *
  * Usage:
  *   DISCORD_APPLICATION_ID=... DISCORD_BOT_TOKEN=... DISCORD_GUILD_ID=... \

@@ -135,3 +135,31 @@ describe('missionReviewScope / canReviewAnyMission', () => {
     await expect(canReviewAnyMission([PEP_MAFIA])).resolves.toBe(true)
   })
 })
+
+describe('missions.reviewerRoleIds (stricter-only narrowing of the L1-L7 reviewers)', () => {
+  const setRoles = (value: unknown) => vi.mocked(prisma.appSetting.findMany).mockResolvedValue([{ key: 'missions.reviewerRoleIds', value }] as never)
+
+  it('with no row the built-in reviewers apply, as before', async () => {
+    for (const r of [LEONARDO, DPR, CAPO, PEP_MAFIA]) await expect(canReviewMission([r], 3)).resolves.toBe(true)
+  })
+
+  it('a narrowed list drops the other roles but DPR always stays', async () => {
+    setRoles([CAPO])
+    await expect(canReviewMission([CAPO], 3)).resolves.toBe(true)
+    await expect(canReviewMission([DPR], 3)).resolves.toBe(true)
+    await expect(canReviewMission([PEP_MAFIA], 3)).resolves.toBe(false)
+    await expect(canReviewMission([LEONARDO], 3)).resolves.toBe(false)
+    await expect(canReviewAnyMission([PEP_MAFIA])).resolves.toBe(false)
+  })
+
+  it('a stored list with a role outside the built-in list is invalid: only DPR reviews', async () => {
+    setRoles([CAPO, RANDOM])
+    await expect(canReviewMission([CAPO], 3)).resolves.toBe(false)
+    await expect(canReviewMission([DPR], 3)).resolves.toBe(true)
+  })
+
+  it('the pure function takes the narrowed list as a parameter', () => {
+    expect(missionReviewerRoleIds(3, 8, [CAPO])).toEqual([CAPO, DPR])
+    expect(missionReviewerRoleIds(8, 8, [CAPO])).toEqual([DPR])
+  })
+})

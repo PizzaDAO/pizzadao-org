@@ -59,4 +59,19 @@ describe('tallyRound', () => {
     ]
     expect(tallyRound(votes, ctx(at(8 * D))).yes).toBe(3)
   })
+
+  it('a round counts under the rules it opened with, not the current defaults', () => {
+    // opened with a threshold of 5 and 3 decision days
+    const rules = { yesThreshold: 5, decisionDays: 3 }
+    expect(tallyRound(v(4, 'YES'), ctx(at(5 * D), rules)).outcome).toBe('pending')
+    expect(tallyRound(v(5, 'YES'), ctx(at(2 * D), rules)).outcome).toBe('pending') // not before day 3
+    expect(tallyRound(v(5, 'YES'), ctx(at(3 * D), rules)).outcome).toBe('passed')
+    expect(tallyRound(v(4, 'YES'), ctx(closesAt, rules)).outcome).toBe('failed')
+  })
+  it('a round with no snapshot (opened before it existed) keeps 3 votes and 7 days', () => {
+    const none = { yesThreshold: null, decisionDays: null }
+    expect(tallyRound(v(3, 'YES'), ctx(at(6 * D), none)).outcome).toBe('pending')
+    expect(tallyRound(v(3, 'YES'), ctx(at(7 * D), none)).outcome).toBe('passed')
+    expect(tallyRound(v(2, 'YES'), ctx(at(7 * D), none)).outcome).toBe('pending')
+  })
 })

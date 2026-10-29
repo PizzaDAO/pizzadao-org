@@ -10,13 +10,13 @@ export const maxDuration = 60
 /**
  * GET /api/cron/call-agenda — every 10 minutes (Vercel Cron, Bearer CRON_SECRET).
  * Posts each crew's pre-call agenda ~30 minutes before its Discord scheduled
- * event. Does nothing while CALL_AGENDA_POST_ENABLED is off. Idempotent per event occurrence.
+ * event. Does nothing while calls.agendaPostEnabled is off. Idempotent per event occurrence.
  */
 export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  if (!callAgendaEnabled()) return NextResponse.json({ skipped: 'disabled' })
+  if (!(await callAgendaEnabled())) return NextResponse.json({ skipped: 'disabled' })
   try {
     const result = await runCallAgenda()
     console.log('[cron/call-agenda]', JSON.stringify(result))

@@ -2,9 +2,9 @@ import { getVerifier } from './verifiers'
 /**
  * Rollout flag and payout policy for automatic mission verification.
  *
- *   MISSION_VERIFIERS_ENABLED  "1" / "true" / "on" turns the engine on. Default
- *                              OFF: every run is a dry run (progress hints only,
- *                              nothing approved, nothing paid, no Discord posts).
+ *   missions.verifiersEnabled  (admin setting; env MISSION_VERIFIERS_ENABLED is the fallback and,
+ *                              set to off, a kill switch). Default OFF: every run is a dry run
+ *                              (progress hints only, nothing approved, nothing paid, no Discord posts).
  *
  * Decision D9 (plans/mission-verification.md §9): a verifier pass is approved
  * automatically only when no human "release" is required. A release is
@@ -20,9 +20,15 @@ import { getVerifier } from './verifiers'
  */
 import type { MissionHold } from '@prisma/client'
 import { loadSettings } from '../settings'
+import { toggleEnabled } from '../settings/toggles'
 
-export function missionVerifiersEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return ['1', 'true', 'on', 'yes'].includes((env.MISSION_VERIFIERS_ENABLED ?? '').trim().toLowerCase())
+/**
+ * Whether automatic verification is on: the admin setting `missions.verifiersEnabled`, with the
+ * MISSION_VERIFIERS_ENABLED env var as the fallback while no setting is saved and as a kill switch
+ * when set to off (see settings/toggles.ts). Unreadable settings mean off (a dry run).
+ */
+export function missionVerifiersEnabled(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  return toggleEnabled('missions.verifiersEnabled', env)
 }
 
 /** Code default for `missions.humanReleaseMinLevel`: levels at or above this always need a human release (D9). */

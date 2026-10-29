@@ -19,6 +19,7 @@
  */
 
 import { SHEET_IDS } from "@/app/lib/sheets/config";
+import { savedChannelId } from "@/app/lib/settings/channels";
 import {
   postDiscordMessage,
   DiscordPostError,
@@ -52,13 +53,18 @@ export interface AnnounceConfig {
   secretService: SecretServiceConfig | null;
 }
 
+/**
+ * `savedChannelId`: the admin setting discord.announceChannelId (already checked against the
+ * server when it was saved); empty falls back to the env var, then the built-in channel.
+ */
 export function getAnnounceConfig(
   env: Record<string, string | undefined> = process.env,
   spreadsheetId: string = SHEET_IDS.announce,
+  savedChannelId = "",
 ): AnnounceConfig {
   const webhookUrl = env.ANNOUNCE_DISCORD_WEBHOOK_URL?.trim();
   const botToken = env.DISCORD_BOT_TOKEN?.trim();
-  const channelId = (env.ANNOUNCE_DISCORD_CHANNEL_ID?.trim() || DEFAULT_ANNOUNCE_CHANNEL_ID).replace(/\D/g, "");
+  const channelId = (savedChannelId || env.ANNOUNCE_DISCORD_CHANNEL_ID?.trim() || DEFAULT_ANNOUNCE_CHANNEL_ID).replace(/\D/g, "");
 
   let discord: DiscordTarget | null = null;
   if (webhookUrl) discord = { kind: "webhook", url: webhookUrl };
@@ -287,9 +293,9 @@ export async function runAnnouncement(deps: AnnounceDeps): Promise<AnnounceResul
 }
 
 /** Production wiring. */
-export function runAnnouncementFromEnv(): Promise<AnnounceResult> {
+export async function runAnnouncementFromEnv(): Promise<AnnounceResult> {
   return runAnnouncement({
     sheet: createAnnounceSheetIO(SHEET_IDS.announce),
-    config: getAnnounceConfig(),
+    config: getAnnounceConfig(process.env, SHEET_IDS.announce, await savedChannelId("discord.announceChannelId")),
   });
 }

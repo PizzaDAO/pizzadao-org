@@ -76,7 +76,7 @@ export default async function AdminEmailPreviewPage({
         <main className="min-h-screen bg-background text-foreground p-5 max-w-3xl mx-auto grid gap-4">
             <h1 className="text-2xl font-black m-0">Weekly email preview</h1>
             <p className="m-0 text-foreground/60">
-                Sending is {reengageEnabled() ? "ENABLED" : "off"} (REENGAGE_EMAIL_ENABLED). This page never sends.
+                Sending is {(await reengageEnabled()) ? "ENABLED" : "off"} (setting reengage.enabled, or REENGAGE_EMAIL_ENABLED). This page never sends.
             </p>
             <form method="get" className="flex flex-wrap gap-2 items-end">
                 <label className="grid gap-1 text-sm">

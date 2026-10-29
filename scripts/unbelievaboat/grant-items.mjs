@@ -28,7 +28,7 @@
  * Members with no app account yet (no User row) are not skipped: their grant
  * is HELD (ItemGrant status PENDING, same grantKey) and credited into their
  * inventory automatically on first login / onboarding. The dry run marks each
- * row "+ GRANT NOW" or "~ HOLD PENDING". Set ITEM_GRANT_CLAIMS=0 in the app to
+ * row "+ GRANT NOW" or "~ HOLD PENDING". Set shop.itemGrantsEnabled in the app to
  * pause the login credit (on by default).
  *
  * Collectibles (e.g. Molto Benny Pin, see seed-store.mjs --collectible) can be

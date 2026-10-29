@@ -10,7 +10,7 @@ export const dynamic = 'force-dynamic'
 
 /** POST /api/disavow/me/response { text } — the listed member's reply (editable, logged). */
 export const POST = safe('me-response', async (request: Request) => {
-  if (!disavowEnabled()) return disavowNotFound()
+  if (!(await disavowEnabled())) return disavowNotFound()
   const session = await getSession().catch(() => null)
   if (!session?.discordId) return disavowNotFound()
   const mine = await findSubjectDisavowals(session.discordId)

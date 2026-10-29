@@ -125,10 +125,10 @@
     "save": "Enregistrer la réponse",
     "saved": "Enregistré.",
     "appeal": "Faire appel",
-    "appealHelp": "Demande aux Dread Pizza Roberts de voter le retrait de l'inscription. Vous pouvez faire appel une fois tous les 90 jours.",
+    "appealHelp": "Demande aux Dread Pizza Roberts de voter le retrait de l'inscription. Vous pouvez faire appel une fois tous les {days} jours.",
     "appealed": "Appel déposé. Les Dread Pizza Roberts voteront.",
     "appealOpen": "Un vote est déjà ouvert.",
-    "tooSoon": "Vous pouvez faire appel une fois tous les 90 jours.",
+    "tooSoon": "Vous pouvez faire appel une fois tous les {days} jours.",
     "error": "Une erreur s'est produite."
   },
   "vouch": {

@@ -14,7 +14,7 @@ export const runtime = 'nodejs'
 // POST - "Check my progress" on /missions: run the automatic mission
 // verifiers for the signed-in member (plans/mission-verification.md §3.4).
 // Rate limited per member: 1 per 30 s and 30 per day. While
-// MISSION_VERIFIERS_ENABLED is off it is a dry run (progress and hints only).
+// missions.verifiersEnabled is off it is a dry run (progress and hints only).
 const POST_HANDLER = async () => {
   const session = await getSession()
   if (!session?.discordId) throw new UnauthorizedError()

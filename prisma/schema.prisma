@@ -422,6 +422,10 @@ model DisavowRound {
   opensAt     DateTime          @default(now())
   closesAt    DateTime
   closedAt    DateTime?
+  // The rules this round opened under (admin settings at the time). Null: opened before the
+  // snapshot existed, so it keeps the code defaults (3 yes votes, 7 days).
+  yesThreshold Int?
+  decisionDays Int?
   disavowal   Disavowal         @relation(fields: [disavowalId], references: [id])
   votes       DisavowVote[]
 

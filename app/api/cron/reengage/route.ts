@@ -10,7 +10,7 @@ export const maxDuration = 300
 /**
  * GET /api/cron/reengage — the weekly re-engagement email (Vercel Cron,
  * `Authorization: Bearer $CRON_SECRET`). See app/lib/reengage/run.ts.
- * Sends nothing while REENGAGE_EMAIL_ENABLED is not "true"; `?dry=1` forces a
+ * Sends nothing while reengage.enabled is not "true"; `?dry=1` forces a
  * dry run even when enabled (counts only, no sends, no rows written);
  * `?limit=N` overrides the batch size (capped).
  */

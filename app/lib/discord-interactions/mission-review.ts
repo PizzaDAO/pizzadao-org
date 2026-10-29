@@ -8,7 +8,7 @@
  *   mr:reject-modal:<id> (modal submit) check again, then a deferred update and
  *                                       the rejection in after()
  *
- * Every path checks, in order: the feature flag (MISSION_REVIEW_CARDS_ENABLED),
+ * Every path checks, in order: the feature flag (missions.reviewCardsEnabled),
  * that the completion exists, canReviewMission(member.roles, level) (L1–L7:
  * Leonardo, Dread Pizza Roberts, Pizza Capo, Pepperoni Mafia; L8: Dread Pizza
  * Roberts only), not your own submission, and still PENDING. Refusals are
@@ -56,8 +56,8 @@ export interface ReviewTarget {
 }
 
 export interface MissionReviewDeps {
-  /** MISSION_REVIEW_CARDS_ENABLED. */
-  enabled: () => boolean
+  /** missions.reviewCardsEnabled (env MISSION_REVIEW_CARDS_ENABLED as fallback and kill switch). */
+  enabled: () => boolean | Promise<boolean>
   target: (completionId: number) => Promise<ReviewTarget | null>
   /** canReviewMission(roles, level). */
   canReview: (roles: string[], level: number) => Promise<boolean>
@@ -97,7 +97,7 @@ async function check(
   deps: MissionReviewDeps,
   refuse: Refuse,
 ): Promise<{ ok: true; target: ReviewTarget } | { ok: false; res: InteractionResponse }> {
-  if (!deps.enabled()) {
+  if (!(await deps.enabled())) {
     const where = deps.appUrl ? ` Review at [${deps.appUrl.replace(/^https?:\/\//, '')}/missions](<${deps.appUrl}/missions>).` : ''
     return { ok: false, res: refuse('Discord mission review is turned off.', where.trim() || undefined) }
   }

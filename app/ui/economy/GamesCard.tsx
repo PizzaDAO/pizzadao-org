@@ -5,7 +5,7 @@
 // Web versions of the Discord casino games (slots, roulette, blackjack).
 // Same server logic and ledger as the slash commands: POST
 // /api/economy/games/{slots,roulette,blackjack}. Rendered on /pep only when
-// /api/economy/features says games are on (PEP_GAMES_ENABLED=1).
+// /api/economy/features says games are on (games.enabled)
 
 import React, { useCallback, useEffect, useState } from "react";
 import { PepAmount } from "./PepIcon";

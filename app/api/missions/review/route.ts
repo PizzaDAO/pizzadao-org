@@ -68,7 +68,7 @@ const POST_HANDLER = async (request: NextRequest) => {
 
   // Keep the Discord review card in sync (outcome, who, when; buttons
   // disabled). After the response, best effort: never blocks this request.
-  if (reviewCardsEnabled()) {
+  if (await reviewCardsEnabled()) {
     after(() => syncReviewCard(completionId).then(() => undefined))
   }
 

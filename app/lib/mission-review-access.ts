@@ -30,9 +30,27 @@ export function dprOnlyMinLevel(): Promise<number> {
   return getSetting('missions.dprOnlyMinLevel')
 }
 
-/** Roles that may review a mission of `level`. */
-export function missionReviewerRoleIds(level: number, dprOnlyFrom: number = DPR_ONLY_MIN_LEVEL): readonly string[] {
+/**
+ * The roles that may review L1-L7 missions from the admin setting `missions.reviewerRoleIds`.
+ * Empty (the default) means the whole built-in list. The setting can only narrow that list, and
+ * unreadable settings leave only Dread Pizza Roberts.
+ */
+export async function reviewerRoleSetting(): Promise<readonly string[]> {
+  try {
+    return await getSetting('missions.reviewerRoleIds')
+  } catch {
+    return [DREAD_PIZZA_ROBERTS_ROLE_ID]
+  }
+}
+
+/** Roles that may review a mission of `level` (`narrowedTo`: the saved reviewer roles, empty = built-in list). */
+export function missionReviewerRoleIds(
+  level: number,
+  dprOnlyFrom: number = DPR_ONLY_MIN_LEVEL,
+  narrowedTo: readonly string[] = [],
+): readonly string[] {
   if (level >= dprOnlyFrom) return [DREAD_PIZZA_ROBERTS_ROLE_ID]
+  if (narrowedTo.length) return [...new Set<string>([...narrowedTo, DREAD_PIZZA_ROBERTS_ROLE_ID])]
   return [...new Set<string>([...ADMIN_ROLE_IDS, ...MISSION_REVIEWER_ROLE_IDS])]
 }
 
@@ -72,8 +90,8 @@ export async function isDreadPizzaRoberts(who: Reviewer): Promise<boolean> {
 /** Whether `who` may approve or reject a submission for a mission of `level`. */
 export async function canReviewMission(who: Reviewer, level: number): Promise<boolean> {
   if (!Number.isInteger(level) || level < 1) return false
-  const [roles, dprFrom] = await Promise.all([resolveRoles(who), dprOnlyMinLevel()])
-  return holdsAny(roles, missionReviewerRoleIds(level, dprFrom))
+  const [roles, dprFrom, narrowed] = await Promise.all([resolveRoles(who), dprOnlyMinLevel(), reviewerRoleSetting()])
+  return holdsAny(roles, missionReviewerRoleIds(level, dprFrom, narrowed))
 }
 
 /**
@@ -81,10 +99,10 @@ export async function canReviewMission(who: Reviewer, level: number): Promise<bo
  * `null` = none (hide the review panel); otherwise a predicate on the level.
  */
 export async function missionReviewScope(who: Reviewer): Promise<((level: number) => boolean) | null> {
-  const [roles, dprFrom] = await Promise.all([resolveRoles(who), dprOnlyMinLevel()])
+  const [roles, dprFrom, narrowed] = await Promise.all([resolveRoles(who), dprOnlyMinLevel(), reviewerRoleSetting()])
   const [low, high] = await Promise.all([
-    holdsAny(roles, missionReviewerRoleIds(1, dprFrom)),
-    holdsAny(roles, missionReviewerRoleIds(dprFrom, dprFrom)),
+    holdsAny(roles, missionReviewerRoleIds(1, dprFrom, narrowed)),
+    holdsAny(roles, missionReviewerRoleIds(dprFrom, dprFrom, narrowed)),
   ])
   if (!low && !high) return null
   return (level: number) =>

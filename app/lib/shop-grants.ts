@@ -16,9 +16,10 @@
  * creditPendingItemGrants moves every PENDING grant into Inventory in one
  * transaction and marks it CREDITED (exactly once, even across parallel
  * logins). Same idea as PendingPepClaim, but on by default: set
- * ITEM_GRANT_CLAIMS=0 to pause the login credit.
+ * Switch off shop.itemGrantsEnabled to pause the login credit.
  */
 import { prisma } from './db'
+import { toggleEnabled } from './settings/toggles'
 
 export const normalizeItemName = (s: string) => s.toLowerCase().replace(/[^a-z0-9]/g, '')
 
@@ -253,15 +254,18 @@ export async function creditPendingItemGrants(discordId: string): Promise<Credit
   })
 }
 
-/** On unless ITEM_GRANT_CLAIMS=0 (independent of PEP_MIGRATION_CLAIMS). */
-export const itemGrantClaimsEnabled = () => process.env.ITEM_GRANT_CLAIMS !== '0'
+/**
+ * On unless the setting shop.itemGrantsEnabled is switched off or ITEM_GRANT_CLAIMS=0 (independent
+ * of PEP_MIGRATION_CLAIMS). Unreadable settings pause it; the next login retries.
+ */
+export const itemGrantClaimsEnabled = () => toggleEnabled('shop.itemGrantsEnabled')
 
 /**
  * Login / onboarding hook: credit held item grants. Never throws; a failure
  * (e.g. the migration isn't deployed yet) is logged and the next login retries.
  */
 export async function creditPendingItemGrantsOnLogin(discordId: string): Promise<void> {
-  if (!itemGrantClaimsEnabled() || !discordId) return
+  if (!discordId || !(await itemGrantClaimsEnabled())) return
   try {
     const r = await creditPendingItemGrants(discordId)
     if (r.credited) console.log(`[item-grants] credited ${r.credited} held item grant(s) to ${discordId}`)

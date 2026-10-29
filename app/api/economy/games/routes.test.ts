@@ -8,6 +8,7 @@ const playRoulette = vi.fn()
 const startBlackjack = vi.fn()
 const blackjackAction = vi.fn()
 const getActiveBlackjack = vi.fn()
+vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/session', () => ({ getSession: () => getSession() }))
 vi.mock('@/app/lib/pep-games/slots', () => ({ playSlots: (...a: unknown[]) => playSlots(...a) }))
 vi.mock('@/app/lib/pep-games/roulette', async (orig) => ({

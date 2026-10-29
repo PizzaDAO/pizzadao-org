@@ -3,7 +3,7 @@
  * Rules, payouts and house edges are documented in
  * plans/unbelievaboat-replacement.md §7.5.
  *
- *  - Off unless PEP_GAMES_ENABLED=1 (Discord commands and web).
+ *  - Off unless the setting games.enabled (or PEP_GAMES_ENABLED=1) turns it on (Discord commands and web).
  *  - Bets are whole PEP from the wallet, GAME_MIN_BET..GAME_MAX_BET.
  *  - One game start per GAME_COOLDOWN_SECONDS per member (rate limit), claimed
  *    in the same transaction as the stake.
@@ -13,12 +13,14 @@ import { prisma } from '../db'
 import { creditInTx, debitInTx, getOrCreateEconomy } from '../economy'
 import { ValidationError } from '../errors/api-errors'
 import { claimCooldown, envInt } from '../pep-earn/cooldown'
+import { toggleEnabled } from '../settings/toggles'
 import type { Prisma } from '@prisma/client'
 
 export type GameName = 'blackjack' | 'roulette' | 'slots'
 
-export function gamesEnabled() {
-  return process.env.PEP_GAMES_ENABLED === '1'
+/** Setting `games.enabled` (env PEP_GAMES_ENABLED is the fallback and, set to off, a kill switch). Unreadable settings: off. */
+export function gamesEnabled(): Promise<boolean> {
+  return toggleEnabled('games.enabled')
 }
 
 export function gameConfig() {

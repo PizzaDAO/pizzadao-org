@@ -89,7 +89,7 @@ describe('SLA digest follows the settings', () => {
   it('uses the configured hours and line cap', async () => {
     rows({ 'missions.slaHours': 24, 'missions.slaDigestMaxLines': 2 })
     const rules = await loadSlaRules()
-    expect(rules).toEqual({ slaHours: 24, maxLines: 2 })
+    expect(rules).toEqual({ slaHours: 24, maxLines: 2, pingRoleId: '839206162837798945' })
     const body = renderSlaDigest([item(1), item(2), item(3)], { guildId: null, appUrl: 'https://x.test', ...rules })
     const embed = (body.embeds as Array<{ description: string; footer?: { text: string } }>)[0]
     expect(embed.description).toContain('past the 24h target')

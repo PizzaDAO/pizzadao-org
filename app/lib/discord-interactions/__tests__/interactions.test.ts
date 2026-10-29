@@ -403,7 +403,7 @@ describe('POST /api/discord/interactions', () => {
   beforeEach(() => {
     vi.resetModules()
     vi.doMock('@/app/lib/pep-earn/work', () => ({ doWork }))
-    vi.doMock('@/app/lib/db', () => ({ prisma: { economy: { findUnique } } }))
+    vi.doMock('@/app/lib/db', () => ({ prisma: { economy: { findUnique }, appSetting: { findMany: async () => [] } } }))
     process.env.DISCORD_PUBLIC_KEY = PUBLIC_HEX
     process.env.DISCORD_GUILD_ID = GUILD
     doWork.mockReset()
@@ -430,7 +430,7 @@ describe('POST /api/discord/interactions', () => {
   it('401s on a bad signature (Discord probes this when the URL is saved)', async () => {
     const res = await post({ type: 1 }, '00'.repeat(64))
     expect(res.status).toBe(401)
-  })
+  }, 20_000) // the first test cold-imports the whole route graph
 
   it('PONGs a signed PING', async () => {
     const res = await post({ type: 1 })

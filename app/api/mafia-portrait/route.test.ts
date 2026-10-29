@@ -10,7 +10,7 @@ let upstash = true;
 
 vi.mock("@/app/lib/session", () => ({ getSession: () => getSession() }));
 vi.mock("@/app/lib/db", () => ({
-  prisma: { mafiaPortrait: { findUnique: (...a: unknown[]) => findUnique(...a), create: (...a: unknown[]) => create(...a) } },
+  prisma: { appSetting: { findMany: async () => [] }, mafiaPortrait: { findUnique: (...a: unknown[]) => findUnique(...a), create: (...a: unknown[]) => create(...a) } },
 }));
 vi.mock("@/app/lib/activation", () => ({
   recordActivationLater: (...a: unknown[]) => recordLater(...a),

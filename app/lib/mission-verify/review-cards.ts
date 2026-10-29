@@ -25,15 +25,16 @@
  *
  * Everything here is best effort and meant to run in `after()`: it never
  * blocks a web request and never throws into one. Gated by
- * MISSION_REVIEW_CARDS_ENABLED (default off) plus a DISCORD_BOT_TOKEN. Cards
- * for human submissions do not depend on MISSION_VERIFIERS_ENABLED (holds
+ * missions.reviewCardsEnabled (default off) plus a DISCORD_BOT_TOKEN. Cards
+ * for human submissions do not depend on missions.verifiersEnabled (holds
  * only exist while it is on). Tests inject ReviewCardDeps, so nothing reaches
  * Discord or the DB.
  */
 import { after } from 'next/server'
 import type { MissionHold, MissionStatus, Prisma } from '@prisma/client'
 import { prisma } from '../db'
-import { resolveChannelId } from '../discord-channels'
+import { resolveConfiguredChannel } from '../settings/channels'
+import { toggleEnabled } from '../settings/toggles'
 import { editDiscordMessage, postDiscordMessage } from '../discord-rest'
 import { makeEmbed, type Embed, type EmbedField, type Tone } from '../discord-interactions/embeds'
 import { attemptsSoFar, loadMaxAttempts, MAX_MISSION_ATTEMPTS } from '../missions'
@@ -46,8 +47,12 @@ export type { CardRef } from './review-ids'
 
 // ------------------------------------------------------------------ config ---
 
-export function reviewCardsEnabled(env: NodeJS.ProcessEnv = process.env): boolean {
-  return ['1', 'true', 'on', 'yes'].includes((env.MISSION_REVIEW_CARDS_ENABLED ?? '').trim().toLowerCase())
+/**
+ * Admin setting `missions.reviewCardsEnabled`; the MISSION_REVIEW_CARDS_ENABLED env var is the
+ * fallback while none is saved and, set to off, a kill switch. Unreadable settings: off.
+ */
+export function reviewCardsEnabled(env: NodeJS.ProcessEnv = process.env): Promise<boolean> {
+  return toggleEnabled('missions.reviewCardsEnabled', env)
 }
 
 /** A claimed card that never got a message id (crash mid-post) may be re-posted after this. */
@@ -244,8 +249,8 @@ export function renderReviewCard(
 // ------------------------------------------------------------------- sync ---
 
 export interface ReviewCardDeps {
-  /** MISSION_REVIEW_CARDS_ENABLED and a bot token. */
-  enabled: () => boolean
+  /** missions.reviewCardsEnabled and a bot token. */
+  enabled: () => boolean | Promise<boolean>
   load: (completionId: number) => Promise<ReviewCardView | null>
   /** Conditional claim of the right to post this round's card. */
   claim: (completionId: number, now: Date) => Promise<boolean>
@@ -270,7 +275,7 @@ export type SyncOutcome = 'disabled' | 'missing' | 'edited' | 'posted' | 'no_car
  */
 export async function syncReviewCard(completionId: number, deps: ReviewCardDeps = defaultReviewCardDeps, hint?: CardRef): Promise<SyncOutcome> {
   try {
-    if (!deps.enabled()) return 'disabled'
+    if (!(await deps.enabled())) return 'disabled'
     const v = await deps.load(completionId)
     if (!v) return 'missing'
     const appUrl = deps.appUrl()
@@ -321,7 +326,7 @@ export async function syncReviewCard(completionId: number, deps: ReviewCardDeps 
 
 /** Sync the cards of one member's completions for these missions (submit, verifier runs). */
 export async function syncReviewCardsFor(discordId: string, missionIds: number[], deps: ReviewCardDeps = defaultReviewCardDeps): Promise<SyncOutcome[]> {
-  if (!deps.enabled() || missionIds.length === 0) return []
+  if (!(await deps.enabled()) || missionIds.length === 0) return []
   try {
     const ids = await deps.idsFor(discordId, [...new Set(missionIds)])
     const out: SyncOutcome[] = []
@@ -420,7 +425,7 @@ export async function loadReviewCardView(completionId: number): Promise<ReviewCa
 }
 
 export const defaultReviewCardDeps: ReviewCardDeps = {
-  enabled: () => reviewCardsEnabled() && !!botToken(),
+  enabled: async () => (await reviewCardsEnabled()) && !!botToken(),
   load: loadReviewCardView,
   async claim(completionId, now) {
     const r = await prisma.missionCompletion.updateMany({
@@ -447,7 +452,7 @@ export const defaultReviewCardDeps: ReviewCardDeps = {
     const rows = await prisma.missionCompletion.findMany({ where: { discordId, missionId: { in: missionIds } }, select: { id: true } })
     return rows.map((r) => r.id)
   },
-  resolveChannel: () => resolveChannelId('work', 'MISSION_REVIEW_CHANNEL_ID'),
+  resolveChannel: () => resolveConfiguredChannel('discord.missionReviewChannelId', 'work', 'MISSION_REVIEW_CHANNEL_ID'),
   post: (channelId, msg) => postDiscordMessage({ kind: 'bot', channelId, botToken: botToken() }, msg),
   edit: (card, msg) => editDiscordMessage({ ...card, botToken: botToken() }, msg),
   appUrl: () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, ''),

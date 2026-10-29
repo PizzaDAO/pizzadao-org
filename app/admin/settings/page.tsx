@@ -66,6 +66,14 @@ export default async function AdminSettingsPage() {
         loadError: t("loadError"),
         empty: t("empty"),
         nonProdBanner: t("nonProdBanner"),
+        on: t("on"),
+        off: t("off"),
+        emptyDefault: t("emptyDefault"),
+        envForcedOff: t("envForcedOff", { env: "{env}" }),
+        envFallback: t("envFallback", { env: "{env}" }),
+        inForce: t("inForce"),
+        idPlaceholder: t("idPlaceholder"),
+        idsPlaceholder: t("idsPlaceholder"),
     };
 
     return (

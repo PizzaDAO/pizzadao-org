@@ -73,6 +73,7 @@ export async function DELETE(request: Request) {
     const removed = await resetSetting(b.key, auth.session.discordId, { note: b.note })
     return json({ ok: true, removed })
   } catch (e) {
+    if (e instanceof SettingError) return json({ error: e.message }, e.status)
     console.error('[admin settings] reset failed:', e)
     return json({ error: 'Could not reset the setting' }, 500)
   }

@@ -11,12 +11,12 @@
  *
  * In-app notifications are written by the engine and missions.ts. Everything
  * here is best effort (logged, never thrown) and is meant to run in `after()`.
- * Only sent while MISSION_VERIFIERS_ENABLED is on. Tests inject NotifyDeps, so
+ * Only sent while missions.verifiersEnabled is on. Tests inject NotifyDeps, so
  * nothing reaches Discord.
  */
 import { prisma } from '../db'
 import { sendDM } from '../discord'
-import { resolveChannelId } from '../discord-channels'
+import { resolveConfiguredChannel } from '../settings/channels'
 import { postDiscordMessage } from '../discord-rest'
 import { makeEmbed, type Embed } from '../discord-interactions/embeds'
 import { missionVerifiersEnabled } from './policy'
@@ -29,7 +29,7 @@ export interface LevelInfo {
 }
 
 export interface NotifyDeps {
-  enabled: () => boolean
+  enabled: () => boolean | Promise<boolean>
   levelInfo: (levels: number[]) => Promise<LevelInfo[]>
   sendDM: (userId: string, content: string, embeds: Embed[]) => Promise<{ success: boolean; error?: string }>
   resolveAnnounceChannel: () => Promise<string | null>
@@ -53,7 +53,7 @@ export const defaultNotifyDeps: NotifyDeps = {
     })
   },
   sendDM: (userId, content, embeds) => sendDM(userId, content, { embeds }),
-  resolveAnnounceChannel: () => resolveChannelId('work', 'MISSIONS_ANNOUNCE_CHANNEL_ID'),
+  resolveAnnounceChannel: () => resolveConfiguredChannel('discord.missionsAnnounceChannelId', 'work', 'MISSIONS_ANNOUNCE_CHANNEL_ID'),
   async postToChannel(channelId, body) {
     const botToken = process.env.DISCORD_BOT_TOKEN?.trim()
     if (!botToken) return
@@ -79,7 +79,7 @@ export async function announceMissionResults(
   deps: NotifyDeps = defaultNotifyDeps,
 ): Promise<{ dm: boolean; posted: boolean }> {
   const sent = { dm: false, posted: false }
-  if (!deps.enabled()) return sent
+  if (!(await deps.enabled())) return sent
   const { discordId, approvedTitles, levelsPaid, trigger } = input
   const watching = trigger === 'discord' || trigger === 'on_demand' || trigger === 'submit' || trigger === 'review'
   const dmApprovals = approvedTitles.length > 0 && !watching && trigger !== 'backfill'

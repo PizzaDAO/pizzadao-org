@@ -12,6 +12,7 @@
 //
 // The finale never blocks on this route: any non-200 just keeps the topping seal.
 import { NextResponse } from "next/server";
+import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { z } from "zod";
 import { Prisma } from "@prisma/client";
 import { prisma } from "@/app/lib/db";
@@ -69,7 +70,7 @@ const dailyCap = () => envCap("MAFIA_PORTRAIT_DAILY_CAP", DEFAULT_DAILY_CAP);
 const publicDailyCap = () => envCap("MAFIA_PORTRAIT_PUBLIC_DAILY_CAP", RATE_LIMITS["mafia-portrait-public"].limit);
 
 export async function POST(req: Request) {
-  if (process.env.MAFIA_PORTRAIT_ENABLED !== "1" || !process.env.OPENAI_API_KEY) {
+  if (!(await toggleEnabled("portrait.enabled")) || !process.env.OPENAI_API_KEY) {
     return fallback("disabled");
   }
 

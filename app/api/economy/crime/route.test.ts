@@ -3,6 +3,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 const getSession = vi.fn()
 const commitCrime = vi.fn()
+vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/session', () => ({ getSession: () => getSession() }))
 vi.mock('@/app/lib/pep-earn/crime', () => ({ commitCrime: (id: string) => commitCrime(id) }))
 

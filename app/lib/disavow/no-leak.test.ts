@@ -7,7 +7,7 @@ import { join } from 'node:path'
 
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ getUserRoles: vi.fn(async () => []) }))
-vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+vi.mock('@/app/lib/db', () => ({ prisma: { appSetting: { findMany: async () => [] } } }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn(async () => 9) }))
 vi.mock('@/app/lib/disavow/messages', () => ({ getDisavowTranslator: vi.fn(async () => (k: string) => `T:${k}`) }))
 vi.mock('@/app/lib/disavow/access', () => ({ disavowViewerCached: vi.fn(async () => ({ allowed: true, isDPR: true })) }))

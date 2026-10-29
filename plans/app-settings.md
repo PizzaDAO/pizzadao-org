@@ -484,3 +484,9 @@ Each migration is applied to prod by hand before merge (`prisma migrate deploy` 
 3. Mission editor scope: verifier params, per-level rewards, titles, active flag. Reward changes apply going forward only (no top-ups, no clawbacks). No creating missions from the UI.
 4. Preview deploys may edit settings, with a "this changes production" banner.
 5. Defaults taken: settings unreadable → every auto-pass waits for a human and posting/paying/emailing toggles go off; CallPostFilter folds in last (phase 5).
+
+## Phase 3 implementation notes (2026-10-29)
+- Previews share the production database, so on any deploy where `VERCEL_ENV` is not `production` the feature switches ignore saved rows and follow the env var only (env off still wins). A saved ON never reaches a preview.
+- Disavow yes votes (min 3) and decision days (min 7) are stricter-only from the admin page; loosening needs a PR.
+- Rounds snapshot `yesThreshold` and `decisionDays` when they open (migration 20261102100000_disavow_round_rules); null columns mean the code defaults.
+- Announcement and article-author role lists always include the top role in code.

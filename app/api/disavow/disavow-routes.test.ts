@@ -5,7 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('NEXT_NOT_FOUND') } }))
 vi.mock('@/app/lib/db', () => ({
-  prisma: { disavowIdentifier: { findFirst: vi.fn(), findMany: vi.fn(async () => []) }, disavowal: { findUnique: vi.fn(), count: vi.fn(async () => 0), findMany: vi.fn(async () => []) } },
+  prisma: { appSetting: { findMany: async () => [] }, disavowIdentifier: { findFirst: vi.fn(), findMany: vi.fn(async () => []) }, disavowal: { findUnique: vi.fn(), count: vi.fn(async () => 0), findMany: vi.fn(async () => []) } },
 }))
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))

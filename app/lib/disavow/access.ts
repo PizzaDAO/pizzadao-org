@@ -5,7 +5,7 @@
  * normal access (so they can't infer it from losing the nav link) but gets a
  * 404 for their own entry everywhere (see detail.ts) and can't vote on it.
  * Everyone who is not allowed gets a 404 with no body that hints the feature
- * exists, and the same 404 when DISAVOW_ENABLED is off. Every check runs per
+ * exists, and the same 404 when the feature is off (setting disavow.enabled / env DISAVOW_ENABLED). Every check runs per
  * request (no cached grant), and every lookup failure fails closed.
  */
 import { NextResponse } from 'next/server'
@@ -42,7 +42,7 @@ export async function isDisavowSubject(discordId: string): Promise<boolean> {
 
 /** The viewer's own LISTED/SUSPENDED entries: the only things a subject can reach. */
 export async function findSubjectDisavowals(discordId: string) {
-  if (!disavowEnabled()) return []
+  if (!(await disavowEnabled())) return []
   try {
     const hits = await prisma.disavowIdentifier.findMany({
       where: (await subjectWhere(discordId, LOCKOUT_STATUSES)) as never,
@@ -72,7 +72,7 @@ const DENIED: DisavowViewer = { allowed: false, isDPR: false }
 
 /** Single source of truth for "may this person see/nominate". Fails closed. */
 export async function disavowViewer(discordId: string): Promise<DisavowViewer> {
-  if (!disavowEnabled() || !discordId) return DENIED
+  if (!discordId || !(await disavowEnabled())) return DENIED
   try {
     const [subject, dpr, level, minLevel] = await Promise.all([
       isDisavowSubject(discordId),
@@ -120,7 +120,7 @@ export type DisavowGuard =
 
 /** API guard: 404 (never 401/403) unless the caller may use the list. */
 export async function requireDisavowViewer(): Promise<DisavowGuard> {
-  if (!disavowEnabled()) return { ok: false, response: disavowNotFound() }
+  if (!(await disavowEnabled())) return { ok: false, response: disavowNotFound() }
   const session = await getSession().catch(() => null)
   if (!session?.discordId) return { ok: false, response: disavowNotFound() }
   const v = await disavowViewer(session.discordId)

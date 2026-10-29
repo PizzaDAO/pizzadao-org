@@ -5,6 +5,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from "vitest";
 
 vi.mock("@/app/api/profile-summary/[id]/route", () => ({ composeProfileSummary: vi.fn() }));
 vi.mock("./ProfileClient", () => ({ ProfileClient: () => null }));
+vi.mock("@/app/lib/db");
 vi.mock("@/app/lib/session", () => ({ getSession: vi.fn() }));
 vi.mock("@/app/lib/disavow/access", () => ({ canViewDisavowList: vi.fn() }));
 vi.mock("@/app/lib/disavow/match", () => ({ findActiveListingFor: vi.fn() }));

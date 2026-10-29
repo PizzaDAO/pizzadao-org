@@ -13,6 +13,8 @@
 
 import { NextResponse } from "next/server";
 import { hasAnyRoleSafe, requireSession, type GuardResult } from "@/app/lib/auth-guards";
+import { getSetting } from "@/app/lib/settings";
+import { DREAD_PIZZA_ROBERTS_ROLE_ID } from "@/app/ui/constants";
 
 /** TEMPORARY fallback (pre-role-check allowlist from PR #116). */
 export const LEGACY_ANNOUNCE_DISCORD_IDS: readonly string[] = [
@@ -20,7 +22,7 @@ export const LEGACY_ANNOUNCE_DISCORD_IDS: readonly string[] = [
 ];
 
 export type AnnounceAccessConfig =
-  | { mode: "roles"; source: "ANNOUNCE_ROLE_IDS" | "ADMIN_ROLE_IDS"; roleIds: string[] }
+  | { mode: "roles"; source: "settings" | "ANNOUNCE_ROLE_IDS" | "ADMIN_ROLE_IDS"; roleIds: string[] }
   | { mode: "legacy-users"; source: "legacy"; discordIds: readonly string[] };
 
 export function parseIdList(raw: string | undefined): string[] {
@@ -30,7 +32,16 @@ export function parseIdList(raw: string | undefined): string[] {
     .filter((s) => /^\d{5,25}$/.test(s));
 }
 
-export function getAnnounceAccessConfig(env: Record<string, string | undefined> = process.env): AnnounceAccessConfig {
+/**
+ * `savedRoleIds`: the admin setting announce.roleIds (checked against the server when saved). It wins
+ * while set; empty keeps the env chain below.
+ */
+export function getAnnounceAccessConfig(
+  env: Record<string, string | undefined> = process.env,
+  savedRoleIds: readonly string[] = [],
+): AnnounceAccessConfig {
+  // Dread Pizza Roberts is always included, whatever is saved (a bad edit can't lock the top role out).
+  if (savedRoleIds.length) return { mode: "roles", source: "settings", roleIds: [...new Set([...savedRoleIds, DREAD_PIZZA_ROBERTS_ROLE_ID])] };
   const announceRoles = parseIdList(env.ANNOUNCE_ROLE_IDS);
   if (announceRoles.length) return { mode: "roles", source: "ANNOUNCE_ROLE_IDS", roleIds: announceRoles };
   const adminRoles = parseIdList(env.ADMIN_ROLE_IDS);
@@ -38,11 +49,17 @@ export function getAnnounceAccessConfig(env: Record<string, string | undefined> 
   return { mode: "legacy-users", source: "legacy", discordIds: LEGACY_ANNOUNCE_DISCORD_IDS };
 }
 
-export async function canAnnounce(
-  discordId: string,
-  config: AnnounceAccessConfig = getAnnounceAccessConfig(),
-): Promise<boolean> {
+async function savedAnnounceRoles(): Promise<string[]> {
+  try {
+    return await getSetting("announce.roleIds");
+  } catch {
+    return [];
+  }
+}
+
+export async function canAnnounce(discordId: string, config?: AnnounceAccessConfig): Promise<boolean> {
   if (!discordId) return false;
+  config ??= getAnnounceAccessConfig(process.env, await savedAnnounceRoles());
   if (config.mode === "legacy-users") return config.discordIds.includes(discordId);
   return hasAnyRoleSafe(discordId, config.roleIds);
 }

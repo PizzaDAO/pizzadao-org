@@ -18,7 +18,7 @@ export async function proxy(req: NextRequest) {
 }
 
 async function allowed(req: NextRequest): Promise<boolean> {
-    if (!disavowEnabled()) return false;
+    if (!(await disavowEnabled())) return false;
     try {
         const session = verifySession(req.cookies.get(COOKIE_NAME)?.value);
         if (!session?.discordId) return false;

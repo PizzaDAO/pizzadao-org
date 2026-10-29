@@ -11,8 +11,9 @@
  * - Keys never contain secrets. Editorial/private values live only in DB rows, never here.
  */
 import { z } from 'zod'
+import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -22,6 +23,8 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   passport: 'Pizza Passport',
   guide: 'Handbook facts',
   followups: 'Follow-ups',
+  discord: 'Discord channels and roles',
+  features: 'Other feature switches',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -33,8 +36,14 @@ export type SettingInput =
   | { type: 'text'; maxLength: number; multiline?: boolean; placeholder?: string }
   | { type: 'date' }
   | { type: 'url'; maxLength: number }
+  | { type: 'bool' }
+  | { type: 'channel'; kind: 'text' | 'voice' }
+  | { type: 'role' }
+  /** `allowed`: a stricter-only list may only hold ids from this code list (an empty value means the whole list). */
+  | { type: 'roleList'; allowed?: readonly string[] }
 
-export interface SettingDef<T> {
+// eslint-disable-next-line @typescript-eslint/no-explicit-any
+export interface SettingDef<T = any> {
   key: string
   area: SettingArea
   /** Admin-only English label and help (the admin page is not translated per setting). */
@@ -50,7 +59,7 @@ export interface SettingDef<T> {
   /** True when the code bound deliberately stops at today's value (loosening needs a PR). */
   stricterOnly?: boolean
   /** For stricter-only settings: which direction is looser (moving back toward the default asks for confirmation). */
-  looserWhen?: 'higher' | 'lower'
+  looserWhen?: 'higher' | 'lower' | 'larger'
   /** Editorial values: only ever sent to the settings page and its API. */
   private?: boolean
 }
@@ -161,6 +170,108 @@ function urlSetting(o: { key: string; area: SettingArea; label: string; help: st
     onReadFailure: { value: o.default ?? '' },
     input: { type: 'url', maxLength },
   }
+}
+
+/**
+ * On/off switch. `default` is the legacy behaviour (what happened before the switch existed);
+ * how env interacts is in toggles.ts (env off always wins; env is the fallback while no row exists).
+ */
+function boolSetting(o: {
+  key: string
+  area: SettingArea
+  label: string
+  help: string
+  default?: boolean
+  /** Text asked before turning it ON (it posts, pays or emails). */
+  confirmOn?: string
+}): SettingDef<boolean> {
+  return {
+    key: o.key,
+    area: o.area,
+    label: o.label,
+    help: o.help,
+    schema: z.boolean(),
+    default: o.default ?? false,
+    // Unreadable settings turn anything that posts, pays or emails OFF.
+    onReadFailure: { value: false },
+    input: { type: 'bool' },
+    confirm: o.confirmOn ? (from, to) => (to && !from ? o.confirmOn! : null) : undefined,
+  }
+}
+
+/** A Discord snowflake. */
+export const snowflake = z.string().regex(/^\d{15,25}$/, 'Not a Discord id')
+/** A snowflake, or '' meaning "not set here: use the env value, then the code default". */
+const optionalSnowflake = z.union([snowflake, z.literal('')])
+
+function channelSetting(o: { key: string; label: string; help: string; kind?: 'text' | 'voice' }): SettingDef<string> {
+  return {
+    key: o.key,
+    area: 'discord',
+    label: o.label,
+    help: `${o.help} Empty uses the environment value, then the built-in default. Checked against the server when saved.`,
+    schema: optionalSnowflake,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    input: { type: 'channel', kind: o.kind ?? 'text' },
+    confirm: (from, to) => (to && to !== from ? 'Messages will go to the new channel from now on.' : null),
+  }
+}
+
+function roleListSetting(o: {
+  key: string
+  area: SettingArea
+  label: string
+  help: string
+  confirm?: (from: string[], to: string[]) => string | null
+}): SettingDef<string[]> {
+  return {
+    key: o.key,
+    area: o.area,
+    label: o.label,
+    help: `${o.help} Empty uses the built-in list. Checked against the server when saved.`,
+    schema: z.array(snowflake).max(10),
+    default: [],
+    onReadFailure: 'lastKnownGood',
+    input: { type: 'roleList' },
+    confirm: o.confirm,
+  }
+}
+
+/** Reviewer roles for missions L1-L7 in code today (Dread Pizza Roberts is always added in code too). */
+export const REVIEWER_ROLE_CODE_LIST: readonly string[] = [...new Set<string>([...ADMIN_ROLE_IDS, ...MISSION_REVIEWER_ROLE_IDS])]
+
+const slaPingRole: SettingDef<string> = {
+  key: 'missions.slaPingRoleId',
+  area: 'discord',
+  label: 'Review digest ping role',
+  help: 'The role tagged by the daily review digest. Empty uses the built-in role. Checked against the server when saved.',
+  schema: optionalSnowflake,
+  default: '',
+  onReadFailure: 'lastKnownGood',
+  input: { type: 'role' },
+}
+
+const reviewerRoles: SettingDef<string[]> = {
+  key: 'missions.reviewerRoleIds',
+  area: 'discord',
+  label: 'Mission reviewer roles (levels 1-7)',
+  help: 'Roles that may approve missions below the top-role-only level. Can only be narrowed here to a subset of the built-in list; adding a role needs a code change. Dread Pizza Roberts is always included. Empty uses the whole built-in list.',
+  schema: z
+    .array(snowflake)
+    .max(10)
+    .refine((ids) => ids.every((id) => REVIEWER_ROLE_CODE_LIST.includes(id)), 'Only roles from the built-in list; adding a role needs a code change'),
+  default: [],
+  // Unreadable: only the top role approves.
+  onReadFailure: { value: [DREAD_PIZZA_ROBERTS_ROLE_ID] },
+  input: { type: 'roleList', allowed: REVIEWER_ROLE_CODE_LIST },
+  stricterOnly: true,
+  looserWhen: 'larger',
+  // An empty list means the whole built-in list.
+  confirm: (from, to) => {
+    const size = (l: string[]) => (l.length === 0 ? REVIEWER_ROLE_CODE_LIST.length : l.length)
+    return size(to) < size(from) ? 'Fewer roles will be able to approve missions.' : null
+  },
 }
 
 export const SETTINGS = {
@@ -531,7 +642,203 @@ export const SETTINGS = {
     unit: 'h UTC',
   }),
   // ---- END follow-ups block ----
-} as const satisfies Record<string, SettingDef<number> | SettingDef<string>>
+  // ---- Phase 3: disavow voting rules (a round snapshots its threshold and decision days when it opens) ----
+  'disavow.yesThreshold': intSetting({
+    key: 'disavow.yesThreshold',
+    area: 'disavow',
+    label: 'Yes votes needed',
+    help: 'Top-role yes votes needed (and more yes than no) to list someone. Can only be raised here; lowering it below 3 needs a code change. Applies to rounds opened from now on; open rounds keep the rule they opened under.',
+    min: 3,
+    max: 20,
+    default: 3,
+    stricterOnly: true,
+    looserWhen: 'lower',
+  }),
+  'disavow.decisionDays': intSetting({
+    key: 'disavow.decisionDays',
+    area: 'disavow',
+    label: 'Days before a round can be decided',
+    help: 'Nothing is counted until a round has been open this long, so dissent has time to show up. Can only be raised here; shortening it below 7 days needs a code change. Applies to rounds opened from now on. Cannot be longer than the voting window.',
+    min: 7,
+    max: 30,
+    default: 7,
+    unit: 'days',
+    stricterOnly: true,
+    looserWhen: 'lower',
+  }),
+  'disavow.windowDays': intSetting({
+    key: 'disavow.windowDays',
+    area: 'disavow',
+    label: 'Voting window',
+    help: 'A round that has not passed by then fails. Must be at least the decision days. Applies to rounds opened from now on.',
+    min: 1,
+    max: 60,
+    default: 14,
+    unit: 'days',
+  }),
+  'disavow.nominationsPerWindow': intSetting({
+    key: 'disavow.nominationsPerWindow',
+    area: 'disavow',
+    label: 'Nominations per person',
+    help: 'Nominations (including duplicates) one person can submit per nomination window.',
+    min: 1,
+    max: 20,
+    default: 3,
+  }),
+  'disavow.nominationWindowDays': intSetting({
+    key: 'disavow.nominationWindowDays',
+    area: 'disavow',
+    label: 'Nomination window',
+    help: 'The rolling window the nominations limit is counted over.',
+    min: 1,
+    max: 90,
+    default: 30,
+    unit: 'days',
+  }),
+  'disavow.listingMonths': intSetting({
+    key: 'disavow.listingMonths',
+    area: 'disavow',
+    label: 'Listing length',
+    help: 'How long a listing lasts before it needs a new vote. Applies to listings and re-affirmations from now on.',
+    min: 1,
+    max: 36,
+    default: 12,
+    unit: 'months',
+  }),
+  'disavow.appealCooldownDays': intSetting({
+    key: 'disavow.appealCooldownDays',
+    area: 'disavow',
+    label: 'Appeal cooldown',
+    help: 'A listed member can appeal once per this many days.',
+    min: 7,
+    max: 365,
+    default: 90,
+    unit: 'days',
+  }),
+
+  // ---- Phase 3: feature switches (env stays the fallback and a kill switch: see toggles.ts) ----
+  'missions.verifiersEnabled': boolSetting({
+    key: 'missions.verifiersEnabled',
+    area: 'missions',
+    label: 'Automatic mission verification',
+    help: 'On: passes are approved and paid automatically (subject to the human-release rules). Off: dry runs only. The MISSION_VERIFIERS_ENABLED env var set to off always wins.',
+    confirmOn: 'Verified missions will start paying PEP automatically.',
+  }),
+  'missions.reviewCardsEnabled': boolSetting({
+    key: 'missions.reviewCardsEnabled',
+    area: 'missions',
+    label: 'Discord review cards',
+    help: 'Post review cards, the daily digest and the nightly summary to Discord. The MISSION_REVIEW_CARDS_ENABLED env var set to off always wins.',
+  }),
+  'calls.recapPostEnabled': boolSetting({
+    key: 'calls.recapPostEnabled',
+    area: 'calls',
+    label: 'Post call recaps',
+    help: 'Post the recap to Discord when a call is published. The CALL_RECAP_POST_ENABLED env var set to off always wins.',
+    confirmOn: 'Published calls will post a recap to Discord.',
+  }),
+  'calls.agendaPostEnabled': boolSetting({
+    key: 'calls.agendaPostEnabled',
+    area: 'calls',
+    label: 'Post call agendas',
+    help: 'Post the pre-call agenda to Discord. The CALL_AGENDA_POST_ENABLED env var set to off always wins.',
+    confirmOn: 'Upcoming calls will get an agenda post in Discord.',
+  }),
+  'disavow.enabled': boolSetting({
+    key: 'disavow.enabled',
+    area: 'disavow',
+    label: 'Disavow list',
+    help: 'The whole feature. Off: every page and API answers as if it does not exist. The DISAVOW_ENABLED env var set to off always wins.',
+    confirmOn: 'The disavow pages and API become reachable to eligible members.',
+  }),
+  'reengage.enabled': boolSetting({
+    key: 'reengage.enabled',
+    area: 'features',
+    label: 'Re-engagement emails',
+    help: 'Send the weekly re-engagement email. Off: dry run. The REENGAGE_EMAIL_ENABLED env var set to off always wins.',
+    confirmOn: 'Members will be emailed on the next run.',
+  }),
+  'onboarding.traineeNickEnabled': boolSetting({
+    key: 'onboarding.traineeNickEnabled',
+    area: 'features',
+    label: 'Trainee nickname sync',
+    help: 'Apply the trainee nickname and role changes in Discord. Off: dry run. The TRAINEE_NICK_ENABLED env var set to off always wins.',
+  }),
+  'games.enabled': boolSetting({
+    key: 'games.enabled',
+    area: 'features',
+    label: 'PEP games',
+    help: 'Slots, roulette and blackjack (web and Discord). The PEP_GAMES_ENABLED env var set to off always wins.',
+    confirmOn: 'PEP games go live: members can win and lose PEP.',
+  }),
+  'crime.enabled': boolSetting({
+    key: 'crime.enabled',
+    area: 'features',
+    label: 'Crime (PEP earn)',
+    help: 'The crime action. The PEP_CRIME_ENABLED env var set to off always wins.',
+    confirmOn: 'Crime goes live: members can earn and lose PEP.',
+  }),
+  'portrait.enabled': boolSetting({
+    key: 'portrait.enabled',
+    area: 'features',
+    label: 'Mafia portraits',
+    help: 'AI portrait generation (it also needs the OpenAI key). The MAFIA_PORTRAIT_ENABLED env var set to off always wins.',
+    confirmOn: 'Portrait generation goes live and spends OpenAI credit.',
+  }),
+  'shop.itemGrantsEnabled': boolSetting({
+    key: 'shop.itemGrantsEnabled',
+    area: 'features',
+    label: 'Item grants on login',
+    help: 'Credit pending shop items when a member signs in. On unless switched off. The ITEM_GRANT_CLAIMS env var set to 0 always pauses it.',
+    default: true,
+  }),
+  'shop.sheetSyncEnabled': boolSetting({
+    key: 'shop.sheetSyncEnabled',
+    area: 'features',
+    label: 'Shop sheet sync',
+    help: 'Accept pushes from the old shop sheet script (the shop is managed at /admin/shop). The SHOP_SHEET_SYNC_ENABLED env var set to off always wins.',
+  }),
+
+  // ---- Phase 3: Discord channels and roles (resolved against the server when saved) ----
+  'discord.missionReviewChannelId': channelSetting({
+    key: 'discord.missionReviewChannelId',
+    label: 'Mission review channel',
+    help: 'Where review cards, the daily digest and the nightly summary are posted.',
+  }),
+  'discord.missionsAnnounceChannelId': channelSetting({
+    key: 'discord.missionsAnnounceChannelId',
+    label: 'Level-up announcement channel',
+    help: 'Where level-up posts go.',
+  }),
+  'discord.announceChannelId': channelSetting({
+    key: 'discord.announceChannelId',
+    label: 'Announcement and recap channel',
+    help: 'Where announcements and call recaps go.',
+  }),
+  'discord.callVoiceChannelId': channelSetting({
+    key: 'discord.callVoiceChannelId',
+    label: 'Call voice channel',
+    help: 'Scheduled events in this voice channel get an agenda post.',
+    kind: 'voice',
+  }),
+  'missions.slaPingRoleId': slaPingRole,
+  'missions.reviewerRoleIds': reviewerRoles,
+  'announce.roleIds': roleListSetting({
+    key: 'announce.roleIds',
+    area: 'discord',
+    label: 'Announcement roles',
+    help: 'Roles allowed to send announcements to the whole server. Dread Pizza Roberts is always included.',
+    // Authority over a server-wide post: every change (including a reset) is confirmed.
+    confirm: () => 'This changes who can send announcements to the whole server.',
+  }),
+  'articles.authorRoleIds': roleListSetting({
+    key: 'articles.authorRoleIds',
+    area: 'discord',
+    label: 'Article author roles',
+    help: 'Roles allowed to publish articles on the site. Dread Pizza Roberts is always included.',
+    confirm: (from, to) => (to.some((id) => !from.includes(id)) ? 'More roles will be able to publish articles.' : null),
+  }),
+} as const satisfies Record<string, SettingDef>
 
 export type SettingKey = keyof typeof SETTINGS
 export type SettingValue<K extends SettingKey> = z.infer<(typeof SETTINGS)[K]['schema']>

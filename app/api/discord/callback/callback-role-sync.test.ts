@@ -2,6 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 // Mock the sync-roles-on-login module BEFORE importing the route
 const mockSyncRolesOnLogin = vi.fn().mockResolvedValue(undefined);
+vi.mock("@/app/lib/db");
 vi.mock("@/app/lib/sync-roles-on-login", () => ({
   syncRolesOnLogin: mockSyncRolesOnLogin,
 }));

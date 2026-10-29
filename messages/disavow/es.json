@@ -125,10 +125,10 @@
     "save": "Guardar respuesta",
     "saved": "Guardado.",
     "appeal": "Apelar",
-    "appealHelp": "Pide a los Dread Pizza Roberts que voten la eliminación de la entrada. Puedes apelar una vez cada 90 días.",
+    "appealHelp": "Pide a los Dread Pizza Roberts que voten la eliminación de la entrada. Puedes apelar una vez cada {days} días.",
     "appealed": "Apelación presentada. Los Dread Pizza Roberts votarán.",
     "appealOpen": "Ya hay una votación abierta.",
-    "tooSoon": "Puedes apelar una vez cada 90 días.",
+    "tooSoon": "Puedes apelar una vez cada {days} días.",
     "error": "Algo salió mal."
   },
   "vouch": {

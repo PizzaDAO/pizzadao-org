@@ -73,7 +73,7 @@ export async function GET() {
   // Disavow list: only computed while the feature flag is on; fails closed.
   // Never present (not even false) when the flag is off, so nothing hints at it.
   let disavowFlags: { canViewDisavow: true; canVoteDisavow: boolean; disavowNavLabel: string } | null = null;
-  if (disavowEnabled()) {
+  if (await disavowEnabled()) {
     // Cached 60s per user: this endpoint is polled. Data guards never use the cache.
     const v = await disavowViewerCached(session.discordId);
     if (v.allowed) {

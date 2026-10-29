@@ -5,8 +5,8 @@ import { Prisma, type ReviewAction } from '@prisma/client'
 import { creditInTx, getOrCreateEconomy, lockWallet } from './economy'
 import { createNotification } from './notifications'
 import { getMembersWithRoles } from './discord'
-import { MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
-import { dprOnlyMinLevel, missionReviewerRoleIds } from './mission-review-access'
+import { DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '../ui/constants'
+import { dprOnlyMinLevel, missionReviewerRoleIds, reviewerRoleSetting } from './mission-review-access'
 import { getSetting } from './settings'
 import { ValidationError, NotFoundError, ConflictError } from './errors/api-errors'
 import { approvalNeedsNote, NEW_REVIEW_ROUND } from './mission-verify/review-ids'
@@ -281,7 +281,7 @@ export async function submitMissionCompletion(
   // first incomplete level) and its reward is paid in order (settleLevels).
 
   // Nothing is approved on submit: the submission is PENDING. When automatic
-  // verification is on (MISSION_VERIFIERS_ENABLED) the submit route then runs
+  // verification is on (missions.verifiersEnabled) the submit route then runs
   // the mission's verifier, which may approve it (app/lib/mission-verify).
   let completion
   if (existing) {
@@ -856,8 +856,8 @@ export async function getUserProgressSummary(discordId: string) {
 
 /**
  * Notify the members who can review it that a mission needs review: the
- * MISSION_REVIEWER_ROLE_IDS holders, or only Dread Pizza Roberts for the
- * DPR-only levels (L8).
+ * MISSION_REVIEWER_ROLE_IDS holders (narrowed by the setting missions.reviewerRoleIds), or only
+ * Dread Pizza Roberts for the DPR-only levels (L8).
  */
 export async function notifyReviewers(
   submitterDiscordId: string,
@@ -866,7 +866,10 @@ export async function notifyReviewers(
   message = `New submission for "${truncate(missionTitle, 50)}" needs approval.`,
 ) {
   const dprFrom = await dprOnlyMinLevel()
-  const roleIds = level >= dprFrom ? missionReviewerRoleIds(level, dprFrom) : MISSION_REVIEWER_ROLE_IDS
+  // The same list that may approve (the narrowed setting, else the built-in reviewers).
+  const roleIds = level >= dprFrom
+    ? missionReviewerRoleIds(level, dprFrom)
+    : await reviewerRolesToNotify()
   const reviewerIds = await getMembersWithRoles(roleIds)
 
   await Promise.allSettled(
@@ -883,6 +886,12 @@ export async function notifyReviewers(
         })
       )
   )
+}
+
+/** Who gets pinged for L1-L7: the narrowed reviewer roles (plus DPR), else the built-in pinged roles. */
+async function reviewerRolesToNotify(): Promise<readonly string[]> {
+  const narrowed = await reviewerRoleSetting()
+  return narrowed.length ? [...new Set([...narrowed, DREAD_PIZZA_ROBERTS_ROLE_ID])] : MISSION_REVIEWER_ROLE_IDS
 }
 
 function truncate(str: string, maxLength: number): string {

@@ -7,7 +7,10 @@ import { SETTINGS, SETTING_KEYS, isSettingKey, parseSetting } from './registry'
 import { CALL_TRANSCRIPT_MIN_LEVEL } from '@/app/lib/calls/transcript-access'
 import { HUMAN_RELEASE_MIN_LEVEL, NEW_ACCOUNT_DAYS } from '@/app/lib/mission-verify/policy'
 import { DPR_ONLY_MIN_LEVEL } from '@/app/lib/mission-review-access'
-import { DISAVOW_MIN_LEVEL } from '@/app/lib/disavow/constants'
+import {
+  DISAVOW_APPEAL_COOLDOWN_DAYS, DISAVOW_DECISION_DAYS, DISAVOW_LISTING_MONTHS, DISAVOW_MIN_LEVEL, DISAVOW_NOMINATIONS_PER_WINDOW,
+  DISAVOW_NOMINATION_WINDOW_DAYS, DISAVOW_WINDOW_DAYS, DISAVOW_YES_THRESHOLD,
+} from '@/app/lib/disavow/constants'
 import { SLA_HOURS, DIGEST_MAX_LINES } from '@/app/lib/mission-verify/sla'
 import { MAX_MISSION_ATTEMPTS } from '@/app/lib/missions'
 
@@ -30,7 +33,7 @@ describe('settings registry', () => {
         if (typeof def.onReadFailure === 'object') expect(Number.isInteger(def.onReadFailure.value)).toBe(true)
         expect(def.input.min).toBeLessThanOrEqual(def.default as number)
         expect(def.input.max).toBeGreaterThanOrEqual(def.default as number)
-      } else {
+      } else if (['text', 'date', 'url', 'channel', 'role'].includes(def.input.type)) {
         expect(typeof def.default).toBe('string')
       }
     }
@@ -45,6 +48,13 @@ describe('settings registry', () => {
     expect(SETTINGS['missions.slaHours'].default).toBe(SLA_HOURS)
     expect(SETTINGS['missions.slaDigestMaxLines'].default).toBe(DIGEST_MAX_LINES)
     expect(SETTINGS['missions.maxAttempts'].default).toBe(MAX_MISSION_ATTEMPTS)
+    expect(SETTINGS['disavow.yesThreshold'].default).toBe(DISAVOW_YES_THRESHOLD)
+    expect(SETTINGS['disavow.decisionDays'].default).toBe(DISAVOW_DECISION_DAYS)
+    expect(SETTINGS['disavow.windowDays'].default).toBe(DISAVOW_WINDOW_DAYS)
+    expect(SETTINGS['disavow.nominationsPerWindow'].default).toBe(DISAVOW_NOMINATIONS_PER_WINDOW)
+    expect(SETTINGS['disavow.nominationWindowDays'].default).toBe(DISAVOW_NOMINATION_WINDOW_DAYS)
+    expect(SETTINGS['disavow.listingMonths'].default).toBe(DISAVOW_LISTING_MONTHS)
+    expect(SETTINGS['disavow.appealCooldownDays'].default).toBe(DISAVOW_APPEAL_COOLDOWN_DAYS)
     // And the literal values today (a change here is a deliberate, reviewed change).
     expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.')).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
@@ -62,6 +72,36 @@ describe('settings registry', () => {
       ['passport.revisitCooldownHours', 20],
       ['passport.publicDelayHours', 6],
       ['passport.maxTravelKmPerHour', 900],
+      // Phase 3: disavow voting rules.
+      ['disavow.yesThreshold', 3],
+      ['disavow.decisionDays', 7],
+      ['disavow.windowDays', 14],
+      ['disavow.nominationsPerWindow', 3],
+      ['disavow.nominationWindowDays', 30],
+      ['disavow.listingMonths', 12],
+      ['disavow.appealCooldownDays', 90],
+      // Phase 3: switches default to the behaviour before they existed (env is the fallback; see toggles.ts)...
+      ['missions.verifiersEnabled', false],
+      ['missions.reviewCardsEnabled', false],
+      ['calls.recapPostEnabled', false],
+      ['calls.agendaPostEnabled', false],
+      ['disavow.enabled', false],
+      ['reengage.enabled', false],
+      ['onboarding.traineeNickEnabled', false],
+      ['games.enabled', false],
+      ['crime.enabled', false],
+      ['portrait.enabled', false],
+      ['shop.itemGrantsEnabled', true],
+      ['shop.sheetSyncEnabled', false],
+      // ...and channels and roles to "not set here" (the env value, then the built-in id, apply).
+      ['discord.missionReviewChannelId', ''],
+      ['discord.missionsAnnounceChannelId', ''],
+      ['discord.announceChannelId', ''],
+      ['discord.callVoiceChannelId', ''],
+      ['missions.slaPingRoleId', ''],
+      ['missions.reviewerRoleIds', []],
+      ['announce.roleIds', []],
+      ['articles.authorRoleIds', []],
     ])
   })
 
@@ -106,6 +146,21 @@ describe('settings registry', () => {
     expect(c(6, 8)).toBeNull()
     expect(SETTINGS['disavow.minLevel'].confirm!(5, 3)).not.toBeNull()
     expect(SETTINGS['disavow.minLevel'].confirm!(5, 7)).toBeNull()
+  })
+
+  it('disavow vote rules can only be made stricter (threshold 3+, decision time 7+ days), and are bounded', () => {
+    expect(parseSetting('disavow.yesThreshold', 2).ok).toBe(false)
+    expect(parseSetting('disavow.yesThreshold', 1).ok).toBe(false)
+    expect(parseSetting('disavow.yesThreshold', 3).ok).toBe(true)
+    expect(parseSetting('disavow.yesThreshold', 5).ok).toBe(true)
+    expect(parseSetting('disavow.yesThreshold', 21).ok).toBe(false)
+    expect(parseSetting('disavow.decisionDays', 6).ok).toBe(false)
+    expect(parseSetting('disavow.decisionDays', 10).ok).toBe(true)
+    expect(parseSetting('disavow.decisionDays', 31).ok).toBe(false)
+    for (const k of ['disavow.yesThreshold', 'disavow.decisionDays'] as const) expect(SETTINGS[k].stricterOnly).toBe(true)
+    expect(parseSetting('disavow.windowDays', 61).ok).toBe(false)
+    expect(parseSetting('disavow.listingMonths', 0).ok).toBe(false)
+    expect(parseSetting('disavow.appealCooldownDays', 6).ok).toBe(false)
   })
 
   it('guide settings ship unset so unconfirmed handbook facts stay hidden', () => {

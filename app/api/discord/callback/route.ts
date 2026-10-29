@@ -161,7 +161,7 @@ async function finishLogin(
 
   // Fire-and-forget: credit UnbelievaBoat item holdings that were held
   // (ItemGrant PENDING) because this member had no app account when
-  // grant-items.mjs ran. On unless ITEM_GRANT_CLAIMS=0; never throws;
+  // grant-items.mjs ran. On unless shop.itemGrantsEnabled is switched off; never throws;
   // exactly-once per grant, so a cut-off run retries next login.
   creditPendingItemGrantsOnLogin(me.id).catch(() => {});
 

@@ -7,7 +7,7 @@
  *
  *   after(() => emitMissionEvent(discordId, 'x_linked'))
  *
- * No-op while MISSION_VERIFIERS_ENABLED is off. Never throws.
+ * No-op while missions.verifiersEnabled is off. Never throws.
  */
 import { clearBoxCache } from '../rare-pizza-box'
 import { fetchMemberIdByDiscordId } from '../sheets/member-repository'
@@ -34,7 +34,7 @@ export async function emitMissionEvent(
   event: MissionEvent,
   opts: { memberId?: string | null } = {},
 ): Promise<RunReport | null> {
-  if (!discordId || !missionVerifiersEnabled()) return null
+  if (!discordId || !(await missionVerifiersEnabled())) return null
   try {
     const keys = EVENT_VERIFIERS[event]
     // A wallet was just connected: a cached "no box" is stale, look again.
@@ -60,7 +60,7 @@ export async function emitMissionEvent(
 
 /** Run the hook for many members, a few at a time (attendance sync). */
 export async function emitMissionEventMany(discordIds: readonly string[], event: MissionEvent, concurrency = 4): Promise<void> {
-  if (!missionVerifiersEnabled() || discordIds.length === 0) return
+  if (!(await missionVerifiersEnabled()) || discordIds.length === 0) return
   const queue = [...new Set(discordIds)]
   await Promise.all(
     Array.from({ length: Math.min(concurrency, queue.length) }, async () => {

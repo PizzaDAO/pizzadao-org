@@ -2,6 +2,7 @@ import { notFound } from "next/navigation";
 import { getDisavowTranslator } from "@/app/lib/disavow/messages";
 import { findSubjectDisavowals } from "@/app/lib/disavow/access";
 import { getSession } from "@/app/lib/session";
+import { loadDisavowRules } from "@/app/lib/disavow/rules";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
 import { ResponseForm } from "../_components/ResponseForm";
 
@@ -18,6 +19,7 @@ export default async function DisavowResponsePage() {
     const mine = await findSubjectDisavowals(session.discordId);
     if (mine.length === 0) notFound();
     const t = await getDisavowTranslator();
+    const { appealCooldownDays } = await loadDisavowRules();
     return (
         <EditorialPage width="max-w-[720px]">
             <EditorialMasthead overline={t("overline")} title={t("response.title")} dek={t("response.intro")} />
@@ -34,7 +36,7 @@ export default async function DisavowResponsePage() {
                             </ul>
                         )}
                     </section>
-                    <ResponseForm entryId={entry.id} initial={entry.subjectResponse ?? ""} hasOpenRound={entry.rounds.length > 0} />
+                    <ResponseForm entryId={entry.id} initial={entry.subjectResponse ?? ""} hasOpenRound={entry.rounds.length > 0} appealDays={appealCooldownDays} />
                 </div>
             ))}
         </EditorialPage>

@@ -26,7 +26,7 @@ export const metadata: Metadata = {
  */
 export default async function DisavowLayout({ children }: { children: ReactNode }) {
     let eligible = false;
-    if (disavowEnabled()) {
+    if (await disavowEnabled()) {
         const session = await getSession().catch(() => null);
         if (session?.discordId) {
             eligible =

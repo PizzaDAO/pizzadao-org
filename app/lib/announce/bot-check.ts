@@ -15,6 +15,7 @@
  */
 
 import { getAnnounceConfig } from "./run";
+import { savedChannelId } from "@/app/lib/settings/channels";
 
 export const PERMISSIONS = {
   ADMINISTRATOR: BigInt(1) << BigInt(3),
@@ -167,7 +168,7 @@ export async function checkAnnounceBot(
   env: Record<string, string | undefined> = process.env,
   fetchImpl: typeof fetch = fetch,
 ): Promise<BotCheck> {
-  const cfg = getAnnounceConfig(env);
+  const cfg = getAnnounceConfig(env, undefined, await savedChannelId("discord.announceChannelId"));
   if (!cfg.discord) {
     return {
       configured: false,
@@ -246,7 +247,7 @@ export async function getAnnounceBotCheck(
   fetchImpl: typeof fetch = fetch,
   now: () => number = Date.now,
 ): Promise<BotCheck> {
-  const cfg = getAnnounceConfig(env);
+  const cfg = getAnnounceConfig(env, undefined, await savedChannelId("discord.announceChannelId"));
   const key =
     cfg.discord?.kind === "bot" ? `bot:${cfg.discord.channelId}` : cfg.discord?.kind ?? "none";
   if (cache && cache.key === key && now() - cache.at < BOT_CHECK_TTL_MS) return cache.value;

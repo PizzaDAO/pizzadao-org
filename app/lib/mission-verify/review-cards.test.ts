@@ -2,7 +2,7 @@
 // Review cards (Phase 3): rendering and the post / edit sync, with injected deps.
 import { describe, it, expect, vi } from 'vitest'
 
-vi.mock('../db', () => ({ prisma: {} }))
+vi.mock('../db', () => ({ prisma: { appSetting: { findMany: async () => [] } } }))
 
 import { evidenceImage, renderReviewCard, reviewCardsEnabled, syncReviewCard, syncReviewCardsFor, type ReviewCardDeps, type ReviewCardView } from './review-cards'
 
@@ -158,11 +158,11 @@ describe('renderReviewCard', () => {
 })
 
 describe('reviewCardsEnabled', () => {
-  it('is off by default', () => {
-    expect(reviewCardsEnabled({} as unknown as NodeJS.ProcessEnv)).toBe(false)
-    expect(reviewCardsEnabled({ MISSION_REVIEW_CARDS_ENABLED: '0' } as unknown as NodeJS.ProcessEnv)).toBe(false)
-    expect(reviewCardsEnabled({ MISSION_REVIEW_CARDS_ENABLED: '1' } as unknown as NodeJS.ProcessEnv)).toBe(true)
-    expect(reviewCardsEnabled({ MISSION_REVIEW_CARDS_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)).toBe(true)
+  it('is off by default', async () => {
+    expect(await reviewCardsEnabled({} as unknown as NodeJS.ProcessEnv)).toBe(false)
+    expect(await reviewCardsEnabled({ MISSION_REVIEW_CARDS_ENABLED: '0' } as unknown as NodeJS.ProcessEnv)).toBe(false)
+    expect(await reviewCardsEnabled({ MISSION_REVIEW_CARDS_ENABLED: '1' } as unknown as NodeJS.ProcessEnv)).toBe(true)
+    expect(await reviewCardsEnabled({ MISSION_REVIEW_CARDS_ENABLED: 'true' } as unknown as NodeJS.ProcessEnv)).toBe(true)
   })
 })
 
