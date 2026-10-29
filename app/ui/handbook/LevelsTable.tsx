@@ -38,7 +38,9 @@ export async function LevelsTable() {
                         {[...lvl.missions]
                             .sort((a, b) => a.index - b.index)
                             .map((m) => (
-                                <li key={m.id}>{m.title}</li>
+                                <li key={m.id}>
+                                    {m.guideHref ? <Link href={m.guideHref} className="underline underline-offset-2">{m.title}</Link> : m.title}
+                                </li>
                             ))}
                     </ul>
                 </article>

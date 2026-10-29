@@ -149,7 +149,7 @@ export function WelcomeStep({ onJoin, onLogin }: Props) {
         <div className="mt-5 flex flex-wrap justify-center gap-x-5 gap-y-1">
           <Link href="/crews" className="inline-flex min-h-11 items-center font-semibold text-tomato-readable underline underline-offset-4">{t("explore")}</Link>
           <Link href="/articles" className="inline-flex min-h-11 items-center text-foreground/80 underline underline-offset-4">{t("stories")}</Link>
-          <Link href="/manuals" className="inline-flex min-h-11 items-center text-foreground/80 underline underline-offset-4">{t("guides")}</Link>
+          <Link href="/handbook/getting-started" className="inline-flex min-h-11 items-center text-foreground/80 underline underline-offset-4">{t("guides")}</Link>
         </div>
       </section>
       <CommunityPreview />

@@ -15,11 +15,18 @@ import { PROOF_HINTS } from "@/app/lib/mission-verify/proof-links";
 import { BOX_PURCHASE_URL } from "@/app/lib/box-mafia";
 import { PIZZA_BOX_LINK } from "@/app/lib/rare-pizza-box";
 import { inviteUrl } from "@/app/lib/referral-link";
+import { parseGuideHref } from "@/app/lib/guide-href";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 
 /** Whether a mission's verifier can approve it automatically (not "manual", not a semi pre-check). */
 function isAutoChecked(key: string | null | undefined): boolean {
   return getVerifier(key)?.mode === "auto";
+}
+
+/** guideHref passes through only if it is still a valid internal handbook path (a bad row adds no link). */
+function guideField(raw: string | null | undefined): { guideHref?: string } {
+  const g = parseGuideHref(raw);
+  return g.ok && g.value ? { guideHref: g.value } : {};
 }
 
 export type MissionProgress = {
@@ -52,6 +59,8 @@ export type MissionsOverview = {
       referral?: boolean;
       /** L5.3 "Own a Rare Pizza Box": where to get one (an extra link on the card). */
       getBoxUrl?: string;
+      /** Handbook page that explains this mission (an internal path, validated). */
+      guideHref?: string;
       /** Checked automatically with nothing to submit: no submit form (the submit API refuses it too). */
       noManualSubmit?: boolean;
       progress: MissionProgress | null;
@@ -112,6 +121,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
         ...(m.verifierKey === "referral" ? { referral: true } : {}),
         ...(acceptsManualSubmission({ verifierKey: m.verifierKey, proofKind: m.proofKind }) ? {} : { noManualSubmit: true }),
+        ...guideField(m.guideHref),
         ...(m.verifierKey === "rare_pizza_box" ? { getBoxUrl: BOX_PURCHASE_URL || PIZZA_BOX_LINK } : {}),
         progress: progressMap[m.id] || null,
       })),

@@ -12,6 +12,7 @@
 // Prior history: garlic-68749 (Phase 4b token migration).
 
 import { GetBoxLink, BonusNote } from "./GetBoxLink";
+import { GuideLink } from "./GuideLink";
 import { useState } from "react";
 import { input } from "../shared-styles";
 
@@ -46,6 +47,8 @@ type MissionData = {
   proofHint?: string;
   /** L5.3 "Own a Rare Pizza Box": where to get one. */
   getBoxUrl?: string;
+  /** Handbook page that explains this mission. */
+  guideHref?: string;
   /** Checked automatically, nothing to submit. */
   noManualSubmit?: boolean;
   progress: MissionProgress | null;
@@ -309,6 +312,7 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
           {inviteUrl !== undefined && !isCompleted && <InviteLink url={inviteUrl} />}
           {bonus && !isCompleted && <BonusNote />}
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
+          {mission.guideHref && <GuideLink href={mission.guideHref} muted={isCompleted} />}
           {isPending && mission.progress?.holdReason && (
             <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>
               {holdCopy(humanReleaseMinLevel ?? DEFAULT_HUMAN_RELEASE_MIN_LEVEL)[mission.progress.holdReason] ?? "Verified. Awaiting a reviewer's release."}

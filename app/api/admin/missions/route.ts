@@ -13,7 +13,7 @@ export const dynamic = 'force-dynamic'
  * deleting missions, and no changing a mission's verifier. Never cached.
  *
  *   GET                                         levels + missions + recent changes
- *   PATCH {missionId, title?, description?, isActive?, verifierParams?, note?, confirm?}
+ *   PATCH {missionId, title?, description?, guideHref?, isActive?, verifierParams?, note?, confirm?}
  *   PATCH {level, reward?, levelTitle?, note?, confirm?}
  */
 export async function GET() {
@@ -36,7 +36,7 @@ export async function PATCH(request: Request) {
       if (typeof b.missionId !== 'number') return json({ error: 'missionId must be a number' }, 400)
       const r = await updateMission(
         b.missionId,
-        { title: b.title, description: b.description, isActive: b.isActive, verifierParams: b.verifierParams },
+        { title: b.title, description: b.description, guideHref: b.guideHref, isActive: b.isActive, verifierParams: b.verifierParams },
         auth.session.discordId,
         opts,
       )

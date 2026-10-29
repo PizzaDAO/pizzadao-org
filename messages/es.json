@@ -30,7 +30,7 @@
       "appetiteNote": "ven con hambre",
       "explore": "Explorar PizzaDAO",
       "stories": "Leer nuestras historias",
-      "guides": "Ver guías"
+      "guides": "Lee el manual"
     },
     "name": {
       "heroPrefix": "Reclama tu",
@@ -634,7 +634,8 @@
         "heading": "Nivel {level}",
         "reward": "+{amount, number} $PEP ganados",
         "finalBody": "Llegaste a la cima. Eres un auténtico Pizza Don.",
-        "continue": "Continuar"
+        "continue": "Continuar",
+        "whatsNext": "Qué sigue"
       }
     },
     "optionalSetup": {
@@ -657,12 +658,16 @@
       "notNow": "Ahora no",
       "ariaLabel": "Sugerencia de Box Mafia"
     },
-    "howToAttend": "Cómo asistir a una llamada"
+    "howToAttend": "Cómo asistir a una llamada",
+    "gettingStarted": "Primeros pasos",
+    "handbook": "Manual"
   },
   "missionLinks": {
     "boxHint": "Esta misión necesita una Rare Pizza Box NFT en una wallet conectada a tu perfil.",
     "getBox": "Consigue una Rare Pizza Box",
-    "bonus": "Extra: este nivel ya está completo. Esta misión es opcional y no da más recompensa."
+    "bonus": "Extra: este nivel ya está completo. Esta misión es opcional y no da más recompensa.",
+    "howTo": "Cómo hacerlo",
+    "howLevelsWork": "Cómo funcionan los niveles"
   },
   "crewsPage": {
     "joined": "Inscrito",
@@ -1284,7 +1289,9 @@
     "errorGeneric": "No se pudo guardar. Revisa los valores e inténtalo de nuevo.",
     "loadError": "No se pudieron cargar las misiones.",
     "rewardLowerOnly": "Las recompensas se pueden bajar, o subir de nuevo hasta el valor del código; superarlo requiere un PR.",
-    "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR."
+    "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR.",
+    "guideLink": "Enlace a la guía",
+    "guideLinkHelp": "Opcional. Muestra un enlace \"Cómo hacerlo\" en la tarjeta de la misión. Solo rutas internas del manual, por ejemplo /handbook/levels#vouching. Déjalo vacío para no mostrar enlace."
   },
   "passport": {
     "overline": "Pasaporte Pizza",

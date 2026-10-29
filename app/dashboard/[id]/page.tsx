@@ -270,7 +270,13 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     )}
 
                     <SliceClaimsCard />
-                    <Link href="/calls/how-to-attend" className="inline-block min-h-11 py-2 underline text-sm">{t("howToAttend")}</Link>
+                    <nav className="flex flex-wrap gap-x-5 text-sm" aria-label={t("handbook")}>
+                        {(missionsData?.currentLevel ?? 1) <= 2 && (
+                            <Link href="/handbook/getting-started" className="inline-block min-h-11 py-2 underline">{t("gettingStarted")}</Link>
+                        )}
+                        <Link href="/calls/how-to-attend" className="inline-block min-h-11 py-2 underline">{t("howToAttend")}</Link>
+                        <Link href="/handbook" className="inline-block min-h-11 py-2 underline">{t("handbook")}</Link>
+                    </nav>
 
                     {/* ── 1.6. Box Mafia suggestion (woodfired-65373) ── */}
                     <BoxMafiaSuggestion boxMafia={summary?.boxMafia} />

@@ -7,6 +7,7 @@
 //
 // Prior: diavola-40350 — level-up modal.
 
+import Link from "next/link";
 import { useTranslations } from "next-intl";
 
 type Props = {
@@ -172,6 +173,16 @@ export function LevelUpModal({ level, levelTitle, reward, onDismiss, isFinal }: 
           >
             {t("finalBody")}
           </p>
+        )}
+
+        {!isFinalLevel && (
+          <Link
+            href={`/handbook/levels#level-${level}`}
+            data-testid="level-up-whats-next"
+            style={{ fontSize: 14, fontWeight: 600, textDecoration: "underline", textUnderlineOffset: 3, color: "hsl(var(--foreground))" }}
+          >
+            {t("whatsNext")}
+          </Link>
         )}
 
         <button

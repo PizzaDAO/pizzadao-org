@@ -48,6 +48,8 @@ export default async function AdminMissionsPage() {
         saveLevel: t("saveLevel"),
         missionTitle: t("missionTitle"),
         missionDescription: t("missionDescription"),
+        guideLink: t("guideLink"),
+        guideLinkHelp: t("guideLinkHelp"),
         active: t("active"),
         verifier: t("verifier"),
         manualVerifier: t("manualVerifier"),

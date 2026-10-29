@@ -37,6 +37,11 @@ export interface MissionVerifierConfig {
   verifierParams: Record<string, unknown> | null
   proofKind: ProofKindName
   /**
+   * The handbook page that explains this mission (an internal path, validated like the admin
+   * editor's field). Seeded by scripts/missions/set-guide-links.mjs, which only fills NULLs.
+   */
+  guideHref?: string
+  /**
    * A mission that is not in the seed: INSERT the row when (level, index) is
    * missing. `reward` must equal the level's shared reward (checked against
    * the level's existing rows). Needs `description`; the title is `seedTitle`.
@@ -92,6 +97,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'x_linked',
     verifierParams: {},
     proofKind: 'NONE',
+    guideHref: '/handbook/getting-started#connect-x',
   },
   {
     level: 2,
@@ -100,6 +106,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'attendance_count',
     verifierParams: { min: 1, crews: 'any' },
     proofKind: 'NONE',
+    guideHref: '/calls/how-to-attend',
   },
   {
     level: 2,
@@ -118,6 +125,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'discord_message',
     verifierParams: { channelName: 'show-and-tell', channelEnv: 'SHOW_AND_TELL_CHANNEL_ID' },
     proofKind: 'DISCORD_MESSAGE',
+    guideHref: '/handbook/getting-started#discord',
   },
   {
     level: 3,
@@ -128,6 +136,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'referral', // D4: the Referral table (onboarding step + /join?ref= links), qualifies on onboarding
     verifierParams: { min: 1, qualify: 'onboarded' },
     proofKind: 'NONE',
+    guideHref: '/handbook/getting-started#invite',
   },
   {
     level: 4,
@@ -150,6 +159,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'vouch_received',
     verifierParams: { min: 1, sources: ['PIZZADAO'] },
     proofKind: 'NONE',
+    guideHref: '/handbook/levels#vouching',
     insert: { reward: LEVEL_4_REWARD },
   },
   {
@@ -160,6 +170,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'attendance_count',
     verifierParams: { min: 3, crews: 'any', distinct: 'call' },
     proofKind: 'NONE',
+    guideHref: '/calls/how-to-attend',
   },
   {
     level: 5,
@@ -170,6 +181,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'media_proof', // D16: links only
     verifierParams: { kinds: ['youtube', 'x', 'drive', 'loom'] },
     proofKind: 'URL',
+    guideHref: '/handbook/levels#selfie-interview',
   },
   {
     level: 5,
@@ -181,6 +193,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'vouch_given',
     verifierParams: { min: 1, sources: ['PIZZADAO'] },
     proofKind: 'NONE',
+    guideHref: '/handbook/levels#vouching',
     insert: { reward: LEVEL_5_REWARD },
   },
   {
@@ -192,6 +205,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'rare_pizza_box',
     verifierParams: { minLevel: 5 },
     proofKind: 'NONE',
+    guideHref: '/handbook/levels#rare-pizza-box',
     insert: { reward: LEVEL_5_REWARD },
   },
   {
@@ -201,6 +215,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'discord_role',
     verifierParams: { roleIds: [PEPPERONI_MAFIA_ROLE_ID] },
     proofKind: 'NONE',
+    guideHref: '/handbook/levels#level-6',
   },
   {
     level: 6,
@@ -222,6 +237,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'vouch_received',
     verifierParams: { min: 5, sources: ['PIZZADAO'] },
     proofKind: 'NONE',
+    guideHref: '/handbook/levels#vouching',
     insert: { reward: LEVEL_6_REWARD },
   },
   {
@@ -231,6 +247,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'discord_role',
     verifierParams: { roleNames: ['Crew Leader'], roleEnv: 'MISSION_CREW_LEADER_ROLE' },
     proofKind: 'NONE',
+    guideHref: '/handbook/levels#crew-leader',
   },
   {
     level: 8,
@@ -249,6 +266,7 @@ export const MISSION_VERIFIER_CONFIG: readonly MissionVerifierConfig[] = [
     verifierKey: 'vouch_received',
     verifierParams: { min: 10, sources: ['PIZZADAO'] },
     proofKind: 'NONE',
+    guideHref: '/handbook/levels#vouching',
     insert: { reward: LEVEL_8_REWARD },
   },
 ]
@@ -508,4 +526,40 @@ export function parseLevelTitlesArg(arg: string): Record<number, string> {
   }
   if (!Object.keys(out).length) throw new Error('--level-titles: no titles given (expected 3="Title",4="Title")')
   return out
+}
+
+export interface GuideLinkRow {
+  id: number
+  level: number
+  index: number
+  guideHref: string | null
+}
+
+export interface GuideLinkPlan {
+  updates: Array<{ id: number; level: number; index: number; guideHref: string }>
+  /** Rows that already have a link (an admin may have set or cleared-then-set it): never touched. */
+  kept: string[]
+  /** Config entries with no row. */
+  missing: string[]
+}
+
+/**
+ * Pure: which missions would get their default handbook link. Fills NULLs only, so an admin edit
+ * (including a link they chose) is never reverted. Used by scripts/missions/set-guide-links.mjs.
+ */
+export function planGuideLinks(rows: readonly GuideLinkRow[], config: readonly MissionVerifierConfig[] = MISSION_VERIFIER_CONFIG): GuideLinkPlan {
+  const plan: GuideLinkPlan = { updates: [], kept: [], missing: [] }
+  for (const c of config) {
+    if (!c.guideHref) continue
+    const label = labelOf(c)
+    const row = rows.find((r) => r.level === c.level && r.index === c.index)
+    if (!row) {
+      plan.missing.push(`${label} "${c.seedTitle}"`)
+    } else if (row.guideHref) {
+      plan.kept.push(label)
+    } else {
+      plan.updates.push({ id: row.id, level: row.level, index: row.index, guideHref: c.guideHref })
+    }
+  }
+  return plan
 }

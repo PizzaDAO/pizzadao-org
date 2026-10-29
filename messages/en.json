@@ -30,7 +30,7 @@
       "appetiteNote": "bring your appetite",
       "explore": "Explore PizzaDAO",
       "stories": "Read our stories",
-      "guides": "Browse guides"
+      "guides": "Read the handbook"
     },
     "name": {
       "heroPrefix": "Claim your",
@@ -634,7 +634,8 @@
         "heading": "Level {level}",
         "reward": "+{amount, number} $PEP earned",
         "finalBody": "You reached the top. You are a true Pizza Don.",
-        "continue": "Continue"
+        "continue": "Continue",
+        "whatsNext": "What's next"
       }
     },
     "optionalSetup": {
@@ -657,12 +658,16 @@
       "notNow": "Not now",
       "ariaLabel": "Box Mafia suggestion"
     },
-    "howToAttend": "How to attend a call"
+    "howToAttend": "How to attend a call",
+    "gettingStarted": "Getting started",
+    "handbook": "Handbook"
   },
   "missionLinks": {
     "boxHint": "This mission needs a Rare Pizza Box NFT in a wallet connected to your profile.",
     "getBox": "Get a Rare Pizza Box",
-    "bonus": "Bonus: this level is already complete. This mission is optional and pays nothing extra."
+    "bonus": "Bonus: this level is already complete. This mission is optional and pays nothing extra.",
+    "howTo": "How to do this",
+    "howLevelsWork": "How levels work"
   },
   "crewsPage": {
     "joined": "Joined",
@@ -1284,7 +1289,9 @@
     "errorGeneric": "Could not save. Check the values and try again.",
     "loadError": "Could not load the missions.",
     "rewardLowerOnly": "Rewards can be lowered, or raised back up to the code value; going above needs a PR.",
-    "activeOnlyEnable": "Can only be switched on here; deactivating needs a PR."
+    "activeOnlyEnable": "Can only be switched on here; deactivating needs a PR.",
+    "guideLink": "Guide link",
+    "guideLinkHelp": "Optional. Shows a \"How to do this\" link on the mission card. Internal handbook paths only, e.g. /handbook/levels#vouching. Leave empty for no link."
   },
   "passport": {
     "overline": "Pizza Passport",
