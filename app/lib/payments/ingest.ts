@@ -229,8 +229,6 @@ export interface IngestDeps {
   setIngestFrom: (d: Date) => Promise<void>
   findExistingRefs: (refs: string[]) => Promise<Set<string>>
   create: (data: NewPaymentRequest) => Promise<void>
-  /** Member id for a Discord id, or null. */
-  matchMember: (discordId: string) => Promise<string | null>
   saveStatus: (s: IngestStatusInput) => Promise<void>
   now?: () => Date
   env?: NodeJS.ProcessEnv
@@ -299,9 +297,9 @@ export async function runIngest(deps: IngestDeps): Promise<IngestResult> {
 
   let created = 0
   for (const p of fresh) {
-    const memberId = p.claimedDiscordId ? await deps.matchMember(p.claimedDiscordId).catch(() => null) : null
     try {
-      await deps.create({ ...p, requesterMemberId: memberId })
+      // No member id from a claim: whatever was typed, a form row has no verified requester.
+      await deps.create({ ...p, requesterMemberId: null })
       created++
     } catch (e) {
       // A concurrent run already created it (unique sourceRef): fine. Anything else: stop quietly.

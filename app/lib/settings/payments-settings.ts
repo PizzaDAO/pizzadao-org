@@ -8,7 +8,7 @@
  * - Every toggle is an int 0/1 and ships OFF.
  * - If a value cannot be read, the failure value is the one that disables the fast lane (or turns
  *   the feature off), never the one that loosens a rule.
- * - Plain ints only. Nothing here is a secret, a name, or a link.
+ * - Numbers and switches only. The one text value (the responses sheet id) is defined in registry.ts.
  *
  * This file imports only types from ./registry, so there is no runtime import cycle.
  */
@@ -142,7 +142,7 @@ export const PAYMENT_SETTINGS = {
     onReadFailure: { value: 625 }, stricterOnly: true, looserWhen: 'higher',
   }),
   'payments.fastTrackEnabled': toggle('payments.fastTrackEnabled', 'Fast lane on', '1 lets eligible requests use the fast lane. Off by default; when off every request is standard or higher.'),
-  'payments.formIngestEnabled': toggle('payments.formIngestEnabled', 'Form ingest on', '1 reads new work-payment form responses into the queue every 15 minutes (needs the form sheet id set on the payments admin page).'),
+  'payments.formIngestEnabled': toggle('payments.formIngestEnabled', 'Form ingest on', '1 reads new work-payment form responses into the queue every 15 minutes (needs the responses sheet id setting below).'),
   'payments.requestFormEnabled': toggle('payments.requestFormEnabled', 'Request form on', '1 opens the in-app payment request form to members.'),
   'payments.receiptUploadEnabled': toggle('payments.receiptUploadEnabled', 'Receipt upload on', '1 allows receipt and photo uploads. Needs a Blob store that supports private files; leave off until that is confirmed.'),
   'payments.aiChecksEnabled': toggle('payments.aiChecksEnabled', 'AI checks on', '1 lets reviewers run an AI check on a request. AI only adds flags; it never approves or rejects.'),

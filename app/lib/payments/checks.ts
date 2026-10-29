@@ -4,7 +4,9 @@
  * everything on the request plus a PaymentCheck snapshot of what the reviewer was shown.
  *
  * Runs on ingest, on every new attachment and from the reviewer's "Re-check" button. It never
- * approves, rejects or clears a flag, and it only touches requests still waiting for a decision.
+ * approves, rejects or clears a flag. Requests waiting for a decision get flags, score, lane and
+ * approval count refreshed; APPROVED ones get flags, score and checkedAt only (so "mark paid" shows
+ * today's flags); anything else is left alone.
  */
 import { prisma } from '@/app/lib/db'
 import { disavowEnabled } from '@/app/lib/disavow/constants'
@@ -76,7 +78,28 @@ const signature = (lane: string, flags: readonly PaymentFlag[]) =>
 
 const asFlags = (v: unknown): PaymentFlag[] => (Array.isArray(v) ? (v as PaymentFlag[]) : [])
 
+class CheckConflict extends Error {}
+
+/**
+ * Run the checks. The save is conditional on the request not having changed since it was read (a
+ * reviewer decision or another check in between); on a conflict the whole run is repeated once on
+ * fresh data, and a second conflict is an error rather than a silent overwrite.
+ */
 export async function evaluateRequest(id: string, deps: EvalDeps = {}): Promise<EvalResult | null> {
+  try {
+    return await evaluateOnce(id, deps)
+  } catch (e) {
+    if (!(e instanceof CheckConflict)) throw e
+  }
+  try {
+    return await evaluateOnce(id, deps)
+  } catch (e) {
+    if (e instanceof CheckConflict) throw new Error('payment request kept changing while it was being checked')
+    throw e
+  }
+}
+
+async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | null> {
   const req = await loadRequest(id)
   if (!req) return null
   // APPROVED requests get their flags refreshed (shown again at "mark paid"); the lane and the approval
@@ -86,15 +109,19 @@ export async function evaluateRequest(id: string, deps: EvalDeps = {}): Promise<
   const now = deps.now ?? new Date()
   const policy = deps.policy ?? (await loadPaymentPolicy())
 
-  // Risk lookups use the verified requester, or for a form row the id claimed on it (a claim can only
-  // ADD flags to this request; it never grants anything).
-  const identity = req.requesterDiscordId ?? req.claimedDiscordId
+  // `verified` is the signed-in requester (null for a form row). History that can sink a request (fraud
+  // rejections, split and duplicate requests) counts ONLY verified rows of a verified requester. The id
+  // typed into a form is a claim: it feeds the restricted-list and account-age lookups (which can only
+  // add flags) and at most a medium, non-blocking hint.
+  const verified = req.requesterDiscordId
+  const identity = verified ?? req.claimedDiscordId
   const hashes = req.attachments.map((a: { sha256: string }) => a.sha256)
-  const linked = identity ? await linkedDiscordIds(prisma as never, identity) : []
+  const linked = verified ? await linkedDiscordIds(prisma as never, verified) : []
+  const verifiedIds = [verified, ...linked].filter((x): x is string => !!x)
   const requesters = [identity, ...linked].filter((x): x is string => !!x)
-  const byRequester = { OR: [{ requesterDiscordId: { in: requesters } }, { claimedDiscordId: { in: requesters } }] }
+  const claimOnly = !verified && !!req.claimedDiscordId
 
-  const [reused, shared, fraud, restricted, newAccountDays, siblings, signals, aiChecks] = await Promise.all([
+  const [reused, shared, fraud, restricted, newAccountDays, siblings, signals, aiChecks, claimedFraud] = await Promise.all([
     hashes.length ? prisma.paymentAttachment.findFirst({ where: { sha256: { in: hashes }, requestId: { not: id } }, select: { id: true } }) : null,
     req.payeeHash
       ? prisma.paymentRequest.findFirst({
@@ -102,17 +129,18 @@ export async function evaluateRequest(id: string, deps: EvalDeps = {}): Promise<
           select: { id: true },
         })
       : null,
-    requesters.length ? prisma.paymentRequest.findFirst({ where: { rejectedAsFraud: true, ...byRequester }, select: { id: true } }) : null,
+    verifiedIds.length ? prisma.paymentRequest.findFirst({ where: { rejectedAsFraud: true, requesterDiscordId: { in: verifiedIds } }, select: { id: true } }) : null,
     restrictedMatches(requesters, req.requesterMemberId),
     getSetting('missions.newAccountDays'),
-    identity
+    verifiedIds.length
       ? prisma.paymentRequest.findMany({
-          where: { ...byRequester, id: { not: id }, status: { notIn: ['REJECTED', 'WITHDRAWN'] }, createdAt: { gte: new Date(now.getTime() - 30 * DAY) } },
+          where: { requesterDiscordId: { in: verifiedIds }, id: { not: id }, status: { notIn: ['REJECTED', 'WITHDRAWN'] }, createdAt: { gte: new Date(now.getTime() - 30 * DAY) } },
           select: { amountUsdCents: true, createdAt: true },
         })
       : [],
     approved ? ({ rsvFlagged: false, fastEligible: false } as TrackSignals) : (deps.signals ?? signalsFor)(req, policy).catch((): TrackSignals => ({ rsvFlagged: false, fastEligible: false })),
     prisma.paymentCheck.findMany({ where: { requestId: id, kind: 'AI_RECEIPT' }, orderBy: { createdAt: 'desc' }, take: 5, select: { kind: true, result: true } }),
+    claimOnly ? prisma.paymentRequest.findFirst({ where: { rejectedAsFraud: true, requesterDiscordId: req.claimedDiscordId }, select: { id: true } }) : null,
   ])
 
   const created = identity ? snowflakeCreatedAt(identity) : null
@@ -130,13 +158,15 @@ export async function evaluateRequest(id: string, deps: EvalDeps = {}): Promise<
       rsvEventSlug: req.rsvEventSlug,
       title: req.title,
       proposalUrl: req.proposalUrl,
-      requesterDiscordId: identity,
-      requesterMemberId: req.requesterMemberId,
+      // Verified identity only: a form row is always "unmatched", whatever was typed into it.
+      requesterDiscordId: verified,
+      requesterMemberId: verified ? req.requesterMemberId : null,
     },
     attachments: req.attachments,
     reusedAttachment: !!reused,
     sharedPayee: !!shared,
     priorFraud: !!fraud,
+    claimedFraudHint: !!claimedFraud,
     restrictedMatches: restricted.ids,
     restrictedCheckFailed: restricted.failed,
     restrictedCheckOff: restricted.off,
@@ -173,7 +203,14 @@ export async function evaluateRequest(id: string, deps: EvalDeps = {}): Promise<
         })
       }
     }
-    await tx.paymentRequest.update({ where: { id }, data: { flags: flags as never, riskScore, lane, approvalsNeeded, checkedAt: now } })
+    // checkedAt uses the database clock (like createdAt and file upload times), so "checked after the
+    // latest file" is compared on one clock. Tests inject `now`.
+    const checkedAt = deps.now ?? (await tx.$queryRaw<Array<{ now: Date }>>`SELECT now() AS now`)[0].now
+    const saved = await tx.paymentRequest.updateMany({
+      where: { id, updatedAt: req.updatedAt },
+      data: { flags: flags as never, riskScore, lane, approvalsNeeded, checkedAt },
+    })
+    if (saved.count !== 1) throw new CheckConflict()
     await tx.paymentCheck.create({ data: { requestId: id, kind: 'RULES', version: RULES_VERSION, result: { flags, riskScore, lane } as never } })
     for (const c of signals.checks ?? []) {
       await tx.paymentCheck.create({ data: { requestId: id, kind: c.kind, version: c.version, result: c.result as never } })

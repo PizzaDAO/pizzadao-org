@@ -422,7 +422,7 @@ GPP-related follow-ups belong in the **rsv-pizza** repo and are listed so they d
   Mitigations:
   - mark-paid and approve are allowed on previews, but every decision row records `VERCEL_ENV`;
   - cron and AI auto-run are production only;
-  - preview testing uses a test request created by hand and deleted afterwards (section 10).
+  - preview testing uses a test request created by hand that is REJECTED when the test ends (section 10); decisions are append-only, so test rows are never deleted and never marked PAID.
 - **Form header drift.** Someone edits the form and the ingest maps the wrong column. Mitigations:
   required-header check fails closed, and an admin banner shows "ingest paused: header X missing".
 - **Private Blob store.** The current Blob token may be for a public store. Phase 2 must confirm that
@@ -476,14 +476,16 @@ Vercel preview checks (`vercel-deploy`, logged in as DPR):
    with two fake rows, then trigger the ingest route by hand.
    - The rows appear once; re-running adds nothing.
    - The payee shows only a masked hint.
-   - Approve as one reviewer, then mark paid with a fake ref: the timeline shows both rows, and the CSV
-     export includes them.
-   - Delete the test rows afterwards.
+   - Approve as one reviewer and check the timeline row and the CSV export. Do NOT mark a test request
+     paid: PAID counts toward a member's fast-track history and cannot be undone. To test "mark paid", use
+     a throwaway database, never the shared one.
+   - End every test request as REJECTED (with a note saying it is a test). The database refuses to delete
+     or change decision rows, so test requests stay in the record; that is intended.
 4. A non-reviewer account gets 403 on `/admin/payments`, and on the attachment URL even with the blob
    path copied.
 5. Phase 3: upload the same receipt to two test requests. The second shows `reused_attachment` and lands
    in HIGH_RISK. One approval doesn't change its status; a second reviewer plus DPR does.
-6. Phase 5: a test member with two paid requests and level ≥ 4 shows FAST and the "1 approval" label. With
+6. Phase 5 (throwaway database only, since it needs PAID history): a test member with two paid requests and level ≥ 4 shows FAST and the "1 approval" label. With
    the rsv.pizza URL pointed at a dead host, the same request falls back to STANDARD.
 7. Phase 6: "Run AI check" on a receipt whose total differs from the request shows `ai_amount_mismatch`
    with a reason and does not change the lane to HIGH_RISK.

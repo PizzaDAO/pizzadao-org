@@ -26,6 +26,7 @@ const ctx = (over: Partial<RuleContext> = {}, req: Partial<RuleContext['req']> =
   reusedAttachment: false,
   sharedPayee: false,
   priorFraud: false,
+  claimedFraudHint: false,
   restrictedMatches: [],
   restrictedCheckFailed: false,
   restrictedCheckOff: false,
@@ -91,6 +92,16 @@ describe('rule flags', () => {
     const f = computeRuleFlags(ctx({}, { source: 'FORM', requesterDiscordId: '100000000000000001' }))
     expect(f.map((x) => [x.id, x.severity])).toEqual([['unverified_requester', 'medium']])
     expect(ids(ctx({}, { source: 'APP' }))).toEqual([])
+  })
+
+  it('a form row is unmatched whatever was typed; a verified requester is not', () => {
+    expect(ids(ctx({}, { source: 'FORM', requesterDiscordId: null, requesterMemberId: null }))).toEqual(['unverified_requester', 'unmatched_requester'])
+    expect(ids(ctx({}, { source: 'APP', requesterDiscordId: '100000000000000001', requesterMemberId: null }))).toEqual([])
+  })
+
+  it('a claimed id with a fraud history is a medium hint, not a block', () => {
+    const f = computeRuleFlags(ctx({ claimedFraudHint: true }))
+    expect(f.map((x) => [x.id, x.severity, x.hardBlock ?? false])).toEqual([['claimed_id_history', 'medium', false]])
   })
 
   it('says so (info, no score) when the restricted list or payee fingerprints are off', () => {

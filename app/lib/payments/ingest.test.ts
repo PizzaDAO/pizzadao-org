@@ -160,7 +160,6 @@ function deps(values: Cell[][], over: Partial<IngestDeps> = {}, truncated = fals
     create: async (data) => {
       store.set(data.sourceRef as string, data)
     },
-    matchMember: async () => 'M-1',
     saveStatus,
     now: () => NOW,
     env: ENV,
@@ -199,12 +198,12 @@ describe('runIngest', () => {
     expect(store.size).toBe(2)
   })
 
-  it('stores the hash and hint, never the raw payee; form rows have no verified requester', async () => {
+  it('stores the hash and hint, never the raw payee; form rows have no verified requester and no member id from a claim', async () => {
     const { d, store } = deps([HEADERS, row()])
     await runIngest(d)
     const saved = [...store.values()][0]
     expect(JSON.stringify(saved)).not.toContain(WALLET)
-    expect(saved).toMatchObject({ source: 'FORM', requesterDiscordId: null, claimedDiscordId: '123456789012345678', requesterMemberId: 'M-1' })
+    expect(saved).toMatchObject({ source: 'FORM', requesterDiscordId: null, claimedDiscordId: '123456789012345678', requesterMemberId: null })
   })
 
   it('ignores responses from before the "ingest from" moment', async () => {

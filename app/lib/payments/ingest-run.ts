@@ -8,7 +8,6 @@
  * display format or locale cannot change a response's identity.
  */
 import { sheetsClient } from '@/app/api/lib/google-sheets'
-import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { DEFAULT_MAX_NEW, runIngest, type Cell, type IngestResult } from './ingest'
 import { loadPaymentPolicy } from './policy'
 import { createPaymentRequest, findExistingRefs } from './store'
@@ -53,7 +52,6 @@ export async function runFormIngest(): Promise<IngestResult> {
     create: async (data) => {
       await createPaymentRequest(data, policy)
     },
-    matchMember: (discordId) => fetchMemberIdByDiscordId(discordId),
     saveStatus: saveIngestStatus,
     maxNew: DEFAULT_MAX_NEW,
   })

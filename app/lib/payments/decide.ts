@@ -38,6 +38,8 @@ export interface RequestSnapshot {
   newestAttachmentAt?: Date | null
   lastApprovedAt?: Date | null
   payeeHash?: string | null
+  /** Reviewers who entered this request's dollar value: they cannot also approve it. */
+  usdAmountSetBy?: string[]
   /** Other Discord accounts linked to the requester (shared wallet, etc.). */
   linkedDiscordIds: string[]
   proposalUrl: string | null
@@ -148,6 +150,7 @@ export function evaluateDecision(
       if (req.status !== 'RECEIVED') return fail(409, 'bad_state', 'This request is not waiting for review')
       if (req.amountUsdCents <= 0) return fail(400, 'no_amount', 'The request has no amount')
       if (restricted && !actor.isDpr) return fail(403, 'restricted', 'Restricted: ask the top review role')
+      if (req.usdAmountSetBy?.includes(actor.discordId)) return fail(403, 'self_review', 'You entered the dollar value, so someone else has to approve this request')
       if (!checkedSince(req.newestAttachmentAt)) return fail(409, 'not_checked', 'The automated checks have not run on the latest version of this request. Re-check first.')
       if (req.flags.some((f) => f.id === 'restricted_check_failed')) return fail(409, 'check_failed', 'The restricted-list check could not run. Re-check before approving.')
 
@@ -287,6 +290,9 @@ export async function applyDecision(
       newestAttachmentAt: newestFile,
       lastApprovedAt: approvals.length ? approvals[approvals.length - 1].createdAt : null,
       payeeHash: row.payeeHash,
+      usdAmountSetBy: (row.decisions as Array<{ checklist: unknown; actorDiscordId: string }>)
+        .filter((d) => (d.checklist as { usdAmountSet?: unknown } | null)?.usdAmountSet !== undefined)
+        .map((d) => d.actorDiscordId),
       claimedDiscordId: row.claimedDiscordId,
       id: row.id,
       status: row.status as PaymentStatus,
@@ -384,7 +390,7 @@ export async function setUsdAmount(
         note, deployEnv: (opts.env ?? process.env).VERCEL_ENV ?? 'local',
       },
     })
-    const moved = await tx.paymentRequest.updateMany({ where: { id: row.id, updatedAt: row.updatedAt }, data: { amountUsdCents: cents } })
+    const moved = await tx.paymentRequest.updateMany({ where: { id: row.id, updatedAt: row.updatedAt }, data: { amountUsdCents: cents, checkedAt: null } })
     if (moved.count !== 1) throw new ConflictError()
     return { ok: true as const }
   }).catch((e) => {

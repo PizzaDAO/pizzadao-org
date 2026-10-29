@@ -35,8 +35,10 @@ export interface RuleContext {
   reusedAttachment: boolean
   /** The same payee hash is used by a different requester. */
   sharedPayee: boolean
-  /** The requester, or a linked account, has a request rejected as fraud. */
+  /** The (verified) requester, or a linked account, has a request rejected as fraud. */
   priorFraud: boolean
+  /** A form row's CLAIMED id belongs to someone with a fraud rejection: a hint, never a block. */
+  claimedFraudHint: boolean
   /** Disavow-list entries that match the requester (ids only; shown to the top role). */
   restrictedMatches: string[]
   /** The disavow lookup failed: the result is unknown. */
@@ -64,6 +66,7 @@ export function computeRuleFlags(c: RuleContext): PaymentFlag[] {
   if (c.reusedAttachment) add({ id: 'reused_attachment', severity: 'high', hardBlock: true, detail: 'A file attached here was already used on another request.' })
   if (c.sharedPayee) add({ id: 'shared_payee', severity: 'high', hardBlock: true, detail: 'The same payee reference is used by a different requester.' })
   if (c.priorFraud) add({ id: 'prior_fraud', severity: 'high', hardBlock: true, detail: 'The requester, or a linked account, has a request rejected as fraud.' })
+  if (c.claimedFraudHint) add({ id: 'claimed_id_history', severity: 'medium', detail: 'The Discord id typed into this form belongs to someone with a fraud rejection. It is only a claim, so this is a hint to look into, not a block.' })
   if (c.restrictedMatches.length > 0) {
     add({ id: 'restricted_list', severity: 'high', hardBlock: true, restricted: true, detail: `Matches a restricted-list entry (${c.restrictedMatches.slice(0, 3).join(', ')}).` })
   } else if (c.restrictedCheckFailed) {

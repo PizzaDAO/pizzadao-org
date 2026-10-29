@@ -2,7 +2,7 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/app/lib/db', () => {
-  const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), create: vi.fn() })
+  const model = () => ({ findUnique: vi.fn(), findFirst: vi.fn(), findMany: vi.fn(), update: vi.fn(), updateMany: vi.fn(), create: vi.fn() })
   const prisma = {
     paymentRequest: model(),
     paymentAttachment: model(),
@@ -11,6 +11,7 @@ vi.mock('@/app/lib/db', () => {
     accountSignal: model(),
     disavowIdentifier: model(),
     $transaction: vi.fn(),
+    $queryRaw: vi.fn(),
   }
   prisma.$transaction.mockImplementation(async (fn: (t: unknown) => unknown) => fn(prisma))
   return { prisma }
@@ -32,7 +33,7 @@ import { policy } from './test-utils'
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
 const REQ = '100000000000000001'
 const base = (over: Record<string, unknown> = {}) => ({
-  id: 'req1', status: 'RECEIVED', source: 'APP', lane: 'STANDARD', flags: [], approvalsNeeded: 1, claimedDiscordId: null, kind: 'EVENT_BUDGET', amountUsdCents: 20000, currency: 'USD', eventDate: null,
+  id: 'req1', updatedAt: new Date('2026-11-01T00:00:00Z'), status: 'RECEIVED', source: 'APP', lane: 'STANDARD', flags: [], approvalsNeeded: 1, claimedDiscordId: null, kind: 'EVENT_BUDGET', amountUsdCents: 20000, currency: 'USD', eventDate: null,
   createdAt: new Date('2026-11-10T00:00:00Z'), rsvEventSlug: null, title: 'Meetup', proposalUrl: null,
   requesterDiscordId: REQ, requesterMemberId: 'M-1', payeeHash: 'abc', attachments: [{ kind: 'RECEIPT', sha256: 'h1', createdAt: new Date() }], ...over,
 })
@@ -50,9 +51,11 @@ beforeEach(() => {
   m(prisma.disavowIdentifier.findMany).mockResolvedValue([])
   m(prisma.paymentDecision.findMany).mockResolvedValue([])
   m(prisma.paymentDecision.create).mockResolvedValue({})
+  m(prisma.paymentRequest.updateMany).mockResolvedValue({ count: 1 })
+  m(prisma.$queryRaw).mockResolvedValue([{ now: new Date('2026-11-11T12:00:00Z') }])
 })
 
-const saved = () => m(prisma.paymentRequest.update).mock.calls[0][0].data
+const saved = () => m(prisma.paymentRequest.updateMany).mock.calls[0][0].data
 
 describe('evaluateRequest', () => {
   it('a clean request stays standard and writes a RULES snapshot', async () => {
@@ -77,7 +80,7 @@ describe('evaluateRequest', () => {
     expect(r?.flags.map((f) => f.id)).toEqual(expect.arrayContaining(['shared_payee', 'prior_fraud']))
     expect(r?.lane).toBe('HIGH_RISK')
     const fraudQuery = m(prisma.paymentRequest.findFirst).mock.calls.find((c) => c[0].where.rejectedAsFraud)
-    expect(fraudQuery?.[0].where.OR[0].requesterDiscordId.in).toEqual([REQ, '200000000000000009'])
+    expect(fraudQuery?.[0].where.requesterDiscordId.in).toEqual([REQ, '200000000000000009'])
   })
 
   it('a disavow match is restricted and hard-blocks; a lookup failure is a visible flag', async () => {
@@ -86,7 +89,7 @@ describe('evaluateRequest', () => {
     expect(hit?.flags.find((f) => f.id === 'restricted_list')).toMatchObject({ restricted: true, hardBlock: true })
     expect(hit?.lane).toBe('HIGH_RISK')
 
-    m(prisma.paymentRequest.update).mockClear()
+    m(prisma.paymentRequest.updateMany).mockClear()
     m(prisma.disavowIdentifier.findMany).mockRejectedValue(new Error('db'))
     const failed = await evaluateRequest('req1', { policy: policy() })
     expect(failed?.flags.map((f) => f.id)).toEqual(['restricted_check_failed'])
@@ -132,6 +135,46 @@ describe('evaluateRequest: claims, resets, approved requests, AI', () => {
     m(prisma.accountSignal.findMany).mockResolvedValue([{ discordIds: [REQ, '200000000000000009'] }])
     await evaluateRequest('req1', { policy: policy() })
     expect(prisma.disavowIdentifier.findMany).toHaveBeenCalledTimes(2)
+  })
+
+  it('prior fraud, split and duplicate history count only VERIFIED rows of a verified requester', async () => {
+    m(prisma.paymentRequest.findFirst).mockResolvedValue({ id: 'old' })
+    await evaluateRequest('req1', { policy: policy() })
+    const fraudQ = m(prisma.paymentRequest.findFirst).mock.calls.find((c) => c[0].where.rejectedAsFraud)
+    expect(fraudQ?.[0].where).toEqual({ rejectedAsFraud: true, requesterDiscordId: { in: [REQ] } })
+    const sibQ = m(prisma.paymentRequest.findMany).mock.calls[0][0].where
+    expect(sibQ.requesterDiscordId).toEqual({ in: [REQ] })
+    expect(JSON.stringify(sibQ)).not.toContain('claimedDiscordId')
+  })
+
+  it('a form row\'s claimed id never counts as history: no fraud/sibling queries, only a non-blocking hint', async () => {
+    m(prisma.paymentRequest.findUnique).mockResolvedValue(base({ source: 'FORM', requesterDiscordId: null, claimedDiscordId: '200000000000000007', requesterMemberId: null }))
+    m(prisma.paymentRequest.findFirst).mockImplementation(async (a: { where: Record<string, unknown> }) => (a.where.rejectedAsFraud ? { id: 'old' } : null))
+    const r = await evaluateRequest('req1', { policy: policy() })
+    expect(r?.flags.map((f) => f.id)).toEqual(expect.arrayContaining(['unverified_requester', 'unmatched_requester', 'claimed_id_history']))
+    expect(r?.flags.map((f) => f.id)).not.toContain('prior_fraud')
+    expect(r?.flags.find((f) => f.id === 'claimed_id_history')).toMatchObject({ severity: 'medium' })
+    expect(r?.flags.find((f) => f.id === 'claimed_id_history')?.hardBlock).toBeUndefined()
+    expect(prisma.paymentRequest.findMany).not.toHaveBeenCalled()
+  })
+
+  it('saves only if the request did not change since it was read, and retries once on a conflict', async () => {
+    m(prisma.paymentRequest.updateMany).mockResolvedValueOnce({ count: 0 }).mockResolvedValueOnce({ count: 1 })
+    const r = await evaluateRequest('req1', { policy: policy() })
+    expect(r).not.toBeNull()
+    expect(prisma.paymentRequest.updateMany).toHaveBeenCalledTimes(2)
+    expect(m(prisma.paymentRequest.updateMany).mock.calls[0][0].where).toEqual({ id: 'req1', updatedAt: expect.any(Date) })
+    expect(prisma.paymentRequest.findUnique).toHaveBeenCalledTimes(2) // re-read on fresh data
+  })
+
+  it('gives up with an error after a second conflict instead of overwriting', async () => {
+    m(prisma.paymentRequest.updateMany).mockResolvedValue({ count: 0 })
+    await expect(evaluateRequest('req1', { policy: policy() })).rejects.toThrow(/kept changing/)
+  })
+
+  it('checkedAt comes from the database clock unless a time is injected', async () => {
+    await evaluateRequest('req1', { policy: policy() })
+    expect(saved().checkedAt).toEqual(new Date('2026-11-11T12:00:00Z'))
   })
 
   it('says so when the restricted list is switched off', async () => {

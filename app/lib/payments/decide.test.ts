@@ -272,6 +272,15 @@ describe('applyDecision (database)', () => {
     expect(tx.paymentDecision.create).not.toHaveBeenCalled()
   })
 
+  it('whoever entered the dollar value cannot approve the request', async () => {
+    tx.paymentRequest.findUnique.mockResolvedValue(row({ decisions: [{ id: 1, action: 'NOTE', actorDiscordId: A, actorIsDpr: false, createdAt: new Date('2026-11-01T01:00:00Z'), checklist: { usdAmountSet: 44.5 } }] }))
+    const mine = await applyDecision('req1', actor(A), { action: 'APPROVE' }, p)
+    expect(mine.ok === false && mine.code).toBe('self_review')
+    expect(tx.paymentDecision.create).not.toHaveBeenCalled()
+    const other = await applyDecision('req1', actor(B), { action: 'APPROVE' }, p)
+    expect(other.ok).toBe(true)
+  })
+
   it('404 for an unknown request', async () => {
     tx.paymentRequest.findUnique.mockResolvedValue(null)
     const r = await applyDecision('nope', actor(A), { action: 'APPROVE' }, p)
@@ -297,7 +306,8 @@ describe('setUsdAmount', () => {
   it('records the dollar value as an append-only note with the reason', async () => {
     const r = await setUsdAmount('req1', actor(A), { amountUsd: '44.50', note: 'rate on the day from a public rate table' })
     expect(r.ok).toBe(true)
-    expect(tx.paymentRequest.updateMany.mock.calls[0][0].data).toEqual({ amountUsdCents: 4450 })
+    // The old check no longer describes this request: checks must run again before anyone can approve.
+    expect(tx.paymentRequest.updateMany.mock.calls[0][0].data).toEqual({ amountUsdCents: 4450, checkedAt: null })
     expect(tx.paymentDecision.create.mock.calls[0][0].data).toMatchObject({ action: 'NOTE', checklist: { usdAmountSet: 44.5, originalCurrency: 'EUR', original: 40 } })
   })
 
