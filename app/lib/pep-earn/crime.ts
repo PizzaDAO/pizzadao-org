@@ -6,24 +6,29 @@
  * Fines never take the wallet below zero. Ledger: CRIME_REWARD (+) or
  * CRIME_FINE (-).
  *
- * Tunables (env): CRIME_MIN_PEP, CRIME_MAX_PEP, CRIME_FAIL_PERCENT,
+ * Tunables: settings crime.* (admin page); the env vars below are the legacy values while nothing is
+ * saved: CRIME_MIN_PEP, CRIME_MAX_PEP, CRIME_FAIL_PERCENT,
  * CRIME_FINE_MIN_PERCENT, CRIME_FINE_MAX_PERCENT, CRIME_COOLDOWN_SECONDS.
  */
 import { prisma } from '../db'
 import { getOrCreateEconomy } from '../economy'
 import { logTransaction } from '../transactions'
-import { claimCooldown, envInt, randInt } from './cooldown'
+import { loadSettings, type Settings } from '../settings'
+import { effectiveInt, envNumber } from '../settings/numbers'
+import { claimCooldown, randInt } from './cooldown'
 
-export function crimeConfig() {
-  const min = envInt('CRIME_MIN_PEP', 2)
-  const fineMin = envInt('CRIME_FINE_MIN_PERCENT', 5)
+/** Settings crime.* (saved rows win; the CRIME_* env vars are the legacy values while nothing is saved). */
+export function crimeConfig(settings?: Settings) {
+  const env = process.env
+  const min = effectiveInt('crime.minPep', settings, envNumber(env.CRIME_MIN_PEP))
+  const fineMin = effectiveInt('crime.fineMinPercent', settings, envNumber(env.CRIME_FINE_MIN_PERCENT))
   return {
     min,
-    max: Math.max(min, envInt('CRIME_MAX_PEP', 420)),
-    failPercent: Math.min(100, Math.max(0, envInt('CRIME_FAIL_PERCENT', 60))),
+    max: Math.max(min, effectiveInt('crime.maxPep', settings, envNumber(env.CRIME_MAX_PEP))),
+    failPercent: Math.min(100, Math.max(0, effectiveInt('crime.failPercent', settings, envNumber(env.CRIME_FAIL_PERCENT)))),
     fineMinPercent: fineMin,
-    fineMaxPercent: Math.max(fineMin, envInt('CRIME_FINE_MAX_PERCENT', 55)),
-    cooldownMs: envInt('CRIME_COOLDOWN_SECONDS', 30) * 1000,
+    fineMaxPercent: Math.max(fineMin, effectiveInt('crime.fineMaxPercent', settings, envNumber(env.CRIME_FINE_MAX_PERCENT))),
+    cooldownMs: effectiveInt('crime.cooldownSeconds', settings, envNumber(env.CRIME_COOLDOWN_SECONDS)) * 1000,
   }
 }
 
@@ -38,7 +43,7 @@ export async function commitCrime(
 ): Promise<CrimeResult> {
   const rng = opts.rng ?? Math.random
   const now = opts.now ?? new Date()
-  const cfg = crimeConfig()
+  const cfg = crimeConfig(await loadSettings())
 
   await getOrCreateEconomy(discordId)
 

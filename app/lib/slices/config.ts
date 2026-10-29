@@ -12,6 +12,8 @@
 //   SLICES_ALLOW_NON_PROD     "true" lets a NON-production deploy (local dev only!) mint. Vercel
 //                             previews share the production DB, so they must never mint.
 import { base, baseSepolia } from "viem/chains";
+import type { Settings } from "@/app/lib/settings";
+import { effectiveInt, storedOverride } from "@/app/lib/settings/numbers";
 
 export const SLICES_BATCH_SIZE = 50;
 export const SLICES_MAX_ATTEMPTS = 5;
@@ -37,17 +39,34 @@ export function contractAddress(env: NodeJS.ProcessEnv = process.env): `0x${stri
   return a && isEvmAddress(a) ? (a as `0x${string}`) : null;
 }
 
-function posNumber(raw: string | undefined, fallback: number): number {
+// The three spend limits below are env-or-default (the legacy value) tightened by the settings
+// slices.dailyCap / slices.maxGasMilliGwei / slices.minBalanceMilliEth. A saved setting can only make a
+// limit stricter (lower cap, lower gas ceiling, higher balance floor); see settings/numbers.ts.
+const optNumber = (raw: string | undefined): number | undefined => {
   const n = Number(raw?.trim());
-  return Number.isFinite(n) && n > 0 ? n : fallback;
-}
+  return Number.isFinite(n) && n > 0 ? n : undefined;
+};
 
-export const dailyCap = (env: NodeJS.ProcessEnv = process.env) => Math.floor(posNumber(env.SLICES_DAILY_CAP, 1000));
-export const maxGasGwei = (env: NodeJS.ProcessEnv = process.env) => posNumber(env.SLICES_MAX_GAS_GWEI, 0.5);
+export const dailyCap = (env: NodeJS.ProcessEnv = process.env, settings?: Settings) => {
+  const legacy = optNumber(env.SLICES_DAILY_CAP);
+  return effectiveInt("slices.dailyCap", settings, legacy === undefined ? undefined : Math.floor(legacy));
+};
+
+// Gas and balance are decimals in env but whole thousandths in settings. With no saved row the env
+// value is used untouched (no rounding), so deploying changes nothing.
+export const maxGasGwei = (env: NodeJS.ProcessEnv = process.env, settings?: Settings) => {
+  const legacy = optNumber(env.SLICES_MAX_GAS_GWEI) ?? 0.5;
+  const saved = storedOverride("slices.maxGasMilliGwei", settings);
+  // Compared in env units (gwei) so rounding can never loosen the env value.
+  return saved ? Math.min(legacy, (saved.value as number) / 1000) : legacy;
+};
 
 /** Alert threshold in wei. */
-export function minBalanceWei(env: NodeJS.ProcessEnv = process.env): bigint {
-  return BigInt(Math.round(posNumber(env.SLICES_MIN_BALANCE_ETH, 0.003) * 1e9)) * BigInt(1_000_000_000);
+export function minBalanceWei(env: NodeJS.ProcessEnv = process.env, settings?: Settings): bigint {
+  const legacy = optNumber(env.SLICES_MIN_BALANCE_ETH) ?? 0.003;
+  const saved = storedOverride("slices.minBalanceMilliEth", settings);
+  const eth = saved ? Math.max(legacy, (saved.value as number) / 1000) : legacy;
+  return BigInt(Math.round(eth * 1e9)) * BigInt(1_000_000_000);
 }
 
 export type SlicesStatus = { ok: true } | { ok: false; reason: "disabled" | "misconfigured" | "not_production" };

@@ -11,10 +11,11 @@
  * - Keys never contain secrets. Editorial/private values live only in DB rows, never here.
  */
 import { z } from 'zod'
+import { ECONOMY_SETTINGS } from './economy-settings'
 import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -28,6 +29,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   features: 'Other feature switches',
   payments: 'Payments',
   proposals: 'Proposals',
+  economy: 'Economy and spend caps',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -40,6 +42,8 @@ export type SettingInput =
   | { type: 'date' }
   | { type: 'url'; maxLength: number }
   | { type: 'bool' }
+  /** The role income table: rows of {name, amount, intervalHours, roleId?}; stricter-only (rows can be removed or lowered). */
+  | { type: 'roleIncome' }
   | { type: 'channel'; kind: 'text' | 'voice' }
   | { type: 'role' }
   /** `allowed`: a stricter-only list may only hold ids from this code list (an empty value means the whole list). */
@@ -944,6 +948,8 @@ export const SETTINGS = {
   }),
   // Payments group (plans/host-fast-track.md): defined in ./payments-settings.
   ...PAYMENT_SETTINGS,
+  // Economy numbers and spend caps (phase 4): ./economy-settings.
+  ...ECONOMY_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.
   'payments.formSheetId': {

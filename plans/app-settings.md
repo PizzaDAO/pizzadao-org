@@ -490,3 +490,12 @@ Each migration is applied to prod by hand before merge (`prisma migrate deploy` 
 - Disavow yes votes (min 3) and decision days (min 7) are stricter-only from the admin page; loosening needs a PR.
 - Rounds snapshot `yesThreshold` and `decisionDays` when they open (migration 20261102100000_disavow_round_rules); null columns mean the code defaults.
 - Announcement and article-author role lists always include the top role in code.
+
+## Phase 4 implementation notes (2026-10-29)
+- New group "Economy and spend caps" (`economy-settings.ts`) plus `missions.runPepAlert`. No migration.
+- Every payout, cap and limit is stricter-only: the schema bound stops at today's value. Saved values act as a ceiling over the legacy value (`numbers.ts`): min(env or default, saved) where higher is looser, max where lower is looser, so an env value that is already stricter still wins. Only `games.minBet` and `games.blackjackTimeoutSeconds` take the full range (no spend risk).
+- No saved row: env is the legacy value (`GAME_*`, `CRIME_*`, `WORK_*`, `JOB_REWARD_AMOUNT`, `ADMIN_GRANT_MAX`, `MISSIONS_RUN_PEP_ALERT`, `SLICES_*`, `MAFIA_PORTRAIT_*_DAILY_CAP`, `ROLE_INCOME_JSON`), else the code default. Unreadable settings: the last saved value this instance saw, then the legacy value.
+- `economy.roleIncome` is a table input (`roleIncome`). Rows can be removed or made smaller or slower; a row must be a built-in role with the same id. Saving replaces the `ROLE_INCOME_JSON` table.
+- Slices gas and balance use whole thousandths (milli-gwei, milli-ETH) because settings are integers; with no row the env decimals are used untouched.
+- Left for phase 5: `WORK_PROMPTS_JSON` (string list), slot weights stay in code, `MISSIONS_CRON_*` budgets stay env.
+- Review fixes: the role income table is judged against the table actually in force (ROLE_INCOME_JSON if valid, else built-in); the admin page and loosening/reset confirmations use the env-aware baseline; a saved smallest bet is clamped to the largest bet in force; slices thousandths are compared in env units.

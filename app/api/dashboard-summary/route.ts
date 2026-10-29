@@ -15,6 +15,7 @@ import { getSession } from "@/app/lib/session";
 import { prisma } from "@/app/lib/db";
 import { fetchMemberById, fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { getBalance } from "@/app/lib/economy";
+import { loadSettings } from "@/app/lib/settings";
 import {
     getMissionsByLevel,
     getUserMissionProgress,
@@ -235,13 +236,14 @@ export async function GET(request: NextRequest) {
         const guildMember = await safe(fetchGuildMember(discordId), null);
         const isReviewer =
             guildMember?.roles.some((r) => (MISSION_REVIEWER_ROLE_IDS as readonly string[]).includes(r)) ?? false;
+        const incomeSettings = await loadSettings();
         const boxMafia = {
             status: boxMafiaStatus(
                 guildMember?.roles ?? null,
-                resolveBoxMafiaRoleId(guildRoles)
+                resolveBoxMafiaRoleId(guildRoles, incomeSettings)
             ),
             purchaseUrl: BOX_PURCHASE_URL,
-            dailyPep: boxMafiaDailyPep(),
+            dailyPep: boxMafiaDailyPep(incomeSettings),
         };
 
         // --- Level info ---

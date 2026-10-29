@@ -7,7 +7,9 @@ import { clearSettingsCache, loadSettings } from './index'
 import { jsonOrDbNull } from './json'
 import { AREA_LABELS, SETTINGS, SETTING_KEYS, isSettingKey, parseSetting, type SettingKey } from './registry'
 import { checkTargets, targetNames, TargetError } from './targets'
+import { baselineInt, combineSaved, legacyEnvName } from './numbers'
 import { describeToggle, isToggleKey } from './toggles'
+import { roleIncomeBaseline } from '@/app/lib/pep-earn/income-defaults'
 
 export class SettingError extends Error {
   constructor(
@@ -32,21 +34,55 @@ const MAX_NOTE = 300
 const cleanNote = (note: unknown): string | null =>
   typeof note === 'string' && note.trim() ? note.trim().slice(0, MAX_NOTE) : null
 
-/** Settings that depend on each other are checked together: the voting window cannot be shorter than the decision time. */
+/** Pairs of settings that must stay in order: `low` may not exceed `high`. */
+const PAIRS: ReadonlyArray<{ low: SettingKey; high: SettingKey; what: (low: number, high: number) => string }> = [
+  {
+    low: 'disavow.decisionDays',
+    high: 'disavow.windowDays',
+    what: (low, high) => `the voting window (${high} days) cannot be shorter than the decision time (${low} days)`,
+  },
+  { low: 'games.minBet', high: 'games.maxBet', what: (low, high) => `the smallest bet (${low}) cannot be above the largest bet (${high})` },
+  { low: 'crime.minPep', high: 'crime.maxPep', what: (low, high) => `the smallest crime payout (${low}) cannot be above the largest (${high})` },
+  {
+    low: 'crime.fineMinPercent',
+    high: 'crime.fineMaxPercent',
+    what: (low, high) => `the smallest fine (${low}%) cannot be above the largest fine (${high}%)`,
+  },
+  { low: 'work.minPep', high: 'work.maxPep', what: (low, high) => `the smallest work payout (${low}) cannot be above the largest (${high})` },
+]
+
+/**
+ * Settings that depend on each other are checked together (see PAIRS), on the values that would be in
+ * force: a saved value is combined with the env value like the app does, so a stricter env cap counts.
+ * `value` undefined means the key is being reset (its baseline applies).
+ */
 async function checkTogether(key: SettingKey, value: unknown): Promise<void> {
-  if (key !== 'disavow.decisionDays' && key !== 'disavow.windowDays') return
+  const pairs = PAIRS.filter((p) => p.low === key || p.high === key)
+  if (pairs.length === 0) return
   const rows = (await prisma.appSetting.findMany()) as Array<{ key: string; value: unknown }>
-  const effective = (k: 'disavow.decisionDays' | 'disavow.windowDays'): number => {
-    if (k === key) return value as number
-    const stored = rows.find((r) => r.key === k)
-    const parsed = stored ? parseSetting(k, stored.value) : null
-    return parsed?.ok ? (parsed.value as number) : SETTINGS[k].default
+  const effective = (k: SettingKey): number => {
+    const base = baselineInt(k)
+    let row: number | undefined
+    if (k === key) row = value as number | undefined
+    else {
+      const stored = rows.find((r) => r.key === k)
+      const parsed = stored ? parseSetting(k, stored.value) : null
+      row = parsed?.ok ? (parsed.value as number) : undefined
+    }
+    return row === undefined ? base : combineSaved(k, base, row)
   }
-  const decision = effective('disavow.decisionDays')
-  const window = effective('disavow.windowDays')
-  if (window < decision) {
-    throw new SettingError(400, `${key}: the voting window (${window} days) cannot be shorter than the decision time (${decision} days)`)
+  for (const p of pairs) {
+    const low = effective(p.low)
+    const high = effective(p.high)
+    if (low > high) throw new SettingError(400, `${key}: ${p.what(low, high)}`)
   }
+}
+
+/** What is in force for a setting when nothing is saved: the env value or table, else the code default. */
+export function baselineValue(key: SettingKey): unknown {
+  if (key === 'economy.roleIncome') return roleIncomeBaseline().map((r) => ({ ...r }))
+  if (legacyEnvName(key)) return baselineInt(key)
+  return SETTINGS[key].default
 }
 
 /** Set an override. `expectedUpdatedAt` (ISO) guards against editing a value changed since it was loaded. */
@@ -92,7 +128,7 @@ export async function saveSetting(
 export async function resetSetting(key: SettingKey, actor: string, opts: { note?: unknown } = {}): Promise<boolean> {
   const note = cleanNote(opts.note)
   // Going back to the default must not break a rule that depends on another setting.
-  await checkTogether(key, SETTINGS[key].default)
+  await checkTogether(key, undefined)
   const removed = await prisma.$transaction(async (tx) => {
     const existing = await tx.appSetting.findUnique({ where: { key } })
     if (!existing) return false
@@ -133,6 +169,10 @@ export interface SettingView {
   input: (typeof SETTINGS)[SettingKey]['input']
   stricterOnly: boolean
   default: unknown
+  /** What is in force with no saved row: the env value or table if set, else the code default. */
+  baseline: unknown
+  /** The env var that supplies the baseline, if this setting has one. */
+  legacyEnv?: string
   /** The effective value (override if valid, else the failure mode / default). */
   value: unknown
   /** The stored override, if any. */
@@ -196,8 +236,16 @@ export async function listSettingViews(): Promise<SettingView[]> {
       value: shown(
         isToggleKey(key)
           ? describeToggle(key, snap).effective
-          : valid ? parsed.value : row ? (def.onReadFailure === 'lastKnownGood' || def.onReadFailure === 'throw' ? def.default : def.onReadFailure.value) : def.default,
+          : valid
+            ? typeof parsed.value === 'number' && legacyEnvName(key) && def.stricterOnly
+              ? combineSaved(key, baselineInt(key), parsed.value)
+              : parsed.value
+            : row && typeof def.onReadFailure === 'object'
+              ? def.onReadFailure.value
+              : baselineValue(key),
       ),
+      baseline: def.private ? maskPrivate(def.default) ?? 'not set' : baselineValue(key),
+      ...(legacyEnvName(key) ? { legacyEnv: legacyEnvName(key) } : key === 'economy.roleIncome' ? { legacyEnv: 'ROLE_INCOME_JSON' } : {}),
       override: row ? shown(row.value) : null,
       modified: !!row,
       invalid: !!row && !valid,

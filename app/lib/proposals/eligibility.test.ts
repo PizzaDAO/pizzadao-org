@@ -3,7 +3,7 @@ import { describe, expect, it, vi } from 'vitest'
 
 vi.mock('@/app/lib/discord-channels', () => ({ getGuildRoles: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ hasRole: vi.fn() }))
-vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn() }))
+vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(), loadSettings: vi.fn(async () => undefined) }))
 vi.mock('@/app/lib/mission-verify/bulk', () => ({ listGuildMemberRoles: vi.fn() }))
 
 import { listRoleHolders, snapshotRoleHolders, type RoleDeps } from './eligibility'

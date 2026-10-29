@@ -15,50 +15,22 @@
  */
 import { prisma } from '../db'
 import { creditInTx, getOrCreateEconomy } from '../economy'
+import type { Settings } from '../settings'
+import { storedOverride } from '../settings/numbers'
 import { claimCooldown } from './cooldown'
+import { DEFAULT_ROLE_INCOME, normalizeRoleName, validEntry, type RoleIncome } from './income-defaults'
 
-export interface RoleIncome {
-  /** Discord role name, as shown in the server. */
-  name: string
-  /** PEP paid per interval. */
-  amount: number
-  /** Hours between collections (UB: 1 day for every role). */
-  intervalHours: number
-  /** Discord role id. Optional: resolved by name when absent. */
-  roleId?: string
-}
+export { DEFAULT_ROLE_INCOME, normalizeRoleName }
+export type { RoleIncome }
 
-/** Live UB role income, read from the UB dashboard on 2026-10-03. */
-export const DEFAULT_ROLE_INCOME: readonly RoleIncome[] = [
-  { name: 'Pizzaiolo', amount: 690, intervalHours: 24 },
-  { name: 'Dread Pizza Roberts', amount: 420, intervalHours: 24, roleId: '812131585327235113' },
-  { name: 'Pizza Holder', amount: 69, intervalHours: 24 },
-  { name: 'Pizza Mafia', amount: 69, intervalHours: 24 },
-  { name: 'Pizza Capo', amount: 69, intervalHours: 24, roleId: '839206162837798945' },
-  { name: 'Crew Member', amount: 42, intervalHours: 24 },
-  { name: 'Box Mafia', amount: 42, intervalHours: 24 },
-  { name: 'Pizza Sticks Holder', amount: 8, intervalHours: 24 },
-  { name: 'Pizza Pop Holder', amount: 8, intervalHours: 24 },
-  { name: 'Pizza Tattoo Club', amount: 8, intervalHours: 24 },
-  { name: 'Pockets Checked', amount: 1, intervalHours: 24 },
-]
-
-function validEntry(e: unknown): e is RoleIncome {
-  const r = e as RoleIncome
-  return (
-    !!r &&
-    typeof r.name === 'string' &&
-    r.name.trim().length > 0 &&
-    Number.isInteger(r.amount) &&
-    r.amount > 0 &&
-    typeof r.intervalHours === 'number' &&
-    r.intervalHours > 0 &&
-    (r.roleId === undefined || (typeof r.roleId === 'string' && /^\d{5,25}$/.test(r.roleId)))
-  )
-}
-
-/** The role income table: ROLE_INCOME_JSON if set and valid, else the defaults. */
-export function roleIncomeConfig(raw = process.env.ROLE_INCOME_JSON): readonly RoleIncome[] {
+/**
+ * The role income table. A saved `economy.roleIncome` setting (stricter than the table that would
+ * otherwise be in force) wins; with no saved row it is ROLE_INCOME_JSON if set and valid, else the built-in defaults.
+ * Unreadable settings fall back to the last good saved table, then to the no-row rule above.
+ */
+export function roleIncomeConfig(raw = process.env.ROLE_INCOME_JSON, settings?: Settings): readonly RoleIncome[] {
+  const saved = storedOverride('economy.roleIncome', settings)
+  if (saved) return saved.value as RoleIncome[]
   if (raw) {
     try {
       const parsed = JSON.parse(raw)
@@ -72,11 +44,6 @@ export function roleIncomeConfig(raw = process.env.ROLE_INCOME_JSON): readonly R
     }
   }
   return DEFAULT_ROLE_INCOME
-}
-
-/** Lowercase, letters and digits only ("🍕 Pizza-Holder" -> "pizzaholder"). */
-export function normalizeRoleName(name: string): string {
-  return name.toLowerCase().replace(/[^a-z0-9]/g, '')
 }
 
 export type ResolvedRoleIncome = RoleIncome & { roleId: string }

@@ -5,6 +5,7 @@ import { NextResponse } from "next/server";
 import { requireAdmin } from "@/app/lib/auth-guards";
 import { prisma } from "@/app/lib/db";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { loadSettings } from "@/app/lib/settings";
 import { chainWhere, dailyCap, minBalanceWei, slicesEnabled, slicesReady, addressUrl, contractAddress } from "@/app/lib/slices/config";
 import { dayKey, retryClaim } from "@/app/lib/slices/claims";
 import { mintedLast24h, processMintQueue } from "@/app/lib/slices/mint-queue";
@@ -18,12 +19,13 @@ export async function GET() {
   const admin = await requireAdmin();
   if (!admin.ok) return admin.response;
 
+  const settings = await loadSettings();
   const ready = slicesReady();
   let minter: { address: string; balanceEth: string; low: boolean } | null = null;
   if (ready.ok) {
     try {
       const balance = await getMinterBalance();
-      minter = { address: minterAddress(), balanceEth: (Number(balance) / 1e18).toFixed(5), low: balance < minBalanceWei() };
+      minter = { address: minterAddress(), balanceEth: (Number(balance) / 1e18).toFixed(5), low: balance < minBalanceWei(process.env, settings) };
     } catch (e) {
       console.error("[admin/slices] balance error:", scrubError(e));
     }
@@ -74,7 +76,7 @@ export async function GET() {
     ready: ready.ok ? "ok" : ready.reason,
     contract: contract ? { address: contract, url: addressUrl(contract) } : null,
     minter,
-    daily: { used: await mintedLast24h().catch(() => 0), cap: dailyCap() },
+    daily: { used: await mintedLast24h().catch(() => 0), cap: dailyCap(process.env, settings) },
     counts: Object.fromEntries(grouped.map((g) => [g.status, g._count._all])),
     failed,
     failing,

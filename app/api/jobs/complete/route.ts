@@ -1,14 +1,11 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { completeJob, JOB_REWARD_AMOUNT } from '@/app/lib/jobs'
+import { completeJob, getJobRewardAmount } from '@/app/lib/jobs'
 import { formatCurrency } from '@/app/lib/economy'
 import { prisma } from '@/app/lib/db'
 
 // Admin role IDs that can complete jobs
 const ADMIN_ROLE_IDS = process.env.ADMIN_ROLE_IDS?.split(',') || []
-
-// Upper bound on a single admin job reward (this endpoint mints PEP).
-const MAX_ADMIN_JOB_REWARD = Math.max(JOB_REWARD_AMOUNT * 100, 10_000)
 
 export const runtime = 'nodejs'
 
@@ -39,7 +36,10 @@ export async function POST(request: NextRequest) {
     }
 
     const body = await request.json()
-    const { userId, reward = JOB_REWARD_AMOUNT } = body
+    const jobReward = await getJobRewardAmount()
+    // Upper bound on a single admin job reward (this endpoint mints PEP).
+    const MAX_ADMIN_JOB_REWARD = Math.max(jobReward * 100, 10_000)
+    const { userId, reward = jobReward } = body
 
     if (!userId || typeof userId !== 'string') {
       return NextResponse.json({ error: 'User ID required' }, { status: 400 })

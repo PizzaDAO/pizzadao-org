@@ -27,6 +27,8 @@ import {
   isUpstashConfigured,
   rateLimitResponse,
 } from "@/app/lib/rate-limit";
+import { loadSettings, type Settings } from "@/app/lib/settings";
+import { effectiveInt } from "@/app/lib/settings/numbers";
 import { activationActor, recordActivationLater } from "@/app/lib/activation";
 import { verifyNameOrigin } from "@/app/lib/name-origin-sig";
 import { NAME_ORIGIN_KINDS } from "@/app/lib/name-origin";
@@ -66,8 +68,12 @@ function envCap(name: string, fallbackCap: number): number {
   const n = Number.parseInt(process.env[name] ?? "", 10);
   return Number.isFinite(n) && n > 0 ? n : fallbackCap;
 }
-const dailyCap = () => envCap("MAFIA_PORTRAIT_DAILY_CAP", DEFAULT_DAILY_CAP);
-const publicDailyCap = () => envCap("MAFIA_PORTRAIT_PUBLIC_DAILY_CAP", RATE_LIMITS["mafia-portrait-public"].limit);
+// Legacy values (env, else the code default) tightened by the settings portrait.dailyCap / portrait.publicDailyCap,
+// which can only lower them.
+const dailyCap = (settings: Settings) =>
+  effectiveInt("portrait.dailyCap", settings, envCap("MAFIA_PORTRAIT_DAILY_CAP", DEFAULT_DAILY_CAP));
+const publicDailyCap = (settings: Settings) =>
+  effectiveInt("portrait.publicDailyCap", settings, envCap("MAFIA_PORTRAIT_PUBLIC_DAILY_CAP", RATE_LIMITS["mafia-portrait-public"].limit));
 
 export async function POST(req: Request) {
   if (!(await toggleEnabled("portrait.enabled")) || !process.env.OPENAI_API_KEY) {
@@ -103,6 +109,7 @@ export async function POST(req: Request) {
     }
   }
 
+  const settings = await loadSettings();
   const cacheKey = portraitCacheKey({ name, turtles, crews, variant });
 
   // Cache hits are free: they skip the limits and the provider.
@@ -131,7 +138,7 @@ export async function POST(req: Request) {
     const pub = await checkKeyedRateLimit(
       "mafia-portrait-public",
       "all",
-      { ...RATE_LIMITS["mafia-portrait-public"], limit: publicDailyCap() },
+      { ...RATE_LIMITS["mafia-portrait-public"], limit: publicDailyCap(settings) },
       { failClosed: true },
     );
     if (!pub.success) return fallback("capacity");
@@ -139,7 +146,7 @@ export async function POST(req: Request) {
   const global = await checkKeyedRateLimit(
     "mafia-portrait-global",
     "all",
-    { ...RATE_LIMITS["mafia-portrait-global"], limit: dailyCap() },
+    { ...RATE_LIMITS["mafia-portrait-global"], limit: dailyCap(settings) },
     { failClosed: true },
   );
   if (!global.success) return fallback("capacity");

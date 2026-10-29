@@ -6,7 +6,7 @@ vi.mock('@/app/lib/auth-guards', () => ({
 }))
 vi.mock('@/app/lib/jobs', () => ({
   getJob: vi.fn(),
-  JOB_REWARD_AMOUNT: 50,
+  getJobRewardAmount: vi.fn(async () => 50),
   hasCompletedJobToday: vi.fn(),
   recordDailyJobCompletion: vi.fn(),
   isTodaysDailyJob: vi.fn(),

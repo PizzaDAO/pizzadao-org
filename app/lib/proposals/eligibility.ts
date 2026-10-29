@@ -9,7 +9,7 @@ import { getGuildRoles } from '@/app/lib/discord-channels'
 import { resolveBoxMafiaRoleId } from '@/app/lib/box-mafia'
 import { hasRole } from '@/app/lib/discord'
 import { listGuildMemberRoles } from '@/app/lib/mission-verify/bulk'
-import { getSetting } from '@/app/lib/settings'
+import { getSetting, loadSettings } from '@/app/lib/settings'
 
 export interface RoleDeps {
   /** The role id that makes someone a voter, or null when it cannot be resolved (fail closed). */
@@ -38,7 +38,7 @@ export async function resolveVoterRoleId(): Promise<string | null> {
   } catch {
     /* fall through to the built-in role */
   }
-  return resolveBoxMafiaRoleId(await getGuildRoles())
+  return resolveBoxMafiaRoleId(await getGuildRoles(), await loadSettings())
 }
 
 /**

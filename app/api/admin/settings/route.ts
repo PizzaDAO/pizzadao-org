@@ -67,7 +67,7 @@ export async function DELETE(request: Request) {
     // Resetting a stricter-only setting moves it back toward the (looser) code default: confirm first.
     const current = (await listSettingViews()).find((x) => x.key === b.key)
     if (current?.modified) {
-      const ask = confirmationFor(b.key, current.value, current.default)
+      const ask = confirmationFor(b.key, current.value, current.baseline)
       if (ask && b.confirm !== true) return json({ error: 'Confirmation required', needsConfirm: ask }, 409)
     }
     const removed = await resetSetting(b.key, auth.session.discordId, { note: b.note })

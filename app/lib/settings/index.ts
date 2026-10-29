@@ -10,6 +10,7 @@
  * key's onReadFailure value (see registry.ts). A failed read is cached only briefly.
  */
 import { prisma } from '@/app/lib/db'
+import { clearKnownOverrides, forgetOverride, rememberOverride } from './known'
 import { SETTINGS, SETTING_KEYS, isSettingKey, type SettingKey, type SettingValue } from './registry'
 
 export const SETTINGS_CACHE_MS = 30_000
@@ -36,6 +37,7 @@ export function clearSettingsCache(opts: { all?: boolean } = {}): void {
   inflight = null
   if (opts.all) {
     lastKnownGood.clear()
+    clearKnownOverrides()
     warned.clear()
   }
 }
@@ -89,6 +91,7 @@ async function readAll(): Promise<{ settings: Settings; ttl: number }> {
     if (!stored.has(key)) {
       values.set(key, SETTINGS[key].default)
       lastKnownGood.set(key, SETTINGS[key].default)
+      forgetOverride(key)
       continue
     }
     const parsed = (SETTINGS[key].schema as { safeParse(v: unknown): { success: boolean; data?: unknown } }).safeParse(stored.get(key))
@@ -96,6 +99,7 @@ async function readAll(): Promise<{ settings: Settings; ttl: number }> {
       values.set(key, parsed.data)
       overrides.add(key)
       lastKnownGood.set(key, parsed.data)
+      rememberOverride(key, parsed.data)
     } else {
       invalid.push(key)
       warnOnce(`invalid:${key}`, `stored value for ${key} is invalid; using its failure mode`)
@@ -126,3 +130,5 @@ export async function loadSettings(now: number = Date.now()): Promise<Settings> 
 export async function getSetting<K extends SettingKey>(key: K): Promise<SettingValue<K>> {
   return (await loadSettings()).get(key)
 }
+
+export { knownOverride } from './known'

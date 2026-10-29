@@ -33,6 +33,7 @@ import { parseRouletteSpace, playRoulette } from "@/app/lib/pep-games/roulette";
 import { playSlots } from "@/app/lib/pep-games/slots";
 import { getLeaderboard, transfer } from "@/app/lib/economy";
 import { buyItem, getShopItems } from "@/app/lib/shop";
+import { loadSettings, type Settings } from "@/app/lib/settings";
 import { adminAddMoney, adminGrantMax, adminRemoveMoney, isPepAdmin } from "@/app/lib/pep-admin";
 import { makeEmbed } from "@/app/lib/discord-interactions/embeds";
 import { postDiscordMessage } from "@/app/lib/discord-rest";
@@ -144,14 +145,14 @@ const followups: FollowUpInteractionDeps = {
   },
 };
 
-function deps(guildId: string | undefined): HandlerDeps {
+function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
   return {
     guildId,
     currency: process.env.PEP_EMOJI?.trim() || "$PEP",
     getWallet,
     doWork,
     collectIncome: async (discordId, roleIds) => {
-      const { resolved, unresolved } = resolveRoleIncome(roleIncomeConfig(), guildId ? await getGuildRoles(guildId) : null);
+      const { resolved, unresolved } = resolveRoleIncome(roleIncomeConfig(process.env.ROLE_INCOME_JSON, await loadSettings()), guildId ? await getGuildRoles(guildId) : null);
       if (unresolved.length) console.warn("[collect-income] unresolved roles:", unresolved.join(", "));
       return { ...(await collectIncome(discordId, roleIds, resolved)), unresolved };
     },
@@ -166,7 +167,7 @@ function deps(guildId: string | undefined): HandlerDeps {
     buy: (id, itemId, qty) => buyItem(id, itemId, qty),
     isAdmin: (roles) =>
       isPepAdmin(roles, { baseRoleIds: ADMIN_ROLE_IDS, getGuildRoles: async () => (guildId ? getGuildRoles(guildId) : null) }),
-    adminGrantMax: adminGrantMax(),
+    adminGrantMax: adminGrantMax(process.env, settings),
     addMoney: adminAddMoney,
     removeMoney: adminRemoveMoney,
     logAdmin: logAdminGrant,
@@ -197,7 +198,7 @@ export async function POST(req: Request) {
   }
 
   try {
-    const res = await handleInteraction(interaction, deps(process.env.DISCORD_GUILD_ID?.trim()));
+    const res = await handleInteraction(interaction, deps(process.env.DISCORD_GUILD_ID?.trim(), await loadSettings()));
     return NextResponse.json(res);
   } catch (err) {
     console.error("[discord/interactions] handler failed:", err);

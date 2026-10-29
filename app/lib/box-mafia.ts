@@ -6,6 +6,7 @@
  * Discord down, role not found by name) yields "unknown" and the card hides.
  */
 import { normalizeRoleName, roleIncomeConfig } from './pep-earn/income'
+import type { Settings } from './settings'
 
 export const BOX_MAFIA_ROLE_NAME = 'Box Mafia'
 export const DEFAULT_BOX_PURCHASE_URL = 'https://opensea.io/collection/rare-pizzas-box'
@@ -16,23 +17,24 @@ export const BOX_PURCHASE_URL = (process.env.NEXT_PUBLIC_BOX_PURCHASE_URL ?? DEF
 export type BoxMafiaStatus = 'has_role' | 'missing' | 'unknown'
 
 /** The Box Mafia entry of the role income table (honours ROLE_INCOME_JSON). */
-export function boxMafiaIncomeEntry() {
+export function boxMafiaIncomeEntry(settings?: Settings) {
   const target = normalizeRoleName(BOX_MAFIA_ROLE_NAME)
-  return roleIncomeConfig().find((e) => normalizeRoleName(e.name) === target)
+  return roleIncomeConfig(process.env.ROLE_INCOME_JSON, settings).find((e) => normalizeRoleName(e.name) === target)
 }
 
 /** Daily PEP for Box Mafia holders, per the role income table. */
-export function boxMafiaDailyPep(): number {
-  return boxMafiaIncomeEntry()?.amount ?? 42
+export function boxMafiaDailyPep(settings?: Settings): number {
+  return boxMafiaIncomeEntry(settings)?.amount ?? 42
 }
 
 /** BOX_MAFIA_ROLE_ID env override, then the income entry's roleId, else the single guild role named "Box Mafia". */
 export function resolveBoxMafiaRoleId(
   guildRoles: ReadonlyArray<{ id: string; name: string }> | null,
+  settings?: Settings,
 ): string | null {
   const override = (process.env.BOX_MAFIA_ROLE_ID ?? '').trim()
   if (/^\d{5,25}$/.test(override)) return override
-  const configured = boxMafiaIncomeEntry()?.roleId
+  const configured = boxMafiaIncomeEntry(settings)?.roleId
   if (configured) return configured
   if (!guildRoles) return null
   const target = normalizeRoleName(BOX_MAFIA_ROLE_NAME)

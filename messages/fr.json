@@ -1313,6 +1313,10 @@
     "inForce": "En vigueur maintenant",
     "idPlaceholder": "ID Discord (vide = par défaut)",
     "idsPlaceholder": "IDs Discord séparés par des virgules (vide = par défaut)",
+    "incomeRole": "Rôle",
+    "incomeAmount": "PEP",
+    "incomeEvery": "Toutes les (heures)",
+    "incomeRemove": "Retirer",
     "empty": "(vide)"
   },
   "adminMissions": {

@@ -43,6 +43,17 @@ export interface SettingsLabels {
     inForce: string;
     idPlaceholder: string;
     idsPlaceholder: string;
+    incomeRole: string;
+    incomeAmount: string;
+    incomeEvery: string;
+    incomeRemove: string;
+}
+
+interface IncomeRow {
+    name: string;
+    amount: number;
+    intervalHours: number;
+    roleId?: string;
 }
 
 interface SettingView {
@@ -54,6 +65,7 @@ interface SettingView {
     input:
         | { type: "int"; min: number; max: number; unit?: string }
         | { type: "bool" }
+        | { type: "roleIncome" }
         | { type: "channel"; kind: "text" | "voice" }
         | { type: "role" }
         | { type: "roleList" }
@@ -62,6 +74,8 @@ interface SettingView {
         | { type: "url"; maxLength: number };
     stricterOnly: boolean;
     default: SettingValue;
+    baseline?: SettingValue;
+    legacyEnv?: string;
     value: SettingValue;
     override: SettingValue | null;
     modified: boolean;
@@ -72,13 +86,16 @@ interface SettingView {
     names?: Record<string, string>;
 }
 
-type SettingValue = number | boolean | string | string[];
+type SettingValue = number | boolean | string | string[] | IncomeRow[];
 
 /** How a value reads in the page: numbers with their unit, on/off, ids with their resolved names. */
 function show(s: SettingView, v: SettingValue, labels: SettingsLabels): string {
     const names = s.names ?? {};
+    if (s.input.type === "roleIncome" && Array.isArray(v)) {
+        return (v as IncomeRow[]).map((r) => `${r.name} ${r.amount}/${r.intervalHours}h`).join(", ");
+    }
     if (typeof v === "boolean") return v ? labels.on : labels.off;
-    if (Array.isArray(v)) return v.length === 0 ? labels.emptyDefault : v.map((id) => (names[id] ? `${names[id]} (${id})` : id)).join(", ");
+    if (Array.isArray(v)) return v.length === 0 ? labels.emptyDefault : (v as string[]).map((id) => (names[id] ? `${names[id]} (${id})` : id)).join(", ");
     if (typeof v === "string") {
         if (v === "") return s.input.type === "channel" || s.input.type === "role" ? labels.emptyDefault : labels.empty;
         return names[v] ? `${names[v]} (${v})` : v;
@@ -110,7 +127,9 @@ async function api(method: string, body?: unknown, query = ""): Promise<{ ok: bo
 }
 
 function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels; onChanged: () => void }) {
-    const [text, setText] = useState(Array.isArray(s.value) ? s.value.join(", ") : String(s.value));
+    const [text, setText] = useState(s.input.type === "roleIncome" ? "" : Array.isArray(s.value) ? (s.value as string[]).join(", ") : String(s.value));
+    // The role income table: editable copy of the rows (only amounts and intervals change; rows can be removed).
+    const [income, setIncome] = useState<IncomeRow[]>(s.input.type === "roleIncome" && Array.isArray(s.value) ? (s.value as IncomeRow[]).map((r) => ({ ...r })) : []);
     // For a switch, s.value is what is in force (env may have it on), so the box starts there and Save
     // stays disabled until the choice differs from it.
     const [flag, setFlag] = useState(typeof s.value === "boolean" ? s.value : false);
@@ -125,10 +144,12 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
     const next: SettingValue =
         s.input.type === "int" ? Number(text)
         : s.input.type === "bool" ? flag
+        : s.input.type === "roleIncome" ? income
         : s.input.type === "roleList" ? text.split(",").map((x) => x.trim()).filter(Boolean)
         : text.trim();
     const dirty =
-        s.input.type === "int" ? text.trim() !== "" && next !== s.value
+        s.input.type === "roleIncome" ? income.length > 0 && JSON.stringify(income) !== JSON.stringify(s.value)
+        : s.input.type === "int" ? text.trim() !== "" && next !== s.value
         : s.input.type === "bool" ? next !== s.value
         : JSON.stringify(next) !== JSON.stringify(s.value);
 
@@ -191,6 +212,9 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
             {s.invalid && <p role="alert" className="m-0 text-sm text-tomato">{labels.invalid}</p>}
             {s.toggle?.envKill && <p className="m-0 text-sm font-bold text-tomato">{fill(labels.envForcedOff, { env: s.toggle.env })}</p>}
             {s.toggle && !s.toggle.envKill && !s.modified && <p className="m-0 text-xs text-foreground/60">{fill(labels.envFallback, { env: s.toggle.env })}</p>}
+            {s.legacyEnv && !s.toggle && !s.modified && JSON.stringify(s.baseline) !== JSON.stringify(s.default) && (
+                <p className="m-0 text-xs text-foreground/60">{fill(labels.envFallback, { env: s.legacyEnv })} {show(s, s.baseline as SettingValue, labels)}</p>
+            )}
             {s.modified && (s.input.type === "channel" || s.input.type === "role" || s.input.type === "roleList") && (
                 <p className="m-0 text-xs text-foreground/60">{show(s, s.value, labels)}</p>
             )}
@@ -222,6 +246,57 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                             className="w-28 rounded-lg border bg-background px-2 py-1 tabular-nums"
                             style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
                         />
+                    ) : s.input.type === "roleIncome" ? (
+                        <table className="text-sm">
+                            <thead>
+                                <tr className="text-left text-foreground/50">
+                                    <th className="pr-3 font-normal">{labels.incomeRole}</th>
+                                    <th className="pr-3 font-normal">{labels.incomeAmount}</th>
+                                    <th className="pr-3 font-normal">{labels.incomeEvery}</th>
+                                    <th />
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {income.map((r, i) => (
+                                    <tr key={r.name}>
+                                        <td className="pr-3">{r.name}</td>
+                                        <td className="pr-3">
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                min={1}
+                                                max={10000}
+                                                step={1}
+                                                value={r.amount}
+                                                aria-label={`${r.name} ${labels.incomeAmount}`}
+                                                onChange={(e) => setIncome(income.map((x, j) => (j === i ? { ...x, amount: Number(e.target.value) } : x)))}
+                                                className="w-24 rounded-lg border bg-background px-2 py-1 tabular-nums"
+                                                style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
+                                            />
+                                        </td>
+                                        <td className="pr-3">
+                                            <input
+                                                type="number"
+                                                inputMode="numeric"
+                                                min={1}
+                                                max={720}
+                                                step={1}
+                                                value={r.intervalHours}
+                                                aria-label={`${r.name} ${labels.incomeEvery}`}
+                                                onChange={(e) => setIncome(income.map((x, j) => (j === i ? { ...x, intervalHours: Number(e.target.value) } : x)))}
+                                                className="w-20 rounded-lg border bg-background px-2 py-1 tabular-nums"
+                                                style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
+                                            />
+                                        </td>
+                                        <td>
+                                            <button type="button" onClick={() => setIncome(income.filter((_, j) => j !== i))} className="underline">
+                                                {labels.incomeRemove}
+                                            </button>
+                                        </td>
+                                    </tr>
+                                ))}
+                            </tbody>
+                        </table>
                     ) : s.input.type === "bool" ? (
                         <input type="checkbox" checked={flag} onChange={(e) => setFlag(e.target.checked)} aria-label={s.label} className="h-5 w-5" />
                     ) : s.input.type === "text" && s.input.multiline ? (
