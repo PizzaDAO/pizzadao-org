@@ -184,6 +184,11 @@ export default function ManualsPage() {
           </>
         }
         dek="Operating manuals and documentation for PizzaDAO crews."
+        aside={
+          <Link href="/budget" className={pillInk}>
+            Budget guidelines
+          </Link>
+        }
       />
 
       {/* Search and Filters */}

@@ -11,9 +11,10 @@
  * - Keys never contain secrets. Editorial/private values live only in DB rows, never here.
  */
 import { z } from 'zod'
+import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -25,6 +26,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   followups: 'Follow-ups',
   discord: 'Discord channels and roles',
   features: 'Other feature switches',
+  payments: 'Payments',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -838,6 +840,23 @@ export const SETTINGS = {
     help: 'Roles allowed to publish articles on the site. Dread Pizza Roberts is always included.',
     confirm: (from, to) => (to.some((id) => !from.includes(id)) ? 'More roles will be able to publish articles.' : null),
   }),
+  // Payments group (plans/host-fast-track.md): defined in ./payments-settings.
+  ...PAYMENT_SETTINGS,
+  // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
+  // never sent anywhere except this admin settings page (private: true) and the ingest job.
+  'payments.formSheetId': {
+    ...textSetting({
+      key: 'payments.formSheetId',
+      area: 'payments',
+      label: 'Work payment responses sheet id',
+      help: 'The id of the Google Sheet that holds the Work Payment form responses (the part of its address between /d/ and /edit). It must be shared with the service account. Empty turns form ingest off.',
+      maxLength: 120,
+      check: (v) => v === '' || isValidSheetId(v),
+      checkMessage: 'That does not look like a sheet id',
+      onReadFailure: { value: '' },
+    }),
+    private: true,
+  },
 } as const satisfies Record<string, SettingDef>
 
 export type SettingKey = keyof typeof SETTINGS

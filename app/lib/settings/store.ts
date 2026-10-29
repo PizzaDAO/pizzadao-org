@@ -5,7 +5,7 @@
 import { prisma } from '@/app/lib/db'
 import { clearSettingsCache, loadSettings } from './index'
 import { jsonOrDbNull } from './json'
-import { AREA_LABELS, SETTINGS, SETTING_KEYS, parseSetting, type SettingKey } from './registry'
+import { AREA_LABELS, SETTINGS, SETTING_KEYS, isSettingKey, parseSetting, type SettingKey } from './registry'
 import { checkTargets, targetNames, TargetError } from './targets'
 import { describeToggle, isToggleKey } from './toggles'
 
@@ -111,7 +111,17 @@ export async function listChanges(opts: { key?: string; limit?: number } = {}): 
     orderBy: [{ changedAt: 'desc' }, { id: 'desc' }],
     take: Math.min(Math.max(opts.limit ?? 50, 1), 200),
   })
-  return rows as SettingChangeRow[]
+  // Values of private settings (for example the responses sheet id) are never echoed back.
+  return (rows as SettingChangeRow[]).map((r) => {
+    const def = isSettingKey(r.key) ? SETTINGS[r.key] : null
+    return def?.private ? { ...r, oldValue: maskPrivate(r.oldValue), newValue: maskPrivate(r.newValue) } : r
+  })
+}
+
+/** What the admin page may show for a private setting: whether it is set, never the value. */
+export function maskPrivate(v: unknown): 'set' | 'not set' | null {
+  if (v === null || v === undefined) return null
+  return (Array.isArray(v) ? v.length > 0 : v !== '' && v !== false) ? 'set' : 'not set'
 }
 
 export interface SettingView {
@@ -166,6 +176,8 @@ export async function listSettingViews(): Promise<SettingView[]> {
     const valid = !!parsed?.ok
     const shownIds: string[] = []
     const t = def.input.type
+    // Private values (the responses sheet id) are masked to "set" / "not set" in every view.
+    const shown = (v: unknown) => (def.private ? (maskPrivate(v) ?? 'not set') : v)
     if (t === 'channel' || t === 'role' || t === 'roleList') {
       const v = valid ? parsed.value : def.default
       if (typeof v === 'string' && v) shownIds.push(v)
@@ -179,12 +191,14 @@ export async function listSettingViews(): Promise<SettingView[]> {
       help: def.help,
       input: def.input,
       stricterOnly: !!def.stricterOnly,
-      default: def.default,
+      default: def.private ? maskPrivate(def.default) ?? 'not set' : def.default,
       // For a switch, the value is what is in force (env fallback, kill switch and failures included).
-      value: isToggleKey(key)
-        ? describeToggle(key, snap).effective
-        : valid ? parsed.value : row ? (def.onReadFailure === 'lastKnownGood' || def.onReadFailure === 'throw' ? def.default : def.onReadFailure.value) : def.default,
-      override: row ? row.value : null,
+      value: shown(
+        isToggleKey(key)
+          ? describeToggle(key, snap).effective
+          : valid ? parsed.value : row ? (def.onReadFailure === 'lastKnownGood' || def.onReadFailure === 'throw' ? def.default : def.onReadFailure.value) : def.default,
+      ),
+      override: row ? shown(row.value) : null,
       modified: !!row,
       invalid: !!row && !valid,
       updatedAt: row ? row.updatedAt.toISOString() : null,

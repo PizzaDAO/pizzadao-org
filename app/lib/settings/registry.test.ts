@@ -56,7 +56,7 @@ describe('settings registry', () => {
     expect(SETTINGS['disavow.listingMonths'].default).toBe(DISAVOW_LISTING_MONTHS)
     expect(SETTINGS['disavow.appealCooldownDays'].default).toBe(DISAVOW_APPEAL_COOLDOWN_DAYS)
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.')).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.')).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['missions.humanReleaseMinLevel', 6],
       ['missions.newAccountDays', 30],
