@@ -1,3 +1,4 @@
+/* eslint-disable @typescript-eslint/no-explicit-any */
 // @vitest-environment node
 // Store rules against an in-memory Prisma fake and a real RSA key pair: blind issuance (once per member),
 // secret changeable ballots, the eligibility snapshot, closing and the pass rule.
