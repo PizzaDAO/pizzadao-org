@@ -9,7 +9,7 @@ import { useTranslations } from "next-intl";
 import { InkStamp } from "../../../ui/passport/InkStamp";
 
 type Result =
-    | { kind: "approved"; newStamp: boolean; name: string; city: string | null }
+    | { kind: "approved"; newStamp: boolean; countsAsVisit: boolean; name: string; city: string | null }
     | { kind: "pending"; name: string }
     | { kind: "error"; reason: string }
     | { kind: "login" };
@@ -33,7 +33,7 @@ export function CheckInClient({ qr }: { qr: string }) {
             if (r.ok && j.ok) {
                 setResult(
                     j.decision === "APPROVED"
-                        ? { kind: "approved", newStamp: !!j.newStamp, name: j.pizzeria.name, city: j.pizzeria.city }
+                        ? { kind: "approved", newStamp: !!j.newStamp, countsAsVisit: !!j.countsAsVisit, name: j.pizzeria.name, city: j.pizzeria.city }
                         : { kind: "pending", name: j.pizzeria.name },
                 );
             } else {
@@ -85,7 +85,7 @@ export function CheckInClient({ qr }: { qr: string }) {
                         <div className="flex justify-center mb-3">
                             <InkStamp seed={qr} name={result.name} city={result.city} verified size={180} />
                         </div>
-                        <p className="text-lg">{result.newStamp ? t("newStamp") : t("visitCounted")}</p>
+                        <p className="text-lg">{result.newStamp ? t("newStamp") : result.countsAsVisit ? t("visitCounted") : t("alreadyCounted")}</p>
                         <Link href="/passport" className="inline-block mt-4 underline">
                             {t("viewPassport")}
                         </Link>

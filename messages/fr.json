@@ -1324,6 +1324,7 @@
       "too_far": "Vous ne semblez pas être à la pizzeria.",
       "daily_limit": "Vous avez atteint la limite de tampons du jour. Revenez demain.",
       "not_found": "Nous n'avons pas trouvé cette pizzeria."
-    }
+    },
+    "alreadyCounted": "Vous avez déjà enregistré une visite ici récemment. Revenez un autre jour pour ajouter une visite."
   }
 }

@@ -20,6 +20,7 @@ vi.mock('@/app/lib/mission-verify/sla', () => ({
 vi.mock('@/app/lib/slices/mint-queue', () => ({
   processMintQueue: vi.fn(async () => ({ status: 'skipped', reason: 'disabled' })),
 }))
+vi.mock('@/app/lib/passport/scrub', () => ({ scrubCoordinates: vi.fn(async () => 4) }))
 vi.mock('@/app/lib/slices/claims', () => ({ sweepAwaitingWallet: vi.fn(async () => 0) }))
 
 vi.mock('@/app/lib/trainee-nick-run', () => ({
@@ -32,6 +33,8 @@ import { GET as attendanceGET } from './attendance/route'
 import { GET as missionSlaGET } from './mission-sla/route'
 import { GET as traineeNicksGET } from './trainee-nicks/route'
 import { GET as slicesMintGET } from './slices-mint/route'
+import { GET as passportScrubGET } from './passport-scrub/route'
+import { scrubCoordinates } from '@/app/lib/passport/scrub'
 import { processMintQueue } from '@/app/lib/slices/mint-queue'
 import { runTraineeNicks } from '@/app/lib/trainee-nick-run'
 import { runSlaDigest } from '@/app/lib/mission-verify/sla'
@@ -58,6 +61,7 @@ describe.each([
   ['/api/cron/mission-sla', missionSlaGET, () => runSlaDigest],
   ['/api/cron/trainee-nicks', traineeNicksGET, () => runTraineeNicks],
   ['/api/cron/slices-mint', slicesMintGET, () => processMintQueue],
+  ['/api/cron/passport-scrub', passportScrubGET, () => scrubCoordinates],
 ] as const)('%s auth', (path, GET, work) => {
   it('401 without the bearer token, and does no work', async () => {
     const res = await GET(req(path))
@@ -186,5 +190,18 @@ describe('/api/cron/slices-mint', () => {
     const res = await slicesMintGET(req('/api/cron/slices-mint', 'Bearer cron-secret'))
     expect(res.status).toBe(500)
     spy.mockRestore()
+  })
+})
+
+describe('/api/cron/passport-scrub', () => {
+  it('is scheduled daily in vercel.json', async () => {
+    const { readFileSync } = await import('node:fs')
+    const crons = JSON.parse(readFileSync('vercel.json', 'utf8')).crons as Array<{ path: string; schedule: string }>
+    expect(crons.filter((c) => c.path === '/api/cron/passport-scrub')).toEqual([{ path: '/api/cron/passport-scrub', schedule: '45 6 * * *' }])
+  })
+
+  it('returns the number of scrubbed rows', async () => {
+    const res = await passportScrubGET(req('/api/cron/passport-scrub', 'Bearer cron-secret'))
+    expect(await res.json()).toEqual({ scrubbed: 4 })
   })
 })

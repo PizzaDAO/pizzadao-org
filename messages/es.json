@@ -1324,6 +1324,7 @@
       "too_far": "No parece que estés en la pizzería.",
       "daily_limit": "Has alcanzado el límite de sellos de hoy. Vuelve mañana.",
       "not_found": "No encontramos esta pizzería."
-    }
+    },
+    "alreadyCounted": "Ya registraste una visita aquí hace poco. Vuelve otro día para sumar una visita."
   }
 }

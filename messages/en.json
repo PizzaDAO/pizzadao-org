@@ -1324,6 +1324,7 @@
       "too_far": "You do not seem to be at the pizzeria.",
       "daily_limit": "You reached today's stamp limit. Come back tomorrow.",
       "not_found": "We could not find this pizzeria."
-    }
+    },
+    "alreadyCounted": "You already checked in here recently. Come back another day to add a visit."
   }
 }

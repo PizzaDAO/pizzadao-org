@@ -82,6 +82,27 @@ describe('reviewCheckIn approval', () => {
   })
 })
 
+describe('performCheckIn cooldown', () => {
+  it('records a flagged in-cooldown revisit as a coordinate-free REJECTED row with its flags', async () => {
+    process.env.PASSPORT_QR_SECRET = 's3cret'
+    db.prisma.pizzeria.findUnique.mockResolvedValue({ id: 'pz', slug: 'a-b', name: 'A', city: null, countryCode: null, isPartner: true, isChain: false, status: 'ACTIVE', lat: 40.7128, lng: -74.006, qrVersion: 1 })
+    db.prisma.passportStamp.findUnique.mockResolvedValue({ lastVisitAt: new Date(now.getTime() - 3_600_000) })
+    db.prisma.passportStamp.count.mockResolvedValue(0)
+    db.prisma.pizzeriaCheckIn.findFirst = vi.fn(async () => null)
+    // discord id '1' is not a real snowflake, so the account is flagged new_account
+    const r = await performCheckIn(
+      { discordId: '1', slug: 'a-b', code: qrCodeFor('pz', 1, 's3cret'), client: { lat: 40.71283, lng: -74.00601, accuracy: 15 } },
+      { enabled: true, radiusM: 150, maxAccuracyM: 150, maxNewStampsPerDay: 5, revisitCooldownHours: 20, publicDelayHours: 6, maxTravelKmPerHour: 900, newAccountDays: 30 },
+      now,
+    )
+    expect(r).toMatchObject({ ok: true, decision: 'APPROVED', countsAsVisit: false })
+    const data = db.prisma.pizzeriaCheckIn.create.mock.calls.at(-1)![0].data
+    expect(data).toMatchObject({ status: 'REJECTED', lat: null, lng: null })
+    expect(data.riskFlags).toContain('cooldown')
+    expect(data.riskFlags).toContain('new_account')
+  })
+})
+
 describe('performCheckIn', () => {
   const secret = 's3cret'
   const config = {

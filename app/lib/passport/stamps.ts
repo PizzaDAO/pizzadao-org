@@ -112,8 +112,9 @@ export async function performCheckIn(req: CheckInRequest, config: PassportConfig
 
   const info = { slug: pizzeria.slug, name: pizzeria.name, city: pizzeria.city, countryCode: pizzeria.countryCode }
   if (result.decision === 'PENDING') {
-    // A flagged revisit inside the cooldown would not count anyway: leave nothing for a reviewer.
+    // A flagged revisit inside the cooldown would not count anyway: keep a coordinate-free audit row, nothing for a reviewer.
     if (existing && now.getTime() - existing.lastVisitAt.getTime() < config.revisitCooldownHours * 3_600_000) {
+      await prisma.pizzeriaCheckIn.create({ data: { ...row(req, pizzeria.id, memberId, result, 'REJECTED'), riskFlags: [...result.riskFlags, 'cooldown'] } })
       return { ok: true, decision: 'APPROVED', newStamp: false, countsAsVisit: false, pizzeria: info }
     }
     await prisma.pizzeriaCheckIn.create({ data: row(req, pizzeria.id, memberId, result, 'PENDING') })
@@ -177,6 +178,12 @@ export async function reviewCheckIn(
   config: Pick<PassportConfig, 'revisitCooldownHours' | 'maxNewStampsPerDay'>,
   now = new Date(),
 ) {
+  // The disavow lookup is a network/DB call: do it before the transaction opens.
+  let disallowed = false
+  if (approve) {
+    const pre = await prisma.pizzeriaCheckIn.findUnique({ where: { id: checkInId }, select: { discordId: true } })
+    if (pre) disallowed = await isDisallowed(pre.discordId)
+  }
   return prisma.$transaction(async (tx) => {
     const c = await tx.pizzeriaCheckIn.findUnique({ where: { id: checkInId }, include: { pizzeria: true } })
     if (!c || c.status !== 'PENDING') return { ok: false as const, reason: 'not_pending' as const }
@@ -187,7 +194,7 @@ export async function reviewCheckIn(
     if (c.pizzeria.status !== 'ACTIVE' || !c.pizzeria.isPartner || c.pizzeria.isChain) {
       return { ok: false as const, reason: 'not_eligible' as const }
     }
-    if (await isDisallowed(c.discordId)) return { ok: false as const, reason: 'not_allowed' as const }
+    if (disallowed) return { ok: false as const, reason: 'not_allowed' as const }
 
     await lockMember(tx, c.discordId)
     const [existing, fresh] = await Promise.all([
