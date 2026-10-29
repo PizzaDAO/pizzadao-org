@@ -1282,5 +1282,48 @@
     "loadError": "Impossible de charger les missions.",
     "rewardLowerOnly": "Les récompenses peuvent baisser, ou remonter jusqu'à la valeur du code ; la dépasser demande une PR.",
     "activeOnlyEnable": "Ici, on peut seulement activer ; désactiver demande une PR."
+  },
+  "passport": {
+    "overline": "Passeport Pizza",
+    "title": "Passeport Pizza",
+    "metaDescription": "Collectionnez un tampon pour chaque pizzeria partenaire que vous visitez.",
+    "intro": "Scannez le QR code sur la table d'une pizzeria partenaire pour obtenir son tampon.",
+    "unavailable": "Le passeport n'est pas disponible pour le moment.",
+    "login": "Connectez-vous pour continuer",
+    "emptyTitle": "Pas encore de tampons",
+    "emptyBody": "Rendez-vous dans une pizzeria partenaire et scannez le QR code sur la table pour obtenir votre premier tampon.",
+    "summary": "{stamps, plural, one {# tampon} other {# tampons}} · {countries, plural, one {# pays} other {# pays}} · {verified} vérifiés chez un partenaire",
+    "seeAll": "Ouvrir mon passeport",
+    "manage": "Gérer mon passeport",
+    "visibilityLabel": "Qui peut voir mes tampons",
+    "visibility": {
+      "public": "Tout le monde",
+      "members": "Membres connectés",
+      "private": "Moi seulement"
+    },
+    "privacyNote": "Les autres ne voient que le mois, et un nouveau tampon apparaît quelques heures après votre visite.",
+    "saveError": "Enregistrement impossible. Réessayez.",
+    "checkInTitle": "Enregistrer la visite",
+    "checkInBody": "Partagez votre position pour confirmer que vous êtes à la pizzeria.",
+    "checkInButton": "Enregistrer ici",
+    "locating": "Recherche de votre position…",
+    "locationNote": "Votre position exacte est utilisée une fois pour vérifier la distance et supprimée après 30 jours.",
+    "newStamp": "Nouveau tampon obtenu !",
+    "visitCounted": "Re-bonjour. Votre visite est comptée.",
+    "viewPassport": "Voir mon passeport",
+    "pendingTitle": "Visite reçue",
+    "pendingBody": "Une personne la vérifiera bientôt. Votre tampon apparaît une fois approuvé.",
+    "tryAgain": "Réessayer",
+    "errors": {
+      "generic": "Une erreur est survenue. Réessayez.",
+      "not_allowed": "Vous ne pouvez pas enregistrer de visite pour le moment.",
+      "not_eligible": "Cette pizzeria ne fait pas partie du passeport.",
+      "bad_qr": "Ce QR code n'est pas valide. Demandez-en un à jour au personnel.",
+      "bad_location": "Nous n'avons pas pu lire votre position. Réessayez.",
+      "low_accuracy": "Votre position n'est pas assez précise. Sortez ou activez la localisation précise, puis réessayez.",
+      "too_far": "Vous ne semblez pas être à la pizzeria.",
+      "daily_limit": "Vous avez atteint la limite de tampons du jour. Revenez demain.",
+      "not_found": "Nous n'avons pas trouvé cette pizzeria."
+    }
   }
 }

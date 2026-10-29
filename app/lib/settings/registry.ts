@@ -12,10 +12,10 @@
  */
 import { z } from 'zod'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
-export const AREA_LABELS: Record<SettingArea, string> = { missions: 'Missions', calls: 'Calls', disavow: 'Disavow list' }
+export const AREA_LABELS: Record<SettingArea, string> = { missions: 'Missions', calls: 'Calls', disavow: 'Disavow list', passport: 'Pizza Passport' }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
 export type FailureMode<T> = { value: T } | 'lastKnownGood' | 'throw'
@@ -157,6 +157,75 @@ export const SETTINGS = {
     max: 9,
     default: 5,
     confirm: (from, to) => (to < from ? 'Lowering this exposes the list and nominations to more members.' : null),
+  }),
+  'passport.enabled': intSetting({
+    key: 'passport.enabled',
+    area: 'passport',
+    label: 'Pizza Passport on (1) or off (0)',
+    help: 'Shows the passport, accepts check-ins and shows stamps on profiles. Off by default. The PASSPORT_ENABLED=off environment variable forces it off whatever this says.',
+    min: 0,
+    max: 1,
+    default: 0,
+    onReadFailure: { value: 0 },
+  }),
+  'passport.checkInRadiusM': intSetting({
+    key: 'passport.checkInRadiusM',
+    area: 'passport',
+    label: 'Check-in radius (metres)',
+    help: 'How close to the venue a check-in must be.',
+    min: 25,
+    max: 1000,
+    default: 150,
+    unit: 'm',
+  }),
+  'passport.maxAccuracyM': intSetting({
+    key: 'passport.maxAccuracyM',
+    area: 'passport',
+    label: 'Worst accepted location accuracy (metres)',
+    help: 'A location reading less precise than this is refused.',
+    min: 20,
+    max: 1000,
+    default: 150,
+    unit: 'm',
+  }),
+  'passport.maxNewStampsPerDay': intSetting({
+    key: 'passport.maxNewStampsPerDay',
+    area: 'passport',
+    label: 'New stamps per member per day',
+    help: 'Most new stamps one member can collect in 24 hours.',
+    min: 1,
+    max: 50,
+    default: 5,
+  }),
+  'passport.revisitCooldownHours': intSetting({
+    key: 'passport.revisitCooldownHours',
+    area: 'passport',
+    label: 'Repeat-visit cooldown (hours)',
+    help: 'A second check-in at the same venue inside this window does not count as another visit.',
+    min: 1,
+    max: 168,
+    default: 20,
+    unit: 'hours',
+  }),
+  'passport.publicDelayHours': intSetting({
+    key: 'passport.publicDelayHours',
+    area: 'passport',
+    label: 'Public profile delay (hours)',
+    help: 'A new stamp shows on the public profile only after this long, so a profile is not a live location feed. Members always see their own stamps at once.',
+    min: 0,
+    max: 168,
+    default: 6,
+    unit: 'hours',
+  }),
+  'passport.maxTravelKmPerHour': intSetting({
+    key: 'passport.maxTravelKmPerHour',
+    area: 'passport',
+    label: 'Impossible-travel speed (km/h)',
+    help: 'A check-in farther from the previous one than this speed allows (plus 50 km slack) waits for a reviewer.',
+    min: 100,
+    max: 1500,
+    default: 900,
+    unit: 'km/h',
   }),
 } as const satisfies Record<string, SettingDef<number>>
 
