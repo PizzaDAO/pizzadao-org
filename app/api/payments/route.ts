@@ -5,6 +5,8 @@ import { listMyRequests } from '@/app/lib/payments/mine'
 import { loadPaymentPolicy } from '@/app/lib/payments/policy'
 import { createPaymentRequest } from '@/app/lib/payments/store'
 import { hostViewFor } from '@/app/lib/payments/trust-load'
+import { proposalsEnabled } from '@/app/lib/proposals/constants'
+import { validatePaymentProposal } from '@/app/lib/proposals/payment-link'
 import { checkKeyedRateLimit, rateLimitResponse } from '@/app/lib/rate-limit'
 import { fetchMemberByDiscordId } from '@/app/lib/sheets/member-repository'
 
@@ -50,12 +52,27 @@ export async function POST(request: Request) {
 
   try {
     const discordId = auth.session.discordId
+    // Proposals on: Sesh links and typed counts are not accepted. A request above the on-approval cap links a passed
+    // in-app proposal of the requester's. Proposals off: the form behaves exactly as before.
+    let data = parsed.data
+    if (await proposalsEnabled()) {
+      const link = await validatePaymentProposal({
+        proposalId: data.proposalId ?? null,
+        requesterDiscordId: discordId,
+        amountUsdCents: data.amountUsdCents,
+        capUsdCents: Math.round(policy.onApprovalCapUsd * 100),
+      })
+      if (!link.ok) return json({ error: link.error }, 400)
+      data = { ...data, proposalId: link.proposalId, proposalUrl: null }
+    } else {
+      data = { ...data, proposalId: null }
+    }
     const member = await fetchMemberByDiscordId(discordId).catch(() => null)
     // Members only: a signed-in Discord account that is not in the member list cannot file requests.
     if (!member?.memberId) return json({ error: 'Only members can file payment requests' }, 403)
     const label = (member?.name || auth.session.nick || auth.session.username || 'Member').slice(0, 100)
     const { id } = await createPaymentRequest(
-      { ...parsed.data, requesterDiscordId: discordId, claimedDiscordId: null, requesterMemberId: member.memberId, requesterLabel: label },
+      { ...data, requesterDiscordId: discordId, claimedDiscordId: null, requesterMemberId: member.memberId, requesterLabel: label },
       policy,
     )
     return json({ ok: true, id }, 201)

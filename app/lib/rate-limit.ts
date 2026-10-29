@@ -70,6 +70,10 @@ export const RATE_LIMITS = {
   // Payment requests (plans/host-fast-track.md), per member.
   "payments-create": { limit: 5, windowSec: 60 * 60 },
   "payments-upload": { limit: 20, windowSec: 60 * 60 },
+  // Proposals: creating is per member;
+  // the secret vote endpoint has no session, so it is throttled per IP (the IP is hashed in the limiter and never stored).
+  "proposals-create": { limit: 5, windowSec: 60 * 60 },
+  "proposals-vote": { limit: 60, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
@@ -115,7 +119,9 @@ export function rateLimitIp(ip: string): string {
 
 /** Hash the IP so raw addresses never land in Redis keys. */
 function ipKey(ip: string): string {
-  return createHash("sha256").update(`rl:${ip}`).digest("hex").slice(0, 32);
+  // RATE_LIMIT_IP_SALT (a server secret) keeps the hash from being reversed by trying every address; it matters most for
+  // the secret vote endpoint, whose throttle keys must not let anyone with a Redis dump recover who voted from where.
+  return createHash("sha256").update(`rl:${process.env.RATE_LIMIT_IP_SALT ?? ""}:${ip}`).digest("hex").slice(0, 32);
 }
 
 export function isUpstashConfigured(): boolean {

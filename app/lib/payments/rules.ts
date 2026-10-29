@@ -9,7 +9,7 @@
 import type { PaymentPolicy } from './policy'
 import { SEVERITY_WEIGHT, type PaymentFlag, type PaymentKind } from './types'
 
-export const RULES_VERSION = 'rules-2026-11-b'
+export const RULES_VERSION = 'rules-2026-11-c'
 
 const DAY = 86_400_000
 
@@ -27,6 +27,10 @@ export interface RuleContext {
     rsvEventSlug: string | null
     title: string
     proposalUrl: string | null
+    /** Proposals are on: the legacy poll link is ignored and a passed in-app proposal is required above the cap. */
+    proposalsOn?: boolean
+    /** The in-app proposal linked to the request (proposals on only). */
+    proposal?: { status: string; amountUsdCents: number | null } | null
     requesterDiscordId: string | null
     requesterMemberId: string | null
   }
@@ -81,7 +85,18 @@ export function computeRuleFlags(c: RuleContext): PaymentFlag[] {
   if (c.restrictedCheckOff) add({ id: 'restricted_check_off', severity: 'info', detail: 'The restricted-list check is switched off, so nobody was checked against it.' })
   if (!c.hashConfigured) add({ id: 'payee_check_off', severity: 'info', detail: 'Payee fingerprints are off (no hash secret is set), so reuse of one payee by several people is not checked.' })
   if (c.rsvFlagged) add({ id: 'rsv_flagged', severity: 'high', detail: 'The party platform lists this host as flagged.' })
-  if (usd > cap && !c.req.proposalUrl) add({ id: 'over_cap_no_vote', severity: 'high', detail: 'Above the on-approval cap with no community proposal link.' })
+  if (c.req.proposalsOn) {
+    // Proposals on: a Sesh link or typed count counts for nothing. Above the cap the request needs a PASSED in-app proposal,
+    // and it may not ask for more than that proposal did.
+    const p = c.req.proposal
+    const passed = p?.status === 'PASSED'
+    if (usd > cap && !passed) add({ id: 'over_cap_no_vote', severity: 'high', detail: 'Above the on-approval cap without a passed in-app proposal linked to the request.' })
+    if (passed && p?.amountUsdCents != null && c.req.amountUsdCents > p.amountUsdCents) {
+      add({ id: 'amount_over_proposal', severity: 'high', detail: 'The request asks for more than the linked proposal that passed.' })
+    }
+  } else if (usd > cap && !c.req.proposalUrl) {
+    add({ id: 'over_cap_no_vote', severity: 'high', detail: 'Above the on-approval cap with no community proposal link.' })
+  }
 
   const monthAgo = c.now.getTime() - 30 * DAY
   const recent = c.siblings.filter((s) => s.createdAt.getTime() >= monthAgo)

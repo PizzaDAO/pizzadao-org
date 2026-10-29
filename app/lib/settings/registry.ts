@@ -14,7 +14,7 @@ import { z } from 'zod'
 import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -27,6 +27,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   discord: 'Discord channels and roles',
   features: 'Other feature switches',
   payments: 'Payments',
+  proposals: 'Proposals',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -251,6 +252,17 @@ const slaPingRole: SettingDef<string> = {
   schema: optionalSnowflake,
   default: '',
   onReadFailure: 'lastKnownGood',
+  input: { type: 'role' },
+}
+
+const proposalsPingRole: SettingDef<string> = {
+  key: 'discord.proposalsPingRoleId',
+  area: 'discord',
+  label: 'Proposals ping role',
+  help: 'Optional role tagged when a new proposal is posted in the proposals channel. Empty tags nobody. Checked against the server when saved.',
+  schema: optionalSnowflake,
+  default: '',
+  onReadFailure: { value: '' },
   input: { type: 'role' },
 }
 
@@ -823,6 +835,12 @@ export const SETTINGS = {
     help: 'Scheduled events in this voice channel get an agenda post.',
     kind: 'voice',
   }),
+  'discord.proposalsChannelId': channelSetting({
+    key: 'discord.proposalsChannelId',
+    label: 'Proposals channel',
+    help: 'Where each new proposal and its result are posted, with a link to vote and the proposal\'s voting-key fingerprint. There is no voting in Discord (votes are secret). Empty uses the PROPOSALS_CHANNEL_ID environment value, then the channel named "proposals". Checked against the server when saved.',
+  }),
+  'discord.proposalsPingRoleId': proposalsPingRole,
   'missions.slaPingRoleId': slaPingRole,
   'missions.reviewerRoleIds': reviewerRoles,
   'announce.roleIds': roleListSetting({
@@ -839,6 +857,50 @@ export const SETTINGS = {
     label: 'Article author roles',
     help: 'Roles allowed to publish articles on the site. Dread Pizza Roberts is always included.',
     confirm: (from, to) => (to.some((id) => !from.includes(id)) ? 'More roles will be able to publish articles.' : null),
+  }),
+  // ---- Proposals and voting (plans/proposals-voting.md). Tiers reuse payments.voteAyes* / voteMidMaxUsd. ----
+  'proposals.enabled': boolSetting({
+    key: 'proposals.enabled',
+    area: 'proposals',
+    label: 'Proposals and voting',
+    help: 'The whole feature: proposal pages, secret ballots, the Discord posts, and the payments link to a passed proposal. Off: every page answers as if it does not exist and payments behave as before. The PROPOSALS_ENABLED env var set to off always wins.',
+    confirmOn: 'Proposals go live: payment requests above the on-approval cap will need a passed in-app proposal, and Sesh links stop being accepted.',
+  }),
+  'proposals.voterRoleId': {
+    key: 'proposals.voterRoleId',
+    area: 'proposals',
+    label: 'Voter role',
+    help: 'Members holding this role when a proposal opens can vote on it, and can submit proposals. Empty uses the Box Mafia role (assigned by the holder-verification bot, which checks a wallet signature). Applies to proposals opened from now on. Checked against the server when saved.',
+    schema: optionalSnowflake,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    input: { type: 'role' },
+    // This decides who can pass spending: every change is confirmed.
+    confirm: (from: string, to: string) => (to !== from ? 'This changes who can vote on proposals that approve spending.' : null),
+  } as SettingDef<string>,
+  'proposals.windowDays': intSetting({
+    key: 'proposals.windowDays',
+    area: 'proposals',
+    label: 'Voting window',
+    help: 'How long a proposal stays open for votes. Fixed: there is no early close. Can only be lengthened here; shortening below 7 days needs a code change. Applies to proposals opened from now on.',
+    min: 7,
+    max: 14,
+    default: 7,
+    unit: 'days',
+    onReadFailure: { value: 14 },
+    stricterOnly: true,
+    looserWhen: 'lower',
+  }),
+  'proposals.generalAyes': intSetting({
+    key: 'proposals.generalAyes',
+    area: 'proposals',
+    label: 'Ayes needed for a general proposal',
+    help: 'Ayes plus abstains needed (and more ayes than nays) for a proposal that asks for no money. Funding proposals use the payments tiers. Can only be raised here. Applies to proposals opened from now on.',
+    min: 15,
+    max: 200,
+    default: 15,
+    stricterOnly: true,
+    looserWhen: 'lower',
   }),
   // Payments group (plans/host-fast-track.md): defined in ./payments-settings.
   ...PAYMENT_SETTINGS,

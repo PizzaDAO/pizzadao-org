@@ -18,6 +18,7 @@
 import { prisma } from '@/app/lib/db'
 import type { PaymentActor } from './access'
 import { hashPayee } from './hash'
+import { proposalsEnabled } from '@/app/lib/proposals/constants'
 import { isHighRisk, requiredAyes } from './lane'
 import type { PaymentPolicy } from './policy'
 import { isSelf, type DecisionAction, type DecisionRow, type PaymentFlag, type PaymentLane, type PaymentStatus } from './types'
@@ -44,6 +45,11 @@ export interface RequestSnapshot {
   /** Other Discord accounts linked to the requester (shared wallet, etc.). */
   linkedDiscordIds: string[]
   proposalUrl: string | null
+  /** Proposals are on: the in-app proposal replaces the poll link and the typed ayes. */
+  proposalsOn?: boolean
+  proposal?: { id: string; status: string; amountUsdCents: number | null; ayes: number } | null
+  /** Cents of every non-rejected, non-withdrawn request linked to that proposal, THIS one included (re-summed under a lock at approval). */
+  proposalFundedCents?: number
   amountUsdCents: number
   updatedAt: Date
 }
@@ -185,7 +191,19 @@ export function evaluateDecision(
       if ((risky || overCap || heavyFlag || req.lane === 'HIGH_RISK' || req.lane === 'VOTE_REQUIRED') && note.length < 3) {
         return fail(400, 'note_required', 'A note is required for this request')
       }
-      if (overCap) {
+      if (overCap && req.proposalsOn) {
+        // The vote is the in-app proposal's own count: nothing is typed or ticked by the reviewer.
+        const p = req.proposal
+        if (!p) return fail(400, 'proposal_missing', 'This amount needs a passed proposal linked to the request')
+        if (p.status !== 'PASSED') return fail(400, 'proposal_not_passed', 'The linked proposal has not passed')
+        if (p.amountUsdCents != null && req.amountUsdCents > p.amountUsdCents) return fail(400, 'amount_over_proposal', 'The request asks for more than the proposal that passed')
+        if (p.amountUsdCents != null && (req.proposalFundedCents ?? req.amountUsdCents) > p.amountUsdCents) {
+          return fail(400, 'proposal_exhausted', 'The requests already funded from this proposal, with this one, are more than it passed for')
+        }
+        checklist.proposalPassed = true
+        checklist.ayesConfirmed = p.ayes
+        checklist.proposalId = p.id
+      } else if (overCap) {
         if (!req.proposalUrl) return fail(400, 'proposal_missing', 'This amount needs a community proposal link')
         const need = requiredAyes(req.amountUsdCents / 100, policy)
         if (!input.checklist?.proposalPassed || !Number.isFinite(input.ayesConfirmed) || (input.ayesConfirmed as number) < need) {
@@ -292,18 +310,32 @@ export async function applyDecision(
   policy: PaymentPolicy,
   opts: { expectedUpdatedAt?: string | null; env?: NodeJS.ProcessEnv } = {},
 ): Promise<DecisionSuccess | DecisionFailure | { ok: false; status: 404; code: 'not_found'; message: string }> {
+  const proposalsOn = await proposalsEnabled()
   return prisma.$transaction(async (tx) => {
     const row = await tx.paymentRequest.findUnique({
       where: { id: requestId },
       include: {
         decisions: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
         attachments: { select: { createdAt: true } },
+        proposal: { select: { id: true, status: true, amountUsdCents: true, ayes: true } },
         checks: { where: { kind: 'RULES' }, orderBy: { id: 'desc' }, take: 1, select: { result: true } },
       },
     })
     if (!row) return { ok: false as const, status: 404 as const, code: 'not_found' as const, message: 'Not found' }
     if (opts.expectedUpdatedAt && opts.expectedUpdatedAt !== row.updatedAt.toISOString()) {
       return fail(409, 'conflict', 'This request changed since you opened it. Reload and try again.')
+    }
+    // Proposals on and linked: lock the proposal row and re-sum what is already committed to it, so two approvals racing
+    // on one proposal cannot together exceed what it passed for.
+    let proposalFundedCents: number | undefined
+    if (proposalsOn && row.proposalId) {
+      await tx.$queryRaw`SELECT id FROM "Proposal" WHERE id = ${row.proposalId} FOR UPDATE`
+      const linked = await tx.paymentRequest.findMany({
+        where: { proposalId: row.proposalId, status: { notIn: ['REJECTED', 'WITHDRAWN'] } },
+        select: { id: true, amountUsdCents: true },
+      })
+      proposalFundedCents = (linked as Array<{ id: string; amountUsdCents: number }>).reduce((n, r) => n + r.amountUsdCents, 0)
+      if (!(linked as Array<{ id: string }>).some((r) => r.id === row.id)) proposalFundedCents += row.amountUsdCents
     }
     const flags = (Array.isArray(row.flags) ? row.flags : []) as unknown as PaymentFlag[]
     const linked = row.requesterDiscordId ? await linkedDiscordIds(tx, row.requesterDiscordId) : []
@@ -327,6 +359,9 @@ export async function applyDecision(
       requesterDiscordId: row.requesterDiscordId,
       linkedDiscordIds: linked,
       proposalUrl: row.proposalUrl,
+      proposalsOn,
+      proposal: proposalsOn ? row.proposal : null,
+      proposalFundedCents,
       amountUsdCents: row.amountUsdCents,
       updatedAt: row.updatedAt,
     }
