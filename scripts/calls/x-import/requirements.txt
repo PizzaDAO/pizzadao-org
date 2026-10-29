@@ -1,0 +1,5 @@
+# Operator-machine only (never deployed). Python 3.12 venv: `uv venv -p 3.12 <workdir>/.venv`.
+# Pin to exact versions after the first successful run on your machine (`uv pip freeze`).
+pyannote.audio>=3.3,<5
+torch>=2.2
+torchaudio>=2.2
