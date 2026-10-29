@@ -74,6 +74,8 @@ interface SettingView {
         | { type: "url"; maxLength: number };
     stricterOnly: boolean;
     default: SettingValue;
+    baseline?: SettingValue;
+    legacyEnv?: string;
     value: SettingValue;
     override: SettingValue | null;
     modified: boolean;
@@ -210,6 +212,9 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
             {s.invalid && <p role="alert" className="m-0 text-sm text-tomato">{labels.invalid}</p>}
             {s.toggle?.envKill && <p className="m-0 text-sm font-bold text-tomato">{fill(labels.envForcedOff, { env: s.toggle.env })}</p>}
             {s.toggle && !s.toggle.envKill && !s.modified && <p className="m-0 text-xs text-foreground/60">{fill(labels.envFallback, { env: s.toggle.env })}</p>}
+            {s.legacyEnv && !s.toggle && !s.modified && JSON.stringify(s.baseline) !== JSON.stringify(s.default) && (
+                <p className="m-0 text-xs text-foreground/60">{fill(labels.envFallback, { env: s.legacyEnv })} {show(s, s.baseline as SettingValue, labels)}</p>
+            )}
             {s.modified && (s.input.type === "channel" || s.input.type === "role" || s.input.type === "roleList") && (
                 <p className="m-0 text-xs text-foreground/60">{show(s, s.value, labels)}</p>
             )}

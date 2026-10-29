@@ -13,7 +13,7 @@
  * This file imports only types from ./registry, so there is no runtime import cycle.
  */
 import { z } from 'zod'
-import { DEFAULT_ROLE_INCOME, normalizeRoleName, type RoleIncome } from '@/app/lib/pep-earn/income-defaults'
+import { DEFAULT_ROLE_INCOME, normalizeRoleName, roleIncomeBaseline, type RoleIncome } from '@/app/lib/pep-earn/income-defaults'
 import type { SettingArea, SettingDef } from './registry'
 
 function num(o: {
@@ -50,35 +50,36 @@ export function roleIncomeDailyTotal(rows: ReadonlyArray<Pick<RoleIncome, 'amoun
   return rows.reduce((sum, r) => sum + (r.amount * 24) / r.intervalHours, 0)
 }
 
-const DEFAULT_BY_NAME = new Map(DEFAULT_ROLE_INCOME.map((r) => [normalizeRoleName(r.name), r]))
-
 const roleIncomeEntry = z.object({
   name: z.string().trim().min(1).max(60),
-  amount: z.number().int().min(1).max(10_000),
+  amount: z.number().int().min(1).max(1_000_000),
   intervalHours: z.number().int().min(1).max(720),
   roleId: z.string().regex(/^\d{5,25}$/, 'Not a Discord id').optional(),
 })
 
 /**
- * Stricter-only table: every row must be one of the built-in roles (same id), may pay no more than the
- * built-in amount and no more often than the built-in interval. Dropping a row is allowed.
+ * Stricter-only table, judged against the table in force when nothing is saved (ROLE_INCOME_JSON if set
+ * and valid, else the built-in one): every row must be a role of that table (same id), may pay no more
+ * than its amount and no more often than its interval. Dropping a row is allowed.
  */
 const roleIncomeSchema: z.ZodType<RoleIncome[]> = z
   .array(roleIncomeEntry)
   .min(1)
-  .max(DEFAULT_ROLE_INCOME.length)
   .superRefine((rows, ctx) => {
+    const baseline = roleIncomeBaseline()
+    const byName = new Map(baseline.map((r) => [normalizeRoleName(r.name), r]))
+    if (rows.length > baseline.length) ctx.addIssue({ code: 'custom', message: `at most ${baseline.length} rows` })
     const seen = new Set<string>()
     rows.forEach((row, i) => {
       const key = normalizeRoleName(row.name)
-      const base = DEFAULT_BY_NAME.get(key)
+      const base = byName.get(key)
       const bad = (message: string) => ctx.addIssue({ code: 'custom', path: [i], message: `${row.name}: ${message}` })
       if (seen.has(key)) bad('listed twice')
       seen.add(key)
-      if (!base) return bad('not a role in the built-in income table; adding a role needs a code change')
+      if (!base) return bad('not a role in the income table in force; adding a role needs a code change')
       if (row.amount > base.amount) bad(`pays at most ${base.amount}; raising it needs a code change`)
       if (row.intervalHours < base.intervalHours) bad(`pays at most every ${base.intervalHours} hours; shortening it needs a code change`)
-      if ((row.roleId ?? undefined) !== base.roleId) bad('the role id is fixed by the built-in table')
+      if ((row.roleId ?? undefined) !== base.roleId) bad('the role id is fixed by the income table in force')
     })
   })
 
@@ -158,7 +159,7 @@ export const ECONOMY_SETTINGS = {
     key: 'economy.roleIncome',
     area: 'economy',
     label: 'Role income table',
-    help: 'What /collect-income pays each role, and how often. Rows can be removed or made smaller or slower here; adding a role or paying more needs a code change. Saving replaces the ROLE_INCOME_JSON env table. Reset restores the built-in table.',
+    help: 'What /collect-income pays each role, and how often. Rows can be removed or made smaller or slower here, judged against the table in force before anything is saved (the ROLE_INCOME_JSON env table if set, else the built-in one); adding a role or paying more needs a code change. Reset restores that table.',
     schema: roleIncomeSchema,
     default: DEFAULT_ROLE_INCOME.map((r) => ({ ...r })),
     onReadFailure: 'lastKnownGood',

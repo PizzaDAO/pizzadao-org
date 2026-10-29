@@ -28,6 +28,38 @@ export const DEFAULT_ROLE_INCOME: readonly RoleIncome[] = [
   { name: 'Pockets Checked', amount: 1, intervalHours: 24 },
 ]
 
+export function validEntry(e: unknown): e is RoleIncome {
+  const r = e as RoleIncome
+  return (
+    !!r &&
+    typeof r.name === 'string' &&
+    r.name.trim().length > 0 &&
+    Number.isInteger(r.amount) &&
+    r.amount > 0 &&
+    typeof r.intervalHours === 'number' &&
+    r.intervalHours > 0 &&
+    (r.roleId === undefined || (typeof r.roleId === 'string' && /^\d{5,25}$/.test(r.roleId)))
+  )
+}
+
+/** The ROLE_INCOME_JSON table when it is set and valid; null otherwise. */
+export function parseRoleIncomeEnv(raw: string | undefined): RoleIncome[] | null {
+  if (!raw) return null
+  try {
+    const parsed = JSON.parse(raw)
+    if (!Array.isArray(parsed)) return null
+    const rows = parsed.map((e) => ({ intervalHours: 24, ...e }))
+    return rows.length && rows.every(validEntry) ? rows : null
+  } catch {
+    return null
+  }
+}
+
+/** The table in force when nothing is saved: the env table if set and valid, else the built-in one. */
+export function roleIncomeBaseline(raw: string | undefined = process.env.ROLE_INCOME_JSON): readonly RoleIncome[] {
+  return parseRoleIncomeEnv(raw) ?? DEFAULT_ROLE_INCOME
+}
+
 /** Lowercase, letters and digits only ("🍕 Pizza-Holder" -> "pizzaholder"). */
 export function normalizeRoleName(name: string): string {
   return name.toLowerCase().replace(/[^a-z0-9]/g, '')

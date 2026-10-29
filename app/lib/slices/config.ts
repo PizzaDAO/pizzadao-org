@@ -56,16 +56,16 @@ export const dailyCap = (env: NodeJS.ProcessEnv = process.env, settings?: Settin
 // value is used untouched (no rounding), so deploying changes nothing.
 export const maxGasGwei = (env: NodeJS.ProcessEnv = process.env, settings?: Settings) => {
   const legacy = optNumber(env.SLICES_MAX_GAS_GWEI) ?? 0.5;
-  if (!storedOverride("slices.maxGasMilliGwei", settings)) return legacy;
-  return effectiveInt("slices.maxGasMilliGwei", settings, Math.round(legacy * 1000)) / 1000;
+  const saved = storedOverride("slices.maxGasMilliGwei", settings);
+  // Compared in env units (gwei) so rounding can never loosen the env value.
+  return saved ? Math.min(legacy, (saved.value as number) / 1000) : legacy;
 };
 
 /** Alert threshold in wei. */
 export function minBalanceWei(env: NodeJS.ProcessEnv = process.env, settings?: Settings): bigint {
   const legacy = optNumber(env.SLICES_MIN_BALANCE_ETH) ?? 0.003;
-  const eth = storedOverride("slices.minBalanceMilliEth", settings)
-    ? effectiveInt("slices.minBalanceMilliEth", settings, Math.round(legacy * 1000)) / 1000
-    : legacy;
+  const saved = storedOverride("slices.minBalanceMilliEth", settings);
+  const eth = saved ? Math.max(legacy, (saved.value as number) / 1000) : legacy;
   return BigInt(Math.round(eth * 1e9)) * BigInt(1_000_000_000);
 }
 

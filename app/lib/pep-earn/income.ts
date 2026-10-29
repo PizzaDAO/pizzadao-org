@@ -18,28 +18,14 @@ import { creditInTx, getOrCreateEconomy } from '../economy'
 import type { Settings } from '../settings'
 import { storedOverride } from '../settings/numbers'
 import { claimCooldown } from './cooldown'
-import { DEFAULT_ROLE_INCOME, normalizeRoleName, type RoleIncome } from './income-defaults'
+import { DEFAULT_ROLE_INCOME, normalizeRoleName, validEntry, type RoleIncome } from './income-defaults'
 
 export { DEFAULT_ROLE_INCOME, normalizeRoleName }
 export type { RoleIncome }
 
-function validEntry(e: unknown): e is RoleIncome {
-  const r = e as RoleIncome
-  return (
-    !!r &&
-    typeof r.name === 'string' &&
-    r.name.trim().length > 0 &&
-    Number.isInteger(r.amount) &&
-    r.amount > 0 &&
-    typeof r.intervalHours === 'number' &&
-    r.intervalHours > 0 &&
-    (r.roleId === undefined || (typeof r.roleId === 'string' && /^\d{5,25}$/.test(r.roleId)))
-  )
-}
-
 /**
- * The role income table. A saved `economy.roleIncome` setting (stricter than the built-in table only)
- * wins; with no saved row it is ROLE_INCOME_JSON if set and valid, else the built-in defaults.
+ * The role income table. A saved `economy.roleIncome` setting (stricter than the table that would
+ * otherwise be in force) wins; with no saved row it is ROLE_INCOME_JSON if set and valid, else the built-in defaults.
  * Unreadable settings fall back to the last good saved table, then to the no-row rule above.
  */
 export function roleIncomeConfig(raw = process.env.ROLE_INCOME_JSON, settings?: Settings): readonly RoleIncome[] {

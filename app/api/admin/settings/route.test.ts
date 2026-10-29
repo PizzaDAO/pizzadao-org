@@ -248,6 +248,32 @@ describe('Phase 3 settings', () => {
     expect((await PUT(req('PUT', { key: 'games.minBet', value: 50 }))).status).toBe(200)
   })
 
+  it('the bet pair check counts a stricter env cap', async () => {
+    vi.stubEnv('GAME_MAX_BET', '100')
+    try {
+      const r = await PUT(req('PUT', { key: 'games.minBet', value: 500 }))
+      expect(r.status).toBe(400)
+      expect((await r.json()).error).toMatch(/smallest bet/)
+      expect((await PUT(req('PUT', { key: 'games.minBet', value: 50 }))).status).toBe(200)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
+  it('the page shows the env value in force and resetting back to it needs no loosening prompt', async () => {
+    vi.stubEnv('GAME_MAX_BET', '100')
+    try {
+      const j = await (await GET(req('GET'))).json()
+      expect(j.settings.find((x: { key: string }) => x.key === 'games.maxBet')).toMatchObject({ default: 5000, baseline: 100, value: 100, legacyEnv: 'GAME_MAX_BET' })
+      const row = { key: 'games.maxBet', value: 2000, updatedAt: new Date(), updatedBy: ME }
+      m(prisma.appSetting.findMany).mockResolvedValue([row])
+      m(prisma.appSetting.findUnique).mockResolvedValue(row)
+      expect((await DELETE(req('DELETE', { key: 'games.maxBet' }))).status).toBe(200)
+    } finally {
+      vi.unstubAllEnvs()
+    }
+  })
+
   it('loosening a spend cap is refused; tightening it saves', async () => {
     expect((await PUT(req('PUT', { key: 'economy.adminGrantMax', value: 10_001 }))).status).toBe(400)
     expect((await PUT(req('PUT', { key: 'economy.adminGrantMax', value: 500 }))).status).toBe(200)

@@ -498,3 +498,4 @@ Each migration is applied to prod by hand before merge (`prisma migrate deploy` 
 - `economy.roleIncome` is a table input (`roleIncome`). Rows can be removed or made smaller or slower; a row must be a built-in role with the same id. Saving replaces the `ROLE_INCOME_JSON` table.
 - Slices gas and balance use whole thousandths (milli-gwei, milli-ETH) because settings are integers; with no row the env decimals are used untouched.
 - Left for phase 5: `WORK_PROMPTS_JSON` (string list), slot weights stay in code, `MISSIONS_CRON_*` budgets stay env.
+- Review fixes: the role income table is judged against the table actually in force (ROLE_INCOME_JSON if valid, else built-in); the admin page and loosening/reset confirmations use the env-aware baseline; a saved smallest bet is clamped to the largest bet in force; slices thousandths are compared in env units.

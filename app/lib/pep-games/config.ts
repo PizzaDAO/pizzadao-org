@@ -14,7 +14,7 @@ import { creditInTx, debitInTx, getOrCreateEconomy } from '../economy'
 import { ValidationError } from '../errors/api-errors'
 import { claimCooldown } from '../pep-earn/cooldown'
 import { loadSettings, type Settings } from '../settings'
-import { effectiveInt, envNumber } from '../settings/numbers'
+import { effectiveInt, envNumber, storedOverride } from '../settings/numbers'
 import { toggleEnabled } from '../settings/toggles'
 import type { Prisma } from '@prisma/client'
 
@@ -31,10 +31,15 @@ export function gamesEnabled(): Promise<boolean> {
  */
 export function gameConfig(settings?: Settings) {
   const env = process.env
-  const minBet = Math.max(1, effectiveInt('games.minBet', settings, envNumber(env.GAME_MIN_BET)))
+  const wantMin = Math.max(1, effectiveInt('games.minBet', settings, envNumber(env.GAME_MIN_BET)))
+  const wantMax = effectiveInt('games.maxBet', settings, envNumber(env.GAME_MAX_BET))
+  // A saved smallest bet is clamped down to the largest bet in force, so it can never raise a stricter
+  // env cap. With no saved smallest bet the old rule holds (the largest bet is raised to meet it).
+  const savedMin = !!storedOverride('games.minBet', settings)
+  const minBet = savedMin ? Math.min(wantMin, Math.max(1, wantMax)) : wantMin
   return {
     minBet,
-    maxBet: Math.max(minBet, effectiveInt('games.maxBet', settings, envNumber(env.GAME_MAX_BET))),
+    maxBet: savedMin ? Math.max(1, wantMax) : Math.max(minBet, wantMax),
     cooldownMs: Math.max(0, effectiveInt('games.cooldownSeconds', settings, envNumber(env.GAME_COOLDOWN_SECONDS))) * 1000,
     blackjackTimeoutMs: Math.max(30, effectiveInt('games.blackjackTimeoutSeconds', settings, envNumber(env.BLACKJACK_TIMEOUT_SECONDS))) * 1000,
   }

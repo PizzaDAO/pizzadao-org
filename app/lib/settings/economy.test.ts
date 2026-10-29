@@ -167,7 +167,14 @@ describe('economy settings: effective values', () => {
   })
 
   it('keeps the largest bet at or above the smallest', () => {
-    expect(gameConfig(snap({ 'games.minBet': 500, 'games.maxBet': 100 }))).toMatchObject({ minBet: 500, maxBet: 500 })
+    // a saved smallest bet is clamped down to the largest bet; it never raises it
+    expect(gameConfig(snap({ 'games.minBet': 500, 'games.maxBet': 100 }))).toMatchObject({ minBet: 100, maxBet: 100 })
+    vi.stubEnv('GAME_MAX_BET', '100')
+    expect(gameConfig(snap({ 'games.minBet': 500 }))).toMatchObject({ minBet: 100, maxBet: 100 })
+    expect(() => assertBet(500, gameConfig(snap({ 'games.minBet': 500 })))).toThrow(/Bet must be/)
+    // no saved smallest bet: the old rule (env min above env max raises the max) is unchanged
+    vi.stubEnv('GAME_MIN_BET', '300')
+    expect(gameConfig(snap())).toMatchObject({ minBet: 300, maxBet: 300 })
     expect(crimeConfig(snap({ 'crime.fineMinPercent': 90 }))).toMatchObject({ fineMinPercent: 90, fineMaxPercent: 90 })
   })
 
@@ -207,6 +214,9 @@ describe('economy settings: effective values', () => {
     expect(maxGasGwei({ SLICES_MAX_GAS_GWEI: '0.1' } as unknown as NodeJS.ProcessEnv, s)).toBe(0.1)
     expect(minBalanceWei({} as NodeJS.ProcessEnv, s)).toBe(BigInt('10000000000000000'))
     expect(minBalanceWei({ SLICES_MIN_BALANCE_ETH: '0.05' } as unknown as NodeJS.ProcessEnv, s)).toBe(BigInt('50000000000000000'))
+    // thousandths never loosen a finer env value (compared in env units)
+    expect(maxGasGwei({ SLICES_MAX_GAS_GWEI: '0.1004' } as unknown as NodeJS.ProcessEnv, snap({ 'slices.maxGasMilliGwei': 200 }))).toBe(0.1004)
+    expect(minBalanceWei({ SLICES_MIN_BALANCE_ETH: '0.0104' } as unknown as NodeJS.ProcessEnv, snap({ 'slices.minBalanceMilliEth': 10 }))).toBe(BigInt('10400000000000000'))
     // no saved row: the env value is used untouched
     expect(maxGasGwei({ SLICES_MAX_GAS_GWEI: '0.0004' } as unknown as NodeJS.ProcessEnv, snap())).toBe(0.0004)
   })
@@ -278,5 +288,54 @@ describe('role income table', () => {
     expect(roleIncomeConfig(envTable, snap({}, { readFailed: true }))).toEqual([{ name: 'Crew Member', amount: 50, intervalHours: 24 }])
     rememberOverride('economy.roleIncome', saved)
     expect(roleIncomeConfig(envTable, snap({}, { readFailed: true }))).toEqual(saved)
+  })
+})
+
+describe('role income table against the env table in force', () => {
+  const envTable = JSON.stringify([
+    { name: 'Crew Member', amount: 30, intervalHours: 48 },
+    { name: 'Box Mafia', amount: 20 },
+  ])
+  const ok = (v: unknown) => parseSetting('economy.roleIncome', v).ok
+
+  it('is judged against ROLE_INCOME_JSON when set and valid', () => {
+    vi.stubEnv('ROLE_INCOME_JSON', envTable)
+    expect(ok([{ name: 'Crew Member', amount: 30, intervalHours: 48 }])).toBe(true)
+    expect(ok([{ name: 'Crew Member', amount: 20, intervalHours: 72 }])).toBe(true)
+    // loose against the env table even though inside the built-in one
+    expect(ok([{ name: 'Crew Member', amount: 31, intervalHours: 48 }])).toBe(false)
+    expect(ok([{ name: 'Crew Member', amount: 30, intervalHours: 24 }])).toBe(false)
+    // a built-in role the env table does not list cannot be added back
+    expect(ok([{ name: 'Pizza Holder', amount: 1, intervalHours: 24 }])).toBe(false)
+    expect(ok([{ name: 'Crew Member', amount: 1, intervalHours: 48 }, { name: 'Box Mafia', amount: 1, intervalHours: 24 }, { name: 'Pizza Holder', amount: 1, intervalHours: 24 }])).toBe(false)
+  })
+
+  it('falls back to the built-in table when the env table is invalid', () => {
+    vi.stubEnv('ROLE_INCOME_JSON', 'not json')
+    expect(ok(DEFAULT_ROLE_INCOME.map((r) => ({ ...r })))).toBe(true)
+  })
+
+  it('the baseline and confirmation use the env table', async () => {
+    vi.stubEnv('ROLE_INCOME_JSON', envTable)
+    const { baselineValue } = await import('./store')
+    expect(baselineValue('economy.roleIncome')).toEqual([
+      { name: 'Crew Member', amount: 30, intervalHours: 48 },
+      { name: 'Box Mafia', amount: 20, intervalHours: 24 },
+    ])
+    const c = SETTINGS['economy.roleIncome'].confirm!
+    const small = [{ name: 'Crew Member', amount: 10, intervalHours: 48 }]
+    expect(c(small, baselineValue('economy.roleIncome') as never)).toMatch(/more PEP/)
+  })
+})
+
+describe('admin page baseline', () => {
+  it('shows the env value in force for numbers that have one', async () => {
+    vi.stubEnv('GAME_MAX_BET', '1000')
+    const { baselineValue } = await import('./store')
+    expect(baselineValue('games.maxBet')).toBe(1000)
+    expect(baselineValue('games.minBet')).toBe(10)
+    vi.stubEnv('SLICES_MAX_GAS_GWEI', '0.2')
+    expect(baselineValue('slices.maxGasMilliGwei')).toBeCloseTo(200)
+    expect(baselineValue('missions.slaHours')).toBe(48)
   })
 })
