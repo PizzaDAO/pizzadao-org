@@ -67,6 +67,9 @@ export const RATE_LIMITS = {
   // Pizza Passport check-ins: per IP and per member (Discord id).
   "passport-checkin-ip": { limit: 30, windowSec: 10 * 60 },
   "passport-checkin": { limit: 20, windowSec: 60 * 60 },
+  // Payment requests (plans/host-fast-track.md), per member.
+  "payments-create": { limit: 5, windowSec: 60 * 60 },
+  "payments-upload": { limit: 20, windowSec: 60 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

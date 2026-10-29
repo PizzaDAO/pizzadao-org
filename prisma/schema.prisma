@@ -1768,3 +1768,130 @@ model MessagingOptOut {
   scope     String   @default("followups")
   createdAt DateTime @default(now())
 }
+
+// ===== PAYMENT REQUESTS (plans/host-fast-track.md) =====
+// The app only sorts, flags and records. Nothing here moves money: PAID is a person's record that
+// they sent it (with a reference). Payee details are stored as a keyed hash plus a masked hint.
+
+enum PaymentSource {
+  FORM
+  APP
+  REVIEWER
+}
+
+enum PaymentKind {
+  EVENT_BUDGET
+  REIMBURSEMENT
+  WORK
+  OTHER
+}
+
+enum PaymentStatus {
+  RECEIVED
+  NEEDS_INFO
+  APPROVED
+  REJECTED
+  PAID
+  WITHDRAWN
+}
+
+enum PaymentLane {
+  FAST
+  STANDARD
+  HIGH_RISK
+  VOTE_REQUIRED
+}
+
+model PaymentRequest {
+  id                 String        @id @default(cuid())
+  source             PaymentSource
+  sourceRef          String?       @unique // form ingest: hash of sheet id + response timestamp + requester (idempotent)
+  kind               PaymentKind
+  status             PaymentStatus @default(RECEIVED)
+  lane               PaymentLane   @default(STANDARD)
+  requesterDiscordId String? // VERIFIED requester (in-app form, signed-in session). Null for form rows.
+  claimedDiscordId   String? // form rows: the id typed into the form. A claim, never an identity.
+  requesterMemberId  String?
+  requesterLabel     String // display name as submitted (no email stored)
+  title              String
+  description        String
+  eventDate          DateTime?
+  eventCity          String?
+  rsvEventSlug       String? // GPP events: link out instead of handling here
+  amountUsdCents     Int
+  currency           String        @default("USD")
+  amountOriginal     Decimal?
+  payeeHash          String? // HMAC of the normalized payee reference: reuse detection only
+  payeeHint          String? // masked, e.g. 0x12...ab
+  proposalUrl        String? // community poll link (required in VOTE_REQUIRED)
+  riskScore          Int           @default(0)
+  flags              Json          @default("[]") // latest computed flags [{id, severity, detail, source}]
+  checkedAt          DateTime?
+  approvalsNeeded    Int           @default(1)
+  rejectedAsFraud    Boolean       @default(false)
+  createdAt          DateTime      @default(now())
+  updatedAt          DateTime      @updatedAt
+
+  attachments PaymentAttachment[]
+  checks      PaymentCheck[]
+  decisions   PaymentDecision[]
+
+  @@index([status, lane, createdAt])
+  @@index([requesterDiscordId])
+  @@index([claimedDiscordId])
+  @@index([payeeHash])
+}
+
+model PaymentAttachment {
+  id         String   @id @default(cuid())
+  requestId  String
+  kind       String // RECEIPT | PHOTO | BUDGET | OTHER
+  blobPath   String // private blob pathname, served only through an authenticated route
+  sha256     String // exact-reuse detection across requests
+  sizeBytes  Int
+  mime       String
+  uploadedBy String // Discord id
+  createdAt  DateTime @default(now())
+
+  request PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([sha256])
+  @@index([requestId])
+}
+
+model PaymentCheck {
+  id        Int      @id @default(autoincrement())
+  requestId String
+  kind      String // RULES | RSV_TRACK | AI_RECEIPT
+  version   String // rule-set or prompt version
+  model     String? // AI model id when kind is AI_*
+  result    Json // flags + extracted fields; never raw payee details
+  createdAt DateTime @default(now())
+
+  request PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Cascade)
+
+  @@index([requestId, createdAt])
+  @@index([kind, createdAt])
+}
+
+// Append-only: no code path updates or deletes a row. Corrections are new rows (REOPEN, NOTE).
+model PaymentDecision {
+  id                Int         @id @default(autoincrement())
+  requestId         String
+  action            String // APPROVE | REJECT | REQUEST_INFO | MARK_PAID | REOPEN | NOTE | WITHDRAW | REPLY
+  actorDiscordId    String
+  actorIsDpr        Boolean     @default(false)
+  lane              PaymentLane
+  riskScoreAtAction Int
+  flagsAtAction     Json // flags the actor saw
+  checklist         Json? // ticked items and acknowledged flag ids
+  note              String?
+  proofRef          String? // MARK_PAID: tx hash / transfer reference (no bank numbers)
+  deployEnv         String? // VERCEL_ENV at the time (previews share the production database)
+  createdAt         DateTime    @default(now())
+
+  request PaymentRequest @relation(fields: [requestId], references: [id], onDelete: Restrict)
+
+  @@index([requestId, createdAt])
+  @@index([actorDiscordId])
+}
