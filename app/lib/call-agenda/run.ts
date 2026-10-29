@@ -20,11 +20,12 @@ import { SITE_URL } from '@/app/lib/site-url'
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { DISCORD_ONLY, importedAllowed } from '@/app/lib/calls/imported'
-import { buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
+import { loadSettings } from '@/app/lib/settings'
+import { agendaLeadMs, agendaLimits, buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
 const API = 'https://discord.com/api/v10'
 export const DEFAULT_CALL_VOICE_CHANNEL_ID = '823956905739026442'
-/** Post when the call starts within this long (cron every 10 min, so it lands 20-30 min before). */
+/** Post when the call starts within this long (cron every 10 min, so it lands 20-30 min before). Setting calls.agendaLeadMinutes; this is the default. */
 export const POST_LEAD_MS = 30 * 60 * 1000
 const SNOWFLAKE = /^\d{5,25}$/
 
@@ -142,6 +143,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
   const now = o.now ?? new Date()
   // Throws when the filter cannot be read: better no agenda than an unfiltered one.
   const filter = o.filter ?? (await loadPostFilter())
+  const limits = agendaLimits(await loadSettings())
   const events = await fetchUpcomingEvents({ now, horizonMs: o.horizonMs, fetchImpl: o.fetchImpl })
   if (!events.length) return []
   const { crews } = await getCrewMappings()
@@ -172,7 +174,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     const tasks = sheet.tasks.filter((t) => !mentionsBlockedTerm(t.label, filter))
     const items = actionItems.filter((a) => !mentionsBlockedTerm(a.text, filter) && !mentionsBlockedTerm(a.owner, filter))
     const filteredOut = sheet.tasks.length - tasks.length + actionItems.length - items.length
-    const bullets = buildAgendaBullets({ tasks, actionItems: items, now })
+    const bullets = buildAgendaBullets({ tasks, actionItems: items, now, limits })
     const crewUrl = crewPageUrl(crew.id)
     plans.push({
       eventId: ev.id,
@@ -257,7 +259,7 @@ async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutco
 export async function runCallAgenda(o: { now?: Date; fetchImpl?: typeof fetch } = {}): Promise<RunResult> {
   if (!(await callAgendaEnabled())) return { status: 'disabled', outcomes: [] }
   const token = process.env.DISCORD_BOT_TOKEN?.trim() ?? ''
-  const plans = await planAgendas({ now: o.now, horizonMs: POST_LEAD_MS, fetchImpl: o.fetchImpl })
+  const plans = await planAgendas({ now: o.now, horizonMs: agendaLeadMs(await loadSettings()), fetchImpl: o.fetchImpl })
   const outcomes: AgendaOutcome[] = []
   for (const p of plans) {
     try {

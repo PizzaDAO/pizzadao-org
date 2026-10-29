@@ -11,7 +11,8 @@ import { getSession } from "@/app/lib/session";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
-import { buildRecapText, recapCrewExcluded, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
+import { loadSettings } from "@/app/lib/settings";
+import { buildRecapText, recapCrewExcluded, recapLimits, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
@@ -76,7 +77,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
         : [true, true];
     const recapText =
         postFilter && importedRecapOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && rec.summary?.trim()
-            ? buildRecapText({ id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters }, undefined, postFilter)
+            ? buildRecapText({ id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters }, undefined, postFilter, recapLimits(await loadSettings()))
             : null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
     const recapEnabled = await recapPostingEnabled();

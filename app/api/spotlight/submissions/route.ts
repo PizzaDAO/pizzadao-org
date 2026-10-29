@@ -8,9 +8,9 @@ import { after, NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
 import { requireSession } from "@/app/lib/auth-guards";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { loadSettings } from "@/app/lib/settings";
+import { settingInt } from "@/app/lib/settings/numbers";
 import {
-    MAX_PENDING,
-    MAX_SUBMISSIONS_PER_DAY,
     NAME_MAX_LEN,
     notifyNewSubmission,
     parseSubmissionInput,
@@ -44,6 +44,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: 400 });
     }
 
+    // Limits: settings spotlight.maxPerDay / spotlight.maxPending (defaults 3 and 5).
+    const settings = await loadSettings();
+    const MAX_SUBMISSIONS_PER_DAY = settingInt("spotlight.maxPerDay", settings);
+    const MAX_PENDING = settingInt("spotlight.maxPending", settings);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [recent, pending] = await Promise.all([
         prisma.spotlightSubmission.count({

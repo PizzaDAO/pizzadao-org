@@ -8,6 +8,8 @@ import {
   claimLevelCelebration,
 } from '@/app/lib/celebration'
 import { getCurrentLevel } from '@/app/lib/missions'
+import { loadSettings } from '@/app/lib/settings'
+import { settingInt } from '@/app/lib/settings/numbers'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { UnauthorizedError, NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -115,10 +117,11 @@ const POST_HANDLER = async (request: NextRequest) => {
   // `claimLevelUp: true` claims the level-up celebration for the member's
   // current level as computed here on the server (not a client-sent number),
   // so a level-up approved while they were away is celebrated exactly once.
+  // The first level that celebrates is the setting missions.celebrationMinLevel (default 2).
   let levelUp: { levelUpClaimed: boolean; level: number } | undefined
   if (body.claimLevelUp === true) {
     const level = await getCurrentLevel(session.discordId)
-    levelUp = { levelUpClaimed: level >= 2 && (await claimLevelCelebration(memberId, level)), level }
+    levelUp = { levelUpClaimed: level >= settingInt('missions.celebrationMinLevel', await loadSettings()) && (await claimLevelCelebration(memberId, level)), level }
   }
 
   const state = await updateCelebrationState(memberId, patch)

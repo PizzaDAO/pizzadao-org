@@ -221,6 +221,7 @@ export const MAFIA_RANKS: MafiaRank[] = [
   { name: "Intern", minPoints: 0 },
 ];
 
-export function getRankForPoints(points: number): MafiaRank {
-  return MAFIA_RANKS.find(r => points >= r.minPoints) || MAFIA_RANKS[MAFIA_RANKS.length - 1];
+/** `ranks` must be sorted highest first (the code table is; settings/mafia.ts sorts a saved one). */
+export function getRankForPoints(points: number, ranks: MafiaRank[] = MAFIA_RANKS): MafiaRank {
+  return ranks.find(r => points >= r.minPoints) || ranks[ranks.length - 1];
 }

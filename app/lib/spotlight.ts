@@ -18,7 +18,7 @@ import {
 
 export * from "./spotlight-shared";
 
-/** Abuse controls, enforced per Discord account. */
+/** Abuse controls, enforced per Discord account. These are the defaults; settings spotlight.maxPerDay / spotlight.maxPending apply. */
 export const MAX_SUBMISSIONS_PER_DAY = 3;
 export const MAX_PENDING = 5;
 

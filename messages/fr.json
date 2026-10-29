@@ -916,6 +916,7 @@
     "filtersSaving": "Enregistrement...",
     "filtersSaved": "Enregistré.",
     "filtersError": "Impossible d'enregistrer les filtres.",
+    "filtersMirrorWarning": "Enregistré. L'ancienne copie de ces filtres dans la table n'a pas pu être mise à jour et est périmée ; les publications utilisent les filtres enregistrés.",
     "filtersUnavailable": "Impossible de charger les filtres, les publications automatiques sont donc suspendues.",
     "overline": "Enregistrements d'appels",
     "title": "Appels enregistrés",
@@ -1317,6 +1318,11 @@
     "incomeAmount": "PEP",
     "incomeEvery": "Toutes les (heures)",
     "incomeRemove": "Retirer",
+    "addRow": "Ajouter une ligne",
+    "removeRow": "Retirer",
+    "listHint": "Un par ligne, jusqu'à {max} lignes de {chars} caractères.",
+    "editedElsewhere": "Modifié sur la page de revue des appels",
+    "cellRequired": "Saisissez un nombre",
     "empty": "(vide)"
   },
   "adminMissions": {

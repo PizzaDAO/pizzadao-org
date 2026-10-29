@@ -5,8 +5,9 @@ vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 
 import { SETTINGS, SETTING_KEYS, isSettingKey, parseSetting } from './registry'
 import { ECONOMY_SETTINGS } from './economy-settings'
+import { CONTENT_SETTINGS } from './content-settings'
 
-const ECONOMY_KEYS = new Set<string>(Object.keys(ECONOMY_SETTINGS))
+const ECONOMY_KEYS = new Set<string>([...Object.keys(ECONOMY_SETTINGS), ...Object.keys(CONTENT_SETTINGS)])
 import { CALL_TRANSCRIPT_MIN_LEVEL } from '@/app/lib/calls/transcript-access'
 import { HUMAN_RELEASE_MIN_LEVEL, NEW_ACCOUNT_DAYS } from '@/app/lib/mission-verify/policy'
 import { DPR_ONLY_MIN_LEVEL } from '@/app/lib/mission-review-access'

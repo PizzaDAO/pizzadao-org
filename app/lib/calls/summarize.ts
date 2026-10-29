@@ -9,6 +9,8 @@ import { z, ZodError } from 'zod'
 import { publicChatText } from './chat'
 import type { TranscriptSegment } from './ingest-schema'
 import { importedSpeakerNumber } from './speaker-labels'
+import { loadSettings, type Settings } from '@/app/lib/settings'
+import { storedOverride } from '@/app/lib/settings/numbers'
 
 export const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5.5'
 /** Used directly through OpenAI (OPENAI_API_KEY) when the gateway call fails for any reason. */
@@ -28,8 +30,24 @@ export const summarySchema = z.object({
 
 export type CallSummary = z.infer<typeof summarySchema>
 
-export function summaryModel(env: Record<string, string | undefined> = process.env): string {
-  return env.CALL_SUMMARY_MODEL?.trim() || DEFAULT_SUMMARY_MODEL
+/**
+ * The summary model: the saved `calls.summaryModel` setting if there is one, else CALL_SUMMARY_MODEL
+ * (the legacy value), else the built-in model. Unreadable settings use the last saved model this instance saw.
+ */
+export function summaryModel(env: Record<string, string | undefined> = process.env, settings?: Settings): string {
+  const saved = storedOverride('calls.summaryModel', settings)
+  const model = typeof saved?.value === 'string' ? saved.value.trim() : ''
+  return model || env.CALL_SUMMARY_MODEL?.trim() || DEFAULT_SUMMARY_MODEL
+}
+
+/**
+ * The summary instructions: the built-in rules plus the private addendum (`calls.summaryPromptExtra`),
+ * if one is saved. If the settings cannot be read, this throws so the summary fails and is retried
+ * instead of being written without the addendum.
+ */
+export function summarySystemPrompt(settings?: Settings): string {
+  const extra = settings ? String(settings.get('calls.summaryPromptExtra') ?? '').trim() : ''
+  return extra ? `${SUMMARY_SYSTEM_PROMPT}\n\n${extra}` : SUMMARY_SYSTEM_PROMPT
 }
 
 export function summaryFallbackModel(env: Record<string, string | undefined> = process.env): string {
@@ -129,16 +147,19 @@ export function isFallbackWorthy(err: unknown): boolean {
 export async function generateCallSummary(
   segments: TranscriptSegment[],
   names: Record<string, string>,
-  model: string = summaryModel(),
+  model?: string,
   opts: { budgetMs?: number } = {},
 ): Promise<CallSummary> {
+  const settings = await loadSettings()
+  const modelId = model ?? summaryModel(process.env, settings)
+  const system = summarySystemPrompt(settings)
   const transcript = buildTranscriptText(segments, names)
   if (!transcript.trim()) throw new Error('Empty transcript')
   const deadline = Date.now() + (opts.budgetMs ?? DEFAULT_SUMMARY_BUDGET_MS)
   const run = async (m: LanguageModel, timeoutMs: number) => {
     const { output } = await generateText({
       model: m,
-      system: SUMMARY_SYSTEM_PROMPT,
+      system,
       output: Output.object({ schema: summarySchema }),
       prompt: `Transcript:\n\n${transcript}`,
       abortSignal: AbortSignal.timeout(Math.max(1_000, timeoutMs)),
@@ -148,7 +169,7 @@ export async function generateCallSummary(
   const total = deadline - Date.now()
   if (total < MIN_CALL_MS) throw new Error('not enough time left for a summary')
   try {
-    const out = await run(model, Math.floor(total * PRIMARY_SHARE))
+    const out = await run(modelId, Math.floor(total * PRIMARY_SHARE))
     console.log('[calls/summary] provider=gateway')
     return out
   } catch (primaryErr) {

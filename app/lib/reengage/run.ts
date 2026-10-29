@@ -29,6 +29,8 @@ export const DEFAULT_BATCH = 60;
 const MAX_BATCH = 300;
 
 import { toggleEnabled } from "@/app/lib/settings/toggles";
+import { loadSettings, type Settings } from "@/app/lib/settings";
+import { settingInt, storedOverride } from "@/app/lib/settings/numbers";
 
 export const EMAIL_RE = /^[^\s@<>,;"]+@[^\s@<>,;"]+\.[^\s@<>,;"]+$/;
 
@@ -125,10 +127,15 @@ export interface ReengageOptions {
   now?: Date;
 }
 
-export function clampBatch(limit: number | undefined, env: NodeJS.ProcessEnv = process.env): number {
+/**
+ * Members emailed per run. An explicit `limit` (cron ?limit=N) or REENGAGE_BATCH_SIZE gives the value as
+ * before (capped at 300); a saved `reengage.batchSize` can only lower it (it is a ceiling).
+ */
+export function clampBatch(limit: number | undefined, env: NodeJS.ProcessEnv = process.env, settings?: Settings): number {
   const raw = limit ?? Number(env.REENGAGE_BATCH_SIZE);
-  if (!Number.isFinite(raw) || raw <= 0) return DEFAULT_BATCH;
-  return Math.min(Math.floor(raw), MAX_BATCH);
+  const base = !Number.isFinite(raw) || raw <= 0 ? DEFAULT_BATCH : Math.min(Math.floor(raw), MAX_BATCH);
+  const saved = storedOverride("reengage.batchSize", settings);
+  return saved ? Math.min(base, saved.value as number) : base;
 }
 
 export async function runReengage(opts: ReengageOptions = {}): Promise<ReengageResult> {
@@ -136,7 +143,8 @@ export async function runReengage(opts: ReengageOptions = {}): Promise<ReengageR
   const week = weekKey(now);
   const enabled = await reengageEnabled();
   const dryRun = opts.dryRun === true || !enabled;
-  const limit = clampBatch(opts.limit);
+  const settings = await loadSettings();
+  const limit = clampBatch(opts.limit, process.env, settings);
 
   const { eligible, optedIn, duplicates } = await listEligible(week);
   const result: ReengageResult = {
@@ -152,7 +160,7 @@ export async function runReengage(opts: ReengageOptions = {}): Promise<ReengageR
   }
 
   const batch = eligible.slice(0, limit);
-  const digests = await loadDigests(batch, now);
+  const digests = await loadDigests(batch, now, settingInt("reengage.callWindowDays", settings) * 24 * 60 * 60 * 1000);
   const byId = new Map(batch.map((b) => [b.memberId, b]));
 
   for (const digest of digests) {

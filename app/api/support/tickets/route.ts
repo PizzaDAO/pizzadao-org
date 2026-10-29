@@ -8,9 +8,9 @@ import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
 import { requireSession } from "@/app/lib/auth-guards";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { loadSettings } from "@/app/lib/settings";
+import { settingInt } from "@/app/lib/settings/numbers";
 import {
-    MAX_OPEN_TICKETS,
-    MAX_TICKETS_PER_DAY,
     notifyNewTicket,
     parseTicketInput,
     toMemberTicket,
@@ -43,6 +43,10 @@ export async function POST(req: Request) {
         return NextResponse.json({ error: parsed.error, field: parsed.field }, { status: 400 });
     }
 
+    // Limits: settings support.maxTicketsPerDay / support.maxOpenTickets (defaults 5 and 10).
+    const settings = await loadSettings();
+    const MAX_TICKETS_PER_DAY = settingInt("support.maxTicketsPerDay", settings);
+    const MAX_OPEN_TICKETS = settingInt("support.maxOpenTickets", settings);
     const since = new Date(Date.now() - 24 * 60 * 60 * 1000);
     const [recent, open] = await Promise.all([
         prisma.supportTicket.count({ where: { discordId: session.discordId, createdAt: { gte: since } } }),

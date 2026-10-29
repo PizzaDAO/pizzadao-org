@@ -16,7 +16,7 @@ import { z } from 'zod'
 import { DEFAULT_ROLE_INCOME, normalizeRoleName, roleIncomeBaseline, type RoleIncome } from '@/app/lib/pep-earn/income-defaults'
 import type { SettingArea, SettingDef } from './registry'
 
-function num(o: {
+export function num(o: {
   key: string
   area?: SettingArea
   label: string

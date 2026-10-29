@@ -91,6 +91,7 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                             saving: t("filtersSaving"),
                             saved: t("filtersSaved"),
                             error: t("filtersError"),
+                            mirrorWarning: t("filtersMirrorWarning"),
                         }}
                     />
                 ) : (

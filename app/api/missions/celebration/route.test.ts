@@ -9,6 +9,7 @@ vi.mock('@/app/lib/missions', () => ({ getCurrentLevel: vi.fn() }))
 vi.mock('@/app/lib/db', () => ({
   prisma: {
     memberProfileExtras: { findUnique: vi.fn(), create: vi.fn(), createMany: vi.fn(), update: vi.fn(), updateMany: vi.fn() },
+    appSetting: { findMany: vi.fn() },
   },
 }))
 
@@ -17,6 +18,7 @@ import { getSession } from '@/app/lib/session'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { getCurrentLevel } from '@/app/lib/missions'
 import { prisma } from '@/app/lib/db'
+import { clearSettingsCache } from '@/app/lib/settings'
 
 const extras = prisma.memberProfileExtras as unknown as Record<string, ReturnType<typeof vi.fn>>
 const ROW = {
@@ -64,5 +66,23 @@ describe('POST /api/missions/celebration claimLevelUp', () => {
 
   it('rejects a non-boolean claimLevelUp', async () => {
     expect((await post({ claimLevelUp: 7 })).status).toBe(400)
+  })
+  it('the off value (10) never celebrates, even at the highest level a member can reach (9)', async () => {
+    clearSettingsCache({ all: true })
+    vi.mocked(prisma.appSetting.findMany).mockResolvedValue([{ key: 'missions.celebrationMinLevel', value: 10 }] as never)
+    vi.mocked(getCurrentLevel).mockResolvedValue(9)
+    const json = await (await post({ claimLevelUp: true })).json()
+    expect(json).toMatchObject({ levelUpClaimed: false, level: 9 })
+    expect(extras.updateMany).not.toHaveBeenCalled()
+    clearSettingsCache({ all: true })
+  })
+
+  it('a lower saved level celebrates earlier', async () => {
+    clearSettingsCache({ all: true })
+    vi.mocked(prisma.appSetting.findMany).mockResolvedValue([{ key: 'missions.celebrationMinLevel', value: 1 }] as never)
+    vi.mocked(getCurrentLevel).mockResolvedValue(1)
+    extras.updateMany.mockResolvedValue({ count: 1 })
+    expect((await (await post({ claimLevelUp: true })).json()).levelUpClaimed).toBe(true)
+    clearSettingsCache({ all: true })
   })
 })

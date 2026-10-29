@@ -78,6 +78,11 @@ export default async function AdminSettingsPage() {
         incomeAmount: t("incomeAmount"),
         incomeEvery: t("incomeEvery"),
         incomeRemove: t("incomeRemove"),
+        addRow: t("addRow"),
+        removeRow: t("removeRow"),
+        listHint: t("listHint", { max: "{max}", chars: "{chars}" }),
+        editedElsewhere: t("editedElsewhere"),
+        cellRequired: t("cellRequired"),
     };
 
     return (

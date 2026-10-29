@@ -24,6 +24,7 @@ export interface PostFiltersLabels {
     saving: string;
     saved: string;
     error: string;
+    mirrorWarning: string;
 }
 
 const toText = (l: string[]) => l.join("\n");
@@ -35,6 +36,7 @@ export function PostFilters({ initial, labels }: { initial: PostFiltersValue; la
     const [terms, setTerms] = useState(toText(initial.excludedCrewLabelTerms));
     const [blocked, setBlocked] = useState(toText(initial.blockedTerms));
     const [state, setState] = useState<"idle" | "saving" | "saved" | "error">("idle");
+    const [stale, setStale] = useState(false);
 
     async function save() {
         setState("saving");
@@ -45,6 +47,8 @@ export function PostFilters({ initial, labels }: { initial: PostFiltersValue; la
                 body: JSON.stringify({ excludedCrewIds: toList(ids), excludedCrewLabelTerms: toList(terms), blockedTerms: toList(blocked) }),
             });
             if (!res.ok) return setState("error");
+            const data = (await res.json().catch(() => ({}))) as { mirrored?: boolean };
+            setStale(data.mirrored === false);
             setState("saved");
             router.refresh();
         } catch {
@@ -76,6 +80,7 @@ export function PostFilters({ initial, labels }: { initial: PostFiltersValue; la
                     {state === "saving" ? labels.saving : labels.save}
                 </button>
                 {state === "saved" && <span className="text-sm">{labels.saved}</span>}
+                {state === "saved" && stale && <span role="alert" className="text-sm text-tomato">{labels.mirrorWarning}</span>}
                 {state === "error" && <span className="text-sm text-tomato">{labels.error}</span>}
             </div>
         </section>

@@ -7,8 +7,9 @@ import { fetchPizzaDAONFTs } from "@/app/lib/nft";
 import { fetchFilteredPOAPs } from "@/app/lib/poap";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { cacheGetOrSet } from "@/app/api/lib/cache";
+import { loadSettings } from "@/app/lib/settings";
+import { mafiaRanks, mafiaSources } from "@/app/lib/settings/mafia";
 import {
-  MAFIA_POINT_SOURCES,
   REGIONAL_CREW_IDS,
   COMMUNITY_CREW_IDS,
   type PointSource,
@@ -70,6 +71,8 @@ async function calculateMafiaPoints(
   const wallet = findWallet(member);
 
   const breakdown: PointBreakdown[] = [];
+  // Point values: the code table, with any saved per-source points (settings mafia.sourcePoints).
+  const MAFIA_POINT_SOURCES = mafiaSources(await loadSettings());
 
   // Run all data fetches in parallel
   const [guildMember, allAttendance, nftData, poapData] = await Promise.all([
@@ -220,7 +223,7 @@ export async function getMafiaRank(
   memberId: string,
 ): Promise<MafiaRankResult> {
   const result = await getMafiaPoints(memberId);
-  const rank = getRankForPoints(result.totalPoints);
+  const rank = getRankForPoints(result.totalPoints, mafiaRanks(await loadSettings()));
   return {
     memberId: result.memberId,
     memberName: result.memberName,
