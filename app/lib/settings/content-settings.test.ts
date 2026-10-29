@@ -204,7 +204,7 @@ describe('content settings: bounds', () => {
       ['reengage.callWindowDays', 1, 30], ['reengage.sendWeekday', 0, 6],
       ['spotlight.maxPerDay', 1, 10], ['spotlight.maxPending', 1, 20],
       ['support.maxTicketsPerDay', 1, 20], ['support.maxOpenTickets', 1, 50],
-      ['roster.minCallsForSuggestion', 1, 20], ['roster.inactiveMonths', 1, 24], ['missions.celebrationMinLevel', 1, 9],
+      ['roster.minCallsForSuggestion', 1, 20], ['roster.inactiveMonths', 1, 24], ['missions.celebrationMinLevel', 1, 10],
     ]
     for (const [k, lo, hi] of cases) {
       expect(ok(k, lo), `${k} min`).toBe(true)

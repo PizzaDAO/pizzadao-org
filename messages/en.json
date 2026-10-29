@@ -916,6 +916,7 @@
     "filtersSaving": "Saving...",
     "filtersSaved": "Saved.",
     "filtersError": "Could not save the filters.",
+    "filtersMirrorWarning": "Saved. The older table copy of these filters could not be updated and is now stale; the saved filters are what posts use.",
     "filtersUnavailable": "Could not load the post filters, so automated posts are paused.",
     "overline": "Call recordings",
     "title": "Recorded calls",
@@ -1321,6 +1322,7 @@
     "removeRow": "Remove",
     "listHint": "One per line, up to {max} lines of {chars} characters.",
     "editedElsewhere": "Edited on the call review page",
+    "cellRequired": "Enter a number",
     "empty": "(empty)"
   },
   "adminMissions": {

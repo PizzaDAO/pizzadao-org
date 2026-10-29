@@ -112,11 +112,22 @@ export async function saveSetting(
       const have = existing ? existing.updatedAt.toISOString() : null
       if (have !== (opts.expectedUpdatedAt ?? null)) throw new SettingError(409, `${key} changed since you loaded it; reload and retry`)
     }
-    const saved = await tx.appSetting.upsert({
-      where: { key },
-      create: { key, value: parsed.value as never, updatedBy: actor },
-      update: { value: parsed.value as never, updatedBy: actor },
-    })
+    let saved
+    if (opts.expectedUpdatedAt === null) {
+      // "Only if there is no row yet": a real insert, so a concurrent insert is a conflict, not an overwrite.
+      try {
+        saved = await tx.appSetting.create({ data: { key, value: parsed.value as never, updatedBy: actor } })
+      } catch (e) {
+        if ((e as { code?: string } | null)?.code === 'P2002') throw new SettingError(409, `${key} changed since you loaded it; reload and retry`)
+        throw e
+      }
+    } else {
+      saved = await tx.appSetting.upsert({
+        where: { key },
+        create: { key, value: parsed.value as never, updatedBy: actor },
+        update: { value: parsed.value as never, updatedBy: actor },
+      })
+    }
     await tx.appSettingChange.create({
       data: { key, oldValue: jsonOrDbNull(existing ? existing.value : null), newValue: jsonOrDbNull(parsed.value), changedBy: actor, note },
     })

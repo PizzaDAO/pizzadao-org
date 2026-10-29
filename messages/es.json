@@ -916,6 +916,7 @@
     "filtersSaving": "Guardando...",
     "filtersSaved": "Guardado.",
     "filtersError": "No se pudieron guardar los filtros.",
+    "filtersMirrorWarning": "Guardado. No se pudo actualizar la copia antigua de estos filtros en la tabla y ahora está desactualizada; las publicaciones usan los filtros guardados.",
     "filtersUnavailable": "No se pudieron cargar los filtros, así que las publicaciones automáticas están en pausa.",
     "overline": "Grabaciones de llamadas",
     "title": "Llamadas grabadas",
@@ -1321,6 +1322,7 @@
     "removeRow": "Quitar",
     "listHint": "Uno por línea, hasta {max} líneas de {chars} caracteres.",
     "editedElsewhere": "Se edita en la página de revisión de llamadas",
+    "cellRequired": "Ingresa un número",
     "empty": "(vacío)"
   },
   "adminMissions": {

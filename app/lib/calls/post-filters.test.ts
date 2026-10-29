@@ -70,13 +70,14 @@ describe('loadPostFilter / savePostFilter', () => {
   it('save stores the cleaned lists as the private setting, mirrors them to the table and refreshes the cache', async () => {
     db.callPostFilter.upsert.mockResolvedValue({})
     const saved = await savePostFilter({ excludedCrewIds: [' crew_x ', 'crew_x'], blockedTerms: ['ZETA'] }, 'u1')
-    expect(saved).toEqual({ excludedCrewIds: ['crew_x'], excludedCrewLabelTerms: [], blockedTerms: ['ZETA'] })
-    expect(saveSetting).toHaveBeenCalledWith('calls.postFilter', saved, 'u1')
+    const filter = { excludedCrewIds: ['crew_x'], excludedCrewLabelTerms: [], blockedTerms: ['ZETA'] }
+    expect(saved).toEqual({ ...filter, mirrored: true })
+    expect(saveSetting).toHaveBeenCalledWith('calls.postFilter', filter, 'u1')
     expect(db.callPostFilter.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 1 }, update: expect.objectContaining({ updatedBy: 'u1' }) }))
   })
   it('a failed table mirror does not fail the save', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     db.callPostFilter.upsert.mockRejectedValue(new Error('x'))
-    await expect(savePostFilter({ blockedTerms: ['ZETA'] }, 'u1')).resolves.toMatchObject({ blockedTerms: ['ZETA'] })
+    await expect(savePostFilter({ blockedTerms: ['ZETA'] }, 'u1')).resolves.toMatchObject({ blockedTerms: ['ZETA'], mirrored: false })
   })
 })

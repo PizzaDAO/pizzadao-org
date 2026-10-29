@@ -51,6 +51,7 @@ export interface SettingsLabels {
     removeRow: string;
     listHint: string;
     editedElsewhere: string;
+    cellRequired: string;
 }
 
 interface IncomeRow {
@@ -155,6 +156,8 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
     );
     const tableInput = s.input.type === "table" ? s.input : null;
     const [rows, setRows] = useState<TableRow[]>(s.input.type === "table" && Array.isArray(s.value) ? (s.value as TableRow[]).map((r) => ({ ...r })) : []);
+    // A cleared number cell is invalid (never coerced to 0): Save stays blocked and the cell says so.
+    const emptyCell = !!tableInput && rows.some((r) => tableInput.columns.some((c) => c.kind === "int" && r[c.key] === ""));
     // The role income table: editable copy of the rows (only amounts and intervals change; rows can be removed).
     const [income, setIncome] = useState<IncomeRow[]>(s.input.type === "roleIncome" && Array.isArray(s.value) ? (s.value as IncomeRow[]).map((r) => ({ ...r })) : []);
     // For a switch, s.value is what is in force (env may have it on), so the box starts there and Save
@@ -178,7 +181,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
         : text.trim();
     const dirty =
         s.input.type === "roleIncome" ? income.length > 0 && JSON.stringify(income) !== JSON.stringify(s.value)
-        : s.input.type === "table" ? rows.length > 0 && JSON.stringify(rows) !== JSON.stringify(s.value)
+        : s.input.type === "table" ? rows.length > 0 && !emptyCell && JSON.stringify(rows) !== JSON.stringify(s.value)
         : s.private && s.input.type === "text" ? text.trim() !== ""
         : s.input.type === "stringList" ? (next as string[]).length > 0 && JSON.stringify(next) !== JSON.stringify(s.value)
         : s.input.type === "int" ? text.trim() !== "" && next !== s.value
@@ -358,12 +361,13 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                                                             value={r[c.key]}
                                                             aria-label={`${String(r[s.input.type === "table" ? s.input.columns[0].key : ""])} ${c.label}`}
                                                             onChange={(e) =>
-                                                                setRows(rows.map((x, j) => (j === i ? { ...x, [c.key]: c.kind === "int" ? Number(e.target.value) : e.target.value } : x)))
+                                                                setRows(rows.map((x, j) => (j === i ? { ...x, [c.key]: c.kind === "int" ? (e.target.value.trim() === "" ? "" : Number(e.target.value)) : e.target.value } : x)))
                                                             }
                                                             className={`${c.kind === "int" ? "w-28 tabular-nums" : "w-40"} rounded-lg border bg-background px-2 py-1`}
                                                             style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
                                                         />
                                                     )}
+                                                    {c.kind === "int" && r[c.key] === "" && <span role="alert" className="block text-xs text-tomato">{labels.cellRequired}</span>}
                                                 </td>
                                             ))}
                                             <td>

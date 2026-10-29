@@ -127,4 +127,18 @@ describe('SettingsEditor phase 5 inputs', () => {
     await waitFor(() => expect(calls).toHaveLength(1))
     expect(calls[0]).toMatchObject({ method: 'PUT', body: { key: 'mafia.sourcePoints', value: [{ id: 'a', points: 9 }, { id: 'b', points: 6 }] } })
   })
+  it('a cleared number cell is invalid: Save is blocked and the cell says so', async () => {
+    const input = { type: 'table', columns: [{ key: 'id', label: 'Source', kind: 'text', fixed: true }, { key: 'points', label: 'Points', kind: 'int', min: 0, max: 1000000 }], maxRows: 2, fixedRows: true }
+    serve([view({ key: 'mafia.sourcePoints', input, toggle: undefined, default: [], value: [{ id: 'a', points: 5 }, { id: 'b', points: 6 }] })])
+    render(<SettingsEditor labels={labels} />)
+    const pts = (await screen.findByLabelText('a Points')) as HTMLInputElement
+    fireEvent.change(pts, { target: { value: '' } })
+    expect(screen.getByText('cellRequired')).toBeTruthy()
+    const save = screen.getByRole('button', { name: 'save' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.click(save)
+    expect(calls).toHaveLength(0)
+    fireEvent.change(pts, { target: { value: '7' } })
+    expect(save.disabled).toBe(false)
+  })
 })

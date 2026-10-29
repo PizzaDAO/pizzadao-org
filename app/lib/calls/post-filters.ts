@@ -90,14 +90,16 @@ export async function loadPostFilter(now: number = Date.now()): Promise<PostFilt
  * Replace the three lists (saved as the private setting, audited with the values masked). The legacy
  * table is updated too, best effort, so rolling the code back does not bring back an older filter.
  */
-export async function savePostFilter(input: Partial<PostFilter>, updatedBy: string): Promise<PostFilter> {
+export async function savePostFilter(input: Partial<PostFilter>, updatedBy: string): Promise<PostFilter & { mirrored: boolean }> {
   const data = clean(input)
   await saveSetting(KEY, data, updatedBy)
+  let mirrored = true
   try {
     await prisma.callPostFilter.upsert({ where: { id: 1 }, create: { id: 1, ...data, updatedBy }, update: { ...data, updatedBy } })
   } catch (e) {
+    mirrored = false
     console.error('[calls/post-filters] could not mirror the filter to the legacy table:', e instanceof Error ? e.message : e)
   }
   clearPostFilterCache()
-  return data
+  return { ...data, mirrored }
 }

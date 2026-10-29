@@ -82,6 +82,7 @@ export default async function AdminSettingsPage() {
         removeRow: t("removeRow"),
         listHint: t("listHint", { max: "{max}", chars: "{chars}" }),
         editedElsewhere: t("editedElsewhere"),
+        cellRequired: t("cellRequired"),
     };
 
     return (
