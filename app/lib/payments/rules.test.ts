@@ -26,6 +26,7 @@ const ctx = (over: Partial<RuleContext> = {}, req: Partial<RuleContext['req']> =
   reusedAttachment: false,
   sharedPayee: false,
   sharedPayeeFormRow: false,
+  repeatFormPayee: false,
   priorFraud: false,
   claimedFraudHint: false,
   restrictedMatches: [],
@@ -98,6 +99,17 @@ describe('rule flags', () => {
   it('a form row is unmatched whatever was typed; a verified requester is not', () => {
     expect(ids(ctx({}, { source: 'FORM', requesterDiscordId: null, requesterMemberId: null }))).toEqual(['unverified_requester', 'unmatched_requester'])
     expect(ids(ctx({}, { source: 'APP', requesterDiscordId: '100000000000000001', requesterMemberId: null }))).toEqual([])
+  })
+
+  it('a form row repeating its own earlier form rows\' payee is a medium hint, not a block', () => {
+    const f = computeRuleFlags(ctx({ repeatFormPayee: true }))
+    expect(f.map((x) => [x.id, x.severity, x.hardBlock ?? false])).toEqual([['repeat_form_payee', 'medium', false]])
+    expect(ids(ctx({ sharedPayee: true, repeatFormPayee: true }))).toEqual(['shared_payee'])
+  })
+
+  it('the shared-payee text does not claim a "different requester" it cannot know', () => {
+    const f = computeRuleFlags(ctx({ sharedPayee: true }))
+    expect(f[0].detail).not.toMatch(/different requester/i)
   })
 
   it('a verified request whose payee also appears on a form row gets a hint, not a block', () => {

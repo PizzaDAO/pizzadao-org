@@ -37,6 +37,8 @@ export interface RuleContext {
   sharedPayee: boolean
   /** A verified request's payee also appears on a public-form row: a hint, never a block. */
   sharedPayeeFormRow: boolean
+  /** A form row's payee matches earlier form rows with the same claimed id: a hint, never a block. */
+  repeatFormPayee: boolean
   /** The (verified) requester, or a linked account, has a request rejected as fraud. */
   priorFraud: boolean
   /** A form row's CLAIMED id belongs to someone with a fraud rejection: a hint, never a block. */
@@ -66,8 +68,9 @@ export function computeRuleFlags(c: RuleContext): PaymentFlag[] {
   const cap = c.policy.onApprovalCapUsd
 
   if (c.reusedAttachment) add({ id: 'reused_attachment', severity: 'high', hardBlock: true, detail: 'A file attached here was already used on another request.' })
-  if (c.sharedPayee) add({ id: 'shared_payee', severity: 'high', hardBlock: true, detail: 'The same payee reference is used by a different requester.' })
+  if (c.sharedPayee) add({ id: 'shared_payee', severity: 'high', hardBlock: true, detail: 'The same payee reference is used on another request from someone else, or from a form that cannot be tied to this requester.' })
   if (c.sharedPayeeFormRow && !c.sharedPayee) add({ id: 'shared_payee_form_row', severity: 'medium', detail: 'The same payee reference also appears on a public-form request. Form rows are unverified, so this is a hint to look into, not a block.' })
+  if (c.repeatFormPayee && !c.sharedPayee) add({ id: 'repeat_form_payee', severity: 'medium', detail: 'Same payee as earlier form rows from the same claimed Discord id. Both are unverified, so this is a hint to look into, not a block.' })
   if (c.priorFraud) add({ id: 'prior_fraud', severity: 'high', hardBlock: true, detail: 'The requester, or a linked account, has a request rejected as fraud.' })
   if (c.claimedFraudHint) add({ id: 'claimed_id_history', severity: 'medium', detail: 'The Discord id typed into this form belongs to someone with a fraud rejection. It is only a claim, so this is a hint to look into, not a block.' })
   if (c.restrictedMatches.length > 0) {

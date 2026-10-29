@@ -298,7 +298,7 @@ export async function applyDecision(
       include: {
         decisions: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
         attachments: { select: { createdAt: true } },
-        checks: { where: { kind: 'RULES' }, orderBy: [{ createdAt: 'desc' }, { id: 'desc' }], take: 1, select: { result: true } },
+        checks: { where: { kind: 'RULES' }, orderBy: { id: 'desc' }, take: 1, select: { result: true } },
       },
     })
     if (!row) return { ok: false as const, status: 404 as const, code: 'not_found' as const, message: 'Not found' }

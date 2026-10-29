@@ -200,14 +200,39 @@ describe('evaluateRequest: claims, resets, approved requests, AI', () => {
     expect(r?.flags.find((f) => f.id === 'shared_payee_form_row')?.hardBlock).toBeUndefined()
   })
 
-  it('shared payee: a form row (claim only) excludes nothing, so a claim cannot exempt the payee owner\'s rows', async () => {
+  it('shared payee: a form row is exempt only from its OWN claimed id\'s earlier form rows; those get a hint', async () => {
     m(prisma.paymentRequest.findUnique).mockResolvedValue(base({ source: 'FORM', requesterDiscordId: null, claimedDiscordId: '200000000000000007', requesterMemberId: null }))
     m(prisma.paymentRequest.findFirst).mockImplementation(async (a: { where: Record<string, unknown> }) => (a.where.payeeHash ? { id: 'owner-row' } : null))
     const r = await evaluateRequest('req1', { policy: policy() })
     const q = m(prisma.paymentRequest.findFirst).mock.calls.find((c) => c[0].where.payeeHash)
-    expect(q?.[0].where).toEqual({ payeeHash: 'abc', id: { not: 'req1' } })
+    // Everything blocks EXCEPT form rows (no verified requester) carrying this same claimed id.
+    expect(q?.[0].where).toEqual({
+      payeeHash: 'abc',
+      id: { not: 'req1' },
+      OR: [{ requesterDiscordId: { not: null } }, { claimedDiscordId: null }, { claimedDiscordId: { not: '200000000000000007' } }],
+    })
     expect(r?.flags.find((f) => f.id === 'shared_payee')).toMatchObject({ severity: 'high', hardBlock: true })
     expect(r?.lane).toBe('HIGH_RISK')
+  })
+
+  it('a form row whose only payee match is its own claimed id\'s earlier form rows: medium hint, no hard block', async () => {
+    m(prisma.paymentRequest.findUnique).mockResolvedValue(base({ source: 'FORM', requesterDiscordId: null, claimedDiscordId: '200000000000000007', requesterMemberId: null }))
+    m(prisma.paymentRequest.findFirst).mockImplementation(async (a: { where: Record<string, unknown> }) =>
+      a.where.payeeHash && a.where.claimedDiscordId === '200000000000000007' ? { id: 'earlier-form-row' } : null)
+    const r = await evaluateRequest('req1', { policy: policy() })
+    const ids = r?.flags.map((f) => f.id)
+    expect(ids).toContain('repeat_form_payee')
+    expect(ids).not.toContain('shared_payee')
+    expect(r?.flags.find((f) => f.id === 'repeat_form_payee')).toMatchObject({ severity: 'medium' })
+    expect(r?.flags.some((f) => f.hardBlock)).toBe(false)
+  })
+
+  it('a verified row of someone else with the same payee still hard-blocks a form row, whatever it claims', async () => {
+    m(prisma.paymentRequest.findUnique).mockResolvedValue(base({ source: 'FORM', requesterDiscordId: null, claimedDiscordId: '200000000000000007', requesterMemberId: null }))
+    m(prisma.paymentRequest.findFirst).mockImplementation(async (a: { where: Record<string, unknown> }) =>
+      a.where.payeeHash && !a.where.claimedDiscordId ? { id: 'verified-owner-row' } : null)
+    const r = await evaluateRequest('req1', { policy: policy() })
+    expect(r?.flags.find((f) => f.id === 'shared_payee')).toMatchObject({ hardBlock: true })
   })
 
   it('says so when the restricted list is switched off', async () => {
