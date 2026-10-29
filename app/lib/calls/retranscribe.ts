@@ -11,17 +11,20 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { asSegments } from './recordings'
 import { TRANSCRIBABLE_STATUSES } from './transcribe'
+import { DISCORD_ONLY, isImportedSource } from './imported'
 
 export type RetranscribeResult =
   | { ok: true; dryRun: boolean; speechLines: number; chatLines: number; tracks: number }
-  | { ok: false; reason: 'not-found' | 'refused' | 'changed'; details: string[] }
+  | { ok: false; reason: 'not-found' | 'refused' | 'changed' | 'not-supported'; details: string[] }
 
 export async function resetForRetranscribe(id: string, opts: { apply?: boolean; forceWorker?: boolean } = {}): Promise<RetranscribeResult> {
   const rec = await prisma.callRecording.findUnique({
     where: { id },
-    select: { status: true, transcript: true, summaryEditedAt: true, reviewedBy: true, transcribeStats: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } }, redactedSegmentIds: true, redactedSpeakerIds: true, updatedAt: true },
+    select: { status: true, source: true, transcript: true, summaryEditedAt: true, reviewedBy: true, transcribeStats: true, speakers: { select: { discordId: true, trackKey: true, talkTimeSec: true } }, redactedSegmentIds: true, redactedSpeakerIds: true, updatedAt: true },
   })
   if (!rec) return { ok: false, reason: 'not-found', details: [] }
+  // An imported call has no audio tracks for the app to redo this from: resetting it would only destroy the transcript. Re-run the import tool instead.
+  if (isImportedSource(rec.source)) return { ok: false, reason: 'not-supported', details: ['imported call: re-run the import tool with --force instead'] }
   const details: string[] = []
   if (!(TRANSCRIBABLE_STATUSES as readonly string[]).includes(rec.status)) details.push(`status is ${rec.status}`)
   if (rec.summaryEditedAt) details.push('summary was edited by a reviewer')
@@ -48,6 +51,7 @@ export async function resetForRetranscribe(id: string, opts: { apply?: boolean; 
   const res = await prisma.callRecording.updateMany({
     where: {
       id,
+      ...DISCORD_ONLY,
       status: { in: [...TRANSCRIBABLE_STATUSES] },
       summaryEditedAt: null,
       reviewedBy: null,

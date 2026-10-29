@@ -1342,6 +1342,14 @@ enum CallRecordingStatus {
 // One recorded call. Written by the recorder worker through the ingest API
 // (idempotent on sessionId). Audio lives in a private R2 bucket and is never
 // public; transcript / summary / actionItems / chapters are filled in Phase 2.
+// Where a call recording came from. Imported calls (anything but DISCORD) get no Discord recap, follow-ups,
+// agenda context or automatic summary unless the matching calls.imported* setting is on.
+enum CallSource {
+  DISCORD
+  X_SPACE
+  X_BROADCAST
+}
+
 model CallRecording {
   id                 String              @id @default(cuid())
   sessionId          String              @unique // worker idempotency key
@@ -1395,6 +1403,13 @@ model CallRecording {
   followupsDraftedAt DateTime?
   followupsAttempts  Int                 @default(0) // automatic drafting attempts; the sweep gives up at 3
   followupsError     String? // last drafting failure (no URLs, max 300 chars)
+  // Imported calls (scripts/calls/x-import.mjs). Discord recordings keep source DISCORD and null in the rest.
+  source             CallSource          @default(DISCORD)
+  sourceUrl          String? // original stream URL; reviewers only, never shown publicly
+  importedAt         DateTime?
+  importedBy         String? // Discord id of the operator
+  importMeta         Json? // engine, model, tool versions, sha256s, speaker count; never text
+  speakerLabelsUpdatedAt DateTime? // last time a reviewer labelled a speaker (the summary may be older)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -1403,6 +1418,7 @@ model CallRecording {
   @@index([status, startedAt])
   @@index([crewId, startedAt])
   @@index([createdAt])
+  @@index([source, startedAt])
 }
 
 model CallSpeaker {
@@ -1413,10 +1429,12 @@ model CallSpeaker {
   talkTimeSec Int           @default(0)
   trackKey    String? // R2 key of this speaker's own track
   trackBytes  Int?
+  linkedDiscordId String? // member an imported (diarized) speaker was identified as; null for guests
   recording   CallRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
 
   @@unique([recordingId, discordId])
   @@index([discordId])
+  @@index([linkedDiscordId])
 }
 
 // UNUSED since 2026-10-25 (calzone-30418): the /record optout command was removed and existing

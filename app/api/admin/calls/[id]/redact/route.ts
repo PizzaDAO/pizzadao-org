@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCallReviewer } from '@/app/lib/calls/access'
 import { setSpeakerRedacted } from '@/app/lib/calls/recordings'
-import { SNOWFLAKE } from '@/app/lib/calls/ingest-schema'
+import { SPEAKER_ID } from '@/app/lib/calls/ingest-schema'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -22,7 +22,7 @@ export const POST = withErrorHandling(async (request: Request, ctx: { params: Pr
   const body = (await request.json().catch(() => null)) as { discordId?: unknown; confirm?: unknown; restore?: unknown } | null
   const restore = body?.restore === true
   if (!restore && body?.confirm !== true) throw new ValidationError('Confirmation required')
-  if (typeof body?.discordId !== 'string' || !SNOWFLAKE.test(body.discordId)) throw new ValidationError('discordId must be a Discord id')
+  if (typeof body?.discordId !== 'string' || !SPEAKER_ID.test(body.discordId)) throw new ValidationError('discordId must be a speaker id')
 
   const { id } = await ctx.params
   const lines = await setSpeakerRedacted(id, body.discordId, !restore)

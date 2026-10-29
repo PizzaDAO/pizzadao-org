@@ -16,6 +16,7 @@ import { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { getObjectBytes } from './r2'
 import { asSegments, generateAndStoreSummaryResult, sanitizeSummaryError, type SummaryResult } from './recordings'
+import { DISCORD_ONLY, importedAllowed } from './imported'
 import type { TranscriptSegment } from './ingest-schema'
 import { analyzeTrack, extractSpeech, mapChunkResult, planSpeech, renderChunkWav, wordJoiner, type Region, type TrackLevels, type WordTime } from './speech'
 
@@ -41,6 +42,8 @@ const SUMMARY_STUCK_MS = 15 * 60 * 1000
 const SUMMARY_RETRY_MS = 60 * 60 * 1000
 /** The sweep stops retrying a summary after this many recorded failures. */
 export const MAX_SUMMARY_ATTEMPTS = 3
+/** The summary sweep only looks at calls this recent (an old row without a summary is a reviewer's call, not the cron's). */
+export const SUMMARY_SWEEP_WINDOW_DAYS = 30
 /** transcribeError of a call whose every track is over the upload limit (retrying cannot help). */
 export const TOO_LARGE_ERROR = 'failed: every track is larger than the upload limit'
 /** transcribeError of a call whose every track has more speech than MAX_SPEECH_MS. */
@@ -371,6 +374,8 @@ function parseTrackResults(v: unknown): { saved: TrackResults; progress: Record<
 }
 
 const eligibleWhere = (now: Date) => ({
+  // Imported calls have no per-speaker tracks and are never re-transcribed by the app.
+  ...DISCORD_ONLY,
   transcribedAt: null,
   status: { in: [...TRANSCRIBABLE_STATUSES] },
   transcribeAttempts: { lt: MAX_ATTEMPTS },
@@ -698,8 +703,12 @@ async function parkForReview(id: string, summarize: NonNullable<TranscribeDeps['
  * reviewer clicks Regenerate; it is not stuck, just stale.
  */
 export async function listNeedingSummary(now = new Date(), take = 3) {
+  // Imported calls are summarized on purpose by the import tool, not by this sweep, unless calls.importedAutoSummarize is on.
+  const withImported = await importedAllowed('calls.importedAutoSummarize')
   return prisma.callRecording.findMany({
     where: {
+      ...(withImported ? {} : DISCORD_ONLY),
+      startedAt: { gte: new Date(now.getTime() - SUMMARY_SWEEP_WINDOW_DAYS * 86_400_000) },
       summary: null,
       summaryEditedAt: null,
       summaryGeneratedAt: null,

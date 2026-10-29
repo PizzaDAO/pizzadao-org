@@ -10,6 +10,10 @@
 import { ValidationError } from '@/app/lib/errors/api-errors'
 
 export const SNOWFLAKE = /^\d{5,25}$/
+/** A speaker id on a stored call: a Discord id, or `xs:N` for a speaker diarized from an imported call. */
+export const SPEAKER_ID = /^(\d{5,25}|xs:\d{1,3})$/
+/** A transcript line key (see segmentKey): chat `c:<messageId>`, speech `s:<speaker>:<startMs>`. */
+export const SEGMENT_KEY = /^(c:\d{5,25}|s:(\d{5,25}|xs:\d{1,3}):\d{1,10})$/
 const SESSION_ID = /^[A-Za-z0-9_-]{6,80}$/
 export const MAX_SPEAKERS = 300
 const MAX_SECONDS = 24 * 3600

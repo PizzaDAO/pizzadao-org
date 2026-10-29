@@ -3,6 +3,7 @@ import { requireCallReviewer } from '@/app/lib/calls/access'
 import { CLAIMED, MAX_ATTEMPTS, PERMANENT_TRANSCRIBE_ERRORS, TRANSCRIBABLE_STATUSES } from '@/app/lib/calls/transcribe'
 import { PENDING_WINDOW_DAYS } from '@/app/lib/calls/recordings'
 import { prisma } from '@/app/lib/db'
+import { DISCORD_ONLY } from '@/app/lib/calls/imported'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ConflictError } from '@/app/lib/errors/api-errors'
 
@@ -31,6 +32,7 @@ export const POST = withErrorHandling(async (_request: Request, ctx: { params: P
   const res = await prisma.callRecording.updateMany({
     where: {
       id,
+      ...DISCORD_ONLY,
       transcribedAt: null,
       status: { in: [...TRANSCRIBABLE_STATUSES] },
       transcribeAttempts: { gte: MAX_ATTEMPTS },
@@ -46,6 +48,7 @@ export const POST = withErrorHandling(async (_request: Request, ctx: { params: P
     const old = await prisma.callRecording.updateMany({
       where: {
         id,
+        ...DISCORD_ONLY,
         transcribedAt: null,
         status: { in: [...TRANSCRIBABLE_STATUSES] },
         transcribeAttempts: 0,

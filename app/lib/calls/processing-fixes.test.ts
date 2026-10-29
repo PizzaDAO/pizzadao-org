@@ -332,6 +332,7 @@ describe('resetForRetranscribe', () => {
     const arg = db.callRecording.updateMany.mock.calls[0][0]
     expect(arg.where).toEqual({
       id: 'r1',
+      source: 'DISCORD',
       status: { in: ['RECORDED', 'PROCESSING', 'IN_REVIEW'] },
       summaryEditedAt: null,
       reviewedBy: null,

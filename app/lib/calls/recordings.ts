@@ -122,13 +122,33 @@ function storedKeys(r: { mixKey: string | null; speakers: Array<{ trackKey: stri
   return [r.mixKey, ...r.speakers.map((s) => s.trackKey)].filter((k): k is string => !!k)
 }
 
-export async function listRecordings(take = 100) {
-  return prisma.callRecording.findMany({
-    orderBy: { startedAt: 'desc' },
-    take,
+export type SourceFilter = 'all' | 'discord' | 'imported'
+export const ADMIN_PAGE_SIZE = 100
+
+export interface ListRecordingsOpts {
+  take?: number
+  source?: SourceFilter
+  status?: 'RECORDED' | 'PROCESSING' | 'IN_REVIEW' | 'PUBLISHED' | 'REJECTED'
+  /** Id of the last row of the previous page. */
+  cursor?: string | null
+}
+
+/** One page of the review list, newest first, with an id cursor for the next page (null on the last page). */
+export async function listRecordingsPage(opts: ListRecordingsOpts = {}) {
+  const take = Math.min(Math.max(opts.take ?? ADMIN_PAGE_SIZE, 1), 500)
+  const where: Prisma.CallRecordingWhereInput = {
+    ...(opts.source === 'discord' ? { source: 'DISCORD' as const } : opts.source === 'imported' ? { source: { not: 'DISCORD' as const } } : {}),
+    ...(opts.status ? { status: opts.status } : {}),
+  }
+  const rows = await prisma.callRecording.findMany({
+    where,
+    orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
+    take: take + 1,
+    ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     select: {
       id: true,
       status: true,
+      source: true,
       eventName: true,
       crewId: true,
       crewLabel: true,
@@ -139,6 +159,12 @@ export async function listRecordings(take = 100) {
       _count: { select: { speakers: true } },
     },
   })
+  const page = rows.slice(0, take)
+  return { rows: page, nextCursor: rows.length > take ? page[page.length - 1].id : null }
+}
+
+export async function listRecordings(take = ADMIN_PAGE_SIZE) {
+  return (await listRecordingsPage({ take })).rows
 }
 
 export async function getRecording(id: string) {

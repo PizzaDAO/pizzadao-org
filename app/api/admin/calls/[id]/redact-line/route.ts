@@ -1,13 +1,14 @@
 import { NextResponse } from 'next/server'
 import { requireCallReviewer } from '@/app/lib/calls/access'
 import { setSegmentRedacted } from '@/app/lib/calls/recordings'
+import { SEGMENT_KEY } from '@/app/lib/calls/ingest-schema'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { NotFoundError, ValidationError } from '@/app/lib/errors/api-errors'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const KEY = /^(c:\d{5,25}|s:\d{5,25}:\d{1,10})$/
+const KEY = SEGMENT_KEY
 
 /**
  * POST /api/admin/calls/[id]/redact-line  { "key": "c:<messageId>", "confirm": true }   hide one transcript line
