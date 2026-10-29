@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
-import { loadBallot, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
+import { loadBallot, parseMine, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
 
 type Ready = { id: string; title: string };
 
@@ -24,6 +24,7 @@ export function GlobalBallotPreparer() {
 
     useEffect(() => {
         let cancelled = false;
+        // Nothing in here may throw or reject: this runs in the root layout on every page, and a failure must be silent.
         (async () => {
             try {
                 const last = Number(sessionStorage.getItem(CHECKED_KEY) || 0);
@@ -34,8 +35,9 @@ export function GlobalBallotPreparer() {
             }
             if (typeof window.matchMedia === "function" && window.matchMedia("(pointer: coarse)").matches) return;
             const r = await fetch("/api/proposals/mine", { cache: "no-store" }).catch(() => null);
-            if (!r?.ok) return;
-            const { proposals } = (await r.json()) as { proposals: Array<{ id: string; title: string; tokenIssued: boolean }> };
+            if (!r?.ok) return; // logged out, feature off or any error: do nothing
+            // Only a well-formed answer from an enabled feature is used; anything else (HTML, {}, null, a mock) is ignored.
+            const proposals = parseMine(await r.json().catch(() => null));
             for (const p of proposals) {
                 if (cancelled) return;
                 if (p.tokenIssued || loadBallot(p.id)) continue;
@@ -45,7 +47,7 @@ export function GlobalBallotPreparer() {
                     /* the proposal page shows its own retry message */
                 }
             }
-        })();
+        })().catch(() => {});
         return () => {
             cancelled = true;
         };

@@ -106,6 +106,26 @@ async function trustedPublicKey(proposalId: string, pageFingerprint?: string | n
   return publicKey
 }
 
+export interface MineItem {
+  id: string
+  title: string
+  tokenIssued: boolean
+}
+
+/** The /api/proposals/mine answer, validated: [] unless the feature is on and the shape is exactly as expected. */
+export function parseMine(body: unknown): MineItem[] {
+  if (!body || typeof body !== 'object') return []
+  const b = body as { enabled?: unknown; proposals?: unknown }
+  if (b.enabled !== true || !Array.isArray(b.proposals)) return []
+  const out: MineItem[] = []
+  for (const p of b.proposals) {
+    if (!p || typeof p !== 'object') continue
+    const { id, title, tokenIssued } = p as { id?: unknown; title?: unknown; tokenIssued?: unknown }
+    if (typeof id === 'string' && /^[A-Za-z0-9_-]{8,60}$/.test(id) && typeof title === 'string') out.push({ id, title, tokenIssued: tokenIssued !== false })
+  }
+  return out
+}
+
 const inFlight = new Map<string, Promise<Ballot | null>>()
 
 /**
