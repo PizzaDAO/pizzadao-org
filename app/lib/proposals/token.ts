@@ -1,5 +1,5 @@
 /**
- * Blind-signed ballot tokens (RSABSSA, the same suite and key pair as the retired /vote polls).
+ * Blind-signed ballot tokens (RSABSSA-SHA384-PSS-Randomized) under a PER-PROPOSAL key pair (see keys.ts).
  *
  * Issuance (the member's browser sends a BLINDED message; we sign it without seeing the token) and
  * voting (an unauthenticated request carries the unblinded token + signature) are separate requests,
@@ -7,10 +7,12 @@
  *
  * Token format: proposal-<proposalId>-<uuid>. The signed "prepared message" is 32 random bytes followed
  * by UTF-8(token); the server checks that it really encodes the token, or one signature could be
- * replayed with unlimited fresh tokens.
+ * replayed with unlimited fresh tokens. The key is the proposal's own, so a token minted under one proposal
+ * and labelled for another fails both the label check and the signature check.
  */
 import { blindSign, fromBase64, hashToken, importPrivateKey, importPublicKey } from '@/utils/blindRsa'
 import { preparedMessageEncodesToken } from '@/utils/voteToken'
+import { unwrapPrivateKey } from './keys'
 
 export const MAX_TOKEN_LENGTH = 512
 const SALT_LENGTH_SHA384 = 48
@@ -46,18 +48,18 @@ function cachedKey(kind: 'private' | 'public', pem: string): Promise<CryptoKey> 
 
 export class TokenConfigError extends Error {}
 
-/** Sign a blinded message with the voting private key. Throws TokenConfigError when the key is not set. */
-export async function signBlinded(blindedMessageB64: string, env: NodeJS.ProcessEnv = process.env): Promise<string> {
-  const pem = env.RSA_PRIVATE_KEY_PEM
-  if (!pem) throw new TokenConfigError('RSA_PRIVATE_KEY_PEM is not set')
+/** Sign a blinded message with THIS proposal's private key (unwrapped just for the call). */
+export async function signBlinded(
+  proposal: { id: string; keyPrivateEnc: string | null },
+  blindedMessageB64: string,
+  env: NodeJS.ProcessEnv = process.env,
+): Promise<string> {
+  if (!proposal.keyPrivateEnc) throw new TokenConfigError('proposal has no signing key')
   const blinded = fromBase64(blindedMessageB64)
-  if (blinded.length < 64 || blinded.length > 1024) throw new Error('bad blinded message')
+  if (blinded.length < 128 || blinded.length > 1024) throw new Error('bad blinded message')
+  const pem = await unwrapPrivateKey(proposal.keyPrivateEnc, proposal.id, env)
   const sig = await blindSign(await cachedKey('private', pem), blinded)
   return Buffer.from(sig).toString('base64')
-}
-
-export function publicKeyPem(env: NodeJS.ProcessEnv = process.env): string | null {
-  return env.RSA_PUBLIC_KEY_PEM?.trim() || null
 }
 
 export interface BallotCredentials {
@@ -66,14 +68,12 @@ export interface BallotCredentials {
   signature: string
 }
 
-/** Null when the credentials are valid for this proposal, else a short error. Never logs the token. */
+/** Null when the credentials are valid for this proposal under its public key, else a short error. Never logs the token. */
 export async function verifyBallotCredentials(
-  proposalId: string,
+  proposal: { id: string; keyPublicPem: string | null },
   c: BallotCredentials,
-  env: NodeJS.ProcessEnv = process.env,
 ): Promise<string | null> {
-  const pem = env.RSA_PUBLIC_KEY_PEM
-  if (!pem) throw new TokenConfigError('RSA_PUBLIC_KEY_PEM is not set')
+  if (!proposal.keyPublicPem) throw new TokenConfigError('proposal has no public key')
   let sig: Uint8Array
   let prepared: Uint8Array
   try {
@@ -82,10 +82,10 @@ export async function verifyBallotCredentials(
   } catch {
     return 'Invalid signature'
   }
-  const binding = validateProposalTokenBinding(c.token, proposalId, prepared)
+  const binding = validateProposalTokenBinding(c.token, proposal.id, prepared)
   if (binding) return binding
   try {
-    const key = await cachedKey('public', pem)
+    const key = await cachedKey('public', proposal.keyPublicPem)
     const ok = await crypto.subtle.verify({ name: 'RSA-PSS', saltLength: SALT_LENGTH_SHA384 }, key, new Uint8Array(sig), new Uint8Array(prepared))
     return ok ? null : 'Invalid signature'
   } catch {

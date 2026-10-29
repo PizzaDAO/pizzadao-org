@@ -1613,7 +1613,7 @@
     "form": {
       "meta": "Nueva propuesta",
       "title": "Nueva propuesta",
-      "dek": "Rellena la plantilla de propuesta. La votación se abre enseguida.Solo pueden enviarla quienes tienen una Rare Pizzas Box; si no tienes una, pide a alguien que la tenga que la envíe por ti y nómbralo como patrocinador.",
+      "dek": "Rellena la plantilla de propuesta. La votación se abre enseguida. Solo pueden enviarla los miembros con el rol Box Mafia; si no lo tienes, pide a alguien que lo tenga que la envíe por ti y nómbralo como patrocinador.",
       "fieldKind": "Tipo",
       "fieldTitle": "Título del evento o propuesta",
       "fieldAmount": "Importe solicitado (USD)",
@@ -1633,7 +1633,7 @@
       "back": "Volver a propuestas",
       "errors": {
         "generic": "No se pudo enviar tu propuesta. Inténtalo de nuevo.",
-        "not_holder": "Solo quienes tienen una Rare Pizzas Box pueden enviar una propuesta. Pide a alguien que la tenga que la envíe por ti.",
+        "not_holder": "Solo los miembros con el rol Box Mafia pueden enviar una propuesta. Pide a alguien que lo tenga que la envíe por ti.",
         "bad_kind": "Elige un tipo.",
         "bad_title": "Añade un título (al menos 3 caracteres).",
         "bad_description": "Añade una descripción (al menos 20 caracteres).",
@@ -1652,7 +1652,8 @@
       "event": "Fecha del evento: {date}",
       "city": "Lugar: {city}",
       "sponsor": "Patrocinador: {sponsor}",
-      "cancelled": "Esta propuesta fue cancelada."
+      "cancelled": "Esta propuesta fue cancelada.",
+      "fingerprint": "Huella de la clave de votación: {fp}"
     },
     "vote": {
       "heading": "Tu voto",
@@ -1662,7 +1663,7 @@
       "preparing": "Preparando tu papeleta...",
       "working": "Registrando...",
       "recorded": "Registrado: {choice}. Puedes cambiarlo hasta el {date}.",
-      "notEligible": "Solo pueden votar quienes tenían una Rare Pizzas Box cuando se abrió esta propuesta.",
+      "notEligible": "Solo pueden votar los miembros con el rol Box Mafia cuando se abrió esta propuesta.",
       "closed": "La votación está cerrada.",
       "login": "Inicia sesión para votar.",
       "loginLink": "Iniciar sesión",
@@ -1676,7 +1677,36 @@
       "codeHelp": "Guárdalo para cambiar tu voto desde otro navegador o dispositivo. Quien lo tenga puede cambiar tu voto, asi que no lo compartas. Si lo pierdes, aún puedes cambiar tu voto aquí.",
       "copy": "Copiar",
       "copied": "Copiado",
-      "secret": "Tu voto es secreto: el sitio no puede saber quién emitió cada voto."
+      "secret": "Tu voto es secreto: el sitio no puede saber quién emitió cada voto.",
+      "saveTitle": "Guarda ahora tu código de voto",
+      "saveHelp": "Tu papeleta solo existe en este navegador. Guarda el código (o respáldala con una wallet) para poder cambiar tu voto más tarde o desde otro dispositivo. Si pierdes ambos, tu voto sigue contando pero no se podrá cambiar.",
+      "saveCode": "Guardar código",
+      "saveShared": "Código compartido.",
+      "saveFailed": "No se pudo compartir ni copiar automáticamente. Abre \"Tu código de voto\" abajo y cópialo a mano.",
+      "queued": "Tu voto ({choice}) se enviará en breve. Deja esta web abierta o vuelve más tarde; puedes cambiarlo hasta que la propuesta cierre.",
+      "fingerprint": "Huella de la clave de votación: {fp}",
+      "backupWallet": "Respaldar con una wallet",
+      "backupHelp": "Conecta cualquier wallet y firma un mensaje (sin transacción ni coste). La firma se queda en tu navegador y cifra tu papeleta; solo se guarda la copia cifrada. Para restaurar en otro dispositivo, conecta la misma wallet y firma el mismo mensaje.",
+      "backupNow": "Respaldar mi papeleta",
+      "restoreNow": "Restaurar mi papeleta",
+      "backupDone": "Respaldado. Puedes restaurarlo con la misma wallet en cualquier dispositivo.",
+      "backupFailed": "El respaldo no funcionó. Usa Guardar código.",
+      "backupNotRepeatable": "Esta wallet firma distinto cada vez (habitual en wallets de contrato inteligente), así que un respaldo no podría restaurarse. Usa Guardar código, o conecta una wallet normal.",
+      "restoreNone": "No hay respaldo para esta propuesta.",
+      "restoreWrongWallet": "Esa wallet no puede abrir el respaldo. Conecta la wallet con la que lo hiciste.",
+      "restoreDone": "Papeleta restaurada en este dispositivo.",
+      "restoreFailed": "No se pudo restaurar. Inténtalo de nuevo o usa tu código de voto."
+    },
+    "banner": {
+      "region": "Papeleta lista",
+      "ready": "Tu papeleta para \"{title}\" está lista.",
+      "save": "Guarda ahora tu código de voto para poder cambiar tu voto más tarde o desde otro dispositivo.",
+      "saveCode": "Guardar código",
+      "open": "Abrir propuesta",
+      "dismiss": "Cerrar",
+      "shared": "Código compartido.",
+      "copied": "Código copiado.",
+      "failed": "No se pudo copiar. Abre la propuesta y copia el código desde allí."
     }
   }
 }

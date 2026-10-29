@@ -85,6 +85,12 @@ describe('approving a VOTE_REQUIRED request', () => {
     if (r.ok) expect(r.checklist).toMatchObject({ proposalPassed: true, ayesConfirmed: 31, proposalId: 'prop1' })
   })
 
+  it('refuses approval when the requests already funded from the proposal, with this one, exceed what it passed for (M3)', () => {
+    const prop = { id: 'prop1', status: 'PASSED', amountUsdCents: 100_000, ayes: 30 }
+    expect(code(approve(big({ proposal: prop, proposalFundedCents: 100_000 })))).toBe('ok')
+    expect(code(approve(big({ proposal: prop, proposalFundedCents: 130_000 })))).toBe('proposal_exhausted')
+  })
+
   it('with proposals off the old poll rules apply unchanged', () => {
     const off = snapshot({ amountUsdCents: 100_000, lane: 'VOTE_REQUIRED', proposalUrl: 'https://example.com/poll' })
     expect(code(approve(off))).toBe('proposal_unconfirmed')

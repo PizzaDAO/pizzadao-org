@@ -120,7 +120,9 @@ export function rateLimitIp(ip: string): string {
 
 /** Hash the IP so raw addresses never land in Redis keys. */
 function ipKey(ip: string): string {
-  return createHash("sha256").update(`rl:${ip}`).digest("hex").slice(0, 32);
+  // RATE_LIMIT_IP_SALT (a server secret) keeps the hash from being reversed by trying every address; it matters most for
+  // the secret vote endpoint, whose throttle keys must not let anyone with a Redis dump recover who voted from where.
+  return createHash("sha256").update(`rl:${process.env.RATE_LIMIT_IP_SALT ?? ""}:${ip}`).digest("hex").slice(0, 32);
 }
 
 export function isUpstashConfigured(): boolean {

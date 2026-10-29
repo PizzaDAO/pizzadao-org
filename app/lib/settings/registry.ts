@@ -838,7 +838,7 @@ export const SETTINGS = {
   'discord.proposalsChannelId': channelSetting({
     key: 'discord.proposalsChannelId',
     label: 'Proposals channel',
-    help: 'Where each new proposal and its result are posted, with a link to vote. There is no voting in Discord (votes are secret).',
+    help: 'Where each new proposal and its result are posted, with a link to vote and the proposal\'s voting-key fingerprint. There is no voting in Discord (votes are secret). Empty uses the PROPOSALS_CHANNEL_ID environment value, then the channel named "proposals". Checked against the server when saved.',
   }),
   'discord.proposalsPingRoleId': proposalsPingRole,
   'missions.slaPingRoleId': slaPingRole,
@@ -866,6 +866,18 @@ export const SETTINGS = {
     help: 'The whole feature: proposal pages, secret ballots, the Discord posts, and the payments link to a passed proposal. Off: every page answers as if it does not exist and payments behave as before. The PROPOSALS_ENABLED env var set to off always wins.',
     confirmOn: 'Proposals go live: payment requests above the on-approval cap will need a passed in-app proposal, and Sesh links stop being accepted.',
   }),
+  'proposals.voterRoleId': {
+    key: 'proposals.voterRoleId',
+    area: 'proposals',
+    label: 'Voter role',
+    help: 'Members holding this role when a proposal opens can vote on it, and can submit proposals. Empty uses the Box Mafia role (assigned by the holder-verification bot, which checks a wallet signature). Applies to proposals opened from now on. Checked against the server when saved.',
+    schema: optionalSnowflake,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    input: { type: 'role' },
+    // This decides who can pass spending: every change is confirmed.
+    confirm: (from: string, to: string) => (to !== from ? 'This changes who can vote on proposals that approve spending.' : null),
+  } as SettingDef<string>,
   'proposals.windowDays': intSetting({
     key: 'proposals.windowDays',
     area: 'proposals',

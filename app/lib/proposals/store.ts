@@ -12,7 +12,8 @@
  */
 import { prisma } from '@/app/lib/db'
 import { COUNT_ABSTAINS, DAY_MS, DRAFT_RETRY_MS, REQUIRE_AYES_OVER_NAYS } from './constants'
-import { defaultSnapshotDeps, snapshotEligibleVoters, type SnapshotDeps } from './eligibility'
+import { defaultRoleDeps, snapshotRoleHolders, type RoleDeps } from './eligibility'
+import { generateProposalKeyPair, wrapPrivateKey } from './keys'
 import { ayesNeededFor, loadProposalRules, type ProposalRules } from './rules'
 import { countBallots, tallyProposal } from './tally'
 import { ballotKey, signBlinded, verifyBallotCredentials, type BallotCredentials } from './token'
@@ -62,25 +63,34 @@ export async function createProposal(input: NewProposal & { proposerDiscordId: s
 
 // -------------------------------------------------------------------- open
 
+/** Voting is production-only: previews share the production database, so they must never open, issue or count. */
+export function isProduction(env: NodeJS.ProcessEnv = process.env): boolean {
+  return env.VERCEL_ENV === 'production'
+}
+
 export type OpenResult =
-  | { ok: true; eligible: number; lookupErrors: number }
-  | { ok: false; code: 'not_found' | 'not_draft' }
+  | { ok: true; eligible: number }
+  | { ok: false; code: 'not_found' | 'not_draft' | 'not_production' }
 
 /**
- * Open a DRAFT proposal: take the eligibility snapshot, copy the rules onto it and start the window.
- * The snapshot (one chain lookup per member with a wallet) runs outside the transaction; the transaction
- * only lands if the proposal is still a DRAFT, so a second open attempt changes nothing.
+ * Open a DRAFT proposal: list the voter-role holders (strict: any Discord failure aborts), generate this proposal's
+ * own signing key pair, copy the rules onto it and start the window. The slow parts run outside the transaction;
+ * the transaction only lands if the proposal is still a DRAFT, so a second open attempt changes nothing.
  */
 export async function openProposal(
   id: string,
-  opts: { now?: Date; deps?: SnapshotDeps; rules?: ProposalRules } = {},
+  opts: { now?: Date; deps?: RoleDeps; rules?: ProposalRules; env?: NodeJS.ProcessEnv; keyBits?: number } = {},
 ): Promise<OpenResult> {
+  const env = opts.env ?? process.env
+  if (!isProduction(env)) return { ok: false, code: 'not_production' }
   const now = opts.now ?? new Date()
   const p = await prisma.proposal.findUnique({ where: { id }, select: { status: true, kind: true, amountUsdCents: true } })
   if (!p) return { ok: false, code: 'not_found' }
   if (p.status !== 'DRAFT') return { ok: false, code: 'not_draft' }
   const rules = opts.rules ?? (await loadProposalRules())
-  const snap = await snapshotEligibleVoters(opts.deps ?? defaultSnapshotDeps)
+  const snap = await snapshotRoleHolders(opts.deps ?? defaultRoleDeps)
+  const pair = await generateProposalKeyPair(opts.keyBits)
+  const keyPrivateEnc = await wrapPrivateKey(pair.privatePem, id, env)
   const closesAt = new Date(now.getTime() + rules.windowDays * DAY_MS)
   const ayesNeeded = ayesNeededFor(p.kind, p.amountUsdCents, rules)
   return prisma.$transaction(async (tx) => {
@@ -100,18 +110,28 @@ export async function openProposal(
         countAbstains: COUNT_ABSTAINS,
         requireAyesOverNays: REQUIRE_AYES_OVER_NAYS,
         eligibleCount: snap.discordIds.length,
+        voterRoleId: snap.roleId,
+        keyPublicPem: pair.publicPem,
+        keyFingerprint: pair.fingerprint,
+        keyPrivateEnc,
       },
     })
-    await logEvent(tx, id, 'OPENED', null, { eligible: snap.discordIds.length, lookupErrors: snap.errors, ayesNeeded, windowDays: rules.windowDays })
-    return { ok: true as const, eligible: snap.discordIds.length, lookupErrors: snap.errors }
+    await logEvent(tx, id, 'OPENED', null, { eligible: snap.discordIds.length, ayesNeeded, windowDays: rules.windowDays })
+    return { ok: true as const, eligible: snap.discordIds.length }
   })
+}
+
+/** The proposal's public voting key and fingerprint (null until it has opened). */
+export async function getPublicKey(proposalId: string): Promise<{ publicKey: string; fingerprint: string } | null> {
+  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { keyPublicPem: true, keyFingerprint: true } })
+  return p?.keyPublicPem && p.keyFingerprint ? { publicKey: p.keyPublicPem, fingerprint: p.keyFingerprint } : null
 }
 
 // ------------------------------------------------------------ token issue
 
 export type IssueResult =
   | { ok: true; blindSignature: string }
-  | { ok: false; code: 'not_found' | 'closed' | 'not_eligible' | 'already_issued' | 'bad_request' }
+  | { ok: false; code: 'not_found' | 'closed' | 'not_eligible' | 'already_issued' | 'bad_request' | 'not_production' }
 
 /**
  * Sign a blinded ballot token for an eligible member, once per proposal. The server never sees the token.
@@ -122,11 +142,13 @@ export async function issueToken(
   proposalId: string,
   discordId: string,
   blindedMessage: unknown,
-  opts: { now?: Date; sign?: (blinded: string) => Promise<string> } = {},
+  opts: { now?: Date; env?: NodeJS.ProcessEnv } = {},
 ): Promise<IssueResult> {
+  const env = opts.env ?? process.env
+  if (!isProduction(env)) return { ok: false, code: 'not_production' }
   const now = opts.now ?? new Date()
-  if (typeof blindedMessage !== 'string' || blindedMessage.length < 80 || blindedMessage.length > 2000) return { ok: false, code: 'bad_request' }
-  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { status: true, closesAt: true } })
+  if (typeof blindedMessage !== 'string' || blindedMessage.length < 150 || blindedMessage.length > 2000) return { ok: false, code: 'bad_request' }
+  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { id: true, status: true, closesAt: true, keyPrivateEnc: true } })
   if (!p) return { ok: false, code: 'not_found' }
   if (p.status !== 'OPEN' || !p.closesAt || now >= p.closesAt) return { ok: false, code: 'closed' }
   const voter = await prisma.proposalVoter.findUnique({
@@ -137,7 +159,7 @@ export async function issueToken(
   if (voter.tokenIssuedAt) return { ok: false, code: 'already_issued' }
   let blindSignature: string
   try {
-    blindSignature = await (opts.sign ?? signBlinded)(blindedMessage)
+    blindSignature = await signBlinded(p, blindedMessage, env)
   } catch (e) {
     if (e instanceof Error && e.message === 'bad blinded message') return { ok: false, code: 'bad_request' }
     throw e
@@ -150,11 +172,30 @@ export async function issueToken(
   return { ok: true, blindSignature }
 }
 
+// ----------------------------------------------------------- ballot backup
+
+const MAX_BLOB = 6000
+
+/**
+ * Optional wallet-encrypted ballot backup. The server stores ciphertext only: the key is derived in the browser
+ * from a wallet signature that never leaves it. Replaces any earlier backup.
+ */
+export async function saveBallotBlob(proposalId: string, discordId: string, blob: unknown): Promise<'ok' | 'not_eligible' | 'bad_request'> {
+  if (typeof blob !== 'string' || blob.length < 20 || blob.length > MAX_BLOB || !/^[A-Za-z0-9+/_=-]+$/.test(blob)) return 'bad_request'
+  const r = await prisma.proposalVoter.updateMany({ where: { proposalId, discordId }, data: { ballotBlob: blob } })
+  return r.count === 1 ? 'ok' : 'not_eligible'
+}
+
+export async function getBallotBlob(proposalId: string, discordId: string): Promise<{ eligible: boolean; blob: string | null }> {
+  const v = await prisma.proposalVoter.findUnique({ where: { proposalId_discordId: { proposalId, discordId } }, select: { ballotBlob: true } })
+  return { eligible: !!v, blob: v?.ballotBlob ?? null }
+}
+
 // -------------------------------------------------------------------- vote
 
 export type BallotResult =
   | { ok: true }
-  | { ok: false; code: 'not_found' | 'closed' | 'bad_request' | 'invalid_token' }
+  | { ok: false; code: 'not_found' | 'closed' | 'bad_request' | 'invalid_token' | 'not_production' }
 
 /**
  * Record (or replace) a ballot. No session, no member id: the signature on the token is the only credential.
@@ -166,15 +207,16 @@ export async function castBallot(
   choice: unknown,
   opts: { now?: Date; env?: NodeJS.ProcessEnv } = {},
 ): Promise<BallotResult> {
+  if (!isProduction(opts.env ?? process.env)) return { ok: false, code: 'not_production' }
   const now = opts.now ?? new Date()
   if (typeof choice !== 'string' || !(CHOICES as readonly string[]).includes(choice)) return { ok: false, code: 'bad_request' }
   if (![creds.token, creds.preparedMessage, creds.signature].every((v) => typeof v === 'string' && v.length > 0 && v.length < 4000)) {
     return { ok: false, code: 'bad_request' }
   }
-  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { status: true, closesAt: true } })
+  const p = await prisma.proposal.findUnique({ where: { id: proposalId }, select: { id: true, status: true, closesAt: true, keyPublicPem: true } })
   if (!p) return { ok: false, code: 'not_found' }
   if (p.status !== 'OPEN' || !p.closesAt || now >= p.closesAt) return { ok: false, code: 'closed' }
-  const bad = await verifyBallotCredentials(proposalId, creds, opts.env)
+  const bad = await verifyBallotCredentials(p, creds)
   if (bad) return { ok: false, code: 'invalid_token' }
   const tokenHash = await ballotKey(proposalId, creds.token)
   return prisma.$transaction(async (tx) => {
@@ -287,7 +329,22 @@ export async function listProposals(recentLimit = 30): Promise<{ open: ProposalS
   return { open: (open as ProposalRow[]).map(toSummary), recent: (recent as ProposalRow[]).map(toSummary) }
 }
 
+/** Open proposals this member is in the voter snapshot for (id, title, close time, token already issued?). */
+export async function openForViewer(discordId: string): Promise<Array<{ id: string; title: string; closesAt: string | null; tokenIssued: boolean }>> {
+  const rows = await prisma.proposalVoter.findMany({
+    where: { discordId, proposal: { status: 'OPEN' } },
+    select: { proposalId: true, tokenIssuedAt: true, proposal: { select: { title: true, closesAt: true } } },
+  })
+  return (rows as Array<{ proposalId: string; tokenIssuedAt: Date | null; proposal: { title: string; closesAt: Date | null } }>).map((r) => ({
+    id: r.proposalId,
+    title: r.proposal.title,
+    closesAt: r.proposal.closesAt?.toISOString() ?? null,
+    tokenIssued: !!r.tokenIssuedAt,
+  }))
+}
+
 export interface ProposalDetail extends ProposalSummary {
+  keyFingerprint: string | null
   body: string
   eventDate: string | null
   sponsorLabel: string | null
@@ -299,12 +356,13 @@ export interface ProposalDetail extends ProposalSummary {
 export async function getProposalDetail(id: string, viewerDiscordId: string): Promise<ProposalDetail | null> {
   const r = await prisma.proposal.findUnique({
     where: { id },
-    select: { ...SUMMARY_SELECT, body: true, eventDate: true, sponsorLabel: true, eligibleCount: true, proposerDiscordId: true },
+    select: { ...SUMMARY_SELECT, body: true, eventDate: true, sponsorLabel: true, eligibleCount: true, proposerDiscordId: true, keyFingerprint: true },
   })
   if (!r) return null
   return {
     ...toSummary(r as ProposalRow),
     body: r.body,
+    keyFingerprint: r.keyFingerprint,
     eventDate: r.eventDate ? r.eventDate.toISOString().slice(0, 10) : null,
     sponsorLabel: r.sponsorLabel,
     ayesNeeded: r.ayesNeeded,

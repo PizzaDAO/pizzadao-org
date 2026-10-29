@@ -48,6 +48,8 @@ export interface RequestSnapshot {
   /** Proposals are on: the in-app proposal replaces the poll link and the typed ayes. */
   proposalsOn?: boolean
   proposal?: { id: string; status: string; amountUsdCents: number | null; ayes: number } | null
+  /** Cents of every non-rejected, non-withdrawn request linked to that proposal, THIS one included (re-summed under a lock at approval). */
+  proposalFundedCents?: number
   amountUsdCents: number
   updatedAt: Date
 }
@@ -195,6 +197,9 @@ export function evaluateDecision(
         if (!p) return fail(400, 'proposal_missing', 'This amount needs a passed proposal linked to the request')
         if (p.status !== 'PASSED') return fail(400, 'proposal_not_passed', 'The linked proposal has not passed')
         if (p.amountUsdCents != null && req.amountUsdCents > p.amountUsdCents) return fail(400, 'amount_over_proposal', 'The request asks for more than the proposal that passed')
+        if (p.amountUsdCents != null && (req.proposalFundedCents ?? req.amountUsdCents) > p.amountUsdCents) {
+          return fail(400, 'proposal_exhausted', 'The requests already funded from this proposal, with this one, are more than it passed for')
+        }
         checklist.proposalPassed = true
         checklist.ayesConfirmed = p.ayes
         checklist.proposalId = p.id
@@ -320,6 +325,18 @@ export async function applyDecision(
     if (opts.expectedUpdatedAt && opts.expectedUpdatedAt !== row.updatedAt.toISOString()) {
       return fail(409, 'conflict', 'This request changed since you opened it. Reload and try again.')
     }
+    // Proposals on and linked: lock the proposal row and re-sum what is already committed to it, so two approvals racing
+    // on one proposal cannot together exceed what it passed for.
+    let proposalFundedCents: number | undefined
+    if (proposalsOn && row.proposalId) {
+      await tx.$queryRaw`SELECT id FROM "Proposal" WHERE id = ${row.proposalId} FOR UPDATE`
+      const linked = await tx.paymentRequest.findMany({
+        where: { proposalId: row.proposalId, status: { notIn: ['REJECTED', 'WITHDRAWN'] } },
+        select: { id: true, amountUsdCents: true },
+      })
+      proposalFundedCents = (linked as Array<{ id: string; amountUsdCents: number }>).reduce((n, r) => n + r.amountUsdCents, 0)
+      if (!(linked as Array<{ id: string }>).some((r) => r.id === row.id)) proposalFundedCents += row.amountUsdCents
+    }
     const flags = (Array.isArray(row.flags) ? row.flags : []) as unknown as PaymentFlag[]
     const linked = row.requesterDiscordId ? await linkedDiscordIds(tx, row.requesterDiscordId) : []
     const decisions = row.decisions as unknown as DecisionRow[]
@@ -344,6 +361,7 @@ export async function applyDecision(
       proposalUrl: row.proposalUrl,
       proposalsOn,
       proposal: proposalsOn ? row.proposal : null,
+      proposalFundedCents,
       amountUsdCents: row.amountUsdCents,
       updatedAt: row.updatedAt,
     }

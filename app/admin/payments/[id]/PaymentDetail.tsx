@@ -76,6 +76,7 @@ export function PaymentDetail({ id }: { id: string }) {
     const [usd, setUsd] = useState("");
     const [fraud, setFraud] = useState(false);
     const [busy, setBusy] = useState(false);
+    const [linkId, setLinkId] = useState("");
 
     const load = useCallback(async () => {
         try {
@@ -186,7 +187,24 @@ export function PaymentDetail({ id }: { id: string }) {
                                 {r.proposal.amountUsd != null ? `, passed for $${r.proposal.amountUsd}` : ""}). The vote is counted by the app.
                             </>
                         ) : (
-                            "Above the on-approval cap: needs a passed in-app proposal, and none is linked."
+                            <>
+                                Above the on-approval cap: needs a passed in-app proposal, and none is linked.
+                                {r.status === "RECEIVED" || r.status === "NEEDS_INFO" ? (
+                                    <span className="mt-2 flex flex-wrap items-center gap-2">
+                                        <input className={field} placeholder="Proposal link or id" value={linkId} onChange={(e) => setLinkId(e.target.value)} />
+                                        <button
+                                            type="button"
+                                            disabled={busy || !linkId.trim()}
+                                            className="min-h-10 px-4 rounded border"
+                                            onClick={() =>
+                                                post(`/api/admin/payments/${id}/proposal`, { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ proposalId: linkId.trim().split("/").filter(Boolean).pop() }) }, "Proposal linked.")
+                                            }
+                                        >
+                                            Link passed proposal
+                                        </button>
+                                    </span>
+                                ) : null}
+                            </>
                         )
                     ) : (
                         <>

@@ -1,74 +1,79 @@
 /**
- * Who may vote: members whose linked wallets hold a Rare Pizzas Box NFT (the same check as the L5.3 mission,
- * checkRarePizzaBox). The set is taken ONCE, when a proposal opens; a box moved to another wallet or member
- * afterwards cannot add a vote. One vote per member however many boxes. A failed lookup excludes the member
- * (fail closed) and is counted so the open event shows it.
+ * Who may vote: guild members holding the voter role (Box Mafia by default) at the moment a proposal opens. That
+ * role is assigned by a holder-verification bot that already requires a wallet signature, so the app does no
+ * wallet verification of its own. The set is taken ONCE, at open; a role gained afterwards cannot add a vote.
+ * One vote per member. The listing is strict: any Discord failure aborts the open (the proposal stays a DRAFT and
+ * the cron retries) instead of opening with a partial list.
  */
-import { prisma } from '@/app/lib/db'
-import { checkRarePizzaBox, type Lookup } from '@/app/lib/rare-pizza-box'
-import { fetchMemberById } from '@/app/lib/sheets/member-repository'
+import { getGuildRoles } from '@/app/lib/discord-channels'
+import { resolveBoxMafiaRoleId } from '@/app/lib/box-mafia'
+import { hasRole } from '@/app/lib/discord'
+import { getSetting } from '@/app/lib/settings'
 
-export interface Candidate {
-  memberId: string
-  /** From the wallet row when known; otherwise resolved through `resolveDiscordId`. */
-  discordId: string | null
+export interface RoleDeps {
+  /** The role id that makes someone a voter, or null when it cannot be resolved (fail closed). */
+  voterRoleId(): Promise<string | null>
+  /** Every guild member with the role. Throws on any failure or an incomplete listing. */
+  listRoleHolders(roleId: string): Promise<string[]>
 }
 
-export interface SnapshotDeps {
-  candidates(): Promise<Candidate[]>
-  resolveDiscordId(memberId: string): Promise<string | null>
-  holdsBox(memberId: string): Promise<Lookup>
-  concurrency?: number
-}
-
-export interface Snapshot {
+export interface RoleSnapshot {
+  roleId: string
   discordIds: string[]
-  /** Members whose lookup failed (excluded). */
-  errors: number
 }
 
-export async function snapshotEligibleVoters(deps: SnapshotDeps): Promise<Snapshot> {
-  const all = await deps.candidates()
-  // One entry per member.
-  const byMember = new Map<string, Candidate>()
-  for (const c of all) {
-    const prev = byMember.get(c.memberId)
-    if (!prev || (!prev.discordId && c.discordId)) byMember.set(c.memberId, c)
-  }
-  const list = [...byMember.values()]
-  const found = new Set<string>()
-  let errors = 0
-  let next = 0
-  const worker = async () => {
-    for (;;) {
-      const i = next++
-      if (i >= list.length) return
-      const c = list[i]
-      const answer = await deps.holdsBox(c.memberId).catch((): Lookup => 'error')
-      if (answer === 'error') { errors++; continue }
-      if (answer !== 'yes') continue
-      const id = c.discordId || (await deps.resolveDiscordId(c.memberId).catch(() => null))
-      if (id) found.add(id)
-    }
-  }
-  await Promise.all(Array.from({ length: Math.max(1, deps.concurrency ?? 8) }, worker))
-  return { discordIds: [...found].sort(), errors }
+export async function snapshotRoleHolders(deps: RoleDeps): Promise<RoleSnapshot> {
+  const roleId = await deps.voterRoleId()
+  if (!roleId) throw new Error('voter role not resolved')
+  const ids = await deps.listRoleHolders(roleId)
+  return { roleId, discordIds: [...new Set(ids)].sort() }
 }
 
-export const defaultSnapshotDeps: SnapshotDeps = {
-  async candidates() {
-    const rows = await prisma.memberWallet.findMany({
-      where: { chainType: 'evm' },
-      select: { memberId: true, discordId: true },
+/** The configured voter role (setting), else the Box Mafia role found by the existing helper. */
+export async function resolveVoterRoleId(): Promise<string | null> {
+  try {
+    const saved = await getSetting('proposals.voterRoleId')
+    if (saved) return saved
+  } catch {
+    /* fall through to the built-in role */
+  }
+  return resolveBoxMafiaRoleId(await getGuildRoles())
+}
+
+const PAGE = 1000
+const MAX_PAGES = 50
+
+export async function listRoleHoldersStrict(roleId: string, env: NodeJS.ProcessEnv = process.env, fetchImpl: typeof fetch = fetch): Promise<string[]> {
+  const guildId = env.DISCORD_GUILD_ID
+  const botToken = env.DISCORD_BOT_TOKEN
+  if (!guildId || !botToken) throw new Error('discord not configured')
+  const out: string[] = []
+  let after = '0'
+  for (let page = 0; page < MAX_PAGES; page++) {
+    const r = await fetchImpl(`https://discord.com/api/v10/guilds/${guildId}/members?limit=${PAGE}&after=${after}`, {
+      headers: { Authorization: `Bot ${botToken}` },
+      cache: 'no-store',
     })
-    return rows.map((r: { memberId: string; discordId: string | null }) => ({ memberId: r.memberId, discordId: r.discordId }))
-  },
-  async resolveDiscordId(memberId) {
-    const row = await fetchMemberById(memberId)
-    const id = typeof row?.discordId === 'string' ? row.discordId.trim() : ''
-    return /^\d{5,25}$/.test(id) ? id : null
-  },
-  // No cache: an eligibility snapshot must reflect the chain now, not an hour-old answer.
-  holdsBox: (memberId) => checkRarePizzaBox(memberId, { cache: false }),
-  concurrency: 8,
+    if (!r.ok) throw new Error(`discord members ${r.status}`)
+    const members = (await r.json()) as Array<{ roles: string[]; user: { id: string } }>
+    for (const m of members) if (m.roles.includes(roleId)) out.push(m.user.id)
+    if (members.length < PAGE) return out
+    after = members[members.length - 1].user.id
+  }
+  throw new Error('discord members listing too long')
+}
+
+export const defaultRoleDeps: RoleDeps = {
+  voterRoleId: resolveVoterRoleId,
+  listRoleHolders: (roleId) => listRoleHoldersStrict(roleId),
+}
+
+/** Live check for a proposer: holds the voter role right now. Fails closed. */
+export async function holdsVoterRole(discordId: string): Promise<boolean> {
+  try {
+    const roleId = await resolveVoterRoleId()
+    return roleId ? await hasRole(discordId, roleId) : false
+  } catch {
+    return false
+  }
 }

@@ -8,6 +8,7 @@ import { Providers } from "./providers";
 import CornerLinks from "@/app/ui/CornerLinks";
 import SiteHeader from "@/app/ui/SiteHeader";
 import { XConnectNotice } from "@/app/ui/XConnectNotice";
+import { GlobalBallotPreparer } from "@/app/proposals/_components/GlobalBallotPreparer";
 import { SITE_URL } from "@/app/lib/site-url";
 
 // Body / UI sans — matches pizzadao.org marketing site.
@@ -72,6 +73,7 @@ export default async function RootLayout({
         <NextIntlClientProvider locale={locale} messages={messages}>
           <Providers>
             <XConnectNotice />
+            <GlobalBallotPreparer />
             <Suspense fallback={null}><SiteHeader /></Suspense>
             <Suspense fallback={null}><div id="main-content">{children}</div></Suspense>
           </Providers>

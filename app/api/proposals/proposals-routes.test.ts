@@ -9,6 +9,9 @@ const m = vi.hoisted(() => ({
   cast: vi.fn(),
   create: vi.fn(),
   getSession: vi.fn(),
+  pubkey: vi.fn(),
+  saveBlob: vi.fn(),
+  getBlob: vi.fn(),
 }))
 
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
@@ -28,12 +31,13 @@ vi.mock('@/app/lib/rate-limit', () => ({
 }))
 vi.mock('@/app/lib/proposals/proposer', () => ({ canSubmitProposal: async () => m.holder }))
 vi.mock('@/app/lib/proposals/lifecycle', () => ({ openAndAnnounce: vi.fn() }))
-vi.mock('@/app/lib/proposals/store', () => ({ issueToken: m.issue, castBallot: m.cast, createProposal: m.create }))
+vi.mock('@/app/lib/proposals/store', () => ({ issueToken: m.issue, castBallot: m.cast, createProposal: m.create, getPublicKey: m.pubkey, saveBallotBlob: m.saveBlob, getBallotBlob: m.getBlob }))
 
 import { POST as createPOST } from './route'
 import { POST as tokenPOST } from './[id]/token/route'
 import { POST as votePOST } from './[id]/vote/route'
-import { GET as pubkeyGET } from './pubkey/route'
+import { GET as pubkeyGET } from './[id]/pubkey/route'
+import { GET as backupGET, PUT as backupPUT } from './[id]/backup/route'
 
 const json = (body: unknown, headers: Record<string, string> = {}) =>
   new Request('https://app.pizzadao.org/api/proposals/p1/x', {
@@ -52,6 +56,9 @@ beforeEach(() => {
   m.cast.mockResolvedValue({ ok: true })
   m.issue.mockResolvedValue({ ok: true, blindSignature: 'sig' })
   m.create.mockResolvedValue({ id: 'new1' })
+  m.pubkey.mockResolvedValue({ publicKey: 'PEM', fingerprint: 'aaaa bbbb' })
+  m.saveBlob.mockResolvedValue('ok')
+  m.getBlob.mockResolvedValue({ eligible: true, blob: 'ciphertext' })
 })
 
 describe('proposals routes while the feature is off', () => {
@@ -60,7 +67,7 @@ describe('proposals routes while the feature is off', () => {
     expect((await createPOST(json({}))).status).toBe(404)
     expect((await tokenPOST(json({ blindedMessage: 'x' }), ctx)).status).toBe(404)
     expect((await votePOST(json(voteBody), ctx)).status).toBe(404)
-    expect((await pubkeyGET()).status).toBe(404)
+    expect((await pubkeyGET(new Request('https://app.pizzadao.org/x'), ctx)).status).toBe(404)
     expect(m.cast).not.toHaveBeenCalled()
   })
 })

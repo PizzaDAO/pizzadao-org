@@ -6,9 +6,8 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
-import { listProposals, viewerStates, type ProposalSummary } from "@/app/lib/proposals/store";
+import { listProposals, type ProposalSummary } from "@/app/lib/proposals/store";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillTomato } from "@/app/ui/shared/Editorial";
-import { BallotPreparer } from "./_components/BallotPreparer";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -46,14 +45,9 @@ export default async function ProposalsPage() {
     const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
     const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const { open, recent } = await listProposals();
-    const openIds = open.filter((p) => p.status === "OPEN").map((p) => p.id);
-    const states = await viewerStates(openIds, session.discordId);
-    // Tokens for proposals this member may vote on and has no ballot for yet are prepared in the background.
-    const toPrepare = openIds.filter((id) => states[id]?.eligible && !states[id]?.tokenIssued);
 
     return (
         <EditorialPage width="max-w-[900px]">
-            <BallotPreparer ids={toPrepare} />
             <EditorialMasthead
                 overline={t("overline")}
                 title={t("title")}

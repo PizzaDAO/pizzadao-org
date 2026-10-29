@@ -14,6 +14,8 @@ export interface LinkInput {
   requesterDiscordId: string
   amountUsdCents: number
   capUsdCents: number
+  /** A request being (re)linked: its own amount is already in the sum and must not count twice. */
+  excludeRequestId?: string
 }
 
 export interface LinkableProposal {
@@ -42,7 +44,7 @@ export async function validatePaymentProposal(i: LinkInput): Promise<{ ok: true;
   const [proposal, others] = await Promise.all([
     prisma.proposal.findUnique({ where: { id: i.proposalId }, select: { kind: true, status: true, proposerDiscordId: true, amountUsdCents: true } }),
     prisma.paymentRequest.findMany({
-      where: { proposalId: i.proposalId, status: { notIn: ['REJECTED', 'WITHDRAWN'] } },
+      where: { proposalId: i.proposalId, status: { notIn: ['REJECTED', 'WITHDRAWN'] }, ...(i.excludeRequestId ? { id: { not: i.excludeRequestId } } : {}) },
       select: { amountUsdCents: true },
     }),
   ])

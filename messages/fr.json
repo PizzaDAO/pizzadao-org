@@ -1613,7 +1613,7 @@
     "form": {
       "meta": "Nouvelle proposition",
       "title": "Nouvelle proposition",
-      "dek": "Remplissez le modèle de proposition. Le vote s'ouvre tout de suite.Seuls les détenteurs d'une Rare Pizzas Box peuvent soumettre ; si vous n'en avez pas, demandez à un détenteur de la soumettre pour vous et nommez-le comme parrain.",
+      "dek": "Remplissez le modèle de proposition. Le vote s'ouvre tout de suite. Seuls les membres ayant le rôle Box Mafia peuvent soumettre ; si vous ne l'avez pas, demandez à quelqu'un qui l'a de la soumettre pour vous et nommez-le comme parrain.",
       "fieldKind": "Type",
       "fieldTitle": "Titre de l'événement ou de la proposition",
       "fieldAmount": "Montant demandé (USD)",
@@ -1633,7 +1633,7 @@
       "back": "Retour aux propositions",
       "errors": {
         "generic": "Impossible de soumettre votre proposition. Réessayez.",
-        "not_holder": "Seuls les détenteurs d'une Rare Pizzas Box peuvent soumettre une proposition. Demandez à un détenteur de la soumettre pour vous.",
+        "not_holder": "Seuls les membres ayant le rôle Box Mafia peuvent soumettre une proposition. Demandez à quelqu'un qui l'a de la soumettre pour vous.",
         "bad_kind": "Choisissez un type.",
         "bad_title": "Ajoutez un titre (3 caractères minimum).",
         "bad_description": "Ajoutez une description (20 caractères minimum).",
@@ -1652,7 +1652,8 @@
       "event": "Date de l'événement : {date}",
       "city": "Lieu : {city}",
       "sponsor": "Parrain : {sponsor}",
-      "cancelled": "Cette proposition a été annulée."
+      "cancelled": "Cette proposition a été annulée.",
+      "fingerprint": "Empreinte de la clé de vote : {fp}"
     },
     "vote": {
       "heading": "Votre vote",
@@ -1662,7 +1663,7 @@
       "preparing": "Préparation de votre bulletin...",
       "working": "Enregistrement...",
       "recorded": "Enregistré : {choice}. Vous pouvez le changer jusqu'au {date}.",
-      "notEligible": "Seuls les détenteurs d'une Rare Pizzas Box au moment de l'ouverture de cette proposition peuvent voter.",
+      "notEligible": "Seuls les membres ayant le rôle Box Mafia à l'ouverture de cette proposition peuvent voter.",
       "closed": "Le vote est clos.",
       "login": "Connectez-vous pour voter.",
       "loginLink": "Se connecter",
@@ -1676,7 +1677,36 @@
       "codeHelp": "Gardez-le pour changer votre vote depuis un autre navigateur ou appareil. Quiconque le possède peut changer votre vote, ne le partagez donc pas. Si vous le perdez, vous pouvez toujours changer votre vote ici.",
       "copy": "Copier",
       "copied": "Copié",
-      "secret": "Votre vote est secret : le site ne peut pas savoir qui a vote quoi."
+      "secret": "Votre vote est secret : le site ne peut pas savoir qui a vote quoi.",
+      "saveTitle": "Enregistrez maintenant votre code de vote",
+      "saveHelp": "Votre bulletin n'existe que dans ce navigateur. Enregistrez le code (ou sauvegardez-le avec un wallet) pour pouvoir changer votre vote plus tard ou depuis un autre appareil. Si vous perdez les deux, votre vote reste compté mais ne peut plus être changé.",
+      "saveCode": "Enregistrer le code",
+      "saveShared": "Code partagé.",
+      "saveFailed": "Impossible de partager ou copier automatiquement. Ouvrez « Votre code de vote » ci-dessous et copiez-le à la main.",
+      "queued": "Votre vote ({choice}) sera envoyé sous peu. Laissez ce site ouvert ou revenez plus tard ; vous pouvez le changer jusqu'à la clôture.",
+      "fingerprint": "Empreinte de la clé de vote : {fp}",
+      "backupWallet": "Sauvegarder avec un wallet",
+      "backupHelp": "Connectez un wallet et signez un message (ni transaction ni frais). La signature reste dans votre navigateur et chiffre votre bulletin ; seule la copie chiffrée est stockée. Pour restaurer sur un autre appareil, connectez le même wallet et signez le même message.",
+      "backupNow": "Sauvegarder mon bulletin",
+      "restoreNow": "Restaurer mon bulletin",
+      "backupDone": "Sauvegardé. Vous pouvez le restaurer avec le même wallet sur n'importe quel appareil.",
+      "backupFailed": "La sauvegarde n'a pas fonctionné. Utilisez Enregistrer le code.",
+      "backupNotRepeatable": "Ce wallet signe différemment à chaque fois (fréquent pour les wallets à contrat intelligent), une sauvegarde ne pourrait donc jamais être restaurée. Utilisez Enregistrer le code, ou connectez un wallet classique.",
+      "restoreNone": "Aucune sauvegarde pour cette proposition.",
+      "restoreWrongWallet": "Ce wallet ne peut pas ouvrir la sauvegarde. Connectez celui qui a servi à la faire.",
+      "restoreDone": "Bulletin restauré sur cet appareil.",
+      "restoreFailed": "Impossible de restaurer. Réessayez ou utilisez votre code de vote."
+    },
+    "banner": {
+      "region": "Bulletin prêt",
+      "ready": "Votre bulletin pour « {title} » est prêt.",
+      "save": "Enregistrez maintenant votre code de vote pour pouvoir changer votre vote plus tard ou depuis un autre appareil.",
+      "saveCode": "Enregistrer le code",
+      "open": "Ouvrir la proposition",
+      "dismiss": "Fermer",
+      "shared": "Code partagé.",
+      "copied": "Code copié.",
+      "failed": "Copie impossible. Ouvrez la proposition et copiez le code de là."
     }
   }
 }

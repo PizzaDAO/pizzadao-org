@@ -1613,7 +1613,7 @@
     "form": {
       "meta": "New proposal",
       "title": "New proposal",
-      "dek": "Fill in the proposal template. Voting opens right away.Only Rare Pizzas Box holders can submit; if you do not hold one, ask a holder to submit it for you and name them as the sponsor.",
+      "dek": "Fill in the proposal template. Voting opens right away. Only members with the Box Mafia role can submit; if you do not have it, ask someone who does to submit it for you and name them as the sponsor.",
       "fieldKind": "Type",
       "fieldTitle": "Event or proposal title",
       "fieldAmount": "Amount requested (USD)",
@@ -1633,7 +1633,7 @@
       "back": "Back to proposals",
       "errors": {
         "generic": "Could not submit your proposal. Try again.",
-        "not_holder": "Only Rare Pizzas Box holders can submit a proposal. Ask a holder to submit it for you.",
+        "not_holder": "Only members with the Box Mafia role can submit a proposal. Ask someone who has it to submit it for you.",
         "bad_kind": "Pick a type.",
         "bad_title": "Add a title (at least 3 characters).",
         "bad_description": "Add a description (at least 20 characters).",
@@ -1652,7 +1652,8 @@
       "event": "Event date: {date}",
       "city": "Location: {city}",
       "sponsor": "Sponsor: {sponsor}",
-      "cancelled": "This proposal was cancelled."
+      "cancelled": "This proposal was cancelled.",
+      "fingerprint": "Voting key fingerprint: {fp}"
     },
     "vote": {
       "heading": "Your vote",
@@ -1662,7 +1663,7 @@
       "preparing": "Getting your ballot ready...",
       "working": "Recording...",
       "recorded": "Recorded: {choice}. You can change it until {date}.",
-      "notEligible": "Only Rare Pizzas Box holders who held one when this proposal opened can vote.",
+      "notEligible": "Only members with the Box Mafia role when this proposal opened can vote.",
       "closed": "Voting is closed.",
       "login": "Log in to vote.",
       "loginLink": "Log in",
@@ -1676,7 +1677,36 @@
       "codeHelp": "Keep it to change your vote from another browser or device. Anyone who has it can change your vote, so do not share it. If you lose it you can still change your vote here.",
       "copy": "Copy",
       "copied": "Copied",
-      "secret": "Your vote is secret: the site cannot tell who cast which vote."
+      "secret": "Your vote is secret: the site cannot tell who cast which vote.",
+      "saveTitle": "Save your vote code now",
+      "saveHelp": "Your ballot lives only in this browser. Save the code (or back it up with a wallet) so you can change your vote later or from another device. If you lose both, your vote stays counted but cannot be changed.",
+      "saveCode": "Save code",
+      "saveShared": "Code shared.",
+      "saveFailed": "Could not share or copy automatically. Open \"Your vote code\" below and copy it by hand.",
+      "queued": "Your vote ({choice}) will be sent shortly. Keep this site open or come back later; you can change it until the proposal closes.",
+      "fingerprint": "Voting key fingerprint: {fp}",
+      "backupWallet": "Back up with a wallet",
+      "backupHelp": "Connect any wallet and sign a message (no transaction, no cost). The signature stays in your browser and encrypts your ballot; only the encrypted copy is stored. To restore on a new device, connect the same wallet and sign the same message.",
+      "backupNow": "Back up my ballot",
+      "restoreNow": "Restore my ballot",
+      "backupDone": "Backed up. You can restore it with the same wallet on any device.",
+      "backupFailed": "The backup did not work. Use Save code instead.",
+      "backupNotRepeatable": "This wallet signs differently every time (common for smart-contract wallets), so a backup could never be restored. Use Save code instead, or connect a regular wallet.",
+      "restoreNone": "No backup found for this proposal.",
+      "restoreWrongWallet": "That wallet cannot open the backup. Connect the wallet you used to back it up.",
+      "restoreDone": "Ballot restored on this device.",
+      "restoreFailed": "Could not restore. Try again or use your vote code."
+    },
+    "banner": {
+      "region": "Ballot ready",
+      "ready": "Your ballot for \"{title}\" is ready.",
+      "save": "Save your vote code now so you can change your vote later or from another device.",
+      "saveCode": "Save code",
+      "open": "Open proposal",
+      "dismiss": "Dismiss",
+      "shared": "Code shared.",
+      "copied": "Code copied.",
+      "failed": "Could not copy. Open the proposal and copy the code from there."
     }
   }
 }

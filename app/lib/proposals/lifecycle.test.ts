@@ -5,8 +5,8 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const fake = vi.hoisted(() => ({ current: null as any }))
 vi.mock('@/app/lib/db', () => ({ prisma: new Proxy({}, { get: (_t, k) => fake.current.db[k] }) }))
-vi.mock('@/app/lib/rare-pizza-box', () => ({ checkRarePizzaBox: vi.fn() }))
-vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberById: vi.fn() }))
+vi.mock('@/app/lib/discord-channels', () => ({ getGuildRoles: vi.fn() }))
+vi.mock('@/app/lib/discord', () => ({ hasRole: vi.fn() }))
 vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(async () => ''), loadSettings: vi.fn() }))
 vi.mock('@/app/lib/settings/channels', () => ({ resolveConfiguredChannel: vi.fn(async () => '999999999999999999') }))
 

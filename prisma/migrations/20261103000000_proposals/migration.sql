@@ -29,6 +29,10 @@ CREATE TABLE "Proposal" (
     "countAbstains" BOOLEAN NOT NULL DEFAULT true,
     "requireAyesOverNays" BOOLEAN NOT NULL DEFAULT true,
     "eligibleCount" INTEGER,
+    "voterRoleId" TEXT,
+    "keyPublicPem" TEXT,
+    "keyFingerprint" TEXT,
+    "keyPrivateEnc" TEXT,
     "ayes" INTEGER NOT NULL DEFAULT 0,
     "nays" INTEGER NOT NULL DEFAULT 0,
     "abstains" INTEGER NOT NULL DEFAULT 0,
@@ -46,6 +50,7 @@ CREATE TABLE "ProposalVoter" (
     "proposalId" TEXT NOT NULL,
     "discordId" TEXT NOT NULL,
     "tokenIssuedAt" TIMESTAMP(3),
+    "ballotBlob" TEXT,
 
     CONSTRAINT "ProposalVoter_pkey" PRIMARY KEY ("proposalId","discordId")
 );

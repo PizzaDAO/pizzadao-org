@@ -1941,6 +1941,11 @@ model Proposal {
   countAbstains       Boolean        @default(true)
   requireAyesOverNays Boolean        @default(true)
   eligibleCount       Int?
+  voterRoleId         String? // the Discord role whose holders were the eligible set at open
+  // Per-proposal blind-signature key pair, generated at open. The private key is stored AES-GCM wrapped.
+  keyPublicPem        String?
+  keyFingerprint      String?
+  keyPrivateEnc       String?
   // Settled counts (written once, at close).
   ayes                Int            @default(0)
   nays                Int            @default(0)
@@ -1965,6 +1970,8 @@ model ProposalVoter {
   discordId     String
   // Set once, when the blind-signed ballot token is issued (day precision). Never cleared: a token is never re-issued.
   tokenIssuedAt DateTime?
+  // Optional wallet-encrypted backup of the member's ballot (ciphertext only; the key never reaches the server).
+  ballotBlob    String?
 
   proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
 

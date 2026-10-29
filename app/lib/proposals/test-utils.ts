@@ -2,29 +2,29 @@
 // Test helpers for the proposals tests: a real RSA key pair, the browser side of the blind-signature flow,
 // and a small in-memory stand-in for the Prisma models the store uses.
 import { finalize, blind, fromBase64, importPublicKey, prepareMessage, toBase64 } from '@/utils/blindRsa.client'
+import { generateProposalKeyPair, wrapPrivateKey } from './keys'
 import { signBlinded, type BallotCredentials } from './token'
 
-function pem(label: string, der: ArrayBuffer): string {
-  const b64 = Buffer.from(der).toString('base64').match(/.{1,64}/g)!.join('\n')
-  return `-----BEGIN ${label}-----\n${b64}\n-----END ${label}-----`
+/** A production-like env with a wrap secret: what the store needs to open, issue and count. */
+export const testEnv = (): NodeJS.ProcessEnv =>
+  ({ VERCEL_ENV: 'production', PROPOSAL_KEY_WRAP_SECRET: 'test-wrap-secret-test-wrap-secret-1234' }) as unknown as NodeJS.ProcessEnv
+
+export interface TestKey {
+  id: string
+  keyPublicPem: string
+  keyPrivateEnc: string
 }
 
-export async function makeKeyEnv(): Promise<NodeJS.ProcessEnv> {
-  const pair = await crypto.subtle.generateKey(
-    { name: 'RSA-PSS', modulusLength: 2048, publicExponent: new Uint8Array([1, 0, 1]), hash: 'SHA-384' },
-    true,
-    ['sign', 'verify'],
-  )
-  return {
-    RSA_PRIVATE_KEY_PEM: pem('PRIVATE KEY', await crypto.subtle.exportKey('pkcs8', pair.privateKey)),
-    RSA_PUBLIC_KEY_PEM: pem('PUBLIC KEY', await crypto.subtle.exportKey('spki', pair.publicKey)),
-  } as unknown as NodeJS.ProcessEnv
+/** A per-proposal key pair as openProposal stores it (2048 bits to keep tests fast). */
+export async function makeProposalKey(id: string, env: NodeJS.ProcessEnv = testEnv(), bits = 2048): Promise<TestKey> {
+  const pair = await generateProposalKeyPair(bits)
+  return { id, keyPublicPem: pair.publicPem, keyPrivateEnc: await wrapPrivateKey(pair.privatePem, id, env) }
 }
 
-/** What the member's browser does: blind a fresh token. Returns the blinded message and a finisher. */
-export async function startBlind(env: NodeJS.ProcessEnv, proposalId: string) {
-  const publicKey = await importPublicKey(env.RSA_PUBLIC_KEY_PEM!)
-  const token = `proposal-${proposalId}-${crypto.randomUUID()}`
+/** What the member's browser does: blind a fresh token for `label`. Returns the blinded message and a finisher. */
+export async function startBlind(publicPem: string, label: string) {
+  const publicKey = await importPublicKey(publicPem)
+  const token = `proposal-${label}-${crypto.randomUUID()}`
   const prepared = prepareMessage(token)
   const { blindedMessage, blindInverse } = await blind(publicKey, prepared)
   return {
@@ -37,10 +37,10 @@ export async function startBlind(env: NodeJS.ProcessEnv, proposalId: string) {
   }
 }
 
-/** Full issue-and-unblind flow with the real signer (no database). */
-export async function mintCredentials(env: NodeJS.ProcessEnv, proposalId: string): Promise<BallotCredentials> {
-  const b = await startBlind(env, proposalId)
-  return b.finish(await signBlinded(b.blinded, env))
+/** Full issue-and-unblind flow with the real signer: blinded under `signer`'s public key, token labelled `label`. */
+export async function mintCredentials(signer: TestKey, env: NodeJS.ProcessEnv = testEnv(), label: string = signer.id): Promise<BallotCredentials> {
+  const b = await startBlind(signer.keyPublicPem, label)
+  return b.finish(await signBlinded(signer, b.blinded, env))
 }
 
 type Row = Record<string, any>
@@ -80,7 +80,7 @@ export function makeFakeDb() {
       findUnique: async ({ where }: any) => state.voter.find((r) => matchWhere(r, where)) ?? null,
       findMany: async ({ where }: any) => state.voter.filter((r) => matchWhere(r, where)),
       createMany: async ({ data }: any) => {
-        for (const d of data) if (!state.voter.some((r) => r.proposalId === d.proposalId && r.discordId === d.discordId)) state.voter.push({ tokenIssuedAt: null, ...d })
+        for (const d of data) if (!state.voter.some((r) => r.proposalId === d.proposalId && r.discordId === d.discordId)) state.voter.push({ tokenIssuedAt: null, ballotBlob: null, ...d })
         return { count: data.length }
       },
       updateMany: async ({ where, data }: any) => {

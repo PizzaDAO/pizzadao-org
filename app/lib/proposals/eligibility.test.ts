@@ -1,46 +1,47 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/app/lib/db', () => ({ prisma: {} }))
-vi.mock('@/app/lib/rare-pizza-box', () => ({ checkRarePizzaBox: vi.fn() }))
-vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberById: vi.fn() }))
+vi.mock('@/app/lib/discord-channels', () => ({ getGuildRoles: vi.fn() }))
+vi.mock('@/app/lib/discord', () => ({ hasRole: vi.fn() }))
+vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn() }))
 
-import { snapshotEligibleVoters, type SnapshotDeps } from './eligibility'
+import { listRoleHoldersStrict, snapshotRoleHolders, type RoleDeps } from './eligibility'
 
-const deps = (o: Partial<SnapshotDeps> & { holders?: string[]; failing?: string[] }): SnapshotDeps => ({
-  candidates: async () => [
-    { memberId: 'm1', discordId: '111111111111111111' },
-    { memberId: 'm1', discordId: '111111111111111111' }, // second wallet of the same member
-    { memberId: 'm2', discordId: null },
-    { memberId: 'm3', discordId: '333333333333333333' },
-    { memberId: 'm4', discordId: '444444444444444444' },
-  ],
-  resolveDiscordId: async (m) => (m === 'm2' ? '222222222222222222' : null),
-  holdsBox: async (m) => (o.failing?.includes(m) ? 'error' : o.holders?.includes(m) ? 'yes' : 'no'),
+const deps = (o: Partial<RoleDeps> = {}): RoleDeps => ({
+  voterRoleId: async () => '700000000000000001',
+  listRoleHolders: async () => ['333', '111', '222', '111'],
   ...o,
 })
 
-describe('eligibility snapshot', () => {
-  it('lists box holders once each, resolving the Discord id when the wallet row has none', async () => {
-    const s = await snapshotEligibleVoters(deps({ holders: ['m1', 'm2', 'm3'] }))
-    expect(s.discordIds).toEqual(['111111111111111111', '222222222222222222', '333333333333333333'])
-    expect(s.errors).toBe(0)
+describe('voter role snapshot', () => {
+  it('lists the role holders once each, sorted, with the role used', async () => {
+    expect(await snapshotRoleHolders(deps())).toEqual({ roleId: '700000000000000001', discordIds: ['111', '222', '333'] })
   })
 
-  it('checks each member once however many wallets they have', async () => {
-    const holdsBox = vi.fn(async () => 'no' as const)
-    await snapshotEligibleVoters(deps({ holdsBox }))
-    expect(holdsBox).toHaveBeenCalledTimes(4)
+  it('fails closed when the role cannot be resolved or the listing fails', async () => {
+    await expect(snapshotRoleHolders(deps({ voterRoleId: async () => null }))).rejects.toThrow()
+    await expect(snapshotRoleHolders(deps({ listRoleHolders: async () => { throw new Error('discord 500') } }))).rejects.toThrow()
+  })
+})
+
+describe('listRoleHoldersStrict', () => {
+  const env = { DISCORD_GUILD_ID: 'g1', DISCORD_BOT_TOKEN: 'tok' } as unknown as NodeJS.ProcessEnv
+  const member = (id: string, roles: string[]) => ({ user: { id }, roles })
+  const page = (members: unknown[], ok = true) => ({ ok, status: ok ? 200 : 500, json: async () => members }) as Response
+
+  it('keeps only members with the role and follows pages', async () => {
+    const first = Array.from({ length: 1000 }, (_, i) => member(String(1000 + i), i === 5 ? ['r'] : []))
+    const fetchImpl = vi.fn()
+      .mockResolvedValueOnce(page(first))
+      .mockResolvedValueOnce(page([member('9999', ['r']), member('9998', ['x'])]))
+    expect(await listRoleHoldersStrict('r', env, fetchImpl as unknown as typeof fetch)).toEqual(['1005', '9999'])
+    expect(fetchImpl).toHaveBeenCalledTimes(2)
   })
 
-  it('fails closed: a failed lookup excludes the member and is counted', async () => {
-    const s = await snapshotEligibleVoters(deps({ holders: ['m1'], failing: ['m3'] }))
-    expect(s.discordIds).toEqual(['111111111111111111'])
-    expect(s.errors).toBe(1)
-  })
-
-  it('skips a holder whose Discord id cannot be found', async () => {
-    const s = await snapshotEligibleVoters(deps({ holders: ['m2'], resolveDiscordId: async () => null }))
-    expect(s.discordIds).toEqual([])
+  it('throws on a Discord error mid-listing instead of returning a partial list', async () => {
+    const first = Array.from({ length: 1000 }, (_, i) => member(String(1000 + i), ['r']))
+    const fetchImpl = vi.fn().mockResolvedValueOnce(page(first)).mockResolvedValueOnce(page([], false))
+    await expect(listRoleHoldersStrict('r', env, fetchImpl as unknown as typeof fetch)).rejects.toThrow()
+    await expect(listRoleHoldersStrict('r', {} as unknown as NodeJS.ProcessEnv)).rejects.toThrow()
   })
 })

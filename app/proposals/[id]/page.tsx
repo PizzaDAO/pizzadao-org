@@ -7,7 +7,6 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { getProposalDetail, viewerStates } from "@/app/lib/proposals/store";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
-import { BallotPreparer } from "../_components/BallotPreparer";
 import { VotePanel } from "../_components/VotePanel";
 
 export const runtime = "nodejs";
@@ -34,7 +33,6 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
 
     return (
         <EditorialPage width="max-w-[820px]">
-            {isOpen && viewer?.eligible && !viewer.tokenIssued && <BallotPreparer ids={[p.id]} />}
             <EditorialMasthead
                 overline={`${t(`status.${p.status}` as never)} · ${t(`kind.${p.kind}` as never)}`}
                 title={p.title}
@@ -51,6 +49,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
                     {p.city && <p className="m-0">{t("detail.city", { city: p.city })}</p>}
                     {p.sponsorLabel && <p className="m-0">{t("detail.sponsor", { sponsor: p.sponsorLabel })}</p>}
                     {p.ayesNeeded != null && <p className="m-0">{t("detail.meta", { needed: p.ayesNeeded })}</p>}
+                    {p.keyFingerprint && <p className="m-0 break-words font-mono text-xs">{t("detail.fingerprint", { fp: p.keyFingerprint })}</p>}
                     {p.eligibleCount != null && <p className="m-0">{t("detail.eligible", { count: p.eligibleCount })}</p>}
                     {isOpen && p.closesAt && <p className="m-0">{t("closes", { date: fmt.format(new Date(p.closesAt)) })}</p>}
                     {p.status === "CANCELLED" && <p className="m-0">{t("detail.cancelled")}</p>}
@@ -59,7 +58,7 @@ export default async function ProposalPage({ params }: { params: Promise<{ id: s
                 <div className={`${paperCard} whitespace-pre-wrap break-words p-5`}>{p.body}</div>
                 {p.status === "DRAFT" && <p role="status" className="m-0">{t("detail.opening")}</p>}
                 {isOpen && (
-                    <VotePanel proposalId={p.id} open eligible={!!viewer?.eligible} tokenIssued={!!viewer?.tokenIssued} closesAt={p.closesAt} />
+                    <VotePanel proposalId={p.id} title={p.title} fingerprint={p.keyFingerprint} open eligible={!!viewer?.eligible} tokenIssued={!!viewer?.tokenIssued} closesAt={p.closesAt} />
                 )}
                 {isOpen && <p className="m-0 text-sm text-foreground/70">{t("detail.hidden")}</p>}
                 {p.result && (

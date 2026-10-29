@@ -36,7 +36,7 @@ const clip = (s: string, n: number) => (s.length > n ? `${s.slice(0, n - 1)}…`
 
 /** The Discord post for a newly opened proposal. Pure. */
 export function openMessage(
-  p: { id: string; title: string; kind: 'FUNDING' | 'GENERAL'; amountUsdCents: number | null; closesAt: Date; ayesNeeded: number | null },
+  p: { id: string; title: string; kind: 'FUNDING' | 'GENERAL'; amountUsdCents: number | null; closesAt: Date; ayesNeeded: number | null; keyFingerprint?: string | null },
   url: string,
   pingRoleId: string,
 ): DiscordMessageBody {
@@ -46,6 +46,7 @@ export function openMessage(
     p.ayesNeeded != null ? `Needs ${p.ayesNeeded} ayes plus abstains, and more ayes than nays.` : null,
     `Voting closes <t:${Math.floor(p.closesAt.getTime() / 1000)}:F>. Votes are secret and you can change yours until then.`,
     `Vote: ${url}/proposals/${p.id}`,
+    p.keyFingerprint ? `Voting key fingerprint (check it matches the proposal page): ${p.keyFingerprint}` : null,
   ]
   return {
     content: lines.filter(Boolean).join('\n'),
@@ -81,7 +82,7 @@ export async function announceOpen(id: string, deps: PostDeps = defaultPostDeps)
   if (!channelId) return 'skipped'
   const claimed = await prisma.proposal.updateMany({ where: { id, status: 'OPEN', discordChannelId: null }, data: { discordChannelId: channelId } })
   if (claimed.count !== 1) return 'skipped'
-  const p = await prisma.proposal.findUnique({ where: { id }, select: { id: true, title: true, kind: true, amountUsdCents: true, closesAt: true, ayesNeeded: true } })
+  const p = await prisma.proposal.findUnique({ where: { id }, select: { id: true, title: true, kind: true, amountUsdCents: true, closesAt: true, ayesNeeded: true, keyFingerprint: true } })
   if (!p?.closesAt) {
     await prisma.proposal.updateMany({ where: { id }, data: { discordChannelId: null } })
     return 'skipped'
