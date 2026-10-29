@@ -38,7 +38,6 @@ export async function GET(_req: Request, { params }: { params: Promise<{ memberI
     enabled: true,
     isOwner: viewer === 'owner',
     stamps: rows.map((s) => ({
-      id: s.id,
       slug: s.slug,
       name: s.name,
       city: s.city,

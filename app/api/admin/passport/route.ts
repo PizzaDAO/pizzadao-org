@@ -57,28 +57,35 @@ export async function POST(request: Request) {
   }
 
   const base = slugify(v.name!, v.city)
-  let slug = base
-  for (let n = 2; await prisma.pizzeria.findUnique({ where: { slug }, select: { id: true } }); n++) slug = `${base}-${n}`.slice(0, 80)
-
   const now = new Date()
-  const created = await prisma.pizzeria.create({
-    data: {
-      slug,
-      name: v.name!,
-      address: v.address ?? null,
-      city: v.city ?? null,
-      countryCode: v.countryCode ?? null,
-      lat,
-      lng,
-      source: 'ADMIN',
-      isPartner: true,
-      partnerSince: now,
-      website: v.website ?? null,
-      stampInk: v.stampInk ?? null,
-      logoUrl: v.logoUrl && v.logoConsent ? v.logoUrl : null,
-      logoConsentAt: v.logoUrl && v.logoConsent ? now : null,
-      createdBy: auth.session.discordId,
-    },
-  })
+  let created: { id: string; slug: string } | null = null
+  for (let n = 1; n <= 20 && !created; n++) {
+    const slug = n === 1 ? base : `${base}-${n}`.slice(0, 80)
+    try {
+      created = await prisma.pizzeria.create({
+        data: {
+          slug,
+          name: v.name!,
+          address: v.address ?? null,
+          city: v.city ?? null,
+          countryCode: v.countryCode ?? null,
+          lat,
+          lng,
+          source: 'ADMIN',
+          isPartner: true,
+          partnerSince: now,
+          website: v.website ?? null,
+          stampInk: v.stampInk ?? null,
+          logoUrl: v.logoUrl && v.logoConsent ? v.logoUrl : null,
+          logoConsentAt: v.logoUrl && v.logoConsent ? now : null,
+          createdBy: auth.session.discordId,
+        },
+        select: { id: true, slug: true },
+      })
+    } catch (e) {
+      if ((e as { code?: string }).code !== 'P2002') throw e // slug taken (also under a race): try the next suffix
+    }
+  }
+  if (!created) return json({ error: 'Could not pick a unique slug' }, 409)
   return json({ id: created.id, slug: created.slug }, 201)
 }

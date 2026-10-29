@@ -1,9 +1,5 @@
-/** Admin guard and input parsing for the passport partner admin routes. */
-import { requireAnyRole, type GuardResult } from '@/app/lib/auth-guards'
-import { ADMIN_ROLE_IDS } from '@/app/ui/constants'
+/** Admin guard for the passport partner admin routes (guild admins). */
+import { requireAdmin } from '@/app/lib/auth-guards'
 
-export function requireAdminAuth(): Promise<GuardResult> {
-  return requireAnyRole(ADMIN_ROLE_IDS, 'Admin access required')
-}
-
+export const requireAdminAuth = requireAdmin
 export { parsePartner } from './partner-input'

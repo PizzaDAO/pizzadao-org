@@ -15,7 +15,7 @@ import { StampGrid, type StampItem } from "../passport/StampGrid";
 interface ApiResponse {
     enabled: boolean;
     isOwner?: boolean;
-    stamps: Array<StampItem & { slug: string; countryCode: string | null }>;
+    stamps: Array<StampItem & { countryCode: string | null }>;
 }
 
 const VISIBLE = 6;

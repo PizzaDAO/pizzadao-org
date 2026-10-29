@@ -417,6 +417,7 @@ Exit criteria: about 50 real stamps and no fraud incidents in 4 weeks.
 ## Phase 1 build notes
 - Built as the partner pilot: partner pizzerias only, table QR + location, stamps are side achievements (not level requirements).
 - Open decisions taken at the recommended option: D2 any logged-in member, D3 QR+geo for partners, D6 no retro stamps for now, D7 public profile with month-only dates and a 6 hour delay, D8 partner logos only with a consent box, D11 name "Pizza Passport", D12 no PEP.
-- On/off and tunables are DB settings (`passport.*`, edited at /admin/settings), off by default. `PASSPORT_ENABLED=off` in the environment is a kill switch that wins. Table QR codes need `PASSPORT_QR_SECRET`.
+- On/off and tunables are DB settings (`passport.*`, edited at /admin/settings), off by default. `PASSPORT_ENABLED=off` in the environment is a kill switch that wins. Table QR codes need `PASSPORT_QR_SECRET`, which must be identical in Preview and Production (a QR printed from one must work on the other). QR links always use `NEXT_PUBLIC_APP_URL`, falling back to https://app.pizzadao.org, never the request origin.
 - The UI is our own design. A community-made prototype can restyle it later: `app/ui/passport/InkStamp.tsx` and `StampGrid.tsx` take plain props, and the pages are thin.
-- Not in phase 1: the printable catalog entry (the admin page prints each QR as SVG), the 30-day coordinate scrub cron, nearby search, reviews, the `passport_stamps` mission verifier.
+- A daily cron (`/api/cron/passport-scrub`) clears check-in coordinates older than 30 days; rejected check-ins never store coordinates.
+- Not in phase 1: the printable catalog entry (the admin page prints each QR as SVG), nearby search, reviews, the `passport_stamps` mission verifier.

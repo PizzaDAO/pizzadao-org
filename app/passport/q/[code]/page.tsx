@@ -11,5 +11,11 @@ export async function generateMetadata(): Promise<Metadata> {
 
 export default async function QrLandingPage({ params }: { params: Promise<{ code: string }> }) {
     const { code } = await params;
-    return <CheckInClient qr={decodeURIComponent(code)} />;
+    let qr = code;
+    try {
+        qr = decodeURIComponent(code);
+    } catch {
+        /* malformed escape: the check-in will report an invalid code */
+    }
+    return <CheckInClient qr={qr} />;
 }

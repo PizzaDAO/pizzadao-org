@@ -1641,7 +1641,7 @@ model PizzeriaCheckIn {
   memberId   String?
   method     CheckInMethod
   status     CheckInStatus @default(APPROVED)
-  lat        Float?        // scrubbed after 30 days
+  lat        Float?        // nulled after 30 days by /api/cron/passport-scrub; never stored on REJECTED rows
   lng        Float?
   accuracyM  Int?
   distanceM  Int?

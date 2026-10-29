@@ -8,6 +8,9 @@ import { findMemberIdByDiscordId } from '@/app/lib/member-utils'
 import { decideCheckIn, type DecisionResult, type RejectReason } from './checkin'
 import type { PassportConfig } from './config'
 import { verifyQrCode } from './qr'
+import { COORD_RETENTION_DAYS } from './scrub'
+
+const DAY_MS = 86_400_000
 
 export interface CheckInRequest {
   discordId: string
@@ -76,7 +79,7 @@ export async function performCheckIn(req: CheckInRequest, config: PassportConfig
     }),
     prisma.passportStamp.count({ where: { discordId: req.discordId, stampedAt: { gte: since } } }),
     prisma.pizzeriaCheckIn.findFirst({
-      where: { discordId: req.discordId, status: { not: 'REJECTED' }, lat: { not: null }, lng: { not: null } },
+      where: { discordId: req.discordId, status: { not: 'REJECTED' }, lat: { not: null }, lng: { not: null }, createdAt: { gte: new Date(now.getTime() - COORD_RETENTION_DAYS * DAY_MS) } },
       orderBy: { createdAt: 'desc' },
       select: { lat: true, lng: true, createdAt: true },
     }),
@@ -99,7 +102,7 @@ export async function performCheckIn(req: CheckInRequest, config: PassportConfig
     now,
   })
 
-  // A malformed or ineligible attempt leaves no row; only a located/held/approved one is worth keeping.
+  // A malformed or ineligible attempt leaves no row; a located refusal keeps distance/accuracy only (no coordinates).
   if (result.decision === 'REJECTED') {
     if (result.reason === 'too_far' || result.reason === 'low_accuracy' || result.reason === 'daily_limit') {
       await prisma.pizzeriaCheckIn.create({ data: row(req, pizzeria.id, memberId, result, 'REJECTED') })
@@ -109,22 +112,40 @@ export async function performCheckIn(req: CheckInRequest, config: PassportConfig
 
   const info = { slug: pizzeria.slug, name: pizzeria.name, city: pizzeria.city, countryCode: pizzeria.countryCode }
   if (result.decision === 'PENDING') {
+    // A flagged revisit inside the cooldown would not count anyway: leave nothing for a reviewer.
+    if (existing && now.getTime() - existing.lastVisitAt.getTime() < config.revisitCooldownHours * 3_600_000) {
+      return { ok: true, decision: 'APPROVED', newStamp: false, countsAsVisit: false, pizzeria: info }
+    }
     await prisma.pizzeriaCheckIn.create({ data: row(req, pizzeria.id, memberId, result, 'PENDING') })
     return { ok: true, decision: 'PENDING', newStamp: false, countsAsVisit: false, pizzeria: info }
   }
 
-  await prisma.$transaction(async (tx) => {
+  // Serialize per member so parallel requests cannot all pass the daily cap, then decide on fresh counts.
+  const outcome = await prisma.$transaction(async (tx) => {
+    await lockMember(tx, req.discordId)
+    const [stamp, fresh] = await Promise.all([
+      tx.passportStamp.findUnique({
+        where: { discordId_pizzeriaId: { discordId: req.discordId, pizzeriaId: pizzeria.id } },
+        select: { lastVisitAt: true },
+      }),
+      tx.passportStamp.count({ where: { discordId: req.discordId, stampedAt: { gte: since } } }),
+    ])
+    if (!stamp && fresh >= config.maxNewStampsPerDay) {
+      await tx.pizzeriaCheckIn.create({ data: row(req, pizzeria.id, memberId, result, 'REJECTED') })
+      return { capped: true as const }
+    }
+    const countsAsVisit = !stamp || now.getTime() - stamp.lastVisitAt.getTime() >= config.revisitCooldownHours * 3_600_000
     const c = await tx.pizzeriaCheckIn.create({ data: row(req, pizzeria.id, memberId, result, 'APPROVED') })
-    await applyApproved(tx, {
-      checkInId: c.id,
-      discordId: req.discordId,
-      memberId,
-      pizzeriaId: pizzeria.id,
-      countsAsVisit: result.countsAsVisit,
-      at: now,
-    })
+    await applyApproved(tx, { checkInId: c.id, discordId: req.discordId, memberId, pizzeriaId: pizzeria.id, countsAsVisit, at: now })
+    return { capped: false as const, newStamp: !stamp, countsAsVisit }
   })
-  return { ok: true, decision: 'APPROVED', newStamp: result.newStamp, countsAsVisit: result.countsAsVisit, pizzeria: info }
+  if (outcome.capped) return { ok: false, reason: 'daily_limit' }
+  return { ok: true, decision: 'APPROVED', newStamp: outcome.newStamp, countsAsVisit: outcome.countsAsVisit, pizzeria: info }
+}
+
+/** Per-member advisory lock held until the transaction ends. */
+export async function lockMember(tx: Prisma.TransactionClient, discordId: string): Promise<void> {
+  await tx.$executeRaw`SELECT pg_advisory_xact_lock(hashtext(${'passport:' + discordId}))`
 }
 
 function row(
@@ -140,37 +161,54 @@ function row(
     memberId,
     method: r.method,
     status,
-    lat: r.located?.lat ?? null,
-    lng: r.located?.lng ?? null,
+    lat: status === 'REJECTED' ? null : (r.located?.lat ?? null),
+    lng: status === 'REJECTED' ? null : (r.located?.lng ?? null),
     accuracyM: r.accuracyM,
     distanceM: r.distanceM,
     riskFlags: (r.riskFlags.length ? (r.riskFlags as unknown as Prisma.InputJsonValue) : undefined),
   }
 }
 
-/** Admin: release (approve) or reject a held check-in. Approving grants the stamp. */
-export async function reviewCheckIn(checkInId: number, reviewerId: string, approve: boolean, now = new Date()) {
+/** Admin: release (approve) or reject a held check-in. Approving grants the stamp, with the same cap and cooldown rules. */
+export async function reviewCheckIn(
+  checkInId: number,
+  reviewerId: string,
+  approve: boolean,
+  config: Pick<PassportConfig, 'revisitCooldownHours' | 'maxNewStampsPerDay'>,
+  now = new Date(),
+) {
   return prisma.$transaction(async (tx) => {
-    const c = await tx.pizzeriaCheckIn.findUnique({ where: { id: checkInId } })
+    const c = await tx.pizzeriaCheckIn.findUnique({ where: { id: checkInId }, include: { pizzeria: true } })
     if (!c || c.status !== 'PENDING') return { ok: false as const, reason: 'not_pending' as const }
-    await tx.pizzeriaCheckIn.update({
-      where: { id: c.id },
-      data: { status: approve ? 'APPROVED' : 'REJECTED', reviewedBy: reviewerId },
-    })
-    if (approve) {
-      const existing = await tx.passportStamp.findUnique({
+    if (!approve) {
+      await tx.pizzeriaCheckIn.update({ where: { id: c.id }, data: { status: 'REJECTED', reviewedBy: reviewerId, lat: null, lng: null } })
+      return { ok: true as const }
+    }
+    if (c.pizzeria.status !== 'ACTIVE' || !c.pizzeria.isPartner || c.pizzeria.isChain) {
+      return { ok: false as const, reason: 'not_eligible' as const }
+    }
+    if (await isDisallowed(c.discordId)) return { ok: false as const, reason: 'not_allowed' as const }
+
+    await lockMember(tx, c.discordId)
+    const [existing, fresh] = await Promise.all([
+      tx.passportStamp.findUnique({
         where: { discordId_pizzeriaId: { discordId: c.discordId, pizzeriaId: c.pizzeriaId } },
         select: { lastVisitAt: true },
-      })
-      await applyApproved(tx, {
-        checkInId: c.id,
-        discordId: c.discordId,
-        memberId: c.memberId,
-        pizzeriaId: c.pizzeriaId,
-        countsAsVisit: !existing,
-        at: now,
-      })
-    }
+      }),
+      tx.passportStamp.count({ where: { discordId: c.discordId, stampedAt: { gte: new Date(now.getTime() - DAY_MS) } } }),
+    ])
+    if (!existing && fresh >= config.maxNewStampsPerDay) return { ok: false as const, reason: 'daily_limit' as const }
+    const countsAsVisit = !existing || now.getTime() - existing.lastVisitAt.getTime() >= config.revisitCooldownHours * 3_600_000
+
+    await tx.pizzeriaCheckIn.update({ where: { id: c.id }, data: { status: 'APPROVED', reviewedBy: reviewerId } })
+    await applyApproved(tx, {
+      checkInId: c.id,
+      discordId: c.discordId,
+      memberId: c.memberId,
+      pizzeriaId: c.pizzeriaId,
+      countsAsVisit,
+      at: now,
+    })
     return { ok: true as const }
   })
 }

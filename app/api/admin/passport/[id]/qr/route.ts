@@ -3,6 +3,7 @@ import { json } from '@/app/lib/admin-guard'
 import { prisma } from '@/app/lib/db'
 import { requireAdminAuth } from '@/app/lib/passport/admin'
 import { qrCodeFor, qrPath } from '@/app/lib/passport/qr'
+import { appBaseUrl } from '@/app/lib/slices/config'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 
 export const runtime = 'nodejs'
@@ -21,7 +22,7 @@ export async function GET(request: Request, { params }: { params: Promise<{ id: 
   } catch {
     return json({ error: 'PASSPORT_QR_SECRET is not set' }, 503)
   }
-  const origin = process.env.NEXT_PUBLIC_APP_URL?.replace(/\/$/, '') || new URL(request.url).origin
+  const origin = appBaseUrl()
   const url = `${origin}${qrPath(p.slug, code)}`
   if (new URL(request.url).searchParams.get('format') === 'url') return json({ url })
   const svg = await QRCode.toString(url, { type: 'svg', margin: 2, errorCorrectionLevel: 'M' })
