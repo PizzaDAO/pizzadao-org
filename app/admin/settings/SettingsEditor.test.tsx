@@ -37,3 +37,31 @@ describe('SettingsEditor switch', () => {
     expect(calls[0]).toMatchObject({ method: 'PUT', body: { key: 'disavow.enabled', value: false } })
   })
 })
+
+describe('SettingsEditor role income table', () => {
+  const rows = [
+    { name: 'Crew Member', amount: 42, intervalHours: 24 },
+    { name: 'Box Mafia', amount: 42, intervalHours: 24 },
+  ]
+  beforeEach(() => {
+    vi.stubGlobal('fetch', vi.fn(async (_url: string, init?: RequestInit) => {
+      const method = init?.method ?? 'GET'
+      if (method !== 'GET') calls.push({ method, body: JSON.parse(String(init?.body)) })
+      const income = view({ key: 'economy.roleIncome', area: 'economy', areaLabel: 'Economy', label: 'Role income table', input: { type: 'roleIncome' }, stricterOnly: true, default: rows, value: rows, toggle: undefined })
+      return new Response(JSON.stringify(method === 'GET' ? { settings: [income], changes: [], nonProduction: false } : { ok: true }), { status: 200 })
+    }))
+  })
+
+  it('lowering an amount and removing a row sends the edited table', async () => {
+    render(<SettingsEditor labels={labels} />)
+    const amount = (await screen.findByRole('spinbutton', { name: 'Crew Member incomeAmount' })) as HTMLInputElement
+    const save = screen.getByRole('button', { name: 'save' }) as HTMLButtonElement
+    expect(save.disabled).toBe(true)
+    fireEvent.change(amount, { target: { value: '30' } })
+    fireEvent.click(screen.getAllByRole('button', { name: 'incomeRemove' })[1])
+    expect(save.disabled).toBe(false)
+    fireEvent.click(save)
+    await waitFor(() => expect(calls).toHaveLength(1))
+    expect(calls[0]).toMatchObject({ method: 'PUT', body: { key: 'economy.roleIncome', value: [{ name: 'Crew Member', amount: 30, intervalHours: 24 }] } })
+  })
+})

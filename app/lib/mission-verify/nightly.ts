@@ -19,10 +19,12 @@
  * Discord: when a live run finishes having flagged or held something (or
  * found new duplicate signals), one summary post goes to the review channel
  * (MISSION_REVIEW_CHANNEL_ID, else #work, D11): counts only, no names. A run
- * paying more than MISSIONS_RUN_PEP_ALERT PEP (default 50,000) also posts an
+ * paying more than the missions.runPepAlert setting (env MISSIONS_RUN_PEP_ALERT is the legacy value; default 50,000) also posts an
  * alert to PEP_ADMIN_LOG_CHANNEL_ID.
  */
+import { loadSettings } from '../settings'
 import { resolveConfiguredChannel } from '../settings/channels'
+import { effectiveInt, envNumber } from '../settings/numbers'
 import { postDiscordMessage } from '../discord-rest'
 import {
   checkMany,
@@ -194,7 +196,7 @@ export async function announceRun({ runId, dryRun, stats }: NightlySummary): Pro
   const signals = stats.signals as { created?: number } | undefined
   const newSignals = signals?.created ?? 0
   const appUrl = (process.env.NEXT_PUBLIC_APP_URL?.trim() || 'https://app.pizzadao.org').replace(/\/$/, '')
-  const alertAt = envInt('MISSIONS_RUN_PEP_ALERT', 50_000)
+  const alertAt = effectiveInt('missions.runPepAlert', await loadSettings(), envNumber(process.env.MISSIONS_RUN_PEP_ALERT))
 
   if (stats.flagged || stats.held || stats.reopened || newSignals) {
     const channelId = await resolveConfiguredChannel('discord.missionReviewChannelId', 'work', 'MISSION_REVIEW_CHANNEL_ID')

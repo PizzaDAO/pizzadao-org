@@ -238,6 +238,32 @@ describe('Phase 3 settings', () => {
     expect((await PUT(req('PUT', { key: 'disavow.decisionDays', value: 20 }))).status).toBe(200)
   })
 
+  it('the smallest bet cannot be set above the largest bet (checked together)', async () => {
+    const r = await PUT(req('PUT', { key: 'games.minBet', value: 6000 }))
+    expect(r.status).toBe(400) // above the 1000 bound
+    m(prisma.appSetting.findMany).mockResolvedValue([{ key: 'games.maxBet', value: 100, updatedAt: new Date(), updatedBy: ME }])
+    const over = await PUT(req('PUT', { key: 'games.minBet', value: 500 }))
+    expect(over.status).toBe(400)
+    expect((await over.json()).error).toMatch(/smallest bet/)
+    expect((await PUT(req('PUT', { key: 'games.minBet', value: 50 }))).status).toBe(200)
+  })
+
+  it('loosening a spend cap is refused; tightening it saves', async () => {
+    expect((await PUT(req('PUT', { key: 'economy.adminGrantMax', value: 10_001 }))).status).toBe(400)
+    expect((await PUT(req('PUT', { key: 'economy.adminGrantMax', value: 500 }))).status).toBe(200)
+  })
+
+  it('the role income table: a higher payout is refused, a smaller table saves, and reset asks first', async () => {
+    const { DEFAULT_ROLE_INCOME } = await import('@/app/lib/pep-earn/income-defaults')
+    const table = DEFAULT_ROLE_INCOME.slice(2).map((r) => ({ ...r }))
+    expect((await PUT(req('PUT', { key: 'economy.roleIncome', value: [{ ...DEFAULT_ROLE_INCOME[0], amount: 9999 }] }))).status).toBe(400)
+    expect((await PUT(req('PUT', { key: 'economy.roleIncome', value: table }))).status).toBe(200)
+    m(prisma.appSetting.findMany).mockResolvedValue([{ key: 'economy.roleIncome', value: table, updatedAt: new Date(), updatedBy: ME }])
+    m(prisma.appSetting.findUnique).mockResolvedValue({ key: 'economy.roleIncome', value: table, updatedAt: new Date() })
+    const reset = await DELETE(req('DELETE', { key: 'economy.roleIncome' }))
+    expect(reset.status).toBe(409) // back to the full built-in table loosens it
+  })
+
   it('a threshold of 1 is refused', async () => {
     expect((await PUT(req('PUT', { key: 'disavow.yesThreshold', value: 1 }))).status).toBe(400)
   })

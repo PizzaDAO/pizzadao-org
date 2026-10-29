@@ -31,7 +31,7 @@ vi.mock("@/app/lib/discord", () => ({ fetchGuildMember: (...a: unknown[]) => fet
 vi.mock("@/app/lib/discord-interactions/guild-roles", () => ({
     getGuildRoles: (...a: unknown[]) => getGuildRoles(...a),
 }));
-vi.mock("@/app/ui/constants", () => ({ MISSION_REVIEWER_ROLE_IDS: ["900001", "900002"] }));
+vi.mock("@/app/ui/constants", async (importOriginal) => ({ ...(await importOriginal<typeof import("@/app/ui/constants")>()), MISSION_REVIEWER_ROLE_IDS: ["900001", "900002"] }));
 
 async function call() {
     // Fresh import per call to bypass the route's 60s in-memory cache.

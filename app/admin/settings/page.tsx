@@ -74,6 +74,10 @@ export default async function AdminSettingsPage() {
         inForce: t("inForce"),
         idPlaceholder: t("idPlaceholder"),
         idsPlaceholder: t("idsPlaceholder"),
+        incomeRole: t("incomeRole"),
+        incomeAmount: t("incomeAmount"),
+        incomeEvery: t("incomeEvery"),
+        incomeRemove: t("incomeRemove"),
     };
 
     return (

@@ -1313,6 +1313,10 @@
     "inForce": "En vigor ahora",
     "idPlaceholder": "ID de Discord (vacío = predeterminado)",
     "idsPlaceholder": "IDs de Discord separados por comas (vacío = predeterminado)",
+    "incomeRole": "Rol",
+    "incomeAmount": "PEP",
+    "incomeEvery": "Cada (horas)",
+    "incomeRemove": "Quitar",
     "empty": "(vacío)"
   },
   "adminMissions": {

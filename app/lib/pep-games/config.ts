@@ -12,7 +12,9 @@
 import { prisma } from '../db'
 import { creditInTx, debitInTx, getOrCreateEconomy } from '../economy'
 import { ValidationError } from '../errors/api-errors'
-import { claimCooldown, envInt } from '../pep-earn/cooldown'
+import { claimCooldown } from '../pep-earn/cooldown'
+import { loadSettings, type Settings } from '../settings'
+import { effectiveInt, envNumber } from '../settings/numbers'
 import { toggleEnabled } from '../settings/toggles'
 import type { Prisma } from '@prisma/client'
 
@@ -23,18 +25,28 @@ export function gamesEnabled(): Promise<boolean> {
   return toggleEnabled('games.enabled')
 }
 
-export function gameConfig() {
-  const minBet = Math.max(1, envInt('GAME_MIN_BET', 10))
+/**
+ * Bet limits and timings. Settings games.* (saved rows win; the GAME_* env vars are the legacy
+ * values while nothing is saved). Without a snapshot, only the env vars and defaults apply.
+ */
+export function gameConfig(settings?: Settings) {
+  const env = process.env
+  const minBet = Math.max(1, effectiveInt('games.minBet', settings, envNumber(env.GAME_MIN_BET)))
   return {
     minBet,
-    maxBet: Math.max(minBet, envInt('GAME_MAX_BET', 5000)),
-    cooldownMs: Math.max(0, envInt('GAME_COOLDOWN_SECONDS', 3)) * 1000,
-    blackjackTimeoutMs: Math.max(30, envInt('BLACKJACK_TIMEOUT_SECONDS', 300)) * 1000,
+    maxBet: Math.max(minBet, effectiveInt('games.maxBet', settings, envNumber(env.GAME_MAX_BET))),
+    cooldownMs: Math.max(0, effectiveInt('games.cooldownSeconds', settings, envNumber(env.GAME_COOLDOWN_SECONDS))) * 1000,
+    blackjackTimeoutMs: Math.max(30, effectiveInt('games.blackjackTimeoutSeconds', settings, envNumber(env.BLACKJACK_TIMEOUT_SECONDS))) * 1000,
   }
 }
 
-export function assertBet(bet: unknown): asserts bet is number {
-  const { minBet, maxBet } = gameConfig()
+/** The config with the current settings (cached ~30s). */
+export async function loadGameConfig() {
+  return gameConfig(await loadSettings())
+}
+
+export function assertBet(bet: unknown, config: Pick<ReturnType<typeof gameConfig>, 'minBet' | 'maxBet'> = gameConfig()): asserts bet is number {
+  const { minBet, maxBet } = config
   if (typeof bet !== 'number' || !Number.isInteger(bet) || bet < minBet || bet > maxBet) {
     throw new ValidationError(`Bet must be a whole number from ${minBet.toLocaleString('en-US')} to ${maxBet.toLocaleString('en-US')}`)
   }
@@ -55,9 +67,10 @@ export async function playRound<T extends { payout: number }>(
   play: () => T,
   opts: { now?: Date } = {},
 ): Promise<CooldownRefusal | (T & { ok: true; bet: number; balance: number })> {
-  assertBet(bet)
+  const config = await loadGameConfig()
+  assertBet(bet, config)
   const now = opts.now ?? new Date()
-  const { cooldownMs } = gameConfig()
+  const { cooldownMs } = config
   await getOrCreateEconomy(discordId)
 
   return prisma.$transaction(async (tx) => {

@@ -24,7 +24,7 @@ import { prisma } from '../db'
 import { creditInTx, debitInTx, getOrCreateEconomy } from '../economy'
 import { claimCooldown } from '../pep-earn/cooldown'
 import { cryptoRng, shuffle, type Rng } from '../pep-earn/rng'
-import { assertBet, gameConfig } from './config'
+import { assertBet, loadGameConfig } from './config'
 
 // ---------------------------------------------------------------- engine ---
 
@@ -193,10 +193,11 @@ export async function startBlackjack(
   bet: number,
   opts: { rng?: Rng; now?: Date; source?: 'discord' | 'web' } = {},
 ): Promise<BlackjackStart> {
-  assertBet(bet)
+  const config = await loadGameConfig()
+  assertBet(bet, config)
   const rng = opts.rng ?? cryptoRng
   const now = opts.now ?? new Date()
-  const { cooldownMs, blackjackTimeoutMs } = gameConfig()
+  const { cooldownMs, blackjackTimeoutMs } = config
 
   // Auto-stand the member's own timed-out hand first, plus a few others.
   await sweepExpiredBlackjack({ now, discordId })

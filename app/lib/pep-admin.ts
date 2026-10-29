@@ -12,6 +12,8 @@ import { prisma } from './db'
 import { ValidationError } from './errors/api-errors'
 import { creditInTx, debitInTx, getOrCreateEconomy } from './economy'
 import { normalizeRoleName } from './pep-earn/income'
+import { loadSettings, type Settings } from './settings'
+import { effectiveInt } from './settings/numbers'
 
 // ------------------------------------------------------------ who may use ---
 
@@ -75,12 +77,14 @@ export async function isPepAdmin(
 
 export const ADMIN_REASON_MIN = 3
 export const ADMIN_REASON_MAX = 200
-const DEFAULT_GRANT_MAX = 10_000
-
-/** Largest single /add-money or /remove-money (env ADMIN_GRANT_MAX, default 10000). */
-export function adminGrantMax(env: Record<string, string | undefined> = process.env): number {
+/**
+ * Largest single /add-money or /remove-money. Setting economy.adminGrantMax can only lower it; the
+ * legacy value is env ADMIN_GRANT_MAX, default 10000. Without a snapshot only those two apply.
+ */
+export function adminGrantMax(env: Record<string, string | undefined> = process.env, settings?: Settings): number {
   const v = Number(env.ADMIN_GRANT_MAX)
-  return Number.isInteger(v) && v > 0 && v <= 2_147_483_647 ? v : DEFAULT_GRANT_MAX
+  const legacy = Number.isInteger(v) && v > 0 && v <= 2_147_483_647 ? v : undefined
+  return effectiveInt('economy.adminGrantMax', settings, legacy)
 }
 
 /** Collapse whitespace so a reason is one line. */
@@ -104,9 +108,9 @@ export type AdminAdjustResult =
   | { ok: true; amount: number; balance: number }
   | { ok: false; reason: 'insufficient'; balance: number }
 
-function check(adminId: string, targetId: string, amount: number, rawReason: string) {
+async function check(adminId: string, targetId: string, amount: number, rawReason: string) {
   const reason = normalizeReason(rawReason)
-  const err = adminGrantError(amount, reason)
+  const err = adminGrantError(amount, reason, adminGrantMax(process.env, await loadSettings()))
   if (err) throw new ValidationError(err)
   if (!/^\d{5,25}$/.test(adminId) || !/^\d{5,25}$/.test(targetId)) throw new ValidationError('Invalid member')
   return reason
@@ -116,7 +120,7 @@ const meta = (adminId: string, reason: string) => ({ adminId, reason, source: 'd
 
 /** /add-money: credit `targetId` (creating their User/Economy rows if needed, like /pay does for recipients). */
 export async function adminAddMoney(adminId: string, targetId: string, amount: number, rawReason: string): Promise<AdminAdjustResult> {
-  const reason = check(adminId, targetId, amount, rawReason)
+  const reason = await check(adminId, targetId, amount, rawReason)
   await getOrCreateEconomy(targetId)
   const balance = await prisma.$transaction(async (tx) => {
     await creditInTx(tx, targetId, amount, 'ADMIN_GRANT', `Admin grant by ${adminId}: ${reason}`, meta(adminId, reason))
@@ -131,7 +135,7 @@ export async function adminAddMoney(adminId: string, targetId: string, amount: n
  * with no wallet has 0, so nothing is created for them.
  */
 export async function adminRemoveMoney(adminId: string, targetId: string, amount: number, rawReason: string): Promise<AdminAdjustResult> {
-  const reason = check(adminId, targetId, amount, rawReason)
+  const reason = await check(adminId, targetId, amount, rawReason)
   const current = async () =>
     (await prisma.economy.findUnique({ where: { id: targetId }, select: { wallet: true } }))?.wallet ?? 0
   const before = await current()

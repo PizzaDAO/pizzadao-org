@@ -1,20 +1,21 @@
 import { NextResponse } from 'next/server'
 import { getSession } from '@/app/lib/session'
-import { getDailyJobs, getCompletedJobsToday, JOB_REWARD_AMOUNT } from '@/app/lib/jobs'
+import { getDailyJobs, getCompletedJobsToday, getJobRewardAmount } from '@/app/lib/jobs'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
 import { resolveDiscordMentions } from '@/app/lib/discord-mention-resolve'
 
 export const runtime = 'nodejs'
 
 // Replace {amount} placeholder with actual reward
-function replaceAmountPlaceholder(text: string): string {
-  return text.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())
+function replaceAmountPlaceholder(text: string, reward: number): string {
+  return text.replace(/{amount}/gi, reward.toString())
 }
 
 export async function GET() {
   try {
     const session = await getSession()
     const { jobs, resetAt } = await getDailyJobs()
+    const rewardAmount = await getJobRewardAmount()
 
     // Get jobs the user has completed today
     let completedJobIds: number[] = []
@@ -22,7 +23,7 @@ export async function GET() {
       completedJobIds = await getCompletedJobsToday(session.discordId)
     }
 
-    const descriptions = jobs.map((job: any) => replaceAmountPlaceholder(job.description))
+    const descriptions = jobs.map((job: any) => replaceAmountPlaceholder(job.description, rewardAmount))
 
     // Resolve any <#channelId> / <@&roleId> Discord mentions in the job
     // descriptions to names here, server-side (bot token stays on the
@@ -38,7 +39,7 @@ export async function GET() {
         completed: completedJobIds.includes(job.id)
       })),
       resetAt: resetAt.toISOString(),
-      rewardAmount: JOB_REWARD_AMOUNT,
+      rewardAmount,
       channels,
       roles,
       guildId

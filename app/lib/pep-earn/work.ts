@@ -6,7 +6,8 @@
  * members toward community actions (staff pay the advertised bonuses by hand).
  * Every payout is a WORK_REWARD ledger row.
  *
- * Tunables (env): WORK_MIN_PEP, WORK_MAX_PEP, WORK_COOLDOWN_SECONDS.
+ * Tunables: settings work.* (admin page); the env vars below are the legacy values while nothing is
+ * saved: WORK_MIN_PEP, WORK_MAX_PEP, WORK_COOLDOWN_SECONDS.
  * Replies: WORK_PROMPTS_JSON (a JSON array of strings with {amount}) overrides
  * the defaults below; moving them to a sheet/DB table is specced in
  * plans/unbelievaboat-replacement.md.
@@ -14,7 +15,9 @@
 import { prisma } from '../db'
 import { getOrCreateEconomy } from '../economy'
 import { logTransaction } from '../transactions'
-import { claimCooldown, envInt, randInt } from './cooldown'
+import { loadSettings, type Settings } from '../settings'
+import { effectiveInt, envNumber } from '../settings/numbers'
+import { claimCooldown, randInt } from './cooldown'
 
 export const DEFAULT_WORK_PROMPTS: readonly string[] = [
   "You tossed dough for the crew and earned {amount}. Bonus mission: invite a friend to this week's [community call](<https://app.pizzadao.org/calls>) and tag a mod for a 314 bonus.",
@@ -38,10 +41,12 @@ export function workPrompts(): readonly string[] {
   return DEFAULT_WORK_PROMPTS
 }
 
-export function workConfig() {
-  const min = envInt('WORK_MIN_PEP', 10)
-  const max = Math.max(min, envInt('WORK_MAX_PEP', 100))
-  return { min, max, cooldownMs: envInt('WORK_COOLDOWN_SECONDS', 30) * 1000 }
+/** Settings work.* (saved rows win; the WORK_* env vars are the legacy values while nothing is saved). */
+export function workConfig(settings?: Settings) {
+  const env = process.env
+  const min = effectiveInt('work.minPep', settings, envNumber(env.WORK_MIN_PEP))
+  const max = Math.max(min, effectiveInt('work.maxPep', settings, envNumber(env.WORK_MAX_PEP)))
+  return { min, max, cooldownMs: effectiveInt('work.cooldownSeconds', settings, envNumber(env.WORK_COOLDOWN_SECONDS)) * 1000 }
 }
 
 export type WorkResult =
@@ -54,7 +59,7 @@ export async function doWork(
 ): Promise<WorkResult> {
   const rng = opts.rng ?? Math.random
   const now = opts.now ?? new Date()
-  const { min, max, cooldownMs } = workConfig()
+  const { min, max, cooldownMs } = workConfig(await loadSettings())
   const prompts = workPrompts()
 
   await getOrCreateEconomy(discordId)

@@ -10,6 +10,7 @@
 import { randomUUID } from "crypto";
 import type { Hex } from "viem";
 import { prisma } from "@/app/lib/db";
+import { loadSettings } from "@/app/lib/settings";
 import { chainWhere, dailyCap, maxGasGwei, minBalanceWei, planFees, sliceChain, SLICES_BATCH_SIZE, SLICES_MAX_ATTEMPTS, slicesReady } from "./config";
 import { checkMinterSetup, claimKeyFor, getBalanceOf, getFeeQuote, getMinterBalance, getReceiptInfo, isClaimUsed, replaceStuckTx, scrubError, sendMintMany, waitForReceipt } from "./minter";
 import { postSliceAlert } from "./alerts";
@@ -119,7 +120,7 @@ export async function reconcileSubmitted(now = new Date()): Promise<number> {
     if (info.state === "pending" && !stuck) continue;
 
     if (info.state === "pending") {
-      const ceiling = BigInt(Math.floor(maxGasGwei() * 1e9));
+      const ceiling = BigInt(Math.floor(maxGasGwei(process.env, await loadSettings()) * 1e9));
       const r = await replaceStuckTx(hash as Hex, ceiling).catch((e) => {
         console.error("[slices] replace check failed:", scrubError(e));
         return { kind: "still_pending" } as const;
@@ -258,11 +259,12 @@ export async function processMintQueue(opts: { budgetMs?: number } = {}): Promis
       console.error("[slices] balance check failed:", scrubError(e));
       return { status: "skipped", reason: "rpc_error", reconciled };
     }
-    if (balance < minBalanceWei()) {
+    const settings = await loadSettings();
+    if (balance < minBalanceWei(process.env, settings)) {
       await postSliceAlert(`minter balance is low (${(Number(balance) / 1e18).toFixed(5)} ETH). Minting is paused until it is topped up.`);
       return { status: "skipped", reason: "low_balance", reconciled };
     }
-    const cap = dailyCap();
+    const cap = dailyCap(process.env, settings);
     const remaining = cap - (await mintedLast24h());
     if (remaining <= 0) {
       await postSliceAlert(`daily mint cap (${cap}) reached. Queue is paused until the 24h window rolls.`);
@@ -292,7 +294,7 @@ export async function processMintQueue(opts: { budgetMs?: number } = {}): Promis
     let fees: { maxFee: bigint; priority: bigint } | null;
     try {
       const q = await getFeeQuote();
-      fees = planFees(q.baseFee, q.priority, maxGasGwei());
+      fees = planFees(q.baseFee, q.priority, maxGasGwei(process.env, settings));
     } catch (e) {
       console.error("[slices] fee estimate failed:", scrubError(e));
       return { status: "skipped", reason: "rpc_error", reconciled };

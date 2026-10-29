@@ -2,12 +2,20 @@ import { prisma } from './db'
 import { creditInTx, getOrCreateEconomy } from './economy'
 import { discordTextToPlainText } from './discord-markup'
 import { resolveDiscordMentions } from './discord-mention-resolve'
+import { loadSettings } from './settings'
+import { effectiveInt, envNumber } from './settings/numbers'
 
-const JOB_REWARD_AMOUNT = parseInt(process.env.JOB_REWARD_AMOUNT || '50', 10)
 const JOBS_SHEET_ID = process.env.JOBS_SHEET_ID
-const DAILY_JOBS_COUNT = 3
 
-export { JOB_REWARD_AMOUNT }
+/** PEP per completed daily job: setting economy.jobRewardAmount (env JOB_REWARD_AMOUNT is the legacy value, default 50). */
+export async function getJobRewardAmount(): Promise<number> {
+  return effectiveInt('economy.jobRewardAmount', await loadSettings(), envNumber(process.env.JOB_REWARD_AMOUNT))
+}
+
+/** Jobs offered per UTC day: setting economy.dailyJobsCount (default 3). */
+export async function getDailyJobsCount(): Promise<number> {
+  return effectiveInt('economy.dailyJobsCount', await loadSettings())
+}
 
 /**
  * Get the start of the current UTC day
@@ -125,8 +133,9 @@ function shuffleWithSeed<T>(array: T[], seed: number): T[] {
  */
 export async function getDailyJobs() {
   const allJobs = await getJobs()
+  const dailyCount = await getDailyJobsCount()
 
-  if (allJobs.length <= DAILY_JOBS_COUNT) {
+  if (allJobs.length <= dailyCount) {
     return {
       jobs: allJobs,
       resetAt: getNextResetTime()
@@ -139,7 +148,7 @@ export async function getDailyJobs() {
 
   // Shuffle and take first 3
   const shuffled = shuffleWithSeed(allJobs, seed)
-  const dailyJobs = shuffled.slice(0, DAILY_JOBS_COUNT)
+  const dailyJobs = shuffled.slice(0, dailyCount)
 
   return {
     jobs: dailyJobs,
@@ -149,7 +158,7 @@ export async function getDailyJobs() {
 
 /**
  * Is this job one of today's daily jobs? Daily-job rewards are only for the
- * DAILY_JOBS_COUNT jobs picked for the current UTC day, not every active job.
+ * economy.dailyJobsCount jobs picked for the current UTC day, not every active job.
  */
 export async function isTodaysDailyJob(jobId: number): Promise<boolean> {
   const { jobs } = await getDailyJobs()
@@ -364,6 +373,7 @@ export async function fetchJobsFromSheet(): Promise<SheetJob[]> {
 
   const csv = await response.text()
   const lines = csv.split('\n').filter(line => line.trim())
+  const rewardText = String(await getJobRewardAmount())
 
   // Skip header row, parse Type and Prompt columns
   const jobs: SheetJob[] = []
@@ -371,7 +381,7 @@ export async function fetchJobsFromSheet(): Promise<SheetJob[]> {
     const cols = parseCSVLine(lines[i])
     if (cols.length >= 2 && cols[1]) {
       // Replace {amount} placeholder with configured reward
-      const description = cols[1].replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())
+      const description = cols[1].replace(/{amount}/gi, rewardText)
       jobs.push({
         type: cols[0] || 'General',
         description,
@@ -414,6 +424,8 @@ export async function syncJobsFromData(jobs: Array<{ type: string; description: 
     return { synced: 0, added: 0, updated: 0 }
   }
 
+  const rewardText = String(await getJobRewardAmount())
+
   // Get current jobs
   const currentJobs = await prisma.job.findMany()
   const currentByDescription = new Map(currentJobs.map((j: any) => [j.description, j]))
@@ -424,7 +436,7 @@ export async function syncJobsFromData(jobs: Array<{ type: string; description: 
 
   // Add or update jobs
   for (const job of jobs) {
-    const description = job.description.replace(/{amount}/gi, JOB_REWARD_AMOUNT.toString())
+    const description = job.description.replace(/{amount}/gi, rewardText)
     seenDescriptions.add(description)
 
     const existing = currentByDescription.get(description)
