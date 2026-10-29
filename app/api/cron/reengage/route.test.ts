@@ -26,4 +26,20 @@ describe("/api/cron/reengage", () => {
     expect(res.status).toBe(200);
     expect(runReengage).toHaveBeenCalledWith({ dryRun: true, limit: 5 });
   });
+  it("skips a real run on days other than the send day, but still allows a dry run", async () => {
+    vi.useFakeTimers();
+    try {
+      vi.setSystemTime(new Date("2026-11-04T16:00:00Z")); // a Wednesday; the default send day is Tuesday
+      const skipped = await GET(req("/api/cron/reengage", "Bearer cron-secret"));
+      expect(await skipped.json()).toEqual({ skipped: "not-send-day", weekday: 2 });
+      expect(runReengage).not.toHaveBeenCalled();
+      expect((await GET(req("/api/cron/reengage?dry=1", "Bearer cron-secret"))).status).toBe(200);
+      expect(runReengage).toHaveBeenCalledTimes(1);
+      vi.setSystemTime(new Date("2026-11-03T16:00:00Z")); // Tuesday
+      await GET(req("/api/cron/reengage", "Bearer cron-secret"));
+      expect(runReengage).toHaveBeenCalledTimes(2);
+    } finally {
+      vi.useRealTimers();
+    }
+  });
 });

@@ -48,6 +48,15 @@ export function effectiveInt(key: SettingKey, settings: Settings | undefined, le
   return saved ? combineSaved(key, base, saved.value as number) : base
 }
 
+/**
+ * A plain (two-way) number setting: the saved value, else the code default. With no snapshot, the
+ * default. An unreadable snapshot gives the last value this instance saw, then the default (the
+ * registry's lastKnownGood failure mode).
+ */
+export function settingInt(key: SettingKey, settings?: Settings): number {
+  return settings ? (settings.get(key) as number) : (SETTINGS[key].default as number)
+}
+
 type Env = Record<string, string | undefined>
 
 /**
@@ -55,7 +64,7 @@ type Env = Record<string, string | undefined>
  * (so the admin page and the cross-field checks see the same legacy value the app uses).
  * `unit` scales a decimal env value into the setting's whole units.
  */
-const LEGACY: Partial<Record<SettingKey, { env: string; read: 'int' | 'posInt' | 'grant' | 'posFloor' | 'scaled'; unit?: number }>> = {
+const LEGACY: Partial<Record<SettingKey, { env: string; read: 'int' | 'posInt' | 'grant' | 'posFloor' | 'scaled' | 'batch'; unit?: number }>> = {
   'games.minBet': { env: 'GAME_MIN_BET', read: 'int' },
   'games.maxBet': { env: 'GAME_MAX_BET', read: 'int' },
   'games.cooldownSeconds': { env: 'GAME_COOLDOWN_SECONDS', read: 'int' },
@@ -76,6 +85,7 @@ const LEGACY: Partial<Record<SettingKey, { env: string; read: 'int' | 'posInt' |
   'slices.maxGasMilliGwei': { env: 'SLICES_MAX_GAS_GWEI', read: 'scaled', unit: 1000 },
   'slices.minBalanceMilliEth': { env: 'SLICES_MIN_BALANCE_ETH', read: 'scaled', unit: 1000 },
   'portrait.dailyCap': { env: 'MAFIA_PORTRAIT_DAILY_CAP', read: 'posInt' },
+  'reengage.batchSize': { env: 'REENGAGE_BATCH_SIZE', read: 'batch' },
   'portrait.publicDailyCap': { env: 'MAFIA_PORTRAIT_PUBLIC_DAILY_CAP', read: 'posInt' },
 }
 
@@ -103,6 +113,11 @@ export function legacyValue(key: SettingKey, env: Env = process.env): number | u
     case 'posFloor': {
       const v = Number(raw?.trim())
       return Number.isFinite(v) && v > 0 ? Math.floor(v) : undefined
+    }
+    case 'batch': {
+      // How the re-engagement run always read it: a positive number, whole, never above the code ceiling.
+      const v = Number(raw)
+      return Number.isFinite(v) && v > 0 ? Math.min(Math.floor(v), 300) : undefined
     }
     case 'scaled': {
       const v = Number(raw?.trim())

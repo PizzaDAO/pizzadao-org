@@ -19,12 +19,28 @@ import { EMPTY_POST_FILTER, isCrewExcluded, loadPostFilter, mentionsBlockedTerm,
 import { SITE_URL } from '@/app/lib/site-url'
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
+import { loadSettings, type Settings } from '@/app/lib/settings'
+import { settingInt } from '@/app/lib/settings/numbers'
 import { importedAllowed, isImportedSource } from '@/app/lib/calls/imported'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
-const MAX_BULLETS = 5
-const MAX_ACTIONS = 5
-const BULLET_CHARS = 220
+
+/** How long a recap may be (settings calls.recap*; Discord's 2000-character limit is enforced regardless). */
+export interface RecapLimits {
+  bullets: number
+  actions: number
+  chars: number
+}
+
+export const DEFAULT_RECAP_LIMITS: RecapLimits = { bullets: 5, actions: 5, chars: 220 }
+
+export function recapLimits(settings?: Settings): RecapLimits {
+  return {
+    bullets: settingInt('calls.recapMaxBullets', settings),
+    actions: settingInt('calls.recapMaxActions', settings),
+    chars: settingInt('calls.recapBulletChars', settings),
+  }
+}
 
 /**
  * Whether recaps are posted: the admin setting `calls.recapPostEnabled`, with CALL_RECAP_POST_ENABLED
@@ -48,17 +64,17 @@ const oneLine = (s: string) => s.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u202
 const clip = (s: string, n: number) => (s.length <= n ? s : `${s.slice(0, n - 1).trimEnd()}…`)
 
 /** 3-6 short bullets: the summary's first sentences, or the chapter titles when the summary is too short to split. */
-export function recapBullets(summary: string | null, chapters: unknown, filter: PostFilter = EMPTY_POST_FILTER): string[] {
+export function recapBullets(summary: string | null, chapters: unknown, filter: PostFilter = EMPTY_POST_FILTER, limits: RecapLimits = DEFAULT_RECAP_LIMITS): string[] {
   const sentences = oneLine(summary ?? '')
     .split(/(?<=[.!?])\s+/)
     .map((s) => s.trim())
     .filter((s) => s.length > 3 && !mentionsBlockedTerm(s, filter))
-  if (sentences.length >= 3) return sentences.slice(0, MAX_BULLETS).map((s) => clip(s, BULLET_CHARS))
+  if (sentences.length >= 3) return sentences.slice(0, limits.bullets).map((s) => clip(s, limits.chars))
   const titles = (Array.isArray(chapters) ? chapters : [])
     .map((c) => (c && typeof c === 'object' && typeof (c as { title?: unknown }).title === 'string' ? oneLine((c as { title: string }).title) : ''))
     .filter((t) => t && !mentionsBlockedTerm(t, filter))
-  if (titles.length >= 3) return titles.slice(0, MAX_BULLETS + 1).map((s) => clip(s, BULLET_CHARS))
-  return sentences.slice(0, MAX_BULLETS).map((s) => clip(s, BULLET_CHARS))
+  if (titles.length >= 3) return titles.slice(0, limits.bullets + 1).map((s) => clip(s, limits.chars))
+  return sentences.slice(0, limits.bullets).map((s) => clip(s, limits.chars))
 }
 
 /** How many summary sentences / chapter titles / action items the Discord text leaves out because of the blocked terms (the stored summary is untouched). */
@@ -82,18 +98,18 @@ export function recapUrl(id: string, base: string = SITE_URL): string {
 }
 
 /** The Discord message text. Always within Discord's 2000-character limit. */
-export function buildRecapText(rec: RecapInput, base: string = SITE_URL, filter: PostFilter = EMPTY_POST_FILTER): string {
+export function buildRecapText(rec: RecapInput, base: string = SITE_URL, filter: PostFilter = EMPTY_POST_FILTER, limits: RecapLimits = DEFAULT_RECAP_LIMITS): string {
   const title = clip(oneLine(rec.title ?? rec.eventName ?? rec.crewLabel ?? 'Call recap'), 120)
-  const bullets = recapBullets(rec.summary, rec.chapters, filter)
+  const bullets = recapBullets(rec.summary, rec.chapters, filter, limits)
   const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : [])
     .map((a) => {
       const o = a as { text?: unknown; owner?: unknown }
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
-      return text && !mentionsBlockedTerm(text, filter) && !mentionsBlockedTerm(owner, filter) ? `${clip(text, BULLET_CHARS)}${owner ? ` (${clip(owner, 40)})` : ''}` : ''
+      return text && !mentionsBlockedTerm(text, filter) && !mentionsBlockedTerm(owner, filter) ? `${clip(text, limits.chars)}${owner ? ` (${clip(owner, 40)})` : ''}` : ''
     })
     .filter(Boolean)
-    .slice(0, MAX_ACTIONS)
+    .slice(0, limits.actions)
   const url = recapUrl(rec.id, base)
   const lines = [`**Call recap: ${title}**`]
   if (bullets.length) lines.push('', ...bullets.map((b) => `- ${b}`))
@@ -249,7 +265,7 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
   try {
     const sent = await (deps.post ?? postDiscordMessage)(
       { kind: 'bot', channelId: channel.channelId, botToken },
-      { content: buildRecapText(rec, deps.base, filter), allowed_mentions: { parse: [] }, flags: 4 /* SUPPRESS_EMBEDS */ },
+      { content: buildRecapText(rec, deps.base, filter, recapLimits(await loadSettings())), allowed_mentions: { parse: [] }, flags: 4 /* SUPPRESS_EMBEDS */ },
     )
     messageId = sent.id
   } catch (err) {

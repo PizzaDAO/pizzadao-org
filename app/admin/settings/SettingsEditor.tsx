@@ -47,6 +47,10 @@ export interface SettingsLabels {
     incomeAmount: string;
     incomeEvery: string;
     incomeRemove: string;
+    addRow: string;
+    removeRow: string;
+    listHint: string;
+    editedElsewhere: string;
 }
 
 interface IncomeRow {
@@ -55,6 +59,11 @@ interface IncomeRow {
     intervalHours: number;
     roleId?: string;
 }
+
+type TableRow = Record<string, string | number>;
+type TableColumn =
+    | { key: string; label: string; kind: "text"; maxLength?: number; fixed?: boolean }
+    | { key: string; label: string; kind: "int"; min: number; max: number };
 
 interface SettingView {
     key: string;
@@ -71,7 +80,10 @@ interface SettingView {
         | { type: "roleList" }
         | { type: "text"; maxLength: number; multiline?: boolean; placeholder?: string }
         | { type: "date" }
-        | { type: "url"; maxLength: number };
+        | { type: "url"; maxLength: number }
+        | { type: "stringList"; maxItems: number; maxLength: number }
+        | { type: "table"; columns: TableColumn[]; maxRows: number; fixedRows?: boolean }
+        | { type: "managed"; href: string };
     stricterOnly: boolean;
     default: SettingValue;
     baseline?: SettingValue;
@@ -80,13 +92,15 @@ interface SettingView {
     override: SettingValue | null;
     modified: boolean;
     invalid: boolean;
+    warning?: string;
+    private?: boolean;
     updatedAt: string | null;
     updatedBy: string | null;
     toggle?: { env: string; envKill: boolean; envOn: boolean; effective: boolean };
     names?: Record<string, string>;
 }
 
-type SettingValue = number | boolean | string | string[] | IncomeRow[];
+type SettingValue = number | boolean | string | string[] | IncomeRow[] | TableRow[];
 
 /** How a value reads in the page: numbers with their unit, on/off, ids with their resolved names. */
 function show(s: SettingView, v: SettingValue, labels: SettingsLabels): string {
@@ -94,7 +108,12 @@ function show(s: SettingView, v: SettingValue, labels: SettingsLabels): string {
     if (s.input.type === "roleIncome" && Array.isArray(v)) {
         return (v as IncomeRow[]).map((r) => `${r.name} ${r.amount}/${r.intervalHours}h`).join(", ");
     }
+    if (s.input.type === "table" && Array.isArray(v)) {
+        const cols = s.input.columns;
+        return (v as TableRow[]).map((r) => cols.map((c) => String(r[c.key])).join(" ")).join(", ");
+    }
     if (typeof v === "boolean") return v ? labels.on : labels.off;
+    if (s.input.type === "stringList" && Array.isArray(v)) return `${v.length}`;
     if (Array.isArray(v)) return v.length === 0 ? labels.emptyDefault : (v as string[]).map((id) => (names[id] ? `${names[id]} (${id})` : id)).join(", ");
     if (typeof v === "string") {
         if (v === "") return s.input.type === "channel" || s.input.type === "role" ? labels.emptyDefault : labels.empty;
@@ -127,7 +146,15 @@ async function api(method: string, body?: unknown, query = ""): Promise<{ ok: bo
 }
 
 function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels; onChanged: () => void }) {
-    const [text, setText] = useState(s.input.type === "roleIncome" ? "" : Array.isArray(s.value) ? (s.value as string[]).join(", ") : String(s.value));
+    // A private value is never sent to the page (only "set" / "not set"), so its box starts empty: saving replaces it.
+    const [text, setText] = useState(
+        s.private || s.input.type === "roleIncome" || s.input.type === "table" || s.input.type === "managed" ? ""
+        : s.input.type === "stringList" && Array.isArray(s.value) ? (s.value as string[]).join("\n")
+        : Array.isArray(s.value) ? (s.value as string[]).join(", ")
+        : String(s.value),
+    );
+    const tableInput = s.input.type === "table" ? s.input : null;
+    const [rows, setRows] = useState<TableRow[]>(s.input.type === "table" && Array.isArray(s.value) ? (s.value as TableRow[]).map((r) => ({ ...r })) : []);
     // The role income table: editable copy of the rows (only amounts and intervals change; rows can be removed).
     const [income, setIncome] = useState<IncomeRow[]>(s.input.type === "roleIncome" && Array.isArray(s.value) ? (s.value as IncomeRow[]).map((r) => ({ ...r })) : []);
     // For a switch, s.value is what is in force (env may have it on), so the box starts there and Save
@@ -145,10 +172,15 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
         s.input.type === "int" ? Number(text)
         : s.input.type === "bool" ? flag
         : s.input.type === "roleIncome" ? income
+        : s.input.type === "table" ? rows
+        : s.input.type === "stringList" ? text.split("\n").map((x) => x.trim()).filter(Boolean)
         : s.input.type === "roleList" ? text.split(",").map((x) => x.trim()).filter(Boolean)
         : text.trim();
     const dirty =
         s.input.type === "roleIncome" ? income.length > 0 && JSON.stringify(income) !== JSON.stringify(s.value)
+        : s.input.type === "table" ? rows.length > 0 && JSON.stringify(rows) !== JSON.stringify(s.value)
+        : s.private && s.input.type === "text" ? text.trim() !== ""
+        : s.input.type === "stringList" ? (next as string[]).length > 0 && JSON.stringify(next) !== JSON.stringify(s.value)
         : s.input.type === "int" ? text.trim() !== "" && next !== s.value
         : s.input.type === "bool" ? next !== s.value
         : JSON.stringify(next) !== JSON.stringify(s.value);
@@ -210,6 +242,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
             <p className="m-0 text-sm text-foreground/70">{s.help}</p>
             {s.stricterOnly && <p className="m-0 text-xs text-foreground/60">{labels.stricterOnly}</p>}
             {s.invalid && <p role="alert" className="m-0 text-sm text-tomato">{labels.invalid}</p>}
+            {s.warning && <p role="alert" className="m-0 rounded-lg border border-tomato bg-tomato/10 p-2 text-sm font-bold text-tomato">{s.warning}</p>}
             {s.toggle?.envKill && <p className="m-0 text-sm font-bold text-tomato">{fill(labels.envForcedOff, { env: s.toggle.env })}</p>}
             {s.toggle && !s.toggle.envKill && !s.modified && <p className="m-0 text-xs text-foreground/60">{fill(labels.envFallback, { env: s.toggle.env })}</p>}
             {s.legacyEnv && !s.toggle && !s.modified && JSON.stringify(s.baseline) !== JSON.stringify(s.default) && (
@@ -297,6 +330,80 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                                 ))}
                             </tbody>
                         </table>
+                    ) : s.input.type === "table" ? (
+                        <div className="grid gap-1">
+                            <table className="text-sm">
+                                <thead>
+                                    <tr className="text-left text-foreground/50">
+                                        {s.input.columns.map((c) => (
+                                            <th key={c.key} className="pr-3 font-normal">{c.label}</th>
+                                        ))}
+                                        <th />
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((r, i) => (
+                                        <tr key={i}>
+                                            {s.input.type === "table" && s.input.columns.map((c) => (
+                                                <td key={c.key} className="pr-3">
+                                                    {c.kind === "text" && c.fixed ? (
+                                                        <code className="text-xs">{String(r[c.key])}</code>
+                                                    ) : (
+                                                        <input
+                                                            type={c.kind === "int" ? "number" : "text"}
+                                                            inputMode={c.kind === "int" ? "numeric" : undefined}
+                                                            min={c.kind === "int" ? c.min : undefined}
+                                                            max={c.kind === "int" ? c.max : undefined}
+                                                            maxLength={c.kind === "text" ? c.maxLength : undefined}
+                                                            value={r[c.key]}
+                                                            aria-label={`${String(r[s.input.type === "table" ? s.input.columns[0].key : ""])} ${c.label}`}
+                                                            onChange={(e) =>
+                                                                setRows(rows.map((x, j) => (j === i ? { ...x, [c.key]: c.kind === "int" ? Number(e.target.value) : e.target.value } : x)))
+                                                            }
+                                                            className={`${c.kind === "int" ? "w-28 tabular-nums" : "w-40"} rounded-lg border bg-background px-2 py-1`}
+                                                            style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
+                                                        />
+                                                    )}
+                                                </td>
+                                            ))}
+                                            <td>
+                                                {!tableInput?.fixedRows && (
+                                                    <button type="button" onClick={() => setRows(rows.filter((_, j) => j !== i))} className="underline">
+                                                        {labels.removeRow}
+                                                    </button>
+                                                )}
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                            {!s.input.fixedRows && rows.length < s.input.maxRows && (
+                                <button
+                                    type="button"
+                                    onClick={() => {
+                                        if (s.input.type !== "table") return;
+                                        setRows([...rows, Object.fromEntries(s.input.columns.map((c) => [c.key, c.kind === "int" ? 0 : ""]))]);
+                                    }}
+                                    className="w-fit underline"
+                                >
+                                    {labels.addRow}
+                                </button>
+                            )}
+                        </div>
+                    ) : s.input.type === "stringList" ? (
+                        <div className="grid gap-1">
+                            <textarea
+                                rows={6}
+                                value={text}
+                                aria-label={s.label}
+                                onChange={(e) => setText(e.target.value)}
+                                className="w-96 max-w-full rounded-lg border bg-background px-2 py-1"
+                                style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
+                            />
+                            <span className="text-xs text-foreground/60">{fill(labels.listHint, { max: String(s.input.maxItems), chars: String(s.input.maxLength) })}</span>
+                        </div>
+                    ) : s.input.type === "managed" ? (
+                        <a href={s.input.href} className="underline">{labels.editedElsewhere}</a>
                     ) : s.input.type === "bool" ? (
                         <input type="checkbox" checked={flag} onChange={(e) => setFlag(e.target.checked)} aria-label={s.label} className="h-5 w-5" />
                     ) : s.input.type === "text" && s.input.multiline ? (
@@ -326,7 +433,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                         />
                     )}
                 </label>
-                <input
+                {s.input.type !== "managed" && <input
                     type="text"
                     value={note}
                     maxLength={300}
@@ -335,11 +442,11 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                     aria-label={labels.notePlaceholder}
                     className="min-w-40 flex-1 rounded-lg border bg-background px-2 py-1"
                     style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}
-                />
-                <button type="button" onClick={() => save(false)} disabled={!dirty || state === "saving"} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
+                />}
+                {s.input.type !== "managed" && <button type="button" onClick={() => save(false)} disabled={!dirty || state === "saving"} className="rounded-lg bg-tomato px-3 py-1.5 font-bold text-white disabled:opacity-40">
                     {state === "saving" ? labels.saving : labels.save}
-                </button>
-                {s.modified && (
+                </button>}
+                {s.modified && s.input.type !== "managed" && (
                     <button type="button" onClick={() => reset()} disabled={state === "resetting"} className="rounded-lg border px-3 py-1.5" style={{ borderColor: "hsl(var(--rule-warm) / 0.55)" }}>
                         {state === "resetting" ? labels.resetting : labels.reset}
                     </button>

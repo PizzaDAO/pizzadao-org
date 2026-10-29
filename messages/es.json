@@ -1317,6 +1317,10 @@
     "incomeAmount": "PEP",
     "incomeEvery": "Cada (horas)",
     "incomeRemove": "Quitar",
+    "addRow": "Agregar una fila",
+    "removeRow": "Quitar",
+    "listHint": "Uno por línea, hasta {max} líneas de {chars} caracteres.",
+    "editedElsewhere": "Se edita en la página de revisión de llamadas",
     "empty": "(vacío)"
   },
   "adminMissions": {

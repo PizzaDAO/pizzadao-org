@@ -4,11 +4,32 @@
  * first. No AI: the wording is templated so the same data always gives the same post.
  */
 import type { CrewTaskDetail } from '@/app/lib/crew-mappings'
+import type { Settings } from '@/app/lib/settings'
+import { settingInt } from '@/app/lib/settings/numbers'
 
-export const MAX_BULLETS = 7
-const MAX_TASKS = 5
-const MAX_FOLLOWUPS = 2
-const MAX_LEN = 110
+/** How big an agenda may be (settings calls.agenda*; the defaults are the original constants). */
+export interface AgendaLimits {
+  bullets: number
+  tasks: number
+  followups: number
+  chars: number
+}
+
+export const DEFAULT_AGENDA_LIMITS: AgendaLimits = { bullets: 7, tasks: 5, followups: 2, chars: 110 }
+
+export function agendaLimits(settings?: Settings): AgendaLimits {
+  return {
+    bullets: settingInt('calls.agendaMaxBullets', settings),
+    tasks: settingInt('calls.agendaMaxTasks', settings),
+    followups: settingInt('calls.agendaMaxFollowups', settings),
+    chars: settingInt('calls.agendaItemChars', settings),
+  }
+}
+
+/** Post when the call starts within this many minutes (setting calls.agendaLeadMinutes; default 30). */
+export function agendaLeadMs(settings?: Settings): number {
+  return settingInt('calls.agendaLeadMinutes', settings) * 60 * 1000
+}
 
 export interface ActionItem {
   text: string
@@ -25,9 +46,9 @@ export interface AgendaBullet {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-function clip(s: string): string {
+function clipTo(s: string, max: number): string {
   const t = s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
-  const clipped = t.length > MAX_LEN ? `${t.slice(0, MAX_LEN - 1).trimEnd()}…` : t
+  const clipped = t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t
   // Escape Discord markdown so sheet text cannot format or break the post.
   return clipped.replace(/([\\*_~`|>[\]<])/g, '\\$1')
 }
@@ -84,8 +105,11 @@ export function buildAgendaBullets(input: {
   tasks: readonly CrewTaskDetail[]
   actionItems?: readonly ActionItem[]
   now: Date
+  limits?: AgendaLimits
 }): AgendaBullet[] {
   const { now } = input
+  const limits = input.limits ?? DEFAULT_AGENDA_LIMITS
+  const clip = (s: string) => clipTo(s, limits.chars)
   type Scored = { t: CrewTaskDetail; overdue: number; pr: number }
   const scored: Scored[] = input.tasks.map((t) => ({ t, overdue: daysOverdue(t.due, now), pr: priorityRank(t.priority) }))
   // Urgent = overdue, or Top/High priority. Others only pad the list if actively in progress.
@@ -99,12 +123,12 @@ export function buildAgendaBullets(input: {
         Number(b.t.isActive) - Number(a.t.isActive) ||
         a.t.label.localeCompare(b.t.label),
     )
-    .slice(0, MAX_TASKS)
+    .slice(0, limits.tasks)
   const bullets: AgendaBullet[] = []
   const seen = new Set<string>()
   const add = (b: AgendaBullet) => {
     const key = b.text.toLowerCase()
-    if (seen.has(key) || bullets.length >= MAX_BULLETS) return
+    if (seen.has(key) || bullets.length >= limits.bullets) return
     seen.add(key)
     bullets.push(b)
   }
@@ -114,7 +138,7 @@ export function buildAgendaBullets(input: {
     if (s.overdue > 0) add({ kind: 'overdue', text: `Overdue ${s.overdue}d: ${label}`, url: s.t.url })
     else add({ kind: 'priority', text: `${s.pr === 0 ? 'Top' : 'High'} priority: ${label}`, url: s.t.url })
   }
-  for (const a of (input.actionItems ?? []).slice(0, MAX_FOLLOWUPS)) {
+  for (const a of (input.actionItems ?? []).slice(0, limits.followups)) {
     add({ kind: 'followup', text: `From last call: ${clip(a.text)}${a.owner ? ` (${clip(a.owner).slice(0, 40)})` : ''}` })
   }
   // Pad toward 3 with in-progress tasks (highest priority first).

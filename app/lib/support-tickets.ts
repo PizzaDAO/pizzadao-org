@@ -15,7 +15,7 @@ import {
 
 export * from "./support-tickets-shared";
 
-/** Abuse controls, enforced per Discord account. */
+/** Abuse controls, enforced per Discord account. These are the defaults; settings support.maxTicketsPerDay / support.maxOpenTickets apply. */
 export const MAX_TICKETS_PER_DAY = 5;
 export const MAX_OPEN_TICKETS = 10;
 

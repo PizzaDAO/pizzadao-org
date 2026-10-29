@@ -1,5 +1,5 @@
 import { requireDpr, rejectUnsafeWrite, json, isNonProductionDeploy } from '@/app/lib/admin-guard'
-import { isSettingKey, parseSetting } from '@/app/lib/settings/registry'
+import { SETTINGS, isSettingKey, parseSetting } from '@/app/lib/settings/registry'
 import { confirmationFor, listChanges, listSettingViews, resetSetting, saveSetting, SettingError } from '@/app/lib/settings/store'
 
 export const runtime = 'nodejs'
@@ -40,6 +40,8 @@ export async function PUT(request: Request) {
   const b = await body(request)
   if (!b || typeof b.key !== 'string' || !isSettingKey(b.key)) return json({ error: 'Unknown setting' }, 400)
   const key = b.key
+  // Settings edited on their own page (the call post filter) are not editable here.
+  if (SETTINGS[key].input.type === 'managed') return json({ error: `${key} is edited on its own page` }, 400)
   const parsed = parseSetting(key, b.value)
   if (!parsed.ok) return json({ error: `${key}: ${parsed.error}` }, 400)
   try {
@@ -63,6 +65,7 @@ export async function DELETE(request: Request) {
   if (unsafe) return unsafe
   const b = await body(request)
   if (!b || typeof b.key !== 'string' || !isSettingKey(b.key)) return json({ error: 'Unknown setting' }, 400)
+  if (SETTINGS[b.key].input.type === 'managed') return json({ error: `${b.key} is edited on its own page` }, 400)
   try {
     // Resetting a stricter-only setting moves it back toward the (looser) code default: confirm first.
     const current = (await listSettingViews()).find((x) => x.key === b.key)

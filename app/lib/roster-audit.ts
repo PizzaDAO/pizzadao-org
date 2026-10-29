@@ -14,9 +14,24 @@
 import { prisma } from "@/app/lib/db";
 import { fetchAllMembers } from "@/app/lib/sheets/members-list";
 import { normalizeCrewId, NON_ROSTER_CREW_IDS } from "@/app/lib/crew-id";
+import { loadSettings, type Settings } from "@/app/lib/settings";
+import { settingInt } from "@/app/lib/settings/numbers";
 
+// Defaults; settings roster.minCallsForSuggestion / roster.inactiveMonths apply in runRosterAudit.
 export const MIN_CALLS_FOR_SUGGESTION = 3;
 export const INACTIVE_MONTHS = 6;
+
+export interface AuditLevels {
+  minCalls: number;
+  inactiveMonths: number;
+}
+
+export function auditLevels(settings?: Settings): AuditLevels {
+  return {
+    minCalls: settingInt("roster.minCallsForSuggestion", settings),
+    inactiveMonths: settingInt("roster.inactiveMonths", settings),
+  };
+}
 
 export interface RosterMismatch {
   memberId: string;
@@ -90,7 +105,8 @@ export function parseCrewBreakdown(raw: unknown): Breakdown | null {
 export function computeRosterAudit(
   members: AuditMember[],
   summaries: AuditSummary[],
-  now: Date = new Date()
+  now: Date = new Date(),
+  levels: AuditLevels = { minCalls: MIN_CALLS_FOR_SUGGESTION, inactiveMonths: INACTIVE_MONTHS },
 ): RosterAuditResult {
   const byDiscordId = new Map<string, Breakdown | null>();
   const byMemberId = new Map<string, Breakdown | null>();
@@ -110,7 +126,7 @@ export function computeRosterAudit(
   }
 
   const cutoff = new Date(now);
-  cutoff.setMonth(cutoff.getMonth() - INACTIVE_MONTHS);
+  cutoff.setMonth(cutoff.getMonth() - levels.inactiveMonths);
   const cutoffMs = cutoff.getTime();
 
   const missing: RosterMismatch[] = [];
@@ -182,7 +198,7 @@ export function computeRosterAudit(
     for (const [crewId, entry] of Object.entries(breakdown)) {
       if (NON_ROSTER_CREW_IDS.has(crewId)) continue;
       if (claimedCrews.has(crewId)) continue;
-      if (entry.count >= MIN_CALLS_FOR_SUGGESTION) {
+      if (entry.count >= levels.minCalls) {
         missing.push({
           memberId: member.id,
           name: member.name,
@@ -207,5 +223,5 @@ export async function runRosterAudit(): Promise<RosterAuditResult> {
   const summaries = await prisma.attendanceSummary.findMany({
     select: { discordId: true, memberId: true, crewBreakdown: true },
   });
-  return computeRosterAudit(members, summaries);
+  return computeRosterAudit(members, summaries, new Date(), auditLevels(await loadSettings()));
 }

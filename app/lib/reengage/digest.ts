@@ -35,6 +35,8 @@ export interface DigestInput {
   paidLevels: ReadonlySet<number>;
   crews: CrewOption[];
   now: Date;
+  /** How far ahead a crew call is listed (default CALL_WINDOW_MS; setting reengage.callWindowDays). */
+  callWindowMs?: number;
 }
 
 export interface Digest {
@@ -80,7 +82,7 @@ export function computeDigest(input: DigestInput): Digest {
     if (!crew || seen.has(crew.id)) continue;
     seen.add(crew.id);
     const at = nextCrewCall(crew.callTime, input.now);
-    if (at && at.getTime() - input.now.getTime() <= CALL_WINDOW_MS) calls.push({ crew: crew.label, at });
+    if (at && at.getTime() - input.now.getTime() <= (input.callWindowMs ?? CALL_WINDOW_MS)) calls.push({ crew: crew.label, at });
   }
   calls.sort((a, b) => a.at.getTime() - b.at.getTime());
 
@@ -114,7 +116,7 @@ export function parseCrewNames(raw: unknown): string[] {
 }
 
 /** Batched reads for a set of candidates, then one `computeDigest` each. */
-export async function loadDigests(candidates: DigestCandidate[], now = new Date()): Promise<Digest[]> {
+export async function loadDigests(candidates: DigestCandidate[], now = new Date(), callWindowMs: number = CALL_WINDOW_MS): Promise<Digest[]> {
   if (candidates.length === 0) return [];
   const discordIds = candidates.map((c) => c.discordId).filter(Boolean);
   const memberIds = candidates.map((c) => c.memberId);
@@ -174,6 +176,7 @@ export async function loadDigests(candidates: DigestCandidate[], now = new Date(
       paidLevels: paid.get(c.discordId) ?? new Set<number>(),
       crews: crewsRes.crews,
       now,
+      callWindowMs,
     });
   });
 }

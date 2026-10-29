@@ -9,6 +9,7 @@ import { generateText, Output, type LanguageModel } from 'ai'
 import { createOpenAI } from '@ai-sdk/openai'
 import { z } from 'zod'
 import type { TranscriptSegment } from '@/app/lib/calls/ingest-schema'
+import { loadSettings } from '@/app/lib/settings'
 import { buildSpeakerNames, buildTranscriptText, isFallbackWorthy, summaryFallbackModel, summaryModel } from '@/app/lib/calls/summarize'
 import { normalizeName } from './resolve'
 
@@ -166,7 +167,7 @@ export async function extractFollowUps(input: ExtractInput, opts: { budgetMs?: n
   if (total < MIN_CALL_MS) throw new Error('not enough time left to draft follow-ups')
   let raw: unknown
   try {
-    raw = await run(process.env.FOLLOWUP_MODEL?.trim() || summaryModel(), Math.floor(total * 0.6))
+    raw = await run(process.env.FOLLOWUP_MODEL?.trim() || summaryModel(process.env, await loadSettings()), Math.floor(total * 0.6))
   } catch (primaryErr) {
     const apiKey = process.env.OPENAI_API_KEY?.trim()
     const left = deadline - Date.now()

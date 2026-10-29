@@ -8,37 +8,27 @@
  *
  * Tunables: settings work.* (admin page); the env vars below are the legacy values while nothing is
  * saved: WORK_MIN_PEP, WORK_MAX_PEP, WORK_COOLDOWN_SECONDS.
- * Replies: WORK_PROMPTS_JSON (a JSON array of strings with {amount}) overrides
- * the defaults below; moving them to a sheet/DB table is specced in
- * plans/unbelievaboat-replacement.md.
+ * Replies: the work.prompts setting (admin page); WORK_PROMPTS_JSON (a JSON array of strings with
+ * {amount}) is the legacy value while nothing is saved, else the built-in replies in ./work-prompts.
  */
 import { prisma } from '../db'
 import { getOrCreateEconomy } from '../economy'
 import { logTransaction } from '../transactions'
 import { loadSettings, type Settings } from '../settings'
-import { effectiveInt, envNumber } from '../settings/numbers'
+import { effectiveInt, envNumber, storedOverride } from '../settings/numbers'
+import { DEFAULT_WORK_PROMPTS, workPromptsBaseline } from './work-prompts'
 import { claimCooldown, randInt } from './cooldown'
 
-export const DEFAULT_WORK_PROMPTS: readonly string[] = [
-  "You tossed dough for the crew and earned {amount}. Bonus mission: invite a friend to this week's [community call](<https://app.pizzadao.org/calls>) and tag a mod for a 314 bonus.",
-  'You folded pizza boxes all shift: {amount}. Bonus mission: share your best pizza gif in the gifs channel for a 69-314 bonus.',
-  'You delivered a pie across town and earned {amount}. Bonus mission: post a photo of a local pizzeria to earn a bonus.',
-  'You grated mountains of mozzarella: {amount}. Bonus mission: welcome a new member in general.',
-  'You tended the wood-fired oven and earned {amount}. Bonus mission: claim a task on [app.pizzadao.org](<https://app.pizzadao.org/crews>).',
-  'You pitched a Global Pizza Party venue and earned {amount}. Bonus mission: help plan a party in your city on [rsv.pizza](<https://rsv.pizza>).',
-]
+export { DEFAULT_WORK_PROMPTS }
 
-export function workPrompts(): readonly string[] {
-  const raw = process.env.WORK_PROMPTS_JSON
-  if (raw) {
-    try {
-      const parsed = JSON.parse(raw)
-      if (Array.isArray(parsed) && parsed.length && parsed.every((p) => typeof p === 'string')) return parsed
-    } catch {
-      /* fall through to defaults */
-    }
-  }
-  return DEFAULT_WORK_PROMPTS
+/**
+ * The /work replies. A saved `work.prompts` setting wins; with none it is WORK_PROMPTS_JSON if set and
+ * valid, else the built-in replies. Unreadable settings use the last saved replies this instance saw.
+ */
+export function workPrompts(settings?: Settings): readonly string[] {
+  const saved = storedOverride('work.prompts', settings)
+  if (saved) return saved.value as string[]
+  return workPromptsBaseline()
 }
 
 /** Settings work.* (saved rows win; the WORK_* env vars are the legacy values while nothing is saved). */
@@ -59,8 +49,9 @@ export async function doWork(
 ): Promise<WorkResult> {
   const rng = opts.rng ?? Math.random
   const now = opts.now ?? new Date()
-  const { min, max, cooldownMs } = workConfig(await loadSettings())
-  const prompts = workPrompts()
+  const settings = await loadSettings()
+  const { min, max, cooldownMs } = workConfig(settings)
+  const prompts = workPrompts(settings)
 
   await getOrCreateEconomy(discordId)
 

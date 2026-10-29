@@ -10,6 +10,7 @@ import { checkTargets, targetNames, TargetError } from './targets'
 import { baselineInt, combineSaved, legacyEnvName } from './numbers'
 import { describeToggle, isToggleKey } from './toggles'
 import { roleIncomeBaseline } from '@/app/lib/pep-earn/income-defaults'
+import { workPromptsBaseline } from '@/app/lib/pep-earn/work-prompts'
 
 export class SettingError extends Error {
   constructor(
@@ -81,6 +82,7 @@ async function checkTogether(key: SettingKey, value: unknown): Promise<void> {
 /** What is in force for a setting when nothing is saved: the env value or table, else the code default. */
 export function baselineValue(key: SettingKey): unknown {
   if (key === 'economy.roleIncome') return roleIncomeBaseline().map((r) => ({ ...r }))
+  if (key === 'work.prompts') return [...workPromptsBaseline()]
   if (legacyEnvName(key)) return baselineInt(key)
   return SETTINGS[key].default
 }
@@ -157,8 +159,14 @@ export async function listChanges(opts: { key?: string; limit?: number } = {}): 
 /** What the admin page may show for a private setting: whether it is set, never the value. */
 export function maskPrivate(v: unknown): 'set' | 'not set' | null {
   if (v === null || v === undefined) return null
+  // A group of lists (the call post filter) counts as set when any list has an entry.
+  if (typeof v === 'object' && !Array.isArray(v)) return Object.values(v as Record<string, unknown>).some((x) => (Array.isArray(x) ? x.length > 0 : !!x)) ? 'set' : 'not set'
   return (Array.isArray(v) ? v.length > 0 : v !== '' && v !== false) ? 'set' : 'not set'
 }
+
+/** Shown in red when the saved role income table fails validation on read (for example after ROLE_INCOME_JSON was tightened). */
+export const ROLE_INCOME_NOT_IN_FORCE =
+  'The saved role income table is NOT in force: it no longer passes validation against the table that applies when nothing is saved (for example ROLE_INCOME_JSON was tightened). The env table applies (the built-in table if ROLE_INCOME_JSON is unset or invalid). Instances that read the saved table while it was still valid may keep using it until they restart. Save a table that passes, or reset this setting, to clear this.'
 
 export interface SettingView {
   key: SettingKey
@@ -168,6 +176,8 @@ export interface SettingView {
   help: string
   input: (typeof SETTINGS)[SettingKey]['input']
   stricterOnly: boolean
+  /** Editorial value: the page only ever gets "set" / "not set". */
+  private: boolean
   default: unknown
   /** What is in force with no saved row: the env value or table if set, else the code default. */
   baseline: unknown
@@ -180,6 +190,8 @@ export interface SettingView {
   modified: boolean
   /** Stored value fails its schema: flagged red. */
   invalid: boolean
+  /** A loud explanation shown on the row (for a saved value that is not in force). */
+  warning?: string
   updatedAt: string | null
   updatedBy: string | null
   /** Feature switches: the env var, whether it kills the switch, and what is in force right now. */
@@ -231,6 +243,7 @@ export async function listSettingViews(): Promise<SettingView[]> {
       help: def.help,
       input: def.input,
       stricterOnly: !!def.stricterOnly,
+      private: !!def.private,
       default: def.private ? maskPrivate(def.default) ?? 'not set' : def.default,
       // For a switch, the value is what is in force (env fallback, kill switch and failures included).
       value: shown(
@@ -245,10 +258,11 @@ export async function listSettingViews(): Promise<SettingView[]> {
               : baselineValue(key),
       ),
       baseline: def.private ? maskPrivate(def.default) ?? 'not set' : baselineValue(key),
-      ...(legacyEnvName(key) ? { legacyEnv: legacyEnvName(key) } : key === 'economy.roleIncome' ? { legacyEnv: 'ROLE_INCOME_JSON' } : {}),
+      ...(legacyEnvName(key) ? { legacyEnv: legacyEnvName(key) } : key === 'economy.roleIncome' ? { legacyEnv: 'ROLE_INCOME_JSON' } : key === 'work.prompts' ? { legacyEnv: 'WORK_PROMPTS_JSON' } : {}),
       override: row ? shown(row.value) : null,
       modified: !!row,
       invalid: !!row && !valid,
+      ...(row && !valid && key === 'economy.roleIncome' ? { warning: ROLE_INCOME_NOT_IN_FORCE } : {}),
       updatedAt: row ? row.updatedAt.toISOString() : null,
       updatedBy: row ? row.updatedBy : null,
       ...(isToggleKey(key) ? { toggle: describeToggle(key, snap) } : {}),

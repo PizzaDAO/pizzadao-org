@@ -363,7 +363,8 @@ describe('summary generation', () => {
     m(generateText).mockRejectedValue(Object.assign(new Error('forbidden'), { statusCode: 403 }))
     // 25 s budget; the gateway attempt "takes" 16 s, leaving 9 s < the 20 s minimum, so no fallback
     const now = vi.spyOn(Date, 'now')
-    now.mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(16_000)
+    // clock reads in order: the settings snapshot, the deadline, the time left for the gateway call, then after it
+    now.mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(0).mockReturnValueOnce(16_000)
     await expect(generateCallSummary(segments, {}, undefined, { budgetMs: 25_000 })).rejects.toThrow('forbidden')
     expect(m(generateText)).toHaveBeenCalledTimes(1)
     expect(m(generateText).mock.calls[0][0].abortSignal).toBeInstanceOf(AbortSignal)
