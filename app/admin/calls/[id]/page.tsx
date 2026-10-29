@@ -23,6 +23,9 @@ import { prisma } from "@/app/lib/db";
 import { PERMANENT_TRANSCRIBE_ERRORS, PROGRESS } from "@/app/lib/calls/transcribe";
 import { HideLine } from "../HideLine";
 import { segmentKey } from "@/app/lib/calls/chat";
+import { displaySpeakerName, importedSpeakerNumber } from "@/app/lib/calls/speaker-labels";
+import { importedAllowed } from "@/app/lib/calls/imported";
+import { SpeakerLabel } from "../SpeakerLabel";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -55,13 +58,24 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const segments = asSegments(rec.transcript);
     const redacted = new Set(rec.redactedSpeakerIds);
     const hiddenLines = new Set(rec.redactedSegmentIds);
-    const names = new Map(rec.speakers.map((sp) => [sp.discordId, sp.displayName ?? sp.discordId]));
+    const imported = rec.source !== "DISCORD";
+    const speakerName = (discordId: string, displayName: string | null) =>
+        displaySpeakerName(discordId, displayName, { speakerN: (n) => t("speakerN", { n }), fallback: discordId.startsWith("xs:") ? t("unknownSpeaker") : discordId });
+    const names = new Map(rec.speakers.map((sp) => [sp.discordId, speakerName(sp.discordId, sp.displayName)]));
+    // Labels written after the summary: the summary still has "Speaker N" until it is regenerated.
+    const labelsNewerThanSummary =
+        imported && !!rec.speakerLabelsUpdatedAt && !!rec.summary && rec.speakerLabelsUpdatedAt.getTime() > Math.max(rec.summaryGeneratedAt?.getTime() ?? 0, rec.summaryEditedAt?.getTime() ?? 0);
+    const canLabel = imported && rec.status !== "REJECTED" && rec.status !== "PROCESSING";
     const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
     // Preview of the Discord recap that publishing triggers (text from the saved title/summary/action items).
     const postFilter = await loadPostFilter().catch(() => null);
+    // An imported call posts no recap (and drafts no follow-ups) unless its switch is on, so there is nothing to preview.
+    const [importedRecapOn, importedFollowupsOn] = imported
+        ? await Promise.all([importedAllowed("calls.importedRecapPostEnabled"), importedAllowed("calls.importedFollowupsEnabled")])
+        : [true, true];
     const recapText =
-        postFilter && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && rec.summary?.trim()
+        postFilter && importedRecapOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && rec.summary?.trim()
             ? buildRecapText({ id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters }, undefined, postFilter)
             : null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
@@ -76,7 +90,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
             ? ((rec.transcribeStats as { _progress?: { lastError?: unknown } } | null)?._progress?.lastError as string | undefined) ?? null
             : null;
     const followUpCount = await prisma.followUp.count({ where: { recordingId: rec.id } }).catch(() => 0);
-    const canDraftFollowUps = (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
+    const canDraftFollowUps = importedFollowupsOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -90,6 +104,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     <p className="overline text-tomato m-0">
                         {rec.crewLabel ?? t("noCrew")} · {t(`status.${rec.status}`)}
                         {rec.partial ? ` · ${t("partial")}` : ""}
+                        {imported ? ` · ${t("sourceBadgeX")}` : ""}
                     </p>
                     <h1 className="font-[family-name:var(--font-display)] font-black text-3xl m-0">{rec.title ?? rec.eventName ?? t("title")}</h1>
                     <p className="m-0 text-foreground/70">
@@ -97,6 +112,19 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         {rec.endReason ? ` · ${t("endReason", { reason: rec.endReason })}` : ""}
                     </p>
                 </header>
+
+                {imported && (
+                    <section className="grid gap-1">
+                        <p className="m-0 text-sm text-foreground/70">{t("importedNote")}</p>
+                        {rec.sourceUrl && (
+                            <p className="m-0 text-sm">
+                                <a href={rec.sourceUrl} rel="noreferrer noopener" target="_blank" className="underline">
+                                    {t("sourceLink")}
+                                </a>
+                            </p>
+                        )}
+                    </section>
+                )}
 
                 <section className="grid gap-3">
                     <h2 className="text-xl font-bold m-0">{t("audioHeading")}</h2>
@@ -117,6 +145,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <p className="text-foreground/60 m-0">{t("noAudio")}</p>
                     )}
                 </section>
+
+                {labelsNewerThanSummary && <p className="m-0 text-tomato">{t("labelsChanged")}</p>}
 
                 {rec.summaryError && !rec.summary && (
                     <p className="m-0 text-tomato">{t("summaryFailed", { count: rec.summaryAttempts, error: rec.summaryError })}</p>
@@ -159,13 +189,19 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 const missing = rec.status !== "PROCESSING" && s.talkTimeSec >= 10 && speechLines === 0;
                                 return (
                                     <li key={s.id}>
-                                        {s.displayName ?? s.discordId}{" "}
+                                        {names.get(s.discordId) ?? s.discordId}{" "}
                                         <span className="text-foreground/60">
                                             ({t("talkTime", { time: clock(s.talkTimeSec) })}
                                             {segments.length > 0 ? `, ${t("lines", { count: lines })}` : ""})
                                         </span>
                                         {redacted.has(s.discordId) && <span className="text-tomato"> {t("redactedBadge")}</span>}
                                         {missing && <span className="text-tomato"> {t("noLinesWarning")}</span>}
+                                        {canLabel && importedSpeakerNumber(s.discordId) !== null && (
+                                            <>
+                                                {" "}
+                                                <SpeakerLabel recordingId={rec.id} speakerId={s.discordId} name={s.displayName} linked={!!s.linkedDiscordId} />
+                                            </>
+                                        )}
                                         {(lines > 0 || redacted.has(s.discordId)) && rec.status !== "REJECTED" && rec.status !== "PROCESSING" && (
                                             <>
                                                 {" "}
@@ -314,7 +350,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                                 💬{" "}
                                             </span>
                                         )}
-                                        <strong>{names.get(seg.discordId) ?? seg.name ?? seg.discordId}</strong>:{" "}
+                                        <strong>{names.get(seg.discordId) ?? seg.name ?? speakerName(seg.discordId, null)}</strong>:{" "}
                                         {hidden ? (
                                             <em className="text-foreground/60">{t("hiddenLine")}</em>
                                         ) : seg.kind === "chat" ? (

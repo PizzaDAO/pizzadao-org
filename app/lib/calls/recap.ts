@@ -19,6 +19,7 @@ import { EMPTY_POST_FILTER, isCrewExcluded, loadPostFilter, mentionsBlockedTerm,
 import { SITE_URL } from '@/app/lib/site-url'
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
+import { importedAllowed, isImportedSource } from '@/app/lib/calls/imported'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
 const MAX_BULLETS = 5
@@ -189,7 +190,7 @@ export function redactionsNewerThanSummary(rec: { redactionsUpdatedAt?: Date | n
   return rec.redactionsUpdatedAt.getTime() > fresh
 }
 
-export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'excluded' | 'stale-redactions' | 'no-channel' | 'no-token' | 'failed'
+export type RecapResult = 'posted' | 'disabled' | 'already-posted' | 'not-published' | 'excluded' | 'stale-redactions' | 'no-channel' | 'no-token' | 'imported' | 'failed'
 
 export interface PostRecapDeps extends RecapDeps {
   post?: typeof postDiscordMessage
@@ -220,6 +221,7 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
     select: {
       id: true,
       status: true,
+      source: true,
       crewId: true,
       crewLabel: true,
       eventName: true,
@@ -233,6 +235,8 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
       summaryEditedAt: true,
     },
   })
+  // Imported (old X broadcast) calls never post a recap unless calls.importedRecapPostEnabled is on (fail-safe: off).
+  if (rec && isImportedSource(rec.source) && !(await importedAllowed('calls.importedRecapPostEnabled', env))) return 'imported'
   if (rec && recapCrewExcluded(rec, filter)) return 'excluded'
   if (!rec || rec.status !== 'PUBLISHED' || !rec.summary?.trim()) return 'not-published'
   if (rec.recapPostedAt) return 'already-posted'

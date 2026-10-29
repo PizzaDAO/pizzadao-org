@@ -12,6 +12,7 @@ import { fetchAllMembers } from '@/app/lib/sheets/members-list'
 import { loadFollowUpConfig } from './config'
 import { extractFollowUps, type FollowUpDraft } from './extract'
 import { resolveOwner, type MemberRef } from './resolve'
+import { DISCORD_ONLY, importedAllowed, isImportedSource } from '@/app/lib/calls/imported'
 
 export type DraftResult = 'ok' | 'already' | 'disabled' | 'crew-excluded' | 'not-ready' | 'failed' | 'not-found'
 
@@ -75,6 +76,7 @@ export async function draftFollowUpsForRecording(
     select: {
       id: true,
       status: true,
+      source: true,
       crewId: true,
       summary: true,
       actionItems: true,
@@ -87,6 +89,8 @@ export async function draftFollowUpsForRecording(
     },
   })
   if (!rec) return { result: 'not-found', created: 0 }
+  // Imported (old X broadcast) calls never get follow-ups, not even a forced manual draft, unless calls.importedFollowupsEnabled is on.
+  if (isImportedSource(rec.source) && !(await importedAllowed('calls.importedFollowupsEnabled'))) return { result: 'disabled', created: 0 }
   // Rejected calls and calls still being processed produce nothing.
   if (!['IN_REVIEW', 'PUBLISHED'].includes(rec.status) || !rec.summary?.trim()) return { result: 'not-ready', created: 0 }
 
@@ -130,8 +134,10 @@ export async function draftFollowUpsForRecording(
 
 /** Summarized calls from the last two weeks that still need their one drafting pass. */
 export async function listNeedingFollowups(limit = 3, now = new Date()): Promise<Array<{ id: string }>> {
+  const withImported = await importedAllowed('calls.importedFollowupsEnabled')
   return prisma.callRecording.findMany({
     where: {
+      ...(withImported ? {} : DISCORD_ONLY),
       status: { in: ['IN_REVIEW', 'PUBLISHED'] },
       summary: { not: null },
       followupsDraftedAt: null,

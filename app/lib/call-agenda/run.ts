@@ -19,6 +19,7 @@ import { isCrewExcluded, loadPostFilter, mentionsBlockedTerm, type PostFilter } 
 import { SITE_URL } from '@/app/lib/site-url'
 import { savedChannelId } from '@/app/lib/settings/channels'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
+import { DISCORD_ONLY, importedAllowed } from '@/app/lib/calls/imported'
 import { buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
 const API = 'https://discord.com/api/v10'
@@ -96,8 +97,9 @@ export async function resolveCrewChannel(raw: string | undefined): Promise<strin
 
 /** Action items of the crew's latest published call that has any. */
 export async function previousActionItems(crewId: string): Promise<ActionItem[]> {
+  const withImported = await importedAllowed('calls.importedAgendaContext')
   const rows = await prisma.callRecording.findMany({
-    where: { crewId, status: 'PUBLISHED' },
+    where: { crewId, status: 'PUBLISHED', ...(withImported ? {} : DISCORD_ONLY) },
     orderBy: { startedAt: 'desc' },
     take: 3,
     select: { actionItems: true },

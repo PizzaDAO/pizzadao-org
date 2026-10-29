@@ -8,6 +8,7 @@ import { createOpenAI } from '@ai-sdk/openai'
 import { z, ZodError } from 'zod'
 import { publicChatText } from './chat'
 import type { TranscriptSegment } from './ingest-schema'
+import { importedSpeakerNumber } from './speaker-labels'
 
 export const DEFAULT_SUMMARY_MODEL = 'anthropic/claude-sonnet-5.5'
 /** Used directly through OpenAI (OPENAI_API_KEY) when the gateway call fails for any reason. */
@@ -37,7 +38,7 @@ export function summaryFallbackModel(env: Record<string, string | undefined> = p
 
 /**
  * Display names for the prompt: control characters and newlines stripped, length capped, and
- * "Speaker N" (by first appearance) when there is no usable name. Raw Discord ids are never sent.
+ * "Speaker N" when there is no usable name (the number in xs:N for an imported call, else by first appearance). Raw Discord ids are never sent.
  */
 export function buildSpeakerNames(
   speakers: Array<{ discordId: string; displayName: string | null }>,
@@ -57,7 +58,9 @@ export function buildSpeakerNames(
   let n = 0
   for (const seg of [...segments].sort((a, b) => a.startMs - b.startMs)) {
     if (out[seg.discordId]) continue
-    out[seg.discordId] = clean.get(seg.discordId) ?? `Speaker ${++n}`
+    const imported = importedSpeakerNumber(seg.discordId)
+    // Imported speakers keep the number the page shows (xs:N is Speaker N, xs:0 is unknown); only Discord ids are counted here.
+    out[seg.discordId] = clean.get(seg.discordId) ?? (imported !== null ? `Speaker ${imported}` : seg.discordId === 'xs:0' ? 'Unknown speaker' : `Speaker ${++n}`)
   }
   return out
 }

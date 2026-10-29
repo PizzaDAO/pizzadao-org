@@ -15,6 +15,7 @@ import { asSegments, getPublishedRecording } from "@/app/lib/calls/recordings";
 import { transcriptMinLevel, canViewCallTranscript } from "@/app/lib/calls/transcript-access";
 import { getSession } from "@/app/lib/session";
 import { formatClock } from "@/app/lib/calls/summarize";
+import { displaySpeakerName } from "@/app/lib/calls/speaker-labels";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -40,7 +41,9 @@ export default async function PublishedCallPage({ params }: Params) {
     const t = await getTranslations("callsPage.recording");
     const locale = await getLocale();
     const when = new Intl.DateTimeFormat(locale, { dateStyle: "long", timeStyle: "short" }).format(rec.startedAt);
-    const names = new Map(rec.speakers.map((s) => [s.discordId, s.displayName ?? t("unknownSpeaker")]));
+    // Unlabelled speakers of an imported call show as "Speaker N"; the source link and linked member ids are never public.
+    const speakerText = { speakerN: (n: number) => t("speakerN", { n }), fallback: t("unknownSpeaker") };
+    const names = new Map(rec.speakers.map((s) => [s.discordId, displaySpeakerName(s.discordId, s.displayName, speakerText)]));
     const segments = showTranscript ? asSegments(rec.transcript) : [];
     const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
@@ -57,6 +60,8 @@ export default async function PublishedCallPage({ params }: Params) {
             />
 
             <article className="grid gap-8">
+                {rec.source !== "DISCORD" && <p className="m-0 text-sm text-foreground/60">{t("importedNote")}</p>}
+
                 {rec.summary && (
                     <section className={`${paperCard} p-5 grid gap-3`}>
                         <h2 className="font-display text-xl font-black m-0">{t("summary")}</h2>
@@ -108,7 +113,7 @@ export default async function PublishedCallPage({ params }: Params) {
                                                 💬{" "}
                                             </span>
                                         )}
-                                        <strong>{names.get(seg.discordId) ?? seg.name ?? t("unknownSpeaker")}</strong>{" "}
+                                        <strong>{names.get(seg.discordId) ?? seg.name ?? displaySpeakerName(seg.discordId, null, speakerText)}</strong>{" "}
                                         <span className="tabular-nums text-foreground/60">{formatClock(seg.startMs)}</span>
                                     </span>
                                     <span className={isChatLine ? "italic whitespace-pre-wrap break-words" : undefined}>{seg.text}</span>
