@@ -7,7 +7,7 @@
  * so every existing reader of the transcript keeps working.
  */
 import type { TranscriptSegment } from './ingest-schema'
-import { dropRepeatRuns, isDubious, mergeSpeakerTurns, type Utterance, type WhisperSegment } from './transcribe'
+import { dropRepeatRuns, isDubious, TURN_GAP_MS, type Utterance, type WhisperSegment } from './transcribe'
 
 export const UNKNOWN_SPEAKER = 'xs:0'
 /** A turn this close to a word still claims it when nothing overlaps. */
@@ -144,6 +144,72 @@ function splitSegment(seg: WhisperSeg, turns: DiarTurn[]): Array<{ speaker: stri
     .filter((p) => p.text.length > 0)
 }
 
+/** No stored segment is longer than this (the importer accepts 4000 characters per segment). */
+export const MAX_TURN_CHARS = 3000
+
+/** Split text into chunks of at most `max` characters, at sentence ends where possible, else at spaces, else hard. */
+export function chunkText(text: string, max = MAX_TURN_CHARS): string[] {
+  const pieces: string[] = []
+  for (const sentence of text.split(/(?<=[.!?])\s+/)) {
+    if (sentence.length <= max) pieces.push(sentence)
+    else {
+      let cur = ''
+      for (const word of sentence.split(/\s+/)) {
+        if (word.length > max) {
+          if (cur) pieces.push(cur)
+          cur = ''
+          for (let i = 0; i < word.length; i += max) pieces.push(word.slice(i, i + max))
+        } else if (cur && cur.length + 1 + word.length > max) {
+          pieces.push(cur)
+          cur = word
+        } else cur = cur ? `${cur} ${word}` : word
+      }
+      if (cur) pieces.push(cur)
+    }
+  }
+  const chunks: string[] = []
+  for (const piece of pieces) {
+    const last = chunks[chunks.length - 1]
+    if (last !== undefined && last.length + 1 + piece.length <= max) chunks[chunks.length - 1] = `${last} ${piece}`
+    else chunks.push(piece)
+  }
+  return chunks
+}
+
+/** An utterance over the cap becomes several, each with a share of its time proportional to its text. */
+function capUtterance(u: Utterance, max: number): Utterance[] {
+  if (u.text.length <= max) return [u]
+  const chunks = chunkText(u.text, max)
+  const total = chunks.reduce((n, c) => n + c.length, 0) || 1
+  let done = 0
+  return chunks.map((text) => {
+    const startMs = Math.round(u.startMs + ((u.endMs - u.startMs) * done) / total)
+    done += text.length
+    return { startMs, endMs: Math.round(u.startMs + ((u.endMs - u.startMs) * done) / total), text }
+  })
+}
+
+/**
+ * Speaker turns: consecutive lines of one speaker within the usual gap are joined, but a turn is closed before it
+ * would pass `maxChars`, so one long monologue becomes several segments (split at utterance and sentence ends).
+ */
+export function buildTurns(perSpeaker: Array<{ discordId: string; utterances: Utterance[] }>, gapMs = TURN_GAP_MS, maxChars = MAX_TURN_CHARS): TranscriptSegment[] {
+  const all = perSpeaker
+    .flatMap((s) => s.utterances.flatMap((u) => capUtterance(u, maxChars)).map((u) => ({ discordId: s.discordId, ...u })))
+    .sort((a, b) => a.startMs - b.startMs || a.endMs - b.endMs)
+  const turns: TranscriptSegment[] = []
+  for (const u of all) {
+    const last = turns[turns.length - 1]
+    if (last && last.discordId === u.discordId && u.startMs - last.endMs < gapMs && last.text.length + 1 + u.text.length <= maxChars) {
+      last.text = `${last.text} ${u.text}`
+      last.endMs = Math.max(last.endMs, u.endMs)
+    } else {
+      turns.push({ discordId: u.discordId, startMs: u.startMs, endMs: Math.max(u.startMs, u.endMs), text: u.text })
+    }
+  }
+  return turns
+}
+
 export interface MergeStats {
   whisperSegments: number
   droppedDubious: number
@@ -225,7 +291,7 @@ export function mergeTranscript(input: { segments: WhisperSeg[]; turns: DiarTurn
     perSpeaker.set(id, list)
   }
 
-  let segments = mergeSpeakerTurns([...perSpeaker.entries()].map(([discordId, utterances]) => ({ discordId, utterances }))).map((s) => ({ ...s, kind: 'speech' as const }))
+  let segments = buildTurns([...perSpeaker.entries()].map(([discordId, utterances]) => ({ discordId, utterances }))).map((s) => ({ ...s, kind: 'speech' as const }))
   if (input.durationMs !== undefined) {
     const max = input.durationMs
     // Text that starts after the recording ends is a timing glitch; one that runs past the end is cut at it.

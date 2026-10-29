@@ -5,14 +5,13 @@ vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn(async () => ({ cached: true, crews: [] })) }))
 vi.mock('@/app/lib/discord-channels', () => ({ resolveChannelId: vi.fn(async () => null) }))
 
-const state = vi.hoisted(() => ({ values: {} as Record<string, number>, readFailed: false, invalid: [] as string[], throws: false }))
+const state = vi.hoisted(() => ({ values: {} as Record<string, boolean>, readFailed: false, invalid: [] as string[], throws: false }))
 vi.mock('@/app/lib/settings', () => ({
   loadSettings: vi.fn(async () => {
     if (state.throws) throw new Error('db down')
-    return { get: (k: string) => state.values[k] ?? 0, isSet: () => true, readFailed: state.readFailed, invalidKeys: state.invalid }
+    return { get: (k: string) => state.values[k] ?? false, isSet: () => true, readFailed: state.readFailed, invalidKeys: state.invalid }
   }),
 }))
-vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: vi.fn(async () => true) }))
 
 import { prisma } from '@/app/lib/db'
 import { DISCORD_ONLY, importedAllowed, isImportedSource } from './imported'
@@ -39,10 +38,13 @@ beforeEach(() => {
 describe('importedAllowed', () => {
   it('is off by default, when unreadable, invalid, throwing, or not production', async () => {
     expect(await importedAllowed('calls.importedRecapPostEnabled', PROD)).toBe(false)
-    state.values['calls.importedRecapPostEnabled'] = 1
+    state.values['calls.importedRecapPostEnabled'] = true
     expect(await importedAllowed('calls.importedRecapPostEnabled', PROD)).toBe(true)
     expect(await importedAllowed('calls.importedRecapPostEnabled', {})).toBe(false)
     expect(await importedAllowed('calls.importedRecapPostEnabled', { VERCEL_ENV: 'preview' })).toBe(false)
+    // The env var set to off always wins; on a preview only the env var counts.
+    expect(await importedAllowed('calls.importedRecapPostEnabled', { ...PROD, CALL_IMPORT_RECAP_ENABLED: 'off' })).toBe(false)
+    expect(await importedAllowed('calls.importedRecapPostEnabled', { VERCEL_ENV: 'preview', CALL_IMPORT_RECAP_ENABLED: '1' })).toBe(true)
     state.readFailed = true
     expect(await importedAllowed('calls.importedRecapPostEnabled', PROD)).toBe(false)
     state.readFailed = false
@@ -62,6 +64,9 @@ describe('importedAllowed', () => {
 
 describe('recap guard', () => {
   const env = { CALL_RECAP_POST_ENABLED: '1', DISCORD_BOT_TOKEN: 'tok', ...PROD }
+  beforeEach(() => {
+    state.values['calls.recapPostEnabled'] = true
+  })
   const published = { id: 'r1', source: 'X_BROADCAST', status: 'PUBLISHED', title: 'T', summary: 'A. B. C. D.', actionItems: [], chapters: [], crewId: 'community_call', crewLabel: 'Community', eventName: null, recapPostedAt: null, redactionsUpdatedAt: null, summaryGeneratedAt: null, summaryEditedAt: null }
   it('returns imported and posts nothing for an imported call', async () => {
     db.callRecording.findUnique.mockResolvedValue(published)
@@ -71,7 +76,7 @@ describe('recap guard', () => {
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
   })
   it('posts when the setting is on', async () => {
-    state.values['calls.importedRecapPostEnabled'] = 1
+    state.values['calls.importedRecapPostEnabled'] = true
     db.callRecording.findUnique.mockResolvedValue(published)
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     db.callRecording.update.mockResolvedValue({})
@@ -108,13 +113,29 @@ describe('transcription sweeps', () => {
     await listPendingTranscription(14, 10)
     expect(db.callRecording.findMany.mock.calls[0][0].where).toMatchObject({ source: 'DISCORD' })
   })
-  it('the summary sweep is Discord only and has an age window', async () => {
+  it('the summary sweep is Discord only by default', async () => {
+    db.callRecording.findMany.mockResolvedValue([])
+    await listNeedingSummary(new Date('2026-11-04T00:00:00Z'))
+    expect(db.callRecording.findMany.mock.calls[0][0].where.source).toBe('DISCORD')
+  })
+  it('with auto-summarize on, imported rows are windowed on importedAt and Discord rows are not', async () => {
+    state.values['calls.importedAutoSummarize'] = true
+    const prevEnv = process.env.VERCEL_ENV
+    process.env.VERCEL_ENV = 'production'
     db.callRecording.findMany.mockResolvedValue([])
     const now = new Date('2026-11-04T00:00:00Z')
-    await listNeedingSummary(now)
+    try {
+      await listNeedingSummary(now)
+    } finally {
+      if (prevEnv === undefined) delete process.env.VERCEL_ENV
+      else process.env.VERCEL_ENV = prevEnv
+    }
     const where = db.callRecording.findMany.mock.calls[0][0].where
-    expect(where.source).toBe('DISCORD')
-    expect(where.startedAt.gte.getTime()).toBe(now.getTime() - SUMMARY_SWEEP_WINDOW_DAYS * 86_400_000)
+    expect(where.source).toBeUndefined()
+    expect(where.startedAt).toBeUndefined()
+    const windowed = where.AND[2].OR
+    expect(windowed[0]).toEqual({ source: 'DISCORD' })
+    expect(windowed[1].importedAt.gte.getTime()).toBe(now.getTime() - SUMMARY_SWEEP_WINDOW_DAYS * 86_400_000)
   })
 })
 
@@ -128,17 +149,26 @@ describe('retranscribe guard', () => {
 })
 
 describe('admin list', () => {
-  it('filters by source and pages with a cursor', async () => {
+  it('filters by source and pages by (startedAt, id) with no skipped rows', async () => {
     const rows = Array.from({ length: 3 }, (_, i) => ({ id: `r${i}` }))
+    const t0 = new Date('2026-01-01T00:00:00Z')
+    db.callRecording.findUnique.mockResolvedValue({ startedAt: t0 })
     db.callRecording.findMany.mockResolvedValue(rows)
     const page = await listRecordingsPage({ take: 2, source: 'imported', cursor: 'r9' })
     expect(page.rows).toHaveLength(2)
     expect(page.nextCursor).toBe('r1')
     const arg = db.callRecording.findMany.mock.calls[0][0]
-    expect(arg.where).toEqual({ source: { not: 'DISCORD' } })
+    expect(arg.where).toEqual({ OR: [{ startedAt: { lt: t0 } }, { startedAt: t0, id: { lt: 'r9' } }], source: { not: 'DISCORD' } })
     expect(arg.take).toBe(3)
-    expect(arg.cursor).toEqual({ id: 'r9' })
-    expect(arg.skip).toBe(1)
+    expect(arg).not.toHaveProperty('skip')
+    expect(arg).not.toHaveProperty('cursor')
+    expect(arg.orderBy).toEqual([{ startedAt: 'desc' }, { id: 'desc' }])
+  })
+  it('an unknown cursor starts from the newest', async () => {
+    db.callRecording.findUnique.mockResolvedValue(null)
+    db.callRecording.findMany.mockResolvedValue([])
+    await listRecordingsPage({ cursor: 'gone' })
+    expect(db.callRecording.findMany.mock.calls[0][0].where).toEqual({})
   })
 })
 

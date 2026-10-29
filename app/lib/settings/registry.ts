@@ -288,21 +288,6 @@ const reviewerRoles: SettingDef<string[]> = {
   },
 }
 
-/** A 0/1 switch for imported calls (the settings editor has number and text inputs only). Off by default and when unreadable. */
-function importedFlag(o: { key: string; label: string; help: string; confirmOn: string }): SettingDef<number> {
-  return intSetting({
-    key: o.key,
-    area: 'calls',
-    label: `${o.label} (0 = off, 1 = on)`,
-    help: o.help,
-    min: 0,
-    max: 1,
-    default: 0,
-    onReadFailure: { value: 0 },
-    confirm: (from, to) => (to > from ? o.confirmOn : null),
-  })
-}
-
 export const SETTINGS = {
   'calls.transcriptMinLevel': intSetting({
     key: 'calls.transcriptMinLevel',
@@ -775,28 +760,32 @@ export const SETTINGS = {
   }),
   // Calls imported from X live broadcasts (plans/x-call-import.md). All off: an imported call never reaches Discord,
   // the follow-up drafter, the agenda or the automatic summary sweep unless a setting here says so.
-  'calls.importedRecapPostEnabled': importedFlag({
+  'calls.importedRecapPostEnabled': boolSetting({
     key: 'calls.importedRecapPostEnabled',
+    area: 'calls',
     label: 'Post recaps for imported calls',
-    help: 'Also post the Discord recap when an imported (X broadcast) call is published. Needs "Post call recaps" on too. Only takes effect on the production site.',
+    help: 'Also post the Discord recap when an imported (X broadcast) call is published. Needs "Post call recaps" on too. The CALL_IMPORT_RECAP_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Publishing an imported call will post a recap to Discord.',
   }),
-  'calls.importedFollowupsEnabled': importedFlag({
+  'calls.importedFollowupsEnabled': boolSetting({
     key: 'calls.importedFollowupsEnabled',
+    area: 'calls',
     label: 'Draft follow-ups for imported calls',
-    help: 'Let the follow-up drafter (sweep and manual) work on imported calls. Off: imported calls never produce follow-ups. Only takes effect on the production site.',
+    help: 'Let the follow-up drafter (sweep and manual) work on imported calls. Off: imported calls never produce follow-ups. The CALL_IMPORT_FOLLOWUPS_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Imported calls will be turned into follow-up items.',
   }),
-  'calls.importedAgendaContext': importedFlag({
+  'calls.importedAgendaContext': boolSetting({
     key: 'calls.importedAgendaContext',
+    area: 'calls',
     label: 'Use imported calls in agendas',
-    help: 'Let the action items of imported calls feed the pre-call agenda. Off: only Discord-recorded calls do. Only takes effect on the production site.',
+    help: 'Let the action items of imported calls feed the pre-call agenda. Off: only Discord-recorded calls do. The CALL_IMPORT_AGENDA_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'Old imported calls can show up in upcoming call agendas.',
   }),
-  'calls.importedAutoSummarize': importedFlag({
+  'calls.importedAutoSummarize': boolSetting({
     key: 'calls.importedAutoSummarize',
+    area: 'calls',
     label: 'Auto-summarize imported calls',
-    help: 'Let the transcript cron write AI summaries for imported calls (costs model usage). Off: the import tool summarizes them on purpose. Only takes effect on the production site.',
+    help: 'Let the transcript cron write AI summaries for imported calls (costs model usage). Off: the import tool summarizes them on purpose. The CALL_IMPORT_AUTOSUMMARY_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'The cron will spend model usage summarizing imported calls.',
   }),
   'calls.bulkActionMax': intSetting({

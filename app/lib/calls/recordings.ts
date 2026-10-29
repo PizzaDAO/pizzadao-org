@@ -136,7 +136,12 @@ export interface ListRecordingsOpts {
 /** One page of the review list, newest first, with an id cursor for the next page (null on the last page). */
 export async function listRecordingsPage(opts: ListRecordingsOpts = {}) {
   const take = Math.min(Math.max(opts.take ?? ADMIN_PAGE_SIZE, 1), 500)
+  // Keyset paging on (startedAt desc, id desc): the rows strictly after the cursor row, however many share its time.
+  const cursorRow = opts.cursor ? await prisma.callRecording.findUnique({ where: { id: opts.cursor }, select: { startedAt: true } }) : null
   const where: Prisma.CallRecordingWhereInput = {
+    ...(opts.cursor && cursorRow
+      ? { OR: [{ startedAt: { lt: cursorRow.startedAt } }, { startedAt: cursorRow.startedAt, id: { lt: opts.cursor } }] }
+      : {}),
     ...(opts.source === 'discord' ? { source: 'DISCORD' as const } : opts.source === 'imported' ? { source: { not: 'DISCORD' as const } } : {}),
     ...(opts.status ? { status: opts.status } : {}),
   }
@@ -144,7 +149,6 @@ export async function listRecordingsPage(opts: ListRecordingsOpts = {}) {
     where,
     orderBy: [{ startedAt: 'desc' }, { id: 'desc' }],
     take: take + 1,
-    ...(opts.cursor ? { cursor: { id: opts.cursor }, skip: 1 } : {}),
     select: {
       id: true,
       status: true,

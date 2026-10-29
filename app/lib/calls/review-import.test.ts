@@ -26,6 +26,7 @@ import { publishRecording, rejectRecording } from './recordings'
 import { postCallRecap } from './recap'
 import { bulkActionMax, bulkReview } from './bulk'
 import { setSpeakerLabel } from './speakers'
+import { buildSpeakerNames } from './summarize'
 import { displaySpeakerName, importedSpeakerNumber, tidyLabel } from './speaker-labels'
 import { POST as bulkPOST } from '@/app/api/admin/calls/bulk/route'
 import { POST as speakersPOST } from '@/app/api/admin/calls/[id]/speakers/route'
@@ -56,6 +57,23 @@ describe('speaker names', () => {
     expect(tidyLabel('  Ann\n\tLee  ')).toBe('Ann Lee')
     expect(tidyLabel('x'.repeat(100))).toHaveLength(40)
     expect(tidyLabel(5)).toBe('')
+  })
+})
+
+describe('summary speaker names', () => {
+  const line = (discordId: string, startMs: number) => ({ discordId, startMs, endMs: startMs + 1, text: 'x' })
+  it('xs:N is Speaker N whatever the order of appearance, xs:0 is unknown, labels win, only Discord ids are counted', () => {
+    const names = buildSpeakerNames(
+      [{ discordId: 'xs:3', displayName: 'Ann' }],
+      [line('xs:2', 0), line('xs:3', 10), line('xs:1', 20), line('xs:0', 30), line('123456789012345678', 40), line('223456789012345678', 50)],
+    )
+    expect(names).toEqual({ 'xs:2': 'Speaker 2', 'xs:3': 'Ann', 'xs:1': 'Speaker 1', 'xs:0': 'Unknown speaker', '123456789012345678': 'Speaker 1', '223456789012345678': 'Speaker 2' })
+  })
+  it('matches what the page shows for the same speakers', () => {
+    const text = { speakerN: (n: number) => `Speaker ${n}`, fallback: 'Unknown speaker' }
+    const names = buildSpeakerNames([], [line('xs:2', 0), line('xs:1', 5)])
+    expect(names['xs:2']).toBe(displaySpeakerName('xs:2', null, text))
+    expect(names['xs:1']).toBe(displaySpeakerName('xs:1', null, text))
   })
 })
 
@@ -97,9 +115,9 @@ describe('setSpeakerLabel', () => {
 describe('bulkReview', () => {
   it('sends every imported id through the single-call publish gate and reports each result', async () => {
     db.callRecording.findMany.mockResolvedValue([
-      { id: 'a', source: 'X_BROADCAST' },
-      { id: 'b', source: 'X_BROADCAST' },
-      { id: 'c', source: 'DISCORD' },
+      { id: 'a', source: 'X_BROADCAST', status: 'IN_REVIEW' },
+      { id: 'b', source: 'X_BROADCAST', status: 'IN_REVIEW' },
+      { id: 'c', source: 'DISCORD', status: 'IN_REVIEW' },
     ])
     vi.mocked(publishRecording).mockResolvedValueOnce('ok').mockResolvedValueOnce('incomplete')
     const out = await bulkReview('publish', ['a', 'b', 'c', 'zz', 'a'], '9')
@@ -113,11 +131,27 @@ describe('bulkReview', () => {
     expect(postCallRecap).not.toHaveBeenCalled()
   })
   it('rejects imported calls only', async () => {
-    db.callRecording.findMany.mockResolvedValue([{ id: 'a', source: 'X_BROADCAST' }, { id: 'c', source: 'DISCORD' }])
+    db.callRecording.findMany.mockResolvedValue([{ id: 'a', source: 'X_BROADCAST', status: 'IN_REVIEW' }, { id: 'c', source: 'DISCORD', status: 'IN_REVIEW' }])
     vi.mocked(rejectRecording).mockResolvedValue(true)
     const out = await bulkReview('reject', ['a', 'c'], '9')
     expect(out).toEqual([{ id: 'a', result: 'rejected' }, { id: 'c', result: 'not-imported' }])
     expect(rejectRecording).toHaveBeenCalledTimes(1)
+  })
+  it('only calls in review are touched, for publish and for reject', async () => {
+    db.callRecording.findMany.mockResolvedValue([
+      { id: 'p', source: 'X_BROADCAST', status: 'PUBLISHED' },
+      { id: 'r', source: 'X_BROADCAST', status: 'REJECTED' },
+      { id: 'w', source: 'X_BROADCAST', status: 'PROCESSING' },
+    ])
+    for (const action of ['publish', 'reject'] as const) {
+      expect(await bulkReview(action, ['p', 'r', 'w'], '9')).toEqual([
+        { id: 'p', result: 'not-allowed' },
+        { id: 'r', result: 'not-allowed' },
+        { id: 'w', result: 'not-allowed' },
+      ])
+    }
+    expect(publishRecording).not.toHaveBeenCalled()
+    expect(rejectRecording).not.toHaveBeenCalled()
   })
   it('the cap follows the setting, never exceeds 50, and is 1 when settings fail', async () => {
     maxState.value = 20
@@ -143,7 +177,7 @@ describe('bulk route', () => {
     expect(db.callRecording.findMany).not.toHaveBeenCalled()
   })
   it('publishes up to the cap and returns counts', async () => {
-    db.callRecording.findMany.mockResolvedValue(ids(50).map((id) => ({ id, source: 'X_BROADCAST' })))
+    db.callRecording.findMany.mockResolvedValue(ids(50).map((id) => ({ id, source: 'X_BROADCAST', status: 'IN_REVIEW' })))
     vi.mocked(publishRecording).mockResolvedValue('ok')
     const res = await call({ action: 'publish', ids: ids(50), confirm: true })
     expect(res.status).toBe(200)

@@ -72,7 +72,7 @@ describe('importExternalRecording', () => {
   })
 
   const row = (over: Record<string, unknown> = {}) => ({
-    id: 'r1', source: 'X_BROADCAST', status: 'IN_REVIEW', updatedAt: new Date(), mixKey: `calls/${SID}/mix.m4a`, importMeta: { transcriptSha256: 'old' },
+    id: 'r1', source: 'X_BROADCAST', status: 'IN_REVIEW', updatedAt: new Date(), eventName: 'Community call', crewId: 'community_call', sourceUrl: 'https://x.com/i/broadcasts/AbCdEfGh12345', durationSec: 3600, startedAt: new Date('2020-10-28T18:00:00Z'), mixKey: `calls/${SID}/mix.m4a`, importMeta: { transcriptSha256: 'old' },
     summaryEditedAt: null, reviewedBy: null, redactedSpeakerIds: [], redactedSegmentIds: [], speakerLabelsUpdatedAt: null, ...over,
   })
 
@@ -81,6 +81,21 @@ describe('importExternalRecording', () => {
     expect(await importExternalRecording(payload())).toEqual({ id: 'r1', action: 'unchanged' })
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
     expect(db.callRecording.create).not.toHaveBeenCalled()
+  })
+
+  it('a changed title, crew, date or link updates only those details', async () => {
+    db.callRecording.findUnique.mockResolvedValue(row({ importMeta: { transcriptSha256: sha() }, summary: 'kept', summaryEditedAt: new Date() }))
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    for (const change of [{ eventName: 'Old title' }, { crewId: 'ops' }, { startedAt: new Date('2019-01-01T00:00:00Z') }, { sourceUrl: null }, { durationSec: 5 }]) {
+      db.callRecording.updateMany.mockClear()
+      db.callRecording.findUnique.mockResolvedValue(row({ importMeta: { transcriptSha256: sha() }, summaryEditedAt: new Date(), ...change }))
+      expect(await importExternalRecording(payload())).toEqual({ id: 'r1', action: 'replaced' })
+      const data = db.callRecording.updateMany.mock.calls[0][0].data
+      expect(data).toMatchObject({ eventName: 'Community call', crewId: 'community_call' })
+      expect(data).not.toHaveProperty('transcript')
+      expect(data).not.toHaveProperty('summary')
+    }
+    expect(db.$transaction).not.toHaveBeenCalled()
   })
 
   it('never overwrites a published or rejected call, even with force', async () => {

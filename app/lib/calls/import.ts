@@ -182,6 +182,11 @@ export async function importExternalRecording(p: ImportPayload, opts: { force?: 
       status: true,
       updatedAt: true,
       mixKey: true,
+      eventName: true,
+      crewId: true,
+      sourceUrl: true,
+      startedAt: true,
+      durationSec: true,
       importMeta: true,
       summaryEditedAt: true,
       reviewedBy: true,
@@ -227,7 +232,22 @@ export async function importExternalRecording(p: ImportPayload, opts: { force?: 
   if (existing.status === 'PUBLISHED' || existing.status === 'REJECTED') return { id: existing.id, action: 'refused', reason: `the call is ${existing.status}; it is never overwritten` }
 
   const prevSha = isObj(existing.importMeta) ? existing.importMeta.transcriptSha256 : null
-  if (prevSha === sha && existing.mixKey === (p.mix?.key ?? null)) return { id: existing.id, action: 'unchanged' }
+  const sameText = prevSha === sha && existing.mixKey === (p.mix?.key ?? null)
+  const sameDetails =
+    existing.eventName === p.eventName &&
+    existing.crewId === p.crewId &&
+    existing.sourceUrl === p.sourceUrl &&
+    existing.durationSec === p.durationSec &&
+    existing.startedAt.getTime() === p.startedAt.getTime()
+  if (sameText && sameDetails) return { id: existing.id, action: 'unchanged' }
+  if (sameText) {
+    // Only the call's details changed (title, crew, date, link): update them, and leave the transcript, summary and review work alone.
+    const res = await prisma.callRecording.updateMany({
+      where: { id: existing.id, updatedAt: existing.updatedAt },
+      data: { eventName: p.eventName, crewId: p.crewId, crewLabel, sourceUrl: p.sourceUrl, startedAt: p.startedAt, endedAt, durationSec: p.durationSec, importMeta: meta as Prisma.InputJsonValue },
+    })
+    return res.count === 1 ? { id: existing.id, action: 'replaced' } : { id: existing.id, action: 'refused', reason: 'the call changed while importing; run again' }
+  }
 
   const touched: string[] = []
   if (existing.summaryEditedAt) touched.push('a reviewer edited the summary')

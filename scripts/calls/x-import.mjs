@@ -14,6 +14,7 @@
  *   upload                                    mix.m4a + raw whisper/RTTM to R2 with the write-capable token (skips unchanged sha256)
  *   import                                    validate and store the call as IN_REVIEW (never overwrites published / rejected / edited calls)
  *   summarize [--limit N]                     AI title / summary / chapters / action items, one call at a time
+ *   delete --only <key,...>                   remove imported rows from the database (e.g. a test import); never published or Discord calls
  *   status                                    one line per call
  *   run --from <step> --to <step> [--only k1,k2]   chain the steps above
  *
@@ -131,7 +132,7 @@ function saveState(st) {
 }
 
 const sleep = (ms) => new Promise((r) => setTimeout(r, ms));
-const cleanErr = (e) => String(e instanceof Error ? e.message : e).replace(/https?:\/\/\S+/g, "").replace(/\s+/g, " ").slice(0, 300);
+const cleanErr = (e) => String(e instanceof Error ? e.message : e).replace(/[A-Za-z][A-Za-z0-9+.-]*:\/\/\S+/g, "").replace(/\s+/g, " ").slice(0, 300);
 
 const lib = {
   archive: await importApp("app/lib/calls/import-archive.ts"),
@@ -145,7 +146,14 @@ function loadManifest() {
 
 /** Included rows (include=y, or short), narrowed by --only. */
 function selectRows() {
-  return loadManifest().filter((r) => ["y", "short"].includes(r.include.toLowerCase()) && (!only || only.has(r.key) || only.has(r.external_id)));
+  const rows = [];
+  for (const raw of loadManifest()) {
+    if (!["y", "short"].includes(raw.include.toLowerCase()) || (only && !only.has(raw.key) && !only.has(raw.external_id))) continue;
+    const row = lib.archive.validateManifestRow(raw);
+    if (!row) { console.error(`${raw.key || "(row without key)"}: skipped, the key / external_id do not match x-broadcast-<id>`); continue; }
+    rows.push(row);
+  }
+  return rows;
 }
 
 const paths = (key) => ({
@@ -192,26 +200,35 @@ async function probe() {
   if (!apply) return console.log("Dry run: would run yt-dlp --dump-json for each row without a probe. Re-run with --apply.");
   ensureDirs();
   const all = loadManifest();
-  for (const row of rows) {
-    const st = loadState(row.key);
-    if (st.probe && !force) continue;
-    const argv = ["--dump-json", "--no-playlist", "--skip-download", ...(args["cookies-from-browser"] && args["cookies-from-browser"] !== true ? ["--cookies-from-browser", String(args["cookies-from-browser"])] : []), row.url];
-    const r = run("yt-dlp", argv, { capture: true });
-    if (r.status !== 0) {
-      st.probe = { status: /unavailable|not found|404|gone|ended|no longer/i.test(r.stderr ?? "") ? "gone" : "error", at: new Date().toISOString() };
-    } else {
-      const info = JSON.parse(r.stdout.split("\n").find((l) => l.startsWith("{")) ?? "{}");
-      const ts = info.timestamp ?? info.release_timestamp ?? null;
-      st.probe = { status: "ok", at: new Date().toISOString(), durationSec: Math.round(info.duration ?? 0) || null, startedAt: ts ? new Date(ts * 1000).toISOString() : null };
-      const m = all.find((x) => x.key === row.key);
-      if (m && st.probe.startedAt) m.started_at_utc = st.probe.startedAt;
-      if (m && !m.title && typeof info.title === "string") m.title = info.title.slice(0, 200);
+  try {
+    for (const row of rows) {
+      const st = loadState(row.key);
+      if (st.probe && !force) continue;
+      try {
+        const argv = ["--dump-json", "--no-playlist", "--skip-download", ...(args["cookies-from-browser"] && args["cookies-from-browser"] !== true ? ["--cookies-from-browser", String(args["cookies-from-browser"])] : []), "--", row.url];
+        const r = run("yt-dlp", argv, { capture: true });
+        if (r.status !== 0) {
+          st.probe = { status: /unavailable|not found|404|gone|ended|no longer/i.test(r.stderr ?? "") ? "gone" : "error", at: new Date().toISOString() };
+        } else {
+          const info = JSON.parse(r.stdout.split("\n").find((l) => l.startsWith("{")) ?? "{}");
+          const ts = info.timestamp ?? info.release_timestamp ?? null;
+          st.probe = { status: "ok", at: new Date().toISOString(), durationSec: Math.round(info.duration ?? 0) || null, startedAt: ts ? new Date(ts * 1000).toISOString() : null };
+          const m = all.find((x) => x.key === row.key);
+          if (m && st.probe.startedAt) m.started_at_utc = st.probe.startedAt;
+          if (m && !m.title && typeof info.title === "string") m.title = info.title.slice(0, 200);
+        }
+      } catch (e) {
+        // One bad answer (unreadable JSON, tool missing) must not lose the rows already probed.
+        st.probe = { status: "error", at: new Date().toISOString() };
+        st.error = { step: "probe", message: cleanErr(e) };
+      }
+      saveState(st);
+      console.log(`${row.key}: ${st.probe.status}${st.probe.durationSec ? `, ${Math.round(st.probe.durationSec / 60)} min` : ""}`);
+      await sleep(2000);
     }
-    saveState(st);
-    console.log(`${row.key}: ${st.probe.status}${st.probe.durationSec ? `, ${Math.round(st.probe.durationSec / 60)} min` : ""}`);
-    await sleep(2000);
+  } finally {
+    writeFileSync(manifestPath, lib.archive.manifestToCsv(all));
   }
-  writeFileSync(manifestPath, lib.archive.manifestToCsv(all));
 }
 
 async function fetchStep() {
@@ -234,7 +251,7 @@ async function fetchStep() {
     try {
       mkdirSync(p.outDir, { recursive: true });
       const dl = ["--no-playlist", "-f", "bestaudio/worst", "--continue", "--retries", "10", "--fragment-retries", "20", "--sleep-requests", "2", "--limit-rate", String(args["limit-rate"] ?? "2M"), "--no-warnings", "-o", path.join(dirs.raw, `${row.key}.%(ext)s`),
-        ...(args["cookies-from-browser"] && args["cookies-from-browser"] !== true ? ["--cookies-from-browser", String(args["cookies-from-browser"])] : []), row.url];
+        ...(args["cookies-from-browser"] && args["cookies-from-browser"] !== true ? ["--cookies-from-browser", String(args["cookies-from-browser"])] : []), "--", row.url];
       const r = run("yt-dlp", dl);
       if (r.status !== 0) throw new Error(`yt-dlp exited ${r.status}`);
       const rawFile = readdirSync(dirs.raw).filter((f) => f.startsWith(`${row.key}.`) && !/\.(part|ytdl)$/.test(f)).map((f) => path.join(dirs.raw, f))[0];
@@ -442,6 +459,31 @@ async function summarizeStep() {
   }
 }
 
+/** Remove imported calls from the database (a test import, or one to redo). Dry run by default; never a Discord call or a published one. */
+async function deleteStep() {
+  needDb();
+  if (!only || only.size === 0) die("delete needs --only <key,...> (x-broadcast-<id>)");
+  const keys = [...only];
+  for (const k of keys) if (!/^x-(broadcast|space)-[A-Za-z0-9]{8,32}$/.test(k)) die(`not an import key: ${k}`);
+  const { prisma } = await importApp("app/lib/db.ts");
+  try {
+    for (const key of keys) {
+      const rec = await prisma.callRecording.findUnique({ where: { sessionId: key }, select: { id: true, source: true, status: true } });
+      if (!rec) { console.log(`${key}: not in the database`); continue; }
+      if (rec.source === "DISCORD") { console.log(`${key}: refused, a Discord-recorded call`); continue; }
+      if (rec.status === "PUBLISHED") { console.log(`${key}: refused, it is published (unpublish it on /admin/calls first)`); continue; }
+      if (!apply) { console.log(`${key}: would delete row ${rec.id} (${rec.status}) with its speakers; R2 objects stay`); continue; }
+      await prisma.callRecording.delete({ where: { id: rec.id } });
+      const st = loadState(key);
+      delete st.import;
+      saveState(st);
+      console.log(`${key}: deleted row ${rec.id}. Re-run "import --apply" to bring it back.`);
+    }
+  } finally {
+    await prisma.$disconnect?.();
+  }
+}
+
 function statusStep() {
   const rows = loadManifest();
   console.log("key\tinclude\tstep\terror\trow id");
@@ -460,6 +502,7 @@ switch (cmd) {
   case "discover": await discover(); break;
   case "probe": await probe(); break;
   case "status": statusStep(); break;
+  case "delete": await deleteStep(); break;
   case "run": {
     const from = ORDER.indexOf(String(args.from ?? "fetch"));
     const to = ORDER.indexOf(String(args.to ?? "import"));

@@ -1339,9 +1339,6 @@ enum CallRecordingStatus {
   REJECTED
 }
 
-// One recorded call. Written by the recorder worker through the ingest API
-// (idempotent on sessionId). Audio lives in a private R2 bucket and is never
-// public; transcript / summary / actionItems / chapters are filled in Phase 2.
 // Where a call recording came from. Imported calls (anything but DISCORD) get no Discord recap, follow-ups,
 // agenda context or automatic summary unless the matching calls.imported* setting is on.
 enum CallSource {
@@ -1350,6 +1347,9 @@ enum CallSource {
   X_BROADCAST
 }
 
+// One recorded call. Written by the recorder worker through the ingest API
+// (idempotent on sessionId). Audio lives in a private R2 bucket and is never
+// public; transcript / summary / actionItems / chapters are filled in Phase 2.
 model CallRecording {
   id                 String              @id @default(cuid())
   sessionId          String              @unique // worker idempotency key

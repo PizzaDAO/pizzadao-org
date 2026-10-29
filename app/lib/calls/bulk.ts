@@ -1,5 +1,5 @@
 /**
- * Bulk review of imported calls: publish or reject many at once. Every id still goes through the normal
+ * Bulk review of imported calls that are IN_REVIEW: publish or reject many at once. Every id still goes through the normal
  * single-call gate (publishRecording: IN_REVIEW, a summary, visible text, the updatedAt guard), so a call
  * that is not ready is reported, never forced. Discord-recorded calls are refused here; they are reviewed
  * one by one. Bulk publish never posts a Discord recap.
@@ -29,13 +29,16 @@ export async function bulkReview(
   reviewerDiscordId: string,
 ): Promise<Array<{ id: string; result: BulkItemResult }>> {
   const unique = [...new Set(ids)]
-  const rows = await prisma.callRecording.findMany({ where: { id: { in: unique } }, select: { id: true, source: true } })
+  const rows = await prisma.callRecording.findMany({ where: { id: { in: unique } }, select: { id: true, source: true, status: true } })
   const imported = new Map(rows.map((r) => [r.id, isImportedSource(r.source)]))
+  const inReview = new Map(rows.map((r) => [r.id, r.status === 'IN_REVIEW']))
   const out: Array<{ id: string; result: BulkItemResult }> = []
   // One at a time: each publish is a guarded write, and order keeps the report readable.
   for (const id of unique) {
     if (!imported.has(id)) out.push({ id, result: 'not-found' })
     else if (!imported.get(id)) out.push({ id, result: 'not-imported' })
+    // Bulk actions are for calls waiting in review; published or rejected calls are handled one by one.
+    else if (!inReview.get(id)) out.push({ id, result: 'not-allowed' })
     else if (action === 'publish') out.push({ id, result: await publishRecording(id, reviewerDiscordId).catch(() => 'conflict' as const) })
     else out.push({ id, result: (await rejectRecording(id, reviewerDiscordId).catch(() => false)) ? 'rejected' : 'not-found' })
   }

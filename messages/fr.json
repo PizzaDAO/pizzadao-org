@@ -1060,7 +1060,6 @@
     "labelName": "Nom",
     "labelFindMember": "Chercher un membre",
     "labelLinked": "Lié à un membre",
-    "labelUnlink": "Délier",
     "labelSave": "Enregistrer le nom",
     "labelReset": "Revenir à « Intervenant N »",
     "labelsChanged": "Les noms des intervenants ont changé après la rédaction du résumé. Régénérez le résumé pour qu’il les utilise."

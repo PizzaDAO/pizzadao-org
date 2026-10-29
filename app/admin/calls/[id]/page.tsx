@@ -23,7 +23,8 @@ import { prisma } from "@/app/lib/db";
 import { PERMANENT_TRANSCRIBE_ERRORS, PROGRESS } from "@/app/lib/calls/transcribe";
 import { HideLine } from "../HideLine";
 import { segmentKey } from "@/app/lib/calls/chat";
-import { displaySpeakerName } from "@/app/lib/calls/speaker-labels";
+import { displaySpeakerName, importedSpeakerNumber } from "@/app/lib/calls/speaker-labels";
+import { importedAllowed } from "@/app/lib/calls/imported";
 import { SpeakerLabel } from "../SpeakerLabel";
 
 export const runtime = "nodejs";
@@ -69,8 +70,12 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
     // Preview of the Discord recap that publishing triggers (text from the saved title/summary/action items).
     const postFilter = await loadPostFilter().catch(() => null);
+    // An imported call posts no recap (and drafts no follow-ups) unless its switch is on, so there is nothing to preview.
+    const [importedRecapOn, importedFollowupsOn] = imported
+        ? await Promise.all([importedAllowed("calls.importedRecapPostEnabled"), importedAllowed("calls.importedFollowupsEnabled")])
+        : [true, true];
     const recapText =
-        postFilter && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && rec.summary?.trim()
+        postFilter && importedRecapOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && rec.summary?.trim()
             ? buildRecapText({ id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters }, undefined, postFilter)
             : null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
@@ -85,7 +90,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
             ? ((rec.transcribeStats as { _progress?: { lastError?: unknown } } | null)?._progress?.lastError as string | undefined) ?? null
             : null;
     const followUpCount = await prisma.followUp.count({ where: { recordingId: rec.id } }).catch(() => 0);
-    const canDraftFollowUps = (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
+    const canDraftFollowUps = importedFollowupsOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -191,7 +196,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                         </span>
                                         {redacted.has(s.discordId) && <span className="text-tomato"> {t("redactedBadge")}</span>}
                                         {missing && <span className="text-tomato"> {t("noLinesWarning")}</span>}
-                                        {canLabel && (
+                                        {canLabel && importedSpeakerNumber(s.discordId) !== null && (
                                             <>
                                                 {" "}
                                                 <SpeakerLabel recordingId={rec.id} speakerId={s.discordId} name={s.displayName} linked={!!s.linkedDiscordId} />

@@ -32,10 +32,10 @@ Imported calls differ from Discord calls:
 
 | Gap | Fix |
 |---|---|
-| `postCallRecap` had no notion of source | returns `'imported'` unless `calls.importedRecapPostEnabled` (and production) |
+| `postCallRecap` had no notion of source | returns `'imported'` unless `calls.importedRecapPostEnabled` |
 | follow-up sweep and manual draft had no source guard (the 14-day window excluded old rows only by accident) | sweep filters `source = DISCORD`; draft returns `'disabled'`, even when forced, unless `calls.importedFollowupsEnabled` |
 | agenda `previousActionItems` read the latest published call of a crew | filters `source = DISCORD` unless `calls.importedAgendaContext` |
-| `listNeedingSummary` had no age window and no source filter | `source = DISCORD` unless `calls.importedAutoSummarize`, plus a 30-day window |
+| `listNeedingSummary` had no age window and no source filter | `source = DISCORD` unless `calls.importedAutoSummarize`; imported rows only within 30 days of `importedAt` |
 | pending transcription relied on `trackKey` to skip imports | explicit `source = DISCORD` in the shared eligibility fragment (also guards the claim) |
 | `resetForRetranscribe` / retry-transcription would wipe an import | `'not-supported'` / conflict; re-run the import tool with `--force` |
 | redact routes accepted Discord snowflakes only | `SPEAKER_ID = ^(\d{5,25}|xs:\d{1,3})$`, `SEGMENT_KEY` accepts `s:xs:N:ms` |
@@ -82,9 +82,9 @@ PR 3 adds a "Label" control on `/admin/calls/[id]`: a display name, or a member 
 
 `enum CallSource { DISCORD X_SPACE X_BROADCAST }`; `CallRecording.source` (default DISCORD), `sourceUrl` (reviewers only, never public), `importedAt`, `importedBy`, `importMeta` (never text), `speakerLabelsUpdatedAt`, index `(source, startedAt)`; `CallSpeaker.linkedDiscordId` + index.
 
-## Settings (DPR on `/admin/settings`, area calls; all default 0 = off, fail-safe off, production only)
+## Settings (DPR on `/admin/settings`, area calls; all default off, fail-safe off, saved values ignored on previews)
 
-`calls.importedRecapPostEnabled`, `calls.importedFollowupsEnabled`, `calls.importedAgendaContext`, `calls.importedAutoSummarize`; PR 3 adds `calls.bulkActionMax` (default 50, max 50).
+`calls.importedRecapPostEnabled`, `calls.importedFollowupsEnabled`, `calls.importedAgendaContext`, `calls.importedAutoSummarize` (feature switches with kill-switch env vars `CALL_IMPORT_RECAP_ENABLED`, `CALL_IMPORT_FOLLOWUPS_ENABLED`, `CALL_IMPORT_AGENDA_ENABLED`, `CALL_IMPORT_AUTOSUMMARY_ENABLED`); PR 3 adds `calls.bulkActionMax` (default 50, max 50).
 
 ## Review and publish (PR 3)
 
@@ -114,4 +114,4 @@ Local whisper.cpp and pyannote: $0. Summaries about $10-20. R2 about 4 GB. X API
 - **PR 1:** schema, guards, settings, tests.
 - **PR 2:** operator CLI, merge library, whisper / pyannote / R2 steps, DB import, runbook (`docs/x-call-import.md`).
 - **PR 3:** admin filter, paging, bulk actions, speaker labelling, public "Speaker N", en / es / fr.
-- Run the import on the real archive only after PR 1 is merged and deployed and the migration is applied: the guards must be live before imported rows exist.
+- Order: apply the migration first, then deploy the guards, then import. The guards must be live before imported rows exist.

@@ -1060,7 +1060,6 @@
     "labelName": "Nombre",
     "labelFindMember": "Buscar un miembro",
     "labelLinked": "Vinculado a un miembro",
-    "labelUnlink": "Desvincular",
     "labelSave": "Guardar etiqueta",
     "labelReset": "Volver a \"Hablante N\"",
     "labelsChanged": "Las etiquetas de los hablantes cambiaron después de escribir el resumen. Regenera el resumen para que use los nombres."

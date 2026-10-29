@@ -42,7 +42,7 @@ const SUMMARY_STUCK_MS = 15 * 60 * 1000
 const SUMMARY_RETRY_MS = 60 * 60 * 1000
 /** The sweep stops retrying a summary after this many recorded failures. */
 export const MAX_SUMMARY_ATTEMPTS = 3
-/** The summary sweep only looks at calls this recent (an old row without a summary is a reviewer's call, not the cron's). */
+/** The summary sweep only picks up imported calls imported this recently (Discord calls have no age limit). */
 export const SUMMARY_SWEEP_WINDOW_DAYS = 30
 /** transcribeError of a call whose every track is over the upload limit (retrying cannot help). */
 export const TOO_LARGE_ERROR = 'failed: every track is larger than the upload limit'
@@ -708,7 +708,6 @@ export async function listNeedingSummary(now = new Date(), take = 3) {
   return prisma.callRecording.findMany({
     where: {
       ...(withImported ? {} : DISCORD_ONLY),
-      startedAt: { gte: new Date(now.getTime() - SUMMARY_SWEEP_WINDOW_DAYS * 86_400_000) },
       summary: null,
       summaryEditedAt: null,
       summaryGeneratedAt: null,
@@ -725,6 +724,8 @@ export async function listNeedingSummary(now = new Date(), take = 3) {
             { summaryError: { not: null }, updatedAt: { lt: new Date(now.getTime() - SUMMARY_RETRY_MS) } },
           ],
         },
+        // Discord rows have no age limit (as before). Imported rows (only here when auto-summarize is on) must have been imported recently: the old broadcast date says nothing about when they arrived.
+        { OR: [{ source: 'DISCORD' }, { importedAt: { gte: new Date(now.getTime() - SUMMARY_SWEEP_WINDOW_DAYS * 86_400_000) } }] },
       ],
     },
     orderBy: { startedAt: 'asc' },

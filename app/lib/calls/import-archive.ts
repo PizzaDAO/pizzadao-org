@@ -33,6 +33,8 @@ export function broadcastIdFromUrl(url: string): string | null {
   return null
 }
 
+export const EXTERNAL_ID = new RegExp(`^${ID}$`)
+
 export const broadcastKey = (externalId: string) => `x-broadcast-${externalId}`
 export const broadcastUrl = (externalId: string) => `https://x.com/i/broadcasts/${externalId}`
 
@@ -135,6 +137,8 @@ export function parseCsv(text: string): string[][] {
 
 /** A cell that a spreadsheet could run as a formula is prefixed with an apostrophe. */
 const safeCell = (v: string) => (/^[=+\-@\t\r]/.test(v) ? `'${v}` : v)
+/** Undo safeCell: a leading apostrophe in front of = + - @ (or a tab / CR) was added by csvEscape. */
+const unsafeCell = (v: string) => (/^'[=+\-@\t\r]/.test(v) ? v.slice(1) : v)
 export const csvEscape = (v: string): string => {
   const s = safeCell(v)
   return /[",\n\r]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s
@@ -163,7 +167,7 @@ export function parseManifest(text: string): ManifestRow[] {
     const r = emptyManifestRow()
     for (const c of MANIFEST_COLUMNS) {
       const i = idx.get(c)
-      r[c] = i === undefined ? '' : (cells[i] ?? '').trim()
+      r[c] = i === undefined ? '' : unsafeCell((cells[i] ?? '').trim())
     }
     return r
   })
@@ -231,4 +235,15 @@ export function buildManifest(existing: ManifestRow[], archive: BroadcastCandida
   for (const c of archive) add(c, {})
   for (const m of manual) add(m.candidate, { startedAt: m.startedAt, title: m.title, crewId: m.crewId, include: m.include })
   return [...byKey.values()]
+}
+
+/**
+ * A manifest row is only trusted after it is rebuilt from its broadcast id: the key must be `x-broadcast-<id>`
+ * and the link is always the canonical one (whatever the url column says), so an edited file cannot point the
+ * tool at another site, another path or an option-looking value. Returns null for a row that fails.
+ */
+export function validateManifestRow(row: ManifestRow): ManifestRow | null {
+  if (!EXTERNAL_ID.test(row.external_id)) return null
+  if (row.key !== broadcastKey(row.external_id)) return null
+  return { ...row, url: broadcastUrl(row.external_id) }
 }

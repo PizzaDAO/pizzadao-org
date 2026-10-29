@@ -4,7 +4,7 @@ Plan and background: `plans/x-call-import.md`. This runs on the operator's machi
 
 ## Before you start
 
-1. The `20261104000000_call_import` migration is applied and the guards are deployed (imported calls must not be able to post recaps, draft follow-ups, feed agendas or be auto-summarized). Check `/admin/settings` (area calls): the four `Imported ...` switches are all 0.
+1. The `20261104000000_call_import` migration is **applied first**, then the guards are deployed (imported calls must not be able to post recaps, draft follow-ups, feed agendas or be auto-summarized). Check `/admin/settings` (area calls): the four `... imported calls` switches are all off.
 2. The main PizzaDAO X account's **data archive** is downloaded and unzipped (X: Settings, Your account, Download an archive of your data; ready in about 24-48 h). The tool reads `data/tweets*.js`.
 
 ## Prerequisites (one time)
@@ -82,8 +82,15 @@ Notes:
 
 ## Review and publish
 
-On `/admin/calls`, filter Source: Imported. Label PizzaDAO members on each call's speaker panel (guests stay "Speaker N"), redact anything that should not be public, click Regenerate where labels changed, then publish (bulk publish is capped by the `calls.bulkActionMax` setting). Publishing an imported call posts nothing to Discord unless `Post recaps for imported calls` is switched on.
+On `/admin/calls`, filter Source: Imported. Label PizzaDAO members on each call's speaker panel (guests stay "Speaker N"), redact anything that should not be public, click Regenerate where labels changed, then publish (bulk publish is capped by the `calls.bulkActionMax` setting). Publishing an imported call posts nothing to Discord unless `Post recaps for imported calls` is switched on (and bulk publish never posts a recap).
 
 ## Preview deployments
 
-Previews share the production database. Import exactly one short test call with `--only <key>`, check it, then reject it. The `Imported ...` switches are ignored on non-production deployments.
+Previews share the production database. Import exactly one short test call with `--only <key>` and check it. Then remove the test row from the database (dry run first, then `--apply`):
+
+```bash
+$S delete --only <key>
+$S delete --only <key> --apply
+```
+
+`delete` refuses Discord-recorded and published calls (unpublish first) and leaves the R2 objects alone. The four `... imported calls` switches ignore their saved value on non-production deployments (only the `CALL_IMPORT_*_ENABLED` env var counts there; each env var set to off also wins in production).

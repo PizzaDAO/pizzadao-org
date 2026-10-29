@@ -9,6 +9,8 @@ import {
   parseManifest,
   parseManualCsv,
   parseTweetDate,
+  validateManifestRow,
+  emptyManifestRow,
 } from './import-archive'
 
 const ID1 = 'AbCdEfGh12345'
@@ -84,6 +86,22 @@ describe('manual csv and manifest', () => {
     const again = buildManifest(reread, archive, parseManualCsv(csv).rows)
     expect(again).toHaveLength(2)
     expect(again[0].include).toBe('y')
-    expect(again.find((r) => r.external_id === ID1)?.title).toBe("'=HYPERLINK(\"x\")")
+    // csvEscape's apostrophe is stripped on read, so edits round-trip without the title growing a quote.
+    expect(again.find((r) => r.external_id === ID1)?.title).toBe('=HYPERLINK("x")')
+    expect(parseManifest(manifestToCsv(again))[0].title).toBe('=HYPERLINK("x")')
+    expect(parseManifest("key,title\nk,'quoted\nk2,'=x")).toMatchObject([{ title: "'quoted" }, { title: '=x' }])
+  })
+})
+
+describe('validateManifestRow', () => {
+  const row = (over: Record<string, string>) => ({ ...emptyManifestRow(), key: `x-broadcast-${ID1}`, external_id: ID1, url: 'https://evil.example/--output=/etc/x', ...over })
+  it('rebuilds the link from the broadcast id', () => {
+    expect(validateManifestRow(row({}))?.url).toBe(`https://x.com/i/broadcasts/${ID1}`)
+  })
+  it('rejects a key that does not match, or an id with odd characters', () => {
+    expect(validateManifestRow(row({ key: 'x-broadcast-other12345' }))).toBeNull()
+    expect(validateManifestRow(row({ key: '../../etc', external_id: '../../etc' }))).toBeNull()
+    expect(validateManifestRow(row({ external_id: '-oEvil12345', key: 'x-broadcast--oEvil12345' }))).toBeNull()
+    expect(validateManifestRow(row({ external_id: '' }))).toBeNull()
   })
 })

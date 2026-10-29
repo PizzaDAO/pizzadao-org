@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 
-import { mergeTranscript, parseRttm, parseWhisperJson, speakerFor, UNKNOWN_SPEAKER, type DiarTurn, type WhisperSeg } from './import-merge'
+import { MAX_TURN_CHARS, chunkText, mergeTranscript, parseRttm, parseWhisperJson, speakerFor, UNKNOWN_SPEAKER, type DiarTurn, type WhisperSeg } from './import-merge'
 
 const tok = (text: string, startMs: number, endMs: number, p = 0.9) => ({ text, startMs, endMs, p })
 const seg = (startMs: number, endMs: number, text: string, tokens = [] as WhisperSeg['tokens']): WhisperSeg => ({ startMs, endMs, text, tokens })
@@ -119,5 +119,30 @@ describe('mergeTranscript', () => {
     expect(r.segments.map((s) => s.text)).toEqual(['inside', 'runs over'])
     expect(r.segments[1].endMs).toBe(20000)
     expect(r.stats.words).toBe(3)
+  })
+})
+
+describe('long monologues', () => {
+  const sentence = 'This is one sentence of a very long talk by a single speaker.'
+  it('never makes a segment longer than the cap: ten minutes of one speaker', () => {
+    // 10 minutes, a 6 s line every 7 s (about 85 lines, 1 s apart), all one speaker.
+    const segs: WhisperSeg[] = Array.from({ length: 85 }, (_, i) => seg(i * 7000, i * 7000 + 6000, ` Part ${i}. ${sentence} ${sentence} ${sentence} ${sentence} ${sentence} ${sentence}`))
+    const r = mergeTranscript({ turns: [{ startMs: 0, endMs: 600_000, speaker: 'A' }], segments: segs, durationMs: 600_000 })
+    expect(r.segments.length).toBeGreaterThan(1)
+    expect(r.segments.every((s) => s.text.length <= MAX_TURN_CHARS && s.discordId === 'xs:1')).toBe(true)
+    // nothing is lost and the order is kept
+    expect(r.segments.map((s) => s.text).join(' ').split(sentence).length - 1).toBe(85 * 6)
+    expect(r.segments.every((s, i) => i === 0 || s.startMs >= r.segments[i - 1].startMs)).toBe(true)
+  })
+  it('splits one huge line at sentence ends with proportional times', () => {
+    const big = Array.from({ length: 200 }, () => sentence).join(' ')
+    const r = mergeTranscript({ turns: [{ startMs: 0, endMs: 100_000, speaker: 'A' }], segments: [seg(0, 100_000, ` ${big}`)] })
+    expect(r.segments.length).toBeGreaterThan(3)
+    expect(r.segments.every((s) => s.text.length <= MAX_TURN_CHARS && s.text.endsWith('.'))).toBe(true)
+    expect(r.segments[0].startMs).toBe(0)
+    expect(r.segments[r.segments.length - 1].endMs).toBe(100_000)
+  })
+  it('hard-splits a single word longer than the cap', () => {
+    expect(chunkText('x'.repeat(7000), 3000).map((c) => c.length)).toEqual([3000, 3000, 1000])
   })
 })

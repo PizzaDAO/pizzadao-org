@@ -31,7 +31,7 @@ export function RecordingsTable({ rows, bulkMax }: { rows: RecordingRow[]; bulkM
     const [state, setState] = useState<"idle" | "working" | "error">("idle");
     const [message, setMessage] = useState<string | null>(null);
 
-    const selectable = rows.filter((r) => r.imported && r.status !== "REJECTED" && r.status !== "PROCESSING");
+    const selectable = rows.filter((r) => r.imported && r.status === "IN_REVIEW");
     const selectableIds = new Set(selectable.map((r) => r.id));
     const allPicked = selectable.length > 0 && selectable.slice(0, bulkMax).every((r) => picked.has(r.id));
 

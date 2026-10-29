@@ -1060,7 +1060,6 @@
     "labelName": "Name",
     "labelFindMember": "Find a member",
     "labelLinked": "Linked to a member",
-    "labelUnlink": "Unlink",
     "labelSave": "Save label",
     "labelReset": "Reset to \"Speaker N\"",
     "labelsChanged": "Speaker labels changed after the summary was written. Regenerate the summary so it uses the names."
