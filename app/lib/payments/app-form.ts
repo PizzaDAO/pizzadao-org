@@ -55,6 +55,9 @@ export function parseNewRequest(
   const link = clean(o.proposalUrl, 500)
   if (link && !/^https:\/\/\S{4,480}$/i.test(link)) return { ok: false, error: 'bad_link' }
 
+  const rawProposalId = clean(o.proposalId, 60)
+  const proposalId = /^[A-Za-z0-9_-]{8,60}$/.test(rawProposalId) ? rawProposalId : null
+
   const payee = clean(o.payee, 200)
   return {
     ok: true,
@@ -73,6 +76,7 @@ export function parseNewRequest(
       payeeHash: payee ? hashPayee(payee, env) : null,
       payeeHint: payee ? maskPayee(payee) : null,
       proposalUrl: link || null,
+      proposalId,
     },
   }
 }

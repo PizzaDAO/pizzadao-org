@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useTranslations } from "next-intl";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import { EditorialMasthead, paperCard } from "@/app/ui/shared/Editorial";
 
 const KINDS = ["EVENT_BUDGET", "REIMBURSEMENT", "WORK", "OTHER"] as const;
@@ -18,9 +18,25 @@ export function NewPaymentForm() {
     const [eventCity, setEventCity] = useState("");
     const [proposalUrl, setProposalUrl] = useState("");
     const [payee, setPayee] = useState("");
+    // Proposals on: a picker of the member's passed funding proposals replaces the poll link. null = proposals off.
+    const [passedProposals, setPassedProposals] = useState<Array<{ id: string; title: string; amountUsd: number }> | null>(null);
+    const [proposalId, setProposalId] = useState("");
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState("");
     const [done, setDone] = useState(false);
+
+    useEffect(() => {
+        let cancelled = false;
+        fetch("/api/proposals/passed", { cache: "no-store" })
+            .then((r) => (r.ok ? r.json() : null))
+            .then((b) => {
+                if (!cancelled && b && Array.isArray(b.proposals)) setPassedProposals(b.proposals);
+            })
+            .catch(() => {});
+        return () => {
+            cancelled = true;
+        };
+    }, []);
 
     async function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -30,7 +46,7 @@ export function NewPaymentForm() {
             const r = await fetch("/api/payments", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ kind, title, description, amount, eventDate, eventCity, proposalUrl, payee }),
+                body: JSON.stringify({ kind, title, description, amount, eventDate, eventCity, proposalUrl: passedProposals ? "" : proposalUrl, proposalId: passedProposals ? proposalId : "", payee }),
             });
             const body = await r.json().catch(() => ({}));
             if (r.ok) {
@@ -91,10 +107,25 @@ export function NewPaymentForm() {
                             <input className={field} value={eventCity} onChange={(e) => setEventCity(e.target.value)} maxLength={100} />
                         </label>
                     </div>
-                    <label className="grid gap-1">
-                        {t("fieldProposal")}
-                        <input className={field} type="url" inputMode="url" value={proposalUrl} onChange={(e) => setProposalUrl(e.target.value)} maxLength={500} />
-                    </label>
+                    {passedProposals ? (
+                        <label className="grid gap-1">
+                            {t("fieldProposalPick")}
+                            <select className={field} value={proposalId} onChange={(e) => setProposalId(e.target.value)}>
+                                <option value="">{t("proposalNone")}</option>
+                                {passedProposals.map((p) => (
+                                    <option key={p.id} value={p.id}>
+                                        {p.title} (${p.amountUsd})
+                                    </option>
+                                ))}
+                            </select>
+                            <span className="text-sm text-foreground/70">{t("proposalPickHelp")}</span>
+                        </label>
+                    ) : (
+                        <label className="grid gap-1">
+                            {t("fieldProposal")}
+                            <input className={field} type="url" inputMode="url" value={proposalUrl} onChange={(e) => setProposalUrl(e.target.value)} maxLength={500} />
+                        </label>
+                    )}
                     <label className="grid gap-1">
                         {t("fieldPayee")}
                         <input className={field} value={payee} onChange={(e) => setPayee(e.target.value)} maxLength={200} autoComplete="off" />

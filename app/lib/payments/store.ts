@@ -49,6 +49,7 @@ export async function createPaymentRequest(data: NewPaymentRequest, policy: Paym
       payeeHash: data.payeeHash,
       payeeHint: data.payeeHint,
       proposalUrl: data.proposalUrl,
+      proposalId: data.proposalId ?? null,
       lane,
       approvalsNeeded,
     },
@@ -129,6 +130,7 @@ export async function getRequestDetail(id: string, viewer: { isDpr: boolean }) {
       attachments: { select: { id: true, kind: true, sha256: true, sizeBytes: true, mime: true, uploadedBy: true, createdAt: true }, orderBy: { createdAt: 'asc' } },
       checks: { orderBy: { createdAt: 'desc' }, take: 20 },
       decisions: { orderBy: [{ createdAt: 'asc' }, { id: 'asc' }] },
+      proposal: { select: { id: true, title: true, status: true, kind: true, amountUsdCents: true, ayes: true, nays: true, abstains: true } },
     },
   })
   if (!r) return null
@@ -151,6 +153,9 @@ export async function getRequestDetail(id: string, viewer: { isDpr: boolean }) {
     amountOriginal: r.amountOriginal === null ? null : Number(r.amountOriginal),
     payeeHint: r.payeeHint,
     proposalUrl: r.proposalUrl,
+    proposal: r.proposal
+      ? { id: r.proposal.id, title: r.proposal.title, status: r.proposal.status as string, amountUsd: r.proposal.amountUsdCents == null ? null : r.proposal.amountUsdCents / 100, ayes: r.proposal.ayes, nays: r.proposal.nays, abstains: r.proposal.abstains }
+      : null,
     riskScore: r.riskScore,
     flags: redactFlags(asFlags(r.flags), viewer.isDpr),
     checkedAt: r.checkedAt?.toISOString() ?? null,

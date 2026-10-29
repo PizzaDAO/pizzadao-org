@@ -1565,7 +1565,10 @@
       "bad_link": "The proposal link must start with https://",
       "party_event": "This looks like a party event. Those are handled on the party platform, not here.",
       "closed": "The request form is not open yet.",
-      "generic": "Could not send the request. Please try again."
+      "generic": "Could not send the request. Please try again.",
+      "proposal_required": "This amount needs a passed proposal. Pick one of yours, or file a proposal first.",
+      "proposal_invalid": "That proposal cannot be used for this request. It must be one of yours that passed, for at least this amount.",
+      "proposal_exhausted": "That proposal has already been used for other requests up to the amount it passed for."
     },
     "fastTitle": "Fast track",
     "fastReady": "You qualify for fast track. Eligible requests are reviewed first.",
@@ -1575,7 +1578,10 @@
       "account_age": "Your Discord account needs to be a little older",
       "level": "Reach a higher member level"
     },
-    "fastNote": "Fast track only speeds up the review. A person still checks and approves every request."
+    "fastNote": "Fast track only speeds up the review. A person still checks and approves every request.",
+    "fieldProposalPick": "Passed proposal (needed above the on-approval cap)",
+    "proposalNone": "None",
+    "proposalPickHelp": "Requests above the cap must link a funding proposal you filed that has passed, for at least the amount you ask. Propose first, then ask for the payment."
   },
   "proposals": {
     "metaTitle": "Proposals",

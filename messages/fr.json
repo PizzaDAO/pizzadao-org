@@ -1565,7 +1565,10 @@
       "bad_link": "Le lien de la proposition doit commencer par https://",
       "party_event": "Cela ressemble à un événement festif. Ils sont gérés sur la plateforme de l'événement, pas ici.",
       "closed": "Le formulaire de demande n'est pas encore ouvert.",
-      "generic": "Impossible d'envoyer la demande. Veuillez réessayer."
+      "generic": "Impossible d'envoyer la demande. Veuillez réessayer.",
+      "proposal_required": "Ce montant nécessite une proposition adoptée. Choisissez-en une des vôtres, ou déposez d'abord une proposition.",
+      "proposal_invalid": "Cette proposition ne peut pas servir pour cette demande. Elle doit être la vôtre, adoptée, et couvrir au moins ce montant.",
+      "proposal_exhausted": "Cette proposition a déjà été utilisée pour d'autres demandes jusqu'au montant adopté."
     },
     "fastTitle": "Voie rapide",
     "fastReady": "Vous êtes éligible à la voie rapide. Les demandes éligibles sont examinées en premier.",
@@ -1575,7 +1578,10 @@
       "account_age": "Votre compte Discord doit être un peu plus ancien",
       "level": "Atteignez un niveau de membre plus élevé"
     },
-    "fastNote": "La voie rapide accélère seulement l'examen. Une personne vérifie et approuve toujours chaque demande."
+    "fastNote": "La voie rapide accélère seulement l'examen. Une personne vérifie et approuve toujours chaque demande.",
+    "fieldProposalPick": "Proposition adoptée (requise au-dessus du plafond d'approbation directe)",
+    "proposalNone": "Aucune",
+    "proposalPickHelp": "Les demandes au-dessus du plafond doivent lier une proposition de financement que vous avez déposée et qui a été adoptée, pour au moins le montant demandé. Proposez d'abord, puis demandez le paiement."
   },
   "proposals": {
     "metaTitle": "Propositions",

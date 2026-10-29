@@ -35,6 +35,7 @@ type Detail = {
         amountOriginal: number | null;
         payeeHint: string | null;
         proposalUrl: string | null;
+        proposal: { id: string; title: string; status: string; amountUsd: number | null; ayes: number; nays: number; abstains: number } | null;
         riskScore: number;
         flags: Flag[];
         checkedAt: string | null;
@@ -48,6 +49,7 @@ type Detail = {
     viewer: { discordId: string; isDpr: boolean; canMarkPaid: boolean };
     overCap: boolean;
     requiredAyes: number;
+    proposalsOn: boolean;
     receiptUploadEnabled: boolean;
     aiChecksEnabled: boolean;
 };
@@ -173,13 +175,30 @@ export function PaymentDetail({ id }: { id: string }) {
 
             {d.overCap && (
                 <p className="m-0 rounded p-3 bg-[hsl(var(--butter)/0.4)]">
-                    Above the on-approval cap: needs a passed community poll with at least {d.requiredAyes} ayes.{" "}
-                    {r.proposalUrl ? (
-                        <a href={r.proposalUrl} target="_blank" rel="noopener noreferrer nofollow" className="underline">
-                            Poll link
-                        </a>
+                    {d.proposalsOn ? (
+                        r.proposal ? (
+                            <>
+                                Above the on-approval cap: linked proposal{" "}
+                                <a href={`/proposals/${r.proposal.id}`} className="underline">
+                                    {r.proposal.title}
+                                </a>{" "}
+                                ({r.proposal.status.toLowerCase()}: {r.proposal.ayes} aye, {r.proposal.nays} nay, {r.proposal.abstains} abstain
+                                {r.proposal.amountUsd != null ? `, passed for $${r.proposal.amountUsd}` : ""}). The vote is counted by the app.
+                            </>
+                        ) : (
+                            "Above the on-approval cap: needs a passed in-app proposal, and none is linked."
+                        )
                     ) : (
-                        "No poll link was given."
+                        <>
+                            Above the on-approval cap: needs a passed community poll with at least {d.requiredAyes} ayes.{" "}
+                            {r.proposalUrl ? (
+                                <a href={r.proposalUrl} target="_blank" rel="noopener noreferrer nofollow" className="underline">
+                                    Poll link
+                                </a>
+                            ) : (
+                                "No poll link was given."
+                            )}
+                        </>
                     )}
                 </p>
             )}
@@ -298,7 +317,7 @@ export function PaymentDetail({ id }: { id: string }) {
                         ))}
                     </fieldset>
                 )}
-                {reviewable && d.overCap && (
+                {reviewable && d.overCap && !d.proposalsOn && (
                     <div className="grid gap-1 text-sm">
                         <label className="flex gap-2">
                             <input type="checkbox" checked={passed} onChange={(e) => setPassed(e.target.checked)} /> I checked that the community poll passed

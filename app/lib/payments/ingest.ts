@@ -123,6 +123,8 @@ export interface NewPaymentRequest {
   payeeHash: string | null
   payeeHint: string | null
   proposalUrl: string | null
+  /** In-app proposal that funds the request (set by the app form while proposals are on). */
+  proposalId?: string | null
 }
 
 const SNOWFLAKE = /^\d{17,20}$/

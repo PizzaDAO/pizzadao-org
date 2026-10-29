@@ -1565,7 +1565,10 @@
       "bad_link": "El enlace de la propuesta debe empezar por https://",
       "party_event": "Parece un evento de fiesta. Esos se gestionan en la plataforma del evento, no aquí.",
       "closed": "El formulario de solicitud todavía no está abierto.",
-      "generic": "No se pudo enviar la solicitud. Inténtalo de nuevo."
+      "generic": "No se pudo enviar la solicitud. Inténtalo de nuevo.",
+      "proposal_required": "Este importe necesita una propuesta aprobada. Elige una tuya, o presenta primero una propuesta.",
+      "proposal_invalid": "Esa propuesta no sirve para esta solicitud. Debe ser tuya, estar aprobada y cubrir al menos este importe.",
+      "proposal_exhausted": "Esa propuesta ya se usó en otras solicitudes hasta el importe por el que fue aprobada."
     },
     "fastTitle": "Vía rápida",
     "fastReady": "Calificas para la vía rápida. Las solicitudes elegibles se revisan primero.",
@@ -1575,7 +1578,10 @@
       "account_age": "Tu cuenta de Discord necesita ser un poco más antigua",
       "level": "Alcanza un nivel de miembro más alto"
     },
-    "fastNote": "La vía rápida solo acelera la revisión. Una persona sigue comprobando y aprobando cada solicitud."
+    "fastNote": "La vía rápida solo acelera la revisión. Una persona sigue comprobando y aprobando cada solicitud.",
+    "fieldProposalPick": "Propuesta aprobada (necesaria por encima del límite de aprobación directa)",
+    "proposalNone": "Ninguna",
+    "proposalPickHelp": "Las solicitudes por encima del límite deben enlazar una propuesta de financiación tuya que haya sido aprobada, por al menos el importe que pides. Primero propón y luego pide el pago."
   },
   "proposals": {
     "metaTitle": "Propuestas",
