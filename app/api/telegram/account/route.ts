@@ -32,7 +32,7 @@ export async function GET() {
 
     const account = await prisma.telegramAccount.findUnique({
         where: { discordId: auth.session.discordId },
-        select: { username: true, firstName: true, lastName: true, photoUrl: true },
+        select: { username: true, firstName: true, lastName: true, photoUrl: true, dmAllowed: true },
     });
 
     return NextResponse.json(
@@ -89,6 +89,8 @@ export async function POST(req: Request) {
         lastName: tg.lastName,
         photoUrl: tg.photoUrl,
         authDate: tg.authDate,
+        // dmAllowed is deliberately NOT set here: the widget payload does not say whether write access
+        // was granted. It becomes true when the person taps /start or unblocks the bot.
         ...(memberId ? { memberId } : {}),
     };
 

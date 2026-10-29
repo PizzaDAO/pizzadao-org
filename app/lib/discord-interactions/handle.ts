@@ -19,6 +19,7 @@ import { SLOT_EMOJI, type SlotSymbol } from '../pep-games/slots'
 import { EPHEMERAL, InteractionType, ResponseType } from './commands'
 import { authorFor, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
 import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
+import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
 
 type Option = { name: string; type: number; value: unknown; focused?: boolean }
 type DiscordUser = { id: string; username?: string; global_name?: string | null; avatar?: string | null; bot?: boolean }
@@ -105,6 +106,8 @@ export interface HandlerDeps {
   }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
+  /** Follow-up DM buttons and Reply modal (./followups.ts). */
+  followups?: FollowUpInteractionDeps
 }
 
 /** What the deferred /missions follow-up needs. */
@@ -179,6 +182,19 @@ export async function handleInteraction(i: Interaction, deps: HandlerDeps): Prom
     InteractionType.MODAL_SUBMIT,
   ]
   if (!known.includes(i.type)) return out.error('Unsupported interaction.')
+
+  // Follow-up buttons live in direct messages, which have no guild id: handled before the guild check.
+  if ((i.type === InteractionType.MESSAGE_COMPONENT || i.type === InteractionType.MODAL_SUBMIT) && isFollowUpInteraction(i)) {
+    const fuUser = i.member?.user?.id ?? i.user?.id
+    if (!fuUser) return out.error('Could not identify you.')
+    if (!deps.followups) return out.error('Unknown button.')
+    try {
+      return await handleFollowUpInteraction(i, fuUser, deps.followups)
+    } catch (err) {
+      console.error('[discord/interactions] follow-up action failed:', err instanceof Error ? err.message.slice(0, 160) : 'error')
+      return out.error('Something went wrong. Please try again.')
+    }
+  }
 
   if (!deps.guildId || i.guild_id !== deps.guildId) {
     if (i.type === InteractionType.AUTOCOMPLETE) return { type: ResponseType.AUTOCOMPLETE_RESULT, data: { choices: [] } }

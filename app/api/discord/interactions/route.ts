@@ -50,6 +50,9 @@ import { invalidateProgressCache } from "@/app/lib/mission-cache";
 import { reviewCardsEnabled, syncReviewCard } from "@/app/lib/mission-verify/review-cards";
 import { postEphemeralFollowup, runReviewDecision, type ReviewDecisionJob } from "@/app/lib/mission-verify/review-decision";
 import type { MissionReviewDeps } from "@/app/lib/discord-interactions/mission-review";
+import type { FollowUpInteractionDeps } from "@/app/lib/discord-interactions/followups";
+import { applyMemberAction } from "@/app/lib/followups/actions";
+import { notifyApprovers } from "@/app/lib/followups/notify";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -132,6 +135,15 @@ const missionReview: MissionReviewDeps = {
   appUrl: appUrl(),
 };
 
+const followups: FollowUpInteractionDeps = {
+  respond: (a) => applyMemberAction({ ...a, actorId: a.discordId }),
+  notify: (text) => after(() => notifyApprovers(text).then(() => undefined, () => undefined)),
+  owns: async (id, discordId) => {
+    const row = await prisma.followUp.findUnique({ where: { id }, select: { ownerDiscordId: true } });
+    return !!row && row.ownerDiscordId === discordId;
+  },
+};
+
 function deps(guildId: string | undefined): HandlerDeps {
   return {
     guildId,
@@ -160,6 +172,7 @@ function deps(guildId: string | undefined): HandlerDeps {
     logAdmin: logAdminGrant,
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
     missionReview,
+    followups,
   };
 }
 

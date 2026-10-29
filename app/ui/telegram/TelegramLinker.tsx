@@ -17,6 +17,7 @@ type TelegramStatus = {
     username?: string | null;
     firstName?: string | null;
     lastName?: string | null;
+    dmAllowed?: boolean;
 };
 
 declare global {
@@ -102,6 +103,8 @@ export function TelegramLinker() {
         script.setAttribute("data-size", "medium");
         script.setAttribute("data-radius", "20");
         script.setAttribute("data-userpic", "false");
+        // Lets the bot send direct messages (follow-ups from calls) once the person approves.
+        script.setAttribute("data-request-access", "write");
         script.setAttribute("data-onauth", "onTelegramAuth(user)");
         container.appendChild(script);
 
@@ -186,6 +189,16 @@ export function TelegramLinker() {
                             >
                                 § Telegram linked
                             </div>
+                            {status.dmAllowed === false && status.botUsername && (
+                                <a
+                                    href={`https://t.me/${status.botUsername}?start=fu`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    style={{ fontSize: 13, textDecoration: "underline", color: "hsl(var(--foreground))" }}
+                                >
+                                    Allow PizzaDAO to message you on Telegram
+                                </a>
+                            )}
                         </div>
                         <button
                             type="button"

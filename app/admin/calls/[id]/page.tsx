@@ -18,6 +18,8 @@ import { RemoveRecording } from "../RemoveRecording";
 import { ReviewActions } from "../ReviewActions";
 import { RedactSpeaker } from "../RedactSpeaker";
 import { RetryTranscription } from "../RetryTranscription";
+import { DraftFollowUps } from "../DraftFollowUps";
+import { prisma } from "@/app/lib/db";
 import { PERMANENT_TRANSCRIBE_ERRORS, PROGRESS } from "@/app/lib/calls/transcribe";
 import { HideLine } from "../HideLine";
 import { segmentKey } from "@/app/lib/calls/chat";
@@ -73,6 +75,8 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
         !rec.transcribedAt && rec.transcribeError === PROGRESS
             ? ((rec.transcribeStats as { _progress?: { lastError?: unknown } } | null)?._progress?.lastError as string | undefined) ?? null
             : null;
+    const followUpCount = await prisma.followUp.count({ where: { recordingId: rec.id } }).catch(() => 0);
+    const canDraftFollowUps = (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -124,6 +128,22 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                     <section className="grid gap-2">
                         <p className="m-0 text-tomato">{t("transcribeFailed", { count: rec.transcribeAttempts, error: rec.transcribeError ?? "" })}</p>
                         <RetryTranscription recordingId={rec.id} labels={{ retry: t("transcribeRetry"), working: t("working"), error: t("reviewError") }} />
+                    </section>
+                )}
+
+                {canDraftFollowUps && (
+                    <section className="grid gap-2">
+                        <h2 className="text-xl font-bold m-0">
+                            {t("followUpsHeading")}
+                            {followUpCount > 0 ? ` (${followUpCount})` : ""}
+                        </h2>
+                        <p className="m-0 text-foreground/70 text-sm">{t("followUpsHelp")}</p>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <DraftFollowUps recordingId={rec.id} />
+                            <Link href="/admin/followups" className="underline text-sm">
+                                {t("followUpsLink")}
+                            </Link>
+                        </div>
                     </section>
                 )}
 
