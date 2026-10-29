@@ -271,7 +271,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
 
                     <SliceClaimsCard />
                     <nav className="flex flex-wrap gap-x-5 text-sm" aria-label={t("handbook")}>
-                        {(missionsData?.currentLevel ?? 1) <= 2 && (
+                        {missionsData?.currentLevel != null && missionsData.currentLevel <= 2 && (
                             <Link href="/handbook/getting-started" className="inline-block min-h-11 py-2 underline">{t("gettingStarted")}</Link>
                         )}
                         <Link href="/calls/how-to-attend" className="inline-block min-h-11 py-2 underline">{t("howToAttend")}</Link>

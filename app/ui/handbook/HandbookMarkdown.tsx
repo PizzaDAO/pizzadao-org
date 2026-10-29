@@ -24,6 +24,8 @@ export function HandbookMarkdown({ content }: { content: string }) {
         <div className="handbook-content">
             <ReactMarkdown
                 remarkPlugins={[remarkGfm]}
+                disallowedElements={["img"]}
+                unwrapDisallowed
                 components={{
                     h2: ({ children }) => {
                         const h = splitHeadingAnchor(children);
@@ -34,7 +36,7 @@ export function HandbookMarkdown({ content }: { content: string }) {
                         return <h3 id={h.id}>{h.children}</h3>;
                     },
                     a: ({ href, children }) => {
-                        if (href && href.startsWith("/") && !href.startsWith("//")) return <Link href={href}>{children}</Link>;
+                        if (href && /^\/(?![\/\\])/.test(href)) return <Link href={href}>{children}</Link>;
                         if (href && href.startsWith("#")) return <a href={href}>{children}</a>;
                         return (
                             <a href={href} target="_blank" rel="noopener noreferrer">

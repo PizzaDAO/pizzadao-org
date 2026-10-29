@@ -549,7 +549,12 @@ export interface GuideLinkPlan {
  * Pure: which missions would get their default handbook link. Fills NULLs only, so an admin edit
  * (including a link they chose) is never reverted. Used by scripts/missions/set-guide-links.mjs.
  */
-export function planGuideLinks(rows: readonly GuideLinkRow[], config: readonly MissionVerifierConfig[] = MISSION_VERIFIER_CONFIG): GuideLinkPlan {
+export function planGuideLinks(
+  rows: readonly GuideLinkRow[],
+  config: readonly MissionVerifierConfig[] = MISSION_VERIFIER_CONFIG,
+  /** Mission ids whose guideHref was ever edited by an admin (from the audit log): never seeded. */
+  adminEditedIds: ReadonlySet<number> = new Set(),
+): GuideLinkPlan {
   const plan: GuideLinkPlan = { updates: [], kept: [], missing: [] }
   for (const c of config) {
     if (!c.guideHref) continue
@@ -557,7 +562,7 @@ export function planGuideLinks(rows: readonly GuideLinkRow[], config: readonly M
     const row = rows.find((r) => r.level === c.level && r.index === c.index)
     if (!row) {
       plan.missing.push(`${label} "${c.seedTitle}"`)
-    } else if (row.guideHref) {
+    } else if (row.guideHref || adminEditedIds.has(row.id)) {
       plan.kept.push(label)
     } else {
       plan.updates.push({ id: row.id, level: row.level, index: row.index, guideHref: c.guideHref })

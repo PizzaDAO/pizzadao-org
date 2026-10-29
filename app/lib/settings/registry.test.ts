@@ -131,6 +131,13 @@ describe('settings registry', () => {
     expect(parseSetting(k, 5).ok).toBe(false)
   })
 
+  it('url settings store the canonical href (trimmed, backslashes normalised)', () => {
+    const k = 'guide.budgetTemplateUrl'
+    expect(parseSetting(k, ' https://example.org ')).toEqual({ ok: true, value: 'https://example.org/' })
+    expect(parseSetting(k, 'https://example.org/a\\b')).toEqual({ ok: true, value: 'https://example.org/a/b' })
+    expect(parseSetting(k, '')).toEqual({ ok: true, value: '' })
+  })
+
   it('date settings accept real ISO dates (or empty) only', () => {
     const k = 'guide.gppDate'
     expect(parseSetting(k, '').ok).toBe(true)

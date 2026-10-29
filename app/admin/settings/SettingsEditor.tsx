@@ -45,7 +45,7 @@ interface SettingView {
     help: string;
     input:
         | { type: "int"; min: number; max: number; unit?: string }
-        | { type: "text"; maxLength: number; multiline?: boolean }
+        | { type: "text"; maxLength: number; multiline?: boolean; placeholder?: string }
         | { type: "date" }
         | { type: "url"; maxLength: number };
     stricterOnly: boolean;
@@ -182,6 +182,7 @@ function Row({ s, labels, onChanged }: { s: SettingView; labels: SettingsLabels;
                         <textarea
                             rows={5}
                             maxLength={s.input.maxLength}
+                            placeholder={s.input.placeholder}
                             value={text}
                             onChange={(e) => setText(e.target.value)}
                             className="w-80 max-w-full rounded-lg border bg-background px-2 py-1"

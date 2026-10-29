@@ -30,7 +30,7 @@
       "appetiteNote": "venez avec de l’appétit",
       "explore": "Découvrir PizzaDAO",
       "stories": "Lire nos histoires",
-      "guides": "Lis le manuel"
+      "guides": "Lis le guide"
     },
     "name": {
       "heroPrefix": "Réclame ton",
@@ -441,7 +441,7 @@
     "activation": "Activation des membres",
     "spotlight": "Coup de projecteur Mafia",
     "spotlightAdmin": "File Spotlight",
-    "handbook": "Manuel"
+    "handbook": "Guide PizzaDAO"
   },
   "dashboard": {
     "loading": {
@@ -660,7 +660,7 @@
     },
     "howToAttend": "Comment participer à un appel",
     "gettingStarted": "Premiers pas",
-    "handbook": "Manuel"
+    "handbook": "Guide PizzaDAO"
   },
   "missionLinks": {
     "boxHint": "Cette mission nécessite une Rare Pizza Box NFT dans un wallet connecté à ton profil.",
@@ -696,7 +696,7 @@
     "pages": "Pages des équipes",
     "dashboard": "Mon tableau de bord",
     "members": "Voir les membres",
-    "manuals": "Voir tous les guides",
+    "manuals": "Voir tous les manuels",
     "schedule": "Programme hebdomadaire",
     "every": "Chaque",
     "offCalendar": "Sans horaire fixe",
@@ -1154,7 +1154,7 @@
     "nextCta": "Commencer cette mission",
     "nextNone": "Vous avez terminé toutes les missions disponibles. Bravo.",
     "nextCtaAll": "Voir toutes les missions",
-    "handbook": "Manuel"
+    "handbook": "Guide PizzaDAO"
   },
   "reengage": {
     "subjectMission": "Ta prochaine mission : {title}",
@@ -1338,14 +1338,14 @@
     "alreadyCounted": "Vous avez déjà enregistré une visite ici récemment. Revenez un autre jour pour ajouter une visite."
   },
   "handbook": {
-    "metaTitle": "Manuel",
+    "metaTitle": "Guide PizzaDAO",
     "metaDescription": "Tout ce dont un nouveau membre ou un hôte de PizzaDAO a besoin : premiers pas, niveaux et missions, organiser une fête, créer un POAP.",
-    "overline": "Manuel",
-    "titlePrefix": "Le manuel de",
+    "overline": "Guide PizzaDAO",
+    "titlePrefix": "Le guide de",
     "titleAccent": "PizzaDAO",
     "dek": "Comment les choses fonctionnent, tenu à jour au même endroit. Choisis un chapitre, ou commence par Premiers pas.",
-    "pages": "Chapitres du manuel",
-    "back": "Manuel",
+    "pages": "Chapitres du guide",
+    "back": "Guide PizzaDAO",
     "open": "Lire",
     "groups": {
       "newMember": "Nouveaux membres",

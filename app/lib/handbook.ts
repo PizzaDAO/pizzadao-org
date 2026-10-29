@@ -63,7 +63,7 @@ export function internalLinks(body: string): string[] {
 }
 
 function safeUrl(v: string): string {
-  return v.replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\s/g, '%20')
+  return v.replace(/\\/g, '%5C').replace(/\(/g, '%28').replace(/\)/g, '%29').replace(/\s/g, '%20')
 }
 
 /**

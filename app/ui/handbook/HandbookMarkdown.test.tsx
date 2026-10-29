@@ -39,3 +39,18 @@ describe('HandbookMarkdown', () => {
     expect(splitHeadingAnchor('Hello {#A B}').id).toBeUndefined()
   })
 })
+
+describe('HandbookMarkdown hardening', () => {
+  it('does not render images', () => {
+    const { container } = render(<HandbookMarkdown content={'![alt](https://example.org/x.png) after'} />)
+    expect(container.querySelector('img')).toBeNull()
+  })
+
+  it('does not treat //host or /\\host as internal links', () => {
+    const { container } = render(<HandbookMarkdown content={'[a](//example.org) [b](/\\example.org) [c](/ok)'} />)
+    const [a, b, c] = Array.from(container.querySelectorAll('a'))
+    expect(a.getAttribute('target')).toBe('_blank')
+    expect(b.getAttribute('href') ?? '').not.toContain('\\')
+    expect(c.getAttribute('target')).toBeNull()
+  })
+})

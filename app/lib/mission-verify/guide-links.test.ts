@@ -53,6 +53,13 @@ describe('planGuideLinks', () => {
     expect(plan.kept).toContain('L1.1')
   })
 
+  it('skips a mission whose link an admin ever edited (it may have been cleared on purpose)', () => {
+    const r = rows()
+    const plan = planGuideLinks(r, MISSION_VERIFIER_CONFIG, new Set([r[0].id]))
+    expect(plan.updates.find((u) => u.id === r[0].id)).toBeUndefined()
+    expect(plan.kept).toContain('L1.1')
+  })
+
   it('reports a config entry with no row', () => {
     const plan = planGuideLinks(rows().slice(1))
     expect(plan.missing.length).toBeGreaterThan(0)

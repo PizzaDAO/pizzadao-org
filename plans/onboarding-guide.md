@@ -389,5 +389,6 @@ Where the build differs from the plan above:
 - **Pizza math (D6).** The Host a party page states the budget template's rule: an order about every 45
   minutes, roughly one pizza per one and a half guests.
 - **No city or attendance numbers (D9).**
-- **Needs a person (Snax):** fill the `guide.*` settings listed in the PR description, run the migration,
-  then `set-guide-links.mjs` (dry run first), then do the Drive pointer edits in section 7.
+- **Needs a person (Snax), in this order:** apply the migration, merge and deploy, fill the `guide.*`
+  settings listed in the PR description, then run `set-guide-links.mjs` (dry run first), then do the Drive
+  pointer edits in section 7.

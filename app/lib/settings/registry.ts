@@ -29,7 +29,7 @@ export type FailureMode<T> = { value: T } | 'lastKnownGood' | 'throw'
 /** How the admin page edits a value. Text-like inputs allow an empty string (= unset). */
 export type SettingInput =
   | { type: 'int'; min: number; max: number; unit?: string }
-  | { type: 'text'; maxLength: number; multiline?: boolean }
+  | { type: 'text'; maxLength: number; multiline?: boolean; placeholder?: string }
   | { type: 'date' }
   | { type: 'url'; maxLength: number }
 
@@ -86,16 +86,37 @@ function intSetting(o: {
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
-function textSetting(o: { key: string; area: SettingArea; label: string; help: string; maxLength: number; multiline?: boolean; default?: string }): SettingDef<string> {
+export function textSetting(o: {
+  key: string
+  area: SettingArea
+  label: string
+  help: string
+  maxLength: number
+  multiline?: boolean
+  default?: string
+  placeholder?: string
+  /** Extra validation on the trimmed value (runs on write and on read). */
+  check?: (value: string) => boolean
+  checkMessage?: string
+  onReadFailure?: FailureMode<string>
+}): SettingDef<string> {
+  const base = z.string().trim().max(o.maxLength)
+  const check = o.check
+  const schema = check ? base.refine(check, o.checkMessage ?? 'Invalid value') : base
   return {
     key: o.key,
     area: o.area,
     label: o.label,
     help: o.help,
-    schema: z.string().trim().max(o.maxLength),
+    schema,
     default: o.default ?? '',
-    onReadFailure: { value: o.default ?? '' },
-    input: { type: 'text', maxLength: o.maxLength, ...(o.multiline ? { multiline: true } : {}) },
+    onReadFailure: o.onReadFailure ?? { value: o.default ?? '' },
+    input: {
+      type: 'text',
+      maxLength: o.maxLength,
+      ...(o.multiline ? { multiline: true } : {}),
+      ...(o.placeholder ? { placeholder: o.placeholder } : {}),
+    },
   }
 }
 
@@ -134,7 +155,7 @@ function urlSetting(o: { key: string; area: SettingArea; label: string; help: st
       } catch {
         return false
       }
-    }, 'Use a full https:// address, or leave empty'),
+    }, 'Use a full https:// address, or leave empty').transform((v) => (v === '' ? '' : new URL(v).href)),
     default: o.default ?? '',
     onReadFailure: { value: o.default ?? '' },
     input: { type: 'url', maxLength },

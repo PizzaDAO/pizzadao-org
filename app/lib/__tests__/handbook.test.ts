@@ -177,6 +177,10 @@ describe('renderPlaceholders', () => {
     expect(out).toBe('[x](https://example.org/a%20b%29%28c)')
   })
 
+  it('escapes a backslash in URL facts', () => {
+    expect(renderPlaceholders('[x]({{budgetTemplateUrl}})', { budgetTemplateUrl: 'https://example.org/a\\b' })).toBe('[x](https://example.org/a%5Cb)')
+  })
+
   it('treats an unset or missing fact as empty', () => {
     expect(renderPlaceholders('Date {{gppDate}}.\n\nOk.', {})).toBe('Ok.')
   })

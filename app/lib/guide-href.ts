@@ -5,8 +5,8 @@
  */
 export const GUIDE_HREF_MAX = 120
 
-/** Allowed shape: a known root, at most one more path segment, at most one #anchor. */
-export const GUIDE_HREF_PATTERN = /^\/(handbook|calls\/how-to-attend|manuals|vouches|missions)(\/[a-z0-9-]+)?(#[a-z0-9-]+)?$/
+/** Allowed shape: /handbook[/<slug>] or /calls/how-to-attend, with at most one #anchor. */
+export const GUIDE_HREF_PATTERN = /^\/(handbook(\/[a-z0-9-]+)?|calls\/how-to-attend)(#[a-z0-9-]+)?$/
 
 /** Trim; empty becomes null (no link); an invalid value returns the error text. */
 export function parseGuideHref(raw: unknown): { ok: true; value: string | null } | { ok: false; error: string } {

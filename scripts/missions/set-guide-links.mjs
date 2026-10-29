@@ -4,12 +4,13 @@
  * DRY RUN BY DEFAULT: it prints the plan and writes nothing without --apply.
  *
  * Fills NULLs only, matching rows by (level, index) from app/lib/mission-verify/mission-config.ts
- * (the guideHref on each config entry). A row that already has a link is never touched, so an
- * edit made in /admin/missions is never reverted. Idempotent: a second run reports nothing to do.
+ * (the guideHref on each config entry). A row that already has a link is never touched, and neither
+ * is a row whose link an admin has ever edited (the audit log has a `mission:<id>:guideHref` entry),
+ * so an admin who cleared a link on purpose does not get it back. Idempotent: a second run
+ * reports nothing to do.
  *
- * Requires the migration prisma/migrations/20261102300000_mission_guide_href to be applied first.
- * The handbook pages the links point to must be deployed first too (a link to a page that does
- * not exist yet would 404).
+ * Order: apply the migration prisma/migrations/20261102300000_mission_guide_href, then merge and
+ * deploy the handbook pages (a link to a page that does not exist yet would 404), then run this.
  *
  * Usage:
  *   DATABASE_URL=... node scripts/missions/set-guide-links.mjs            # dry run: prints the plan
@@ -53,7 +54,13 @@ try {
     select: { id: true, level: true, index: true, guideHref: true },
     orderBy: [{ level: "asc" }, { index: "asc" }],
   });
-  const plan = planGuideLinks(rows, MISSION_VERIFIER_CONFIG);
+  // A mission whose guideHref was ever edited in the admin editor is left alone (it may have been cleared on purpose).
+  const edited = await prisma.appSettingChange.findMany({
+    where: { key: { in: rows.map((r) => `mission:${r.id}:guideHref`) } },
+    select: { key: true },
+  });
+  const editedIds = new Set(edited.map((e) => Number(e.key.split(":")[1])));
+  const plan = planGuideLinks(rows, MISSION_VERIFIER_CONFIG, editedIds);
 
   console.log(`\n${rows.length} mission rows.`);
   if (plan.missing.length) console.log(`Not found (skipped): ${plan.missing.join(", ")}`);

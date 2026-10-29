@@ -10,9 +10,7 @@ describe('parseGuideHref', () => {
       '/handbook/levels#vouching',
       '/handbook/getting-started#connect-x',
       '/calls/how-to-attend',
-      '/manuals',
-      '/vouches',
-      '/missions',
+      '/calls/how-to-attend#schedule',
     ]) {
       expect(parseGuideHref(` ${ok} `), ok).toEqual({ ok: true, value: ok })
     }
@@ -28,6 +26,11 @@ describe('parseGuideHref', () => {
   it('rejects anything that is not an internal path under a known root', () => {
     for (const bad of [
       'https://example.org',
+      '/manuals',
+      '/vouches',
+      '/missions',
+      '/calls',
+      '/calls/how-to-attend/x',
       'javascript:alert(1)',
       'data:text/html,x',
       '//example.org',
