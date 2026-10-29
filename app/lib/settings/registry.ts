@@ -838,7 +838,7 @@ export const SETTINGS = {
   'discord.proposalsChannelId': channelSetting({
     key: 'discord.proposalsChannelId',
     label: 'Proposals channel',
-    help: 'Where each new proposal and its result are posted, with a link to vote. Empty posts nothing (voting still works on the site).',
+    help: 'Where each new proposal and its result are posted, with a link to vote. There is no voting in Discord (votes are secret).',
   }),
   'discord.proposalsPingRoleId': proposalsPingRole,
   'missions.slaPingRoleId': slaPingRole,

@@ -63,13 +63,18 @@ export function makeFakeDb() {
   const db: any = {
     proposal: {
       create: async ({ data }: any) => {
-        const row = { id: `p${++state.seq}`, status: 'DRAFT', ayes: 0, nays: 0, abstains: 0, countAbstains: true, requireAyesOverNays: true, opensAt: null, closesAt: null, closedAt: null, ayesNeeded: null, eligibleCount: null, ...data }
+        const row = { id: `p${++state.seq}`, status: 'DRAFT', ayes: 0, nays: 0, abstains: 0, countAbstains: true, requireAyesOverNays: true, opensAt: null, closesAt: null, closedAt: null, ayesNeeded: null, eligibleCount: null, discordChannelId: null, discordMessageId: null, resultPostedAt: null, createdAt: new Date(0), ...data }
         state.proposal.push(row)
         return row
       },
       findUnique: async ({ where }: any) => state.proposal.find((r) => matchWhere(r, where)) ?? null,
       findMany: async ({ where }: any) => state.proposal.filter((r) => matchWhere(r, where)),
       update: async ({ where, data }: any) => Object.assign(state.proposal.find((r) => matchWhere(r, where))!, data),
+      updateMany: async ({ where, data }: any) => {
+        const rows = state.proposal.filter((r) => matchWhere(r, where))
+        rows.forEach((r) => Object.assign(r, data))
+        return { count: rows.length }
+      },
     },
     proposalVoter: {
       findUnique: async ({ where }: any) => state.voter.find((r) => matchWhere(r, where)) ?? null,
