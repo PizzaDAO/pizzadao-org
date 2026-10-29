@@ -49,6 +49,7 @@ export default async function HowToAttendPage() {
         dek={t("dek")}
       >
         <nav className="flex flex-wrap gap-2.5" aria-label={t("pages")}>
+          <Link href="/handbook" className={pillOutline}>{t("handbook")}</Link>
           <Link href="/crews" className={pillOutline}>{t("crews")}</Link>
           <Link href="/calls" className={pillOutline}>{t("callLog")}</Link>
         </nav>

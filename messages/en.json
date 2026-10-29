@@ -419,7 +419,7 @@
     "articles": "Stories",
     "calls": "Call history",
     "chats": "Chats",
-    "manuals": "Guides",
+    "manuals": "Crew manuals",
     "turtles": "Roles (Turtles)",
     "techProjects": "Tech Projects",
     "nfts": "NFTs",
@@ -440,7 +440,8 @@
     "resources": "Resources",
     "activation": "Member activation",
     "spotlight": "Mafia Spotlight",
-    "spotlightAdmin": "Spotlight queue"
+    "spotlightAdmin": "Spotlight queue",
+    "handbook": "Handbook"
   },
   "dashboard": {
     "loading": {
@@ -1147,7 +1148,8 @@
     "nextLevel": "Level {level}",
     "nextCta": "Start this mission",
     "nextNone": "You have finished every mission available to you. Nice work.",
-    "nextCtaAll": "See all missions"
+    "nextCtaAll": "See all missions",
+    "handbook": "Handbook"
   },
   "reengage": {
     "subjectMission": "Your next mission: {title}",
@@ -1327,5 +1329,49 @@
       "not_found": "We could not find this pizzeria."
     },
     "alreadyCounted": "You already checked in here recently. Come back another day to add a visit."
+  },
+  "handbook": {
+    "metaTitle": "Handbook",
+    "metaDescription": "Everything a new PizzaDAO member or party host needs: getting started, levels and missions, hosting a party, making a POAP.",
+    "overline": "Handbook",
+    "titlePrefix": "The PizzaDAO",
+    "titleAccent": "handbook",
+    "dek": "How things work, kept up to date in one place. Pick a chapter, or start with Getting started.",
+    "pages": "Handbook chapters",
+    "back": "Handbook",
+    "open": "Read",
+    "groups": {
+      "newMember": "New member",
+      "hosting": "Hosting",
+      "takingPart": "Taking part"
+    },
+    "chapters": {
+      "attend": {
+        "title": "How to attend a call",
+        "dek": "Find your crew's call, join the Discord voice channel and know what to expect."
+      },
+      "crewManuals": {
+        "title": "Crew manuals",
+        "dek": "The working guides each crew keeps for its own tasks."
+      }
+    },
+    "lastReviewed": "Last reviewed: {date}",
+    "outdated": "This page was last reviewed more than a year ago and may be out of date.",
+    "notTranslated": "This page is not translated into your language yet, so it is shown in English.",
+    "wrong": "Something wrong?",
+    "wrongCta": "Tell us",
+    "next": {
+      "title": "Your next mission",
+      "level": "Level {level}",
+      "cta": "Open missions",
+      "login": "Log in to see your next mission"
+    },
+    "levels": {
+      "tableTitle": "Levels and missions",
+      "level": "Level {n}",
+      "reward": "Reward: {pep, number} PEP",
+      "unavailable": "The live level list is not available right now.",
+      "seeMissions": "See all missions"
+    }
   }
 }

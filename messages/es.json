@@ -419,7 +419,7 @@
     "articles": "Historias",
     "calls": "Historial de llamadas",
     "chats": "Chats",
-    "manuals": "Guías",
+    "manuals": "Manuales de crews",
     "turtles": "Roles (Turtles)",
     "techProjects": "Proyectos tech",
     "nfts": "NFTs",
@@ -440,7 +440,8 @@
     "resources": "Recursos",
     "activation": "Activación de miembros",
     "spotlight": "Foco de la Mafia",
-    "spotlightAdmin": "Cola de Spotlight"
+    "spotlightAdmin": "Cola de Spotlight",
+    "handbook": "Manual"
   },
   "dashboard": {
     "loading": {
@@ -1147,7 +1148,8 @@
     "nextLevel": "Nivel {level}",
     "nextCta": "Empezar esta misión",
     "nextNone": "Terminaste todas las misiones disponibles. Buen trabajo.",
-    "nextCtaAll": "Ver todas las misiones"
+    "nextCtaAll": "Ver todas las misiones",
+    "handbook": "Manual"
   },
   "reengage": {
     "subjectMission": "Tu próxima misión: {title}",
@@ -1327,5 +1329,49 @@
       "not_found": "No encontramos esta pizzería."
     },
     "alreadyCounted": "Ya registraste una visita aquí hace poco. Vuelve otro día para sumar una visita."
+  },
+  "handbook": {
+    "metaTitle": "Manual",
+    "metaDescription": "Todo lo que necesita un nuevo miembro o anfitrión de PizzaDAO: primeros pasos, niveles y misiones, organizar una fiesta y crear un POAP.",
+    "overline": "Manual",
+    "titlePrefix": "El manual de",
+    "titleAccent": "PizzaDAO",
+    "dek": "Cómo funcionan las cosas, siempre actualizado en un solo lugar. Elige un capítulo o empieza por Primeros pasos.",
+    "pages": "Capítulos del manual",
+    "back": "Manual",
+    "open": "Leer",
+    "groups": {
+      "newMember": "Nuevos miembros",
+      "hosting": "Organizar",
+      "takingPart": "Participar"
+    },
+    "chapters": {
+      "attend": {
+        "title": "Cómo asistir a una llamada",
+        "dek": "Encuentra la llamada de tu crew, entra al canal de voz de Discord y sabe qué esperar."
+      },
+      "crewManuals": {
+        "title": "Manuales de crews",
+        "dek": "Las guías de trabajo que cada crew mantiene para sus propias tareas."
+      }
+    },
+    "lastReviewed": "Última revisión: {date}",
+    "outdated": "Esta página se revisó por última vez hace más de un año y puede estar desactualizada.",
+    "notTranslated": "Esta página aún no está traducida a tu idioma, por eso se muestra en inglés.",
+    "wrong": "¿Algo no está bien?",
+    "wrongCta": "Avísanos",
+    "next": {
+      "title": "Tu próxima misión",
+      "level": "Nivel {level}",
+      "cta": "Abrir misiones",
+      "login": "Inicia sesión para ver tu próxima misión"
+    },
+    "levels": {
+      "tableTitle": "Niveles y misiones",
+      "level": "Nivel {n}",
+      "reward": "Recompensa: {pep, number} PEP",
+      "unavailable": "La lista de niveles en vivo no está disponible ahora.",
+      "seeMissions": "Ver todas las misiones"
+    }
   }
 }

@@ -419,7 +419,7 @@
     "articles": "Histoires",
     "calls": "Historique des appels",
     "chats": "Discussions",
-    "manuals": "Guides",
+    "manuals": "Manuels des crews",
     "turtles": "Rôles (Turtles)",
     "techProjects": "Projets tech",
     "nfts": "NFT",
@@ -440,7 +440,8 @@
     "resources": "Ressources",
     "activation": "Activation des membres",
     "spotlight": "Coup de projecteur Mafia",
-    "spotlightAdmin": "File Spotlight"
+    "spotlightAdmin": "File Spotlight",
+    "handbook": "Manuel"
   },
   "dashboard": {
     "loading": {
@@ -1147,7 +1148,8 @@
     "nextLevel": "Niveau {level}",
     "nextCta": "Commencer cette mission",
     "nextNone": "Vous avez terminé toutes les missions disponibles. Bravo.",
-    "nextCtaAll": "Voir toutes les missions"
+    "nextCtaAll": "Voir toutes les missions",
+    "handbook": "Manuel"
   },
   "reengage": {
     "subjectMission": "Ta prochaine mission : {title}",
@@ -1327,5 +1329,49 @@
       "not_found": "Nous n'avons pas trouvé cette pizzeria."
     },
     "alreadyCounted": "Vous avez déjà enregistré une visite ici récemment. Revenez un autre jour pour ajouter une visite."
+  },
+  "handbook": {
+    "metaTitle": "Manuel",
+    "metaDescription": "Tout ce dont un nouveau membre ou un hôte de PizzaDAO a besoin : premiers pas, niveaux et missions, organiser une fête, créer un POAP.",
+    "overline": "Manuel",
+    "titlePrefix": "Le manuel de",
+    "titleAccent": "PizzaDAO",
+    "dek": "Comment les choses fonctionnent, tenu à jour au même endroit. Choisis un chapitre, ou commence par Premiers pas.",
+    "pages": "Chapitres du manuel",
+    "back": "Manuel",
+    "open": "Lire",
+    "groups": {
+      "newMember": "Nouveaux membres",
+      "hosting": "Organiser",
+      "takingPart": "Participer"
+    },
+    "chapters": {
+      "attend": {
+        "title": "Comment assister à un appel",
+        "dek": "Trouve l'appel de ta crew, rejoins le salon vocal Discord et sache à quoi t'attendre."
+      },
+      "crewManuals": {
+        "title": "Manuels des crews",
+        "dek": "Les guides de travail que chaque crew tient à jour pour ses propres tâches."
+      }
+    },
+    "lastReviewed": "Dernière révision : {date}",
+    "outdated": "Cette page a été révisée pour la dernière fois il y a plus d'un an et peut être périmée.",
+    "notTranslated": "Cette page n'est pas encore traduite dans ta langue, elle s'affiche donc en anglais.",
+    "wrong": "Quelque chose ne va pas ?",
+    "wrongCta": "Dis-le-nous",
+    "next": {
+      "title": "Ta prochaine mission",
+      "level": "Niveau {level}",
+      "cta": "Ouvrir les missions",
+      "login": "Connecte-toi pour voir ta prochaine mission"
+    },
+    "levels": {
+      "tableTitle": "Niveaux et missions",
+      "level": "Niveau {n}",
+      "reward": "Récompense : {pep, number} PEP",
+      "unavailable": "La liste des niveaux en direct n'est pas disponible pour le moment.",
+      "seeMissions": "Voir toutes les missions"
+    }
   }
 }
