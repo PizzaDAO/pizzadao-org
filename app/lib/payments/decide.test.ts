@@ -287,6 +287,12 @@ describe('applyDecision (database)', () => {
     expect(other.ok).toBe(true)
   })
 
+  it('uses the latest RULES check by id alone', async () => {
+    await applyDecision('req1', actor(A), { action: 'APPROVE' }, p)
+    const include = tx.paymentRequest.findUnique.mock.calls[0][0].include
+    expect(include.checks).toMatchObject({ where: { kind: 'RULES' }, orderBy: { id: 'desc' }, take: 1 })
+  })
+
   it('404 for an unknown request', async () => {
     tx.paymentRequest.findUnique.mockResolvedValue(null)
     const r = await applyDecision('nope', actor(A), { action: 'APPROVE' }, p)

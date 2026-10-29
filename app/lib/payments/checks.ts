@@ -124,7 +124,7 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
   const requesters = [identity, ...linked].filter((x): x is string => !!x)
   const claimOnly = !verified && !!req.claimedDiscordId
 
-  const [reused, shared, fraud, restricted, newAccountDays, siblings, signals, aiChecks, claimedFraud, sharedFormRow] = await Promise.all([
+  const [reused, shared, fraud, restricted, newAccountDays, siblings, signals, aiChecks, claimedFraud, sharedFormRow, repeatFormPayee] = await Promise.all([
     hashes.length ? prisma.paymentAttachment.findFirst({ where: { sha256: { in: hashes }, requestId: { not: id } }, select: { id: true } }) : null,
     // A payee used by someone else is a hard block. For a verified request only VERIFIED rows of other
     // people count; for a form row (claim only) nothing is excluded, since a claim cannot exempt the
@@ -134,7 +134,14 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
           where: {
             payeeHash: req.payeeHash,
             id: { not: id },
-            ...(verified ? { AND: [{ requesterDiscordId: { not: null } }, { requesterDiscordId: { notIn: verifiedIds } }] } : {}),
+            ...(verified
+              ? { AND: [{ requesterDiscordId: { not: null } }, { requesterDiscordId: { notIn: verifiedIds } }] }
+              : claimOnly
+                ? // The only exemption: earlier FORM rows with the same claimed id (they get a hint below). Verified rows,
+                  // and form rows with a different or no claimed id, still block. Written as an OR of positive conditions
+                  // because "NOT (a AND b)" would silently drop rows whose claimed id is null.
+                  { OR: [{ requesterDiscordId: { not: null } }, { claimedDiscordId: null }, { claimedDiscordId: { not: req.claimedDiscordId } }] }
+                : {}),
           },
           select: { id: true },
         })
@@ -153,6 +160,8 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
     claimOnly ? prisma.paymentRequest.findFirst({ where: { rejectedAsFraud: true, requesterDiscordId: req.claimedDiscordId }, select: { id: true } }) : null,
     // A verified request whose payee also appears on a public-form row: worth a look, not a block.
     verified && req.payeeHash ? prisma.paymentRequest.findFirst({ where: { payeeHash: req.payeeHash, id: { not: id }, requesterDiscordId: null }, select: { id: true } }) : null,
+    // A form row repeating its own claimed id's earlier form rows with the same payee: a hint, never a block.
+    claimOnly && req.payeeHash ? prisma.paymentRequest.findFirst({ where: { payeeHash: req.payeeHash, id: { not: id }, requesterDiscordId: null, claimedDiscordId: req.claimedDiscordId }, select: { id: true } }) : null,
   ])
 
   const created = identity ? snowflakeCreatedAt(identity) : null
@@ -178,6 +187,7 @@ async function evaluateOnce(id: string, deps: EvalDeps): Promise<EvalResult | nu
     reusedAttachment: !!reused,
     sharedPayee: !!shared,
     sharedPayeeFormRow: !!sharedFormRow,
+    repeatFormPayee: !!repeatFormPayee,
     priorFraud: !!fraud,
     claimedFraudHint: !!claimedFraud,
     restrictedMatches: restricted.ids,
