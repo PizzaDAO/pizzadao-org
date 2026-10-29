@@ -39,6 +39,7 @@
     "ogg-opus-decoder": "^1.7.5",
     "prisma": "^7.2.0",
     "promise-limit": "^2.7.0",
+    "qrcode": "^1.5.3",
     "react": "19.2.3",
     "react-dom": "19.2.3",
     "react-markdown": "^10.1.0",

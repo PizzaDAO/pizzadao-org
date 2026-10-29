@@ -23,6 +23,7 @@ import { ProfileHero } from "../../ui/profile/ProfileHero";
 import { AboutChips } from "../../ui/profile/AboutChips";
 import { CrewChipRow, type CrewOption } from "../../ui/profile/CrewChipRow";
 import { ContributionsBlock } from "../../ui/profile/ContributionsBlock";
+import { PassportBlock } from "../../ui/profile/PassportBlock";
 import { CollectionsLazy } from "../../ui/profile/CollectionsLazy";
 import { AttendanceCard } from "../../ui/attendance-card";
 import { useProfileSummary } from "../../lib/hooks/use-api";
@@ -160,6 +161,8 @@ export function ProfileClient({ id, disavowWarning = null }: ProfileClientProps)
                 <CrewChipRow crewIds={data.crewIds} crewOptions={crewOptions} />
 
                 <ContributionsBlock memberId={id} />
+
+                <PassportBlock memberId={id} />
 
                 {/* Attendance — uses inline variant so this page owns the wrapper */}
                 <section

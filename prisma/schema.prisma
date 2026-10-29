@@ -966,6 +966,8 @@ model MemberProfileExtras {
   emailVerifiedAt          DateTime?                  // set by the signed confirmation link; reset when the address changes
   emailConfirmSentAt       DateTime?                  // last confirmation email (throttle)
   reengageEmailOptIn       Boolean   @default(false)  // explicit opt-in to the weekly digest
+  // ===== Pizza Passport (plans/pizza-passport.md): who may see this member's stamps =====
+  passportVisibility       String    @default("public") @db.VarChar(8) // public | members | private
   updatedAt                DateTime  @updatedAt
   createdAt                DateTime  @default(now())
 }
@@ -1569,4 +1571,103 @@ model AppSettingChange {
 
   @@index([key, changedAt])
   @@index([changedAt])
+}
+
+// ===== Pizza Passport, phase 1 (plans/pizza-passport.md) =====
+enum PizzeriaSource {
+  OVERTURE
+  OSM
+  MEMBER
+  ADMIN
+  GPP
+}
+
+enum PizzeriaStatus {
+  ACTIVE
+  PENDING
+  HIDDEN
+  CLOSED
+}
+
+enum CheckInMethod {
+  GEO
+  QR
+  QR_NO_GEO
+  ADMIN
+}
+
+enum CheckInStatus {
+  APPROVED
+  PENDING
+  REJECTED
+}
+
+model Pizzeria {
+  id            String            @id @default(cuid())
+  slug          String            @unique
+  name          String            @db.VarChar(160)
+  address       String?
+  city          String?           @db.VarChar(120)
+  countryCode   String?           @db.VarChar(2)
+  lat           Float
+  lng           Float
+  source        PizzeriaSource
+  sourceId      String?
+  isChain       Boolean           @default(false)
+  status        PizzeriaStatus    @default(ACTIVE)
+  isPartner     Boolean           @default(false)
+  partnerSince  DateTime?
+  qrVersion     Int               @default(1)
+  logoUrl       String?           // partner-granted only
+  logoConsentAt DateTime?
+  stampInk      String?           @db.VarChar(16)
+  website       String?
+  createdBy     String?
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+  checkIns      PizzeriaCheckIn[]
+  stamps        PassportStamp[]
+
+  @@unique([source, sourceId])
+  @@index([lat, lng])
+  @@index([countryCode, city])
+  @@index([isPartner])
+}
+
+model PizzeriaCheckIn {
+  id         Int           @id @default(autoincrement())
+  pizzeriaId String
+  discordId  String
+  memberId   String?
+  method     CheckInMethod
+  status     CheckInStatus @default(APPROVED)
+  lat        Float?        // nulled after 30 days by /api/cron/passport-scrub; never stored on REJECTED rows
+  lng        Float?
+  accuracyM  Int?
+  distanceM  Int?
+  riskFlags  Json?
+  reviewedBy String?
+  createdAt  DateTime      @default(now())
+  pizzeria   Pizzeria      @relation(fields: [pizzeriaId], references: [id])
+
+  @@index([discordId, createdAt])
+  @@index([pizzeriaId, createdAt])
+  @@index([status])
+}
+
+model PassportStamp {
+  id             Int      @id @default(autoincrement())
+  discordId      String
+  memberId       String?
+  pizzeriaId     String
+  firstCheckInId Int
+  visits         Int      @default(1)
+  lastVisitAt    DateTime @default(now())
+  verified       Boolean  @default(false)
+  stampedAt      DateTime @default(now())
+  pinned         Boolean  @default(false)
+  pizzeria       Pizzeria @relation(fields: [pizzeriaId], references: [id])
+
+  @@unique([discordId, pizzeriaId])
+  @@index([discordId, stampedAt])
 }

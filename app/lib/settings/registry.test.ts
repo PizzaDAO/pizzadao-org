@@ -51,6 +51,13 @@ describe('settings registry', () => {
       ['missions.slaDigestMaxLines', 15],
       ['missions.maxAttempts', 3],
       ['disavow.minLevel', 5],
+      ['passport.enabled', 0],
+      ['passport.checkInRadiusM', 150],
+      ['passport.maxAccuracyM', 150],
+      ['passport.maxNewStampsPerDay', 5],
+      ['passport.revisitCooldownHours', 20],
+      ['passport.publicDelayHours', 6],
+      ['passport.maxTravelKmPerHour', 900],
     ])
   })
 

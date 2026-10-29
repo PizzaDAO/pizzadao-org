@@ -1282,5 +1282,49 @@
     "loadError": "No se pudieron cargar las misiones.",
     "rewardLowerOnly": "Las recompensas se pueden bajar, o subir de nuevo hasta el valor del código; superarlo requiere un PR.",
     "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR."
+  },
+  "passport": {
+    "overline": "Pasaporte Pizza",
+    "title": "Pasaporte Pizza",
+    "metaDescription": "Consigue un sello por cada pizzería asociada que visites.",
+    "intro": "Escanea el código QR de la mesa en una pizzería asociada para conseguir su sello.",
+    "unavailable": "El pasaporte no está disponible ahora mismo.",
+    "login": "Inicia sesión para continuar",
+    "emptyTitle": "Aún no hay sellos",
+    "emptyBody": "Visita una pizzería asociada y escanea el código QR de la mesa para conseguir tu primer sello.",
+    "summary": "{stamps, plural, one {# sello} other {# sellos}} · {countries, plural, one {# país} other {# países}} · {verified} verificados en un local asociado",
+    "seeAll": "Abrir mi pasaporte",
+    "manage": "Gestionar mi pasaporte",
+    "visibilityLabel": "Quién puede ver mis sellos",
+    "visibility": {
+      "public": "Todo el mundo",
+      "members": "Miembros con sesión iniciada",
+      "private": "Solo yo"
+    },
+    "privacyNote": "Los demás solo ven el mes, y un sello nuevo aparece unas horas después de tu visita.",
+    "saveError": "No se pudo guardar. Inténtalo de nuevo.",
+    "checkInTitle": "Registrar visita",
+    "checkInBody": "Comparte tu ubicación para confirmar que estás en la pizzería.",
+    "checkInButton": "Registrar aquí",
+    "locating": "Buscándote…",
+    "locationNote": "Tu ubicación exacta se usa una vez para comprobar la distancia y se borra a los 30 días.",
+    "newStamp": "¡Nuevo sello conseguido!",
+    "visitCounted": "Bienvenido de nuevo. Tu visita cuenta.",
+    "viewPassport": "Ver mi pasaporte",
+    "pendingTitle": "Visita recibida",
+    "pendingBody": "Una persona la revisará pronto. Tu sello aparece cuando se apruebe.",
+    "tryAgain": "Intentar de nuevo",
+    "errors": {
+      "generic": "Algo salió mal. Inténtalo de nuevo.",
+      "not_allowed": "No puedes registrar visitas ahora.",
+      "not_eligible": "Esta pizzería no forma parte del pasaporte.",
+      "bad_qr": "Este código QR no es válido. Pide uno actual al personal.",
+      "bad_location": "No pudimos leer tu ubicación. Inténtalo de nuevo.",
+      "low_accuracy": "Tu ubicación no es lo bastante precisa. Sal al exterior o activa la ubicación precisa e inténtalo de nuevo.",
+      "too_far": "No parece que estés en la pizzería.",
+      "daily_limit": "Has alcanzado el límite de sellos de hoy. Vuelve mañana.",
+      "not_found": "No encontramos esta pizzería."
+    },
+    "alreadyCounted": "Ya registraste una visita aquí hace poco. Vuelve otro día para sumar una visita."
   }
 }

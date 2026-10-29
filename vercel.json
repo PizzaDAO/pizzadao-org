@@ -12,6 +12,7 @@
     { "path": "/api/cron/call-transcripts", "schedule": "*/15 * * * *" },
     { "path": "/api/cron/reengage", "schedule": "0 16-21 * * 2" },
     { "path": "/api/cron/call-agenda", "schedule": "*/10 * * * *" },
-    { "path": "/api/cron/slices-mint", "schedule": "*/5 * * * *" }
+    { "path": "/api/cron/slices-mint", "schedule": "*/5 * * * *" },
+    { "path": "/api/cron/passport-scrub", "schedule": "45 6 * * *" }
   ]
 }

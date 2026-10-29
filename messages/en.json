@@ -1282,5 +1282,49 @@
     "loadError": "Could not load the missions.",
     "rewardLowerOnly": "Rewards can be lowered, or raised back up to the code value; going above needs a PR.",
     "activeOnlyEnable": "Can only be switched on here; deactivating needs a PR."
+  },
+  "passport": {
+    "overline": "Pizza Passport",
+    "title": "Pizza Passport",
+    "metaDescription": "Collect a stamp for every partner pizzeria you visit.",
+    "intro": "Scan the QR code on the table at a partner pizzeria to collect its stamp.",
+    "unavailable": "The passport is not available right now.",
+    "login": "Log in to continue",
+    "emptyTitle": "No stamps yet",
+    "emptyBody": "Visit a partner pizzeria and scan the QR code on the table to earn your first stamp.",
+    "summary": "{stamps, plural, one {# stamp} other {# stamps}} · {countries, plural, one {# country} other {# countries}} · {verified} verified at a partner",
+    "seeAll": "Open my passport",
+    "manage": "Manage my passport",
+    "visibilityLabel": "Who can see my stamps",
+    "visibility": {
+      "public": "Everyone",
+      "members": "Logged-in members",
+      "private": "Only me"
+    },
+    "privacyNote": "Other people see the month only, and a new stamp shows up a few hours after your visit.",
+    "saveError": "Could not save. Try again.",
+    "checkInTitle": "Check in",
+    "checkInBody": "Share your location to confirm you are at the pizzeria.",
+    "checkInButton": "Check in here",
+    "locating": "Finding you…",
+    "locationNote": "Your exact location is used once to check the distance and is deleted after 30 days.",
+    "newStamp": "New stamp collected!",
+    "visitCounted": "Welcome back. Your visit is counted.",
+    "viewPassport": "See my passport",
+    "pendingTitle": "Check-in received",
+    "pendingBody": "A reviewer will confirm it soon. Your stamp appears once it is approved.",
+    "tryAgain": "Try again",
+    "errors": {
+      "generic": "Something went wrong. Try again.",
+      "not_allowed": "You cannot check in right now.",
+      "not_eligible": "This pizzeria is not part of the passport.",
+      "bad_qr": "This QR code is not valid. Ask the staff for a current one.",
+      "bad_location": "We could not read your location. Try again.",
+      "low_accuracy": "Your location is not precise enough. Step outside or turn on precise location and try again.",
+      "too_far": "You do not seem to be at the pizzeria.",
+      "daily_limit": "You reached today's stamp limit. Come back tomorrow.",
+      "not_found": "We could not find this pizzeria."
+    },
+    "alreadyCounted": "You already checked in here recently. Come back another day to add a visit."
   }
 }
