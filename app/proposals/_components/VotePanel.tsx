@@ -7,7 +7,6 @@ import { paperCard } from "@/app/ui/shared/Editorial";
 import {
     decodeVoteCode,
     encodeVoteCode,
-    flushQueuedVotes,
     loadBallot,
     prepareBallot,
     saveBallot,
@@ -53,7 +52,6 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
 
     useEffect(() => {
         if (!canVote) return;
-        flushQueuedVotes().then(() => setBallot(loadBallot(proposalId))).catch(() => {});
         const have = loadBallot(proposalId);
         if (have) {
             setBallot(have);
@@ -97,8 +95,8 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                 setBallot(b);
             }
             setBusy("sending");
-            const r = await submitVote(proposalId, b, choice, closesAt);
-            if (r.outcome === "ok" || r.outcome === "queued") setBallot(r.ballot);
+            const r = await submitVote(proposalId, b, choice);
+            if (r.outcome === "ok") setBallot(r.ballot);
             else setError(r.outcome === "closed" ? t("closed") : t("error"));
         } catch {
             setError(t("tokenError"));
@@ -131,7 +129,7 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
     if (!open) return <p className="m-0 text-sm text-foreground/70">{t("closed")}</p>;
     if (!eligible) return <p className="m-0 text-sm text-foreground/70">{t("notEligible")}</p>;
 
-    const current = ballot?.queued?.choice ?? ballot?.choice;
+    const current = ballot?.choice;
     const choiceLabel = current ? t(CHOICES.find((c) => c.choice === current)!.key) : "";
 
     return (
@@ -199,12 +197,7 @@ export function VotePanel({ proposalId, title, open, closesAt, eligible, tokenIs
                             {busy === "sending" ? t("working") : t("preparing")}
                         </p>
                     )}
-                    {ballot?.queued && busy === "" && (
-                        <p role="status" className="m-0 text-sm">
-                            {t("queued", { choice: choiceLabel })}
-                        </p>
-                    )}
-                    {!ballot?.queued && ballot?.choice && busy === "" && (
+                    {ballot?.choice && busy === "" && (
                         <p role="status" className="m-0 text-sm">
                             {t("recorded", { choice: choiceLabel, date: when })}
                         </p>

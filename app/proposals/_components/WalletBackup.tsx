@@ -38,14 +38,13 @@ function Inner({ proposalId, ballot, onRestored }: Props) {
                 token: ballot.token,
                 preparedMessage: ballot.preparedMessage,
                 signature: ballot.signature,
-                choice: ballot.choice,
             });
             const r = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}/backup`, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ blob }),
             });
-            setNote(r.ok ? t("backupDone") : t("backupFailed"));
+            setNote(r.ok ? t("backupDone") : r.status === 409 ? t("backupExists") : t("backupFailed"));
         } catch {
             setNote(t("backupFailed"));
         } finally {
@@ -70,7 +69,7 @@ function Inner({ proposalId, ballot, onRestored }: Props) {
                 setNote(t("restoreWrongWallet"));
                 return;
             }
-            onRestored({ token: p.token, preparedMessage: p.preparedMessage, signature: p.signature, choice: p.choice });
+            onRestored({ token: p.token, preparedMessage: p.preparedMessage, signature: p.signature });
             setNote(t("restoreDone"));
         } catch {
             setNote(t("restoreFailed"));

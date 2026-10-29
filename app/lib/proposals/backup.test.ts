@@ -1,11 +1,11 @@
 // @vitest-environment node
 import { describe, expect, it } from 'vitest'
-import { backupMessage, decryptBallot, encryptBallot, type BackupPayload } from './backup'
+import { BACKUP_BLOB_LENGTH, backupMessage, decryptBallot, encryptBallot, type BackupPayload } from './backup'
 
 // Stand-in for a 65-byte wallet signature (computed in the browser; never sent anywhere).
 const SIG = '0x' + 'ab'.repeat(32) + 'cd'.repeat(32) + '1b'
 const OTHER_SIG = '0x' + '12'.repeat(32) + '34'.repeat(32) + '1c'
-const payload: BackupPayload = { token: 'proposal-p1-3f0c2a8e', preparedMessage: 'UFJFUA', signature: 'U0lH', choice: 'NAY' }
+const payload: BackupPayload = { token: 'proposal-p1-3f0c2a8e', preparedMessage: 'UFJFUA', signature: 'U0lH' }
 
 describe('wallet-backed ballot backup', () => {
   it('uses a fixed, proposal-specific message to sign', () => {
@@ -43,6 +43,22 @@ describe('wallet-backed ballot backup', () => {
   it('refuses a backup whose token belongs to another proposal', async () => {
     const blob = await encryptBallot(SIG, 'p2', payload) // token says proposal-p1-...
     expect(await decryptBallot(SIG, 'p2', blob)).toBeNull()
+  })
+
+  it('every backup has the same exact length, whatever the contents', async () => {
+    const small = await encryptBallot(SIG, 'p1', { token: 'proposal-p1-a', preparedMessage: 'x', signature: 'y' })
+    const big = await encryptBallot(SIG, 'p1', { ...payload, signature: 'S'.repeat(700) })
+    expect(small.length).toBe(BACKUP_BLOB_LENGTH)
+    expect(big.length).toBe(BACKUP_BLOB_LENGTH)
+    expect(BACKUP_BLOB_LENGTH).toBe(2768)
+    await expect(encryptBallot(SIG, 'p1', { ...payload, signature: 'S'.repeat(3000) })).rejects.toThrow()
+  })
+
+  it('never stores a choice, even if the caller passes one', async () => {
+    const blob = await encryptBallot(SIG, 'p1', { ...payload, choice: 'NAY' } as unknown as BackupPayload)
+    const back = await decryptBallot(SIG, 'p1', blob)
+    expect(back).toEqual(payload)
+    expect(Object.keys(back!)).not.toContain('choice')
   })
 
   it('rejects a malformed signature', async () => {

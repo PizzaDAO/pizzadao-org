@@ -8,6 +8,7 @@
 import { getGuildRoles } from '@/app/lib/discord-channels'
 import { resolveBoxMafiaRoleId } from '@/app/lib/box-mafia'
 import { hasRole } from '@/app/lib/discord'
+import { listGuildMemberRoles } from '@/app/lib/mission-verify/bulk'
 import { getSetting } from '@/app/lib/settings'
 
 export interface RoleDeps {
@@ -40,32 +41,21 @@ export async function resolveVoterRoleId(): Promise<string | null> {
   return resolveBoxMafiaRoleId(await getGuildRoles())
 }
 
-const PAGE = 1000
-const MAX_PAGES = 50
-
-export async function listRoleHoldersStrict(roleId: string, env: NodeJS.ProcessEnv = process.env, fetchImpl: typeof fetch = fetch): Promise<string[]> {
-  const guildId = env.DISCORD_GUILD_ID
-  const botToken = env.DISCORD_BOT_TOKEN
-  if (!guildId || !botToken) throw new Error('discord not configured')
+/**
+ * Every member with the role, from the shared guild lister (rate-limit retry, up to 200 pages). It returns null
+ * unless the WHOLE listing was read, and that becomes an error here: a partial voter list must never be stored.
+ */
+export async function listRoleHolders(roleId: string, lister: typeof listGuildMemberRoles = listGuildMemberRoles): Promise<string[]> {
+  const members = await lister()
+  if (!members) throw new Error('guild member listing incomplete')
   const out: string[] = []
-  let after = '0'
-  for (let page = 0; page < MAX_PAGES; page++) {
-    const r = await fetchImpl(`https://discord.com/api/v10/guilds/${guildId}/members?limit=${PAGE}&after=${after}`, {
-      headers: { Authorization: `Bot ${botToken}` },
-      cache: 'no-store',
-    })
-    if (!r.ok) throw new Error(`discord members ${r.status}`)
-    const members = (await r.json()) as Array<{ roles: string[]; user: { id: string } }>
-    for (const m of members) if (m.roles.includes(roleId)) out.push(m.user.id)
-    if (members.length < PAGE) return out
-    after = members[members.length - 1].user.id
-  }
-  throw new Error('discord members listing too long')
+  for (const [id, roles] of members) if (roles.includes(roleId)) out.push(id)
+  return out
 }
 
 export const defaultRoleDeps: RoleDeps = {
   voterRoleId: resolveVoterRoleId,
-  listRoleHolders: (roleId) => listRoleHoldersStrict(roleId),
+  listRoleHolders: (roleId) => listRoleHolders(roleId),
 }
 
 /** Live check for a proposer: holds the voter role right now. Fails closed. */

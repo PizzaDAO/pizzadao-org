@@ -5,7 +5,8 @@
 import { prisma } from '@/app/lib/db'
 import { DRAFT_RETRY_MS } from './constants'
 import { announceOpen, announceResult, type PostDeps, defaultPostDeps } from './discord'
-import { openProposal, settleProposal } from './store'
+import type { PendingStore } from './pending'
+import { drainPending, openProposal, settleProposal } from './store'
 
 /** Open a DRAFT proposal, then post it. Never throws: a failed open leaves a DRAFT that the cron retries. */
 export async function openAndAnnounce(id: string, deps: PostDeps = defaultPostDeps): Promise<void> {
@@ -20,6 +21,8 @@ export async function openAndAnnounce(id: string, deps: PostDeps = defaultPostDe
 export interface CronResult {
   opened: number
   settled: number
+  /** Pending votes moved into the ballot table for proposals still open. */
+  drained: number
   openPosts: number
   resultPosts: number
 }
@@ -27,8 +30,8 @@ export interface CronResult {
 /** Most drafts opened per run (each takes a full eligibility snapshot). */
 const MAX_OPENS_PER_RUN = 3
 
-export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = defaultPostDeps): Promise<CronResult> {
-  const out: CronResult = { opened: 0, settled: 0, openPosts: 0, resultPosts: 0 }
+export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = defaultPostDeps, opts: { pending?: PendingStore | null } = {}): Promise<CronResult> {
+  const out: CronResult = { opened: 0, settled: 0, drained: 0, openPosts: 0, resultPosts: 0 }
 
   const drafts: Array<{ id: string }> = await prisma.proposal.findMany({
     where: { status: 'DRAFT', createdAt: { lte: new Date(now.getTime() - DRAFT_RETRY_MS) } },
@@ -48,9 +51,19 @@ export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = 
   const due: Array<{ id: string }> = await prisma.proposal.findMany({ where: { status: 'OPEN', closesAt: { lte: now } }, select: { id: true } })
   for (const p of due) {
     try {
-      if ((await settleProposal(p.id, now)).ok) out.settled++
+      if ((await settleProposal(p.id, now, { pending: opts.pending })).ok) out.settled++
     } catch (e) {
       console.error('[proposals] settle failed:', (e as Error)?.name)
+    }
+  }
+
+  // Proposals still open: move their pending votes into the table (one sorted transaction each).
+  const stillOpen: Array<{ id: string }> = await prisma.proposal.findMany({ where: { status: 'OPEN' }, select: { id: true } })
+  for (const p of stillOpen) {
+    try {
+      out.drained += await drainPending(p.id, { pending: opts.pending })
+    } catch (e) {
+      console.error('[proposals] drain failed:', (e as Error)?.name)
     }
   }
 

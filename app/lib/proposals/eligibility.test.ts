@@ -4,8 +4,9 @@ import { describe, expect, it, vi } from 'vitest'
 vi.mock('@/app/lib/discord-channels', () => ({ getGuildRoles: vi.fn() }))
 vi.mock('@/app/lib/discord', () => ({ hasRole: vi.fn() }))
 vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn() }))
+vi.mock('@/app/lib/mission-verify/bulk', () => ({ listGuildMemberRoles: vi.fn() }))
 
-import { listRoleHoldersStrict, snapshotRoleHolders, type RoleDeps } from './eligibility'
+import { listRoleHolders, snapshotRoleHolders, type RoleDeps } from './eligibility'
 
 const deps = (o: Partial<RoleDeps> = {}): RoleDeps => ({
   voterRoleId: async () => '700000000000000001',
@@ -24,24 +25,14 @@ describe('voter role snapshot', () => {
   })
 })
 
-describe('listRoleHoldersStrict', () => {
-  const env = { DISCORD_GUILD_ID: 'g1', DISCORD_BOT_TOKEN: 'tok' } as unknown as NodeJS.ProcessEnv
-  const member = (id: string, roles: string[]) => ({ user: { id }, roles })
-  const page = (members: unknown[], ok = true) => ({ ok, status: ok ? 200 : 500, json: async () => members }) as Response
-
-  it('keeps only members with the role and follows pages', async () => {
-    const first = Array.from({ length: 1000 }, (_, i) => member(String(1000 + i), i === 5 ? ['r'] : []))
-    const fetchImpl = vi.fn()
-      .mockResolvedValueOnce(page(first))
-      .mockResolvedValueOnce(page([member('9999', ['r']), member('9998', ['x'])]))
-    expect(await listRoleHoldersStrict('r', env, fetchImpl as unknown as typeof fetch)).toEqual(['1005', '9999'])
-    expect(fetchImpl).toHaveBeenCalledTimes(2)
+describe('listRoleHolders (through the shared guild lister)', () => {
+  it('keeps only members with the role', async () => {
+    const lister = vi.fn(async () => new Map([['1', ['r']], ['2', ['x']], ['3', ['r', 'x']], ['4', []]]))
+    expect(await listRoleHolders('r', lister)).toEqual(['1', '3'])
+    expect(lister).toHaveBeenCalledTimes(1)
   })
 
-  it('throws on a Discord error mid-listing instead of returning a partial list', async () => {
-    const first = Array.from({ length: 1000 }, (_, i) => member(String(1000 + i), ['r']))
-    const fetchImpl = vi.fn().mockResolvedValueOnce(page(first)).mockResolvedValueOnce(page([], false))
-    await expect(listRoleHoldersStrict('r', env, fetchImpl as unknown as typeof fetch)).rejects.toThrow()
-    await expect(listRoleHoldersStrict('r', {} as unknown as NodeJS.ProcessEnv)).rejects.toThrow()
+  it('throws when the lister could not read the whole guild (null), never a partial list', async () => {
+    await expect(listRoleHolders('r', vi.fn(async () => null))).rejects.toThrow(/incomplete/)
   })
 })

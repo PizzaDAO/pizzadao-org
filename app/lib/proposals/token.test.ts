@@ -46,8 +46,9 @@ describe('blind ballot tokens (per-proposal keys)', () => {
 
   it('refuses garbage blinded messages and missing wrap secret', async () => {
     await expect(signBlinded(P, 'AAAA', env)).rejects.toThrow()
-    const b = await startBlind(P.keyPublicPem, 'propP')
-    await expect(signBlinded(P, b.blinded, { VERCEL_ENV: 'production' } as unknown as NodeJS.ProcessEnv)).rejects.toBeInstanceOf(KeyConfigError)
+    const fresh = await makeProposalKey('propFresh', env) // not in the key cache
+    const b = await startBlind(fresh.keyPublicPem, 'propFresh')
+    await expect(signBlinded(fresh, b.blinded, { VERCEL_ENV: 'production' } as unknown as NodeJS.ProcessEnv)).rejects.toBeInstanceOf(KeyConfigError)
   })
 
   it('never uses the legacy RSA_PRIVATE_KEY_PEM', async () => {

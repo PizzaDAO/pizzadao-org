@@ -47,7 +47,7 @@ export async function POST(request: Request, ctx: { params: Promise<{ id: string
         amountUsdCents: r.amountUsdCents,
         capUsdCents: Math.round(policy.onApprovalCapUsd * 100),
         excludeRequestId: id,
-      })
+      }, tx)
       if (!link.ok) return { status: STATUS[link.error], error: link.error }
       await tx.paymentRequest.update({ where: { id }, data: { proposalId, proposalUrl: null } })
       await tx.paymentDecision.create({

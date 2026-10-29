@@ -27,5 +27,5 @@ export const PUT = safe('backup-put', async (request: Request, { params }: Route
   const body = (await request.json().catch(() => null)) as { blob?: unknown } | null
   const r = await saveBallotBlob(id, auth.session.discordId, body?.blob)
   if (r === 'ok') return out({ ok: true })
-  return out({ error: r }, r === 'not_eligible' ? 403 : 400)
+  return out({ error: r }, r === 'not_eligible' ? 403 : r === 'exists' ? 409 : 400)
 })

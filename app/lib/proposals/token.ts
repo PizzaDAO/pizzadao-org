@@ -34,16 +34,23 @@ export function ballotKey(proposalId: string, token: string): Promise<string> {
   return hashToken(`${proposalId}:${token}`)
 }
 
-const keyCache = new Map<string, Promise<CryptoKey>>()
-function cachedKey(kind: 'private' | 'public', pem: string): Promise<CryptoKey> {
-  const k = `${kind}:${pem}`
-  let p = keyCache.get(k)
-  if (!p) {
-    p = kind === 'private' ? importPrivateKey(pem) : importPublicKey(pem)
-    keyCache.set(k, p)
-    p.catch(() => keyCache.delete(k))
-  }
-  return p
+// Imported keys are cached per proposal id for a short time, in a small bounded map. The unwrapped private key text is
+// never a map key and is not kept: only the (non-extractable-by-us) imported CryptoKey is.
+const KEY_TTL_MS = { private: 60_000, public: 5 * 60_000 } as const
+const KEY_CACHE_MAX = 32
+const keyCache = new Map<string, { key: Promise<CryptoKey>; expires: number }>()
+function cachedKey(kind: 'private' | 'public', proposalId: string, fingerprint: string, load: () => Promise<string>): Promise<CryptoKey> {
+  // The proposal id plus a tail of the stored key material, so a changed key can never hit a stale entry.
+  const k = `${kind}:${proposalId}:${fingerprint.slice(-40)}`
+  const now = Date.now()
+  const hit = keyCache.get(k)
+  if (hit && hit.expires > now) return hit.key
+  for (const [name, v] of keyCache) if (v.expires <= now) keyCache.delete(name)
+  while (keyCache.size >= KEY_CACHE_MAX) keyCache.delete(keyCache.keys().next().value as string)
+  const key = load().then((pem) => (kind === 'private' ? importPrivateKey(pem) : importPublicKey(pem)))
+  keyCache.set(k, { key, expires: now + KEY_TTL_MS[kind] })
+  key.catch(() => keyCache.delete(k))
+  return key
 }
 
 export class TokenConfigError extends Error {}
@@ -57,8 +64,8 @@ export async function signBlinded(
   if (!proposal.keyPrivateEnc) throw new TokenConfigError('proposal has no signing key')
   const blinded = fromBase64(blindedMessageB64)
   if (blinded.length < 128 || blinded.length > 1024) throw new Error('bad blinded message')
-  const pem = await unwrapPrivateKey(proposal.keyPrivateEnc, proposal.id, env)
-  const sig = await blindSign(await cachedKey('private', pem), blinded)
+  const enc = proposal.keyPrivateEnc
+  const sig = await blindSign(await cachedKey('private', proposal.id, enc, () => unwrapPrivateKey(enc, proposal.id, env)), blinded)
   return Buffer.from(sig).toString('base64')
 }
 
@@ -85,7 +92,8 @@ export async function verifyBallotCredentials(
   const binding = validateProposalTokenBinding(c.token, proposal.id, prepared)
   if (binding) return binding
   try {
-    const key = await cachedKey('public', proposal.keyPublicPem)
+    const pem = proposal.keyPublicPem
+    const key = await cachedKey('public', proposal.id, pem.replace(/\s/g, '').slice(0, -30), async () => pem)
     const ok = await crypto.subtle.verify({ name: 'RSA-PSS', saltLength: SALT_LENGTH_SHA384 }, key, new Uint8Array(sig), new Uint8Array(prepared))
     return ok ? null : 'Invalid signature'
   } catch {

@@ -14,6 +14,7 @@ vi.mock('@/app/lib/discord', () => ({ hasRole: vi.fn() }))
 
 import { SETTINGS } from '@/app/lib/settings/registry'
 import { resolvePaymentPolicy } from '@/app/lib/payments/policy'
+import { BACKUP_BLOB_LENGTH } from './backup'
 import { castBallot, createProposal, getBallotBlob, getPublicKey, issueToken, openProposal, saveBallotBlob, settleProposal } from './store'
 import { makeFakeDb, makeProposalKey, mintCredentials, startBlind, testEnv } from './test-utils'
 import type { ProposalRules } from './rules'
@@ -225,9 +226,10 @@ describe('ballots are secret', () => {
 })
 
 describe('wallet backup storage', () => {
-  it('stores only the opaque ciphertext for an eligible voter, and returns it to them alone', async () => {
+  const blob = 'A'.repeat(BACKUP_BLOB_LENGTH)
+
+  it('stores only the opaque fixed-length ciphertext for an eligible voter, and returns it to them alone', async () => {
     const id = await openOne()
-    const blob = 'A'.repeat(200)
     expect(await saveBallotBlob(id, 'v1', blob)).toBe('ok')
     expect(await getBallotBlob(id, 'v1')).toEqual({ eligible: true, blob })
     expect(await getBallotBlob(id, 'v2')).toEqual({ eligible: true, blob: null })
@@ -235,11 +237,19 @@ describe('wallet backup storage', () => {
     expect(await getBallotBlob(id, 'outsider')).toEqual({ eligible: false, blob: null })
   })
 
-  it('rejects anything that is not a plausible ciphertext (so a key or code is not stored by mistake)', async () => {
+  it('is written once: a second backup never overwrites the first', async () => {
     const id = await openOne()
-    for (const bad of [null, 5, 'short', 'has spaces in it that is long enough to pass', '{"token":"x"}'.repeat(20), 'A'.repeat(7000)]) {
+    expect(await saveBallotBlob(id, 'v1', blob)).toBe('ok')
+    expect(await saveBallotBlob(id, 'v1', 'B'.repeat(BACKUP_BLOB_LENGTH))).toBe('exists')
+    expect((await getBallotBlob(id, 'v1')).blob).toBe(blob)
+  })
+
+  it('accepts only the one exact length (so a key, a code or anything else cannot be stored)', async () => {
+    const id = await openOne()
+    for (const bad of [null, 5, 'short', 'A'.repeat(BACKUP_BLOB_LENGTH - 1), 'A'.repeat(BACKUP_BLOB_LENGTH + 1), 'A'.repeat(BACKUP_BLOB_LENGTH - 1) + '+', ' '.repeat(BACKUP_BLOB_LENGTH)]) {
       expect(await saveBallotBlob(id, 'v1', bad)).toBe('bad_request')
     }
+    expect((await getBallotBlob(id, 'v1')).blob).toBeNull()
   })
 })
 

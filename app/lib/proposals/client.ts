@@ -4,16 +4,15 @@
  * Browser side of secret voting. The ballot (token + blind signature) lives in this browser, per proposal.
  *
  *  - prepareBallot(): runs when the member is on the site (NOT when they vote): checks the proposal's public key
- *    (fingerprint pinned, modulus >= 2048), blinds a fresh token, asks the server to sign it (once per member),
+ *    (fingerprint checked against the page and, when the member came from the Discord post, the fingerprint in its link;
+ *    pinned after first sight; modulus >= 2048), blinds a fresh token, asks the server to sign it (once per member),
  *    unblinds, keeps it in localStorage;
- *  - submitVote(): a vote made while the token is young is queued and sent later (see queue.ts), so the token request
- *    and the vote request are far apart in time;
+ *  - submitVote(): sends the vote at once; the server mixes votes before they reach the ballot table (pending.ts);
  *  - castVote(): sends token + choice with no cookies and no referrer to the unauthenticated vote endpoint;
  *  - the "vote code" is the ballot encoded as text, to change a vote from another browser.
  */
 import { blind, finalize, fromBase64, importPublicKey, prepareMessage, toBase64 } from '@/utils/blindRsa.client'
 import { fingerprintOfPem, modulusOk } from './fingerprint'
-import { planVoteSend } from './queue'
 
 export type Choice = 'AYE' | 'NAY' | 'ABSTAIN'
 
@@ -23,10 +22,8 @@ export interface Ballot {
   signature: string
   /** What this browser last sent (display only). */
   choice?: Choice
-  /** When the token was made here (ms). Absent for a ballot restored from a code or backup, which is already old. */
+  /** When the token was made here (ms). */
   preparedAt?: number
-  /** A vote waiting for its send time. */
-  queued?: { choice: Choice; sendAt: number }
 }
 
 const PREFIX = 'pizzadao:proposal-ballot:'
@@ -71,14 +68,33 @@ export function decodeVoteCode(code: string, proposalId: string): Ballot | null 
   }
 }
 
-/** Fetch the proposal's key and check it: same fingerprint as the page showed, never changed since first seen, RSA >= 2048. */
+const squash = (fp: string) => fp.replace(/\s+/g, '').toLowerCase()
+
+/**
+ * The fingerprint carried by the link in the Discord post (`?fp=...`), if this page was opened from it. It reaches the
+ * browser without passing through this server's page, so it is the independent half of the check (a member who did not
+ * come from Discord can compare the fingerprint on the page with the post by eye).
+ */
+export function discordFingerprintFromUrl(search: string): string | null {
+  const v = new URLSearchParams(search).get('fp')
+  return v && /^[0-9a-fA-F ]{32,40}$/.test(v) ? v : null
+}
+
+/** Fetch the proposal's key and check it: same fingerprint as the page and the Discord link showed, never changed since first seen, RSA >= 2048. */
 async function trustedPublicKey(proposalId: string, pageFingerprint?: string | null): Promise<string> {
   const res = await fetch(`/api/proposals/${encodeURIComponent(proposalId)}/pubkey`, { cache: 'no-store' })
   if (!res.ok) throw new Error('key')
   const { publicKey, fingerprint } = (await res.json()) as { publicKey: string; fingerprint: string }
   const computed = await fingerprintOfPem(publicKey)
   if (computed !== fingerprint) throw new Error('key fingerprint mismatch')
-  if (pageFingerprint && pageFingerprint !== computed) throw new Error('key differs from the proposal page')
+  if (pageFingerprint && squash(pageFingerprint) !== squash(computed)) throw new Error('key differs from the proposal page')
+  let fromDiscord: string | null = null
+  try {
+    fromDiscord = discordFingerprintFromUrl(window.location.search)
+  } catch {
+    /* no window */
+  }
+  if (fromDiscord && squash(fromDiscord) !== squash(computed)) throw new Error('key differs from the Discord post')
   if (!(await modulusOk(publicKey))) throw new Error('key too small')
   try {
     const pinned = localStorage.getItem(pinKey(proposalId))
@@ -147,51 +163,16 @@ export async function castVote(proposalId: string, ballot: Ballot, choice: Choic
   }
 }
 
-export type SubmitOutcome = VoteOutcome | 'queued'
-
-/** Send the vote now if the token is old enough, otherwise queue it and send it later (here, or on a later visit). */
-export async function submitVote(proposalId: string, ballot: Ballot, choice: Choice, closesAt: string | null, now = Date.now()): Promise<{ outcome: SubmitOutcome; ballot: Ballot }> {
-  // A token without preparedAt came from a code or backup: it is already old.
-  const plan = planVoteSend({ now, preparedAt: ballot.preparedAt ?? 0, closesAt: closesAt ? new Date(closesAt).getTime() : null, rand: Math.random() })
-  if (!plan.immediate) {
-    const next = { ...ballot, queued: { choice, sendAt: plan.sendAt } }
-    saveBallot(proposalId, next)
-    return { outcome: 'queued', ballot: next }
-  }
+/**
+ * Send the vote now. (There is no client-side delay: the server mixes votes before they reach the ballot table, see
+ * pending.ts. "ok" means the server durably recorded the vote.)
+ */
+export async function submitVote(proposalId: string, ballot: Ballot, choice: Choice): Promise<{ outcome: VoteOutcome; ballot: Ballot }> {
   const outcome = await castVote(proposalId, ballot, choice)
   if (outcome !== 'ok') return { outcome, ballot }
   const next: Ballot = { ...ballot, choice }
-  delete next.queued
   saveBallot(proposalId, next)
   return { outcome, ballot: next }
-}
-
-/** Send any queued vote whose time has come. Called on load and every minute by the site-wide component. */
-export async function flushQueuedVotes(now = Date.now()): Promise<string[]> {
-  const sent: string[] = []
-  let keys: string[] = []
-  try {
-    keys = Object.keys(localStorage).filter((k) => k.startsWith(PREFIX))
-  } catch {
-    return sent
-  }
-  for (const k of keys) {
-    const id = k.slice(PREFIX.length)
-    const b = loadBallot(id)
-    if (!b?.queued || b.queued.sendAt > now) continue
-    const outcome = await castVote(id, b, b.queued.choice)
-    if (outcome === 'ok') {
-      const next: Ballot = { ...b, choice: b.queued.choice }
-      delete next.queued
-      saveBallot(id, next)
-      sent.push(id)
-    } else if (outcome === 'closed' || outcome === 'invalid') {
-      const next: Ballot = { ...b }
-      delete next.queued
-      saveBallot(id, next)
-    }
-  }
-  return sent
 }
 
 /** Share (where the browser supports it) or copy the vote code. Returns how it was handled. */

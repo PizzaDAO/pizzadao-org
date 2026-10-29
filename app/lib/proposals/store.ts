@@ -12,15 +12,21 @@
  */
 import { prisma } from '@/app/lib/db'
 import { COUNT_ABSTAINS, DAY_MS, DRAFT_RETRY_MS, REQUIRE_AYES_OVER_NAYS } from './constants'
+import { BACKUP_BLOB_LENGTH } from './backup'
 import { defaultRoleDeps, snapshotRoleHolders, type RoleDeps } from './eligibility'
 import { generateProposalKeyPair, wrapPrivateKey } from './keys'
 import { ayesNeededFor, loadProposalRules, type ProposalRules } from './rules'
 import { countBallots, tallyProposal } from './tally'
+import { defaultPendingStore, sortedByHash, type PendingStore } from './pending'
 import { ballotKey, signBlinded, verifyBallotCredentials, type BallotCredentials } from './token'
 import type { NewProposal } from './validate'
 
 type Tx = Parameters<Parameters<typeof prisma.$transaction>[0]>[0]
 export type Choice = 'AYE' | 'NAY' | 'ABSTAIN'
+
+/** `undefined` = use Redis when configured; `null` = no Redis (write straight to the database). */
+type PendingOpt = PendingStore | null | undefined
+const pendingFor = (o: PendingOpt): PendingStore | null => (o === undefined ? defaultPendingStore() : o)
 export const CHOICES: readonly Choice[] = ['AYE', 'NAY', 'ABSTAIN']
 
 /** Row lock so a vote and a settle on the same proposal serialize. */
@@ -174,16 +180,18 @@ export async function issueToken(
 
 // ----------------------------------------------------------- ballot backup
 
-const MAX_BLOB = 6000
-
 /**
  * Optional wallet-encrypted ballot backup. The server stores ciphertext only: the key is derived in the browser
  * from a wallet signature that never leaves it. Replaces any earlier backup.
  */
-export async function saveBallotBlob(proposalId: string, discordId: string, blob: unknown): Promise<'ok' | 'not_eligible' | 'bad_request'> {
-  if (typeof blob !== 'string' || blob.length < 20 || blob.length > MAX_BLOB || !/^[A-Za-z0-9+/_=-]+$/.test(blob)) return 'bad_request'
-  const r = await prisma.proposalVoter.updateMany({ where: { proposalId, discordId }, data: { ballotBlob: blob } })
-  return r.count === 1 ? 'ok' : 'not_eligible'
+export async function saveBallotBlob(proposalId: string, discordId: string, blob: unknown): Promise<'ok' | 'not_eligible' | 'bad_request' | 'exists'> {
+  // One exact length (the browser pads before encrypting), so the size says nothing about the contents.
+  if (typeof blob !== 'string' || blob.length !== BACKUP_BLOB_LENGTH || !/^[A-Za-z0-9_-]+$/.test(blob)) return 'bad_request'
+  // Written once: the backup holds the ballot credentials only, which never change, so there is nothing to overwrite.
+  const r = await prisma.proposalVoter.updateMany({ where: { proposalId, discordId, ballotBlob: null }, data: { ballotBlob: blob } })
+  if (r.count === 1) return 'ok'
+  const v = await prisma.proposalVoter.findUnique({ where: { proposalId_discordId: { proposalId, discordId } }, select: { ballotBlob: true } })
+  return v ? 'exists' : 'not_eligible'
 }
 
 export async function getBallotBlob(proposalId: string, discordId: string): Promise<{ eligible: boolean; blob: string | null }> {
@@ -195,17 +203,21 @@ export async function getBallotBlob(proposalId: string, discordId: string): Prom
 
 export type BallotResult =
   | { ok: true }
-  | { ok: false; code: 'not_found' | 'closed' | 'bad_request' | 'invalid_token' | 'not_production' }
+  | { ok: false; code: 'not_found' | 'closed' | 'bad_request' | 'invalid_token' | 'not_production' | 'unavailable' }
 
 /**
  * Record (or replace) a ballot. No session, no member id: the signature on the token is the only credential.
  * The ballot is keyed by hash(proposalId + token), so the same token replaces the choice until the proposal closes.
+ *
+ * With Redis configured the vote is written to the pending hash (see pending.ts) and `ok` means that write succeeded;
+ * the hourly cron (and settle) move pending votes into the table in one sorted transaction. If that write fails the
+ * answer is `unavailable` and the browser retries; nothing is half-saved. Without Redis the row is written directly.
  */
 export async function castBallot(
   proposalId: string,
   creds: BallotCredentials,
   choice: unknown,
-  opts: { now?: Date; env?: NodeJS.ProcessEnv } = {},
+  opts: { now?: Date; env?: NodeJS.ProcessEnv; pending?: PendingOpt } = {},
 ): Promise<BallotResult> {
   if (!isProduction(opts.env ?? process.env)) return { ok: false, code: 'not_production' }
   const now = opts.now ?? new Date()
@@ -219,6 +231,15 @@ export async function castBallot(
   const bad = await verifyBallotCredentials(p, creds)
   if (bad) return { ok: false, code: 'invalid_token' }
   const tokenHash = await ballotKey(proposalId, creds.token)
+  const store = pendingFor(opts.pending)
+  if (store) {
+    try {
+      await store.put(proposalId, tokenHash, choice as Choice)
+    } catch {
+      return { ok: false, code: 'unavailable' }
+    }
+    return { ok: true }
+  }
   return prisma.$transaction(async (tx) => {
     // Re-check under the row lock: a settle that already counted must not be followed by a late vote.
     await lockProposal(tx, proposalId)
@@ -239,9 +260,46 @@ export type SettleResult =
   | { ok: true; outcome: 'passed' | 'failed'; ayes: number; nays: number; abstains: number }
   | { ok: false; code: 'not_found' | 'not_open' | 'not_due' }
 
-/** Count a proposal that is due. Idempotent: only an OPEN proposal past closesAt settles, once. */
-export async function settleProposal(id: string, now: Date = new Date()): Promise<SettleResult> {
-  return prisma.$transaction(async (tx) => {
+type BallotWrite = { tokenHash: string; choice: Choice }
+
+/** Upsert pending ballots in tokenHash order (so insertion order carries no vote-time information). */
+async function writeBallots(tx: Tx, proposalId: string, entries: readonly BallotWrite[]) {
+  for (const e of sortedByHash(entries)) {
+    await tx.proposalBallot.upsert({
+      where: { proposalId_tokenHash: { proposalId, tokenHash: e.tokenHash } },
+      create: { proposalId, tokenHash: e.tokenHash, choice: e.choice },
+      update: { choice: e.choice },
+    })
+  }
+}
+
+/**
+ * Move a proposal's pending votes into the ballot table in ONE transaction (sorted by tokenHash), then delete only the
+ * pending fields that still hold what was moved. Safe to repeat or to interrupt: a crash before the delete means the
+ * next run re-upserts the same values; a vote changed meanwhile is left in place for the next run.
+ */
+export async function drainPending(proposalId: string, opts: { pending?: PendingOpt } = {}): Promise<number> {
+  const store = pendingFor(opts.pending)
+  if (!store) return 0
+  const entries = await store.all(proposalId)
+  if (entries.length === 0) return 0
+  const written = await prisma.$transaction(async (tx) => {
+    await lockProposal(tx, proposalId)
+    const p = await tx.proposal.findUnique({ where: { id: proposalId }, select: { status: true } })
+    if (!p || p.status !== 'OPEN') return false
+    await writeBallots(tx, proposalId, entries)
+    return true
+  })
+  if (!written) return 0
+  await store.removeIfUnchanged(proposalId, entries)
+  return entries.length
+}
+
+/** Count a proposal that is due. Idempotent: only an OPEN proposal past closesAt settles, once. Pending votes are moved in first, under the lock. */
+export async function settleProposal(id: string, now: Date = new Date(), opts: { pending?: PendingOpt } = {}): Promise<SettleResult> {
+  const store = pendingFor(opts.pending)
+  let drained: BallotWrite[] = []
+  const result = await prisma.$transaction(async (tx) => {
     await lockProposal(tx, id)
     const p = await tx.proposal.findUnique({
       where: { id },
@@ -250,6 +308,9 @@ export async function settleProposal(id: string, now: Date = new Date()): Promis
     if (!p) return { ok: false as const, code: 'not_found' as const }
     if (p.status !== 'OPEN' || !p.closesAt || p.ayesNeeded == null) return { ok: false as const, code: 'not_open' as const }
     if (now < p.closesAt) return { ok: false as const, code: 'not_due' as const }
+    // Votes are only accepted before closesAt, so everything pending belongs in this count.
+    drained = store ? await store.all(id) : []
+    if (drained.length) await writeBallots(tx, id, drained)
     const ballots = await tx.proposalBallot.findMany({ where: { proposalId: id }, select: { choice: true } })
     const t = tallyProposal(countBallots(ballots), { ayesNeeded: p.ayesNeeded, countAbstains: p.countAbstains, requireAyesOverNays: p.requireAyesOverNays }, now, p.closesAt)
     if (t.outcome === 'pending') return { ok: false as const, code: 'not_due' as const }
@@ -261,6 +322,9 @@ export async function settleProposal(id: string, now: Date = new Date()): Promis
     await logEvent(tx, id, 'CLOSED', null, { outcome, ayes: t.ayes, nays: t.nays, abstains: t.abstains })
     return { ok: true as const, outcome, ayes: t.ayes, nays: t.nays, abstains: t.abstains }
   })
+  // After the commit; if this fails the closed proposal just keeps stale pending fields that nothing reads.
+  if (result.ok && store && drained.length) await store.removeIfUnchanged(id, drained).catch(() => {})
+  return result
 }
 
 // ------------------------------------------------------------------- reads

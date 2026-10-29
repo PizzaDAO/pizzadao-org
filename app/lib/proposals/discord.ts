@@ -45,7 +45,8 @@ export function openMessage(
     p.kind === 'FUNDING' && p.amountUsdCents != null ? `Asking for ${usd(p.amountUsdCents)}.` : null,
     p.ayesNeeded != null ? `Needs ${p.ayesNeeded} ayes plus abstains, and more ayes than nays.` : null,
     `Voting closes <t:${Math.floor(p.closesAt.getTime() / 1000)}:F>. Votes are secret and you can change yours until then.`,
-    `Vote: ${url}/proposals/${p.id}`,
+    // The link carries the key fingerprint, so a member who opens it from Discord has the browser check the key against it.
+    `Vote: ${url}/proposals/${p.id}${p.keyFingerprint ? `?fp=${p.keyFingerprint.replace(/\s+/g, '')}` : ''}`,
     p.keyFingerprint ? `Voting key fingerprint (check it matches the proposal page): ${p.keyFingerprint}` : null,
   ]
   return {

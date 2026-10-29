@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { useTranslations } from "next-intl";
 import { useEffect, useState } from "react";
-import { flushQueuedVotes, loadBallot, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
+import { loadBallot, prepareBallot, shareVoteCode } from "@/app/lib/proposals/client";
 
 type Ready = { id: string; title: string };
 
@@ -11,8 +11,8 @@ const CHECKED_KEY = "pizzadao:proposals-checked";
 const CHECK_EVERY_MS = 5 * 60 * 1000;
 
 /**
- * Mounted once in the root layout. On any page, for a signed-in member: sends votes that were queued, and (on devices
- * with a mouse or trackpad) quietly prepares a ballot token for each open proposal the member can vote on, so the token
+ * Mounted once in the root layout. On any page, for a signed-in member, on devices
+ * with a mouse or trackpad, quietly prepares a ballot token for each open proposal the member can vote on, so the token
  * request happens long before any vote. On phones (coarse pointer) nothing is prepared here: a token made where the
  * member cannot easily save it is at risk, so the proposal page prepares it and shows the save prompt right away.
  * Renders a small card with a Save prompt for each ballot it just prepared; nothing otherwise.
@@ -24,9 +24,6 @@ export function GlobalBallotPreparer() {
 
     useEffect(() => {
         let cancelled = false;
-        const tick = () => flushQueuedVotes().catch(() => {});
-        tick();
-        const timer = setInterval(tick, 60_000);
         (async () => {
             try {
                 const last = Number(sessionStorage.getItem(CHECKED_KEY) || 0);
@@ -51,7 +48,6 @@ export function GlobalBallotPreparer() {
         })();
         return () => {
             cancelled = true;
-            clearInterval(timer);
         };
     }, []);
 

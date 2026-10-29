@@ -37,7 +37,6 @@ import { POST as createPOST } from './route'
 import { POST as tokenPOST } from './[id]/token/route'
 import { POST as votePOST } from './[id]/vote/route'
 import { GET as pubkeyGET } from './[id]/pubkey/route'
-import { GET as backupGET, PUT as backupPUT } from './[id]/backup/route'
 
 const json = (body: unknown, headers: Record<string, string> = {}) =>
   new Request('https://app.pizzadao.org/api/proposals/p1/x', {

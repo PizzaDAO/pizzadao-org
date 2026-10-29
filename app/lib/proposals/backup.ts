@@ -10,12 +10,19 @@
  */
 
 export interface BackupPayload {
-  /** The ballot token, its prepared message and unblinded signature (all that is needed to vote), and the last choice. */
+  /** The ballot token, its prepared message and unblinded signature: all that is needed to vote. Never the choice. */
   token: string
   preparedMessage: string
   signature: string
-  choice?: 'AYE' | 'NAY' | 'ABSTAIN'
 }
+
+/**
+ * The plaintext is padded to this many bytes before encryption, so every backup has the same length and the server can
+ * require exactly that length (the size reveals nothing about the contents, and it bounds what can be stored).
+ */
+export const BACKUP_PLAINTEXT_BYTES = 2048
+/** base64url length (no padding) of iv (12) + padded plaintext + GCM tag (16). */
+export const BACKUP_BLOB_LENGTH = Math.ceil(((12 + BACKUP_PLAINTEXT_BYTES + 16) * 4) / 3)
 
 export const backupMessage = (proposalId: string) => `PizzaDAO ballot backup v1 – ${proposalId}`
 
@@ -58,8 +65,13 @@ async function deriveKey(walletSignatureHex: string, proposalId: string): Promis
 /** base64url(iv || ciphertext). Safe to send to the server: it holds no key material. */
 export async function encryptBallot(walletSignatureHex: string, proposalId: string, payload: BackupPayload): Promise<string> {
   const iv = crypto.getRandomValues(new Uint8Array(12))
+  // Only the three credentials go in, whatever else the caller's object carries.
+  const json = enc.encode(JSON.stringify({ token: payload.token, preparedMessage: payload.preparedMessage, signature: payload.signature }))
+  if (json.length > BACKUP_PLAINTEXT_BYTES) throw new Error('backup payload too large')
+  const padded = new Uint8Array(BACKUP_PLAINTEXT_BYTES).fill(0x20) // trailing spaces: valid JSON whitespace
+  padded.set(json)
   const ct = new Uint8Array(
-    await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(proposalId) }, await deriveKey(walletSignatureHex, proposalId), enc.encode(JSON.stringify(payload))),
+    await crypto.subtle.encrypt({ name: 'AES-GCM', iv, additionalData: enc.encode(proposalId) }, await deriveKey(walletSignatureHex, proposalId), padded),
   )
   const out = new Uint8Array(iv.length + ct.length)
   out.set(iv)
@@ -79,7 +91,7 @@ export async function decryptBallot(walletSignatureHex: string, proposalId: stri
     const o = JSON.parse(new TextDecoder().decode(pt)) as BackupPayload
     if (typeof o.token !== 'string' || typeof o.preparedMessage !== 'string' || typeof o.signature !== 'string') return null
     if (!o.token.startsWith(`proposal-${proposalId}-`)) return null
-    return o
+    return { token: o.token, preparedMessage: o.preparedMessage, signature: o.signature }
   } catch {
     return null
   }

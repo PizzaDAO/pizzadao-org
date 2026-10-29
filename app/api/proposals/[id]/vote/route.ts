@@ -7,7 +7,7 @@ import { TokenConfigError } from '@/app/lib/proposals/token'
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 
-const STATUS = { not_found: 404, closed: 409, bad_request: 400, invalid_token: 401, not_production: 404 } as const
+const STATUS = { not_found: 404, closed: 409, bad_request: 400, invalid_token: 401, not_production: 404, unavailable: 503 } as const
 
 /**
  * POST /api/proposals/[id]/vote — cast or change a secret vote. Body: { token, preparedMessage, signature, choice }.

@@ -105,3 +105,25 @@ export function makeFakeDb() {
   }
   return { db, state }
 }
+
+/** In-memory PendingStore, with switches to simulate Redis failing. */
+export function makeFakePending() {
+  const hashes = new Map<string, Map<string, string>>()
+  const state = { failPut: false, failRemove: false, removed: 0 }
+  const store = {
+    async put(proposalId: string, tokenHash: string, choice: 'AYE' | 'NAY' | 'ABSTAIN') {
+      if (state.failPut) throw new Error('redis down')
+      if (!hashes.has(proposalId)) hashes.set(proposalId, new Map())
+      hashes.get(proposalId)!.set(tokenHash, choice)
+    },
+    async all(proposalId: string) {
+      return [...(hashes.get(proposalId) ?? new Map<string, string>())].map(([tokenHash, choice]) => ({ tokenHash, choice: choice as 'AYE' | 'NAY' | 'ABSTAIN' }))
+    },
+    async removeIfUnchanged(proposalId: string, entries: ReadonlyArray<{ tokenHash: string; choice: string }>) {
+      if (state.failRemove) throw new Error('redis down')
+      const h = hashes.get(proposalId)
+      for (const e of entries) if (h?.get(e.tokenHash) === e.choice) { h.delete(e.tokenHash); state.removed++ }
+    },
+  }
+  return { store, hashes, state }
+}

@@ -36,14 +36,15 @@ export function checkProposalLink(i: LinkInput, proposal: LinkableProposal | nul
   return null
 }
 
-export async function validatePaymentProposal(i: LinkInput): Promise<{ ok: true; proposalId: string | null } | { ok: false; error: LinkError }> {
+/** `db` lets a caller run the reads inside its own transaction (the reviewer link action holds a lock there). */
+export async function validatePaymentProposal(i: LinkInput, db: Pick<typeof prisma, 'proposal' | 'paymentRequest'> = prisma): Promise<{ ok: true; proposalId: string | null } | { ok: false; error: LinkError }> {
   if (!i.proposalId) {
     const e = checkProposalLink(i, null, 0)
     return e ? { ok: false, error: e } : { ok: true, proposalId: null }
   }
   const [proposal, others] = await Promise.all([
-    prisma.proposal.findUnique({ where: { id: i.proposalId }, select: { kind: true, status: true, proposerDiscordId: true, amountUsdCents: true } }),
-    prisma.paymentRequest.findMany({
+    db.proposal.findUnique({ where: { id: i.proposalId }, select: { kind: true, status: true, proposerDiscordId: true, amountUsdCents: true } }),
+    db.paymentRequest.findMany({
       where: { proposalId: i.proposalId, status: { notIn: ['REJECTED', 'WITHDRAWN'] }, ...(i.excludeRequestId ? { id: { not: i.excludeRequestId } } : {}) },
       select: { amountUsdCents: true },
     }),
