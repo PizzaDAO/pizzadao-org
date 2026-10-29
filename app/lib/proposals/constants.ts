@@ -15,6 +15,9 @@ export const PROPOSAL_MAX_USD = 1_000_000
 /** A proposal that was created but never opened (the snapshot failed) is retried by the cron after this long. */
 export const DRAFT_RETRY_MS = 2 * 60 * 1000
 
+/** A proposal is counted only this long after closesAt, so a vote written just before the close is never missed. */
+export const CLOSE_MARGIN_MS = 5 * 60 * 1000
+
 /** Pass rule shape: (ayes + abstains) reach the threshold AND ayes > nays. Snapshotted on each proposal at open. */
 export const COUNT_ABSTAINS = true
 export const REQUIRE_AYES_OVER_NAYS = true

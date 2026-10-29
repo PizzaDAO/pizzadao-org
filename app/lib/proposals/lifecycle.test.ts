@@ -88,7 +88,7 @@ describe('Discord posts', () => {
 
 describe('daily run', () => {
   it('closes due proposals, posts the result once, and leaves open ones alone', async () => {
-    const due = await seedOpen({ closesAt: new Date(t0.getTime() - 1000) })
+    const due = await seedOpen({ closesAt: new Date(t0.getTime() - 10 * 60_000) })
     const later = await seedOpen({ closesAt: new Date(t0.getTime() + 3 * DAY) })
     for (let i = 0; i < 30; i++) fake.current.state.ballot.push({ id: `b${i}`, proposalId: due, tokenHash: `h${i}`, choice: 'AYE' })
     const { d, post } = deps()
@@ -110,7 +110,7 @@ describe('daily run', () => {
   })
 
   it('a proposal with too few votes fails at close', async () => {
-    const id = await seedOpen({ closesAt: new Date(t0.getTime() - 1000) })
+    const id = await seedOpen({ closesAt: new Date(t0.getTime() - 10 * 60_000) })
     for (let i = 0; i < 10; i++) fake.current.state.ballot.push({ id: `b${i}`, proposalId: id, tokenHash: `h${i}`, choice: 'AYE' })
     await runProposalsCron(t0, deps().d)
     expect(fake.current.state.proposal[0].status).toBe('FAILED')

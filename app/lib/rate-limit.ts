@@ -70,10 +70,9 @@ export const RATE_LIMITS = {
   // Payment requests (plans/host-fast-track.md), per member.
   "payments-create": { limit: 5, windowSec: 60 * 60 },
   "payments-upload": { limit: 20, windowSec: 60 * 60 },
-  // Proposals: creating is per member; token issue is per member (one token each, so this only stops hammering);
+  // Proposals: creating is per member;
   // the secret vote endpoint has no session, so it is throttled per IP (the IP is hashed in the limiter and never stored).
   "proposals-create": { limit: 5, windowSec: 60 * 60 },
-  "proposals-token": { limit: 30, windowSec: 10 * 60 },
   "proposals-vote": { limit: 60, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 

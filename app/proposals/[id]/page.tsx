@@ -17,10 +17,15 @@ export async function generateMetadata(): Promise<Metadata> {
     return { title: t("metaTitle"), robots: { index: false, follow: false } };
 }
 
-export default async function ProposalPage({ params }: { params: Promise<{ id: string }> }) {
+export default async function ProposalPage({ params, searchParams }: { params: Promise<{ id: string }>; searchParams: Promise<{ fp?: string }> }) {
     const { id } = await params;
+    const { fp } = await searchParams;
     const session = await getSession().catch(() => null);
-    if (!session?.discordId) redirect(`/login?returnTo=/proposals/${encodeURIComponent(id)}`);
+    if (!session?.discordId) {
+        // Keep the key fingerprint from the Discord link through the login round trip, so the browser can still check against it.
+        const back = `/proposals/${encodeURIComponent(id)}${fp && /^[0-9a-fA-F ]{32,40}$/.test(fp) ? `?fp=${encodeURIComponent(fp)}` : ""}`;
+        redirect(`/login?returnTo=${encodeURIComponent(back)}`);
+    }
     const p = await getProposalDetail(id, session.discordId);
     if (!p) notFound();
     const t = await getTranslations("proposals");

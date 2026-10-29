@@ -6,6 +6,8 @@ import { TokenConfigError } from '@/app/lib/proposals/token'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
+// A vote is one Redis write; fail fast rather than hang until the platform default.
+export const maxDuration = 30
 
 const STATUS = { not_found: 404, closed: 409, bad_request: 400, invalid_token: 401, not_production: 404, unavailable: 503 } as const
 

@@ -1,5 +1,4 @@
 import { rejectUnsafeWrite } from '@/app/lib/admin-guard'
-import { checkKeyedRateLimit } from '@/app/lib/rate-limit'
 import { out, requireProposalsSession, safe, type RouteCtx } from '@/app/lib/proposals/http'
 import { issueToken } from '@/app/lib/proposals/store'
 import { KeyConfigError } from '@/app/lib/proposals/keys'
@@ -21,8 +20,7 @@ export const POST = safe('token', async (request: Request, { params }: RouteCtx)
   const unsafe = rejectUnsafeWrite(request)
   if (unsafe) return unsafe
   const { id } = await params
-  const limited = await checkKeyedRateLimit('proposals-token', auth.session.discordId)
-  if (!limited.success) return out({ error: 'rate_limited' }, 429)
+  // No rate limit: issuance is once per member per proposal (the claim is atomic), so there is nothing to hammer.
 
   const body = (await request.json().catch(() => null)) as { blindedMessage?: unknown } | null
   try {

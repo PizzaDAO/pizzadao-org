@@ -7,7 +7,7 @@ import { signBlinded, type BallotCredentials } from './token'
 
 /** A production-like env with a wrap secret: what the store needs to open, issue and count. */
 export const testEnv = (): NodeJS.ProcessEnv =>
-  ({ VERCEL_ENV: 'production', PROPOSAL_KEY_WRAP_SECRET: 'test-wrap-secret-test-wrap-secret-1234' }) as unknown as NodeJS.ProcessEnv
+  ({ VERCEL_ENV: 'production', NODE_ENV: 'test', PROPOSAL_KEY_WRAP_SECRET: 'test-wrap-secret-test-wrap-secret-1234' }) as unknown as NodeJS.ProcessEnv
 
 export interface TestKey {
   id: string
@@ -47,6 +47,7 @@ type Row = Record<string, any>
 
 /** In-memory fakes for proposal, proposalVoter, proposalBallot, proposalEvent. */
 export function makeFakeDb() {
+  let txChain: Promise<void> = Promise.resolve()
   const state = { proposal: [] as Row[], voter: [] as Row[], ballot: [] as Row[], event: [] as Row[], seq: 0 }
   const matchWhere = (row: Row, where: Row = {}): boolean =>
     Object.entries(where).every(([k, v]) => {
@@ -91,6 +92,20 @@ export function makeFakeDb() {
     },
     proposalBallot: {
       findMany: async ({ where }: any) => state.ballot.filter((r) => matchWhere(r, where)),
+      createMany: async ({ data }: any) => {
+        let count = 0
+        for (const d of data) {
+          if (state.ballot.some((r) => r.proposalId === d.proposalId && r.tokenHash === d.tokenHash)) continue
+          state.ballot.push({ id: `b${++state.seq}`, ...d })
+          count++
+        }
+        return { count }
+      },
+      updateMany: async ({ where, data }: any) => {
+        const rows = state.ballot.filter((r) => matchWhere(r, where))
+        rows.forEach((r) => Object.assign(r, data))
+        return { count: rows.length }
+      },
       upsert: async ({ where, create, update }: any) => {
         const hit = state.ballot.find((r) => matchWhere(r, where))
         if (hit) return Object.assign(hit, update)
@@ -101,7 +116,12 @@ export function makeFakeDb() {
     },
     proposalEvent: { create: async ({ data }: any) => { state.event.push(data); return data } },
     $queryRaw: async () => [],
-    $transaction: async (fn: any) => fn(db),
+    // Transactions run one at a time, like row locks on one proposal would make them.
+    $transaction: async (fn: any) => {
+      const run = txChain.then(() => fn(db))
+      txChain = run.then(() => undefined, () => undefined)
+      return run
+    },
   }
   return { db, state }
 }

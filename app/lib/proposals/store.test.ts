@@ -263,7 +263,7 @@ describe('closing and the pass rule', () => {
   it('passes at close with 15 counted and more ayes than nays, and stores the counts', async () => {
     const id = await openOne()
     await voteAll(id, [...rep('AYE', 10), ...rep('ABSTAIN', 5), ...rep('NAY', 2)])
-    expect(await settleProposal(id, new Date(t0.getTime() + 7 * DAY + 1))).toMatchObject({ ok: true, outcome: 'passed', ayes: 10, nays: 2, abstains: 5 })
+    expect(await settleProposal(id, new Date(t0.getTime() + 7 * DAY + 6 * 60_000))).toMatchObject({ ok: true, outcome: 'passed', ayes: 10, nays: 2, abstains: 5 })
     expect(row(id)).toMatchObject({ status: 'PASSED', ayes: 10, nays: 2, abstains: 5 })
     expect(fake.current.state.event.map((e: any) => e.type)).toContain('CLOSED')
   })
@@ -289,7 +289,7 @@ describe('closing and the pass rule', () => {
     await voteAll(id, rep('AYE', 20))
     expect(await settleProposal(id, new Date(t0.getTime() + 3 * DAY))).toEqual({ ok: false, code: 'not_due' })
     expect(row(id).status).toBe('OPEN')
-    expect((await settleProposal(id, new Date(t0.getTime() + 7 * DAY))).ok).toBe(true)
+    expect((await settleProposal(id, new Date(t0.getTime() + 7 * DAY + 5 * 60_000))).ok).toBe(true)
     expect(await settleProposal(id, new Date(t0.getTime() + 9 * DAY))).toEqual({ ok: false, code: 'not_open' })
   })
 })

@@ -3,7 +3,7 @@
  * daily run that retries what was missed, closes what is due and posts results.
  */
 import { prisma } from '@/app/lib/db'
-import { DRAFT_RETRY_MS } from './constants'
+import { CLOSE_MARGIN_MS, DRAFT_RETRY_MS } from './constants'
 import { announceOpen, announceResult, type PostDeps, defaultPostDeps } from './discord'
 import type { PendingStore } from './pending'
 import { drainPending, openProposal, settleProposal } from './store'
@@ -48,7 +48,7 @@ export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = 
     }
   }
 
-  const due: Array<{ id: string }> = await prisma.proposal.findMany({ where: { status: 'OPEN', closesAt: { lte: now } }, select: { id: true } })
+  const due: Array<{ id: string }> = await prisma.proposal.findMany({ where: { status: 'OPEN', closesAt: { lte: new Date(now.getTime() - CLOSE_MARGIN_MS) } }, select: { id: true } })
   for (const p of due) {
     try {
       if ((await settleProposal(p.id, now, { pending: opts.pending })).ok) out.settled++
