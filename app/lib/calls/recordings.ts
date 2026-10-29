@@ -206,6 +206,8 @@ const PUBLIC_SELECT = {
   transcript: true,
   transcriptLanguage: true,
   publishedAt: true,
+  // Only the origin kind (for a small note); never sourceUrl, importMeta or linkedDiscordId.
+  source: true,
   speakers: { select: { discordId: true, displayName: true } },
 } as const
 

@@ -799,6 +799,16 @@ export const SETTINGS = {
     help: 'Let the transcript cron write AI summaries for imported calls (costs model usage). Off: the import tool summarizes them on purpose. Only takes effect on the production site.',
     confirmOn: 'The cron will spend model usage summarizing imported calls.',
   }),
+  'calls.bulkActionMax': intSetting({
+    key: 'calls.bulkActionMax',
+    area: 'calls',
+    label: 'Bulk publish / reject: calls per click',
+    help: 'Most imported calls a reviewer can publish or reject with one bulk click on /admin/calls. Each call still has to pass the normal publish checks. Never above 50.',
+    min: 1,
+    max: 50,
+    default: 50,
+    onReadFailure: { value: 1 },
+  }),
   'disavow.enabled': boolSetting({
     key: 'disavow.enabled',
     area: 'disavow',

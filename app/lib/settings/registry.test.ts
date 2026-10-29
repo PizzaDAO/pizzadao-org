@@ -89,6 +89,7 @@ describe('settings registry', () => {
       ['calls.importedFollowupsEnabled', 0],
       ['calls.importedAgendaContext', 0],
       ['calls.importedAutoSummarize', 0],
+      ['calls.bulkActionMax', 50],
       ['disavow.enabled', false],
       ['reengage.enabled', false],
       ['onboarding.traineeNickEnabled', false],
