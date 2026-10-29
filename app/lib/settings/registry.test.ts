@@ -46,7 +46,7 @@ describe('settings registry', () => {
     expect(SETTINGS['missions.slaDigestMaxLines'].default).toBe(DIGEST_MAX_LINES)
     expect(SETTINGS['missions.maxAttempts'].default).toBe(MAX_MISSION_ATTEMPTS)
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.')).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.')).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['missions.humanReleaseMinLevel', 6],
       ['missions.newAccountDays', 30],

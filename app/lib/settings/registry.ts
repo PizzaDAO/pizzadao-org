@@ -12,7 +12,7 @@
  */
 import { z } from 'zod'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -21,6 +21,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   disavow: 'Disavow list',
   passport: 'Pizza Passport',
   guide: 'Handbook facts',
+  followups: 'Follow-ups',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -392,6 +393,144 @@ export const SETTINGS = {
     maxLength: 1000,
     multiline: true,
   }),
+  // ---- BEGIN follow-ups block (metalhead-followups). Kept separate to ease merges. ----
+  // Booleans are 0/1 integers (the settings editor has number and text inputs only).
+  'followups.sendEnabled': intSetting({
+    key: 'followups.sendEnabled',
+    area: 'followups',
+    label: 'Sending follow-up messages (0 = off, 1 = on)',
+    help: 'Master switch. Off by default: approved follow-ups wait and nothing is sent. The FOLLOWUPS_SEND_ENABLED environment variable set to off always wins over this. If settings cannot be read, nothing is sent.',
+    min: 0,
+    max: 1,
+    default: 0,
+    onReadFailure: { value: 0 },
+    confirm: (from, to) => (to > from ? 'Approved follow-ups will start going out as private messages.' : null),
+  }),
+  'followups.draftEnabled': intSetting({
+    key: 'followups.draftEnabled',
+    area: 'followups',
+    label: 'Draft follow-ups after each call (0 = off, 1 = on)',
+    help: 'When on, every summarized call is scanned once for things worth following up. Drafts only: nothing is sent without an approval click.',
+    min: 0,
+    max: 1,
+    default: 1,
+  }),
+  'followups.draftCrews': textSetting({
+    key: 'followups.draftCrews',
+    area: 'followups',
+    label: 'Only draft for these crews',
+    help: 'Comma-separated crew ids. Empty means every call.',
+    maxLength: 300,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'crew-id, other-crew-id',
+    check: (v) => v === '' || /^[A-Za-z0-9_\-]+(\s*,\s*[A-Za-z0-9_\-]+)*$/.test(v),
+    checkMessage: 'Use comma-separated crew ids (letters, digits, - and _)',
+  }),
+  'followups.maxPerDay': intSetting({
+    key: 'followups.maxPerDay',
+    area: 'followups',
+    label: 'Most follow-ups per person per day',
+    help: 'Extra approved messages to the same person wait until the 24 hour window has room.',
+    min: 1,
+    max: 20,
+    default: 3,
+    onReadFailure: { value: 1 },
+  }),
+  'followups.quietStartHour': intSetting({
+    key: 'followups.quietStartHour',
+    area: 'followups',
+    label: 'Quiet hours start (local hour, 0-23)',
+    help: 'No follow-ups are sent to a person between this hour and the end hour in their own timezone (UTC when unknown).',
+    min: 0,
+    max: 23,
+    default: 21,
+    unit: 'h',
+  }),
+  'followups.quietEndHour': intSetting({
+    key: 'followups.quietEndHour',
+    area: 'followups',
+    label: 'Quiet hours end (local hour, 0-23)',
+    help: 'See quiet hours start. Equal start and end hours mean no quiet hours.',
+    min: 0,
+    max: 23,
+    default: 9,
+    unit: 'h',
+  }),
+  'followups.escalationDiscordIds': textSetting({
+    key: 'followups.escalationDiscordIds',
+    area: 'followups',
+    label: 'Escalation contacts (Discord ids)',
+    help: 'Comma-separated Discord ids told when someone cannot be reached or asks for help. Empty means the approvers who linked Telegram.',
+    maxLength: 400,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: '123456789012345678, 234567890123456789',
+    check: (v) => v === '' || /^\d{5,25}(\s*,\s*\d{5,25})*$/.test(v),
+    checkMessage: 'Use comma-separated Discord ids (digits only)',
+  }),
+  'followups.footerTelegram': textSetting({
+    key: 'followups.footerTelegram',
+    area: 'followups',
+    label: 'Footer on Telegram messages',
+    help: 'Added under every follow-up sent on Telegram so people know how to opt out.',
+    maxLength: 200,
+    default: 'Reply STOP to stop these messages.',
+    check: (v) => v.length > 0,
+    checkMessage: 'The footer cannot be empty',
+    onReadFailure: 'lastKnownGood',
+  }),
+  'followups.footerDiscord': textSetting({
+    key: 'followups.footerDiscord',
+    area: 'followups',
+    label: 'Footer on Discord messages',
+    help: 'Added under every follow-up sent as a Discord message (typed replies are not read there, so point at the Stop button).',
+    maxLength: 200,
+    default: 'Tap Stop to stop these messages.',
+    check: (v) => v.length > 0,
+    checkMessage: 'The footer cannot be empty',
+    onReadFailure: 'lastKnownGood',
+  }),
+  'followups.maxAlertsPerDay': intSetting({
+    key: 'followups.maxAlertsPerDay',
+    area: 'followups',
+    label: 'Most approver alerts per member per day',
+    help: 'Replies and help requests from one member alert the approvers at most this many times in 24 hours (they are still saved in the queue).',
+    min: 1,
+    max: 50,
+    default: 5,
+  }),
+  'followups.approvalMaxDays': intSetting({
+    key: 'followups.approvalMaxDays',
+    area: 'followups',
+    label: 'Approvals expire after (days)',
+    help: 'An approved follow-up that has not gone out after this many days is not sent; it goes back to draft and needs approving again.',
+    min: 1,
+    max: 60,
+    default: 7,
+    unit: 'days',
+  }),
+  'followups.unknownTzStartHour': intSetting({
+    key: 'followups.unknownTzStartHour',
+    area: 'followups',
+    label: 'Sending window start when timezone is unknown (UTC hour)',
+    help: 'For people with no known timezone, messages only go out between this UTC hour and the end hour.',
+    min: 0,
+    max: 23,
+    default: 14,
+    unit: 'h UTC',
+  }),
+  'followups.unknownTzEndHour': intSetting({
+    key: 'followups.unknownTzEndHour',
+    area: 'followups',
+    label: 'Sending window end when timezone is unknown (UTC hour)',
+    help: 'See the window start.',
+    min: 0,
+    max: 23,
+    default: 22,
+    unit: 'h UTC',
+  }),
+  // ---- END follow-ups block ----
 } as const satisfies Record<string, SettingDef<number> | SettingDef<string>>
 
 export type SettingKey = keyof typeof SETTINGS

@@ -21,6 +21,10 @@ vi.mock('@/app/lib/slices/mint-queue', () => ({
   processMintQueue: vi.fn(async () => ({ status: 'skipped', reason: 'disabled' })),
 }))
 vi.mock('@/app/lib/passport/scrub', () => ({ scrubCoordinates: vi.fn(async () => 4) }))
+
+vi.mock('@/app/lib/followups/send', () => ({ processDue: vi.fn(async () => ({ held: 1 })) }))
+vi.mock('@/app/lib/followups/draft', () => ({ draftFollowUpsForRecording: vi.fn(), listNeedingFollowups: vi.fn(async () => []) }))
+vi.mock('@/app/lib/followups/config', () => ({ loadFollowUpConfig: vi.fn(async () => ({ draftEnabled: true, sendEnabled: false })) }))
 vi.mock('@/app/lib/slices/claims', () => ({ sweepAwaitingWallet: vi.fn(async () => 0) }))
 
 vi.mock('@/app/lib/trainee-nick-run', () => ({
@@ -35,6 +39,9 @@ import { GET as traineeNicksGET } from './trainee-nicks/route'
 import { GET as slicesMintGET } from './slices-mint/route'
 import { GET as passportScrubGET } from './passport-scrub/route'
 import { scrubCoordinates } from '@/app/lib/passport/scrub'
+
+import { GET as followupsGET } from './followups/route'
+import { processDue } from '@/app/lib/followups/send'
 import { processMintQueue } from '@/app/lib/slices/mint-queue'
 import { runTraineeNicks } from '@/app/lib/trainee-nick-run'
 import { runSlaDigest } from '@/app/lib/mission-verify/sla'
@@ -62,6 +69,8 @@ describe.each([
   ['/api/cron/trainee-nicks', traineeNicksGET, () => runTraineeNicks],
   ['/api/cron/slices-mint', slicesMintGET, () => processMintQueue],
   ['/api/cron/passport-scrub', passportScrubGET, () => scrubCoordinates],
+
+  ['/api/cron/followups', followupsGET, () => processDue],
 ] as const)('%s auth', (path, GET, work) => {
   it('401 without the bearer token, and does no work', async () => {
     const res = await GET(req(path))

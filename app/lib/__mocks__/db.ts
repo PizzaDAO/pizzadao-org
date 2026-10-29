@@ -48,7 +48,13 @@ export const prisma = {
   crewDraft: createModelMock(),
   appSetting: createModelMock(),
   appSettingChange: createModelMock(),
+  followUp: createModelMock(),
+  followUpEvent: createModelMock(),
+  messagingOptOut: createModelMock(),
+  telegramAccount: createModelMock(),
+  memberProfileExtras: createModelMock(),
   $queryRaw: vi.fn(),
+  $executeRaw: vi.fn(),
   $transaction: vi.fn(),
 }
 

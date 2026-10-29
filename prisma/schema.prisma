@@ -1082,6 +1082,9 @@ model TelegramAccount {
   authDate   DateTime // auth_date of the most recent verified widget login
   linkedAt   DateTime @default(now())
   updatedAt  DateTime @updatedAt
+  // The bot may send this person a private message (write access granted at link time, or /start sent).
+  // Cleared when Telegram refuses a DM or the person blocks the bot.
+  dmAllowed  Boolean  @default(false)
 
   @@index([memberId])
 }
@@ -1384,6 +1387,10 @@ model CallRecording {
   redactedSpeakerIds String[]            @default([])
   // Single transcript lines hidden the same way (keys from segmentKey(): `c:<messageId>` for chat, `s:<speaker>:<startMs>` for speech).
   redactedSegmentIds String[]            @default([])
+  // Follow-up drafting (metalhead-followups): set once the extraction pass finished (even with zero items).
+  followupsDraftedAt DateTime?
+  followupsAttempts  Int                 @default(0) // automatic drafting attempts; the sweep gives up at 3
+  followupsError     String? // last drafting failure (no URLs, max 300 chars)
   createdAt          DateTime            @default(now())
   updatedAt          DateTime            @updatedAt
 
@@ -1673,4 +1680,87 @@ model PassportStamp {
 
   @@unique([discordId, pizzeriaId])
   @@index([discordId, stampedAt])
+}
+
+// ===== FOLLOW-UPS (metalhead-followups) =====
+//
+// Things said on calls that Metalhead may follow up on by private message. A row starts as a DRAFT
+// and nothing is sent until a reviewer approves it. FollowUpEvent is the append-only audit log.
+
+enum FollowUpStatus {
+  DRAFT
+  APPROVED
+  SENT
+  FAILED
+  UNREACHABLE
+  ESCALATED
+  REPLIED
+  IN_PROGRESS
+  NEEDS_HELP
+  DONE
+  DISMISSED
+}
+
+enum FollowUpChannel {
+  DISCORD
+  TELEGRAM
+}
+
+model FollowUp {
+  id                String           @id @default(cuid())
+  recordingId       String? // CallRecording.id (null for manual rows)
+  sourceKey         String           @unique // `${recordingId}:${startMs}:${ownerNameNorm}`
+  ownerName         String
+  ownerDiscordId    String?
+  ownerMemberId     String?
+  candidates        Json? // ambiguous matches to pick from: [{memberId, name, discordId}]
+  kind              String
+  ask               String
+  message           String // editable draft / sent text (without the footer)
+  quote             String?
+  startMs           Int?
+  dueAt             DateTime?
+  dueText           String?
+  status            FollowUpStatus   @default(DRAFT)
+  channel           FollowUpChannel?
+  escalateOnly      Boolean          @default(false) // approved to go straight to the approvers
+  sendAfter         DateTime?
+  sendAttemptAt     DateTime? // written before delivery starts; a row with it is never auto-resent
+  discordChannelId  String?
+  discordMessageId  String?
+  telegramChatId    String?
+  telegramMessageId Int?
+  lastReply         String?
+  lastReplyAt       DateTime?
+  approvedBy        String?
+  approvedAt        DateTime?
+  sentAt            DateTime?
+  escalatedAt       DateTime?
+  error             String?
+  createdAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+  events            FollowUpEvent[]
+
+  @@index([status, sendAfter])
+  @@index([ownerDiscordId, sentAt])
+  @@index([recordingId])
+  @@index([telegramChatId, telegramMessageId])
+}
+
+model FollowUpEvent {
+  id         Int      @id @default(autoincrement())
+  followUpId String
+  type       String
+  actorId    String? // Discord id, "telegram:<id>", or "system"
+  data       Json?
+  createdAt  DateTime @default(now())
+  followUp   FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+
+  @@index([followUpId, createdAt])
+}
+
+model MessagingOptOut {
+  discordId String   @id
+  scope     String   @default("followups")
+  createdAt DateTime @default(now())
 }
