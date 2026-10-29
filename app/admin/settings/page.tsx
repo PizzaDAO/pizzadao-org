@@ -64,6 +64,7 @@ export default async function AdminSettingsPage() {
         fromDefault: t("fromDefault"),
         toDefault: t("toDefault"),
         loadError: t("loadError"),
+        empty: t("empty"),
         nonProdBanner: t("nonProdBanner"),
     };
 

@@ -1244,7 +1244,8 @@
     "changeLine": "{key}: {from} to {to} by {who}",
     "fromDefault": "default",
     "toDefault": "default",
-    "loadError": "Could not load the settings."
+    "loadError": "Could not load the settings.",
+    "empty": "(empty)"
   },
   "adminMissions": {
     "title": "Mission editor",

@@ -1244,7 +1244,8 @@
     "changeLine": "{key}: {from} a {to} por {who}",
     "fromDefault": "valor por defecto",
     "toDefault": "valor por defecto",
-    "loadError": "No se pudieron cargar los ajustes."
+    "loadError": "No se pudieron cargar los ajustes.",
+    "empty": "(vacío)"
   },
   "adminMissions": {
     "title": "Editor de misiones",

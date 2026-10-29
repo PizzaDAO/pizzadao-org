@@ -1244,7 +1244,8 @@
     "changeLine": "{key} : {from} vers {to} par {who}",
     "fromDefault": "valeur par défaut",
     "toDefault": "valeur par défaut",
-    "loadError": "Impossible de charger les paramètres."
+    "loadError": "Impossible de charger les paramètres.",
+    "empty": "(vide)"
   },
   "adminMissions": {
     "title": "Éditeur de missions",
