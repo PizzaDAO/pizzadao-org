@@ -1823,7 +1823,8 @@ model PaymentRequest {
   amountOriginal     Decimal?
   payeeHash          String? // HMAC of the normalized payee reference: reuse detection only
   payeeHint          String? // masked, e.g. 0x12...ab
-  proposalUrl        String? // community poll link (required in VOTE_REQUIRED)
+  proposalUrl        String? // community poll link (legacy Sesh link; ignored once proposals are on)
+  proposalId         String? // passed in-app proposal that funds this request (VOTE_REQUIRED lane)
   riskScore          Int           @default(0)
   flags              Json          @default("[]") // latest computed flags [{id, severity, detail, source}]
   checkedAt          DateTime?
@@ -1835,8 +1836,10 @@ model PaymentRequest {
   attachments PaymentAttachment[]
   checks      PaymentCheck[]
   decisions   PaymentDecision[]
+  proposal    Proposal?          @relation(fields: [proposalId], references: [id], onDelete: SetNull)
 
   @@index([status, lane, createdAt])
+  @@index([proposalId])
   @@index([requesterDiscordId])
   @@index([claimedDiscordId])
   @@index([payeeHash])
@@ -1894,4 +1897,101 @@ model PaymentDecision {
 
   @@index([requestId, createdAt])
   @@index([actorDiscordId])
+}
+
+// ===== PROPOSALS AND VOTING (plans/proposals-voting.md) =====
+// Ballots are secret: a ProposalBallot has no member id, no IP and no timestamp. ProposalVoter records who
+// was eligible when the proposal opened and that a ballot token was issued to them (never what they voted).
+
+enum ProposalKind {
+  FUNDING
+  GENERAL
+}
+
+enum ProposalStatus {
+  DRAFT
+  OPEN
+  PASSED
+  FAILED
+  CANCELLED
+}
+
+enum ProposalChoice {
+  AYE
+  NAY
+  ABSTAIN
+}
+
+model Proposal {
+  id                  String         @id @default(cuid())
+  kind                ProposalKind
+  status              ProposalStatus @default(DRAFT)
+  title               String
+  body                String
+  amountUsdCents      Int? // FUNDING only; fixed once the proposal exists
+  eventDate           DateTime?
+  city                String?
+  proposerDiscordId   String
+  sponsorLabel        String? // free text: a holder who sponsors a proposer without a box
+  opensAt             DateTime?
+  closesAt            DateTime?
+  closedAt            DateTime?
+  // Rules snapshotted when the proposal opens, so later setting changes never move a running vote.
+  ayesNeeded          Int?
+  countAbstains       Boolean        @default(true)
+  requireAyesOverNays Boolean        @default(true)
+  eligibleCount       Int?
+  // Settled counts (written once, at close).
+  ayes                Int            @default(0)
+  nays                Int            @default(0)
+  abstains            Int            @default(0)
+  discordChannelId    String?
+  discordMessageId    String?
+  resultPostedAt      DateTime?
+  createdAt           DateTime       @default(now())
+  updatedAt           DateTime       @updatedAt
+
+  voters   ProposalVoter[]
+  ballots  ProposalBallot[]
+  events   ProposalEvent[]
+  payments PaymentRequest[]
+
+  @@index([status, closesAt])
+  @@index([proposerDiscordId])
+}
+
+model ProposalVoter {
+  proposalId    String
+  discordId     String
+  // Set once, when the blind-signed ballot token is issued (day precision). Never cleared: a token is never re-issued.
+  tokenIssuedAt DateTime?
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@id([proposalId, discordId])
+  @@index([discordId])
+}
+
+model ProposalBallot {
+  id         String         @id @default(uuid())
+  proposalId String
+  tokenHash  String // sha256 of the ballot token; the token itself is never stored
+  choice     ProposalChoice
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, tokenHash])
+}
+
+model ProposalEvent {
+  id             Int      @id @default(autoincrement())
+  proposalId     String
+  type           String // CREATED | OPENED | POSTED | CLOSED | CANCELLED | RESULT_POSTED
+  actorDiscordId String?
+  data           Json?
+  createdAt      DateTime @default(now())
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@index([proposalId, createdAt])
 }

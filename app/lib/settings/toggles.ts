@@ -41,6 +41,10 @@ export const TOGGLES = {
     env: 'DISAVOW_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
+  'proposals.enabled': {
+    env: 'PROPOSALS_ENABLED',
+    legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
+  },
   'reengage.enabled': { env: 'REENGAGE_EMAIL_ENABLED', legacy: (raw) => (raw ?? '').trim().toLowerCase() === 'true' },
   'onboarding.traineeNickEnabled': { env: 'TRAINEE_NICK_ENABLED', legacy: (raw) => raw === 'true' },
   'games.enabled': { env: 'PEP_GAMES_ENABLED', legacy: (raw) => raw === '1' },

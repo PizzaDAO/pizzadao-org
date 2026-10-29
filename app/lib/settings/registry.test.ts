@@ -56,7 +56,7 @@ describe('settings registry', () => {
     expect(SETTINGS['disavow.listingMonths'].default).toBe(DISAVOW_LISTING_MONTHS)
     expect(SETTINGS['disavow.appealCooldownDays'].default).toBe(DISAVOW_APPEAL_COOLDOWN_DAYS)
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.')).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.')).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['missions.humanReleaseMinLevel', 6],
       ['missions.newAccountDays', 30],
@@ -98,6 +98,8 @@ describe('settings registry', () => {
       ['discord.missionsAnnounceChannelId', ''],
       ['discord.announceChannelId', ''],
       ['discord.callVoiceChannelId', ''],
+      ['discord.proposalsChannelId', ''],
+      ['discord.proposalsPingRoleId', ''],
       ['missions.slaPingRoleId', ''],
       ['missions.reviewerRoleIds', []],
       ['announce.roleIds', []],
@@ -161,6 +163,19 @@ describe('settings registry', () => {
     expect(parseSetting('disavow.windowDays', 61).ok).toBe(false)
     expect(parseSetting('disavow.listingMonths', 0).ok).toBe(false)
     expect(parseSetting('disavow.appealCooldownDays', 6).ok).toBe(false)
+  })
+
+  it('proposals settings ship off, stricter-only, and fail to the strictest value', () => {
+    expect(SETTINGS['proposals.enabled'].default).toBe(false)
+    expect(SETTINGS['proposals.windowDays'].default).toBe(7)
+    expect(SETTINGS['proposals.generalAyes'].default).toBe(15)
+    expect(parseSetting('proposals.windowDays', 6).ok).toBe(false)
+    expect(parseSetting('proposals.windowDays', 7).ok).toBe(true)
+    expect(parseSetting('proposals.windowDays', 15).ok).toBe(false)
+    expect(parseSetting('proposals.generalAyes', 14).ok).toBe(false)
+    expect(parseSetting('proposals.generalAyes', 20).ok).toBe(true)
+    for (const k of ['proposals.windowDays', 'proposals.generalAyes'] as const) expect(SETTINGS[k].stricterOnly).toBe(true)
+    expect(SETTINGS['proposals.windowDays'].onReadFailure).toEqual({ value: 14 })
   })
 
   it('guide settings ship unset so unconfirmed handbook facts stay hidden', () => {
