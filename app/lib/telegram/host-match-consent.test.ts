@@ -77,7 +77,7 @@ describe('startConfirmation (side a: the member says yes)', () => {
     expect(a.text + JSON.stringify(a.buttons)).not.toContain(TG + '"')
     const writes = vi.mocked(prisma.telegramHostMatch.updateMany).mock.calls.map((c) => c[0].data)
     expect(writes).toContainEqual({ memberConfirmedAt: NOW, invitedAt: NOW })
-    expect(send.mock.calls[0][0].idempotencyKey).toBe(`tm:${D}:${Math.floor(NOW.getTime() / RESEND_COOLDOWN_MS)}`)
+    expect(send.mock.calls[0][0].idempotencyKey).toBe(`tm:${D}:${NOW.getTime()}`)
     // The click alone never confirms anything.
     expect(writes.some((w) => (w as { consent?: string }).consent === 'CONFIRMED')).toBe(false)
   })

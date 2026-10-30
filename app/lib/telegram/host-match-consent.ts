@@ -143,7 +143,7 @@ export async function startConfirmation(discordId: string, resend: boolean, deps
   const t = await dmText('confirm', await localeOf(m.memberId))
   const send = deps.send ?? ((a) => sendDm(a, { env }))
   // One key per cooldown window: a repeat inside it replays the same send instead of duplicating it.
-  const r = await send({ telegramUserId: m.telegramId, text: t.text, buttons: [[{ text: t.button, url: confirmUrl(token, env) }]], idempotencyKey: `tm:${discordId}:${Math.floor(now.getTime() / RESEND_COOLDOWN_MS)}` })
+  const r = await send({ telegramUserId: m.telegramId, text: t.text, buttons: [[{ text: t.button, url: confirmUrl(token, env) }]], idempotencyKey: `tm:${discordId}:${now.getTime()}` })
   if (r.ok) {
     await recordResult(m.telegramId, 'ok', recheck, now).catch(() => {})
     return 'sent'
