@@ -32,7 +32,6 @@ beforeEach(() => {
   state.readFailed = false
   state.invalid = []
   state.throws = false
-  db.callPostFilter.findUnique.mockResolvedValue(null)
 })
 
 describe('importedAllowed', () => {

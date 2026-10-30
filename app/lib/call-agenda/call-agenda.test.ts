@@ -125,7 +125,7 @@ describe('runCallAgenda', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     clearPostFilterCache()
-    vi.mocked(prisma.callPostFilter.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.appSetting.findMany).mockResolvedValue([])
     process.env.DISCORD_BOT_TOKEN = 'tok'
     process.env.DISCORD_GUILD_ID = '1'
     process.env.CALL_AGENDA_POST_ENABLED = 'true'
@@ -226,7 +226,7 @@ describe('runCallAgenda', () => {
   })
 
   const setFilter = (f: Partial<{ excludedCrewIds: string[]; excludedCrewLabelTerms: string[]; blockedTerms: string[] }>) =>
-    vi.mocked(prisma.callPostFilter.findUnique).mockResolvedValue({ id: 1, excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ...f } as never)
+    vi.mocked(prisma.appSetting.findMany).mockResolvedValue([{ key: 'calls.postFilter', value: { excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [], ...f } }] as never)
 
   it('skips an excluded crew entirely: outcome excluded, no sheet read, no claim, no post', async () => {
     setFilter({ excludedCrewIds: ['crew_x'] })
@@ -252,8 +252,8 @@ describe('runCallAgenda', () => {
   })
 
   it('posts nothing when the filter cannot be read', async () => {
-    vi.mocked(prisma.callPostFilter.findUnique).mockRejectedValue(new Error('db down'))
-    await expect(runCallAgenda({ now: NOW, fetchImpl: fetchEvents })).rejects.toThrow('db down')
+    vi.mocked(prisma.appSetting.findMany).mockRejectedValue(new Error('db down'))
+    await expect(runCallAgenda({ now: NOW, fetchImpl: fetchEvents })).rejects.toThrow('Post filter could not be read')
     expect(postDiscordMessage).not.toHaveBeenCalled()
     expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
   })

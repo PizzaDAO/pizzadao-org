@@ -6,7 +6,7 @@ Discord channels should be changeable by an authorised admin in the app, with no
 
 The repo is public. This plan, the code and any PR text must name **keys and code defaults only**. Editorial
 values (what to omit from posts, blocked terms, etc.) live only in private DB rows, the same way
-`CallPostFilter` works today.
+the call post filter setting does.
 
 ## 1. Goal and non-goals
 
@@ -52,7 +52,7 @@ Line numbers are as of `eb14cf6`.
 | `DEFAULT_TRANSCRIBE_MODEL` | transcribe.ts:18 | whisper-1 | Fallback ASR | **Code** (the response format depends on it) | n/a |
 | Ingest caps (`MAX_SPEAKERS`, `MAX_TRANSCRIPT_SEGMENTS`, ...) | app/lib/calls/ingest-schema.ts:14-56 | various | Input validation | **Code**: DoS/input bounds | n/a |
 | `SIGNED_URL_TTL_SEC` | app/lib/calls/r2.ts:12 | 900 | Audio link lifetime | **Code**: security | n/a |
-| `CallPostFilter` row | prisma/schema.prisma:1535, app/lib/calls/post-filters.ts | private | Agenda and recap omissions | Already DB. **Migrate** into settings in Phase 5 (private, fails by throwing) | Unreadable means skip posting (keep) |
+| Call post filter table row | app/lib/calls/post-filters.ts | private | Agenda and recap omissions | Already DB. **Migrate** into settings in Phase 5 (private, fails by throwing) | Unreadable means skip posting (keep) |
 
 ### 2.2 Call agenda
 
@@ -215,7 +215,7 @@ model AppSettingChange {
 
 - A row exists only for overridden settings. With no row, the code default applies, and "reset to default"
   deletes the row. So deploying the framework changes no behaviour.
-- **Why one table, not typed single-row tables per area** (the `CallPostFilter` shape):
+- **Why one table, not typed single-row tables per area** (the old call post filter table shape):
   - With one table, adding a knob is a registry entry only, with no migration. Per-area tables would need a
     migration and hand-applied prod SQL for every new knob, which is the friction this work removes.
   - One table gives one generic audit log and one generic admin UI.
@@ -428,7 +428,7 @@ Each migration is applied to prod by hand before merge (`prisma migrate deploy` 
    - Recap and agenda sizes and lead time; summary model and private prompt addendum; reengage
      batch/window/weekday; spotlight/support caps; roster-audit and celebration levels; mafia points and
      ranks.
-   - Migrate `CallPostFilter` into private settings (data migration, then drop the table in a follow-up PR).
+   - Migrate the call post filter table into private settings (data migration, then drop the table in a follow-up PR).
    - Delete the env vars once DB rows exist.
 
 ## 6. Risks
@@ -474,7 +474,7 @@ Each migration is applied to prod by hand before merge (`prisma migrate deploy` 
    forward only: no top-ups, no clawbacks.
 4. **Behaviour when the settings DB can't be read.** Recommended: hold every auto-verified pass for a human
    and switch posting/paying toggles off. Everything else uses last-known-good, then the default.
-5. **Fold `CallPostFilter` into the new system?** Recommended: yes, but last (Phase 5); it works today.
+5. **Fold the call post filter table into the new system?** Recommended: yes, but last (Phase 5); it works today.
 6. **Edits from preview deploys.** Recommended: allow them, with a "this changes production" banner, so
    previews can be checked end to end. The alternative is to block writes outside production.
 
@@ -483,7 +483,7 @@ Each migration is applied to prod by hand before merge (`prisma migrate deploy` 
 2. Env toggles move to the DB: env stays the fallback when no row exists, env "off" is a kill switch that always wins. Slices arming and one-time migration flags stay env-only.
 3. Mission editor scope: verifier params, per-level rewards, titles, active flag. Reward changes apply going forward only (no top-ups, no clawbacks). No creating missions from the UI.
 4. Preview deploys may edit settings, with a "this changes production" banner.
-5. Defaults taken: settings unreadable → every auto-pass waits for a human and posting/paying/emailing toggles go off; CallPostFilter folds in last (phase 5).
+5. Defaults taken: settings unreadable → every auto-pass waits for a human and posting/paying/emailing toggles go off; the call post filter table folds in last (phase 5).
 
 ## Phase 3 implementation notes (2026-10-29)
 - Previews share the production database, so on any deploy where `VERCEL_ENV` is not `production` the feature switches ignore saved rows and follow the env var only (env off still wins). A saved ON never reaches a preview.
@@ -508,7 +508,7 @@ Each migration is applied to prod by hand before merge (`prisma migrate deploy` 
 - Caps: `spotlight.maxPerDay/maxPending` (1..10, 1..20), `support.maxTicketsPerDay/maxOpenTickets` (1..20, 1..50), `roster.minCallsForSuggestion` (1..20), `roster.inactiveMonths` (1..24), `missions.celebrationMinLevel` (1..10; 10 turns it off, since finishing the last level computes level 9). Two-way.
 - Lists: `work.prompts` (1..20 replies of up to 500 characters; saved wins over WORK_PROMPTS_JSON, which wins over the built-ins), `mafia.sourcePoints` (rows {id from the code table, points 0..1,000,000}; ids left out keep the code value; which sources exist stays in code), `mafia.ranks` (1..12 tiers, one must start at 0, unique names and starts). Rank results are cached for 2 hours, so source points show up gradually.
 - Stays in code: slot weights and payouts (house edge is math that needs tests), `MISSIONS_CRON_*` budgets, `MAX_BATCH`, Discord length limits.
-- Call post filter: private setting `calls.postFilter` (three lists, at most 200 entries of 100 characters, cleaned on write and on read, failure mode `throw`). `loadPostFilter()` order: saved setting; else the old `CallPostFilter` table (so deploying before the copy is safe); a failed or invalid read throws and callers skip posting, as before. `/admin/calls` saves through the settings store (audited, values masked) and also mirrors to the table best effort, so a code rollback does not bring back an older filter. The settings page only shows set / not set and links to `/admin/calls`.
-- Copy script: `scripts/settings/migrate-call-post-filters.mjs` (dry run by default, `--apply` to write, counts only, never prints text, leaves an existing saved setting alone, guarded against a concurrent edit). The table and model stay; dropping them is a follow-up PR after the script has run in prod and the mirror is no longer wanted.
+- Call post filter: private setting `calls.postFilter` (three lists, at most 200 entries of 100 characters, cleaned on write and on read, failure mode `throw`). `loadPostFilter()` reads the setting only; a failed or invalid read throws and callers skip posting, as before. `/admin/calls` saves through the settings store (audited, values masked). The settings page only shows set / not set and links to `/admin/calls`.
+- Follow-up done: the one-off copy script has run in prod and was deleted, and the old table, model and mirror were dropped (migration `20261105000000_drop_call_post_filter`).
 - Role income edge case: when a saved `economy.roleIncome` fails validation on read (for example ROLE_INCOME_JSON was tightened), the settings page shows a red warning that the saved table is not in force and the env table applies. Fallback behaviour is unchanged.
 - Env vars that become removable once a row is saved (env stays the legacy baseline in code; an operator removes them in Vercel afterwards): CALL_SUMMARY_MODEL (`calls.summaryModel`), REENGAGE_BATCH_SIZE (`reengage.batchSize`, then the ceiling is the 60 default), WORK_PROMPTS_JSON (`work.prompts`). From earlier phases: the DB+env switches (MISSION_VERIFIERS_ENABLED, MISSION_REVIEW_CARDS_ENABLED, CALL_RECAP_POST_ENABLED, CALL_AGENDA_POST_ENABLED, CALL_IMPORT_*, DISAVOW_ENABLED, PROPOSALS_ENABLED, REENGAGE_EMAIL_ENABLED, TRAINEE_NICK_ENABLED, PEP_GAMES_ENABLED, PEP_CRIME_ENABLED, MAFIA_PORTRAIT_ENABLED, ITEM_GRANT_CLAIMS, SHOP_SHEET_SYNC_ENABLED) once each has a row, but note that removing a switch's env var also removes the env kill switch; the channel ids (ANNOUNCE_DISCORD_CHANNEL_ID, CALL_VOICE_CHANNEL_ID, MISSION_REVIEW_CHANNEL_ID, MISSIONS_ANNOUNCE_CHANNEL_ID); and the phase 4 numbers (GAME_*, BLACKJACK_TIMEOUT_SECONDS, CRIME_*, WORK_MIN/MAX/COOLDOWN, JOB_REWARD_AMOUNT, ADMIN_GRANT_MAX, MISSIONS_RUN_PEP_ALERT, SLICES_DAILY_CAP / MAX_GAS_GWEI / MIN_BALANCE_ETH, MAFIA_PORTRAIT_*_DAILY_CAP, ROLE_INCOME_JSON), where a stricter-only cap is a ceiling: delete the env var only after the saved value matches what you want, since the baseline then falls back to the code default. Never removable: SLICES_ENABLED, SLICES_ALLOW_NON_PROD, PEP_MIGRATION_CLAIMS, PEP_ADMIN_ROLE_*, and the secrets.
