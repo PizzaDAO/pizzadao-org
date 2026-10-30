@@ -438,7 +438,9 @@ export function TelegramLinker() {
                             </button>
                             {appState === "waiting" && pending ? (
                                 <div role="status" style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
-                                    <span>{t("appLinkPending", { who: pending.username ? `@${pending.username}` : pending.name || "Telegram" })}</span>
+                                    <span>{pending.username
+                                        ? t("appLinkPending", { who: `@${pending.username}` })
+                                        : t("appLinkPendingNoUsername", { name: pending.name || "?" })}</span>
                                     <button type="button" onClick={() => onPending("confirm")} disabled={pendingBusy} className="btn-pill" style={{ opacity: pendingBusy ? 0.5 : 1 }}>
                                         {t("appLinkConfirm")}
                                     </button>

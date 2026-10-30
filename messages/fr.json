@@ -42,7 +42,8 @@
     "appLinkPending": "{who} sur Telegram veut se lier à ton compte.",
     "appLinkConfirm": "Lier",
     "appLinkDeny": "Annuler",
-    "appLinkOpen": "Ouvrir Telegram"
+    "appLinkOpen": "Ouvrir Telegram",
+    "appLinkPendingNoUsername": "Un compte Telegram sans nom d'utilisateur, nommé {name}, veut se lier à ton compte."
   },
   "telegramConfirm": {
     "title": "Confirmez votre Telegram",

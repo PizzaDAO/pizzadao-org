@@ -13,7 +13,7 @@
 
 import { createHash, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
-import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
+import { fetchMemberById, fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { telegramConfig } from "@/app/lib/telegram-auth";
 import { claimLinkCode, confirmByTelegram } from "@/app/lib/telegram/link-code";
 import { loginBotCall, loginBotSend } from "@/app/lib/telegram/login-bot";
@@ -53,6 +53,17 @@ interface TgUpdate {
     callback_query?: { id?: unknown; from?: TgFrom; data?: unknown; message?: TgMessage };
 }
 
+/** Mafia Name, else a masked Discord handle (ab…yz). Never the sheet's real "Name". Null when neither is known. */
+async function publicLabel(discordId: string): Promise<string | null> {
+    const memberId = await fetchMemberIdByDiscordId(discordId);
+    const row = memberId ? await fetchMemberById(memberId) : null;
+    if (!row) return null;
+    const mafia = String(row["Mafia Name"] ?? "").trim();
+    if (mafia) return mafia;
+    const handle = String(row["Discord Username"] ?? row["Discord Handle"] ?? row["Username"] ?? "").trim();
+    return handle.length >= 5 ? `${handle.slice(0, 2)}…${handle.slice(-2)}` : null;
+}
+
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, 256) : null);
 const userId = (from: TgFrom | undefined): string | null => {
     if (!from || from.is_bot === true) return null;
@@ -84,11 +95,15 @@ async function onStart(botToken: string, msg: TgMessage) {
         await loginBotSend(botToken, chatId, EXPIRED);
         return;
     }
-    const name = await fetchMemberByDiscordId(claim.discordId).then((r) => r?.name || null).catch(() => null);
+    const name = await publicLabel(claim.discordId).catch(() => null);
+    if (!name) {
+        await loginBotSend(botToken, chatId, "This link can't be used. Start again from your profile.");
+        return;
+    }
     await loginBotSend(
         botToken,
         chatId,
-        `Link this Telegram to the PizzaDAO member ${name ?? "who started this"}? Only tap if you started this from your own profile.`,
+        `Link this Telegram to the PizzaDAO member ${name}? Only tap if you started this from your own profile.`,
         { reply_markup: { inline_keyboard: [[{ text: "Yes, link", callback_data: `ok:${claim.ref}` }]] } },
     );
 }
@@ -98,10 +113,11 @@ async function onCallback(botToken: string, cq: NonNullable<TgUpdate["callback_q
     const fromId = userId(cq.from);
     const data = typeof cq.data === "string" ? cq.data : "";
     const msg = cq.message;
+    // Answer first, whatever happens next, so the button never keeps spinning.
+    if (queryId) await loginBotCall(botToken, "answerCallbackQuery", { callback_query_id: queryId });
     if (!queryId || !fromId || !data.startsWith("ok:") || msg?.chat?.type !== "private") return;
 
     const ok = await confirmByTelegram(data.slice(3), fromId);
-    await loginBotCall(botToken, "answerCallbackQuery", { callback_query_id: queryId });
     if (typeof msg.chat.id === "number" && typeof msg.message_id === "number") {
         await loginBotCall(botToken, "editMessageText", {
             chat_id: msg.chat.id,
