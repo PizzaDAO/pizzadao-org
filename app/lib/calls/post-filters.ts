@@ -1,7 +1,7 @@
 /**
  * Private editorial filters for Metalhead's automated call posts (pre-call agendas, post-call
  * recaps). The values live in the database as the private setting `calls.postFilter` (edited by call
- * reviewers on /admin/calls); nothing about them is in code, config or any public surface. Until that
+ * reviewers on /admin/calls); nothing about them is in code, config or any public surface. While that
  * setting has no saved row, its default (no filter) applies.
  *
  * - excludedCrewIds: crews that never get an automated post (compared as crew-mappings slugs).
