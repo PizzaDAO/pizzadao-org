@@ -21,6 +21,7 @@ import { savedChannelId } from '@/app/lib/settings/channels'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { DISCORD_ONLY, importedAllowed } from '@/app/lib/calls/imported'
 import { loadSettings } from '@/app/lib/settings'
+import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 import { agendaLeadMs, agendaLimits, buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
 
 const API = 'https://discord.com/api/v10'
@@ -244,6 +245,8 @@ async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutco
       { fetchImpl: (url, init) => fetch(url, { ...init, signal: AbortSignal.timeout(POST_TIMEOUT_MS) }) },
     )
     await prisma.callAgendaPost.update({ where, data: { messageId: id } }).catch(() => {})
+    // Mirror to the mapped city Telegram groups (queued only when switched on; never affects Discord).
+    await enqueueMirror({ kind: 'agenda', sourceId: `${p.eventId}:${p.startsAt.toISOString()}`, crewId: p.crewId, crewLabel: p.crewLabel, text: p.message, expiresAt: p.startsAt })
     return { ...base, status: 'posted', messageId: id }
   } catch (err) {
     console.error('[call-agenda] post failed', p.eventId, err instanceof Error ? err.message : err)
@@ -252,6 +255,7 @@ async function processPlan(p: PlannedAgenda, token: string): Promise<AgendaOutco
       return { ...base, status: 'failed' }
     }
     // The message may have been delivered; keep the claim rather than risk a double post.
+    await enqueueMirror({ kind: 'agenda', sourceId: `${p.eventId}:${p.startsAt.toISOString()}`, crewId: p.crewId, crewLabel: p.crewLabel, text: p.message, expiresAt: p.startsAt })
     return { ...base, status: 'post-uncertain' }
   }
 }

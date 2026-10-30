@@ -22,6 +22,7 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { loadSettings, type Settings } from '@/app/lib/settings'
 import { settingInt } from '@/app/lib/settings/numbers'
 import { importedAllowed, isImportedSource } from '@/app/lib/calls/imported'
+import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 
 export const COMMUNITY_CALL_CREW_ID = 'community_call'
 
@@ -262,10 +263,12 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
   const claim = await prisma.callRecording.updateMany({ where: { id, recapPostedAt: null, status: 'PUBLISHED' }, data: { recapPostedAt: new Date(), recapChannelId: channel.channelId, recapError: null } })
   if (claim.count !== 1) return 'already-posted'
   let messageId: string | null
+  let content: string | undefined
   try {
+    content = buildRecapText(rec, deps.base, filter, recapLimits(await loadSettings()))
     const sent = await (deps.post ?? postDiscordMessage)(
       { kind: 'bot', channelId: channel.channelId, botToken },
-      { content: buildRecapText(rec, deps.base, filter, recapLimits(await loadSettings())), allowed_mentions: { parse: [] }, flags: 4 /* SUPPRESS_EMBEDS */ },
+      { content, allowed_mentions: { parse: [] }, flags: 4 /* SUPPRESS_EMBEDS */ },
     )
     messageId = sent.id
   } catch (err) {
@@ -276,9 +279,13 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
     } else {
       // Unknown outcome: the message may have been posted. Keep the claim (no automatic repost).
       await prisma.callRecording.updateMany({ where: { id }, data: { recapError: `unknown outcome: ${msg}`.slice(0, 300) } })
+      // The claim is kept, so Discord may have it: mirror (never when Discord definitely refused).
+      if (content) await enqueueMirror({ kind: 'recap', sourceId: rec.id, crewId: rec.crewId, crewLabel: rec.crewLabel, text: content }, env)
     }
     return 'failed'
   }
+  // Mirror to the mapped city Telegram groups (queued only when switched on; never affects Discord).
+  await enqueueMirror({ kind: 'recap', sourceId: rec.id, crewId: rec.crewId, crewLabel: rec.crewLabel, text: content }, env)
   // The post succeeded; bookkeeping trouble must never release the claim or look like a failed post.
   if (messageId) await prisma.callRecording.update({ where: { id }, data: { recapMessageId: messageId } }).catch((e) => console.error('[calls/recap] could not store message id:', e instanceof Error ? e.message : e))
   return 'posted'

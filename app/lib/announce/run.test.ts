@@ -5,6 +5,8 @@ vi.mock("googleapis", () => ({
   google: { auth: { GoogleAuth: vi.fn() }, sheets: vi.fn(() => { throw new Error("real sheets client used"); }) },
 }));
 
+vi.mock("@/app/lib/telegram/city-posts", () => ({ enqueueMirror: vi.fn(async () => ({ queued: 0 })) }));
+import { enqueueMirror } from "@/app/lib/telegram/city-posts";
 import {
   runAnnouncement,
   getAnnounceConfig,
@@ -163,6 +165,20 @@ describe("runAnnouncement", () => {
       { range: "'Crews'!E23", value: "2026-10-02 14:00:00" },
       { range: "'Crews'!G23", value: "" },
     ]);
+  });
+
+  it("mirrors the announcement to Telegram city groups only after a successful Discord post", async () => {
+    vi.mocked(enqueueMirror).mockClear();
+    const ok = fakeSheet();
+    await runAnnouncement({ sheet: ok.io, config: BOT_CONFIG, now: () => NOW, postDiscord: vi.fn(async () => ({ id: "m" })), callSecretService: vi.fn(async () => ({ success: true })) });
+    expect(enqueueMirror).toHaveBeenCalledTimes(1);
+    const arg = vi.mocked(enqueueMirror).mock.calls[0][0];
+    expect(arg).toMatchObject({ kind: "announce", sourceId: "announce:2026-10-02" });
+    expect(arg.text).not.toMatch(/\*\*/);
+    vi.mocked(enqueueMirror).mockClear();
+    const bad = fakeSheet();
+    await runAnnouncement({ sheet: bad.io, config: BOT_CONFIG, now: () => NOW, postDiscord: vi.fn(async () => { throw new DiscordPostError("nope", 500); }) });
+    expect(enqueueMirror).not.toHaveBeenCalled();
   });
 
   it("on Discord failure: resets Announce?, keeps Last Sent, writes Last Error, returns 502", async () => {

@@ -2030,3 +2030,36 @@ model ProposalEvent {
 
   @@index([proposalId, createdAt])
 }
+
+enum TelegramPostStatus {
+  PENDING
+  SENT
+  SKIPPED
+  FAILED
+  UNCERTAIN
+}
+
+// Outbox of call recaps, agendas and announcements mirrored to city Telegram groups through the
+// rsv.pizza send proxy (plans/telegram-shared-bot.md). One row per (post, city); plain text.
+model TelegramGroupPost {
+  id        String             @id @default(cuid())
+  kind      String             @db.VarChar(16) // recap | agenda | announce
+  sourceId  String             @db.VarChar(120) // CallRecording.id | `${eventId}:${startsAt}` | announce date key
+  crewId    String?            @db.VarChar(64)
+  crewLabel String?            @db.VarChar(120) // for the send-time crew exclusion check
+  cityKey   String             @db.VarChar(80)
+  text      String // plain text, already filtered when queued
+  status    TelegramPostStatus @default(PENDING)
+  attempts  Int                @default(0)
+  sendAfter DateTime?
+  claimedAt DateTime?
+  expiresAt DateTime
+  messageId String?
+  code      String?            @db.VarChar(32)
+  createdAt DateTime           @default(now())
+  sentAt    DateTime?
+
+  @@unique([kind, sourceId, cityKey])
+  @@index([status, sendAfter])
+  @@index([cityKey, sentAt])
+}

@@ -26,6 +26,9 @@ vi.mock('@/app/lib/passport/scrub', () => ({ scrubCoordinates: vi.fn(async () =>
 vi.mock('@/app/lib/followups/send', () => ({ processDue: vi.fn(async () => ({ held: 1 })) }))
 vi.mock('@/app/lib/followups/draft', () => ({ draftFollowUpsForRecording: vi.fn(), listNeedingFollowups: vi.fn(async () => []) }))
 vi.mock('@/app/lib/followups/config', () => ({ loadFollowUpConfig: vi.fn(async () => ({ draftEnabled: true, sendEnabled: false })) }))
+vi.mock('@/app/lib/telegram/city-posts', () => ({
+  processOutbox: vi.fn(async () => ({ status: 'disabled', sent: 0, skipped: 0, failed: 0, uncertain: 0, deferred: 0 })),
+}))
 vi.mock('@/app/lib/slices/claims', () => ({ sweepAwaitingWallet: vi.fn(async () => 0) }))
 
 vi.mock('@/app/lib/trainee-nick-run', () => ({
@@ -42,6 +45,8 @@ import { GET as passportScrubGET } from './passport-scrub/route'
 import { scrubCoordinates } from '@/app/lib/passport/scrub'
 
 import { GET as followupsGET } from './followups/route'
+import { GET as telegramPostsGET } from './telegram-posts/route'
+import { processOutbox } from '@/app/lib/telegram/city-posts'
 import { processDue } from '@/app/lib/followups/send'
 import { processMintQueue } from '@/app/lib/slices/mint-queue'
 import { runTraineeNicks } from '@/app/lib/trainee-nick-run'
@@ -72,6 +77,7 @@ describe.each([
   ['/api/cron/passport-scrub', passportScrubGET, () => scrubCoordinates],
 
   ['/api/cron/followups', followupsGET, () => processDue],
+  ['/api/cron/telegram-posts', telegramPostsGET, () => processOutbox],
 ] as const)('%s auth', (path, GET, work) => {
   it('401 without the bearer token, and does no work', async () => {
     const res = await GET(req(path))
@@ -213,5 +219,13 @@ describe('/api/cron/passport-scrub', () => {
   it('returns the number of scrubbed rows', async () => {
     const res = await passportScrubGET(req('/api/cron/passport-scrub', 'Bearer cron-secret'))
     expect(await res.json()).toEqual({ scrubbed: 4 })
+  })
+})
+
+describe('/api/cron/telegram-posts', () => {
+  it('is scheduled every 5 minutes in vercel.json', async () => {
+    const { readFileSync } = await import('node:fs')
+    const crons = JSON.parse(readFileSync('vercel.json', 'utf8')).crons as Array<{ path: string; schedule: string }>
+    expect(crons.filter((c) => c.path === '/api/cron/telegram-posts')).toEqual([{ path: '/api/cron/telegram-posts', schedule: '*/5 * * * *' }])
   })
 })

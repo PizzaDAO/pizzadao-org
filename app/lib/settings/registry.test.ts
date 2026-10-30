@@ -23,7 +23,8 @@ describe('settings registry', () => {
     expect(new Set(SETTING_KEYS).size).toBe(SETTING_KEYS.length)
     for (const key of SETTING_KEYS) {
       expect(key).toMatch(/^[a-z][a-zA-Z]*(\.[a-zA-Z]+)+$/)
-      expect(key).not.toMatch(/secret|token|key|password/i)
+      // "city keys" are rsv.pizza directory names (public), not credentials.
+      expect(key.replace(/CityKeys$/, '')).not.toMatch(/secret|token|key|password/i)
       expect(SETTINGS[key].key).toBe(key)
     }
   })
@@ -59,8 +60,20 @@ describe('settings registry', () => {
     expect(SETTINGS['disavow.nominationWindowDays'].default).toBe(DISAVOW_NOMINATION_WINDOW_DAYS)
     expect(SETTINGS['disavow.listingMonths'].default).toBe(DISAVOW_LISTING_MONTHS)
     expect(SETTINGS['disavow.appealCooldownDays'].default).toBe(DISAVOW_APPEAL_COOLDOWN_DAYS)
+    // Telegram city mirrors: every switch off, no groups chosen, pacing as planned.
+    expect(SETTING_KEYS.filter((k) => k.startsWith('telegram.') && !k.startsWith('telegram.dm')).map((k) => [k, SETTINGS[k].default])).toEqual([
+      ['telegram.cityPostsEnabled', false],
+      ['telegram.recapMirrorEnabled', false],
+      ['telegram.agendaMirrorEnabled', false],
+      ['telegram.announceMirrorEnabled', false],
+      ['telegram.crewCityGroups', []],
+      ['telegram.announceCityKeys', []],
+      ['telegram.maxSendsPerRun', 25],
+      ['telegram.groupGapSeconds', 10],
+      ['telegram.postMaxAgeHours', 12],
+    ])
     // And the literal values today (a change here is a deliberate, reviewed change).
-    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('telegram.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
+    expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
       ['missions.humanReleaseMinLevel', 6],
       ['missions.newAccountDays', 30],

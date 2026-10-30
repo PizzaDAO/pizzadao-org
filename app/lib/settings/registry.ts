@@ -14,6 +14,7 @@ import { z } from 'zod'
 import { CONTENT_SETTINGS } from './content-settings'
 import { ECONOMY_SETTINGS } from './economy-settings'
 import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
+import { TELEGRAM_SETTINGS } from './telegram-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
 export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram'
@@ -1016,6 +1017,36 @@ export const SETTINGS = {
   ...ECONOMY_SETTINGS,
   // Content, caps, lists and the private call post filter (phase 5): ./content-settings.
   ...CONTENT_SETTINGS,
+  // Telegram city group mirrors (PR P3): the switches here, the data and pacing in ./telegram-settings.
+  'telegram.cityPostsEnabled': boolSetting({
+    key: 'telegram.cityPostsEnabled',
+    area: 'telegram',
+    label: 'Mirror posts to city Telegram groups',
+    help: 'Master switch for every mirror below: nothing is queued or sent while it is off. Posts go through the rsv.pizza bot to the groups chosen below. The TELEGRAM_CITY_POSTS_ENABLED env var set to off (or TELEGRAM_SENDS_ENABLED set to off) always wins; previews never send.',
+    confirmOn: 'Mirrors that are switched on will start posting into city Telegram groups.',
+  }),
+  'telegram.recapMirrorEnabled': boolSetting({
+    key: 'telegram.recapMirrorEnabled',
+    area: 'telegram',
+    label: 'Mirror call recaps to city groups',
+    help: 'When a recap is posted to Discord, also queue it for the city groups mapped to the crew. Needs the master switch and the recap switch (Calls).',
+    confirmOn: 'Published call recaps will also post to the mapped city Telegram groups.',
+  }),
+  'telegram.agendaMirrorEnabled': boolSetting({
+    key: 'telegram.agendaMirrorEnabled',
+    area: 'telegram',
+    label: 'Mirror pre-call agendas to city groups',
+    help: 'When an agenda is posted to Discord, also queue it for the city groups mapped to the crew. Needs the master switch and the agenda switch (Calls).',
+    confirmOn: 'Pre-call agendas will also post to the mapped city Telegram groups.',
+  }),
+  'telegram.announceMirrorEnabled': boolSetting({
+    key: 'telegram.announceMirrorEnabled',
+    area: 'telegram',
+    label: 'Mirror the Community Call announcement to city groups',
+    help: 'When the announcement goes out on Discord, also queue it for the announcement city groups below. Needs the master switch.',
+    confirmOn: 'The Community Call announcement will also post to the chosen city Telegram groups.',
+  }),
+  ...TELEGRAM_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.
   'payments.formSheetId': {

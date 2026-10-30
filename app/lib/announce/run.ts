@@ -32,6 +32,7 @@ import {
   normalizeForCrossPosting,
   parseSheetTimestamp,
 } from "./message";
+import { enqueueMirror } from "@/app/lib/telegram/city-posts";
 import { createAnnounceSheetIO, SENT_VALUE, type AnnounceSheetIO } from "./sheet";
 import {
   callSecretServiceAnnounce,
@@ -153,6 +154,15 @@ function errorText(err: unknown): string {
   return String(err);
 }
 
+/** YYYY-MM-DD in the announcement time zone: one announcement per day is mirrored once. */
+function announceDateKey(d: Date, timeZone: string): string {
+  try {
+    return new Intl.DateTimeFormat("en-CA", { timeZone, year: "numeric", month: "2-digit", day: "2-digit" }).format(d);
+  } catch {
+    return d.toISOString().slice(0, 10);
+  }
+}
+
 export async function runAnnouncement(deps: AnnounceDeps): Promise<AnnounceResult> {
   const now = deps.now ?? (() => new Date());
   const postDiscord = deps.postDiscord ?? postDiscordMessage;
@@ -210,6 +220,8 @@ export async function runAnnouncement(deps: AnnounceDeps): Promise<AnnounceResul
         deps.discordOptions,
       );
       results.discord = { success: true };
+      // Mirror to the chosen city Telegram groups (queued only when switched on; never affects Discord).
+      await enqueueMirror({ kind: "announce", sourceId: `announce:${announceDateKey(now(), config.timeZone)}`, text: normalizeForCrossPosting(msgs.telegram) });
     } catch (err) {
       results.discord = { success: false, error: errorText(err) };
     }

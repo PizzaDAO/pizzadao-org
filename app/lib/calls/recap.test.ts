@@ -3,9 +3,11 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: vi.fn(async () => ({ cached: true, crews: [] })) }))
+vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: vi.fn(async () => ({ queued: 0, reason: 'error' })) }))
 vi.mock('@/app/lib/discord-channels', () => ({ resolveChannelId: vi.fn(async () => null) }))
 
 import { prisma } from '@/app/lib/db'
+import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 import { DiscordPostError } from '@/app/lib/discord-rest'
 import { clearPostFilterCache, type PostFilter } from './post-filters'
 import { buildRecapText, channelIdFromCell, parseChannelCell, postCallRecap, recapBullets, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from './recap'
@@ -114,6 +116,34 @@ describe('postCallRecap', () => {
     expect(body.allowed_mentions).toEqual({ parse: [] })
     expect(body.content).toContain('https://example.org/calls/abc123')
     expect(db.callRecording.update).toHaveBeenCalledWith({ where: { id: 'abc123' }, data: { recapMessageId: 'm1' } })
+  })
+  it('mirrors the same text to Telegram after the claim, and a Telegram problem never changes the Discord result', async () => {
+    db.callRecording.findUnique.mockResolvedValue(published)
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callRecording.update.mockResolvedValue({})
+    const post = vi.fn(async () => ({ id: 'm1' }))
+    expect(await postCallRecap('abc123', { env, post, base })).toBe('posted')
+    expect(enqueueMirror).toHaveBeenCalledTimes(1)
+    const arg = vi.mocked(enqueueMirror).mock.calls[0][0]
+    expect(arg).toMatchObject({ kind: 'recap', sourceId: 'abc123', crewId: 'community_call' })
+    expect(arg.text).toBe((post.mock.calls[0] as unknown as [unknown, { content: string }])[1].content)
+  })
+  it('mirrors on an unknown Discord outcome (claim kept) but never when Discord refused', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    db.callRecording.findUnique.mockResolvedValue(published)
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    await postCallRecap('abc123', { env, post: vi.fn(async () => { throw new DiscordPostError('forbidden', 403) }) })
+    expect(enqueueMirror).not.toHaveBeenCalled()
+    await postCallRecap('abc123', { env, post: vi.fn(async () => { throw new DiscordPostError('bad gateway', 502) }) })
+    expect(enqueueMirror).toHaveBeenCalledTimes(1)
+  })
+  it('does not mirror when the post is not allowed or the claim is lost', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ ...published, status: 'IN_REVIEW' })
+    await postCallRecap('abc123', { env, post: vi.fn() })
+    db.callRecording.findUnique.mockResolvedValue(published)
+    db.callRecording.updateMany.mockResolvedValue({ count: 0 })
+    await postCallRecap('abc123', { env, post: vi.fn() })
+    expect(enqueueMirror).not.toHaveBeenCalled()
   })
   it('never double-posts', async () => {
     const post = vi.fn()
