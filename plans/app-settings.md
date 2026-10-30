@@ -6,7 +6,7 @@ Discord channels should be changeable by an authorised admin in the app, with no
 
 The repo is public. This plan, the code and any PR text must name **keys and code defaults only**. Editorial
 values (what to omit from posts, blocked terms, etc.) live only in private DB rows, the same way
-the call post filter table works today.
+the call post filter setting does.
 
 ## 1. Goal and non-goals
 
