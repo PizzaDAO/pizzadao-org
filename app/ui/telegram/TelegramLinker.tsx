@@ -134,6 +134,55 @@ export function TelegramLinker() {
         };
     }, [botUsername, load]);
 
+    // "Link with the Telegram app": get a one-time deep link, then poll until the bot has linked the account.
+    const [appState, setAppState] = useState<"idle" | "starting" | "waiting">("idle");
+    const [appNote, setAppNote] = useState<string | null>(null);
+
+    const onAppLink = async () => {
+        setError(null);
+        setAppNote(null);
+        setAppState("starting");
+        try {
+            const res = await fetch("/api/telegram/link/start", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: "{}",
+            });
+            const body = (await res.json().catch(() => ({}))) as { url?: string };
+            if (!res.ok || !body.url) {
+                setAppNote(t("appLinkFailed"));
+                setAppState("idle");
+                return;
+            }
+            // A plain navigation-free open: some mobile browsers block window.open after an await, so fall back to a link.
+            const w = window.open(body.url, "_blank", "noopener,noreferrer");
+            if (!w) window.location.href = body.url;
+            setAppState("waiting");
+        } catch {
+            setAppNote(t("appLinkFailed"));
+            setAppState("idle");
+        }
+    };
+
+    useEffect(() => {
+        if (appState !== "waiting") return;
+        const startedAt = Date.now();
+        const timer = setInterval(async () => {
+            if (Date.now() - startedAt > 10 * 60 * 1000) {
+                clearInterval(timer);
+                setAppNote(t("appLinkTimeout"));
+                setAppState("idle");
+                return;
+            }
+            await load();
+        }, 3000);
+        return () => clearInterval(timer);
+    }, [appState, load, t]);
+
+    useEffect(() => {
+        if (status?.connected && appState !== "idle") setAppState("idle");
+    }, [status?.connected, appState]);
+
     const onUnlink = async () => {
         setError(null);
         setBusy(true);
@@ -333,6 +382,38 @@ export function TelegramLinker() {
                         </span>
                         <span style={{ fontSize: 13, color: "hsl(var(--ink) / 0.55)", flexBasis: "100%" }}>{t("recognise")}</span>
                         <div ref={widgetRef} aria-label="Log in with Telegram to link your account" />
+                        <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
+                            <button
+                                type="button"
+                                onClick={onAppLink}
+                                disabled={appState !== "idle"}
+                                className="btn-pill"
+                                style={{
+                                    background: "transparent",
+                                    border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                                    color: "hsl(var(--foreground))",
+                                    opacity: appState !== "idle" ? 0.5 : 1,
+                                    cursor: appState !== "idle" ? "not-allowed" : "pointer",
+                                    maxWidth: "100%",
+                                    whiteSpace: "normal",
+                                }}
+                            >
+                                {appState === "starting" ? t("appLinkOpening") : t("appLink")}
+                            </button>
+                            {appState === "waiting" ? (
+                                <>
+                                    <span role="status" style={{ color: "hsl(var(--ink) / 0.55)" }}>{t("appLinkWaiting")}</span>
+                                    <button
+                                        type="button"
+                                        onClick={() => setAppState("idle")}
+                                        style={{ background: "none", border: "none", padding: 0, textDecoration: "underline", color: "hsl(var(--ink) / 0.7)", cursor: "pointer" }}
+                                    >
+                                        {t("appLinkCancel")}
+                                    </button>
+                                </>
+                            ) : null}
+                            {appNote ? <span role="status" style={{ color: "hsl(var(--ink) / 0.55)" }}>{appNote}</span> : null}
+                        </div>
                     </>
                 )}
             </div>

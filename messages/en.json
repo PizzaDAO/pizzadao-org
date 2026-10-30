@@ -7,6 +7,12 @@
     "saved": "Saved!"
   },
   "telegramLink": {
+    "appLink": "No phone number? Link with the Telegram app",
+    "appLinkOpening": "Opening Telegram…",
+    "appLinkWaiting": "Open Telegram and press Start. Waiting for it to finish…",
+    "appLinkCancel": "Stop waiting",
+    "appLinkFailed": "Couldn't start the link. Try again later.",
+    "appLinkTimeout": "Didn't finish in time. Start again to get a new link.",
     "recognise": "Linking lets PizzaDAO recognise your Telegram.",
     "dmOk": "The PizzaDAO bot can message you here.",
     "dmUnknown": "To get messages here, start the PizzaDAO bot in Telegram, then check again.",

@@ -7,6 +7,12 @@
     "saved": "¡Guardado!"
   },
   "telegramLink": {
+    "appLink": "¿Sin número de teléfono? Vincula con la app de Telegram",
+    "appLinkOpening": "Abriendo Telegram…",
+    "appLinkWaiting": "Abre Telegram y pulsa Iniciar. Esperando a que termine…",
+    "appLinkCancel": "Dejar de esperar",
+    "appLinkFailed": "No se pudo iniciar la vinculación. Inténtalo más tarde.",
+    "appLinkTimeout": "No terminó a tiempo. Empieza de nuevo para obtener un enlace nuevo.",
     "recognise": "Vincular tu cuenta permite que PizzaDAO reconozca tu Telegram.",
     "dmOk": "El bot de PizzaDAO puede escribirte aquí.",
     "dmUnknown": "Para recibir mensajes aquí, inicia el bot de PizzaDAO en Telegram y vuelve a comprobar.",
