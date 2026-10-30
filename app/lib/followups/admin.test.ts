@@ -21,6 +21,19 @@ beforeEach(() => {
   vi.mocked(prisma.followUpEvent.create).mockResolvedValue({} as never)
 })
 
+describe('admin queue reach', () => {
+  it('shows Discord only while the app has no Telegram sender, even for a linked and allowed person', async () => {
+    const { listFollowUps } = await import('./admin')
+    vi.mocked(prisma.followUp.findMany).mockResolvedValue([{ ...row(), recordingId: null, events: [] }] as never)
+    vi.mocked(prisma.telegramAccount.findMany).mockResolvedValue([{ discordId: '111', dmAllowed: true }] as never)
+    vi.mocked(prisma.messagingOptOut.findMany).mockResolvedValue([] as never)
+    vi.mocked(prisma.callRecording.findMany).mockResolvedValue([] as never)
+    const r = await listFollowUps()
+    expect(r.items[0]).toMatchObject({ telegramLinked: true, telegramDmAllowed: false })
+    expect(r.reach).toEqual({ people: 1, telegram: 0 })
+  })
+})
+
 describe('approval is the only door to sending', () => {
   it('approves a draft with an owner and logs the event', async () => {
     vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row() as never)

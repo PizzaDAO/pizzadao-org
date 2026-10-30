@@ -9,6 +9,7 @@
 // configured (TELEGRAM_LOGIN_BOT_TOKEN / NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME unset).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type TelegramStatus = {
     enabled: boolean;
@@ -45,6 +46,7 @@ function TelegramIcon() {
 }
 
 export function TelegramLinker() {
+    const t = useTranslations("telegramLink");
     const [status, setStatus] = useState<TelegramStatus | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -210,6 +212,7 @@ export function TelegramLinker() {
                         <span style={{ fontSize: 14, color: "hsl(var(--ink) / 0.7)" }}>
                             {busy ? "Linking Telegram…" : "Link your Telegram account"}
                         </span>
+                        <span style={{ fontSize: 13, color: "hsl(var(--ink) / 0.55)", flexBasis: "100%" }}>{t("recognise")}</span>
                         <div ref={widgetRef} aria-label="Log in with Telegram to link your account" />
                     </>
                 )}
