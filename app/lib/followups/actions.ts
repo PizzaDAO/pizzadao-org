@@ -1,6 +1,6 @@
 /**
  * What a member can do with a follow-up they received (button taps, replies, STOP). Shared by the
- * Telegram webhook and the Discord interactions endpoint. Only the person the row is addressed to
+ * Discord interactions endpoint (and the Telegram link actions planned for P2). Only the person the row is addressed to
  * can act on it. Returns text for the approvers when they should be told.
  */
 import type { FollowUpStatus } from '@prisma/client'

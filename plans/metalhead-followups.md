@@ -1,6 +1,9 @@
 # metalhead-followups: Metalhead follows up on things said on calls
 
 **Status:** Plan v1 (2026-10-27). Waiting on the admin's decisions at the bottom.
+**Superseded in part (2026-10-30):** the Telegram bot, webhook, `TELEGRAM_WEBHOOK_SECRET` and
+`scripts/telegram-set-webhook` described below were removed in PR P1 of `plans/telegram-shared-bot.md`.
+Telegram DMs will go through the rsv.pizza bot (P2); the login bot only verifies the Login Widget.
 **Ask (the admin, Ops call):** Metalhead should follow up on things said on calls by messaging the
 people involved on Telegram or Discord (e.g. "ask Member A how regional planning is
 going", "ask Member B to do the press release"). If it can't reach someone, it messages the admin

@@ -1,6 +1,7 @@
 /**
- * Minimal Telegram Bot API client for follow-up DMs. Uses the existing login bot (TELEGRAM_BOT_TOKEN),
- * because people grant DM permission per bot. Plain text only (no parse_mode), so message text can
+ * Minimal Telegram Bot API client for follow-up DMs. The app holds no sender token: the login bot only verifies
+ * the widget and never sends, so Telegram DMs are unavailable until they go through the rsv.pizza
+ * proxy (plans/telegram-shared-bot.md, PR P2). Plain text only (no parse_mode), so message text can
  * never break formatting. The token is never put in an error message or log line.
  */
 
@@ -17,8 +18,14 @@ export class TelegramApiError extends Error {
 
 export const TELEGRAM_TEXT_LIMIT = 4096
 
-export function telegramBotToken(env: Record<string, string | undefined> = process.env): string | null {
-  return env.TELEGRAM_BOT_TOKEN?.trim() || null
+/** The app has no Telegram sender token (the login bot never sends). Always null until P2. */
+export function telegramBotToken(): string | null {
+  return null
+}
+
+/** Whether follow-ups can send Telegram DMs at all. False until P2; callers then use Discord only. */
+export function telegramSenderAvailable(): boolean {
+  return telegramBotToken() !== null
 }
 
 export async function telegramApi<T>(
@@ -67,8 +74,4 @@ export async function sendTelegramMessage(
     { token: opts.token, fetchImpl: opts.fetchImpl },
   )
   return { messageId: result.message_id }
-}
-
-export async function answerCallback(callbackQueryId: string, text?: string): Promise<void> {
-  await telegramApi('answerCallbackQuery', { callback_query_id: callbackQueryId, ...(text ? { text: text.slice(0, 190) } : {}) }).catch(() => {})
 }

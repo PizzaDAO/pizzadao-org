@@ -6,9 +6,10 @@
 // official Telegram Login Widget; its data-onauth callback hands the signed
 // user object to POST /api/telegram/account, which verifies the HMAC
 // server-side. Renders nothing when the server reports Telegram as not
-// configured (TELEGRAM_BOT_TOKEN / NEXT_PUBLIC_TELEGRAM_BOT_USERNAME unset).
+// configured (TELEGRAM_LOGIN_BOT_TOKEN / NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME unset).
 
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useTranslations } from "next-intl";
 
 type TelegramStatus = {
     enabled: boolean;
@@ -17,7 +18,7 @@ type TelegramStatus = {
     username?: string | null;
     firstName?: string | null;
     lastName?: string | null;
-    dmAllowed?: boolean;
+    telegramDm?: { state: string; botUsername?: string | null };
 };
 
 declare global {
@@ -45,6 +46,7 @@ function TelegramIcon() {
 }
 
 export function TelegramLinker() {
+    const t = useTranslations("telegramLink");
     const [status, setStatus] = useState<TelegramStatus | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -103,8 +105,7 @@ export function TelegramLinker() {
         script.setAttribute("data-size", "medium");
         script.setAttribute("data-radius", "20");
         script.setAttribute("data-userpic", "false");
-        // Lets the bot send direct messages (follow-ups from calls) once the person approves.
-        script.setAttribute("data-request-access", "write");
+        // No data-request-access: the login bot never sends, so it must not ask for write access.
         script.setAttribute("data-onauth", "onTelegramAuth(user)");
         container.appendChild(script);
 
@@ -189,16 +190,6 @@ export function TelegramLinker() {
                             >
                                 § Telegram linked
                             </div>
-                            {status.dmAllowed === false && status.botUsername && (
-                                <a
-                                    href={`https://t.me/${status.botUsername}?start=fu`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{ fontSize: 13, textDecoration: "underline", color: "hsl(var(--foreground))" }}
-                                >
-                                    Allow PizzaDAO to message you on Telegram
-                                </a>
-                            )}
                         </div>
                         <button
                             type="button"
@@ -221,6 +212,7 @@ export function TelegramLinker() {
                         <span style={{ fontSize: 14, color: "hsl(var(--ink) / 0.7)" }}>
                             {busy ? "Linking Telegram…" : "Link your Telegram account"}
                         </span>
+                        <span style={{ fontSize: 13, color: "hsl(var(--ink) / 0.55)", flexBasis: "100%" }}>{t("recognise")}</span>
                         <div ref={widgetRef} aria-label="Log in with Telegram to link your account" />
                     </>
                 )}

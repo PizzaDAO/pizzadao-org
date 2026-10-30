@@ -6,6 +6,9 @@
     "loading": "Loading…",
     "saved": "Saved!"
   },
+  "telegramLink": {
+    "recognise": "Linking lets PizzaDAO recognise your Telegram."
+  },
   "language": {
     "sectionTitle": "Language",
     "description": "Choose the language the app uses to talk to you.",

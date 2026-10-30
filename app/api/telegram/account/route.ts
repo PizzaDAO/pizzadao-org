@@ -2,13 +2,13 @@
 //
 // Link / unlink the logged-in member's Telegram account (calzone-93434).
 //
-//   GET    -> { enabled, botUsername, connected, username, firstName, lastName, photoUrl }
+//   GET    -> { enabled, botUsername, connected, username, firstName, lastName, photoUrl, telegramDm }
 //   POST   -> body = Telegram Login Widget `user` object; HMAC-verified, then stored
 //   DELETE -> unlink
 //
-// All methods require a Discord session. When TELEGRAM_BOT_TOKEN or
-// NEXT_PUBLIC_TELEGRAM_BOT_USERNAME is unset, GET reports enabled:false (the UI
-// hides the button) and POST returns 503.
+// All methods require a Discord session. When TELEGRAM_LOGIN_BOT_TOKEN or
+// NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME is unset, GET reports enabled:false (the UI
+// hides the button) and POST returns 503. The login bot only verifies the widget; it never sends.
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
@@ -32,7 +32,7 @@ export async function GET() {
 
     const account = await prisma.telegramAccount.findUnique({
         where: { discordId: auth.session.discordId },
-        select: { username: true, firstName: true, lastName: true, photoUrl: true, dmAllowed: true },
+        select: { username: true, firstName: true, lastName: true, photoUrl: true },
     });
 
     return NextResponse.json(
@@ -40,6 +40,8 @@ export async function GET() {
             enabled: true,
             botUsername: cfg.botUsername,
             connected: Boolean(account),
+            // Reachability over the sender bot arrives with the next phase of plans/telegram-shared-bot.md.
+            telegramDm: { state: "unknown", botUsername: null },
             ...(account ?? {}),
         },
         { headers: NO_STORE },
@@ -89,8 +91,6 @@ export async function POST(req: Request) {
         lastName: tg.lastName,
         photoUrl: tg.photoUrl,
         authDate: tg.authDate,
-        // dmAllowed is deliberately NOT set here: the widget payload does not say whether write access
-        // was granted. It becomes true when the person taps /start or unblocks the bot.
         ...(memberId ? { memberId } : {}),
     };
 

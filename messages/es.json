@@ -6,6 +6,9 @@
     "loading": "Cargando…",
     "saved": "¡Guardado!"
   },
+  "telegramLink": {
+    "recognise": "Vincular tu cuenta permite que PizzaDAO reconozca tu Telegram."
+  },
   "language": {
     "sectionTitle": "Idioma",
     "description": "Elige el idioma con el que la aplicación se comunicará contigo.",

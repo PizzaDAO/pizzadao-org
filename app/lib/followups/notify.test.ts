@@ -2,6 +2,9 @@ import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/discord', () => ({ getMembersWithRoles: vi.fn(async () => []) }))
 
+const tg = vi.hoisted(() => ({ available: true }))
+vi.mock('./telegram', async (orig) => ({ ...(await orig<typeof import('./telegram')>()), telegramSenderAvailable: () => tg.available }))
+
 import { TelegramApiError } from './telegram'
 import { deliverToContacts, resolveContacts, type ContactDeps, type DeliverDeps } from './notify'
 
@@ -11,6 +14,15 @@ const deps = (holders: string[], accounts: Array<{ discordId: string; telegramId
 })
 
 describe('resolveContacts', () => {
+  it('while the app has no Telegram sender, every contact is Discord-only', async () => {
+    tg.available = false
+    try {
+      const c = await resolveContacts({ escalationDiscordIds: ['1'] }, deps([], [{ discordId: '1', telegramId: '901', dmAllowed: true }]))
+      expect(c).toEqual([{ discordId: '1', telegramChatId: null }])
+    } finally {
+      tg.available = true
+    }
+  })
   it('uses the configured list, Telegram when allowed, else Discord', async () => {
     const c = await resolveContacts({ escalationDiscordIds: ['1', '2'] }, deps([], [{ discordId: '1', telegramId: '901', dmAllowed: true }]))
     expect(c).toEqual([

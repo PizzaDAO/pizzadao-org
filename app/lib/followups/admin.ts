@@ -4,6 +4,7 @@
  */
 import { Prisma, type FollowUpChannel, type FollowUpStatus } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
+import { telegramSenderAvailable } from './telegram'
 import { fetchAllMembers } from '@/app/lib/sheets/members-list'
 import { addEvent, guardedTransition } from './store'
 import { canTransition, EDITABLE } from './state'
@@ -56,13 +57,14 @@ export async function listFollowUps(f: ListFilter = {}) {
       select: { id: true, title: true, eventName: true, crewLabel: true, startedAt: true },
     }),
   ])
+  const tgSender = telegramSenderAvailable()
   const tg = new Map(telegram.map((t) => [t.discordId, t.dmAllowed]))
   const opted = new Set(optedOut.map((o) => o.discordId))
   const callById = new Map(calls.map((c) => [c.id, c]))
   const items = rows.map((r) => ({
     ...r,
     telegramLinked: r.ownerDiscordId ? tg.has(r.ownerDiscordId) : false,
-    telegramDmAllowed: r.ownerDiscordId ? tg.get(r.ownerDiscordId) === true : false,
+    telegramDmAllowed: r.ownerDiscordId ? tg.get(r.ownerDiscordId) === true && tgSender : false,
     optedOut: r.ownerDiscordId ? opted.has(r.ownerDiscordId) : false,
     call: r.recordingId ? (callById.get(r.recordingId) ?? null) : null,
   }))

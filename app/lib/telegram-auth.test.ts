@@ -173,12 +173,12 @@ describe("telegramConfig", () => {
     });
 
     it("returns null unless both env vars are set", () => {
-        delete process.env.TELEGRAM_BOT_TOKEN;
-        delete process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+        delete process.env.TELEGRAM_LOGIN_BOT_TOKEN;
+        delete process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME;
         expect(telegramConfig()).toBeNull();
-        process.env.TELEGRAM_BOT_TOKEN = "t";
+        process.env.TELEGRAM_LOGIN_BOT_TOKEN = "t";
         expect(telegramConfig()).toBeNull();
-        process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME = "@PizzaDAOBot";
+        process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME = "@PizzaDAOBot";
         expect(telegramConfig()).toEqual({ botToken: "t", botUsername: "PizzaDAOBot" });
     });
 });
