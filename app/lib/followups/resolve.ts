@@ -96,7 +96,7 @@ export function resolveOwner(input: { ownerName: string; speakerDiscordId?: stri
 
 export type Channel = 'DISCORD' | 'TELEGRAM'
 
-/** Telegram when the person linked it and allowed DMs; otherwise a Discord DM. */
-export function defaultChannel(telegram: { dmAllowed: boolean } | null | undefined): Channel {
-  return telegram?.dmAllowed ? 'TELEGRAM' : 'DISCORD'
+/** Telegram when the person linked it and the shared bot can (or may yet) reach them; otherwise a Discord DM. */
+export function defaultChannel(telegram: { state: 'UNKNOWN' | 'OK' | 'NOT_STARTED' | 'BLOCKED' } | null | undefined): Channel {
+  return telegram && (telegram.state === 'OK' || telegram.state === 'UNKNOWN') ? 'TELEGRAM' : 'DISCORD'
 }

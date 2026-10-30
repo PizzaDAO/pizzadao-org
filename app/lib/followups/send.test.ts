@@ -4,7 +4,6 @@ vi.mock('@/app/lib/discord', () => ({ getMembersWithRoles: vi.fn(async () => [])
 vi.mock('./notify', async (orig) => ({ ...(await orig<typeof import('./notify')>()), deliverToContacts: vi.fn(async () => 0) }))
 
 import { DiscordPostError } from '@/app/lib/discord-rest'
-import { TelegramApiError } from './telegram'
 import { prisma } from '@/app/lib/db'
 import { composeText, decideSend, deliverOverChannels, escalationText, flagStuck, footerFor, isStale, sendFollowUp, type DecideInput, type Senders } from './send'
 import type { FollowUpConfig } from './config'
@@ -18,7 +17,7 @@ const base = (over: Partial<DecideInput> = {}): DecideInput => ({
   optedOut: false,
   timezone: 'UTC',
   sentAt: [],
-  telegramDmAllowed: false,
+  telegramEligible: false,
   ...over,
 })
 
@@ -30,11 +29,11 @@ describe('decideSend', () => {
   })
   it('sends over Discord by default and Telegram first when the person allowed DMs', () => {
     expect(decideSend(base())).toEqual({ action: 'send', channels: ['DISCORD'] })
-    expect(decideSend(base({ telegramDmAllowed: true }))).toEqual({ action: 'send', channels: ['TELEGRAM', 'DISCORD'] })
+    expect(decideSend(base({ telegramEligible: true }))).toEqual({ action: 'send', channels: ['TELEGRAM', 'DISCORD'] })
   })
   it('honours the reviewer channel, but never Telegram without DM permission', () => {
-    expect(decideSend(base({ row: { escalateOnly: false, ownerDiscordId: '111', channel: 'DISCORD' }, telegramDmAllowed: true }))).toEqual({ action: 'send', channels: ['DISCORD', 'TELEGRAM'] })
-    expect(decideSend(base({ row: { escalateOnly: false, ownerDiscordId: '111', channel: 'TELEGRAM' }, telegramDmAllowed: false }))).toEqual({ action: 'send', channels: ['DISCORD'] })
+    expect(decideSend(base({ row: { escalateOnly: false, ownerDiscordId: '111', channel: 'DISCORD' }, telegramEligible: true }))).toEqual({ action: 'send', channels: ['DISCORD', 'TELEGRAM'] })
+    expect(decideSend(base({ row: { escalateOnly: false, ownerDiscordId: '111', channel: 'TELEGRAM' }, telegramEligible: false }))).toEqual({ action: 'send', channels: ['DISCORD'] })
   })
   it('defers during the recipient quiet hours, to the end of them', () => {
     const late = new Date('2026-11-03T03:00:00Z') // 22:00 in New York
@@ -80,45 +79,78 @@ describe('message text', () => {
 })
 
 describe('deliverOverChannels fallbacks', () => {
-  const msg = { id: 'a'.repeat(25), message: 'hi', footers: { TELEGRAM: 'Reply STOP to stop.', DISCORD: 'Tap Stop to stop.' }, ownerDiscordId: '111', telegramChatId: '555', locale: 'en' }
+  const recheck = { dmRecheckDays: 7, dmRecheckMaxDays: 60 }
+  const buttons = [[{ text: 'Done', url: 'https://app.example.test/fu/x' }]]
+  const msg = {
+    id: 'a'.repeat(25), message: 'hi', footers: { TELEGRAM: 'Use the buttons to stop.', DISCORD: 'Tap Stop to stop.' }, ownerDiscordId: '111',
+    telegramChatId: '555', telegramButtons: buttons, attemptKey: 'fu:aaa:1', recheck, locale: 'en',
+  }
   const senders = (over: Partial<Senders> = {}): Senders => ({
-    telegram: vi.fn(async () => ({ messageId: 42 })),
+    telegram: vi.fn(async () => ({ ok: true as const, messageId: 42 })),
     discord: vi.fn(async () => ({ channelId: 'c1', messageId: 'm1' })),
-    markNoTelegramDm: vi.fn(async () => {}),
+    recordReach: vi.fn(async () => {}),
     ...over,
   })
+  const tgFail = (code: string, retryAfter?: number) => vi.fn(async () => ({ ok: false as const, code: code as never, retryAfter }))
 
-  it('sends over Telegram when it works', async () => {
+  it('sends over Telegram when it works, with URL buttons and the idempotency key', async () => {
     const s = senders()
     expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toEqual({ ok: true, channel: 'TELEGRAM', telegramChatId: '555', telegramMessageId: 42 })
     expect(s.discord).not.toHaveBeenCalled()
+    expect(s.telegram).toHaveBeenCalledWith({ telegramUserId: '555', text: 'hi\n\nUse the buttons to stop.', buttons, idempotencyKey: 'fu:aaa:1' })
+    expect(s.recordReach).toHaveBeenCalledWith('555', 'ok', recheck)
   })
-  it('a Telegram 403 clears the DM permission and falls through to Discord', async () => {
-    const s = senders({ telegram: vi.fn(async () => { throw new TelegramApiError('x', 403, 'Forbidden: bot was blocked by the user') }) })
+  it('not_started records the reach and falls through to Discord', async () => {
+    const s = senders({ telegram: tgFail('not_started') })
     const r = await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)
-    expect(r).toMatchObject({ ok: true, channel: 'DISCORD', discordChannelId: 'c1', discordMessageId: 'm1' })
-    expect(s.markNoTelegramDm).toHaveBeenCalledWith('555')
+    expect(r).toMatchObject({ ok: true, channel: 'DISCORD', discordChannelId: 'c1', discordMessageId: 'm1', telegramSkip: 'not-started' })
+    expect(s.recordReach).toHaveBeenCalledWith('555', 'not_started', recheck)
+  })
+  it('blocked records the reach and falls through to Discord', async () => {
+    const s = senders({ telegram: tgFail('blocked') })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toMatchObject({ ok: true, channel: 'DISCORD', telegramSkip: 'blocked' })
+    expect(s.recordReach).toHaveBeenCalledWith('555', 'blocked', recheck)
+  })
+  it('uncertain never also goes out on Discord (it may already have been delivered)', async () => {
+    const s = senders({ telegram: tgFail('uncertain') })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toEqual({ ok: false, errors: ['telegram: send failed'] })
+    expect(s.discord).not.toHaveBeenCalled()
+    expect(s.recordReach).not.toHaveBeenCalled()
+  })
+  it('rate_limited asks for a retry later and sends nothing on Discord', async () => {
+    const s = senders({ telegram: tgFail('rate_limited', 30) })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toMatchObject({ ok: false, retryAfterSec: 30 })
+    expect(s.discord).not.toHaveBeenCalled()
+  })
+  it('a briefly unavailable proxy also retries later (nothing was sent)', async () => {
+    const s = senders({ telegram: tgFail('unavailable') })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toMatchObject({ ok: false, retryAfterSec: 300 })
+    expect(s.discord).not.toHaveBeenCalled()
+  })
+  it('bad_request and not_configured fall through to Discord', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, senders({ telegram: tgFail('bad_request') }))).toMatchObject({ ok: true, channel: 'DISCORD', telegramSkip: 'bad-request' })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, senders({ telegram: tgFail('not_configured') }))).toMatchObject({ ok: true, channel: 'DISCORD', telegramSkip: 'off' })
   })
   it('a closed Discord DM (403) is a failed channel, reported without detail', async () => {
     const s = senders({ discord: vi.fn(async () => { throw new DiscordPostError('Cannot send messages to this user (code 50007)', 403) }) })
     const r = await deliverOverChannels(['DISCORD'], msg, s)
     expect(r).toEqual({ ok: false, errors: ['discord: DMs closed'] })
   })
-  it('a Telegram error that is NOT a refusal never also goes out on Discord (it may already have posted)', async () => {
-    const s = senders({ telegram: vi.fn(async () => { throw new TelegramApiError('x', 500, 'oops') }) })
-    const r = await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)
-    expect(r).toEqual({ ok: false, errors: ['telegram: send failed'] })
-    expect(s.discord).not.toHaveBeenCalled()
-    expect(s.markNoTelegramDm).not.toHaveBeenCalled()
-  })
   it('each channel gets its own footer', async () => {
     const s = senders()
     await deliverOverChannels(['TELEGRAM'], msg, s)
-    expect(vi.mocked(s.telegram).mock.calls[0][1]).toBe('hi\n\nReply STOP to stop.')
+    expect(vi.mocked(s.telegram).mock.calls[0][0].text).toBe('hi\n\nUse the buttons to stop.')
     const s2 = senders()
     await deliverOverChannels(['DISCORD'], msg, s2)
     expect(vi.mocked(s2.discord).mock.calls[0][1]).toBe('hi\n\nTap Stop to stop.')
-    expect(vi.mocked(s2.discord).mock.calls[0][1]).not.toMatch(/Reply/)
+  })
+  it('Discord gets an "Open in app" link button when a link is given', async () => {
+    const s = senders()
+    await deliverOverChannels(['DISCORD'], { ...msg, discordOpenUrl: 'https://app.example.test/fu/x' }, s)
+    const components = JSON.stringify(vi.mocked(s.discord).mock.calls[0][2])
+    expect(components).toContain('"style":5')
+    expect(components).toContain('https://app.example.test/fu/x')
   })
   it('Discord first: a 5xx does not fall back to Telegram, only a closed DM does', async () => {
     const s = senders({ discord: vi.fn(async () => { throw new DiscordPostError('boom', 500) }) })
@@ -129,18 +161,22 @@ describe('deliverOverChannels fallbacks', () => {
     expect(await deliverOverChannels(['DISCORD', 'TELEGRAM'], msg, s2)).toMatchObject({ ok: true, channel: 'TELEGRAM' })
   })
   it('a Telegram refusal then a Discord failure reports failure', async () => {
-    const s = senders({
-      telegram: vi.fn(async () => { throw new TelegramApiError('x', 403, 'Forbidden') }),
-      discord: vi.fn(async () => { throw new DiscordPostError('boom', 500) }),
-    })
+    const s = senders({ telegram: tgFail('blocked'), discord: vi.fn(async () => { throw new DiscordPostError('boom', 500) }) })
     const r = await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)
     expect(r.ok).toBe(false)
   })
-  it('skips Telegram when there is no chat id', async () => {
+  it('skips Telegram when there is no chat id or no buttons', async () => {
     const s = senders()
-    const r = await deliverOverChannels(['TELEGRAM', 'DISCORD'], { ...msg, telegramChatId: null }, s)
-    expect(r).toMatchObject({ ok: true, channel: 'DISCORD' })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], { ...msg, telegramChatId: null }, s)).toMatchObject({ ok: true, channel: 'DISCORD' })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], { ...msg, telegramButtons: null }, s)).toMatchObject({ ok: true, channel: 'DISCORD' })
     expect(s.telegram).not.toHaveBeenCalled()
+  })
+})
+
+describe('decideSend: Telegram eligibility', () => {
+  it('records why Telegram was left out', () => {
+    expect(decideSend(base({ telegramEligible: false, telegramWhy: 'not-started' }))).toEqual({ action: 'send', channels: ['DISCORD'], telegramSkip: 'not-started' })
+    expect(decideSend(base({ telegramEligible: true }))).toEqual({ action: 'send', channels: ['TELEGRAM', 'DISCORD'] })
   })
 })
 
@@ -182,7 +218,7 @@ describe('stale approvals', () => {
     vi.mocked(prisma.followUp.updateMany).mockResolvedValue({ count: 1 } as never)
     vi.mocked(prisma.followUpEvent.create).mockResolvedValue({} as never)
     vi.mocked(prisma.followUp.findUnique).mockResolvedValue({ id: 'f1', status: 'APPROVED', approvedAt: new Date('2026-11-01T00:00:00Z'), ownerDiscordId: '111' } as never)
-    const senders = { telegram: vi.fn(), discord: vi.fn(), markNoTelegramDm: vi.fn() }
+    const senders = { telegram: vi.fn(), discord: vi.fn(), recordReach: vi.fn() }
     expect(await sendFollowUp('f1', { now, cfg, senders: senders as never })).toBe('stale')
     expect(senders.telegram).not.toHaveBeenCalled()
     expect(senders.discord).not.toHaveBeenCalled()

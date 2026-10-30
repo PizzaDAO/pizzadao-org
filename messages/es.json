@@ -7,7 +7,17 @@
     "saved": "¡Guardado!"
   },
   "telegramLink": {
-    "recognise": "Vincular tu cuenta permite que PizzaDAO reconozca tu Telegram."
+    "recognise": "Vincular tu cuenta permite que PizzaDAO reconozca tu Telegram.",
+    "dmOk": "El bot de PizzaDAO puede escribirte aquí.",
+    "dmUnknown": "Para recibir mensajes aquí, inicia el bot de PizzaDAO en Telegram y vuelve a comprobar.",
+    "dmNotStarted": "El bot de PizzaDAO aún no puede escribirte. Inícialo en Telegram y vuelve a comprobar.",
+    "dmBlocked": "Bloqueaste el bot de PizzaDAO. Desbloquéalo en Telegram y vuelve a comprobar.",
+    "dmStart": "Iniciar el bot",
+    "dmCheck": "Comprobar de nuevo",
+    "dmChecking": "Comprobando…",
+    "dmPreview": "La comprobación no está disponible en este sitio.",
+    "dmTryLater": "No se pudo comprobar ahora. Inténtalo de nuevo en unos minutos.",
+    "dmCheckFailed": "No se pudo comprobar. Inténtalo de nuevo."
   },
   "language": {
     "sectionTitle": "Idioma",
@@ -1467,7 +1477,7 @@
     "linkSettings": "Ajustes",
     "sendingOn": "El envío está activado: los mensajes aprobados salen en minutos (rigen las horas de silencio y los límites diarios).",
     "sendingOff": "El envío está desactivado: los mensajes aprobados esperan y no se envía nada. Actívalo en Ajustes.",
-    "reach": "{telegram} de {people} personas se pueden contactar por Telegram; el resto recibe un mensaje de Discord.",
+    "reach": "Alcanzables en Telegram: {telegram} / vinculados: {linked} (de {people} personas). El resto recibe un mensaje de Discord.",
     "empty": "No hay nada aquí.",
     "untitledCall": "Llamada",
     "loadError": "No se pudieron cargar los seguimientos.",
@@ -1526,8 +1536,20 @@
       "button": "Botón pulsado",
       "optout": "Se dio de baja",
       "dismissed": "Descartado",
-      "reresolved": "Persona reasignada"
-    }
+      "reresolved": "Persona reasignada",
+      "snooze": "Pospuesto",
+      "telegram-undeliverable": "Telegram no pudo entregar",
+      "optout-undone": "Baja deshecha"
+    },
+    "fallback": {
+      "off": "Telegram está desactivado",
+      "no-link": "Sin Telegram vinculado",
+      "not-started": "No ha iniciado el bot",
+      "blocked": "Bloqueó el bot",
+      "bad-request": "Telegram rechazó el mensaje"
+    },
+    "fallbackNote": "No se envió por Telegram: {reason}",
+    "snoozedUntil": "Pospuesto hasta {when}"
   },
   "budget": {
     "metaTitle": "Guía de presupuestos",
@@ -1765,6 +1787,68 @@
       "shared": "Código compartido.",
       "copied": "Código copiado.",
       "failed": "No se pudo copiar. Abre la propuesta y copia el código desde allí."
+    }
+  },
+  "followupAction": {
+    "overline": "§ Seguimiento",
+    "askIntro": "Se trata de:",
+    "invalid": {
+      "title": "Este enlace no es válido",
+      "body": "Puede que se copiara mal. Abre de nuevo el último mensaje."
+    },
+    "expired": {
+      "title": "Este enlace ha caducado",
+      "body": "Pide uno nuevo a la persona que te escribió."
+    },
+    "closed": {
+      "body": "Este seguimiento ya está cerrado. No hay nada más que hacer."
+    },
+    "replyLabel": "Tu respuesta",
+    "send": "Enviar respuesta",
+    "working": "Procesando…",
+    "undo": "Deshacer",
+    "undone": "Listo. Vuelves a estar en la lista.",
+    "undoExpired": "Ya es tarde para deshacerlo.",
+    "emptyReply": "Escribe primero una respuesta.",
+    "tooMany": "Demasiados intentos. Espera un minuto e inténtalo de nuevo.",
+    "error": "Algo salió mal. Inténtalo de nuevo.",
+    "actions": {
+      "done": {
+        "title": "Marcar como hecho",
+        "prompt": "¿Marcar esto como hecho?",
+        "confirm": "Sí, está hecho",
+        "done": "Marcado como hecho. ¡Gracias!"
+      },
+      "wip": {
+        "title": "Estoy en ello",
+        "prompt": "¿Avisar de que estás trabajando en esto?",
+        "confirm": "Sí, estoy en ello",
+        "done": "Anotado: estás en ello."
+      },
+      "help": {
+        "title": "Pedir ayuda",
+        "prompt": "¿Pedir ayuda con esto?",
+        "confirm": "Sí, necesito ayuda",
+        "done": "Anotado: alguien se pondrá en contacto para ayudar."
+      },
+      "snooze": {
+        "title": "Posponer",
+        "prompt": "¿Posponer esto {days} días?",
+        "confirm": "Posponer",
+        "done": "Pospuesto {days} días."
+      },
+      "reply": {
+        "title": "Responder",
+        "prompt": "Escribe tu respuesta abajo.",
+        "confirm": "Enviar respuesta",
+        "done": "Gracias, se lo hemos pasado."
+      },
+      "stop": {
+        "title": "Dejar de recibir estos mensajes",
+        "prompt": "¿Dejar de recibir los mensajes de seguimiento de PizzaDAO, en todas las apps?",
+        "confirm": "Dejar de recibirlos",
+        "done": "Listo. No recibirás más estos mensajes."
+      }
     }
   }
 }

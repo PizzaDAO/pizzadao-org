@@ -19,7 +19,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const STATUSES = ["DRAFT", "APPROVED", "SENT", "FAILED", "UNREACHABLE", "ESCALATED", "REPLIED", "IN_PROGRESS", "NEEDS_HELP", "DONE", "DISMISSED"] as const;
-const EVENTS = ["drafted", "edited", "approved", "sent", "failed", "deferred", "unreachable", "escalated", "reply", "button", "optout", "dismissed", "reresolved"] as const;
+const EVENTS = ["drafted", "edited", "approved", "sent", "failed", "deferred", "unreachable", "escalated", "reply", "button", "optout", "dismissed", "reresolved", "snooze", "telegram-undeliverable", "optout-undone"] as const;
+const FALLBACKS = ["off", "no-link", "not-started", "blocked", "bad-request"] as const;
 const PLAIN = [
     "sendingOn", "sendingOff", "empty", "untitledCall", "loadError", "errorGeneric", "working", "unresolved", "ambiguous", "optedOut",
     "pickPerson", "searchPlaceholder", "reresolve", "message", "channel", "channelDiscord", "channelTelegram", "due", "openCall", "reply",
@@ -50,7 +51,10 @@ export default async function AdminFollowUpsPage() {
     const labels: QueueLabels = {};
     for (const k of PLAIN) labels[k] = t(k);
     // Templates keep their {placeholders} for the client to fill.
-    labels.reach = t("reach", { telegram: "{telegram}", people: "{people}" });
+    labels.reach = t("reach", { telegram: "{telegram}", linked: "{linked}", people: "{people}" });
+    labels.fallbackNote = t("fallbackNote", { reason: "{reason}" });
+    labels.snoozedUntil = t("snoozedUntil", { when: "{when}" });
+    for (const f of FALLBACKS) labels[`fallback.${f}`] = t(`fallback.${f}`);
     labels.footerNote = t("footerNote", { footer: "{footer}" });
     labels.channelDefault = t("channelDefault", { channel: "{channel}" });
     labels.scheduled = t("scheduled", { when: "{when}" });

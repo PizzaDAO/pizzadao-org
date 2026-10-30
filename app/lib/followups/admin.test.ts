@@ -22,15 +22,24 @@ beforeEach(() => {
 })
 
 describe('admin queue reach', () => {
-  it('shows Discord only while the app has no Telegram sender, even for a linked and allowed person', async () => {
-    const { listFollowUps } = await import('./admin')
+  const setup = (reach: Array<{ telegramId: string; state: string; failures: number; recheckAt: Date | null }>) => {
     vi.mocked(prisma.followUp.findMany).mockResolvedValue([{ ...row(), recordingId: null, events: [] }] as never)
-    vi.mocked(prisma.telegramAccount.findMany).mockResolvedValue([{ discordId: '111', dmAllowed: true }] as never)
+    vi.mocked(prisma.telegramAccount.findMany).mockResolvedValue([{ discordId: '111', telegramId: '901' }] as never)
+    vi.mocked(prisma.telegramReach.findMany).mockResolvedValue(reach as never)
     vi.mocked(prisma.messagingOptOut.findMany).mockResolvedValue([] as never)
     vi.mocked(prisma.callRecording.findMany).mockResolvedValue([] as never)
+  }
+  it('shows Discord only while Telegram sending is off (preview or switch off), even for a reachable person', async () => {
+    const { listFollowUps } = await import('./admin')
+    setup([{ telegramId: '901', state: 'OK', failures: 0, recheckAt: null }])
     const r = await listFollowUps()
-    expect(r.items[0]).toMatchObject({ telegramLinked: true, telegramDmAllowed: false })
-    expect(r.reach).toEqual({ people: 1, telegram: 0 })
+    expect(r.items[0]).toMatchObject({ telegramLinked: true, telegramDmAllowed: false, telegramState: 'OK' })
+    expect(r.reach).toEqual({ people: 1, linked: 1, telegram: 1 })
+  })
+  it('counts only confirmed-reachable people as reachable', async () => {
+    const { listFollowUps } = await import('./admin')
+    setup([{ telegramId: '901', state: 'NOT_STARTED', failures: 1, recheckAt: new Date('2099-01-01') }])
+    expect((await listFollowUps()).reach).toEqual({ people: 1, linked: 1, telegram: 0 })
   })
 })
 

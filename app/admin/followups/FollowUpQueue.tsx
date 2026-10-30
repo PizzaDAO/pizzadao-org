@@ -46,6 +46,9 @@ interface Item {
     error: string | null;
     telegramLinked: boolean;
     telegramDmAllowed: boolean;
+    telegramState: string | null;
+    telegramFallback: string | null;
+    snoozedUntil: string | null;
     optedOut: boolean;
     call: { id: string; title: string | null; eventName: string | null; crewLabel: string | null; startedAt: string } | null;
     events: EventRow[];
@@ -54,7 +57,7 @@ interface Item {
 
 interface Payload {
     items: Item[];
-    reach: { people: number; telegram: number };
+    reach: { people: number; linked: number; telegram: number };
     sendEnabled: boolean;
     footerTelegram: string;
     footerDiscord: string;
@@ -226,6 +229,8 @@ function Row({ item, labels, footers, onChanged }: { item: Item; labels: QueueLa
 
             {item.lastReply && <p className="m-0 rounded-lg bg-foreground/5 p-2 text-sm"><strong>{labels.reply}:</strong> {item.lastReply}</p>}
             {item.error && <p className="m-0 text-sm text-tomato">{item.error}</p>}
+            {item.telegramFallback && <p className="m-0 text-sm text-foreground/60">{fill(labels.fallbackNote, { reason: labels[`fallback.${item.telegramFallback}`] ?? item.telegramFallback })}</p>}
+            {item.snoozedUntil && <p className="m-0 text-sm text-foreground/60">{fill(labels.snoozedUntil, { when: new Date(item.snoozedUntil).toLocaleDateString() })}</p>}
             {item.status === "APPROVED" && item.sendAfter && <p className="m-0 text-xs text-foreground/60">{fill(labels.scheduled, { when: new Date(item.sendAfter).toLocaleString() })}</p>}
 
             <div className="flex flex-wrap items-center gap-2 text-sm">
@@ -308,7 +313,7 @@ export function FollowUpQueue({ labels }: { labels: QueueLabels }) {
             <p className="m-0 rounded-xl border p-3 text-sm font-bold" style={{ borderColor: data.sendEnabled ? "hsl(var(--rule-warm) / 0.55)" : "tomato" }}>
                 {data.sendEnabled ? labels.sendingOn : labels.sendingOff}
             </p>
-            {data.reach.people > 0 && <p className="m-0 text-sm text-foreground/70">{fill(labels.reach, { telegram: data.reach.telegram, people: data.reach.people })}</p>}
+            {data.reach.people > 0 && <p className="m-0 text-sm text-foreground/70">{fill(labels.reach, { telegram: data.reach.telegram, linked: data.reach.linked, people: data.reach.people })}</p>}
             <div className="flex flex-wrap gap-2 text-sm">
                 {(["open", "sent", "all"] as const).map((f) => (
                     <button key={f} type="button" onClick={() => setFilter(f)} aria-pressed={filter === f} className="rounded-lg border px-3 py-1" style={{ ...border, fontWeight: filter === f ? 700 : 400 }}>

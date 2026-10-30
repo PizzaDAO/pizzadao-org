@@ -7,7 +7,17 @@
     "saved": "Enregistré !"
   },
   "telegramLink": {
-    "recognise": "Lier ton compte permet à PizzaDAO de reconnaître ton Telegram."
+    "recognise": "Lier ton compte permet à PizzaDAO de reconnaître ton Telegram.",
+    "dmOk": "Le bot PizzaDAO peut vous écrire ici.",
+    "dmUnknown": "Pour recevoir des messages ici, démarrez le bot PizzaDAO dans Telegram, puis vérifiez à nouveau.",
+    "dmNotStarted": "Le bot PizzaDAO ne peut pas encore vous écrire. Démarrez-le dans Telegram, puis vérifiez à nouveau.",
+    "dmBlocked": "Vous avez bloqué le bot PizzaDAO. Débloquez-le dans Telegram, puis vérifiez à nouveau.",
+    "dmStart": "Démarrer le bot",
+    "dmCheck": "Vérifier à nouveau",
+    "dmChecking": "Vérification…",
+    "dmPreview": "La vérification n'est pas disponible sur ce site.",
+    "dmTryLater": "Impossible de vérifier pour le moment. Réessayez dans quelques minutes.",
+    "dmCheckFailed": "Impossible de vérifier. Réessayez."
   },
   "language": {
     "sectionTitle": "Langue",
@@ -1467,7 +1477,7 @@
     "linkSettings": "Réglages",
     "sendingOn": "L'envoi est activé : les messages approuvés partent en quelques minutes (heures calmes et limites quotidiennes appliquées).",
     "sendingOff": "L'envoi est désactivé : les messages approuvés attendent et rien n'est envoyé. Activez-le dans les Réglages.",
-    "reach": "{telegram} personnes sur {people} sont joignables sur Telegram ; les autres reçoivent un message Discord.",
+    "reach": "Joignables sur Telegram : {telegram} / liés : {linked} (sur {people} personnes). Les autres reçoivent un message Discord.",
     "empty": "Rien ici.",
     "untitledCall": "Appel",
     "loadError": "Impossible de charger les suivis.",
@@ -1526,8 +1536,20 @@
       "button": "Bouton touché",
       "optout": "Désinscrit",
       "dismissed": "Écarté",
-      "reresolved": "Personne réassociée"
-    }
+      "reresolved": "Personne réassociée",
+      "snooze": "Reporté",
+      "telegram-undeliverable": "Telegram n'a pas pu livrer",
+      "optout-undone": "Désinscription annulée"
+    },
+    "fallback": {
+      "off": "Telegram est désactivé",
+      "no-link": "Aucun Telegram lié",
+      "not-started": "N'a pas démarré le bot",
+      "blocked": "A bloqué le bot",
+      "bad-request": "Telegram a rejeté le message"
+    },
+    "fallbackNote": "Non envoyé sur Telegram : {reason}",
+    "snoozedUntil": "Reporté jusqu'au {when}"
   },
   "budget": {
     "metaTitle": "Guide du budget",
@@ -1765,6 +1787,68 @@
       "shared": "Code partagé.",
       "copied": "Code copié.",
       "failed": "Copie impossible. Ouvrez la proposition et copiez le code de là."
+    }
+  },
+  "followupAction": {
+    "overline": "§ Suivi",
+    "askIntro": "Cela concerne :",
+    "invalid": {
+      "title": "Ce lien n'est pas valide",
+      "body": "Il a peut-être été mal copié. Rouvrez le dernier message."
+    },
+    "expired": {
+      "title": "Ce lien a expiré",
+      "body": "Demandez-en un nouveau à la personne qui vous a écrit."
+    },
+    "closed": {
+      "body": "Ce suivi est déjà clos. Il n'y a plus rien à faire."
+    },
+    "replyLabel": "Votre réponse",
+    "send": "Envoyer la réponse",
+    "working": "En cours…",
+    "undo": "Annuler",
+    "undone": "C'est fait. Vous êtes de nouveau sur la liste.",
+    "undoExpired": "Il est trop tard pour annuler.",
+    "emptyReply": "Écrivez d'abord une réponse.",
+    "tooMany": "Trop d'essais. Attendez une minute et réessayez.",
+    "error": "Une erreur s'est produite. Réessayez.",
+    "actions": {
+      "done": {
+        "title": "Marquer comme fait",
+        "prompt": "Marquer ceci comme fait ?",
+        "confirm": "Oui, c'est fait",
+        "done": "Marqué comme fait. Merci !"
+      },
+      "wip": {
+        "title": "Je m'en occupe",
+        "prompt": "Indiquer que vous travaillez dessus ?",
+        "confirm": "Oui, je m'en occupe",
+        "done": "Noté : vous vous en occupez."
+      },
+      "help": {
+        "title": "Demander de l'aide",
+        "prompt": "Demander de l'aide pour ceci ?",
+        "confirm": "Oui, j'ai besoin d'aide",
+        "done": "Noté : quelqu'un vous contactera pour vous aider."
+      },
+      "snooze": {
+        "title": "Reporter",
+        "prompt": "Reporter ceci de {days} jours ?",
+        "confirm": "Reporter",
+        "done": "Reporté de {days} jours."
+      },
+      "reply": {
+        "title": "Répondre",
+        "prompt": "Écrivez votre réponse ci-dessous.",
+        "confirm": "Envoyer la réponse",
+        "done": "Merci, c'est transmis."
+      },
+      "stop": {
+        "title": "Arrêter ces messages",
+        "prompt": "Arrêter tous les messages de suivi de PizzaDAO, sur toutes les apps ?",
+        "confirm": "Arrêter ces messages",
+        "done": "C'est fait. Vous ne recevrez plus ces messages."
+      }
     }
   }
 }

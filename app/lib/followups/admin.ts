@@ -4,7 +4,9 @@
  */
 import { Prisma, type FollowUpChannel, type FollowUpStatus } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
-import { telegramSenderAvailable } from './telegram'
+import { canTryTelegram } from '@/app/lib/telegram/reach'
+import { telegramSendAllowed } from '@/app/lib/telegram/rsv-client'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { fetchAllMembers } from '@/app/lib/sheets/members-list'
 import { addEvent, guardedTransition } from './store'
 import { canTransition, EDITABLE } from './state'
@@ -50,29 +52,35 @@ export async function listFollowUps(f: ListFilter = {}) {
   })
   const owners = [...new Set(rows.flatMap((r) => (r.ownerDiscordId ? [r.ownerDiscordId] : [])))]
   const [telegram, optedOut, calls] = await Promise.all([
-    owners.length ? prisma.telegramAccount.findMany({ where: { discordId: { in: owners } }, select: { discordId: true, dmAllowed: true } }) : [],
+    owners.length ? prisma.telegramAccount.findMany({ where: { discordId: { in: owners } }, select: { discordId: true, telegramId: true } }) : [],
     owners.length ? prisma.messagingOptOut.findMany({ where: { discordId: { in: owners } }, select: { discordId: true } }) : [],
     prisma.callRecording.findMany({
       where: { id: { in: [...new Set(rows.flatMap((r) => (r.recordingId ? [r.recordingId] : [])))] } },
       select: { id: true, title: true, eventName: true, crewLabel: true, startedAt: true },
     }),
   ])
-  const tgSender = telegramSenderAvailable()
-  const tg = new Map(telegram.map((t) => [t.discordId, t.dmAllowed]))
+  const reachRows = telegram.length ? await prisma.telegramReach.findMany({ where: { telegramId: { in: telegram.map((t) => t.telegramId) } }, select: { telegramId: true, state: true, failures: true, recheckAt: true } }) : []
+  const reachById = new Map(reachRows.map((r) => [r.telegramId, r]))
+  const tgSender = telegramSendAllowed() && (await toggleEnabled('telegram.dmEnabled').catch(() => false))
+  const now = new Date()
+  const tg = new Map(telegram.map((t) => [t.discordId, reachById.get(t.telegramId) ?? null]))
   const opted = new Set(optedOut.map((o) => o.discordId))
   const callById = new Map(calls.map((c) => [c.id, c]))
   const items = rows.map((r) => ({
     ...r,
     telegramLinked: r.ownerDiscordId ? tg.has(r.ownerDiscordId) : false,
-    telegramDmAllowed: r.ownerDiscordId ? tg.get(r.ownerDiscordId) === true && tgSender : false,
+    /** Telegram would be tried for this person now (linked, the sender is on, and reach does not rule it out). */
+    telegramDmAllowed: r.ownerDiscordId && tg.has(r.ownerDiscordId) ? tgSender && canTryTelegram(tg.get(r.ownerDiscordId), now) : false,
+    telegramState: r.ownerDiscordId && tg.has(r.ownerDiscordId) ? (tg.get(r.ownerDiscordId)?.state ?? 'UNKNOWN') : null,
+    snoozedUntil: r.snoozedUntil && r.snoozedUntil.getTime() > now.getTime() ? r.snoozedUntil : null,
     optedOut: r.ownerDiscordId ? opted.has(r.ownerDiscordId) : false,
     call: r.recordingId ? (callById.get(r.recordingId) ?? null) : null,
   }))
-  // Reach: of the rows with a person, how many can be messaged on Telegram (the rest use Discord DMs).
+  // Reach: of the rows with a person, how many linked Telegram and how many are confirmed reachable (the rest use Discord DMs).
   const withOwner = items.filter((i) => i.ownerDiscordId)
   return {
     items,
-    reach: { people: withOwner.length, telegram: withOwner.filter((i) => i.telegramDmAllowed).length },
+    reach: { people: withOwner.length, linked: withOwner.filter((i) => i.telegramLinked).length, telegram: withOwner.filter((i) => i.telegramState === 'OK').length },
   }
 }
 

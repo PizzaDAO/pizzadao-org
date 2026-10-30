@@ -5,6 +5,7 @@
  * the settings could be read. Anything unreadable means nothing is sent.
  */
 import { loadSettings } from '@/app/lib/settings'
+import { resolveToggle } from '@/app/lib/settings/toggles'
 
 export interface FollowUpConfig {
   sendEnabled: boolean
@@ -21,6 +22,12 @@ export interface FollowUpConfig {
   approvalMaxDays: number
   unknownTzStartHour: number
   unknownTzEndHour: number
+  /** Telegram DMs over the shared sender bot (telegram.dmEnabled; needs sendEnabled too). */
+  telegramDmEnabled: boolean
+  dmRecheckDays: number
+  dmRecheckMaxDays: number
+  linkTtlDays: number
+  snoozeDays: number
 }
 
 /** FOLLOWUPS_SEND_ENABLED set to off/0/false/no always wins over the setting. */
@@ -50,6 +57,11 @@ export async function loadFollowUpConfig(env: Record<string, string | undefined>
     approvalMaxDays: s.get('followups.approvalMaxDays'),
     unknownTzStartHour: s.get('followups.unknownTzStartHour'),
     unknownTzEndHour: s.get('followups.unknownTzEndHour'),
+    telegramDmEnabled: sendOk && resolveToggle('telegram.dmEnabled', s, env),
+    dmRecheckDays: s.get('telegram.dmRecheckDays'),
+    dmRecheckMaxDays: s.get('telegram.dmRecheckMaxDays'),
+    linkTtlDays: s.get('followups.linkTtlDays'),
+    snoozeDays: s.get('followups.snoozeDays'),
   }
 }
 

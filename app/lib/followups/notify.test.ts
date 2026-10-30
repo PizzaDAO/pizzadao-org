@@ -1,30 +1,36 @@
-import { describe, it, expect, vi } from 'vitest'
+import { afterEach, beforeEach, describe, it, expect, vi } from 'vitest'
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/discord', () => ({ getMembersWithRoles: vi.fn(async () => []) }))
 
-const tg = vi.hoisted(() => ({ available: true }))
-vi.mock('./telegram', async (orig) => ({ ...(await orig<typeof import('./telegram')>()), telegramSenderAvailable: () => tg.available }))
-
-import { TelegramApiError } from './telegram'
+import type { ReachRow } from '@/app/lib/telegram/reach'
 import { deliverToContacts, resolveContacts, type ContactDeps, type DeliverDeps } from './notify'
 
-const deps = (holders: string[], accounts: Array<{ discordId: string; telegramId: string; dmAllowed: boolean }>): ContactDeps => ({
+const SENDER_ENV = { VERCEL_ENV: 'production', RSV_PIZZA_TELEGRAM_KEY: 'key' } as const
+const on = { telegramDmEnabled: true }
+const reach = (state: ReachRow['state'], recheckAt: Date | null = null): ReachRow => ({ state, failures: 0, recheckAt })
+
+const deps = (holders: string[], accounts: Array<{ discordId: string; telegramId: string; reach: ReachRow | null }>): ContactDeps => ({
   roleHolders: async () => holders,
   accounts: async (ids) => accounts.filter((a) => ids.includes(a.discordId)),
 })
 
 describe('resolveContacts', () => {
-  it('while the app has no Telegram sender, every contact is Discord-only', async () => {
-    tg.available = false
-    try {
-      const c = await resolveContacts({ escalationDiscordIds: ['1'] }, deps([], [{ discordId: '1', telegramId: '901', dmAllowed: true }]))
-      expect(c).toEqual([{ discordId: '1', telegramChatId: null }])
-    } finally {
-      tg.available = true
-    }
+  beforeEach(() => {
+    for (const [k, v] of Object.entries(SENDER_ENV)) vi.stubEnv(k, v)
   })
-  it('uses the configured list, Telegram when allowed, else Discord', async () => {
-    const c = await resolveContacts({ escalationDiscordIds: ['1', '2'] }, deps([], [{ discordId: '1', telegramId: '901', dmAllowed: true }]))
+  afterEach(() => vi.unstubAllEnvs())
+
+  it('with the Telegram toggle off, every contact is Discord-only', async () => {
+    const c = await resolveContacts({ escalationDiscordIds: ['1'], telegramDmEnabled: false }, deps([], [{ discordId: '1', telegramId: '901', reach: reach('OK') }]))
+    expect(c).toEqual([{ discordId: '1', telegramChatId: null }])
+  })
+  it('on a preview (not production) every contact is Discord-only', async () => {
+    vi.stubEnv('VERCEL_ENV', 'preview')
+    const c = await resolveContacts({ escalationDiscordIds: ['1'], ...on }, deps([], [{ discordId: '1', telegramId: '901', reach: reach('OK') }]))
+    expect(c).toEqual([{ discordId: '1', telegramChatId: null }])
+  })
+  it('uses the configured list, Telegram when reachable, else Discord', async () => {
+    const c = await resolveContacts({ escalationDiscordIds: ['1', '2'], ...on }, deps([], [{ discordId: '1', telegramId: '901', reach: null }]))
     expect(c).toEqual([
       { discordId: '1', telegramChatId: '901' },
       { discordId: '2', telegramChatId: null },
@@ -32,43 +38,59 @@ describe('resolveContacts', () => {
   })
   it('with no list: the approvers who linked Telegram (nobody is hard-coded)', async () => {
     const c = await resolveContacts(
-      { escalationDiscordIds: [] },
-      deps(['1', '2', '3'], [{ discordId: '2', telegramId: '902', dmAllowed: true }, { discordId: '3', telegramId: '903', dmAllowed: false }]),
+      { escalationDiscordIds: [], ...on },
+      deps(['1', '2', '3'], [{ discordId: '2', telegramId: '902', reach: reach('OK') }, { discordId: '3', telegramId: '903', reach: reach('BLOCKED') }]),
     )
     expect(c).toEqual([{ discordId: '2', telegramChatId: '902' }])
   })
   it('with no list and nobody on Telegram: falls back to Discord DMs to the approvers', async () => {
-    const c = await resolveContacts({ escalationDiscordIds: [] }, deps(['1', '2'], []))
+    const c = await resolveContacts({ escalationDiscordIds: [], ...on }, deps(['1', '2'], []))
     expect(c.map((x) => x.discordId)).toEqual(['1', '2'])
     expect(c.every((x) => x.telegramChatId === null)).toBe(true)
   })
   it('no approvers at all means no contacts', async () => {
-    expect(await resolveContacts({ escalationDiscordIds: [] }, deps([], []))).toEqual([])
+    expect(await resolveContacts({ escalationDiscordIds: [], ...on }, deps([], []))).toEqual([])
   })
 })
 
 describe('deliverToContacts', () => {
+  const cfg = { dmRecheckDays: 7, dmRecheckMaxDays: 60 }
   const mk = (over: Partial<DeliverDeps> = {}): DeliverDeps => ({
-    telegram: vi.fn(async () => ({ messageId: 1 })),
+    telegram: vi.fn(async () => ({ ok: true as const, messageId: 1 })),
     discord: vi.fn(async () => ({ channelId: 'c', messageId: 'm' })),
-    markNoDm: vi.fn(async () => {}),
+    recordReach: vi.fn(async () => {}),
     ...over,
   })
+  const fail = (code: string) => vi.fn(async () => ({ ok: false as const, code: code as never }))
   it('counts deliveries and prefers Telegram', async () => {
     const d = mk()
-    const n = await deliverToContacts([{ discordId: '1', telegramChatId: '901' }, { discordId: '2', telegramChatId: null }], 'hi', d)
+    const n = await deliverToContacts([{ discordId: '1', telegramChatId: '901' }, { discordId: '2', telegramChatId: null }], 'hi', cfg, d)
     expect(n).toBe(2)
     expect(d.telegram).toHaveBeenCalledTimes(1)
+    expect(vi.mocked(d.telegram).mock.calls[0][0].idempotencyKey).toMatch(/^[A-Za-z0-9:_-]{8,80}$/)
     expect(d.discord).toHaveBeenCalledTimes(1)
   })
-  it('falls back to Discord when Telegram refuses, and clears the permission', async () => {
-    const d = mk({ telegram: vi.fn(async () => { throw new TelegramApiError('x', 403, 'Forbidden') }) })
-    expect(await deliverToContacts([{ discordId: '1', telegramChatId: '901' }], 'hi', d)).toBe(1)
-    expect(d.markNoDm).toHaveBeenCalledWith('901')
+  it('falls back to Discord when Telegram cannot reach them, and records it', async () => {
+    const d = mk({ telegram: fail('not_started') })
+    expect(await deliverToContacts([{ discordId: '1', telegramChatId: '901' }], 'hi', cfg, d)).toBe(1)
+    expect(d.recordReach).toHaveBeenCalledWith('901', 'not_started', cfg)
+  })
+  it('a rate limit or config problem falls back to Discord without touching the reach', async () => {
+    for (const code of ['rate_limited', 'unavailable', 'not_configured', 'bad_request']) {
+      const d = mk({ telegram: fail(code) })
+      expect(await deliverToContacts([{ discordId: '1', telegramChatId: '901' }], 'hi', cfg, d)).toBe(1)
+      expect(d.recordReach).not.toHaveBeenCalled()
+    }
+  })
+  it('uncertain never also sends on Discord', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    const d = mk({ telegram: fail('uncertain') })
+    expect(await deliverToContacts([{ discordId: '1', telegramChatId: '901' }], 'hi', cfg, d)).toBe(0)
+    expect(d.discord).not.toHaveBeenCalled()
   })
   it('one unreachable contact does not stop the rest', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     const d = mk({ discord: vi.fn().mockRejectedValueOnce(new Error('closed')).mockResolvedValue({ channelId: 'c', messageId: 'm' }) })
-    expect(await deliverToContacts([{ discordId: '1', telegramChatId: null }, { discordId: '2', telegramChatId: null }], 'hi', d)).toBe(1)
+    expect(await deliverToContacts([{ discordId: '1', telegramChatId: null }, { discordId: '2', telegramChatId: null }], 'hi', cfg, d)).toBe(1)
   })
 })

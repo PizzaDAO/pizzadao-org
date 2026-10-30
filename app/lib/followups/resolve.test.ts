@@ -71,8 +71,10 @@ describe('resolveOwner', () => {
 
 describe('defaultChannel', () => {
   it('prefers Telegram only when DMs are allowed', () => {
-    expect(defaultChannel({ dmAllowed: true })).toBe('TELEGRAM')
-    expect(defaultChannel({ dmAllowed: false })).toBe('DISCORD')
+    expect(defaultChannel({ state: 'OK' })).toBe('TELEGRAM')
+    expect(defaultChannel({ state: 'UNKNOWN' })).toBe('TELEGRAM')
+    expect(defaultChannel({ state: 'NOT_STARTED' })).toBe('DISCORD')
+    expect(defaultChannel({ state: 'BLOCKED' })).toBe('DISCORD')
     expect(defaultChannel(null)).toBe('DISCORD')
   })
 })

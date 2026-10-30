@@ -1,6 +1,6 @@
 /**
  * What a member can do with a follow-up they received (button taps, replies, STOP). Shared by the
- * Discord interactions endpoint (and the Telegram link actions planned for P2). Only the person the row is addressed to
+ * Discord interactions endpoint and the signed action links sent on Telegram (app/api/fu). Only the person the row is addressed to
  * can act on it. Returns text for the approvers when they should be told.
  */
 import type { FollowUpStatus } from '@prisma/client'
@@ -12,7 +12,6 @@ import { OPEN_AFTER_SEND } from './state'
 import { addEvent, guardedTransition, optOut } from './store'
 
 export const MAX_REPLY_CHARS = 1000
-const REPLY_WINDOW_MS = 7 * 24 * 3600_000
 /** Replies on one row alert the approvers at most once per this long; replies in between are merged. */
 export const REPLY_ALERT_GAP_MS = 10 * 60_000
 
@@ -34,7 +33,7 @@ export async function takeAlertSlot(rowId: string, ownerDiscordId: string, kind:
 }
 
 export type ActionResult =
-  | { ok: true; kind: 'status' | 'reply' | 'stopped'; status: FollowUpStatus; notify?: string }
+  | { ok: true; kind: 'status' | 'reply' | 'stopped' | 'snoozed'; status: FollowUpStatus; notify?: string; until?: Date }
   | { ok: false; reason: 'not-found' | 'not-yours' | 'closed' | 'empty' }
 
 const STATUS_FOR: Record<'done' | 'wip' | 'help', FollowUpStatus> = { done: 'DONE', wip: 'IN_PROGRESS', help: 'NEEDS_HELP' }
@@ -74,6 +73,15 @@ export async function applyMemberAction(a: {
     return { ok: true, kind: 'reply', status: row.status === 'SENT' ? 'REPLIED' : row.status, ...(alert ? { notify: `Reply from ${row.ownerName} on "${row.ask}": ${text}` } : {}) }
   }
 
+  if (a.action === 'snooze') {
+    // Not a status: the row stays open and shows as snoozed in the queue. Approvers are not alerted.
+    const cfg = await loadFollowUpConfig()
+    const until = new Date(Date.now() + cfg.snoozeDays * DAY_MS)
+    await prisma.followUp.update({ where: { id: row.id }, data: { snoozedUntil: until } })
+    await addEvent(row.id, 'snooze', a.actorId, { until: until.toISOString() })
+    return { ok: true, kind: 'snoozed', status: row.status, until }
+  }
+
   const to = STATUS_FOR[a.action]
   const wasHelp = row.status === 'NEEDS_HELP'
   if (row.status !== to) {
@@ -89,17 +97,4 @@ export async function applyMemberAction(a: {
     // Only a change into NEEDS_HELP alerts; tapping it again does not.
     ...(a.action === 'help' && !wasHelp && (await takeAlertSlot(row.id, a.discordId, 'help', a.actorId)) ? { notify: `${row.ownerName} needs help with: "${row.ask}"` } : {}),
   }
-}
-
-/** The follow-up a Telegram message belongs to: the one it replies to, else the chat's latest open one from the last 7 days. */
-export async function findFollowUpForChat(chatId: string, replyToMessageId?: number | null): Promise<{ id: string; ownerDiscordId: string | null } | null> {
-  if (replyToMessageId) {
-    const direct = await prisma.followUp.findFirst({ where: { telegramChatId: chatId, telegramMessageId: replyToMessageId }, select: { id: true, ownerDiscordId: true } })
-    if (direct) return direct
-  }
-  return prisma.followUp.findFirst({
-    where: { telegramChatId: chatId, status: { in: [...OPEN_AFTER_SEND] }, sentAt: { gte: new Date(Date.now() - REPLY_WINDOW_MS) } },
-    orderBy: { sentAt: 'desc' },
-    select: { id: true, ownerDiscordId: true },
-  })
 }

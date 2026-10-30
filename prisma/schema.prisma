@@ -1741,6 +1741,8 @@ model FollowUp {
   discordMessageId  String?
   telegramChatId    String?
   telegramMessageId Int?
+  snoozedUntil      DateTime? // the member snoozed this from the action page; reminders must respect it
+  telegramFallback  String?   @db.VarChar(32) // why Telegram was skipped or failed (no-link, not-started, blocked, off, bad-request)
   lastReply         String?
   lastReplyAt       DateTime?
   approvedBy        String?
@@ -1756,6 +1758,24 @@ model FollowUp {
   @@index([ownerDiscordId, sentAt])
   @@index([recordingId])
   @@index([telegramChatId, telegramMessageId])
+}
+
+enum TelegramReachState {
+  UNKNOWN
+  OK
+  NOT_STARTED
+  BLOCKED
+}
+
+/// Whether the shared sender bot can DM this Telegram user. Keyed by Telegram id.
+model TelegramReach {
+  telegramId String             @id
+  state      TelegramReachState @default(UNKNOWN)
+  failures   Int                @default(0) // consecutive not_started results
+  checkedAt  DateTime?
+  recheckAt  DateTime? // do not try Telegram before this (NOT_STARTED backoff)
+  lastCode   String?            @db.VarChar(32)
+  updatedAt  DateTime           @updatedAt
 }
 
 model FollowUpEvent {
