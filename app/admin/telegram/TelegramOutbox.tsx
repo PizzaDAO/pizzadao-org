@@ -37,6 +37,7 @@ interface Overview {
         announceOn: boolean;
         directory: string;
     };
+    hostMatch: { on: boolean; mode: number; checkedToday: number; dailyBudget: number; counts: { pending: number; invited: number; confirmed: number; declined: number } };
     rows: Row[];
     directory: Array<{ cityKey: string; title: string | null; country: string | null; region: string | null; hasChat: boolean }>;
     warnings: Array<{ source: "crew" | "announce"; crewId?: string; cityKey: string; problem: "unknown" | "no_chat" }>;
@@ -99,6 +100,25 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
                     <li>{fill(labels.statusSend, { value: s.sendAllowed ? labels.sendYes : !s.production ? labels.sendPreview : !s.keyConfigured ? labels.sendNoKey : s.killed ? labels.sendKilled : labels.sendNo })}</li>
                     <li>{fill(labels.statusSwitches, { master: yesNo(s.cityPostsOn), recap: yesNo(s.recapOn), agenda: yesNo(s.agendaOn), announce: yesNo(s.announceOn) })}</li>
                     <li>{fill(labels.statusDirectory, { value: s.directory === "ok" ? labels.dirOk : labels[`code.${s.directory}`] ?? s.directory })}</li>
+                </ul>
+            </section>
+
+            <section className="grid gap-2">
+                <h2 className="m-0 text-xl font-black">{labels.hostMatchTitle}</h2>
+                <ul className="m-0 grid gap-1 pl-5 text-sm">
+                    <li>
+                        {data.hostMatch.on
+                            ? fill(labels.hostMatchOn, { mode: String(data.hostMatch.mode), today: String(data.hostMatch.checkedToday), budget: String(data.hostMatch.dailyBudget) })
+                            : labels.hostMatchOff}
+                    </li>
+                    <li>
+                        {fill(labels.hostMatchCounts, {
+                            pending: String(data.hostMatch.counts.pending),
+                            invited: String(data.hostMatch.counts.invited),
+                            confirmed: String(data.hostMatch.counts.confirmed),
+                            declined: String(data.hostMatch.counts.declined),
+                        })}
+                    </li>
                 </ul>
             </section>
 

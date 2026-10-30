@@ -17,7 +17,61 @@
     "dmChecking": "Comprobando…",
     "dmPreview": "La comprobación no está disponible en este sitio.",
     "dmTryLater": "No se pudo comprobar ahora. Inténtalo de nuevo en unos minutos.",
-    "dmCheckFailed": "No se pudo comprobar. Inténtalo de nuevo."
+    "dmCheckFailed": "No se pudo comprobar. Inténtalo de nuevo.",
+    "matchOverline": "§ Telegram encontrado",
+    "matchAsk": "Encontramos una cuenta de Telegram ({hint}) vinculada a tu actividad como anfitrión en rsv.pizza. ¿La usamos para los seguimientos de PizzaDAO?",
+    "matchAwaiting": "Enviamos un mensaje de confirmación a esa cuenta de Telegram ({hint}). Abre el enlace con tu sesión iniciada aquí para terminar.",
+    "matchConfirmed": "La cuenta de Telegram {hint} está conectada para los seguimientos de PizzaDAO.",
+    "matchYes": "Sí, soy yo",
+    "matchNo": "No, no soy yo",
+    "matchResend": "Enviar de nuevo",
+    "matchRemove": "Dejar de usarla",
+    "matchSent": "Listo. Revisa Telegram: te llegó un mensaje del bot con un enlace.",
+    "matchNotStarted": "El bot aún no puede escribir a esa cuenta. Abre el bot de rsv.pizza en Telegram, pulsa Iniciar e inténtalo de nuevo.",
+    "matchBlocked": "Esa cuenta bloqueó al bot, así que no podemos enviar la confirmación.",
+    "matchWait": "Se acaba de enviar una confirmación. Espera unos minutos antes de pedirla otra vez.",
+    "matchTryLater": "No se pudo enviar ahora. Inténtalo de nuevo en unos minutos.",
+    "matchUnavailable": "No se pudo enviar la confirmación. Inténtalo más tarde.",
+    "matchPreview": "El envío no está disponible en este sitio."
+  },
+  "telegramConfirm": {
+    "title": "Confirma tu Telegram",
+    "overline": "§ Telegram",
+    "login": {
+      "title": "Inicia sesión para continuar",
+      "body": "Para confirmar tu Telegram hace falta la cuenta de PizzaDAO a la que pertenece.",
+      "cta": "Iniciar sesión"
+    },
+    "invalid": {
+      "title": "Este enlace no es válido",
+      "body": "Puede que se copiara mal. Pide un nuevo mensaje de confirmación en la app."
+    },
+    "expired": {
+      "title": "Este enlace ha caducado",
+      "body": "Pide un nuevo mensaje de confirmación desde tu perfil."
+    },
+    "closed": {
+      "title": "Este enlace ya no está activo",
+      "body": "La coincidencia se eliminó o cambió. No hay nada que hacer."
+    },
+    "wrong-account": {
+      "title": "Este enlace es de otra cuenta",
+      "body": "Tienes la sesión iniciada como otro miembro de PizzaDAO. Inicia sesión como quien lo pidió."
+    },
+    "ready": {
+      "title": "¿Usar este Telegram para PizzaDAO?",
+      "body": "Al confirmar, PizzaDAO podrá enviarte los seguimientos de las llamadas por Telegram, a través del bot de rsv.pizza.",
+      "hint": "Cuenta de Telegram: {hint}",
+      "confirm": "Sí, usar este Telegram"
+    },
+    "already": {
+      "body": "Este Telegram ya está confirmado."
+    },
+    "done": "Confirmado. Los seguimientos de PizzaDAO ya pueden llegarte por Telegram.",
+    "working": "Procesando…",
+    "error": "Algo salió mal. Inténtalo de nuevo.",
+    "tooMany": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
+    "hasLogin": "Ya vinculaste una cuenta de Telegram con el botón de inicio de sesión, que tiene prioridad."
   },
   "language": {
     "sectionTitle": "Idioma",
@@ -1865,6 +1919,10 @@
     "loadError": "No se pudo cargar la cola de Telegram.",
     "errorGeneric": "Algo salió mal.",
     "working": "Trabajando...",
+    "hostMatchTitle": "Coincidencias de anfitriones",
+    "hostMatchOff": "Las coincidencias de anfitriones están desactivadas.",
+    "hostMatchOn": "Las coincidencias de anfitriones están activadas (modo {mode}). Revisados hoy: {today} de {budget}.",
+    "hostMatchCounts": "Sugeridas: {pending}, invitadas: {invited}, confirmadas: {confirmed}, rechazadas: {declined}",
     "empty": "Aún no hay nada en cola.",
     "on": "activado",
     "off": "desactivado",

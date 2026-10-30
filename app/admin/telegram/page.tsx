@@ -20,7 +20,7 @@ export async function generateMetadata(): Promise<Metadata> {
 
 const PLAIN = [
     "loadError", "errorGeneric", "working", "empty", "on", "off", "statusTitle", "sendYes", "sendNo", "sendPreview", "sendNoKey", "sendKilled",
-    "dirOk", "warnTitle", "outboxTitle", "skip", "showText", "hideText", "directoryTitle", "directoryEmpty", "noChat", "warnAnnounce",
+    "dirOk", "warnTitle", "outboxTitle", "skip", "showText", "hideText", "directoryTitle", "directoryEmpty", "noChat", "warnAnnounce", "hostMatchTitle", "hostMatchOff",
 ] as const;
 const TEMPLATES: Record<string, string[]> = {
     statusSend: ["value"],
@@ -29,6 +29,8 @@ const TEMPLATES: Record<string, string[]> = {
     warnUnknown: ["city", "where"],
     warnNoChat: ["city", "where"],
     warnCrew: ["crew"],
+    hostMatchOn: ["mode", "today", "budget"],
+    hostMatchCounts: ["pending", "invited", "confirmed", "declined"],
 };
 const STATUSES = ["PENDING", "SENT", "SKIPPED", "FAILED", "UNCERTAIN"] as const;
 const KINDS = ["recap", "agenda", "announce"] as const;

@@ -62,6 +62,13 @@ export async function loadAdminOverview() {
     agenda: describeToggle('telegram.agendaMirrorEnabled', settings),
     announce: describeToggle('telegram.announceMirrorEnabled', settings),
   }
+  const hostMatchToggle = describeToggle('telegram.hostMatchEnabled', settings)
+  const dayStart = new Date(Date.UTC(new Date().getUTCFullYear(), new Date().getUTCMonth(), new Date().getUTCDate()))
+  const [matchGroups, checkedToday] = await Promise.all([
+    prisma.telegramHostMatch.groupBy({ by: ['consent'], _count: { _all: true } }).catch(() => []),
+    prisma.telegramHostMatchCheck.count({ where: { checkedAt: { gte: dayStart } } }).catch(() => 0),
+  ])
+  const matchCount = (c: string) => matchGroups.find((g) => g.consent === c)?._count._all ?? 0
   const crewRows = settings.get('telegram.crewCityGroups') as Array<{ crewId: string; cityKeys: string }>
   const announceKeys = settings.get('telegram.announceCityKeys') as string[]
   return {
@@ -75,6 +82,14 @@ export async function loadAdminOverview() {
       agendaOn: toggles.agenda.effective,
       announceOn: toggles.announce.effective,
       directory: directory.ok ? 'ok' : directory.reason,
+    },
+    // Counts only: no ids, handles or member names.
+    hostMatch: {
+      on: hostMatchToggle.effective,
+      mode: settings.get('telegram.hostMatchMode') as number,
+      checkedToday,
+      dailyBudget: settings.get('telegram.hostMatchDailyHashes') as number,
+      counts: { pending: matchCount('PENDING'), invited: matchCount('INVITED'), confirmed: matchCount('CONFIRMED'), declined: matchCount('DECLINED') },
     },
     rows: rows.map((r) => ({
       id: r.id,

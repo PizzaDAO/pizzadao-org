@@ -14,6 +14,7 @@ vi.mock("@/app/lib/db", () => ({
             upsert: vi.fn(),
             deleteMany: vi.fn(),
         },
+        telegramHostMatch: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
     },
 }));
 
@@ -97,6 +98,9 @@ describe("/api/telegram/account", () => {
                 create: expect.objectContaining({ discordId: "d1", telegramId: "7", username: "tee", memberId: "42" }),
             }),
         );
+        // A login always wins: any suggested host match for this member is dropped.
+        const hm = (prisma as unknown as { telegramHostMatch: { deleteMany: ReturnType<typeof vi.fn> } }).telegramHostMatch;
+        expect(hm.deleteMany).toHaveBeenCalledWith({ where: { OR: [{ discordId: "d1" }, { telegramId: "7" }] } });
     });
 
     it("POST refuses a Telegram account linked to another member", async () => {

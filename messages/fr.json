@@ -17,7 +17,61 @@
     "dmChecking": "Vérification…",
     "dmPreview": "La vérification n'est pas disponible sur ce site.",
     "dmTryLater": "Impossible de vérifier pour le moment. Réessayez dans quelques minutes.",
-    "dmCheckFailed": "Impossible de vérifier. Réessayez."
+    "dmCheckFailed": "Impossible de vérifier. Réessayez.",
+    "matchOverline": "§ Telegram trouvé",
+    "matchAsk": "Nous avons trouvé un compte Telegram ({hint}) lié à votre activité d'hôte sur rsv.pizza. L'utiliser pour les suivis PizzaDAO ?",
+    "matchAwaiting": "Nous avons envoyé un message de confirmation à ce compte Telegram ({hint}). Ouvrez le lien qu'il contient, connecté ici, pour terminer.",
+    "matchConfirmed": "Le compte Telegram {hint} est connecté pour les suivis PizzaDAO.",
+    "matchYes": "Oui, c'est moi",
+    "matchNo": "Non, pas moi",
+    "matchResend": "Renvoyer",
+    "matchRemove": "Ne plus l'utiliser",
+    "matchSent": "C'est fait. Regardez Telegram : le bot vous a envoyé un message avec un lien.",
+    "matchNotStarted": "Le bot ne peut pas encore écrire à ce compte. Ouvrez le bot rsv.pizza dans Telegram, appuyez sur Démarrer, puis réessayez.",
+    "matchBlocked": "Ce compte a bloqué le bot, nous ne pouvons donc pas envoyer la confirmation.",
+    "matchWait": "Une confirmation vient d'être envoyée. Attendez quelques minutes avant d'en demander une autre.",
+    "matchTryLater": "Envoi impossible pour le moment. Réessayez dans quelques minutes.",
+    "matchUnavailable": "Impossible d'envoyer la confirmation. Réessayez plus tard.",
+    "matchPreview": "L'envoi n'est pas disponible sur ce site."
+  },
+  "telegramConfirm": {
+    "title": "Confirmez votre Telegram",
+    "overline": "§ Telegram",
+    "login": {
+      "title": "Connectez-vous pour continuer",
+      "body": "Confirmer votre Telegram nécessite le compte PizzaDAO auquel il appartient.",
+      "cta": "Se connecter"
+    },
+    "invalid": {
+      "title": "Ce lien n'est pas valide",
+      "body": "Il a peut-être été mal copié. Demandez un nouveau message de confirmation dans l'app."
+    },
+    "expired": {
+      "title": "Ce lien a expiré",
+      "body": "Demandez un nouveau message de confirmation depuis votre profil."
+    },
+    "closed": {
+      "title": "Ce lien n'est plus actif",
+      "body": "La correspondance a été supprimée ou modifiée. Rien à faire."
+    },
+    "wrong-account": {
+      "title": "Ce lien est pour un autre compte",
+      "body": "Vous êtes connecté en tant qu'un autre membre PizzaDAO. Connectez-vous avec le compte qui l'a demandé."
+    },
+    "ready": {
+      "title": "Utiliser ce Telegram pour PizzaDAO ?",
+      "body": "En confirmant, PizzaDAO pourra vous envoyer les suivis des appels sur Telegram, via le bot rsv.pizza.",
+      "hint": "Compte Telegram : {hint}",
+      "confirm": "Oui, utiliser ce Telegram"
+    },
+    "already": {
+      "body": "Ce Telegram est déjà confirmé."
+    },
+    "done": "Confirmé. Les suivis PizzaDAO peuvent maintenant vous joindre sur Telegram.",
+    "working": "En cours…",
+    "error": "Une erreur s'est produite. Réessayez.",
+    "tooMany": "Trop d'essais. Attendez quelques minutes et réessayez.",
+    "hasLogin": "Vous avez déjà lié un compte Telegram avec le bouton de connexion, qui est prioritaire."
   },
   "language": {
     "sectionTitle": "Langue",
@@ -1865,6 +1919,10 @@
     "loadError": "Impossible de charger la file Telegram.",
     "errorGeneric": "Une erreur s'est produite.",
     "working": "En cours...",
+    "hostMatchTitle": "Correspondance des hôtes",
+    "hostMatchOff": "La correspondance des hôtes est désactivée.",
+    "hostMatchOn": "La correspondance des hôtes est activée (mode {mode}). Vérifiés aujourd'hui : {today} sur {budget}.",
+    "hostMatchCounts": "Suggérées : {pending}, invitées : {invited}, confirmées : {confirmed}, refusées : {declined}",
     "empty": "Rien en file d'attente pour l'instant.",
     "on": "activé",
     "off": "désactivé",

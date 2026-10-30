@@ -2063,3 +2063,38 @@ model TelegramGroupPost {
   @@index([status, sendAfter])
   @@index([cityKey, sentAt])
 }
+
+enum HostMatchConsent {
+  PENDING
+  INVITED
+  CONFIRMED
+  DECLINED
+}
+
+// A Telegram account that rsv.pizza matched to a member by verified email (plans/telegram-shared-bot.md,
+// part 4). Only a suggestion until both sides confirm: the member in the app (memberConfirmedAt) and the
+// Telegram holder through the signed link the bot DMs. Never used for follow-ups before CONFIRMED.
+model TelegramHostMatch {
+  discordId         String           @id
+  memberId          String
+  telegramId        String           @unique
+  handleHint        String?          @db.VarChar(8)
+  matchedBy         String           @default("email") @db.VarChar(16)
+  consent           HostMatchConsent @default(PENDING)
+  invitedAt         DateTime? // the last confirmation / invitation DM that went out
+  memberConfirmedAt DateTime? // the member clicked "yes, that's me" while logged in
+  decidedAt         DateTime?
+  matchedAt         DateTime         @default(now())
+  updatedAt         DateTime         @updatedAt
+
+  @@index([consent])
+}
+
+// When a member's verified email was last sent to rsv.pizza as a hash (match or no match), so the daily
+// budget is spread over the members and nobody is re-asked before telegram.hostMatchRecheckDays.
+model TelegramHostMatchCheck {
+  memberId  String   @id
+  checkedAt DateTime
+
+  @@index([checkedAt])
+}

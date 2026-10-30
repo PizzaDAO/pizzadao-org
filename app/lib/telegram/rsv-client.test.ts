@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
-import { cityGroups, cityPost, probe, RSV_TELEGRAM_TIMEOUT_MS, sendDm, telegramSendAllowed, telegramSendsKilled } from './rsv-client'
+import { cityGroups, cityPost, hostMatch, probe, RSV_TELEGRAM_TIMEOUT_MS, sendDm, telegramSendAllowed, telegramSendsKilled } from './rsv-client'
 
 const PROD = { VERCEL_ENV: 'production', RSV_PIZZA_TELEGRAM_KEY: 'secret-key', RSV_PIZZA_API_URL: 'https://api.example.test/' }
 const json = (status: number, body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
@@ -174,5 +174,59 @@ describe('cityGroups', () => {
     expect(await run(503, { reason: 'unavailable' })).toEqual({ ok: false, reason: 'unavailable' })
     expect(await run(500)).toEqual({ ok: false, reason: 'unavailable' })
     expect(await run(200, { ok: true })).toEqual({ ok: false, reason: 'unavailable' })
+  })
+})
+
+describe('hostMatch', () => {
+  const h = (c: string) => c.repeat(64)
+  const env = { VERCEL_ENV: 'production', RSV_PIZZA_TELEGRAM_KEY: 'secret-key' }
+
+  it('makes no call on a preview, without the key or with the kill switch', async () => {
+    const fetchImpl = vi.fn()
+    for (const e of [{ ...env, VERCEL_ENV: 'preview' }, { ...env, RSV_PIZZA_TELEGRAM_KEY: undefined }, { ...env, TELEGRAM_SENDS_ENABLED: 'off' }]) {
+      expect(await hostMatch([h('a')], { env: e, fetchImpl: fetchImpl as never })).toEqual({ ok: false, reason: 'not_configured' })
+    }
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('rejects bad input before any call', async () => {
+    const fetchImpl = vi.fn()
+    for (const list of [[], ['abc'], [h('A')], Array.from({ length: 101 }, (_, i) => i.toString(16).padStart(64, '0'))]) {
+      expect(await hostMatch(list, { env, fetchImpl: fetchImpl as never })).toEqual({ ok: false, reason: 'bad_request' })
+    }
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('posts the hashes with the key and keeps only well-formed matches for hashes it asked about', async () => {
+    const fetchImpl = json(200, {
+      ok: true,
+      matches: [
+        { emailHash: h('a'), telegramUserId: '123456', handleHint: 'al\u2026' },
+        { emailHash: h('b'), telegramUserId: '-1001', handleHint: null }, // not a person
+        { emailHash: h('c'), telegramUserId: '99', handleHint: null }, // never asked
+        { emailHash: h('a'), telegramUserId: '777', handleHint: null }, // duplicate
+        { emailHash: h('d'), telegramUserId: '0', handleHint: null },
+      ],
+    })
+    const r = await hostMatch([h('a'), h('b'), h('d')], { env, fetchImpl: fetchImpl as never })
+    expect(r).toEqual({ ok: true, matches: [{ emailHash: h('a'), telegramUserId: '123456', handleHint: 'al\u2026' }] })
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.rsv.pizza/api/service/telegram/host-match')
+    expect((init.headers as Record<string, string>)['x-pizzadao-telegram-key']).toBe('secret-key')
+    expect(JSON.parse(init.body as string)).toEqual({ emailHashes: [h('a'), h('b'), h('d')] })
+  })
+
+  it('maps rsv.pizza failures, telling its two 429s apart', async () => {
+    const run = (status: number, b: unknown = {}) => hostMatch([h('a')], { env, fetchImpl: json(status, b) as never })
+    expect(await run(401)).toEqual({ ok: false, reason: 'not_configured' })
+    expect(await run(400)).toEqual({ ok: false, reason: 'bad_request' })
+    expect(await run(503, { reason: 'not configured' })).toEqual({ ok: false, reason: 'not_configured' })
+    expect(await run(503, { reason: 'disabled' })).toEqual({ ok: false, reason: 'disabled' })
+    expect(await run(429, { reason: 'rate limited' })).toEqual({ ok: false, reason: 'rate_limited' })
+    expect(await run(429, { reason: 'daily cap' })).toEqual({ ok: false, reason: 'daily_cap' })
+    expect(await run(500)).toEqual({ ok: false, reason: 'unavailable' })
+    expect(await run(200, { ok: true })).toEqual({ ok: false, reason: 'unavailable' })
+    const down = vi.fn(async () => { throw new Error('x') })
+    expect(await hostMatch([h('a')], { env, fetchImpl: down as never })).toEqual({ ok: false, reason: 'unavailable' })
   })
 })

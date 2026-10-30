@@ -6,6 +6,7 @@
  *   POST {base}/api/service/telegram/probe  can the bot DM this user?
  *   GET  {base}/api/service/telegram/city-groups  the city group directory (no chat ids)
  *   POST {base}/api/service/telegram/city-post    post plain text to a city's group
+ *   POST {base}/api/service/telegram/host-match   email hashes -> Telegram ids of hosts (a suggestion only)
  *
  * Auth is the `x-pizzadao-telegram-key` header (RSV_PIZZA_TELEGRAM_KEY, Production only). Every
  * Telegram outcome comes back as HTTP 200 with a code; 4xx/5xx are our own auth, validation or
@@ -209,4 +210,54 @@ export async function cityPost(a: { cityKey: string; text: string; idempotencyKe
     return { ok: false, code: body.code as CityPostCode, ...(retryAfter !== undefined ? { retryAfter } : {}), ...(body.replay === true ? { replay: true } : {}) }
   }
   return { ok: false, code: 'uncertain' }
+}
+
+// ---- Host matching (PR P4) ----
+
+export const HOST_MATCH_MAX_HASHES = 100
+const HASH_RE = /^[0-9a-f]{64}$/
+
+export interface HostMatchHit {
+  emailHash: string
+  /** Decimal Telegram user id. */
+  telegramUserId: string
+  /** The first two characters of the handle plus an ellipsis, for the member's "is this you?" card. */
+  handleHint: string | null
+}
+
+/**
+ * `disabled`: the rsv.pizza owner has host matching switched off. `rate_limited` (10 requests a minute)
+ * and `daily_cap` (2000 hashes a day) are rsv.pizza's limits: stop for now, do not retry in a loop.
+ */
+export type HostMatchFailure = 'not_configured' | 'disabled' | 'unavailable' | 'rate_limited' | 'daily_cap' | 'bad_request'
+
+export type HostMatchResult = { ok: true; matches: HostMatchHit[] } | { ok: false; reason: HostMatchFailure }
+
+/**
+ * Look up hosts by email hash (sha256 of the lower-cased, trimmed address, 64 hex; 1 to 100 per call).
+ * Only owner-verified host chats come back, and unmatched hashes are simply absent. A read: it sends
+ * nothing to anyone. No network call unless telegramSendAllowed(). A match is a suggestion, never proof.
+ */
+export async function hostMatch(emailHashes: string[], opts: CallOpts = {}): Promise<HostMatchResult> {
+  if (!telegramSendAllowed(opts.env ?? process.env)) return { ok: false, reason: 'not_configured' }
+  if (emailHashes.length < 1 || emailHashes.length > HOST_MATCH_MAX_HASHES || emailHashes.some((h) => !HASH_RE.test(h))) return { ok: false, reason: 'bad_request' }
+  const raw = await post('/host-match', { emailHashes }, opts)
+  if (raw.kind === 'network') return { ok: false, reason: 'unavailable' }
+  const { status, body } = raw
+  if (status === 429) return { ok: false, reason: body?.reason === 'daily cap' ? 'daily_cap' : 'rate_limited' }
+  if (status === 503) return { ok: false, reason: body?.reason === 'disabled' ? 'disabled' : body?.reason === 'unavailable' ? 'unavailable' : 'not_configured' }
+  if (status === 401) return { ok: false, reason: 'not_configured' }
+  if (status === 400) return { ok: false, reason: 'bad_request' }
+  if (status !== 200 || !body || body.ok !== true || !Array.isArray(body.matches)) return { ok: false, reason: 'unavailable' }
+  const wanted = new Set(emailHashes)
+  const seen = new Set<string>()
+  const matches: HostMatchHit[] = []
+  for (const m of body.matches as Array<Record<string, unknown>>) {
+    if (!m || typeof m.emailHash !== 'string' || !wanted.has(m.emailHash) || seen.has(m.emailHash)) continue
+    // A private chat id is a positive decimal user id; anything else is not a person we can DM.
+    if (typeof m.telegramUserId !== 'string' || !/^[1-9]\d{0,19}$/.test(m.telegramUserId)) continue
+    seen.add(m.emailHash)
+    matches.push({ emailHash: m.emailHash, telegramUserId: m.telegramUserId, handleHint: typeof m.handleHint === 'string' && m.handleHint.trim() ? m.handleHint.trim().slice(0, 8) : null })
+  }
+  return { ok: true, matches }
 }

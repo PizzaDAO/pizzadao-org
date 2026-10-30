@@ -95,4 +95,18 @@ export const TELEGRAM_SETTINGS = {
     key: 'telegram.postMaxAgeHours', area: 'telegram', label: 'Telegram: hours before a queued recap or announcement is dropped', help: 'A recap or announcement still waiting after this long is skipped, not sent late. (Agendas are dropped when the call starts.)',
     min: 1, max: 72, default: 12, unit: 'h',
   }),
+  // ---- Optional host matching (PR P4); the on/off switch is in registry.ts + toggles.ts ----
+  'telegram.hostMatchMode': num({
+    key: 'telegram.hostMatchMode', area: 'telegram', label: 'Telegram host matching: mode',
+    help: '1 = only when the member starts it on their profile. 2 = also send one invitation on Telegram the first time a follow-up goes to a matched member on Discord. Either way nothing is used until the member confirms in the app and on Telegram.',
+    min: 1, max: 2, default: 1,
+  }),
+  'telegram.hostMatchRecheckDays': num({
+    key: 'telegram.hostMatchRecheckDays', area: 'telegram', label: 'Telegram host matching: days before a member is checked again', help: 'A member with no match is looked up again after this many days (a host may link Telegram on rsv.pizza later).',
+    min: 1, max: 90, default: 14, unit: 'days',
+  }),
+  'telegram.hostMatchDailyHashes': num({
+    key: 'telegram.hostMatchDailyHashes', area: 'telegram', label: 'Telegram host matching: most members checked per day', help: 'Email hashes sent to rsv.pizza per day. rsv.pizza refuses more than 2000 a day, so the top value leaves no margin.',
+    min: 100, max: 2000, default: 1000, unit: 'members', looserWhen: 'higher',
+  }),
 } as const satisfies Record<string, SettingDef>
