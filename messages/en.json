@@ -9,7 +9,7 @@
   "telegramLink": {
     "appLink": "No phone number? Link with the Telegram app",
     "appLinkOpening": "Opening Telegram…",
-    "appLinkWaiting": "Open Telegram and press Start. Waiting for it to finish…",
+    "appLinkWaiting": "Open Telegram and press Start, then tap Yes. Waiting for it…",
     "appLinkCancel": "Stop waiting",
     "appLinkFailed": "Couldn't start the link. Try again later.",
     "appLinkTimeout": "Didn't finish in time. Start again to get a new link.",
@@ -38,7 +38,11 @@
     "matchWait": "A confirmation was just sent. Give it a few minutes before asking again.",
     "matchTryLater": "Couldn't send right now. Try again in a few minutes.",
     "matchUnavailable": "Couldn't send the confirmation. Try again later.",
-    "matchPreview": "Sending isn't available on this site."
+    "matchPreview": "Sending isn't available on this site.",
+    "appLinkPending": "{who} on Telegram wants to link to your account.",
+    "appLinkConfirm": "Link it",
+    "appLinkDeny": "Cancel",
+    "appLinkOpen": "Open Telegram"
   },
   "telegramConfirm": {
     "title": "Confirm your Telegram",

@@ -9,7 +9,7 @@
   "telegramLink": {
     "appLink": "¿Sin número de teléfono? Vincula con la app de Telegram",
     "appLinkOpening": "Abriendo Telegram…",
-    "appLinkWaiting": "Abre Telegram y pulsa Iniciar. Esperando a que termine…",
+    "appLinkWaiting": "Abre Telegram, pulsa Iniciar y luego Sí. Esperando…",
     "appLinkCancel": "Dejar de esperar",
     "appLinkFailed": "No se pudo iniciar la vinculación. Inténtalo más tarde.",
     "appLinkTimeout": "No terminó a tiempo. Empieza de nuevo para obtener un enlace nuevo.",
@@ -38,7 +38,11 @@
     "matchWait": "Se acaba de enviar una confirmación. Espera unos minutos antes de pedirla otra vez.",
     "matchTryLater": "No se pudo enviar ahora. Inténtalo de nuevo en unos minutos.",
     "matchUnavailable": "No se pudo enviar la confirmación. Inténtalo más tarde.",
-    "matchPreview": "El envío no está disponible en este sitio."
+    "matchPreview": "El envío no está disponible en este sitio.",
+    "appLinkPending": "{who} en Telegram quiere vincularse a tu cuenta.",
+    "appLinkConfirm": "Vincular",
+    "appLinkDeny": "Cancelar",
+    "appLinkOpen": "Abrir Telegram"
   },
   "telegramConfirm": {
     "title": "Confirma tu Telegram",

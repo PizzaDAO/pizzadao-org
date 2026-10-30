@@ -2,7 +2,7 @@
 // Point OUR login bot's webhook at the app (used by "Link with the Telegram app").
 //
 //   node scripts/telegram-login-webhook.mjs            dry run: prints what it would do
-//   node scripts/telegram-login-webhook.mjs --apply    setWebhook on the login bot
+//   node scripts/telegram-login-webhook.mjs --apply    setWebhook on the login bot (--force replaces a different existing URL)
 //   node scripts/telegram-login-webhook.mjs --info     getWebhookInfo (url, pending count, last error only)
 //
 // Reads TELEGRAM_LOGIN_BOT_TOKEN, TELEGRAM_LOGIN_WEBHOOK_SECRET and NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME
@@ -16,6 +16,8 @@ const secret = process.env.TELEGRAM_LOGIN_WEBHOOK_SECRET?.trim();
 const expected = process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME?.trim().replace(/^@/, "");
 const apply = process.argv.includes("--apply");
 const info = process.argv.includes("--info");
+const force = process.argv.includes("--force");
+const senderBot = process.env.NEXT_PUBLIC_TELEGRAM_SENDER_BOT_USERNAME?.trim().replace(/^@/, "");
 
 function fail(msg) {
     console.error(msg);
@@ -41,18 +43,26 @@ if (String(me.username ?? "").toLowerCase() !== expected.toLowerCase()) {
     fail(`Refusing: the token belongs to @${me.username}, not the login bot @${expected}.`);
 }
 
+if (senderBot && String(me.username ?? "").toLowerCase() === senderBot.toLowerCase()) {
+    fail(`Refusing: @${me.username} is the shared sender bot, not the login bot.`);
+}
+
 if (info) {
     const w = await call("getWebhookInfo");
     console.log(JSON.stringify({ url: w.url, pending_update_count: w.pending_update_count, last_error_message: w.last_error_message ?? null }, null, 2));
 } else if (!apply) {
     console.log(`Dry run. Would set the webhook of @${me.username} to ${WEBHOOK_URL}`);
-    console.log("allowed_updates: [message], drop_pending_updates: true, secret_token: (from env)");
+    console.log("allowed_updates: [message, callback_query], drop_pending_updates: true, secret_token: (from env)");
     console.log("Re-run with --apply to do it.");
 } else {
+    const current = await call("getWebhookInfo");
+    if (current.url && current.url !== WEBHOOK_URL && !force) {
+        fail("Refusing: this bot already has a different webhook URL set. Check the bot, or re-run with --force.");
+    }
     await call("setWebhook", {
         url: WEBHOOK_URL,
         secret_token: secret,
-        allowed_updates: ["message"],
+        allowed_updates: ["message", "callback_query"],
         drop_pending_updates: true,
     });
     console.log(`Webhook of @${me.username} set to ${WEBHOOK_URL}`);

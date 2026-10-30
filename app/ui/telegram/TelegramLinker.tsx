@@ -137,6 +137,9 @@ export function TelegramLinker() {
     // "Link with the Telegram app": get a one-time deep link, then poll until the bot has linked the account.
     const [appState, setAppState] = useState<"idle" | "starting" | "waiting">("idle");
     const [appNote, setAppNote] = useState<string | null>(null);
+    const [appUrl, setAppUrl] = useState<string | null>(null);
+    const [pending, setPending] = useState<{ username: string | null; name: string | null } | null>(null);
+    const [pendingBusy, setPendingBusy] = useState(false);
 
     const onAppLink = async () => {
         setError(null);
@@ -154,9 +157,12 @@ export function TelegramLinker() {
                 setAppState("idle");
                 return;
             }
-            // A plain navigation-free open: some mobile browsers block window.open after an await, so fall back to a link.
-            const w = window.open(body.url, "_blank", "noopener,noreferrer");
-            if (!w) window.location.href = body.url;
+            // Open Telegram in a new tab and cut its link to this page (without the noopener feature, which makes
+            // window.open return null). This tab never navigates away: if the browser blocks the popup, the
+            // waiting state shows an "Open Telegram" link instead.
+            setAppUrl(body.url);
+            const w = window.open(body.url, "_blank");
+            if (w) w.opener = null;
             setAppState("waiting");
         } catch {
             setAppNote(t("appLinkFailed"));
@@ -175,6 +181,13 @@ export function TelegramLinker() {
                 return;
             }
             await load();
+            try {
+                const res = await fetch("/api/telegram/link/pending", { cache: "no-store" });
+                const body = (await res.json().catch(() => ({}))) as { pending?: { username: string | null; name: string | null } | null };
+                setPending(res.ok ? (body.pending ?? null) : null);
+            } catch {
+                // Try again on the next tick.
+            }
         }, 3000);
         return () => clearInterval(timer);
     }, [appState, load, t]);
@@ -182,6 +195,29 @@ export function TelegramLinker() {
     useEffect(() => {
         if (status?.connected && appState !== "idle") setAppState("idle");
     }, [status?.connected, appState]);
+
+    const onPending = async (action: "confirm" | "cancel") => {
+        setPendingBusy(true);
+        setAppNote(null);
+        try {
+            const res = await fetch("/api/telegram/link/pending", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+            if (action === "confirm" && !res.ok) {
+                const body = await res.json().catch(() => ({}));
+                setAppNote(res.status === 409 ? String(body?.error ?? t("appLinkFailed")) : t("appLinkFailed"));
+            }
+            setPending(null);
+            if (action === "cancel" || !res.ok) setAppState("idle");
+            await load();
+        } catch {
+            setAppNote(t("appLinkFailed"));
+        } finally {
+            setPendingBusy(false);
+        }
+    };
 
     const onUnlink = async () => {
         setError(null);
@@ -400,9 +436,31 @@ export function TelegramLinker() {
                             >
                                 {appState === "starting" ? t("appLinkOpening") : t("appLink")}
                             </button>
-                            {appState === "waiting" ? (
+                            {appState === "waiting" && pending ? (
+                                <div role="status" style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
+                                    <span>{t("appLinkPending", { who: pending.username ? `@${pending.username}` : pending.name || "Telegram" })}</span>
+                                    <button type="button" onClick={() => onPending("confirm")} disabled={pendingBusy} className="btn-pill" style={{ opacity: pendingBusy ? 0.5 : 1 }}>
+                                        {t("appLinkConfirm")}
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => onPending("cancel")}
+                                        disabled={pendingBusy}
+                                        className="btn-pill"
+                                        style={{ background: "transparent", border: "1px solid hsl(var(--rule-warm) / 0.55)", color: "hsl(var(--foreground))", opacity: pendingBusy ? 0.5 : 1 }}
+                                    >
+                                        {t("appLinkDeny")}
+                                    </button>
+                                </div>
+                            ) : null}
+                            {appState === "waiting" && !pending ? (
                                 <>
                                     <span role="status" style={{ color: "hsl(var(--ink) / 0.55)" }}>{t("appLinkWaiting")}</span>
+                                    {appUrl ? (
+                                        <a href={appUrl} target="_blank" rel="noopener noreferrer" style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>
+                                            {t("appLinkOpen")}
+                                        </a>
+                                    ) : null}
                                     <button
                                         type="button"
                                         onClick={() => setAppState("idle")}

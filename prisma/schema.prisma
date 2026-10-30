@@ -2102,11 +2102,20 @@ model TelegramHostMatchCheck {
 // Single-use codes for linking Telegram through the app deep link (t.me/<login bot>?start=<code>), with no phone number.
 // Only the sha256 of the code is stored. Starting a new code deletes the member's unused ones.
 model TelegramLinkCode {
-  codeHash  String    @id
-  discordId String
-  expiresAt DateTime
-  usedAt    DateTime?
-  createdAt DateTime  @default(now())
+  codeHash      String    @id
+  discordId     String
+  expiresAt     DateTime
+  usedAt        DateTime?
+  createdAt     DateTime  @default(now())
+  // Two-sided: the first Telegram user to press Start claims the code (tg* fields) and taps "Yes" in the bot
+  // (tgConfirmedAt); only then can the member confirm on the website, which links and sets usedAt.
+  tgId          String?
+  tgUsername    String?
+  tgFirstName   String?
+  tgLastName    String?
+  ref           String?   @unique // opaque reference in the bot button's callback_data (never the code)
+  claimedAt     DateTime?
+  tgConfirmedAt DateTime?
 
   @@index([discordId])
   @@index([expiresAt])
