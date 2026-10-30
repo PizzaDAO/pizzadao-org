@@ -38,8 +38,8 @@ export type TelegramVerifyResult =
     | { ok: false; reason: string };
 
 /**
- * Whether Telegram linking is configured (both env vars present). The login bot only verifies the
- * widget payload: it never sends messages and has no webhook.
+ * Whether Telegram linking is configured (both env vars present). The login bot verifies the
+ * widget payload and answers the `/start <code>` link (login-bot/webhook); it sends nothing else.
  */
 export function telegramConfig(): { botToken: string; botUsername: string } | null {
     const botToken = process.env.TELEGRAM_LOGIN_BOT_TOKEN?.trim();

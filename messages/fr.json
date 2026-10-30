@@ -7,6 +7,12 @@
     "saved": "Enregistré !"
   },
   "telegramLink": {
+    "appLink": "Pas de numéro de téléphone ? Lie avec l'app Telegram",
+    "appLinkOpening": "Ouverture de Telegram…",
+    "appLinkWaiting": "Ouvre Telegram, appuie sur Démarrer puis sur Oui. En attente…",
+    "appLinkCancel": "Arrêter d'attendre",
+    "appLinkFailed": "Impossible de démarrer la liaison. Réessaie plus tard.",
+    "appLinkTimeout": "Pas terminé à temps. Recommence pour obtenir un nouveau lien.",
     "recognise": "Lier ton compte permet à PizzaDAO de reconnaître ton Telegram.",
     "dmOk": "Le bot PizzaDAO peut vous écrire ici.",
     "dmUnknown": "Pour recevoir des messages ici, démarrez le bot PizzaDAO dans Telegram, puis vérifiez à nouveau.",
@@ -32,7 +38,12 @@
     "matchWait": "Une confirmation vient d'être envoyée. Attendez quelques minutes avant d'en demander une autre.",
     "matchTryLater": "Envoi impossible pour le moment. Réessayez dans quelques minutes.",
     "matchUnavailable": "Impossible d'envoyer la confirmation. Réessayez plus tard.",
-    "matchPreview": "L'envoi n'est pas disponible sur ce site."
+    "matchPreview": "L'envoi n'est pas disponible sur ce site.",
+    "appLinkPending": "{who} sur Telegram veut se lier à ton compte.",
+    "appLinkConfirm": "Lier",
+    "appLinkDeny": "Annuler",
+    "appLinkOpen": "Ouvrir Telegram",
+    "appLinkPendingNoUsername": "Un compte Telegram sans nom d'utilisateur, nommé {name}, veut se lier à ton compte."
   },
   "telegramConfirm": {
     "title": "Confirmez votre Telegram",

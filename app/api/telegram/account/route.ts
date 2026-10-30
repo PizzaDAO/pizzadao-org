@@ -8,13 +8,13 @@
 //
 // All methods require a Discord session. When TELEGRAM_LOGIN_BOT_TOKEN or
 // NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME is unset, GET reports enabled:false (the UI
-// hides the button) and POST returns 503. The login bot only verifies the widget; it never sends.
+// hides the button) and POST returns 503. The login bot verifies the widget and answers the /start link (see login-bot/webhook).
 
 import { NextResponse } from "next/server";
 import { prisma } from "@/app/lib/db";
 import { requireSession } from "@/app/lib/auth-guards";
 import { telegramConfig, verifyTelegramAuth } from "@/app/lib/telegram-auth";
-import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { linkTelegramAccount } from "@/app/lib/telegram/link-account";
 import { loadReach } from "@/app/lib/telegram/reach";
 
 export const runtime = "nodejs";
@@ -72,55 +72,13 @@ export async function POST(req: Request) {
     }
     const tg = result.user;
 
-    // One Telegram account per member: refuse if it's already linked elsewhere.
-    const existing = await prisma.telegramAccount.findUnique({
-        where: { telegramId: tg.id },
-        select: { discordId: true },
-    });
-    if (existing && existing.discordId !== discordId) {
+    const outcome = await linkTelegramAccount(discordId, tg);
+    if (outcome === "conflict") {
         return NextResponse.json(
             { error: "This Telegram account is already linked to another member" },
             { status: 409 },
         );
     }
-
-    let memberId: string | null = null;
-    try {
-        memberId = await fetchMemberIdByDiscordId(discordId);
-    } catch {
-        // Best-effort; the row is keyed by discordId.
-    }
-
-    const fields = {
-        telegramId: tg.id,
-        username: tg.username,
-        firstName: tg.firstName,
-        lastName: tg.lastName,
-        photoUrl: tg.photoUrl,
-        authDate: tg.authDate,
-        ...(memberId ? { memberId } : {}),
-    };
-
-    try {
-        await prisma.telegramAccount.upsert({
-            where: { discordId },
-            create: { discordId, ...fields },
-            update: fields,
-        });
-    } catch (e: unknown) {
-        // Unique race on telegramId between the check above and the write.
-        if ((e as { code?: string })?.code === "P2002") {
-            return NextResponse.json(
-                { error: "This Telegram account is already linked to another member" },
-                { status: 409 },
-            );
-        }
-        throw e;
-    }
-
-    // A Telegram login always wins over a suggested host match: drop the suggestion for this member.
-    // The same Telegram id suggested to anyone else is now someone's login: drop those suggestions too.
-    await prisma.telegramHostMatch.deleteMany({ where: { OR: [{ discordId }, { telegramId: tg.id }] } }).catch(() => undefined);
 
     return NextResponse.json({
         ok: true,
