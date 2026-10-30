@@ -341,8 +341,6 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
     await addEvent(id, 'telegram-undeliverable', 'system', { reason: result.telegramSkip })
   }
   if (result.ok) {
-    // Mode 2: one invitation on Telegram for a matched member who got this on Discord. Best effort.
-    if (result.channel === 'DISCORD' && row.ownerDiscordId) await maybeInvite(row.ownerDiscordId, { now }).catch(() => 'skipped')
     await guardedTransition(
       id,
       'APPROVED',
@@ -358,6 +356,9 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
       },
       { type: 'sent', actorId: 'system', data: { channel: result.channel } },
     )
+    // Mode 2: one invitation on Telegram for a matched member who got this on Discord. Only after the
+    // row is SENT; best effort, never affects the outcome.
+    if (result.channel === 'DISCORD' && row.ownerDiscordId) await maybeInvite(row.ownerDiscordId, { now }).catch(() => 'skipped')
     return 'sent'
   }
   if (result.uncertain) {

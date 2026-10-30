@@ -26,7 +26,7 @@ const okSend = () => vi.fn(async (_a: SendArg): Promise<DmResult> => ({ ok: true
 
 beforeEach(() => {
   vi.resetAllMocks()
-  settings({ 'telegram.hostMatchEnabled': true })
+  settings({ 'telegram.hostMatchEnabled': true, 'telegram.dmEnabled': true })
   vi.mocked(prisma.telegramAccount.findUnique).mockResolvedValue(null)
   vi.mocked(prisma.telegramAccount.findFirst).mockResolvedValue(null)
   vi.mocked(prisma.telegramHostMatch.updateMany).mockResolvedValue({ count: 1 } as never)
@@ -76,8 +76,8 @@ describe('startConfirmation (side a: the member says yes)', () => {
     expect(a.buttons[0][0].url).toMatch(/^https:\/\/app\.example\.test\/telegram\/confirm\//)
     expect(a.text + JSON.stringify(a.buttons)).not.toContain(TG + '"')
     const writes = vi.mocked(prisma.telegramHostMatch.updateMany).mock.calls.map((c) => c[0].data)
-    expect(writes).toContainEqual({ memberConfirmedAt: NOW })
-    expect(writes).toContainEqual({ invitedAt: NOW })
+    expect(writes).toContainEqual({ memberConfirmedAt: NOW, invitedAt: NOW })
+    expect(send.mock.calls[0][0].idempotencyKey).toBe(`tm:${D}:${Math.floor(NOW.getTime() / RESEND_COOLDOWN_MS)}`)
     // The click alone never confirms anything.
     expect(writes.some((w) => (w as { consent?: string }).consent === 'CONFIRMED')).toBe(false)
   })
@@ -102,6 +102,33 @@ describe('startConfirmation (side a: the member says yes)', () => {
     found()
     expect(await startConfirmation(D, true, { env: ENV, now: NOW, send })).toBe('not-found')
     expect(send).not.toHaveBeenCalled()
+  })
+
+  it('needs telegram.dmEnabled too, and a lost claim sends nothing', async () => {
+    found()
+    const send = okSend()
+    settings({ 'telegram.hostMatchEnabled': true })
+    expect(await startConfirmation(D, false, { env: ENV, now: NOW, send })).toBe('unavailable')
+    settings({ 'telegram.hostMatchEnabled': true, 'telegram.dmEnabled': true })
+    vi.mocked(prisma.telegramHostMatch.updateMany).mockResolvedValue({ count: 0 } as never)
+    expect(await startConfirmation(D, false, { env: ENV, now: NOW, send })).toBe('wait')
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('a Telegram id that is someone\'s widget login is unusable', async () => {
+    found()
+    vi.mocked(prisma.telegramAccount.findUnique).mockImplementation((async (a: { where: { telegramId?: string } }) => (a.where.telegramId ? { discordId: '77777' } : null)) as never)
+    const send = okSend()
+    expect(await startConfirmation(D, false, { env: ENV, now: NOW, send })).toBe('has-login')
+    expect(send).not.toHaveBeenCalled()
+  })
+
+  it('sends the text from settings, and the translated default otherwise', async () => {
+    found()
+    settings({ 'telegram.hostMatchEnabled': true, 'telegram.dmEnabled': true, 'telegram.hostMatchConfirmText': 'Custom words', 'telegram.hostMatchConfirmButton': 'Go' })
+    const send = okSend()
+    await startConfirmation(D, false, { env: ENV, now: NOW, send })
+    expect(send.mock.calls[0][0]).toMatchObject({ text: 'Custom words', buttons: [[{ text: 'Go' }]] })
   })
 
   it('a second ask inside the cooldown waits', async () => {
@@ -196,7 +223,7 @@ describe('the confirm link (side b) needs the same Discord session', () => {
 })
 
 describe('maybeInvite (mode 2)', () => {
-  const MODE2 = { 'telegram.hostMatchEnabled': true, 'telegram.hostMatchMode': 2 }
+  const MODE2 = { 'telegram.hostMatchEnabled': true, 'telegram.dmEnabled': true, 'telegram.hostMatchMode': 2 }
 
   it('sends at most one invitation: the row is claimed before the send', async () => {
     settings(MODE2)
@@ -215,9 +242,17 @@ describe('maybeInvite (mode 2)', () => {
     expect(send).toHaveBeenCalledTimes(1)
   })
 
+  it('needs telegram.dmEnabled', async () => {
+    settings({ 'telegram.hostMatchEnabled': true, 'telegram.hostMatchMode': 2 })
+    found()
+    const send = okSend()
+    expect(await maybeInvite(D, { env: ENV, now: NOW, send })).toBe('skipped')
+    expect(send).not.toHaveBeenCalled()
+  })
+
   it('does nothing in mode 1 (the default), on a preview, or for a confirmed, declined or logged-in member', async () => {
     const send = okSend()
-    settings({ 'telegram.hostMatchEnabled': true })
+    settings({ 'telegram.hostMatchEnabled': true, 'telegram.dmEnabled': true })
     found()
     expect(await maybeInvite(D, { env: ENV, now: NOW, send })).toBe('skipped')
     settings(MODE2)

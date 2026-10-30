@@ -70,7 +70,10 @@ export async function undoOptOut(discordId: string, actorId: string, followUpId:
 
 async function confirmedHostMatch(discordId: string): Promise<{ telegramId: string; memberId: string } | null> {
   if (!(await toggleEnabled('telegram.hostMatchEnabled').catch(() => false))) return null
-  return prisma.telegramHostMatch.findFirst({ where: { discordId, consent: 'CONFIRMED' }, select: { telegramId: true, memberId: true } })
+  const m = await prisma.telegramHostMatch.findFirst({ where: { discordId, consent: 'CONFIRMED' }, select: { telegramId: true, memberId: true } })
+  // A Telegram id that is anyone's Login Widget link is never usable through a match.
+  if (m && (await prisma.telegramAccount.findUnique({ where: { telegramId: m.telegramId }, select: { discordId: true } }))) return null
+  return m
 }
 
 export interface OwnerContext {

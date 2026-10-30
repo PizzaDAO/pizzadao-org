@@ -81,6 +81,8 @@ export const RATE_LIMITS = {
   "telegram-check": { limit: 3, windowSec: 10 * 60 },
   // Host-match card actions and the confirm page: per member.
   "telegram-host-match": { limit: 3, windowSec: 10 * 60 },
+  // The confirm page POST has its own bucket, so asking for DMs cannot starve confirming.
+  "telegram-host-match-confirm": { limit: 5, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

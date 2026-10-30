@@ -62,7 +62,9 @@ export async function listFollowUps(f: ListFilter = {}) {
     }),
   ])
   // A Telegram login wins; a host match counts only once both sides confirmed it.
-  const telegram = [...logins, ...confirmedMatches.filter((m) => !logins.some((l) => l.discordId === m.discordId))]
+  const matchIds = confirmedMatches.map((m) => m.telegramId)
+  const loginIds = new Set((matchIds.length ? await prisma.telegramAccount.findMany({ where: { telegramId: { in: matchIds } }, select: { telegramId: true } }) : []).map((a) => a.telegramId))
+  const telegram = [...logins, ...confirmedMatches.filter((m) => !logins.some((l) => l.discordId === m.discordId) && !loginIds.has(m.telegramId))]
   const reachRows = telegram.length ? await prisma.telegramReach.findMany({ where: { telegramId: { in: telegram.map((t) => t.telegramId) } }, select: { telegramId: true, state: true, failures: true, recheckAt: true } }) : []
   const reachById = new Map(reachRows.map((r) => [r.telegramId, r]))
   const tgSender = telegramSendAllowed() && (await toggleEnabled('telegram.dmEnabled').catch(() => false))

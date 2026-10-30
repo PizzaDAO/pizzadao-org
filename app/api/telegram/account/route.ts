@@ -119,7 +119,8 @@ export async function POST(req: Request) {
     }
 
     // A Telegram login always wins over a suggested host match: drop the suggestion for this member.
-    await prisma.telegramHostMatch.deleteMany({ where: { discordId } }).catch(() => undefined);
+    // The same Telegram id suggested to anyone else is now someone's login: drop those suggestions too.
+    await prisma.telegramHostMatch.deleteMany({ where: { OR: [{ discordId }, { telegramId: tg.id }] } }).catch(() => undefined);
 
     return NextResponse.json({
         ok: true,

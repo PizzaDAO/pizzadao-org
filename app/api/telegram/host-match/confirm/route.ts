@@ -22,7 +22,7 @@ export async function POST(req: Request) {
     const auth = await requireSession();
     if (!auth.ok) return auth.response;
 
-    const limited = await checkKeyedRateLimit("telegram-host-match", auth.session.discordId);
+    const limited = await checkKeyedRateLimit("telegram-host-match-confirm", auth.session.discordId);
     if (!limited.success) return rateLimitResponse(limited);
 
     const body = (await req.json().catch(() => null)) as { token?: unknown } | null;

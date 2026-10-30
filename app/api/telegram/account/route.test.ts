@@ -100,7 +100,7 @@ describe("/api/telegram/account", () => {
         );
         // A login always wins: any suggested host match for this member is dropped.
         const hm = (prisma as unknown as { telegramHostMatch: { deleteMany: ReturnType<typeof vi.fn> } }).telegramHostMatch;
-        expect(hm.deleteMany).toHaveBeenCalledWith({ where: { discordId: "d1" } });
+        expect(hm.deleteMany).toHaveBeenCalledWith({ where: { OR: [{ discordId: "d1" }, { telegramId: "7" }] } });
     });
 
     it("POST refuses a Telegram account linked to another member", async () => {

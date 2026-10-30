@@ -17,10 +17,11 @@ import { prisma } from '@/app/lib/db'
 import { appUrl, loadFollowUpConfig } from '@/app/lib/followups/config'
 import { linkSecret } from '@/app/lib/followups/links'
 import { loadSettings } from '@/app/lib/settings'
+import { SETTINGS } from '@/app/lib/settings/registry'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { canTryTelegram, loadReach, recordResult } from './reach'
 import { sendDm, telegramSendAllowed, type DmResult } from './rsv-client'
-import { confirmUrl, signConfirmToken, telegramFingerprint, verifyConfirmToken } from './host-match-token'
+import { confirmUrl, keyedDiscordId, signConfirmToken, telegramFingerprint, verifyConfirmToken } from './host-match-token'
 
 type Env = Record<string, string | undefined>
 
@@ -28,27 +29,53 @@ type Env = Record<string, string | undefined>
 export const RESEND_COOLDOWN_MS = 5 * 60 * 1000
 
 type Loc = 'en' | 'es' | 'fr'
-const TEXT: Record<Loc, { confirm: { text: string; button: string }; invite: { text: string; button: string } }> = {
-  en: {
-    confirm: { text: 'Confirm this Telegram for your PizzaDAO account. Only tap the button if you just asked for this in the PizzaDAO app.', button: 'Confirm' },
-    invite: { text: 'PizzaDAO would like to send you call follow-ups here. Tap the button to confirm, or ignore this message.', button: 'Confirm' },
-  },
+type Kind = 'confirm' | 'invite'
+const loc = (l: string | null | undefined): Loc => ((l ?? 'en').slice(0, 2).toLowerCase() === 'es' ? 'es' : (l ?? '').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en')
+
+/** Translations used only while the setting still holds its English default; an edited setting is sent as written. */
+const FALLBACK: Record<Loc, Record<'confirmText' | 'confirmButton' | 'inviteText' | 'inviteButton', string>> = {
+  en: { confirmText: '', confirmButton: '', inviteText: '', inviteButton: '' },
   es: {
-    confirm: { text: 'Confirma este Telegram para tu cuenta de PizzaDAO. Toca el botón solo si lo acabas de pedir en la app de PizzaDAO.', button: 'Confirmar' },
-    invite: { text: 'PizzaDAO quiere enviarte aquí los seguimientos de las llamadas. Toca el botón para confirmar, o ignora este mensaje.', button: 'Confirmar' },
+    confirmText: 'Confirma este Telegram para tu cuenta de PizzaDAO. Toca el botón solo si lo acabas de pedir en la app de PizzaDAO.',
+    confirmButton: 'Confirmar',
+    inviteText: 'PizzaDAO quiere enviarte aquí los seguimientos de las llamadas. Toca el botón para confirmar, o ignora este mensaje.',
+    inviteButton: 'Confirmar',
   },
   fr: {
-    confirm: { text: 'Confirmez ce Telegram pour votre compte PizzaDAO. N\'appuyez sur le bouton que si vous venez de le demander dans l\'app PizzaDAO.', button: 'Confirmer' },
-    invite: { text: 'PizzaDAO aimerait vous envoyer ici les suivis des appels. Appuyez sur le bouton pour confirmer, ou ignorez ce message.', button: 'Confirmer' },
+    confirmText: "Confirmez ce Telegram pour votre compte PizzaDAO. N'appuyez sur le bouton que si vous venez de le demander dans l'app PizzaDAO.",
+    confirmButton: 'Confirmer',
+    inviteText: 'PizzaDAO aimerait vous envoyer ici les suivis des appels. Appuyez sur le bouton pour confirmer, ou ignorez ce message.',
+    inviteButton: 'Confirmer',
   },
 }
-const loc = (l: string | null | undefined): Loc => ((l ?? 'en').slice(0, 2).toLowerCase() === 'es' ? 'es' : (l ?? '').slice(0, 2).toLowerCase() === 'fr' ? 'fr' : 'en')
+
+/** The DM text and button label (settings, with per-language fallbacks for the untouched defaults). */
+async function dmText(kind: Kind, l: Loc): Promise<{ text: string; button: string }> {
+  const s = await loadSettings()
+  const pick = (field: 'Text' | 'Button') => {
+    const key = `telegram.hostMatch${kind === 'confirm' ? 'Confirm' : 'Invite'}${field}` as const
+    const v = s.get(key) as string
+    const fb = FALLBACK[l][`${kind}${field}` as 'confirmText']
+    return v === (SETTINGS[key].default as string) && fb ? fb : v
+  }
+  return { text: pick('Text'), button: pick('Button') }
+}
 
 const OPEN: HostMatchConsent[] = ['PENDING', 'INVITED']
 
 /** The feature is on: toggle (production only), sender allowed, and a link secret to sign with. */
 async function featureOn(env: Env): Promise<boolean> {
   return resolveToggle('telegram.hostMatchEnabled', await loadSettings(), env)
+}
+
+/** Sending the confirmation / invitation DM also needs telegram.dmEnabled. */
+async function dmOn(env: Env): Promise<boolean> {
+  return resolveToggle('telegram.dmEnabled', await loadSettings(), env)
+}
+
+/** A Telegram id some member linked with the Login Widget is never usable for a match. */
+async function isLoginId(telegramId: string): Promise<boolean> {
+  return !!(await prisma.telegramAccount.findUnique({ where: { telegramId }, select: { discordId: true } }))
 }
 
 export type CardState = 'none' | 'pending' | 'awaiting' | 'confirmed'
@@ -94,36 +121,39 @@ async function localeOf(memberId: string): Promise<Loc> {
 export async function startConfirmation(discordId: string, resend: boolean, deps: Deps = {}): Promise<StartResult> {
   const env = deps.env ?? process.env
   const now = deps.now ?? new Date()
-  if (!(await featureOn(env)) || !telegramSendAllowed(env) || !linkSecret(env)) return 'unavailable'
+  if (!(await featureOn(env)) || !(await dmOn(env)) || !telegramSendAllowed(env) || !linkSecret(env)) return 'unavailable'
   const m = await prisma.telegramHostMatch.findUnique({ where: { discordId } })
   if (!m || !OPEN.includes(m.consent)) return 'not-found'
   if (resend && !m.memberConfirmedAt) return 'not-found'
   if (await prisma.telegramAccount.findUnique({ where: { discordId }, select: { discordId: true } })) return 'has-login'
   if (m.memberConfirmedAt && m.invitedAt && now.getTime() - m.invitedAt.getTime() < RESEND_COOLDOWN_MS) return 'wait'
+  if (await isLoginId(m.telegramId)) return 'has-login'
   const cfg = await loadFollowUpConfig(env)
   const recheck = { dmRecheckDays: cfg.dmRecheckDays, dmRecheckMaxDays: cfg.dmRecheckMaxDays }
 
   const token = signConfirmToken(discordId, m.telegramId, now, env)
   if (!token) return 'unavailable'
-  if (!m.memberConfirmedAt) {
-    await prisma.telegramHostMatch.updateMany({ where: { discordId, consent: { in: OPEN } }, data: { memberConfirmedAt: now } })
-  }
-  const t = TEXT[await localeOf(m.memberId)].confirm
+  // Claim the send before making it: only one concurrent request gets past the cooldown.
+  const claim = await prisma.telegramHostMatch.updateMany({
+    where: { discordId, consent: { in: OPEN }, OR: [{ invitedAt: null }, { invitedAt: { lt: new Date(now.getTime() - RESEND_COOLDOWN_MS) } }] },
+    data: { memberConfirmedAt: m.memberConfirmedAt ?? now, invitedAt: now },
+  })
+  if (claim.count !== 1) return 'wait'
+  const release = () => prisma.telegramHostMatch.updateMany({ where: { discordId, consent: { in: OPEN } }, data: { invitedAt: m.invitedAt } }).catch(() => undefined)
+  const t = await dmText('confirm', await localeOf(m.memberId))
   const send = deps.send ?? ((a) => sendDm(a, { env }))
-  const r = await send({ telegramUserId: m.telegramId, text: t.text, buttons: [[{ text: t.button, url: confirmUrl(token, env) }]], idempotencyKey: `tm:${discordId}:${now.getTime()}` })
+  // One key per cooldown window: a repeat inside it replays the same send instead of duplicating it.
+  const r = await send({ telegramUserId: m.telegramId, text: t.text, buttons: [[{ text: t.button, url: confirmUrl(token, env) }]], idempotencyKey: `tm:${discordId}:${Math.floor(now.getTime() / RESEND_COOLDOWN_MS)}` })
   if (r.ok) {
     await recordResult(m.telegramId, 'ok', recheck, now).catch(() => {})
-    await prisma.telegramHostMatch.updateMany({ where: { discordId, consent: { in: OPEN } }, data: { invitedAt: now } })
     return 'sent'
   }
+  if (r.code === 'uncertain') return 'sent' // it may have gone out: the claim stays, so the cooldown stops repeats
+  // Nothing was sent: free the claim so the member can try again.
+  await release()
   if (r.code === 'not_started' || r.code === 'blocked') {
     await recordResult(m.telegramId, r.code, recheck, now).catch(() => {})
     return r.code === 'blocked' ? 'blocked' : 'not-started'
-  }
-  if (r.code === 'uncertain') {
-    // It may have gone out: count it as sent so the cooldown stops repeats.
-    await prisma.telegramHostMatch.updateMany({ where: { discordId, consent: { in: OPEN } }, data: { invitedAt: now } })
-    return 'sent'
   }
   return r.code === 'rate_limited' || r.code === 'unavailable' ? 'try-later' : 'unavailable'
 }
@@ -147,9 +177,9 @@ export async function lookupConfirmation(token: string, sessionDiscordId: string
   const env = deps.env ?? process.env
   const v = verifyConfirmToken(token, deps.now ?? new Date(), env)
   if (!v.ok) return v
-  if (v.claims.d !== sessionDiscordId) return { ok: false, reason: 'wrong-account' }
+  if (v.claims.d !== keyedDiscordId(sessionDiscordId, env)) return { ok: false, reason: 'wrong-account' }
   const m = await prisma.telegramHostMatch.findUnique({ where: { discordId: sessionDiscordId }, select: { telegramId: true, consent: true, handleHint: true } })
-  if (!m || m.consent === 'DECLINED' || telegramFingerprint(m.telegramId) !== v.claims.h) return { ok: false, reason: 'closed' }
+  if (!m || m.consent === 'DECLINED' || telegramFingerprint(m.telegramId, env) !== v.claims.h) return { ok: false, reason: 'closed' }
   return { ok: true, state: m.consent === 'CONFIRMED' ? 'already' : 'ready', handleHint: m.handleHint }
 }
 
@@ -165,9 +195,9 @@ export async function completeConfirmation(token: string, sessionDiscordId: stri
   if (!(await featureOn(env))) return { ok: false, reason: 'unavailable' }
   const v = verifyConfirmToken(token, now, env)
   if (!v.ok) return v
-  if (v.claims.d !== sessionDiscordId) return { ok: false, reason: 'wrong-account' }
+  if (v.claims.d !== keyedDiscordId(sessionDiscordId, env)) return { ok: false, reason: 'wrong-account' }
   const m = await prisma.telegramHostMatch.findUnique({ where: { discordId: sessionDiscordId } })
-  if (!m || m.consent === 'DECLINED' || telegramFingerprint(m.telegramId) !== v.claims.h) return { ok: false, reason: 'closed' }
+  if (!m || m.consent === 'DECLINED' || telegramFingerprint(m.telegramId, env) !== v.claims.h) return { ok: false, reason: 'closed' }
   if (m.consent === 'CONFIRMED') return { ok: true }
   // A widget login wins over a match, and one Telegram account belongs to one member.
   if (await prisma.telegramAccount.findFirst({ where: { OR: [{ discordId: sessionDiscordId }, { telegramId: m.telegramId }] }, select: { discordId: true } })) return { ok: false, reason: 'has-login' }
@@ -190,11 +220,12 @@ export async function maybeInvite(discordId: string, deps: Deps = {}): Promise<'
   const env = deps.env ?? process.env
   const now = deps.now ?? new Date()
   const settings = await loadSettings()
-  if (!resolveToggle('telegram.hostMatchEnabled', settings, env) || settings.get('telegram.hostMatchMode') < 2) return 'skipped'
+  if (!resolveToggle('telegram.hostMatchEnabled', settings, env) || !resolveToggle('telegram.dmEnabled', settings, env) || settings.get('telegram.hostMatchMode') < 2) return 'skipped'
   if (!telegramSendAllowed(env) || !linkSecret(env)) return 'skipped'
   const m = await prisma.telegramHostMatch.findUnique({ where: { discordId } })
   if (!m || m.consent !== 'PENDING') return 'skipped'
   if (await prisma.telegramAccount.findUnique({ where: { discordId }, select: { discordId: true } })) return 'skipped'
+  if (await isLoginId(m.telegramId)) return 'skipped'
   if (!canTryTelegram(await loadReach(m.telegramId), now)) return 'skipped'
   const token = signConfirmToken(discordId, m.telegramId, now, env)
   if (!token) return 'skipped'
@@ -202,7 +233,7 @@ export async function maybeInvite(discordId: string, deps: Deps = {}): Promise<'
   if (claim.count !== 1) return 'skipped'
   const cfg = await loadFollowUpConfig(env)
   const recheck = { dmRecheckDays: cfg.dmRecheckDays, dmRecheckMaxDays: cfg.dmRecheckMaxDays }
-  const t = TEXT[await localeOf(m.memberId)].invite
+  const t = await dmText('invite', await localeOf(m.memberId))
   const send = deps.send ?? ((a) => sendDm(a, { env }))
   const r = await send({ telegramUserId: m.telegramId, text: t.text, buttons: [[{ text: t.button, url: confirmUrl(token, env) }]], idempotencyKey: `ti:${discordId}:${now.getTime()}` })
   if (r.ok) {
