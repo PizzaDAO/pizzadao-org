@@ -66,11 +66,16 @@ describe('settings registry', () => {
       ['telegram.recapMirrorEnabled', false],
       ['telegram.agendaMirrorEnabled', false],
       ['telegram.announceMirrorEnabled', false],
+      ['telegram.hostMatchEnabled', false],
+      ['telegram.hostMatchDiscordLine', 'Prefer Telegram? Confirm here: {link}'],
       ['telegram.crewCityGroups', []],
       ['telegram.announceCityKeys', []],
       ['telegram.maxSendsPerRun', 25],
       ['telegram.groupGapSeconds', 10],
       ['telegram.postMaxAgeHours', 12],
+      ['telegram.hostMatchMode', 1],
+      ['telegram.hostMatchRecheckDays', 14],
+      ['telegram.hostMatchDailyHashes', 1000],
     ])
     // And the literal values today (a change here is a deliberate, reviewed change).
     expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([

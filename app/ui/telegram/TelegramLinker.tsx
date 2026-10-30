@@ -23,6 +23,8 @@ type TelegramStatus = {
 
 type DmState = "unknown" | "ok" | "not_started" | "blocked";
 
+type MatchCard = { state: "none" | "pending" | "awaiting" | "confirmed"; handleHint?: string | null; canSend?: boolean };
+
 declare global {
     interface Window {
         onTelegramAuth?: (user: Record<string, unknown>) => void;
@@ -54,6 +56,9 @@ export function TelegramLinker() {
     const [error, setError] = useState<string | null>(null);
     const [checking, setChecking] = useState(false);
     const [checkNote, setCheckNote] = useState<string | null>(null);
+    const [match, setMatch] = useState<MatchCard | null>(null);
+    const [matchBusy, setMatchBusy] = useState(false);
+    const [matchNote, setMatchNote] = useState<string | null>(null);
     const widgetRef = useRef<HTMLDivElement>(null);
 
     const load = useCallback(async () => {
@@ -69,9 +74,19 @@ export function TelegramLinker() {
         }
     }, []);
 
+    const loadMatch = useCallback(async () => {
+        try {
+            const res = await fetch("/api/telegram/host-match", { cache: "no-store" });
+            setMatch(res.ok ? ((await res.json()) as MatchCard) : null);
+        } catch {
+            setMatch(null);
+        }
+    }, []);
+
     useEffect(() => {
         load();
-    }, [load]);
+        void loadMatch();
+    }, [load, loadMatch]);
 
     const botUsername = status?.enabled && !status.connected ? status.botUsername : undefined;
 
@@ -155,7 +170,86 @@ export function TelegramLinker() {
         }
     };
 
-    if (!status?.enabled) return null;
+    // The suggested rsv.pizza match: the member answers here, then confirms again from the Telegram message.
+    const onMatch = async (action: "confirm" | "send-confirmation" | "decline") => {
+        setMatchNote(null);
+        setMatchBusy(true);
+        try {
+            const res = await fetch("/api/telegram/host-match", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ action }),
+            });
+            const body = (await res.json().catch(() => ({}))) as { result?: string };
+            if (res.status === 429) setMatchNote(t("matchTryLater"));
+            else if (action !== "decline") {
+                const r = body.result;
+                setMatchNote(
+                    r === "sent" ? t("matchSent")
+                    : r === "not-started" ? t("matchNotStarted")
+                    : r === "blocked" ? t("matchBlocked")
+                    : r === "wait" ? t("matchWait")
+                    : r === "try-later" ? t("matchTryLater")
+                    : r === "has-login" || r === "not-found" ? null
+                    : t("matchUnavailable"),
+                );
+            }
+            await Promise.all([loadMatch(), load()]);
+        } catch {
+            setMatchNote(t("matchUnavailable"));
+        } finally {
+            setMatchBusy(false);
+        }
+    };
+
+    const matchCard =
+        match && match.state !== "none" ? (
+            <div
+                style={{
+                    padding: 14,
+                    borderRadius: 16,
+                    border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                    background: "hsl(var(--cream) / 0.4)",
+                    display: "grid",
+                    gap: 8,
+                    fontSize: 14,
+                }}
+            >
+                <div className="overline" style={{ color: "hsl(var(--ink) / 0.55)" }}>{t("matchOverline")}</div>
+                {match.state === "confirmed" ? (
+                    <span>{t("matchConfirmed", { hint: match.handleHint ?? "" })}</span>
+                ) : match.state === "awaiting" ? (
+                    <span>{t("matchAwaiting", { hint: match.handleHint ?? "" })}</span>
+                ) : (
+                    <span>{t("matchAsk", { hint: match.handleHint ?? "" })}</span>
+                )}
+                <div style={{ display: "flex", flexWrap: "wrap", gap: 8, alignItems: "center" }}>
+                    {match.state === "pending" ? (
+                        <button type="button" onClick={() => onMatch("confirm")} disabled={matchBusy || !match.canSend} className="btn-pill" style={{ opacity: matchBusy || !match.canSend ? 0.5 : 1 }}>
+                            {t("matchYes")}
+                        </button>
+                    ) : null}
+                    {match.state === "awaiting" ? (
+                        <button type="button" onClick={() => onMatch("send-confirmation")} disabled={matchBusy || !match.canSend} className="btn-pill" style={{ opacity: matchBusy || !match.canSend ? 0.5 : 1 }}>
+                            {t("matchResend")}
+                        </button>
+                    ) : null}
+                    <button
+                        type="button"
+                        onClick={() => onMatch("decline")}
+                        disabled={matchBusy}
+                        className="btn-pill"
+                        style={{ background: "transparent", border: "1px solid hsl(var(--rule-warm) / 0.55)", color: "hsl(var(--foreground))", opacity: matchBusy ? 0.5 : 1 }}
+                    >
+                        {match.state === "confirmed" ? t("matchRemove") : t("matchNo")}
+                    </button>
+                    {match.canSend === false && match.state !== "confirmed" ? <span style={{ color: "hsl(var(--ink) / 0.55)" }}>{t("matchPreview")}</span> : null}
+                    {matchNote ? <span role="status" style={{ color: "hsl(var(--ink) / 0.55)" }}>{matchNote}</span> : null}
+                </div>
+            </div>
+        ) : null;
+
+    if (!status?.enabled) return matchCard;
 
     const dmState = (status.telegramDm?.state ?? "unknown") as DmState;
     const senderBot = status.telegramDm?.botUsername ?? null;
@@ -164,7 +258,7 @@ export function TelegramLinker() {
         ? `@${status.username}`
         : [status.firstName, status.lastName].filter(Boolean).join(" ") || "Telegram account";
 
-    return (
+    const linker = (
         <div
             style={{
                 padding: 14,
@@ -280,6 +374,14 @@ export function TelegramLinker() {
                     {error}
                 </div>
             ) : null}
+        </div>
+    );
+
+    if (!matchCard) return linker;
+    return (
+        <div style={{ display: "grid", gap: 12 }}>
+            {linker}
+            {matchCard}
         </div>
     );
 }

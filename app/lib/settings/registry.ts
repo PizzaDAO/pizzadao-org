@@ -1046,6 +1046,25 @@ export const SETTINGS = {
     help: 'When the announcement goes out on Discord, also queue it for the announcement city groups below. Needs the master switch.',
     confirmOn: 'The Community Call announcement will also post to the chosen city Telegram groups.',
   }),
+  // Optional host matching (PR P4): the switch here, the mode and pacing in ./telegram-settings.
+  'telegram.hostMatchEnabled': boolSetting({
+    key: 'telegram.hostMatchEnabled',
+    area: 'telegram',
+    label: 'Match members to Telegram accounts hosts already linked on rsv.pizza',
+    help: 'Once a day, members with a verified email are matched (by hash only) against hosts who linked Telegram on rsv.pizza. A match is only a suggestion: the member must confirm in the app and on Telegram before any follow-up goes there. Also needs the rsv.pizza side switched on. The TELEGRAM_HOST_MATCH_ENABLED env var set to off (or TELEGRAM_SENDS_ENABLED set to off) always wins; previews never run it.',
+    confirmOn: 'Verified member emails will be sent to rsv.pizza as hashes, and members with a match will be asked to confirm it.',
+  }),
+  'telegram.hostMatchDiscordLine': textSetting({
+    key: 'telegram.hostMatchDiscordLine',
+    area: 'telegram',
+    label: 'Line added to Discord follow-ups for a member with a Telegram match',
+    help: 'Added once per follow-up to members who have a suggested Telegram match they have not answered. {link} is replaced with the profile link. Empty adds nothing.',
+    maxLength: 200,
+    default: 'Prefer Telegram? Confirm here: {link}',
+    check: (v) => v === '' || v.includes('{link}'),
+    checkMessage: 'Include {link} where the profile link should go',
+    onReadFailure: { value: '' },
+  }),
   ...TELEGRAM_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.

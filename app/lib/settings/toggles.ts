@@ -62,6 +62,7 @@ export const TOGGLES = {
   'telegram.recapMirrorEnabled': { env: 'TELEGRAM_RECAP_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.agendaMirrorEnabled': { env: 'TELEGRAM_AGENDA_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.announceMirrorEnabled': { env: 'TELEGRAM_ANNOUNCE_MIRROR_ENABLED', legacy: ON_WORDS },
+  'telegram.hostMatchEnabled': { env: 'TELEGRAM_HOST_MATCH_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

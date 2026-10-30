@@ -118,6 +118,9 @@ export async function POST(req: Request) {
         throw e;
     }
 
+    // A Telegram login always wins over a suggested host match: drop the suggestion for this member.
+    await prisma.telegramHostMatch.deleteMany({ where: { discordId } }).catch(() => undefined);
+
     return NextResponse.json({
         ok: true,
         connected: true,

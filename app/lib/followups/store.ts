@@ -4,6 +4,7 @@
  */
 import type { FollowUpStatus, Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { loadReach, type ReachRow } from '@/app/lib/telegram/reach'
 import { canTransition } from './state'
 
@@ -67,6 +68,11 @@ export async function undoOptOut(discordId: string, actorId: string, followUpId:
   return res.count > 0
 }
 
+async function confirmedHostMatch(discordId: string): Promise<{ telegramId: string; memberId: string } | null> {
+  if (!(await toggleEnabled('telegram.hostMatchEnabled').catch(() => false))) return null
+  return prisma.telegramHostMatch.findFirst({ where: { discordId, consent: 'CONFIRMED' }, select: { telegramId: true, memberId: true } })
+}
+
 export interface OwnerContext {
   /** The linked Telegram id and what we know about reaching it. */
   telegram: { telegramId: string; reach: ReachRow | null } | null
@@ -76,7 +82,10 @@ export interface OwnerContext {
 }
 
 export async function loadOwnerContext(discordId: string, memberId?: string | null): Promise<OwnerContext> {
-  const telegram = await prisma.telegramAccount.findUnique({ where: { discordId }, select: { telegramId: true, memberId: true } })
+  const login = await prisma.telegramAccount.findUnique({ where: { discordId }, select: { telegramId: true, memberId: true } })
+  // No Telegram login: a host match counts only once both sides confirmed it (and only while matching is on).
+  const matched = login ? null : await confirmedHostMatch(discordId)
+  const telegram = login ?? matched
   const reach = telegram ? await loadReach(telegram.telegramId) : null
   const mid = memberId ?? telegram?.memberId ?? null
   const extras = mid ? await prisma.memberProfileExtras.findUnique({ where: { memberId: mid }, select: { timezone: true, locale: true } }) : null

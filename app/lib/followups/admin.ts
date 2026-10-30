@@ -51,14 +51,18 @@ export async function listFollowUps(f: ListFilter = {}) {
     include: { events: { orderBy: { createdAt: 'asc' }, take: 50 } },
   })
   const owners = [...new Set(rows.flatMap((r) => (r.ownerDiscordId ? [r.ownerDiscordId] : [])))]
-  const [telegram, optedOut, calls] = await Promise.all([
+  const hostMatchOn = owners.length ? await toggleEnabled('telegram.hostMatchEnabled').catch(() => false) : false
+  const [logins, confirmedMatches, optedOut, calls] = await Promise.all([
     owners.length ? prisma.telegramAccount.findMany({ where: { discordId: { in: owners } }, select: { discordId: true, telegramId: true } }) : [],
+    hostMatchOn ? prisma.telegramHostMatch.findMany({ where: { discordId: { in: owners }, consent: 'CONFIRMED' }, select: { discordId: true, telegramId: true } }) : [],
     owners.length ? prisma.messagingOptOut.findMany({ where: { discordId: { in: owners } }, select: { discordId: true } }) : [],
     prisma.callRecording.findMany({
       where: { id: { in: [...new Set(rows.flatMap((r) => (r.recordingId ? [r.recordingId] : [])))] } },
       select: { id: true, title: true, eventName: true, crewLabel: true, startedAt: true },
     }),
   ])
+  // A Telegram login wins; a host match counts only once both sides confirmed it.
+  const telegram = [...logins, ...confirmedMatches.filter((m) => !logins.some((l) => l.discordId === m.discordId))]
   const reachRows = telegram.length ? await prisma.telegramReach.findMany({ where: { telegramId: { in: telegram.map((t) => t.telegramId) } }, select: { telegramId: true, state: true, failures: true, recheckAt: true } }) : []
   const reachById = new Map(reachRows.map((r) => [r.telegramId, r]))
   const tgSender = telegramSendAllowed() && (await toggleEnabled('telegram.dmEnabled').catch(() => false))

@@ -1,5 +1,6 @@
 import { describe, it, expect, vi } from 'vitest'
 vi.mock('@/app/lib/db')
+vi.mock('@/app/lib/telegram/host-match-consent', () => ({ discordPreferLine: vi.fn(async () => null), maybeInvite: vi.fn(async () => 'skipped') }))
 vi.mock('@/app/lib/discord', () => ({ getMembersWithRoles: vi.fn(async () => []) }))
 vi.mock('./notify', async (orig) => ({ ...(await orig<typeof import('./notify')>()), deliverToContacts: vi.fn(async () => 0) }))
 

@@ -11,6 +11,7 @@
 import type { FollowUp } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { appUrl, loadFollowUpConfig, type FollowUpConfig } from './config'
+import { discordPreferLine, maybeInvite } from '@/app/lib/telegram/host-match-consent'
 import { recordResult, telegramEligibility, type RecheckCfg, type TelegramSkip } from '@/app/lib/telegram/reach'
 import { DM_TEXT_LIMIT, sendDm, telegramSendAllowed, type DmFailureCode, type DmResult, type TelegramButton } from '@/app/lib/telegram/rsv-client'
 import { discordComponents, telegramUrlKeyboard } from './buttons'
@@ -310,12 +311,14 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
   if (!row.telegramAttemptKey) await prisma.followUp.updateMany({ where: { id, telegramAttemptKey: null }, data: { telegramAttemptKey: attemptKey } })
   const recheck: RecheckCfg = { dmRecheckDays: cfg.dmRecheckDays, dmRecheckMaxDays: cfg.dmRecheckMaxDays }
   const openToken = signLink(id, 'reply', cfg.linkTtlDays, now)
+  // A suggested Telegram match the member has not answered yet: one extra line on the Discord copy (never blocks the send).
+  const preferLine = !row.ownerDiscordId ? null : await discordPreferLine(row.ownerDiscordId, owner.memberId).catch(() => null)
   const result = await deliverOverChannels(
     decision.channels,
     {
       id,
       message: row.message,
-      footers: { TELEGRAM: cfg.footerTelegram, DISCORD: cfg.footerDiscord },
+      footers: { TELEGRAM: cfg.footerTelegram, DISCORD: preferLine ? `${preferLine}\n\n${cfg.footerDiscord}` : cfg.footerDiscord },
       ownerDiscordId: row.ownerDiscordId as string,
       telegramChatId: eligibility.eligible ? (owner.telegram?.telegramId ?? null) : null,
       telegramButtons: eligibility.eligible ? telegramUrlKeyboard(id, owner.locale, cfg.linkTtlDays, now) : null,
@@ -338,6 +341,8 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
     await addEvent(id, 'telegram-undeliverable', 'system', { reason: result.telegramSkip })
   }
   if (result.ok) {
+    // Mode 2: one invitation on Telegram for a matched member who got this on Discord. Best effort.
+    if (result.channel === 'DISCORD' && row.ownerDiscordId) await maybeInvite(row.ownerDiscordId, { now }).catch(() => 'skipped')
     await guardedTransition(
       id,
       'APPROVED',
