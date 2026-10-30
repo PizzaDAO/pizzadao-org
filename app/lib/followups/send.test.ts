@@ -5,7 +5,7 @@ vi.mock('./notify', async (orig) => ({ ...(await orig<typeof import('./notify')>
 
 import { DiscordPostError } from '@/app/lib/discord-rest'
 import { prisma } from '@/app/lib/db'
-import { composeText, decideSend, deliverOverChannels, escalationText, flagStuck, footerFor, isStale, sendFollowUp, type DecideInput, type Senders } from './send'
+import { composeText, decideSend, deliverOverChannels, escalationText, flagStuck, footerFor, isStale, sendFollowUp, UNCONFIRMED_TWICE_TEXT, type DecideInput, type Senders } from './send'
 import type { FollowUpConfig } from './config'
 import { deliverToContacts } from './notify'
 
@@ -117,6 +117,24 @@ describe('deliverOverChannels fallbacks', () => {
     expect(s.discord).not.toHaveBeenCalled()
     expect(s.recordReach).not.toHaveBeenCalled()
   })
+  it('a replayed not_started leaves the stored reach alone but still falls through', async () => {
+    const s = senders({ telegram: vi.fn(async () => ({ ok: false as const, code: 'not_started' as const, replay: true })) })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toMatchObject({ ok: true, channel: 'DISCORD', keyDone: true })
+    expect(s.recordReach).not.toHaveBeenCalled()
+  })
+  it('a replayed sent result counts as sent without touching the reach', async () => {
+    const s = senders({ telegram: vi.fn(async () => ({ ok: true as const, messageId: 9, replay: true })) })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toMatchObject({ ok: true, channel: 'TELEGRAM', telegramMessageId: 9 })
+    expect(s.recordReach).not.toHaveBeenCalled()
+  })
+  it('definite non-sends mark the key done; uncertain does not', async () => {
+    for (const code of ['not_started', 'blocked', 'bad_request', 'not_configured']) {
+      vi.spyOn(console, 'warn').mockImplementation(() => {})
+      expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, senders({ telegram: tgFail(code) }))).toMatchObject({ keyDone: true })
+    }
+    for (const code of ['rate_limited', 'unavailable']) expect(await deliverOverChannels(['TELEGRAM'], msg, senders({ telegram: tgFail(code) }))).toMatchObject({ keyDone: true })
+    expect(await deliverOverChannels(['TELEGRAM'], msg, senders({ telegram: tgFail('uncertain') }))).not.toHaveProperty('keyDone')
+  })
   it('uncertain is flagged so the row ends FAILED, not escalated', async () => {
     const s = senders({ telegram: tgFail('uncertain') })
     expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toMatchObject({ ok: false, uncertain: true })
@@ -226,6 +244,44 @@ describe('sendFollowUp: an uncertain Telegram send', () => {
     expect(deliverToContacts).not.toHaveBeenCalled()
     expect(prisma.followUp.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', error: 'A send was started but never confirmed. Check the recipient before approving again.' }) }))
     expect(prisma.followUp.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'UNREACHABLE' }) }))
+  })
+  const withTelegram = (fn: (a: { idempotencyKey: string }) => Promise<unknown>) => ({ telegram: vi.fn(fn), discord: vi.fn(async () => ({ channelId: 'c', messageId: 'm' })), recordReach: vi.fn() })
+  it('a second uncertain answer that is a replay ends FAILED with its own message and clears the key', async () => {
+    setup('fu:f1:123456')
+    const s = withTelegram(async () => ({ ok: false, code: 'uncertain', replay: true }))
+    await sendFollowUp('f1', { now, cfg, senders: s as never })
+    expect(s.telegram.mock.calls[0][0].idempotencyKey).toBe('fu:f1:123456')
+    expect(prisma.followUp.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', error: UNCONFIRMED_TWICE_TEXT, telegramAttemptKey: null }) }))
+    expect(s.discord).not.toHaveBeenCalled()
+  })
+  it('a first uncertain answer keeps the key for the one replay', async () => {
+    setup(null)
+    await sendFollowUp('f1', { now, cfg, senders: withTelegram(async () => ({ ok: false, code: 'uncertain' })) as never })
+    const failed = vi.mocked(prisma.followUp.updateMany).mock.calls.find((c) => (c[0].data as { status?: string }).status === 'FAILED')!
+    expect((failed[0].data as Record<string, unknown>).telegramAttemptKey).toBeUndefined()
+  })
+  it('a replayed sent result moves the row to SENT', async () => {
+    setup('fu:f1:123456')
+    const s = withTelegram(async () => ({ ok: true, messageId: 5, replay: true }))
+    expect(await sendFollowUp('f1', { now, cfg, senders: s as never })).toBe('sent')
+    expect(s.recordReach).not.toHaveBeenCalled()
+  })
+  it('after bad_request the key is cleared, so the next attempt starts fresh', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    setup('fu:f1:123456')
+    const s = withTelegram(async () => ({ ok: false, code: 'bad_request' }))
+    await sendFollowUp('f1', { now, cfg, senders: s as never })
+    expect(prisma.followUp.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'SENT', telegramAttemptKey: null }) }))
+    // The next attempt, with the cleared key, builds a new one.
+    setup(null)
+    const s2 = withTelegram(async () => ({ ok: false, code: 'uncertain' }))
+    await sendFollowUp('f1', { now, cfg, senders: s2 as never })
+    expect(s2.telegram.mock.calls[0][0].idempotencyKey).toBe(`fu:f1:${now.getTime()}`)
+  })
+  it('a deferral (rate limit) clears the key', async () => {
+    setup('fu:f1:123456')
+    await sendFollowUp('f1', { now, cfg, senders: withTelegram(async () => ({ ok: false, code: 'rate_limited', retryAfter: 30 })) as never })
+    expect(prisma.followUp.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ sendAttemptAt: null, telegramAttemptKey: null }) }))
   })
   it('stores the attempt key, and reuses a stored one on the next attempt', async () => {
     setup(null)
