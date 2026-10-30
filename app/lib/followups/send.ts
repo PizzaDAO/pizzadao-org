@@ -17,7 +17,7 @@ import { deliverToContacts, MAX_CONTACTS, resolveContacts } from './notify'
 import { capDecision, DAY_MS, isKnownTimezone, isQuiet, nextAllowedTime } from './quiet-hours'
 import type { Channel } from './resolve'
 import { addEvent, guardedTransition, isOptedOut, loadOwnerContext, setDmAllowed, type OwnerContext } from './store'
-import { cannotMessage, sendTelegramMessage } from './telegram'
+import { cannotMessage, sendTelegramMessage, telegramSenderAvailable } from './telegram'
 
 export const LEASE_MS = 5 * 60_000
 export const MAX_PER_RUN = 20
@@ -203,7 +203,7 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
     optedOut: row.ownerDiscordId ? await isOptedOut(row.ownerDiscordId) : false,
     timezone: owner.timezone,
     sentAt: row.ownerDiscordId ? await recentSendTimes(prisma, row.ownerDiscordId, now, id) : [],
-    telegramDmAllowed: !!owner.telegram?.dmAllowed,
+    telegramDmAllowed: telegramSenderAvailable() && !!owner.telegram?.dmAllowed,
   })
 
   if (decision.action === 'hold') {
@@ -232,7 +232,7 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
       message: row.message,
       footers: { TELEGRAM: cfg.footerTelegram, DISCORD: cfg.footerDiscord },
       ownerDiscordId: row.ownerDiscordId as string,
-      telegramChatId: owner.telegram?.dmAllowed ? owner.telegram.telegramId : null,
+      telegramChatId: telegramSenderAvailable() && owner.telegram?.dmAllowed ? owner.telegram.telegramId : null,
       locale: owner.locale,
     },
     ctx.senders,

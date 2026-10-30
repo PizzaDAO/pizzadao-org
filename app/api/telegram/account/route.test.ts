@@ -46,8 +46,8 @@ describe("/api/telegram/account", () => {
     beforeEach(() => {
         vi.clearAllMocks();
         getSession.mockResolvedValue({ discordId: "d1", createdAt: Date.now() });
-        process.env.TELEGRAM_BOT_TOKEN = TOKEN;
-        process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME = "PizzaDAOBot";
+        process.env.TELEGRAM_LOGIN_BOT_TOKEN = TOKEN;
+        process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME = "PizzaDAOBot";
     });
     afterEach(() => {
         process.env = { ...savedEnv };
@@ -61,7 +61,7 @@ describe("/api/telegram/account", () => {
     });
 
     it("GET reports disabled when env is unset", async () => {
-        delete process.env.TELEGRAM_BOT_TOKEN;
+        delete process.env.TELEGRAM_LOGIN_BOT_TOKEN;
         const res = await GET();
         expect(await res.json()).toEqual({ enabled: false, connected: false });
         expect(tg.findUnique).not.toHaveBeenCalled();
@@ -74,7 +74,7 @@ describe("/api/telegram/account", () => {
     });
 
     it("POST returns 503 when not configured", async () => {
-        delete process.env.NEXT_PUBLIC_TELEGRAM_BOT_USERNAME;
+        delete process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME;
         expect((await POST(post({}))).status).toBe(503);
     });
 

@@ -9,7 +9,7 @@ import { getMembersWithRoles } from '@/app/lib/discord'
 import { DREAD_PIZZA_ROBERTS_ROLE_ID } from '@/app/ui/constants'
 import { loadFollowUpConfig, type FollowUpConfig } from './config'
 import { sendDiscordDm } from './discord-dm'
-import { cannotMessage, sendTelegramMessage } from './telegram'
+import { cannotMessage, sendTelegramMessage, telegramSenderAvailable } from './telegram'
 import { setDmAllowed } from './store'
 
 export const MAX_CONTACTS = 5
@@ -36,7 +36,7 @@ export async function resolveContacts(cfg: Pick<FollowUpConfig, 'escalationDisco
   const accounts = new Map((await deps.accounts(ids)).map((a) => [a.discordId, a]))
   const all: Contact[] = ids.map((discordId) => {
     const a = accounts.get(discordId)
-    return { discordId, telegramChatId: a?.dmAllowed ? a.telegramId : null }
+    return { discordId, telegramChatId: telegramSenderAvailable() && a?.dmAllowed ? a.telegramId : null }
   })
   if (configured) return all
   // Default list: the approvers who linked Telegram; with none, fall back to their Discord DMs.

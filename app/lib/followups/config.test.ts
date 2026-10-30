@@ -7,6 +7,7 @@ import { envSendOff, loadFollowUpConfig, parseList } from './config'
 import { SETTINGS, parseSetting } from '@/app/lib/settings/registry'
 
 const findMany = vi.mocked(prisma.appSetting.findMany)
+const PROD = { VERCEL_ENV: 'production' }
 
 beforeEach(() => {
   clearSettingsCache({ all: true })
@@ -18,7 +19,7 @@ afterEach(() => vi.restoreAllMocks())
 describe('follow-up settings defaults', () => {
   it('sending is OFF by default; caps and quiet hours match the decision', async () => {
     findMany.mockResolvedValue([])
-    const c = await loadFollowUpConfig({})
+    const c = await loadFollowUpConfig(PROD)
     expect(c.sendEnabled).toBe(false)
     expect(c.draftEnabled).toBe(true)
     expect(c.maxPerDay).toBe(3)
@@ -35,21 +36,28 @@ describe('follow-up settings defaults', () => {
   })
   it('turns on only with the setting and no env kill switch', async () => {
     findMany.mockResolvedValue([{ key: 'followups.sendEnabled', value: 1 }] as never)
-    expect((await loadFollowUpConfig({})).sendEnabled).toBe(true)
-    expect((await loadFollowUpConfig({ FOLLOWUPS_SEND_ENABLED: 'off' })).sendEnabled).toBe(false)
-    expect((await loadFollowUpConfig({ FOLLOWUPS_SEND_ENABLED: '0' })).sendEnabled).toBe(false)
-    expect((await loadFollowUpConfig({ FOLLOWUPS_SEND_ENABLED: 'on' })).sendEnabled).toBe(true)
+    expect((await loadFollowUpConfig(PROD)).sendEnabled).toBe(true)
+    expect((await loadFollowUpConfig({ ...PROD, FOLLOWUPS_SEND_ENABLED: 'off' })).sendEnabled).toBe(false)
+    expect((await loadFollowUpConfig({ ...PROD, FOLLOWUPS_SEND_ENABLED: '0' })).sendEnabled).toBe(false)
+    expect((await loadFollowUpConfig({ ...PROD, FOLLOWUPS_SEND_ENABLED: 'on' })).sendEnabled).toBe(true)
+  })
+  it('a saved 1 is held on a preview or local deploy (they share the prod database)', async () => {
+    findMany.mockResolvedValue([{ key: 'followups.sendEnabled', value: 1 }] as never)
+    expect((await loadFollowUpConfig({ VERCEL_ENV: 'preview' })).sendEnabled).toBe(false)
+    expect((await loadFollowUpConfig({ VERCEL_ENV: 'development' })).sendEnabled).toBe(false)
+    expect((await loadFollowUpConfig({})).sendEnabled).toBe(false)
+    expect((await loadFollowUpConfig(PROD)).sendEnabled).toBe(true)
   })
   it('fails safe: unreadable settings never send', async () => {
     findMany.mockResolvedValueOnce([{ key: 'followups.sendEnabled', value: 1 }] as never)
-    expect((await loadFollowUpConfig({})).sendEnabled).toBe(true)
+    expect((await loadFollowUpConfig(PROD)).sendEnabled).toBe(true)
     clearSettingsCache() // keeps last-known-good
     findMany.mockRejectedValue(new Error('db down'))
-    expect((await loadFollowUpConfig({})).sendEnabled).toBe(false)
+    expect((await loadFollowUpConfig(PROD)).sendEnabled).toBe(false)
   })
   it('an invalid stored value does not turn sending on', async () => {
     findMany.mockResolvedValue([{ key: 'followups.sendEnabled', value: 5 }] as never)
-    expect((await loadFollowUpConfig({})).sendEnabled).toBe(false)
+    expect((await loadFollowUpConfig(PROD)).sendEnabled).toBe(false)
   })
 })
 

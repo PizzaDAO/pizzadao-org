@@ -1,6 +1,7 @@
 /**
  * Follow-up settings, read from the DB settings registry (app/lib/settings). Sending is OFF unless
- * ALL of these hold: the env kill switch is not "off", the setting followups.sendEnabled is 1, and
+ * ALL of these hold: this is a production deploy (VERCEL_ENV=production; previews share the prod database and
+ * must never message anyone), the env kill switch is not "off", the setting followups.sendEnabled is 1, and
  * the settings could be read. Anything unreadable means nothing is sent.
  */
 import { loadSettings } from '@/app/lib/settings'
@@ -34,7 +35,7 @@ export function parseList(raw: string): string[] {
 
 export async function loadFollowUpConfig(env: Record<string, string | undefined> = process.env): Promise<FollowUpConfig> {
   const s = await loadSettings()
-  const sendOk = !envSendOff(env) && !s.readFailed && !s.invalidKeys.includes('followups.sendEnabled') && s.get('followups.sendEnabled') === 1
+  const sendOk = env.VERCEL_ENV === 'production' && !envSendOff(env) && !s.readFailed && !s.invalidKeys.includes('followups.sendEnabled') && s.get('followups.sendEnabled') === 1
   return {
     sendEnabled: sendOk,
     draftEnabled: s.get('followups.draftEnabled') === 1,

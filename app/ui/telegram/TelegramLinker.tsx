@@ -6,7 +6,7 @@
 // official Telegram Login Widget; its data-onauth callback hands the signed
 // user object to POST /api/telegram/account, which verifies the HMAC
 // server-side. Renders nothing when the server reports Telegram as not
-// configured (TELEGRAM_BOT_TOKEN / NEXT_PUBLIC_TELEGRAM_BOT_USERNAME unset).
+// configured (TELEGRAM_LOGIN_BOT_TOKEN / NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME unset).
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -17,7 +17,7 @@ type TelegramStatus = {
     username?: string | null;
     firstName?: string | null;
     lastName?: string | null;
-    dmAllowed?: boolean;
+    telegramDm?: { state: string; botUsername?: string | null };
 };
 
 declare global {
@@ -103,8 +103,7 @@ export function TelegramLinker() {
         script.setAttribute("data-size", "medium");
         script.setAttribute("data-radius", "20");
         script.setAttribute("data-userpic", "false");
-        // Lets the bot send direct messages (follow-ups from calls) once the person approves.
-        script.setAttribute("data-request-access", "write");
+        // No data-request-access: the login bot never sends, so it must not ask for write access.
         script.setAttribute("data-onauth", "onTelegramAuth(user)");
         container.appendChild(script);
 
@@ -189,16 +188,6 @@ export function TelegramLinker() {
                             >
                                 § Telegram linked
                             </div>
-                            {status.dmAllowed === false && status.botUsername && (
-                                <a
-                                    href={`https://t.me/${status.botUsername}?start=fu`}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    style={{ fontSize: 13, textDecoration: "underline", color: "hsl(var(--foreground))" }}
-                                >
-                                    Allow PizzaDAO to message you on Telegram
-                                </a>
-                            )}
                         </div>
                         <button
                             type="button"
