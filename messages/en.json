@@ -1849,6 +1849,7 @@
         "confirm": "Stop these messages",
         "done": "Done. You won't get these messages anymore."
       }
-    }
+    },
+    "title": "Follow-up"
   }
 }

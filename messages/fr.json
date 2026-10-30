@@ -1849,6 +1849,7 @@
         "confirm": "Arrêter ces messages",
         "done": "C'est fait. Vous ne recevrez plus ces messages."
       }
-    }
+    },
+    "title": "Suivi"
   }
 }

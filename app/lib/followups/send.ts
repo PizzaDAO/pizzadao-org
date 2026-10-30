@@ -12,7 +12,7 @@ import type { FollowUp } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { appUrl, loadFollowUpConfig, type FollowUpConfig } from './config'
 import { recordResult, telegramEligibility, type RecheckCfg, type TelegramSkip } from '@/app/lib/telegram/reach'
-import { sendDm, telegramSendAllowed, type DmFailureCode, type DmResult, type TelegramButton } from '@/app/lib/telegram/rsv-client'
+import { DM_TEXT_LIMIT, sendDm, telegramSendAllowed, type DmFailureCode, type DmResult, type TelegramButton } from '@/app/lib/telegram/rsv-client'
 import { discordComponents, telegramUrlKeyboard } from './buttons'
 import { isDmClosed, sendDiscordDm } from './discord-dm'
 import { deliverToContacts, MAX_CONTACTS, resolveContacts } from './notify'
@@ -21,6 +21,7 @@ import type { Channel } from './resolve'
 import { linkSecret, linkUrl, signLink } from './links'
 import { addEvent, guardedTransition, isOptedOut, loadOwnerContext, type OwnerContext } from './store'
 
+export const UNCONFIRMED_TEXT = 'A send was started but never confirmed. Check the recipient before approving again.'
 export const LEASE_MS = 5 * 60_000
 export const MAX_PER_RUN = 20
 
@@ -67,7 +68,14 @@ export function decideSend(i: DecideInput): SendDecision {
   return { action: 'send', channels, ...(!i.telegramEligible && i.telegramWhy ? { telegramSkip: i.telegramWhy } : {}) }
 }
 
-export const composeText = (message: string, footer: string) => `${message.trim()}\n\n${footer.trim()}`
+/** Body, blank line, footer. The body is cut (with an ellipsis) so the footer always survives `limit`. */
+export function composeText(message: string, footer: string, limit = Infinity): string {
+  const f = footer.trim()
+  const room = limit - f.length - 2
+  let body = message.trim()
+  if (body.length > room) body = `${body.slice(0, Math.max(0, room - 1)).trimEnd()}…`
+  return `${body}\n\n${f}`
+}
 
 /** The footer for a channel (both point at buttons: replies to the Telegram bot are not read). */
 export const footerFor = (cfg: Pick<FollowUpConfig, 'footerTelegram' | 'footerDiscord'>, channel: Channel) => (channel === 'TELEGRAM' ? cfg.footerTelegram : cfg.footerDiscord)
@@ -94,6 +102,8 @@ export type Delivered =
       telegramSkip?: FallbackReason
       /** Telegram definitely sent nothing and asked us to wait: put the row back and retry then. */
       retryAfterSec?: number
+      /** The Telegram send may have been delivered: never retry on another channel; a human checks first. */
+      uncertain?: boolean
     }
 
 /** How long to wait when the proxy is briefly unavailable and gave no retryAfter. */
@@ -127,7 +137,7 @@ export async function deliverOverChannels(
         telegramSkip = telegramSkip ?? 'off'
         continue
       }
-      const r = await senders.telegram({ telegramUserId: m.telegramChatId, text: composeText(m.message, m.footers.TELEGRAM), buttons: m.telegramButtons, idempotencyKey: m.attemptKey })
+      const r = await senders.telegram({ telegramUserId: m.telegramChatId, text: composeText(m.message, m.footers.TELEGRAM, DM_TEXT_LIMIT), buttons: m.telegramButtons, idempotencyKey: m.attemptKey })
       if (r.ok) {
         await senders.recordReach(m.telegramChatId, 'ok', m.recheck).catch(() => {})
         return { ok: true, channel: 'TELEGRAM', telegramChatId: m.telegramChatId, telegramMessageId: r.messageId, ...(telegramSkip ? { telegramSkip } : {}) }
@@ -150,7 +160,7 @@ export async function deliverOverChannels(
       } else {
         // uncertain: the message may have been delivered already, so never also send on Discord.
         errors.push('telegram: send failed')
-        return { ok: false, errors, ...(telegramSkip ? { telegramSkip } : {}) }
+        return { ok: false, errors, uncertain: true, ...(telegramSkip ? { telegramSkip } : {}) }
       }
     } else {
       try {
@@ -276,6 +286,10 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
   // The attempt marker goes in BEFORE anything is delivered.
   const marked = await markAttempt(row, cfg, now)
   if (marked.ok === 'busy') return 'busy'
+  // One idempotency key per row until a send is confirmed: a re-approve after an uncertain send replays the
+  // same key, so the proxy can answer with the stored result instead of sending twice.
+  const attemptKey = row.telegramAttemptKey ?? `fu:${id}:${now.getTime()}`
+  if (!row.telegramAttemptKey) await prisma.followUp.updateMany({ where: { id, telegramAttemptKey: null }, data: { telegramAttemptKey: attemptKey } })
   if (marked.ok === false) {
     await prisma.followUp.updateMany({ where: { id, status: 'APPROVED' }, data: { sendAfter: marked.retryAt } })
     await addEvent(id, 'deferred', 'system', { why: 'cap', until: marked.retryAt.toISOString() })
@@ -292,7 +306,7 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
       ownerDiscordId: row.ownerDiscordId as string,
       telegramChatId: eligibility.eligible ? (owner.telegram?.telegramId ?? null) : null,
       telegramButtons: eligibility.eligible ? telegramUrlKeyboard(id, owner.locale, cfg.linkTtlDays, now) : null,
-      attemptKey: `fu:${id}:${now.getTime()}`,
+      attemptKey,
       recheck,
       discordOpenUrl: openToken ? linkUrl(openToken) : null,
       locale: owner.locale,
@@ -327,6 +341,11 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
     )
     return 'sent'
   }
+  if (result.uncertain) {
+    // It may have gone out: no Discord copy, no "every channel failed" escalation. A human checks, then re-approves.
+    const flagged = await guardedTransition(id, 'APPROVED', 'FAILED', { sendAfter: null, error: UNCONFIRMED_TEXT, telegramFallback: fallback }, { type: 'needs-check', actorId: 'system' })
+    return flagged ? 'unreachable' : 'busy'
+  }
   const failed = await guardedTransition(id, 'APPROVED', 'UNREACHABLE', { error: result.errors.join('; ').slice(0, 300), sendAfter: null, telegramFallback: fallback }, { type: 'failed', actorId: 'system', data: { errors: result.errors.join('; ') } })
   if (!failed) return 'busy'
   return escalate({ ...row, status: 'UNREACHABLE' }, 'unreachable', cfg, now)
@@ -359,7 +378,7 @@ export async function flagStuck(now: Date): Promise<number> {
   })
   let n = 0
   for (const r of rows) {
-    const ok = await guardedTransition(r.id, 'APPROVED', 'FAILED', { sendAfter: null, error: 'A send was started but never confirmed. Check the recipient before approving again.' }, { type: 'needs-check', actorId: 'system' })
+    const ok = await guardedTransition(r.id, 'APPROVED', 'FAILED', { sendAfter: null, error: UNCONFIRMED_TEXT }, { type: 'needs-check', actorId: 'system' })
     if (ok) n++
   }
   return n

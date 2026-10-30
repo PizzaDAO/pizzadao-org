@@ -38,14 +38,15 @@ export async function POST() {
     }
 
     const cfg = await loadFollowUpConfig();
-    await resetReach(account.telegramId);
     const result = await probe(account.telegramId);
-    // Only a definite answer is recorded; rate limits and transient failures leave it as "unknown".
-    if (result.reachable) await recordResult(account.telegramId, "ok", cfg);
-    else if (result.code === "not_started" || result.code === "blocked") await recordResult(account.telegramId, result.code, cfg);
-
-    const reach = await loadReach(account.telegramId);
+    // Only a definite answer changes anything (reset first so a fresh "not started" restarts the backoff);
+    // rate limits and transient failures leave the stored state alone.
     const definite = result.reachable || result.code === "not_started" || result.code === "blocked";
+    if (definite) {
+        await resetReach(account.telegramId);
+        await recordResult(account.telegramId, result.reachable ? "ok" : (result.code as "not_started" | "blocked"), cfg);
+    }
+    const reach = await loadReach(account.telegramId);
     return NextResponse.json(
         { state: (reach?.state ?? "UNKNOWN").toLowerCase(), ...(definite ? {} : { tryLater: true }) },
         { headers: NO_STORE },

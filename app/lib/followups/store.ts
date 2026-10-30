@@ -58,7 +58,11 @@ export const UNDO_OPT_OUT_MS = 10 * 60_000
 
 /** Remove the opt-out, but only if it was made in the last few minutes (the undo on the Stop confirmation). */
 export async function undoOptOut(discordId: string, actorId: string, followUpId: string, now = new Date()): Promise<boolean> {
-  const res = await prisma.messagingOptOut.deleteMany({ where: { discordId, createdAt: { gte: new Date(now.getTime() - UNDO_OPT_OUT_MS) } } })
+  const since = new Date(now.getTime() - UNDO_OPT_OUT_MS)
+  // Only the opt-out THIS follow-up's Stop link just made: an older or admin-made opt-out is never undone here.
+  const made = await prisma.followUpEvent.findFirst({ where: { followUpId, type: 'optout', actorId: 'link:stop', createdAt: { gte: since } }, select: { id: true } })
+  if (!made) return false
+  const res = await prisma.messagingOptOut.deleteMany({ where: { discordId, createdAt: { gte: since } } })
   if (res.count > 0) await addEvent(followUpId, 'optout-undone', actorId)
   return res.count > 0
 }

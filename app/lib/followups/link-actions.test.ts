@@ -83,11 +83,18 @@ describe('performLinkAction (the POST)', () => {
   it('undo of a Stop only works for a few minutes, and only from the Stop link', async () => {
     vi.mocked(prisma.followUp.findUnique).mockResolvedValue(row() as never)
     vi.mocked(prisma.messagingOptOut.deleteMany).mockResolvedValue({ count: 1 } as never)
+    vi.mocked(prisma.followUpEvent.findFirst).mockResolvedValue({ id: 1 } as never)
     expect(await performLinkAction(tok('stop'), { undo: true })).toEqual({ ok: true, kind: 'undone' })
+    expect(prisma.followUpEvent.findFirst).toHaveBeenCalledWith(expect.objectContaining({ where: expect.objectContaining({ followUpId: ID, type: 'optout', actorId: 'link:stop' }) }))
     const where = vi.mocked(prisma.messagingOptOut.deleteMany).mock.calls[0][0]?.where as { createdAt: { gte: Date } }
     expect(Date.now() - where.createdAt.gte.getTime()).toBeLessThanOrEqual(10 * 60_000 + 1000)
+    vi.mocked(prisma.messagingOptOut.deleteMany).mockClear()
     vi.mocked(prisma.messagingOptOut.deleteMany).mockResolvedValue({ count: 0 } as never)
     expect(await performLinkAction(tok('stop'), { undo: true })).toEqual({ ok: false, reason: 'closed' })
+    // An opt-out this follow-up's Stop link did not just create (an admin one, an older one) is never undone.
+    vi.mocked(prisma.followUpEvent.findFirst).mockResolvedValue(null)
+    expect(await performLinkAction(tok('stop'), { undo: true })).toEqual({ ok: false, reason: 'closed' })
+    expect(prisma.messagingOptOut.deleteMany).toHaveBeenCalledTimes(1)
     expect(await performLinkAction(tok('done'), { undo: true })).toEqual({ ok: false, reason: 'invalid' })
   })
   it('a closed follow-up refuses done', async () => {

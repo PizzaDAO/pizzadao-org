@@ -1742,6 +1742,7 @@ model FollowUp {
   telegramChatId    String?
   telegramMessageId Int?
   snoozedUntil      DateTime? // the member snoozed this from the action page; reminders must respect it
+  telegramAttemptKey String?  @db.VarChar(80) // idempotency key for the Telegram send; reused after an uncertain send so a replay cannot double-send
   telegramFallback  String?   @db.VarChar(32) // why Telegram was skipped or failed (no-link, not-started, blocked, off, bad-request)
   lastReply         String?
   lastReplyAt       DateTime?

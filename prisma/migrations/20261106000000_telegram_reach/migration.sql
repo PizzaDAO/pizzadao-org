@@ -16,3 +16,4 @@ CREATE TABLE "TelegramReach" (
 
 ALTER TABLE "FollowUp" ADD COLUMN "snoozedUntil" TIMESTAMP(3);
 ALTER TABLE "FollowUp" ADD COLUMN "telegramFallback" VARCHAR(32);
+ALTER TABLE "FollowUp" ADD COLUMN "telegramAttemptKey" VARCHAR(80);

@@ -29,6 +29,17 @@ describe('follow-up action links', () => {
     const preview = signLink(ID, 'done', 30, now, { FOLLOWUP_LINK_SECRET: 'preview-secret-0123456789abcdef' })!
     expect(verifyLink(preview, now, ENV).ok).toBe(false)
   })
+  it('a token has exactly one valid spelling', () => {
+    const t = signLink(ID, 'done', 30, now, ENV)!
+    const [body, mac] = t.split('.')
+    expect(mac).toHaveLength(43)
+    // Padding, a different length, and stray characters are all refused even though they decode to the same bytes.
+    for (const alt of [`${body}.${mac}=`, `${body}.${mac}A`, `${body}.${mac.slice(0, 42)}`, `${body}=.${mac}`, `${body}.${mac.slice(0, 42)}+`]) expect(verifyLink(alt, now, ENV).ok).toBe(false)
+    // The last base64url char of a 32-byte MAC carries only 2 significant bits: a re-spelling of it must not verify.
+    const last = mac[42]
+    const alts = 'AQgw'.split('').filter((c) => c !== last)
+    expect(alts.some((c) => verifyLink(`${body}.${mac.slice(0, 42)}${c}`, now, ENV).ok)).toBe(false)
+  })
   it('expires after the lifetime', () => {
     const t = signLink(ID, 'done', 7, now, ENV)!
     expect(verifyLink(t, new Date(now.getTime() + 6 * 86400_000), ENV).ok).toBe(true)

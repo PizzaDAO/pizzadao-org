@@ -113,9 +113,13 @@ describe('deliverOverChannels fallbacks', () => {
   })
   it('uncertain never also goes out on Discord (it may already have been delivered)', async () => {
     const s = senders({ telegram: tgFail('uncertain') })
-    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toEqual({ ok: false, errors: ['telegram: send failed'] })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toEqual({ ok: false, errors: ['telegram: send failed'], uncertain: true })
     expect(s.discord).not.toHaveBeenCalled()
     expect(s.recordReach).not.toHaveBeenCalled()
+  })
+  it('uncertain is flagged so the row ends FAILED, not escalated', async () => {
+    const s = senders({ telegram: tgFail('uncertain') })
+    expect(await deliverOverChannels(['TELEGRAM', 'DISCORD'], msg, s)).toMatchObject({ ok: false, uncertain: true })
   })
   it('rate_limited asks for a retry later and sends nothing on Discord', async () => {
     const s = senders({ telegram: tgFail('rate_limited', 30) })
@@ -177,6 +181,63 @@ describe('decideSend: Telegram eligibility', () => {
   it('records why Telegram was left out', () => {
     expect(decideSend(base({ telegramEligible: false, telegramWhy: 'not-started' }))).toEqual({ action: 'send', channels: ['DISCORD'], telegramSkip: 'not-started' })
     expect(decideSend(base({ telegramEligible: true }))).toEqual({ action: 'send', channels: ['TELEGRAM', 'DISCORD'] })
+  })
+})
+
+describe('composeText limit', () => {
+  it('cuts the body so the footer always survives', () => {
+    const t = composeText('x'.repeat(5000), 'Use the buttons.', 3500)
+    expect(t.length).toBeLessThanOrEqual(3500)
+    expect(t.endsWith('\n\nUse the buttons.')).toBe(true)
+    expect(t).toContain('…')
+    expect(composeText('short', 'F', 3500)).toBe('short\n\nF')
+  })
+})
+
+describe('sendFollowUp: an uncertain Telegram send', () => {
+  const now = new Date('2026-11-10T15:00:00Z') // inside the unknown-timezone window
+  const cfg = {
+    sendEnabled: true, maxPerDay: 3, quietStartHour: 21, quietEndHour: 9, approvalMaxDays: 7, footerTelegram: 'T', footerDiscord: 'D', unknownTzStartHour: 14, unknownTzEndHour: 22,
+    telegramDmEnabled: true, dmRecheckDays: 7, dmRecheckMaxDays: 60, linkTtlDays: 30, snoozeDays: 3, escalationDiscordIds: [],
+  } as unknown as FollowUpConfig
+  const setup = (telegramAttemptKey: string | null) => {
+    vi.resetAllMocks()
+    vi.stubEnv('VERCEL_ENV', 'production')
+    vi.stubEnv('RSV_PIZZA_TELEGRAM_KEY', 'k')
+    vi.stubEnv('FOLLOWUP_LINK_SECRET', 'a'.repeat(32))
+    vi.mocked(prisma.followUp.updateMany).mockResolvedValue({ count: 1 } as never)
+    vi.mocked(prisma.followUpEvent.create).mockResolvedValue({} as never)
+    vi.mocked(prisma.followUpEvent.count).mockResolvedValue(0 as never)
+    vi.mocked(prisma.followUp.findMany).mockResolvedValue([] as never)
+    vi.mocked(prisma.messagingOptOut.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.telegramAccount.findUnique).mockResolvedValue({ telegramId: '555', memberId: null } as never)
+    vi.mocked(prisma.telegramReach.findUnique).mockResolvedValue(null)
+    vi.mocked(prisma.memberProfileExtras.findUnique).mockResolvedValue(null as never)
+    vi.mocked(prisma.$transaction).mockImplementation((async (fn: (tx: unknown) => unknown) => fn(prisma)) as never)
+    vi.mocked(prisma.$executeRaw).mockResolvedValue(0 as never)
+    vi.mocked(prisma.followUp.findUnique).mockResolvedValue({ id: 'f1', status: 'APPROVED', approvedAt: now, ownerDiscordId: '111', ownerMemberId: null, message: 'hi', escalateOnly: false, channel: null, telegramAttemptKey } as never)
+  }
+  const senders = () => ({ telegram: vi.fn(async (_a: { idempotencyKey: string }) => ({ ok: false as const, code: 'uncertain' as const })), discord: vi.fn(), recordReach: vi.fn() })
+  it('ends FAILED with the check-first text, no Discord copy and no escalation', async () => {
+    setup(null)
+    const s = senders()
+    await sendFollowUp('f1', { now, cfg, senders: s as never })
+    expect(s.discord).not.toHaveBeenCalled()
+    expect(deliverToContacts).not.toHaveBeenCalled()
+    expect(prisma.followUp.updateMany).toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'FAILED', error: 'A send was started but never confirmed. Check the recipient before approving again.' }) }))
+    expect(prisma.followUp.updateMany).not.toHaveBeenCalledWith(expect.objectContaining({ data: expect.objectContaining({ status: 'UNREACHABLE' }) }))
+  })
+  it('stores the attempt key, and reuses a stored one on the next attempt', async () => {
+    setup(null)
+    const s1 = senders()
+    await sendFollowUp('f1', { now, cfg, senders: s1 as never })
+    const key = vi.mocked(s1.telegram).mock.calls[0][0].idempotencyKey
+    expect(key).toBe(`fu:f1:${now.getTime()}`)
+    expect(prisma.followUp.updateMany).toHaveBeenCalledWith({ where: { id: 'f1', telegramAttemptKey: null }, data: { telegramAttemptKey: key } })
+    setup('fu:f1:123456')
+    const s2 = senders()
+    await sendFollowUp('f1', { now, cfg, senders: s2 as never })
+    expect(vi.mocked(s2.telegram).mock.calls[0][0].idempotencyKey).toBe('fu:f1:123456')
   })
 })
 

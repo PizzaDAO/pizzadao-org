@@ -39,7 +39,8 @@ export function verifyLink(token: string, now = new Date(), env: Env = process.e
   const secret = linkSecret(env)
   if (!secret || typeof token !== 'string' || token.length > 400) return { ok: false, reason: 'invalid' }
   const [body, mac, extra] = token.split('.')
-  if (!body || !mac || extra !== undefined) return { ok: false, reason: 'invalid' }
+  // One valid spelling per token (a 32-byte MAC is exactly 43 base64url chars): spellings cannot dodge the per-token rate limit.
+  if (!body || !mac || extra !== undefined || !/^[A-Za-z0-9_-]+$/.test(body) || !/^[A-Za-z0-9_-]{43}$/.test(mac)) return { ok: false, reason: 'invalid' }
   const want = sign(body, secret)
   const got = Buffer.from(mac, 'base64url')
   if (got.length !== want.length || !timingSafeEqual(got, want)) return { ok: false, reason: 'invalid' }

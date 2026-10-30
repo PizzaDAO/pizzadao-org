@@ -1849,6 +1849,7 @@
         "confirm": "Dejar de recibirlos",
         "done": "Listo. No recibirás más estos mensajes."
       }
-    }
+    },
+    "title": "Seguimiento"
   }
 }
