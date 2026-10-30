@@ -10,6 +10,7 @@ vi.mock('@/app/lib/discord-rest', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/discord-rest')>()),
   postDiscordMessage: vi.fn(),
 }))
+vi.mock('@/app/lib/telegram/city-posts', () => ({ enqueueMirror: vi.fn(async () => ({ queued: 0 })) }))
 vi.mock('@/app/lib/discord-channels', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/discord-channels')>()),
   getGuildChannels: vi.fn(),
@@ -21,6 +22,7 @@ import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { getGuildChannels } from '@/app/lib/discord-channels'
 import { buildAgendaBullets, daysOverdue, parseActionItems, formatAgendaMessage, agendaTimeZone } from './rank'
 import { clearPostFilterCache } from '@/app/lib/calls/post-filters'
+import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 import { runCallAgenda, resolveCrewChannel, fetchUpcomingEvents } from './run'
 
 const NOW = new Date('2026-10-29T15:00:00Z')
@@ -165,6 +167,34 @@ describe('runCallAgenda', () => {
     expect(target).toMatchObject({ kind: 'bot', channelId: '555555555555555555' })
     expect(body.content).toContain('Top priority: Ship thing')
     expect(body.content).toContain('/crew/ops')
+  })
+
+  it('mirrors the agenda to Telegram only after the claim, expiring when the call starts', async () => {
+    await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    expect(enqueueMirror).toHaveBeenCalledTimes(1)
+    const arg = vi.mocked(enqueueMirror).mock.calls[0][0]
+    expect(arg).toMatchObject({ kind: 'agenda', crewId: 'ops' })
+    expect(arg.sourceId).toMatch(/^111111111111111111:/)
+    expect(arg.text).toContain('Top priority: Ship thing')
+    expect(arg.expiresAt).toBeInstanceOf(Date)
+  })
+
+  it('mirrors on an uncertain Discord outcome but never when Discord refused', async () => {
+    vi.spyOn(console, 'error').mockImplementation(() => {})
+    vi.mocked(postDiscordMessage).mockRejectedValue(new DiscordPostError('forbidden', 403))
+    await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    expect(enqueueMirror).not.toHaveBeenCalled()
+    vi.mocked(postDiscordMessage).mockRejectedValue(new DiscordPostError('bad gateway', 502))
+    await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    expect(enqueueMirror).toHaveBeenCalledTimes(1)
+  })
+
+  it('does not mirror when nothing was claimed', async () => {
+    vi.mocked(prisma.callAgendaPost.create).mockRejectedValue({ code: 'P2002' })
+    await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    vi.mocked(prisma.callAgendaPost.findFirst).mockResolvedValue({ id: 'x' } as never)
+    await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
+    expect(enqueueMirror).not.toHaveBeenCalled()
   })
 
   it('skips an occurrence that is already recorded, or whose claim loses the race', async () => {

@@ -58,6 +58,10 @@ export const TOGGLES = {
   // On unless the env var is exactly "0" (independent of the one-time migration flag).
   'shop.itemGrantsEnabled': { env: 'ITEM_GRANT_CLAIMS', legacy: (raw) => raw !== '0' },
   'shop.sheetSyncEnabled': { env: 'SHOP_SHEET_SYNC_ENABLED', legacy: (raw) => raw?.trim() === '1' },
+  'telegram.cityPostsEnabled': { env: 'TELEGRAM_CITY_POSTS_ENABLED', legacy: ON_WORDS },
+  'telegram.recapMirrorEnabled': { env: 'TELEGRAM_RECAP_MIRROR_ENABLED', legacy: ON_WORDS },
+  'telegram.agendaMirrorEnabled': { env: 'TELEGRAM_AGENDA_MIRROR_ENABLED', legacy: ON_WORDS },
+  'telegram.announceMirrorEnabled': { env: 'TELEGRAM_ANNOUNCE_MIRROR_ENABLED', legacy: ON_WORDS },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES

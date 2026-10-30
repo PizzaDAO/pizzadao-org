@@ -1,7 +1,7 @@
 import { readFileSync } from 'fs'
 import { join } from 'path'
 import { describe, expect, it, vi } from 'vitest'
-import { probe, RSV_TELEGRAM_TIMEOUT_MS, sendDm, telegramSendAllowed, telegramSendsKilled } from './rsv-client'
+import { cityGroups, cityPost, probe, RSV_TELEGRAM_TIMEOUT_MS, sendDm, telegramSendAllowed, telegramSendsKilled } from './rsv-client'
 
 const PROD = { VERCEL_ENV: 'production', RSV_PIZZA_TELEGRAM_KEY: 'secret-key', RSV_PIZZA_API_URL: 'https://api.example.test/' }
 const json = (status: number, body: unknown) => vi.fn(async () => new Response(JSON.stringify(body), { status, headers: { 'Content-Type': 'application/json' } }))
@@ -103,5 +103,76 @@ describe('the no-token rule', () => {
     const src = readFileSync(join(process.cwd(), 'app/lib/telegram/rsv-client.ts'), 'utf8')
     expect(src).not.toContain('api.telegram.org')
     expect(src).not.toMatch(/setWebhook|deleteWebhook|getUpdates|setdomain/i)
+  })
+})
+
+describe('cityPost', () => {
+  const cp = { cityKey: 'somewhere', text: 'hi', idempotencyKey: 'tg:abc12345' }
+
+  it('makes no network call on a preview, with no key, or with the kill switch', async () => {
+    const fetchImpl = vi.fn()
+    for (const env of [{ ...PROD, VERCEL_ENV: 'preview' }, { ...PROD, RSV_PIZZA_TELEGRAM_KEY: undefined }, { ...PROD, TELEGRAM_SENDS_ENABLED: 'off' }]) {
+      expect(await cityPost(cp, { env, fetchImpl: fetchImpl as never })).toEqual({ ok: false, code: 'not_configured' })
+    }
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('sends the key header and body, and reads a success (message id as a string)', async () => {
+    const fetchImpl = json(200, { ok: true, messageId: 42, replay: true })
+    expect(await cityPost(cp, { env: PROD, fetchImpl: fetchImpl as never })).toEqual({ ok: true, messageId: '42', replay: true })
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.example.test/api/service/telegram/city-post')
+    expect((init.headers as Record<string, string>)['x-pizzadao-telegram-key']).toBe('secret-key')
+    expect(JSON.parse(String(init.body))).toEqual(cp)
+  })
+
+  it('reads Telegram outcomes (HTTP 200)', async () => {
+    const run = (b: unknown) => cityPost(cp, { env: PROD, fetchImpl: json(200, b) as never })
+    expect(await run({ ok: false, code: 'rate_limited', retryAfter: 7 })).toEqual({ ok: false, code: 'rate_limited', retryAfter: 7 })
+    expect(await run({ ok: false, code: 'no_group' })).toEqual({ ok: false, code: 'no_group' })
+    expect(await run({ ok: false, code: 'kicked', replay: true })).toEqual({ ok: false, code: 'kicked', replay: true })
+    expect(await run({ ok: false, code: 'something new' })).toEqual({ ok: false, code: 'uncertain' })
+  })
+
+  it('maps proxy failures: 503 reasons, validation, and any other 5xx is uncertain', async () => {
+    const run = (status: number, b: unknown = {}) => cityPost(cp, { env: PROD, fetchImpl: json(status, b) as never })
+    expect(await run(401)).toEqual({ ok: false, code: 'not_configured' })
+    expect(await run(400)).toEqual({ ok: false, code: 'bad_request' })
+    expect(await run(503, { reason: 'not configured' })).toEqual({ ok: false, code: 'not_configured' })
+    expect(await run(503, { reason: 'disabled' })).toEqual({ ok: false, code: 'disabled' })
+    expect(await run(503, { reason: 'unavailable' })).toEqual({ ok: false, code: 'unavailable' })
+    expect(await run(500)).toEqual({ ok: false, code: 'uncertain' })
+    expect(await run(502)).toEqual({ ok: false, code: 'uncertain' })
+  })
+
+  it('a network error or timeout is uncertain', async () => {
+    const fetchImpl = vi.fn(async () => { throw new Error('timeout') })
+    expect(await cityPost(cp, { env: PROD, fetchImpl: fetchImpl as never })).toEqual({ ok: false, code: 'uncertain' })
+  })
+})
+
+describe('cityGroups', () => {
+  it('is not configured without the key, and makes no call', async () => {
+    const fetchImpl = vi.fn()
+    expect(await cityGroups({ env: {}, fetchImpl: fetchImpl as never })).toEqual({ ok: false, reason: 'not_configured' })
+    expect(fetchImpl).not.toHaveBeenCalled()
+  })
+
+  it('reads the directory with a GET (works on any deploy that has the key)', async () => {
+    const group = { cityKey: 'a', title: 'A', country: 'X', region: null, chatUrl: 'https://t.me/x', hasChat: true }
+    const fetchImpl = json(200, { ok: true, groups: [group, { nope: 1 }] })
+    expect(await cityGroups({ env: { RSV_PIZZA_TELEGRAM_KEY: 'k' }, fetchImpl: fetchImpl as never })).toEqual({ ok: true, groups: [group] })
+    const [url, init] = fetchImpl.mock.calls[0] as unknown as [string, RequestInit]
+    expect(url).toBe('https://api.rsv.pizza/api/service/telegram/city-groups')
+    expect(init.method).toBe('GET')
+    expect(init.body).toBeUndefined()
+  })
+
+  it('maps failures', async () => {
+    const run = (status: number, b: unknown = {}) => cityGroups({ env: { RSV_PIZZA_TELEGRAM_KEY: 'k' }, fetchImpl: json(status, b) as never })
+    expect(await run(401)).toEqual({ ok: false, reason: 'not_configured' })
+    expect(await run(503, { reason: 'unavailable' })).toEqual({ ok: false, reason: 'unavailable' })
+    expect(await run(500)).toEqual({ ok: false, reason: 'unavailable' })
+    expect(await run(200, { ok: true })).toEqual({ ok: false, reason: 'unavailable' })
   })
 })

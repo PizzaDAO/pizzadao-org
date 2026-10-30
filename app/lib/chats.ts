@@ -2,7 +2,9 @@
 // Reads the Global Pizza Party Telegram chat directory from the rsvpizza
 // Supabase project (cross-database). This data does NOT live in the onboarding
 // app's Neon/Prisma DB — it is read over Supabase PostgREST with a plain fetch
-// using the publishable (anon) key. The source table has RLS disabled.
+// using the publishable (anon) key. rsv.pizza has since locked that table down, so when
+// RSV_PIZZA_TELEGRAM_KEY is set the directory is read through the rsv.pizza send proxy instead
+// (GET /city-groups, no chat ids); the anon read stays as the fallback.
 
 export interface CityChat {
   slug: string;
@@ -54,6 +56,37 @@ export function displayName(cityKey: string, title: string | null): string {
     .join(" ");
 }
 
+import { cityGroups, rsvTelegramConfigured } from "@/app/lib/telegram/rsv-client";
+
+/** The directory from the rsv.pizza proxy, or null when it is not configured or unavailable. */
+async function fetchViaProxy(): Promise<CityChat[] | null> {
+  if (!rsvTelegramConfigured()) return null;
+  const r = await cityGroups();
+  if (!r.ok) {
+    console.error(`[chats] rsv.pizza directory unavailable (${r.reason}), falling back`);
+    return null;
+  }
+  const seen = new Set<string>();
+  const cities: CityChat[] = [];
+  for (const g of r.groups) {
+    const chatUrl = (g.chatUrl ?? "").trim();
+    if (!chatUrl) continue;
+    const slug = slugify(g.cityKey);
+    if (!slug || seen.has(slug)) continue;
+    seen.add(slug);
+    cities.push({
+      slug,
+      name: displayName(g.cityKey, g.title),
+      chatUrl,
+      country: g.country,
+      region: g.region,
+      // The proxy directory does not say; the badge is simply not shown.
+      isSupergroup: false,
+    });
+  }
+  return cities;
+}
+
 // ===== In-memory cache (~30 min TTL), mirrors app/lib/mission-cache.ts =====
 let cityChatsCache: { data: CityChat[]; timestamp: number } | null = null;
 const CITY_CHATS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
@@ -65,6 +98,12 @@ const CITY_CHATS_CACHE_TTL = 30 * 60 * 1000; // 30 minutes
 export async function getCityChats(): Promise<CityChat[]> {
   if (cityChatsCache && Date.now() - cityChatsCache.timestamp < CITY_CHATS_CACHE_TTL) {
     return cityChatsCache.data;
+  }
+
+  const viaProxy = await fetchViaProxy();
+  if (viaProxy) {
+    cityChatsCache = { data: viaProxy, timestamp: Date.now() };
+    return viaProxy;
   }
 
   const baseUrl = (process.env.RSVPIZZA_SUPABASE_URL ?? "").trim();
