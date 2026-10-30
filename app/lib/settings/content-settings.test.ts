@@ -294,33 +294,26 @@ describe('private settings', () => {
   })
 })
 
-describe('call post filter: settings first, the table until then, and fail closed', () => {
+describe('call post filter: read from the setting only, and fail closed', () => {
   const at = new Date('2026-11-01T00:00:00Z')
   const f = { excludedCrewIds: ['crew_a'], excludedCrewLabelTerms: [], blockedTerms: ['term-a'] }
-  it('uses the table while the setting has no row', async () => {
-    m(prisma.callPostFilter.findUnique).mockResolvedValue({ id: 1, excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: ['from-table'] })
-    expect((await loadPostFilter()).blockedTerms).toEqual(['from-table'])
+  it('is empty (no filter) while the setting has no saved row', async () => {
+    m(prisma.appSetting.findMany).mockResolvedValue([])
+    expect(await loadPostFilter()).toEqual({ excludedCrewIds: [], excludedCrewLabelTerms: [], blockedTerms: [] })
   })
-  it('uses the saved setting once it exists (the table is not read)', async () => {
+  it('uses the saved setting', async () => {
     m(prisma.appSetting.findMany).mockResolvedValue([{ key: 'calls.postFilter', value: f, updatedAt: at, updatedBy: 'x' }])
     expect(await loadPostFilter()).toEqual({ ...f, excludedCrewLabelTerms: [] })
-    expect(prisma.callPostFilter.findUnique).not.toHaveBeenCalled()
   })
-  it('throws when the settings cannot be read', async () => {
+  it('throws when the settings cannot be read, so callers skip posting', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     m(prisma.appSetting.findMany).mockRejectedValue(new Error('db down'))
-    m(prisma.callPostFilter.findUnique).mockResolvedValue(null)
     await expect(loadPostFilter()).rejects.toThrow()
   })
-  it('throws when the saved value is invalid, rather than falling back to the table', async () => {
+  it('throws when the saved value is invalid', async () => {
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     m(prisma.appSetting.findMany).mockResolvedValue([{ key: 'calls.postFilter', value: { blockedTerms: 'nope' }, updatedAt: at, updatedBy: 'x' }])
-    m(prisma.callPostFilter.findUnique).mockResolvedValue(null)
     await expect(loadPostFilter()).rejects.toThrow()
-  })
-  it('throws when there is no saved row and the table cannot be read', async () => {
-    m(prisma.callPostFilter.findUnique).mockRejectedValue(new Error('db down'))
-    await expect(loadPostFilter()).rejects.toThrow('db down')
   })
 })
 

@@ -2,18 +2,16 @@
  * Private editorial filters for Metalhead's automated call posts (pre-call agendas, post-call
  * recaps). The values live in the database as the private setting `calls.postFilter` (edited by call
  * reviewers on /admin/calls); nothing about them is in code, config or any public surface. Until that
- * setting has a row, the older CallPostFilter table (one row) is read instead, so deploying before the
- * copy script runs (scripts/settings/migrate-call-post-filters.mjs) changes nothing.
+ * setting has no saved row, its default (no filter) applies.
  *
  * - excludedCrewIds: crews that never get an automated post (compared as crew-mappings slugs).
  * - excludedCrewLabelTerms: whole-word terms; a crew whose label (or id) contains one is excluded.
  * - blockedTerms: whole-word terms; agenda items and recap bullets / action items that contain one
  *   are dropped from the Discord text only (stored data is untouched).
  *
- * Fail-safe: loadPostFilter() THROWS when the setting or the table cannot be read (database down, or a
+ * Fail-safe: loadPostFilter() THROWS when the setting cannot be read (database down, or a
  * stored value that fails validation); callers must then skip posting rather than post unfiltered.
  */
-import { prisma } from '@/app/lib/db'
 import { clearSettingsCache, loadSettings } from '@/app/lib/settings'
 import { saveSetting } from '@/app/lib/settings/store'
 import { normalizeCrewId } from '@/app/lib/crew-id'
@@ -56,12 +54,9 @@ export function isCrewExcluded(crew: { id?: string | null; label?: string | null
 }
 
 const KEY = 'calls.postFilter' as const
-const CACHE_MS = 30_000
-let cached: { at: number; filter: PostFilter } | null = null
 
-/** Test hook / after saving: forget the cached filter (and the settings snapshot it came from). */
+/** Test hook / after saving: forget the cached settings snapshot the filter came from. */
 export function clearPostFilterCache(): void {
-  cached = null
   clearSettingsCache()
 }
 
@@ -72,34 +67,19 @@ const clean = (v: Partial<PostFilter> | null | undefined): PostFilter => ({
 })
 
 /**
- * The current filter (settings cached ~30s). A saved `calls.postFilter` wins; with none, the legacy
- * CallPostFilter row (cached ~30s) is used. Throws if either cannot be read or the saved value is invalid.
+ * The current filter (settings cached ~30s). With no saved row the setting's empty default applies.
+ * Throws if the settings cannot be read or the saved value is invalid; callers then skip posting.
  */
 export async function loadPostFilter(now: number = Date.now()): Promise<PostFilter> {
   const settings = await loadSettings(now)
   if (settings.readFailed || settings.invalidKeys.includes(KEY)) throw new Error('Post filter could not be read')
-  if (settings.isSet(KEY)) return clean(settings.get(KEY))
-  if (cached && now - cached.at < CACHE_MS) return cached.filter
-  const row = await prisma.callPostFilter.findUnique({ where: { id: 1 } })
-  const filter: PostFilter = row ? clean(row) : EMPTY_POST_FILTER
-  cached = { at: now, filter }
-  return filter
+  return clean(settings.get(KEY))
 }
 
-/**
- * Replace the three lists (saved as the private setting, audited with the values masked). The legacy
- * table is updated too, best effort, so rolling the code back does not bring back an older filter.
- */
-export async function savePostFilter(input: Partial<PostFilter>, updatedBy: string): Promise<PostFilter & { mirrored: boolean }> {
+/** Replace the three lists (saved as the private setting, audited with the values masked). */
+export async function savePostFilter(input: Partial<PostFilter>, updatedBy: string): Promise<PostFilter> {
   const data = clean(input)
   await saveSetting(KEY, data, updatedBy)
-  let mirrored = true
-  try {
-    await prisma.callPostFilter.upsert({ where: { id: 1 }, create: { id: 1, ...data, updatedBy }, update: { ...data, updatedBy } })
-  } catch (e) {
-    mirrored = false
-    console.error('[calls/post-filters] could not mirror the filter to the legacy table:', e instanceof Error ? e.message : e)
-  }
   clearPostFilterCache()
-  return { ...data, mirrored }
+  return data
 }

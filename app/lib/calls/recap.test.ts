@@ -24,7 +24,7 @@ const rec = {
 beforeEach(() => {
   vi.clearAllMocks()
   clearPostFilterCache()
-  db.callPostFilter.findUnique.mockResolvedValue(null)
+  db.appSetting.findMany.mockResolvedValue([])
 })
 
 describe('recap text', () => {
@@ -201,7 +201,7 @@ describe('post filters', () => {
   const published = { ...rec, status: 'PUBLISHED', crewId: 'community_call', eventName: null, recapPostedAt: null, redactionsUpdatedAt: null, summaryGeneratedAt: null, summaryEditedAt: null }
   const env = { CALL_RECAP_POST_ENABLED: '1', DISCORD_BOT_TOKEN: 'tok' }
   it('never posts a recap for an excluded crew, by id or label word', async () => {
-    db.callPostFilter.findUnique.mockResolvedValue({ id: 1, ...filter })
+    db.appSetting.findMany.mockResolvedValue([{ key: 'calls.postFilter', value: filter }])
     const post = vi.fn()
     db.callRecording.findUnique.mockResolvedValue({ ...published, crewId: 'crew_x', crewLabel: 'Whatever' })
     expect(await postCallRecap('abc123', { env, post })).toBe('excluded')
@@ -212,7 +212,7 @@ describe('post filters', () => {
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
   })
   it('posts nothing (and claims nothing) when the filter cannot be read', async () => {
-    db.callPostFilter.findUnique.mockRejectedValue(new Error('db down'))
+    db.appSetting.findMany.mockRejectedValue(new Error('db down'))
     vi.spyOn(console, 'error').mockImplementation(() => {})
     db.callRecording.findUnique.mockResolvedValue(published)
     const post = vi.fn()

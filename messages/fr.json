@@ -916,7 +916,6 @@
     "filtersSaving": "Enregistrement...",
     "filtersSaved": "Enregistré.",
     "filtersError": "Impossible d'enregistrer les filtres.",
-    "filtersMirrorWarning": "Enregistré. L'ancienne copie de ces filtres dans la table n'a pas pu être mise à jour et est périmée ; les publications utilisent les filtres enregistrés.",
     "filtersUnavailable": "Impossible de charger les filtres, les publications automatiques sont donc suspendues.",
     "overline": "Enregistrements d'appels",
     "title": "Appels enregistrés",

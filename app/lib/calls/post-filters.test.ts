@@ -58,26 +58,19 @@ describe('cleanList', () => {
 
 describe('loadPostFilter / savePostFilter', () => {
   const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
-  it('is empty with no row, caches, and throws when the read fails', async () => {
-    db.callPostFilter.findUnique.mockResolvedValue(null)
+  it('is empty with no saved row', async () => {
+    db.appSetting.findMany.mockResolvedValue([])
     expect(await loadPostFilter(1000)).toEqual(EMPTY_POST_FILTER)
-    await loadPostFilter(1001)
-    expect(db.callPostFilter.findUnique).toHaveBeenCalledTimes(1)
-    clearPostFilterCache()
-    db.callPostFilter.findUnique.mockRejectedValue(new Error('db down'))
-    await expect(loadPostFilter()).rejects.toThrow('db down')
   })
-  it('save stores the cleaned lists as the private setting, mirrors them to the table and refreshes the cache', async () => {
-    db.callPostFilter.upsert.mockResolvedValue({})
+  it('throws when the read fails, so callers skip posting', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    db.appSetting.findMany.mockRejectedValue(new Error('db down'))
+    await expect(loadPostFilter()).rejects.toThrow('Post filter could not be read')
+  })
+  it('save stores the cleaned lists as the private setting and refreshes the cache', async () => {
     const saved = await savePostFilter({ excludedCrewIds: [' crew_x ', 'crew_x'], blockedTerms: ['ZETA'] }, 'u1')
     const filter = { excludedCrewIds: ['crew_x'], excludedCrewLabelTerms: [], blockedTerms: ['ZETA'] }
-    expect(saved).toEqual({ ...filter, mirrored: true })
+    expect(saved).toEqual(filter)
     expect(saveSetting).toHaveBeenCalledWith('calls.postFilter', filter, 'u1')
-    expect(db.callPostFilter.upsert).toHaveBeenCalledWith(expect.objectContaining({ where: { id: 1 }, update: expect.objectContaining({ updatedBy: 'u1' }) }))
-  })
-  it('a failed table mirror does not fail the save', async () => {
-    vi.spyOn(console, 'error').mockImplementation(() => {})
-    db.callPostFilter.upsert.mockRejectedValue(new Error('x'))
-    await expect(savePostFilter({ blockedTerms: ['ZETA'] }, 'u1')).resolves.toMatchObject({ blockedTerms: ['ZETA'], mirrored: false })
   })
 })
