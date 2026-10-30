@@ -1,9 +1,10 @@
 /**
  * Database helpers for follow-ups: the append-only audit log, guarded status changes, opt-out and
- * the recipient context (Telegram link, timezone, locale).
+ * the recipient context (Telegram link and reach, timezone, locale).
  */
 import type { FollowUpStatus, Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
+import { loadReach, type ReachRow } from '@/app/lib/telegram/reach'
 import { canTransition } from './state'
 
 const MAX_EVENT_TEXT = 500
@@ -52,25 +53,37 @@ export async function optOut(discordId: string, actorId: string, followUpId?: st
   if (followUpId) await addEvent(followUpId, 'optout', actorId)
 }
 
+/** How long after tapping Stop the confirmation page still offers "undo". */
+export const UNDO_OPT_OUT_MS = 10 * 60_000
+
+/** Remove the opt-out, but only if it was made in the last few minutes (the undo on the Stop confirmation). */
+export async function undoOptOut(discordId: string, actorId: string, followUpId: string, now = new Date()): Promise<boolean> {
+  const since = new Date(now.getTime() - UNDO_OPT_OUT_MS)
+  // Only the opt-out THIS follow-up's Stop link just made: an older or admin-made opt-out is never undone here.
+  const made = await prisma.followUpEvent.findFirst({ where: { followUpId, type: 'optout', actorId: 'link:stop', createdAt: { gte: since } }, select: { id: true } })
+  if (!made) return false
+  const res = await prisma.messagingOptOut.deleteMany({ where: { discordId, createdAt: { gte: since } } })
+  if (res.count > 0) await addEvent(followUpId, 'optout-undone', actorId)
+  return res.count > 0
+}
+
 export interface OwnerContext {
-  telegram: { telegramId: string; dmAllowed: boolean } | null
+  /** The linked Telegram id and what we know about reaching it. */
+  telegram: { telegramId: string; reach: ReachRow | null } | null
   timezone: string | null
   locale: string | null
   memberId: string | null
 }
 
 export async function loadOwnerContext(discordId: string, memberId?: string | null): Promise<OwnerContext> {
-  const telegram = await prisma.telegramAccount.findUnique({ where: { discordId }, select: { telegramId: true, dmAllowed: true, memberId: true } })
+  const telegram = await prisma.telegramAccount.findUnique({ where: { discordId }, select: { telegramId: true, memberId: true } })
+  const reach = telegram ? await loadReach(telegram.telegramId) : null
   const mid = memberId ?? telegram?.memberId ?? null
   const extras = mid ? await prisma.memberProfileExtras.findUnique({ where: { memberId: mid }, select: { timezone: true, locale: true } }) : null
   return {
-    telegram: telegram ? { telegramId: telegram.telegramId, dmAllowed: telegram.dmAllowed } : null,
+    telegram: telegram ? { telegramId: telegram.telegramId, reach } : null,
     timezone: extras?.timezone ?? null,
     locale: extras?.locale ?? null,
     memberId: mid,
   }
-}
-
-export async function setDmAllowed(telegramId: string, allowed: boolean): Promise<void> {
-  await prisma.telegramAccount.updateMany({ where: { telegramId }, data: { dmAllowed: allowed } })
 }

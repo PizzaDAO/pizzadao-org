@@ -95,8 +95,3 @@ export function resolveOwner(input: { ownerName: string; speakerDiscordId?: stri
 }
 
 export type Channel = 'DISCORD' | 'TELEGRAM'
-
-/** Telegram when the person linked it and allowed DMs; otherwise a Discord DM. */
-export function defaultChannel(telegram: { dmAllowed: boolean } | null | undefined): Channel {
-  return telegram?.dmAllowed ? 'TELEGRAM' : 'DISCORD'
-}

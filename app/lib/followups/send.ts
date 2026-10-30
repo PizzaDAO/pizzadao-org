@@ -3,7 +3,7 @@
  * nothing is sent while sending is off (see config.ts).
  *
  *   decideSend()      pure: hold / defer (quiet hours, daily cap) / escalate / send
- *   deliverOverChannels()  tries Telegram, then Discord, with the failure fallbacks
+ *   deliverOverChannels()  tries Telegram (over the rsv.pizza proxy), then Discord, with the failure fallbacks
  *   sendFollowUp()    claims the row (a short lease so overlapping runs cannot double-send),
  *                     decides, delivers, records the outcome and escalates when unreachable
  *   processDue()      the cron loop (bounded per run)
@@ -11,14 +11,18 @@
 import type { FollowUp } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { appUrl, loadFollowUpConfig, type FollowUpConfig } from './config'
-import { discordComponents, telegramKeyboard } from './buttons'
+import { recordResult, telegramEligibility, type RecheckCfg, type TelegramSkip } from '@/app/lib/telegram/reach'
+import { DM_TEXT_LIMIT, sendDm, telegramSendAllowed, type DmFailureCode, type DmResult, type TelegramButton } from '@/app/lib/telegram/rsv-client'
+import { discordComponents, telegramUrlKeyboard } from './buttons'
 import { isDmClosed, sendDiscordDm } from './discord-dm'
 import { deliverToContacts, MAX_CONTACTS, resolveContacts } from './notify'
 import { capDecision, DAY_MS, isKnownTimezone, isQuiet, nextAllowedTime } from './quiet-hours'
 import type { Channel } from './resolve'
-import { addEvent, guardedTransition, isOptedOut, loadOwnerContext, setDmAllowed, type OwnerContext } from './store'
-import { cannotMessage, sendTelegramMessage, telegramSenderAvailable } from './telegram'
+import { linkSecret, linkUrl, signLink } from './links'
+import { addEvent, guardedTransition, isOptedOut, loadOwnerContext, type OwnerContext } from './store'
 
+export const UNCONFIRMED_TEXT = 'A send was started but never confirmed. Check the recipient before approving again.'
+export const UNCONFIRMED_TWICE_TEXT = "rsv.pizza couldn't confirm this send either. Approving again will send a new message."
 export const LEASE_MS = 5 * 60_000
 export const MAX_PER_RUN = 20
 
@@ -28,7 +32,7 @@ export type SendDecision =
   | { action: 'hold' }
   | { action: 'defer'; until: Date; why: 'quiet' | 'cap' }
   | { action: 'escalate'; reason: EscalateReason }
-  | { action: 'send'; channels: Channel[] }
+  | { action: 'send'; channels: Channel[]; /** Why Telegram was left out, when it was. */ telegramSkip?: TelegramSkip }
 
 export interface DecideInput {
   row: Pick<FollowUp, 'escalateOnly' | 'ownerDiscordId' | 'channel'>
@@ -38,7 +42,9 @@ export interface DecideInput {
   timezone: string | null
   /** When this person was last messaged (any follow-up). */
   sentAt: readonly Date[]
-  telegramDmAllowed: boolean
+  /** The person can be tried on Telegram now (reach.ts telegramEligibility). */
+  telegramEligible: boolean
+  telegramWhy?: TelegramSkip
 }
 
 export function decideSend(i: DecideInput): SendDecision {
@@ -56,70 +62,133 @@ export function decideSend(i: DecideInput): SendDecision {
   }
   const cap = capDecision(i.sentAt, i.now, i.cfg.maxPerDay)
   if (!cap.ok) return { action: 'defer', until: cap.retryAt, why: 'cap' }
-  // Telegram only when the person allowed DMs; the reviewer's channel choice is tried first.
-  const preferred: Channel = i.row.channel ?? (i.telegramDmAllowed ? 'TELEGRAM' : 'DISCORD')
+  // Telegram only when the person can be reached there; the reviewer's channel choice is tried first.
+  const preferred: Channel = i.row.channel ?? (i.telegramEligible ? 'TELEGRAM' : 'DISCORD')
   const order: Channel[] = preferred === 'TELEGRAM' ? ['TELEGRAM', 'DISCORD'] : ['DISCORD', 'TELEGRAM']
-  const channels = order.filter((c) => c !== 'TELEGRAM' || i.telegramDmAllowed)
-  return { action: 'send', channels }
+  const channels = order.filter((c) => c !== 'TELEGRAM' || i.telegramEligible)
+  return { action: 'send', channels, ...(!i.telegramEligible && i.telegramWhy ? { telegramSkip: i.telegramWhy } : {}) }
 }
 
-export const composeText = (message: string, footer: string) => `${message.trim()}\n\n${footer.trim()}`
+/** Body, blank line, footer. The body is cut (with an ellipsis) so the footer always survives `limit`. */
+export function composeText(message: string, footer: string, limit = Infinity): string {
+  const f = footer.trim()
+  const room = limit - f.length - 2
+  let body = message.trim()
+  if (body.length > room) body = `${body.slice(0, Math.max(0, room - 1)).trimEnd()}…`
+  return `${body}\n\n${f}`
+}
 
-/** The footer for a channel: Telegram people can type STOP; on Discord there is only the button. */
+/** The footer for a channel (both point at buttons: replies to the Telegram bot are not read). */
 export const footerFor = (cfg: Pick<FollowUpConfig, 'footerTelegram' | 'footerDiscord'>, channel: Channel) => (channel === 'TELEGRAM' ? cfg.footerTelegram : cfg.footerDiscord)
 
 /** True once an approval is older than `maxDays`. */
 export const isStale = (approvedAt: Date | null, now: Date, maxDays: number) => !!approvedAt && now.getTime() - approvedAt.getTime() > maxDays * DAY_MS
 
 export interface Senders {
-  telegram: typeof sendTelegramMessage
+  telegram: (a: { telegramUserId: string; text: string; buttons?: TelegramButton[][]; idempotencyKey: string }) => Promise<DmResult>
   discord: typeof sendDiscordDm
-  markNoTelegramDm: (telegramId: string) => Promise<void>
+  recordReach: (telegramId: string, code: DmFailureCode | 'ok', cfg: RecheckCfg) => Promise<void>
 }
 
-const realSenders: Senders = { telegram: sendTelegramMessage, discord: sendDiscordDm, markNoTelegramDm: (id) => setDmAllowed(id, false) }
+const realSenders: Senders = { telegram: (a) => sendDm(a), discord: sendDiscordDm, recordReach: (id, code, cfg) => recordResult(id, code, cfg) }
+
+/** Why Telegram did not carry the message (stored on the row). */
+export type FallbackReason = TelegramSkip | 'bad-request'
 
 export type Delivered =
-  | { ok: true; channel: Channel; discordChannelId?: string; discordMessageId?: string | null; telegramChatId?: string; telegramMessageId?: number }
-  | { ok: false; errors: string[] }
+  | { ok: true; channel: Channel; discordChannelId?: string; discordMessageId?: string | null; telegramChatId?: string; telegramMessageId?: number; telegramSkip?: FallbackReason; keyDone?: boolean }
+  | {
+      ok: false
+      errors: string[]
+      telegramSkip?: FallbackReason
+      /** Telegram definitely sent nothing and asked us to wait: put the row back and retry then. */
+      retryAfterSec?: number
+      /** The Telegram send may have been delivered: never retry on another channel; a human checks first. */
+      uncertain?: boolean
+      /** The uncertain answer was itself a replay of an earlier one: the proxy cannot confirm this send either. */
+      replayUncertain?: boolean
+      /** Telegram gave a definite "not sent" answer, so the stored idempotency key must be cleared (a replay would repeat that answer). */
+      keyDone?: boolean
+    }
+
+/** How long to wait when the proxy is briefly unavailable and gave no retryAfter. */
+const UNAVAILABLE_WAIT_SEC = 300
 
 export async function deliverOverChannels(
   channels: readonly Channel[],
-  m: { id: string; message: string; footers: { TELEGRAM: string; DISCORD: string }; ownerDiscordId: string; telegramChatId: string | null; locale: string | null },
+  m: {
+    id: string
+    message: string
+    footers: { TELEGRAM: string; DISCORD: string }
+    ownerDiscordId: string
+    /** The Telegram user id to DM (a private chat id is the user id), or null. */
+    telegramChatId: string | null
+    /** URL buttons for the Telegram message; null when links cannot be signed. */
+    telegramButtons: TelegramButton[][] | null
+    /** Idempotency key for this delivery attempt (one per sendAttemptAt). */
+    attemptKey: string
+    recheck: RecheckCfg
+    /** Signed link for the Discord "Open in app" button. */
+    discordOpenUrl?: string | null
+    locale: string | null
+  },
   senders: Senders = realSenders,
 ): Promise<Delivered> {
   const errors: string[] = []
+  let telegramSkip: FallbackReason | undefined
+  let keyDone = false
+  const extra = (): { telegramSkip?: FallbackReason; keyDone?: true } => ({ ...(telegramSkip ? { telegramSkip } : {}), ...(keyDone ? { keyDone: true as const } : {}) })
   for (const ch of channels) {
     if (ch === 'TELEGRAM') {
-      if (!m.telegramChatId) continue
-      try {
-        const r = await senders.telegram(m.telegramChatId, composeText(m.message, m.footers.TELEGRAM), { keyboard: telegramKeyboard(m.id, m.locale) })
-        return { ok: true, channel: 'TELEGRAM', telegramChatId: m.telegramChatId, telegramMessageId: r.messageId }
-      } catch (e) {
-        if (cannotMessage(e)) {
-          await senders.markNoTelegramDm(m.telegramChatId).catch(() => {})
-          errors.push('telegram: cannot message this chat')
-        } else {
-          // Anything else may have been delivered already (a 5xx can still post): never also send on Discord.
-          errors.push('telegram: send failed')
-          return { ok: false, errors }
-        }
+      if (!m.telegramChatId || !m.telegramButtons) {
+        telegramSkip = telegramSkip ?? 'off'
+        continue
+      }
+      const r = await senders.telegram({ telegramUserId: m.telegramChatId, text: composeText(m.message, m.footers.TELEGRAM, DM_TEXT_LIMIT), buttons: m.telegramButtons, idempotencyKey: m.attemptKey })
+      if (r.ok) {
+        // A replayed answer is old news: never let it overwrite fresher reach information.
+        if (!r.replay) await senders.recordReach(m.telegramChatId, 'ok', m.recheck).catch(() => {})
+        return { ok: true, channel: 'TELEGRAM', telegramChatId: m.telegramChatId, telegramMessageId: r.messageId, ...extra() }
+      }
+      if (r.code === 'not_started' || r.code === 'blocked') {
+        keyDone = true
+        if (!r.replay) await senders.recordReach(m.telegramChatId, r.code, m.recheck).catch(() => {})
+        telegramSkip = r.code === 'blocked' ? 'blocked' : 'not-started'
+        errors.push('telegram: cannot message this chat')
+      } else if (r.code === 'rate_limited' || r.code === 'unavailable') {
+        // Nothing was sent (the proxy guarantees it): try again later instead of falling back.
+        keyDone = true
+        errors.push(`telegram: ${r.code === 'rate_limited' ? 'rate limited' : 'temporarily unavailable'}`)
+        return { ok: false, errors, retryAfterSec: Math.max(1, r.retryAfter ?? UNAVAILABLE_WAIT_SEC), ...extra() }
+      } else if (r.code === 'not_configured') {
+        keyDone = true
+        telegramSkip = 'off'
+        errors.push('telegram: not configured')
+      } else if (r.code === 'bad_request') {
+        console.warn('[followups] the Telegram proxy rejected a message as invalid')
+        keyDone = true
+        telegramSkip = 'bad-request'
+        errors.push('telegram: rejected')
+      } else {
+        // uncertain: the message may have been delivered already, so never also send on Discord.
+        errors.push('telegram: send failed')
+        return { ok: false, errors, uncertain: true, ...(r.replay ? { replayUncertain: true } : {}), ...extra() }
       }
     } else {
       try {
-        const r = await senders.discord(m.ownerDiscordId, composeText(m.message, m.footers.DISCORD), { components: discordComponents(m.id, m.locale) })
-        return { ok: true, channel: 'DISCORD', discordChannelId: r.channelId, discordMessageId: r.messageId }
+        const r = await senders.discord(m.ownerDiscordId, composeText(m.message, m.footers.DISCORD), { components: discordComponents(m.id, m.locale, m.discordOpenUrl) })
+        return { ok: true, channel: 'DISCORD', discordChannelId: r.channelId, discordMessageId: r.messageId, ...extra() }
       } catch (e) {
         if (isDmClosed(e)) errors.push('discord: DMs closed')
         else {
           // A 5xx or timeout may have posted: only a clear "cannot DM" falls back to Telegram.
           errors.push('discord: send failed')
-          return { ok: false, errors }
+          return { ok: false, errors, ...extra() }
         }
       }
     }
   }
-  return { ok: false, errors }
+  return { ok: false, errors, ...extra() }
 }
 
 const REASON_TEXT: Record<EscalateReason, string> = {
@@ -196,6 +265,14 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
   const owner: OwnerContext = row.ownerDiscordId
     ? await loadOwnerContext(row.ownerDiscordId, row.ownerMemberId)
     : { telegram: null, timezone: null, locale: null, memberId: null }
+  const eligibility = telegramEligibility({
+    toggleOn: cfg.telegramDmEnabled,
+    senderAllowed: telegramSendAllowed(),
+    linkSecretSet: !!linkSecret(),
+    telegramId: owner.telegram?.telegramId ?? null,
+    reach: owner.telegram?.reach ?? null,
+    now,
+  })
   const decision = decideSend({
     row,
     cfg,
@@ -203,7 +280,8 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
     optedOut: row.ownerDiscordId ? await isOptedOut(row.ownerDiscordId) : false,
     timezone: owner.timezone,
     sentAt: row.ownerDiscordId ? await recentSendTimes(prisma, row.ownerDiscordId, now, id) : [],
-    telegramDmAllowed: telegramSenderAvailable() && !!owner.telegram?.dmAllowed,
+    telegramEligible: eligibility.eligible,
+    ...(eligibility.eligible ? {} : { telegramWhy: eligibility.why }),
   })
 
   if (decision.action === 'hold') {
@@ -220,11 +298,18 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
   // The attempt marker goes in BEFORE anything is delivered.
   const marked = await markAttempt(row, cfg, now)
   if (marked.ok === 'busy') return 'busy'
+  // One idempotency key per row until a send is confirmed: a re-approve after an uncertain send replays the
+  // same key, so the proxy can answer with the stored result instead of sending twice.
   if (marked.ok === false) {
     await prisma.followUp.updateMany({ where: { id, status: 'APPROVED' }, data: { sendAfter: marked.retryAt } })
     await addEvent(id, 'deferred', 'system', { why: 'cap', until: marked.retryAt.toISOString() })
     return 'deferred'
   }
+  // Written only once the cap check passed, so a deferred row never holds a key.
+  const attemptKey = row.telegramAttemptKey ?? `fu:${id}:${now.getTime()}`
+  if (!row.telegramAttemptKey) await prisma.followUp.updateMany({ where: { id, telegramAttemptKey: null }, data: { telegramAttemptKey: attemptKey } })
+  const recheck: RecheckCfg = { dmRecheckDays: cfg.dmRecheckDays, dmRecheckMaxDays: cfg.dmRecheckMaxDays }
+  const openToken = signLink(id, 'reply', cfg.linkTtlDays, now)
   const result = await deliverOverChannels(
     decision.channels,
     {
@@ -232,11 +317,26 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
       message: row.message,
       footers: { TELEGRAM: cfg.footerTelegram, DISCORD: cfg.footerDiscord },
       ownerDiscordId: row.ownerDiscordId as string,
-      telegramChatId: telegramSenderAvailable() && owner.telegram?.dmAllowed ? owner.telegram.telegramId : null,
+      telegramChatId: eligibility.eligible ? (owner.telegram?.telegramId ?? null) : null,
+      telegramButtons: eligibility.eligible ? telegramUrlKeyboard(id, owner.locale, cfg.linkTtlDays, now) : null,
+      attemptKey,
+      recheck,
+      discordOpenUrl: openToken ? linkUrl(openToken) : null,
       locale: owner.locale,
     },
     ctx.senders,
   )
+  const fallback = result.telegramSkip ?? decision.telegramSkip ?? null
+  if (result.ok === false && result.retryAfterSec !== undefined) {
+    // The proxy guarantees nothing was sent: clear the attempt marker and try again later.
+    const retryAt = new Date(now.getTime() + result.retryAfterSec * 1000)
+    await prisma.followUp.updateMany({ where: { id, status: 'APPROVED' }, data: { sendAfter: retryAt, sendAttemptAt: null, telegramAttemptKey: null } })
+    await addEvent(id, 'deferred', 'system', { why: 'telegram-retry', until: retryAt.toISOString() })
+    return 'deferred'
+  }
+  if (result.telegramSkip === 'not-started' || result.telegramSkip === 'blocked') {
+    await addEvent(id, 'telegram-undeliverable', 'system', { reason: result.telegramSkip })
+  }
   if (result.ok) {
     await guardedTransition(
       id,
@@ -247,13 +347,22 @@ export async function sendFollowUp(id: string, ctx: SendCtx = {}): Promise<SendO
         sendAfter: null,
         error: null,
         channel: result.channel,
+        telegramFallback: fallback,
+        ...(result.keyDone ? { telegramAttemptKey: null } : {}),
         ...(result.channel === 'DISCORD' ? { discordChannelId: result.discordChannelId, discordMessageId: result.discordMessageId ?? null } : { telegramChatId: result.telegramChatId, telegramMessageId: result.telegramMessageId }),
       },
       { type: 'sent', actorId: 'system', data: { channel: result.channel } },
     )
     return 'sent'
   }
-  const failed = await guardedTransition(id, 'APPROVED', 'UNREACHABLE', { error: result.errors.join('; ').slice(0, 300), sendAfter: null }, { type: 'failed', actorId: 'system', data: { errors: result.errors.join('; ') } })
+  if (result.uncertain) {
+    // It may have gone out: no Discord copy, no "every channel failed" escalation. A human checks, then re-approves.
+    // Second uncertain answer in a row, this time a replay: re-sending the same key can never settle it, so drop the key.
+    const twice = result.replayUncertain === true
+    const flagged = await guardedTransition(id, 'APPROVED', 'FAILED', { sendAfter: null, error: twice ? UNCONFIRMED_TWICE_TEXT : UNCONFIRMED_TEXT, telegramFallback: fallback, ...(twice ? { telegramAttemptKey: null } : {}) }, { type: 'needs-check', actorId: 'system' })
+    return flagged ? 'unreachable' : 'busy'
+  }
+  const failed = await guardedTransition(id, 'APPROVED', 'UNREACHABLE', { error: result.errors.join('; ').slice(0, 300), sendAfter: null, telegramFallback: fallback, ...(result.keyDone ? { telegramAttemptKey: null } : {}) }, { type: 'failed', actorId: 'system', data: { errors: result.errors.join('; ') } })
   if (!failed) return 'busy'
   return escalate({ ...row, status: 'UNREACHABLE' }, 'unreachable', cfg, now)
 }
@@ -264,7 +373,7 @@ export async function escalate(row: FollowUp, reason: EscalateReason, cfg: Follo
     const moved = await guardedTransition(row.id, 'APPROVED', 'UNREACHABLE', { sendAfter: null, error: REASON_TEXT[reason] }, { type: 'unreachable', actorId: 'system', data: { reason } })
     if (!moved) return 'busy'
   }
-  const delivered = await deliverToContacts((await resolveContacts(cfg)).slice(0, MAX_CONTACTS), escalationText(row, reason))
+  const delivered = await deliverToContacts((await resolveContacts(cfg)).slice(0, MAX_CONTACTS), escalationText(row, reason), cfg)
   if (delivered > 0) {
     await guardedTransition(row.id, 'UNREACHABLE', 'ESCALATED', { escalatedAt: now }, { type: 'escalated', actorId: 'system', data: { reason, delivered } })
     return 'escalated'
@@ -285,7 +394,7 @@ export async function flagStuck(now: Date): Promise<number> {
   })
   let n = 0
   for (const r of rows) {
-    const ok = await guardedTransition(r.id, 'APPROVED', 'FAILED', { sendAfter: null, error: 'A send was started but never confirmed. Check the recipient before approving again.' }, { type: 'needs-check', actorId: 'system' })
+    const ok = await guardedTransition(r.id, 'APPROVED', 'FAILED', { sendAfter: null, error: UNCONFIRMED_TEXT }, { type: 'needs-check', actorId: 'system' })
     if (ok) n++
   }
   return n

@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest'
-import { defaultChannel, editDistance, normalizeName, resolveOwner, type MemberRef } from './resolve'
+import { editDistance, normalizeName, resolveOwner, type MemberRef } from './resolve'
 
 const members: MemberRef[] = [
   { id: 'm1', name: 'Alpha Bravo', discordId: '111111' },
@@ -66,13 +66,5 @@ describe('resolveOwner', () => {
   it('is unresolved for an unknown or empty name', () => {
     expect(resolveOwner({ ownerName: 'Zulu Yankee' }, members).status).toBe('unresolved')
     expect(resolveOwner({ ownerName: '   ' }, members).status).toBe('unresolved')
-  })
-})
-
-describe('defaultChannel', () => {
-  it('prefers Telegram only when DMs are allowed', () => {
-    expect(defaultChannel({ dmAllowed: true })).toBe('TELEGRAM')
-    expect(defaultChannel({ dmAllowed: false })).toBe('DISCORD')
-    expect(defaultChannel(null)).toBe('DISCORD')
   })
 })

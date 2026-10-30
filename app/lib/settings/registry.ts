@@ -16,7 +16,7 @@ import { ECONOMY_SETTINGS } from './economy-settings'
 import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
-export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia'
+export type SettingArea = 'missions' | 'calls' | 'disavow' | 'passport' | 'guide' | 'followups' | 'discord' | 'features' | 'payments' | 'proposals' | 'economy' | 'mafia' | 'telegram'
 
 /** Admin-only English group names (kept out of messages/*.json: the disavow feature must not leak into them). */
 export const AREA_LABELS: Record<SettingArea, string> = {
@@ -32,6 +32,7 @@ export const AREA_LABELS: Record<SettingArea, string> = {
   proposals: 'Proposals',
   economy: 'Economy and spend caps',
   mafia: 'Mafia points and ranks',
+  telegram: 'Telegram',
 }
 
 /** What a reader gets when the stored value cannot be used (DB down, row fails its schema). */
@@ -112,6 +113,8 @@ function intSetting(o: {
     looserWhen: o.looserWhen,
   }
 }
+
+const FOOTER_TELEGRAM_DEFAULT = "Replies to this bot aren't read. Use the buttons above to answer, snooze or stop these messages."
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
@@ -614,12 +617,12 @@ export const SETTINGS = {
     key: 'followups.footerTelegram',
     area: 'followups',
     label: 'Footer on Telegram messages',
-    help: 'Added under every follow-up sent on Telegram so people know how to opt out.',
+    help: 'Added under every follow-up sent on Telegram. Replies to the bot are not read, so it must point at the buttons (it cannot ask people to type STOP).',
     maxLength: 200,
-    default: 'Reply STOP to stop these messages.',
-    check: (v) => v.length > 0,
-    checkMessage: 'The footer cannot be empty',
-    onReadFailure: 'lastKnownGood',
+    default: FOOTER_TELEGRAM_DEFAULT,
+    check: (v) => v.length > 0 && !/\breply\s+stop\b/i.test(v),
+    checkMessage: "Typed STOP can't be read on Telegram any more; point at the buttons instead",
+    onReadFailure: { value: FOOTER_TELEGRAM_DEFAULT },
   }),
   'followups.footerDiscord': textSetting({
     key: 'followups.footerDiscord',
@@ -671,7 +674,56 @@ export const SETTINGS = {
     default: 22,
     unit: 'h UTC',
   }),
+  'followups.linkTtlDays': intSetting({
+    key: 'followups.linkTtlDays',
+    area: 'followups',
+    label: 'Follow-up action links last (days)',
+    help: 'How long the Done, On it, Snooze, Need help, Reply and Stop links in Telegram messages keep working.',
+    min: 7,
+    max: 90,
+    default: 30,
+    unit: 'days',
+  }),
+  'followups.snoozeDays': intSetting({
+    key: 'followups.snoozeDays',
+    area: 'followups',
+    label: 'Snooze lasts (days)',
+    help: 'When a member taps Snooze on a follow-up, reminders for it wait this long.',
+    min: 1,
+    max: 14,
+    default: 3,
+    unit: 'days',
+  }),
   // ---- END follow-ups block ----
+  // ---- Telegram sending through the shared sender bot (plans/telegram-shared-bot.md). Kept separate to ease merges. ----
+  'telegram.dmEnabled': boolSetting({
+    key: 'telegram.dmEnabled',
+    area: 'telegram',
+    label: 'Follow-up DMs over Telegram',
+    help: 'Send follow-ups to members who linked Telegram through the shared sender bot, with Discord as the fallback. Also needs "Sending follow-up messages" on. The TELEGRAM_DM_ENABLED env var set to off always wins; previews use the env var only.',
+    confirmOn: 'Approved follow-ups will go to members on Telegram when they have started the bot.',
+  }),
+  'telegram.dmRecheckDays': intSetting({
+    key: 'telegram.dmRecheckDays',
+    area: 'telegram',
+    label: 'First retry after "has not started the bot" (days)',
+    help: 'A member who linked Telegram but never started the bot is skipped (Discord is used) and tried again after this many days, doubling after each further miss.',
+    min: 1,
+    max: 90,
+    default: 7,
+    unit: 'days',
+  }),
+  'telegram.dmRecheckMaxDays': intSetting({
+    key: 'telegram.dmRecheckMaxDays',
+    area: 'telegram',
+    label: 'Longest wait between those retries (days)',
+    help: 'The doubling stops at this many days.',
+    min: 7,
+    max: 180,
+    default: 60,
+    unit: 'days',
+  }),
+  // ---- END telegram block ----
   // ---- Phase 3: disavow voting rules (a round snapshots its threshold and decision days when it opens) ----
   'disavow.yesThreshold': intSetting({
     key: 'disavow.yesThreshold',

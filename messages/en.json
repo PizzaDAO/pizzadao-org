@@ -7,7 +7,17 @@
     "saved": "Saved!"
   },
   "telegramLink": {
-    "recognise": "Linking lets PizzaDAO recognise your Telegram."
+    "recognise": "Linking lets PizzaDAO recognise your Telegram.",
+    "dmOk": "The PizzaDAO bot can message you here.",
+    "dmUnknown": "To get messages here, start the PizzaDAO bot in Telegram, then check again.",
+    "dmNotStarted": "The PizzaDAO bot can't message you yet. Start it in Telegram, then check again.",
+    "dmBlocked": "You blocked the PizzaDAO bot. Unblock it in Telegram, then check again.",
+    "dmStart": "Start the bot",
+    "dmCheck": "Check again",
+    "dmChecking": "Checking…",
+    "dmPreview": "Checking isn't available on this site.",
+    "dmTryLater": "Couldn't check right now. Try again in a few minutes.",
+    "dmCheckFailed": "Couldn't check. Try again."
   },
   "language": {
     "sectionTitle": "Language",
@@ -1467,7 +1477,7 @@
     "linkSettings": "Settings",
     "sendingOn": "Sending is on: approved messages go out within minutes (quiet hours and daily limits apply).",
     "sendingOff": "Sending is off: approved messages wait and nothing is sent. Turn it on in Settings.",
-    "reach": "{telegram} of {people} people can be reached on Telegram; the rest get a Discord message.",
+    "reach": "Telegram reachable: {telegram} / linked: {linked} (of {people} people). The rest get a Discord message.",
     "empty": "Nothing here.",
     "untitledCall": "Call",
     "loadError": "Could not load follow-ups.",
@@ -1526,8 +1536,20 @@
       "button": "Button tapped",
       "optout": "Opted out",
       "dismissed": "Dismissed",
-      "reresolved": "Person re-matched"
-    }
+      "reresolved": "Person re-matched",
+      "snooze": "Snoozed",
+      "telegram-undeliverable": "Telegram could not deliver",
+      "optout-undone": "Opt-out undone"
+    },
+    "fallback": {
+      "off": "Telegram is off",
+      "no-link": "No Telegram linked",
+      "not-started": "Has not started the bot",
+      "blocked": "Blocked the bot",
+      "bad-request": "Telegram rejected the message"
+    },
+    "fallbackNote": "Not sent on Telegram: {reason}",
+    "snoozedUntil": "Snoozed until {when}"
   },
   "budget": {
     "metaTitle": "Budget guidelines",
@@ -1766,5 +1788,68 @@
       "copied": "Code copied.",
       "failed": "Could not copy. Open the proposal and copy the code from there."
     }
+  },
+  "followupAction": {
+    "overline": "§ Follow-up",
+    "askIntro": "This is about:",
+    "invalid": {
+      "title": "This link isn't valid",
+      "body": "It may have been copied incorrectly. Open the latest message again."
+    },
+    "expired": {
+      "title": "This link has expired",
+      "body": "Ask the person who messaged you for a new one."
+    },
+    "closed": {
+      "body": "This follow-up is already closed. Nothing more to do."
+    },
+    "replyLabel": "Your reply",
+    "send": "Send reply",
+    "working": "Working…",
+    "undo": "Undo",
+    "undone": "Done. You're back on the list.",
+    "undoExpired": "It's too late to undo this.",
+    "emptyReply": "Write a reply first.",
+    "tooMany": "Too many tries. Wait a minute and try again.",
+    "error": "Something went wrong. Try again.",
+    "actions": {
+      "done": {
+        "title": "Mark as done",
+        "prompt": "Mark this as done?",
+        "confirm": "Yes, it's done",
+        "done": "Marked as done. Thanks!"
+      },
+      "wip": {
+        "title": "I'm on it",
+        "prompt": "Let us know you're working on this?",
+        "confirm": "Yes, I'm on it",
+        "done": "Noted: you're on it."
+      },
+      "help": {
+        "title": "Ask for help",
+        "prompt": "Ask for help with this?",
+        "confirm": "Yes, I need help",
+        "done": "Noted: someone will reach out to help."
+      },
+      "snooze": {
+        "title": "Snooze",
+        "prompt": "Snooze this for {days} days?",
+        "confirm": "Snooze",
+        "done": "Snoozed for {days} days."
+      },
+      "reply": {
+        "title": "Reply",
+        "prompt": "Write your reply below.",
+        "confirm": "Send reply",
+        "done": "Thanks, passed it on."
+      },
+      "stop": {
+        "title": "Stop these messages",
+        "prompt": "Stop all follow-up messages from PizzaDAO, on every app?",
+        "confirm": "Stop these messages",
+        "done": "Done. You won't get these messages anymore."
+      }
+    },
+    "title": "Follow-up"
   }
 }

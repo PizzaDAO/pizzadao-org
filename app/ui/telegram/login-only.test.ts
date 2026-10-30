@@ -15,7 +15,7 @@ describe('Telegram is login-only in the app', () => {
     }
   })
   it('the old shared env names are no longer read by the app', () => {
-    for (const p of ['app/lib/telegram-auth.ts', 'app/api/telegram/account/route.ts', 'app/lib/followups/telegram.ts']) {
+    for (const p of ['app/lib/telegram-auth.ts', 'app/api/telegram/account/route.ts', 'app/lib/telegram/rsv-client.ts', 'app/lib/telegram/reach.ts']) {
       expect(read(p), p).not.toMatch(/process\.env\.TELEGRAM_BOT_TOKEN|TELEGRAM_BOT_USERNAME|TELEGRAM_WEBHOOK_SECRET/)
     }
   })

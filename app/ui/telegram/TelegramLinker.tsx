@@ -21,6 +21,8 @@ type TelegramStatus = {
     telegramDm?: { state: string; botUsername?: string | null };
 };
 
+type DmState = "unknown" | "ok" | "not_started" | "blocked";
+
 declare global {
     interface Window {
         onTelegramAuth?: (user: Record<string, unknown>) => void;
@@ -50,6 +52,8 @@ export function TelegramLinker() {
     const [status, setStatus] = useState<TelegramStatus | null>(null);
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
+    const [checking, setChecking] = useState(false);
+    const [checkNote, setCheckNote] = useState<string | null>(null);
     const widgetRef = useRef<HTMLDivElement>(null);
 
     const load = useCallback(async () => {
@@ -133,7 +137,28 @@ export function TelegramLinker() {
         }
     };
 
+    const onCheck = async () => {
+        setCheckNote(null);
+        setChecking(true);
+        try {
+            const res = await fetch("/api/telegram/account/check", { method: "POST" });
+            const body = (await res.json().catch(() => ({}))) as { state?: string; preview?: boolean; tryLater?: boolean };
+            if (res.status === 429) setCheckNote(t("dmTryLater"));
+            else if (!res.ok) setCheckNote(t("dmCheckFailed"));
+            else if (body.preview) setCheckNote(t("dmPreview"));
+            else if (body.tryLater) setCheckNote(t("dmTryLater"));
+            await load();
+        } catch {
+            setCheckNote(t("dmCheckFailed"));
+        } finally {
+            setChecking(false);
+        }
+    };
+
     if (!status?.enabled) return null;
+
+    const dmState = (status.telegramDm?.state ?? "unknown") as DmState;
+    const senderBot = status.telegramDm?.botUsername ?? null;
 
     const label = status.username
         ? `@${status.username}`
@@ -217,6 +242,36 @@ export function TelegramLinker() {
                     </>
                 )}
             </div>
+            {status.connected && senderBot ? (
+                <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
+                    <span style={{ color: "hsl(var(--ink) / 0.7)" }}>
+                        {dmState === "ok" ? t("dmOk") : dmState === "blocked" ? t("dmBlocked") : dmState === "not_started" ? t("dmNotStarted") : t("dmUnknown")}
+                    </span>
+                    {dmState !== "ok" && dmState !== "blocked" ? (
+                        <a href={`https://t.me/${senderBot}`} target="_blank" rel="noreferrer" style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>
+                            {t("dmStart")}
+                        </a>
+                    ) : null}
+                    {dmState !== "ok" ? (
+                        <button
+                            type="button"
+                            onClick={onCheck}
+                            disabled={checking}
+                            className="btn-pill"
+                            style={{
+                                background: "transparent",
+                                border: "1px solid hsl(var(--rule-warm) / 0.55)",
+                                color: "hsl(var(--foreground))",
+                                opacity: checking ? 0.5 : 1,
+                                cursor: checking ? "not-allowed" : "pointer",
+                            }}
+                        >
+                            {checking ? t("dmChecking") : t("dmCheck")}
+                        </button>
+                    ) : null}
+                    {checkNote ? <span role="status" style={{ color: "hsl(var(--ink) / 0.55)" }}>{checkNote}</span> : null}
+                </div>
+            ) : null}
             {error ? (
                 <div
                     role="alert"

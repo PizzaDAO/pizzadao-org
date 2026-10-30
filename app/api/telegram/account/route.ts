@@ -2,7 +2,7 @@
 //
 // Link / unlink the logged-in member's Telegram account (calzone-93434).
 //
-//   GET    -> { enabled, botUsername, connected, username, firstName, lastName, photoUrl, telegramDm }
+//   GET    -> { enabled, botUsername, connected, username, firstName, lastName, photoUrl, telegramDm: { state, botUsername } }
 //   POST   -> body = Telegram Login Widget `user` object; HMAC-verified, then stored
 //   DELETE -> unlink
 //
@@ -15,6 +15,7 @@ import { prisma } from "@/app/lib/db";
 import { requireSession } from "@/app/lib/auth-guards";
 import { telegramConfig, verifyTelegramAuth } from "@/app/lib/telegram-auth";
 import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
+import { loadReach } from "@/app/lib/telegram/reach";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -32,17 +33,23 @@ export async function GET() {
 
     const account = await prisma.telegramAccount.findUnique({
         where: { discordId: auth.session.discordId },
-        select: { username: true, firstName: true, lastName: true, photoUrl: true },
+        select: { telegramId: true, username: true, firstName: true, lastName: true, photoUrl: true },
     });
+    // Whether the shared sender bot can DM this member (the Telegram id itself is never returned).
+    const reach = account ? await loadReach(account.telegramId).catch(() => null) : null;
+    const { telegramId: _telegramId, ...shown } = account ?? ({} as { telegramId?: string });
+    void _telegramId;
 
     return NextResponse.json(
         {
             enabled: true,
             botUsername: cfg.botUsername,
             connected: Boolean(account),
-            // Reachability over the sender bot arrives with the next phase of plans/telegram-shared-bot.md.
-            telegramDm: { state: "unknown", botUsername: null },
-            ...(account ?? {}),
+            telegramDm: {
+                state: (reach?.state ?? "UNKNOWN").toLowerCase(),
+                botUsername: process.env.NEXT_PUBLIC_TELEGRAM_SENDER_BOT_USERNAME?.trim() || null,
+            },
+            ...shown,
         },
         { headers: NO_STORE },
     );

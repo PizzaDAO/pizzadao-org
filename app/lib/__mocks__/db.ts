@@ -51,6 +51,7 @@ export const prisma = {
   followUpEvent: createModelMock(),
   messagingOptOut: createModelMock(),
   telegramAccount: createModelMock(),
+  telegramReach: createModelMock(),
   memberProfileExtras: createModelMock(),
   $queryRaw: vi.fn(),
   $executeRaw: vi.fn(),
