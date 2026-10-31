@@ -1,7 +1,8 @@
 "use client";
 
-import { useEffect, useState } from "react";
-import { btn, input as inputStyle } from "../shared-styles";
+import { useCallback, useEffect, useId, useState } from "react";
+import { useTranslations } from "next-intl";
+import { input as inputStyle } from "../shared-styles";
 
 type SocialAccount = {
   platform: "TWITTER" | "FARCASTER";
@@ -12,10 +13,22 @@ type SocialAccount = {
 type SocialAccountLinkerProps = {
   memberId: string;
   onAccountChange?: (accounts: { platform: string; handle: string }[]) => void;
+  /**
+   * Hide the manual (unverified) X row. Set only when the verified X card is
+   * available, so a member can still set X some way. Stored values are never
+   * touched, and the collapsed chips keep showing them.
+   */
+  hideManualX?: boolean;
 };
 
 const displayFont =
   "var(--font-display), var(--font-sans), system-ui, sans-serif";
+
+const BUTTON_BASE: React.CSSProperties = {
+  minHeight: 44,
+  padding: "0 16px",
+  fontSize: 13,
+};
 
 function chip(): React.CSSProperties {
   return {
@@ -32,58 +45,85 @@ function chip(): React.CSSProperties {
   };
 }
 
+// Same card chrome as the X and Telegram cards next to it.
+function cardChrome(): React.CSSProperties {
+  return {
+    padding: 14,
+    borderRadius: 16,
+    border: "1px solid hsl(var(--rule-warm) / 0.55)",
+    background: "hsl(var(--secondary))",
+    color: "hsl(var(--foreground))",
+  };
+}
+
 export function SocialAccountLinker({
   memberId,
   onAccountChange,
+  hideManualX = false,
 }: SocialAccountLinkerProps) {
+  const t = useTranslations("profileEdit.social");
+  const tRoot = useTranslations("profileEdit");
+  const baseId = useId();
   const [accounts, setAccounts] = useState<SocialAccount[]>([]);
   const [twitterHandle, setTwitterHandle] = useState("");
   const [farcasterHandle, setFarcasterHandle] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
+  const [savingAction, setSavingAction] = useState<"connect" | "disconnect">(
+    "connect"
+  );
   const [error, setError] = useState<string | null>(null);
-  const [loaded, setLoaded] = useState(false);
+  const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
+    "loading"
+  );
   const [expanded, setExpanded] = useState(false);
+
+  const load = useCallback(async () => {
+    setLoadState("loading");
+    try {
+      const res = await fetch(
+        `/api/social-accounts?memberId=${encodeURIComponent(memberId)}`
+      );
+      if (!res.ok) {
+        setLoadState("error");
+        return;
+      }
+      const data = await res.json();
+      const accts = data.accounts || [];
+      setAccounts(accts);
+      onAccountChange?.(
+        accts.map((a: SocialAccount) => ({
+          platform: a.platform,
+          handle: a.handle,
+        }))
+      );
+
+      const twitter = accts.find((a: SocialAccount) => a.platform === "TWITTER");
+      const farcaster = accts.find(
+        (a: SocialAccount) => a.platform === "FARCASTER"
+      );
+      if (twitter) setTwitterHandle(twitter.handle);
+      if (farcaster) setFarcasterHandle(farcaster.handle);
+      setLoadState("ready");
+    } catch {
+      setLoadState("error");
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [memberId]);
 
   // Load accounts on mount
   useEffect(() => {
-    (async () => {
-      try {
-        const res = await fetch(
-          `/api/social-accounts?memberId=${encodeURIComponent(memberId)}`
-        );
-        if (res.ok) {
-          const data = await res.json();
-          const accts = data.accounts || [];
-          setAccounts(accts);
-          onAccountChange?.(
-            accts.map((a: SocialAccount) => ({
-              platform: a.platform,
-              handle: a.handle,
-            }))
-          );
+    load();
+  }, [load]);
 
-          const twitter = accts.find(
-            (a: SocialAccount) => a.platform === "TWITTER"
-          );
-          const farcaster = accts.find(
-            (a: SocialAccount) => a.platform === "FARCASTER"
-          );
-          if (twitter) setTwitterHandle(twitter.handle);
-          if (farcaster) setFarcasterHandle(farcaster.handle);
-        }
-      } catch {
-        // Silently fail
-      } finally {
-        setLoaded(true);
-      }
-    })();
-  }, [memberId]);
+  const failureMessage = (status: number, fallback: string) =>
+    status === 401 || status === 403 ? tRoot("authFailed") : fallback;
 
   const saveAccount = async (
     platform: "TWITTER" | "FARCASTER",
     handle: string
   ) => {
     setSaving(platform);
+    setSavingAction("connect");
     setError(null);
 
     try {
@@ -99,8 +139,9 @@ export function SocialAccountLinker({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to save");
+        // Server text is English-only; show a translated message by status.
+        setError(failureMessage(res.status, t("saveFailed")));
+        return;
       }
 
       // Update local state
@@ -116,8 +157,8 @@ export function SocialAccountLinker({
       onAccountChange?.(
         newAccounts.map((a) => ({ platform: a.platform, handle: a.handle }))
       );
-    } catch (err: unknown) {
-      setError((err as Error).message || "Failed to save");
+    } catch {
+      setError(tRoot("networkError"));
     } finally {
       setSaving(null);
     }
@@ -125,6 +166,7 @@ export function SocialAccountLinker({
 
   const unlinkAccount = async (platform: "TWITTER" | "FARCASTER") => {
     setSaving(platform);
+    setSavingAction("disconnect");
     setError(null);
 
     try {
@@ -136,8 +178,8 @@ export function SocialAccountLinker({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || "Failed to unlink");
+        setError(failureMessage(res.status, t("disconnectFailed")));
+        return;
       }
 
       const newAccounts = accounts.filter((a) => a.platform !== platform);
@@ -147,14 +189,64 @@ export function SocialAccountLinker({
       );
       if (platform === "TWITTER") setTwitterHandle("");
       if (platform === "FARCASTER") setFarcasterHandle("");
-    } catch (err: unknown) {
-      setError((err as Error).message || "Failed to unlink");
+    } catch {
+      setError(tRoot("networkError"));
     } finally {
       setSaving(null);
     }
   };
 
-  if (!loaded) return null;
+  if (loadState === "loading") {
+    // Fixed-height skeleton so the section doesn't jump once it loads.
+    return (
+      <div
+        role="status"
+        style={{
+          ...cardChrome(),
+          gridColumn: "1 / -1",
+          height: 74,
+          boxSizing: "border-box",
+          display: "flex",
+          alignItems: "center",
+          fontSize: 13,
+          color: "hsl(var(--foreground) / 0.65)",
+        }}
+      >
+        {t("loading")}
+      </div>
+    );
+  }
+
+  if (loadState === "error") {
+    return (
+      <div
+        style={{
+          ...cardChrome(),
+          gridColumn: "1 / -1",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "space-between",
+          flexWrap: "wrap",
+          gap: 8,
+        }}
+      >
+        <span
+          role="alert"
+          style={{ fontSize: 13, color: "hsl(var(--tomato-readable))" }}
+        >
+          {t("loadFailed")}
+        </span>
+        <button
+          type="button"
+          onClick={load}
+          className="btn-pill btn-pill-secondary"
+          style={BUTTON_BASE}
+        >
+          {tRoot("retry")}
+        </button>
+      </div>
+    );
+  }
 
   const hasTwitter = accounts.some((a) => a.platform === "TWITTER");
   const hasFarcaster = accounts.some((a) => a.platform === "FARCASTER");
@@ -167,118 +259,134 @@ export function SocialAccountLinker({
     value: string,
     setValue: (s: string) => void,
     hasAccount: boolean
-  ) => (
-    <div
-      style={{
-        display: "flex",
-        gap: 8,
-        alignItems: "center",
-        flexWrap: "wrap",
-      }}
-    >
-      <span
-        style={{
-          fontFamily: displayFont,
-          fontSize: 13,
-          fontWeight: 600,
-          minWidth: 80,
-          color: "hsl(var(--foreground))",
-        }}
-      >
-        {label}
-      </span>
-      <input
-        type="text"
-        value={value}
-        onChange={(e) => setValue(e.target.value)}
-        placeholder={placeholder}
-        style={{ ...inputStyle(), flex: 1, minWidth: 150 }}
-      />
-      <button
-        onClick={() => saveAccount(platform, value)}
-        disabled={saving === platform || !value.trim()}
-        style={{
-          ...btn("primary", saving === platform || !value.trim()),
-          padding: "8px 14px",
-          fontSize: 13,
-        }}
-      >
-        {saving === platform ? "…" : hasAccount ? "Connect" : "Connect"}
-      </button>
-      {hasAccount && (
-        <button
-          onClick={() => unlinkAccount(platform)}
-          disabled={saving === platform}
-          style={{
-            ...btn("secondary", saving === platform),
-            padding: "8px 12px",
-            fontSize: 12,
-          }}
-        >
-          Disconnect
-        </button>
-      )}
-    </div>
-  );
-
-  return (
-    <div style={{ gridColumn: "1 / -1" }}>
+  ) => {
+    const inputId = `${baseId}-${platform}`;
+    const busy = saving === platform;
+    const connecting = busy && savingAction === "connect";
+    const disconnecting = busy && savingAction === "disconnect";
+    return (
       <div
         style={{
           display: "flex",
-          alignItems: "center",
           gap: 8,
-          marginBottom: expanded ? 12 : 0,
-          cursor: "pointer",
+          alignItems: "center",
+          flexWrap: "wrap",
         }}
-        onClick={() => setExpanded(!expanded)}
       >
-        <h3
+        <label
+          htmlFor={inputId}
           style={{
             fontFamily: displayFont,
-            fontSize: 12,
-            textTransform: "uppercase",
-            letterSpacing: "0.08em",
-            color: "hsl(var(--muted-foreground))",
-            margin: 0,
-            fontWeight: 700,
-            display: "inline-flex",
-            alignItems: "center",
-            gap: 6,
+            fontSize: 13,
+            fontWeight: 600,
+            minWidth: 80,
+            color: "hsl(var(--foreground))",
           }}
         >
-          Social Accounts
-          {linkedCount > 0 && (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                background: "hsl(var(--butter) / 0.35)",
-                color: "hsl(var(--foreground))",
-                border: "1px solid hsl(var(--butter) / 0.60)",
-                padding: "1px 8px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-                textTransform: "none",
-                letterSpacing: 0,
-              }}
-            >
-              {linkedCount}
-            </span>
-          )}
-        </h3>
-        <span
-          style={{
-            fontSize: 12,
-            color: "hsl(var(--muted-foreground))",
-            transition: "transform 200ms ease",
-            transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-          }}
+          {label}
+        </label>
+        <input
+          id={inputId}
+          type="text"
+          value={value}
+          onChange={(e) => setValue(e.target.value)}
+          placeholder={placeholder}
+          maxLength={100}
+          style={{ ...inputStyle(), flex: 1, minWidth: 150 }}
+        />
+        <button
+          type="button"
+          onClick={() => saveAccount(platform, value)}
+          disabled={busy || !value.trim()}
+          className="btn-pill btn-pill-primary"
+          style={BUTTON_BASE}
         >
-          ▼
-        </span>
+          {connecting ? t("saving") : t("connect")}
+        </button>
+        {hasAccount && (
+          <button
+            type="button"
+            onClick={() => unlinkAccount(platform)}
+            disabled={busy}
+            className="btn-pill btn-pill-secondary"
+            style={BUTTON_BASE}
+          >
+            {disconnecting ? t("disconnecting") : t("disconnect")}
+          </button>
+        )}
       </div>
+    );
+  };
+
+  const panelId = `${baseId}-panel`;
+
+  return (
+    <div style={{ ...cardChrome(), gridColumn: "1 / -1" }}>
+      <h3 style={{ margin: 0 }}>
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-controls={panelId}
+          style={{
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            gap: 8,
+            width: "100%",
+            minHeight: 44,
+            marginBottom: expanded ? 12 : 0,
+            padding: 0,
+            background: "none",
+            border: "none",
+            color: "inherit",
+            font: "inherit",
+            textAlign: "left",
+            cursor: "pointer",
+          }}
+        >
+          <span
+            style={{
+              fontFamily: displayFont,
+              fontSize: 16,
+              fontWeight: 600,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {t("title")}
+            {linkedCount > 0 && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  background: "hsl(var(--butter) / 0.35)",
+                  color: "hsl(var(--foreground))",
+                  border: "1px solid hsl(var(--butter) / 0.60)",
+                  padding: "1px 8px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {linkedCount}
+              </span>
+            )}
+          </span>
+          <span
+            aria-hidden
+            style={{
+              fontSize: 12,
+              color: "hsl(var(--foreground) / 0.65)",
+              transition: "transform 200ms ease",
+              transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          >
+            ▼
+          </span>
+        </button>
+      </h3>
 
       {!expanded && linkedCount > 0 && (
         <div
@@ -291,47 +399,52 @@ export function SocialAccountLinker({
         >
           {accounts.map((a) => (
             <span key={a.platform} style={chip()}>
-              {a.platform === "TWITTER" ? "X" : "Farcaster"}: @{a.handle}
+              {a.platform === "TWITTER" ? t("xLabel") : t("farcasterLabel")}: @
+              {a.handle}
             </span>
           ))}
         </div>
       )}
 
-      {expanded && (
-        <div style={{ display: "grid", gap: 12 }}>
-          {error && (
-            <div
-              style={{
-                padding: 10,
-                background: "hsl(var(--tomato) / 0.08)",
-                border: "1px solid hsl(var(--tomato) / 0.30)",
-                borderRadius: "var(--radius)",
-                color: "hsl(var(--tomato))",
-                fontSize: 13,
-              }}
-            >
-              {error}
-            </div>
-          )}
+      <div
+        id={panelId}
+        hidden={!expanded}
+        style={{ display: expanded ? "grid" : "none", gap: 12 }}
+      >
+        {error && (
+          <div
+            role="alert"
+            style={{
+              padding: 10,
+              background: "hsl(var(--tomato) / 0.08)",
+              border: "1px solid hsl(var(--tomato) / 0.30)",
+              borderRadius: "var(--radius)",
+              color: "hsl(var(--tomato-readable))",
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        )}
 
-          {renderRow(
+        {(!hideManualX || hasTwitter) &&
+          renderRow(
             "TWITTER",
-            "X",
-            "@handle",
+            t("xManualLabel"),
+            t("xPlaceholder"),
             twitterHandle,
             setTwitterHandle,
             hasTwitter
           )}
-          {renderRow(
-            "FARCASTER",
-            "Farcaster",
-            "username",
-            farcasterHandle,
-            setFarcasterHandle,
-            hasFarcaster
-          )}
-        </div>
-      )}
+        {renderRow(
+          "FARCASTER",
+          t("farcasterLabel"),
+          t("farcasterPlaceholder"),
+          farcasterHandle,
+          setFarcasterHandle,
+          hasFarcaster
+        )}
+      </div>
     </div>
   );
 }

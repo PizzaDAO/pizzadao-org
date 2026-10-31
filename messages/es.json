@@ -84,6 +84,92 @@
     "tooMany": "Demasiados intentos. Espera unos minutos e inténtalo de nuevo.",
     "hasLogin": "Ya vinculaste una cuenta de Telegram con el botón de inicio de sesión, que tiene prioridad."
   },
+  "profileEdit": {
+    "backToDashboard": "← Volver al panel",
+    "viewPublic": "Ver perfil público →",
+    "loadingOverline": "§ Cargando tu expediente",
+    "stalledOverline": "§ Algo se atascó",
+    "loadFailedTitle": "No se pudo cargar tu perfil",
+    "tryAgainLater": "Inténtalo de nuevo en un momento.",
+    "deskOverline": "§ La mesa editorial",
+    "pageTitle": "Editar perfil",
+    "draftThenLive": "borrador, luego en vivo",
+    "live": "en vivo",
+    "endOverline": "§ Fin de la mesa editorial",
+    "tagline": {
+      "overline": "§ 01 · La firma",
+      "title": "Lema",
+      "description": "Una línea. Aparece bajo tu nombre en tu perfil y en las vistas previas sociales."
+    },
+    "about": {
+      "overline": "§ 02 · Acerca de",
+      "title": "Acerca de",
+      "description": "Cómo apareces en tu perfil público.",
+      "orgsLabel": "Organizaciones",
+      "orgsHint": "Separadas por comas. Empresas, proyectos y DAOs con los que trabajas.",
+      "orgsPlaceholder": "p. ej. PizzaDAO, Brooklyn Pizza Lab",
+      "skillsLabel": "Habilidades",
+      "skillsHint": "Separadas por comas. En qué puedes ayudar a la DAO.",
+      "skillsPlaceholder": "p. ej. solidity, diseño, edición de video"
+    },
+    "connections": {
+      "overline": "§ 03 · Conexiones",
+      "title": "Conexiones",
+      "description": "Conecta tus cuentas sociales para que la comunidad pueda encontrarte y avalarte."
+    },
+    "links": {
+      "overline": "§ 04 · Enlaces",
+      "title": "Enlaces del perfil",
+      "description": "Añade tu sitio web, portafolio y otros enlaces."
+    },
+    "languageOverline": "§ 05 · Idioma",
+    "emailOverline": "§ 05b · Correo",
+    "wallets": {
+      "overline": "§ 06 · Wallets",
+      "title": "Wallets",
+      "description": "La gestión de wallets ahora tiene su propia página.",
+      "manage": "Gestionar wallets →"
+    },
+    "save": "Guardar",
+    "saving": "Guardando…",
+    "saved": "§ Guardado",
+    "tooLongKeep": "Demasiado largo: mantén menos de {max} caracteres.",
+    "tooLongMax": "Demasiado largo: máximo {max} caracteres.",
+    "saveFailedStatus": "No se pudo guardar ({status})",
+    "networkError": "Error de red: inténtalo de nuevo.",
+    "authFailed": "Inicia sesión de nuevo para cambiar esto.",
+    "signInAgain": "Inicia sesión de nuevo.",
+    "retry": "Reintentar",
+    "x": {
+      "ariaLabel": "X (Twitter)",
+      "loading": "Cargando tu cuenta de X…",
+      "loadFailed": "No se pudo cargar tu cuenta de X.",
+      "prompt": "Conecta tu cuenta de X",
+      "connect": "Conectar X",
+      "connected": "Conectada",
+      "disconnect": "Desconectar",
+      "disconnecting": "Desconectando…",
+      "disconnectFailed": "No se pudo desconectar ({status})",
+      "unavailable": "Conectar X no está disponible por ahora.",
+      "retrying": "Reintentando…"
+    },
+    "social": {
+      "title": "Cuentas sociales",
+      "xLabel": "X",
+      "xManualLabel": "X (sin verificar)",
+      "farcasterLabel": "Farcaster",
+      "xPlaceholder": "@usuario",
+      "farcasterPlaceholder": "usuario",
+      "connect": "Conectar",
+      "disconnect": "Desconectar",
+      "saving": "Conectando…",
+      "loading": "Cargando cuentas sociales…",
+      "loadFailed": "No se pudieron cargar tus cuentas sociales.",
+      "saveFailed": "No se pudo conectar",
+      "disconnectFailed": "No se pudo desconectar",
+      "disconnecting": "Desconectando…"
+    }
+  },
   "language": {
     "sectionTitle": "Idioma",
     "description": "Elige el idioma con el que la aplicación se comunicará contigo.",
@@ -724,8 +810,8 @@
     },
     "connections": {
       "title": "Conexiones opcionales",
-      "description": "Puedes participar sin conectar una cartera ni X. Añádelas para mostrar coleccionables o usar sus funciones.",
-      "wallet": "Gestionar carteras",
+      "description": "Puedes participar sin conectar una wallet ni X. Añádelas para mostrar coleccionables o usar sus funciones.",
+      "wallet": "Gestionar wallets",
       "x": "Conectar X"
     },
     "boxMafia": {

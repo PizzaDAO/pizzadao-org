@@ -95,5 +95,10 @@ export default async function EditProfilePage({
         );
     }
 
-    return <EditClient memberId={id} />;
+    // Server-side only; the public API is unchanged.
+    const xConfigured = Boolean(
+        process.env.X_CLIENT_ID && process.env.X_CLIENT_SECRET,
+    );
+
+    return <EditClient memberId={id} xConfigured={xConfigured} />;
 }
