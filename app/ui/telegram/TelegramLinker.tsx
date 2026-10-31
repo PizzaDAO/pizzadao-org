@@ -224,11 +224,10 @@ export function TelegramLinker() {
         };
         const timer = setInterval(async () => {
             if (Date.now() - startedAt > 10 * 60 * 1000) {
-                cancelled = true;
                 clearInterval(timer);
                 // One last look, so a tap just before the limit isn't reported as a failure.
                 const last = await load();
-                if (last.data?.connected) return;
+                if (cancelled || last.data?.connected) return;
                 setError(t("appLinkTimeout"));
                 setAppState("idle");
                 return;
