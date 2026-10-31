@@ -77,21 +77,25 @@ export interface SpentLink {
  * The claimant tapped "Yes, connect". Spends the code atomically (conditional update), so a double tap or a
  * retry links at most once, and only the claiming Telegram user can do it.
  *   "spent"   -> this call owns the code; link now,
- *   "expired" -> the code ran out (or never existed for this user's ref),
+ *   "expired" -> the code ran out or was deleted (Stop waiting, a newer code),
  *   "ignore"  -> someone else's tap, or the code was already spent: do nothing.
  */
 export async function spendByTelegram(
     ref: string,
     fromId: string,
     now = Date.now(),
+    beforeSpend?: (discordId: string) => Promise<void>,
 ): Promise<{ result: "spent"; link: SpentLink } | { result: "expired" | "ignore" }> {
     if (!isRefShape(ref)) return { result: "ignore" };
     const row = await prisma.telegramLinkCode.findUnique({
         where: { ref },
         select: { codeHash: true, discordId: true, tgId: true, tgUsername: true, tgFirstName: true, tgLastName: true, usedAt: true, expiresAt: true },
     });
-    if (!row || !row.tgId || row.tgId !== fromId || row.usedAt) return { result: "ignore" };
+    if (!row) return { result: "expired" };
+    if (!row.tgId || row.tgId !== fromId || row.usedAt) return { result: "ignore" };
     if (row.expiresAt.getTime() <= now) return { result: "expired" };
+    // Anything the caller needs to read first (it may throw) happens while the code is still unspent.
+    if (beforeSpend) await beforeSpend(row.discordId);
     const res = await prisma.telegramLinkCode.updateMany({
         where: { codeHash: row.codeHash, ref, tgId: fromId, usedAt: null, expiresAt: { gt: new Date(now) } },
         data: { usedAt: new Date(now) },

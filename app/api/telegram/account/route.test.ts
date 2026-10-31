@@ -15,12 +15,14 @@ vi.mock("@/app/lib/db", () => ({
             deleteMany: vi.fn(),
         },
         telegramHostMatch: { deleteMany: vi.fn().mockResolvedValue({ count: 1 }) },
+        telegramLinkCode: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }) },
     },
 }));
 
 import { GET, POST, DELETE } from "./route";
 import { prisma } from "@/app/lib/db";
 
+const codes = (prisma as unknown as { telegramLinkCode: { deleteMany: ReturnType<typeof vi.fn> } }).telegramLinkCode;
 const tg = (prisma as unknown as {
     telegramAccount: Record<"findUnique" | "upsert" | "deleteMany", ReturnType<typeof vi.fn>>;
 }).telegramAccount;
@@ -104,6 +106,8 @@ describe("/api/telegram/account", () => {
         // A login always wins: any suggested host match for this member is dropped.
         const hm = (prisma as unknown as { telegramHostMatch: { deleteMany: ReturnType<typeof vi.fn> } }).telegramHostMatch;
         expect(hm.deleteMany).toHaveBeenCalledWith({ where: { OR: [{ discordId: "d1" }, { telegramId: "7" }] } });
+        // An unused app link can't link later.
+        expect(codes.deleteMany).toHaveBeenCalledWith({ where: { discordId: "d1", usedAt: null } });
     });
 
     it("POST refuses a Telegram account linked to another member", async () => {
@@ -121,5 +125,6 @@ describe("/api/telegram/account", () => {
         tg.deleteMany.mockResolvedValue({ count: 1 });
         expect((await DELETE()).status).toBe(200);
         expect(tg.deleteMany).toHaveBeenCalledWith({ where: { discordId: "d1" } });
+        expect(codes.deleteMany).toHaveBeenCalledWith({ where: { discordId: "d1", usedAt: null } });
     });
 });

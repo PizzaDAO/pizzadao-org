@@ -116,7 +116,11 @@ async function onCallback(botToken: string, cq: NonNullable<TgUpdate["callback_q
     if (queryId) await loginBotCall(botToken, "answerCallbackQuery", { callback_query_id: queryId });
     if (!queryId || !fromId || !data.startsWith("ok:") || msg?.chat?.type !== "private") return;
 
-    const spent = await spendByTelegram(data.slice(3), fromId);
+    // The member lookup runs before the code is spent, so a failure or kill in between can't lose the code.
+    const who: { name: string | null } = { name: null };
+    const spent = await spendByTelegram(data.slice(3), fromId, Date.now(), async (discordId) => {
+        who.name = await publicLabel(discordId);
+    });
     // Someone else's tap, or a double tap whose first call already did the work: say nothing.
     if (spent.result === "ignore") return;
 
@@ -129,10 +133,9 @@ async function onCallback(botToken: string, cq: NonNullable<TgUpdate["callback_q
             { replaceExisting: false },
         );
         if (outcome === "linked") {
-            const name = await publicLabel(discordId).catch(() => null);
-            text = `Connected${name ? ` to the PizzaDAO member ${name}` : ""}. If this wasn't you, press Stop or contact the member.`;
+            text = `Connected${who.name ? ` to the PizzaDAO member ${who.name}` : ""}. If this wasn't you, disconnect it on the PizzaDAO profile page.`;
         } else if (outcome === "member_linked") {
-            text = "This member already has a Telegram connected. Disconnect it on their profile first, then start again.";
+            text = "This member already has a Telegram connected. Disconnect it on the PizzaDAO profile page, then start again.";
         } else {
             text = "This Telegram account is already connected to another PizzaDAO member.";
         }

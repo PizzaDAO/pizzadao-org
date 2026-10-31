@@ -2,7 +2,7 @@ import { describe, it, expect, vi, beforeEach } from "vitest";
 
 vi.mock("@/app/lib/db", () => ({
     prisma: {
-        telegramLinkCode: { findUnique: vi.fn(), findFirst: vi.fn(), updateMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
+        telegramLinkCode: { findUnique: vi.fn(), updateMany: vi.fn(), create: vi.fn(), deleteMany: vi.fn() },
     },
 }));
 
@@ -62,6 +62,8 @@ describe("link codes", () => {
         expect(await spendByTelegram(ref, "555", 5000)).toEqual({ result: "ignore" });
         t.findUnique.mockResolvedValue(row({ usedAt: new Date() }));
         expect(await spendByTelegram(ref, "777", 5000)).toEqual({ result: "ignore" });
+        t.findUnique.mockResolvedValue(null);
+        expect(await spendByTelegram(ref, "777", 5000)).toEqual({ result: "expired" });
         t.findUnique.mockResolvedValue(row());
         expect(await spendByTelegram(ref, "777", 20_000)).toEqual({ result: "expired" });
         expect(await spendByTelegram("short", "777")).toEqual({ result: "ignore" });

@@ -49,7 +49,7 @@ export async function linkTelegramAccount(
         username: tg.username,
         firstName: tg.firstName,
         lastName: tg.lastName,
-        photoUrl: tg.photoUrl,
+        ...(tg.photoUrl || opts.replaceExisting !== false ? { photoUrl: tg.photoUrl } : {}),
         authDate: tg.authDate,
         ...(memberId ? { memberId } : {}),
     };

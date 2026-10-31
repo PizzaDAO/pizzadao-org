@@ -54,7 +54,6 @@
     "errUnlinkFailed": "Couldn't disconnect Telegram. Try again.",
     "errAlreadyLinked": "This Telegram account is already connected to another member.",
     "errInvalidLogin": "Telegram couldn't verify that login. Try again.",
-    "errNothingPending": "Nothing to confirm. Start again.",
     "actionFailed": "Couldn't do that. Try again.",
     "loadFailed": "Couldn't load Telegram",
     "retry": "Retry",

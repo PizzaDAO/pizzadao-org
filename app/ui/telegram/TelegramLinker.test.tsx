@@ -198,7 +198,19 @@ describe("TelegramLinker", () => {
         fireEvent.click(utils.getByText(M.appLinkCancel));
         await flush();
         expect(calls).toContain("DELETE /api/telegram/link/start");
+        const del = (fetch as unknown as ReturnType<typeof vi.fn>).mock.calls.find((c) => c[1]?.method === "DELETE");
+        expect(del?.[1].headers).toEqual({ "Content-Type": "application/json" });
         expect(utils.getByText(M.appLink)).toBeTruthy();
+    });
+
+    it("a tap just before the time limit is not reported as a failure", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        // The final check before timing out sees the account.
+        routes["GET /api/telegram/account"] = { body: connected };
+        await act(async () => { await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 3000); });
+        expect(utils.queryByRole("alert")).toBeNull();
+        expect(utils.getByText(M.dmNotStarted)).toBeTruthy();
     });
 
     it("flips to connected when the poll sees the account", async () => {

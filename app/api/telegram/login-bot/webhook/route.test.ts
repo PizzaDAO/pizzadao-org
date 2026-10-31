@@ -193,8 +193,36 @@ describe("/api/telegram/login-bot/webhook", () => {
             expect(db.telegramAccount.upsert).not.toHaveBeenCalled();
             expect(calls().map((c) => c.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
             const text = calls()[1].body.text as string;
-            expect(text).toContain("Connected to the PizzaDAO member Tony");
-            expect(text).toMatch(/wasn't you/);
+            expect(text).toContain("Connected to the PizzaDAO member Tony. If this wasn't you, disconnect it on the PizzaDAO profile page.");
+        });
+
+        it("tells the person when linking throws after the code was spent", async () => {
+            db.telegramAccount.create.mockRejectedValue(new Error("db down"));
+            const res = await POST(hook(cb(`ok:${REF}`)));
+            expect(res.status).toBe(200);
+            expect(calls().at(-1)?.body.text).toMatch(/Something went wrong/);
+        });
+
+        it("a unique-key error with no row for the member is a conflict", async () => {
+            db.telegramAccount.create.mockRejectedValue(P2002);
+            db.telegramAccount.findUnique.mockResolvedValue(null);
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(calls()[1].body.text).toMatch(/already connected to another PizzaDAO member/);
+        });
+
+        it("does not swallow other database errors as a conflict", async () => {
+            db.telegramAccount.create.mockRejectedValue(Object.assign(new Error("x"), { code: "P2034" }));
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(calls().at(-1)?.body.text).toMatch(/Something went wrong/);
+            expect(calls().map((c) => c.body.text).join(" ")).not.toMatch(/already connected/);
+        });
+
+        it("a failed member lookup leaves the code unspent", async () => {
+            fetchMember.mockRejectedValue(new Error("sheet down"));
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(db.telegramLinkCode.updateMany).not.toHaveBeenCalled();
+            expect(db.telegramAccount.create).not.toHaveBeenCalled();
+            expect(calls().at(-1)?.body.text).toMatch(/Something went wrong/);
         });
 
         it("a double tap links once", async () => {

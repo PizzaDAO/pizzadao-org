@@ -2107,8 +2107,8 @@ model TelegramLinkCode {
   expiresAt     DateTime
   usedAt        DateTime?
   createdAt     DateTime  @default(now())
-  // Two-sided: the first Telegram user to press Start claims the code (tg* fields) and taps "Yes" in the bot
-  // (tgConfirmedAt); only then can the member confirm on the website, which links and sets usedAt.
+  // The first Telegram user to press Start claims the code (tg* fields). Their "Yes" tap in the bot spends it
+  // (usedAt) and links the account. tgConfirmedAt is no longer written.
   tgId          String?
   tgUsername    String?
   tgFirstName   String?

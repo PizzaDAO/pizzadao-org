@@ -54,7 +54,6 @@
     "errUnlinkFailed": "Impossible de déconnecter Telegram. Réessayez.",
     "errAlreadyLinked": "Ce compte Telegram est déjà connecté à un autre membre.",
     "errInvalidLogin": "Telegram n'a pas pu vérifier cette connexion. Réessayez.",
-    "errNothingPending": "Rien à confirmer. Recommencez.",
     "actionFailed": "Action impossible. Réessayez.",
     "loadFailed": "Impossible de charger Telegram",
     "retry": "Réessayer",

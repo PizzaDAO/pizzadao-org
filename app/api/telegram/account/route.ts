@@ -16,6 +16,7 @@ import { prisma } from "@/app/lib/db";
 import { requireSession } from "@/app/lib/auth-guards";
 import { telegramConfig, verifyTelegramAuth } from "@/app/lib/telegram-auth";
 import { linkTelegramAccount } from "@/app/lib/telegram/link-account";
+import { cancelPending } from "@/app/lib/telegram/link-code";
 import { loadReach } from "@/app/lib/telegram/reach";
 
 export const runtime = "nodejs";
@@ -81,6 +82,9 @@ export async function POST(req: Request) {
         );
     }
 
+    // An unused app link must not link again after this connect (and a later disconnect).
+    await cancelPending(discordId).catch(() => undefined);
+
     return NextResponse.json({
         ok: true,
         connected: true,
@@ -98,5 +102,6 @@ export async function DELETE() {
     await prisma.telegramAccount.deleteMany({
         where: { discordId: auth.session.discordId },
     });
+    await cancelPending(auth.session.discordId).catch(() => undefined);
     return NextResponse.json({ ok: true, connected: false });
 }

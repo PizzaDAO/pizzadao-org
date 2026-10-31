@@ -8,7 +8,7 @@ vi.mock("@/app/lib/db", () => ({
     prisma: { telegramLinkCode: { deleteMany: vi.fn().mockResolvedValue({ count: 0 }), create: vi.fn().mockResolvedValue({}) } },
 }));
 
-import { POST } from "./route";
+import { DELETE, POST } from "./route";
 import { prisma } from "@/app/lib/db";
 import { __resetMemoryRateLimits } from "@/app/lib/rate-limit";
 
@@ -60,6 +60,27 @@ describe("/api/telegram/link/start", () => {
         expect(data.expiresAt.getTime() - Date.now()).toBeGreaterThan(9 * 60 * 1000);
         // Earlier unused codes of this member are dropped.
         expect(codes.deleteMany.mock.calls[0][0].where.OR[0]).toEqual({ discordId: "d1", usedAt: null });
+    });
+
+    describe("DELETE (Stop waiting)", () => {
+        const del = (headers: Record<string, string> = { "Content-Type": "application/json", host: "localhost", origin: "http://localhost" }) =>
+            new Request("http://localhost/api/telegram/link/start", { method: "DELETE", headers });
+
+        it("401 without a session", async () => {
+            getSession.mockResolvedValue(null);
+            expect((await DELETE(del())).status).toBe(401);
+            expect(codes.deleteMany).not.toHaveBeenCalled();
+        });
+
+        it("415 without a JSON content type", async () => {
+            expect((await DELETE(del({ host: "localhost", origin: "http://localhost" }))).status).toBe(415);
+            expect(codes.deleteMany).not.toHaveBeenCalled();
+        });
+
+        it("discards only the session member's unused codes", async () => {
+            expect((await DELETE(del())).status).toBe(200);
+            expect(codes.deleteMany).toHaveBeenCalledWith({ where: { discordId: "d1", usedAt: null } });
+        });
     });
 
     it("rate limits to 5 per 10 minutes per member", async () => {

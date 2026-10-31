@@ -179,11 +179,14 @@ export function TelegramLinker() {
 
     // "Link with the Telegram app": get a one-time deep link, then poll until the bot has linked the account.
     const [appUrl, setAppUrl] = useState<string | null>(null);
+    // The last "Stop waiting" request: a new link waits for it, so the old DELETE can't remove the new code.
+    const stopRef = useRef<Promise<void> | null>(null);
 
     const onAppLink = async () => {
         setError(null);
         setAppState("starting");
         try {
+            await stopRef.current;
             const res = await fetch("/api/telegram/link/start", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
@@ -223,6 +226,9 @@ export function TelegramLinker() {
             if (Date.now() - startedAt > 10 * 60 * 1000) {
                 cancelled = true;
                 clearInterval(timer);
+                // One last look, so a tap just before the limit isn't reported as a failure.
+                const last = await load();
+                if (last.data?.connected) return;
                 setError(t("appLinkTimeout"));
                 setAppState("idle");
                 return;
@@ -249,7 +255,9 @@ export function TelegramLinker() {
     // "Stop waiting": also discard the code so an old link can't be used later. Best effort.
     const onStopWaiting = () => {
         setAppState("idle");
-        void fetch("/api/telegram/link/start", { method: "DELETE" }).catch(() => undefined);
+        stopRef.current = fetch("/api/telegram/link/start", { method: "DELETE", headers: { "Content-Type": "application/json" } })
+            .then(() => undefined)
+            .catch(() => undefined);
     };
 
     const onUnlink = async () => {
@@ -539,19 +547,14 @@ export function TelegramLinker() {
                 ) : null}
                 {!status.connected && waiting ? (
                     <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px", marginTop: 10 }}>
-                                {appUrl ? (
-                                    <a
-                                        href={appUrl}
-                                        target="_blank"
-                                        rel="noopener noreferrer"
-                                        className="btn-pill btn-pill-primary"
-                                    >
-                                        {t("appLinkOpen")}
-                                    </a>
-                                ) : null}
-                                <button type="button" onClick={onStopWaiting} style={linkAction}>
-                                    {t("appLinkCancel")}
-                                </button>
+                        {appUrl ? (
+                            <a href={appUrl} target="_blank" rel="noopener noreferrer" className="btn-pill btn-pill-primary">
+                                {t("appLinkOpen")}
+                            </a>
+                        ) : null}
+                        <button type="button" onClick={onStopWaiting} style={linkAction}>
+                            {t("appLinkCancel")}
+                        </button>
                     </div>
                 ) : null}
                 {/* One always-mounted status line, text only (no buttons inside). */}
