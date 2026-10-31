@@ -96,11 +96,6 @@ export function TelegramLinker() {
     const [matchBotUrl, setMatchBotUrl] = useState<string | null>(null);
     const widgetRef = useRef<HTMLDivElement>(null);
     const [appState, setAppState] = useState<"idle" | "starting" | "waiting">("idle");
-    // The widget's global callback outlives renders, so it reads the current step from a ref.
-    const appStateRef = useRef(appState);
-    useEffect(() => {
-        appStateRef.current = appState;
-    }, [appState]);
 
     // Resolves with the loaded status (data) and the HTTP status; data is null when the load failed (http 0 = network).
     const load = useCallback(async (): Promise<{ data: TelegramStatus | null; http: number }> => {
@@ -142,8 +137,6 @@ export function TelegramLinker() {
         if (!botUsername || !container) return;
 
         window.onTelegramAuth = async (user) => {
-            // A widget login must not race the app flow's pending confirmation.
-            if (appStateRef.current === "waiting") return;
             setError(null);
             setBusy("link");
             try {
@@ -186,12 +179,9 @@ export function TelegramLinker() {
 
     // "Link with the Telegram app": get a one-time deep link, then poll until the bot has linked the account.
     const [appUrl, setAppUrl] = useState<string | null>(null);
-    const [pending, setPending] = useState<{ username: string | null; name: string | null } | null>(null);
-    const [pendingBusy, setPendingBusy] = useState<null | "confirm" | "cancel">(null);
 
     const onAppLink = async () => {
         setError(null);
-        setPending(null);
         setAppState("starting");
         try {
             const res = await fetch("/api/telegram/link/start", {
@@ -240,23 +230,10 @@ export function TelegramLinker() {
             const loaded = await load();
             if (cancelled) return;
             if (loaded.http === 401) return expire();
-            try {
-                const res = await fetch("/api/telegram/link/pending", { cache: "no-store" });
-                if (cancelled) return;
-                if (res.status === 401) return expire();
-                // A failed poll keeps whatever is already shown (e.g. the Connect prompt).
-                if (res.ok) {
-                    const body = (await res.json().catch(() => ({}))) as { pending?: { username: string | null; name: string | null } | null };
-                    if (!cancelled && "pending" in body) setPending(body.pending ?? null);
-                }
-            } catch {
-                // Try again on the next tick.
-            }
         }, 3000);
         return () => {
             cancelled = true;
             clearInterval(timer);
-            setPending(null);
         };
     }, [appState, load, t]);
 
@@ -269,38 +246,10 @@ export function TelegramLinker() {
         setError(null);
     }, [status?.connected]);
 
-    const onPending = async (action: "confirm" | "cancel") => {
-        setPendingBusy(action);
-        setError(null);
-        try {
-            const res = await fetch("/api/telegram/link/pending", {
-                method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ action }),
-            });
-            if (!res.ok) {
-                const body = await res.json().catch(() => ({}));
-                setError(t(action === "confirm" ? telegramErrorKey(body?.code, "appLinkFailed") : "actionFailed"));
-                // A failed confirm ends this attempt (the code is gone or taken); a failed cancel can be retried.
-                if (action === "confirm") {
-                    setPending(null);
-                    setAppState("idle");
-                }
-            } else {
-                setPending(null);
-                if (action === "cancel") setAppState("idle");
-            }
-            const loaded = await load();
-            if (!loaded.data && res.ok && action === "confirm") {
-                // Connected, but we can't see it: leave the waiting step so its buttons don't sit beside the error.
-                setAppState("idle");
-                setError(t("errReload"));
-            }
-        } catch {
-            setError(t(action === "confirm" ? "appLinkFailed" : "actionFailed"));
-        } finally {
-            setPendingBusy(null);
-        }
+    // "Stop waiting": also discard the code so an old link can't be used later. Best effort.
+    const onStopWaiting = () => {
+        setAppState("idle");
+        void fetch("/api/telegram/link/start", { method: "DELETE" }).catch(() => undefined);
     };
 
     const onUnlink = async () => {
@@ -493,13 +442,7 @@ export function TelegramLinker() {
             ? `@${status.username}`
             : [status.firstName, status.lastName].filter(Boolean).join(" ") || t("accountFallback");
 
-        const statusText = waiting
-            ? pending
-                ? pending.username
-                    ? t("appLinkPending", { who: `@${pending.username}` })
-                    : t("appLinkPendingNoUsername", { name: pending.name || "?" })
-                : t("appLinkWaiting")
-            : null;
+        const statusText = waiting ? t("appLinkWaiting") : null;
 
         main = (
             <div
@@ -596,27 +539,6 @@ export function TelegramLinker() {
                 ) : null}
                 {!status.connected && waiting ? (
                     <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "4px 12px", marginTop: 10 }}>
-                        {pending ? (
-                            <>
-                                <button
-                                    type="button"
-                                    onClick={() => onPending("confirm")}
-                                    disabled={pendingBusy !== null || busy !== null}
-                                    className="btn-pill btn-pill-primary"
-                                >
-                                    {pendingBusy === "confirm" ? t("appLinkConnecting") : t("appLinkConfirm")}
-                                </button>
-                                <button
-                                    type="button"
-                                    onClick={() => onPending("cancel")}
-                                    disabled={pendingBusy !== null || busy !== null}
-                                    className="btn-pill btn-pill-secondary"
-                                >
-                                    {pendingBusy === "cancel" ? t("appLinkCancelling") : t("appLinkDeny")}
-                                </button>
-                            </>
-                        ) : (
-                            <>
                                 {appUrl ? (
                                     <a
                                         href={appUrl}
@@ -627,11 +549,9 @@ export function TelegramLinker() {
                                         {t("appLinkOpen")}
                                     </a>
                                 ) : null}
-                                <button type="button" onClick={() => setAppState("idle")} style={linkAction}>
+                                <button type="button" onClick={onStopWaiting} style={linkAction}>
                                     {t("appLinkCancel")}
                                 </button>
-                            </>
-                        )}
                     </div>
                 ) : null}
                 {/* One always-mounted status line, text only (no buttons inside). */}

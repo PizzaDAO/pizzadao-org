@@ -1,11 +1,12 @@
 // app/api/telegram/login-bot/webhook/route.ts
 //
-// Webhook for OUR login bot only (never the shared rsv.pizza bot). Two-sided "Link with the Telegram app":
+// Webhook for OUR login bot only (never the shared rsv.pizza bot). "Link with the Telegram app":
 //   1. private `/start <code>`  -> the sender claims the member's code; the bot asks "Connect this Telegram to
 //      the PizzaDAO member <name>?" with a "Yes, connect" button (callback_data is an opaque ref, not the code),
-//   2. the claimant taps Yes     -> the code is marked confirmed on the Telegram side,
-//   3. the member confirms on the website (POST /api/telegram/link/pending), which does the actual link.
-// Nothing is linked from here, so a deep link sent to someone else cannot link their account by itself.
+//   2. the claimant taps Yes     -> the code is spent atomically and the account is linked right here; the bot
+//      edits its message to say so. Only the claiming Telegram user can complete it.
+// A member who already has a different Telegram is never overwritten, and a Telegram linked to another member
+// is refused. The profile card polls and flips to connected.
 //
 // Auth: X-Telegram-Bot-Api-Secret-Token must equal TELEGRAM_LOGIN_WEBHOOK_SECRET (unset -> 503, wrong -> 401).
 // Everything after auth answers 200 so Telegram does not retry. Only production acts: previews share the
@@ -15,7 +16,8 @@ import { createHash, timingSafeEqual } from "crypto";
 import { NextResponse } from "next/server";
 import { fetchMemberById, fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { telegramConfig } from "@/app/lib/telegram-auth";
-import { claimLinkCode, confirmByTelegram } from "@/app/lib/telegram/link-code";
+import { linkTelegramAccount } from "@/app/lib/telegram/link-account";
+import { claimLinkCode, spendByTelegram } from "@/app/lib/telegram/link-code";
 import { loginBotCall, loginBotSend } from "@/app/lib/telegram/login-bot";
 
 export const runtime = "nodejs";
@@ -114,13 +116,29 @@ async function onCallback(botToken: string, cq: NonNullable<TgUpdate["callback_q
     if (queryId) await loginBotCall(botToken, "answerCallbackQuery", { callback_query_id: queryId });
     if (!queryId || !fromId || !data.startsWith("ok:") || msg?.chat?.type !== "private") return;
 
-    const ok = await confirmByTelegram(data.slice(3), fromId);
+    const spent = await spendByTelegram(data.slice(3), fromId);
+    // Someone else's tap, or a double tap whose first call already did the work: say nothing.
+    if (spent.result === "ignore") return;
+
+    let text = EXPIRED;
+    if (spent.result === "spent") {
+        const { discordId, claimant } = spent.link;
+        const outcome = await linkTelegramAccount(
+            discordId,
+            { ...claimant, photoUrl: null, authDate: new Date() },
+            { replaceExisting: false },
+        );
+        if (outcome === "linked") {
+            const name = await publicLabel(discordId).catch(() => null);
+            text = `Connected${name ? ` to the PizzaDAO member ${name}` : ""}. If this wasn't you, press Stop or contact the member.`;
+        } else if (outcome === "member_linked") {
+            text = "This member already has a Telegram connected. Disconnect it on their profile first, then start again.";
+        } else {
+            text = "This Telegram account is already connected to another PizzaDAO member.";
+        }
+    }
     if (typeof msg.chat.id === "number" && typeof msg.message_id === "number") {
-        await loginBotCall(botToken, "editMessageText", {
-            chat_id: msg.chat.id,
-            message_id: msg.message_id,
-            text: ok ? "Waiting for you to confirm on the website." : EXPIRED,
-        });
+        await loginBotCall(botToken, "editMessageText", { chat_id: msg.chat.id, message_id: msg.message_id, text });
     }
 }
 

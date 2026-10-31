@@ -3,11 +3,11 @@
 // Codes for "Link with the Telegram app". The code travels in t.me/<login bot>?start=<code>
 // (Telegram allows 64 chars of [A-Za-z0-9_-]); 32 random bytes in base64url is 43. Only the sha256 is stored.
 //
-// Two-sided, so a code forwarded to someone else cannot link their account silently:
+// Flow, entirely in the bot (no website confirmation):
 //   1. the first Telegram user to press Start CLAIMS the code (claimLinkCode),
-//   2. that user taps "Yes, link" in the bot (confirmByTelegram, by an opaque ref),
-//   3. the member sees "Telegram X wants to link" on the website and confirms (completePending).
-// The whole thing expires 10 minutes after the code was made.
+//   2. the bot asks "Connect this Telegram to member X?"; that same user taps "Yes, connect" (opaque ref),
+//   3. the tap SPENDS the code atomically (spendByTelegram) and the webhook links the account.
+// The code expires 10 minutes after it was made and works once. The tgConfirmedAt column is no longer used.
 
 import { createHash, randomBytes } from "crypto";
 import { prisma } from "@/app/lib/db";
@@ -68,46 +68,45 @@ export async function claimLinkCode(code: string, tg: ClaimantInfo, now = Date.n
     return res.count === 1 ? { discordId: row.discordId, ref } : null;
 }
 
-/** The claimant tapped "Yes, link" in the bot. Only the claiming Telegram user can do this. */
-export async function confirmByTelegram(ref: string, fromId: string, now = Date.now()): Promise<boolean> {
-    if (!isRefShape(ref)) return false;
-    const res = await prisma.telegramLinkCode.updateMany({
-        where: { ref, tgId: fromId, usedAt: null, expiresAt: { gt: new Date(now) } },
-        data: { tgConfirmedAt: new Date(now) },
-    });
-    return res.count === 1;
-}
-
-export interface PendingLink {
-    codeHash: string;
+export interface SpentLink {
+    discordId: string;
     claimant: ClaimantInfo;
 }
 
-async function findPending(discordId: string, now: number): Promise<PendingLink | null> {
-    const row = await prisma.telegramLinkCode.findFirst({
-        where: { discordId, usedAt: null, expiresAt: { gt: new Date(now) }, tgConfirmedAt: { not: null }, tgId: { not: null } },
-        orderBy: { createdAt: "desc" },
-        select: { codeHash: true, tgId: true, tgUsername: true, tgFirstName: true, tgLastName: true },
+/**
+ * The claimant tapped "Yes, connect". Spends the code atomically (conditional update), so a double tap or a
+ * retry links at most once, and only the claiming Telegram user can do it.
+ *   "spent"   -> this call owns the code; link now,
+ *   "expired" -> the code ran out (or never existed for this user's ref),
+ *   "ignore"  -> someone else's tap, or the code was already spent: do nothing.
+ */
+export async function spendByTelegram(
+    ref: string,
+    fromId: string,
+    now = Date.now(),
+): Promise<{ result: "spent"; link: SpentLink } | { result: "expired" | "ignore" }> {
+    if (!isRefShape(ref)) return { result: "ignore" };
+    const row = await prisma.telegramLinkCode.findUnique({
+        where: { ref },
+        select: { codeHash: true, discordId: true, tgId: true, tgUsername: true, tgFirstName: true, tgLastName: true, usedAt: true, expiresAt: true },
     });
-    if (!row || !row.tgId) return null;
-    return { codeHash: row.codeHash, claimant: { id: row.tgId, username: row.tgUsername, firstName: row.tgFirstName, lastName: row.tgLastName } };
-}
-
-/** What the website shows: a Telegram user who claimed this member's code and said yes in the bot. */
-export function getPendingLink(discordId: string, now = Date.now()) {
-    return findPending(discordId, now);
-}
-
-/** Spend the pending code after the account was linked. False when someone else already spent it. */
-export async function markPendingUsed(codeHash: string, now = Date.now()): Promise<boolean> {
+    if (!row || !row.tgId || row.tgId !== fromId || row.usedAt) return { result: "ignore" };
+    if (row.expiresAt.getTime() <= now) return { result: "expired" };
     const res = await prisma.telegramLinkCode.updateMany({
-        where: { codeHash, usedAt: null, expiresAt: { gt: new Date(now) }, tgConfirmedAt: { not: null } },
+        where: { codeHash: row.codeHash, ref, tgId: fromId, usedAt: null, expiresAt: { gt: new Date(now) } },
         data: { usedAt: new Date(now) },
     });
-    return res.count === 1;
+    if (res.count !== 1) return { result: "ignore" };
+    return {
+        result: "spent",
+        link: {
+            discordId: row.discordId,
+            claimant: { id: row.tgId, username: row.tgUsername, firstName: row.tgFirstName, lastName: row.tgLastName },
+        },
+    };
 }
 
-/** Discard the member's unused codes (cancel). */
+/** Discard the member's unused codes (Stop waiting). */
 export async function cancelPending(discordId: string): Promise<void> {
     await prisma.telegramLinkCode.deleteMany({ where: { discordId, usedAt: null } });
 }

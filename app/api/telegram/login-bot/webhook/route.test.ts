@@ -9,7 +9,7 @@ vi.mock("@/app/lib/sheets/member-repository", () => ({
 vi.mock("@/app/lib/db", () => ({
     prisma: {
         telegramLinkCode: { findUnique: vi.fn(), updateMany: vi.fn() },
-        telegramAccount: { findUnique: vi.fn(), upsert: vi.fn() },
+        telegramAccount: { findUnique: vi.fn(), create: vi.fn(), updateMany: vi.fn(), upsert: vi.fn() },
         telegramHostMatch: { deleteMany: vi.fn() },
     },
 }));
@@ -19,7 +19,7 @@ import { prisma } from "@/app/lib/db";
 
 const db = prisma as unknown as {
     telegramLinkCode: { findUnique: ReturnType<typeof vi.fn>; updateMany: ReturnType<typeof vi.fn> };
-    telegramAccount: { upsert: ReturnType<typeof vi.fn> };
+    telegramAccount: Record<"findUnique" | "create" | "updateMany" | "upsert", ReturnType<typeof vi.fn>>;
 };
 
 const SECRET = "s3cret";
@@ -62,6 +62,9 @@ describe("/api/telegram/login-bot/webhook", () => {
         fetchMember.mockResolvedValue({ Name: "Tony" });
         db.telegramLinkCode.findUnique.mockResolvedValue({ discordId: "d1", tgId: null, ref: null, usedAt: null, expiresAt: new Date(Date.now() + 60000) });
         db.telegramLinkCode.updateMany.mockResolvedValue({ count: 1 });
+        db.telegramAccount.findUnique.mockResolvedValue(null);
+        db.telegramAccount.create.mockResolvedValue({});
+        (prisma as unknown as { telegramHostMatch: { deleteMany: ReturnType<typeof vi.fn> } }).telegramHostMatch.deleteMany.mockResolvedValue({ count: 0 });
     });
     afterEach(() => {
         process.env = { ...savedEnv };
@@ -161,20 +164,96 @@ describe("/api/telegram/login-bot/webhook", () => {
         expect(calls()[0].body.text).toMatch(/profile/);
     });
 
-    it("tapping Yes confirms for the claimant only, then edits the message", async () => {
-        await POST(hook(cb(`ok:${REF}`)));
-        const upd = db.telegramLinkCode.updateMany.mock.calls[0][0];
-        expect(upd.where).toMatchObject({ ref: REF, tgId: "777", usedAt: null });
-        expect(calls().map((c) => c.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
-        expect(calls()[1].body.text).toMatch(/confirm on the website/);
-        expect(db.telegramAccount.upsert).not.toHaveBeenCalled();
+    const claimed = (over: Record<string, unknown> = {}) => ({
+        codeHash: "h1",
+        discordId: "d1",
+        tgId: "777",
+        tgUsername: "pizza",
+        tgFirstName: "Pia",
+        tgLastName: "Zza",
+        usedAt: null,
+        expiresAt: new Date(Date.now() + 60000),
+        ...over,
     });
+    const alreadyIn = (telegramId: string) => ({ telegramId });
+    const P2002 = Object.assign(new Error("unique"), { code: "P2002" });
 
-    it("a different user tapping Yes confirms nothing", async () => {
-        db.telegramLinkCode.updateMany.mockResolvedValue({ count: 0 });
-        await POST(hook(cb(`ok:${REF}`, 555)));
-        expect(db.telegramLinkCode.updateMany.mock.calls[0][0].where.tgId).toBe("555");
-        expect(calls()[1].body.text).toMatch(/expired/);
+    describe("tapping Yes", () => {
+        beforeEach(() => {
+            db.telegramLinkCode.findUnique.mockResolvedValue(claimed());
+        });
+
+        it("links the account, spends the code and edits the message", async () => {
+            await POST(hook(cb(`ok:${REF}`)));
+            const spend = db.telegramLinkCode.updateMany.mock.calls[0][0];
+            expect(spend.where).toMatchObject({ ref: REF, tgId: "777", usedAt: null });
+            expect(spend.data.usedAt).toBeInstanceOf(Date);
+            const created = db.telegramAccount.create.mock.calls[0][0].data;
+            expect(created).toMatchObject({ discordId: "d1", telegramId: "777", username: "pizza", firstName: "Pia", memberId: "42" });
+            expect(db.telegramAccount.upsert).not.toHaveBeenCalled();
+            expect(calls().map((c) => c.method)).toEqual(["answerCallbackQuery", "editMessageText"]);
+            const text = calls()[1].body.text as string;
+            expect(text).toContain("Connected to the PizzaDAO member Tony");
+            expect(text).toMatch(/wasn't you/);
+        });
+
+        it("a double tap links once", async () => {
+            // Concurrent: both read the row unspent, only one conditional update wins.
+            db.telegramLinkCode.updateMany.mockResolvedValueOnce({ count: 1 }).mockResolvedValueOnce({ count: 0 });
+            await Promise.all([POST(hook(cb(`ok:${REF}`))), POST(hook(cb(`ok:${REF}`)))]);
+            expect(db.telegramAccount.create).toHaveBeenCalledTimes(1);
+            expect(calls().filter((c) => c.method === "editMessageText")).toHaveLength(1);
+            // Sequential: the code is already spent.
+            fetchMock.mockClear();
+            db.telegramAccount.create.mockClear();
+            db.telegramLinkCode.findUnique.mockResolvedValue(claimed({ usedAt: new Date() }));
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(db.telegramAccount.create).not.toHaveBeenCalled();
+            expect(calls().map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+        });
+
+        it("a different Telegram user's tap does nothing", async () => {
+            await POST(hook(cb(`ok:${REF}`, 555)));
+            expect(db.telegramLinkCode.updateMany).not.toHaveBeenCalled();
+            expect(db.telegramAccount.create).not.toHaveBeenCalled();
+            expect(calls().map((c) => c.method)).toEqual(["answerCallbackQuery"]);
+        });
+
+        it("an expired code links nothing and says so", async () => {
+            db.telegramLinkCode.findUnique.mockResolvedValue(claimed({ expiresAt: new Date(Date.now() - 1000) }));
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(db.telegramLinkCode.updateMany).not.toHaveBeenCalled();
+            expect(db.telegramAccount.create).not.toHaveBeenCalled();
+            expect(calls()[1].body.text).toMatch(/expired/);
+        });
+
+        it("refuses when the member already has a different Telegram", async () => {
+            db.telegramAccount.create.mockRejectedValue(P2002);
+            db.telegramAccount.findUnique.mockImplementation(async ({ where }: { where: Record<string, string> }) =>
+                where.discordId ? alreadyIn("111") : null,
+            );
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(db.telegramAccount.upsert).not.toHaveBeenCalled();
+            expect(db.telegramAccount.updateMany).not.toHaveBeenCalled();
+            expect(calls()[1].body.text).toMatch(/already has a Telegram connected/);
+        });
+
+        it("is fine when the member already has this same Telegram", async () => {
+            db.telegramAccount.create.mockRejectedValue(P2002);
+            db.telegramAccount.findUnique.mockImplementation(async ({ where }: { where: Record<string, string> }) =>
+                where.discordId ? alreadyIn("777") : { discordId: "d1" },
+            );
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(db.telegramAccount.updateMany.mock.calls[0][0].where).toEqual({ discordId: "d1", telegramId: "777" });
+            expect(calls()[1].body.text).toContain("Connected to the PizzaDAO member Tony");
+        });
+
+        it("refuses when this Telegram is linked to another member", async () => {
+            db.telegramAccount.findUnique.mockResolvedValue({ discordId: "someone-else" });
+            await POST(hook(cb(`ok:${REF}`)));
+            expect(db.telegramAccount.create).not.toHaveBeenCalled();
+            expect(calls()[1].body.text).toMatch(/already connected to another PizzaDAO member/);
+        });
     });
 
     it("if the work throws, still 200 with a start-again reply", async () => {

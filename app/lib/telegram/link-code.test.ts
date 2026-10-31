@@ -7,7 +7,7 @@ vi.mock("@/app/lib/db", () => ({
 }));
 
 import { prisma } from "@/app/lib/db";
-import { claimLinkCode, confirmByTelegram, createLinkCode, LINK_CODE_TTL_MS } from "./link-code";
+import { claimLinkCode, createLinkCode, spendByTelegram, LINK_CODE_TTL_MS } from "./link-code";
 
 const t = (prisma as unknown as { telegramLinkCode: Record<"findUnique" | "updateMany" | "create" | "deleteMany", ReturnType<typeof vi.fn>> }).telegramLinkCode;
 const tg = { id: "777", username: "pizza", firstName: "Pia", lastName: null };
@@ -49,9 +49,22 @@ describe("link codes", () => {
         expect(t.updateMany).not.toHaveBeenCalled();
     });
 
-    it("confirmByTelegram needs the claimant's id and an unexpired, unused code", async () => {
-        expect(await confirmByTelegram("R".repeat(22), "777", 5000)).toBe(true);
-        expect(t.updateMany.mock.calls[0][0].where).toMatchObject({ ref: "R".repeat(22), tgId: "777", usedAt: null });
-        expect(await confirmByTelegram("short", "777")).toBe(false);
+    it("spendByTelegram spends once for the claimant, and ignores other users, spent and malformed refs", async () => {
+        const ref = "R".repeat(22);
+        const row = (over = {}) => ({ codeHash: "h", discordId: "d1", tgId: "777", tgUsername: "pizza", tgFirstName: "Pia", tgLastName: null, usedAt: null, expiresAt: new Date(10_000), ...over });
+        t.findUnique.mockResolvedValue(row());
+        const ok = await spendByTelegram(ref, "777", 5000);
+        expect(ok).toMatchObject({ result: "spent", link: { discordId: "d1", claimant: { id: "777", username: "pizza" } } });
+        expect(t.updateMany.mock.calls[0][0].where).toMatchObject({ ref, tgId: "777", usedAt: null });
+        t.updateMany.mockResolvedValue({ count: 0 });
+        expect(await spendByTelegram(ref, "777", 5000)).toEqual({ result: "ignore" });
+        t.updateMany.mockClear();
+        expect(await spendByTelegram(ref, "555", 5000)).toEqual({ result: "ignore" });
+        t.findUnique.mockResolvedValue(row({ usedAt: new Date() }));
+        expect(await spendByTelegram(ref, "777", 5000)).toEqual({ result: "ignore" });
+        t.findUnique.mockResolvedValue(row());
+        expect(await spendByTelegram(ref, "777", 20_000)).toEqual({ result: "expired" });
+        expect(await spendByTelegram("short", "777")).toEqual({ result: "ignore" });
+        expect(t.updateMany).not.toHaveBeenCalled();
     });
 });
