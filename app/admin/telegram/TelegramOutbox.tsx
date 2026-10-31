@@ -100,9 +100,11 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
     const errorBox = error && (
         <div role="alert" className="flex flex-wrap items-center gap-3 text-tomato-readable">
             <p className="m-0">{error}</p>
-            <button type="button" className="min-h-11 rounded-lg border border-foreground/25 px-3 font-bold text-foreground" onClick={() => void refresh()}>
-                {labels.retry}
-            </button>
+            {error === labels.loadError ? (
+                <button type="button" className="min-h-11 rounded-lg border border-foreground/25 px-3 font-bold text-foreground" onClick={() => void refresh()}>
+                    {labels.retry}
+                </button>
+            ) : null}
         </div>
     );
 
@@ -218,7 +220,7 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
             <section className="grid gap-2">
                 <h2 className="m-0 text-xl font-black">
                     <button type="button" className="min-h-11 text-left font-black" aria-expanded={showDirectory} onClick={() => setShowDirectory((v) => !v)}>
-                        {labels.directoryTitle} ({data.directory.length}) {showDirectory ? labels.hideText : labels.showText}
+                        <span aria-hidden="true">{showDirectory ? "▾" : "▸"}</span> {labels.directoryTitle} ({data.directory.length})
                     </button>
                 </h2>
                 {!showDirectory ? null : data.directory.length === 0 ? (
