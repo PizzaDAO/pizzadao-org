@@ -2018,7 +2018,7 @@
     "working": "Trabajando...",
     "hostMatchTitle": "Coincidencias de anfitriones",
     "hostMatchOff": "Las coincidencias de anfitriones están desactivadas.",
-    "hostMatchOn": "Las coincidencias de anfitriones están activadas (modo {mode}). Revisados hoy: {today} de {budget}.",
+    "hostMatchOn": "Las coincidencias de anfitriones están activadas ({mode}). Revisados hoy: {today} de {budget}.",
     "hostMatchCounts": "Sugeridas: {pending}, invitadas: {invited}, confirmadas: {confirmed}, rechazadas: {declined}",
     "empty": "Aún no hay nada en cola.",
     "on": "activado",
@@ -2071,6 +2071,18 @@
       "expired": "demasiado antiguo para enviar",
       "filtered": "excluido por el filtro de publicaciones",
       "manual": "omitido por un admin"
-    }
+    },
+    "retry": "Intentar de nuevo",
+    "refresh": "Actualizar",
+    "skipConfirm": "¿Omitir esta publicación?",
+    "skipYes": "Sí, omitir",
+    "skipCancel": "Conservar",
+    "modeProfile": "solo perfil",
+    "modeInvite": "perfil + invitación de Telegram",
+    "sentAt": "Enviado {value}",
+    "createdAt": "Creado {value}",
+    "sendAfter": "Programado para {value}",
+    "expiresAt": "Caduca {value}",
+    "attempts": "Intentos: {value}"
   }
 }

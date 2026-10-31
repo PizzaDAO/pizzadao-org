@@ -2018,7 +2018,7 @@
     "working": "Working...",
     "hostMatchTitle": "Host matching",
     "hostMatchOff": "Host matching is off.",
-    "hostMatchOn": "Host matching is on (mode {mode}). Checked today: {today} of {budget}.",
+    "hostMatchOn": "Host matching is on ({mode}). Checked today: {today} of {budget}.",
     "hostMatchCounts": "Suggested: {pending}, invited: {invited}, confirmed: {confirmed}, declined: {declined}",
     "empty": "Nothing queued yet.",
     "on": "on",
@@ -2071,6 +2071,18 @@
       "expired": "too old to send",
       "filtered": "left out by the post filter",
       "manual": "skipped by an admin"
-    }
+    },
+    "retry": "Try again",
+    "refresh": "Refresh",
+    "skipConfirm": "Skip this post?",
+    "skipYes": "Yes, skip",
+    "skipCancel": "Keep",
+    "modeProfile": "profile only",
+    "modeInvite": "profile + Telegram invitation",
+    "sentAt": "Sent {value}",
+    "createdAt": "Created {value}",
+    "sendAfter": "Scheduled for {value}",
+    "expiresAt": "Expires {value}",
+    "attempts": "Attempts: {value}"
   }
 }

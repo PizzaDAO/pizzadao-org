@@ -21,9 +21,15 @@ export async function generateMetadata(): Promise<Metadata> {
 const PLAIN = [
     "loadError", "errorGeneric", "working", "empty", "on", "off", "statusTitle", "sendYes", "sendNo", "sendPreview", "sendNoKey", "sendKilled",
     "dirOk", "warnTitle", "outboxTitle", "skip", "showText", "hideText", "directoryTitle", "directoryEmpty", "noChat", "warnAnnounce", "hostMatchTitle", "hostMatchOff",
+    "retry", "refresh", "skipConfirm", "skipYes", "skipCancel", "modeProfile", "modeInvite",
 ] as const;
 const TEMPLATES: Record<string, string[]> = {
     statusSend: ["value"],
+    sentAt: ["value"],
+    createdAt: ["value"],
+    sendAfter: ["value"],
+    expiresAt: ["value"],
+    attempts: ["value"],
     statusSwitches: ["master", "recap", "agenda", "announce"],
     statusDirectory: ["value"],
     warnUnknown: ["city", "where"],

@@ -2018,7 +2018,7 @@
     "working": "En cours...",
     "hostMatchTitle": "Correspondance des hôtes",
     "hostMatchOff": "La correspondance des hôtes est désactivée.",
-    "hostMatchOn": "La correspondance des hôtes est activée (mode {mode}). Vérifiés aujourd'hui : {today} sur {budget}.",
+    "hostMatchOn": "La correspondance des hôtes est activée ({mode}). Vérifiés aujourd'hui : {today} sur {budget}.",
     "hostMatchCounts": "Suggérées : {pending}, invitées : {invited}, confirmées : {confirmed}, refusées : {declined}",
     "empty": "Rien en file d'attente pour l'instant.",
     "on": "activé",
@@ -2071,6 +2071,18 @@
       "expired": "trop ancien pour être envoyé",
       "filtered": "écarté par le filtre de publication",
       "manual": "ignoré par un admin"
-    }
+    },
+    "retry": "Réessayer",
+    "refresh": "Actualiser",
+    "skipConfirm": "Ignorer ce message ?",
+    "skipYes": "Oui, ignorer",
+    "skipCancel": "Garder",
+    "modeProfile": "profil seulement",
+    "modeInvite": "profil + invitation Telegram",
+    "sentAt": "Envoyé {value}",
+    "createdAt": "Créé {value}",
+    "sendAfter": "Prévu pour {value}",
+    "expiresAt": "Expire {value}",
+    "attempts": "Tentatives : {value}"
   }
 }
