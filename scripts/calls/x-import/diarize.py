@@ -12,8 +12,20 @@ Run with the project venv, isolated:  <workdir>/.venv/bin/python -I diarize.py -
 import argparse
 import os
 import sys
+import wave
 
 PIPELINE = "pyannote/speaker-diarization-3.1"
+
+
+def load_wav(path, torch):
+    """Decode the 16-bit PCM WAV here, so pyannote does not need torchcodec's matching FFmpeg libraries."""
+    with wave.open(path, "rb") as wav:
+        if wav.getsampwidth() != 2 or wav.getnchannels() != 1:
+            raise ValueError("expected a 16-bit mono WAV")
+        rate = wav.getframerate()
+        frames = wav.readframes(wav.getnframes())
+    samples = torch.frombuffer(bytearray(frames), dtype=torch.int16).float() / 32768.0
+    return {"waveform": samples.unsqueeze(0), "sample_rate": rate}
 
 
 def main() -> int:
@@ -61,7 +73,7 @@ def main() -> int:
     if args.max_speakers:
         options["max_speakers"] = args.max_speakers
 
-    result = pipeline(args.wav, **options)
+    result = pipeline(load_wav(args.wav, torch), **options)
     # pyannote.audio 4 wraps the annotation; 3.x returns it directly.
     annotation = getattr(result, "speaker_diarization", result)
     tmp = args.out + ".tmp"
