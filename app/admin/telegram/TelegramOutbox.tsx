@@ -7,6 +7,7 @@
 // comes from the Dread Pizza Roberts-only /api/admin/telegram routes.
 
 import { useCallback, useEffect, useState } from "react";
+import { hostMatchModeKey, statusBadgeClass } from "./outbox-format";
 
 export type OutboxLabels = Record<string, string>;
 
@@ -51,6 +52,9 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState<string | null>(null);
     const [open, setOpen] = useState<string | null>(null);
+    const [confirming, setConfirming] = useState<string | null>(null);
+    const [refreshing, setRefreshing] = useState(false);
+    const [showDirectory, setShowDirectory] = useState(false);
 
     const load = useCallback(async () => {
         try {
@@ -67,7 +71,14 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
         void load();
     }, [load]);
 
+    async function refresh() {
+        setRefreshing(true);
+        await load();
+        setRefreshing(false);
+    }
+
     async function skip(id: string) {
+        setConfirming(null);
         setBusy(id);
         try {
             const res = await fetch(`/api/admin/telegram/${encodeURIComponent(id)}`, {
@@ -86,13 +97,29 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
 
     const reason = (code: string | null) => (code ? labels[`code.${code}`] ?? code : "");
 
-    if (!data) return <p className="m-0 text-foreground/70">{error ?? labels.working}</p>;
+    const errorBox = error && (
+        <div role="alert" className="flex flex-wrap items-center gap-3 text-tomato-readable">
+            <p className="m-0">{error}</p>
+            {error === labels.loadError ? (
+                <button type="button" className="min-h-11 rounded-lg border border-foreground/25 px-3 font-bold text-foreground" onClick={() => void refresh()}>
+                    {labels.retry}
+                </button>
+            ) : null}
+        </div>
+    );
+
+    if (!data) return error ? <>{errorBox}</> : <p className="m-0 text-foreground/70">{labels.working}</p>;
     const s = data.status;
     const yesNo = (v: boolean) => (v ? labels.on : labels.off);
 
     return (
         <div className="grid gap-6">
-            {error && <p className="m-0 text-tomato">{error}</p>}
+            {errorBox}
+            <div>
+                <button type="button" className="min-h-11 rounded-lg border border-foreground/25 px-3 font-bold" disabled={refreshing} onClick={() => void refresh()}>
+                    {refreshing ? labels.working : labels.refresh}
+                </button>
+            </div>
 
             <section className="grid gap-2">
                 <h2 className="m-0 text-xl font-black">{labels.statusTitle}</h2>
@@ -108,7 +135,7 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
                 <ul className="m-0 grid gap-1 pl-5 text-sm">
                     <li>
                         {data.hostMatch.on
-                            ? fill(labels.hostMatchOn, { mode: String(data.hostMatch.mode), today: String(data.hostMatch.checkedToday), budget: String(data.hostMatch.dailyBudget) })
+                            ? fill(labels.hostMatchOn, { mode: labels[hostMatchModeKey(data.hostMatch.mode)], today: String(data.hostMatch.checkedToday), budget: String(data.hostMatch.dailyBudget) })
                             : labels.hostMatchOff}
                     </li>
                     <li>
@@ -125,7 +152,7 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
             {data.warnings.length > 0 && (
                 <section className="grid gap-2">
                     <h2 className="m-0 text-xl font-black">{labels.warnTitle}</h2>
-                    <ul className="m-0 grid gap-1 pl-5 text-sm text-tomato">
+                    <ul className="m-0 grid gap-1 pl-5 text-sm text-tomato-readable">
                         {data.warnings.map((w, i) => (
                             <li key={i}>
                                 {fill(w.problem === "unknown" ? labels.warnUnknown : labels.warnNoChat, {
@@ -145,23 +172,45 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
                 ) : (
                     <ul className="m-0 grid list-none gap-2 p-0">
                         {data.rows.map((r) => (
-                            <li key={r.id} className="grid gap-1 rounded border border-foreground/15 p-3 text-sm">
+                            <li key={r.id} className="grid min-w-0 gap-1 rounded border border-foreground/15 p-3 text-sm">
                                 <div className="flex flex-wrap items-center gap-x-3 gap-y-1">
                                     <strong>{r.cityKey}</strong>
                                     <span>{labels[`kind.${r.kind}`] ?? r.kind}</span>
-                                    <span>{labels[`status.${r.status}`] ?? r.status}</span>
+                                    <span className={statusBadgeClass(r.status)}>{labels[`status.${r.status}`] ?? r.status}</span>
                                     {r.code && <span className="text-foreground/70">{reason(r.code)}</span>}
-                                    <span className="text-foreground/60">{when(r.sentAt ?? r.createdAt)}</span>
-                                    {r.status === "PENDING" && (
-                                        <button type="button" className="underline" disabled={busy === r.id} onClick={() => skip(r.id)}>
-                                            {busy === r.id ? labels.working : labels.skip}
-                                        </button>
+                                    {r.attempts > 0 && <span className="text-foreground/60">{fill(labels.attempts, { value: String(r.attempts) })}</span>}
+                                </div>
+                                <div className="flex flex-wrap gap-x-3 gap-y-1 text-foreground/60">
+                                    {r.sentAt ? (
+                                        <span>{fill(labels.sentAt, { value: when(r.sentAt) })}</span>
+                                    ) : (
+                                        <span>{fill(labels.createdAt, { value: when(r.createdAt) })}</span>
                                     )}
-                                    <button type="button" className="underline" onClick={() => setOpen(open === r.id ? null : r.id)}>
+                                    {r.status === "PENDING" && r.sendAfter && <span>{fill(labels.sendAfter, { value: when(r.sendAfter) })}</span>}
+                                    {r.status === "PENDING" && <span>{fill(labels.expiresAt, { value: when(r.expiresAt) })}</span>}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-2">
+                                    {r.status === "PENDING" &&
+                                        (confirming === r.id ? (
+                                            <>
+                                                <span className="font-bold">{labels.skipConfirm}</span>
+                                                <button type="button" className="min-h-11 px-2 font-bold underline" disabled={busy === r.id} onClick={() => skip(r.id)}>
+                                                    {labels.skipYes}
+                                                </button>
+                                                <button type="button" className="min-h-11 px-2 underline" onClick={() => setConfirming(null)}>
+                                                    {labels.skipCancel}
+                                                </button>
+                                            </>
+                                        ) : (
+                                            <button type="button" className="min-h-11 px-2 underline" disabled={busy === r.id} onClick={() => setConfirming(r.id)}>
+                                                {busy === r.id ? labels.working : labels.skip}
+                                            </button>
+                                        ))}
+                                    <button type="button" className="min-h-11 px-2 underline" aria-expanded={open === r.id} onClick={() => setOpen(open === r.id ? null : r.id)}>
                                         {open === r.id ? labels.hideText : labels.showText}
                                     </button>
                                 </div>
-                                {open === r.id && <pre className="m-0 whitespace-pre-wrap text-foreground/80">{r.text}</pre>}
+                                {open === r.id && <pre className="m-0 min-w-0 whitespace-pre-wrap break-words text-foreground/80">{r.text}</pre>}
                             </li>
                         ))}
                     </ul>
@@ -169,8 +218,12 @@ export function TelegramOutbox({ labels }: { labels: OutboxLabels }) {
             </section>
 
             <section className="grid gap-2">
-                <h2 className="m-0 text-xl font-black">{labels.directoryTitle}</h2>
-                {data.directory.length === 0 ? (
+                <h2 className="m-0 text-xl font-black">
+                    <button type="button" className="min-h-11 text-left font-black" aria-expanded={showDirectory} onClick={() => setShowDirectory((v) => !v)}>
+                        <span aria-hidden="true">{showDirectory ? "▾" : "▸"}</span> {labels.directoryTitle} ({data.directory.length})
+                    </button>
+                </h2>
+                {!showDirectory ? null : data.directory.length === 0 ? (
                     <p className="m-0 text-foreground/70">{labels.directoryEmpty}</p>
                 ) : (
                     <ul className="m-0 grid gap-1 pl-5 text-sm">
