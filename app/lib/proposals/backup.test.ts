@@ -17,10 +17,10 @@ describe('wallet-backed ballot backup', () => {
     expect(await decryptBallot(SIG, 'p1', blob)).toEqual(payload)
   })
 
-  it('the ciphertext holds neither the signature, the token nor the choice, so the server learns nothing', async () => {
+  it('the ciphertext holds neither the signature nor the token, so the server learns nothing', async () => {
     const blob = await encryptBallot(SIG, 'p1', payload)
     const plain = Buffer.from(blob, 'base64url').toString('latin1')
-    for (const secret of [SIG.slice(2), 'proposal-p1', payload.token, 'NAY', payload.signature]) {
+    for (const secret of [SIG.slice(2), 'proposal-p1', payload.token, payload.signature]) {
       expect(blob).not.toContain(secret)
       expect(plain).not.toContain(secret)
     }

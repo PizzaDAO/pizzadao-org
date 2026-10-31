@@ -2,6 +2,7 @@
 //
 // Start "Link with the Telegram app" (no phone number needed): returns a t.me deep link to our login bot
 // carrying a single-use, 10-minute code. The webhook at /api/telegram/login-bot/webhook spends it.
+// DELETE discards the member's unused codes (Stop waiting).
 // Session-gated, 5 per 10 minutes per member.
 
 import { NextResponse } from "next/server";
@@ -9,7 +10,7 @@ import { rejectUnsafeWrite } from "@/app/lib/admin-guard";
 import { requireSession } from "@/app/lib/auth-guards";
 import { checkKeyedRateLimit, rateLimitResponse } from "@/app/lib/rate-limit";
 import { telegramConfig } from "@/app/lib/telegram-auth";
-import { createLinkCode } from "@/app/lib/telegram/link-code";
+import { cancelPending, createLinkCode } from "@/app/lib/telegram/link-code";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -36,4 +37,14 @@ export async function POST(req: Request) {
         { url: `https://t.me/${cfg.botUsername}?start=${code}`, expiresInSeconds: 600 },
         { headers: NO_STORE },
     );
+}
+
+/** "Stop waiting": discard this member's unused codes so an old link stops working. */
+export async function DELETE(req: Request) {
+    const unsafe = rejectUnsafeWrite(req);
+    if (unsafe) return unsafe;
+    const auth = await requireSession();
+    if (!auth.ok) return auth.response;
+    await cancelPending(auth.session.discordId);
+    return NextResponse.json({ ok: true }, { headers: NO_STORE });
 }

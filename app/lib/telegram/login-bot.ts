@@ -1,7 +1,7 @@
 // app/lib/telegram/login-bot.ts
 //
 // Best-effort calls to OUR login bot (never the shared rsv.pizza bot). Failures are swallowed: the
-// profile page polls and shows the outcome either way. Message text is never logged.
+// profile page polls and shows a successful link; a failed link is reported by the bot message only. Message text is never logged.
 
 export async function loginBotCall(botToken: string, method: string, body: Record<string, unknown>): Promise<void> {
     try {
