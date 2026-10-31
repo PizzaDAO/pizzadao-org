@@ -810,7 +810,7 @@
     },
     "connections": {
       "title": "Conexiones opcionales",
-      "description": "Puedes participar sin conectar una cartera ni X. Añádelas para mostrar coleccionables o usar sus funciones.",
+      "description": "Puedes participar sin conectar una wallet ni X. Añádelas para mostrar coleccionables o usar sus funciones.",
       "wallet": "Gestionar wallets",
       "x": "Conectar X"
     },
