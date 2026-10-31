@@ -53,15 +53,12 @@ interface TgUpdate {
     callback_query?: { id?: unknown; from?: TgFrom; data?: unknown; message?: TgMessage };
 }
 
-/** Mafia Name, else a masked Discord handle (ab…yz). Never the sheet's real "Name". Null when neither is known. */
+/** The member's public name (the sheet's "Name" column, as shown on their profile), else their member number. */
 async function publicLabel(discordId: string): Promise<string | null> {
     const memberId = await fetchMemberIdByDiscordId(discordId);
     const row = memberId ? await fetchMemberById(memberId) : null;
     if (!row) return null;
-    const mafia = String(row["Mafia Name"] ?? "").trim();
-    if (mafia) return mafia;
-    const handle = String(row["Discord Username"] ?? row["Discord Handle"] ?? row["Username"] ?? "").trim();
-    return handle.length >= 5 ? `${handle.slice(0, 2)}…${handle.slice(-2)}` : null;
+    return String(row["Name"] || row["Mafia Name"] || "").trim() || `#${memberId}`;
 }
 
 const str = (v: unknown): string | null => (typeof v === "string" && v.trim() ? v.trim().slice(0, 256) : null);

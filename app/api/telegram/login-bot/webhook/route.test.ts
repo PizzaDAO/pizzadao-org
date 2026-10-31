@@ -59,7 +59,7 @@ describe("/api/telegram/login-bot/webhook", () => {
         process.env.VERCEL_ENV = "production";
         fetchMock.mockResolvedValue(new Response("{}"));
         vi.stubGlobal("fetch", fetchMock);
-        fetchMember.mockResolvedValue({ Name: "Real Person", "Mafia Name": "Tony" });
+        fetchMember.mockResolvedValue({ Name: "Tony" });
         db.telegramLinkCode.findUnique.mockResolvedValue({ discordId: "d1", tgId: null, ref: null, usedAt: null, expiresAt: new Date(Date.now() + 60000) });
         db.telegramLinkCode.updateMany.mockResolvedValue({ count: 1 });
     });
@@ -96,19 +96,18 @@ describe("/api/telegram/login-bot/webhook", () => {
         const [send] = calls();
         expect(send.method).toBe("sendMessage");
         expect(send.body.text).toContain("PizzaDAO member Tony");
-        expect(send.body.text).not.toContain("Real Person");
         const data = send.body.reply_markup.inline_keyboard[0][0].callback_data as string;
         expect(data).toMatch(/^ok:[A-Za-z0-9_-]{22}$/);
         expect(data).not.toContain(CODE);
     });
 
-    it("falls back to a masked handle, and sends no button when nothing public resolves", async () => {
-        fetchMember.mockResolvedValue({ Name: "Real Person", "Discord Username": "abcdefgh" });
+    it("falls back to the member number, and sends no button when the member isn't found", async () => {
+        fetchMember.mockResolvedValue({ Name: "  " });
         await POST(hook(startMsg(`/start ${CODE}`)));
-        expect(calls()[0].body.text).toContain("member ab…gh?");
-        expect(calls()[0].body.text).not.toContain("Real Person");
+        expect(calls()[0].body.text).toContain("member #42?");
+        expect(calls()[0].body.reply_markup).toBeDefined();
         fetchMock.mockClear();
-        fetchMember.mockResolvedValue({ Name: "Real Person" });
+        fetchMember.mockResolvedValue(null);
         await POST(hook(startMsg(`/start ${CODE}`)));
         expect(calls()[0].body.text).toMatch(/can't be used/);
         expect(calls()[0].body.reply_markup).toBeUndefined();
