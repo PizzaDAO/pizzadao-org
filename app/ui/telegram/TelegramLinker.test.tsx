@@ -6,7 +6,7 @@ import { TelegramLinker } from "./TelegramLinker";
 
 const M = CATALOGS.en.telegramLink;
 
-type Reply = { status?: number; body?: unknown } | "throw";
+type Reply = { status?: number; body?: unknown } | "throw" | (() => Promise<{ status?: number; body?: unknown }>);
 let routes: Record<string, Reply>;
 let calls: string[];
 
@@ -24,6 +24,22 @@ function resetRoutes() {
 
 const flush = () => act(async () => { await vi.advanceTimersByTimeAsync(0); });
 const tick = () => act(async () => { await vi.advanceTimersByTimeAsync(3000); });
+
+const prompt = { body: { pending: { username: "someone", name: null } } };
+const connected = {
+    enabled: true,
+    botUsername: "login_bot",
+    connected: true,
+    username: "tester",
+    telegramDm: { state: "not_started", botUsername: "sender_bot" },
+};
+
+// A reply the test resolves by hand, to hold a request in flight.
+function deferred() {
+    let release!: (r: { status?: number; body?: unknown }) => void;
+    const promise = new Promise<{ status?: number; body?: unknown }>((res) => { release = res; });
+    return { reply: () => promise, release };
+}
 
 const widgetScript = () => document.querySelector("script[data-telegram-login]");
 
@@ -45,8 +61,9 @@ beforeEach(() => {
     vi.stubGlobal("fetch", vi.fn(async (url: string, init?: { method?: string }) => {
         const key = `${init?.method ?? "GET"} ${url}`;
         calls.push(key);
-        const reply = routes[key];
-        if (!reply || reply === "throw") throw new Error("network");
+        const found = routes[key];
+        if (!found || found === "throw") throw new Error("network");
+        const reply = typeof found === "function" ? await found() : found;
         const status = reply.status ?? 200;
         return { ok: status < 400, status, json: async () => reply.body ?? {} };
     }));
@@ -126,18 +143,168 @@ describe("TelegramLinker", () => {
         expect(utils.getByText(M.appLink)).toBeTruthy();
     });
 
-    it("clears a stale pending prompt when a new attempt starts", async () => {
+    it("does not show an old Connect prompt on a new attempt after a timeout", async () => {
         const utils = await mount();
         await startWaiting(utils);
-        routes["GET /api/telegram/link/pending"] = { body: { pending: { username: "someone", name: null } } };
+        routes["GET /api/telegram/link/pending"] = prompt;
         await tick();
-        fireEvent.click(utils.getByText(M.appLinkDeny));
-        await flush();
+        expect(utils.getByText(M.appLinkConfirm)).toBeTruthy();
+        // Leave the waiting step by timing out, with the prompt still showing.
+        await act(async () => { await vi.advanceTimersByTimeAsync(10 * 60 * 1000); });
+        expect(utils.getByRole("alert").textContent).toBe(M.appLinkTimeout);
         expect(utils.queryByText(M.appLinkConfirm)).toBeNull();
+        // The server still reports the old pending, but no poll has run yet for the new attempt.
         await startWaiting(utils);
-        // The server still answers with the old pending, but no poll has run yet for this attempt.
         expect(utils.queryByText(M.appLinkConfirm)).toBeNull();
         expect(utils.getByText(M.appLinkWaiting)).toBeTruthy();
+    });
+
+    it("stops waiting with an error after 10 minutes", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        await act(async () => { await vi.advanceTimersByTimeAsync(10 * 60 * 1000 + 3000); });
+        expect(utils.getByRole("alert").textContent).toBe(M.appLinkTimeout);
+        expect(utils.getByText(M.appLink)).toBeTruthy();
+    });
+
+    it("stops polling on a 401 from the account poll", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        routes["GET /api/telegram/account"] = { status: 401 };
+        await tick();
+        expect(utils.getByRole("alert").textContent).toBe(M.errSessionExpired);
+        const before = calls.length;
+        await tick();
+        await tick();
+        expect(calls.length).toBe(before);
+    });
+
+    it("ignores widget logins while the app flow is waiting", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        expect(window.onTelegramAuth).toBeDefined();
+        await act(async () => { await window.onTelegramAuth?.({ id: 1 }); });
+        expect(calls).not.toContain("POST /api/telegram/account");
+    });
+
+    it("ignores a poll that was in flight when waiting was cancelled", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        const slow = deferred();
+        routes["GET /api/telegram/link/pending"] = slow.reply;
+        await tick();
+        fireEvent.click(utils.getByText(M.appLinkCancel));
+        await flush();
+        await startWaiting(utils);
+        slow.release(prompt);
+        await flush();
+        expect(utils.queryByText(M.appLinkConfirm)).toBeNull();
+    });
+
+    it("disables the app link while a widget login is in flight", async () => {
+        const slow = deferred();
+        const utils = await mount();
+        routes["POST /api/telegram/account"] = slow.reply;
+        act(() => { void window.onTelegramAuth?.({ id: 1 }); });
+        await flush();
+        expect(utils.getByText(M.linking)).toBeTruthy();
+        expect((utils.getByText(M.appLink) as HTMLButtonElement).disabled).toBe(true);
+        slow.release({ body: { ok: true } });
+        await flush();
+    });
+
+    it("disables Connect and Cancel while a confirm is in flight", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        routes["GET /api/telegram/link/pending"] = prompt;
+        await tick();
+        const slow = deferred();
+        routes["POST /api/telegram/link/pending"] = slow.reply;
+        fireEvent.click(utils.getByText(M.appLinkConfirm));
+        await flush();
+        expect((utils.getByText(M.appLinkConnecting) as HTMLButtonElement).disabled).toBe(true);
+        expect((utils.getByText(M.appLinkDeny) as HTMLButtonElement).disabled).toBe(true);
+        slow.release({ body: { ok: true } });
+        await flush();
+    });
+
+    it("leaves waiting and says so when a confirm worked but the reload failed", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        routes["GET /api/telegram/link/pending"] = prompt;
+        await tick();
+        routes["GET /api/telegram/account"] = { status: 500 };
+        fireEvent.click(utils.getByText(M.appLinkConfirm));
+        await flush();
+        expect(utils.getByRole("alert").textContent).toBe(M.errReload);
+        expect(utils.queryByText(M.appLinkCancel)).toBeNull();
+        expect(utils.getByText(M.appLink)).toBeTruthy();
+    });
+
+    it("does not claim anything was saved when a cancel's reload fails", async () => {
+        const utils = await mount();
+        await startWaiting(utils);
+        routes["GET /api/telegram/link/pending"] = prompt;
+        await tick();
+        routes["GET /api/telegram/account"] = { status: 500 };
+        fireEvent.click(utils.getByText(M.appLinkDeny));
+        await flush();
+        expect(utils.queryByRole("alert")).toBeNull();
+    });
+
+    describe("connected DM row", () => {
+        beforeEach(() => {
+            routes["GET /api/telegram/account"] = { body: connected };
+        });
+
+        it("says so when a check leaves the state unchanged", async () => {
+            routes["POST /api/telegram/account/check"] = { body: { state: "not_started" } };
+            const utils = await mount();
+            fireEvent.click(utils.getByText(M.dmCheck));
+            await flush();
+            expect(utils.getByText(M.dmStillNo)).toBeTruthy();
+        });
+
+        it("falls back to the reported state when the reload fails", async () => {
+            const utils = await mount();
+            routes["POST /api/telegram/account/check"] = { body: { state: "not_started" } };
+            routes["GET /api/telegram/account"] = { status: 500 };
+            fireEvent.click(utils.getByText(M.dmCheck));
+            await flush();
+            expect(utils.getByText(M.dmStillNo)).toBeTruthy();
+        });
+
+        it("shows an error when nothing says what the state is", async () => {
+            const utils = await mount();
+            routes["POST /api/telegram/account/check"] = { body: {} };
+            routes["GET /api/telegram/account"] = { status: 500 };
+            fireEvent.click(utils.getByText(M.dmCheck));
+            await flush();
+            expect(utils.getByRole("alert").textContent).toBe(M.dmCheckFailed);
+        });
+
+        it("clears the check note on disconnect", async () => {
+            routes["POST /api/telegram/account/check"] = { body: { state: "not_started" } };
+            const utils = await mount();
+            fireEvent.click(utils.getByText(M.dmCheck));
+            await flush();
+            routes["DELETE /api/telegram/account"] = { body: { ok: true } };
+            routes["GET /api/telegram/account"] = { body: account };
+            fireEvent.click(utils.getByText(M.unlink));
+            await flush();
+            expect(utils.queryByText(M.dmStillNo)).toBeNull();
+        });
+    });
+
+    it("links to the sender bot, outside the status region, when it has not been started", async () => {
+        routes["GET /api/telegram/host-match"] = { body: { enabled: true, state: "pending", handleHint: "ab", canSend: true } };
+        routes["POST /api/telegram/host-match"] = { body: { result: "not-started", senderBot: "sender_bot" } };
+        const utils = await mount();
+        fireEvent.click(utils.getByText(M.matchYes));
+        await flush();
+        const link = utils.getByText(M.dmOpen) as HTMLAnchorElement;
+        expect(link.getAttribute("href")).toBe("https://t.me/sender_bot");
+        expect(link.closest('[role="status"]')).toBeNull();
     });
 
     it("stops polling and shows a session error on 401", async () => {

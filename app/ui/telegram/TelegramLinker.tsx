@@ -28,7 +28,6 @@ type MatchCard = {
     state: "none" | "pending" | "awaiting" | "confirmed";
     handleHint?: string | null;
     canSend?: boolean;
-    senderBot?: string | null;
 };
 
 type MatchAction = "confirm" | "send-confirmation" | "decline";
@@ -103,23 +102,21 @@ export function TelegramLinker() {
         appStateRef.current = appState;
     }, [appState]);
 
-    const lastLoadStatus = useRef(200);
-    // Resolves with the loaded status, or null when the load failed.
-    const load = useCallback(async (): Promise<TelegramStatus | null> => {
+    // Resolves with the loaded status (data) and the HTTP status; data is null when the load failed (http 0 = network).
+    const load = useCallback(async (): Promise<{ data: TelegramStatus | null; http: number }> => {
         try {
             const res = await fetch("/api/telegram/account", { cache: "no-store" });
-            lastLoadStatus.current = res.status;
             if (!res.ok) {
                 setLoadFailed(true);
-                return null;
+                return { data: null, http: res.status };
             }
             const next = (await res.json()) as TelegramStatus;
             setStatus(next);
             setLoadFailed(false);
-            return next;
+            return { data: next, http: res.status };
         } catch {
             setLoadFailed(true);
-            return null;
+            return { data: null, http: 0 };
         }
     }, []);
 
@@ -160,7 +157,7 @@ export function TelegramLinker() {
                     setError(t(telegramErrorKey(body?.code)));
                     return;
                 }
-                if (!(await load())) setError(t("errReload"));
+                if (!(await load()).data) setError(t("errReload"));
             } catch {
                 setError(t("errNetwork"));
             } finally {
@@ -240,9 +237,9 @@ export function TelegramLinker() {
                 setAppState("idle");
                 return;
             }
-            await load();
+            const loaded = await load();
             if (cancelled) return;
-            if (lastLoadStatus.current === 401) return expire();
+            if (loaded.http === 401) return expire();
             try {
                 const res = await fetch("/api/telegram/link/pending", { cache: "no-store" });
                 if (cancelled) return;
@@ -250,7 +247,7 @@ export function TelegramLinker() {
                 // A failed poll keeps whatever is already shown (e.g. the Connect prompt).
                 if (res.ok) {
                     const body = (await res.json().catch(() => ({}))) as { pending?: { username: string | null; name: string | null } | null };
-                    if (!cancelled) setPending(body.pending ?? null);
+                    if (!cancelled && "pending" in body) setPending(body.pending ?? null);
                 }
             } catch {
                 // Try again on the next tick.
@@ -266,6 +263,11 @@ export function TelegramLinker() {
     useEffect(() => {
         if (status?.connected && appState !== "idle") setAppState("idle");
     }, [status?.connected, appState]);
+
+    // A stale failure message shouldn't outlive the account changing underneath it.
+    useEffect(() => {
+        setError(null);
+    }, [status?.connected]);
 
     const onPending = async (action: "confirm" | "cancel") => {
         setPendingBusy(action);
@@ -288,7 +290,12 @@ export function TelegramLinker() {
                 setPending(null);
                 if (action === "cancel") setAppState("idle");
             }
-            if (!(await load()) && res.ok) setError(t("errReload"));
+            const loaded = await load();
+            if (!loaded.data && res.ok && action === "confirm") {
+                // Connected, but we can't see it: leave the waiting step so its buttons don't sit beside the error.
+                setAppState("idle");
+                setError(t("errReload"));
+            }
         } catch {
             setError(t(action === "confirm" ? "appLinkFailed" : "actionFailed"));
         } finally {
@@ -306,7 +313,7 @@ export function TelegramLinker() {
                 setError(t("errUnlinkFailed"));
                 return;
             }
-            if (!(await load())) setError(t("errReload"));
+            if (!(await load()).data) setError(t("errReload"));
         } catch {
             setError(t("errNetwork"));
         } finally {
@@ -336,9 +343,12 @@ export function TelegramLinker() {
                 setCheckNote(t("dmTryLater"));
                 answered = false;
             }
-            const next = await load();
+            const loaded = await load();
+            // If the reload failed, fall back to the state the check itself reported.
+            const after = loaded.data ? (loaded.data.telegramDm?.state ?? "unknown") : body.state;
+            if (answered && after === undefined) setError(t("dmCheckFailed"));
             // The check ran but nothing changed: say so, so the button doesn't feel dead.
-            if (answered && next && next.telegramDm?.state === before) setCheckNote(t("dmStillNo"));
+            else if (answered && after === (before ?? "unknown")) setCheckNote(t("dmStillNo"));
         } catch {
             setError(t("dmCheckFailed"));
         } finally {
@@ -662,7 +672,11 @@ export function TelegramLinker() {
                                 {checking ? t("dmChecking") : t("dmCheck")}
                             </button>
                         ) : null}
-                        <span aria-live="polite" style={{ flexBasis: "100%", color: MUTED, overflowWrap: "anywhere" }}>
+                        <span
+                            aria-live="polite"
+                            // Mounted but out of the layout while empty, so it adds no row or gap.
+                            style={checkNote ? { flexBasis: "100%", color: MUTED, overflowWrap: "anywhere" } : { position: "absolute" }}
+                        >
                             {checkNote}
                         </span>
                     </div>

@@ -76,13 +76,16 @@ describe("/api/telegram/account", () => {
 
     it("POST returns 503 when not configured", async () => {
         delete process.env.NEXT_PUBLIC_TELEGRAM_LOGIN_BOT_USERNAME;
-        expect((await POST(post({}))).status).toBe(503);
+        const res = await POST(post({}));
+        expect(res.status).toBe(503);
+        expect((await res.json()).code).toBe("not_configured");
     });
 
     it("POST rejects an invalid signature", async () => {
         const p = sign({ id: 7, first_name: "T", auth_date: Math.floor(Date.now() / 1000) });
         const res = await POST(post({ ...p, first_name: "Evil" }));
         expect(res.status).toBe(400);
+        expect((await res.json()).code).toBe("invalid_auth");
         expect(tg.upsert).not.toHaveBeenCalled();
     });
 

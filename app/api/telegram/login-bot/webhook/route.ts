@@ -1,8 +1,8 @@
 // app/api/telegram/login-bot/webhook/route.ts
 //
 // Webhook for OUR login bot only (never the shared rsv.pizza bot). Two-sided "Link with the Telegram app":
-//   1. private `/start <code>`  -> the sender claims the member's code; the bot asks "Link this Telegram to
-//      the PizzaDAO member <name>?" with a "Yes, link" button (callback_data is an opaque ref, not the code),
+//   1. private `/start <code>`  -> the sender claims the member's code; the bot asks "Connect this Telegram to
+//      the PizzaDAO member <name>?" with a "Yes, connect" button (callback_data is an opaque ref, not the code),
 //   2. the claimant taps Yes     -> the code is marked confirmed on the Telegram side,
 //   3. the member confirms on the website (POST /api/telegram/link/pending), which does the actual link.
 // Nothing is linked from here, so a deep link sent to someone else cannot link their account by itself.
@@ -76,7 +76,7 @@ async function onStart(botToken: string, msg: TgMessage) {
     const m = /^\/start(?:@\w+)?(?:\s+(\S+))?\s*$/.exec(text);
     if (!m) return;
     if (!m[1]) {
-        await loginBotSend(botToken, chatId, "To link Telegram, use the link on your PizzaDAO profile page.");
+        await loginBotSend(botToken, chatId, "To connect Telegram, use the link on your PizzaDAO profile page.");
         return;
     }
     const fromId = userId(msg.from);
@@ -100,8 +100,8 @@ async function onStart(botToken: string, msg: TgMessage) {
     await loginBotSend(
         botToken,
         chatId,
-        `Link this Telegram to the PizzaDAO member ${name}? Only tap if you started this from your own profile.`,
-        { reply_markup: { inline_keyboard: [[{ text: "Yes, link", callback_data: `ok:${claim.ref}` }]] } },
+        `Connect this Telegram to the PizzaDAO member ${name}? Only tap if you started this from your own profile.`,
+        { reply_markup: { inline_keyboard: [[{ text: "Yes, connect", callback_data: `ok:${claim.ref}` }]] } },
     );
 }
 
