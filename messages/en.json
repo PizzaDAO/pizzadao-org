@@ -137,6 +137,8 @@
     "tooLongMax": "Too long — max {max} characters.",
     "saveFailedStatus": "Failed to save ({status})",
     "networkError": "Network error — please try again.",
+    "authFailed": "Please sign in again to change this.",
+    "signInAgain": "Please sign in again.",
     "retry": "Retry",
     "x": {
       "ariaLabel": "X (Twitter)",
@@ -165,8 +167,7 @@
       "loadFailed": "Couldn't load your social accounts.",
       "saveFailed": "Failed to connect",
       "disconnectFailed": "Failed to disconnect",
-      "disconnecting": "Disconnecting…",
-      "authFailed": "Please sign in again to change this."
+      "disconnecting": "Disconnecting…"
     }
   },
   "language": {

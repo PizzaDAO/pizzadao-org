@@ -116,7 +116,7 @@ export function SocialAccountLinker({
   }, [load]);
 
   const failureMessage = (status: number, fallback: string) =>
-    status === 401 || status === 403 ? t("authFailed") : fallback;
+    status === 401 || status === 403 ? tRoot("authFailed") : fallback;
 
   const saveAccount = async (
     platform: "TWITTER" | "FARCASTER",
@@ -323,69 +323,69 @@ export function SocialAccountLinker({
   return (
     <div style={{ ...cardChrome(), gridColumn: "1 / -1" }}>
       <h3 style={{ margin: 0 }}>
-      <button
-        type="button"
-        onClick={() => setExpanded(!expanded)}
-        aria-expanded={expanded}
-        aria-controls={panelId}
-        style={{
-          display: "flex",
-          alignItems: "center",
-          justifyContent: "space-between",
-          gap: 8,
-          width: "100%",
-          minHeight: 44,
-          marginBottom: expanded ? 12 : 0,
-          padding: 0,
-          background: "none",
-          border: "none",
-          color: "inherit",
-          font: "inherit",
-          textAlign: "left",
-          cursor: "pointer",
-        }}
-      >
-        <span
+        <button
+          type="button"
+          onClick={() => setExpanded(!expanded)}
+          aria-expanded={expanded}
+          aria-controls={panelId}
           style={{
-            fontFamily: displayFont,
-            fontSize: 16,
-            fontWeight: 600,
-            display: "inline-flex",
+            display: "flex",
             alignItems: "center",
-            gap: 6,
+            justifyContent: "space-between",
+            gap: 8,
+            width: "100%",
+            minHeight: 44,
+            marginBottom: expanded ? 12 : 0,
+            padding: 0,
+            background: "none",
+            border: "none",
+            color: "inherit",
+            font: "inherit",
+            textAlign: "left",
+            cursor: "pointer",
           }}
         >
-          {t("title")}
-          {linkedCount > 0 && (
-            <span
-              style={{
-                display: "inline-flex",
-                alignItems: "center",
-                background: "hsl(var(--butter) / 0.35)",
-                color: "hsl(var(--foreground))",
-                border: "1px solid hsl(var(--butter) / 0.60)",
-                padding: "1px 8px",
-                borderRadius: 999,
-                fontSize: 11,
-                fontWeight: 700,
-              }}
-            >
-              {linkedCount}
-            </span>
-          )}
-        </span>
-        <span
-          aria-hidden
-          style={{
-            fontSize: 12,
-            color: "hsl(var(--foreground) / 0.65)",
-            transition: "transform 200ms ease",
-            transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
-          }}
-        >
-          ▼
-        </span>
-      </button>
+          <span
+            style={{
+              fontFamily: displayFont,
+              fontSize: 16,
+              fontWeight: 600,
+              display: "inline-flex",
+              alignItems: "center",
+              gap: 6,
+            }}
+          >
+            {t("title")}
+            {linkedCount > 0 && (
+              <span
+                style={{
+                  display: "inline-flex",
+                  alignItems: "center",
+                  background: "hsl(var(--butter) / 0.35)",
+                  color: "hsl(var(--foreground))",
+                  border: "1px solid hsl(var(--butter) / 0.60)",
+                  padding: "1px 8px",
+                  borderRadius: 999,
+                  fontSize: 11,
+                  fontWeight: 700,
+                }}
+              >
+                {linkedCount}
+              </span>
+            )}
+          </span>
+          <span
+            aria-hidden
+            style={{
+              fontSize: 12,
+              color: "hsl(var(--foreground) / 0.65)",
+              transition: "transform 200ms ease",
+              transform: expanded ? "rotate(180deg)" : "rotate(0deg)",
+            }}
+          >
+            ▼
+          </span>
+        </button>
       </h3>
 
       {!expanded && linkedCount > 0 && (
@@ -406,47 +406,45 @@ export function SocialAccountLinker({
         </div>
       )}
 
-      {(
-        <div
-          id={panelId}
-          hidden={!expanded}
-          style={{ display: expanded ? "grid" : "none", gap: 12 }}
-        >
-          {error && (
-            <div
-              role="alert"
-              style={{
-                padding: 10,
-                background: "hsl(var(--tomato) / 0.08)",
-                border: "1px solid hsl(var(--tomato) / 0.30)",
-                borderRadius: "var(--radius)",
-                color: "hsl(var(--tomato-readable))",
-                fontSize: 13,
-              }}
-            >
-              {error}
-            </div>
-          )}
+      <div
+        id={panelId}
+        hidden={!expanded}
+        style={{ display: expanded ? "grid" : "none", gap: 12 }}
+      >
+        {error && (
+          <div
+            role="alert"
+            style={{
+              padding: 10,
+              background: "hsl(var(--tomato) / 0.08)",
+              border: "1px solid hsl(var(--tomato) / 0.30)",
+              borderRadius: "var(--radius)",
+              color: "hsl(var(--tomato-readable))",
+              fontSize: 13,
+            }}
+          >
+            {error}
+          </div>
+        )}
 
-          {(!hideManualX || hasTwitter) &&
-            renderRow(
-              "TWITTER",
-              t("xManualLabel"),
-              t("xPlaceholder"),
-              twitterHandle,
-              setTwitterHandle,
-              hasTwitter
-            )}
-          {renderRow(
-            "FARCASTER",
-            t("farcasterLabel"),
-            t("farcasterPlaceholder"),
-            farcasterHandle,
-            setFarcasterHandle,
-            hasFarcaster
+        {(!hideManualX || hasTwitter) &&
+          renderRow(
+            "TWITTER",
+            t("xManualLabel"),
+            t("xPlaceholder"),
+            twitterHandle,
+            setTwitterHandle,
+            hasTwitter
           )}
-        </div>
-      )}
+        {renderRow(
+          "FARCASTER",
+          t("farcasterLabel"),
+          t("farcasterPlaceholder"),
+          farcasterHandle,
+          setFarcasterHandle,
+          hasFarcaster
+        )}
+      </div>
     </div>
   );
 }

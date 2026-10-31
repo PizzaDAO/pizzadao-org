@@ -192,7 +192,11 @@ function TextEditor({
                 }),
             });
             if (!res.ok) {
-                setError(t("saveFailedStatus", { status: res.status }));
+                setError(
+                    res.status === 401 || res.status === 403
+                        ? t("authFailed")
+                        : t("saveFailedStatus", { status: res.status })
+                );
                 return;
             }
             setSavedAt(Date.now());
@@ -279,16 +283,20 @@ type XAccountState = {
 function XAccountEditor({
     memberId,
     xConfigured,
+    override,
+    onOverride,
 }: {
     memberId: string;
     xConfigured: boolean;
+    override: XAccountState | null;
+    onOverride: (next: XAccountState) => void;
 }) {
     const t = useTranslations("profileEdit.x");
     const tRoot = useTranslations("profileEdit");
     const { data, refetch, isLoading, isFetching } = useXAccount(memberId);
-    // Local override (after a disconnect) wins over the query data; deriving
-    // it avoids a render where data has loaded but account is still null.
-    const [override, setOverride] = useState<XAccountState | null>(null);
+    // The override (set after a disconnect, owned by EditClient) wins over
+    // the query data; deriving it avoids a render where data has loaded but
+    // account is still null.
     const account: XAccountState | null = override ?? data ?? null;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
@@ -299,10 +307,14 @@ function XAccountEditor({
         try {
             const res = await fetch("/api/x/disconnect", { method: "DELETE" });
             if (!res.ok) {
-                setError(t("disconnectFailed", { status: res.status }));
+                setError(
+                    res.status === 401 || res.status === 403
+                        ? tRoot("authFailed")
+                        : t("disconnectFailed", { status: res.status })
+                );
                 return;
             }
-            setOverride({ connected: false });
+            onOverride({ connected: false });
             refetch();
         } catch {
             setError(tRoot("networkError"));
@@ -507,7 +519,10 @@ export function EditClient({
     // Shared (cached) query with XAccountEditor. The manual X row is hidden
     // only when the verified X card can actually be used: X sign-in is
     // configured (or the member is already connected) and the lookup loaded.
-    const { data: xAccount } = useXAccount(memberId);
+    const { data: xData } = useXAccount(memberId);
+    // After a disconnect the override wins, even if the refetch fails.
+    const [xOverride, setXOverride] = useState<XAccountState | null>(null);
+    const xAccount = xOverride ?? xData;
     const verifiedXAvailable =
         typeof xAccount?.connected === "boolean" &&
         (xConfigured || xAccount.connected === true);
@@ -578,8 +593,10 @@ export function EditClient({
                         {t("loadFailedTitle")}
                     </h1>
                     <p className="text-foreground/70 m-0">
-                        {error instanceof Error
-                            ? error.message
+                        {error instanceof Error &&
+                        (error.message === "__AUTH_401__" ||
+                            error.message === "__AUTH_403__")
+                            ? t("signInAgain")
                             : t("tryAgainLater")}
                     </p>
                     <Link
@@ -685,7 +702,12 @@ export function EditClient({
                     title={t("connections.title")}
                     description={t("connections.description")}
                 >
-                    <XAccountEditor memberId={memberId} xConfigured={xConfigured} />
+                    <XAccountEditor
+                        memberId={memberId}
+                        xConfigured={xConfigured}
+                        override={xOverride}
+                        onOverride={setXOverride}
+                    />
                     <TelegramLinker />
                     <SocialAccountLinker
                         memberId={memberId}

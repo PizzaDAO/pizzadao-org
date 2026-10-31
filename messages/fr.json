@@ -137,6 +137,8 @@
     "tooLongMax": "Trop long : {max} caractères maximum.",
     "saveFailedStatus": "Échec de l'enregistrement ({status})",
     "networkError": "Erreur réseau : réessayez.",
+    "authFailed": "Reconnectez-vous pour modifier ceci.",
+    "signInAgain": "Reconnectez-vous.",
     "retry": "Réessayer",
     "x": {
       "ariaLabel": "X (Twitter)",
@@ -165,8 +167,7 @@
       "loadFailed": "Impossible de charger vos comptes sociaux.",
       "saveFailed": "Échec de la connexion",
       "disconnectFailed": "Échec de la déconnexion",
-      "disconnecting": "Déconnexion…",
-      "authFailed": "Reconnectez-vous pour modifier ceci."
+      "disconnecting": "Déconnexion…"
     }
   },
   "language": {
@@ -810,7 +811,7 @@
     "connections": {
       "title": "Connexions facultatives",
       "description": "Vous pouvez participer sans connecter de portefeuille ni X. Ajoutez-les pour afficher vos objets de collection ou utiliser leurs fonctionnalités.",
-      "wallet": "Gérer les portefeuilles",
+      "wallet": "Gérer les wallets",
       "x": "Connecter X"
     },
     "boxMafia": {

@@ -137,6 +137,8 @@
     "tooLongMax": "Demasiado largo: máximo {max} caracteres.",
     "saveFailedStatus": "No se pudo guardar ({status})",
     "networkError": "Error de red: inténtalo de nuevo.",
+    "authFailed": "Inicia sesión de nuevo para cambiar esto.",
+    "signInAgain": "Inicia sesión de nuevo.",
     "retry": "Reintentar",
     "x": {
       "ariaLabel": "X (Twitter)",
@@ -165,8 +167,7 @@
       "loadFailed": "No se pudieron cargar tus cuentas sociales.",
       "saveFailed": "No se pudo conectar",
       "disconnectFailed": "No se pudo desconectar",
-      "disconnecting": "Desconectando…",
-      "authFailed": "Inicia sesión de nuevo para cambiar esto."
+      "disconnecting": "Desconectando…"
     }
   },
   "language": {
@@ -810,7 +811,7 @@
     "connections": {
       "title": "Conexiones opcionales",
       "description": "Puedes participar sin conectar una cartera ni X. Añádelas para mostrar coleccionables o usar sus funciones.",
-      "wallet": "Gestionar carteras",
+      "wallet": "Gestionar wallets",
       "x": "Conectar X"
     },
     "boxMafia": {

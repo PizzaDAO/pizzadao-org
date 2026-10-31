@@ -2,7 +2,7 @@
 // alert (including with cached data on first render), and the Connect button
 // only exists when X sign-in is configured.
 import { describe, it, expect, vi, beforeEach } from "vitest";
-import { screen } from "@testing-library/react";
+import { screen, fireEvent, waitFor } from "@testing-library/react";
 import { renderWithIntl } from "@/app/lib/i18n/test-utils";
 
 const hooks = vi.hoisted(() => ({
@@ -51,5 +51,14 @@ describe("EditClient X card", () => {
         hooks.x = { ...hooks.x, data: { connected: false } };
         renderWithIntl(<EditClient memberId="1" xConfigured />);
         expect(screen.getByText("Connect X")).toBeTruthy();
+    });
+
+    it("keeps the disconnected override even while query data still says connected", async () => {
+        hooks.x = { ...hooks.x, data: { connected: true, username: "someone" } };
+        vi.stubGlobal("fetch", vi.fn(async () => new Response("{}", { status: 200 })));
+        renderWithIntl(<EditClient memberId="1" xConfigured />);
+        fireEvent.click(screen.getByRole("button", { name: "Disconnect" }));
+        await waitFor(() => expect(screen.getByText("Connect X")).toBeTruthy());
+        expect(screen.queryByText("@someone")).toBeNull();
     });
 });
