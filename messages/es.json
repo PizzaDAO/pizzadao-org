@@ -186,7 +186,9 @@
       "loadFailed": "No se pudieron cargar tus cuentas sociales.",
       "saveFailed": "No se pudo conectar",
       "disconnectFailed": "No se pudo desconectar",
-      "disconnecting": "Desconectando…"
+      "disconnecting": "Desconectando…",
+      "update": "Actualizar",
+      "updating": "Actualizando…"
     }
   },
   "language": {

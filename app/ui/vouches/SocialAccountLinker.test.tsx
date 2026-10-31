@@ -57,6 +57,20 @@ describe("SocialAccountLinker", () => {
         expect(screen.getByLabelText("Farcaster")).toBeTruthy();
     });
 
+    it("offers no save for an unchanged stored handle, and Update once it changes", async () => {
+        failFirst = false;
+        renderWithIntl(<SocialAccountLinker memberId="1" />);
+        fireEvent.click(await screen.findByRole("button", { name: /Social accounts/ }));
+        const input = screen.getByLabelText("X (not verified)");
+        expect(screen.queryByRole("button", { name: "Update" })).toBeNull();
+        fireEvent.change(input, { target: { value: "@someone" } });
+        expect(screen.queryByRole("button", { name: "Update" })).toBeNull();
+        fireEvent.change(input, { target: { value: "someone_else" } });
+        expect(screen.getByRole("button", { name: "Update" })).toBeTruthy();
+        // Farcaster has nothing stored, so it still says Connect.
+        expect(screen.getByRole("button", { name: "Connect" })).toBeTruthy();
+    });
+
     it("shows a skeleton while loading and a retry on failure", async () => {
         failFirst = true;
         renderWithIntl(<SocialAccountLinker memberId="1" />);

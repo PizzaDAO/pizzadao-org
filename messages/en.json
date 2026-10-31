@@ -186,7 +186,9 @@
       "loadFailed": "Couldn't load your social accounts.",
       "saveFailed": "Failed to connect",
       "disconnectFailed": "Failed to disconnect",
-      "disconnecting": "Disconnecting…"
+      "disconnecting": "Disconnecting…",
+      "update": "Update",
+      "updating": "Updating…"
     }
   },
   "language": {
