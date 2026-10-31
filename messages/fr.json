@@ -193,7 +193,9 @@
       "loadFailed": "Impossible de charger vos comptes sociaux.",
       "saveFailed": "Échec de la connexion",
       "disconnectFailed": "Échec de la déconnexion",
-      "disconnecting": "Déconnexion…"
+      "disconnecting": "Déconnexion…",
+      "update": "Mettre à jour",
+      "updating": "Mise à jour…"
     }
   },
   "language": {

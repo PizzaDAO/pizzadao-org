@@ -264,6 +264,9 @@ export function SocialAccountLinker({
     const busy = saving === platform;
     const connecting = busy && savingAction === "connect";
     const disconnecting = busy && savingAction === "disconnect";
+    const stored = accounts.find((a) => a.platform === platform)?.handle;
+    // Re-saving the stored handle changes nothing, so only offer a save when there's something to save.
+    const unchanged = stored !== undefined && value.trim().replace(/^@/, "") === stored;
     return (
       <div
         style={{
@@ -294,15 +297,19 @@ export function SocialAccountLinker({
           maxLength={100}
           style={{ ...inputStyle(), flex: 1, minWidth: 150 }}
         />
-        <button
-          type="button"
-          onClick={() => saveAccount(platform, value)}
-          disabled={busy || !value.trim()}
-          className="btn-pill btn-pill-primary"
-          style={BUTTON_BASE}
-        >
-          {connecting ? t("saving") : t("connect")}
-        </button>
+        {!unchanged && (
+          <button
+            type="button"
+            onClick={() => saveAccount(platform, value)}
+            disabled={busy || !value.trim()}
+            className="btn-pill btn-pill-primary"
+            style={BUTTON_BASE}
+          >
+            {connecting
+              ? t(hasAccount ? "updating" : "saving")
+              : t(hasAccount ? "update" : "connect")}
+          </button>
+        )}
         {hasAccount && (
           <button
             type="button"
