@@ -67,18 +67,22 @@ describe("/api/telegram/link/pending", () => {
         expect(res.status).toBe(200);
         expect(db.telegramAccount.upsert.mock.calls[0][0].create).toMatchObject({ discordId: "d1", telegramId: "777" });
         expect(db.telegramLinkCode.updateMany.mock.calls[0][0].where).toMatchObject({ codeHash: "h", usedAt: null });
-        expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).text).toMatch(/^Linked/);
+        expect(JSON.parse(String(fetchMock.mock.calls[0][1].body)).text).toMatch(/^Connected/);
     });
 
     it("confirm with nothing pending is a 404 and links nothing", async () => {
         db.telegramLinkCode.findFirst.mockResolvedValue(null);
-        expect((await POST(post({ action: "confirm" }))).status).toBe(404);
+        const res = await POST(post({ action: "confirm" }));
+        expect(res.status).toBe(404);
+        expect((await res.json()).code).toBe("nothing_pending");
         expect(db.telegramAccount.upsert).not.toHaveBeenCalled();
     });
 
     it("confirm when that Telegram id belongs to another member is a 409 and discards the code", async () => {
         db.telegramAccount.findUnique.mockResolvedValue({ discordId: "other" });
-        expect((await POST(post({ action: "confirm" }))).status).toBe(409);
+        const res = await POST(post({ action: "confirm" }));
+        expect(res.status).toBe(409);
+        expect((await res.json()).code).toBe("already_linked");
         expect(db.telegramAccount.upsert).not.toHaveBeenCalled();
         expect(db.telegramLinkCode.deleteMany).toHaveBeenCalled();
     });

@@ -21,6 +21,9 @@ export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "private, no-store" };
 
+// The shared sender bot's handle, so the card can link to it when the member hasn't started it yet.
+const senderBot = () => process.env.NEXT_PUBLIC_TELEGRAM_SENDER_BOT_USERNAME?.trim() || null;
+
 export async function GET() {
     const auth = await requireSession();
     if (!auth.ok) return auth.response;
@@ -50,5 +53,5 @@ export async function POST(req: Request) {
     }
     const result = await startConfirmation(discordId, action === "send-confirmation");
     const status = result === "not-found" ? 404 : result === "wait" || result === "has-login" ? 409 : result === "try-later" ? 503 : 200;
-    return NextResponse.json({ ok: result === "sent", result, ...(await getCard(discordId).catch(() => ({ state: "none" }))) }, { status, headers: NO_STORE });
+    return NextResponse.json({ ok: result === "sent", result, senderBot: senderBot(), ...(await getCard(discordId).catch(() => ({ state: "none" }))) }, { status, headers: NO_STORE });
 }

@@ -95,7 +95,8 @@ describe("/api/telegram/login-bot/webhook", () => {
         expect(db.telegramAccount.upsert).not.toHaveBeenCalled();
         const [send] = calls();
         expect(send.method).toBe("sendMessage");
-        expect(send.body.text).toContain("PizzaDAO member Tony");
+        expect(send.body.text).toContain("Connect this Telegram to the PizzaDAO member Tony");
+        expect(send.body.reply_markup.inline_keyboard[0][0].text).toBe("Yes, connect");
         const data = send.body.reply_markup.inline_keyboard[0][0].callback_data as string;
         expect(data).toMatch(/^ok:[A-Za-z0-9_-]{22}$/);
         expect(data).not.toContain(CODE);
