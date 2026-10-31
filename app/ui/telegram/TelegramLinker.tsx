@@ -351,7 +351,7 @@ export function TelegramLinker() {
                 border: "1px solid hsl(var(--rule-warm) / 0.55)",
                 background: "hsl(var(--cream) / 0.4)",
                 display: "flex",
-                alignItems: "center",
+                alignItems: status.connected ? "center" : "flex-start",
                 gap: 12,
                 flexWrap: "wrap",
             }}
@@ -413,29 +413,35 @@ export function TelegramLinker() {
                     </>
                 ) : (
                     <>
-                        <span style={{ fontSize: 14, color: "hsl(var(--ink) / 0.7)" }}>
-                            {busy ? "Linking Telegram…" : "Link your Telegram account"}
-                        </span>
-                        <span style={{ fontSize: 13, color: "hsl(var(--ink) / 0.55)", flexBasis: "100%" }}>{t("recognise")}</span>
-                        <div ref={widgetRef} aria-label="Log in with Telegram to link your account" />
-                        <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
+                        <div style={{ flexBasis: "100%" }}>
+                            <div style={{ fontWeight: 600, fontSize: 16 }}>
+                                {busy ? "Linking Telegram…" : "Link your Telegram account"}
+                            </div>
+                            <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.55)", marginTop: 2 }}>{t("recognise")}</div>
+                        </div>
+                        <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: "8px 14px" }}>
+                            <div ref={widgetRef} style={{ display: "flex" }} aria-label="Log in with Telegram to link your account" />
                             <button
                                 type="button"
                                 onClick={onAppLink}
                                 disabled={appState !== "idle"}
-                                className="btn-pill"
                                 style={{
-                                    background: "transparent",
-                                    border: "1px solid hsl(var(--rule-warm) / 0.55)",
-                                    color: "hsl(var(--foreground))",
+                                    background: "none",
+                                    border: "none",
+                                    padding: "4px 0",
+                                    fontSize: 13,
+                                    textAlign: "left",
+                                    textDecoration: "underline",
+                                    textUnderlineOffset: 3,
+                                    color: "hsl(var(--ink) / 0.7)",
                                     opacity: appState !== "idle" ? 0.5 : 1,
                                     cursor: appState !== "idle" ? "not-allowed" : "pointer",
-                                    maxWidth: "100%",
-                                    whiteSpace: "normal",
                                 }}
                             >
                                 {appState === "starting" ? t("appLinkOpening") : t("appLink")}
                             </button>
+                        </div>
+                        <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
                             {appState === "waiting" && pending ? (
                                 <div role="status" style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
                                     <span>{pending.username
