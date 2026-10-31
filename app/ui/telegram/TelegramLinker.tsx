@@ -441,7 +441,7 @@ export function TelegramLinker() {
                                 {appState === "starting" ? t("appLinkOpening") : t("appLink")}
                             </button>
                         </div>
-                        <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
+                        {appState === "waiting" || appNote ? <div style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8, fontSize: 13 }}>
                             {appState === "waiting" && pending ? (
                                 <div role="status" style={{ flexBasis: "100%", display: "flex", flexWrap: "wrap", alignItems: "center", gap: 8 }}>
                                     <span>{pending.username
@@ -479,7 +479,7 @@ export function TelegramLinker() {
                                 </>
                             ) : null}
                             {appNote ? <span role="status" style={{ color: "hsl(var(--ink) / 0.55)" }}>{appNote}</span> : null}
-                        </div>
+                        </div> : null}
                     </>
                 )}
             </div>
