@@ -115,7 +115,7 @@ function intSetting(o: {
   }
 }
 
-const FOOTER_TELEGRAM_DEFAULT = "Replies to this bot aren't read. Use the buttons above to answer, snooze or stop these messages."
+const FOOTER_TELEGRAM_DEFAULT = "Replies to this bot aren't read. Use the buttons below to answer, snooze or stop these messages."
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
