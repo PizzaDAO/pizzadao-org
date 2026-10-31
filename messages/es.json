@@ -11,7 +11,7 @@
     "appLinkOpening": "Abriendo Telegram…",
     "appLinkWaiting": "Abre Telegram, pulsa Iniciar y luego Sí. Esperando…",
     "appLinkCancel": "Dejar de esperar",
-    "appLinkFailed": "No se pudo iniciar la vinculación. Inténtalo más tarde.",
+    "appLinkFailed": "No se pudo iniciar la conexión. Inténtalo más tarde.",
     "appLinkTimeout": "No terminó a tiempo. Empieza de nuevo para obtener un enlace nuevo.",
     "recognise": "Así PizzaDAO podrá reconocerte en Telegram y enviarte seguimientos allí.",
     "dmOk": "El bot de PizzaDAO puede escribirte en Telegram.",
@@ -67,7 +67,9 @@
     "matchSending": "Enviando…",
     "matchUpdating": "Actualizando…",
     "appLinkConnecting": "Conectando…",
-    "appLinkCancelling": "Cancelando…"
+    "appLinkCancelling": "Cancelando…",
+    "errSessionExpired": "Tu sesión caducó. Inicia sesión de nuevo.",
+    "errReload": "Guardado, pero no se pudo actualizar. Recarga la página."
   },
   "telegramConfirm": {
     "title": "Confirma tu Telegram",

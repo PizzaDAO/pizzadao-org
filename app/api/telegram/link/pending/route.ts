@@ -65,7 +65,7 @@ export async function POST(req: Request) {
 
     const cfg = telegramConfig();
     if (cfg) {
-        await loginBotSend(cfg.botToken, p.claimant.id, "Linked to your PizzaDAO account. If this wasn't you, unlink it on your profile.");
+        await loginBotSend(cfg.botToken, p.claimant.id, "Connected to your PizzaDAO account. If this wasn't you, disconnect it on your profile.");
     }
     return NextResponse.json({ ok: true, connected: true }, { headers: NO_STORE });
 }

@@ -2,7 +2,7 @@
 //
 // The profile card for a suggested Telegram match (plans/telegram-shared-bot.md, part 4).
 //
-//   GET  -> { enabled, state: none|pending|awaiting|confirmed, handleHint, canSend, senderBot }
+//   GET  -> { enabled, state: none|pending|awaiting|confirmed, handleHint, canSend }
 //   POST { action: 'confirm' | 'send-confirmation' | 'decline' }
 //
 // Session-gated, 3 writes per 10 minutes per member. 'confirm' is the member's "yes, that's me" (side a):
@@ -29,7 +29,7 @@ export async function GET() {
     if (!auth.ok) return auth.response;
     const card = await getCard(auth.session.discordId).catch(() => null);
     if (!card) return NextResponse.json({ enabled: false, state: "none" }, { headers: NO_STORE });
-    return NextResponse.json({ enabled: card.state !== "none", ...card, senderBot: senderBot() }, { headers: NO_STORE });
+    return NextResponse.json({ enabled: card.state !== "none", ...card }, { headers: NO_STORE });
 }
 
 export async function POST(req: Request) {

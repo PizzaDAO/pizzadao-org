@@ -52,7 +52,7 @@
     "unlink": "Déconnecter",
     "unlinking": "Déconnexion…",
     "accountFallback": "Compte Telegram",
-    "widgetLabel": "Connectez-vous avec Telegram pour lier votre compte",
+    "widgetLabel": "Connectez-vous avec Telegram pour connecter votre compte",
     "errNetwork": "Erreur réseau. Réessayez.",
     "errLinkFailed": "Impossible de connecter Telegram. Réessayez.",
     "errUnlinkFailed": "Impossible de déconnecter Telegram. Réessayez.",
@@ -67,7 +67,9 @@
     "matchSending": "Envoi…",
     "matchUpdating": "Mise à jour…",
     "appLinkConnecting": "Connexion…",
-    "appLinkCancelling": "Annulation…"
+    "appLinkCancelling": "Annulation…",
+    "errSessionExpired": "Votre session a expiré. Reconnectez-vous.",
+    "errReload": "Enregistré, mais l'actualisation a échoué. Rechargez la page."
   },
   "telegramConfirm": {
     "title": "Confirmez votre Telegram",

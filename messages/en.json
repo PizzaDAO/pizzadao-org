@@ -67,7 +67,9 @@
     "matchSending": "Sending…",
     "matchUpdating": "Updating…",
     "appLinkConnecting": "Connecting…",
-    "appLinkCancelling": "Cancelling…"
+    "appLinkCancelling": "Cancelling…",
+    "errSessionExpired": "Your session expired. Sign in again.",
+    "errReload": "Saved, but couldn't refresh. Reload the page."
   },
   "telegramConfirm": {
     "title": "Confirm your Telegram",

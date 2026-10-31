@@ -96,11 +96,19 @@ export function TelegramLinker() {
     const [matchError, setMatchError] = useState<string | null>(null);
     const [matchBotUrl, setMatchBotUrl] = useState<string | null>(null);
     const widgetRef = useRef<HTMLDivElement>(null);
+    const [appState, setAppState] = useState<"idle" | "starting" | "waiting">("idle");
+    // The widget's global callback outlives renders, so it reads the current step from a ref.
+    const appStateRef = useRef(appState);
+    useEffect(() => {
+        appStateRef.current = appState;
+    }, [appState]);
 
+    const lastLoadStatus = useRef(200);
     // Resolves with the loaded status, or null when the load failed.
     const load = useCallback(async (): Promise<TelegramStatus | null> => {
         try {
             const res = await fetch("/api/telegram/account", { cache: "no-store" });
+            lastLoadStatus.current = res.status;
             if (!res.ok) {
                 setLoadFailed(true);
                 return null;
@@ -137,6 +145,8 @@ export function TelegramLinker() {
         if (!botUsername || !container) return;
 
         window.onTelegramAuth = async (user) => {
+            // A widget login must not race the app flow's pending confirmation.
+            if (appStateRef.current === "waiting") return;
             setError(null);
             setBusy("link");
             try {
@@ -150,7 +160,7 @@ export function TelegramLinker() {
                     setError(t(telegramErrorKey(body?.code)));
                     return;
                 }
-                await load();
+                if (!(await load())) setError(t("errReload"));
             } catch {
                 setError(t("errNetwork"));
             } finally {
@@ -178,13 +188,13 @@ export function TelegramLinker() {
     }, [botUsername, load, locale, t]);
 
     // "Link with the Telegram app": get a one-time deep link, then poll until the bot has linked the account.
-    const [appState, setAppState] = useState<"idle" | "starting" | "waiting">("idle");
     const [appUrl, setAppUrl] = useState<string | null>(null);
     const [pending, setPending] = useState<{ username: string | null; name: string | null } | null>(null);
     const [pendingBusy, setPendingBusy] = useState<null | "confirm" | "cancel">(null);
 
     const onAppLink = async () => {
         setError(null);
+        setPending(null);
         setAppState("starting");
         try {
             const res = await fetch("/api/telegram/link/start", {
@@ -214,23 +224,43 @@ export function TelegramLinker() {
     useEffect(() => {
         if (appState !== "waiting") return;
         const startedAt = Date.now();
+        // Set on cleanup so a tick that is already in flight can't write state after Cancel/timeout/connect.
+        let cancelled = false;
+        const expire = () => {
+            cancelled = true;
+            clearInterval(timer);
+            setError(t("errSessionExpired"));
+            setAppState("idle");
+        };
         const timer = setInterval(async () => {
             if (Date.now() - startedAt > 10 * 60 * 1000) {
+                cancelled = true;
                 clearInterval(timer);
                 setError(t("appLinkTimeout"));
                 setAppState("idle");
                 return;
             }
             await load();
+            if (cancelled) return;
+            if (lastLoadStatus.current === 401) return expire();
             try {
                 const res = await fetch("/api/telegram/link/pending", { cache: "no-store" });
-                const body = (await res.json().catch(() => ({}))) as { pending?: { username: string | null; name: string | null } | null };
-                setPending(res.ok ? (body.pending ?? null) : null);
+                if (cancelled) return;
+                if (res.status === 401) return expire();
+                // A failed poll keeps whatever is already shown (e.g. the Connect prompt).
+                if (res.ok) {
+                    const body = (await res.json().catch(() => ({}))) as { pending?: { username: string | null; name: string | null } | null };
+                    if (!cancelled) setPending(body.pending ?? null);
+                }
             } catch {
                 // Try again on the next tick.
             }
         }, 3000);
-        return () => clearInterval(timer);
+        return () => {
+            cancelled = true;
+            clearInterval(timer);
+            setPending(null);
+        };
     }, [appState, load, t]);
 
     useEffect(() => {
@@ -258,7 +288,7 @@ export function TelegramLinker() {
                 setPending(null);
                 if (action === "cancel") setAppState("idle");
             }
-            await load();
+            if (!(await load()) && res.ok) setError(t("errReload"));
         } catch {
             setError(t(action === "confirm" ? "appLinkFailed" : "actionFailed"));
         } finally {
@@ -268,6 +298,7 @@ export function TelegramLinker() {
 
     const onUnlink = async () => {
         setError(null);
+        setCheckNote(null);
         setBusy("unlink");
         try {
             const res = await fetch("/api/telegram/account", { method: "DELETE" });
@@ -275,7 +306,7 @@ export function TelegramLinker() {
                 setError(t("errUnlinkFailed"));
                 return;
             }
-            await load();
+            if (!(await load())) setError(t("errReload"));
         } catch {
             setError(t("errNetwork"));
         } finally {
@@ -407,15 +438,12 @@ export function TelegramLinker() {
                 {/* Text only: buttons stay outside the live region. */}
                 <div role="status" style={{ color: MUTED, fontSize: 13, marginTop: matchNote ? 0 : -8 }}>
                     {matchNote}
-                    {matchBotUrl ? (
-                        <>
-                            {" "}
-                            <a href={matchBotUrl} target="_blank" rel="noreferrer" style={{ fontWeight: 600, color: "hsl(var(--foreground))" }}>
-                                {t("dmOpen")}
-                            </a>
-                        </>
-                    ) : null}
                 </div>
+                {matchBotUrl ? (
+                    <a href={matchBotUrl} target="_blank" rel="noreferrer" style={{ ...linkAction, fontWeight: 600, color: "hsl(var(--foreground))" }}>
+                        {t("dmOpen")}
+                    </a>
+                ) : null}
                 {matchError ? (
                     <div role="alert" style={{ fontSize: 13, color: ERROR_COLOR }}>
                         {matchError}
@@ -461,7 +489,7 @@ export function TelegramLinker() {
                     ? t("appLinkPending", { who: `@${pending.username}` })
                     : t("appLinkPendingNoUsername", { name: pending.name || "?" })
                 : t("appLinkWaiting")
-            : checkNote;
+            : null;
 
         main = (
             <div
@@ -545,11 +573,11 @@ export function TelegramLinker() {
                         <button
                             type="button"
                             onClick={onAppLink}
-                            disabled={appState !== "idle"}
+                            disabled={appState !== "idle" || busy !== null}
                             style={{
                                 ...linkAction,
-                                opacity: appState !== "idle" ? 0.5 : 1,
-                                cursor: appState !== "idle" ? "not-allowed" : "pointer",
+                                opacity: appState !== "idle" || busy !== null ? 0.5 : 1,
+                                cursor: appState !== "idle" || busy !== null ? "not-allowed" : "pointer",
                             }}
                         >
                             {appState === "starting" ? t("appLinkOpening") : t("appLink")}
@@ -563,7 +591,7 @@ export function TelegramLinker() {
                                 <button
                                     type="button"
                                     onClick={() => onPending("confirm")}
-                                    disabled={pendingBusy !== null}
+                                    disabled={pendingBusy !== null || busy !== null}
                                     className="btn-pill btn-pill-primary"
                                 >
                                     {pendingBusy === "confirm" ? t("appLinkConnecting") : t("appLinkConfirm")}
@@ -571,7 +599,7 @@ export function TelegramLinker() {
                                 <button
                                     type="button"
                                     onClick={() => onPending("cancel")}
-                                    disabled={pendingBusy !== null}
+                                    disabled={pendingBusy !== null || busy !== null}
                                     className="btn-pill btn-pill-secondary"
                                 >
                                     {pendingBusy === "cancel" ? t("appLinkCancelling") : t("appLinkDeny")}
@@ -634,6 +662,9 @@ export function TelegramLinker() {
                                 {checking ? t("dmChecking") : t("dmCheck")}
                             </button>
                         ) : null}
+                        <span aria-live="polite" style={{ flexBasis: "100%", color: MUTED, overflowWrap: "anywhere" }}>
+                            {checkNote}
+                        </span>
                     </div>
                 ) : null}
                 {error ? (
