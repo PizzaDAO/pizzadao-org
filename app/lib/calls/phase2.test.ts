@@ -212,6 +212,15 @@ describe('summary generation', () => {
     expect(arg.prompt).toContain('[01:05] Ann: We ship on Friday')
   })
 
+  it('tells the model the call language when it is known', async () => {
+    m(generateText).mockResolvedValue({ output: good })
+    await generateCallSummary(segments, {}, undefined, { language: 'english' })
+    expect(m(generateText).mock.calls[0][0].prompt).toMatch(/^Call language: english\n\nTranscript:/)
+    m(generateText).mockClear()
+    await generateCallSummary(segments, {}, undefined, { language: null })
+    expect(m(generateText).mock.calls[0][0].prompt).toMatch(/^Transcript:/)
+  })
+
   it('rejects malformed model output', async () => {
     m(generateText).mockResolvedValue({ output: { title: '', summary: 'x', actionItems: [], chapters: [] } })
     await expect(generateCallSummary(segments, {})).rejects.toThrow()
