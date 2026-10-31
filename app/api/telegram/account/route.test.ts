@@ -106,7 +106,11 @@ describe("/api/telegram/account", () => {
     it("POST refuses a Telegram account linked to another member", async () => {
         tg.findUnique.mockResolvedValue({ discordId: "someone-else" });
         const p = sign({ id: 7, first_name: "T", auth_date: Math.floor(Date.now() / 1000) });
-        expect((await POST(post(p))).status).toBe(409);
+        const res = await POST(post(p));
+        expect(res.status).toBe(409);
+        const body = await res.json();
+        expect(body.code).toBe("already_linked");
+        expect(typeof body.error).toBe("string");
         expect(tg.upsert).not.toHaveBeenCalled();
     });
 

@@ -303,6 +303,26 @@ body::before {
   cursor: not-allowed;
 }
 
+/* Filled and outlined colorways for .btn-pill / .btn-pill-lg. Both flip in dark mode via the tokens. */
+.btn-pill-primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--primary));
+  text-decoration: none;
+}
+.btn-pill-primary:hover:not(:disabled) {
+  opacity: 0.88;
+}
+.btn-pill-secondary {
+  background: transparent;
+  color: hsl(var(--foreground));
+  border: 1px solid hsl(var(--rule-warm) / 0.55);
+  text-decoration: none;
+}
+.btn-pill-secondary:hover:not(:disabled) {
+  background: hsl(var(--foreground) / 0.06);
+}
+
 /* Fade-up reveal */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }

@@ -3,7 +3,8 @@
 // Link / unlink the logged-in member's Telegram account (calzone-93434).
 //
 //   GET    -> { enabled, botUsername, connected, username, firstName, lastName, photoUrl, telegramDm: { state, botUsername } }
-//   POST   -> body = Telegram Login Widget `user` object; HMAC-verified, then stored
+//   POST   -> body = Telegram Login Widget `user` object; HMAC-verified, then stored. Errors carry { error, code }
+//             (code: not_configured | invalid_auth | already_linked) so the UI can show a translated message
 //   DELETE -> unlink
 //
 // All methods require a Discord session. When TELEGRAM_LOGIN_BOT_TOKEN or
@@ -62,20 +63,20 @@ export async function POST(req: Request) {
 
     const cfg = telegramConfig();
     if (!cfg) {
-        return NextResponse.json({ error: "Telegram linking is not configured" }, { status: 503 });
+        return NextResponse.json({ error: "Telegram linking is not configured", code: "not_configured" }, { status: 503 });
     }
 
     const payload = await req.json().catch(() => null);
     const result = verifyTelegramAuth(payload, cfg.botToken);
     if (!result.ok) {
-        return NextResponse.json({ error: result.reason }, { status: 400 });
+        return NextResponse.json({ error: result.reason, code: "invalid_auth" }, { status: 400 });
     }
     const tg = result.user;
 
     const outcome = await linkTelegramAccount(discordId, tg);
     if (outcome === "conflict") {
         return NextResponse.json(
-            { error: "This Telegram account is already linked to another member" },
+            { error: "This Telegram account is already linked to another member", code: "already_linked" },
             { status: 409 },
         );
     }

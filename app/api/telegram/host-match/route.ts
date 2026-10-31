@@ -2,7 +2,7 @@
 //
 // The profile card for a suggested Telegram match (plans/telegram-shared-bot.md, part 4).
 //
-//   GET  -> { enabled, state: none|pending|awaiting|confirmed, handleHint, canSend }
+//   GET  -> { enabled, state: none|pending|awaiting|confirmed, handleHint, canSend, senderBot }
 //   POST { action: 'confirm' | 'send-confirmation' | 'decline' }
 //
 // Session-gated, 3 writes per 10 minutes per member. 'confirm' is the member's "yes, that's me" (side a):
@@ -21,12 +21,15 @@ export const dynamic = "force-dynamic";
 
 const NO_STORE = { "Cache-Control": "private, no-store" };
 
+// The shared sender bot's handle, so the card can link to it when the member hasn't started it yet.
+const senderBot = () => process.env.NEXT_PUBLIC_TELEGRAM_SENDER_BOT_USERNAME?.trim() || null;
+
 export async function GET() {
     const auth = await requireSession();
     if (!auth.ok) return auth.response;
     const card = await getCard(auth.session.discordId).catch(() => null);
     if (!card) return NextResponse.json({ enabled: false, state: "none" }, { headers: NO_STORE });
-    return NextResponse.json({ enabled: card.state !== "none", ...card }, { headers: NO_STORE });
+    return NextResponse.json({ enabled: card.state !== "none", ...card, senderBot: senderBot() }, { headers: NO_STORE });
 }
 
 export async function POST(req: Request) {
@@ -50,5 +53,5 @@ export async function POST(req: Request) {
     }
     const result = await startConfirmation(discordId, action === "send-confirmation");
     const status = result === "not-found" ? 404 : result === "wait" || result === "has-login" ? 409 : result === "try-later" ? 503 : 200;
-    return NextResponse.json({ ok: result === "sent", result, ...(await getCard(discordId).catch(() => ({ state: "none" }))) }, { status, headers: NO_STORE });
+    return NextResponse.json({ ok: result === "sent", result, senderBot: senderBot(), ...(await getCard(discordId).catch(() => ({ state: "none" }))) }, { status, headers: NO_STORE });
 }

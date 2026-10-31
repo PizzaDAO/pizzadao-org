@@ -44,7 +44,7 @@ export async function POST(req: Request) {
     }
 
     const p = await getPendingLink(discordId);
-    if (!p) return NextResponse.json({ error: "Nothing to confirm. Start again." }, { status: 404, headers: NO_STORE });
+    if (!p) return NextResponse.json({ error: "Nothing to confirm. Start again.", code: "nothing_pending" }, { status: 404, headers: NO_STORE });
 
     const outcome = await linkTelegramAccount(discordId, {
         id: p.claimant.id,
@@ -57,7 +57,7 @@ export async function POST(req: Request) {
     if (outcome === "conflict") {
         await cancelPending(discordId);
         return NextResponse.json(
-            { error: "This Telegram account is already linked to another member" },
+            { error: "This Telegram account is already linked to another member", code: "already_linked" },
             { status: 409, headers: NO_STORE },
         );
     }
