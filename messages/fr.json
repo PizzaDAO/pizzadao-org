@@ -84,6 +84,87 @@
     "tooMany": "Trop d'essais. Attendez quelques minutes et réessayez.",
     "hasLogin": "Vous avez déjà lié un compte Telegram avec le bouton de connexion, qui est prioritaire."
   },
+  "profileEdit": {
+    "backToDashboard": "← Retour au tableau de bord",
+    "viewPublic": "Voir le profil public →",
+    "loadingOverline": "§ Chargement de ton dossier",
+    "stalledOverline": "§ Quelque chose a calé",
+    "loadFailedTitle": "Impossible de charger ton profil",
+    "tryAgainLater": "Réessaie dans un instant.",
+    "deskOverline": "§ Le bureau éditorial",
+    "pageTitle": "Modifier le profil",
+    "draftThenLive": "brouillon, puis en ligne",
+    "live": "en ligne",
+    "endOverline": "§ Fin du bureau éditorial",
+    "tagline": {
+      "overline": "§ 01 · La signature",
+      "title": "Slogan",
+      "description": "Une ligne. Elle s'affiche sous ton nom sur ton profil et dans les aperçus sociaux."
+    },
+    "about": {
+      "overline": "§ 02 · À propos",
+      "title": "À propos",
+      "description": "Comment tu apparais sur ton profil public.",
+      "orgsLabel": "Organisations",
+      "orgsHint": "Séparées par des virgules. Entreprises, projets et DAO avec lesquels tu travailles.",
+      "orgsPlaceholder": "p. ex. PizzaDAO, Brooklyn Pizza Lab",
+      "skillsLabel": "Compétences",
+      "skillsHint": "Séparées par des virgules. Ce avec quoi tu peux aider la DAO.",
+      "skillsPlaceholder": "p. ex. solidity, design, montage vidéo"
+    },
+    "connections": {
+      "overline": "§ 03 · Connexions",
+      "title": "Connexions",
+      "description": "Connecte tes comptes sociaux pour que la communauté puisse te trouver et se porter garante de toi."
+    },
+    "links": {
+      "overline": "§ 04 · Liens",
+      "title": "Liens du profil",
+      "description": "Ajoute ton site web, ton portfolio et d'autres liens."
+    },
+    "languageOverline": "§ 05 · Langue",
+    "emailOverline": "§ 05b · E-mail",
+    "wallets": {
+      "overline": "§ 06 · Portefeuilles",
+      "title": "Portefeuilles",
+      "description": "La gestion des portefeuilles a désormais sa propre page.",
+      "manage": "Gérer les portefeuilles →"
+    },
+    "save": "Enregistrer",
+    "saving": "Enregistrement…",
+    "saved": "§ Enregistré",
+    "tooLongKeep": "Trop long : reste sous {max} caractères.",
+    "tooLongMax": "Trop long : {max} caractères maximum.",
+    "saveFailedStatus": "Échec de l'enregistrement ({status})",
+    "networkError": "Erreur réseau : réessaie.",
+    "retry": "Réessayer",
+    "x": {
+      "ariaLabel": "X (Twitter)",
+      "loading": "Chargement de ton compte X…",
+      "loadFailed": "Impossible de charger ton compte X.",
+      "prompt": "Connecte ton compte X",
+      "connect": "Connecter X",
+      "connected": "Connecté",
+      "disconnect": "Déconnecter",
+      "disconnecting": "Déconnexion…",
+      "disconnectFailed": "Échec de la déconnexion ({status})"
+    },
+    "social": {
+      "title": "Comptes sociaux",
+      "xLabel": "X",
+      "xManualLabel": "X (non vérifié)",
+      "farcasterLabel": "Farcaster",
+      "xPlaceholder": "@pseudo",
+      "farcasterPlaceholder": "pseudo",
+      "connect": "Connecter",
+      "disconnect": "Déconnecter",
+      "saving": "Enregistrement…",
+      "loading": "Chargement des comptes sociaux…",
+      "loadFailed": "Impossible de charger tes comptes sociaux.",
+      "saveFailed": "Échec de la connexion",
+      "disconnectFailed": "Échec de la déconnexion"
+    }
+  },
   "language": {
     "sectionTitle": "Langue",
     "description": "Choisis la langue dans laquelle l'application s'adresse à toi.",

@@ -84,6 +84,87 @@
     "tooMany": "Too many tries. Wait a few minutes and try again.",
     "hasLogin": "You already linked a Telegram account with the login button, which takes priority."
   },
+  "profileEdit": {
+    "backToDashboard": "← Back to dashboard",
+    "viewPublic": "View public profile →",
+    "loadingOverline": "§ Pulling your dossier",
+    "stalledOverline": "§ Something stalled",
+    "loadFailedTitle": "Couldn't load your profile",
+    "tryAgainLater": "Please try again in a moment.",
+    "deskOverline": "§ The editorial desk",
+    "pageTitle": "Edit profile",
+    "draftThenLive": "draft, then live",
+    "live": "live",
+    "endOverline": "§ End of the editorial desk",
+    "tagline": {
+      "overline": "§ 01 · The byline",
+      "title": "Tagline",
+      "description": "One line. Shows under your name on your profile and in social previews."
+    },
+    "about": {
+      "overline": "§ 02 · About",
+      "title": "About",
+      "description": "How you show up on your public profile.",
+      "orgsLabel": "Orgs",
+      "orgsHint": "Comma-separated. Companies, projects, DAOs you work with.",
+      "orgsPlaceholder": "e.g. PizzaDAO, Brooklyn Pizza Lab",
+      "skillsLabel": "Skills",
+      "skillsHint": "Comma-separated. What you can help the DAO with.",
+      "skillsPlaceholder": "e.g. solidity, design, video editing"
+    },
+    "connections": {
+      "overline": "§ 03 · Connections",
+      "title": "Connections",
+      "description": "Connect your social accounts so the community can find and vouch for you."
+    },
+    "links": {
+      "overline": "§ 04 · Links",
+      "title": "Profile links",
+      "description": "Add your website, portfolio, and other links."
+    },
+    "languageOverline": "§ 05 · Language",
+    "emailOverline": "§ 05b · Email",
+    "wallets": {
+      "overline": "§ 06 · Wallets",
+      "title": "Wallets",
+      "description": "Wallet management has its own page now.",
+      "manage": "Manage wallets →"
+    },
+    "save": "Save",
+    "saving": "Saving…",
+    "saved": "§ Saved",
+    "tooLongKeep": "Too long — keep under {max} characters.",
+    "tooLongMax": "Too long — max {max} characters.",
+    "saveFailedStatus": "Failed to save ({status})",
+    "networkError": "Network error — please try again.",
+    "retry": "Retry",
+    "x": {
+      "ariaLabel": "X (Twitter)",
+      "loading": "Loading your X account…",
+      "loadFailed": "Couldn't load your X account.",
+      "prompt": "Connect your X account",
+      "connect": "Connect X",
+      "connected": "Connected",
+      "disconnect": "Disconnect",
+      "disconnecting": "Disconnecting…",
+      "disconnectFailed": "Failed to disconnect ({status})"
+    },
+    "social": {
+      "title": "Social accounts",
+      "xLabel": "X",
+      "xManualLabel": "X (not verified)",
+      "farcasterLabel": "Farcaster",
+      "xPlaceholder": "@handle",
+      "farcasterPlaceholder": "username",
+      "connect": "Connect",
+      "disconnect": "Disconnect",
+      "saving": "Saving…",
+      "loading": "Loading social accounts…",
+      "loadFailed": "Couldn't load your social accounts.",
+      "saveFailed": "Failed to connect",
+      "disconnectFailed": "Failed to disconnect"
+    }
+  },
   "language": {
     "sectionTitle": "Language",
     "description": "Choose the language the app uses to talk to you.",

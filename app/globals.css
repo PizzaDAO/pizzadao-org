@@ -303,6 +303,18 @@ body::before {
   cursor: not-allowed;
 }
 
+/* Filled / outlined variants. Both use theme tokens so they flip in dark mode. */
+.btn-pill-primary {
+  background: hsl(var(--primary));
+  color: hsl(var(--primary-foreground));
+  border: 1px solid hsl(var(--primary));
+}
+.btn-pill-secondary {
+  background: hsl(var(--secondary));
+  color: hsl(var(--secondary-foreground));
+  border: 1px solid hsl(var(--foreground) / 0.25);
+}
+
 /* Fade-up reveal */
 @keyframes fadeUp {
   from { opacity: 0; transform: translateY(14px); }
