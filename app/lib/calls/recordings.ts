@@ -304,7 +304,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
   const startedAt = new Date()
   const rec = await prisma.callRecording.findUnique({
     where: { id },
-    select: { id: true, status: true, transcript: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
+    select: { id: true, status: true, transcript: true, transcriptLanguage: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
   })
   if (!rec || rec.status === 'REJECTED') return 'skipped'
   // Never leave a fresh row stuck in PROCESSING/RECORDED; never touch a row rejected meanwhile.
@@ -319,7 +319,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
   // Claim an attempt BEFORE the model call: if the function is killed mid-call, the attempt is still counted and the sweep cannot loop forever.
   await prisma.callRecording.updateMany({ where: { id, summary: null, summaryEditedAt: null }, data: { summaryAttempts: { increment: 1 } } }).catch(() => {})
   try {
-    const out = await generateCallSummary(segments, buildSpeakerNames(rec.speakers, segments), undefined, { budgetMs: opts.budgetMs ?? DEFAULT_SUMMARY_BUDGET_MS })
+    const out = await generateCallSummary(segments, buildSpeakerNames(rec.speakers, segments), undefined, { budgetMs: opts.budgetMs ?? DEFAULT_SUMMARY_BUDGET_MS, language: rec.transcriptLanguage })
     const data = {
       title: out.title,
       summary: out.summary,
