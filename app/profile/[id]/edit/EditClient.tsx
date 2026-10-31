@@ -192,19 +192,12 @@ function TextEditor({
                 }),
             });
             if (!res.ok) {
-                let msg = t("saveFailedStatus", { status: res.status });
-                try {
-                    const body = await res.json();
-                    if (body?.error) msg = String(body.error);
-                } catch {
-                    /* swallow */
-                }
-                setError(msg);
+                setError(t("saveFailedStatus", { status: res.status }));
                 return;
             }
             setSavedAt(Date.now());
-        } catch (e) {
-            setError(e instanceof Error ? e.message : t("networkError"));
+        } catch {
+            setError(t("networkError"));
         } finally {
             setSaving(false);
         }
@@ -277,20 +270,28 @@ function TextEditor({
 // X connect / disconnect.
 // ---------------------------------------------------------------------------
 
-function XAccountEditor({ memberId }: { memberId: string }) {
+type XAccountState = {
+    connected: boolean;
+    username?: string;
+    displayName?: string;
+};
+
+function XAccountEditor({
+    memberId,
+    xConfigured,
+}: {
+    memberId: string;
+    xConfigured: boolean;
+}) {
     const t = useTranslations("profileEdit.x");
     const tRoot = useTranslations("profileEdit");
-    const { data, refetch, isLoading } = useXAccount(memberId);
-    const [account, setAccount] = useState<
-        | { connected: boolean; username?: string; displayName?: string }
-        | null
-    >(null);
+    const { data, refetch, isLoading, isFetching } = useXAccount(memberId);
+    // Local override (after a disconnect) wins over the query data; deriving
+    // it avoids a render where data has loaded but account is still null.
+    const [override, setOverride] = useState<XAccountState | null>(null);
+    const account: XAccountState | null = override ?? data ?? null;
     const [busy, setBusy] = useState(false);
     const [error, setError] = useState<string | null>(null);
-
-    useEffect(() => {
-        if (data) setAccount(data);
-    }, [data]);
 
     const onDisconnect = async () => {
         setError(null);
@@ -298,20 +299,13 @@ function XAccountEditor({ memberId }: { memberId: string }) {
         try {
             const res = await fetch("/api/x/disconnect", { method: "DELETE" });
             if (!res.ok) {
-                let msg = t("disconnectFailed", { status: res.status });
-                try {
-                    const body = await res.json();
-                    if (body?.error) msg = String(body.error);
-                } catch {
-                    /* swallow */
-                }
-                setError(msg);
+                setError(t("disconnectFailed", { status: res.status }));
                 return;
             }
-            setAccount({ connected: false });
+            setOverride({ connected: false });
             refetch();
-        } catch (e) {
-            setError(e instanceof Error ? e.message : tRoot("networkError"));
+        } catch {
+            setError(tRoot("networkError"));
         } finally {
             setBusy(false);
         }
@@ -371,10 +365,11 @@ function XAccountEditor({ memberId }: { memberId: string }) {
                         <button
                             type="button"
                             onClick={() => refetch()}
+                            disabled={isFetching}
                             className="btn-pill btn-pill-secondary"
                             style={BTN_SIZE}
                         >
-                            {tRoot("retry")}
+                            {isFetching ? t("retrying") : tRoot("retry")}
                         </button>
                     </div>
                 ) : account.connected ? (
@@ -438,15 +433,17 @@ function XAccountEditor({ memberId }: { memberId: string }) {
                                 color: "hsl(var(--foreground) / 0.65)",
                             }}
                         >
-                            {t("prompt")}
+                            {xConfigured ? t("prompt") : t("unavailable")}
                         </span>
-                        <a
-                            href={`/api/x/login?memberId=${memberId}`}
-                            className="btn-pill btn-pill-primary"
-                            style={BTN_SIZE}
-                        >
-                            {t("connect")}
-                        </a>
+                        {xConfigured ? (
+                            <a
+                                href={`/api/x/login?memberId=${memberId}`}
+                                className="btn-pill btn-pill-primary"
+                                style={BTN_SIZE}
+                            >
+                                {t("connect")}
+                            </a>
+                        ) : null}
                     </div>
                 )}
             </div>
@@ -498,13 +495,22 @@ function EmailSection() {
 // EditClient — the page body.
 // ---------------------------------------------------------------------------
 
-export function EditClient({ memberId }: { memberId: string }) {
+export function EditClient({
+    memberId,
+    xConfigured,
+}: {
+    memberId: string;
+    xConfigured: boolean;
+}) {
     const t = useTranslations("profileEdit");
     const { data: userData, isLoading, error } = useUserData(memberId);
-    // Shared (cached) query with XAccountEditor. The manual X row below is
-    // hidden only once the verified X card has loaded.
+    // Shared (cached) query with XAccountEditor. The manual X row is hidden
+    // only when the verified X card can actually be used: X sign-in is
+    // configured (or the member is already connected) and the lookup loaded.
     const { data: xAccount } = useXAccount(memberId);
-    const verifiedXAvailable = typeof xAccount?.connected === "boolean";
+    const verifiedXAvailable =
+        typeof xAccount?.connected === "boolean" &&
+        (xConfigured || xAccount.connected === true);
 
     const orgsInitial = useMemo(
         () => String((userData as any)?.["Orgs"] ?? "") || "",
@@ -679,7 +685,7 @@ export function EditClient({ memberId }: { memberId: string }) {
                     title={t("connections.title")}
                     description={t("connections.description")}
                 >
-                    <XAccountEditor memberId={memberId} />
+                    <XAccountEditor memberId={memberId} xConfigured={xConfigured} />
                     <TelegramLinker />
                     <SocialAccountLinker
                         memberId={memberId}

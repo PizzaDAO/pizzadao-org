@@ -147,7 +147,9 @@
       "connected": "Connected",
       "disconnect": "Disconnect",
       "disconnecting": "Disconnecting…",
-      "disconnectFailed": "Failed to disconnect ({status})"
+      "disconnectFailed": "Failed to disconnect ({status})",
+      "unavailable": "Connecting X isn't available right now.",
+      "retrying": "Retrying…"
     },
     "social": {
       "title": "Social accounts",
@@ -158,11 +160,13 @@
       "farcasterPlaceholder": "username",
       "connect": "Connect",
       "disconnect": "Disconnect",
-      "saving": "Saving…",
+      "saving": "Connecting…",
       "loading": "Loading social accounts…",
       "loadFailed": "Couldn't load your social accounts.",
       "saveFailed": "Failed to connect",
-      "disconnectFailed": "Failed to disconnect"
+      "disconnectFailed": "Failed to disconnect",
+      "disconnecting": "Disconnecting…",
+      "authFailed": "Please sign in again to change this."
     }
   },
   "language": {

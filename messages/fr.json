@@ -87,10 +87,10 @@
   "profileEdit": {
     "backToDashboard": "← Retour au tableau de bord",
     "viewPublic": "Voir le profil public →",
-    "loadingOverline": "§ Chargement de ton dossier",
+    "loadingOverline": "§ Chargement de votre dossier",
     "stalledOverline": "§ Quelque chose a calé",
-    "loadFailedTitle": "Impossible de charger ton profil",
-    "tryAgainLater": "Réessaie dans un instant.",
+    "loadFailedTitle": "Impossible de charger votre profil",
+    "tryAgainLater": "Réessayez dans un instant.",
     "deskOverline": "§ Le bureau éditorial",
     "pageTitle": "Modifier le profil",
     "draftThenLive": "brouillon, puis en ligne",
@@ -99,55 +99,57 @@
     "tagline": {
       "overline": "§ 01 · La signature",
       "title": "Slogan",
-      "description": "Une ligne. Elle s'affiche sous ton nom sur ton profil et dans les aperçus sociaux."
+      "description": "Une ligne. Elle s'affiche sous votre nom sur votre profil et dans les aperçus sociaux."
     },
     "about": {
       "overline": "§ 02 · À propos",
       "title": "À propos",
-      "description": "Comment tu apparais sur ton profil public.",
+      "description": "Comment vous apparaissez sur votre profil public.",
       "orgsLabel": "Organisations",
-      "orgsHint": "Séparées par des virgules. Entreprises, projets et DAO avec lesquels tu travailles.",
+      "orgsHint": "Séparées par des virgules. Entreprises, projets et DAO avec lesquels vous travaillez.",
       "orgsPlaceholder": "p. ex. PizzaDAO, Brooklyn Pizza Lab",
       "skillsLabel": "Compétences",
-      "skillsHint": "Séparées par des virgules. Ce avec quoi tu peux aider la DAO.",
+      "skillsHint": "Séparées par des virgules. Ce avec quoi vous pouvez aider la DAO.",
       "skillsPlaceholder": "p. ex. solidity, design, montage vidéo"
     },
     "connections": {
       "overline": "§ 03 · Connexions",
       "title": "Connexions",
-      "description": "Connecte tes comptes sociaux pour que la communauté puisse te trouver et se porter garante de toi."
+      "description": "Connectez vos comptes sociaux pour que la communauté puisse vous trouver et se porter garante de vous."
     },
     "links": {
       "overline": "§ 04 · Liens",
       "title": "Liens du profil",
-      "description": "Ajoute ton site web, ton portfolio et d'autres liens."
+      "description": "Ajoutez votre site web, votre portfolio et d'autres liens."
     },
     "languageOverline": "§ 05 · Langue",
     "emailOverline": "§ 05b · E-mail",
     "wallets": {
-      "overline": "§ 06 · Portefeuilles",
-      "title": "Portefeuilles",
-      "description": "La gestion des portefeuilles a désormais sa propre page.",
-      "manage": "Gérer les portefeuilles →"
+      "overline": "§ 06 · Wallets",
+      "title": "Wallets",
+      "description": "La gestion des wallets a désormais sa propre page.",
+      "manage": "Gérer les wallets →"
     },
     "save": "Enregistrer",
     "saving": "Enregistrement…",
     "saved": "§ Enregistré",
-    "tooLongKeep": "Trop long : reste sous {max} caractères.",
+    "tooLongKeep": "Trop long : restez sous {max} caractères.",
     "tooLongMax": "Trop long : {max} caractères maximum.",
     "saveFailedStatus": "Échec de l'enregistrement ({status})",
-    "networkError": "Erreur réseau : réessaie.",
+    "networkError": "Erreur réseau : réessayez.",
     "retry": "Réessayer",
     "x": {
       "ariaLabel": "X (Twitter)",
-      "loading": "Chargement de ton compte X…",
-      "loadFailed": "Impossible de charger ton compte X.",
-      "prompt": "Connecte ton compte X",
+      "loading": "Chargement de votre compte X…",
+      "loadFailed": "Impossible de charger votre compte X.",
+      "prompt": "Connectez votre compte X",
       "connect": "Connecter X",
       "connected": "Connecté",
       "disconnect": "Déconnecter",
       "disconnecting": "Déconnexion…",
-      "disconnectFailed": "Échec de la déconnexion ({status})"
+      "disconnectFailed": "Échec de la déconnexion ({status})",
+      "unavailable": "La connexion de X n'est pas disponible pour le moment.",
+      "retrying": "Nouvelle tentative…"
     },
     "social": {
       "title": "Comptes sociaux",
@@ -158,19 +160,21 @@
       "farcasterPlaceholder": "pseudo",
       "connect": "Connecter",
       "disconnect": "Déconnecter",
-      "saving": "Enregistrement…",
+      "saving": "Connexion…",
       "loading": "Chargement des comptes sociaux…",
-      "loadFailed": "Impossible de charger tes comptes sociaux.",
+      "loadFailed": "Impossible de charger vos comptes sociaux.",
       "saveFailed": "Échec de la connexion",
-      "disconnectFailed": "Échec de la déconnexion"
+      "disconnectFailed": "Échec de la déconnexion",
+      "disconnecting": "Déconnexion…",
+      "authFailed": "Reconnectez-vous pour modifier ceci."
     }
   },
   "language": {
     "sectionTitle": "Langue",
-    "description": "Choisis la langue dans laquelle l'application s'adresse à toi.",
+    "description": "Choisissez la langue dans laquelle l'application s'adresse à vous.",
     "selectLabel": "Langue d'affichage",
     "saveButton": "Enregistrer la langue",
-    "saveError": "Impossible d'enregistrer ta langue. Réessayer ?",
+    "saveError": "Impossible d'enregistrer votre langue. Réessayer ?",
     "names": {
       "en": "English",
       "es": "Español",
@@ -1397,21 +1401,21 @@
     },
     "prefs": {
       "sectionTitle": "E-mail",
-      "description": "Une courte note hebdomadaire avec ta prochaine mission, les appels de tes crews et ta progression de niveau. Envoyée uniquement à une adresse confirmée pour laquelle tu t'inscris.",
+      "description": "Une courte note hebdomadaire avec votre prochaine mission, les appels de vos crews et votre progression de niveau. Envoyée uniquement à une adresse confirmée pour laquelle vous vous inscrivez.",
       "label": "M'envoyer l'e-mail hebdomadaire PizzaDAO",
-      "saveError": "Impossible d'enregistrer ta préférence e-mail. Réessayer ?",
+      "saveError": "Impossible d'enregistrer votre préférence e-mail. Réessayer ?",
       "saved": "Enregistré",
       "emailLabel": "Adresse e-mail",
       "optIn": "Recevoir un résumé hebdomadaire PizzaDAO",
       "save": "Enregistrer",
       "verified": "Confirmée",
-      "pending": "Vérifie ta boîte de réception pour confirmer cette adresse.",
+      "pending": "Vérifiez votre boîte de réception pour confirmer cette adresse.",
       "resend": "Renvoyer la confirmation",
-      "invalidEmail": "Saisis une adresse e-mail valide.",
-      "tooSoon": "Une confirmation vient d'être envoyée. Réessaie dans quelques minutes.",
-      "sendFailed": "Enregistré, mais l'envoi de la confirmation a échoué. Réessaie plus tard.",
-      "loadError": "Impossible de charger tes réglages e-mail. Recharge la page pour réessayer.",
-      "tooMany": "Trop d'e-mails de confirmation. Réessaie demain."
+      "invalidEmail": "Saisissez une adresse e-mail valide.",
+      "tooSoon": "Une confirmation vient d'être envoyée. Réessayez dans quelques minutes.",
+      "sendFailed": "Enregistré, mais l'envoi de la confirmation a échoué. Réessayez plus tard.",
+      "loadError": "Impossible de charger vos réglages e-mail. Rechargez la page pour réessayer.",
+      "tooMany": "Trop d'e-mails de confirmation. Réessayez demain."
     },
     "confirm": {
       "subject": "Confirme ton e-mail pour le résumé hebdomadaire PizzaDAO",

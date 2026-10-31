@@ -68,6 +68,9 @@ export function SocialAccountLinker({
   const [twitterHandle, setTwitterHandle] = useState("");
   const [farcasterHandle, setFarcasterHandle] = useState("");
   const [saving, setSaving] = useState<string | null>(null);
+  const [savingAction, setSavingAction] = useState<"connect" | "disconnect">(
+    "connect"
+  );
   const [error, setError] = useState<string | null>(null);
   const [loadState, setLoadState] = useState<"loading" | "ready" | "error">(
     "loading"
@@ -112,11 +115,15 @@ export function SocialAccountLinker({
     load();
   }, [load]);
 
+  const failureMessage = (status: number, fallback: string) =>
+    status === 401 || status === 403 ? t("authFailed") : fallback;
+
   const saveAccount = async (
     platform: "TWITTER" | "FARCASTER",
     handle: string
   ) => {
     setSaving(platform);
+    setSavingAction("connect");
     setError(null);
 
     try {
@@ -132,8 +139,9 @@ export function SocialAccountLinker({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || t("saveFailed"));
+        // Server text is English-only; show a translated message by status.
+        setError(failureMessage(res.status, t("saveFailed")));
+        return;
       }
 
       // Update local state
@@ -149,8 +157,8 @@ export function SocialAccountLinker({
       onAccountChange?.(
         newAccounts.map((a) => ({ platform: a.platform, handle: a.handle }))
       );
-    } catch (err: unknown) {
-      setError((err as Error).message || t("saveFailed"));
+    } catch {
+      setError(tRoot("networkError"));
     } finally {
       setSaving(null);
     }
@@ -158,6 +166,7 @@ export function SocialAccountLinker({
 
   const unlinkAccount = async (platform: "TWITTER" | "FARCASTER") => {
     setSaving(platform);
+    setSavingAction("disconnect");
     setError(null);
 
     try {
@@ -169,8 +178,8 @@ export function SocialAccountLinker({
       });
 
       if (!res.ok) {
-        const data = await res.json();
-        throw new Error(data.error || t("disconnectFailed"));
+        setError(failureMessage(res.status, t("disconnectFailed")));
+        return;
       }
 
       const newAccounts = accounts.filter((a) => a.platform !== platform);
@@ -180,8 +189,8 @@ export function SocialAccountLinker({
       );
       if (platform === "TWITTER") setTwitterHandle("");
       if (platform === "FARCASTER") setFarcasterHandle("");
-    } catch (err: unknown) {
-      setError((err as Error).message || t("disconnectFailed"));
+    } catch {
+      setError(tRoot("networkError"));
     } finally {
       setSaving(null);
     }
@@ -192,15 +201,19 @@ export function SocialAccountLinker({
     return (
       <div
         role="status"
-        aria-label={t("loading")}
         style={{
           ...cardChrome(),
           gridColumn: "1 / -1",
-          height: 52,
+          height: 74,
           boxSizing: "border-box",
-          opacity: 0.6,
+          display: "flex",
+          alignItems: "center",
+          fontSize: 13,
+          color: "hsl(var(--foreground) / 0.65)",
         }}
-      />
+      >
+        {t("loading")}
+      </div>
     );
   }
 
@@ -249,6 +262,8 @@ export function SocialAccountLinker({
   ) => {
     const inputId = `${baseId}-${platform}`;
     const busy = saving === platform;
+    const connecting = busy && savingAction === "connect";
+    const disconnecting = busy && savingAction === "disconnect";
     return (
       <div
         style={{
@@ -276,6 +291,7 @@ export function SocialAccountLinker({
           value={value}
           onChange={(e) => setValue(e.target.value)}
           placeholder={placeholder}
+          maxLength={100}
           style={{ ...inputStyle(), flex: 1, minWidth: 150 }}
         />
         <button
@@ -285,7 +301,7 @@ export function SocialAccountLinker({
           className="btn-pill btn-pill-primary"
           style={BUTTON_BASE}
         >
-          {busy ? t("saving") : t("connect")}
+          {connecting ? t("saving") : t("connect")}
         </button>
         {hasAccount && (
           <button
@@ -295,7 +311,7 @@ export function SocialAccountLinker({
             className="btn-pill btn-pill-secondary"
             style={BUTTON_BASE}
           >
-            {t("disconnect")}
+            {disconnecting ? t("disconnecting") : t("disconnect")}
           </button>
         )}
       </div>
@@ -306,6 +322,7 @@ export function SocialAccountLinker({
 
   return (
     <div style={{ ...cardChrome(), gridColumn: "1 / -1" }}>
+      <h3 style={{ margin: 0 }}>
       <button
         type="button"
         onClick={() => setExpanded(!expanded)}
@@ -369,6 +386,7 @@ export function SocialAccountLinker({
           ▼
         </span>
       </button>
+      </h3>
 
       {!expanded && linkedCount > 0 && (
         <div
@@ -381,14 +399,19 @@ export function SocialAccountLinker({
         >
           {accounts.map((a) => (
             <span key={a.platform} style={chip()}>
-              {a.platform === "TWITTER" ? "X" : "Farcaster"}: @{a.handle}
+              {a.platform === "TWITTER" ? t("xLabel") : t("farcasterLabel")}: @
+              {a.handle}
             </span>
           ))}
         </div>
       )}
 
-      {expanded && (
-        <div id={panelId} style={{ display: "grid", gap: 12 }}>
+      {(
+        <div
+          id={panelId}
+          hidden={!expanded}
+          style={{ display: expanded ? "grid" : "none", gap: 12 }}
+        >
           {error && (
             <div
               role="alert"
@@ -405,7 +428,7 @@ export function SocialAccountLinker({
             </div>
           )}
 
-          {!hideManualX &&
+          {(!hideManualX || hasTwitter) &&
             renderRow(
               "TWITTER",
               t("xManualLabel"),

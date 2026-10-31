@@ -125,10 +125,10 @@
     "languageOverline": "§ 05 · Idioma",
     "emailOverline": "§ 05b · Correo",
     "wallets": {
-      "overline": "§ 06 · Carteras",
-      "title": "Carteras",
-      "description": "La gestión de carteras ahora tiene su propia página.",
-      "manage": "Gestionar carteras →"
+      "overline": "§ 06 · Wallets",
+      "title": "Wallets",
+      "description": "La gestión de wallets ahora tiene su propia página.",
+      "manage": "Gestionar wallets →"
     },
     "save": "Guardar",
     "saving": "Guardando…",
@@ -147,7 +147,9 @@
       "connected": "Conectada",
       "disconnect": "Desconectar",
       "disconnecting": "Desconectando…",
-      "disconnectFailed": "No se pudo desconectar ({status})"
+      "disconnectFailed": "No se pudo desconectar ({status})",
+      "unavailable": "Conectar X no está disponible por ahora.",
+      "retrying": "Reintentando…"
     },
     "social": {
       "title": "Cuentas sociales",
@@ -158,11 +160,13 @@
       "farcasterPlaceholder": "usuario",
       "connect": "Conectar",
       "disconnect": "Desconectar",
-      "saving": "Guardando…",
+      "saving": "Conectando…",
       "loading": "Cargando cuentas sociales…",
       "loadFailed": "No se pudieron cargar tus cuentas sociales.",
       "saveFailed": "No se pudo conectar",
-      "disconnectFailed": "No se pudo desconectar"
+      "disconnectFailed": "No se pudo desconectar",
+      "disconnecting": "Desconectando…",
+      "authFailed": "Inicia sesión de nuevo para cambiar esto."
     }
   },
   "language": {

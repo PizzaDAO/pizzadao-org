@@ -7,18 +7,18 @@ import { SocialAccountLinker } from "./SocialAccountLinker";
 
 let failFirst = false;
 let calls = 0;
+let stored: { platform: string; handle: string; verified: boolean }[] = [];
 
 beforeEach(() => {
     calls = 0;
+    stored = [{ platform: "TWITTER", handle: "someone", verified: false }];
     vi.stubGlobal(
         "fetch",
         vi.fn(async () => {
             calls++;
             if (failFirst && calls === 1) return new Response("{}", { status: 500 });
             return new Response(
-                JSON.stringify({
-                    accounts: [{ platform: "TWITTER", handle: "someone", verified: false }],
-                }),
+                JSON.stringify({ accounts: stored }),
                 { status: 200 }
             );
         })
@@ -37,11 +37,21 @@ describe("SocialAccountLinker", () => {
         expect(screen.getByLabelText("Farcaster")).toBeTruthy();
     });
 
-    it("hides the manual X row but keeps the stored handle visible when verified X is available", async () => {
+    it("keeps a stored manual X row (changeable) even when verified X is available", async () => {
         failFirst = false;
         renderWithIntl(<SocialAccountLinker memberId="1" hideManualX />);
         const toggle = await screen.findByRole("button", { name: /Social accounts/ });
         expect(screen.getByText(/@someone/)).toBeTruthy();
+        fireEvent.click(toggle);
+        expect(screen.getByLabelText("X (not verified)")).toBeTruthy();
+        expect(screen.getByRole("button", { name: "Disconnect" })).toBeTruthy();
+    });
+
+    it("hides the manual X row when verified X is available and nothing is stored", async () => {
+        failFirst = false;
+        stored = [];
+        renderWithIntl(<SocialAccountLinker memberId="1" hideManualX />);
+        const toggle = await screen.findByRole("button", { name: /Social accounts/ });
         fireEvent.click(toggle);
         expect(screen.queryByLabelText("X (not verified)")).toBeNull();
         expect(screen.getByLabelText("Farcaster")).toBeTruthy();
