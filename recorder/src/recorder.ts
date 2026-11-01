@@ -12,7 +12,7 @@ import path from 'node:path'
 import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
 import type { Config } from './config.js'
-import { consentNotice, lateJoinReminder } from './consent.js'
+import { consentNotice, lateJoinWelcome } from './consent.js'
 import {
   decideWindowAction,
   eventKey,
@@ -365,7 +365,7 @@ export class CallRecorder {
 
   // ---- helpers ---------------------------------------------------------
 
-  /** Late joiners get a one-line reminder (once per person per call). */
+  /** Late joiners get a one-line welcome (once per person per call). */
   onVoiceState(oldState: VoiceState, newState: VoiceState): void {
     const s = this.current
     if (!s || s.stopping) return
@@ -375,7 +375,7 @@ export class CallRecorder {
     void (async () => {
       if (await this.isBot(newState.id)) return
       const channel = newState.channel
-      if (channel) await this.send(channel, lateJoinReminder(newState.id), [newState.id])
+      if (channel) await this.send(channel, lateJoinWelcome(newState.id), [newState.id])
     })()
   }
 

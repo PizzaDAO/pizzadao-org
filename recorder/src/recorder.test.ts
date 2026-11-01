@@ -43,7 +43,7 @@ vi.mock('./finalize.js', async (orig) => ({ ...(await orig<typeof import('./fina
 
 import { CallRecorder } from './recorder.js'
 import { NicknameManager, recNickname, stripRecMark } from './nickname.js'
-import { consentNotice, lateJoinReminder } from './consent.js'
+import { consentNotice, lateJoinWelcome } from './consent.js'
 import { chatMessages, readManifest } from './manifest.js'
 
 const CHANNEL = '823956905739026442'
@@ -335,10 +335,13 @@ describe('NicknameManager', () => {
 
 describe('consent text', () => {
   it('says the call is recorded and transcribed and never mentions opt-out', () => {
-    for (const t of [consentNotice(), lateJoinReminder('1')]) {
-      expect(t).toMatch(/recorded and transcribed/)
-      expect(t).not.toMatch(/opt|\/record/i)
-    }
+    const t = consentNotice()
+    expect(t).toMatch(/recorded and transcribed/)
+    expect(t).not.toMatch(/opt|\/record/i)
+  })
+
+  it('welcomes late joiners by mention', () => {
+    expect(lateJoinWelcome('1')).toBe('Welcome to the call, <@1>!')
   })
 })
 
