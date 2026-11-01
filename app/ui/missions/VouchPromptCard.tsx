@@ -76,7 +76,7 @@ export function VouchPromptCard({ onDismiss }: Props) {
             color: "hsl(var(--foreground))",
           }}
         >
-          Ask 3 members to vouch for you
+          Ask a member to vouch for you
         </h3>
       </div>
 

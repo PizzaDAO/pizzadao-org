@@ -18,7 +18,7 @@ vi.mock('@/app/lib/db', () => {
 })
 vi.mock('./signals', () => ({ signalsFor: vi.fn(async () => ({ rsvFlagged: false, fastEligible: false })) }))
 vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(async () => 30) }))
-vi.mock('@/app/lib/disavow/constants', () => ({ disavowEnabled: vi.fn(() => true) }))
+vi.mock('@/app/lib/disavow/constants', () => ({ disavowEnabled: vi.fn(async () => true) }))
 vi.mock('@/app/lib/proposals/constants', () => ({ proposalsEnabled: vi.fn(async () => false) }))
 vi.mock('@/app/lib/disavow/match', () => ({
   viewerIdentifiers: vi.fn(async () => [{ kind: 'DISCORD_ID', value: '1' }]),
@@ -42,7 +42,7 @@ const base = (over: Record<string, unknown> = {}) => ({
 beforeEach(() => {
   vi.clearAllMocks()
   process.env.PAYMENTS_HASH_SECRET = 'test-secret-value'
-  m(disavowEnabled).mockReturnValue(true)
+  m(disavowEnabled).mockResolvedValue(true)
   m(prisma.paymentRequest.findUnique).mockResolvedValue(base())
   m(prisma.paymentRequest.findFirst).mockResolvedValue(null)
   m(prisma.paymentRequest.findMany).mockResolvedValue([])
@@ -237,7 +237,7 @@ describe('evaluateRequest: claims, resets, approved requests, AI', () => {
   })
 
   it('says so when the restricted list is switched off', async () => {
-    m(disavowEnabled).mockReturnValue(false)
+    m(disavowEnabled).mockResolvedValue(false)
     const r = await evaluateRequest('req1', { policy: policy() })
     expect(r?.flags.find((f) => f.id === 'restricted_check_off')?.severity).toBe('info')
     expect(prisma.disavowIdentifier.findMany).not.toHaveBeenCalled()

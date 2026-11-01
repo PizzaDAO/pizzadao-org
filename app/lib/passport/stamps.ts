@@ -38,7 +38,7 @@ async function memberIdOrNull(discordId: string): Promise<string | null> {
 }
 
 async function isDisallowed(discordId: string): Promise<boolean> {
-  if (!disavowEnabled()) return false
+  if (!(await disavowEnabled())) return false
   try {
     return await isDisavowSubject(discordId)
   } catch {

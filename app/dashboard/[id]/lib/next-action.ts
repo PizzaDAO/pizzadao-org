@@ -128,7 +128,7 @@ export function resolveNextAction(input: NextActionInput): NextAction {
   if (vouches.total < 3) {
     return {
       kind: "get_vouches",
-      headline: "Build your reputation — ask 3 members to vouch",
+      headline: "Build your reputation — ask a member to vouch",
       primaryCta: { label: "Get vouches", href: "/vouches/discover" },
     };
   }
