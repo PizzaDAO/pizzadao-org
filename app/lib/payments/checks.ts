@@ -47,7 +47,7 @@ async function restrictedMatchesOne(discordId: string | null, memberId: string |
 
 /** Checks the requester AND every linked account against the restricted list. */
 async function restrictedMatches(discordIds: string[], memberId: string | null): Promise<{ ids: string[]; failed: boolean; off: boolean }> {
-  if (!disavowEnabled()) return { ids: [], failed: false, off: true }
+  if (!(await disavowEnabled())) return { ids: [], failed: false, off: true }
   const subjects: Array<[string | null, string | null]> = discordIds.slice(0, 6).map((d) => [d, null])
   if (subjects.length === 0 && memberId) subjects.push([null, memberId])
   try {

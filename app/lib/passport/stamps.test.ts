@@ -12,7 +12,7 @@ const db = vi.hoisted(() => {
 })
 vi.mock('@/app/lib/db', () => ({ prisma: db.prisma }))
 vi.mock('@/app/lib/member-utils', () => ({ findMemberIdByDiscordId: vi.fn(async () => null) }))
-vi.mock('@/app/lib/disavow/constants', () => ({ disavowEnabled: () => false }))
+vi.mock('@/app/lib/disavow/constants', () => ({ disavowEnabled: async () => false }))
 vi.mock('@/app/lib/disavow/access', () => ({ isDisavowSubject: vi.fn(async () => false) }))
 
 import { reviewCheckIn, performCheckIn } from './stamps'

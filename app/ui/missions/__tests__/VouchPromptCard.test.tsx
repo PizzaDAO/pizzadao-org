@@ -20,7 +20,7 @@ describe('VouchPromptCard', () => {
 
   it('renders the prompt copy', () => {
     render(<VouchPromptCard onDismiss={() => {}} />)
-    expect(screen.getByText(/ask 3 members/i)).toBeTruthy()
+    expect(screen.getByText(/ask a member/i)).toBeTruthy()
     expect(screen.getByText(/vouches let other members/i)).toBeTruthy()
   })
 

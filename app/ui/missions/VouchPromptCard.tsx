@@ -76,7 +76,7 @@ export function VouchPromptCard({ onDismiss }: Props) {
             color: "hsl(var(--foreground))",
           }}
         >
-          Ask 3 members to vouch for you
+          Ask a member to vouch for you
         </h3>
       </div>
 
@@ -89,7 +89,7 @@ export function VouchPromptCard({ onDismiss }: Props) {
         }}
       >
         Vouches let other members see your contributions and unlock community
-        trust. Find three people you have collaborated with and ask them to
+        trust. Find someone you have collaborated with and ask them to
         vouch.
       </p>
 
