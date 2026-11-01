@@ -5,7 +5,7 @@ import { describe, expect, it, vi } from 'vitest'
 import { GapFiller } from './gap-filler.js'
 import { appendRecord, readManifest, summarize } from './manifest.js'
 import { buildMixArgs, buildSpeakerTrackArgs } from './mix-plan.js'
-import { loadConfig } from './config.js'
+import { loadConfig, maxMinutesFor, parseEventCaps } from './config.js'
 import { finalizeSession, pendingSessions, reconcileOrphans, writeSessionMeta } from './finalize.js'
 import { postIngestWithRetry } from './ingest.js'
 import type { IngestPayload, SessionMeta } from './types.js'
@@ -117,9 +117,17 @@ describe('loadConfig', () => {
     const c = loadConfig(base)
     expect(c.callChannelId).toBe('823956905739026442')
     expect(c.maxCallMinutes).toBe(120)
+    expect(maxMinutesFor(c, '🍕 🤙  Community Call (Recorded)')).toBe(30)
+    expect(maxMinutesFor(c, 'Ops Crew 🫡')).toBe(120)
     expect(c.emptyGraceMinutes).toBe(5)
     expect(c.dataDir).toBe('/data')
     expect(c.appBaseUrl).toBe('https://app.pizzadao.org')
+  })
+  it('reads and rejects event limits', () => {
+    expect(parseEventCaps('a call = 10, b=20.5')).toEqual([{ namePart: 'a call', minutes: 10 }, { namePart: 'b', minutes: 20.5 }])
+    expect(parseEventCaps('')).toEqual([])
+    expect(parseEventCaps('nope')).toBeNull()
+    expect(() => loadConfig({ ...base, MAX_CALL_MINUTES_BY_EVENT: 'x=0' })).toThrow(/MAX_CALL_MINUTES_BY_EVENT/)
   })
   it('lists everything that is missing or invalid', () => {
     expect(() => loadConfig({ MAX_CALL_MINUTES: '-1' })).toThrow(/DISCORD_BOT_TOKEN[\s\S]*MAX_CALL_MINUTES/)

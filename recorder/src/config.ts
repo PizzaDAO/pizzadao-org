@@ -3,6 +3,35 @@
 export const DEFAULT_CALL_VOICE_CHANNEL_ID = '823956905739026442'
 export const REC_MARK = '🔴 REC'
 export const MAX_NICKNAME = 32
+/** `name part=minutes` pairs, comma-separated: events whose name contains the part stop sooner. */
+export const DEFAULT_MAX_CALL_MINUTES_BY_EVENT = 'community call=30'
+
+export interface EventCap {
+  namePart: string
+  minutes: number
+}
+
+/** Parses MAX_CALL_MINUTES_BY_EVENT; null when any pair is malformed. */
+export function parseEventCaps(raw: string): EventCap[] | null {
+  const caps: EventCap[] = []
+  for (const pair of raw.split(',').map((p) => p.trim()).filter(Boolean)) {
+    const m = /^(.+?)\s*=\s*(\d+(?:\.\d+)?)$/.exec(pair)
+    if (!m || Number(m[2]) <= 0) return null
+    caps.push({ namePart: m[1].toLowerCase(), minutes: Number(m[2]) })
+  }
+  return caps
+}
+
+/** The event's shorter limit in minutes, if it has one. */
+export function eventCapMinutes(cfg: Pick<Config, 'eventCaps'>, eventName: string): number | undefined {
+  const name = eventName.toLowerCase()
+  return cfg.eventCaps.find((c) => name.includes(c.namePart))?.minutes
+}
+
+/** The recording limit for an event: the first matching cap, else MAX_CALL_MINUTES. */
+export function maxMinutesFor(cfg: Pick<Config, 'maxCallMinutes' | 'eventCaps'>, eventName: string): number {
+  return eventCapMinutes(cfg, eventName) ?? cfg.maxCallMinutes
+}
 
 export interface Config {
   discordToken: string
@@ -14,6 +43,8 @@ export interface Config {
   deepgramApiKey: string | undefined
   dataDir: string
   maxCallMinutes: number
+  /** Shorter limits for some events (MAX_CALL_MINUTES_BY_EVENT). */
+  eventCaps: EventCap[]
   /** The channel must have had no humans this long before the recording stops. */
   emptyGraceMinutes: number
   port: number
@@ -40,6 +71,9 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     return v ?? ''
   }
 
+  const eventCaps = parseEventCaps(env.MAX_CALL_MINUTES_BY_EVENT ?? DEFAULT_MAX_CALL_MINUTES_BY_EVENT)
+  if (!eventCaps) errors.push('MAX_CALL_MINUTES_BY_EVENT must be comma-separated name=minutes pairs')
+
   const cfg: Config = {
     discordToken: req('DISCORD_BOT_TOKEN'),
     guildId: req('DISCORD_GUILD_ID'),
@@ -49,6 +83,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     deepgramApiKey: env.DEEPGRAM_API_KEY?.trim() || undefined,
     dataDir: env.DATA_DIR?.trim() || '/data',
     maxCallMinutes: positiveNumber(env.MAX_CALL_MINUTES, 120, 'MAX_CALL_MINUTES', errors),
+    eventCaps: eventCaps ?? [],
     emptyGraceMinutes: positiveNumber(env.EMPTY_GRACE_MINUTES, 5, 'EMPTY_GRACE_MINUTES', errors),
     captureVoiceChat: !/^(0|false|off|no)$/i.test(env.CAPTURE_VOICE_CHAT?.trim() ?? ''),
     port: positiveNumber(env.PORT, 3000, 'PORT', errors),

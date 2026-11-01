@@ -11,7 +11,8 @@ import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
-import type { Config } from './config.js'
+import { CallLimits } from './call-limits.js'
+import { eventCapMinutes, maxMinutesFor, type Config } from './config.js'
 import { consentNotice, lateJoinWelcome } from './consent.js'
 import {
   decideWindowAction,
@@ -58,6 +59,7 @@ export class CallRecorder {
   private readonly botCache = new Map<string, boolean>()
   private readonly backoff = new StartBackoff()
   private readonly slots: SlotMemory
+  private readonly limits: CallLimits
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -72,6 +74,11 @@ export class CallRecorder {
     private readonly serial: (fn: () => Promise<void>) => void = (fn) => void fn(),
   ) {
     this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), cfg.callChannelId, log)
+    this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
+  }
+
+  private eventLimitMs(eventName: string): number {
+    return maxMinutesFor(this.cfg, eventName) * 60_000
   }
 
   get currentEventId(): string | null {
@@ -114,7 +121,14 @@ export class CallRecorder {
       this.log(`schedule check failed: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
-    const opts = { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() }
+    const nowMs = Date.now()
+    if (humans === 0) this.limits.noteChannelEmpty(nowMs)
+    const opts = {
+      callChannelId: this.cfg.callChannelId,
+      maxCallMs: this.cfg.maxCallMinutes * 60_000,
+      nowMs,
+      blocked: (e: EventInfo) => this.limits.blocks(e, nowMs),
+    }
     // Back-off bookkeeping: a session that ran long enough recovered; closed windows are forgotten.
     const cur = this.current
     if (cur && opts.nowMs - cur.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(cur.key)
@@ -220,11 +234,15 @@ export class CallRecorder {
       if (this.shuttingDown) return await abort('shutting down')
 
       // 4. only now start capturing audio
-      // Max duration counts from the scheduled start when the session began early.
+      // Max duration counts from the scheduled start when the session began early. A capped event
+      // keeps counting from its first session, so a redeploy or rejoin cannot reset the limit.
+      const limitBaseMs = Math.max(startedAtMs, event.scheduledStartMs ?? 0)
+      const limitMs = this.eventLimitMs(event.name)
+      const capped = eventCapMinutes(this.cfg, event.name) !== undefined
       const tracker = new StopTracker(
-        Math.max(startedAtMs, event.scheduledStartMs ?? 0),
+        capped ? this.limits.noteStart(event.id, { baseMs: limitBaseMs, limitMs, startMs: event.scheduledStartMs ?? limitBaseMs }) : limitBaseMs,
         {
-          maxCallMs: this.cfg.maxCallMinutes * 60_000,
+          maxCallMs: limitMs,
           emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
         },
         event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
@@ -273,6 +291,10 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
+    if (s.meta.eventId) {
+      if (reason === 'max-duration') this.limits.noteHit(s.meta.eventId, Date.now())
+      else this.limits.noteEndedBeforeBase(s.meta.eventId, Date.now())
+    }
     if (isFailureStop(reason)) {
       if (Date.now() - s.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(s.key) // it had recovered
       this.noteFailure(s.key)
