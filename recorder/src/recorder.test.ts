@@ -245,36 +245,120 @@ describe('CallRecorder stop paths', () => {
 })
 
 describe('CallRecorder event limits', () => {
-  const community = (startMs: number) => ev({ name: 'Community Call (Recorded)', scheduledStartMs: startMs })
-
-  it('stops a capped event at its limit and does not rejoin, even after a restart', async () => {
-    const start = Date.now() - 60_000
-    const w = world()
-    await begin(w, community(start))
+  const MIN = 60_000
+  const T = Date.parse('2026-11-08T18:00:00Z')
+  const community = (over: Partial<EventInfo> = {}) => ev({ name: 'Community Call (Recorded)', scheduledStartMs: T, status: EventStatus.Scheduled, ...over })
+  const crew = (id: string, startMs: number) => ev({ id, name: 'Ops Crew', scheduledStartMs: startMs, status: EventStatus.Scheduled })
+  const at = (ms: number) => vi.spyOn(Date, 'now').mockImplementation(() => ms)
+  const restart = (w: ReturnType<typeof world>) =>
+    new CallRecorder(w.client as never, w.cfg, w.nick, { appBaseUrl: 'x', apiKey: 'k', uploader: {} as never, log: () => {} }, () => {}, () => {})
+  const tick = (r: CallRecorder) => (r as unknown as { onTick: () => Promise<void> }).onTick()
+  /** Record the Community Call from T until it hits its limit at T+31. */
+  const hitLimit = async (w: ReturnType<typeof world>, extra: EventInfo[] = []) => {
+    at(T + MIN)
+    withHumans(w, 1)
+    await w.rec.checkSchedule([community(), ...extra])
     expect(w.rec.currentEventId).toBe('100')
+    at(T + 31 * MIN)
+    await tick(w.rec)
+    expect(w.rec.currentEventId).toBeNull()
+  }
 
-    const realNow = Date.now
-    vi.spyOn(Date, 'now').mockImplementation(() => start + 31 * 60_000)
-    try {
-      await (w.rec as unknown as { onTick: () => Promise<void> }).onTick()
-      expect(w.rec.currentEventId).toBeNull()
-      await begin(w, community(start))
-      expect(w.rec.currentEventId).toBeNull()
+  afterEach(() => vi.restoreAllMocks())
 
-      const restarted = new CallRecorder(
-        w.client as never,
-        w.cfg,
-        w.nick,
-        { appBaseUrl: 'x', apiKey: 'k', uploader: {} as never, log: () => {} },
-        () => {},
-        () => {},
-      )
-      await restarted.checkSchedule([{ ...community(start), status: EventStatus.Scheduled }])
-      expect(restarted.currentEventId).toBeNull()
-    } finally {
-      Date.now = realNow
-      vi.restoreAllMocks()
-    }
+  it('does not rejoin after the limit, even after a restart', async () => {
+    const w = world()
+    await hitLimit(w)
+    await w.rec.checkSchedule([community()])
+    expect(w.rec.currentEventId).toBeNull()
+    const again = restart(w)
+    await again.checkSchedule([community()])
+    expect(again.currentEventId).toBeNull()
+  })
+
+  it('counts from the scheduled start when it began early, and from the start when it began late', async () => {
+    const early = world()
+    at(T - 10 * MIN)
+    withHumans(early, 1)
+    await early.rec.checkSchedule([community()])
+    at(T + 29 * MIN)
+    await tick(early.rec)
+    expect(early.rec.currentEventId).toBe('100')
+    at(T + 30 * MIN)
+    await tick(early.rec)
+    expect(early.rec.currentEventId).toBeNull()
+
+    const late = world()
+    at(T + 20 * MIN)
+    withHumans(late, 1)
+    await late.rec.checkSchedule([community()])
+    at(T + 49 * MIN)
+    await tick(late.rec)
+    expect(late.rec.currentEventId).toBe('100')
+    at(T + 50 * MIN)
+    await tick(late.rec)
+    expect(late.rec.currentEventId).toBeNull()
+  })
+
+  it('does not lead-window into the next crew while the call runs on, but records once that slot begins', async () => {
+    const w = world()
+    const next = crew('200', T + 45 * MIN)
+    await hitLimit(w, [next])
+    await w.rec.checkSchedule([community(), next])
+    expect(w.rec.currentEventId).toBeNull()
+    at(T + 45 * MIN)
+    await w.rec.checkSchedule([community(), next])
+    expect(w.rec.currentEventId).toBe('200')
+  })
+
+  it('does not reopen an earlier event that the capped call closed', async () => {
+    const w = world()
+    const earlier = crew('300', T - 30 * MIN)
+    await hitLimit(w, [earlier])
+    await w.rec.checkSchedule([community(), earlier])
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
+  it('treats a shifted occurrence of the same event as the same call', async () => {
+    const w = world()
+    await hitLimit(w)
+    at(T + 46 * MIN)
+    await w.rec.checkSchedule([community({ scheduledStartMs: T + 60 * MIN })])
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
+  it('keeps counting from the first session after a redeploy, and records the next week', async () => {
+    const w = world()
+    at(T + MIN)
+    withHumans(w, 1)
+    await w.rec.checkSchedule([community()])
+    at(T + 20 * MIN)
+    await w.rec.stop('shutdown')
+
+    const again = restart(w)
+    at(T + 21 * MIN)
+    await again.checkSchedule([community()])
+    expect(again.currentEventId).toBe('100')
+    at(T + 31 * MIN)
+    await tick(again)
+    expect(again.currentEventId).toBeNull()
+
+    const week = T + 7 * 24 * 60 * MIN
+    at(week)
+    await again.checkSchedule([community({ scheduledStartMs: week })])
+    expect(again.currentEventId).toBe('100')
+  })
+
+  it('leaves events without a shorter limit alone', async () => {
+    const w = world()
+    const e = crew('400', T)
+    at(T + MIN)
+    withHumans(w, 1)
+    await w.rec.checkSchedule([e])
+    at(T + 121 * MIN)
+    await tick(w.rec)
+    expect(w.rec.currentEventId).toBeNull()
+    expect(existsSync(path.join(w.dataDir, 'call-limits.json'))).toBe(false)
   })
 })
 

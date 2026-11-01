@@ -7,10 +7,11 @@
  * visible; if neither can be shown the session is deleted without capturing.
  * Event serialization is the caller's job (index.ts passes `serial`).
  */
-import { existsSync, mkdirSync, readFileSync, rmSync, writeFileSync } from 'node:fs'
+import { existsSync, mkdirSync, rmSync } from 'node:fs'
 import path from 'node:path'
 import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
+import { CallLimits } from './call-limits.js'
 import { maxMinutesFor, type Config } from './config.js'
 import { consentNotice, lateJoinWelcome } from './consent.js'
 import {
@@ -33,7 +34,6 @@ import type { SessionMeta } from './types.js'
 
 const TICK_MS = 10_000
 const REMINDER_AFTER_MS = 5 * 60_000
-const HIT_LIMIT_KEEP = 100
 
 interface ActiveSession {
   meta: SessionMeta
@@ -59,7 +59,7 @@ export class CallRecorder {
   private readonly botCache = new Map<string, boolean>()
   private readonly backoff = new StartBackoff()
   private readonly slots: SlotMemory
-  private readonly hitLimit: Set<string>
+  private readonly limits: CallLimits
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -74,29 +74,15 @@ export class CallRecorder {
     private readonly serial: (fn: () => Promise<void>) => void = (fn) => void fn(),
   ) {
     this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), cfg.callChannelId, log)
-    this.hitLimit = this.loadHitLimit()
+    this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
   }
 
-  /** Occurrences stopped at their limit: never recorded again, so a restart cannot rejoin the same call. */
-  private loadHitLimit(): Set<string> {
-    try {
-      return new Set(JSON.parse(readFileSync(this.hitLimitPath, 'utf8')) as string[])
-    } catch {
-      return new Set()
-    }
+  private eventLimitMs(eventName: string): number {
+    return maxMinutesFor(this.cfg, eventName) * 60_000
   }
 
-  private noteHitLimit(key: string): void {
-    this.hitLimit.add(key)
-    try {
-      writeFileSync(this.hitLimitPath, JSON.stringify([...this.hitLimit].slice(-HIT_LIMIT_KEEP)))
-    } catch (err) {
-      this.log(`could not save ${this.hitLimitPath}: ${err instanceof Error ? err.message : String(err)}`)
-    }
-  }
-
-  private get hitLimitPath(): string {
-    return path.join(this.cfg.dataDir, 'hit-limit.json')
+  private isCapped(eventName: string): boolean {
+    return maxMinutesFor(this.cfg, eventName) !== this.cfg.maxCallMinutes
   }
 
   get currentEventId(): string | null {
@@ -128,7 +114,7 @@ export class CallRecorder {
     // Remember every occurrence we see: Discord auto-ends an empty ACTIVE event and a recurring one
     // then jumps to next week, so the live list alone forgets today's slot.
     this.slots.observe(liveEvents, Date.now())
-    const events = this.slots.merge(liveEvents).filter((e) => !this.hitLimit.has(eventKey(e)))
+    const events = this.slots.merge(liveEvents)
     if (this.shuttingDown || this.starting) return
     if (this.current?.stopping) return
     let humans: number
@@ -139,7 +125,13 @@ export class CallRecorder {
       this.log(`schedule check failed: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
-    const opts = { callChannelId: this.cfg.callChannelId, maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs: Date.now() }
+    const nowMs = Date.now()
+    const opts = {
+      callChannelId: this.cfg.callChannelId,
+      maxCallMs: this.cfg.maxCallMinutes * 60_000,
+      nowMs,
+      blocked: (e: EventInfo) => this.limits.blocks(e, nowMs, this.eventLimitMs(e.name)),
+    }
     // Back-off bookkeeping: a session that ran long enough recovered; closed windows are forgotten.
     const cur = this.current
     if (cur && opts.nowMs - cur.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(cur.key)
@@ -245,11 +237,13 @@ export class CallRecorder {
       if (this.shuttingDown) return await abort('shutting down')
 
       // 4. only now start capturing audio
-      // Max duration counts from the scheduled start when the session began early.
+      // Max duration counts from the scheduled start when the session began early. A capped event
+      // keeps counting from its first session, so a redeploy or rejoin cannot reset the limit.
+      const limitBaseMs = Math.max(startedAtMs, event.scheduledStartMs ?? 0)
       const tracker = new StopTracker(
-        Math.max(startedAtMs, event.scheduledStartMs ?? 0),
+        this.isCapped(event.name) ? this.limits.noteStart(event.id, limitBaseMs) : limitBaseMs,
         {
-          maxCallMs: maxMinutesFor(this.cfg, event.name) * 60_000,
+          maxCallMs: this.eventLimitMs(event.name),
           emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
         },
         event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
@@ -298,7 +292,7 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
-    if (reason === 'max-duration') this.noteHitLimit(s.key)
+    if (reason === 'max-duration' && s.meta.eventId && this.isCapped(s.meta.eventName ?? '')) this.limits.noteHit(s.meta.eventId, Date.now())
     if (isFailureStop(reason)) {
       if (Date.now() - s.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(s.key) // it had recovered
       this.noteFailure(s.key)

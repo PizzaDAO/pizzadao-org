@@ -43,7 +43,7 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `APP_BASE_URL` | no | `https://app.pizzadao.org` | Ingest API host. |
 | `DATA_DIR` | no | `/data` | Mount the Railway volume here. |
 | `MAX_CALL_MINUTES` | no | `120` | |
-| `MAX_CALL_MINUTES_BY_EVENT` | no | `community call=30` | Comma-separated `name part=minutes`. An event stopped at its limit is not recorded again. |
+| `MAX_CALL_MINUTES_BY_EVENT` | no | `community call=30` | Comma-separated `name part=minutes`. Counts from the first session of the call. After the limit the bot stays out of that event, and starts nothing else until a slot has begun. |
 | `EMPTY_GRACE_MINUTES` | no | `5` | Humans-absent time before stopping. |
 | `PORT` | no | `3000` (Railway sets it) | `/health` |
 

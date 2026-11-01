@@ -36,6 +36,8 @@ export interface LifecycleOptions {
   callChannelId: string
   maxCallMs: number
   nowMs: number
+  /** Events that must not start. They still count for other events' window math. */
+  blocked?: (event: EventInfo) => boolean
 }
 
 /** A window opens this long before the scheduled start. */
@@ -75,6 +77,7 @@ export function eventWindow(
 export function eventsInWindow(events: EventInfo[], o: LifecycleOptions): EventInfo[] {
   return events.filter((e) => {
     if (e.channelId !== o.callChannelId) return false
+    if (o.blocked?.(e)) return false
     if (e.status !== EventStatus.Scheduled && e.status !== EventStatus.Active) return false
     const w = eventWindow(e, o, events)
     if (w !== null && o.nowMs >= w.openMs && o.nowMs < w.closeMs) return true
