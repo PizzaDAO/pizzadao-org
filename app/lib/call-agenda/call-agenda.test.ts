@@ -20,7 +20,7 @@ import { prisma } from '@/app/lib/db'
 import { getCrewMappings, fetchOpenCrewTasksResult } from '@/app/lib/crew-mappings'
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { getGuildChannels } from '@/app/lib/discord-channels'
-import { buildAgendaBullets, daysOverdue, parseActionItems, formatAgendaMessage, agendaTimeZone } from './rank'
+import { buildAgendaBullets, daysOverdue, parseActionItems, parseAgendaLinks, formatAgendaMessage, agendaTimeZone } from './rank'
 import { clearPostFilterCache } from '@/app/lib/calls/post-filters'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 import { runCallAgenda, resolveCrewChannel, fetchUpcomingEvents } from './run'
@@ -79,6 +79,14 @@ describe('helpers', () => {
     const m = formatAgendaMessage({ crewLabel: 'Ops', startsAt: NOW, bullets: [{ kind: 'priority', text: 'Top priority: X' }], crewUrl: 'https://x/crew/ops' })
     expect(m.split('\n').at(-1)).toBe('Crew page: https://x/crew/ops')
     expect(m).toContain('- Top priority: X')
+  })
+  it('formatAgendaMessage uses a configured link label', () => {
+    const m = formatAgendaMessage({ crewLabel: 'Ops', startsAt: NOW, bullets: [], crewUrl: 'https://x/guide', linkLabel: 'Call guide' })
+    expect(m.split('\n').at(-1)).toBe('Call guide: https://x/guide')
+  })
+  it('parseAgendaLinks reads crew lines and skips bad ones', () => {
+    const links = parseAgendaLinks('Ops = Call guide | https://x/guide\n\nbad line\ntech = Docs | http://not-https')
+    expect([...links.entries()]).toEqual([['ops', { label: 'Call guide', url: 'https://x/guide' }]])
   })
   it('resolveCrewChannel handles ids, links and mentions that belong to the guild (L1)', async () => {
     process.env.DISCORD_GUILD_ID = '1'
@@ -301,5 +309,12 @@ describe('runCallAgenda', () => {
     expect(plan.message.toLowerCase()).not.toContain('zeta')
     expect(plan.message).toContain('Ship thing')
     expect(plan.message).toContain('Book venue')
+  })
+
+  it('swaps the crew page for the link set in calls.agendaLinks', async () => {
+    vi.mocked(prisma.appSetting.findMany).mockResolvedValue([{ key: 'calls.agendaLinks', value: 'ops = Call guide | https://x/guide' }] as never)
+    const { planAgendas } = await import('./run')
+    const [plan] = await planAgendas({ now: NOW, horizonMs: 30 * 60 * 1000, fetchImpl: fetchEvents })
+    expect(plan.message.split('\n').at(-1)).toBe('Call guide: https://x/guide')
   })
 })

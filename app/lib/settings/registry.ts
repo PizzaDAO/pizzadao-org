@@ -119,6 +119,9 @@ const FOOTER_TELEGRAM_DEFAULT = "Replies to this bot aren't read. Use the button
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
+/** One line of calls.agendaLinks: `crew-id = Label | https://...`. */
+export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*(https:\/\/\S+)$/
+
 export function textSetting(o: {
   key: string
   area: SettingArea
@@ -826,6 +829,19 @@ export const SETTINGS = {
     label: 'Post call agendas',
     help: 'Post the pre-call agenda to Discord. The CALL_AGENDA_POST_ENABLED env var set to off always wins.',
     confirmOn: 'Upcoming calls will get an agenda post in Discord.',
+  }),
+  'calls.agendaLinks': textSetting({
+    key: 'calls.agendaLinks',
+    area: 'calls',
+    label: 'Agenda links by crew',
+    help: 'One per line: crew-id = Label | https link. Replaces the crew page link at the end of that crew\'s agenda.',
+    maxLength: 2000,
+    multiline: true,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'crew-id = Call guide | https://example.com/guide',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || AGENDA_LINK_LINE.test(line.trim())),
+    checkMessage: 'Use one line per crew: crew-id = Label | https link',
   }),
   // Calls imported from X live broadcasts (plans/x-call-import.md). All off: an imported call never reaches Discord,
   // the follow-up drafter, the agenda or the automatic summary sweep unless a setting here says so.
