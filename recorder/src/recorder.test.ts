@@ -319,6 +319,60 @@ describe('CallRecorder event limits', () => {
     expect(w.rec.currentEventId).toBeNull()
   })
 
+  it('does not restart under an earlier event that is still ACTIVE or scheduled to overlap', async () => {
+    for (const earlier of [
+      { ...crew('300', T - 30 * MIN), status: EventStatus.Active },
+      { ...crew('301', T - 30 * MIN), scheduledEndMs: T + 60 * MIN },
+    ]) {
+      const w = world()
+      await hitLimit(w, [earlier])
+      await w.rec.checkSchedule([community(), earlier])
+      expect(w.rec.currentEventId).toBeNull()
+    }
+  })
+
+  it('holds the next crew when the limit passed with no session running, until the channel empties', async () => {
+    const w = world()
+    const next = crew('200', T + 50 * MIN)
+    at(T + MIN)
+    withHumans(w, 1)
+    await w.rec.checkSchedule([community(), next])
+    at(T + 29 * MIN)
+    await w.rec.stop('shutdown')
+
+    const again = restart(w)
+    at(T + 40 * MIN)
+    await again.checkSchedule([community(), next])
+    expect(again.currentEventId).toBeNull()
+
+    withHumans(w, 0)
+    await again.checkSchedule([community(), next])
+    withHumans(w, 1)
+    await again.checkSchedule([community(), next])
+    expect(again.currentEventId).toBe('200')
+  })
+
+  it('does not let a false start in the lead window use up the call', async () => {
+    const w = world()
+    at(T - 10 * MIN)
+    withHumans(w, 1)
+    await w.rec.checkSchedule([community()])
+    at(T - 2 * MIN)
+    await w.rec.stop('empty')
+    await w.rec.drain()
+    at(T + 35 * MIN)
+    await w.rec.checkSchedule([community()])
+    expect(w.rec.currentEventId).toBe('100')
+  })
+
+  it('holds a capped call even when its limit equals the default', async () => {
+    const w = world()
+    w.cfg.maxCallMinutes = 30
+    await hitLimit(w)
+    await w.rec.checkSchedule([community()])
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
   it('treats a shifted occurrence of the same event as the same call', async () => {
     const w = world()
     await hitLimit(w)

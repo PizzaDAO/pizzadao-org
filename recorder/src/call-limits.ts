@@ -13,9 +13,17 @@ import type { EventInfo } from './event-lifecycle.js'
 export const LIMIT_HOLD_MS = 6 * 3_600_000
 
 interface Entry {
+  /** When the limit counts from. */
   baseMs: number
+  limitMs: number
+  /** The call's scheduled start. */
+  startMs: number
   hitAtMs?: number
+  /** The channel emptied after the limit: the call is over, later events may lead-window again. */
+  released?: boolean
 }
+
+const spent = (e: Entry, nowMs: number) => e.hitAtMs !== undefined || nowMs - e.baseMs >= e.limitMs
 
 export class CallLimits {
   private entries: Record<string, Entry> = {}
@@ -38,29 +46,53 @@ export class CallLimits {
   }
 
   /** The time this call's limit counts from: the first session's, or `baseMs` for a new call. */
-  noteStart(eventId: string, baseMs: number): number {
-    const existing = this.active(eventId, baseMs)
+  noteStart(eventId: string, call: Omit<Entry, 'hitAtMs' | 'released'>): number {
+    const existing = this.active(eventId, call.baseMs)
     if (existing) return existing.baseMs
-    this.entries[eventId] = { baseMs }
-    this.save(baseMs)
-    return baseMs
+    this.entries[eventId] = call
+    this.save(call.baseMs)
+    return call.baseMs
   }
 
   noteHit(eventId: string, nowMs: number): void {
-    const e = this.entries[eventId] ?? { baseMs: nowMs }
+    const e = this.entries[eventId]
+    if (!e) return
     this.entries[eventId] = { ...e, hitAtMs: nowMs }
     this.save(nowMs)
   }
 
+  /** A session ended before its call's clock began (a false start in the lead window): forget it. */
+  noteEndedBeforeBase(eventId: string, nowMs: number): void {
+    const e = this.entries[eventId]
+    if (!e || e.hitAtMs !== undefined || nowMs >= e.baseMs) return
+    delete this.entries[eventId]
+    this.save(nowMs)
+  }
+
+  noteChannelEmpty(nowMs: number): void {
+    let changed = false
+    for (const id of Object.keys(this.entries)) {
+      const e = this.active(id, nowMs)
+      if (e && spent(e, nowMs) && !e.released) {
+        e.released = true
+        changed = true
+      }
+    }
+    if (changed) this.save(nowMs)
+  }
+
   /**
-   * True when `event` must not start: its own limit is used up, or another call hit its limit and
-   * this event's slot has not begun (no lead-window start into the call that is still going).
+   * True when `event` must not start because a capped call used up its time: the call itself, any
+   * event that began no later than it, and, until the channel empties, anything whose slot has not begun.
    */
-  blocks(event: Pick<EventInfo, 'id' | 'scheduledStartMs'>, nowMs: number, limitMs: number): boolean {
-    const own = this.active(event.id, nowMs)
-    if (own && (own.hitAtMs !== undefined || nowMs - own.baseMs >= limitMs)) return true
-    const begun = event.scheduledStartMs !== null && event.scheduledStartMs <= nowMs
-    return !begun && Object.keys(this.entries).some((id) => this.active(id, nowMs)?.hitAtMs !== undefined)
+  blocks(event: Pick<EventInfo, 'id' | 'scheduledStartMs'>, nowMs: number): boolean {
+    const start = event.scheduledStartMs
+    return Object.keys(this.entries).some((id) => {
+      const e = this.active(id, nowMs)
+      if (!e || !spent(e, nowMs)) return false
+      if (id === event.id || start === null || start <= e.startMs) return true
+      return !e.released && start > nowMs
+    })
   }
 
   private save(nowMs: number): void {

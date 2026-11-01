@@ -12,7 +12,7 @@ import path from 'node:path'
 import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceState } from 'discord.js'
 import { VoiceCapture } from './capture.js'
 import { CallLimits } from './call-limits.js'
-import { maxMinutesFor, type Config } from './config.js'
+import { eventCapMinutes, maxMinutesFor, type Config } from './config.js'
 import { consentNotice, lateJoinWelcome } from './consent.js'
 import {
   decideWindowAction,
@@ -81,10 +81,6 @@ export class CallRecorder {
     return maxMinutesFor(this.cfg, eventName) * 60_000
   }
 
-  private isCapped(eventName: string): boolean {
-    return maxMinutesFor(this.cfg, eventName) !== this.cfg.maxCallMinutes
-  }
-
   get currentEventId(): string | null {
     return this.current?.meta.eventId ?? null
   }
@@ -126,11 +122,12 @@ export class CallRecorder {
       return
     }
     const nowMs = Date.now()
+    if (humans === 0) this.limits.noteChannelEmpty(nowMs)
     const opts = {
       callChannelId: this.cfg.callChannelId,
       maxCallMs: this.cfg.maxCallMinutes * 60_000,
       nowMs,
-      blocked: (e: EventInfo) => this.limits.blocks(e, nowMs, this.eventLimitMs(e.name)),
+      blocked: (e: EventInfo) => this.limits.blocks(e, nowMs),
     }
     // Back-off bookkeeping: a session that ran long enough recovered; closed windows are forgotten.
     const cur = this.current
@@ -240,10 +237,12 @@ export class CallRecorder {
       // Max duration counts from the scheduled start when the session began early. A capped event
       // keeps counting from its first session, so a redeploy or rejoin cannot reset the limit.
       const limitBaseMs = Math.max(startedAtMs, event.scheduledStartMs ?? 0)
+      const limitMs = this.eventLimitMs(event.name)
+      const capped = eventCapMinutes(this.cfg, event.name) !== undefined
       const tracker = new StopTracker(
-        this.isCapped(event.name) ? this.limits.noteStart(event.id, limitBaseMs) : limitBaseMs,
+        capped ? this.limits.noteStart(event.id, { baseMs: limitBaseMs, limitMs, startMs: event.scheduledStartMs ?? limitBaseMs }) : limitBaseMs,
         {
-          maxCallMs: this.eventLimitMs(event.name),
+          maxCallMs: limitMs,
           emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,
         },
         event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
@@ -292,7 +291,10 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
-    if (reason === 'max-duration' && s.meta.eventId && this.isCapped(s.meta.eventName ?? '')) this.limits.noteHit(s.meta.eventId, Date.now())
+    if (s.meta.eventId) {
+      if (reason === 'max-duration') this.limits.noteHit(s.meta.eventId, Date.now())
+      else this.limits.noteEndedBeforeBase(s.meta.eventId, Date.now())
+    }
     if (isFailureStop(reason)) {
       if (Date.now() - s.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(s.key) // it had recovered
       this.noteFailure(s.key)

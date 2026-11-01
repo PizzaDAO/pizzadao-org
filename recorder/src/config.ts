@@ -22,10 +22,15 @@ export function parseEventCaps(raw: string): EventCap[] | null {
   return caps
 }
 
+/** The event's shorter limit in minutes, if it has one. */
+export function eventCapMinutes(cfg: Pick<Config, 'eventCaps'>, eventName: string): number | undefined {
+  const name = eventName.toLowerCase()
+  return cfg.eventCaps.find((c) => name.includes(c.namePart))?.minutes
+}
+
 /** The recording limit for an event: the first matching cap, else MAX_CALL_MINUTES. */
 export function maxMinutesFor(cfg: Pick<Config, 'maxCallMinutes' | 'eventCaps'>, eventName: string): number {
-  const name = eventName.toLowerCase()
-  return cfg.eventCaps.find((c) => name.includes(c.namePart))?.minutes ?? cfg.maxCallMinutes
+  return eventCapMinutes(cfg, eventName) ?? cfg.maxCallMinutes
 }
 
 export interface Config {
