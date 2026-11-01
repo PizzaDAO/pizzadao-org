@@ -83,7 +83,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     voiceStates: { cache: { filter: () => ({ map: () => [] }) } },
   }
   const client = { guilds: { fetch: async () => guild }, users: { fetch: async () => ({ bot: false }) } }
-  const cfg = { dataDir, guildId: 'g1', callChannelId: CHANNEL, maxCallMinutes: 120, emptyGraceMinutes: 5 } as Config
+  const cfg = { dataDir, guildId: 'g1', callChannelId: CHANNEL, maxCallMinutes: 120, eventCaps: [{ namePart: 'community call', minutes: 30 }], emptyGraceMinutes: 5 } as Config
   const nick = new NicknameManager(dataDir, () => {}, async () => {})
   const serialJobs: Array<() => Promise<void>> = []
   const rec = new CallRecorder(
@@ -94,7 +94,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     () => {},
     (fn) => void serialJobs.push(fn),
   )
-  return { rec, dataDir, me, nicknames, channel, guild, serialJobs }
+  return { rec, dataDir, me, nicknames, channel, guild, serialJobs, client, cfg, nick }
 }
 
 beforeEach(() => {
@@ -241,6 +241,40 @@ describe('CallRecorder stop paths', () => {
     expect(w.serialJobs).toHaveLength(1)
     await w.serialJobs[0]()
     expect(w.rec.currentEventId).toBeNull()
+  })
+})
+
+describe('CallRecorder event limits', () => {
+  const community = (startMs: number) => ev({ name: 'Community Call (Recorded)', scheduledStartMs: startMs })
+
+  it('stops a capped event at its limit and does not rejoin, even after a restart', async () => {
+    const start = Date.now() - 60_000
+    const w = world()
+    await begin(w, community(start))
+    expect(w.rec.currentEventId).toBe('100')
+
+    const realNow = Date.now
+    vi.spyOn(Date, 'now').mockImplementation(() => start + 31 * 60_000)
+    try {
+      await (w.rec as unknown as { onTick: () => Promise<void> }).onTick()
+      expect(w.rec.currentEventId).toBeNull()
+      await begin(w, community(start))
+      expect(w.rec.currentEventId).toBeNull()
+
+      const restarted = new CallRecorder(
+        w.client as never,
+        w.cfg,
+        w.nick,
+        { appBaseUrl: 'x', apiKey: 'k', uploader: {} as never, log: () => {} },
+        () => {},
+        () => {},
+      )
+      await restarted.checkSchedule([{ ...community(start), status: EventStatus.Scheduled }])
+      expect(restarted.currentEventId).toBeNull()
+    } finally {
+      Date.now = realNow
+      vi.restoreAllMocks()
+    }
   })
 })
 
