@@ -89,7 +89,7 @@ export function VouchPromptCard({ onDismiss }: Props) {
         }}
       >
         Vouches let other members see your contributions and unlock community
-        trust. Find three people you have collaborated with and ask them to
+        trust. Find someone you have collaborated with and ask them to
         vouch.
       </p>
 
