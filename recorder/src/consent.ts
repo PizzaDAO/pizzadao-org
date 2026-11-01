@@ -8,6 +8,6 @@ export function consentNotice(): string {
   ].join('\n')
 }
 
-export function lateJoinReminder(userId: string): string {
-  return `<@${userId}> this call is being recorded and transcribed, and may be published after review. If you don't want to be recorded, please leave the call.`
+export function lateJoinWelcome(userId: string): string {
+  return `Welcome to the call, <@${userId}>!`
 }
