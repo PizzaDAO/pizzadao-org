@@ -6,6 +6,7 @@
 import type { CrewTaskDetail } from '@/app/lib/crew-mappings'
 import type { Settings } from '@/app/lib/settings'
 import { settingInt } from '@/app/lib/settings/numbers'
+import { AGENDA_LINK_LINE } from '@/app/lib/settings/registry'
 
 /** How big an agenda may be (settings calls.agenda*; the defaults are the original constants). */
 export interface AgendaLimits {
@@ -155,9 +156,19 @@ export function buildAgendaBullets(input: {
   return bullets
 }
 
-/** The Discord message: bullets, then the crew-page link. */
-export function formatAgendaMessage(o: { crewLabel: string; startsAt: Date; bullets: readonly AgendaBullet[]; crewUrl: string }): string {
+/** Per-crew links from calls.agendaLinks, keyed by lower-case crew id. Lines that do not parse are skipped. */
+export function parseAgendaLinks(raw: string): Map<string, { label: string; url: string }> {
+  const links = new Map<string, { label: string; url: string }>()
+  for (const line of raw.split('\n')) {
+    const m = AGENDA_LINK_LINE.exec(line.trim())
+    if (m) links.set(m[1].toLowerCase(), { label: m[2], url: m[3] })
+  }
+  return links
+}
+
+/** The Discord message: bullets, then the crew's link (the crew page unless calls.agendaLinks says otherwise). */
+export function formatAgendaMessage(o: { crewLabel: string; startsAt: Date; bullets: readonly AgendaBullet[]; crewUrl: string; linkLabel?: string }): string {
   const ts = Math.floor(o.startsAt.getTime() / 1000)
-  const lines = [`**${o.crewLabel} call agenda** (starts <t:${ts}:R>)`, ...o.bullets.map((b) => `- ${b.text}`), `Crew page: ${o.crewUrl}`]
+  const lines = [`**${o.crewLabel} call agenda** (starts <t:${ts}:R>)`, ...o.bullets.map((b) => `- ${b.text}`), `${o.linkLabel ?? 'Crew page'}: ${o.crewUrl}`]
   return lines.join('\n')
 }

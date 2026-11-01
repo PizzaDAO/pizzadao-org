@@ -22,7 +22,7 @@ import { toggleEnabled } from '@/app/lib/settings/toggles'
 import { DISCORD_ONLY, importedAllowed } from '@/app/lib/calls/imported'
 import { loadSettings } from '@/app/lib/settings'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
-import { agendaLeadMs, agendaLimits, buildAgendaBullets, formatAgendaMessage, parseActionItems, type ActionItem, type AgendaBullet } from './rank'
+import { agendaLeadMs, agendaLimits, buildAgendaBullets, formatAgendaMessage, parseActionItems, parseAgendaLinks, type ActionItem, type AgendaBullet } from './rank'
 
 const API = 'https://discord.com/api/v10'
 export const DEFAULT_CALL_VOICE_CHANNEL_ID = '823956905739026442'
@@ -144,7 +144,9 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
   const now = o.now ?? new Date()
   // Throws when the filter cannot be read: better no agenda than an unfiltered one.
   const filter = o.filter ?? (await loadPostFilter())
-  const limits = agendaLimits(await loadSettings())
+  const settings = await loadSettings()
+  const limits = agendaLimits(settings)
+  const links = parseAgendaLinks(settings.get('calls.agendaLinks'))
   const events = await fetchUpcomingEvents({ now, horizonMs: o.horizonMs, fetchImpl: o.fetchImpl })
   if (!events.length) return []
   const { crews } = await getCrewMappings()
@@ -176,7 +178,8 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     const items = actionItems.filter((a) => !mentionsBlockedTerm(a.text, filter) && !mentionsBlockedTerm(a.owner, filter))
     const filteredOut = sheet.tasks.length - tasks.length + actionItems.length - items.length
     const bullets = buildAgendaBullets({ tasks, actionItems: items, now, limits })
-    const crewUrl = crewPageUrl(crew.id)
+    const link = links.get(crew.id.toLowerCase())
+    const crewUrl = link?.url ?? crewPageUrl(crew.id)
     plans.push({
       eventId: ev.id,
       eventName: ev.name,
@@ -186,7 +189,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
       channelRaw: crew.channel ?? null,
       crewUrl,
       bullets,
-      message: formatAgendaMessage({ crewLabel: crew.label, startsAt: ev.startsAt, bullets, crewUrl }),
+      message: formatAgendaMessage({ crewLabel: crew.label, startsAt: ev.startsAt, bullets, crewUrl, linkLabel: link?.label }),
       alreadyPosted: !!posted,
       sheetError: sheet.error,
       excluded: false,

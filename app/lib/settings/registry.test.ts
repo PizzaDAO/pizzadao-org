@@ -111,6 +111,7 @@ describe('settings registry', () => {
       ['missions.reviewCardsEnabled', false],
       ['calls.recapPostEnabled', false],
       ['calls.agendaPostEnabled', false],
+      ['calls.agendaLinks', ''],
       ['calls.importedRecapPostEnabled', false],
       ['calls.importedFollowupsEnabled', false],
       ['calls.importedAgendaContext', false],
