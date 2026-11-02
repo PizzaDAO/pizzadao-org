@@ -46,6 +46,7 @@ export const prisma = {
   recordingOptOut: createModelMock(),
   crewDraft: createModelMock(),
   appSetting: createModelMock(),
+  sheetImportRun: createModelMock(),
   appSettingChange: createModelMock(),
   followUp: createModelMock(),
   followUpEvent: createModelMock(),
