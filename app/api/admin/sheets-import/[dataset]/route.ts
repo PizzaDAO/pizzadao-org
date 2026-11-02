@@ -27,6 +27,7 @@ export async function POST(request: Request, { params }: Params) {
   const mode = body?.mode ?? 'dry-run'
   if (mode !== 'dry-run' && mode !== 'apply') return json({ error: 'mode must be "dry-run" or "apply"' }, 400)
   const importer = await info.importer()
-  const report = await runImport(importer, mode as ImportMode, auth.session.discordId)
-  return json(report, report.ok ? 200 : 502)
+  // An apply is refused (409) while the data set reads from the database (see runImport).
+  const report = await runImport(importer, mode as ImportMode, auth.session.discordId, { source: info.source })
+  return json(report, report.ok ? 200 : report.refused ? 409 : 502)
 }

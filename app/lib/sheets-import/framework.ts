@@ -36,6 +36,8 @@ export interface ImportReport {
   ok: boolean
   /** True only when an apply actually wrote. */
   applied: boolean
+  /** True when an apply was refused because the data set already reads from the database. */
+  refused?: boolean
   counts: ImportCounts
   /** Extra counts the importer reports (e.g. unresolved lead ids). Numbers only. */
   extra: Record<string, number>
@@ -61,8 +63,12 @@ export interface Importer<T> {
   load(): Promise<LoadResult<T>>
   /** The database side, projected to the same shape as `load` records. */
   existing(): Promise<Map<string, T>>
-  /** Write creates and updates. Must be idempotent (upserts). */
-  apply(plan: UpsertPlan<T>): Promise<void>
+  /**
+   * Write creates and updates. Must be idempotent (upserts). An apply that writes in several
+   * chunks reports each chunk with `progress(rowsWritten)`, so a failure part-way is logged with
+   * how far it got.
+   */
+  apply(plan: UpsertPlan<T>, progress: (rowsWritten: number) => void): Promise<void>
   equal?: (a: T, b: T) => boolean
 }
 
@@ -111,7 +117,17 @@ export interface RunDeps {
     finishedAt: Date
   }) => Promise<number | undefined>
   now?: () => Date
+  /**
+   * The `sheets.source.*` switch this import feeds. While it reads from the database (fully), an
+   * apply is refused: the website is where the data is edited then, and the sheet is stale.
+   * (A per-crew pilot is allowed; those importers skip the pilot crews themselves.)
+   */
+  source?: SheetSourceKey
+  /** Test hook for the source lookup. */
+  getSource?: (key: SheetSourceKey) => Promise<{ kind: 'sheet' | 'db'; crews: ReadonlySet<string> | null }>
 }
+
+export const REFUSED_SOURCE_IS_DB = 'This data set reads from the database now; switch its source back to "sheet" before applying an import'
 
 async function defaultLog(row: Parameters<NonNullable<RunDeps['log']>>[0]): Promise<number | undefined> {
   const saved = await prisma.sheetImportRun.create({
@@ -144,11 +160,30 @@ export async function runImport<T>(importer: Importer<T>, mode: ImportMode, acto
   const startedAt = now()
   let report: Omit<ImportReport, 'runId' | 'finishedAt'>
   let revision: string | null = null
+  let written = 0
+  const refused = async () => {
+    if (mode !== 'apply' || !deps.source) return false
+    const lookup = deps.getSource ?? (async (key: SheetSourceKey) => (await import('./source')).getSource(key))
+    const src = await lookup(deps.source)
+    return src.kind === 'db' && !src.crews
+  }
   try {
+    if (await refused()) {
+      report = {
+        dataset: importer.key, mode, ok: false, applied: false, refused: true,
+        counts: { create: 0, update: 0, unchanged: 0, orphan: 0, parseErrors: 0 },
+        extra: {}, issues: [], issuesTruncated: 0, error: REFUSED_SOURCE_IS_DB, startedAt: startedAt.toISOString(),
+      }
+      return finish(report)
+    }
     const [loaded, existing] = await Promise.all([importer.load(), importer.existing()])
     revision = loaded.revision ?? null
     const plan = planUpserts(loaded.records, existing, importer.equal ?? stableEqual)
-    if (mode === 'apply' && (plan.create.length || plan.update.length)) await importer.apply(plan)
+    if (mode === 'apply' && (plan.create.length || plan.update.length)) {
+      await importer.apply(plan, (n) => {
+        written = n
+      })
+    }
     report = {
       dataset: importer.key,
       mode,
@@ -167,13 +202,17 @@ export async function runImport<T>(importer: Importer<T>, mode: ImportMode, acto
       ok: false,
       applied: false,
       counts: { create: 0, update: 0, unchanged: 0, orphan: 0, parseErrors: 0 },
-      extra: {},
+      // A chunked apply that failed part-way: how many rows it had already written.
+      extra: mode === 'apply' ? { rowsWrittenBeforeFailure: written } : {},
       issues: [],
       issuesTruncated: 0,
       error: safeError(e),
       startedAt: startedAt.toISOString(),
     }
   }
+  return finish(report)
+
+  async function finish(report: Omit<ImportReport, 'runId' | 'finishedAt'>): Promise<ImportReport> {
   const finishedAt = now()
   let runId: number | undefined
   try {
@@ -194,4 +233,5 @@ export async function runImport<T>(importer: Importer<T>, mode: ImportMode, acto
     console.error('[sheets-import] could not log the run', safeError(e))
   }
   return { ...report, runId, finishedAt: finishedAt.toISOString() }
+  }
 }
