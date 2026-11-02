@@ -55,6 +55,17 @@ describe('stale slots after a reschedule', () => {
     expect(decide(merged).type).toBe('ignore')
   })
 
+  it('an observe-time drop is permanent: merging after the old start passes does not resurrect it', () => {
+    const m = memory()
+    const crewB = ev({ id: 'b', scheduledStartMs: T19 })
+    m.observe([ev({ id: 'a', scheduledStartMs: T20 }), crewB], T19 - 2 * HOUR)
+    const live = [ev({ id: 'a', scheduledStartMs: T21 }), crewB]
+    m.observe(live, T19)
+    const merged = m.merge(live, new Set(), T20 + 60_000)
+    expect(merged.some((e) => eventKey(e) === `a:${T20}`)).toBe(false)
+    expect(decide(merged).type).toBe('ignore')
+  })
+
   it('control: an unfiltered stale remembered slot would supersede the running call', () => {
     const stale = slotsFromLive([ev({ id: 'a', scheduledStartMs: T20 })], CH)
     const live = [ev({ id: 'a', scheduledStartMs: T21 }), ev({ id: 'b', scheduledStartMs: T19 })]
