@@ -304,10 +304,11 @@ export async function runAnnouncement(deps: AnnounceDeps): Promise<AnnounceResul
   }
 }
 
-/** Production wiring. */
+/** Production wiring. The block is the announcement sheet, or the database once sheets.source.announce is "db". */
 export async function runAnnouncementFromEnv(): Promise<AnnounceResult> {
+  const { announceFromDb, createAnnounceDbIO } = await import("./db");
   return runAnnouncement({
-    sheet: createAnnounceSheetIO(SHEET_IDS.announce),
+    sheet: (await announceFromDb()) ? createAnnounceDbIO() : createAnnounceSheetIO(SHEET_IDS.announce),
     config: getAnnounceConfig(process.env, SHEET_IDS.announce, await savedChannelId("discord.announceChannelId")),
   });
 }

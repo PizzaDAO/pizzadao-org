@@ -257,7 +257,99 @@ async function readRow(values: SheetsValuesApi, loc: Located) {
 // Public entry point
 // ---------------------------------------------------------------------------
 
+/**
+ * Add/remove one crew in one member's Crews cell: the members sheet, or (once
+ * `sheets.source.members` is "db", plans/sheets-cutover.md) the Member table, with the
+ * same dry-run / expectedBefore / idempotency rules. Passing `deps` always targets the sheet.
+ */
 export async function updateMemberCrews(
+  input: UpdateMemberCrewsInput,
+  deps?: WritebackDeps
+): Promise<UpdateMemberCrewsResult> {
+  if (deps) return updateMemberCrewsInSheet(input, deps);
+  const { usesDb } = await import("@/app/lib/sheets-import/source");
+  if (await usesDb("members")) return updateMemberCrewsInDb(input);
+  return updateMemberCrewsInSheet(input, defaultDeps());
+}
+
+/** The same input checks for both targets. Throws RosterWritebackError. */
+function checkInput(input: UpdateMemberCrewsInput): { memberId: string; crewId: string; action: RosterAction; mode: WritebackMode } {
+  const { memberId, action } = input;
+  const mode: WritebackMode = input.mode ?? "dry-run";
+  const crewId = normalizeCrewId(input.crewId);
+  if (typeof memberId !== "string" || !/^[A-Za-z0-9_-]{1,64}$/.test(memberId)) {
+    throw new RosterWritebackError("Invalid memberId", 400);
+  }
+  if (!crewId || !CREW_ID_PATTERN.test(crewId) || crewId.length > 64) {
+    throw new RosterWritebackError("Invalid crewId", 400);
+  }
+  if (action !== "add" && action !== "remove") {
+    throw new RosterWritebackError("action must be 'add' or 'remove'", 400);
+  }
+  if (mode !== "dry-run" && mode !== "apply") {
+    throw new RosterWritebackError("mode must be 'dry-run' or 'apply'", 400);
+  }
+  if (mode === "apply" && typeof input.expectedBefore !== "string") {
+    throw new RosterWritebackError("expectedBefore is required to apply", 400);
+  }
+  return { memberId, crewId, action, mode };
+}
+
+/**
+ * The Member-table version. Only the Crews cell of the one member is changed, under the members
+ * write lock. While `sheets.mirror.members` is on, the same change is then copied to the sheet
+ * (best effort).
+ */
+export async function updateMemberCrewsInDb(
+  input: UpdateMemberCrewsInput,
+  resolveCrewLabel: (crewId: string) => Promise<string | null> = defaultResolveCrewLabel,
+): Promise<UpdateMemberCrewsResult> {
+  const { memberId, crewId, action, mode } = checkInput(input);
+  let crewLabel: string | undefined;
+  if (action === "add") {
+    const label = await resolveCrewLabel(crewId);
+    if (!label) throw new RosterWritebackError(`Unknown crew: ${crewId}`, 400);
+    crewLabel = label;
+  }
+  const { prisma } = await import("@/app/lib/db");
+  const range = `db:Member/${memberId}/Crews`;
+  const result = await prisma.$transaction(async (tx) => {
+    await tx.$executeRaw`SELECT pg_advisory_xact_lock(742019332)`;
+    const layout = await tx.memberTableLayout.findUnique({ where: { id: 1 } });
+    const member = await tx.member.findUnique({ where: { id: memberId } });
+    if (!layout || !member) throw new RosterWritebackError(`Member ${memberId} not found`, 404);
+    const headers = (Array.isArray(layout.headers) ? layout.headers : []).map((h) => String(h ?? "").trim());
+    const crewsCol = findColumnIndex(headers, ["crews", "crew"]);
+    if (crewsCol === null || crewsCol < 0) throw new RosterWritebackError("Crews column not found", 500);
+    const cells = (Array.isArray(member.cells) ? [...member.cells] : []) as Array<{ v?: unknown; f?: unknown } | null>;
+    const before = cellToString(cells[crewsCol]?.v ?? cells[crewsCol]?.f ?? "");
+    const plan = planCrewsCellUpdate(before, crewId, action, crewLabel);
+    const out: UpdateMemberCrewsResult = { mode, applied: false, changed: plan.changed, range, before: plan.before, after: plan.after, crews: plan.crews };
+    if (!plan.changed || mode === "dry-run") return out;
+    if (input.expectedBefore !== before) {
+      throw new RosterWritebackError("Crews cell changed since the preview; re-run the dry run", 409);
+    }
+    while (cells.length <= crewsCol) cells.push(null);
+    cells[crewsCol] = { v: plan.after };
+    await tx.member.update({ where: { id: memberId }, data: { cells: cells as never, updatedBy: "roster-writeback" } });
+    return { ...out, applied: true };
+  });
+  if (result.applied) {
+    invalidateMembersCache();
+    const { membersMirrorEnabled } = await import("@/app/lib/sheets-import/source");
+    if (await membersMirrorEnabled()) {
+      try {
+        await updateMemberCrewsInSheet({ memberId, crewId, action, mode: "apply", expectedBefore: result.before }, defaultDeps());
+      } catch (e) {
+        console.error("[roster-writeback] sheet copy failed", e instanceof Error ? e.message : e);
+      }
+    }
+  }
+  return result;
+}
+
+/** The members-sheet version (Sheets API). */
+export async function updateMemberCrewsInSheet(
   input: UpdateMemberCrewsInput,
   deps: WritebackDeps = defaultDeps()
 ): Promise<UpdateMemberCrewsResult> {
