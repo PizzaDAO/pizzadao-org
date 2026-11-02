@@ -117,7 +117,10 @@ export const crewContentImporter: Importer<ContentRecord> = {
     const { crews } = await getCrewMappings(true)
     const issues: ParseIssue[] = []
     const records: Array<{ key: string; value: ContentRecord }> = []
-    const extra: Record<string, number> = { crews: 0, crewsWithoutSheet: 0, crewsWithoutTasks: 0, unreadableSheets: 0, unresolvedLeadIds: 0, doneTasks: 0 }
+    const extra: Record<string, number> = { crews: 0, crewsWithoutSheet: 0, crewsWithoutTasks: 0, unreadableSheets: 0, unresolvedLeadIds: 0, doneTasks: 0, skippedDbCrews: 0 }
+    // Crews already edited on the website (a per-crew pilot) are left alone.
+    const { getSource, readsFromDb } = await import('./source')
+    const source = await getSource('crewTasks')
     let memberIds: Map<string, number> | null = null
     try {
       memberIds = (await getSheetData()).memberToIdx
@@ -126,6 +129,10 @@ export const crewContentImporter: Importer<ContentRecord> = {
     }
     for (const crew of crews) {
       extra.crews++
+      if (readsFromDb(source, crew.id)) {
+        extra.skippedDbCrews++
+        continue
+      }
       const sheetId = crew.sheet ? extractSheetId(crew.sheet) : null
       if (!sheetId) {
         extra.crewsWithoutSheet++
@@ -175,7 +182,7 @@ export const crewContentImporter: Importer<ContentRecord> = {
     }
     return map
   },
-  async apply(plan) {
+  async apply(plan, progress) {
     const ops = [...plan.create, ...plan.update].map(({ value }) => {
       const where = { crewId_naturalKey: { crewId: value.crewId, naturalKey: value.naturalKey } }
       if (value.kind === 'task') {
@@ -190,8 +197,12 @@ export const crewContentImporter: Importer<ContentRecord> = {
       const { kind: _k, ...data } = value
       return prisma.crewGoal.upsert({ where, create: { ...data, updatedBy: 'sheet-import' }, update: { ...data, updatedBy: 'sheet-import' } })
     })
-    // Chunked so one huge transaction does not hit the connection timeout.
-    for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100))
+    // Chunked so one huge transaction does not hit the connection timeout; progress is logged so a
+    // failure part-way shows how far it got (re-running the apply finishes the rest).
+    for (let i = 0; i < ops.length; i += 100) {
+      await prisma.$transaction(ops.slice(i, i + 100))
+      progress(Math.min(i + 100, ops.length))
+    }
     await invalidateCrewMappingsCache()
   },
 }

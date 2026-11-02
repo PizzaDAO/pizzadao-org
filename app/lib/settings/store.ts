@@ -79,6 +79,28 @@ async function checkTogether(key: SettingKey, value: unknown): Promise<void> {
   }
 }
 
+/**
+ * A `sheets.source.*` switch may only be set to read from the database once that data set has a
+ * successful import apply on /admin/sheets (otherwise the app would read empty tables).
+ */
+async function checkSheetSourceImported(key: SettingKey, value: unknown): Promise<void> {
+  if (!key.startsWith('sheets.source.') || typeof value !== 'string' || !value.startsWith('db')) return
+  const source = key.slice('sheets.source.'.length)
+  const { DATASETS } = await import('@/app/lib/sheets-import/datasets')
+  const dataset = DATASETS.find((d) => d.source === source)
+  const applied = dataset
+    ? await prisma.sheetImportRun.findFirst({ where: { dataset: dataset.key, mode: 'apply', ok: true }, select: { id: true } })
+    : null
+  if (!applied) {
+    throw new SettingError(
+      400,
+      dataset
+        ? `${key}: run the "${dataset.label}" import on /admin/sheets (dry run, then apply) before switching to the database`
+        : `${key}: there is no importer for this data set yet, so it cannot read from the database`,
+    )
+  }
+}
+
 /** What is in force for a setting when nothing is saved: the env value or table, else the code default. */
 export function baselineValue(key: SettingKey): unknown {
   if (key === 'economy.roleIncome') return roleIncomeBaseline().map((r) => ({ ...r }))
@@ -98,6 +120,7 @@ export async function saveSetting(
   if (!parsed.ok) throw new SettingError(400, `${key}: ${parsed.error}`)
   const note = cleanNote(opts.note)
   await checkTogether(key, parsed.value)
+  await checkSheetSourceImported(key, parsed.value)
   // Channels and roles must exist in our server (rejected, not stored, when Discord cannot confirm).
   try {
     await checkTargets(key, parsed.value)

@@ -48,6 +48,7 @@ export async function PUT(request: Request, { params }: Params) {
   try {
     return json({ ok: true, counts: await spec.save(rows, auth.session.discordId) })
   } catch (e) {
+    if (e instanceof EditorError) return json({ error: e.message }, 400)
     console.error('[sheets-data] save failed', dataset, e instanceof Error ? e.message : e)
     return json({ error: 'Could not save' }, 500)
   }
