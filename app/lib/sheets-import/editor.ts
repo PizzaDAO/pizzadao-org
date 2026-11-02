@@ -17,6 +17,8 @@ export interface EditorColumn {
   required?: boolean
   /** Shown, not edited (e.g. a derived id). */
   readOnly?: boolean
+  /** Not shown at all (still carried back, e.g. a row id). */
+  hidden?: boolean
   placeholder?: string
 }
 
@@ -39,7 +41,7 @@ export interface EditorSpec {
   /** Extra checks on one cleaned row; return a message to reject it. */
   validate?(row: EditorRow): string | null
   /** The natural key of a cleaned row (duplicates are rejected). */
-  keyOf(row: EditorRow): string
+  keyOf(row: EditorRow, index: number): string
   save(rows: EditorRow[], actor: string): Promise<SaveCounts>
 }
 
@@ -56,7 +58,12 @@ export function cleanRows(spec: EditorSpec, input: unknown): EditorRow[] {
     if (!raw || typeof raw !== 'object' || Array.isArray(raw)) throw new EditorError(`Row ${n}: not a row`)
     const row: EditorRow = {}
     for (const col of spec.columns) {
-      if (col.readOnly) continue
+      if (col.readOnly) {
+        // Carried back unchanged (e.g. a row id the server matches on); never trusted beyond that.
+        const v = (raw as Record<string, unknown>)[col.key]
+        if (typeof v === 'string' && v.trim() && v.length <= 64) row[col.key] = v.trim()
+        continue
+      }
       const v = (raw as Record<string, unknown>)[col.key]
       if (col.kind === 'bool') {
         row[col.key] = v === true || v === 'true'
@@ -80,7 +87,7 @@ export function cleanRows(spec: EditorSpec, input: unknown): EditorRow[] {
     }
     const problem = spec.validate?.(row)
     if (problem) throw new EditorError(`Row ${n}: ${problem}`)
-    const key = spec.keyOf(row)
+    const key = spec.keyOf(row, i)
     if (keys.has(key)) throw new EditorError(`Row ${n}: duplicate of an earlier row`)
     keys.add(key)
     out.push(row)

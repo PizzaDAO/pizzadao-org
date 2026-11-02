@@ -239,41 +239,14 @@ async function fetchCrewTasks(
   }
 }
 
+/** Extra Crew Mappings columns the app does not show but the importer keeps. */
+export type CrewMappingExtras = { type?: string; script?: string };
+
 /**
- * Get crew mappings data directly (without HTTP fetch)
- * @param forceRefresh - If true, bypass cache
- * @returns Crew mappings data
+ * Parse the Crew Mappings tab (GViz, headers=1) into crews, merging duplicate rows the way the
+ * app always has. Pure; shared by the sheet read path and the importer. No tasks, no call links.
  */
-export async function getCrewMappings(forceRefresh = false): Promise<{ crews: CrewOption[]; cached: boolean }> {
-  const cacheKey = `crew-mappings:v7:${SHEET_ID}`;
-
-  if (!forceRefresh) {
-    const cached = await cacheGet<{ crews: CrewOption[] }>(cacheKey);
-    if (cached) {
-      return { ...cached, cached: true };
-    }
-  }
-
-  const gvizEndpoint = buildGvizUrl(SHEET_ID, { tab: TAB_NAME, headers: 1 });
-
-  let gviz: GvizResponse;
-  try {
-    gviz = await fetchGviz(
-      SHEET_ID,
-      { tab: TAB_NAME, headers: 1 },
-      forceRefresh
-        ? { fresh: true, headers: GVIZ_HEADERS }
-        : { revalidate: CONFIG_REVALIDATE_SECONDS, headers: GVIZ_HEADERS },
-    );
-  } catch (e) {
-    const status = e instanceof GvizFetchError ? e.status : "unknown";
-    throw new Error(
-      `Failed to fetch sheet via GViz. status=${status} url=${gvizEndpoint} error=${
-        e instanceof Error ? e.message : String(e)
-      }`
-    );
-  }
-
+export function parseCrewMappings(gviz: GvizResponse): { crews: CrewOption[]; extras: Map<string, CrewMappingExtras> } {
   const table = gviz?.table;
   const cols: any[] = Array.isArray(table?.cols) ? table.cols : [];
   const rows: any[] = Array.isArray(table?.rows) ? table.rows : [];
@@ -310,6 +283,8 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
   const channelIdx = idx("Channel");
   const eventIdx = idx("Event");
   const emojiIdx = idx("Emoji");
+  const typeIdx = idx("Type");
+  const scriptIdx = idx("Script");
 
   const findFuzzy = (subs: string[]) =>
     headers.findIndex((h) => {
@@ -322,6 +297,7 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
   const callLengthIdx = findFuzzy(["Call Length", "Length", "Duration"]);
 
   const byId = new Map<string, CrewOption>();
+  const extras = new Map<string, CrewMappingExtras>();
 
   for (const r of dataRows) {
     const crew = cell(r, crewIdx);
@@ -337,6 +313,13 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
     const sheet = sheetIdx !== -1 ? cell(r, sheetIdx) : "";
     const callTime = callTimeIdx !== -1 ? cell(r, callTimeIdx) : "";
     const callLength = callLengthIdx !== -1 ? cell(r, callLengthIdx) : "";
+    const type = typeIdx !== -1 ? cell(r, typeIdx) : "";
+    const script = scriptIdx !== -1 ? cell(r, scriptIdx) : "";
+
+    const ex = extras.get(id) ?? {};
+    if (!ex.type && type) ex.type = type;
+    if (!ex.script && script) ex.script = script;
+    extras.set(id, ex);
 
     const existing = byId.get(id);
     if (existing) {
@@ -366,18 +349,73 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
   }
 
   const crews = Array.from(byId.values()).sort((a, b) => a.label.localeCompare(b.label));
+  return { crews, extras };
+}
+
+/**
+ * The Crew Mappings tab with call-time links, straight from the sheet (no tasks). Throws on a
+ * sheet error.
+ */
+export async function fetchCrewMappingsFromSheet(forceRefresh = false): Promise<{ crews: CrewOption[]; extras: Map<string, CrewMappingExtras> }> {
+  const gvizEndpoint = buildGvizUrl(SHEET_ID, { tab: TAB_NAME, headers: 1 });
+
+  let gviz: GvizResponse;
+  try {
+    gviz = await fetchGviz(
+      SHEET_ID,
+      { tab: TAB_NAME, headers: 1 },
+      forceRefresh
+        ? { fresh: true, headers: GVIZ_HEADERS }
+        : { revalidate: CONFIG_REVALIDATE_SECONDS, headers: GVIZ_HEADERS },
+    );
+  } catch (e) {
+    const status = e instanceof GvizFetchError ? e.status : "unknown";
+    throw new Error(
+      `Failed to fetch sheet via GViz. status=${status} url=${gvizEndpoint} error=${
+        e instanceof Error ? e.message : String(e)
+      }`
+    );
+  }
+
+  const parsed = parseCrewMappings(gviz);
 
   // Fetch calendar event links from Call Time column
   const callTimeLinks = await getColumnHyperlinks(SHEET_ID, TAB_NAME, "Crew", "Call Time");
-  for (const c of crews) {
+  for (const c of parsed.crews) {
     if (callTimeLinks[c.label]) {
       c.callTimeUrl = callTimeLinks[c.label];
     }
   }
+  return parsed;
+}
 
-  // Parallel fetch tasks for crews that have a sheet
+/** A Crew row as the app's CrewOption (same shape as the sheet path, before tasks). */
+export function crewRowToOption(r: {
+  id: string; label: string; emoji: string | null; turtles: string[]; role: string | null; channel: string | null; event: string | null;
+  callTime: string | null; callTimeUrl: string | null; callLength: string | null; legacySheetUrl: string | null;
+}): CrewOption {
+  const opt: CrewOption = { id: r.id, label: r.label, turtles: [...(r.turtles ?? [])], tasks: [] };
+  if (r.role) opt.role = r.role;
+  if (r.channel) opt.channel = r.channel;
+  if (r.event) opt.event = r.event;
+  if (r.emoji) opt.emoji = r.emoji;
+  if (r.legacySheetUrl) opt.sheet = r.legacySheetUrl;
+  if (r.callTime) opt.callTime = r.callTime;
+  if (r.callTimeUrl) opt.callTimeUrl = r.callTimeUrl;
+  if (r.callLength) opt.callLength = r.callLength;
+  return opt;
+}
+
+/** The crew registry from the database (not archived), sorted like the sheet path. No tasks. */
+export async function fetchCrewsFromDb(): Promise<CrewOption[]> {
+  const { prisma } = await import("@/app/lib/db");
+  const rows = await prisma.crew.findMany({ where: { archived: false } });
+  return rows.map(crewRowToOption).sort((a, b) => a.label.localeCompare(b.label));
+}
+
+/** Top tasks + count for each crew (from its sheet, or the database once crew tasks move). */
+async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<void> {
   const limit = promiseLimit(3);
-
   await Promise.all(
     crews.map((c) => limit(async () => {
       if (c.sheet) {
@@ -387,6 +425,38 @@ export async function getCrewMappings(forceRefresh = false): Promise<{ crews: Cr
       }
     }))
   );
+}
+
+const DB_CACHE_KEY = "crew-mappings:db:v1";
+const sheetCacheKey = () => `crew-mappings:v7:${SHEET_ID}`;
+
+/** Forget the cached crew list (after an edit on the website). */
+export async function invalidateCrewMappingsCache(): Promise<void> {
+  await Promise.all([cacheDel(DB_CACHE_KEY), cacheDel(sheetCacheKey())]);
+}
+
+/**
+ * Get crew mappings data directly (without HTTP fetch). Source: the Crew Mappings sheet, or the
+ * Crew table once `sheets.source.crews` is "db" (plans/sheets-cutover.md).
+ * @param forceRefresh - If true, bypass cache
+ * @returns Crew mappings data
+ */
+export async function getCrewMappings(forceRefresh = false): Promise<{ crews: CrewOption[]; cached: boolean }> {
+  const { usesDb } = await import("@/app/lib/sheets-import/source");
+  const fromDb = await usesDb("crews");
+  const cacheKey = fromDb ? DB_CACHE_KEY : sheetCacheKey();
+
+  if (!forceRefresh) {
+    const cached = await cacheGet<{ crews: CrewOption[] }>(cacheKey);
+    if (cached) {
+      return { ...cached, cached: true };
+    }
+  }
+
+  const crews = fromDb ? await fetchCrewsFromDb() : (await fetchCrewMappingsFromSheet(forceRefresh)).crews;
+
+  // Parallel fetch tasks for crews that have a sheet
+  await attachTasks(crews, forceRefresh);
 
   const payload = { crews };
   await cacheSet(cacheKey, payload, CACHE_TTL.CREW_MAPPINGS);
