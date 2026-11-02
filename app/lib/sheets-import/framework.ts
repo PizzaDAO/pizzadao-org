@@ -98,6 +98,20 @@ export interface ParityReport {
 
 export const MAX_ISSUES = 200
 
+/** Compare two keyed outputs of the same read path (sheet mode vs database mode). Counts only. */
+export function compareKeyed<T>(dataset: string, sheet: ReadonlyMap<string, T>, db: ReadonlyMap<string, T>, equal: (a: T, b: T) => boolean = stableEqual): ParityReport {
+  let mismatches = 0
+  let onlyInSheet = 0
+  let onlyInDb = 0
+  for (const [k, v] of sheet) {
+    const d = db.get(k)
+    if (d === undefined) onlyInSheet++
+    else if (!equal(v, d)) mismatches++
+  }
+  for (const k of db.keys()) if (!sheet.has(k)) onlyInDb++
+  return { dataset, compared: sheet.size, mismatches, onlyInSheet, onlyInDb }
+}
+
 export function countsOf<T>(plan: UpsertPlan<T>, parseErrors: number): ImportCounts {
   return { create: plan.create.length, update: plan.update.length, unchanged: plan.unchanged, orphan: plan.orphans.length, parseErrors }
 }
