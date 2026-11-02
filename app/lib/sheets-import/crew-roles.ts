@@ -134,7 +134,7 @@ export const crewRolesImporter: Importer<RoleRecord> = {
       }),
     )
   },
-  async apply(plan) {
+  async apply(plan, progress) {
     const ops = [...plan.create, ...plan.update].map(({ value }) =>
       prisma.crewRole.upsert({
         where: { crewId_naturalKey: { crewId: value.crewId, naturalKey: value.naturalKey } },
@@ -142,7 +142,11 @@ export const crewRolesImporter: Importer<RoleRecord> = {
         update: { ...value, updatedBy: 'sheet-import' },
       }),
     )
-    for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100))
+    // Chunked; progress is logged so a failure part-way shows how far it got.
+    for (let i = 0; i < ops.length; i += 100) {
+      await prisma.$transaction(ops.slice(i, i + 100))
+      progress(Math.min(i + 100, ops.length))
+    }
   },
 }
 
