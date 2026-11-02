@@ -6,6 +6,7 @@ import type { DatasetInfo, Importer } from './framework'
 import type { EditorSpec } from './editor'
 
 const configs = () => import('./configs')
+const crews = () => import('./crews')
 
 export const DATASETS: DatasetInfo[] = [
   {
@@ -32,6 +33,14 @@ export const DATASETS: DatasetInfo[] = [
     importer: async () => (await configs()).manualsImporter as Importer<unknown>,
     parity: async () => (await configs()).manualsParity(),
   },
+  {
+    key: 'crews',
+    label: 'Crew registry',
+    source: 'crews',
+    description: 'The Crew Mappings sheet: crew, emoji, turtles, role, channel, event, call time and link, call length, type, script, crew sheet. Duplicate rows merge as before. Key: crew id (slug).',
+    importer: async () => (await crews()).crewsImporter as Importer<unknown>,
+    parity: async () => (await crews()).crewsParity(),
+  },
 ]
 
 export function findDataset(key: string): DatasetInfo | undefined {
@@ -43,4 +52,5 @@ export const EDITORS: Record<string, () => Promise<EditorSpec>> = {
   poapWhitelist: async () => (await configs()).poapEditor,
   nftCollections: async () => (await configs()).nftEditor,
   manuals: async () => (await configs()).manualsEditor,
+  crews: async () => (await crews()).crewsEditor,
 }

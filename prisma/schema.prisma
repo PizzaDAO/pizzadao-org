@@ -2203,3 +2203,26 @@ model Manual {
   updatedAt   DateTime @updatedAt
   updatedBy   String?
 }
+
+// The crew registry (was the Crew Mappings sheet). `id` is the slug used in URLs,
+// CallRecording.crewId and CrewDraft.crewId. Archived crews are hidden, never deleted.
+model Crew {
+  id             String   @id
+  label          String
+  emoji          String?
+  turtles        String[] @default([])
+  role           String? // Discord role (as the sheet held it)
+  channel        String? // Discord channel (as the sheet held it)
+  event          String? // text that matches the crew's Discord scheduled events
+  callTime       String?
+  callTimeUrl    String?
+  callLength     String?
+  type           String?
+  script         String?
+  legacySheetUrl String? // the crew's own Google Sheet (tasks, agenda, roster until those move)
+  sortOrder      Int      @default(0)
+  archived       Boolean  @default(false)
+  createdAt      DateTime @default(now())
+  updatedAt      DateTime @updatedAt
+  updatedBy      String?
+}
