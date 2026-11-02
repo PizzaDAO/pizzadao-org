@@ -2156,3 +2156,50 @@ model SheetSnapshot {
   @@index([batchId])
   @@index([sheetKey, takenAt])
 }
+
+// POAP events whose POAPs show on profiles (was the POAP whitelist sheet). Inactive rows are hidden.
+model PoapWhitelistEntry {
+  eventId   String   @id
+  position  Int
+  active    Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
+// NFT collections shown on profiles and the leaderboard (was the NFT contracts sheet).
+model NftCollection {
+  id          String   @id @default(cuid())
+  chain       String
+  address     String
+  addressKey  String // lowercase address: the natural key with chain
+  name        String
+  sortOrder   Int?
+  description String?
+  position    Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+
+  @@unique([chain, addressKey])
+}
+
+// The manuals index (was the manuals sheet). Content stays in the linked documents.
+model Manual {
+  id          String   @id @default(cuid())
+  titleKey    String   @unique // normalized title: the natural key
+  title       String
+  url         String?
+  crew        String   @default("")
+  status      String   @default("")
+  authorId    String   @default("")
+  author      String   @default("")
+  lastUpdated String   @default("")
+  notes       String   @default("")
+  position    Int
+  active      Boolean  @default(true)
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  updatedBy   String?
+}

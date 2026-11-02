@@ -5,6 +5,7 @@ import { norm } from '@/app/lib/strings'
 import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
 import { internalError } from '@/app/lib/errors/error-response'
+import { listManualsFromDb, manualsFromDb } from '@/app/lib/manuals'
 
 const MANUALS_SHEET_ID = SHEET_IDS.manuals
 
@@ -121,6 +122,64 @@ async function fetchSheetContent(sheetId: string, cacheOpts: GvizCacheOptions): 
   }
 }
 
+// The manuals index as the sheet holds it (title in column A), in sheet order.
+async function loadManualsFromSheet(cacheOpts: GvizCacheOptions, debugMode: boolean): Promise<{ manuals: Manual[]; debugInfo: ManualLinksDebugResult | null }> {
+  const loadManualsSheet = () =>
+    fetchGviz(MANUALS_SHEET_ID, { headers: 1 }, cacheOpts).catch(() => {
+      throw new Error('Failed to fetch manuals spreadsheet')
+    })
+
+  let linkMap: Record<string, string>
+  let debugInfo: ManualLinksDebugResult | null = null
+  let gviz: Awaited<ReturnType<typeof fetchGviz>>
+
+  if (debugMode) {
+    const [sheet, debugResult] = await Promise.all([
+      loadManualsSheet(),
+      getManualLinksDebug(MANUALS_SHEET_ID),
+    ])
+    gviz = sheet
+    debugInfo = debugResult
+    linkMap = debugResult.linkMap
+  } else {
+    const [sheet, linkMapResult] = await Promise.all([
+      loadManualsSheet(),
+      getManualLinks(MANUALS_SHEET_ID),
+    ])
+    gviz = sheet
+    linkMap = linkMapResult
+  }
+
+  const rows = gviz?.table?.rows || []
+
+  // Parse all manuals
+  const manuals: Manual[] = []
+  for (const row of rows) {
+    const cells = row?.c || []
+    const title = cellVal(cells[0])
+    if (!title) continue
+
+    // Priority: 1. Sheets API link map (Ctrl+K/rich text links)  2. GViz extraction (cell.l)
+    const titleCell = cells[0]
+    const url = linkMap[title] || extractUrl(titleCell)
+    const crew = cellVal(cells[1])
+
+    manuals.push({
+      title,
+      url,
+      crew,
+      crewId: crewLabelToId(crew),
+      status: cellVal(cells[2]),
+      authorId: cellVal(cells[3]),
+      author: cellVal(cells[4]),
+      lastUpdated: cellVal(cells[5]),
+      notes: cellVal(cells[6]),
+    })
+  }
+
+  return { manuals, debugInfo }
+}
+
 export async function GET(
   req: Request,
   { params }: { params: Promise<{ id: string }> }
@@ -147,57 +206,16 @@ export async function GET(
     const cacheOpts: GvizCacheOptions = forceRefresh
       ? { fresh: true }
       : { revalidate: MANUALS_REVALIDATE_SECONDS }
-    const loadManualsSheet = () =>
-      fetchGviz(MANUALS_SHEET_ID, { headers: 1 }, cacheOpts).catch(() => {
-        throw new Error('Failed to fetch manuals spreadsheet')
-      })
 
-    let linkMap: Record<string, string>
+    let manuals: Manual[] = []
     let debugInfo: ManualLinksDebugResult | null = null
-    let gviz: Awaited<ReturnType<typeof fetchGviz>>
-
-    if (debugMode) {
-      const [sheet, debugResult] = await Promise.all([
-        loadManualsSheet(),
-        getManualLinksDebug(MANUALS_SHEET_ID),
-      ])
-      gviz = sheet
-      debugInfo = debugResult
-      linkMap = debugResult.linkMap
+    if (await manualsFromDb()) {
+      // The index lives in the database (sheets.source.manuals = db); content stays in the linked sheet.
+      manuals = await listManualsFromDb()
     } else {
-      const [sheet, linkMapResult] = await Promise.all([
-        loadManualsSheet(),
-        getManualLinks(MANUALS_SHEET_ID),
-      ])
-      gviz = sheet
-      linkMap = linkMapResult
-    }
-
-    const rows = gviz?.table?.rows || []
-
-    // Parse all manuals
-    const manuals: Manual[] = []
-    for (const row of rows) {
-      const cells = row?.c || []
-      const title = cellVal(cells[0])
-      if (!title) continue
-
-      // Priority: 1. Sheets API link map (Ctrl+K/rich text links)  2. GViz extraction (cell.l)
-      const titleCell = cells[0]
-      const url = linkMap[title] || extractUrl(titleCell)
-      const crew = cellVal(cells[1])
-
-      manuals.push({
-        title,
-        url,
-        crew,
-        crewId: crewLabelToId(crew),
-        status: cellVal(cells[2]),
-        authorId: cellVal(cells[3]),
-        author: cellVal(cells[4]),
-        lastUpdated: cellVal(cells[5]),
-        notes: cellVal(cells[6]),
-      })
+      const sheet = await loadManualsFromSheet(cacheOpts, debugMode)
+      manuals = sheet.manuals
+      debugInfo = sheet.debugInfo
     }
 
     // Get manual by index

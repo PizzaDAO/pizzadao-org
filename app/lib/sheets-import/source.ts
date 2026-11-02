@@ -68,7 +68,17 @@ export function resolveSource(key: SheetSourceKey, settings: Settings, env: Env 
 
 /** The effective source for a data set right now (settings cached ~30s). Never throws. */
 export async function getSource(key: SheetSourceKey, env: Env = process.env): Promise<ResolvedSource> {
+  // The env var or a preview decides without reading settings (no database round trip).
+  if ((env[SHEET_SOURCES[key].env] ?? '').trim() || env.VERCEL_ENV !== 'production') return resolveSource(key, NO_SETTINGS, env)
   return resolveSource(key, await loadSettings(), env)
+}
+
+/** Never consulted: resolveSource returns before reading settings when env or a preview decides. */
+const NO_SETTINGS: Settings = {
+  get: (() => 'sheet') as Settings['get'],
+  isSet: () => false,
+  readFailed: false,
+  invalidKeys: [],
 }
 
 /** True when this data set (and, for a per-crew pilot, this crew) reads from the database. */

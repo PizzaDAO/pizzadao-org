@@ -5,7 +5,7 @@ import { prisma } from '@/app/lib/db'
 import { loadSettings } from '@/app/lib/settings'
 import { SHEET_SOURCES, SHEET_SOURCE_KEYS, type SheetSourceKey } from '@/app/lib/settings/sheets-settings'
 import { SHEET_IDS, type SheetKey } from '@/app/lib/sheets/config'
-import { DATASETS } from './datasets'
+import { DATASETS, EDITORS } from './datasets'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { resolveSource } from './source'
 
@@ -25,6 +25,7 @@ export interface DatasetView {
   description: string
   source: SheetSourceKey | null
   hasParity: boolean
+  hasEditor: boolean
   lastDryRun: RunView | null
   lastApply: RunView | null
 }
@@ -75,6 +76,7 @@ export async function sheetsOverview(): Promise<SheetsOverview> {
       description: d.description,
       source: d.source ?? null,
       hasParity: !!d.parity,
+      hasEditor: !!EDITORS[d.key],
       lastDryRun: lastDryRun ? toRunView(lastDryRun) : null,
       lastApply: lastApply ? toRunView(lastApply) : null,
     })

@@ -1,15 +1,13 @@
 import { fetchGviz, type GvizCacheOptions } from "@/app/lib/sheets/gviz";
 import { SHEET_IDS } from "@/app/lib/sheets/config";
-import {
-  TableConfig,
-  parseTable,
-  getColumnValue,
-  isTablesModeDetected,
-} from "@/app/lib/table-parser";
+import { isTablesModeDetected } from "@/app/lib/table-parser";
+import { listManualsFromDb, manualsFromDb, parseManualsTable, type Manual } from "@/app/lib/manuals";
 import { NextResponse } from 'next/server'
 import { getManualLinks, getManualLinksDebug, ManualLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
-import { GvizRow, GvizTable } from "@/app/lib/types/gviz";
+import { GvizTable } from "@/app/lib/types/gviz";
+
+export type { Manual }
 import { internalError } from "@/app/lib/errors/error-response";
 
 const MANUALS_SHEET_ID = SHEET_IDS.manuals
@@ -17,86 +15,21 @@ const MANUALS_SHEET_ID = SHEET_IDS.manuals
 /** Read-only config sheet: 5-minute data cache unless ?fresh=1. */
 const MANUALS_REVALIDATE_SECONDS = 300
 
-/**
- * Manual table parsing configuration
- * Handles Google Sheets Tables mode with anchor-based detection
- */
-const MANUAL_TABLE_CONFIG: TableConfig = {
-  anchorKeywords: ['manuals', 'manual'],
-  headerMappings: [
-    ['manual', ['manual', 'manuals', 'title', 'name']],
-    ['crew', ['crew', 'team', 'group']],
-    ['status', ['status', 'state', 'stage']],
-    ['authorId', ['author id', 'authorid', 'member id']],
-    ['author', ['author', 'creator', 'owner', 'by']],
-    ['lastUpdated', ['last updated', 'updated', 'date', 'modified']],
-    ['notes', ['notes', 'note', 'comments', 'description']],
-  ],
-  requiredColumns: ['manual'],
-}
-
-// Convert crew label to ID (slug format)
-function crewLabelToId(label: string): string {
-  return label.trim()
-    .toLowerCase()
-    .replace(/[^a-z0-9]+/g, '_')
-    .replace(/^_+|_+$/g, '')
-}
-
-export type Manual = {
-  title: string
-  url: string | null
-  crew: string
-  crewId: string
-  status: string
-  authorId: string
-  author: string
-  lastUpdated: string
-  notes: string
-}
-
-/**
- * Parse a row into a Manual object
- * Returns null if the row should be skipped (empty or header row)
- */
-function parseManualRow(
-  row: GvizRow,
-  columns: Record<string, number>,
-  rowIndex: number,
-  linkMap: Record<string, string>
-): Manual | null {
-  const title = getColumnValue(row, columns, 'manual')
-
-  // Skip empty rows
-  if (!title) return null
-
-  // Skip header rows that might have been duplicated
-  const titleLower = title.toLowerCase().trim()
-  if (titleLower === 'manual' || titleLower === 'manuals' || titleLower === 'title') {
-    return null
-  }
-
-  const crew = getColumnValue(row, columns, 'crew')
-
-  return {
-    title,
-    url: linkMap[title] || null,
-    crew,
-    crewId: crewLabelToId(crew),
-    status: getColumnValue(row, columns, 'status'),
-    authorId: getColumnValue(row, columns, 'authorId'),
-    author: getColumnValue(row, columns, 'author'),
-    lastUpdated: getColumnValue(row, columns, 'lastUpdated'),
-    notes: getColumnValue(row, columns, 'notes'),
-  }
-}
-
 export async function GET(req: Request) {
   try {
     const url = new URL(req.url)
     const crewFilter = url.searchParams.get('crew')?.toLowerCase()
     const debugMode = url.searchParams.get('debug') === '1'
     const forceRefresh = url.searchParams.get('fresh') === '1'
+
+    // Once the index lives in the database (sheets.source.manuals = db), the sheet is not read.
+    if (await manualsFromDb()) {
+      const allManuals = await listManualsFromDb()
+      const manuals = crewFilter ? allManuals.filter(m => m.crew.toLowerCase() === crewFilter) : allManuals
+      return NextResponse.json({ manuals }, {
+        headers: { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=3600' }
+      })
+    }
 
     // Clear cache if force refresh
     if (forceRefresh) {
@@ -132,11 +65,7 @@ export async function GET(req: Request) {
       }
 
       // Parse manuals using the robust table parser
-      const allManuals = parseTable<Manual>(
-        table,
-        MANUAL_TABLE_CONFIG,
-        (row, columns, rowIndex) => parseManualRow(row, columns, rowIndex, linkMap)
-      )
+      const allManuals = parseManualsTable(table, linkMap)
 
       // Apply crew filter if specified
       const manuals = crewFilter
@@ -169,11 +98,7 @@ export async function GET(req: Request) {
     // - Dynamic header row detection
     // - Tables mode (concatenated column labels)
     // - Various column naming conventions
-    const allManuals = parseTable<Manual>(
-      table,
-      MANUAL_TABLE_CONFIG,
-      (row, columns, rowIndex) => parseManualRow(row, columns, rowIndex, linkMap)
-    )
+    const allManuals = parseManualsTable(table, linkMap)
 
     // Apply crew filter if specified
     const manuals = crewFilter

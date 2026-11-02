@@ -24,93 +24,119 @@ interface POAPCache {
 }
 
 /**
- * Fetch allowed POAP event IDs from Google Sheets whitelist
- * Returns Set of event IDs (not token IDs - POAP events have multiple tokens)
+ * Parse the POAP whitelist sheet (GViz, headers=0): event ids in sheet order, plus the 1-based
+ * rows whose cell was filled but not a valid id. Pure; shared by the read path and the importer.
+ */
+export function parseAllowedPOAPIds(gviz: GvizResponse): { ids: string[]; badRows: number[]; found: boolean } {
+  const rows = gviz?.table?.rows || [];
+  const cols = gviz?.table?.cols || [];
+
+  // Strategy 1: Look for a header row with "POAP ID" or similar
+  let poapIdIdx = -1;
+  let startRow = 0;
+
+  for (let ri = 0; ri < Math.min(rows.length, 5); ri++) {
+    const rowCells = rows[ri]?.c || [];
+    const rowVals = rowCells.map((c: GvizCell) =>
+      String(c?.v || c?.f || '').trim().toLowerCase()
+    );
+
+    // Look for "POAP ID" or "Event ID" column header
+    const foundIdx = rowVals.findIndex(v =>
+      (v.includes('poap') && v.includes('id')) ||
+      (v.includes('event') && v.includes('id'))
+    );
+
+    if (foundIdx !== -1) {
+      poapIdIdx = foundIdx;
+      startRow = ri + 1;
+      break;
+    }
+  }
+
+  // Strategy 2: If no header found, look for a numeric column (type: number)
+  // The POAP whitelist sheet has IDs in column D (index 3) with no header
+  if (poapIdIdx === -1) {
+    for (let ci = 0; ci < cols.length; ci++) {
+      if (cols[ci]?.type === 'number') {
+        poapIdIdx = ci;
+        startRow = 1; // Skip first row (likely headers even if empty)
+        break;
+      }
+    }
+  }
+
+  // Strategy 3: Fallback - check column D (index 3) which is common for POAP sheets
+  if (poapIdIdx === -1 && cols.length > 3) {
+    poapIdIdx = 3;
+    startRow = 1;
+  }
+
+  if (poapIdIdx === -1) return { ids: [], badRows: [], found: false };
+
+  const ids: string[] = [];
+  const seen = new Set<string>();
+  const badRows: number[] = [];
+  for (let ri = startRow; ri < rows.length; ri++) {
+    const cells = rows[ri]?.c || [];
+    const cell = cells[poapIdIdx];
+    // Handle both numeric values and string values
+    const poapId = String(cell?.v ?? cell?.f ?? '').trim();
+
+    // Only add valid numeric POAP IDs (they're typically 4-6 digit numbers)
+    if (poapId && poapId !== '0' && /^\d+$/.test(poapId)) {
+      if (!seen.has(poapId)) {
+        seen.add(poapId);
+        ids.push(poapId);
+      }
+    } else if (poapId && poapId !== '0') {
+      badRows.push(ri + 1);
+    }
+  }
+  return { ids, badRows, found: true };
+}
+
+/** The whitelist straight from the sheet. Throws when the sheet cannot be read. */
+export async function fetchAllowedPOAPIdsFromSheet(opts: { fresh?: boolean } = {}): Promise<{ ids: string[]; badRows: number[]; found: boolean }> {
+  const gviz = await fetchGviz(
+    POAP_WHITELIST_SHEET_ID,
+    { headers: 0 },
+    opts.fresh ? { fresh: true } : { revalidate: POAP_WHITELIST_REVALIDATE },
+  );
+  return parseAllowedPOAPIds(gviz);
+}
+
+/** The whitelist from the database (active rows, in order). */
+export async function fetchAllowedPOAPIdsFromDb(): Promise<string[]> {
+  const { prisma } = await import('./db');
+  const rows = await prisma.poapWhitelistEntry.findMany({ where: { active: true }, orderBy: { position: 'asc' }, select: { eventId: true } });
+  return rows.map((r) => r.eventId);
+}
+
+/**
+ * Allowed POAP event IDs (not token IDs - POAP events have multiple tokens).
  *
- * Sheet: SHEET_IDS.poapWhitelist
- * Column: "POAP ID" or numeric column with POAP event IDs
+ * Source: the POAP whitelist sheet (SHEET_IDS.poapWhitelist), or the PoapWhitelistEntry table once
+ * `sheets.source.poapWhitelist` is "db" (plans/sheets-cutover.md). Empty on any read error.
  *
- * Cached for 5 minutes in Next's data cache; pass `{ fresh: true }` to bypass.
+ * The sheet is cached for 5 minutes in Next's data cache; pass `{ fresh: true }` to bypass.
  */
 export async function fetchAllowedPOAPIds(opts: { fresh?: boolean } = {}): Promise<Set<string>> {
   try {
-    let gviz: GvizResponse;
+    const { usesDb } = await import('./sheets-import/source');
+    if (await usesDb('poapWhitelist')) return new Set(await fetchAllowedPOAPIdsFromDb());
+    let parsed: { ids: string[]; found: boolean };
     try {
-      gviz = await fetchGviz(
-        POAP_WHITELIST_SHEET_ID,
-        { headers: 0 },
-        opts.fresh ? { fresh: true } : { revalidate: POAP_WHITELIST_REVALIDATE },
-      );
+      parsed = await fetchAllowedPOAPIdsFromSheet(opts);
     } catch (e) {
       console.error(`POAP whitelist fetch failed: ${e instanceof Error ? e.message : String(e)}`);
       return new Set();
     }
-    const rows = gviz?.table?.rows || [];
-    const cols = gviz?.table?.cols || [];
-
-    // Strategy 1: Look for a header row with "POAP ID" or similar
-    let poapIdIdx = -1;
-    let startRow = 0;
-
-    for (let ri = 0; ri < Math.min(rows.length, 5); ri++) {
-      const rowCells = rows[ri]?.c || [];
-      const rowVals = rowCells.map((c: GvizCell) =>
-        String(c?.v || c?.f || '').trim().toLowerCase()
-      );
-
-      // Look for "POAP ID" or "Event ID" column header
-      const foundIdx = rowVals.findIndex(v =>
-        (v.includes('poap') && v.includes('id')) ||
-        (v.includes('event') && v.includes('id'))
-      );
-
-      if (foundIdx !== -1) {
-        poapIdIdx = foundIdx;
-        startRow = ri + 1;
-        break;
-      }
-    }
-
-    // Strategy 2: If no header found, look for a numeric column (type: number)
-    // The POAP whitelist sheet has IDs in column D (index 3) with no header
-    if (poapIdIdx === -1) {
-      // Find the first numeric column
-      for (let ci = 0; ci < cols.length; ci++) {
-        if (cols[ci]?.type === 'number') {
-          poapIdIdx = ci;
-          startRow = 1; // Skip first row (likely headers even if empty)
-          break;
-        }
-      }
-    }
-
-    // Strategy 3: Fallback - check column D (index 3) which is common for POAP sheets
-    if (poapIdIdx === -1 && cols.length > 3) {
-      poapIdIdx = 3;
-      startRow = 1;
-    }
-
-    if (poapIdIdx === -1) {
+    if (!parsed.found) {
       console.error('Could not locate POAP ID column in whitelist sheet');
       return new Set();
     }
-
-    // Extract POAP IDs from rows
-    const allowedIds = new Set<string>();
-    for (let ri = startRow; ri < rows.length; ri++) {
-      const cells = rows[ri]?.c || [];
-      const cell = cells[poapIdIdx];
-      // Handle both numeric values and string values
-      const poapId = String(cell?.v ?? cell?.f ?? '').trim();
-
-      // Only add valid numeric POAP IDs (they're typically 4-6 digit numbers)
-      if (poapId && poapId !== '' && poapId !== '0' && /^\d+$/.test(poapId)) {
-        allowedIds.add(poapId);
-      }
-    }
-
-    return allowedIds;
-
+    return new Set(parsed.ids);
   } catch (error) {
     console.error('Error fetching POAP whitelist:', error);
     return new Set();

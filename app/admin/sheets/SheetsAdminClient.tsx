@@ -142,6 +142,11 @@ export default function SheetsAdminClient() {
                                                 <button className="px-3 py-2 border rounded text-sm" disabled={!!busy} onClick={() => runImport(d.key, "apply")}>
                                                     {busy === `${d.key}:apply` ? "Applying..." : "Apply"}
                                                 </button>
+                                                {d.hasEditor && (
+                                                    <Link className="px-3 py-2 border rounded text-sm" href={`/admin/sheets/edit/${d.key}`}>
+                                                        Edit on the website
+                                                    </Link>
+                                                )}
                                                 {d.hasParity && (
                                                     <button className="px-3 py-2 border rounded text-sm" disabled={!!busy} onClick={() => runParity(d.key)}>
                                                         {busy === `${d.key}:parity` ? "Checking..." : "Parity check"}
