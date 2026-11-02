@@ -50,7 +50,7 @@ describe('stale slots after a reschedule', () => {
     m.observe(live, T19 + 30 * 60_000, keep)
     expect(logs.some((l) => l.includes('slot dropped') && l.includes(`a:${T20}`))).toBe(true)
 
-    const merged = m.merge(live, keep)
+    const merged = m.merge(live, keep, T20 + 60_000)
     expect(merged.some((e) => eventKey(e) === `a:${T20}`)).toBe(false)
     expect(decide(merged).type).toBe('ignore')
   })
@@ -64,7 +64,7 @@ describe('stale slots after a reschedule', () => {
   it('mergeSlots drops a stale slot from an older build even if never observed', () => {
     const stale = slotsFromLive([ev({ id: 'a', scheduledStartMs: T20 })], CH)
     const live = [ev({ id: 'a', scheduledStartMs: T21 }), ev({ id: 'b', scheduledStartMs: T19 })]
-    expect(decide(mergeSlots(live, stale, { callChannelId: CH })).type).toBe('ignore')
+    expect(decide(mergeSlots(live, stale, { callChannelId: CH, nowMs: T19 })).type).toBe('ignore')
   })
 
   it('drops the stale slot when the old start is already in its lead window', () => {
@@ -81,27 +81,38 @@ describe('stale slots after a reschedule', () => {
     const live = [ev({ id: 'a', scheduledStartMs: T20 + WEEK })]
     m.observe(live, T20 + 5 * 60_000)
     expect(m.all().some((s) => s.scheduledStartMs === T20)).toBe(true)
-    expect(m.merge(live).some((e) => eventKey(e) === `a:${T20}`)).toBe(true)
+    expect(m.merge(live, new Set(), T20 + 5 * 60_000).some((e) => eventKey(e) === `a:${T20}`)).toBe(true)
   })
 
   it('keeps the slot of the session being recorded', () => {
     const slot = slotsFromLive([ev({ id: 'a', scheduledStartMs: T20 })], CH)
     const live = [ev({ id: 'a', scheduledStartMs: T21 })]
-    expect(staleSlots(live, slot, CH, new Set([`a:${T20}`]))).toEqual([])
-    expect(staleSlots(live, slot, CH).map((d) => d.slot.scheduledStartMs)).toContain(T20)
+    expect(staleSlots(live, slot, CH, T19, new Set([`a:${T20}`]))).toEqual([])
+    expect(staleSlots(live, slot, CH, T19).map((d) => d.slot.scheduledStartMs)).toContain(T20)
   })
 
   it('uses 24h when the event is not recurring', () => {
     const slot = slotsFromLive([ev({ id: 'a', scheduledStartMs: T20, recurrenceIntervalMs: null })], CH)
     const near = [ev({ id: 'a', scheduledStartMs: T21, recurrenceIntervalMs: null })]
-    expect(staleSlots(near, slot, CH)).toHaveLength(1)
+    expect(staleSlots(near, slot, CH, T19)).toHaveLength(1)
     const far = [ev({ id: 'a', scheduledStartMs: T20 + 30 * HOUR, recurrenceIntervalMs: null })]
-    expect(staleSlots(far, slot, CH)).toEqual([])
+    expect(staleSlots(far, slot, CH, T19)).toEqual([])
   })
 
   it('ignores other events and other channels', () => {
     const slot = slotsFromLive([ev({ id: 'a', scheduledStartMs: T20 })], CH)
-    expect(staleSlots([ev({ id: 'b', scheduledStartMs: T21 })], slot, CH)).toEqual([])
-    expect(staleSlots([ev({ id: 'a', scheduledStartMs: T21, channelId: 'other' })], slot, CH)).toEqual([])
+    expect(staleSlots([ev({ id: 'b', scheduledStartMs: T21 })], slot, CH, T19)).toEqual([])
+    expect(staleSlots([ev({ id: 'a', scheduledStartMs: T21, channelId: 'other' })], slot, CH, T19)).toEqual([])
+  })
+
+  it('keeps an auto-ended occurrence that has begun when the next start moves earlier (DST patch)', () => {
+    const m = memory()
+    m.observe([ev({ id: 'a', scheduledStartMs: T20 })], T20 - 3 * HOUR)
+    // After the slot began, Discord shows next week's start, patched one hour earlier.
+    const live = [ev({ id: 'a', scheduledStartMs: T20 + WEEK - HOUR })]
+    const now = T20 + 10 * 60_000
+    m.observe(live, now)
+    expect(m.all().some((s) => s.scheduledStartMs === T20)).toBe(true)
+    expect(m.merge(live, new Set(), now).some((e) => eventKey(e) === `a:${T20}`)).toBe(true)
   })
 })

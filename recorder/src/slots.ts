@@ -63,6 +63,7 @@ export function staleSlots(
   live: EventInfo[],
   slots: Slot[],
   callChannelId: string,
+  nowMs: number,
   keep: ReadonlySet<string> = new Set(),
 ): DroppedSlot[] {
   const out: DroppedSlot[] = []
@@ -77,6 +78,9 @@ export function staleSlots(
       if (Math.abs(s.scheduledStartMs - e.scheduledStartMs) >= iv) continue
       const k = slotKey(s)
       if (keep.has(k) || seen.has(k)) continue
+      // An occurrence that has already begun (e.g. auto-ended today) while the series now points
+      // ahead is not a reschedule of that occurrence: late arrivals still need its window.
+      if (s.scheduledStartMs <= nowMs && e.scheduledStartMs > nowMs) continue
       seen.add(k)
       out.push({ slot: s, movedToMs: e.scheduledStartMs })
     }
@@ -93,11 +97,11 @@ export function staleSlots(
 export function mergeSlots(
   live: EventInfo[],
   slots: Slot[],
-  opts: { callChannelId?: string; keep?: ReadonlySet<string> } = {},
+  opts: { callChannelId?: string; nowMs?: number; keep?: ReadonlySet<string> } = {},
 ): EventInfo[] {
   const liveByKey = new Map(live.map((e) => [eventKey(e), e]))
   const stale = new Set(
-    opts.callChannelId === undefined ? [] : staleSlots(live, slots, opts.callChannelId, opts.keep).map((d) => slotKey(d.slot)),
+    opts.callChannelId === undefined ? [] : staleSlots(live, slots, opts.callChannelId, opts.nowMs ?? Date.now(), opts.keep).map((d) => slotKey(d.slot)),
   )
   const out = [...live]
   for (const s of slots) {
@@ -143,7 +147,7 @@ export class SlotMemory {
   /** Record what the live list shows, prune old slots, persist if anything changed. */
   observe(live: EventInfo[], nowMs: number, keep: ReadonlySet<string> = new Set()): void {
     let changed = false
-    for (const d of staleSlots(live, [...this.slots.values()], this.callChannelId, keep)) {
+    for (const d of staleSlots(live, [...this.slots.values()], this.callChannelId, nowMs, keep)) {
       this.log(`slot dropped: "${d.slot.name}" (${slotKey(d.slot)}) rescheduled to ${d.movedToMs}`)
       this.slots.delete(slotKey(d.slot))
       changed = true
@@ -165,8 +169,8 @@ export class SlotMemory {
     if (changed) this.save()
   }
 
-  merge(live: EventInfo[], keep: ReadonlySet<string> = new Set()): EventInfo[] {
-    return mergeSlots(live, [...this.slots.values()], { callChannelId: this.callChannelId, keep })
+  merge(live: EventInfo[], keep: ReadonlySet<string> = new Set(), nowMs: number = Date.now()): EventInfo[] {
+    return mergeSlots(live, [...this.slots.values()], { callChannelId: this.callChannelId, nowMs, keep })
   }
 
   all(): Slot[] {
