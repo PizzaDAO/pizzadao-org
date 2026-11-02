@@ -2120,3 +2120,39 @@ model TelegramLinkCode {
   @@index([discordId])
   @@index([expiresAt])
 }
+
+// ---- Google Sheets cutover (plans/sheets-cutover.md) ----
+
+// One row per import run (dry run or apply) from /admin/sheets. Counts only: never cell contents.
+model SheetImportRun {
+  id            Int       @id @default(autoincrement())
+  dataset       String
+  mode          String // "dry-run" | "apply"
+  ok            Boolean
+  counts        Json // create, update, unchanged, orphan, parseErrors + importer extras
+  issues        Json? // [{ row, code, scope? }]: row numbers and fixed codes only
+  error         String?
+  sheetRevision String?
+  actor         String
+  startedAt     DateTime  @default(now())
+  finishedAt    DateTime?
+
+  @@index([dataset, startedAt])
+}
+
+// Raw frozen copy of one tab of one sheet (the in-database archive). Admin-only: may hold private
+// columns, and is never exposed publicly.
+model SheetSnapshot {
+  id       Int      @id @default(autoincrement())
+  batchId  String
+  sheetKey String
+  sheetId  String
+  tab      String
+  rowCount Int
+  data     Json
+  takenBy  String
+  takenAt  DateTime @default(now())
+
+  @@index([batchId])
+  @@index([sheetKey, takenAt])
+}
