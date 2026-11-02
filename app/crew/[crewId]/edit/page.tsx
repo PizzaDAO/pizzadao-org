@@ -22,7 +22,8 @@ export default async function EditCrewPage({ params }: { params: Promise<{ crewI
     const crewId = normalizeCrewId(raw);
     const session = await getSession();
     const allowed = session?.discordId ? await canManageCrew(session.discordId, crewId) : false;
-    const onWebsite = await usesDb("crewTasks", crewId);
+    const [tasksOnWebsite, rosterOnWebsite] = await Promise.all([usesDb("crewTasks", crewId), usesDb("crewRoles", crewId)]);
+    const onWebsite = tasksOnWebsite || rosterOnWebsite;
 
     if (!allowed || !onWebsite) {
         return (
@@ -34,7 +35,7 @@ export default async function EditCrewPage({ params }: { params: Promise<{ crewI
                             ? "Please log in with Discord."
                             : !allowed
                               ? "Only leads of this crew can edit its tasks and agenda."
-                              : "This crew's tasks and agenda are still edited in its Google Sheet."}
+                              : "This crew's tasks, agenda and roster are still edited in its Google Sheet."}
                     </p>
                     <Link href={session ? `/crew/${crewId}` : `/login?returnTo=/crew/${crewId}/edit`} className="inline-block mt-4 underline">
                         {session ? "Back to the crew page" : "Log in"}
@@ -47,9 +48,14 @@ export default async function EditCrewPage({ params }: { params: Promise<{ crewI
     const back = { backHref: `/crew/${crewId}`, backLabel: "Back to the crew page" };
     return (
         <div>
-            <TableEditorClient dataset={`crewTasks:${crewId}`} apiUrl={`/api/crew/${crewId}/content/tasks`} {...back} />
-            <TableEditorClient dataset={`crewAgenda:${crewId}`} apiUrl={`/api/crew/${crewId}/content/agenda`} {...back} />
-            <TableEditorClient dataset={`crewGoals:${crewId}`} apiUrl={`/api/crew/${crewId}/content/goals`} {...back} />
+            {tasksOnWebsite && (
+                <>
+                    <TableEditorClient dataset={`crewTasks:${crewId}`} apiUrl={`/api/crew/${crewId}/content/tasks`} {...back} />
+                    <TableEditorClient dataset={`crewAgenda:${crewId}`} apiUrl={`/api/crew/${crewId}/content/agenda`} {...back} />
+                    <TableEditorClient dataset={`crewGoals:${crewId}`} apiUrl={`/api/crew/${crewId}/content/goals`} {...back} />
+                </>
+            )}
+            {rosterOnWebsite && <TableEditorClient dataset={`crewRoster:${crewId}`} apiUrl={`/api/crew/${crewId}/content/roster`} {...back} />}
         </div>
     );
 }

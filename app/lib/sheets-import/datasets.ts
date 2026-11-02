@@ -8,6 +8,7 @@ import type { EditorSpec } from './editor'
 const configs = () => import('./configs')
 const crews = () => import('./crews')
 const crewContent = () => import('./crew-content')
+const crewRoles = () => import('./crew-roles')
 
 export const DATASETS: DatasetInfo[] = [
   {
@@ -49,6 +50,14 @@ export const DATASETS: DatasetInfo[] = [
     description: 'The Tasks, Meeting Agenda and Goals sections of every crew sheet, with links. Done and skipped tasks are kept (marked by stage). Reports unreadable sheets and lead ids that are not member ids. Key: crew + section + label.',
     importer: async () => (await crewContent()).crewContentImporter as Importer<unknown>,
     parity: async () => (await crewContent()).crewContentParity(),
+  },
+  {
+    key: 'crewRoles',
+    label: 'Crew rosters and roles',
+    source: 'crewRoles',
+    description: 'The roster section of every crew sheet (name, status, city, org, skills, turtles, telegram, attendance, notes). Lead/capo rights need a member id, exactly as before: lead rows without one are reported and must be fixed before switching. Key: crew + member id (or name).',
+    importer: async () => (await crewRoles()).crewRolesImporter as Importer<unknown>,
+    parity: async () => (await crewRoles()).crewRolesParity(),
   },
 ]
 

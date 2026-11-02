@@ -7,6 +7,7 @@ import { CREW_SHEET_REVALIDATE_SECONDS, extractSheetId, parseCrewSheetRows, type
 import { internalError } from '@/app/lib/errors/error-response'
 import { usesDb } from '@/app/lib/sheets-import/source'
 import { crewContentFromDb } from '@/app/lib/crew-content'
+import { crewRolesFromDb, loadCrewRosterFromDb } from '@/app/lib/crew-roles'
 
 type Params = { params: Promise<{ crewId: string }> }
 
@@ -93,7 +94,14 @@ async function readCrewSheet(crew: CrewOption, sheetId: string, forceRefresh: bo
     }))
   }
 
-  // Enrich roster with turtle data from main members database
+  await enrichRosterTurtles(roster)
+
+  const data: CrewSheetData = { roster, goals, tasks, agenda, callInfo }
+  return { data, taskDebugInfo, agendaDebugInfo }
+}
+
+/** Enrich roster with turtle data from main members database */
+async function enrichRosterTurtles(roster: Array<{ name: string; turtles: string }>): Promise<void> {
   const turtlesMap = await getMemberTurtlesMap()
   for (const member of roster) {
     if (!member.turtles && member.name) {
@@ -104,9 +112,6 @@ async function readCrewSheet(crew: CrewOption, sheetId: string, forceRefresh: bo
       }
     }
   }
-
-  const data: CrewSheetData = { roster, goals, tasks, agenda, callInfo }
-  return { data, taskDebugInfo, agendaDebugInfo }
 }
 
 export async function GET(req: Request, { params }: Params) {
@@ -132,18 +137,28 @@ export async function GET(req: Request, { params }: Params) {
 
     // Tasks, agenda steps and goals from the database (plans/sheets-cutover.md PR 4).
     const tasksFromDb = await usesDb('crewTasks', crew.id)
+    // The roster from the database (plans/sheets-cutover.md PR 5).
+    const rolesFromDb = await crewRolesFromDb()
     const withDbContent = async (data: CrewSheetData): Promise<CrewSheetData> => {
-      if (!tasksFromDb) return data
-      const content = await crewContentFromDb(crew.id)
-      return {
-        ...data,
-        tasks: content.tasks,
-        goals: content.goals,
-        agenda: content.agenda,
-        callInfo: data.callInfo ?? (crew.callTime ? { time: crew.callTime, song: '', announcements: '' } : null),
+      let out = data
+      if (tasksFromDb) {
+        const content = await crewContentFromDb(crew.id)
+        out = {
+          ...out,
+          tasks: content.tasks,
+          goals: content.goals,
+          agenda: content.agenda,
+          callInfo: out.callInfo ?? (crew.callTime ? { time: crew.callTime, song: '', announcements: '' } : null),
+        }
       }
+      if (rolesFromDb) {
+        const roster = await loadCrewRosterFromDb(crew.id)
+        await enrichRosterTurtles(roster)
+        out = { ...out, roster }
+      }
+      return out
     }
-    const source = { tasksSource: tasksFromDb ? 'db' : 'sheet' }
+    const source = { tasksSource: tasksFromDb ? 'db' : 'sheet', rosterSource: rolesFromDb ? 'db' : 'sheet' }
     const empty: CrewSheetData = { roster: [], goals: [], tasks: fallbackTasks, agenda: [], callInfo: null }
 
     // If crew has no sheet URL, return just the metadata
@@ -168,13 +183,19 @@ export async function GET(req: Request, { params }: Params) {
     const debugMode = url.searchParams.get('debug') === '1'  // Shows Sheets API diagnostics
 
     let sheet: Awaited<ReturnType<typeof readCrewSheet>>
-    try {
-      sheet = await readCrewSheet(crew, sheetId, forceRefresh, debugMode)
-    } catch (e) {
-      // Once the crew's tasks live in the database, the sheet only supplies the roster: show the
-      // page without it rather than failing.
-      if (!tasksFromDb) throw e
-      sheet = { data: { ...empty, tasks: [] }, taskDebugInfo: null, agendaDebugInfo: null }
+    const offSheet = { data: { ...empty, tasks: [] }, taskDebugInfo: null, agendaDebugInfo: null }
+    if (tasksFromDb && rolesFromDb) {
+      // Nothing on this page comes from the crew sheet any more: do not read it.
+      sheet = offSheet
+    } else {
+      try {
+        sheet = await readCrewSheet(crew, sheetId, forceRefresh, debugMode)
+      } catch (e) {
+        // Once part of the page lives in the database, show it without the sheet part rather
+        // than failing.
+        if (!tasksFromDb && !rolesFromDb) throw e
+        sheet = offSheet
+      }
     }
     const { taskDebugInfo, agendaDebugInfo } = sheet
 
