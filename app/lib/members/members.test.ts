@@ -32,7 +32,7 @@ function payloadFromImport(t: MembersTable): MembersPayload {
   const layout = records.find((r) => r.value.kind === 'layout')!.value as { headers: string[] }
   return {
     headers: layout.headers,
-    rows: records.filter((r) => r.value.kind === 'member').map((r) => ({ id: r.key, cells: (r.value as { cells: never }).cells, position: (r.value as { position: number }).position })),
+    rows: records.filter((r) => r.value.kind === 'member').map((r) => ({ id: r.key, cells: (r.value as unknown as { cells: never }).cells, position: (r.value as unknown as { position: number }).position })),
     version: 'v1',
   }
 }
