@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { prisma } from "@/app/lib/db";
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/writer";
 import { invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
@@ -28,10 +28,9 @@ export async function DELETE() {
   }
 
   // Clear X username from Google Sheet (fire-and-forget)
-  const sheetsUrl = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   const sheetsSecret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-  if (sheetsUrl && sheetsSecret && existing?.memberId) {
-    fetchWithRedirect(sheetsUrl, {
+  if ((await memberWritesConfigured()) && existing?.memberId) {
+    postMemberWrite({
       secret: sheetsSecret,
       source: "x-disconnect",
       memberId: existing.memberId,

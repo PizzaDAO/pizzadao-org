@@ -1,4 +1,4 @@
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/writer";
 import {
   cellText,
   getMembersSheet,
@@ -127,9 +127,8 @@ async function updateDiscordRoles(opts: {
 
 // --- Write to sheet ---
 async function updateCrewsInSheet(memberId: string, crews: string[]) {
-  const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-  if (!url || !secret) throw new Error("Missing sheet config");
+  if (!(await memberWritesConfigured())) throw new Error("Missing sheet config");
 
   const payload = {
     secret,
@@ -138,7 +137,7 @@ async function updateCrewsInSheet(memberId: string, crews: string[]) {
     source: "join-crew",
   };
 
-  const { status, text } = await fetchWithRedirect(url, payload);
+  const { status, text } = await postMemberWrite(payload);
 
   if (status < 200 || status >= 300) {
     throw new Error(`Sheet update failed: ${text}`);

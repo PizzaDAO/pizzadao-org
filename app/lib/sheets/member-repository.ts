@@ -180,11 +180,54 @@ function parseMembersTable(body: string): MembersTable {
   };
 }
 
+/** Whether members read from the Member table (`sheets.source.members` = db, plans/sheets-cutover.md). */
+export async function membersFromDb(): Promise<boolean> {
+  const { usesDb } = await import("@/app/lib/sheets-import/source");
+  return usesDb("members");
+}
+
+let dbMemo: { version: string; table: MembersTable } | null = null;
+
 /**
- * Fetch and parse the members sheet. `headerRowIndex` is -1 when the header
- * row cannot be found; most callers want `getMembersSheet`, which throws then.
+ * The members table rebuilt from the database, in the same shape as the sheet path. Cached in
+ * Next's data cache under the same "members" tag (so invalidateMembersCache expires it too);
+ * `{ fresh: true }` reads the database directly.
+ */
+export async function getMembersTableFromDb(opts: MemberReadOptions = {}): Promise<MembersTable> {
+  const { buildMembersTable, loadMembersPayload } = await import("@/app/lib/members/db-table");
+  let payload: Awaited<ReturnType<typeof loadMembersPayload>>;
+  if (opts.fresh) {
+    payload = await loadMembersPayload();
+  } else {
+    try {
+      const { unstable_cache } = await import("next/cache");
+      payload = await unstable_cache(loadMembersPayload, ["members-db-v1"], {
+        revalidate: MEMBERS_REVALIDATE_SECONDS,
+        tags: [MEMBERS_CACHE_TAG],
+      })();
+    } catch {
+      // Outside a Next request (scripts, tests): no data cache.
+      payload = await loadMembersPayload();
+    }
+  }
+  if (dbMemo && dbMemo.version === payload.version) return dbMemo.table;
+  const table = buildMembersTable(payload);
+  dbMemo = { version: payload.version, table };
+  return table;
+}
+
+/**
+ * Fetch and parse the members sheet, or (once `sheets.source.members` is "db") the Member table.
+ * `headerRowIndex` is -1 when the header row cannot be found; most callers want
+ * `getMembersSheet`, which throws then.
  */
 export async function getMembersTable(opts: MemberReadOptions = {}): Promise<MembersTable> {
+  if (await membersFromDb()) return getMembersTableFromDb(opts);
+  return getMembersTableFromSheet(opts);
+}
+
+/** The members sheet itself (the importer and the parity check read this directly). */
+export async function getMembersTableFromSheet(opts: MemberReadOptions = {}): Promise<MembersTable> {
   const body = await fetchGvizText(
     SHEET_IDS.members,
     { tab: SHEET_TABS.members, headers: 0 },
@@ -302,6 +345,7 @@ export async function fetchMemberByDiscordId(
  */
 export function invalidateMembersCache(): void {
   parseMemo = null;
+  dbMemo = null;
   try {
     // `expire: 0` expires immediately (the "max" profile would serve stale data
     // once while revalidating in the background).
@@ -314,4 +358,5 @@ export function invalidateMembersCache(): void {
 /** Test helper: forget the parse memo. */
 export function __resetMembersParseMemo(): void {
   parseMemo = null;
+  dbMemo = null;
 }

@@ -1,4 +1,4 @@
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/writer";
 import { NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
 import {
@@ -54,9 +54,8 @@ export async function POST(req: Request) {
         }
 
         // Write to sheet
-        const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
         const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-        if (!url || !secret) {
+        if (!(await memberWritesConfigured())) {
             return NextResponse.json({ error: "Missing Sheets webapp env vars" }, { status: 500 });
         }
 
@@ -69,7 +68,7 @@ export async function POST(req: Request) {
             orgs: String(orgs || "").trim().slice(0, 500),
         };
 
-        const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
+        const { status: sheetStatus, text } = await postMemberWrite(payload);
 
         let parsed: any = null;
         try {

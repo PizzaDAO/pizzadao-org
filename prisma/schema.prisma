@@ -2320,6 +2320,32 @@ model CrewRole {
   @@index([memberId])
 }
 
+// A member (was one row of the members sheet, "Crew" tab). `cells` holds the row exactly as the
+// sheet read path saw it (GViz {v, f} per column, aligned with MemberTableLayout.headers), so the
+// DB-backed getMembersTable returns the same table and every reader keeps working unchanged.
+// Private columns (notes, telegram, wallet...) live in `cells`: never expose this table directly.
+model Member {
+  id        String   @id // the ID cell text
+  discordId String?
+  name      String   @default("")
+  cells     Json
+  position  Int // sheet order at import (ties after sorting by id)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+
+  @@index([discordId])
+  @@index([position])
+}
+
+// The members table's header row (one row, id 1), in sheet order. Blank headers stay "".
+model MemberTableLayout {
+  id        Int      @id @default(1)
+  headers   Json
+  updatedAt DateTime @updatedAt
+  updatedBy String?
+}
+
 // A crew goal (was the crew sheet's Goals section).
 model CrewGoal {
   id          String   @id @default(cuid())

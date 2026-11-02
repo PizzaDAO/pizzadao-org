@@ -1,7 +1,7 @@
 // app/api/auto-claim/route.ts
 // Handles auto-claiming when Discord nickname matches a member name
 // No password required since we verify via session + name match
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/writer";
 import {
     MEMBER_COLUMNS,
     cellText,
@@ -115,9 +115,8 @@ export async function POST(req: Request) {
             const mergedTurtles = mergeTurtles(existingTurtles, discordTurtles);
 
             // Proceed with claim via Google Sheets Web App
-            const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
             const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-            if (!url || !secret) {
+            if (!(await memberWritesConfigured())) {
                 return NextResponse.json({ error: "Missing Sheets env vars" }, { status: 500 });
             }
 
@@ -138,7 +137,7 @@ export async function POST(req: Request) {
                 },
             };
 
-            const { status: sheetStatus, text: sheetText } = await fetchWithRedirect(url, payload);
+            const { status: sheetStatus, text: sheetText } = await postMemberWrite(payload);
 
             let parsed: any = null;
             try {
