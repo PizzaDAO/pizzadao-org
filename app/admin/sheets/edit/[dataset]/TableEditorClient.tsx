@@ -16,7 +16,8 @@ function blankRow(columns: EditorColumn[]): EditorRow {
     return Object.fromEntries(columns.map((c) => [c.key, c.kind === "bool" ? false : c.kind === "int" ? null : ""]));
 }
 
-export default function TableEditorClient({ dataset }: { dataset: string }) {
+export default function TableEditorClient({ dataset, apiUrl, backHref = "/admin/sheets", backLabel = "Back to sheets cutover" }: { dataset: string; apiUrl?: string; backHref?: string; backLabel?: string }) {
+    const endpoint = apiUrl ?? `/api/admin/sheets-data/${encodeURIComponent(dataset)}`;
     const [data, setData] = useState<Loaded | null>(null);
     const [rows, setRows] = useState<EditorRow[]>([]);
     const [error, setError] = useState<string | null>(null);
@@ -24,7 +25,7 @@ export default function TableEditorClient({ dataset }: { dataset: string }) {
     const [saving, setSaving] = useState(false);
 
     useEffect(() => {
-        fetch(`/api/admin/sheets-data/${encodeURIComponent(dataset)}`)
+        fetch(endpoint)
             .then(async (res) => {
                 const body = await res.json().catch(() => ({}));
                 if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
@@ -35,7 +36,7 @@ export default function TableEditorClient({ dataset }: { dataset: string }) {
                 setRows(d.rows);
             })
             .catch((e) => setError(e.message));
-    }, [dataset]);
+    }, [endpoint]);
 
     function setCell(i: number, key: string, value: CellValue) {
         setRows((rs) => rs.map((r, n) => (n === i ? { ...r, [key]: value } : r)));
@@ -54,7 +55,7 @@ export default function TableEditorClient({ dataset }: { dataset: string }) {
         setSaving(true);
         setStatus(null);
         try {
-            const res = await fetch(`/api/admin/sheets-data/${encodeURIComponent(dataset)}`, {
+            const res = await fetch(endpoint, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ rows }),
@@ -73,8 +74,8 @@ export default function TableEditorClient({ dataset }: { dataset: string }) {
     return (
         <main className="min-h-screen bg-background text-foreground p-4 sm:p-6">
             <div className="max-w-6xl mx-auto">
-                <Link href="/admin/sheets" className="text-sm underline">
-                    Back to sheets cutover
+                <Link href={backHref} className="text-sm underline">
+                    {backLabel}
                 </Link>
                 {error && <p className="text-red-500 mt-3">{error}</p>}
                 {!data && !error && <p className="mt-3">Loading...</p>}
@@ -87,7 +88,7 @@ export default function TableEditorClient({ dataset }: { dataset: string }) {
                                 <thead>
                                     <tr>
                                         <th className="p-1" />
-                                        {data.columns.map((c) => (
+                                        {data.columns.filter((c) => !c.hidden).map((c) => (
                                             <th key={c.key} className="text-left p-1 whitespace-nowrap">
                                                 {c.label}
                                             </th>
@@ -99,7 +100,7 @@ export default function TableEditorClient({ dataset }: { dataset: string }) {
                                     {rows.map((row, i) => (
                                         <tr key={i} className="border-t border-foreground/10">
                                             <td className="p-1 text-foreground/50">{i + 1}</td>
-                                            {data.columns.map((c) => (
+                                            {data.columns.filter((c) => !c.hidden).map((c) => (
                                                 <td key={c.key} className="p-1">
                                                     {c.kind === "bool" ? (
                                                         <input type="checkbox" checked={row[c.key] === true} disabled={c.readOnly} onChange={(e) => setCell(i, c.key, e.target.checked)} />

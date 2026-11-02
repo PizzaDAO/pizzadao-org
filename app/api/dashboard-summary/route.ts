@@ -25,7 +25,7 @@ import {
 import { getVouchCounts } from "@/app/lib/vouches";
 import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
-import { fetchMyTasksForCrew } from "@/app/lib/my-tasks";
+import { fetchMyTasksForCrewOption } from "@/app/lib/my-tasks";
 import { resolveNextAction, type NextAction } from "@/app/dashboard/[id]/lib/next-action";
 import {
     getProfileCompletion,
@@ -315,12 +315,10 @@ export async function GET(request: NextRequest) {
 
         const crewsHydrated = await Promise.all(
             myCrewOptions.map(async (c) => {
-                const taskData = c.sheet
-                    ? await safe(fetchMyTasksForCrew(c.sheet, memberId), {
-                          active: [],
-                          doneCount: 0,
-                      })
-                    : { active: [], doneCount: 0 };
+                const taskData = await safe(fetchMyTasksForCrewOption(c, memberId), {
+                    active: [],
+                    doneCount: 0,
+                });
                 return {
                     id: c.id,
                     label: c.label,

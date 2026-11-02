@@ -2,6 +2,8 @@ import { fetchGviz } from "@/app/lib/sheets/gviz";
 import { NextResponse } from "next/server";
 import { getTaskLinks } from "../../lib/google-sheets";
 import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { getSource, readsFromDb } from "@/app/lib/sheets-import/source";
+import { myTasksFromDb } from "@/app/lib/crew-content";
 import { internalError } from "@/app/lib/errors/error-response";
 
 // Simplified types for the tasks API
@@ -364,9 +366,12 @@ export async function GET(req: Request, { params }: { params: Promise<{ memberId
         // 1. Get crews list directly (avoids HTTP fetch which can be blocked by deployment protection)
         const { crews } = await getCrewMappings();
 
-        const sheetsToFetch = crews.filter((c: any) => c.sheet).map((c: any) => ({
+        // Crews covered by sheets.source.crewTasks read from the database; the rest from their sheet.
+        const tasksSource = await getSource("crewTasks");
+        const sheetsToFetch = crews.filter((c: any) => c.sheet || readsFromDb(tasksSource, c.id)).map((c: any) => ({
             crewId: String(c.id).toLowerCase(),
             sheet: c.sheet,
+            fromDb: readsFromDb(tasksSource, c.id),
         }));
 
         const allTasksByCrew: Record<string, Task[]> = {};
@@ -376,7 +381,9 @@ export async function GET(req: Request, { params }: { params: Promise<{ memberId
         // 2. Parallel fetch personalized tasks for each crew
         await Promise.all(
             sheetsToFetch.map(async (item: any) => {
-                const { active, doneCount, log } = await fetchMyTasksForCrew(item.sheet, memberId);
+                const { active, doneCount, log } = item.fromDb
+                    ? ((await myTasksFromDb(item.crewId, memberId).catch(() => ({ active: [], doneCount: 0 }))) as CrewTaskData)
+                    : await fetchMyTasksForCrew(item.sheet, memberId);
                 if (active.length > 0) {
                     allTasksByCrew[item.crewId] = active;
                 }

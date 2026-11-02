@@ -179,8 +179,7 @@ async function fetchCrewTasks(
       const stage = stageIdx !== -1 ? String(r[stageIdx]?.v || "").trim().toLowerCase() : "";
 
       // Skip tasks that are "Done" or "Skip"
-      const isDoneOrSkip = stage === "done" || stage === "skip" || stage === "skipped" || stage === "complete" || stage === "completed";
-      if (isDoneOrSkip) continue;
+      if (isClosedStage(stage)) continue;
 
       const taskCell = r[taskIdx];
       const rawLabel = String(taskCell?.v || "").trim();
@@ -189,54 +188,116 @@ async function fetchCrewTasks(
       const priority = priorityIdx !== -1 ? String(r[priorityIdx]?.v || "").trim() : "";
 
       // Check if task is actively being worked on (for sorting purposes)
-      const isActive = stage === "now" || stage === "doing" || stage === "in progress" || stage === "todo" || stage.includes("progress");
+      const isActive = isActiveStage(stage);
 
       if (taskLabel) {
         allTasks.push({ label: taskLabel, url: taskUrl, priority, isActive, stage, due: dueIdx !== -1 ? parseSheetDue(r[dueIdx]) : undefined });
       }
     }
 
-    const getPriorityRank = (p: string) => {
-      const lower = p.toLowerCase();
-      if (lower.includes("top") || lower === "0") return 0;
-      if (lower.includes("high") || lower === "1") return 1;
-      if (lower.includes("mid") || lower === "2") return 2;
-      if (lower.includes("low") || lower === "3") return 3;
-      return 999;
-    };
-
-    const getPriorityLabel = (p: string) => {
-      const lower = p.toLowerCase();
-      if (lower.includes("top") || lower === "0") return "Top";
-      if (lower.includes("high") || lower === "1") return "High";
-      if (lower.includes("mid") || lower === "2") return "Mid";
-      if (lower.includes("low") || lower === "3") return "Low";
-      return p || undefined;
-    };
-
-    // Sort by: active tasks first, then by priority
-    allTasks.sort((a, b) => {
-      // Active tasks come first
-      if (a.isActive && !b.isActive) return -1;
-      if (!a.isActive && b.isActive) return 1;
-      // Then sort by priority
-      return getPriorityRank(a.priority) - getPriorityRank(b.priority);
-    });
-
-    const totalCount = allTasks.length;
-    const topTasks = allTasks.slice(0, 3).map(t => ({
-      label: t.label,
-      url: t.url,
-      priority: getPriorityLabel(t.priority)
-    }));
-
-    const all = detail
-      ? allTasks.map((t) => ({ label: t.label, url: t.url, priority: getPriorityLabel(t.priority), stage: t.stage, due: t.due, isActive: t.isActive }))
-      : undefined;
-    return { tasks: topTasks, totalCount, all };
+    return rankCrewTasks(allTasks, detail);
   } catch (e) {
     return { tasks: [], totalCount: 0, error: true };
   }
+}
+
+/** One task as the ranking sees it (stage lowercase; priority as the sheet holds it). */
+export type RankableTask = { label: string; url?: string; priority: string; isActive: boolean; stage: string; due?: string };
+
+const getPriorityRank = (p: string) => {
+  const lower = p.toLowerCase();
+  if (lower.includes("top") || lower === "0") return 0;
+  if (lower.includes("high") || lower === "1") return 1;
+  if (lower.includes("mid") || lower === "2") return 2;
+  if (lower.includes("low") || lower === "3") return 3;
+  return 999;
+};
+
+const getPriorityLabel = (p: string) => {
+  const lower = p.toLowerCase();
+  if (lower.includes("top") || lower === "0") return "Top";
+  if (lower.includes("high") || lower === "1") return "High";
+  if (lower.includes("mid") || lower === "2") return "Mid";
+  if (lower.includes("low") || lower === "3") return "Low";
+  return p || undefined;
+};
+
+/** Stages that close a task (it no longer shows as open). */
+export function isClosedStage(stage: string): boolean {
+  const s = stage.trim().toLowerCase();
+  return s === "done" || s === "skip" || s === "skipped" || s === "complete" || s === "completed";
+}
+
+/** Stages that count as actively worked on (ranked first). */
+export function isActiveStage(stage: string): boolean {
+  const s = stage.trim().toLowerCase();
+  return s === "now" || s === "doing" || s === "in progress" || s === "todo" || s.includes("progress");
+}
+
+/**
+ * Rank open tasks the way crew pages and the call agenda always have: active first, then by
+ * priority (stable within a rank, so sheet order breaks ties). Pure; shared by the sheet and
+ * database paths.
+ */
+export function rankCrewTasks(
+  openTasks: RankableTask[],
+  detail = false,
+): { tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[] } {
+  const allTasks = [...openTasks];
+  // Sort by: active tasks first, then by priority
+  allTasks.sort((a, b) => {
+    // Active tasks come first
+    if (a.isActive && !b.isActive) return -1;
+    if (!a.isActive && b.isActive) return 1;
+    // Then sort by priority
+    return getPriorityRank(a.priority) - getPriorityRank(b.priority);
+  });
+
+  const totalCount = allTasks.length;
+  const topTasks = allTasks.slice(0, 3).map(t => ({
+    label: t.label,
+    url: t.url,
+    priority: getPriorityLabel(t.priority)
+  }));
+
+  const all = detail
+    ? allTasks.map((t) => ({ label: t.label, url: t.url, priority: getPriorityLabel(t.priority), stage: t.stage, due: t.due, isActive: t.isActive }))
+    : undefined;
+  return { tasks: topTasks, totalCount, all };
+}
+
+/** Open tasks of a crew from the database (CrewTask), ranked like the sheet path. */
+export async function fetchCrewTasksFromDb(crewId: string, detail = false): Promise<{ tasks: CrewTask[]; totalCount: number; all?: CrewTaskDetail[] }> {
+  const { loadCrewTasks } = await import("@/app/lib/crew-content");
+  const rows = await loadCrewTasks(crewId);
+  const open: RankableTask[] = rows
+    .filter((t) => !isClosedStage(t.stage) && t.label.trim())
+    .map((t) => ({
+      // Same clean-up as the sheet path: a pasted link in the label is not part of the title.
+      label: t.label.replace(/\s*\(https?:\/\/[^\s\)]+\)\s*/g, " ").trim(),
+      url: t.url ?? undefined,
+      priority: t.priority ?? "",
+      isActive: isActiveStage(t.stage),
+      stage: t.stage.trim().toLowerCase(),
+      due: t.due ?? undefined,
+    }));
+  return rankCrewTasks(open, detail);
+}
+
+/**
+ * Every open task of a crew, from its sheet or (once `sheets.source.crewTasks` covers this crew)
+ * the database. `error` is true when the source could not be read.
+ */
+export async function fetchOpenCrewTasksForCrew(crew: Pick<CrewOption, "id" | "sheet">): Promise<{ tasks: CrewTaskDetail[]; error: boolean }> {
+  const { usesDb } = await import("@/app/lib/sheets-import/source");
+  if (await usesDb("crewTasks", crew.id)) {
+    try {
+      return { tasks: (await fetchCrewTasksFromDb(crew.id, true)).all ?? [], error: false };
+    } catch {
+      return { tasks: [], error: true };
+    }
+  }
+  return crew.sheet ? fetchOpenCrewTasksResult(crew.sheet) : { tasks: [], error: false };
 }
 
 /** Extra Crew Mappings columns the app does not show but the importer keeps. */
@@ -415,10 +476,16 @@ export async function fetchCrewsFromDb(): Promise<CrewOption[]> {
 
 /** Top tasks + count for each crew (from its sheet, or the database once crew tasks move). */
 async function attachTasks(crews: CrewOption[], forceRefresh: boolean): Promise<void> {
+  const { getSource, readsFromDb } = await import("@/app/lib/sheets-import/source");
+  const source = await getSource("crewTasks");
   const limit = promiseLimit(3);
   await Promise.all(
     crews.map((c) => limit(async () => {
-      if (c.sheet) {
+      if (readsFromDb(source, c.id)) {
+        const { tasks, totalCount } = await fetchCrewTasksFromDb(c.id).catch(() => ({ tasks: [] as CrewTask[], totalCount: 0 }));
+        c.tasks = tasks;
+        c.taskCount = totalCount;
+      } else if (c.sheet) {
         const { tasks, totalCount } = await fetchCrewTasks(c.sheet, forceRefresh);
         c.tasks = tasks;
         c.taskCount = totalCount;

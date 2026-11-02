@@ -32,6 +32,26 @@ function extractUrlFromText(text: string): string | undefined {
 }
 
 /**
+ * A member's active tasks and closed count in one crew, from the crew's sheet or (once
+ * `sheets.source.crewTasks` covers the crew) the database. { active: [], doneCount: 0 } on failure.
+ */
+export async function fetchMyTasksForCrewOption(
+    crew: { id: string; sheet?: string },
+    memberId: string
+): Promise<CrewTaskData> {
+    const { usesDb } = await import("@/app/lib/sheets-import/source");
+    if (await usesDb("crewTasks", crew.id)) {
+        try {
+            const { myTasksFromDb } = await import("@/app/lib/crew-content");
+            return await myTasksFromDb(crew.id, memberId);
+        } catch {
+            return { active: [], doneCount: 0 };
+        }
+    }
+    return crew.sheet ? fetchMyTasksForCrew(crew.sheet, memberId) : { active: [], doneCount: 0 };
+}
+
+/**
  * Fetch the given member's active tasks and "closed" count from a single
  * crew sheet. Returns { active: [], doneCount: 0 } on any failure.
  */

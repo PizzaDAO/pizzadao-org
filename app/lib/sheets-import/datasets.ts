@@ -7,6 +7,7 @@ import type { EditorSpec } from './editor'
 
 const configs = () => import('./configs')
 const crews = () => import('./crews')
+const crewContent = () => import('./crew-content')
 
 export const DATASETS: DatasetInfo[] = [
   {
@@ -40,6 +41,14 @@ export const DATASETS: DatasetInfo[] = [
     description: 'The Crew Mappings sheet: crew, emoji, turtles, role, channel, event, call time and link, call length, type, script, crew sheet. Duplicate rows merge as before. Key: crew id (slug).',
     importer: async () => (await crews()).crewsImporter as Importer<unknown>,
     parity: async () => (await crews()).crewsParity(),
+  },
+  {
+    key: 'crewContent',
+    label: 'Crew tasks, agenda steps and goals',
+    source: 'crewTasks',
+    description: 'The Tasks, Meeting Agenda and Goals sections of every crew sheet, with links. Done and skipped tasks are kept (marked by stage). Reports unreadable sheets and lead ids that are not member ids. Key: crew + section + label.',
+    importer: async () => (await crewContent()).crewContentImporter as Importer<unknown>,
+    parity: async () => (await crewContent()).crewContentParity(),
   },
 ]
 
