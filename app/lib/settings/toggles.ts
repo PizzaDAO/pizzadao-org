@@ -63,6 +63,8 @@ export const TOGGLES = {
   'telegram.agendaMirrorEnabled': { env: 'TELEGRAM_AGENDA_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.announceMirrorEnabled': { env: 'TELEGRAM_ANNOUNCE_MIRROR_ENABLED', legacy: ON_WORDS },
   'telegram.hostMatchEnabled': { env: 'TELEGRAM_HOST_MATCH_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off (plans/sheets-cutover.md: keep the archive current until the freeze).
+  'sheets.mirror.members': { env: 'SHEETS_MIRROR_MEMBERS', legacy: (raw) => !envKillsToggle(raw) },
 } as const satisfies Partial<Record<SettingKey, ToggleDef>>
 
 export type ToggleKey = keyof typeof TOGGLES
