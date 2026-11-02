@@ -176,11 +176,9 @@ Request → Check Cache → Miss? → Alchemy API (paginated) →
 Transform → Cache 5min → Response
 ```
 
-### Jobs Sync
-```
-Google Sheets Change → Apps Script Webhook →
-POST /api/jobs/sync → Parse CSV → Upsert DB → Invalidate Cache
-```
+### Jobs
+Jobs live only in the database (`Job` table). The old Google Sheets jobs sync and its webhook
+endpoint were removed; any Apps Script trigger that posted to it should be uninstalled.
 
 ## Environment Variables
 

@@ -70,6 +70,11 @@ export interface Importer<T> {
    */
   apply(plan: UpsertPlan<T>, progress: (rowsWritten: number) => void): Promise<void>
   equal?: (a: T, b: T) => boolean
+  /**
+   * When true, `apply` also handles database rows the sheet no longer has (e.g. archives them),
+   * so it runs even when there is nothing to create or update. Never set this to delete rows.
+   */
+  actsOnOrphans?: boolean
 }
 
 export interface DatasetInfo {
@@ -193,7 +198,8 @@ export async function runImport<T>(importer: Importer<T>, mode: ImportMode, acto
     const [loaded, existing] = await Promise.all([importer.load(), importer.existing()])
     revision = loaded.revision ?? null
     const plan = planUpserts(loaded.records, existing, importer.equal ?? stableEqual)
-    if (mode === 'apply' && (plan.create.length || plan.update.length)) {
+    const hasWork = plan.create.length > 0 || plan.update.length > 0 || (!!importer.actsOnOrphans && plan.orphans.length > 0)
+    if (mode === 'apply' && hasWork) {
       await importer.apply(plan, (n) => {
         written = n
       })
@@ -202,7 +208,7 @@ export async function runImport<T>(importer: Importer<T>, mode: ImportMode, acto
       dataset: importer.key,
       mode,
       ok: true,
-      applied: mode === 'apply' && (plan.create.length > 0 || plan.update.length > 0),
+      applied: mode === 'apply' && hasWork,
       counts: countsOf(plan, loaded.issues.length),
       extra: loaded.extra ?? {},
       issues: loaded.issues.slice(0, MAX_ISSUES),

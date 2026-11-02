@@ -41,8 +41,12 @@ export const announceImporter: Importer<AnnounceRecord> = {
     for (const r of rows) map.set(r.naturalKey, { kind: 'special', text: r.text, url: r.url, crew: r.crew, status: r.status, position: r.position, archived: r.archived })
     return map
   },
+  // Specials removed from the sheet are archived on apply (hidden from the announcement, kept in
+  // the table), so the database matches the sheet before the switch.
+  actsOnOrphans: true,
   async apply(plan) {
-    const ops = [...plan.create, ...plan.update].map(({ key, value }) => {
+    const orphanSpecials = plan.orphans.filter((k) => k !== STATE_KEY)
+    const ops: unknown[] = [...plan.create, ...plan.update].map(({ key, value }) => {
       if (value.kind === 'state') {
         const data = { sendValue: value.sendValue, lastSentValue: value.lastSentValue, updatedBy: 'sheet-import' }
         return prisma.announceState.upsert({ where: { id: 1 }, create: { id: 1, ...data }, update: data })
@@ -50,7 +54,10 @@ export const announceImporter: Importer<AnnounceRecord> = {
       const { kind: _k, ...data } = value
       return prisma.announcement.upsert({ where: { naturalKey: key }, create: { naturalKey: key, ...data, updatedBy: 'sheet-import' }, update: { ...data, updatedBy: 'sheet-import' } })
     })
-    if (ops.length) await prisma.$transaction(ops)
+    if (orphanSpecials.length) {
+      ops.push(prisma.announcement.updateMany({ where: { naturalKey: { in: orphanSpecials }, archived: false }, data: { archived: true, updatedBy: 'sheet-import' } }))
+    }
+    if (ops.length) await prisma.$transaction(ops as never)
   },
 }
 
