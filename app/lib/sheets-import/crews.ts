@@ -6,7 +6,7 @@ import { prisma } from '@/app/lib/db'
 import { crewRowToOption, fetchCrewMappingsFromSheet, fetchCrewsFromDb, invalidateCrewMappingsCache, type CrewMappingExtras, type CrewOption } from '@/app/lib/crew-mappings'
 import { norm } from '@/app/lib/strings'
 import { compareKeyed, type Importer, type ParityReport } from './framework'
-import { isHttpUrlOrEmpty, type EditorRow, type EditorSpec } from './editor'
+import { EditorError, isHttpUrlOrEmpty, type EditorRow, type EditorSpec } from './editor'
 import { saveByKey } from './configs'
 
 export type CrewRecord = {
@@ -127,7 +127,7 @@ const orNull = (v: unknown) => (v === null || v === undefined || String(v).trim(
 export const crewsEditor: EditorSpec = {
   dataset: 'crews',
   label: 'Crews',
-  help: 'The crew registry. The crew id (used in links) comes from the name, so renaming a crew makes a new id; removing a row archives the crew. Event is text that matches the crew\'s Discord scheduled events. Sheet is the crew\'s own Google Sheet (still used for tasks and roster until those move).',
+  help: 'The crew registry. A new crew gets its id (used in links, recordings, tasks and rosters) from its name; renaming a crew later only changes its name, never its id. Removing a row archives the crew. Event is text that matches the crew\'s Discord scheduled events. Sheet is the crew\'s own Google Sheet (still used for tasks and roster until those move).',
   columns: [
     { key: 'id', label: 'Id', kind: 'text', readOnly: true },
     { key: 'label', label: 'Crew', kind: 'text', maxLength: 80, required: true },
@@ -149,7 +149,8 @@ export const crewsEditor: EditorSpec = {
     if (!isHttpUrlOrEmpty(row.legacySheetUrl)) return 'sheet must be a full http(s) address'
     return null
   },
-  keyOf: (row) => crewSlug(String(row.label)),
+  // Existing crews keep their id whatever their name; a new row's id comes from its name.
+  keyOf: (row) => (row.id ? `id:${row.id}` : `new:${crewSlug(String(row.label))}`),
   async list() {
     const rows = await prisma.crew.findMany({ where: { archived: false }, orderBy: [{ sortOrder: 'asc' }, { label: 'asc' }] })
     return rows.map((r) => ({
@@ -183,9 +184,18 @@ export const crewsEditor: EditorSpec = {
       sortOrder: position,
       archived: false,
     })
+    const existingIds = new Set((await prisma.crew.findMany({ select: { id: true } })).map((c) => c.id))
+    // The crew id a row writes to: its own id when it has one, else the slug of its name.
+    const targetId = (r: EditorRow) => (r.id && existingIds.has(String(r.id)) ? String(r.id) : crewSlug(String(r.label)))
+    const seen = new Set<string>()
+    rows.forEach((r, i) => {
+      const id = targetId(r)
+      if (seen.has(id)) throw new EditorError(`Row ${i + 1}: a crew with the id "${id}" is already in the list`)
+      seen.add(id)
+    })
     const counts = await saveByKey({
       rows,
-      keyOf: (r) => crewSlug(String(r.label)),
+      keyOf: targetId,
       existing: async () => (await prisma.crew.findMany()).map((r) => ({ key: r.id, active: !r.archived, value: crewFields(r) as unknown as Record<string, unknown> })),
       same: (prev, row, position) => {
         const next = toData(row, position)
@@ -193,7 +203,7 @@ export const crewsEditor: EditorSpec = {
         return prev.active && (Object.keys(next) as Array<keyof typeof next>).every((k) => JSON.stringify(p[k as keyof CrewRecord] ?? null) === JSON.stringify(next[k] ?? null))
       },
       upsert: (row, position) => {
-        const id = crewSlug(String(row.label))
+        const id = targetId(row)
         const data = { ...toData(row, position), updatedBy: actor }
         return prisma.crew.upsert({ where: { id }, create: { id, ...data }, update: data })
       },
