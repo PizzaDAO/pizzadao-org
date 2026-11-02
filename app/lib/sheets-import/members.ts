@@ -95,7 +95,7 @@ export const membersImporter: Importer<MemberRecord> = {
     const bb = b as typeof a
     return a.position === bb.position && stableEqual(comparableCells(a.cells), comparableCells(bb.cells))
   },
-  async apply(plan) {
+  async apply(plan, progress) {
     const all = [...plan.create, ...plan.update]
     const layout = all.find((r) => r.value.kind === 'layout')?.value as { kind: 'layout'; headers: string[] } | undefined
     const headers = layout?.headers ?? ((await prisma.memberTableLayout.findUnique({ where: { id: 1 } }))?.headers as string[] | undefined) ?? []
@@ -109,7 +109,12 @@ export const membersImporter: Importer<MemberRecord> = {
       const data = { cells: r.value.cells as never, position: r.value.position, discordId, name, updatedBy: 'sheet-import' }
       ops.push(prisma.member.upsert({ where: { id: r.key }, create: { id: r.key, ...data }, update: data }))
     }
-    for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100) as never)
+    // Chunked; progress is logged so a failure part-way shows how far it got. Orphans (members no
+    // longer in the sheet) are only reported, never deleted.
+    for (let i = 0; i < ops.length; i += 100) {
+      await prisma.$transaction(ops.slice(i, i + 100) as never)
+      progress(Math.min(i + 100, ops.length))
+    }
     const { invalidateMembersCache } = await import('@/app/lib/sheets/member-repository')
     invalidateMembersCache()
   },

@@ -182,7 +182,7 @@ export const crewContentImporter: Importer<ContentRecord> = {
     }
     return map
   },
-  async apply(plan) {
+  async apply(plan, progress) {
     const ops = [...plan.create, ...plan.update].map(({ value }) => {
       const where = { crewId_naturalKey: { crewId: value.crewId, naturalKey: value.naturalKey } }
       if (value.kind === 'task') {
@@ -197,8 +197,12 @@ export const crewContentImporter: Importer<ContentRecord> = {
       const { kind: _k, ...data } = value
       return prisma.crewGoal.upsert({ where, create: { ...data, updatedBy: 'sheet-import' }, update: { ...data, updatedBy: 'sheet-import' } })
     })
-    // Chunked so one huge transaction does not hit the connection timeout.
-    for (let i = 0; i < ops.length; i += 100) await prisma.$transaction(ops.slice(i, i + 100))
+    // Chunked so one huge transaction does not hit the connection timeout; progress is logged so a
+    // failure part-way shows how far it got (re-running the apply finishes the rest).
+    for (let i = 0; i < ops.length; i += 100) {
+      await prisma.$transaction(ops.slice(i, i + 100))
+      progress(Math.min(i + 100, ops.length))
+    }
     await invalidateCrewMappingsCache()
   },
 }
