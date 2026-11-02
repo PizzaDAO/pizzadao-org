@@ -1,5 +1,5 @@
 // app/api/claim-member/route.ts
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/writer";
 import {
     MEMBER_COLUMNS,
     cellText,
@@ -134,9 +134,8 @@ export async function POST(req: Request) {
         const mergedTurtles = mergeTurtles(existingTurtles, discordTurtles);
 
         // 4) Update via Google Sheets Web App
-        const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
         const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-        if (!url || !secret) {
+        if (!(await memberWritesConfigured())) {
             return NextResponse.json({ error: "Missing Sheets env vars" }, { status: 500 });
         }
 
@@ -157,7 +156,7 @@ export async function POST(req: Request) {
             },
         };
 
-        const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
+        const { status: sheetStatus, text } = await postMemberWrite(payload);
 
         let parsed: any = null;
         try {

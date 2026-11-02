@@ -41,8 +41,18 @@ export function parseSignedUpMembers(rows: unknown[][]): Map<string, string> {
   return out;
 }
 
-/** Everyone with a roster row carrying their Discord ID, read live from the Sheets API (not GViz, which lags writes). */
+/** The members table as plain values from the database (once sheets.source.members is "db"), else null. */
+async function memberRowsFromDb(): Promise<unknown[][] | null> {
+  const { usesDb } = await import("./sheets-import/source");
+  if (!(await usesDb("members"))) return null;
+  const { loadMembersPayload, memberValueRows } = await import("./members/db-table");
+  return memberValueRows(await loadMembersPayload());
+}
+
+/** Everyone with a roster row carrying their Discord ID, read live (the database, or the Sheets API rather than GViz, which lags writes). */
 export async function readSignedUpMembers(): Promise<Map<string, string>> {
+  const fromDb = await memberRowsFromDb();
+  if (fromDb) return parseSignedUpMembers(fromDb);
   const sheets = google.sheets({ version: "v4", auth: getGoogleAuth([GOOGLE_SCOPES.sheetsReadonly]) });
   const response = await sheets.spreadsheets.values.get({
     spreadsheetId: SHEET_IDS.members,
@@ -60,13 +70,18 @@ export async function readSignedUpMembers(): Promise<Map<string, string>> {
 export async function registerWithMemberId<T>(discordId: string, write: (id: string) => Promise<T>): Promise<{ memberId: string; result: T }> {
   return prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(742019331)`;
-    const sheets = google.sheets({ version: "v4", auth: getGoogleAuth([GOOGLE_SCOPES.sheetsReadonly]) });
-    const response = await sheets.spreadsheets.values.get({
-      spreadsheetId: SHEET_IDS.members,
-      range: `'${SHEET_TABS.members}'!A:AZ`,
-      valueRenderOption: "UNFORMATTED_VALUE",
-    });
-    const memberId = nextMemberId(response.data.values || [], discordId);
+    // Once members live in the database, ids come from the database only (plans/sheets-cutover.md).
+    let rows = await memberRowsFromDb();
+    if (!rows) {
+      const sheets = google.sheets({ version: "v4", auth: getGoogleAuth([GOOGLE_SCOPES.sheetsReadonly]) });
+      const response = await sheets.spreadsheets.values.get({
+        spreadsheetId: SHEET_IDS.members,
+        range: `'${SHEET_TABS.members}'!A:AZ`,
+        valueRenderOption: "UNFORMATTED_VALUE",
+      });
+      rows = response.data.values || [];
+    }
+    const memberId = nextMemberId(rows, discordId);
     const result = await write(memberId);
     return { memberId, result };
   }, { timeout: 60000, maxWait: 10000 });

@@ -10,7 +10,7 @@ import { saveMemberTimezone } from "@/app/lib/city-timezone";
 import { parseTurtlesFromSheet } from "@/app/lib/discord-roles";
 import { sendWelcomeMessage } from "@/app/lib/discord-webhook";
 import { parseGvizJson } from "@/app/lib/gviz-parser";
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/writer";
 import { GvizCell } from "@/app/lib/types/gviz";
 import { withErrorHandling } from "@/app/lib/errors/error-response";
 import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
@@ -73,10 +73,8 @@ async function fetchCrewRoleIds(selectedCrewIds: string[]): Promise<string[]> {
 
 // --- main handler ---
 export async function writeToSheet(payload: unknown) {
-  const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
-  if (!url) throw new Error("Missing Sheets webapp env vars");
-
-  const { status: sheetStatus, text } = await fetchWithRedirect(url, payload);
+  // The web app, or the Member table once sheets.source.members is "db" (app/lib/members/writer.ts).
+  const { status: sheetStatus, text } = await postMemberWrite(payload as Record<string, unknown>);
 
   let parsed: unknown = null;
   try {
@@ -129,9 +127,8 @@ function resolveTurtleRoleId(turtleName: string): string | null {
 }
 
 const POST_HANDLER = async (req: Request) => {
-  const url = process.env.GOOGLE_SHEETS_WEBAPP_URL;
   const secret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-  if (!url || !secret) {
+  if (!(await memberWritesConfigured())) {
     throw new Error("Missing Sheets webapp env vars");
   }
 

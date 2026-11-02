@@ -2,7 +2,7 @@ import { after, NextResponse } from "next/server";
 import { cookies } from "next/headers";
 import { verifyXState, encryptToken } from "@/app/lib/x-oauth";
 import { prisma } from "@/app/lib/db";
-import { fetchWithRedirect } from "@/app/lib/sheet-utils";
+import { memberWritesConfigured, postMemberWrite } from "@/app/lib/members/writer";
 import { fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { emitMissionEvent } from "@/app/lib/mission-verify/events";
 
@@ -114,11 +114,10 @@ export async function GET(req: Request) {
     after(() => emitMissionEvent(linkedDiscordId, "x_linked", { memberId: resolvedMemberId ?? null }).then(() => undefined));
 
     // Write X username to Google Sheet
-    const sheetsUrl = process.env.GOOGLE_SHEETS_WEBAPP_URL;
     const sheetsSecret = process.env.GOOGLE_SHEETS_SHARED_SECRET;
-    if (sheetsUrl && sheetsSecret && resolvedMemberId) {
+    if ((await memberWritesConfigured()) && resolvedMemberId) {
       try {
-        await fetchWithRedirect(sheetsUrl, {
+        await postMemberWrite({
           secret: sheetsSecret,
           source: "x-connect",
           memberId: resolvedMemberId,
@@ -131,7 +130,7 @@ export async function GET(req: Request) {
       }
     } else {
       console.warn("X sheet write skipped — missing:", {
-        sheetsUrl: !!sheetsUrl,
+        configured: false,
         sheetsSecret: !!sheetsSecret,
         memberId: resolvedMemberId,
       });

@@ -117,7 +117,10 @@ export const crewContentImporter: Importer<ContentRecord> = {
     const { crews } = await getCrewMappings(true)
     const issues: ParseIssue[] = []
     const records: Array<{ key: string; value: ContentRecord }> = []
-    const extra: Record<string, number> = { crews: 0, crewsWithoutSheet: 0, crewsWithoutTasks: 0, unreadableSheets: 0, unresolvedLeadIds: 0, doneTasks: 0 }
+    const extra: Record<string, number> = { crews: 0, crewsWithoutSheet: 0, crewsWithoutTasks: 0, unreadableSheets: 0, unresolvedLeadIds: 0, doneTasks: 0, skippedDbCrews: 0 }
+    // Crews already edited on the website (a per-crew pilot) are left alone.
+    const { getSource, readsFromDb } = await import('./source')
+    const source = await getSource('crewTasks')
     let memberIds: Map<string, number> | null = null
     try {
       memberIds = (await getSheetData()).memberToIdx
@@ -126,6 +129,10 @@ export const crewContentImporter: Importer<ContentRecord> = {
     }
     for (const crew of crews) {
       extra.crews++
+      if (readsFromDb(source, crew.id)) {
+        extra.skippedDbCrews++
+        continue
+      }
       const sheetId = crew.sheet ? extractSheetId(crew.sheet) : null
       if (!sheetId) {
         extra.crewsWithoutSheet++

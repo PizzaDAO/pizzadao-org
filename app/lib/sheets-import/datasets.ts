@@ -9,6 +9,7 @@ const configs = () => import('./configs')
 const crews = () => import('./crews')
 const crewContent = () => import('./crew-content')
 const crewRoles = () => import('./crew-roles')
+const members = () => import('./members')
 
 export const DATASETS: DatasetInfo[] = [
   {
@@ -58,6 +59,14 @@ export const DATASETS: DatasetInfo[] = [
     description: 'The roster section of every crew sheet (name, status, city, org, skills, turtles, telegram, attendance, notes). Lead/capo rights need a member id, exactly as before: lead rows without one are reported and must be fixed before switching. Key: crew + member id (or name).',
     importer: async () => (await crewRoles()).crewRolesImporter as Importer<unknown>,
     parity: async () => (await crewRoles()).crewRolesParity(),
+  },
+  {
+    key: 'members',
+    label: 'Members',
+    source: 'members',
+    description: 'Every row of the members sheet, stored as the app reads it (every column, private ones included; never shown publicly). Reports rows without an id, repeated ids and repeated Discord ids by row number. Key: member id.',
+    importer: async () => (await members()).membersImporter as Importer<unknown>,
+    parity: async () => (await members()).membersParity(),
   },
 ]
 
