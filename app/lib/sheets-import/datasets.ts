@@ -10,6 +10,7 @@ const crews = () => import('./crews')
 const crewContent = () => import('./crew-content')
 const crewRoles = () => import('./crew-roles')
 const members = () => import('./members')
+const announce = () => import('./announce')
 
 export const DATASETS: DatasetInfo[] = [
   {
@@ -67,6 +68,14 @@ export const DATASETS: DatasetInfo[] = [
     description: 'Every row of the members sheet, stored as the app reads it (every column, private ones included; never shown publicly). Reports rows without an id, repeated ids and repeated Discord ids by row number. Key: member id.',
     importer: async () => (await members()).membersImporter as Importer<unknown>,
     parity: async () => (await members()).membersParity(),
+  },
+  {
+    key: 'announce',
+    label: 'Community Call announcement',
+    source: 'announce',
+    description: 'The announcement block of the announcement sheet: the Announce? and Last Sent values, and the specials table (text, link, status, crew). Key: special text.',
+    importer: async () => (await announce()).announceImporter as Importer<unknown>,
+    parity: async () => (await announce()).announceParity(),
   },
 ]
 

@@ -1,6 +1,11 @@
 /**
- * Google Apps Script for PizzaDAO $PEP Jobs & Shop Sync
- * Automatically syncs jobs and shop items from this spreadsheet to the web dashboard
+ * Google Apps Script for PizzaDAO $PEP Shop Sync
+ * Syncs shop items from this spreadsheet to the web dashboard.
+ *
+ * The Jobs sync was removed: the app's jobs sync endpoint no longer exists and jobs live only in
+ * the database. If this script is still installed with an edit trigger, update it and re-run
+ * setup(), or uninstall the trigger (Extensions > Apps Script > Triggers) if the shop sync is not
+ * used either.
  */
 
 // ============ CONFIGURATION ============
@@ -13,15 +18,7 @@ const CONFIG = {
   SYNC_SECRET: PropertiesService.getScriptProperties().getProperty('JOB_SYNC_SECRET') || '',
 
   // Sheet names
-  JOBS_SHEET: 'Jobs',
   SHOP_SHEET: 'Shop',
-
-  // Jobs column mapping (0-indexed)
-  JOBS: {
-    TYPE_COLUMN: 0,      // Column A: Job Type
-    PROMPT_COLUMN: 1,    // Column B: Job Description/Prompt
-    HEADER_ROWS: 1
-  },
 
   // Shop column mapping (0-indexed)
   SHOP: {
@@ -60,48 +57,10 @@ function onSheetEdit(e) {
 
   const sheetName = e.source.getActiveSheet().getName();
 
-  // Sync based on which sheet was edited
-  if (sheetName === CONFIG.JOBS_SHEET || sheetName.toLowerCase().includes('job')) {
-    syncJobs();
-  } else if (sheetName === CONFIG.SHOP_SHEET || sheetName.toLowerCase().includes('shop')) {
+  // Only the shop tab syncs (the jobs sync was removed)
+  if (sheetName === CONFIG.SHOP_SHEET || sheetName.toLowerCase().includes('shop')) {
     syncShopItems();
   }
-}
-
-/**
- * Sync jobs from the Jobs sheet
- */
-function syncJobs() {
-  const spreadsheet = SpreadsheetApp.getActiveSpreadsheet();
-  let sheet = spreadsheet.getSheetByName(CONFIG.JOBS_SHEET);
-
-  // Fallback to first sheet if Jobs sheet doesn't exist
-  if (!sheet) {
-    sheet = spreadsheet.getSheets()[0];
-  }
-
-  const data = sheet.getDataRange().getValues();
-
-  // Parse jobs from spreadsheet
-  const jobs = [];
-  for (let i = CONFIG.JOBS.HEADER_ROWS; i < data.length; i++) {
-    const row = data[i];
-    const type = row[CONFIG.JOBS.TYPE_COLUMN]?.toString().trim();
-    const description = row[CONFIG.JOBS.PROMPT_COLUMN]?.toString().trim();
-
-    // Skip empty rows
-    if (!description) continue;
-
-    jobs.push({
-      sheetRow: i + 1, // 1-indexed for user reference
-      type: type || 'General',
-      description: description
-    });
-  }
-
-  // Send to webhook
-  const url = CONFIG.BASE_URL + '/api/jobs/sync';
-  sendToWebhook(url, { jobs }, 'jobs');
 }
 
 /**
@@ -184,10 +143,9 @@ function sendToWebhook(url, payload, dataType) {
 }
 
 /**
- * Sync everything - both jobs and shop items
+ * Sync everything (only shop items now)
  */
 function syncAll() {
-  syncJobs();
   syncShopItems();
 }
 
@@ -235,7 +193,6 @@ function createShopTab() {
 function onOpen() {
   SpreadsheetApp.getUi()
     .createMenu('$PEP Sync')
-    .addItem('Sync Jobs', 'syncJobs')
     .addItem('Sync Shop Items', 'syncShopItems')
     .addItem('Sync All', 'syncAll')
     .addSeparator()

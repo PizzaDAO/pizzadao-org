@@ -150,6 +150,13 @@ export default function AnnouncePage() {
             <li>Start the Discord event, post the tweet and take attendance (via SecretService)</li>
             <li>Update Announce? / Last Sent / Last Error on the sheet</li>
           </ul>
+          <p className="text-sm text-gray-600 mb-6">
+            Once the specials move off the sheet, edit them on the{" "}
+            <a href="/announce/edit" className="underline">
+              announcement editor
+            </a>
+            .
+          </p>
 
           {success ? (
             <div className="rounded bg-green-50 border border-green-200 p-4 text-green-800">

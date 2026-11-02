@@ -2346,6 +2346,35 @@ model MemberTableLayout {
   updatedBy String?
 }
 
+// The Community Call announcement status (was the Announce? / Last Sent: / Last Error: cells on
+// the announcement sheet). One row, id 1.
+model AnnounceState {
+  id            Int      @id @default(1)
+  sendValue     String   @default("")
+  lastSentValue String   @default("")
+  lastError     String   @default("")
+  updatedAt     DateTime @updatedAt
+  updatedBy     String?
+}
+
+// One line of the Community Call announcement's specials table (was the Announcement / Status /
+// Crew table on the announcement sheet).
+model Announcement {
+  id         String   @id @default(cuid())
+  naturalKey String   @unique
+  text       String
+  url        String?
+  crew       String   @default("")
+  status     String   @default("")
+  position   Int
+  archived   Boolean  @default(false)
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@index([archived, position])
+}
+
 // A crew goal (was the crew sheet's Goals section).
 model CrewGoal {
   id          String   @id @default(cuid())
