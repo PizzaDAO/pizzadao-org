@@ -16,6 +16,8 @@ export const metadata: Metadata = {
 // Crew mappings come from public sheets through getCrewMappings(), which is
 // already cached (KV + Next data cache, 5 min), so rendering per request is
 // cheap. The viewer's own crews and join/leave still load in the client.
+// Rendered per request, never at build time: a slow sheet fetch must not fail the build.
+export const dynamic = "force-dynamic";
 
 export default async function CrewsPage() {
   let crews = null;
