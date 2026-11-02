@@ -1,147 +1,112 @@
 import { NextResponse } from 'next/server'
 import { getTaskLinks, getTaskLinksDebug, getAgendaStepLinks, getAgendaStepLinksDebug, getMemberTurtlesMap, TaskLinksDebugResult, AgendaLinksDebugResult } from '@/app/api/lib/google-sheets'
 import { cacheDel } from '@/app/api/lib/cache'
-import { getCrewMappings } from "@/app/lib/crew-mappings";
+import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { fetchGviz } from '@/app/lib/sheets/gviz'
-import { CREW_SHEET_REVALIDATE_SECONDS, extractSheetId, cellVal, detectSection, parseRoster } from '@/app/lib/crew-sheet'
+import { CREW_SHEET_REVALIDATE_SECONDS, extractSheetId, parseCrewSheetRows, type CrewSheetTask } from '@/app/lib/crew-sheet'
 import { internalError } from '@/app/lib/errors/error-response'
+import { usesDb } from '@/app/lib/sheets-import/source'
+import { crewContentFromDb } from '@/app/lib/crew-content'
 
 type Params = { params: Promise<{ crewId: string }> }
 
+type CrewSheetData = { roster: any[]; goals: any[]; tasks: any[]; agenda: any[]; callInfo: any }
 
-// Parse GViz JSON response
-
-// Extract URL from cell (checks GViz link property, hyperlink, or text content)
-function extractUrl(cell: any): string | null {
-  if (!cell) return null
-
-  // Check for GViz link property (how GViz returns hyperlinks)
-  if (cell.l) return cell.l
-
-  // Check for explicit hyperlink in cell properties
-  if (cell.hyperlink) return cell.hyperlink
-
-  // Check formatted value for URL patterns
-  const text = String(cell?.f ?? cell?.v ?? '')
-
-  // Try to extract URL from HYPERLINK formula pattern
-  const hyperlinkMatch = text.match(/HYPERLINK\s*\(\s*"([^"]+)"/i)
-  if (hyperlinkMatch) return hyperlinkMatch[1]
-
-  // Try to extract URL in parentheses: (https://...)
-  const parenMatch = text.match(/\((https?:\/\/[^\s\)]+)\)/)
-  if (parenMatch) return parenMatch[1]
-
-  // Try to extract raw URL from text
-  const urlMatch = text.match(/https?:\/\/[^\s"<>\)]+/)
-  if (urlMatch) return urlMatch[0]
-
-  return null
+/** A sheet task as the page gets it (the importer-only fields are left out). */
+function pageTask({ sheetRow: _row, dueCell: _due, ...t }: CrewSheetTask) {
+  return t
 }
 
-// Parse goals section
-function parseGoals(rows: any[], headerIdx: number, headers: string[]) {
-  const headerMap = new Map<string, number>()
-  headers.forEach((h, i) => headerMap.set(h.toLowerCase(), i))
-
-  const goals: any[] = []
-  const seen = new Set<string>() // Deduplicate by description
-  const goalIdx = headerMap.get('goal') ?? headerMap.get('goals') ?? -1
-  const priorityIdx = headerMap.get('priority') ?? -1
-
-  for (let ri = headerIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || []
-    const goal = cellVal(cells[goalIdx])
-    if (!goal) continue
-
-    // Check if we hit another section header
-    const rowVals = cells.map(cellVal)
-    if (detectSection(rowVals)) break
-
-    // Skip duplicates
-    const key = goal.toLowerCase()
-    if (seen.has(key)) continue
-    seen.add(key)
-
-    goals.push({
-      priority: cellVal(cells[priorityIdx]),
-      description: goal,
-    })
+function crewHeader(crew: CrewOption, withSheet: boolean) {
+  return {
+    id: crew.id,
+    label: crew.label,
+    emoji: crew.emoji,
+    callTime: crew.callTime,
+    callTimeUrl: crew.callTimeUrl,
+    callLength: crew.callLength,
+    channel: crew.channel,
+    role: crew.role,
+    ...(withSheet ? { sheet: crew.sheet } : {}),
   }
-
-  return goals
 }
 
-// Parse tasks section
-function parseTasks(rows: any[], headerIdx: number, headers: string[], htmlLinkMap: Record<string, string> = {}) {
-  const headerMap = new Map<string, number>()
-  headers.forEach((h, i) => headerMap.set(h.toLowerCase(), i))
-
-  const tasks: any[] = []
-  const taskIdx = headerMap.get('task') ?? -1
-
-  for (let ri = headerIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || []
-    const taskCell = cells[taskIdx]
-    const task = cellVal(taskCell)
-    if (!task) continue
-
-    // Check if we hit another section header
-    const rowVals = cells.map(cellVal)
-    if (detectSection(rowVals)) break
-
-    // Priority: 1. HTML link map (Ctrl+K links)  2. GViz/text extraction
-    const url = htmlLinkMap[task] || extractUrl(taskCell)
-
-    tasks.push({
-      priority: cellVal(cells[headerMap.get('priority') ?? -1]),
-      stage: cellVal(cells[headerMap.get('stage') ?? -1]),
-      goal: cellVal(cells[headerMap.get('goal') ?? -1]),
-      task,
-      url,
-      dueDate: cellVal(cells[headerMap.get('due') ?? headerMap.get('due date') ?? headerMap.get('duedate') ?? -1]),
-      lead: cellVal(cells[headerMap.get('lead') ?? headerMap.get('owner') ?? headerMap.get('assigned') ?? -1]),
-      leadId: cellVal(cells[headerMap.get('lead id') ?? -1]),
-      notes: cellVal(cells[headerMap.get('notes') ?? -1]),
-    })
+/**
+ * Read the crew's own sheet: roster, goals, tasks, agenda and call info. Tasks, goals and agenda
+ * are replaced from the database below once `sheets.source.crewTasks` covers the crew.
+ */
+async function readCrewSheet(crew: CrewOption, sheetId: string, forceRefresh: boolean, debugMode: boolean) {
+  // Clear task-links and agenda-links caches if force refresh
+  if (forceRefresh) {
+    await Promise.all([
+      cacheDel(`task-links:${sheetId}`),
+      cacheDel(`agenda-links:${sheetId}`),
+    ])
   }
 
-  return tasks
-}
+  // Debug info to track link extraction
+  let taskDebugInfo: TaskLinksDebugResult | null = null
+  let agendaDebugInfo: AgendaLinksDebugResult | null = null
 
-// Parse agenda section
-function parseAgenda(rows: any[], headerIdx: number, headers: string[], htmlLinkMap: Record<string, string> = {}) {
-  const headerMap = new Map<string, number>()
-  headers.forEach((h, i) => headerMap.set(h.toLowerCase(), i))
-
-  const agenda: any[] = []
-  const stepIdx = headerMap.get('step') ?? -1
-
-  for (let ri = headerIdx + 1; ri < rows.length; ri++) {
-    const cells = rows[ri]?.c || []
-    const stepCell = cells[stepIdx]
-    const step = cellVal(stepCell)
-    const action = cellVal(cells[headerMap.get('action') ?? -1])
-    if (!step && !action) continue
-
-    // Check if we hit another section header
-    const rowVals = cells.map(cellVal)
-    if (detectSection(rowVals)) break
-
-    // Extract URL from step cell (check HTML link map first, then GViz extraction)
-    const stepUrl = htmlLinkMap[step] || extractUrl(stepCell)
-
-    agenda.push({
-      time: cellVal(cells[headerMap.get('time') ?? -1]),
-      lead: cellVal(cells[headerMap.get('lead') ?? -1]),
-      step,
-      stepUrl,
-      action,
-      notes: cellVal(cells[headerMap.get('notes') ?? -1]),
-    })
+  // Sheet data comes from Next's data cache (see CREW_SHEET_REVALIDATE_SECONDS) and
+  // the hyperlink maps from KV, so parsing on every request is cheap.
+  let htmlLinkMap: Record<string, string>
+  let agendaLinkMap: Record<string, string>
+  if (debugMode) {
+    const [taskDebugResult, agendaDebugResult] = await Promise.all([
+      getTaskLinksDebug(sheetId),
+      getAgendaStepLinksDebug(sheetId),
+    ])
+    taskDebugInfo = taskDebugResult
+    agendaDebugInfo = agendaDebugResult
+    htmlLinkMap = taskDebugResult.linkMap
+    agendaLinkMap = agendaDebugResult.linkMap
+  } else {
+    [htmlLinkMap, agendaLinkMap] = await Promise.all([
+      getTaskLinks(sheetId),
+      getAgendaStepLinks(sheetId),
+    ])
   }
 
-  return agenda
+  const gviz = await fetchGviz(
+    sheetId,
+    { headers: 0 },
+    forceRefresh ? { fresh: true } : { revalidate: CREW_SHEET_REVALIDATE_SECONDS },
+  ).catch(() => {
+    throw new Error('Failed to fetch crew spreadsheet')
+  })
+  const rows = gviz?.table?.rows || []
+
+  const parsed = parseCrewSheetRows(rows, htmlLinkMap, agendaLinkMap)
+  const { roster, goals, agenda, callInfo } = parsed
+  let tasks: any[] = parsed.tasks.map(pageTask)
+
+  // Use tasks from crew-mappings if sheet parsing didn't find any
+  if (tasks.length === 0 && (crew.tasks?.length ?? 0) > 0) {
+    tasks = crew.tasks!.map((t: any) => ({
+      task: t.label,
+      url: t.url,
+      priority: '',
+      stage: 'now',
+      lead: '',
+      notes: '',
+    }))
+  }
+
+  // Enrich roster with turtle data from main members database
+  const turtlesMap = await getMemberTurtlesMap()
+  for (const member of roster) {
+    if (!member.turtles && member.name) {
+      const normalizedName = member.name.toLowerCase().replace(/\s+/g, ' ')
+      const turtles = turtlesMap.get(normalizedName)
+      if (turtles) {
+        member.turtles = turtles
+      }
+    }
+  }
+
+  const data: CrewSheetData = { roster, goals, tasks, agenda, callInfo }
+  return { data, taskDebugInfo, agendaDebugInfo }
 }
 
 export async function GET(req: Request, { params }: Params) {
@@ -165,47 +130,35 @@ export async function GET(req: Request, { params }: Params) {
 
     const cacheHeaders = { 'Cache-Control': 'public, s-maxage=300, stale-while-revalidate=1800' };
 
+    // Tasks, agenda steps and goals from the database (plans/sheets-cutover.md PR 4).
+    const tasksFromDb = await usesDb('crewTasks', crew.id)
+    const withDbContent = async (data: CrewSheetData): Promise<CrewSheetData> => {
+      if (!tasksFromDb) return data
+      const content = await crewContentFromDb(crew.id)
+      return {
+        ...data,
+        tasks: content.tasks,
+        goals: content.goals,
+        agenda: content.agenda,
+        callInfo: data.callInfo ?? (crew.callTime ? { time: crew.callTime, song: '', announcements: '' } : null),
+      }
+    }
+    const source = { tasksSource: tasksFromDb ? 'db' : 'sheet' }
+    const empty: CrewSheetData = { roster: [], goals: [], tasks: fallbackTasks, agenda: [], callInfo: null }
+
     // If crew has no sheet URL, return just the metadata
     if (!crew.sheet) {
-      return NextResponse.json({
-        crew: {
-          id: crew.id,
-          label: crew.label,
-          emoji: crew.emoji,
-          callTime: crew.callTime,
-          callTimeUrl: crew.callTimeUrl,
-          callLength: crew.callLength,
-          channel: crew.channel,
-          role: crew.role,
-        },
-        roster: [],
-        goals: [],
-        tasks: fallbackTasks,
-        agenda: [],
-        callInfo: null,
-      }, { headers: cacheHeaders })
+      return NextResponse.json({ crew: crewHeader(crew, false), ...(await withDbContent(empty)), ...source }, { headers: cacheHeaders })
     }
 
     // Extract sheet ID and fetch data
     const sheetId = extractSheetId(crew.sheet)
     if (!sheetId) {
       return NextResponse.json({
-        crew: {
-          id: crew.id,
-          label: crew.label,
-          emoji: crew.emoji,
-          callTime: crew.callTime,
-          callTimeUrl: crew.callTimeUrl,
-          callLength: crew.callLength,
-          channel: crew.channel,
-          role: crew.role,
-        },
-        roster: [],
-        goals: [],
-        tasks: fallbackTasks,
-        agenda: [],
-        callInfo: null,
+        crew: crewHeader(crew, false),
+        ...(await withDbContent(empty)),
         error: 'Invalid sheet URL',
+        ...source,
       }, { headers: cacheHeaders })
     }
 
@@ -214,127 +167,21 @@ export async function GET(req: Request, { params }: Params) {
     const forceRefresh = url.searchParams.get('fresh') === '1'
     const debugMode = url.searchParams.get('debug') === '1'  // Shows Sheets API diagnostics
 
-    // Clear task-links and agenda-links caches if force refresh
-    if (forceRefresh) {
-      await Promise.all([
-        cacheDel(`task-links:${sheetId}`),
-        cacheDel(`agenda-links:${sheetId}`),
-      ])
+    let sheet: Awaited<ReturnType<typeof readCrewSheet>>
+    try {
+      sheet = await readCrewSheet(crew, sheetId, forceRefresh, debugMode)
+    } catch (e) {
+      // Once the crew's tasks live in the database, the sheet only supplies the roster: show the
+      // page without it rather than failing.
+      if (!tasksFromDb) throw e
+      sheet = { data: { ...empty, tasks: [] }, taskDebugInfo: null, agendaDebugInfo: null }
     }
-
-    type CrewSheetData = { roster: any[]; goals: any[]; tasks: any[]; agenda: any[]; callInfo: any }
-    let sheetData: CrewSheetData
-
-    // Debug info to track link extraction
-    let taskDebugInfo: TaskLinksDebugResult | null = null
-    let agendaDebugInfo: AgendaLinksDebugResult | null = null
-
-    // Sheet data comes from Next's data cache (see CREW_SHEET_REVALIDATE_SECONDS) and
-    // the hyperlink maps from KV, so parsing on every request is cheap.
-    {
-      // Use debug version when debug mode is enabled
-      let htmlLinkMap: Record<string, string>
-      let agendaLinkMap: Record<string, string>
-      if (debugMode) {
-        const [taskDebugResult, agendaDebugResult] = await Promise.all([
-          getTaskLinksDebug(sheetId),
-          getAgendaStepLinksDebug(sheetId),
-        ])
-        taskDebugInfo = taskDebugResult
-        agendaDebugInfo = agendaDebugResult
-        htmlLinkMap = taskDebugResult.linkMap
-        agendaLinkMap = agendaDebugResult.linkMap
-      } else {
-        [htmlLinkMap, agendaLinkMap] = await Promise.all([
-          getTaskLinks(sheetId),
-          getAgendaStepLinks(sheetId),
-        ])
-      }
-
-      const gviz = await fetchGviz(
-        sheetId,
-        { headers: 0 },
-        forceRefresh ? { fresh: true } : { revalidate: CREW_SHEET_REVALIDATE_SECONDS },
-      ).catch(() => {
-        throw new Error('Failed to fetch crew spreadsheet')
-      })
-      const rows = gviz?.table?.rows || []
-
-      // Parse sections by detecting header rows
-      let roster: any[] = []
-      let goals: any[] = []
-      let tasks: any[] = []
-      let agenda: any[] = []
-      let callInfo: any = null
-
-      for (let ri = 0; ri < rows.length; ri++) {
-        const cells = rows[ri]?.c || []
-        const rowVals = cells.map(cellVal)
-        const section = detectSection(rowVals)
-
-        if (section === 'roster') {
-          roster = parseRoster(rows, ri, rowVals)
-        } else if (section === 'goals') {
-          goals = parseGoals(rows, ri, rowVals)
-        } else if (section === 'tasks') {
-          tasks = parseTasks(rows, ri, rowVals, htmlLinkMap)
-        } else if (section === 'agenda') {
-          agenda = parseAgenda(rows, ri, rowVals, agendaLinkMap)
-        }
-
-        // Look for call time in early rows
-        if (ri < 10 && !callInfo) {
-          const firstCell = rowVals[0]?.toLowerCase() || ''
-          if (firstCell.includes('call time') || firstCell.includes('meeting time')) {
-            callInfo = {
-              time: rowVals[1] || '',
-              song: '',
-              announcements: '',
-            }
-          }
-        }
-      }
-
-      // Use tasks from crew-mappings if sheet parsing didn't find any
-      if (tasks.length === 0 && (crew.tasks?.length ?? 0) > 0) {
-        tasks = crew.tasks!.map((t: any) => ({
-          task: t.label,
-          url: t.url,
-          priority: '',
-          stage: 'now',
-          lead: '',
-          notes: '',
-        }))
-      }
-
-      // Enrich roster with turtle data from main members database
-      const turtlesMap = await getMemberTurtlesMap()
-      for (const member of roster) {
-        if (!member.turtles && member.name) {
-          const normalizedName = member.name.toLowerCase().replace(/\s+/g, ' ')
-          const turtles = turtlesMap.get(normalizedName)
-          if (turtles) {
-            member.turtles = turtles
-          }
-        }
-      }
-
-      sheetData = { roster, goals, tasks, agenda, callInfo }
-    }
+    const { taskDebugInfo, agendaDebugInfo } = sheet
 
     return NextResponse.json({
-      crew: {
-        id: crew.id,
-        label: crew.label,
-        emoji: crew.emoji,
-        callTime: crew.callTime,
-        callTimeUrl: crew.callTimeUrl,
-        callLength: crew.callLength,
-        channel: crew.channel,
-        role: crew.role,
-        sheet: crew.sheet,
-      },
-      ...sheetData,
+      crew: crewHeader(crew, true),
+      ...(await withDbContent(sheet.data)),
+      ...source,
       ...(taskDebugInfo || agendaDebugInfo ? { _debug: { tasks: taskDebugInfo, agenda: agendaDebugInfo } } : {}),
     }, { headers: cacheHeaders })
   } catch (e: unknown) {

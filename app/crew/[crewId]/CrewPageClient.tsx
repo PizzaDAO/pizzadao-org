@@ -82,6 +82,8 @@ type CrewData = {
     song: string
     announcements: string
   } | null
+  /** "db" once this crew's tasks, agenda and goals live on the website. */
+  tasksSource?: 'db' | 'sheet'
 }
 
 type UserData = {
@@ -277,7 +279,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
       setLoginPrompt('Please log in to claim this task.')
       return
     }
-    if (!data?.crew.sheet) {
+    if (!data?.crew.sheet && data?.tasksSource !== 'db') {
       toast.error('No sheet configured for this crew')
       return
     }
@@ -288,6 +290,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetUrl: data.crew.sheet,
+          crewId: data.crew.id,
           taskName,
           memberId: user.memberId,
           action: 'claim',
@@ -314,7 +317,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
 
   const handleGiveUpTask = async (taskName: string) => {
     if (!user) return
-    if (!data?.crew.sheet) {
+    if (!data?.crew.sheet && data?.tasksSource !== 'db') {
       toast.error('No sheet configured for this crew')
       return
     }
@@ -325,6 +328,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           sheetUrl: data.crew.sheet,
+          crewId: data.crew.id,
           taskName,
           action: 'giveup',
         }),
@@ -916,6 +920,11 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               >
                 📊 Open Sheet
               </a>
+            )}
+            {data.tasksSource === 'db' && (
+              <Link href={`/crew/${crew.id}/edit`} style={{ ...badge(), textDecoration: 'none' }}>
+                ✏️ Edit tasks &amp; agenda
+              </Link>
             )}
           </div>
 

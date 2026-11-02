@@ -2226,3 +2226,85 @@ model Crew {
   updatedAt      DateTime @updatedAt
   updatedBy      String?
 }
+
+// A crew task (was the Tasks section of each crew sheet). `naturalKey` is the normalized label
+// (with #2, #3 for repeats) so a re-import matches rows even after they are re-ordered. Done and
+// skipped tasks are kept (stage says so); archived rows were removed on the website.
+model CrewTask {
+  id           String    @id @default(cuid())
+  crewId       String
+  naturalKey   String
+  label        String
+  url          String?
+  stage        String    @default("todo") // as the sheet held it (e.g. "Doing", "Done")
+  priority     String? // as the sheet held it (e.g. "Top", "High")
+  goal         String?
+  due          String? // ISO date (YYYY-MM-DD)
+  dueRaw       String? // the sheet's own text for the due cell, until the date is edited here
+  leadName     String?
+  leadMemberId String?
+  notes        String?
+  position     Int
+  doneAt       DateTime?
+  archived     Boolean   @default(false)
+  createdBy    String?
+  updatedBy    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@unique([crewId, naturalKey])
+  @@index([crewId, archived, position])
+  @@index([leadMemberId])
+}
+
+// Audit trail for crew task edits on the website (create / update / archive / claim / giveup).
+model CrewTaskEvent {
+  id        Int      @id @default(autoincrement())
+  taskId    String
+  crewId    String
+  action    String
+  actor     String
+  data      Json?
+  createdAt DateTime @default(now())
+
+  @@index([taskId, createdAt])
+  @@index([crewId, createdAt])
+}
+
+// The Meeting Agenda section of a crew page (was the crew sheet's Step / Action / Lead section).
+model CrewAgendaStep {
+  id         String   @id @default(cuid())
+  crewId     String
+  naturalKey String
+  position   Int
+  time       String?
+  step       String
+  stepUrl    String?
+  action     String?
+  leadName   String?
+  notes      String?
+  archived   Boolean  @default(false)
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([crewId, naturalKey])
+  @@index([crewId, archived, position])
+}
+
+// A crew goal (was the crew sheet's Goals section).
+model CrewGoal {
+  id          String   @id @default(cuid())
+  crewId      String
+  naturalKey  String
+  position    Int
+  description String
+  priority    String?
+  archived    Boolean  @default(false)
+  updatedBy   String?
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+
+  @@unique([crewId, naturalKey])
+  @@index([crewId, archived, position])
+}

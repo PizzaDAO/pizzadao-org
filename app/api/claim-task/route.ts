@@ -4,9 +4,10 @@ import { google } from 'googleapis'
 import { prisma } from '@/app/lib/db'
 import { getGoogleAuth, GOOGLE_SCOPES } from '@/app/lib/google-auth'
 import { requireSession } from '@/app/lib/auth-guards'
-import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
+import { fetchMemberByDiscordId, fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { internalError } from '@/app/lib/errors/error-response'
+import { usesDb } from '@/app/lib/sheets-import/source'
 
 // Google Sheets API client with write access, created on first use so a
 // malformed GOOGLE_SERVICE_ACCOUNT_JSON surfaces as a request error rather
@@ -38,17 +39,23 @@ export async function POST(req: Request) {
 
   try {
     // memberId in the body is ignored: it is always derived from the session.
-    const { sheetUrl, taskName, action = 'claim' } = await req.json()
+    const { sheetUrl, taskName, action = 'claim', crewId } = await req.json()
+
+    if (action !== 'claim' && action !== 'giveup') {
+      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
+    }
+
+    // Crews whose tasks live in the database (sheets.source.crewTasks): write CrewTask, not the sheet.
+    if (typeof taskName === 'string' && taskName.trim()) {
+      const dbCrew = await findDbTaskCrew(typeof crewId === 'string' ? crewId : null, typeof sheetUrl === 'string' ? sheetUrl : null)
+      if (dbCrew) return claimInDb(auth.session.discordId, dbCrew, taskName.trim(), action, typeof sheetUrl === 'string' ? sheetUrl : null)
+    }
 
     if (typeof sheetUrl !== 'string' || typeof taskName !== 'string' || !sheetUrl || !taskName.trim()) {
       return NextResponse.json(
         { error: 'Missing required fields' },
         { status: 400 }
       )
-    }
-
-    if (action !== 'claim' && action !== 'giveup') {
-      return NextResponse.json({ error: 'Invalid action' }, { status: 400 })
     }
 
     const memberId = await fetchMemberIdByDiscordId(auth.session.discordId)
@@ -259,4 +266,68 @@ function columnToLetter(col: number): string {
     temp = Math.floor(temp / 26) - 1
   }
   return letter
+}
+
+/** The crew (by id, or by its sheet URL) when its tasks read from the database; otherwise null. */
+async function findDbTaskCrew(crewId: string | null, sheetUrl: string | null): Promise<{ id: string; sheetId: string | null } | null> {
+  const { crews } = await getCrewMappings()
+  const sheetId = sheetUrl ? extractSheetId(sheetUrl) : null
+  const crew = crewId
+    ? crews.find((c) => c.id === crewId.trim().toLowerCase())
+    : sheetId
+      ? crews.find((c) => (c.sheet ? extractSheetId(c.sheet) : null) === sheetId)
+      : undefined
+  if (!crew || !(await usesDb('crewTasks', crew.id))) return null
+  return { id: crew.id, sheetId: crew.sheet ? extractSheetId(crew.sheet) : null }
+}
+
+/**
+ * Claim or give up a crew task stored in the database. Same rules as the sheet path: claiming a
+ * task someone else leads is refused (409), and only the lead may give a task up (403). The
+ * conditional update makes two claims racing for one task safe.
+ */
+async function claimInDb(discordId: string, crew: { id: string; sheetId: string | null }, taskName: string, action: 'claim' | 'giveup', sheetUrl: string | null) {
+  const member = await fetchMemberByDiscordId(discordId)
+  const memberId = member?.memberId ?? (await fetchMemberIdByDiscordId(discordId))
+  if (!memberId) {
+    return NextResponse.json({ error: 'No member profile is linked to your Discord account' }, { status: 403 })
+  }
+  const tasks = await prisma.crewTask.findMany({ where: { crewId: crew.id, archived: false }, select: { id: true, label: true, leadMemberId: true } })
+  const task = tasks.find((t) => t.label.trim() === taskName)
+  if (!task) return NextResponse.json({ error: 'Task not found' }, { status: 404 })
+
+  const current = (task.leadMemberId ?? '').trim()
+  if (action === 'giveup') {
+    if (current !== String(memberId)) return NextResponse.json({ error: 'You can only give up tasks you lead' }, { status: 403 })
+    const r = await prisma.crewTask.updateMany({ where: { id: task.id, leadMemberId: String(memberId) }, data: { leadMemberId: null, leadName: null, updatedBy: discordId } })
+    if (r.count === 0) return NextResponse.json({ error: 'You can only give up tasks you lead' }, { status: 403 })
+  } else {
+    if (current && current !== String(memberId)) return NextResponse.json({ error: 'Task is already claimed by another member' }, { status: 409 })
+    const r = await prisma.crewTask.updateMany({
+      where: { id: task.id, OR: [{ leadMemberId: null }, { leadMemberId: '' }, { leadMemberId: String(memberId) }] },
+      data: { leadMemberId: String(memberId), leadName: member?.name || null, updatedBy: discordId },
+    })
+    if (r.count === 0) return NextResponse.json({ error: 'Task is already claimed by another member' }, { status: 409 })
+  }
+  try {
+    await prisma.crewTaskEvent.create({ data: { taskId: task.id, crewId: crew.id, action, actor: discordId } })
+  } catch (err) {
+    console.error('[claim-task] failed to log CrewTaskEvent (non-blocking):', err)
+  }
+
+  if (action === 'claim') {
+    // Same activity-feed key as the sheet path when the crew still has a sheet, so history lines up.
+    const taskKey = crew.sheetId ? `${crew.sheetId}::${taskName}` : `crew:${crew.id}::${taskName}`
+    try {
+      await prisma.taskClaimEvent.upsert({
+        where: { memberId_taskKey: { memberId: String(memberId), taskKey } },
+        update: {},
+        create: { memberId: String(memberId), taskKey, taskName, sheetUrl: sheetUrl ?? null },
+      })
+    } catch (err) {
+      console.error('[claim-task] failed to log TaskClaimEvent (non-blocking):', err)
+    }
+    recordActivation('first_contribution', { discordId, code: 'task_claim' })
+  }
+  return NextResponse.json({ success: true, action })
 }

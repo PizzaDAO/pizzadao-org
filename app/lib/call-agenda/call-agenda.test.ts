@@ -4,7 +4,7 @@ import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 vi.mock('@/app/lib/db')
 vi.mock('@/app/lib/crew-mappings', () => ({
   getCrewMappings: vi.fn(),
-  fetchOpenCrewTasksResult: vi.fn(),
+  fetchOpenCrewTasksForCrew: vi.fn(),
 }))
 vi.mock('@/app/lib/discord-rest', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/discord-rest')>()),
@@ -17,7 +17,7 @@ vi.mock('@/app/lib/discord-channels', async (orig) => ({
 }))
 
 import { prisma } from '@/app/lib/db'
-import { getCrewMappings, fetchOpenCrewTasksResult } from '@/app/lib/crew-mappings'
+import { getCrewMappings, fetchOpenCrewTasksForCrew } from '@/app/lib/crew-mappings'
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
 import { getGuildChannels } from '@/app/lib/discord-channels'
 import { buildAgendaBullets, daysOverdue, parseActionItems, parseAgendaLinks, formatAgendaMessage, agendaTimeZone } from './rank'
@@ -143,7 +143,7 @@ describe('runCallAgenda', () => {
       cached: false,
       crews: [{ id: 'ops', label: 'Ops', turtles: [], event: '111111111111111111', channel: '555555555555555555', sheet: 'https://docs.google.com/spreadsheets/d/abc/edit' }],
     })
-    vi.mocked(fetchOpenCrewTasksResult).mockResolvedValue({ tasks: [task('Ship thing', { priority: 'Top' })], error: false })
+    vi.mocked(fetchOpenCrewTasksForCrew).mockResolvedValue({ tasks: [task('Ship thing', { priority: 'Top' })], error: false })
     vi.mocked(getGuildChannels).mockResolvedValue([{ id: '555555555555555555', name: 'ops', type: 0 }])
     vi.mocked(prisma.callRecording.findMany).mockResolvedValue([])
     vi.mocked(prisma.callAgendaPost.findFirst).mockResolvedValue(null)
@@ -243,7 +243,7 @@ describe('runCallAgenda', () => {
   })
 
   it('L3: a sheet error is reported and nothing is claimed', async () => {
-    vi.mocked(fetchOpenCrewTasksResult).mockResolvedValue({ tasks: [], error: true })
+    vi.mocked(fetchOpenCrewTasksForCrew).mockResolvedValue({ tasks: [], error: true })
     const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
     expect(r.outcomes[0].status).toBe('sheet-error')
     expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
@@ -257,7 +257,7 @@ describe('runCallAgenda', () => {
   })
 
   it('posts nothing when no tasks are urgent', async () => {
-    vi.mocked(fetchOpenCrewTasksResult).mockResolvedValue({ tasks: [], error: false })
+    vi.mocked(fetchOpenCrewTasksForCrew).mockResolvedValue({ tasks: [], error: false })
     const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
     expect(r.outcomes[0].status).toBe('no-items')
     expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
@@ -274,7 +274,7 @@ describe('runCallAgenda', () => {
     })
     const r = await runCallAgenda({ now: NOW, fetchImpl: fetchEvents })
     expect(r.outcomes).toEqual([{ eventId: '111111111111111111', crewId: 'crew_x', status: 'excluded' }])
-    expect(fetchOpenCrewTasksResult).not.toHaveBeenCalled()
+    expect(fetchOpenCrewTasksForCrew).not.toHaveBeenCalled()
     expect(prisma.callAgendaPost.create).not.toHaveBeenCalled()
     expect(postDiscordMessage).not.toHaveBeenCalled()
   })
@@ -298,7 +298,7 @@ describe('runCallAgenda', () => {
 
   it('drops tasks and last-call items with a blocked term and counts them', async () => {
     setFilter({ blockedTerms: ['ZETA'] })
-    vi.mocked(fetchOpenCrewTasksResult).mockResolvedValue({
+    vi.mocked(fetchOpenCrewTasksForCrew).mockResolvedValue({
       tasks: [task('Ship thing', { priority: 'Top' }), task('Sync with zeta team', { priority: 'Top' })],
       error: false,
     })

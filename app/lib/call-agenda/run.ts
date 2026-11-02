@@ -11,7 +11,7 @@
  *    either way (it never posts).
  */
 import { prisma } from '@/app/lib/db'
-import { getCrewMappings, fetchOpenCrewTasksResult, type CrewOption } from '@/app/lib/crew-mappings'
+import { getCrewMappings, fetchOpenCrewTasksForCrew, type CrewOption } from '@/app/lib/crew-mappings'
 import { resolveCrewForEvent } from '@/app/lib/calls/crew-map'
 import { getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
 import { postDiscordMessage, DiscordPostError } from '@/app/lib/discord-rest'
@@ -166,7 +166,7 @@ export async function planAgendas(o: { now?: Date; horizonMs: number; fetchImpl?
     }
     const start = ev.startsAt.getTime()
     const [sheet, actionItems, posted] = await Promise.all([
-      crew.sheet ? fetchOpenCrewTasksResult(crew.sheet) : Promise.resolve({ tasks: [], error: false }),
+      fetchOpenCrewTasksForCrew(crew),
       previousActionItems(crew.id).catch(() => []),
       prisma.callAgendaPost.findFirst({
         where: { eventId: ev.id, startsAt: { gte: new Date(start - RESCHEDULE_WINDOW_MS), lte: new Date(start + RESCHEDULE_WINDOW_MS) } },
