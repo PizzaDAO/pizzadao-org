@@ -1,7 +1,6 @@
 import { requireDpr, rejectUnsafeWrite, json } from '@/app/lib/admin-guard'
 import { findDataset } from '@/app/lib/sheets-import/datasets'
 import { runImport, type ImportMode } from '@/app/lib/sheets-import/framework'
-import { getSource } from '@/app/lib/sheets-import/source'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -27,13 +26,6 @@ export async function POST(request: Request, { params }: Params) {
   const body = (await request.json().catch(() => null)) as { mode?: unknown } | null
   const mode = body?.mode ?? 'dry-run'
   if (mode !== 'dry-run' && mode !== 'apply') return json({ error: 'mode must be "dry-run" or "apply"' }, 400)
-  // Once a data set reads from the database, the website is where it is edited: an apply would
-  // overwrite those edits with the (stale) sheet. Switch the source back to "sheet" first.
-  // (A per-crew pilot is fine: the importer skips the crews already on the database.)
-  const current = info.source ? await getSource(info.source) : null
-  if (mode === 'apply' && current?.kind === 'db' && !current.crews) {
-    return json({ error: 'This data set reads from the database now; switch its source back to "sheet" before applying an import' }, 409)
-  }
   const importer = await info.importer()
   // An apply is refused (409) while the data set reads from the database (see runImport).
   const report = await runImport(importer, mode as ImportMode, auth.session.discordId, { source: info.source })
