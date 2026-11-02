@@ -5,6 +5,7 @@ vi.mock('./crew-mappings', () => ({ getCrewMappings: vi.fn() }))
 vi.mock('./crew-sheet', () => ({ CREW_SHEET_REVALIDATE_SECONDS: 60, fetchCrewRoster: vi.fn() }))
 vi.mock('./member-utils', () => ({ findMemberIdByDiscordId: vi.fn() }))
 vi.mock('./auth-guards', () => ({ isAdminDiscordId: vi.fn() }))
+vi.mock('./crew-roles', () => ({ crewRolesFromDb: vi.fn(async () => false), loadCrewRosterFromDb: vi.fn() }))
 
 import { isLeadStatus, getCrewLeadMemberIds, isCrewLead, canManageCrew, canManageBounty } from './crew-leads'
 import { getCrewMappings } from './crew-mappings'

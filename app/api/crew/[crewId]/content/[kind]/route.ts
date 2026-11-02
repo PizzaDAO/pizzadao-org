@@ -1,4 +1,5 @@
-import { requireSession } from '@/app/lib/auth-guards'
+import { isAdminDiscordId, requireSession } from '@/app/lib/auth-guards'
+import { isLeadStatus } from '@/app/lib/crew-lead-status'
 import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { canManageCrew } from '@/app/lib/crew-leads'
 import { normalizeCrewId } from '@/app/lib/crew-id'
@@ -12,7 +13,7 @@ export const dynamic = 'force-dynamic'
 type Params = { params: Promise<{ crewId: string; kind: string }> }
 
 /**
- * GET / PUT /api/crew/<crewId>/content/<tasks|agenda|goals>
+ * GET / PUT /api/crew/<crewId>/content/<tasks|agenda|goals|roster>
  * The crew-lead editor for a crew's tasks, meeting agenda and goals (plans/sheets-cutover.md PR 4).
  * Leads of the crew and guild admins only (fails closed). Only once the crew's tasks read from the
  * database (`sheets.source.crewTasks`); before that the crew sheet is still the place to edit.
@@ -22,10 +23,11 @@ async function guard(params: Params['params']) {
   if (!auth.ok) return { error: auth.response }
   const { crewId: raw, kind } = await params
   const crewId = normalizeCrewId(raw)
-  if (!crewId || !(kind in CREW_EDITORS)) return { error: json({ error: 'Not found' }, 404) }
+  const editor = Object.prototype.hasOwnProperty.call(CREW_EDITORS, kind) ? CREW_EDITORS[kind as CrewEditorKind] : null
+  if (!crewId || !editor) return { error: json({ error: 'Not found' }, 404) }
   if (!(await canManageCrew(auth.session.discordId, crewId))) return { error: json({ error: 'Only crew leads can edit this' }, 403) }
-  if (!(await usesDb('crewTasks', crewId))) return { error: json({ error: "This crew's tasks are still edited in its Google Sheet" }, 409) }
-  return { auth, crewId, spec: CREW_EDITORS[kind as CrewEditorKind](crewId) }
+  if (!(await usesDb(editor.source, crewId))) return { error: json({ error: "This is still edited in the crew's Google Sheet" }, 409) }
+  return { auth, crewId, spec: await editor.make(crewId) }
 }
 
 export async function GET(_request: Request, { params }: Params) {
@@ -51,6 +53,16 @@ export async function PUT(request: Request, { params }: Params) {
   } catch (e) {
     if (e instanceof EditorError) return json({ error: e.message }, 400)
     throw e
+  }
+  // Who is a crew lead grants permissions: only guild admins may change that set from here.
+  if (g.spec.dataset.startsWith('crewRoster:')) {
+    const leadsOf = (list: Array<{ memberId?: unknown; status?: unknown }>) =>
+      list.filter((r) => String(r.memberId ?? '').trim() && isLeadStatus(String(r.status ?? ''))).map((r) => String(r.memberId).trim()).sort().join(',')
+    const before = leadsOf((await g.spec.list()) as Array<{ memberId?: unknown; status?: unknown }>)
+    const after = leadsOf(rows as Array<{ memberId?: unknown; status?: unknown }>)
+    if (before !== after && !(await isAdminDiscordId(g.auth.session.discordId))) {
+      return json({ error: 'Only admins can change who leads the crew' }, 403)
+    }
   }
   try {
     return json({ ok: true, counts: await g.spec.save(rows, g.auth.session.discordId) })

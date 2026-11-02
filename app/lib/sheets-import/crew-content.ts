@@ -106,7 +106,7 @@ export function crewContentRecords(
   return { records, foundTasks: parsed.tasks.length > 0 }
 }
 
-async function readCrewSheetRows(sheetId: string): Promise<{ rows: unknown[]; taskLinks: Record<string, string>; agendaLinks: Record<string, string> }> {
+export async function readCrewSheetRows(sheetId: string): Promise<{ rows: unknown[]; taskLinks: Record<string, string>; agendaLinks: Record<string, string> }> {
   const [gviz, taskLinks, agendaLinks] = await Promise.all([fetchGviz(sheetId, { headers: 0 }, { fresh: true }), getTaskLinks(sheetId), getAgendaStepLinks(sheetId)])
   return { rows: gviz?.table?.rows ?? [], taskLinks, agendaLinks }
 }
@@ -251,13 +251,13 @@ function freshKey(label: string, taken: Set<string>): string {
   return key
 }
 
-type Row = { id: string; naturalKey: string; archived: boolean } & Record<string, unknown>
+export type Row = { id: string; naturalKey: string; archived: boolean } & Record<string, unknown>
 
 /**
  * Shared save for the crew editors: rows are matched by id; new rows are created; rows that
  * disappeared are archived (never deleted). `fields` builds the stored fields from an edited row.
  */
-async function saveCrewRows(o: {
+export async function saveCrewRows(o: {
   rows: EditorRow[]
   existing: Row[]
   fields: (row: EditorRow, position: number, prev: Row | undefined) => Record<string, unknown>
@@ -426,5 +426,11 @@ export function crewGoalsEditor(crewId: string): EditorSpec {
   }
 }
 
-export const CREW_EDITORS = { tasks: crewTasksEditor, agenda: crewAgendaEditor, goals: crewGoalsEditor } as const
+/** The crew page editors, and the switch that has to cover the crew before each one is used. */
+export const CREW_EDITORS: Record<string, { make: (crewId: string) => EditorSpec | Promise<EditorSpec>; source: 'crewTasks' | 'crewRoles' }> = {
+  tasks: { make: crewTasksEditor, source: 'crewTasks' },
+  agenda: { make: crewAgendaEditor, source: 'crewTasks' },
+  goals: { make: crewGoalsEditor, source: 'crewTasks' },
+  roster: { make: async (crewId) => (await import('./crew-roles')).crewRosterEditor(crewId), source: 'crewRoles' },
+}
 export type CrewEditorKind = keyof typeof CREW_EDITORS

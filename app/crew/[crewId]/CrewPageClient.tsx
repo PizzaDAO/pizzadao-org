@@ -84,6 +84,8 @@ type CrewData = {
   } | null
   /** "db" once this crew's tasks, agenda and goals live on the website. */
   tasksSource?: 'db' | 'sheet'
+  /** "db" once this crew's roster lives on the website. */
+  rosterSource?: 'db' | 'sheet'
 }
 
 type UserData = {
@@ -921,9 +923,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
                 📊 Open Sheet
               </a>
             )}
-            {data.tasksSource === 'db' && (
+            {(data.tasksSource === 'db' || data.rosterSource === 'db') && (
               <Link href={`/crew/${crew.id}/edit`} style={{ ...badge(), textDecoration: 'none' }}>
-                ✏️ Edit tasks &amp; agenda
+                ✏️ Edit crew
               </Link>
             )}
           </div>

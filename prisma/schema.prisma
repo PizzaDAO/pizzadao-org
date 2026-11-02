@@ -2292,6 +2292,34 @@ model CrewAgendaStep {
   @@index([crewId, archived, position])
 }
 
+// A crew roster row (was the crew sheet's Name / Status / City section). crew-leads.ts reads it for
+// permissions: a lead/capo status grants rights only with a member id (never matched by name).
+// `naturalKey` is "id:<memberId>" or "name:<normalized name>".
+model CrewRole {
+  id         String   @id @default(cuid())
+  crewId     String
+  naturalKey String
+  memberId   String?
+  name       String
+  status     String   @default("")
+  city       String   @default("")
+  org        String   @default("")
+  skills     String   @default("")
+  turtles    String   @default("")
+  telegram   String   @default("")
+  attendance String   @default("")
+  notes      String   @default("")
+  position   Int
+  archived   Boolean  @default(false)
+  updatedBy  String?
+  createdAt  DateTime @default(now())
+  updatedAt  DateTime @updatedAt
+
+  @@unique([crewId, naturalKey])
+  @@index([crewId, archived, position])
+  @@index([memberId])
+}
+
 // A crew goal (was the crew sheet's Goals section).
 model CrewGoal {
   id          String   @id @default(cuid())
