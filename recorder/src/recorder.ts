@@ -109,8 +109,10 @@ export class CallRecorder {
   async checkSchedule(liveEvents: EventInfo[]): Promise<void> {
     // Remember every occurrence we see: Discord auto-ends an empty ACTIVE event and a recurring one
     // then jumps to next week, so the live list alone forgets today's slot.
-    this.slots.observe(liveEvents, Date.now())
-    const events = this.slots.merge(liveEvents)
+    // The call being recorded keeps its slot even if its event was rescheduled mid-call.
+    const keep = new Set(this.current ? [this.current.key] : [])
+    this.slots.observe(liveEvents, Date.now(), keep)
+    const events = this.slots.merge(liveEvents, keep)
     if (this.shuttingDown || this.starting) return
     if (this.current?.stopping) return
     let humans: number
