@@ -875,6 +875,13 @@ export const SETTINGS = {
     help: 'Let the transcript cron write AI summaries for imported calls (costs model usage). Off: the import tool summarizes them on purpose. The CALL_IMPORT_AUTOSUMMARY_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
     confirmOn: 'The cron will spend model usage summarizing imported calls.',
   }),
+  'calls.attendanceFromRecordings': boolSetting({
+    key: 'calls.attendanceFromRecordings',
+    area: 'calls',
+    label: 'Attendance from recorded calls',
+    help: 'Count everyone in a recorded Discord call (speakers and, with a current recorder, silent attendees) as present for that crew and day. Rows are only added, never removed or overwritten. Off: attendance comes only from the daily sheets. The CALL_ATTENDANCE_FROM_RECORDINGS_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will gain attendance rows from recorded calls, and the admin backfill can write them.',
+  }),
   'calls.bulkActionMax': intSetting({
     key: 'calls.bulkActionMax',
     area: 'calls',
