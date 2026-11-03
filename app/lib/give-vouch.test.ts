@@ -9,6 +9,7 @@ const NOW = new Date('2026-11-02T12:00:00Z')
 const deps = (over: Partial<GiveVouchDeps> = {}): GiveVouchDeps => ({
   findVoucher: vi.fn(async () => ({ memberId: '42', name: 'Voucher' })),
   fetchTarget: vi.fn(async (id: string) => (id === '7' ? { Name: 'Friend', discordId: '500' } : id === '8' ? { Name: 'NoDiscord' } : null)),
+  exists: vi.fn(async () => false),
   countRecent: vi.fn(async () => 0),
   dailyLimit: vi.fn(async () => 10),
   create: vi.fn(async () => ({})),
@@ -51,6 +52,12 @@ describe('giveVouch', () => {
     expect(d.countRecent).toHaveBeenCalledWith('42', new Date(NOW.getTime() - DAY_MS))
     expect(d.create).not.toHaveBeenCalled()
     expect((await run(deps({ countRecent: vi.fn(async () => 9) }))).ok).toBe(true)
+  })
+
+  it('a repeat is a duplicate even when the daily limit is used up', async () => {
+    const d = deps({ exists: vi.fn(async () => true), countRecent: vi.fn(async () => 99) })
+    expect(await run(d)).toEqual({ ok: false, reason: 'duplicate' })
+    expect(d.create).not.toHaveBeenCalled()
   })
 
   it('a repeat is a duplicate, with no events', async () => {

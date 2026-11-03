@@ -5,8 +5,8 @@
  *   - the voucher has a member profile
  *   - no vouching for yourself
  *   - the target is a member
+ *   - one vouch per pair (a repeat answers "already vouched", even at the daily limit)
  *   - at most `vouches.dailyLimit` vouches per rolling 24 hours
- *   - one vouch per pair (a repeat answers "already vouched")
  *   - then the mission events (L5.2 for the voucher, L4.2 for the vouched member) and the
  *     notification, scheduled through `defer` so they never delay the reply
  *
@@ -30,6 +30,8 @@ export type GiveVouchResult =
 export interface GiveVouchDeps {
   findVoucher: (discordId: string) => Promise<{ memberId: string; name: string } | null>
   fetchTarget: (memberId: string) => Promise<Record<string, unknown> | null>
+  /** Whether this pair already has a vouch (checked before the daily limit, so a repeat is a 409, never a 429). */
+  exists: (followerId: string, followeeId: string) => Promise<boolean>
   /** Vouches this member gave since `since`. */
   countRecent: (memberId: string, since: Date) => Promise<number>
   dailyLimit: () => Promise<number>
@@ -42,6 +44,7 @@ export interface GiveVouchDeps {
 export const defaultGiveVouchDeps: GiveVouchDeps = {
   findVoucher: findMemberByDiscordId,
   fetchTarget: (id) => fetchMemberById(id) as Promise<Record<string, unknown> | null>,
+  exists: async (followerId, followeeId) => (await prisma.vouch.count({ where: { followerId, followeeId } })) > 0,
   countRecent: (memberId, since) => prisma.vouch.count({ where: { followerId: memberId, createdAt: { gte: since } } }),
   dailyLimit: () => getSetting('vouches.dailyLimit'),
   create: (followerId, followeeId) => addVouch(followerId, followeeId),
@@ -69,6 +72,8 @@ export async function giveVouch(
 
   const target = await deps.fetchTarget(input.targetMemberId)
   if (!target) return { ok: false, reason: 'not-found' }
+
+  if (await deps.exists(voucher.memberId, input.targetMemberId)) return { ok: false, reason: 'duplicate' }
 
   const limit = await deps.dailyLimit()
   const recent = await deps.countRecent(voucher.memberId, new Date(deps.now().getTime() - DAY_MS))

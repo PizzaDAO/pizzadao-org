@@ -95,7 +95,8 @@ export interface DashboardSummary {
     nextAction: NextAction;
     /**
      * The dashboard level card (setting dashboard.levelCardEnabled). `enabled: false` (the default)
-     * means the page renders nothing; the rest is only filled while it is on.
+     * means the page renders nothing. The other fields are always filled from the same mission data
+     * as `level`, so they cost no extra queries.
      */
     levelCard: {
         enabled: boolean;
