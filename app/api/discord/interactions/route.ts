@@ -12,6 +12,8 @@
 // Flags: games.enabled (games).
 // /missions: deferred reply, then the verifier run (dry run unless
 //      missions.verifiersEnabled is edited in via the interaction webhook.
+// /progress (calls.progressReportEnabled on): deferred public reply, then the crew's last call
+//      action items and open tasks (app/lib/calls/progress-report.ts), 1 per channel per 2 min.
 // Mission review cards (missions.reviewCardsEnabled on): Approve / Release /
 //      Reject buttons on the #work cards and the Reject modal. Checked with
 //      canReviewMission(member.roles, level), never your own; deferred update,
@@ -23,7 +25,9 @@
 //      and PEP_ADMIN_LOG_CHANNEL_ID (audit post via the bot token).
 import { after, NextResponse } from "next/server";
 import { verifyDiscordRequest } from "@/app/lib/discord-interactions/verify";
-import { handleInteraction, type HandlerDeps, type Interaction } from "@/app/lib/discord-interactions/handle";
+import { handleInteraction, type HandlerDeps, type Interaction, type ProgressJob } from "@/app/lib/discord-interactions/handle";
+import { progressEnabled, runProgressCommand } from "@/app/lib/calls/progress-command";
+import { getCrewMappings } from "@/app/lib/crew-mappings";
 import { getGuildRoles } from "@/app/lib/discord-interactions/guild-roles";
 import { doWork } from "@/app/lib/pep-earn/work";
 import { collectIncome, resolveRoleIncome, roleIncomeConfig } from "@/app/lib/pep-earn/income";
@@ -104,6 +108,29 @@ function deferMissions(job: Parameters<NonNullable<HandlerDeps["missions"]>["def
   });
 }
 
+/** /progress: one report per channel per 2 minutes (it posts publicly). */
+async function progressRateLimit(channelId: string): Promise<Date | null> {
+  const r = await checkKeyedRateLimit("progress-command", channelId);
+  return r.success ? null : new Date(r.reset);
+}
+
+/** The deferred /progress work, after the type-5 reply has gone out. */
+function deferProgress(job: ProgressJob) {
+  after(async () => {
+    await runProgressCommand(job);
+  });
+}
+
+/** Autocomplete for the /progress crew option: crews whose label or id contains the query. */
+async function progressCrewChoices(query: string): Promise<Array<{ name: string; value: string }>> {
+  const q = query.trim().toLowerCase();
+  const { crews } = await getCrewMappings();
+  return crews
+    .filter((c) => !q || c.label.toLowerCase().includes(q) || c.id.includes(q))
+    .slice(0, 25)
+    .map((c) => ({ name: c.label.slice(0, 100), value: c.id }));
+}
+
 const appUrl = () => (process.env.NEXT_PUBLIC_APP_URL?.trim() || "https://app.pizzadao.org").replace(/\/$/, "");
 
 /**
@@ -172,6 +199,7 @@ function deps(guildId: string | undefined, settings: Settings): HandlerDeps {
     removeMoney: adminRemoveMoney,
     logAdmin: logAdminGrant,
     missions: { rateLimit: missionsRateLimit, defer: deferMissions },
+    progress: { enabled: progressEnabled, rateLimit: progressRateLimit, defer: deferProgress, crewChoices: progressCrewChoices },
     missionReview,
     followups,
   };

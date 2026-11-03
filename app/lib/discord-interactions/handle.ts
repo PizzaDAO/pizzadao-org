@@ -104,6 +104,18 @@ export interface HandlerDeps {
     rateLimit: (discordId: string) => Promise<Date | null>
     defer: (job: MissionsJob) => void
   }
+  /**
+   * /progress (calls.progressReportEnabled). `enabled` is checked first, so a disabled command
+   * never uses up the channel's rate limit. `rateLimit` returns when the channel may run it again
+   * (null = allowed now, and counts this use). `defer` builds the report and edits the deferred
+   * public reply; it must not block (route: after()). `crewChoices` feeds the option's autocomplete.
+   */
+  progress?: {
+    enabled: () => Promise<boolean>
+    rateLimit: (channelId: string) => Promise<Date | null>
+    defer: (job: ProgressJob) => void
+    crewChoices: (query: string) => Promise<Array<{ name: string; value: string }>>
+  }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
   /** Follow-up DM buttons and Reply modal (./followups.ts). */
@@ -116,6 +128,15 @@ export interface MissionsJob {
   roles: string[]
   applicationId: string
   token: string
+  author?: EmbedAuthor
+}
+
+/** What the deferred /progress follow-up needs. */
+export interface ProgressJob {
+  applicationId: string
+  token: string
+  /** The crew option, if the member typed one. */
+  crew?: string
   author?: EmbedAuthor
 }
 
@@ -345,6 +366,22 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
     }
 
+    case 'progress': {
+      if (!deps.progress || !(await deps.progress.enabled())) return out.error("/progress isn't enabled yet.")
+      if (!i.application_id || !i.token || !i.channel_id) return out.error('Could not start the report. Please try again.')
+      const readyAt = await deps.progress.rateLimit(i.channel_id)
+      if (readyAt) return out.wait('A progress report was just posted here.', `You can run /progress in this channel again ${rel(readyAt)}.`)
+      const crew = opt(i, 'crew')
+      deps.progress.defer({
+        applicationId: i.application_id,
+        token: i.token,
+        ...(typeof crew === 'string' && crew.trim() ? { crew: crew.trim().slice(0, 80) } : {}),
+        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+      })
+      // "Metalhead is thinking..." (public); the report is edited in.
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { allowed_mentions: NO_PINGS } }
+    }
+
     default:
       return out.error('Unknown command.')
   }
@@ -399,6 +436,8 @@ async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<Interact
       .filter((it) => it.name.toLowerCase().includes(q))
       .slice(0, 25)
       .map((it) => ({ name: `${it.name} (${n(it.price)})`.slice(0, 100), value: String(it.id) }))
+  } else if (i.data?.name === 'progress' && focused?.name === 'crew' && deps.progress && (await deps.progress.enabled())) {
+    choices = (await deps.progress.crewChoices(String(focused.value ?? ''))).slice(0, 25)
   }
   return { type: ResponseType.AUTOCOMPLETE_RESULT, data: { choices } }
 }

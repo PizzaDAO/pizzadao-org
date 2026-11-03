@@ -900,6 +900,30 @@ export const SETTINGS = {
     default: 1,
     unit: 'people',
   }),
+  'calls.progressReportEnabled': boolSetting({
+    key: 'calls.progressReportEnabled',
+    area: 'calls',
+    label: '/progress command',
+    help: 'Lets anyone in the server run /progress in a channel: it posts the crew\'s last call action items and open tasks as a public message (the crew is the option, else the call in progress). Uses the same private post filter as agendas. The command must also be registered with Discord. The CALL_PROGRESS_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: '/progress will post crew action items and tasks publicly in the channel where it is used.',
+  }),
+  'calls.progressMaxItems': intSetting({
+    key: 'calls.progressMaxItems',
+    area: 'calls',
+    label: '/progress items per section',
+    help: 'Most last-call action items, and most open tasks, shown in one /progress report.',
+    min: 3,
+    max: 15,
+    default: 8,
+    unit: 'items',
+  }),
+  'calls.progressShowFollowups': boolSetting({
+    key: 'calls.progressShowFollowups',
+    area: 'calls',
+    label: 'Show follow-up status in /progress',
+    help: 'Add a status icon (done, in progress, needs help) to each action item that has a follow-up. Only the icon is shown, never the message text or replies. The CALL_PROGRESS_FOLLOWUPS_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: '/progress will show who is done, in progress or needs help on last call\'s action items.',
+  }),
   // Calls imported from X live broadcasts (plans/x-call-import.md). All off: an imported call never reaches Discord,
   // the follow-up drafter, the agenda or the automatic summary sweep unless a setting here says so.
   'calls.importedRecapPostEnabled': boolSetting({
