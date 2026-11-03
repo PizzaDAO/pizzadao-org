@@ -265,7 +265,8 @@ function Row({ item, labels, footers, onChanged }: { item: Item; labels: QueueLa
             {error && <p role="alert" className="m-0 text-sm text-tomato">{error}</p>}
             {showTimeline && (
                 <ul className="m-0 grid list-none gap-1 p-0 text-xs text-foreground/70">
-                    {item.events.map((e) => (
+                    {/* The "inbound" event is only a dedupe marker; the "reply" event carries the text and the badge. */}
+                    {item.events.filter((e) => e.type !== "inbound").map((e) => (
                         <li key={e.id}>
                             {new Date(e.createdAt).toLocaleString()} - {labels[`event.${e.type}`] ?? e.type}
                             {typeof e.data?.channel === "string" ? ` (${e.data.channel})` : ""}
