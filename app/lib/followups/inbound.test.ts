@@ -16,7 +16,7 @@ vi.mock('@/app/lib/db', () => ({
   prisma: {
     telegramAccount: { findUnique: vi.fn() },
     followUp: { findFirst: vi.fn() },
-    followUpEvent: { create: vi.fn() },
+    followUpEvent: { create: vi.fn(), deleteMany: vi.fn() },
   },
 }))
 
@@ -76,6 +76,30 @@ describe('handleInbound', () => {
     vi.mocked(prisma.followUpEvent.create).mockRejectedValue(new Prisma.PrismaClientKnownRequestError('dup', { code: 'P2002', clientVersion: 'x' }))
     expect(await handleInbound(msg({ externalKey: 'discord:1' }), NOW)).toEqual({ claimed: true, duplicate: true })
     expect(apply).not.toHaveBeenCalled()
+  })
+  it('the external key is namespaced by the authenticated source', async () => {
+    await handleInbound(msg({ source: 'telegram', senderId: '999', externalKey: '555:42' }), NOW)
+    expect(vi.mocked(prisma.followUpEvent.create).mock.calls[0][0]).toMatchObject({ data: { externalKey: 'telegram:555:42' } })
+    vi.mocked(prisma.followUpEvent.create).mockClear()
+    await handleInbound(msg({ externalKey: 'telegram:5' }), NOW)
+    expect(vi.mocked(prisma.followUpEvent.create).mock.calls[0][0]).toMatchObject({ data: { externalKey: 'discord:telegram:5' } })
+  })
+  it('if saving the reply throws, the marker is removed so the retry is processed, not called a duplicate', async () => {
+    vi.mocked(prisma.followUpEvent.deleteMany).mockResolvedValue({ count: 1 } as never)
+    apply.mockRejectedValueOnce(new Error('db down'))
+    await expect(handleInbound(msg({ externalKey: 'discord:1' }), NOW)).rejects.toThrow('db down')
+    expect(prisma.followUpEvent.deleteMany).toHaveBeenCalledWith({ where: { externalKey: 'discord:1' } })
+    // The retry finds no marker and saves the reply.
+    const r = await handleInbound(msg({ externalKey: 'discord:1' }), NOW)
+    expect(r).toMatchObject({ claimed: true })
+    expect(r.duplicate).toBeUndefined()
+    expect(apply).toHaveBeenCalledTimes(2)
+  })
+  it('a refused reply also removes the marker', async () => {
+    vi.mocked(prisma.followUpEvent.deleteMany).mockResolvedValue({ count: 1 } as never)
+    apply.mockResolvedValueOnce({ ok: false, reason: 'closed' })
+    expect(await handleInbound(msg({ externalKey: 'discord:1' }), NOW)).toEqual({ claimed: false })
+    expect(prisma.followUpEvent.deleteMany).toHaveBeenCalledWith({ where: { externalKey: 'discord:1' } })
   })
   it('opted-out members are claimed but get no ack', async () => {
     optedOut.mockResolvedValue(true)
