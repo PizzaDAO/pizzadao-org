@@ -10,10 +10,11 @@ import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { extractEventId } from '@/app/lib/calls/crew-map'
 import { loadSettings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
+import { END_SONG_CREW_LINE } from '@/app/lib/settings/registry'
 
 export interface RecorderConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
-  endSong: { enabled: boolean; minHumans: number }
+  endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
   /** Discord event id -> crew label, for naming the call in messages. */
   /** callMinutes: the crew's usual call length, for the end-of-call song when the event has no end time. */
   crews: { eventId: string; label: string; callMinutes?: number }[]
@@ -26,7 +27,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
     batchSeconds: 20,
     recordingLine: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
   },
-  endSong: { enabled: false, minHumans: 1 },
+  endSong: { enabled: false, minHumans: 1, crewMap: [] },
   crews: [],
 }
 
@@ -47,6 +48,16 @@ export async function loadCrewLabels(): Promise<RecorderConfig['crews']> {
   }
 }
 
+/** `our label = radio crew` lines -> pairs (bad lines skipped). */
+export function parseCrewMap(raw: string): { crew: string; radio: string }[] {
+  const out: { crew: string; radio: string }[] = []
+  for (const line of raw.split('\n')) {
+    const m = END_SONG_CREW_LINE.exec(line.trim())
+    if (m) out.push({ crew: m[1].trim(), radio: m[2].trim() })
+  }
+  return out
+}
+
 export async function buildRecorderConfig(): Promise<RecorderConfig> {
   const settings = await loadSettings()
   return {
@@ -60,6 +71,7 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
     endSong: {
       enabled: resolveToggle('calls.endSongTriggerEnabled', settings),
       minHumans: settings.get('calls.endSongMinHumans'),
+      crewMap: parseCrewMap(settings.get('calls.endSongCrewMap')),
     },
     crews: await loadCrewLabels(),
   }

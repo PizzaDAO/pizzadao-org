@@ -31,7 +31,7 @@ import { EndSongMarker, isEndSongStop, postPlayCrew } from './end-song.js'
 import { SlotMemory } from './slots.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
-import { REMOTE_CONFIG_OFF, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
+import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
 
 const TICK_MS = 10_000
@@ -200,7 +200,7 @@ export class CallRecorder {
 
   private async doStart(event: EventInfo): Promise<void> {
     // Fresh settings for this session (5 s cap, never throws; failure keeps the last good value or all-off).
-    await this.remote?.refresh()
+    await this.remote?.refresh(REMOTE_CONFIG_START_WAIT_MS)
     const startedAtMs = Date.now()
     const sessionId = `${event.id}-${startedAtMs}`
     const dir = path.join(this.cfg.dataDir, sessionId)
@@ -397,10 +397,17 @@ export class CallRecorder {
       this.log(`end song: no crew mapped to event ${event.id}; not playing for "${event.name}"`)
       return null
     }
+    // Only crews pizza-radio knows (calls.endSongCrewMap); the radio's own name is what is sent.
+    const key = (s: string) => s.trim().toLowerCase()
+    const radio = rc.endSong.crewMap.find((m) => key(m.crew) === key(crew.label))?.radio
+    if (!radio) {
+      this.log(`end song: crew "${crew.label}" is not in the end-song crew map; not playing`)
+      return null
+    }
     const endMs =
       event.scheduledEndMs ??
       (event.scheduledStartMs !== null && crew.callMinutes ? event.scheduledStartMs + crew.callMinutes * 60_000 : null)
-    return { minHumans: rc.endSong.minHumans, crew: crew.label, endMs, fired: false }
+    return { minHumans: rc.endSong.minHumans, crew: radio, endMs, fired: false }
   }
 
   /** Ask pizza-radio to play the crew song, at most once per call occurrence. Never throws, never blocks. */
@@ -414,11 +421,15 @@ export class CallRecorder {
     }
     e.fired = true
     if (this.endSongMarker.has(s.key)) return // already played for this occurrence (restart or switch)
-    this.endSongMarker.mark(s.key, Date.now())
     this.log(`end song (${why}): asking pizza-radio to play "${e.crew}"`)
-    void postPlayCrew(radio.url, radio.apiKey, e.crew, this.log).catch((err) =>
-      this.log(`end song failed: ${err instanceof Error ? err.message : String(err)}`),
-    )
+    // The "already played" marker is written only once pizza-radio answered: a 2xx, or a 4xx that retrying will
+    // not fix (logged once, marked so it does not loop). A network error or 5xx after the retry leaves it unmarked.
+    void postPlayCrew(radio.url, radio.apiKey, e.crew, this.cfg.callChannelId, this.log)
+      .then((outcome) => {
+        if (outcome === 'failed') this.log('end song: pizza-radio unreachable; not marked as played')
+        else this.endSongMarker.mark(s.key, Date.now())
+      })
+      .catch((err) => this.log(`end song failed: ${err instanceof Error ? err.message : String(err)}`))
   }
 
   /** Process shutdown: close the capture and leave the files for the next boot to finish. */

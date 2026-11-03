@@ -30,6 +30,8 @@ describe('GET /api/calls/recorder/config', () => {
     const body = await res.json()
     expect(body.welcome.enabled).toBe(false)
     expect(body.endSong.enabled).toBe(false)
+    expect(body.endSong.crewMap).toHaveLength(9)
+    expect(body.endSong.crewMap[0]).toEqual({ crew: 'Ops', radio: 'Ops' })
     expect(body.crews).toEqual([{ eventId: '123456789012345678', label: 'Ops Crew', callMinutes: 60 }])
     expect(JSON.stringify(body)).not.toContain('secret')
   })

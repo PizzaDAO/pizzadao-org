@@ -118,6 +118,7 @@ describe('settings registry', () => {
       ['calls.recordingLine', "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded."],
       ['calls.endSongTriggerEnabled', false],
       ['calls.endSongMinHumans', 1],
+      ['calls.endSongCrewMap', 'Ops = Ops\nTech = Tech\nComms = Comms\nBiz Dev = Biz Dev\nEvents = Events\nArt = Art\nMerch = Merch\nReal Estate = Real Estate\nGovernance = Governance'],
       ['calls.progressReportEnabled', false],
       ['calls.progressMaxItems', 8],
       ['calls.progressShowFollowups', false],
@@ -161,6 +162,8 @@ describe('settings registry', () => {
     expect(parseSetting('calls.welcomeTemplate', 'Hi {members} to {call}').ok).toBe(true)
     expect(parseSetting('calls.recordingLine', '   ').ok).toBe(false)
     expect(parseSetting('calls.recordingLine', 'We record.').ok).toBe(true)
+    expect(parseSetting('calls.endSongCrewMap', 'Ops = Ops\nCommunity').ok).toBe(false)
+    expect(parseSetting('calls.endSongCrewMap', 'Ops = Ops\nBiz Dev = Biz Dev').ok).toBe(true)
     expect(parseSetting('calls.welcomeBatchSeconds', 4).ok).toBe(false)
     expect(parseSetting('calls.welcomeBatchSeconds', 121).ok).toBe(false)
   })

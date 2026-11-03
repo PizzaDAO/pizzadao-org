@@ -10,10 +10,10 @@ describe('parseRemoteConfig', () => {
     expect(parseRemoteConfig({ welcome: { enabled: 'yes', batchSeconds: 9999 } }).welcome).toEqual(REMOTE_CONFIG_OFF.welcome)
   })
   it('only an explicit true turns a behaviour on', () => {
-    const c = parseRemoteConfig({ welcome: { enabled: true, batchSeconds: 30 }, endSong: { enabled: true, minHumans: 2 }, crews: [{ eventId: '1', label: 'Ops' }, { bad: 1 }] })
+    const c = parseRemoteConfig({ welcome: { enabled: true, batchSeconds: 30 }, endSong: { enabled: true, minHumans: 2, crewMap: [{ crew: 'Ops', radio: 'Ops' }, { crew: '', radio: 'x' }] }, crews: [{ eventId: '1', label: 'Ops' }, { bad: 1 }] })
     expect(c.welcome.enabled).toBe(true)
     expect(c.welcome.batchSeconds).toBe(30)
-    expect(c.endSong).toEqual({ enabled: true, minHumans: 2 })
+    expect(c.endSong).toEqual({ enabled: true, minHumans: 2, crewMap: [{ crew: 'Ops', radio: 'Ops' }] })
     expect(c.crews).toEqual([{ eventId: '1', label: 'Ops' }])
   })
 })
@@ -36,5 +36,15 @@ describe('RemoteConfigClient', () => {
   it('treats a 401 as a failure (all-off)', async () => {
     const c = new RemoteConfigClient('https://x', 'k', () => {}, vi.fn().mockResolvedValue({ ok: false, status: 401 }) as unknown as typeof fetch)
     expect((await c.refresh()).welcome.enabled).toBe(false)
+  })
+})
+
+describe('session-start wait', () => {
+  it('gives up after the given wait and keeps the last good value (or all-off)', async () => {
+    const slow = vi.fn((_u: string, init?: RequestInit) => new Promise<Response>((_res, rej) => init?.signal?.addEventListener('abort', () => rej(new Error('aborted')))))
+    const c = new RemoteConfigClient('https://x', 'k', () => {}, slow as unknown as typeof fetch)
+    const t0 = Date.now()
+    expect((await c.refresh(40)).welcome.enabled).toBe(false)
+    expect(Date.now() - t0).toBeLessThan(1000)
   })
 })
