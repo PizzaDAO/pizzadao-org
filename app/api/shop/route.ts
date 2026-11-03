@@ -14,6 +14,7 @@ export async function GET() {
         id: item.id,
         name: item.name,
         description: item.description,
+        image: item.image ?? null,
         price: item.price,
         priceFormatted: formatCurrency(item.price),
         quantity: item.quantity,
