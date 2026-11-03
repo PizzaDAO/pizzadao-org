@@ -32,7 +32,7 @@ const run = (options?: Array<{ name: string; type: number; value: unknown; focus
 
 describe('/progress', () => {
   it('is registered with an optional crew option with autocomplete', () => {
-    const c = PEP_COMMANDS.find((x) => x.name === 'progress')
+    const c = (PEP_COMMANDS as readonly { name: string; options?: readonly unknown[] }[]).find((x) => x.name === 'progress')
     expect(c).toBeTruthy()
     expect(c?.options?.[0]).toMatchObject({ name: 'crew', required: false, autocomplete: true })
   })
@@ -63,7 +63,7 @@ describe('/progress', () => {
   it('on without a crew option: the job carries none', async () => {
     const { deps, p } = make()
     await handleInteraction(run(), deps)
-    expect(p.defer.mock.calls[0][0]).not.toHaveProperty('crew')
+    expect((p.defer as ReturnType<typeof vi.fn>).mock.calls[0][0]).not.toHaveProperty('crew')
   })
 
   it('rate limited per channel: ephemeral wait, no deferral', async () => {

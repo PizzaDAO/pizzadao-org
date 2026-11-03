@@ -6,6 +6,8 @@ import Link from "next/link";
 import { isOptimizableImage } from "@/app/lib/image-hosts";
 import { CREWS, TURTLES } from "@/app/ui/constants";
 import { badge, btn, card, input, pageContainer } from "@/app/ui/shared-styles";
+import { useSession } from "@/app/lib/hooks/use-session";
+import { QuickVouchButton } from "@/app/ui/vouches/QuickVouchButton";
 
 interface PublicMember {
   id: string;
@@ -69,6 +71,28 @@ export default function CrewMembersPage() {
   const [turtleFilter, setTurtleFilter] = useState<string | null>(null);
   const [page, setPage] = useState(1);
   const [sort, setSort] = useState("name_asc");
+  // One-click Vouch (setting vouches.quickVouchEnabled): the API says whether it is on for this viewer
+  // and which members they already vouched for.
+  const { data: session } = useSession();
+  const [quick, setQuick] = useState<{ enabled: boolean; memberId?: string; vouched: Set<string> }>({ enabled: false, vouched: new Set() });
+  useEffect(() => {
+    let cancelled = false;
+    (async () => {
+      try {
+        const res = await fetch("/api/vouches/quick", { credentials: "include" });
+        if (!res.ok) return;
+        const body = await res.json();
+        if (!cancelled && body?.enabled === true) {
+          setQuick({ enabled: true, memberId: String(body.memberId ?? ""), vouched: new Set<string>(Array.isArray(body.vouchedIds) ? body.vouchedIds : []) });
+        }
+      } catch {
+        // Optional feature: the list works without it.
+      }
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, []);
 
   const fetchMembers = useCallback(async () => {
     setLoading(true);
@@ -479,11 +503,19 @@ export default function CrewMembersPage() {
             }}
           >
             {members.map((member) => (
-              <MemberCardItem
-                key={member.id}
-                member={member}
-                pfpUrl={member.pfpUrl ?? undefined}
-              />
+              <div key={member.id} style={{ display: "grid", gridTemplateRows: "1fr auto", gap: 6 }}>
+                <MemberCardItem member={member} pfpUrl={member.pfpUrl ?? undefined} />
+                {quick.enabled && member.id !== quick.memberId && (
+                  <div style={{ justifySelf: "end" }}>
+                    <QuickVouchButton
+                      targetMemberId={member.id}
+                      vouched={quick.vouched.has(member.id)}
+                      canViewDisavow={session?.canViewDisavow === true}
+                      onVouched={() => setQuick((q) => ({ ...q, vouched: new Set(q.vouched).add(member.id) }))}
+                    />
+                  </div>
+                )}
+              </div>
             ))}
           </div>
         )}

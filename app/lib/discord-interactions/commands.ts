@@ -116,6 +116,26 @@ export const PEP_COMMANDS = [
     dm_permission: false,
   },
   {
+    // Deferred and ephemeral (type 5, flags 64). Each answers "isn't enabled yet" until its setting
+    // (discord.vouchCommandEnabled / levelCommandEnabled / profileCommandEnabled) is on.
+    name: 'vouch',
+    description: 'Vouch for another PizzaDAO member (only you see the reply)',
+    options: [{ type: USER, name: 'member', description: 'Who to vouch for', required: true }],
+    dm_permission: false,
+  },
+  {
+    name: 'level',
+    description: 'Your level and what you need for the next one (or another member’s level)',
+    options: [{ type: USER, name: 'member', description: 'Member to look up (default: you)', required: false }],
+    dm_permission: false,
+  },
+  {
+    name: 'profile',
+    description: 'Profile stats for you or another member (only you see the reply)',
+    options: [{ type: USER, name: 'member', description: 'Member to look up (default: you)', required: false }],
+    dm_permission: false,
+  },
+  {
     // Deferred and public (type 5): reads the crew's last call and tasks, then edits the reply in.
     // Answers "not enabled" until calls.progressReportEnabled.
     name: 'progress',

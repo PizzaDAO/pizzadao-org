@@ -791,7 +791,11 @@
       "viewAll": "Ver todos",
       "unknownName": "Desconocido",
       "empty": "Aún no tienes avales. ¡Visita los perfiles de otros miembros para avalarlos!",
-      "find": "Buscar avales"
+      "find": "Buscar avales",
+      "vouchedByTitle": "Avalado por",
+      "vouchedByCount": "{count, plural, one {# miembro} other {# miembros}}",
+      "vouchedByEmpty": "Todavía nadie ha dado su aval.",
+      "vouchedByMore": "y {count} más"
     },
     "celebrations": {
       "profile": {
@@ -845,7 +849,18 @@
     },
     "howToAttend": "Cómo asistir a una llamada",
     "gettingStarted": "Primeros pasos",
-    "handbook": "Guía de PizzaDAO"
+    "handbook": "Guía de PizzaDAO",
+    "levelCard": {
+      "overline": "Tu nivel",
+      "level": "Nivel {level}",
+      "max": "Nivel MÁXIMO",
+      "progress": "{done} de {total} misiones completadas",
+      "next": "A continuación",
+      "allSubmitted": "Todo está enviado. Esperando revisión.",
+      "maxBody": "Has llegado a todos los niveles que existen.",
+      "viewAll": "Todas las misiones",
+      "nextLevel": "Siguiente nivel: {title}"
+    }
   },
   "missionLinks": {
     "boxHint": "Esta misión necesita una Rare Pizza Box NFT en una wallet conectada a tu perfil.",
