@@ -1,4 +1,5 @@
 import { prisma } from './db'
+import { validateImageUrl } from './shop-admin'
 import { assertPepAmount, debitInTx, getOrCreateEconomy } from './economy'
 import { toggleEnabled } from './settings/toggles'
 import { ConflictError, NotFoundError, ValidationError } from './errors/api-errors'
@@ -226,6 +227,13 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
     if (item.quantity !== undefined && (!Number.isInteger(item.quantity) || item.quantity < -1)) continue
 
     seenNames.add(item.name)
+    // Sheet rows get the same image rule as the admin form: https or site-relative, else none.
+    let image: string | null = null
+    try {
+      image = validateImageUrl(item.image)
+    } catch {
+      image = null
+    }
     const existing = currentByName.get(item.name)
 
     if (existing?.isCollectible) {
@@ -239,7 +247,7 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
         existing.description !== (item.description || null) ||
         existing.price !== item.price ||
         existing.quantity !== (item.quantity ?? -1) ||
-        existing.image !== (item.image || null) ||
+        existing.image !== image ||
         !existing.isAvailable
 
       if (needsUpdate) {
@@ -249,7 +257,7 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
             description: item.description || null,
             price: item.price,
             quantity: item.quantity ?? -1,
-            image: item.image || null,
+            image,
             isAvailable: true
           }
         })
@@ -263,7 +271,7 @@ export async function syncShopItemsFromData(items: ShopItemData[]) {
           description: item.description || null,
           price: item.price,
           quantity: item.quantity ?? -1,
-          image: item.image || null,
+          image,
           isAvailable: true
         }
       })

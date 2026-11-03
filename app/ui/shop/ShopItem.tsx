@@ -25,6 +25,7 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [quantity, setQuantity] = useState(1);
+  const [imgFailed, setImgFailed] = useState(false);
 
   const handleBuy = async () => {
     setLoading(true);
@@ -70,6 +71,7 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
           // Was aspectRatio 1/1: in the one-column shop on /pep that made
           // every placeholder ~330px tall.
           height: 88,
+          overflow: "hidden",
           background:
             "linear-gradient(135deg, hsl(var(--butter) / 0.40) 0%, hsl(var(--tomato) / 0.25) 100%)",
           borderTopLeftRadius: "var(--radius)",
@@ -86,9 +88,9 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
           letterSpacing: "0.02em",
         }}
       >
-        {item.image ? (
+        {item.image && !imgFailed ? (
           // eslint-disable-next-line @next/next/no-img-element
-          <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+          <img src={item.image} alt={item.name} onError={() => setImgFailed(true)} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
         ) : (
           item.name.charAt(0).toUpperCase()
         )}
