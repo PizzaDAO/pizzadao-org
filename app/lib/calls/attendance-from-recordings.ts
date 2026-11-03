@@ -62,7 +62,7 @@ export interface RecordingAttendanceResult {
  */
 export async function recordAttendanceForRecording(
   recordingId: string,
-  opts: { dryRun?: boolean; planned?: Set<string> } = {},
+  opts: { dryRun?: boolean; planned?: Set<string>; skipSummary?: boolean; createdIds?: Set<string> } = {},
 ): Promise<RecordingAttendanceResult> {
   const rec = await prisma.callRecording.findUnique({
     where: { id: recordingId },
@@ -107,7 +107,8 @@ export async function recordAttendanceForRecording(
     })),
     skipDuplicates: true,
   })
-  if (res.count > 0) await rebuildAttendanceSummaries(fresh).catch((e) => console.error('[calls/attendance] summary rebuild failed:', e instanceof Error ? e.message : e))
+  if (res.count > 0) for (const id of fresh) opts.createdIds?.add(id)
+  if (res.count > 0 && !opts.skipSummary) await rebuildAttendanceSummaries(fresh).catch((e) => console.error('[calls/attendance] summary rebuild failed:', e instanceof Error ? e.message : e))
   return { recordingId, attendees: ids.length, created: res.count }
 }
 
@@ -123,19 +124,35 @@ export async function recordAttendanceOnIngest(recordingId: string): Promise<voi
 
 export const BACKFILL_MAX_DAYS = 120
 export const BACKFILL_MAX_RECORDINGS = 200
+/** Stop starting new recordings after this long so one run stays inside the route's maxDuration. */
+const BACKFILL_BUDGET_MS = 40_000
 
-/** Recent recordings that have a crew, oldest first so a split call's parts are handled in order. */
-export async function backfillAttendance(opts: { days: number; dryRun: boolean }) {
+/**
+ * Recent recordings that have a crew, newest first. `before` (an ISO date, the `nextBefore` of the previous run)
+ * continues past the 200-per-run cap; recordings already fully counted just report 0 created. Summaries are
+ * rebuilt once at the end of a real run.
+ */
+export async function backfillAttendance(opts: { days: number; dryRun: boolean; before?: Date | null }) {
+  const started = Date.now()
   const days = Math.min(Math.max(Math.trunc(opts.days) || 1, 1), BACKFILL_MAX_DAYS)
-  const since = new Date(Date.now() - days * 86_400_000)
+  const since = new Date(started - days * 86_400_000)
   const rows = await prisma.callRecording.findMany({
-    where: { crewId: { not: null }, startedAt: { gte: since }, status: { not: 'REJECTED' } },
-    select: { id: true },
-    orderBy: { startedAt: 'asc' },
+    where: { crewId: { not: null }, startedAt: { gte: since, ...(opts.before ? { lt: opts.before } : {}) }, status: { not: 'REJECTED' } },
+    select: { id: true, startedAt: true },
+    orderBy: { startedAt: 'desc' },
     take: BACKFILL_MAX_RECORDINGS,
   })
   const planned = new Set<string>()
+  const createdIds = new Set<string>()
   const results: RecordingAttendanceResult[] = []
-  for (const { id } of rows) results.push(await recordAttendanceForRecording(id, { dryRun: opts.dryRun, planned }))
-  return { dryRun: opts.dryRun, days, recordings: rows.length, created: results.reduce((n, r) => n + r.created, 0), results }
+  let last: Date | null = null
+  for (const row of rows) {
+    if (Date.now() - started > BACKFILL_BUDGET_MS) break
+    results.push(await recordAttendanceForRecording(row.id, { dryRun: opts.dryRun, planned, skipSummary: true, createdIds }))
+    last = row.startedAt
+  }
+  if (!opts.dryRun && createdIds.size > 0) await rebuildAttendanceSummaries([...createdIds]).catch((e) => console.error('[calls/attendance] summary rebuild failed:', e instanceof Error ? e.message : e))
+  // More to do when the cap or the time budget stopped the run before the window's end.
+  const more = last !== null && (results.length < rows.length || rows.length === BACKFILL_MAX_RECORDINGS)
+  return { dryRun: opts.dryRun, days, recordings: results.length, created: results.reduce((n, r) => n + r.created, 0), nextBefore: more ? last!.toISOString() : null, results }
 }

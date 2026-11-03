@@ -30,8 +30,8 @@ export const POST = withErrorHandling(async (request: Request) => {
   }
   const payload = parseIngestPayload(body)
   const { id, duplicate, keys, summarize, transcribe } = await ingestRecording(payload)
-  // Attendance (setting calls.attendanceFromRecordings; a quick no-op while off, never throws). Idempotent, so a retried ingest is fine.
-  await recordAttendanceOnIngest(id)
+  // Attendance (setting calls.attendanceFromRecordings; after the response so a slow members read cannot hit the worker's timeout; never throws). Idempotent, so a retried ingest is fine.
+  after(() => recordAttendanceOnIngest(id))
   // Summarize after responding so the worker is not kept waiting on the model.
   // Transcription (which then summarizes) supersedes a chat-only summary.
   if (summarize && !transcribe) {
