@@ -257,10 +257,12 @@ export async function updateMission(
     const willBeBonus = patch.bonus === undefined ? current.bonus : patch.bonus === true
     if (r > 0 && !willBeBonus) throw new MissionEditError(400, 'Only a bonus mission has a bonus reward')
     if (r !== current.bonusReward) {
-      confirmText = `${confirmText ? confirmText + ' ' : ''}Bonus reward ${current.bonusReward} -> ${r} $PEP, paid once per member on approval from now on (nothing already paid is topped up or clawed back).`
+      confirmText = `${confirmText ? confirmText + ' ' : ''}Bonus reward ${current.bonusReward} -> ${r} $PEP, paid once per member for approvals from now on (earlier approvals are not paid retroactively; nothing already paid is topped up or clawed back).`
     }
     set('bonusReward', current.bonusReward, r)
   }
+  // Pay only approvals from now on: stamp the moment the payable reward changed (or bonus turned on).
+  if ('bonusReward' in data || (data.bonus === true && current.bonusReward > 0)) data.bonusRewardSetAt = new Date()
   if (patch.verifierParams !== undefined) {
     const params = validateVerifierParams(current.verifierKey ?? null, patch.verifierParams)
     assertStricterParams(current.verifierParams, params, codeParamsOf(current.level, current.index))

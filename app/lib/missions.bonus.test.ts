@@ -30,21 +30,25 @@ const matches = (m: (typeof ALL)[number], where: Record<string, unknown>) =>
     (typeof where.level === 'number' ? m.level === where.level : m.level > (where.level as { gt: number }).gt))
 
 let approved: number[]
+let reviewedAt: Date
+let setAt: Date | null
 
 beforeEach(() => {
   vi.clearAllMocks()
   approved = []
+  reviewedAt = new Date('2026-11-05T00:00:00Z')
+  setAt = null
   mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
   mockFn(prisma.mission.findMany).mockImplementation(async ({ where }: { where: Record<string, unknown> }) =>
     ALL.filter((m) => matches(m, where)).map((m) => ({ ...m, reward: 100, levelTitle: null })),
   )
   mockFn(prisma.missionCompletion.findMany).mockImplementation(async (args: { where: { mission?: unknown } }) =>
     args.where.mission
-      ? approved.filter((id) => id === 9).map((missionId) => ({ missionId, mission: { title: 'Writer', bonusReward: 50 } }))
+      ? approved.filter((id) => id === 9).map((missionId) => ({ missionId, reviewedAt: reviewedAt, submittedAt: reviewedAt, mission: { title: 'Writer', bonusReward: 50, bonusRewardSetAt: setAt } }))
       : approved.map((missionId) => ({ missionId })),
   )
-  mockFn(prisma.missionCompletion.count).mockImplementation(async ({ where }: { where: { missionId: { in: number[] } } }) =>
-    where.missionId.in.filter((id) => approved.includes(id)).length,
+  mockFn(prisma.missionCompletion.count).mockImplementation(async ({ where }: { where: { missionId: number | { in: number[] } } }) =>
+    typeof where.missionId === 'number' ? (approved.includes(where.missionId) ? 1 : 0) : where.missionId.in.filter((id) => approved.includes(id)).length,
   )
   mockFn(prisma.transaction.findMany).mockResolvedValue([])
   mockFn(prisma.transaction.findFirst).mockResolvedValue(null)
@@ -90,6 +94,21 @@ describe('payBonusRewards', () => {
   it('is idempotent: an existing ledger row for the mission pays nothing', async () => {
     approved = [9]
     mockFn(prisma.transaction.findFirst).mockResolvedValue({ id: 1 })
+    expect(await payBonusRewards('u')).toEqual([])
+    expect(mockFn(creditInTx)).not.toHaveBeenCalled()
+  })
+
+  it('is not retroactive: an approval before the reward was set is not paid, a later one is', async () => {
+    approved = [9]
+    setAt = new Date('2026-11-06T00:00:00Z')
+    expect(await payBonusRewards('u')).toEqual([])
+    setAt = new Date('2026-11-04T00:00:00Z')
+    expect(await payBonusRewards('u')).toEqual([9])
+  })
+
+  it('pays nothing when the approval was reopened before the locked re-check', async () => {
+    approved = [9]
+    mockFn(prisma.missionCompletion.count).mockResolvedValue(0)
     expect(await payBonusRewards('u')).toEqual([])
     expect(mockFn(creditInTx)).not.toHaveBeenCalled()
   })

@@ -80,13 +80,36 @@ export const shopPurchase = counting({
   hint: 'Buy any item from the shop.',
 })
 
-export const bountyOrJob = counting({
+/**
+ * Completed bounties (`min`, default 1), OR paid jobs when `minJobs` is set (a single daily job
+ * is too easy, so jobs only count through that higher bar).
+ */
+export const bountyOrJob: Verifier<{ min: number; minJobs?: number }> = {
   key: 'bounty_or_job',
-  kind: 'bounty_or_job',
-  defaultMin: 1,
-  noun: 'bounties or jobs completed',
-  hint: 'Complete a bounty (reward paid) or do a job.',
-})
+  mode: 'auto',
+  stateful: false,
+  parse: (p) => {
+    const o = asObject(p)
+    return { min: positiveInt(o.min, 'min', 1), ...(o.minJobs === undefined ? {} : { minJobs: positiveInt(o.minJobs, 'minJobs') }) }
+  },
+  async check(ctx, { min, minJobs }) {
+    if (!ctx.sources.countActivity) return { status: 'unknown', reason: "Can't check this right now" }
+    let bounties: number
+    let jobs = 0
+    try {
+      bounties = await ctx.sources.countActivity('bounty_completed', ctx.discordId, ctx.memberId)
+      if (minJobs) jobs = await ctx.sources.countActivity('job_completed', ctx.discordId, ctx.memberId)
+    } catch {
+      return { status: 'unknown', reason: "Couldn't read your activity right now" }
+    }
+    if (bounties >= min || (minJobs && jobs >= minJobs)) return { status: 'pass', evidence: { bounties, jobs } }
+    return fail(
+      `${bounties}/${min} bounties completed${minJobs ? `, ${jobs}/${minJobs} jobs` : ''}`,
+      minJobs ? `Complete a bounty, or do ${minJobs} jobs.` : 'Complete a bounty (reward paid).',
+      { have: bounties, need: min },
+    )
+  },
+}
 
 export const articlePublished = counting({
   key: 'article_published',

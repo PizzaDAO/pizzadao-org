@@ -303,7 +303,9 @@ export function batchSources(base: VerifierSources, data: BatchData, guildRoles:
   return {
     ...base,
     getXAccount: async (id) => data.x.get(id) ?? null,
-    countCallsAttended: async (id) => {
+    countCallsAttended: async (id, opts) => {
+      // The prefetch is all-time and all-crew: a windowed / per-crew count (call streak) asks the database.
+      if (opts?.sinceDays || opts?.crewId) return base.countCallsAttended(id, opts)
       const c = data.calls.get(id) ?? { total: 0, byCrew: {} }
       return { total: c.total, calls: c.total, byCrew: { ...c.byCrew } }
     },

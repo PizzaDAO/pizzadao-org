@@ -568,6 +568,8 @@ model Mission {
   // bonusReward is paid once per member on approval (MISSION_REWARD ledger, metadata.bonusMissionId).
   bonus          Boolean   @default(false)
   bonusReward    Int       @default(0)
+  // Set whenever bonusReward changes (or bonus turns on): only approvals at or after it are paid.
+  bonusRewardSetAt DateTime?
   completions MissionCompletion[]
   @@unique([level, index])
 }

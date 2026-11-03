@@ -49,13 +49,10 @@ export const defaultSources: VerifierSources = {
         })
       case 'shop_purchase':
         return prisma.transaction.count({ where: { userId: discordId, type: 'SHOP_PURCHASE' } })
-      case 'bounty_or_job': {
-        const [bounties, jobs] = await Promise.all([
-          prisma.bounty.count({ where: { claimedBy: discordId, status: 'COMPLETED' } }),
-          prisma.transaction.count({ where: { userId: discordId, type: 'JOB_REWARD' } }),
-        ])
-        return bounties + jobs
-      }
+      case 'bounty_completed':
+        return prisma.bounty.count({ where: { claimedBy: discordId, status: 'COMPLETED' } })
+      case 'job_completed':
+        return prisma.transaction.count({ where: { userId: discordId, type: 'JOB_REWARD' } })
       case 'article_published':
         return prisma.article.count({ where: { authorId: discordId, status: 'PUBLISHED' } })
     }

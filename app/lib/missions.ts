@@ -711,7 +711,12 @@ function bonusRewardWhere(discordId: string, missionId: number): Prisma.Transact
 export async function payBonusRewards(discordId: string): Promise<number[]> {
   const rows = await prisma.missionCompletion.findMany({
     where: { discordId, status: 'APPROVED', mission: { isActive: true, bonus: true, bonusReward: { gt: 0 } } },
-    select: { missionId: true, mission: { select: { title: true, bonusReward: true } } },
+    select: {
+      missionId: true,
+      reviewedAt: true,
+      submittedAt: true,
+      mission: { select: { title: true, bonusReward: true, bonusRewardSetAt: true } },
+    },
   })
   const paidNow: number[] = []
   for (const r of rows ?? []) {
@@ -719,9 +724,15 @@ export async function payBonusRewards(discordId: string): Promise<number[]> {
       if (!r.mission) continue
       const reward = r.mission.bonusReward
       if (!Number.isInteger(reward) || reward <= 0) continue
+      // Not retroactive: a reward set (or changed) after this approval does not pay it.
+      const setAt = r.mission.bonusRewardSetAt
+      if (setAt && (r.reviewedAt ?? r.submittedAt) < setAt) continue
       await getOrCreateEconomy(discordId)
       const awarded = await prisma.$transaction(async (tx) => {
         await lockWallet(tx, discordId)
+        // Re-check under the lock: the approval may have been reopened since the read.
+        const stillApproved = await tx.missionCompletion.count({ where: { discordId, missionId: r.missionId, status: 'APPROVED' } })
+        if (stillApproved < 1) return false
         if (await tx.transaction.findFirst({ where: bonusRewardWhere(discordId, r.missionId) })) return false
         await creditInTx(tx, discordId, reward, 'MISSION_REWARD', `Bonus mission reward: ${r.mission.title}`.slice(0, 200), { bonusMissionId: r.missionId })
         return true

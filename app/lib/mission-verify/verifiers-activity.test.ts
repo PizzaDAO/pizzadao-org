@@ -13,7 +13,6 @@ describe.each([
   ['passport_stamps', 'passport_stamp', 5],
   ['spotlight', 'spotlight_featured', 1],
   ['shop_purchase', 'shop_purchase', 1],
-  ['bounty_or_job', 'bounty_or_job', 1],
   ['article_published', 'article_published', 1],
 ])('%s', (key, kind, defMin) => {
   const v = VERIFIERS[key]
@@ -32,6 +31,28 @@ describe.each([
   it('is unknown when the source is missing or throws', async () => {
     expect(await v.check(ctx(), { min: defMin })).toMatchObject({ status: 'unknown' })
     expect(await v.check(ctx({ countActivity: async () => { throw new Error('db') } }), { min: defMin })).toMatchObject({ status: 'unknown' })
+  })
+})
+
+describe('bounty_or_job', () => {
+  const v = VERIFIERS.bounty_or_job
+  const counts = (bounties: number, jobs: number) => ({
+    countActivity: vi.fn(async (kind: string) => (kind === 'bounty_completed' ? bounties : jobs)),
+  })
+  it('parses min and minJobs', () => {
+    expect(v.parse(undefined)).toEqual({ min: 1 })
+    expect(v.parse({ min: 1, minJobs: 10 })).toEqual({ min: 1, minJobs: 10 })
+    expect(() => v.parse({ minJobs: 0 })).toThrow()
+  })
+  it('one bounty passes; jobs alone never count without minJobs', async () => {
+    expect(await v.check(ctx(counts(1, 0) as never), { min: 1 })).toMatchObject({ status: 'pass' })
+    const many = counts(0, 50)
+    expect(await v.check(ctx(many as never), { min: 1 })).toMatchObject({ status: 'fail' })
+    expect(many.countActivity).not.toHaveBeenCalledWith('job_completed', expect.anything(), expect.anything())
+  })
+  it('with minJobs, enough jobs pass and too few fail', async () => {
+    expect(await v.check(ctx(counts(0, 10) as never), { min: 1, minJobs: 10 })).toMatchObject({ status: 'pass' })
+    expect(await v.check(ctx(counts(0, 9) as never), { min: 1, minJobs: 10 })).toMatchObject({ status: 'fail' })
   })
 })
 

@@ -144,7 +144,8 @@ export type ActivityKind =
   | 'passport_stamp'
   | 'spotlight_featured'
   | 'shop_purchase'
-  | 'bounty_or_job'
+  | 'bounty_completed'
+  | 'job_completed'
   | 'article_published'
 
 export interface ReferralRow {
