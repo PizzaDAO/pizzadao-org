@@ -9,6 +9,7 @@ import { resolveCrewForEvent, type CrewRef } from './crew-map'
 import type { IngestPayload, TranscriptSegment } from './ingest-schema'
 import { chatOnlyAuthors, mergeChat, publicChatText, segmentKey } from './chat'
 import { buildSpeakerNames, DEFAULT_SUMMARY_BUDGET_MS, generateCallSummary } from './summarize'
+import { mergeLiveActionItems } from './live-items'
 
 /**
  * Crew list for event -> crew mapping. A sheet outage must not lose a
@@ -305,7 +306,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
   const startedAt = new Date()
   const rec = await prisma.callRecording.findUnique({
     where: { id },
-    select: { id: true, status: true, transcript: true, transcriptLanguage: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
+    select: { id: true, sessionId: true, status: true, transcript: true, transcriptLanguage: true, redactedSpeakerIds: true, redactedSegmentIds: true, speakers: { select: { discordId: true, displayName: true } } },
   })
   if (!rec || rec.status === 'REJECTED') return 'skipped'
   // Never leave a fresh row stuck in PROCESSING/RECORDED; never touch a row rejected meanwhile.
@@ -324,7 +325,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
     const data = {
       title: out.title,
       summary: out.summary,
-      actionItems: out.actionItems as unknown as Prisma.InputJsonValue,
+      actionItems: (await withLiveItems(out.actionItems, rec.sessionId, segments, rec.redactedSpeakerIds)) as unknown as Prisma.InputJsonValue,
       chapters: out.chapters as unknown as Prisma.InputJsonValue,
       status: 'IN_REVIEW' as const,
       publishedAt: null,
@@ -356,6 +357,30 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
       .catch(() => {})
     await toReview()
     return 'failed'
+  }
+}
+
+/**
+ * The summary's action items plus those confirmed during the call (live-items.ts), without duplicates
+ * and respecting redactions. Any failure keeps the summary's own list.
+ */
+async function withLiveItems(
+  base: Array<{ text: string; owner: string | null }>,
+  sessionId: string | null | undefined,
+  segments: TranscriptSegment[],
+  redactedSpeakerIds: readonly string[] | null | undefined,
+): Promise<Array<{ text: string; owner: string | null }>> {
+  if (!sessionId) return base
+  try {
+    const live = await prisma.callLiveItem.findMany({
+      where: { sessionId },
+      orderBy: { createdAt: 'asc' },
+      select: { text: true, owner: true, source: true, speakerIds: true, messageId: true },
+    })
+    return live.length ? mergeLiveActionItems(base, live, segments, redactedSpeakerIds) : base
+  } catch (err) {
+    console.warn('[calls/summary] live action items not merged:', err instanceof Error ? err.message : err)
+    return base
   }
 }
 

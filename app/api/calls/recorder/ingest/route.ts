@@ -5,6 +5,7 @@ import { generateAndStoreSummary, ingestRecording } from '@/app/lib/calls/record
 import { recordAttendanceOnIngest } from '@/app/lib/calls/attendance-from-recordings'
 import { transcribeRecording } from '@/app/lib/calls/transcribe'
 import { draftFollowUpsForRecording } from '@/app/lib/followups/draft'
+import { pruneLiveChunks } from '@/app/lib/calls/live-run'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 
@@ -31,7 +32,8 @@ export const POST = withErrorHandling(async (request: Request) => {
   const payload = parseIngestPayload(body)
   const { id, duplicate, keys, summarize, transcribe } = await ingestRecording(payload)
   // Attendance (setting calls.attendanceFromRecordings; after the response so a slow members read cannot hit the worker's timeout; never throws). Idempotent, so a retried ingest is fine.
-  after(() => recordAttendanceOnIngest(id))
+  // Same hook: the near-live transcript of live action items is superseded by the full one (never throws).
+  after(() => Promise.all([recordAttendanceOnIngest(id), pruneLiveChunks({ sessionId: payload.sessionId })]))
   // Summarize after responding so the worker is not kept waiting on the model.
   // Transcription (which then summarizes) supersedes a chat-only summary.
   if (summarize && !transcribe) {

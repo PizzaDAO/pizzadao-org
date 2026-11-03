@@ -47,6 +47,8 @@ export const TOGGLES = {
   'discord.levelCommandEnabled': { env: 'LEVEL_COMMAND_ENABLED', legacy: ON_WORDS },
   'discord.profileCommandEnabled': { env: 'PROFILE_COMMAND_ENABLED', legacy: ON_WORDS },
   'calls.welcomeEnabled': { env: 'CALL_WELCOME_ENABLED', legacy: ON_WORDS },
+  'calls.liveActionItemsEnabled': { env: 'CALL_LIVE_ACTION_ITEMS_ENABLED', legacy: ON_WORDS },
+  'calls.chatActionItemsEnabled': { env: 'CALL_CHAT_ACTION_ITEMS_ENABLED', legacy: ON_WORDS },
   'calls.importedRecapPostEnabled': { env: 'CALL_IMPORT_RECAP_ENABLED', legacy: ON_WORDS },
   'calls.importedFollowupsEnabled': { env: 'CALL_IMPORT_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   'calls.importedAgendaContext': { env: 'CALL_IMPORT_AGENDA_ENABLED', legacy: ON_WORDS },
