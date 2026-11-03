@@ -266,7 +266,7 @@ export async function GET(request: NextRequest) {
 
         // --- Level info ---
         const levelTitle = await safe(getLevelTitle(currentLevel), null);
-        const currentLevelMissions = (missionsByLevel as any)[currentLevel] || [];
+        const currentLevelMissions = ((missionsByLevel as any)[currentLevel] || []).filter((m: { bonus?: boolean }) => !m.bonus);
         const completedThisLevel = currentLevelMissions.filter((m: { id: number }) =>
             progress.some(
                 (p: { missionId: number; status: string }) =>
@@ -400,7 +400,7 @@ export async function GET(request: NextRequest) {
         const levelCardEnabled = resolveToggle("dashboard.levelCardEnabled", incomeSettings);
         const levelInfo = buildLevelInfo(
             currentLevel,
-            Object.values(missionsByLevel as Record<string, any[]>).flat(),
+            Object.values(missionsByLevel as Record<string, any[]>).flat().filter((m) => !m.bonus && m.level > 0),
             progress.map((p: { missionId: number; status: string }) => ({ missionId: p.missionId, status: p.status })),
         );
         const levelCard: DashboardSummary["levelCard"] = {

@@ -8,7 +8,7 @@
 // to be claimed" (PoapFirstSeen only records first sightings), so there is
 // nothing truthful to say yet.
 import { prisma } from "@/app/lib/db";
-import { computeCurrentLevel, maxMissionLevel, paidLevelOf } from "@/app/lib/missions";
+import { computeCurrentLevel, maxMissionLevel, paidLevelOf, REQUIRED_MISSION_WHERE } from "@/app/lib/missions";
 import { nextCrewCall } from "@/app/lib/crew-next-call";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { DEFAULT_LOCALE, isSupportedLocale, type SupportedLocale } from "@/app/lib/i18n/locales";
@@ -123,7 +123,7 @@ export async function loadDigests(candidates: DigestCandidate[], now = new Date(
 
   const [missions, completions, rewards, extras, crewsRes] = await Promise.all([
     prisma.mission.findMany({
-      where: { isActive: true },
+      where: REQUIRED_MISSION_WHERE,
       select: { id: true, level: true, index: true, title: true, levelTitle: true },
     }),
     discordIds.length

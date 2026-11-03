@@ -35,7 +35,7 @@
 import { fetchPoapDrop } from '../poap'
 import { fetchJsonCapped } from './net'
 import { parseFarcasterCast, parseHttpsUrl, parseMediaLink, parsePoapProof, parseRsvPizzaUrl, parseXPost, type MediaKind } from './proof-links'
-import { asObject, confidenceOf, positiveInt, stringList, type SemiCheck, type Verifier, type VerifyCtx, type VerifyResult } from './types'
+import { asObject, confidenceOf, nonNegativeInt, positiveInt, stringList, type SemiCheck, type Verifier, type VerifyCtx, type VerifyResult } from './types'
 
 const fail = (reason: string, hint: string): VerifyResult => ({ status: 'fail', reason, hint })
 
@@ -80,14 +80,14 @@ export const socialPost: Verifier<SocialParams> = {
     const o = asObject(p)
     const platforms = (o.platforms === undefined ? ['x', 'farcaster'] : stringList(o.platforms, 'platforms')) as SocialParams['platforms']
     if (platforms.some((x) => x !== 'x' && x !== 'farcaster')) throw new Error('platforms must be "x" and/or "farcaster"')
-    return { minReplies: positiveInt(o.minReplies, 'minReplies', 3), minLikes: positiveInt(o.minLikes, 'minLikes', 10), platforms }
+    return { minReplies: nonNegativeInt(o.minReplies, 'minReplies', 3), minLikes: positiveInt(o.minLikes, 'minLikes', 10), platforms }
   },
   async check(ctx, { minReplies, minLikes, platforms }) {
     const where = platforms.map((p) => (p === 'x' ? 'X' : 'Farcaster')).join(' or ')
     const hint = `Submit the link to your post on ${where} (e.g. https://x.com/you/status/123…).`
     const url = parseHttpsUrl(ctx.evidence)
     if (!url) return fail('No post link submitted', hint)
-    const engagement = `${minReplies}+ comments and ${minLikes}+ likes`
+    const engagement = minReplies > 0 ? `${minReplies}+ comments and ${minLikes}+ likes` : `${minLikes}+ likes`
 
     const x = platforms.includes('x') ? parseXPost(url) : null
     if (x) {

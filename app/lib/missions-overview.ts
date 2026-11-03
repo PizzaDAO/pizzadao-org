@@ -61,6 +61,10 @@ export type MissionsOverview = {
       getBoxUrl?: string;
       /** Handbook page that explains this mission (an internal path, validated). */
       guideHref?: string;
+      /** Optional: not needed to complete the level. */
+      bonus?: boolean;
+      /** PEP paid once when a bonus mission is approved. */
+      bonusReward?: number;
       /** Checked automatically with nothing to submit: no submit form (the submit API refuses it too). */
       noManualSubmit?: boolean;
       progress: MissionProgress | null;
@@ -108,8 +112,9 @@ export async function getMissionsOverview(discordId: string | null | undefined):
     const missionsByLevel = await getMissionsByLevel();
     levels = Object.entries(missionsByLevel).map(([levelNum, missions]) => ({
       level: parseInt(levelNum),
-      title: missions[0]?.levelTitle || null,
-      reward: missions[0]?.reward || 0,
+      title: (missions.find((m) => m.levelTitle) ?? missions[0])?.levelTitle || null,
+      // The level reward is shared by its required missions; a bonus row's `reward` is not it.
+      reward: (missions.find((m) => !m.bonus) ?? missions[0])?.reward || 0,
       missions: missions.map((m) => ({
         id: m.id,
         index: m.index,
@@ -121,6 +126,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
         ...(m.verifierKey === "referral" ? { referral: true } : {}),
         ...(acceptsManualSubmission({ verifierKey: m.verifierKey, proofKind: m.proofKind }) ? {} : { noManualSubmit: true }),
+        ...(m.bonus ? { bonus: true, bonusReward: m.bonusReward ?? 0 } : {}),
         ...guideField(m.guideHref),
         ...(m.verifierKey === "rare_pizza_box" ? { getBoxUrl: BOX_PURCHASE_URL || PIZZA_BOX_LINK } : {}),
         progress: progressMap[m.id] || null,

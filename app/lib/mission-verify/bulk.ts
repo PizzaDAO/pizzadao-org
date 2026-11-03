@@ -47,18 +47,20 @@ export interface MissionCatalog {
 export async function loadMissionCatalog(): Promise<MissionCatalog> {
   const rows = await prisma.mission.findMany({
     where: { isActive: true },
-    select: { id: true, level: true, index: true, title: true, reward: true, verifierKey: true, verifierParams: true },
+    select: { id: true, level: true, index: true, title: true, reward: true, bonus: true, verifierKey: true, verifierParams: true },
     orderBy: [{ level: 'asc' }, { index: 'asc' }],
   })
   return buildCatalog(rows)
 }
 
 export function buildCatalog(
-  rows: ReadonlyArray<MissionRow & { reward: number }>,
+  rows: ReadonlyArray<MissionRow & { reward: number; bonus?: boolean }>,
 ): MissionCatalog {
   const sorted = [...rows].sort((a, b) => a.level - b.level || a.index - b.index)
   const levels = new Map<number, LevelInfo>()
   for (const m of sorted) {
+    // Bonus and level-0 "Anytime" missions are verified like any other but never gate a level.
+    if (m.bonus || m.level < 1) continue
     const l = levels.get(m.level) ?? { level: m.level, reward: m.reward, missionIds: [] }
     l.missionIds.push(m.id)
     levels.set(m.level, l)

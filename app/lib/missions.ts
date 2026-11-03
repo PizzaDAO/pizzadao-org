@@ -14,6 +14,17 @@ import { approvalNeedsNote, NEW_REVIEW_ROUND } from './mission-verify/review-ids
 // ===== QUERIES =====
 
 /**
+ * The missions that count toward completing a level: active, not a bonus, and in a real level.
+ * Bonus missions (Mission.bonus) and level-0 "Anytime" missions are optional: level completion,
+ * the per-level PEP reward and every level gate ignore them. Every level computation uses this one
+ * filter, so a mission becoming bonus can only complete levels sooner, never drop anyone.
+ */
+export const REQUIRED_MISSION_WHERE = { isActive: true, bonus: false, level: { gt: 0 } } as const
+
+/** The level number of the "Anytime" bonus section. */
+export const ANYTIME_LEVEL = 0
+
+/**
  * Get all active missions grouped by level
  */
 export async function getMissionsByLevel() {
@@ -87,7 +98,7 @@ export async function getPaidSummary(discordId: string): Promise<{ levels: Set<n
 export async function completedLevelBy(discordIds: readonly string[], level: number): Promise<Set<string>> {
   const done = new Set<string>()
   if (discordIds.length === 0) return done
-  const missions = (await prisma.mission.findMany({ where: { isActive: true }, select: { id: true, level: true } })) ?? []
+  const missions = (await prisma.mission.findMany({ where: REQUIRED_MISSION_WHERE, select: { id: true, level: true } })) ?? []
   // Fail closed: an empty mission list would make every level look complete.
   if (missions.length === 0) throw new Error('completedLevelBy: no active missions')
   for (let i = 0; i < discordIds.length; i += 1000) {
@@ -183,7 +194,7 @@ export async function getCurrentLevel(discordId: string) {
       select: { missionId: true },
     }),
     prisma.mission.findMany({
-      where: { isActive: true },
+      where: REQUIRED_MISSION_WHERE,
       select: { id: true, level: true },
     }),
     getPaidLevels(discordId),
@@ -661,7 +672,7 @@ export async function rejectMission(
  */
 export async function settleLevels(discordId: string): Promise<number[]> {
   const [missions, approved, paid] = await Promise.all([
-    prisma.mission.findMany({ where: { isActive: true }, select: { id: true, level: true } }),
+    prisma.mission.findMany({ where: REQUIRED_MISSION_WHERE, select: { id: true, level: true } }),
     prisma.missionCompletion.findMany({ where: { discordId, status: 'APPROVED' }, select: { missionId: true } }),
     getPaidLevels(discordId),
   ])
@@ -682,6 +693,43 @@ export async function settleLevels(discordId: string): Promise<number[]> {
     const recheck = () =>
       import('./mission-verify/events').then(m => m.emitMissionEvent(discordId, 'level_reached')).catch(() => {})
     try { after(recheck) } catch { void recheck() }
+  }
+  await payBonusRewards(discordId)
+  return paidNow
+}
+
+/** Ledger filter for "this bonus mission's reward was already paid" (no `level` key: never read as a level). */
+function bonusRewardWhere(discordId: string, missionId: number): Prisma.TransactionWhereInput {
+  return { userId: discordId, type: 'MISSION_REWARD', metadata: { path: ['bonusMissionId'], equals: missionId } }
+}
+
+/**
+ * Pay the PEP reward of every approved bonus mission this member has not been paid for yet.
+ * Exactly once per (member, mission): the wallet row lock plus the MISSION_REWARD ledger row
+ * (metadata.bonusMissionId) are the marker, like the level reward. Never throws into the caller.
+ */
+export async function payBonusRewards(discordId: string): Promise<number[]> {
+  const rows = await prisma.missionCompletion.findMany({
+    where: { discordId, status: 'APPROVED', mission: { isActive: true, bonus: true, bonusReward: { gt: 0 } } },
+    select: { missionId: true, mission: { select: { title: true, bonusReward: true } } },
+  })
+  const paidNow: number[] = []
+  for (const r of rows ?? []) {
+    try {
+      if (!r.mission) continue
+      const reward = r.mission.bonusReward
+      if (!Number.isInteger(reward) || reward <= 0) continue
+      await getOrCreateEconomy(discordId)
+      const awarded = await prisma.$transaction(async (tx) => {
+        await lockWallet(tx, discordId)
+        if (await tx.transaction.findFirst({ where: bonusRewardWhere(discordId, r.missionId) })) return false
+        await creditInTx(tx, discordId, reward, 'MISSION_REWARD', `Bonus mission reward: ${r.mission.title}`.slice(0, 200), { bonusMissionId: r.missionId })
+        return true
+      })
+      if (awarded) paidNow.push(r.missionId)
+    } catch (e) {
+      console.warn('[missions] bonus reward failed', r.missionId, e)
+    }
   }
   return paidNow
 }
@@ -714,10 +762,10 @@ function levelRewardWhere(discordId: string, level: number): Prisma.TransactionW
 export async function checkAndAwardLevelReward(discordId: string, level: number) {
   // Get all missions for this level
   const levelMissions = await prisma.mission.findMany({
-    where: { level, isActive: true },
+    where: { ...REQUIRED_MISSION_WHERE, level },
   })
 
-  if (levelMissions.length === 0) return false
+  if (levelMissions.length === 0 || level < 1) return false
 
   // Get the reward amount (all missions in a level share the same reward)
   const reward = levelMissions[0].reward
@@ -822,7 +870,7 @@ export async function getUserProgressSummary(discordId: string) {
       include: { mission: true },
     }),
     prisma.mission.findMany({
-      where: { isActive: true },
+      where: REQUIRED_MISSION_WHERE,
       orderBy: [{ level: 'asc' }, { index: 'asc' }],
     }),
   ])
@@ -832,7 +880,8 @@ export async function getUserProgressSummary(discordId: string) {
 
   // Calculate total missions and approved count
   const totalMissions = missions.length
-  const approvedCount = completions.filter(c => c.status === 'APPROVED').length
+  const requiredIds = new Set(missions.map(m => m.id))
+  const approvedCount = completions.filter(c => c.status === 'APPROVED' && requiredIds.has(c.missionId)).length
 
   // Current level progress
   const currentLevelMissions = missions.filter(m => m.level === currentLevel)

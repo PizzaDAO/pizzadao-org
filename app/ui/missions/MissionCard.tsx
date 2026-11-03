@@ -11,7 +11,7 @@
 //
 // Prior history: garlic-68749 (Phase 4b token migration).
 
-import { GetBoxLink, BonusNote } from "./GetBoxLink";
+import { GetBoxLink, BonusNote, BonusBadge } from "./GetBoxLink";
 import { GuideLink } from "./GuideLink";
 import { useState } from "react";
 import { input } from "../shared-styles";
@@ -51,6 +51,10 @@ type MissionData = {
   guideHref?: string;
   /** Checked automatically, nothing to submit. */
   noManualSubmit?: boolean;
+  /** Optional mission: not needed to complete the level. */
+  bonus?: boolean;
+  /** PEP paid once on approval. */
+  bonusReward?: number;
   progress: MissionProgress | null;
 };
 
@@ -310,7 +314,8 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
             </div>
           )}
           {inviteUrl !== undefined && !isCompleted && <InviteLink url={inviteUrl} />}
-          {bonus && !isCompleted && <BonusNote />}
+          {mission.bonus && <BonusBadge reward={mission.bonusReward} />}
+          {bonus && !mission.bonus && !isCompleted && <BonusNote />}
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
           {mission.guideHref && <GuideLink href={mission.guideHref} muted={isCompleted} />}
           {isPending && mission.progress?.holdReason && (

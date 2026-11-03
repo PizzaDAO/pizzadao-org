@@ -16,12 +16,16 @@ export const defaultSources: VerifierSources = {
     return x ? { xUsername: x.xUsername } : null
   },
 
-  async countCallsAttended(discordId) {
+  async countCallsAttended(discordId, opts) {
     // One CallAttendance row per person per call (@@unique([discordId, dailySheetId])),
     // synced from the community and crew attendance sheets (app/lib/attendance.ts).
     const rows = await prisma.callAttendance.groupBy({
       by: ['crewId'],
-      where: { discordId },
+      where: {
+        discordId,
+        ...(opts?.crewId ? { crewId: opts.crewId } : {}),
+        ...(opts?.sinceDays ? { callDate: { gte: new Date((opts.now ?? new Date()).getTime() - opts.sinceDays * 86_400_000) } } : {}),
+      },
       _count: { _all: true },
     })
     const byCrew: Record<string, number> = {}
@@ -31,6 +35,30 @@ export const defaultSources: VerifierSources = {
       total += r._count._all
     }
     return { total, calls: total, byCrew }
+  },
+
+  async countActivity(kind, discordId, memberId) {
+    switch (kind) {
+      case 'pizzeria_checkin':
+        return prisma.pizzeriaCheckIn.count({ where: { discordId, status: 'APPROVED' } })
+      case 'passport_stamp':
+        return prisma.passportStamp.count({ where: { discordId } })
+      case 'spotlight_featured':
+        return prisma.spotlightSubmission.count({
+          where: { status: 'FEATURED', OR: [{ nomineeDiscordId: discordId }, { submitterDiscordId: discordId, isSelf: true }] },
+        })
+      case 'shop_purchase':
+        return prisma.transaction.count({ where: { userId: discordId, type: 'SHOP_PURCHASE' } })
+      case 'bounty_or_job': {
+        const [bounties, jobs] = await Promise.all([
+          prisma.bounty.count({ where: { claimedBy: discordId, status: 'COMPLETED' } }),
+          prisma.transaction.count({ where: { userId: discordId, type: 'JOB_REWARD' } }),
+        ])
+        return bounties + jobs
+      }
+      case 'article_published':
+        return prisma.article.count({ where: { authorId: discordId, status: 'PUBLISHED' } })
+    }
   },
 
   async getMemberRoles(discordId) {

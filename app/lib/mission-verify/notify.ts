@@ -43,7 +43,7 @@ export const defaultNotifyDeps: NotifyDeps = {
   async levelInfo(levels) {
     if (!levels.length) return []
     const rows = await prisma.mission.findMany({
-      where: { level: { in: levels }, isActive: true },
+      where: { level: { in: levels }, isActive: true, bonus: false },
       select: { level: true, levelTitle: true, reward: true },
       orderBy: [{ level: 'asc' }, { index: 'asc' }],
     })

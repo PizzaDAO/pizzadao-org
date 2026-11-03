@@ -26,6 +26,9 @@ export interface MissionsLabels {
     paramsHelp: string;
     rewardLowerOnly: string;
     activeOnlyEnable: string;
+    bonus: string;
+    bonusReward: string;
+    anytime: string;
     saveMission: string;
     saving: string;
     saved: string;
@@ -51,6 +54,8 @@ interface AdminMission {
     codeParams: Record<string, unknown> | null;
     proofKind: string;
     guideHref: string | null;
+    bonus: boolean;
+    bonusReward: number;
 }
 interface AdminLevel {
     level: number;
@@ -169,6 +174,8 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
     const [description, setDescription] = useState(m.description ?? "");
     const [guideHref, setGuideHref] = useState(m.guideHref ?? "");
     const [active, setActive] = useState(m.isActive);
+    const [bonus, setBonus] = useState(m.bonus);
+    const [bonusReward, setBonusReward] = useState(String(m.bonusReward));
       const [note, setNote] = useState("");
     const saver = useSaver(labels, onSaved);
 
@@ -194,6 +201,8 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
         ...(description.trim() !== (m.description ?? "") ? { description: description.trim() || null } : {}),
         ...(guideHref.trim() !== (m.guideHref ?? "") ? { guideHref: guideHref.trim() || null } : {}),
         ...(active !== m.isActive ? { isActive: active } : {}),
+        ...(bonus !== m.bonus ? { bonus } : {}),
+        ...(bonusReward.trim() !== "" && Number(bonusReward) !== m.bonusReward ? { bonusReward: Number(bonusReward) } : {}),
         ...(paramsChanged ? { verifierParams: { ...current, ...changedParams } } : {}),
         note,
     };
@@ -222,6 +231,16 @@ function MissionBox({ m, labels, onSaved }: { m: AdminMission; labels: MissionsL
                 <input type="checkbox" checked={active} disabled={m.isActive} onChange={(e) => setActive(e.target.checked)} />
                 {labels.active}{m.isActive ? <span className="text-xs text-foreground/50"> ({labels.activeOnlyEnable})</span> : null}
             </label>
+            <label className="flex items-center gap-2 text-sm">
+                <input type="checkbox" checked={bonus} disabled={m.level < 1} onChange={(e) => setBonus(e.target.checked)} />
+                {labels.bonus}
+            </label>
+            {bonus && (
+                <label className="flex items-center gap-2 text-sm">
+                    <span className="text-foreground/50">{labels.bonusReward}</span>
+                    <input type="number" min={0} max={1000000} value={bonusReward} onChange={(e) => setBonusReward(e.target.value)} className="w-32 rounded-lg border bg-background px-2 py-1 tabular-nums" style={border} />
+                </label>
+            )}
             {m.verifierKey && (
                 <div className="grid gap-1 text-sm">
                     <span className="text-foreground/50">{labels.params}</span>
@@ -280,11 +299,11 @@ export function MissionsEditor({ labels }: { labels: MissionsLabels }) {
             {nonProd && <p role="alert" className="m-0 rounded-xl border border-tomato bg-tomato/10 p-3 text-sm font-bold">{labels.nonProdBanner}</p>}
             {levels.map((lvl) => (
                 <section key={lvl.level} className="grid gap-3 rounded-2xl border p-4" style={border}>
-                    <h2 className="m-0 font-[family-name:var(--font-display)] text-xl font-black">{fill(labels.level, { level: String(lvl.level) })}</h2>
-                    <LevelBox key={`${lvl.reward}:${lvl.levelTitle}`} lvl={lvl} labels={labels} onSaved={load} />
+                    <h2 className="m-0 font-[family-name:var(--font-display)] text-xl font-black">{lvl.level === 0 ? labels.anytime : fill(labels.level, { level: String(lvl.level) })}</h2>
+                    {lvl.level > 0 && <LevelBox key={`${lvl.reward}:${lvl.levelTitle}`} lvl={lvl} labels={labels} onSaved={load} />}
                     <ul className="m-0 grid list-none gap-3 p-0">
                         {lvl.missions.map((m) => (
-                            <MissionBox key={`${m.id}:${JSON.stringify([m.title, m.description, m.guideHref, m.isActive, m.verifierParams])}`} m={m} labels={labels} onSaved={load} />
+                            <MissionBox key={`${m.id}:${JSON.stringify([m.title, m.description, m.guideHref, m.isActive, m.bonus, m.bonusReward, m.verifierParams])}`} m={m} labels={labels} onSaved={load} />
                         ))}
                     </ul>
                 </section>

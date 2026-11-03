@@ -96,6 +96,10 @@ export interface AdminMission {
   proofKind: string
   /** Handbook page that explains the mission (internal path), or null. */
   guideHref: string | null
+  /** Optional: not needed to complete the level (level 0 "Anytime" missions are always bonus). */
+  bonus: boolean
+  /** PEP paid once on approval of a bonus mission. */
+  bonusReward: number
 }
 
 export interface AdminLevel {
@@ -114,13 +118,14 @@ export async function listAdminLevels(): Promise<AdminLevel[]> {
     orderBy: [{ level: 'asc' }, { index: 'asc' }],
     select: {
       id: true, level: true, index: true, title: true, description: true, isActive: true, reward: true,
-      levelTitle: true, verifierKey: true, verifierParams: true, proofKind: true, guideHref: true,
+      levelTitle: true, verifierKey: true, verifierParams: true, proofKind: true, guideHref: true, bonus: true, bonusReward: true,
     },
   })
   const byLevel = new Map<number, typeof rows>()
   for (const r of rows) byLevel.set(r.level, [...(byLevel.get(r.level) ?? []), r])
   return [...byLevel.entries()].map(([level, list]) => {
-    const rewards = [...new Set(list.map((r) => r.reward))]
+    // Bonus rows carry their own bonusReward; the shared level reward comes from the required rows.
+    const rewards = [...new Set((list.some((r) => !r.bonus) ? list.filter((r) => !r.bonus) : list).map((r) => r.reward))]
     return {
       level,
       levelTitle: list.find((r) => r.levelTitle)?.levelTitle ?? null,
@@ -130,6 +135,7 @@ export async function listAdminLevels(): Promise<AdminLevel[]> {
       missions: list.map((r) => ({
         id: r.id, level: r.level, index: r.index, title: r.title, description: r.description, isActive: r.isActive,
         verifierKey: r.verifierKey, verifierParams: r.verifierParams, codeParams: codeParamsOf(r.level, r.index), proofKind: String(r.proofKind), guideHref: r.guideHref ?? null,
+        bonus: r.bonus, bonusReward: r.bonusReward,
       })),
     }
   })
@@ -143,6 +149,8 @@ export interface MissionPatch {
   isActive?: unknown
   verifierParams?: unknown
   guideHref?: unknown
+  bonus?: unknown
+  bonusReward?: unknown
 }
 
 const stable = (v: unknown): string =>
@@ -231,6 +239,28 @@ export async function updateMission(
     set('isActive', current.isActive, patch.isActive)
   }
   let confirmText: string | null = null
+  if (patch.bonus !== undefined) {
+    if (typeof patch.bonus !== 'boolean') throw new MissionEditError(400, 'bonus must be true or false')
+    if (patch.bonus === false && current.level < 1) throw new MissionEditError(400, 'An Anytime (level 0) mission is always a bonus mission')
+    if (patch.bonus !== current.bonus) {
+      confirmText = patch.bonus
+        ? `Level ${current.level} no longer needs this mission. Members who already did the rest move up; nobody drops a level.`
+        : `Level ${current.level} will need this mission again. Members who haven't done it can't complete the level until they do (levels already paid stay complete).`
+    }
+    set('bonus', current.bonus, patch.bonus)
+  }
+  if (patch.bonusReward !== undefined) {
+    const r = patch.bonusReward
+    if (typeof r !== 'number' || !Number.isInteger(r) || r < 0 || r > REWARD_MAX) {
+      throw new MissionEditError(400, `bonusReward must be a whole number from 0 to ${REWARD_MAX}`)
+    }
+    const willBeBonus = patch.bonus === undefined ? current.bonus : patch.bonus === true
+    if (r > 0 && !willBeBonus) throw new MissionEditError(400, 'Only a bonus mission has a bonus reward')
+    if (r !== current.bonusReward) {
+      confirmText = `${confirmText ? confirmText + ' ' : ''}Bonus reward ${current.bonusReward} -> ${r} $PEP, paid once per member on approval from now on (nothing already paid is topped up or clawed back).`
+    }
+    set('bonusReward', current.bonusReward, r)
+  }
   if (patch.verifierParams !== undefined) {
     const params = validateVerifierParams(current.verifierKey ?? null, patch.verifierParams)
     assertStricterParams(current.verifierParams, params, codeParamsOf(current.level, current.index))
