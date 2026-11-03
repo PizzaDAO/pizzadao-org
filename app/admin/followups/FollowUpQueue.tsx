@@ -44,6 +44,7 @@ interface Item {
     sendAfter: string | null;
     lastReply: string | null;
     lastReplyAt: string | null;
+    replyHidden?: boolean;
     error: string | null;
     telegramLinked: boolean;
     telegramDmAllowed: boolean;
@@ -229,6 +230,7 @@ function Row({ item, labels, footers, onChanged }: { item: Item; labels: QueueLa
             </div>
 
             {item.lastReply && <p className="m-0 rounded-lg bg-foreground/5 p-2 text-sm"><strong>{labels.reply}:</strong> {item.lastReply}</p>}
+            {item.replyHidden && <p className="m-0 rounded-lg bg-foreground/5 p-2 text-sm text-foreground/60">{labels.replyHidden}{item.lastReplyAt ? ` (${new Date(item.lastReplyAt).toLocaleString()})` : ""}</p>}
             {item.error && <p className="m-0 text-sm text-tomato">{item.error}</p>}
             {item.telegramFallback && <p className="m-0 text-sm text-foreground/60">{fill(labels.fallbackNote, { reason: labels[`fallback.${item.telegramFallback}`] ?? item.telegramFallback })}</p>}
             {item.snoozedUntil && <p className="m-0 text-sm text-foreground/60">{fill(labels.snoozedUntil, { when: new Date(item.snoozedUntil).toLocaleDateString() })}</p>}

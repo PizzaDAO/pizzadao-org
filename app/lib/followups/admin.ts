@@ -45,7 +45,7 @@ export interface ListFilter {
   limit?: number
 }
 
-export async function listFollowUps(f: ListFilter = {}) {
+export async function listFollowUps(f: ListFilter = {}, opts: { canReadReplies?: boolean } = {}) {
   const rows = await prisma.followUp.findMany({
     where: { ...(f.status?.length ? { status: { in: f.status } } : {}), ...(f.recordingId ? { recordingId: f.recordingId } : {}), ...(f.hasReply ? { lastReplyAt: { not: null } } : {}) },
     orderBy: f.hasReply ? [{ lastReplyAt: 'desc' }] : [{ createdAt: 'desc' }],
@@ -87,7 +87,7 @@ export async function listFollowUps(f: ListFilter = {}) {
   // Reach: of the rows with a person, how many linked Telegram and how many are confirmed reachable (the rest use Discord DMs).
   const withOwner = items.filter((i) => i.ownerDiscordId)
   return {
-    items,
+    items: opts.canReadReplies === true ? items.map((i) => ({ ...i, replyHidden: false })) : items.map(hideReplyText),
     reach: { people: withOwner.length, linked: withOwner.filter((i) => i.telegramLinked).length, telegram: withOwner.filter((i) => i.telegramState === 'OK').length },
   }
 }
@@ -190,4 +190,19 @@ export async function reresolveFollowUp(id: string, actor: string): Promise<void
     data: { ownerDiscordId: r.discordId, ownerMemberId: r.memberId, candidates: r.candidates.length ? (r.candidates as unknown as Prisma.InputJsonValue) : Prisma.DbNull },
   })
   await addEvent(id, 'reresolved', actor, { resolution: r.status, matchedBy: r.matchedBy })
+}
+
+/**
+ * Strip member reply text (FollowUp.lastReply and the text of reply events) from a row. The time,
+ * channel badge and event rows stay, so a reviewer still sees that a reply exists. `replyHidden`
+ * tells the page why the text is missing.
+ */
+export function hideReplyText<T extends { lastReply: string | null; lastReplyAt: Date | null; events: Array<{ type: string; data: unknown }> }>(item: T): T & { replyHidden: boolean } {
+  const events = item.events.map((e) => {
+    if (e.type !== 'reply' || !e.data || typeof e.data !== 'object' || Array.isArray(e.data)) return e
+    const rest = { ...(e.data as Record<string, unknown>) }
+    delete rest.text
+    return { ...e, data: rest }
+  })
+  return { ...item, lastReply: null, events, replyHidden: item.lastReplyAt !== null || item.lastReply !== null }
 }

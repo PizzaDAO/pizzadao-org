@@ -7,6 +7,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
+import { replyMinLevel } from "@/app/lib/followups/reply-access";
 import { canReviewCalls } from "@/app/lib/calls/access";
 import { FollowUpQueue, type QueueLabels } from "./FollowUpQueue";
 
@@ -66,6 +67,7 @@ export default async function AdminFollowUpsPage() {
     labels["filter.replies"] = t("filterReplies");
     labels.viaTelegram = t("viaTelegram");
     labels.viaDiscord = t("viaDiscord");
+    labels.replyHidden = t("replyHidden", { level: await replyMinLevel().catch(() => 7) });
 
     return (
         <main className="min-h-screen bg-background text-foreground p-5 md:p-10">
