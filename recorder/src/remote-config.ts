@@ -10,6 +10,12 @@ export interface RemoteConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
   endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
   crews: { eventId: string; label: string; callMinutes?: number }[]
+  /**
+   * Action items confirmed during the call (plans/post-call-agenda-updates.md, options A and C).
+   * audio: speech is sent to the app in chunks every chunkSeconds; chat: messages starting with a
+   * prefix are sent right away. Only events in eventIds (the crew allowlist) take part.
+   */
+  liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -21,6 +27,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   },
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
   crews: [],
+  liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
@@ -38,6 +45,11 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
   const w = (o.welcome && typeof o.welcome === 'object' ? o.welcome : {}) as Record<string, unknown>
   const e = (o.endSong && typeof o.endSong === 'object' ? o.endSong : {}) as Record<string, unknown>
   const d = REMOTE_CONFIG_OFF
+  const l = (o.liveItems && typeof o.liveItems === 'object' ? o.liveItems : {}) as Record<string, unknown>
+  const strings = (v: unknown, max: number, len: number): string[] =>
+    Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim().slice(0, len)).slice(0, max) : []
+  const eventIds = strings(l.eventIds, 100, 25).filter((x) => /^\d{15,25}$/.test(x))
+  const prefixes = strings(l.prefixes, 10, 20).map((x) => x.toLowerCase())
   const crews = Array.isArray(o.crews)
     ? o.crews.flatMap((c: unknown) => {
         const r = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
@@ -66,6 +78,13 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
         : [],
     },
     crews,
+    liveItems: {
+      audio: l.audio === true && eventIds.length > 0,
+      chunkSeconds: int(l.chunkSeconds, d.liveItems.chunkSeconds, 60, 600),
+      chat: l.chat === true && eventIds.length > 0 && prefixes.length > 0,
+      prefixes,
+      eventIds,
+    },
   }
 }
 

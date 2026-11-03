@@ -57,7 +57,7 @@ const ev = (over: Partial<EventInfo> = {}): EventInfo => ({
   ...over,
 })
 
-function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string; remote?: RemoteConfigClient; bots?: string[] } = {}) {
+function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string; remote?: RemoteConfigClient; bots?: string[]; livePost?: (b: unknown) => Promise<string[]>; captureVoiceChat?: boolean } = {}) {
   const dataDir = opts.dataDir ?? mkdtempSync(path.join(os.tmpdir(), 'orch-'))
   const nicknames: Array<string | null> = []
   const me = {
@@ -84,7 +84,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     voiceStates: { cache: { filter: () => ({ map: () => [] }) } },
   }
   const client = { guilds: { fetch: async () => guild }, users: { fetch: async (id: string) => ({ bot: (opts.bots ?? []).includes(id) }) } }
-  const cfg = { dataDir, guildId: 'g1', callChannelId: CHANNEL, maxCallMinutes: 120, eventCaps: [{ namePart: 'community call', minutes: 30 }], emptyGraceMinutes: 5 } as Config
+  const cfg = { dataDir, guildId: 'g1', callChannelId: CHANNEL, maxCallMinutes: 120, eventCaps: [{ namePart: 'community call', minutes: 30 }], emptyGraceMinutes: 5, captureVoiceChat: opts.captureVoiceChat ?? true } as Config
   const nick = new NicknameManager(dataDir, () => {}, async () => {})
   const serialJobs: Array<() => Promise<void>> = []
   const rec = new CallRecorder(
@@ -95,6 +95,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     () => {},
     (fn) => void serialJobs.push(fn),
     opts.remote ?? null,
+    opts.livePost ?? null,
   )
   return { rec, dataDir, me, nicknames, channel, guild, serialJobs, client, cfg, nick }
 }
@@ -1257,5 +1258,70 @@ describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
     await expect(w.rec.stop('event-ended')).resolves.toBeUndefined()
     await w.rec.drain()
     expect(finalizeSession).toHaveBeenCalledTimes(1)
+  })
+})
+
+describe('live action items (typed in the call chat)', () => {
+  const live = (over: Record<string, unknown> = {}) => {
+    const rc = parseRemoteConfig({ liveItems: { audio: false, chat: true, prefixes: ['action:'], eventIds: ['100000000000000001'], ...over } })
+    return { get: () => rc, refresh: async () => rc } as unknown as RemoteConfigClient
+  }
+  const msg = (content: string) => ({
+    id: String(Math.floor(Math.random() * 1e12) + 1e11),
+    channelId: CHANNEL,
+    content,
+    cleanContent: content,
+    createdTimestamp: Date.now() + 1000,
+    system: false,
+    author: { id: '555555555555555555', bot: false, username: 'ann' },
+    member: { displayName: 'Ann' },
+    attachments: new Map(),
+  })
+  const LIVE_EVENT = ev({ id: '100000000000000001' })
+
+  it('sends a prefixed chat line to the app and posts its confirmation in the call chat', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    try {
+      const livePost = vi.fn(async () => ['📝 Action item recorded: book the venue'])
+      const w = world({ remote: live(), livePost })
+      await begin(w, LIVE_EVENT)
+      w.channel.send.mockClear()
+      w.rec.onMessage(msg('hello there') as never)
+      w.rec.onMessage(msg('action: book the venue') as never)
+      await vi.advanceTimersByTimeAsync(10_500)
+      expect(livePost).toHaveBeenCalledTimes(1)
+      const body = (livePost.mock.calls[0] as unknown[])[0] as { chat: Array<{ text: string }>; eventId: string }
+      expect(body.chat.map((c) => c.text)).toEqual(['action: book the venue'])
+      expect(body.eventId).toBe('100000000000000001')
+      expect(w.channel.send).toHaveBeenCalledWith({ content: '📝 Action item recorded: book the venue', allowedMentions: { parse: [], users: [] } })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('does nothing for an event that is not on the allowlist, or without chat capture', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'setInterval', 'clearInterval'] })
+    try {
+      const livePost = vi.fn(async () => ['x'])
+      const a = world({ remote: live(), livePost })
+      await begin(a) // event 100: not on the list
+      a.rec.onMessage(msg('action: book the venue') as never)
+      const b = world({ remote: live(), livePost, captureVoiceChat: false })
+      await begin(b, LIVE_EVENT)
+      b.rec.onMessage(msg('action: book the venue') as never)
+      await vi.advanceTimersByTimeAsync(15_000)
+      expect(livePost).not.toHaveBeenCalled()
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stays off with the all-off config', async () => {
+    const livePost = vi.fn(async () => ['x'])
+    const w = world({ livePost })
+    await begin(w, LIVE_EVENT)
+    w.rec.onMessage(msg('action: book the venue') as never)
+    await new Promise((r) => setTimeout(r, 20))
+    expect(livePost).not.toHaveBeenCalled()
   })
 })
