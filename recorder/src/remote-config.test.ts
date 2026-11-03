@@ -38,3 +38,13 @@ describe('RemoteConfigClient', () => {
     expect((await c.refresh()).welcome.enabled).toBe(false)
   })
 })
+
+describe('session-start wait', () => {
+  it('gives up after the given wait and keeps the last good value (or all-off)', async () => {
+    const slow = vi.fn((_u: string, init?: RequestInit) => new Promise<Response>((_res, rej) => init?.signal?.addEventListener('abort', () => rej(new Error('aborted')))))
+    const c = new RemoteConfigClient('https://x', 'k', () => {}, slow as unknown as typeof fetch)
+    const t0 = Date.now()
+    expect((await c.refresh(40)).welcome.enabled).toBe(false)
+    expect(Date.now() - t0).toBeLessThan(1000)
+  })
+})
