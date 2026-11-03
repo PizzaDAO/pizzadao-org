@@ -30,7 +30,7 @@ import { appendRecord, MAX_CHAT_TEXT } from './manifest.js'
 import { SlotMemory } from './slots.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
-import type { RemoteConfigClient } from './remote-config.js'
+import { REMOTE_CONFIG_START_WAIT_MS, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
 
 const TICK_MS = 10_000
@@ -175,7 +175,7 @@ export class CallRecorder {
 
   private async doStart(event: EventInfo): Promise<void> {
     // Fresh settings for this session (5 s cap, never throws; failure keeps the last good value or all-off).
-    await this.remote?.refresh()
+    await this.remote?.refresh(REMOTE_CONFIG_START_WAIT_MS)
     const startedAtMs = Date.now()
     const sessionId = `${event.id}-${startedAtMs}`
     const dir = path.join(this.cfg.dataDir, sessionId)

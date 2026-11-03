@@ -24,6 +24,8 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
+/** Session start waits at most this long for a fresh config (then the last good one, or all-off, applies). */
+export const REMOTE_CONFIG_START_WAIT_MS = 1_500
 export const REMOTE_CONFIG_REFRESH_MS = 5 * 60_000
 
 const str = (v: unknown, fallback: string, max: number): string => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback)
@@ -72,11 +74,11 @@ export class RemoteConfigClient {
   }
 
   /** Fetch now; never throws. Returns the config in force afterwards. */
-  async refresh(): Promise<RemoteConfig> {
+  async refresh(timeoutMs: number = REMOTE_CONFIG_TIMEOUT_MS): Promise<RemoteConfig> {
     try {
       const res = await this.fetchImpl(`${this.appBaseUrl}/api/calls/recorder/config`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
-        signal: AbortSignal.timeout(REMOTE_CONFIG_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       })
       if (!res.ok) throw new Error(`app answered ${res.status}`)
       this.last = parseRemoteConfig(await res.json())
