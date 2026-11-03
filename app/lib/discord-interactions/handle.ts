@@ -19,6 +19,7 @@ import { SLOT_EMOJI, type SlotSymbol } from '../pep-games/slots'
 import { EPHEMERAL, InteractionType, ResponseType } from './commands'
 import { authorFor, makeEmbed, numbered, roleLabel, type Embed, type EmbedAuthor, type EmbedField, type Tone } from './embeds'
 import { handleReviewButton, handleReviewModal, type MissionReviewDeps } from './mission-review'
+import type { MemberCommandJob, MemberCommandName } from './member-commands'
 import { handleFollowUpInteraction, isFollowUpInteraction, type FollowUpInteractionDeps } from './followups'
 
 type Option = { name: string; type: number; value: unknown; focused?: boolean }
@@ -104,6 +105,28 @@ export interface HandlerDeps {
     rateLimit: (discordId: string) => Promise<Date | null>
     defer: (job: MissionsJob) => void
   }
+  /**
+   * /progress (calls.progressReportEnabled). `enabled` is checked first, so a disabled command
+   * never uses up the channel's rate limit. `rateLimit` returns when the channel may run it again
+   * (null = allowed now, and counts this use). `defer` builds the report and edits the deferred
+   * public reply; it must not block (route: after()). `crewChoices` feeds the option's autocomplete.
+   */
+  progress?: {
+    enabled: () => Promise<boolean>
+    rateLimit: (channelId: string) => Promise<Date | null>
+    defer: (job: ProgressJob) => void
+    crewChoices: (query: string) => Promise<Array<{ name: string; value: string }>>
+  }
+  /**
+   * /vouch, /level and /profile (./member-commands.ts), each behind its own setting. `enabled` is
+   * checked first so a disabled command uses no rate limit. `defer` builds the reply and edits the
+   * deferred ephemeral message; it must not block (route: after()).
+   */
+  memberCommands?: {
+    enabled: (name: MemberCommandName) => Promise<boolean>
+    rateLimit: (discordId: string) => Promise<Date | null>
+    defer: (job: MemberCommandJob) => void
+  }
   /** Mission review card buttons and the Reject modal (./mission-review.ts). */
   missionReview?: MissionReviewDeps
   /** Follow-up DM buttons and Reply modal (./followups.ts). */
@@ -116,6 +139,15 @@ export interface MissionsJob {
   roles: string[]
   applicationId: string
   token: string
+  author?: EmbedAuthor
+}
+
+/** What the deferred /progress follow-up needs. */
+export interface ProgressJob {
+  applicationId: string
+  token: string
+  /** The crew option, if the member typed one. */
+  crew?: string
   author?: EmbedAuthor
 }
 
@@ -345,6 +377,47 @@ async function command(i: Interaction, userId: string, deps: HandlerDeps, cur: s
       return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
     }
 
+    case 'vouch':
+    case 'level':
+    case 'profile': {
+      const name = i.data.name as MemberCommandName
+      if (!deps.memberCommands || !(await deps.memberCommands.enabled(name))) return out.error(`/${name} isn't enabled yet.`)
+      if (!i.application_id || !i.token) return out.error('Could not start the command. Please try again.')
+      const target = opt(i, 'member')
+      if (target !== undefined && (typeof target !== 'string' || !SNOWFLAKE.test(target))) return out.error('Pick a member.')
+      if (typeof target === 'string' && i.data?.resolved?.users?.[target]?.bot) return out.error(name === 'vouch' ? "You can't vouch for a bot." : 'Bots have no profile.')
+      if (name === 'vouch' && !target) return out.error('Pick a member to vouch for.')
+      if (name === 'vouch' && target === userId) return out.error("You can't vouch for yourself.")
+      const readyAt = await deps.memberCommands.rateLimit(userId)
+      if (readyAt) return out.wait('Slow down.', `You can use this again ${rel(readyAt)}.`)
+      deps.memberCommands.defer({
+        name,
+        discordId: userId,
+        ...(typeof target === 'string' ? { targetDiscordId: target } : {}),
+        applicationId: i.application_id,
+        token: i.token,
+        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+      })
+      // "Metalhead is thinking..." (only you see it); the reply is edited in.
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { flags: EPHEMERAL } }
+    }
+
+    case 'progress': {
+      if (!deps.progress || !(await deps.progress.enabled())) return out.error("/progress isn't enabled yet.")
+      if (!i.application_id || !i.token || !i.channel_id) return out.error('Could not start the report. Please try again.')
+      const readyAt = await deps.progress.rateLimit(i.channel_id)
+      if (readyAt) return out.wait('A progress report was just posted here.', `You can run /progress in this channel again ${rel(readyAt)}.`)
+      const crew = opt(i, 'crew')
+      deps.progress.defer({
+        applicationId: i.application_id,
+        token: i.token,
+        ...(typeof crew === 'string' && crew.trim() ? { crew: crew.trim().slice(0, 80) } : {}),
+        author: authorFor(i.member ? { ...i.member, guildId: i.guild_id } : undefined),
+      })
+      // "Metalhead is thinking..." (public); the report is edited in.
+      return { type: ResponseType.DEFERRED_CHANNEL_MESSAGE, data: { allowed_mentions: NO_PINGS } }
+    }
+
     default:
       return out.error('Unknown command.')
   }
@@ -399,6 +472,8 @@ async function autocomplete(i: Interaction, deps: HandlerDeps): Promise<Interact
       .filter((it) => it.name.toLowerCase().includes(q))
       .slice(0, 25)
       .map((it) => ({ name: `${it.name} (${n(it.price)})`.slice(0, 100), value: String(it.id) }))
+  } else if (i.data?.name === 'progress' && focused?.name === 'crew' && deps.progress && (await deps.progress.enabled())) {
+    choices = (await deps.progress.crewChoices(String(focused.value ?? ''))).slice(0, 25)
   }
   return { type: ResponseType.AUTOCOMPLETE_RESULT, data: { choices } }
 }

@@ -23,6 +23,8 @@ import {
     getLevelTitle,
 } from "@/app/lib/missions";
 import { getVouchCounts } from "@/app/lib/vouches";
+import { buildLevelInfo } from "@/app/lib/level-info";
+import { resolveToggle } from "@/app/lib/settings/toggles";
 import { getNotifications, getUnreadCount } from "@/app/lib/notifications";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { fetchMyTasksForCrewOption } from "@/app/lib/my-tasks";
@@ -91,6 +93,22 @@ export interface DashboardSummary {
         }>;
     };
     nextAction: NextAction;
+    /**
+     * The dashboard level card (setting dashboard.levelCardEnabled). `enabled: false` (the default)
+     * means the page renders nothing. The other fields are always filled from the same mission data
+     * as `level`, so they cost no extra queries.
+     */
+    levelCard: {
+        enabled: boolean;
+        level: number;
+        title: string | null;
+        isMax: boolean;
+        done: number;
+        total: number;
+        nextTitle: string | null;
+        nextMissions: Array<{ id: number; title: string }>;
+        awaitingReview: boolean;
+    };
     /** jalapeno-34126 — setup checklist backing the hero completion meter. */
     profileCompletion: ProfileCompletion;
     /** woodfired-65373 — Box Mafia role suggestion; card shows only when "missing". */
@@ -378,6 +396,26 @@ export async function GET(request: NextRequest) {
             x: { connected: x.connected },
         });
 
+        // --- Level card (off unless dashboard.levelCardEnabled) ---
+        const levelCardEnabled = resolveToggle("dashboard.levelCardEnabled", incomeSettings);
+        const levelInfo = buildLevelInfo(
+            currentLevel,
+            Object.values(missionsByLevel as Record<string, any[]>).flat(),
+            progress.map((p: { missionId: number; status: string }) => ({ missionId: p.missionId, status: p.status })),
+        );
+        const levelCard: DashboardSummary["levelCard"] = {
+            enabled: levelCardEnabled,
+            level: levelInfo.level,
+            title: levelInfo.title,
+            isMax: levelInfo.isMax,
+            done: levelInfo.done,
+            total: levelInfo.total,
+            nextTitle: levelInfo.nextTitle,
+            // Missions still to do (not approved and not already waiting for review), in order.
+            nextMissions: levelInfo.missions.filter((m) => m.state === "todo").slice(0, 2).map((m) => ({ id: m.id, title: m.title })),
+            awaitingReview,
+        };
+
         const summary: DashboardSummary = {
             member: {
                 id: memberId,
@@ -403,6 +441,7 @@ export async function GET(request: NextRequest) {
             crewsHydrated,
             notifications: { unread: unreadCount, top: topNotifications },
             nextAction,
+            levelCard,
             profileCompletion,
             boxMafia,
         };

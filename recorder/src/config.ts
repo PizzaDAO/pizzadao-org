@@ -52,6 +52,8 @@ export interface Config {
   captureVoiceChat: boolean
   /** Forward DMs sent to the bot to the app as possible follow-up replies (FOLLOWUP_DM_FORWARD=on; default off). Adds the DirectMessages intent. */
   followupDmForward: boolean
+  /** The pizza-radio bot's API (PIZZA_RADIO_URL + PIZZA_RADIO_API_KEY). null (either missing): the end-of-call song trigger is off. */
+  pizzaRadio: { url: string; apiKey: string } | null
   r2: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string }
 }
 
@@ -89,6 +91,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     emptyGraceMinutes: positiveNumber(env.EMPTY_GRACE_MINUTES, 5, 'EMPTY_GRACE_MINUTES', errors),
     captureVoiceChat: !/^(0|false|off|no)$/i.test(env.CAPTURE_VOICE_CHAT?.trim() ?? ''),
     followupDmForward: /^(1|true|on|yes)$/i.test(env.FOLLOWUP_DM_FORWARD?.trim() ?? ''),
+    pizzaRadio: env.PIZZA_RADIO_URL?.trim() && env.PIZZA_RADIO_API_KEY?.trim() ? { url: env.PIZZA_RADIO_URL.trim().replace(/\/$/, ''), apiKey: env.PIZZA_RADIO_API_KEY.trim() } : null,
     port: positiveNumber(env.PORT, 3000, 'PORT', errors),
     r2: {
       endpoint: req('R2_ENDPOINT'),

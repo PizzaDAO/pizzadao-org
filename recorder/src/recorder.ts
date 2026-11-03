@@ -13,7 +13,7 @@ import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceSt
 import { VoiceCapture } from './capture.js'
 import { CallLimits } from './call-limits.js'
 import { eventCapMinutes, maxMinutesFor, type Config } from './config.js'
-import { consentNotice, lateJoinWelcome } from './consent.js'
+import { callDisplayName, consentNotice, lateJoinWelcome, mentionedIds, MAX_WELCOME_MENTIONS, welcomeBatch, welcomeOpening } from './consent.js'
 import {
   decideWindowAction,
   eventKey,
@@ -27,13 +27,32 @@ import {
 } from './event-lifecycle.js'
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
 import { appendRecord, MAX_CHAT_TEXT } from './manifest.js'
+import { EndSongMarker, isEndSongStop, postPlayCrew } from './end-song.js'
 import { SlotMemory } from './slots.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
+import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
 
 const TICK_MS = 10_000
 const REMINDER_AFTER_MS = 5 * 60_000
+
+interface WelcomeState {
+  cfg: RemoteConfig['welcome']
+  callName: string
+  channel: VoiceBasedChannel | null
+  queue: string[]
+  timer: NodeJS.Timeout | null
+}
+
+interface EndSongState {
+  minHumans: number
+  /** The crew name pizza-radio's /play-crew expects. */
+  crew: string
+  /** When the call is scheduled to end (event end, else start + the crew's call length); null: only stop reasons fire. */
+  endMs: number | null
+  fired: boolean
+}
 
 interface ActiveSession {
   meta: SessionMeta
@@ -43,6 +62,10 @@ interface ActiveSession {
   tracker: StopTracker
   tick: NodeJS.Timeout
   reminded: Set<string>
+  /** Batched welcomes (settings snapshot at session start); null: the old late-joiner welcome applies. */
+  welcome: WelcomeState | null
+  /** End-of-call song (settings snapshot at session start); null: off. */
+  endSong: EndSongState | null
   stopping: boolean
   /** Scheduled start of the event being recorded (forward-only switching). */
   eventStartMs: number | null
@@ -62,6 +85,8 @@ export class CallRecorder {
   private readonly backoff = new StartBackoff()
   private readonly slots: SlotMemory
   private readonly limits: CallLimits
+  private readonly endSongMarker: EndSongMarker
+  private warnedNoRadio = false
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -74,9 +99,12 @@ export class CallRecorder {
     private readonly log: (msg: string) => void,
     /** Runs a job on the event chain (index.ts); default runs it right away. */
     private readonly serial: (fn: () => Promise<void>) => void = (fn) => void fn(),
+    /** Admin settings from the app (all-off until fetched); optional so tests and the spike run without it. */
+    private readonly remote: RemoteConfigClient | null = null,
   ) {
     this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), cfg.callChannelId, log)
     this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
+    this.endSongMarker = new EndSongMarker(path.join(cfg.dataDir, 'end-song.json'), log)
   }
 
   private eventLimitMs(eventName: string): number {
@@ -173,6 +201,8 @@ export class CallRecorder {
   }
 
   private async doStart(event: EventInfo): Promise<void> {
+    // Fresh settings for this session (5 s cap, never throws; failure keeps the last good value or all-off).
+    await this.remote?.refresh(REMOTE_CONFIG_START_WAIT_MS)
     const startedAtMs = Date.now()
     const sessionId = `${event.id}-${startedAtMs}`
     const dir = path.join(this.cfg.dataDir, sessionId)
@@ -233,7 +263,21 @@ export class CallRecorder {
 
       // 2. + 3. the recording indicators. Without at least one, do not record.
       nickAcquired = await this.nick.acquire(g)
-      const noticeOk = await this.send(channel, consentNotice())
+      // With welcomes on, the opening message greets everyone already here and still carries the full notice.
+      const rc = this.remote?.get() ?? REMOTE_CONFIG_OFF
+      const callName = callDisplayName(rc.crews.find((c) => c.eventId === event.id)?.label, event.name)
+      const endSong = this.endSongFor(event, rc)
+      let present: string[] = []
+      if (rc.welcome.enabled) {
+        try {
+          present = await this.humanIds(g)
+        } catch {
+          present = []
+        }
+      }
+      const noticeOk = rc.welcome.enabled
+        ? await this.send(channel, welcomeOpening(rc.welcome.template, present, callName), mentionedIds(present))
+        : await this.send(channel, consentNotice())
       if (!nickAcquired && !noticeOk) return await abort('could not show a recording indicator (nickname and notice both failed)')
       if (this.shuttingDown) return await abort('shutting down')
 
@@ -260,7 +304,9 @@ export class CallRecorder {
         guild: g,
         capture,
         tracker,
-        reminded: new Set(),
+        reminded: new Set(present),
+        endSong,
+        welcome: rc.welcome.enabled ? { cfg: rc.welcome, callName, channel: null, queue: [], timer: null } : null,
         stopping: false,
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
@@ -277,14 +323,20 @@ export class CallRecorder {
   private async onTick(): Promise<void> {
     const s = this.current
     if (!s || s.stopping) return
+    let humans = 0
     try {
-      s.tracker.observeHumans(await this.humanCount(s.guild), Date.now())
+      humans = await this.humanCount(s.guild)
+      s.tracker.observeHumans(humans, Date.now())
     } catch (err) {
       this.log(`human count failed: ${err instanceof Error ? err.message : String(err)}`)
     }
     await this.notePresent(s)
     const reason = s.tracker.check(Date.now())
     if (reason) await this.stop(reason)
+    else if (s.endSong && !s.endSong.fired && s.endSong.endMs !== null && Date.now() >= s.endSong.endMs) {
+      // The scheduled end passed and the call is still going: that is the end of the call for the song.
+      this.fireEndSong(s, humans, 'scheduled end')
+    }
   }
 
   private noteFailure(key: string): void {
@@ -297,7 +349,18 @@ export class CallRecorder {
     if (!s || s.stopping) return
     s.stopping = true
     clearInterval(s.tick)
+    this.cancelWelcome(s)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
+    if (s.endSong && isEndSongStop(reason)) {
+      // The call really ended with people possibly still here. empty / superseded / shutdown / disconnected never play.
+      let humans = 0
+      try {
+        humans = await this.humanCount(s.guild)
+      } catch {
+        // cannot tell who is here: stay quiet
+      }
+      this.fireEndSong(s, humans, reason)
+    }
     if (s.meta.eventId) {
       if (reason === 'max-duration') this.limits.noteHit(s.meta.eventId, Date.now())
       else this.limits.noteEndedBeforeBase(s.meta.eventId, Date.now())
@@ -324,6 +387,56 @@ export class CallRecorder {
     }
   }
 
+  /** Settings snapshot for the end-of-call song, or null when it is off / cannot work here. */
+  private endSongFor(event: EventInfo, rc: RemoteConfig): EndSongState | null {
+    if (!rc.endSong.enabled) return null
+    if (!this.cfg.pizzaRadio) {
+      if (!this.warnedNoRadio) {
+        this.warnedNoRadio = true
+        this.log('end song is on in the settings but PIZZA_RADIO_URL / PIZZA_RADIO_API_KEY are not set: not playing')
+      }
+      return null
+    }
+    const crew = rc.crews.find((c) => c.eventId === event.id)
+    if (!crew) {
+      this.log(`end song: no crew mapped to event ${event.id}; not playing for "${event.name}"`)
+      return null
+    }
+    // Only crews pizza-radio knows (calls.endSongCrewMap); the radio's own name is what is sent.
+    const key = (s: string) => s.trim().toLowerCase()
+    const radio = rc.endSong.crewMap.find((m) => key(m.crew) === key(crew.label))?.radio
+    if (!radio) {
+      this.log(`end song: crew "${crew.label}" is not in the end-song crew map; not playing`)
+      return null
+    }
+    const endMs =
+      event.scheduledEndMs ??
+      (event.scheduledStartMs !== null && crew.callMinutes ? event.scheduledStartMs + crew.callMinutes * 60_000 : null)
+    return { minHumans: rc.endSong.minHumans, crew: radio, endMs, fired: false }
+  }
+
+  /** Ask pizza-radio to play the crew song, at most once per call occurrence. Never throws, never blocks. */
+  private fireEndSong(s: ActiveSession, humans: number, why: string): void {
+    const e = s.endSong
+    const radio = this.cfg.pizzaRadio
+    if (!e || e.fired || !radio) return
+    if (humans < e.minHumans) {
+      if (isEndSongStop(why)) this.log(`end song skipped (${why}): ${humans} in the channel, needs ${e.minHumans}`)
+      return
+    }
+    e.fired = true
+    if (this.endSongMarker.has(s.key)) return // already played for this occurrence (restart or switch)
+    this.log(`end song (${why}): asking pizza-radio to play "${e.crew}"`)
+    // The "already played" marker is written only once pizza-radio answered: a 2xx, or a 4xx that retrying will
+    // not fix (logged once, marked so it does not loop). A network error or 5xx after the retry leaves it unmarked.
+    void postPlayCrew(radio.url, radio.apiKey, e.crew, this.cfg.callChannelId, this.log)
+      .then((outcome) => {
+        if (outcome === 'failed') this.log('end song: pizza-radio unreachable; not marked as played')
+        else this.endSongMarker.mark(s.key, Date.now())
+      })
+      .catch((err) => this.log(`end song failed: ${err instanceof Error ? err.message : String(err)}`))
+  }
+
   /** Process shutdown: close the capture and leave the files for the next boot to finish. */
   async shutdown(): Promise<void> {
     this.shuttingDown = true
@@ -332,6 +445,7 @@ export class CallRecorder {
     if (!s) return
     s.stopping = true
     clearInterval(s.tick)
+    this.cancelWelcome(s)
     try {
       await this.step('stop capture', () => s.capture.stop())
     } finally {
@@ -399,6 +513,10 @@ export class CallRecorder {
     const s = this.current
     if (!s || s.stopping) return
     if (newState.channelId !== this.cfg.callChannelId || oldState.channelId === newState.channelId) return
+    if (s.welcome) {
+      this.queueWelcome(s, s.welcome, newState)
+      return
+    }
     if (Date.now() - s.meta.startedAtMs < REMINDER_AFTER_MS || s.reminded.has(newState.id)) return
     s.reminded.add(newState.id)
     void (async () => {
@@ -406,6 +524,45 @@ export class CallRecorder {
       const channel = newState.channel
       if (channel) await this.send(channel, lateJoinWelcome(newState.id), [newState.id])
     })()
+  }
+
+  /** Welcomes on: a new human joiner waits for the batch window, once per member per call (rejoins are skipped). */
+  private queueWelcome(s: ActiveSession, w: WelcomeState, state: VoiceState): void {
+    if (s.reminded.has(state.id)) return
+    s.reminded.add(state.id)
+    void (async () => {
+      try {
+        if (await this.isBot(state.id)) return
+      } catch {
+        return
+      }
+      if (s.stopping || this.current !== s) return
+      w.queue.push(state.id)
+      if (state.channel) w.channel = state.channel
+      if (!w.timer) {
+        w.timer = setTimeout(() => void this.flushWelcome(s, w), w.cfg.batchSeconds * 1000)
+        w.timer.unref?.()
+      }
+    })()
+  }
+
+  private async flushWelcome(s: ActiveSession, w: WelcomeState): Promise<void> {
+    w.timer = null
+    const ids = w.queue.splice(0)
+    if (!ids.length || s.stopping || this.current !== s || !w.channel) return
+    for (let i = 0; i < ids.length; i += MAX_WELCOME_MENTIONS) {
+      const chunk = ids.slice(i, i + MAX_WELCOME_MENTIONS)
+      // Overflow beyond one message: the last chunk of a very large batch still mentions its own ids.
+      await this.send(w.channel, welcomeBatch(w.cfg.template, chunk, w.callName, w.cfg.recordingLine), mentionedIds(chunk))
+    }
+  }
+
+  private cancelWelcome(s: ActiveSession): void {
+    if (s.welcome?.timer) clearTimeout(s.welcome.timer)
+    if (s.welcome) {
+      s.welcome.timer = null
+      s.welcome.queue = []
+    }
   }
 
   // ---- voice channel text chat -----------------------------------------

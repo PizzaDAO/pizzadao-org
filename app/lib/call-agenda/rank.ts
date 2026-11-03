@@ -47,7 +47,7 @@ export interface AgendaBullet {
 
 const DAY_MS = 24 * 60 * 60 * 1000
 
-function clipTo(s: string, max: number): string {
+export function clipTo(s: string, max: number): string {
   const t = s.replace(/[\u0000-\u001f\u007f]/g, ' ').replace(/\s+/g, ' ').trim()
   const clipped = t.length > max ? `${t.slice(0, max - 1).trimEnd()}…` : t
   // Escape Discord markdown so sheet text cannot format or break the post.

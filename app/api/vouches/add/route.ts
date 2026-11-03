@@ -1,9 +1,6 @@
 import { after, NextRequest, NextResponse } from "next/server";
 import { getSession } from "@/app/lib/session";
-import { fetchMemberById } from "@/app/lib/sheets/member-repository";
-import { findMemberByDiscordId } from "@/app/lib/member-utils";
-import { addVouch, notifyVouchAdded } from "@/app/lib/vouches";
-import { emitMissionEvent } from "@/app/lib/mission-verify/events";
+import { giveVouch } from "@/app/lib/give-vouch";
 
 export const runtime = "nodejs";
 
@@ -11,6 +8,9 @@ export const runtime = "nodejs";
  * POST /api/vouches/add
  * Authenticated - add a vouch
  * Body: { targetMemberId }
+ *
+ * The rules (own profile, no self-vouch, target exists, daily limit, one per pair, mission events,
+ * notification) live in app/lib/give-vouch.ts, shared with the Discord /vouch command.
  */
 export async function POST(req: NextRequest) {
   try {
@@ -29,60 +29,28 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Look up the current user's memberId from their discordId
-    const currentUser = await findMemberByDiscordId(session.discordId);
-    if (!currentUser || !currentUser.memberId) {
-      return NextResponse.json(
-        { error: "Could not find your member profile" },
-        { status: 404 }
-      );
+    const result = await giveVouch(
+      { voucherDiscordId: session.discordId, targetMemberId: String(targetMemberId) },
+      { defer: (job) => after(() => job().then(() => undefined, () => undefined)) },
+    );
+
+    if (result.ok) return NextResponse.json({ success: true });
+
+    switch (result.reason) {
+      case "no-profile":
+        return NextResponse.json({ error: "Could not find your member profile" }, { status: 404 });
+      case "self":
+        return NextResponse.json({ error: "Cannot vouch for yourself" }, { status: 400 });
+      case "not-found":
+        return NextResponse.json({ error: "Target member not found" }, { status: 404 });
+      case "duplicate":
+        return NextResponse.json({ error: "Already vouched for this member" }, { status: 409 });
+      case "limit":
+        return NextResponse.json(
+          { error: `Daily vouch limit reached (${result.limit} per day). Try again tomorrow.`, limit: result.limit },
+          { status: 429 }
+        );
     }
-
-    if (currentUser.memberId === targetMemberId) {
-      return NextResponse.json(
-        { error: "Cannot vouch for yourself" },
-        { status: 400 }
-      );
-    }
-
-    // Verify target member exists
-    const targetMember = await fetchMemberById(targetMemberId);
-    if (!targetMember) {
-      return NextResponse.json(
-        { error: "Target member not found" },
-        { status: 404 }
-      );
-    }
-
-    // Create the vouch
-    await addVouch(currentUser.memberId, targetMemberId);
-
-    // L5.2 "Vouch for another member": re-check the voucher's vouch_given
-    // mission after the response (no-op while missions.verifiersEnabled is off).
-    const voucherDiscordId = session.discordId;
-    const voucherMemberId = currentUser.memberId;
-    after(() => emitMissionEvent(voucherDiscordId, "vouch_created", { memberId: voucherMemberId }).then(() => undefined));
-
-    // L4.2 "Get vouched by a member": re-check the vouched member's
-    // vouch_received mission right away (they pass and the level pays out).
-    const targetDiscordId = targetMember.discordId;
-    if (targetDiscordId) {
-      after(() => emitMissionEvent(targetDiscordId, "vouch_received", { memberId: targetMemberId }).then(() => undefined));
-    }
-
-    // Notify the target (non-blocking)
-    if (targetDiscordId) {
-      notifyVouchAdded(
-        targetMemberId,
-        currentUser.name || "Someone",
-        currentUser.memberId,
-        targetDiscordId
-      ).catch(() => {
-        // Silently fail notification
-      });
-    }
-
-    return NextResponse.json({ success: true });
   } catch (err: any) {
     // Handle unique constraint violation (already vouched)
     if (err?.code === "P2002") {
