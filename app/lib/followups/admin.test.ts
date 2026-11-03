@@ -36,6 +36,15 @@ describe('admin queue reach', () => {
     expect(r.items[0]).toMatchObject({ telegramLinked: true, telegramDmAllowed: false, telegramState: 'OK' })
     expect(r.reach).toEqual({ people: 1, linked: 1, telegram: 1 })
   })
+  it('the replies filter keeps only rows with a reply, newest reply first', async () => {
+    const { listFollowUps } = await import('./admin')
+    setup([])
+    await listFollowUps({ hasReply: true })
+    expect(vi.mocked(prisma.followUp.findMany).mock.calls[0][0]).toMatchObject({ where: { lastReplyAt: { not: null } }, orderBy: [{ lastReplyAt: 'desc' }] })
+    vi.mocked(prisma.followUp.findMany).mockClear()
+    await listFollowUps()
+    expect(vi.mocked(prisma.followUp.findMany).mock.calls[0][0]).toMatchObject({ orderBy: [{ createdAt: 'desc' }] })
+  })
   it('counts only confirmed-reachable people as reachable', async () => {
     const { listFollowUps } = await import('./admin')
     setup([{ telegramId: '901', state: 'NOT_STARTED', failures: 1, recheckAt: new Date('2099-01-01') }])

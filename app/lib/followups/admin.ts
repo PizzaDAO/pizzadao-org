@@ -40,13 +40,15 @@ export async function searchMembers(q: string, limit = 8): Promise<Array<{ membe
 export interface ListFilter {
   status?: FollowUpStatus[]
   recordingId?: string
+  /** Only rows that have a reply, newest reply first. */
+  hasReply?: boolean
   limit?: number
 }
 
 export async function listFollowUps(f: ListFilter = {}) {
   const rows = await prisma.followUp.findMany({
-    where: { ...(f.status?.length ? { status: { in: f.status } } : {}), ...(f.recordingId ? { recordingId: f.recordingId } : {}) },
-    orderBy: [{ createdAt: 'desc' }],
+    where: { ...(f.status?.length ? { status: { in: f.status } } : {}), ...(f.recordingId ? { recordingId: f.recordingId } : {}), ...(f.hasReply ? { lastReplyAt: { not: null } } : {}) },
+    orderBy: f.hasReply ? [{ lastReplyAt: 'desc' }] : [{ createdAt: 'desc' }],
     take: Math.min(f.limit ?? 200, 500),
     include: { events: { orderBy: { createdAt: 'asc' }, take: 50 } },
   })
