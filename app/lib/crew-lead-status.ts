@@ -4,9 +4,11 @@
 
 /**
  * Roster Status that counts as a crew lead: exactly "lead", "crew lead" or "capo"
- * (any case, trimmed). Anything else ("Former lead", "Ex-lead", "Not lead",
- * "Iced lead", "Inactive capo") is not a lead.
+ * (any case, trimmed), optionally after a leading rank number such as "0. Lead",
+ * "1. Capo" or "0 - Lead". Anything else ("Former lead", "Ex-lead", "Not lead",
+ * "Iced lead", "Inactive capo", "2. Hot") is not a lead.
  */
 export function isLeadStatus(status: string | null | undefined): boolean {
-  return /^(crew\s+)?(lead|capo)$/i.test((status ?? '').trim())
+  const s = (status ?? '').trim().replace(/^\d+\s*[.):\-–—]?\s*/, '')
+  return /^(crew\s+)?(lead|capo)$/i.test(s)
 }

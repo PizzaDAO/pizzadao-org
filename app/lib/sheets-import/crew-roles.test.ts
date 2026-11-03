@@ -73,6 +73,20 @@ describe('crew-lead decisions are identical in both modes', () => {
     expect(await isOnCrewRoster('d9', 'ops')).toBe(false)
   })
 
+  it.each([false, true])('a ranked status ("0. Lead", "1. Capo") is a lead; db mode = %s', async (db) => {
+    const ranked = parseCrewSheetRows([
+      r(['ID', 'Name', 'Status']),
+      r(['5', 'Epsilon', '0. Lead']),
+      r(['6', 'Zeta', '1. Capo']),
+      r(['7', 'Eta', '2. Hot']),
+      r([null, 'Theta', '0. Lead']),
+    ] as never[]).roster
+    vi.mocked(fetchCrewRoster).mockResolvedValue(ranked)
+    vi.mocked(loadCrewRosterFromDb).mockResolvedValue(rosterRecords('ops', ranked).records.map(toRosterRow))
+    vi.mocked(crewRolesFromDb).mockResolvedValue(db)
+    expect([...(await getCrewLeadMemberIds('ops'))].sort()).toEqual(['5', '6'])
+  })
+
   it('a database error fails closed', async () => {
     vi.mocked(crewRolesFromDb).mockResolvedValue(true)
     vi.mocked(loadCrewRosterFromDb).mockRejectedValue(new Error('db down'))
