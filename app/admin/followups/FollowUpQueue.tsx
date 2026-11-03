@@ -43,6 +43,7 @@ interface Item {
     escalateOnly: boolean;
     sendAfter: string | null;
     lastReply: string | null;
+    lastReplyAt: string | null;
     error: string | null;
     telegramLinked: boolean;
     telegramDmAllowed: boolean;
@@ -269,6 +270,8 @@ function Row({ item, labels, footers, onChanged }: { item: Item; labels: QueueLa
                             {new Date(e.createdAt).toLocaleString()} - {labels[`event.${e.type}`] ?? e.type}
                             {typeof e.data?.channel === "string" ? ` (${e.data.channel})` : ""}
                             {typeof e.data?.reason === "string" ? ` (${e.data.reason})` : ""}
+                            {e.data?.via === "telegram-dm" || e.data?.via === "discord-dm" ? <span className="ml-1 rounded border px-1" style={border}>{e.data.via === "telegram-dm" ? labels.viaTelegram : labels.viaDiscord}</span> : null}
+                            {e.type === "reply" && typeof e.data?.text === "string" ? <span className="block whitespace-pre-wrap text-foreground">{e.data.text}</span> : null}
                         </li>
                     ))}
                 </ul>
@@ -278,12 +281,12 @@ function Row({ item, labels, footers, onChanged }: { item: Item; labels: QueueLa
 }
 
 export function FollowUpQueue({ labels }: { labels: QueueLabels }) {
-    const [filter, setFilter] = useState<"open" | "sent" | "all">("open");
+    const [filter, setFilter] = useState<"open" | "sent" | "replies" | "all">("open");
     const [data, setData] = useState<Payload | null>(null);
     const [failed, setFailed] = useState(false);
 
     const load = useCallback(async () => {
-        const qs = filter === "open" ? `?status=${OPEN_FILTER}` : filter === "sent" ? `?status=${SENT_FILTER}` : "";
+        const qs = filter === "open" ? `?status=${OPEN_FILTER}` : filter === "sent" ? `?status=${SENT_FILTER}` : filter === "replies" ? "?hasReply=1" : "";
         const r = await api("GET", `/api/admin/followups${qs}`);
         if (!r.ok) return setFailed(true);
         setFailed(false);
@@ -315,7 +318,7 @@ export function FollowUpQueue({ labels }: { labels: QueueLabels }) {
             </p>
             {data.reach.people > 0 && <p className="m-0 text-sm text-foreground/70">{fill(labels.reach, { telegram: data.reach.telegram, linked: data.reach.linked, people: data.reach.people })}</p>}
             <div className="flex flex-wrap gap-2 text-sm">
-                {(["open", "sent", "all"] as const).map((f) => (
+                {(["open", "sent", "replies", "all"] as const).map((f) => (
                     <button key={f} type="button" onClick={() => setFilter(f)} aria-pressed={filter === f} className="rounded-lg border px-3 py-1" style={{ ...border, fontWeight: filter === f ? 700 : 400 }}>
                         {labels[`filter.${f}`]}
                     </button>
