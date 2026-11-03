@@ -9,7 +9,7 @@ vi.mock('@/app/lib/sheets/member-repository', () => ({ getSheetData: vi.fn() }))
 import { prisma } from '@/app/lib/db'
 import { fetchCrewTasksFromDb, isActiveStage, rankCrewTasks, type RankableTask } from '@/app/lib/crew-mappings'
 import { myTasksFromDb } from '@/app/lib/crew-content'
-import { crewContentRecords, crewTasksEditor, type TaskRecord } from './crew-content'
+import { crewContentRecords, crewTasksEditor, openTasksInTaskSection, type TaskRecord } from './crew-content'
 import { cleanRows } from './editor'
 import { planUpserts } from './plan'
 
@@ -94,6 +94,49 @@ describe('database tasks rank exactly like the sheet', () => {
       records.filter((t) => t.leadMemberId === q?.where?.leadMemberId).map((t, i) => ({ ...t, id: `t${i}` }))) as never)
     expect(await myTasksFromDb('ops', '12')).toEqual({ active: [{ label: 'Write the guide', url: undefined }], doneCount: 1 })
     expect(await myTasksFromDb('ops', '')).toEqual({ active: [], doneCount: 0 })
+  })
+})
+
+describe('blank stage', () => {
+  const BLANK = [
+    ['No stage yet', null, 'Top', null, null, null],
+    ['Planned', 'todo', 'Low', null, null, null],
+  ] as Array<Array<string | null | { v: string; f: string }>>
+
+  it('imports a blank stage as blank (not todo), so it ranks where the sheet ranks it', async () => {
+    const records = crewContentRecords('ops', crewSheet(BLANK), {}, {}).records.filter((x) => x.kind === 'task') as TaskRecord[]
+    expect(records.map((t) => t.stage)).toEqual(['', 'todo'])
+    vi.mocked(prisma.crewTask.findMany).mockResolvedValue(records.map((t, i) => ({ ...t, id: `t${i}` })) as never)
+    const fromDb = await fetchCrewTasksFromDb('ops', true)
+    // The sheet path: a blank stage is open but not active, so an active Low task ranks above a blank Top one.
+    const sheetOpen: RankableTask[] = [
+      { label: 'No stage yet', priority: 'Top', stage: '', isActive: false },
+      { label: 'Planned', priority: 'Low', stage: 'todo', isActive: true },
+    ]
+    expect(fromDb).toEqual(rankCrewTasks(sheetOpen, true))
+    expect(fromDb.all?.map((t) => t.label)).toEqual(['Planned', 'No stage yet'])
+  })
+
+  it('the task editor keeps a blank stage blank', async () => {
+    const tx = vi.fn(async () => [])
+    const create = vi.fn((a: unknown) => a)
+    const db = prisma as unknown as Record<string, unknown>
+    db.$transaction = tx
+    db.crewTask = { findMany: vi.fn(async () => []), create, update: vi.fn() }
+    db.crewTaskEvent = { create: vi.fn() }
+    const spec = crewTasksEditor('ops')
+    await spec.save(cleanRows(spec, [{ task: 'No stage yet' }, { task: 'Planned', stage: 'todo' }]), 'tester')
+    expect(create.mock.calls.map((c) => (c[0] as { data: { stage: string } }).data.stage)).toEqual(['', 'todo'])
+    db.crewTask = { findMany: vi.fn() }
+  })
+})
+
+describe('parity: sheet ranking rows outside the task section', () => {
+  it('drops ranked rows that are not tasks of the task section, keeping the rest in order', () => {
+    const ranked = [{ label: 'A  task' }, { label: 'Goal' }, { label: 'B' }, { label: 'Issue' }, { label: 'B' }]
+    const { kept, outside } = openTasksInTaskSection(ranked, [{ task: 'A task' }, { task: 'B' }])
+    expect(kept.map((t) => t.label)).toEqual(['A  task', 'B'])
+    expect(outside).toBe(3)
   })
 })
 

@@ -8,7 +8,7 @@ import type { GvizResponse } from '@/app/lib/gviz-parser'
 import { parseAllowedPOAPIds } from '@/app/lib/poap'
 import { parseNFTContracts } from '@/app/lib/nft-config'
 import { parseManualsTable } from '@/app/lib/manuals'
-import { manualRecords, manualsEditor, nftEditor, nftRecords, poapEditor, poapRecords } from './configs'
+import { manualRecords, manualRowKeys, manualsEditor, nftEditor, nftRecords, poapEditor, poapRecords } from './configs'
 import { cleanRows, EditorError } from './editor'
 import { planUpserts } from './plan'
 
@@ -61,8 +61,24 @@ describe('manuals index', () => {
     const manuals = parseManualsTable(g.table as never, { 'How to Host': 'https://docs.google.com/x' })
     expect(manuals[0]).toMatchObject({ title: 'How to Host', url: 'https://docs.google.com/x', crew: 'Ops', crewId: 'ops', status: 'Done' })
     const { records, duplicates } = manualRecords(manuals)
-    expect(records.map((r) => r.key)).toEqual(['how to host'])
+    // A repeated title is kept (the pages address manuals by position), keyed #2 and counted.
+    expect(records.map((r) => r.key)).toEqual(['how to host', 'how to host#2'])
+    expect(records.map((r) => [r.value.status, r.value.position])).toEqual([['Done', 0], ['Draft', 1]])
     expect(duplicates).toBe(1)
+  })
+
+  it('editor rows keep their stored key while the title matches; new and renamed rows get a free one', () => {
+    expect(
+      manualRowKeys([
+        { key: 'how to host', title: 'How to Host' },
+        { key: 'how to host#2', title: 'how to host' },
+        { title: 'How to host' },
+        { key: 'old name', title: 'New Name' },
+        { title: 'Other' },
+      ]),
+    ).toEqual(['how to host', 'how to host#2', 'how to host#3', 'new name', 'other'])
+    // Two listed rows with the same title are not a duplicate in the editor.
+    expect(cleanRows(manualsEditor, [{ key: 'a', title: 'A' }, { key: 'a#2', title: 'A' }, { title: 'A' }])).toHaveLength(3)
   })
 })
 

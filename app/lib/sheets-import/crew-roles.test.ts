@@ -30,11 +30,14 @@ const SHEET = [
 ]
 
 describe('roster import', () => {
-  it('keys rows by member id (or name), keeps leads without ids visible, drops repeated ids', () => {
+  it('keys rows by member id (or name), keeps leads without ids visible, keeps (and reports) repeated ids', () => {
     const { roster } = parseCrewSheetRows(SHEET as never[])
     const { records, duplicates } = rosterRecords('ops', roster)
-    expect(records.map((x) => x.naturalKey)).toEqual(['id:1', 'id:2', 'name:gamma', 'id:4'])
+    expect(records.map((x) => x.naturalKey)).toEqual(['id:1', 'id:2', 'name:gamma', 'id:4', 'id:1#2'])
     expect(duplicates).toEqual([5])
+    // Every row the crew page shows is kept, in order.
+    expect(records.map(toRosterRow)).toEqual(roster)
+    expect(records.map((x) => x.position)).toEqual([0, 1, 2, 3, 4])
     const db = new Map(records.map((x) => [`${x.crewId}|${x.naturalKey}`, x]))
     expect(planUpserts(records.map((x) => ({ key: `${x.crewId}|${x.naturalKey}`, value: x })), db)).toMatchObject({ create: [], update: [] })
   })
@@ -68,6 +71,20 @@ describe('crew-lead decisions are identical in both modes', () => {
     expect(await isCrewLead('d4', 'ops')).toBe(false) // "Former lead"
     expect(await isOnCrewRoster('d2', 'ops')).toBe(true)
     expect(await isOnCrewRoster('d9', 'ops')).toBe(false)
+  })
+
+  it.each([false, true])('a ranked status ("0. Lead", "1. Capo") is a lead; db mode = %s', async (db) => {
+    const ranked = parseCrewSheetRows([
+      r(['ID', 'Name', 'Status']),
+      r(['5', 'Epsilon', '0. Lead']),
+      r(['6', 'Zeta', '1. Capo']),
+      r(['7', 'Eta', '2. Hot']),
+      r([null, 'Theta', '0. Lead']),
+    ] as never[]).roster
+    vi.mocked(fetchCrewRoster).mockResolvedValue(ranked)
+    vi.mocked(loadCrewRosterFromDb).mockResolvedValue(rosterRecords('ops', ranked).records.map(toRosterRow))
+    vi.mocked(crewRolesFromDb).mockResolvedValue(db)
+    expect([...(await getCrewLeadMemberIds('ops'))].sort()).toEqual(['5', '6'])
   })
 
   it('a database error fails closed', async () => {
