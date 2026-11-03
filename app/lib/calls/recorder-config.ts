@@ -8,6 +8,8 @@
  */
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { extractEventId } from '@/app/lib/calls/crew-map'
+import { loadSettings } from '@/app/lib/settings'
+import { resolveToggle } from '@/app/lib/settings/toggles'
 
 export interface RecorderConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
@@ -43,8 +45,15 @@ export async function loadCrewLabels(): Promise<RecorderConfig['crews']> {
 }
 
 export async function buildRecorderConfig(): Promise<RecorderConfig> {
+  const settings = await loadSettings()
   return {
-    welcome: { ...RECORDER_CONFIG_OFF.welcome },
+    welcome: {
+      // resolveToggle: the env kill switch, "previews ignore saved rows" and unreadable-settings-means-off all apply.
+      enabled: resolveToggle('calls.welcomeEnabled', settings),
+      template: settings.get('calls.welcomeTemplate'),
+      batchSeconds: settings.get('calls.welcomeBatchSeconds'),
+      recordingLine: settings.get('calls.recordingLine'),
+    },
     endSong: { ...RECORDER_CONFIG_OFF.endSong },
     crews: await loadCrewLabels(),
   }

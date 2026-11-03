@@ -13,7 +13,7 @@ import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceSt
 import { VoiceCapture } from './capture.js'
 import { CallLimits } from './call-limits.js'
 import { eventCapMinutes, maxMinutesFor, type Config } from './config.js'
-import { consentNotice, lateJoinWelcome } from './consent.js'
+import { callDisplayName, consentNotice, lateJoinWelcome, mentionedIds, MAX_WELCOME_MENTIONS, welcomeBatch, welcomeOpening } from './consent.js'
 import {
   decideWindowAction,
   eventKey,
@@ -30,11 +30,19 @@ import { appendRecord, MAX_CHAT_TEXT } from './manifest.js'
 import { SlotMemory } from './slots.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
-import type { RemoteConfigClient } from './remote-config.js'
+import { REMOTE_CONFIG_OFF, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
 
 const TICK_MS = 10_000
 const REMINDER_AFTER_MS = 5 * 60_000
+
+interface WelcomeState {
+  cfg: RemoteConfig['welcome']
+  callName: string
+  channel: VoiceBasedChannel | null
+  queue: string[]
+  timer: NodeJS.Timeout | null
+}
 
 interface ActiveSession {
   meta: SessionMeta
@@ -44,6 +52,8 @@ interface ActiveSession {
   tracker: StopTracker
   tick: NodeJS.Timeout
   reminded: Set<string>
+  /** Batched welcomes (settings snapshot at session start); null: the old late-joiner welcome applies. */
+  welcome: WelcomeState | null
   stopping: boolean
   /** Scheduled start of the event being recorded (forward-only switching). */
   eventStartMs: number | null
@@ -236,7 +246,20 @@ export class CallRecorder {
 
       // 2. + 3. the recording indicators. Without at least one, do not record.
       nickAcquired = await this.nick.acquire(g)
-      const noticeOk = await this.send(channel, consentNotice())
+      // With welcomes on, the opening message greets everyone already here and still carries the full notice.
+      const rc = this.remote?.get() ?? REMOTE_CONFIG_OFF
+      const callName = callDisplayName(rc.crews.find((c) => c.eventId === event.id)?.label, event.name)
+      let present: string[] = []
+      if (rc.welcome.enabled) {
+        try {
+          present = await this.humanIds(g)
+        } catch {
+          present = []
+        }
+      }
+      const noticeOk = rc.welcome.enabled
+        ? await this.send(channel, welcomeOpening(rc.welcome.template, present, callName), mentionedIds(present))
+        : await this.send(channel, consentNotice())
       if (!nickAcquired && !noticeOk) return await abort('could not show a recording indicator (nickname and notice both failed)')
       if (this.shuttingDown) return await abort('shutting down')
 
@@ -263,7 +286,8 @@ export class CallRecorder {
         guild: g,
         capture,
         tracker,
-        reminded: new Set(),
+        reminded: new Set(present),
+        welcome: rc.welcome.enabled ? { cfg: rc.welcome, callName, channel: null, queue: [], timer: null } : null,
         stopping: false,
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
@@ -297,6 +321,7 @@ export class CallRecorder {
     if (!s || s.stopping) return
     s.stopping = true
     clearInterval(s.tick)
+    this.cancelWelcome(s)
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
     if (s.meta.eventId) {
       if (reason === 'max-duration') this.limits.noteHit(s.meta.eventId, Date.now())
@@ -332,6 +357,7 @@ export class CallRecorder {
     if (!s) return
     s.stopping = true
     clearInterval(s.tick)
+    this.cancelWelcome(s)
     try {
       await this.step('stop capture', () => s.capture.stop())
     } finally {
@@ -399,6 +425,10 @@ export class CallRecorder {
     const s = this.current
     if (!s || s.stopping) return
     if (newState.channelId !== this.cfg.callChannelId || oldState.channelId === newState.channelId) return
+    if (s.welcome) {
+      this.queueWelcome(s, s.welcome, newState)
+      return
+    }
     if (Date.now() - s.meta.startedAtMs < REMINDER_AFTER_MS || s.reminded.has(newState.id)) return
     s.reminded.add(newState.id)
     void (async () => {
@@ -406,6 +436,45 @@ export class CallRecorder {
       const channel = newState.channel
       if (channel) await this.send(channel, lateJoinWelcome(newState.id), [newState.id])
     })()
+  }
+
+  /** Welcomes on: a new human joiner waits for the batch window, once per member per call (rejoins are skipped). */
+  private queueWelcome(s: ActiveSession, w: WelcomeState, state: VoiceState): void {
+    if (s.reminded.has(state.id)) return
+    s.reminded.add(state.id)
+    void (async () => {
+      try {
+        if (await this.isBot(state.id)) return
+      } catch {
+        return
+      }
+      if (s.stopping || this.current !== s) return
+      w.queue.push(state.id)
+      if (state.channel) w.channel = state.channel
+      if (!w.timer) {
+        w.timer = setTimeout(() => void this.flushWelcome(s, w), w.cfg.batchSeconds * 1000)
+        w.timer.unref?.()
+      }
+    })()
+  }
+
+  private async flushWelcome(s: ActiveSession, w: WelcomeState): Promise<void> {
+    w.timer = null
+    const ids = w.queue.splice(0)
+    if (!ids.length || s.stopping || this.current !== s || !w.channel) return
+    for (let i = 0; i < ids.length; i += MAX_WELCOME_MENTIONS) {
+      const chunk = ids.slice(i, i + MAX_WELCOME_MENTIONS)
+      // Overflow beyond one message: the last chunk of a very large batch still mentions its own ids.
+      await this.send(w.channel, welcomeBatch(w.cfg.template, chunk, w.callName, w.cfg.recordingLine), mentionedIds(chunk))
+    }
+  }
+
+  private cancelWelcome(s: ActiveSession): void {
+    if (s.welcome?.timer) clearTimeout(s.welcome.timer)
+    if (s.welcome) {
+      s.welcome.timer = null
+      s.welcome.queue = []
+    }
   }
 
   // ---- voice channel text chat -----------------------------------------
@@ -499,10 +568,14 @@ export class CallRecorder {
     return user.bot
   }
 
-  private async humanCount(guild: Guild): Promise<number> {
+  private async humanIds(guild: Guild): Promise<string[]> {
     const ids = guild.voiceStates.cache.filter((vs) => vs.channelId === this.cfg.callChannelId).map((vs) => vs.id)
-    let humans = 0
-    for (const id of ids) if (!(await this.isBot(id))) humans++
+    const humans: string[] = []
+    for (const id of ids) if (!(await this.isBot(id))) humans.push(id)
     return humans
+  }
+
+  private async humanCount(guild: Guild): Promise<number> {
+    return (await this.humanIds(guild)).length
   }
 }
