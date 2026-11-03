@@ -88,6 +88,7 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
       durationSec: Math.max(0, Math.round((p.endedAt.getTime() - p.startedAt.getTime()) / 1000)),
       endReason: p.endReason,
       partial: p.partial,
+      participantIds: p.participantIds,
       mixKey: p.mix?.key ?? null,
       mixBytes: p.mix?.bytes ?? null,
       ...(hasSpeech ? { transcribedAt: new Date() } : {}),

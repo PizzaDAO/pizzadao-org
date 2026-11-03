@@ -1681,6 +1681,9 @@
     "hideTimeline": "Masquer l'historique",
     "filterOpen": "À traiter",
     "filterSent": "Envoyés",
+    "filterReplies": "Réponses",
+    "viaTelegram": "DM Telegram",
+    "viaDiscord": "DM Discord",
     "filterAll": "Tous",
     "status": {
       "DRAFT": "Brouillon",
@@ -1711,7 +1714,8 @@
       "reresolved": "Personne réassociée",
       "snooze": "Reporté",
       "telegram-undeliverable": "Telegram n'a pas pu livrer",
-      "optout-undone": "Désinscription annulée"
+      "optout-undone": "Désinscription annulée",
+      "inbound": "Réponse reçue"
     },
     "fallback": {
       "off": "Telegram est désactivé",

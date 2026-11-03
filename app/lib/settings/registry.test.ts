@@ -116,6 +116,7 @@ describe('settings registry', () => {
       ['calls.importedFollowupsEnabled', false],
       ['calls.importedAgendaContext', false],
       ['calls.importedAutoSummarize', false],
+      ['calls.attendanceFromRecordings', false],
       ['calls.bulkActionMax', 50],
       ['disavow.enabled', false],
       ['reengage.enabled', false],

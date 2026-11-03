@@ -41,6 +41,7 @@ export const TOGGLES = {
   'calls.importedFollowupsEnabled': { env: 'CALL_IMPORT_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   'calls.importedAgendaContext': { env: 'CALL_IMPORT_AGENDA_ENABLED', legacy: ON_WORDS },
   'calls.importedAutoSummarize': { env: 'CALL_IMPORT_AUTOSUMMARY_ENABLED', legacy: ON_WORDS },
+  'calls.attendanceFromRecordings': { env: 'CALL_ATTENDANCE_FROM_RECORDINGS_ENABLED', legacy: ON_WORDS },
   'disavow.enabled': {
     env: 'DISAVOW_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),

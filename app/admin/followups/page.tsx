@@ -19,7 +19,7 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 const STATUSES = ["DRAFT", "APPROVED", "SENT", "FAILED", "UNREACHABLE", "ESCALATED", "REPLIED", "IN_PROGRESS", "NEEDS_HELP", "DONE", "DISMISSED"] as const;
-const EVENTS = ["drafted", "edited", "approved", "sent", "failed", "deferred", "unreachable", "escalated", "reply", "button", "optout", "dismissed", "reresolved", "snooze", "telegram-undeliverable", "optout-undone"] as const;
+const EVENTS = ["drafted", "edited", "approved", "sent", "failed", "deferred", "unreachable", "escalated", "reply", "button", "optout", "dismissed", "reresolved", "snooze", "telegram-undeliverable", "optout-undone", "inbound"] as const;
 const FALLBACKS = ["off", "no-link", "not-started", "blocked", "bad-request"] as const;
 const PLAIN = [
     "sendingOn", "sendingOff", "empty", "untitledCall", "loadError", "errorGeneric", "working", "unresolved", "ambiguous", "optedOut",
@@ -63,6 +63,9 @@ export default async function AdminFollowUpsPage() {
     labels["filter.open"] = t("filterOpen");
     labels["filter.sent"] = t("filterSent");
     labels["filter.all"] = t("filterAll");
+    labels["filter.replies"] = t("filterReplies");
+    labels.viaTelegram = t("viaTelegram");
+    labels.viaDiscord = t("viaDiscord");
 
     return (
         <main className="min-h-screen bg-background text-foreground p-5 md:p-10">
