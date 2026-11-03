@@ -2,6 +2,7 @@
 
 import React, { useState } from "react";
 import { btn, badge } from "../shared-styles";
+import { prettyLabel } from "@/app/lib/pretty-label";
 
 type ActiveJobProps = {
   job: {
@@ -91,7 +92,7 @@ export function ActiveJob({ job, onQuit }: ActiveJobProps) {
         >
           Your Active Job
         </h2>
-        <span style={badge("accent")}>{job.type || "General"}</span>
+        <span style={badge("accent")}>{prettyLabel(job.type)}</span>
       </div>
 
       <p

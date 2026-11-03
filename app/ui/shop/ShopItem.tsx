@@ -8,6 +8,7 @@ type Item = {
   id: number;
   name: string;
   description: string | null;
+  image?: string | null;
   price: number;
   priceFormatted: string;
   quantity: number;
@@ -85,7 +86,12 @@ export function ShopItem({ item, onPurchase }: ShopItemProps) {
           letterSpacing: "0.02em",
         }}
       >
-        {item.name.charAt(0).toUpperCase()}
+        {item.image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={item.image} alt={item.name} style={{ width: "100%", height: "100%", objectFit: "cover" }} />
+        ) : (
+          item.name.charAt(0).toUpperCase()
+        )}
       </div>
 
       {/* Body */}

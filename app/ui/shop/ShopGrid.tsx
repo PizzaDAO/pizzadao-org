@@ -8,6 +8,7 @@ type Item = {
   id: number;
   name: string;
   description: string | null;
+  image?: string | null;
   price: number;
   priceFormatted: string;
   quantity: number;

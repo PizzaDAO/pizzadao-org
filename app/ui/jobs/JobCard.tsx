@@ -19,6 +19,7 @@ import React, { useState } from "react";
 import { formatPep } from "../economy/PepIcon";
 import { paperCard } from "../shared/Editorial";
 import { DiscordText } from "../shared/DiscordText";
+import { prettyLabel } from "@/app/lib/pretty-label";
 import { parseDiscordMarkup, discordMarkupToPlainText } from "@/app/lib/discord-markup";
 
 type Job = {
@@ -137,7 +138,7 @@ export function JobCard({
         <span className="relative z-10 min-w-0 flex-1" style={{ pointerEvents: "none" }}>
           <span className="mb-1.5 flex flex-wrap items-center gap-2">
             <span className={`${chip} border-[hsl(var(--rule)/0.22)] bg-muted text-foreground`}>
-              {job.type || "General"}
+              {prettyLabel(job.type)}
             </span>
             {completed && (
               <span className={`${chip} border-[hsl(142_71%_35%/0.35)] bg-[hsl(142_71%_35%/0.12)] text-[hsl(142_71%_30%)]`}>
