@@ -45,6 +45,7 @@ export const TOGGLES = {
     env: 'DISAVOW_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
+  'names.requireThemed': { env: 'REQUIRE_THEMED_NAMES', legacy: ON_WORDS },
   'telegram.dmEnabled': { env: 'TELEGRAM_DM_ENABLED', legacy: ON_WORDS },
   'proposals.enabled': {
     env: 'PROPOSALS_ENABLED',

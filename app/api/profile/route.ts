@@ -13,8 +13,9 @@ import { parseGvizJson } from "@/app/lib/gviz-parser";
 import { fetchWithRedirect } from "@/app/lib/sheet-utils";
 import { GvizCell } from "@/app/lib/types/gviz";
 import { withErrorHandling } from "@/app/lib/errors/error-response";
+import { themedNameAllowed, NAME_NOT_THEMED_ERROR } from "@/app/lib/themed-name";
 import { UnauthorizedError, ForbiddenError, ValidationError, ExternalServiceError } from "@/app/lib/errors/api-errors";
-import { fetchMemberById, fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
+import { fetchMemberById, fetchMemberByDiscordId, fetchMemberIdByDiscordId, invalidateMembersCache } from "@/app/lib/sheets/member-repository";
 import { chooseInviter, recordReferral, type RecordReferralResult } from "@/app/lib/referrals";
 import { creditPendingItemGrantsOnLogin } from "@/app/lib/shop-grants";
 import { readRefCookie, refCookieOptions, REF_COOKIE } from "@/app/lib/referral-cookie";
@@ -246,6 +247,18 @@ const POST_HANDLER = async (req: Request) => {
       }
     }
     // If row doesn't exist, it's a NEW signup with a chosen memberId - allow it to proceed
+  }
+
+  // Optional themed-name rule (setting names.requireThemed, off by default). The
+  // member's current name is always accepted, so existing names are grandfathered.
+  if (
+    !(await themedNameAllowed({
+      name: payload.mafiaName,
+      discordId: payload.discordId,
+      currentName: async () => (await fetchMemberByDiscordId(payload.discordId, { fresh: true }))?.name,
+    }))
+  ) {
+    throw new ValidationError(NAME_NOT_THEMED_ERROR);
   }
 
   // L3.1 referrals (D4) count a member's FIRST onboarding only: a new row,

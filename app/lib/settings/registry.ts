@@ -887,6 +887,12 @@ export const SETTINGS = {
     label: 'Trainee nickname sync',
     help: 'Apply the trainee nickname and role changes in Discord. Off: dry run. The TRAINEE_NICK_ENABLED env var set to off always wins.',
   }),
+  'names.requireThemed': boolSetting({
+    key: 'names.requireThemed',
+    area: 'mafia',
+    label: 'Themed display names only',
+    help: 'New sign-ups and name changes must use a generator name or include a pizza topping or pizza word. Existing names are kept as they are. Off: any name is accepted.',
+  }),
   'games.enabled': boolSetting({
     key: 'games.enabled',
     area: 'features',
