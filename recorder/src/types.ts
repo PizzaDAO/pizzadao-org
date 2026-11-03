@@ -48,6 +48,8 @@ export interface IngestPayload {
   transcript?: IngestTranscript
   /** Voice-channel text chat during the call, in time order. Omitted when there was none. */
   chat?: IngestChatMessage[]
+  /** Discord ids of every non-bot member seen in the voice channel during the session (silent attendees too). Omitted when none were seen. */
+  participantIds?: string[]
 }
 
 /** Written to <session dir>/session.json when a recording starts, updated as it ends. */
@@ -83,6 +85,12 @@ export interface PurgeRecord {
   userId: string
 }
 
+/** Non-bot members seen in the voice channel (sampled while recording). Append-only; ids are cumulative across records. */
+export interface PresentRecord {
+  t: 'present'
+  userIds: string[]
+}
+
 /** A chat message (append-only; later edits/deletes are separate records). */
 export interface ChatRecord {
   t: 'chat'
@@ -104,4 +112,4 @@ export interface ChatDeleteRecord {
   messageId: string
 }
 
-export type ManifestRecord = SegmentRecord | MemberRecord | PurgeRecord | ChatRecord | ChatEditRecord | ChatDeleteRecord
+export type ManifestRecord = SegmentRecord | MemberRecord | PresentRecord | PurgeRecord | ChatRecord | ChatEditRecord | ChatDeleteRecord

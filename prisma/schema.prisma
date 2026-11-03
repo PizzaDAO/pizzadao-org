@@ -842,7 +842,8 @@ model CallAttendance {
   crewId      String   // Crew slug (ops, comms, etc.) or "community_call"
   crewLabel   String   // Display name (Ops, Comms, Community Call)
   callDate    DateTime // Date of the call
-  dailySheetId String  // Google Sheet ID of the daily attendance sheet (for dedup)
+  dailySheetId String  // Google Sheet ID of the daily attendance sheet (for dedup); `rec:<crew>:<date>` for rows from recordings
+  source      String   @default("sheet") // sheet | recording
   createdAt   DateTime @default(now())
 
   @@unique([discordId, dailySheetId]) // One record per person per call
@@ -1364,6 +1365,7 @@ model CallRecording {
   durationSec        Int
   endReason          String? // event-ended | empty | max-duration | superseded | shutdown | ...
   partial            Boolean             @default(false)
+  participantIds     String[]            @default([]) // non-bot Discord ids seen in the voice channel (recorder); feeds attendance
   mixKey             String? // R2 key of the mixed m4a
   mixBytes           Int?
   audioDeletedAt     DateTime? // set when the retention sweep removed the R2 audio

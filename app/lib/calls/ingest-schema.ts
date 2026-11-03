@@ -75,6 +75,8 @@ export interface IngestPayload {
   transcript: IngestTranscript | null
   /** Voice channel text chat during the call, time-ordered; empty when there was none. */
   chat: IngestChatMessage[]
+  /** Non-bot Discord ids seen in the voice channel (silent attendees too). Absent from older workers. */
+  participantIds: string[]
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -155,6 +157,14 @@ function parseChat(v: unknown): IngestChatMessage[] {
   return out.sort((a, b) => a.atMs - b.atMs)
 }
 
+/** Lenient: attendance is a bonus, so a bad entry is dropped rather than failing the whole ingest. */
+function parseParticipants(v: unknown): string[] {
+  if (!Array.isArray(v)) return []
+  const out = new Set<string>()
+  for (const id of v) if (typeof id === 'string' && SNOWFLAKE.test(id)) out.add(id)
+  return [...out].slice(0, MAX_SPEAKERS)
+}
+
 export function parseIngestPayload(body: unknown): IngestPayload {
   if (!isObj(body)) throw new ValidationError('Body must be a JSON object')
 
@@ -209,5 +219,6 @@ export function parseIngestPayload(body: unknown): IngestPayload {
     speakers,
     transcript: parseTranscript(body.transcript, seen),
     chat: parseChat(body.chat),
+    participantIds: parseParticipants(body.participantIds),
   }
 }
