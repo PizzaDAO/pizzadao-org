@@ -1,6 +1,7 @@
 import { requireCallReviewer } from '@/app/lib/calls/access'
 import { json } from '@/app/lib/admin-guard'
 import { loadFollowUpConfig } from '@/app/lib/followups/config'
+import { canReadFollowUpReplies } from '@/app/lib/followups/reply-access'
 import { listFollowUps } from '@/app/lib/followups/admin'
 import type { FollowUpStatus } from '@prisma/client'
 
@@ -22,6 +23,8 @@ export async function GET(request: Request) {
     .map((s) => s.trim().toUpperCase())
     .filter((s): s is FollowUpStatus => (STATUSES as string[]).includes(s))
   const recording = url.searchParams.get('recording')?.trim() || undefined
-  const [list, cfg] = await Promise.all([listFollowUps({ status, recordingId: recording, hasReply: url.searchParams.get('hasReply') === '1' }), loadFollowUpConfig()])
+  // Reply text is level-gated: checked once per request, stripped here on the server.
+  const canReadReplies = await canReadFollowUpReplies(auth.session.discordId)
+  const [list, cfg] = await Promise.all([listFollowUps({ status, recordingId: recording, hasReply: url.searchParams.get('hasReply') === '1' }, { canReadReplies }), loadFollowUpConfig()])
   return json({ ...list, sendEnabled: cfg.sendEnabled, footerTelegram: cfg.footerTelegram, footerDiscord: cfg.footerDiscord })
 }

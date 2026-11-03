@@ -1699,6 +1699,7 @@
     "filterReplies": "Respuestas",
     "viaTelegram": "DM de Telegram",
     "viaDiscord": "DM de Discord",
+    "replyHidden": "Respuesta recibida (texto oculto: solo nivel 7+)",
     "filterAll": "Todos",
     "status": {
       "DRAFT": "Borrador",

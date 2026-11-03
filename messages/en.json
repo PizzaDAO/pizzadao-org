@@ -1699,6 +1699,7 @@
     "filterReplies": "Replies",
     "viaTelegram": "Telegram DM",
     "viaDiscord": "Discord DM",
+    "replyHidden": "Reply received (text hidden: level 7+ only)",
     "filterAll": "All",
     "status": {
       "DRAFT": "Draft",

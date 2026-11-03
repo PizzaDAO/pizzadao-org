@@ -581,6 +581,17 @@ export const SETTINGS = {
     check: (v) => v === '' || /^[A-Za-z0-9_\-]+(\s*,\s*[A-Za-z0-9_\-]+)*$/.test(v),
     checkMessage: 'Use comma-separated crew ids (letters, digits, - and _)',
   }),
+  'followups.replyMinLevel': intSetting({
+    key: 'followups.replyMinLevel',
+    area: 'followups',
+    label: 'Follow-up reply minimum level',
+    help: "Lowest member level that can read the text of members' DM replies to follow-ups. Others still see that a reply exists. 9 means nobody by level (the review role still can).",
+    min: 1,
+    max: 9,
+    default: 7,
+    onReadFailure: { value: 9 },
+    confirm: (from, to) => (to < from ? "Lowering this shows members' follow-up replies to more people." : null),
+  }),
   'followups.maxPerDay': intSetting({
     key: 'followups.maxPerDay',
     area: 'followups',

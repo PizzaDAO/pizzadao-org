@@ -66,6 +66,7 @@ export default async function AdminFollowUpsPage() {
     labels["filter.replies"] = t("filterReplies");
     labels.viaTelegram = t("viaTelegram");
     labels.viaDiscord = t("viaDiscord");
+    labels.replyHidden = t("replyHidden");
 
     return (
         <main className="min-h-screen bg-background text-foreground p-5 md:p-10">
