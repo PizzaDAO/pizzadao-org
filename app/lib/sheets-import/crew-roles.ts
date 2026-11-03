@@ -38,22 +38,21 @@ export function roleKey(memberId: string | null | undefined, name: string): stri
   return memberId ? `id:${memberId.trim()}` : `name:${normalizeLabel(name)}`
 }
 
-/** Roster records for one crew. Rows with the same member id twice keep the first (reported). Pure. */
+/**
+ * Roster records for one crew, one per sheet row, in order. A member id (or name) that repeats gets
+ * `#2`, `#3`... so every row the crew page shows is kept; repeated member ids are also reported.
+ * Pure.
+ */
 export function rosterRecords(crewId: string, roster: readonly RosterRow[]): { records: RoleRecord[]; duplicates: number[] } {
   const records: RoleRecord[] = []
   const seen = new Map<string, number>()
   const duplicates: number[] = []
   roster.forEach((m, i) => {
-    let key = roleKey(m.id, m.name)
-    const n = seen.get(key) ?? 0
-    if (n > 0) {
-      if (m.id) {
-        duplicates.push(i + 1)
-        return
-      }
-      key = `${key}#${n + 1}`
-    }
-    seen.set(roleKey(m.id, m.name), n + 1)
+    const base = roleKey(m.id, m.name)
+    const n = seen.get(base) ?? 0
+    if (n > 0 && m.id) duplicates.push(i + 1)
+    const key = n > 0 ? `${base}#${n + 1}` : base
+    seen.set(base, n + 1)
     records.push({
       crewId,
       naturalKey: key,

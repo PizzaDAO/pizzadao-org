@@ -11,7 +11,7 @@ import { getNFTContractsFromDb, getNFTContractsFromSheet, isContractAddress } fr
 import { listManualsFromDb, parseManualsTable, type Manual } from '@/app/lib/manuals'
 import type { NFTContract } from '@/app/lib/nft-types'
 import { compareKeyed, type Importer, type ParityReport, type ParseIssue } from './framework'
-import { normalizeLabel } from './plan'
+import { labelKeys, normalizeLabel } from './plan'
 import { isHttpUrlOrEmpty, type EditorRow, type EditorSpec, type SaveCounts } from './editor'
 
 // ---------------------------------------------------------------------------
@@ -215,17 +215,26 @@ export const nftEditor: EditorSpec = {
 
 type ManualRecord = Omit<Manual, 'crewId'> & { position: number; active: boolean }
 
+/**
+ * One record per manual, in sheet order. The key is the normalized title; a repeated title gets
+ * `#2`, `#3`... so every row is kept (the manuals pages address a manual by its position, so a
+ * dropped row would move every later one). Repeats are counted; a title with no letters or digits
+ * is skipped and counted.
+ */
 export function manualRecords(manuals: readonly Manual[]): { records: Array<{ key: string; value: ManualRecord }>; duplicates: number } {
   const records: Array<{ key: string; value: ManualRecord }> = []
-  const seen = new Set<string>()
+  const seen = new Map<string, number>()
   let duplicates = 0
   for (const m of manuals) {
-    const key = normalizeLabel(m.title)
-    if (!key || seen.has(key)) {
+    const base = normalizeLabel(m.title)
+    if (!base) {
       duplicates++
       continue
     }
-    seen.add(key)
+    const n = seen.get(base) ?? 0
+    seen.set(base, n + 1)
+    if (n > 0) duplicates++
+    const key = n > 0 ? `${base}#${n + 1}` : base
     const value: ManualRecord = {
       title: m.title,
       url: m.url,
@@ -279,8 +288,35 @@ export const manualsImporter: Importer<ManualRecord> = {
 
 export async function manualsParity(): Promise<ParityReport> {
   const [sheet, db] = await Promise.all([manualsFromSheet(), listManualsFromDb()])
-  const toMap = (list: Manual[]) => new Map(list.map((m, i) => [normalizeLabel(m.title), { ...m, index: i }]))
+  // Keyed like the importer (repeated titles get #2...), with the position the pages address them by.
+  const toMap = (list: Manual[]) => {
+    const keys = labelKeys('', list.map((m) => m.title))
+    return new Map(list.map((m, i) => [keys[i], { ...m, index: i }]))
+  }
   return compareKeyed('manuals', toMap(sheet), toMap(db))
+}
+
+/**
+ * The stored key for each edited manuals row: a row keeps the key it was listed with while its
+ * title still matches it; a new or renamed row gets the normalized title, or `#2`, `#3`... when an
+ * earlier row already has that key (two manuals may share a title). Pure.
+ */
+export function manualRowKeys(rows: readonly EditorRow[]): string[] {
+  const base = (r: EditorRow) => normalizeLabel(String(r.title ?? ''))
+  const kept = rows.map((r) => {
+    const k = typeof r.key === 'string' ? r.key : ''
+    return k && k.replace(/#\d+$/, '') === base(r) ? k : null
+  })
+  const taken = new Set(kept.filter((k): k is string => !!k))
+  return rows.map((r, i) => {
+    const prev = kept[i]
+    if (prev) return prev
+    const b = base(r)
+    let k = b
+    for (let n = 2; taken.has(k); n++) k = `${b}#${n}`
+    taken.add(k)
+    return k
+  })
 }
 
 export const manualsEditor: EditorSpec = {
@@ -288,6 +324,7 @@ export const manualsEditor: EditorSpec = {
   label: 'Manuals index',
   help: 'The manuals list. Link is the Google Sheet or document that holds the manual itself. Rows show in this order; removing a row hides it.',
   columns: [
+    { key: 'key', label: 'Key', kind: 'text', readOnly: true, hidden: true },
     { key: 'title', label: 'Manual', kind: 'text', maxLength: 200, required: true },
     { key: 'url', label: 'Link', kind: 'text', maxLength: 500, placeholder: 'https://...' },
     { key: 'crew', label: 'Crew', kind: 'text', maxLength: 80 },
@@ -299,16 +336,19 @@ export const manualsEditor: EditorSpec = {
   ],
   maxRows: 500,
   validate: (row) => (isHttpUrlOrEmpty(row.url) ? null : 'link must be a full http(s) address'),
-  keyOf: (row) => normalizeLabel(String(row.title)),
+  // Listed rows carry their stored key; new rows get one on save (see manualRowKeys).
+  keyOf: (row, index) => (typeof row.key === 'string' && row.key ? `key:${row.key}` : `new:${index}`),
   async list() {
     const rows = await prisma.manual.findMany({ where: { active: true }, orderBy: { position: 'asc' } })
-    return rows.map((r) => ({ title: r.title, url: r.url ?? '', crew: r.crew, status: r.status, authorId: r.authorId, author: r.author, lastUpdated: r.lastUpdated, notes: r.notes }))
+    return rows.map((r) => ({ key: r.titleKey, title: r.title, url: r.url ?? '', crew: r.crew, status: r.status, authorId: r.authorId, author: r.author, lastUpdated: r.lastUpdated, notes: r.notes }))
   },
   async save(rows, actor) {
     const fields = ['title', 'url', 'crew', 'status', 'authorId', 'author', 'lastUpdated', 'notes'] as const
+    const keyList = manualRowKeys(rows)
+    const keys = new Map(rows.map((r, i) => [r, keyList[i]]))
     return saveByKey({
       rows,
-      keyOf: (r) => normalizeLabel(String(r.title)),
+      keyOf: (r) => keys.get(r)!,
       existing: async () =>
         (await prisma.manual.findMany()).map((r) => ({ key: r.titleKey, active: r.active, value: { ...r, url: r.url ?? '' } as Record<string, unknown> })),
       same: (prev, row, position) => prev.active && prev.value.position === position && fields.every((f) => prev.value[f] === row[f]),
@@ -326,7 +366,7 @@ export const manualsEditor: EditorSpec = {
           active: true,
           updatedBy: actor,
         }
-        const titleKey = normalizeLabel(data.title)
+        const titleKey = keys.get(row)!
         return prisma.manual.upsert({ where: { titleKey }, create: { titleKey, ...data }, update: data })
       },
       deactivate: (key) => prisma.manual.update({ where: { titleKey: key }, data: { active: false, updatedBy: actor } }),
