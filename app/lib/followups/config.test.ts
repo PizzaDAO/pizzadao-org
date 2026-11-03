@@ -16,6 +16,22 @@ beforeEach(() => {
 })
 afterEach(() => vi.restoreAllMocks())
 
+describe('typed-reply settings defaults', () => {
+  it('are off by default, with the documented window, acks and retention', async () => {
+    findMany.mockResolvedValue([])
+    const c = await loadFollowUpConfig(PROD)
+    expect([c.inboundTelegramEnabled, c.inboundDiscordEnabled]).toEqual([false, false])
+    expect([c.inboundWindowDays, c.replyRetentionDays]).toEqual([14, 180])
+    expect(c.inboundAckTelegram).toBe('Got it, thanks. I passed this on.')
+    expect(c.inboundAckDiscord).toBe('')
+  })
+  it('fails closed when settings cannot be read', async () => {
+    findMany.mockRejectedValue(new Error('db down'))
+    const c = await loadFollowUpConfig(PROD)
+    expect([c.inboundTelegramEnabled, c.inboundDiscordEnabled]).toEqual([false, false])
+  })
+})
+
 describe('follow-up settings defaults', () => {
   it('sending is OFF by default; caps and quiet hours match the decision', async () => {
     findMany.mockResolvedValue([])

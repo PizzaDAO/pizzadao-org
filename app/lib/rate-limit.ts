@@ -77,6 +77,8 @@ export const RATE_LIMITS = {
   // Follow-up action links (Telegram buttons): per token and per IP; possession of the link is the authority.
   "followup-link-token": { limit: 10, windowSec: 60 },
   "followup-link-ip": { limit: 30, windowSec: 60 },
+  // Typed replies to follow-ups forwarded by trusted services: per source and sender.
+  "followup-inbound": { limit: 20, windowSec: 60 },
   // "Check again" on the profile: per member.
   "telegram-check": { limit: 3, windowSec: 10 * 60 },
   // Host-match card actions and the confirm page: per member.

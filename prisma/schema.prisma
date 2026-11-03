@@ -1785,6 +1785,7 @@ model FollowUpEvent {
   type       String
   actorId    String? // Discord id, "telegram:<id>", or "system"
   data       Json?
+  externalKey String? @unique @db.VarChar(120) // idempotency key for inbound replies (plans/followup-replies-inbox.md)
   createdAt  DateTime @default(now())
   followUp   FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
 

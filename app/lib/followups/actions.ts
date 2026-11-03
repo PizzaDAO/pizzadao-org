@@ -44,6 +44,8 @@ export async function applyMemberAction(a: {
   actorId: string
   action: FollowUpAction
   text?: string
+  /** Typed reply that arrived as a direct message (not a button or link). */
+  via?: 'telegram-dm' | 'discord-dm'
 }): Promise<ActionResult> {
   const row = await prisma.followUp.findUnique({ where: { id: a.followUpId } })
   if (!row) return { ok: false, reason: 'not-found' }
@@ -64,13 +66,13 @@ export async function applyMemberAction(a: {
     const stored = quick && row.lastReply ? `${row.lastReply}\n${text}`.slice(0, MAX_REPLY_CHARS) : text
     const data = { lastReply: stored, lastReplyAt: now }
     if (row.status === 'SENT') {
-      await guardedTransition(row.id, 'SENT', 'REPLIED', data, { type: 'reply', actorId: a.actorId, data: { text } })
+      await guardedTransition(row.id, 'SENT', 'REPLIED', data, { type: 'reply', actorId: a.actorId, data: { text, ...(a.via ? { via: a.via } : {}) } })
     } else {
       await prisma.followUp.update({ where: { id: row.id }, data })
-      await addEvent(row.id, 'reply', a.actorId, { text })
+      await addEvent(row.id, 'reply', a.actorId, { text, ...(a.via ? { via: a.via } : {}) })
     }
     const alert = !quick && (await takeAlertSlot(row.id, a.discordId, 'reply', a.actorId, now))
-    return { ok: true, kind: 'reply', status: row.status === 'SENT' ? 'REPLIED' : row.status, ...(alert ? { notify: `Reply from ${row.ownerName} on "${row.ask}": ${text}` } : {}) }
+    return { ok: true, kind: 'reply', status: row.status === 'SENT' ? 'REPLIED' : row.status, ...(alert ? { notify: `Reply from ${row.ownerName} on "${row.ask}"${a.via ? ` (${a.via === 'telegram-dm' ? 'Telegram' : 'Discord'} DM)` : ''}: ${text}` } : {}) }
   }
 
   if (a.action === 'snooze') {

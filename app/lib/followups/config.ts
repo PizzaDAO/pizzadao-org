@@ -28,6 +28,12 @@ export interface FollowUpConfig {
   dmRecheckMaxDays: number
   linkTtlDays: number
   snoozeDays: number
+  inboundTelegramEnabled: boolean
+  inboundDiscordEnabled: boolean
+  inboundWindowDays: number
+  inboundAckTelegram: string
+  inboundAckDiscord: string
+  replyRetentionDays: number
 }
 
 /** FOLLOWUPS_SEND_ENABLED set to off/0/false/no always wins over the setting. */
@@ -62,6 +68,13 @@ export async function loadFollowUpConfig(env: Record<string, string | undefined>
     dmRecheckMaxDays: s.get('telegram.dmRecheckMaxDays'),
     linkTtlDays: s.get('followups.linkTtlDays'),
     snoozeDays: s.get('followups.snoozeDays'),
+    // Reading typed replies is independent of sendEnabled, but fails closed on unreadable settings.
+    inboundTelegramEnabled: !s.readFailed && !s.invalidKeys.includes('followups.inboundTelegramEnabled') && s.get('followups.inboundTelegramEnabled') === 1,
+    inboundDiscordEnabled: !s.readFailed && !s.invalidKeys.includes('followups.inboundDiscordEnabled') && s.get('followups.inboundDiscordEnabled') === 1,
+    inboundWindowDays: s.get('followups.inboundWindowDays'),
+    inboundAckTelegram: s.get('followups.inboundAckTelegram'),
+    inboundAckDiscord: s.get('followups.inboundAckDiscord'),
+    replyRetentionDays: s.get('followups.replyRetentionDays'),
   }
 }
 
