@@ -43,7 +43,8 @@ vi.mock('./finalize.js', async (orig) => ({ ...(await orig<typeof import('./fina
 
 import { CallRecorder } from './recorder.js'
 import { NicknameManager, recNickname, stripRecMark } from './nickname.js'
-import { consentNotice, lateJoinWelcome } from './consent.js'
+import { consentNotice, lateJoinWelcome, welcomeBatch, welcomeOpening, callDisplayName, sanitizeCallName } from './consent.js'
+import { parseRemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import { chatMessages, readManifest } from './manifest.js'
 
 const CHANNEL = '823956905739026442'
@@ -56,7 +57,7 @@ const ev = (over: Partial<EventInfo> = {}): EventInfo => ({
   ...over,
 })
 
-function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string } = {}) {
+function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string; remote?: RemoteConfigClient; bots?: string[] } = {}) {
   const dataDir = opts.dataDir ?? mkdtempSync(path.join(os.tmpdir(), 'orch-'))
   const nicknames: Array<string | null> = []
   const me = {
@@ -71,7 +72,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
   const channel = {
     id: CHANNEL,
     isVoiceBased: () => true,
-    send: vi.fn(async () => {
+    send: vi.fn(async (_m?: unknown) => {
       calls.push('notice')
       if (opts.sendFails) throw new Error('Missing Access')
     }),
@@ -82,7 +83,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     channels: { fetch: async () => channel },
     voiceStates: { cache: { filter: () => ({ map: () => [] }) } },
   }
-  const client = { guilds: { fetch: async () => guild }, users: { fetch: async () => ({ bot: false }) } }
+  const client = { guilds: { fetch: async () => guild }, users: { fetch: async (id: string) => ({ bot: (opts.bots ?? []).includes(id) }) } }
   const cfg = { dataDir, guildId: 'g1', callChannelId: CHANNEL, maxCallMinutes: 120, eventCaps: [{ namePart: 'community call', minutes: 30 }], emptyGraceMinutes: 5 } as Config
   const nick = new NicknameManager(dataDir, () => {}, async () => {})
   const serialJobs: Array<() => Promise<void>> = []
@@ -93,6 +94,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     { appBaseUrl: 'x', apiKey: 'k', uploader: {} as never, log: () => {} },
     () => {},
     (fn) => void serialJobs.push(fn),
+    opts.remote ?? null,
   )
   return { rec, dataDir, me, nicknames, channel, guild, serialJobs, client, cfg, nick }
 }
@@ -1007,5 +1009,253 @@ describe('voice channel chat capture', () => {
     w.rec.onMessage(msg({ content: '', cleanContent: '' }) as never)
     expect(chat(dir)).toEqual([])
     expect(logs.filter((l) => l.includes('MessageContent'))).toHaveLength(1)
+  })
+})
+
+describe('batched welcome (calls.welcomeEnabled)', () => {
+  const remoteWith = (welcome: Record<string, unknown>, crews: unknown[] = []) =>
+    ({ get: () => parseRemoteConfig({ welcome, crews }), refresh: async () => parseRemoteConfig({ welcome, crews }) }) as unknown as RemoteConfigClient
+  const joinState = (w: ReturnType<typeof world>, id: string, from: string | null = null) =>
+    w.rec.onVoiceState({ id, channelId: from } as never, { id, channelId: CHANNEL, channel: w.channel } as never)
+  const sent = (w: ReturnType<typeof world>) => w.channel.send.mock.calls.map((c) => c[0] as { content: string; allowedMentions: { users: string[] } })
+  const flush = async () => {
+    await vi.advanceTimersByTimeAsync(60_000)
+  }
+
+  afterEach(() => {
+    vi.useRealTimers()
+  })
+
+  it("off (or no remote config): the opening is exactly today's notice and late joiners get the old welcome", async () => {
+    const w = world()
+    await begin(w)
+    expect(sent(w)[0].content).toBe(consentNotice())
+    joinState(w, 'late')
+    await Promise.resolve()
+    expect(sent(w)).toHaveLength(1) // within 5 minutes: nothing (old behaviour)
+  })
+
+  it('on: the opening greets people already here and still carries the full notice, before capture', async () => {
+    const w = world({ remote: remoteWith({ enabled: true }, [{ eventId: '100', label: 'Ops Crew' }]) })
+    await begin(w)
+    const first = sent(w)[0]
+    expect(first.content).toContain('Welcome <@u0> to the Ops Crew call')
+    expect(first.content).toContain(consentNotice())
+    expect(first.allowedMentions.users).toEqual(['u0'])
+    expect(calls).toEqual(['join', `nick:${REC_NICKNAME}`, 'notice', 'begin'])
+  })
+
+  it('on: joiners are batched into one message, once each, bots and rejoins skipped', async () => {
+    const w = world({ remote: remoteWith({ enabled: true, batchSeconds: 20 }), bots: ['bot1'] })
+    await begin(w)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    joinState(w, 'a')
+    joinState(w, 'b')
+    joinState(w, 'bot1')
+    joinState(w, 'a') // rejoin: skipped
+    await vi.advanceTimersByTimeAsync(0)
+    expect(sent(w)).toHaveLength(1) // not yet
+    await vi.advanceTimersByTimeAsync(20_000)
+    const msgs = sent(w)
+    expect(msgs).toHaveLength(2)
+    expect(msgs[1].content).toContain('<@a> <@b>')
+    expect(msgs[1].content).not.toContain('bot1')
+    expect(msgs[1].content).toContain('recorded and transcribed')
+    expect(msgs[1].allowedMentions.users).toEqual(['a', 'b'])
+    joinState(w, 'a', CHANNEL) // already welcomed this call
+    await flush()
+    expect(sent(w)).toHaveLength(2)
+  })
+
+  it('on: a stop cancels the pending welcome', async () => {
+    const w = world({ remote: remoteWith({ enabled: true }) })
+    await begin(w)
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout'] })
+    joinState(w, 'a')
+    await vi.advanceTimersByTimeAsync(0)
+    await w.rec.stop('empty')
+    await flush()
+    expect(sent(w)).toHaveLength(1)
+  })
+})
+
+describe('welcome wording', () => {
+  it('batches up to 20 mentions then "and N others"', () => {
+    const ids = Array.from({ length: 23 }, (_, i) => String(i))
+    const m = welcomeBatch('Welcome {members} to the {call} 🍕', ids, 'Ops Crew call', 'REC LINE')
+    expect(m).toContain('<@19>')
+    expect(m).not.toContain('<@20>')
+    expect(m).toContain('and 3 others')
+    expect(m.endsWith('\nREC LINE')).toBe(true)
+  })
+  it('opening keeps the full notice; empty room still reads well', () => {
+    const o = welcomeOpening('Welcome {members} to the {call} 🍕', [], 'call')
+    expect(o.startsWith('Welcome to the call 🍕')).toBe(true)
+    expect(o.endsWith(consentNotice())).toBe(true)
+  })
+  it('call names are stripped of mentions and markdown', () => {
+    expect(sanitizeCallName('<@123> **Hi** @everyone _x_')).toBe('Hi x')
+    expect(sanitizeCallName('')).toBe('call')
+    expect(callDisplayName('Ops Crew', 'x')).toBe('Ops Crew call')
+    expect(callDisplayName(undefined, 'Community Call')).toBe('Community Call')
+    expect(callDisplayName(undefined, null)).toBe('call')
+  })
+})
+
+describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
+  const remoteWith = (endSong: Record<string, unknown>, crews: unknown[] = [{ eventId: '100', label: 'Ops Crew', callMinutes: 60 }]) => {
+    const es = { crewMap: [{ crew: 'Ops Crew', radio: 'Ops' }], ...endSong }
+    return { get: () => parseRemoteConfig({ endSong: es, crews }), refresh: async () => parseRemoteConfig({ endSong: es, crews }) } as unknown as RemoteConfigClient
+  }
+  const radio = { url: 'https://radio.example', apiKey: 'radio-secret' }
+  const radioWorld = (endSong: Record<string, unknown> | null, o: { radio?: boolean; crews?: unknown[] } = {}) => {
+    const w = world({ remote: endSong ? remoteWith(endSong, o.crews) : undefined })
+    if (o.radio !== false) (w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    return w
+  }
+  const fetchMock = vi.fn(async (_u: string, _i?: RequestInit) => ({ ok: true, status: 200 }) as Response)
+  const played = () => fetchMock.mock.calls.length
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response)
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('off: nothing is requested when a call ends', async () => {
+    const w = radioWorld(null)
+    await begin(w)
+    await w.rec.stop('event-ended')
+    expect(played()).toBe(0)
+    const w2 = radioWorld({ enabled: false })
+    await begin(w2)
+    await w2.rec.stop('max-duration')
+    expect(played()).toBe(0)
+  })
+
+  it('on: event-ended asks pizza-radio (not Metalhead) to play the crew song', async () => {
+    const w = radioWorld({ enabled: true })
+    await begin(w)
+    await w.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://radio.example/play-crew')
+    expect(JSON.parse(String(init?.body))).toEqual({ crew: 'Ops', channelId: CHANNEL })
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer radio-secret')
+    expect(calls).not.toContain('play') // the recorder never touches audio output
+  })
+
+  it('on: only event-ended fires; max-duration (the recording cap), empty, superseded, shutdown and disconnected do not', async () => {
+    for (const reason of ['max-duration', 'empty', 'superseded', 'disconnected'] as const) {
+      const w = radioWorld({ enabled: true })
+      await begin(w)
+      await w.rec.stop(reason)
+    }
+    const s = radioWorld({ enabled: true })
+    await begin(s)
+    await s.rec.shutdown()
+    expect(played()).toBe(0)
+    const m = radioWorld({ enabled: true })
+    await begin(m)
+    await m.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+  })
+
+  it('on: only crews in the end-song crew map play', async () => {
+    const w = radioWorld({ enabled: true, crewMap: [{ crew: 'Art', radio: 'Art' }] })
+    await begin(w)
+    await w.rec.stop('event-ended')
+    expect(played()).toBe(0)
+  })
+
+  it('the marker is written only after a 2xx or a 4xx, not after a network error or 5xx', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response)
+    const e = ev({ scheduledStartMs: Date.now() })
+    const a = radioWorld({ enabled: true })
+    await begin(a, e)
+    await a.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBeGreaterThanOrEqual(2), { timeout: 4000 }) // first try + retry
+    await new Promise((r) => setTimeout(r, 20))
+    const again = world({ remote: remoteWith({ enabled: true }), dataDir: a.dataDir })
+    ;(again.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    fetchMock.mockClear()
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response)
+    await begin(again, e)
+    await again.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1)) // not marked, so it may try again
+    const rejected = radioWorld({ enabled: true })
+    fetchMock.mockClear()
+    fetchMock.mockResolvedValue({ ok: false, status: 400 } as Response)
+    const e2 = ev({ scheduledStartMs: Date.now() + 1 })
+    await begin(rejected, e2)
+    await rejected.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await new Promise((r) => setTimeout(r, 20))
+    const second = world({ remote: remoteWith({ enabled: true }), dataDir: rejected.dataDir })
+    ;(second.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    await begin(second, e2)
+    await second.rec.stop('event-ended')
+    expect(played()).toBe(1) // 4xx was marked: no loop
+  })
+
+  it('on: skipped when fewer than minHumans are in the channel', async () => {
+    const w = radioWorld({ enabled: true, minHumans: 3 })
+    await begin(w)
+    await w.rec.stop('event-ended')
+    expect(played()).toBe(0)
+  })
+
+  it('on: needs the pizza-radio env and a crew for the event', async () => {
+    const a = radioWorld({ enabled: true }, { radio: false })
+    await begin(a)
+    await a.rec.stop('event-ended')
+    const b = radioWorld({ enabled: true }, { crews: [] })
+    await begin(b)
+    await b.rec.stop('event-ended')
+    expect(played()).toBe(0)
+  })
+
+  it('once per call occurrence, even after a restart (marker persisted)', async () => {
+    const w = radioWorld({ enabled: true })
+    const e = ev({ scheduledStartMs: Date.now() })
+    await begin(w, e)
+    await w.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await new Promise((r) => setTimeout(r, 20)) // let the marker land
+    await begin(w, e) // same occurrence again (rejoin)
+    await w.rec.stop('event-ended')
+    // a fresh process on the same data dir
+    const w2 = world({ remote: remoteWith({ enabled: true }), dataDir: w.dataDir })
+    ;(w2.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    await begin(w2, e)
+    await w2.rec.stop('event-ended')
+    expect(played()).toBe(1)
+  })
+
+  it('fires when the scheduled end passes while people are still in the call', async () => {
+    const start = Date.now()
+    const w = radioWorld({ enabled: true })
+    await begin(w, ev({ name: 'Ops Crew Call', scheduledStartMs: start }))
+    const onTick = (w.rec as unknown as { onTick: () => Promise<void> }).onTick.bind(w.rec)
+    await onTick() // before the end (start + 60 min from the crew): nothing
+    expect(played()).toBe(0)
+    vi.spyOn(Date, 'now').mockReturnValue(start + 61 * 60_000)
+    await onTick()
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await onTick() // not again
+    expect(played()).toBe(1)
+  })
+
+  it('a pizza-radio error never breaks the stop', async () => {
+    fetchMock.mockRejectedValue(new Error('radio down'))
+    const w = radioWorld({ enabled: true })
+    await begin(w)
+    await expect(w.rec.stop('event-ended')).resolves.toBeUndefined()
+    await w.rec.drain()
+    expect(finalizeSession).toHaveBeenCalledTimes(1)
   })
 })

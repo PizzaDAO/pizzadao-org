@@ -97,20 +97,25 @@ export async function resolveCrewChannel(raw: string | undefined): Promise<strin
   return want ? (usable.find((c) => normalizeChannelName(c.name) === want)?.id ?? null) : null
 }
 
-/** Action items of the crew's latest published call that has any. */
-export async function previousActionItems(crewId: string): Promise<ActionItem[]> {
+/** The crew's latest published call that has action items (with its id and date). */
+export async function previousCallWithActionItems(crewId: string): Promise<{ items: ActionItem[]; recordingId: string; startedAt: Date } | null> {
   const withImported = await importedAllowed('calls.importedAgendaContext')
   const rows = await prisma.callRecording.findMany({
     where: { crewId, status: 'PUBLISHED', ...(withImported ? {} : DISCORD_ONLY) },
     orderBy: { startedAt: 'desc' },
     take: 3,
-    select: { actionItems: true },
+    select: { id: true, startedAt: true, actionItems: true },
   })
   for (const r of rows) {
     const items = parseActionItems(r.actionItems)
-    if (items.length) return items
+    if (items.length) return { items, recordingId: r.id, startedAt: r.startedAt }
   }
-  return []
+  return null
+}
+
+/** Action items of the crew's latest published call that has any. */
+export async function previousActionItems(crewId: string): Promise<ActionItem[]> {
+  return (await previousCallWithActionItems(crewId))?.items ?? []
 }
 
 export interface PlannedAgenda {

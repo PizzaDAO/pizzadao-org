@@ -41,6 +41,7 @@ import { HeroBlock } from "./components/HeroBlock";
 import { YourCrews, type CrewOption } from "./components/YourCrews";
 import { SliceClaimsCard } from "../../ui/slices/SliceClaims";
 import { NextActionPanel } from "./components/NextActionPanel";
+import { LevelCard } from "./components/LevelCard";
 import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
 import { RecentActivity } from "./components/RecentActivity";
 import { Discover } from "./components/Discover";
@@ -268,6 +269,8 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                     {summary?.nextAction && (
                         <NextActionPanel nextAction={summary.nextAction} />
                     )}
+
+                    <LevelCard card={summary?.levelCard} />
 
                     <SliceClaimsCard />
                     <nav className="flex flex-wrap gap-x-5 text-sm" aria-label={t("handbook")}>

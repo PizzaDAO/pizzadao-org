@@ -17,6 +17,7 @@
 import { useArticlesByMember } from "../../lib/hooks/use-api";
 import ArticleCard, { type ArticleCardData } from "../articles/ArticleCard";
 import { VouchesWidget } from "../vouches/VouchesWidget";
+import { VouchedBy } from "../vouches/VouchedBy";
 
 interface ContributionsBlockProps {
     memberId: string;
@@ -56,6 +57,7 @@ export function ContributionsBlock({ memberId }: ContributionsBlockProps) {
         return (
             <section className={CARD_CLASS} style={CARD_STYLE}>
                 <p className="overline text-tomato mb-3">§ 04 · The work</p>
+                <VouchedBy memberId={memberId} />
                 <VouchesWidget memberId={memberId} />
             </section>
         );
@@ -102,6 +104,7 @@ export function ContributionsBlock({ memberId }: ContributionsBlockProps) {
             </div>
 
             <div className="rule pt-4">
+                <VouchedBy memberId={memberId} />
                 <VouchesWidget memberId={memberId} />
             </div>
         </section>

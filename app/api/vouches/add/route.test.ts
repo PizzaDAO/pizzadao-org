@@ -19,6 +19,19 @@ vi.mock('@/app/lib/vouches', () => ({
   notifyVouchAdded: vi.fn(async () => ({})),
 }))
 vi.mock('@/app/lib/mission-verify/events', () => ({ emitMissionEvent: vi.fn(async () => null) }))
+// prisma.vouch.count answers two questions: "does this pair exist?" (where.followeeId) and "how many recently?".
+const { count, limit, existing } = vi.hoisted(() => {
+  const existing = { value: false }
+  return {
+    existing,
+    count: vi.fn(async (_q?: { where?: { followeeId?: string } }) => 0),
+    limit: { value: 50 },
+  }
+})
+vi.mock('@/app/lib/db', () => ({
+  prisma: { vouch: { count: (q: { where?: { followeeId?: string } }) => (q?.where?.followeeId ? Promise.resolve(existing.value ? 1 : 0) : count(q)) } },
+}))
+vi.mock('@/app/lib/settings', () => ({ getSetting: vi.fn(async () => limit.value) }))
 
 import { POST } from './route'
 import { getSession } from '@/app/lib/session'
@@ -30,6 +43,9 @@ const req = (body: unknown) =>
 
 beforeEach(() => {
   vi.clearAllMocks()
+  count.mockResolvedValue(0)
+  existing.value = false
+  limit.value = 50
   vi.mocked(getSession).mockResolvedValue({ discordId: ME.discordId } as never)
 })
 
@@ -52,5 +68,24 @@ describe('POST /api/vouches/add -> vouch_created hook', () => {
     vi.mocked(addVouch).mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }))
     expect((await POST(req({ targetMemberId: '7' }))).status).toBe(409)
     expect(emitMissionEvent).not.toHaveBeenCalled()
+  })
+
+  it('refuses with 429 once the daily limit is used, and fires no hooks', async () => {
+    limit.value = 3
+    count.mockResolvedValue(3)
+    const res = await POST(req({ targetMemberId: '7' }))
+    expect(res.status).toBe(429)
+    expect((await res.json()).limit).toBe(3)
+    expect(addVouch).not.toHaveBeenCalled()
+    expect(emitMissionEvent).not.toHaveBeenCalled()
+    count.mockResolvedValue(2)
+    expect((await POST(req({ targetMemberId: '7' }))).status).toBe(200)
+  })
+
+  it('a repeat is a 409 even when the daily limit is used up (never a 429)', async () => {
+    limit.value = 3
+    count.mockResolvedValue(3)
+    existing.value = true
+    expect((await POST(req({ targetMemberId: '7' }))).status).toBe(409)
   })
 })

@@ -115,6 +115,34 @@ export const PEP_COMMANDS = [
     description: 'Check your PizzaDAO missions: verifies what it can and shows your level',
     dm_permission: false,
   },
+  {
+    // Deferred and ephemeral (type 5, flags 64). Each answers "isn't enabled yet" until its setting
+    // (discord.vouchCommandEnabled / levelCommandEnabled / profileCommandEnabled) is on.
+    name: 'vouch',
+    description: 'Vouch for another PizzaDAO member (only you see the reply)',
+    options: [{ type: USER, name: 'member', description: 'Who to vouch for', required: true }],
+    dm_permission: false,
+  },
+  {
+    name: 'level',
+    description: 'Your level and what you need for the next one (or another member’s level)',
+    options: [{ type: USER, name: 'member', description: 'Member to look up (default: you)', required: false }],
+    dm_permission: false,
+  },
+  {
+    name: 'profile',
+    description: 'Profile stats for you or another member (only you see the reply)',
+    options: [{ type: USER, name: 'member', description: 'Member to look up (default: you)', required: false }],
+    dm_permission: false,
+  },
+  {
+    // Deferred and public (type 5): reads the crew's last call and tasks, then edits the reply in.
+    // Answers "not enabled" until calls.progressReportEnabled.
+    name: 'progress',
+    description: 'Post last call\'s action items and open tasks for a crew (default: the call in progress)',
+    options: [{ type: STRING, name: 'crew', description: 'Crew (default: the call that is running now)', required: false, autocomplete: true, max_length: 80 }],
+    dm_permission: false,
+  },
 ] as const
 
 export type PepCommandName = (typeof PEP_COMMANDS)[number]['name']

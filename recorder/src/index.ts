@@ -15,6 +15,7 @@ import { CallRecorder } from './recorder.js'
 import { createR2Uploader } from './storage.js'
 import { postIngestWithRetry } from './ingest.js'
 import { handleDm, postFollowupInbound, type DmMessage } from './dm-forward.js'
+import { RemoteConfigClient } from './remote-config.js'
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`)
 
@@ -48,6 +49,8 @@ function serial(fn: () => Promise<void>) {
 }
 
 let recorder: CallRecorder
+const remote = new RemoteConfigClient(cfg.appBaseUrl, cfg.recorderApiKey, log)
+remote.startRefreshLoop()
 const uploader = createR2Uploader(cfg.r2)
 recorder = new CallRecorder(
   client,
@@ -63,6 +66,7 @@ recorder = new CallRecorder(
   },
   log,
   serial,
+  remote,
 )
 
 const DAY_MS = 86_400_000

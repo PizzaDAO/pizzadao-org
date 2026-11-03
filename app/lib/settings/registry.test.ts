@@ -112,6 +112,23 @@ describe('settings registry', () => {
       ['calls.recapPostEnabled', false],
       ['calls.agendaPostEnabled', false],
       ['calls.agendaLinks', ''],
+      ['calls.welcomeEnabled', false],
+      ['calls.welcomeTemplate', 'Welcome {members} to the {call} 🍕'],
+      ['calls.welcomeBatchSeconds', 20],
+      ['calls.recordingLine', "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded."],
+      ['calls.endSongTriggerEnabled', false],
+      ['calls.endSongMinHumans', 1],
+      ['calls.endSongCrewMap', 'Ops = Ops\nTech = Tech\nComms = Comms\nBiz Dev = Biz Dev\nEvents = Events\nArt = Art\nMerch = Merch\nReal Estate = Real Estate\nGovernance = Governance'],
+      ['calls.progressReportEnabled', false],
+      ['calls.progressMaxItems', 8],
+      ['calls.progressShowFollowups', false],
+      ['vouches.dailyLimit', 50],
+      ['vouches.quickVouchEnabled', false],
+      ['vouches.showVouchersEnabled', false],
+      ['dashboard.levelCardEnabled', false],
+      ['discord.vouchCommandEnabled', false],
+      ['discord.levelCommandEnabled', false],
+      ['discord.profileCommandEnabled', false],
       ['calls.importedRecapPostEnabled', false],
       ['calls.importedFollowupsEnabled', false],
       ['calls.importedAgendaContext', false],
@@ -139,6 +156,18 @@ describe('settings registry', () => {
       ['announce.roleIds', []],
       ['articles.authorRoleIds', []],
     ])
+  })
+
+  it('welcome template needs both placeholders; the recording line can never be empty', () => {
+    expect(parseSetting('calls.welcomeTemplate', 'Hi {members}').ok).toBe(false)
+    expect(parseSetting('calls.welcomeTemplate', 'Hi {call}').ok).toBe(false)
+    expect(parseSetting('calls.welcomeTemplate', 'Hi {members} to {call}').ok).toBe(true)
+    expect(parseSetting('calls.recordingLine', '   ').ok).toBe(false)
+    expect(parseSetting('calls.recordingLine', 'We record.').ok).toBe(true)
+    expect(parseSetting('calls.endSongCrewMap', 'Ops = Ops\nCommunity').ok).toBe(false)
+    expect(parseSetting('calls.endSongCrewMap', 'Ops = Ops\nBiz Dev = Biz Dev').ok).toBe(true)
+    expect(parseSetting('calls.welcomeBatchSeconds', 4).ok).toBe(false)
+    expect(parseSetting('calls.welcomeBatchSeconds', 121).ok).toBe(false)
   })
 
   it('enforces bounds, integers and types', () => {

@@ -791,7 +791,11 @@
       "viewAll": "Tout voir",
       "unknownName": "Inconnu",
       "empty": "Personne ne s'est encore porté garant de toi. Visite les profils des membres pour te porter garant d'eux !",
-      "find": "Trouver des garants"
+      "find": "Trouver des garants",
+      "vouchedByTitle": "Parrainé par",
+      "vouchedByCount": "{count, plural, one {# membre} other {# membres}}",
+      "vouchedByEmpty": "Personne ne s'est encore porté garant.",
+      "vouchedByMore": "et {count} de plus"
     },
     "celebrations": {
       "profile": {
@@ -845,7 +849,18 @@
     },
     "howToAttend": "Comment participer à un appel",
     "gettingStarted": "Premiers pas",
-    "handbook": "Guide PizzaDAO"
+    "handbook": "Guide PizzaDAO",
+    "levelCard": {
+      "overline": "Ton niveau",
+      "level": "Niveau {level}",
+      "max": "Niveau MAX",
+      "progress": "{done} missions sur {total} terminées",
+      "next": "À suivre",
+      "allSubmitted": "Tout est envoyé. En attente de relecture.",
+      "maxBody": "Tu as atteint tous les niveaux existants.",
+      "viewAll": "Toutes les missions",
+      "nextLevel": "Niveau suivant : {title}"
+    }
   },
   "missionLinks": {
     "boxHint": "Cette mission nécessite une Rare Pizza Box NFT dans un wallet connecté à ton profil.",

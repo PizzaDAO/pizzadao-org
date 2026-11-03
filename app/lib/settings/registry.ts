@@ -121,6 +121,10 @@ const FOOTER_TELEGRAM_DEFAULT = "Replies to this bot aren't read. Use the button
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
+/** One line of calls.endSongCrewMap: `our crew label = pizza-radio crew`. */
+export const END_SONG_CREW_LINE = /^([^=\n]{1,60}?)\s*=\s*([^=\n]{1,60})$/
+export const END_SONG_CREW_MAP_DEFAULT = ['Ops', 'Tech', 'Comms', 'Biz Dev', 'Events', 'Art', 'Merch', 'Real Estate', 'Governance'].map((c) => `${c} = ${c}`).join('\n')
+
 /** One line of calls.agendaLinks: `crew-id = Label | https://...`. */
 export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*(https:\/\/\S+)$/
 
@@ -903,6 +907,151 @@ export const SETTINGS = {
     placeholder: 'crew-id = Call guide | https://example.com/guide',
     check: (v) => v.split('\n').every((line) => line.trim() === '' || AGENDA_LINK_LINE.test(line.trim())),
     checkMessage: 'Use one line per crew: crew-id = Label | https link',
+  }),
+  // Metalhead call features (plans/metalhead-call-features.md). All off: the recorder keeps today's behaviour.
+  'calls.welcomeEnabled': boolSetting({
+    key: 'calls.welcomeEnabled',
+    area: 'calls',
+    label: 'Welcome members to calls',
+    help: 'The recorder greets people who join a call with one batched, friendly message that includes the short recording line, in place of the late-joiner welcome. The full recording notice still opens every recorded call. The CALL_WELCOME_ENABLED env var set to off always wins; on preview deploys only the env var counts. Takes effect for the next recorded call.',
+    confirmOn: 'The recorder will post welcome messages in the call voice channel chat.',
+  }),
+  'calls.welcomeTemplate': textSetting({
+    key: 'calls.welcomeTemplate',
+    area: 'calls',
+    label: 'Welcome message',
+    help: 'Use {members} (the mentions of the people joining) and {call} (the crew or event name). Both are required.',
+    maxLength: 300,
+    default: 'Welcome {members} to the {call} 🍕',
+    check: (v) => v.includes('{members}') && v.includes('{call}'),
+    checkMessage: 'Must contain both {members} and {call}',
+  }),
+  'calls.welcomeBatchSeconds': intSetting({
+    key: 'calls.welcomeBatchSeconds',
+    area: 'calls',
+    label: 'Welcome batching window',
+    help: 'People who join within this many seconds of each other get one welcome message.',
+    min: 5,
+    max: 120,
+    default: 20,
+    unit: 'seconds',
+  }),
+  'calls.recordingLine': textSetting({
+    key: 'calls.recordingLine',
+    area: 'calls',
+    label: 'Recording line in welcomes',
+    help: 'The short recording notice added to every welcome message. Cannot be empty: people must always be told the call is recorded.',
+    maxLength: 300,
+    default: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
+    check: (v) => v.length > 0,
+    checkMessage: 'The recording line cannot be empty',
+  }),
+  'calls.endSongTriggerEnabled': boolSetting({
+    key: 'calls.endSongTriggerEnabled',
+    area: 'calls',
+    label: 'End-of-call song from the recorder',
+    help: 'When a recorded call really ends (the Discord event ends or the recording hits its time limit) with people still in the channel, the recorder asks the pizza-radio bot to play the crew song. Metalhead never plays audio itself. Also needs PIZZA_RADIO_URL and PIZZA_RADIO_API_KEY on the recorder. Turn the old Apps Script timer off after the first verified call so the song does not play twice. The CALL_END_SONG_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Pizza-radio will play the crew song when a recorded call ends. Disable the Apps Script song timer to avoid a double play.',
+  }),
+  'calls.endSongMinHumans': intSetting({
+    key: 'calls.endSongMinHumans',
+    area: 'calls',
+    label: 'People needed for the end song',
+    help: 'Play the song only if at least this many people are still in the call channel when it ends.',
+    min: 1,
+    max: 50,
+    default: 1,
+    unit: 'people',
+  }),
+  'calls.endSongCrewMap': textSetting({
+    key: 'calls.endSongCrewMap',
+    area: 'calls',
+    label: 'End song: crew names',
+    help: 'One per line: our crew label = pizza-radio crew name. Only crews listed here get an end-of-call song. Pizza-radio knows: Amore, Art, Biz Dev, Comms, Events, Finance, Governance, Mafia, Merch, Ops, Real Estate, Tech.',
+    maxLength: 1000,
+    multiline: true,
+    default: END_SONG_CREW_MAP_DEFAULT,
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'Ops = Ops',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || END_SONG_CREW_LINE.test(line.trim())),
+    checkMessage: 'Use one line per crew: our crew label = radio crew',
+  }),
+  'calls.progressReportEnabled': boolSetting({
+    key: 'calls.progressReportEnabled',
+    area: 'calls',
+    label: '/progress command',
+    help: 'Lets anyone in the server run /progress in a channel: it posts the crew\'s last call action items and open tasks as a public message (the crew is the option, else the call in progress). Uses the same private post filter as agendas. The command must also be registered with Discord. The CALL_PROGRESS_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: '/progress will post crew action items and tasks publicly in the channel where it is used.',
+  }),
+  'calls.progressMaxItems': intSetting({
+    key: 'calls.progressMaxItems',
+    area: 'calls',
+    label: '/progress items per section',
+    help: 'Most last-call action items, and most open tasks, shown in one /progress report.',
+    min: 3,
+    max: 15,
+    default: 8,
+    unit: 'items',
+  }),
+  'calls.progressShowFollowups': boolSetting({
+    key: 'calls.progressShowFollowups',
+    area: 'calls',
+    label: 'Show follow-up status in /progress',
+    help: 'Add a status icon (done, in progress, needs help) to each action item that has a follow-up. Only the icon is shown, never the message text or replies. The CALL_PROGRESS_FOLLOWUPS_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: '/progress will show who is done, in progress or needs help on last call\'s action items.',
+  }),
+  // Vouching and levels made easier (plans/metalhead-call-features.md, phase C). All off.
+  'vouches.dailyLimit': intSetting({
+    key: 'vouches.dailyLimit',
+    area: 'features',
+    label: 'Vouches per member per day',
+    help: 'Most vouches one member can give in a rolling 24 hours, on the website and in Discord alike. The default is the maximum (50), so saving nothing changes nothing; lower it to throttle.',
+    min: 1,
+    max: 50,
+    default: 50,
+    unit: 'vouches',
+  }),
+  'vouches.quickVouchEnabled': boolSetting({
+    key: 'vouches.quickVouchEnabled',
+    area: 'features',
+    label: 'One-click Vouch on the members list',
+    help: 'Show a Vouch button on every card of the members list (/crew) for signed-in members. Disavow-eligible viewers are sent to the profile when the member is listed. The VOUCH_QUICK_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will see a one-click Vouch button on the members list.',
+  }),
+  'vouches.showVouchersEnabled': boolSetting({
+    key: 'vouches.showVouchersEnabled',
+    area: 'features',
+    label: 'Show who vouched on profiles',
+    help: 'Profiles show how many members vouched for this member, and who. The VOUCH_SHOW_VOUCHERS_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Profiles will list the members who vouched for them.',
+  }),
+  'dashboard.levelCardEnabled': boolSetting({
+    key: 'dashboard.levelCardEnabled',
+    area: 'features',
+    label: 'Level card on the dashboard',
+    help: 'Show a card with the current level, title, progress through the level and the next missions. The DASHBOARD_LEVEL_CARD_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will see a level card on their dashboard.',
+  }),
+  'discord.vouchCommandEnabled': boolSetting({
+    key: 'discord.vouchCommandEnabled',
+    area: 'discord',
+    label: '/vouch command',
+    help: 'Let members vouch for another member with /vouch @member (private reply). The command must also be registered with Discord. The VOUCH_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will be able to vouch from Discord.',
+  }),
+  'discord.levelCommandEnabled': boolSetting({
+    key: 'discord.levelCommandEnabled',
+    area: 'discord',
+    label: '/level command',
+    help: 'Let members see their level and what is needed for the next one with /level (private reply); for another member only their level and title. The LEVEL_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will be able to check levels from Discord.',
+  }),
+  'discord.profileCommandEnabled': boolSetting({
+    key: 'discord.profileCommandEnabled',
+    area: 'discord',
+    label: '/profile command',
+    help: 'Let members see profile stats with /profile [@member] (private reply). Another member shows only what their public profile shows. The PROFILE_COMMAND_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Members will be able to look up profile stats from Discord.',
   }),
   // Calls imported from X live broadcasts (plans/x-call-import.md). All off: an imported call never reaches Discord,
   // the follow-up drafter, the agenda or the automatic summary sweep unless a setting here says so.
