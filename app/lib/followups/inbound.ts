@@ -60,18 +60,33 @@ export async function handleInbound(m: InboundMessage, now = new Date()): Promis
   const via = m.source === 'telegram' ? 'telegram-dm' : 'discord-dm'
   const actorId = m.source === 'telegram' ? `telegram:${m.senderId}` : discordId
 
-  // Idempotency: the first writer of an external key wins; a replay changes nothing.
-  if (m.externalKey) {
+  // Idempotency: the first writer of an external key wins; a replay changes nothing. The key is
+  // namespaced by the authenticated source (never trusted from the caller alone). If saving the
+  // reply fails, the marker is removed again so the sender's retry is not mistaken for a replay.
+  const key = m.externalKey ? (m.externalKey.startsWith(`${m.source}:`) ? m.externalKey : `${m.source}:${m.externalKey}`).slice(0, 120) : null
+  if (key) {
     try {
-      await prisma.followUpEvent.create({ data: { followUpId: row.id, type: 'inbound', actorId, externalKey: m.externalKey.slice(0, 120), data: { via } } })
+      await prisma.followUpEvent.create({ data: { followUpId: row.id, type: 'inbound', actorId, externalKey: key, data: { via } } })
     } catch (e) {
       if (e instanceof Prisma.PrismaClientKnownRequestError && e.code === 'P2002') return { claimed: true, duplicate: true }
       throw e
     }
   }
+  const undoMarker = async () => {
+    if (key) await prisma.followUpEvent.deleteMany({ where: { externalKey: key } }).catch(() => null)
+  }
 
-  const r = await applyMemberAction({ followUpId: row.id, discordId, actorId, action: 'reply', text, via })
-  if (!r.ok) return NOT_CLAIMED
+  let r: Awaited<ReturnType<typeof applyMemberAction>>
+  try {
+    r = await applyMemberAction({ followUpId: row.id, discordId, actorId, action: 'reply', text, via })
+  } catch (e) {
+    await undoMarker()
+    throw e
+  }
+  if (!r.ok) {
+    await undoMarker()
+    return NOT_CLAIMED
+  }
 
   // Opted-out members wrote to us, so the reply is kept, but they get no acknowledgement.
   const optedOut = await isOptedOut(discordId).catch(() => false)
