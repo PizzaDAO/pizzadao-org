@@ -19,6 +19,15 @@ describe("isThemedName", () => {
     expect(isThemedName("Hot Honey Harry")).toBe(true);
     expect(isThemedName("Calzone Carl")).toBe(true);
   });
+  it("accepts real multi-word toppings as phrases", () => {
+    expect(isThemedName("Spicy Salami Sam")).toBe(true);
+    expect(isThemedName("Roasted Red Pepper Rick")).toBe(true);
+    expect(isThemedName("Banana Peppers Bob")).toBe(true);
+    expect(isThemedName("Chili Crisp Charlie")).toBe(true);
+  });
+  it("rejects generic single words", () => {
+    for (const n of ["Red", "Hot Wheels", "Pie", "Ham", "Oven", "Spicy", "Roasted", "Banana"]) expect(isThemedName(n)).toBe(false);
+  });
   it("rejects names with no pizza word", () => {
     expect(isThemedName("Summer Meetup 2026")).toBe(false);
     expect(isThemedName("Test")).toBe(false);

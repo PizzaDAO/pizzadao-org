@@ -10,14 +10,15 @@ import { prisma } from "@/app/lib/db";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { PIZZA_TOPPINGS } from "@/app/lib/topping-images";
 
-/** Extra pizza words that count besides the catalog toppings. */
+/** Pizza words that count on their own. Generic single words (pie, ham, oven, hot, red...) are left out on purpose. */
 const PIZZA_WORDS = [
-  "pizza", "pie", "slice", "crust", "dough", "cheese", "sauce", "tomato", "pepperoni", "margherita",
-  "marinara", "calzone", "stromboli", "focaccia", "napoli", "neapolitan", "sicilian", "oven", "pizzaiolo",
-  "pizzeria", "mozz", "mozzarella", "basil", "oregano", "garlic", "pesto", "salami", "bacon", "ham",
-  "mushroom", "olive", "anchovy", "sausage", "pineapple", "jalapeno", "capricciosa", "diavola", "bianca",
+  "pizza", "pizzas", "slice", "crust", "dough", "cheese", "sauce", "pepperoni", "margherita",
+  "marinara", "calzone", "stromboli", "focaccia", "neapolitan", "sicilian", "pizzaiolo",
+  "pizzeria", "mozzarella", "mozz", "basil", "oregano", "garlic", "pesto", "salami", "bacon",
+  "mushroom", "olive", "anchovy", "sausage", "pineapple", "jalapeno", "capricciosa", "diavola",
 ];
 
+/** Multi-word catalog toppings only match as the whole phrase; single-word ones match as words. */
 function words(s: string): string[] {
   return s
     .normalize("NFKD")
@@ -27,14 +28,20 @@ function words(s: string): string[] {
     .filter(Boolean);
 }
 
-const THEME_TOKENS: Set<string> = new Set([
+const SINGLE_TOKENS: Set<string> = new Set([
   ...PIZZA_WORDS,
-  ...PIZZA_TOPPINGS.flatMap((t) => words(t).filter((w) => w.length >= 3)),
+  ...PIZZA_TOPPINGS.filter((t) => words(t).length === 1).flatMap((t) => words(t)),
 ]);
+const PHRASES: string[] = PIZZA_TOPPINGS.filter((t) => words(t).length > 1).map((t) => words(t).join(" "));
+
+const singular = (w: string) => (w.endsWith("s") ? w.slice(0, -1) : w);
 
 /** Whether the name contains a recognised topping or pizza word (plurals match). */
 export function isThemedName(name: string): boolean {
-  return words(name).some((w) => THEME_TOKENS.has(w) || (w.endsWith("s") && THEME_TOKENS.has(w.slice(0, -1))));
+  const ws = words(name);
+  if (ws.some((w) => SINGLE_TOKENS.has(w) || SINGLE_TOKENS.has(singular(w)))) return true;
+  const joined = " " + ws.map(singular).join(" ") + " ";
+  return PHRASES.some((p) => joined.includes(" " + p.split(" ").map(singular).join(" ") + " "));
 }
 
 export const NAME_NOT_THEMED_ERROR =

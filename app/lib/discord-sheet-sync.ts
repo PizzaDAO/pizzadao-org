@@ -5,6 +5,7 @@
 // SECURITY: the target row is resolved ONLY from the Crew sheet by discordId.
 // Callers cannot pass a memberId: doing so previously let anyone re-point
 // another member's row to their own Discord account.
+import { themedNameAllowed } from "@/app/lib/themed-name";
 import { ROLE_ID_TO_TURTLE } from "@/app/ui/constants";
 import { writeToSheet } from "@/app/api/profile/route";
 import { prisma } from "@/app/lib/db";
@@ -106,11 +107,18 @@ export async function syncDiscordRolesToSheet(
   // 5. Write back to the sheet (only if the row is already linked to this Discord ID)
   let writeRes: unknown = undefined;
   if (found) {
-    const finalMafiaName =
-      String(found.row.Name || "").trim() ||
-      sanitizeDisplayName(fallbackName) ||
-      sanitizeDisplayName(discordMember.user?.username) ||
-      "Unknown";
+    // An existing sheet name is kept as is. A name derived from the Discord profile is only
+    // used when it passes the themed-name rule (a no-op while names.requireThemed is off).
+    let finalMafiaName = String(found.row.Name || "").trim();
+    if (!finalMafiaName) {
+      for (const candidate of [sanitizeDisplayName(fallbackName), sanitizeDisplayName(discordMember.user?.username)]) {
+        if (candidate && (await themedNameAllowed({ name: candidate, discordId }))) {
+          finalMafiaName = candidate;
+          break;
+        }
+      }
+    }
+    finalMafiaName = finalMafiaName || "Unknown";
     writeRes = await writeToSheet({
       secret,
       source: "discord-sync",
