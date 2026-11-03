@@ -124,8 +124,8 @@ export const ECONOMY_SETTINGS = {
     min: 55, max: 100, default: 55, unit: '%', looserWhen: 'lower',
   }),
   'crime.cooldownSeconds': num({
-    key: 'crime.cooldownSeconds', label: 'Crime: seconds between attempts', help: 'Tunable both ways; a saved value replaces the CRIME_COOLDOWN_SECONDS env var.',
-    min: 1, max: 86400, default: 30, unit: 's',
+    key: 'crime.cooldownSeconds', label: 'Crime: seconds between attempts', help: 'Tunable both ways; a saved value replaces the CRIME_COOLDOWN_SECONDS env var. Warning: crime pays out more than it costs on average, so this cooldown is the only throttle on how much PEP it mints. Lowering it raises PEP creation roughly in proportion; check the payout and fail settings first.',
+    min: 10, max: 86400, default: 30, unit: 's',
   }),
 
   // ---- Work ----
