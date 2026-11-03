@@ -7,7 +7,7 @@ import { prisma } from '@/app/lib/db'
 import type { Settings } from '@/app/lib/settings'
 import { SETTINGS, type SettingKey } from '@/app/lib/settings/registry'
 import { EMPTY_POST_FILTER, type PostFilter } from './post-filters'
-import { handleLiveRequest, pruneLiveChunks, type DetectedItem, type LiveDeps } from './live-run'
+import { handleLiveRequest, pruneLiveChunks, sweepLiveData, type DetectedItem, type LiveDeps } from './live-run'
 import type { LiveRequest } from './live-items'
 
 function fakeSettings(over: Partial<Record<SettingKey, unknown>> = {}, readFailed = false): Settings {
@@ -122,20 +122,39 @@ describe('spoken action items (option A)', () => {
     const out = await handleLiveRequest(speech(), deps({}, a))
     expect(a.download).toHaveBeenCalledWith(`calls/${SID}/live/111111/1000.ogg`)
     expect(a.transcribe).toHaveBeenCalledTimes(1)
-    expect(chunks.create).toHaveBeenCalledWith({ data: { sessionId: SID, seq: 1, segments: [] } })
+    expect(chunks.create).toHaveBeenCalledWith({ data: { sessionId: SID, seq: 1, segments: [], segmentKeys: [`calls/${SID}/live/111111/1000.ogg`] } })
     const saved = (chunks.updateMany.mock.calls[0][0] as { data: { segments: Array<{ text: string; startMs: number; name: string }> } }).data.segments
     expect(saved).toEqual([expect.objectContaining({ discordId: '111111', name: 'Ann', text: 'I will send the deck to the team.', startMs: 1000 })])
     const input = (a.detect.mock.calls[0] as unknown[])[0] as { transcript: string; newFrom: string; already: string[] }
     expect(input.newFrom).toBe('00:01')
     expect(input.transcript).toContain('S1 (Ann): I will send the deck to the team.')
     expect(out.messages).toEqual(['📝 Action item recorded: Send the deck to the team — Ann\n-# Added to the call notes for review'])
-    expect(items.create).toHaveBeenCalledWith({ data: expect.objectContaining({ source: 'speech', speakerIds: ['111111'], owner: 'Ann' }) })
+    expect(items.create).toHaveBeenCalledWith({ data: expect.objectContaining({ source: 'speech', speakerIds: ['111111'], owner: 'Ann', startMs: 1000, endMs: 3500 }) })
   })
 
-  it('handles a retried chunk once (sessionId + seq)', async () => {
+  it('never transcribes the same audio twice, whatever seq the recorder sends', async () => {
+    chunks.findMany.mockResolvedValueOnce([{ seq: 1, audioMs: 3000, segmentKeys: [`calls/${SID}/live/111111/1000.ogg`] }] as never)
+    const a = audio()
+    expect((await handleLiveRequest(speech(7), deps({}, a))).messages).toEqual([])
+    expect(a.transcribe).not.toHaveBeenCalled()
+    expect(chunks.create).not.toHaveBeenCalled()
+  })
+
+  it('assigns the chunk number itself and loses a concurrent race quietly', async () => {
+    chunks.findMany.mockResolvedValueOnce([{ seq: 4, audioMs: 1000, segmentKeys: ['k'] }] as never)
     chunks.create.mockRejectedValueOnce(Object.assign(new Error('dup'), { code: 'P2002' }))
     const a = audio()
-    expect((await handleLiveRequest(speech(), deps({}, a))).messages).toEqual([])
+    expect((await handleLiveRequest(speech(99), deps({}, a))).messages).toEqual([])
+    expect((chunks.create.mock.calls[0][0] as { data: { seq: number } }).data.seq).toBe(5)
+    expect(a.transcribe).not.toHaveBeenCalled()
+  })
+
+  it('stops at the per-call caps (checks and minutes of speech)', async () => {
+    const a = audio()
+    chunks.findMany.mockResolvedValueOnce(Array.from({ length: 3 }, (_, i) => ({ seq: i + 1, audioMs: 0, segmentKeys: [] })) as never)
+    expect((await handleLiveRequest(speech(), deps({ settings: { 'calls.liveMaxChunksPerCall': 3 } }, a))).messages).toEqual([])
+    chunks.findMany.mockResolvedValueOnce([{ seq: 1, audioMs: 5 * 60_000 - 1000, segmentKeys: [] }] as never)
+    expect((await handleLiveRequest(speech(), deps({ settings: { 'calls.liveMaxAudioMinutesPerCall': 5 } }, a))).messages).toEqual([]) // 3 s burst, 1 s left
     expect(a.transcribe).not.toHaveBeenCalled()
   })
 
@@ -143,6 +162,7 @@ describe('spoken action items (option A)', () => {
     const a = audio()
     await handleLiveRequest(speech(1, 'calls/other-1700000000000/live/111111/1000.ogg'), deps({}, a))
     await handleLiveRequest(speech(2, `calls/${SID}/live/222222/1000.ogg`), deps({}, a))
+    await handleLiveRequest(speech(3, `calls/${SID}/live/111111/999.ogg`), deps({}, a)) // start does not match the key
     expect(a.download).not.toHaveBeenCalled()
   })
 
@@ -164,7 +184,9 @@ describe('spoken action items (option A)', () => {
   })
 
   it('reads earlier chunks of the call as context only', async () => {
-    chunks.findMany.mockResolvedValue([{ segments: [{ discordId: '222222', name: 'Bob', startMs: 500, endMs: 900, text: 'Can someone send the deck?' }] }] as never)
+    chunks.findMany
+      .mockResolvedValueOnce([{ seq: 1, audioMs: 400, segmentKeys: [`calls/${SID}/live/222222/500.ogg`] }] as never)
+      .mockResolvedValueOnce([{ segments: [{ discordId: '222222', name: 'Bob', startMs: 500, endMs: 900, text: 'Can someone send the deck?' }] }] as never)
     const a = audio()
     await handleLiveRequest(speech(2), deps({}, a))
     const input = (a.detect.mock.calls[0] as unknown[])[0] as { transcript: string }
@@ -181,5 +203,28 @@ describe('pruneLiveChunks', () => {
     chunks.deleteMany.mockRejectedValueOnce(new Error('db down'))
     vi.spyOn(console, 'warn').mockImplementation(() => {})
     expect(await pruneLiveChunks({ now: 1_000_000_000_000 })).toBe(0)
+  })
+})
+
+describe('sweepLiveData', () => {
+  it('drops old and already-ingested chunks, expired items and items of rejected calls', async () => {
+    const rec = vi.mocked(prisma.callRecording)
+    chunks.deleteMany.mockResolvedValue({ count: 1 } as never)
+    items.deleteMany.mockResolvedValue({ count: 2 } as never)
+    chunks.findMany.mockResolvedValueOnce([{ sessionId: 'a-1700000000000' }, { sessionId: 'b-1700000000000' }] as never)
+    items.findMany.mockResolvedValueOnce([{ sessionId: 'c-1700000000000' }] as never)
+    rec.findMany.mockResolvedValueOnce([{ sessionId: 'a-1700000000000' }] as never).mockResolvedValueOnce([{ sessionId: 'c-1700000000000' }] as never)
+    const now = 1_800_000_000_000
+    expect(await sweepLiveData({ now, retentionDays: 30 })).toEqual({ chunks: 2, items: 4 })
+    expect(chunks.deleteMany).toHaveBeenCalledWith({ where: { sessionId: { in: ['a-1700000000000'] } } })
+    expect(items.deleteMany).toHaveBeenCalledWith({ where: { createdAt: { lt: new Date(now - 30 * 86_400_000) } } })
+    expect(rec.findMany.mock.calls[1][0]).toMatchObject({ where: { status: 'REJECTED' } })
+    expect(items.deleteMany).toHaveBeenCalledWith({ where: { sessionId: { in: ['c-1700000000000'] } } })
+  })
+  it('never throws', async () => {
+    vi.spyOn(console, 'warn').mockImplementation(() => {})
+    chunks.deleteMany.mockRejectedValue(new Error('db down'))
+    chunks.findMany.mockRejectedValueOnce(new Error('db down'))
+    await expect(sweepLiveData({ retentionDays: 30 })).resolves.toBeDefined()
   })
 })

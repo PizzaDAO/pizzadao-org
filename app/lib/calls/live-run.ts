@@ -39,6 +39,8 @@ export interface LiveCandidate {
   speakerIds: string[]
   messageId: string | null
   startMs: number | null
+  /** Spoken items: end of the speech span it came from. */
+  endMs?: number | null
 }
 
 export interface LiveDeps {
@@ -83,7 +85,7 @@ export async function handleLiveRequest(req: LiveRequest, deps: LiveDeps = {}): 
   if (settings.readFailed) return none('settings-unreadable')
   const cfg = liveConfigFrom(settings, deps.env)
   const wantsChat = cfg.chat && (req.chat?.length ?? 0) > 0
-  const wantsAudio = cfg.audio && (req.segments?.length ?? 0) > 0 && !!req.seq
+  const wantsAudio = cfg.audio && (req.segments?.length ?? 0) > 0
   if (!wantsChat && !wantsAudio) return none('off')
 
   let crew: { crewId: string; crewLabel: string } | null
@@ -136,7 +138,7 @@ export async function recordAndConfirm(sessionId: string, candidates: LiveCandid
     const post = posted < cfg.maxPerCall
     try {
       await prisma.callLiveItem.create({
-        data: { sessionId, source: c.source, text, owner, normKey: normKey(text), speakerIds: c.speakerIds, messageId: c.messageId, startMs: c.startMs, posted: post },
+        data: { sessionId, source: c.source, text, owner, normKey: normKey(text), speakerIds: c.speakerIds, messageId: c.messageId, startMs: c.startMs, endMs: c.endMs ?? null, posted: post },
       })
     } catch (err) {
       if (isUniqueViolation(err)) continue // a concurrent request recorded it
@@ -212,19 +214,40 @@ async function transcribeSpeaker(
   return { utterances: out, audioMs }
 }
 
-/** Claim the chunk (idempotent on sessionId + seq), transcribe it, and ask the model for new items. */
+/**
+ * Transcribe the new speech and ask the model for new items. Server-side bookkeeping: audio already
+ * transcribed for this call (by R2 key, which names the speaker and start) is never sent again,
+ * whatever seq the recorder claims; the chunk number is assigned here; the per-call caps bound cost.
+ */
 async function detectFromSpeech(req: LiveRequest, cfg: LiveConfig, settings: Settings, deps: LiveDeps, log: (m: string) => void): Promise<LiveCandidate[]> {
   const env = deps.env ?? process.env
   const apiKey = env.OPENAI_API_KEY?.trim()
   if (!deps.transcribe && !apiKey) return []
   const now = deps.now ?? Date.now
   const started = now()
-  const segs = (req.segments ?? []).filter((s) => s.key.startsWith(`calls/${req.sessionId}/live/${s.discordId}/`))
+  // The key must be exactly this session's live key for that speaker and start.
+  const wanted = (req.segments ?? []).filter((s) => s.key === `calls/${req.sessionId}/live/${s.discordId}/${s.startMs}.ogg` && s.endMs > s.startMs)
+  if (wanted.length === 0) return []
+  const done = await prisma.callLiveChunk.findMany({ where: { sessionId: req.sessionId }, select: { seq: true, audioMs: true, segmentKeys: true } })
+  if (done.length >= cfg.maxChunks) return capped(log, 'chunk cap reached')
+  const seen = new Set(done.flatMap((c) => c.segmentKeys ?? []))
+  let budgetMs = cfg.maxAudioMs - done.reduce((n, c) => n + (c.audioMs ?? 0), 0)
+  if (budgetMs <= 0) return capped(log, 'speech cap reached')
+  const segs: typeof wanted = []
+  for (const s of [...wanted].sort((a, b) => a.startMs - b.startMs)) {
+    if (seen.has(s.key)) continue
+    const len = s.endMs - s.startMs
+    if (len > budgetMs) break
+    budgetMs -= len
+    seen.add(s.key)
+    segs.push(s)
+  }
   if (segs.length === 0) return []
+  const seq = done.reduce((m, c) => Math.max(m, c.seq), 0) + 1
   try {
-    await prisma.callLiveChunk.create({ data: { sessionId: req.sessionId, seq: req.seq!, segments: [] } })
+    await prisma.callLiveChunk.create({ data: { sessionId: req.sessionId, seq, segments: [], segmentKeys: segs.map((s) => s.key) } })
   } catch (err) {
-    if (isUniqueViolation(err)) return [] // a retry of a chunk already handled
+    if (isUniqueViolation(err)) return [] // a concurrent request for this call got there first
     throw err
   }
   const hint = transcribeLanguage(env)
@@ -241,24 +264,24 @@ async function detectFromSpeech(req: LiveRequest, cfg: LiveConfig, settings: Set
   }
   const deadline = started + TRANSCRIBE_BUDGET_MS
   const perSpeaker: Array<{ discordId: string; utterances: Utterance[] }> = []
-  let audioMs = 0
+  // Counted as spent even if a speaker fails: the cap is about money.
+  const audioMs = segs.reduce((n, s) => n + (s.endMs - s.startMs), 0)
   await pool([...bySpeaker.entries()], 4, async ([discordId, list]) => {
     try {
       const r = await transcribeSpeaker(list, tdeps, deadline, hint, log)
       perSpeaker.push({ discordId, utterances: r.utterances })
-      audioMs += r.audioMs
     } catch (err) {
       log(`transcription failed for one speaker: ${err instanceof Error ? err.message : String(err)}`)
     }
   })
   const fresh: StoredLine[] = mergeSpeakerTurns(perSpeaker).map((t) => ({ ...t, name: names.get(t.discordId) ?? null }))
-  await prisma.callLiveChunk.updateMany({ where: { sessionId: req.sessionId, seq: req.seq! }, data: { segments: fresh as unknown as object[], audioMs } })
+  await prisma.callLiveChunk.updateMany({ where: { sessionId: req.sessionId, seq }, data: { segments: fresh as unknown as object[], audioMs } })
   if (fresh.length === 0) return []
 
   // The rolling window: earlier chunks of this call within the last windowMinutes of call time.
   const newFromMs = Math.min(...fresh.map((l) => l.startMs))
   const windowFromMs = newFromMs - cfg.windowMinutes * 60_000
-  const earlier = await prisma.callLiveChunk.findMany({ where: { sessionId: req.sessionId, seq: { lt: req.seq! } }, orderBy: { seq: 'asc' }, select: { segments: true } })
+  const earlier = await prisma.callLiveChunk.findMany({ where: { sessionId: req.sessionId, seq: { lt: seq } }, orderBy: { seq: 'asc' }, select: { segments: true } })
   const context = earlier.flatMap((c) => (Array.isArray(c.segments) ? (c.segments as unknown as StoredLine[]) : [])).filter((l) => l.endMs >= windowFromMs && l.startMs < newFromMs)
   const already = await prisma.callLiveItem.findMany({ where: { sessionId: req.sessionId }, orderBy: { createdAt: 'asc' }, select: { text: true } })
   const lines = [...context, ...fresh]
@@ -272,12 +295,26 @@ async function detectFromSpeech(req: LiveRequest, cfg: LiveConfig, settings: Set
     already: already.map((a) => a.text),
     budgetMs: Math.max(5_000, Math.min(DETECT_BUDGET_MS, started + TRANSCRIBE_BUDGET_MS + DETECT_BUDGET_MS - now())),
   })
-  const freshSpeakers = [...new Set(fresh.map((l) => l.discordId))]
   return items.map((it) => {
     const said = it.speaker ? byLabel.get(it.speaker.trim().toUpperCase()) : undefined
-    // Unknown speaker: tie the item to everyone who spoke in the new part, so hiding any of them drops it.
-    return { source: 'speech' as const, text: it.text, owner: it.owner, speakerIds: said ? [said] : freshSpeakers, messageId: null, startMs: newFromMs }
+    // The span it came from: the speaker's lines in the new part (else in the window). With no known
+    // speaker, the whole new part tied to everyone in it, so hiding any of them drops the item.
+    const own = said ? (fresh.some((l) => l.discordId === said) ? fresh : lines).filter((l) => l.discordId === said) : fresh
+    return {
+      source: 'speech' as const,
+      text: it.text,
+      owner: it.owner,
+      speakerIds: said ? [said] : [...new Set(fresh.map((l) => l.discordId))],
+      messageId: null,
+      startMs: Math.min(...own.map((l) => l.startMs)),
+      endMs: Math.max(...own.map((l) => l.endMs)),
+    }
   })
+}
+
+function capped(log: (m: string) => void, why: string): LiveCandidate[] {
+  log(why)
+  return []
 }
 
 // ---- the detector -------------------------------------------------------------------------------
@@ -363,4 +400,40 @@ export async function pruneLiveChunks(opts: { sessionId?: string; now?: number }
     console.warn('[calls/live] could not prune live chunks:', err instanceof Error ? err.message : err)
     return 0
   }
+}
+
+/** Sessions looked at per sweep (the tables stay small: chunks live minutes to days). */
+const SWEEP_SESSIONS = 500
+
+/**
+ * The cron's cleanup (cheap, a few queries): old chunks; chunks of calls already ingested (a missed
+ * prune at ingest); live items past calls.liveItemsRetentionDays; live items of rejected calls.
+ * Never throws.
+ */
+export async function sweepLiveData(opts: { now?: number; retentionDays?: number } = {}): Promise<{ chunks: number; items: number }> {
+  const now = opts.now ?? Date.now()
+  let chunks = 0
+  let items = 0
+  try {
+    chunks += await pruneLiveChunks({ now })
+    const chunkSessions = (await prisma.callLiveChunk.findMany({ distinct: ['sessionId'], select: { sessionId: true }, take: SWEEP_SESSIONS })).map((c) => c.sessionId)
+    if (chunkSessions.length) {
+      const ingested = (await prisma.callRecording.findMany({ where: { sessionId: { in: chunkSessions } }, select: { sessionId: true } })).map((r) => r.sessionId)
+      if (ingested.length) chunks += (await prisma.callLiveChunk.deleteMany({ where: { sessionId: { in: ingested } } })).count
+    }
+    let days = opts.retentionDays
+    if (days === undefined) {
+      const settings = await loadSettings()
+      days = settings.get('calls.liveItemsRetentionDays')
+    }
+    items += (await prisma.callLiveItem.deleteMany({ where: { createdAt: { lt: new Date(now - days * 86_400_000) } } })).count
+    const itemSessions = (await prisma.callLiveItem.findMany({ distinct: ['sessionId'], select: { sessionId: true }, take: SWEEP_SESSIONS })).map((c) => c.sessionId)
+    if (itemSessions.length) {
+      const rejected = (await prisma.callRecording.findMany({ where: { sessionId: { in: itemSessions }, status: 'REJECTED' }, select: { sessionId: true } })).map((r) => r.sessionId)
+      if (rejected.length) items += (await prisma.callLiveItem.deleteMany({ where: { sessionId: { in: rejected } } })).count
+    }
+  } catch (err) {
+    console.warn('[calls/live] sweep failed:', err instanceof Error ? err.message : err)
+  }
+  return { chunks, items }
 }

@@ -1431,7 +1431,8 @@ model CallLiveChunk {
   sessionId String
   seq       Int
   segments  Json // [{discordId, name, startMs, endMs, text}]
-  audioMs   Int      @default(0) // speech sent for transcription (cost tracking)
+  audioMs   Int      @default(0) // speech sent for transcription (cost tracking and the per-call cap)
+  segmentKeys String[] @default([]) // R2 keys transcribed in this chunk (the same audio is never transcribed twice)
   createdAt DateTime @default(now())
 
   @@unique([sessionId, seq])
@@ -1449,6 +1450,7 @@ model CallLiveItem {
   speakerIds String[] @default([]) // who said or typed it (a redacted speaker's items are not merged)
   messageId  String? // chat message id (a deleted or hidden chat line is not merged)
   startMs    Int?
+  endMs      Int? // spoken items: the span of the speech it came from (merged only if a visible line of the speaker overlaps it)
   posted     Boolean  @default(false)
   createdAt  DateTime @default(now())
 

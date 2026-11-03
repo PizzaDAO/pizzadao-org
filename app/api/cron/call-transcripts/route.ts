@@ -3,7 +3,7 @@ import { isCronAuthorized } from '@/app/lib/cron-auth'
 import { internalError } from '@/app/lib/errors/error-response'
 import { generateAndStoreSummaryResult } from '@/app/lib/calls/recordings'
 import { listNeedingSummary, listPendingTranscription, transcribeRecording, USED_OPENAI } from '@/app/lib/calls/transcribe'
-import { pruneLiveChunks } from '@/app/lib/calls/live-run'
+import { sweepLiveData } from '@/app/lib/calls/live-run'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
@@ -21,8 +21,8 @@ export async function GET(request: NextRequest) {
   if (!isCronAuthorized(request.headers.get('authorization'))) {
     return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
   }
-  // Old near-live transcripts (live action items) of calls that never got ingested.
-  await pruneLiveChunks()
+  // Live action items cleanup: old or already-ingested chunks, expired items, items of rejected calls (never throws).
+  await sweepLiveData()
   if (!process.env.OPENAI_API_KEY?.trim()) return NextResponse.json({ skipped: 'no-openai-key' })
   try {
     const started = Date.now()

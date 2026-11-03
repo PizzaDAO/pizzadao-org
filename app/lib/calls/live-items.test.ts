@@ -98,14 +98,27 @@ describe('formatConfirmation', () => {
 
 describe('mergeLiveActionItems', () => {
   const seg = (id: string) => ({ discordId: '111', startMs: 0, endMs: 0, text: 'action: x', kind: 'chat' as const, id })
+  const speech = (discordId: string, startMs: number, endMs: number) => ({ discordId, startMs, endMs, text: 'words' })
+  const spoken = (o: { speakerIds: string[]; startMs?: number | null; endMs?: number | null }) => ({ text: 'Order the banner stickers', owner: null, source: 'speech', messageId: null, ...o })
+  it('drops a spoken item when no visible line of its speaker overlaps its span (hidden line, other speaker, or no span)', () => {
+    const visible = [speech('111', 10_000, 15_000), speech('222', 40_000, 45_000)]
+    const keep = (o: Parameters<typeof spoken>[0]) => mergeLiveActionItems([], [spoken(o)], visible, []).length === 1
+    expect(keep({ speakerIds: ['111'], startMs: 11_000, endMs: 14_000 })).toBe(true)
+    expect(keep({ speakerIds: ['111'], startMs: 16_000, endMs: 17_000 })).toBe(true) // within the slack
+    expect(keep({ speakerIds: ['111'], startMs: 30_000, endMs: 33_000 })).toBe(false) // that line is hidden / gone
+    expect(keep({ speakerIds: ['111'], startMs: 40_000, endMs: 45_000 })).toBe(false) // only someone else spoke then
+    expect(keep({ speakerIds: ['111'], startMs: null, endMs: null })).toBe(false)
+    expect(keep({ speakerIds: [], startMs: 11_000, endMs: 14_000 })).toBe(false)
+    expect(keep({ speakerIds: ['333', '111'], startMs: 11_000, endMs: 14_000 })).toBe(true)
+  })
   it('adds live items the summary lacks, without duplicates', () => {
     const out = mergeLiveActionItems(
       [{ text: 'Book the venue', owner: 'Ann' }],
       [
-        { text: 'book venue', owner: null, source: 'speech', speakerIds: ['111'], messageId: null },
-        { text: 'Send the deck', owner: 'Bob', source: 'speech', speakerIds: ['222'], messageId: null },
+        { text: 'book venue', owner: null, source: 'speech', speakerIds: ['111'], messageId: null, startMs: 1000, endMs: 4000 },
+        { text: 'Send the deck', owner: 'Bob', source: 'speech', speakerIds: ['222'], messageId: null, startMs: 10_000, endMs: 12_000 },
       ],
-      [],
+      [speech('222', 9_000, 13_000)],
       [],
     )
     expect(out).toEqual([{ text: 'Book the venue', owner: 'Ann' }, { text: 'Send the deck', owner: 'Bob' }])
@@ -114,7 +127,7 @@ describe('mergeLiveActionItems', () => {
     const out = mergeLiveActionItems(
       [],
       [
-        { text: 'Hidden speaker task', owner: null, source: 'speech', speakerIds: ['999'], messageId: null },
+        { text: 'Hidden speaker task', owner: null, source: 'speech', speakerIds: ['999'], messageId: null, startMs: 0, endMs: 10 },
         { text: 'Typed and kept', owner: null, source: 'chat', speakerIds: ['111'], messageId: '700000000000000001' },
         { text: 'Typed then deleted', owner: null, source: 'chat', speakerIds: ['111'], messageId: '700000000000000002' },
       ],
@@ -125,7 +138,7 @@ describe('mergeLiveActionItems', () => {
   })
   it('caps the list', () => {
     const base = Array.from({ length: 30 }, (_, i) => ({ text: `Base ${i} item`, owner: null }))
-    expect(mergeLiveActionItems(base, [{ text: 'Extra live task', owner: null, source: 'speech', speakerIds: [], messageId: null }], [], [])).toHaveLength(30)
+    expect(mergeLiveActionItems(base, [{ text: 'Extra live task', owner: null, source: 'chat', speakerIds: [], messageId: '700000000000000001' }], [seg('c:700000000000000001')], [])).toHaveLength(30)
   })
 })
 

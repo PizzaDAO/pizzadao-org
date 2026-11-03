@@ -64,6 +64,9 @@ export interface LiveConfig {
   chunkSeconds: number
   windowMinutes: number
   maxPerCall: number
+  /** Cost caps per call: speech checks, and speech transcribed (ms). */
+  maxChunks: number
+  maxAudioMs: number
   /** Lower-case prefixes. */
   prefixes: string[]
   /** '' = the summary model. */
@@ -91,6 +94,8 @@ export function liveConfigFrom(settings: Settings, env: Record<string, string | 
     chunkSeconds: settings.get('calls.liveChunkSeconds'),
     windowMinutes: settings.get('calls.liveWindowMinutes'),
     maxPerCall: settings.get('calls.liveActionItemsMaxPerCall'),
+    maxChunks: settings.get('calls.liveMaxChunksPerCall'),
+    maxAudioMs: settings.get('calls.liveMaxAudioMinutesPerCall') * 60_000,
     prefixes,
     model: settings.get('calls.liveActionItemsModel').trim(),
     note: settings.get('calls.liveActionItemNote').trim(),
@@ -185,12 +190,26 @@ export interface StoredLiveItem {
   source: string
   speakerIds: string[]
   messageId: string | null
+  /** Spoken items: the call-time span of the speech it came from. */
+  startMs?: number | null
+  endMs?: number | null
+}
+
+/** Slack when matching a live span to the final transcript (the two are transcribed separately). */
+export const SPAN_SLACK_MS = 3_000
+
+/** Is some visible spoken line of one of these speakers inside the span (with slack)? */
+function spokenLineOverlaps(segments: readonly TranscriptSegment[], speakerIds: readonly string[], startMs: number, endMs: number): boolean {
+  const who = new Set(speakerIds)
+  return segments.some((s) => s.kind !== 'chat' && who.has(s.discordId) && s.startMs <= endMs + SPAN_SLACK_MS && s.endMs >= startMs - SPAN_SLACK_MS)
 }
 
 /**
  * The summary's action items plus the live ones it does not already have (live items after the
  * model's, in the order they were recorded). Redactions apply: an item said or typed by a hidden
- * speaker is left out, and a typed item whose chat line is gone (deleted or hidden) too.
+ * speaker is left out, a typed item whose chat line is gone (deleted or hidden) too, and a spoken
+ * item when no visible spoken line of its speaker(s) overlaps the span it came from (a hidden line,
+ * or no span recorded).
  * `segments` are the visible segments the summary was made from.
  */
 export function mergeLiveActionItems(
@@ -207,6 +226,10 @@ export function mergeLiveActionItems(
     if (out.length >= max) break
     if (it.speakerIds.some((id) => hidden.has(id))) continue
     if (it.source === 'chat' && !(it.messageId && chatLines.has(`c:${it.messageId}`))) continue
+    if (it.source !== 'chat') {
+      if (typeof it.startMs !== 'number' || typeof it.endMs !== 'number' || it.speakerIds.length === 0) continue
+      if (!spokenLineOverlaps(segments, it.speakerIds, it.startMs, it.endMs)) continue
+    }
     if (out.some((o) => isSameItem(o.text, it.text))) continue
     out.push({ text: it.text, owner: it.owner })
   }

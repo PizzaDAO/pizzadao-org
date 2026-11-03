@@ -6,6 +6,7 @@ CREATE TABLE IF NOT EXISTS "CallLiveChunk" (
     "seq" INTEGER NOT NULL,
     "segments" JSONB NOT NULL,
     "audioMs" INTEGER NOT NULL DEFAULT 0,
+    "segmentKeys" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "CallLiveChunk_pkey" PRIMARY KEY ("id")
 );
@@ -22,6 +23,7 @@ CREATE TABLE IF NOT EXISTS "CallLiveItem" (
     "speakerIds" TEXT[] DEFAULT ARRAY[]::TEXT[],
     "messageId" TEXT,
     "startMs" INTEGER,
+    "endMs" INTEGER,
     "posted" BOOLEAN NOT NULL DEFAULT false,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT "CallLiveItem_pkey" PRIMARY KEY ("id")

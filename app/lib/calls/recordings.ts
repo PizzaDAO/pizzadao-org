@@ -186,12 +186,20 @@ export async function getRecording(id: string) {
  * Returns false when the recording is unknown.
  */
 export async function rejectRecording(id: string, reviewerDiscordId: string, now = new Date()): Promise<boolean> {
-  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true } })
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: { id: true, sessionId: true } })
   if (!rec) return false
   await prisma.callRecording.update({
     where: { id: rec.id },
     data: { status: 'REJECTED', reviewedBy: reviewerDiscordId, reviewedAt: now, publishedAt: null },
   })
+  // Action items confirmed during a removed call go too (the cron sweep catches a failure here).
+  if (rec.sessionId) {
+    try {
+      await prisma.callLiveItem.deleteMany({ where: { sessionId: rec.sessionId } })
+    } catch {
+      // the cron sweep deletes them later
+    }
+  }
   return true
 }
 
@@ -375,7 +383,7 @@ async function withLiveItems(
     const live = await prisma.callLiveItem.findMany({
       where: { sessionId },
       orderBy: { createdAt: 'asc' },
-      select: { text: true, owner: true, source: true, speakerIds: true, messageId: true },
+      select: { text: true, owner: true, source: true, speakerIds: true, messageId: true, startMs: true, endMs: true },
     })
     return live.length ? mergeLiveActionItems(base, live, segments, redactedSpeakerIds) : base
   } catch (err) {
