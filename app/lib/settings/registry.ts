@@ -121,6 +121,10 @@ const FOOTER_TELEGRAM_DEFAULT = "Replies to this bot aren't read. Use the button
 
 const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 
+/** One line of calls.endSongCrewMap: `our crew label = pizza-radio crew`. */
+export const END_SONG_CREW_LINE = /^([^=\n]{1,60}?)\s*=\s*([^=\n]{1,60})$/
+export const END_SONG_CREW_MAP_DEFAULT = ['Ops', 'Tech', 'Comms', 'Biz Dev', 'Events', 'Art', 'Merch', 'Real Estate', 'Governance'].map((c) => `${c} = ${c}`).join('\n')
+
 /** One line of calls.agendaLinks: `crew-id = Label | https://...`. */
 export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*(https:\/\/\S+)$/
 
@@ -899,6 +903,19 @@ export const SETTINGS = {
     max: 50,
     default: 1,
     unit: 'people',
+  }),
+  'calls.endSongCrewMap': textSetting({
+    key: 'calls.endSongCrewMap',
+    area: 'calls',
+    label: 'End song: crew names',
+    help: 'One per line: our crew label = pizza-radio crew name. Only crews listed here get an end-of-call song. Pizza-radio knows: Amore, Art, Biz Dev, Comms, Events, Finance, Governance, Mafia, Merch, Ops, Real Estate, Tech.',
+    maxLength: 1000,
+    multiline: true,
+    default: END_SONG_CREW_MAP_DEFAULT,
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'Ops = Ops',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || END_SONG_CREW_LINE.test(line.trim())),
+    checkMessage: 'Use one line per crew: our crew label = radio crew',
   }),
   'calls.progressReportEnabled': boolSetting({
     key: 'calls.progressReportEnabled',

@@ -8,7 +8,7 @@
 
 export interface RemoteConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
-  endSong: { enabled: boolean; minHumans: number }
+  endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
   crews: { eventId: string; label: string; callMinutes?: number }[]
 }
 
@@ -19,11 +19,13 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
     batchSeconds: 20,
     recordingLine: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
   },
-  endSong: { enabled: false, minHumans: 1 },
+  endSong: { enabled: false, minHumans: 1, crewMap: [] },
   crews: [],
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
+/** Session start waits at most this long for a fresh config (then the last good one, or all-off, applies). */
+export const REMOTE_CONFIG_START_WAIT_MS = 1_500
 export const REMOTE_CONFIG_REFRESH_MS = 5 * 60_000
 
 const str = (v: unknown, fallback: string, max: number): string => (typeof v === 'string' && v.trim() ? v.trim().slice(0, max) : fallback)
@@ -51,7 +53,18 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
       batchSeconds: int(w.batchSeconds, d.welcome.batchSeconds, 5, 120),
       recordingLine: str(w.recordingLine, d.welcome.recordingLine, 300),
     },
-    endSong: { enabled: e.enabled === true, minHumans: int(e.minHumans, d.endSong.minHumans, 1, 50) },
+    endSong: {
+      enabled: e.enabled === true,
+      minHumans: int(e.minHumans, d.endSong.minHumans, 1, 50),
+      crewMap: Array.isArray(e.crewMap)
+        ? e.crewMap.flatMap((c: unknown) => {
+            const r = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
+            return typeof r.crew === 'string' && typeof r.radio === 'string' && r.crew.trim() && r.radio.trim()
+              ? [{ crew: r.crew.trim().slice(0, 60), radio: r.radio.trim().slice(0, 60) }]
+              : []
+          })
+        : [],
+    },
     crews,
   }
 }
@@ -74,11 +87,11 @@ export class RemoteConfigClient {
   }
 
   /** Fetch now; never throws. Returns the config in force afterwards. */
-  async refresh(): Promise<RemoteConfig> {
+  async refresh(timeoutMs: number = REMOTE_CONFIG_TIMEOUT_MS): Promise<RemoteConfig> {
     try {
       const res = await this.fetchImpl(`${this.appBaseUrl}/api/calls/recorder/config`, {
         headers: { Authorization: `Bearer ${this.apiKey}` },
-        signal: AbortSignal.timeout(REMOTE_CONFIG_TIMEOUT_MS),
+        signal: AbortSignal.timeout(timeoutMs),
       })
       if (!res.ok) throw new Error(`app answered ${res.status}`)
       this.last = parseRemoteConfig(await res.json())
