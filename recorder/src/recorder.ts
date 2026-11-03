@@ -49,6 +49,8 @@ interface ActiveSession {
   eventStartMs: number | null
   /** eventKey of the event being recorded (back-off bookkeeping). */
   key: string
+  /** Voice-channel members already written to the manifest as present. */
+  present: Set<string>
 }
 
 export class CallRecorder {
@@ -267,8 +269,10 @@ export class CallRecorder {
         stopping: false,
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
+        present: new Set(),
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
+      await this.notePresent(this.current)
       this.log(`recording "${event.name}" as ${sessionId}`)
     } catch (err) {
       await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -283,6 +287,7 @@ export class CallRecorder {
     } catch (err) {
       this.log(`human count failed: ${err instanceof Error ? err.message : String(err)}`)
     }
+    await this.notePresent(s)
     const reason = s.tracker.check(Date.now())
     if (reason) await this.stop(reason)
   }
@@ -500,9 +505,25 @@ export class CallRecorder {
   }
 
   private async humanCount(guild: Guild): Promise<number> {
+    return (await this.humanIds(guild)).length
+  }
+
+  private async humanIds(guild: Guild): Promise<string[]> {
     const ids = guild.voiceStates.cache.filter((vs) => vs.channelId === this.cfg.callChannelId).map((vs) => vs.id)
-    let humans = 0
-    for (const id of ids) if (!(await this.isBot(id))) humans++
+    const humans: string[] = []
+    for (const id of ids) if (!(await this.isBot(id))) humans.push(id)
     return humans
+  }
+
+  /** Record who is in the channel right now (new ids only) so silent attendees reach the app's attendance. Never throws. */
+  private async notePresent(s: ActiveSession): Promise<void> {
+    try {
+      const fresh = (await this.humanIds(s.guild)).filter((id) => !s.present.has(id))
+      if (fresh.length === 0) return
+      appendRecord(s.dir, { t: 'present', userIds: fresh })
+      for (const id of fresh) s.present.add(id)
+    } catch (err) {
+      this.log(`could not note who is in the channel: ${err instanceof Error ? err.message : String(err)}`)
+    }
   }
 }

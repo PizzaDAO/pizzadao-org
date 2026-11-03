@@ -129,7 +129,7 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
     expect(data.status).toBe('PROCESSING')
     expect(data.transcriptLanguage).toBe('en')
     expect(data.transcript).toHaveLength(2)
-    expect(after).toHaveBeenCalledTimes(1)
+    expect(after).toHaveBeenCalledTimes(2)
   })
 
   it('stores the words of a previously opted-out member (opt-outs are ignored)', async () => {
@@ -150,7 +150,7 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
     const data = db.callRecording.create.mock.calls[0][0].data
     expect(data.status).toBeUndefined()
     expect(data.transcript).toBeUndefined()
-    expect(after).toHaveBeenCalledTimes(1) // transcribeRecording (a no-op here: no OPENAI_API_KEY)
+    expect(after).toHaveBeenCalledTimes(2) // transcribeRecording (a no-op here: no OPENAI_API_KEY)
     expect(m(generateText)).not.toHaveBeenCalled()
   })
 
@@ -163,14 +163,14 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
     expect(arg.where).toMatchObject({ id: 'rec1', status: 'RECORDED' })
     expect(arg.data).toMatchObject({ status: 'PROCESSING', transcriptLanguage: 'en' })
     expect(db.callRecording.create).not.toHaveBeenCalled()
-    expect(after).toHaveBeenCalledTimes(1)
+    expect(after).toHaveBeenCalledTimes(2)
   })
 
   it('a duplicate whose row is already past RECORDED is never touched', async () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW', mixKey: null, speakers: [] })
     await ingestPOST(ingestReq(payload()))
     expect(db.callRecording.updateMany).not.toHaveBeenCalled()
-    expect(after).not.toHaveBeenCalled()
+    expect(after).toHaveBeenCalledTimes(1) // attendance only
   })
 
   it('a duplicate ingest neither overwrites the transcript nor re-summarizes', async () => {
@@ -178,7 +178,7 @@ describe('POST /api/calls/recorder/ingest with a transcript', () => {
     const res = await ingestPOST(ingestReq(payload()))
     expect(res.status).toBe(200)
     expect(db.callRecording.create).not.toHaveBeenCalled()
-    expect(after).not.toHaveBeenCalled()
+    expect(after).toHaveBeenCalledTimes(1) // attendance only
   })
 })
 

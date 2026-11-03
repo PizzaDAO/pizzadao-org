@@ -71,7 +71,8 @@ export function crewContentRecords(
       naturalKey: taskKeys[i],
       label: t.task,
       url: nz(t.url),
-      stage: t.stage || 'todo',
+      // A blank stage stays blank: the sheet ranks it as not active, and the crew page shows it empty.
+      stage: t.stage,
       priority: nz(t.priority),
       goal: nz(t.goal),
       due: parseSheetDue(t.dueCell as never) ?? null,
@@ -216,6 +217,7 @@ export async function crewContentParity(): Promise<ParityReport> {
   const sheet = new Map<string, unknown>()
   const db = new Map<string, unknown>()
   const byScope: Record<string, number> = {}
+  let excluded = 0
   for (const crew of crews) {
     const sheetId = crew.sheet ? extractSheetId(crew.sheet) : null
     if (!sheetId) continue
@@ -226,11 +228,13 @@ export async function crewContentParity(): Promise<ParityReport> {
       crewContentFromDb(crew.id),
     ])
     const local = { sheet: new Map<string, unknown>(), db: new Map<string, unknown>() }
-    const shown = (t: { label: string; priority?: string; stage: string; due?: string }) => ({ label: t.label, priority: t.priority ?? null, stage: t.stage, due: t.due ?? null })
-    s.tasks.forEach((t, i) => local.sheet.set(`${crew.id}:open:${i}`, shown(t)))
+    const shown = (t: { label: string; priority?: string; stage: string; due?: string }) => ({ label: collapseSpaces(t.label), priority: t.priority ?? null, stage: t.stage, due: t.due ?? null })
+    const parsed = rows ? parseCrewSheetRows(rows.rows as never[], rows.taskLinks, rows.agendaLinks) : null
+    const { kept, outside } = parsed ? openTasksInTaskSection(s.tasks, parsed.tasks) : { kept: s.tasks, outside: 0 }
+    excluded += outside
+    kept.forEach((t, i) => local.sheet.set(`${crew.id}:open:${i}`, shown(t)))
     ;(d.all ?? []).forEach((t, i) => local.db.set(`${crew.id}:open:${i}`, shown(t)))
-    if (rows) {
-      const parsed = parseCrewSheetRows(rows.rows as never[], rows.taskLinks, rows.agendaLinks)
+    if (parsed) {
       parsed.agenda.forEach((a, i) => local.sheet.set(`${crew.id}:agenda:${i}`, { step: a.step, action: a.action, lead: a.lead, time: a.time }))
       parsed.goals.forEach((g, i) => local.sheet.set(`${crew.id}:goal:${i}`, { description: g.description, priority: g.priority }))
     }
@@ -241,7 +245,35 @@ export async function crewContentParity(): Promise<ParityReport> {
     for (const [k, v] of local.sheet) sheet.set(k, v)
     for (const [k, v] of local.db) db.set(k, v)
   }
-  return { ...compareKeyed('crewContent', sheet, db, stableEqual), byScope }
+  return { ...compareKeyed('crewContent', sheet, db, stableEqual), byScope, excluded }
+}
+
+const collapseSpaces = (s: string) => s.replace(/\s+/g, ' ').trim()
+
+/**
+ * The sheet ranking path reads every row below the task header to the end of the sheet, so the
+ * header and rows of a later section (goals, an issue log) show up there as "open tasks". The crew
+ * page and the importer stop at the next section. Those rows are left out of the comparison (and
+ * counted) rather than imported as tasks. Labels compare with runs of spaces collapsed, as the
+ * crew page shows them. Removing rows from a stably ranked list keeps the rest in ranked order.
+ */
+export function openTasksInTaskSection<T extends { label: string }>(ranked: readonly T[], sectionTasks: ReadonlyArray<{ task: string }>): { kept: T[]; outside: number } {
+  const left = new Map<string, number>()
+  for (const t of sectionTasks) {
+    const k = collapseSpaces(t.task.replace(/\s*\(https?:\/\/[^\s\)]+\)\s*/g, ' '))
+    left.set(k, (left.get(k) ?? 0) + 1)
+  }
+  const kept: T[] = []
+  let outside = 0
+  for (const t of ranked) {
+    const k = collapseSpaces(t.label)
+    const n = left.get(k) ?? 0
+    if (n > 0) {
+      left.set(k, n - 1)
+      kept.push(t)
+    } else outside++
+  }
+  return { kept, outside }
 }
 
 // ---------------------------------------------------------------------------
@@ -315,12 +347,12 @@ export function crewTasksEditor(crewId: string): EditorSpec {
   return {
     dataset: `crewTasks:${crewId}`,
     label: 'Crew tasks',
-    help: 'Tasks in the order they show. Stage: todo, now, doing, done or skip (done and skip close the task). Priority: Top, High, Mid or Low. Due is a date (YYYY-MM-DD). Lead id is the member id of whoever leads the task. Removing a row hides the task.',
+    help: 'Tasks in the order they show. Stage: todo, now, doing, done or skip (done and skip close the task; todo, now and doing rank first; a blank stage ranks with the rest). Priority: Top, High, Mid or Low. Due is a date (YYYY-MM-DD). Lead id is the member id of whoever leads the task. Removing a row hides the task.',
     columns: [
       { key: 'id', label: 'Id', kind: 'text', readOnly: true, hidden: true },
       { key: 'task', label: 'Task', kind: 'text', maxLength: 300, required: true },
       { key: 'url', label: 'Link', kind: 'text', maxLength: 500, placeholder: 'https://...' },
-      { key: 'stage', label: 'Stage', kind: 'text', maxLength: 40, placeholder: 'todo' },
+      { key: 'stage', label: 'Stage', kind: 'text', maxLength: 40 },
       { key: 'priority', label: 'Priority', kind: 'text', maxLength: 40, placeholder: 'High' },
       { key: 'due', label: 'Due', kind: 'text', maxLength: 10, placeholder: 'YYYY-MM-DD' },
       { key: 'lead', label: 'Lead', kind: 'text', maxLength: 120 },
@@ -350,7 +382,8 @@ export function crewTasksEditor(crewId: string): EditorSpec {
         existing,
         labelOf: (r) => text(r.task),
         fields: (r, position, prev) => {
-          const stage = text(r.stage) || 'todo'
+          // Blank stays blank, as on the sheet (not active, shown empty).
+          const stage = text(r.stage)
           const due = orNull(r.due)
           const wasClosed = prev ? isClosedStage(String(prev.stage ?? '')) : false
           const closed = isClosedStage(stage)

@@ -181,6 +181,7 @@ export default function SheetsAdminClient() {
                                                             mismatches: res.parity.mismatches,
                                                             onlyInSheet: res.parity.onlyInSheet,
                                                             onlyInDb: res.parity.onlyInDb,
+                                                            ...(res.parity.excluded ? { excluded: res.parity.excluded } : {}),
                                                             ...(res.parity.byScope ?? {}),
                                                         }}
                                                     />

@@ -44,6 +44,7 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `DATA_DIR` | no | `/data` | Mount the Railway volume here. |
 | `MAX_CALL_MINUTES` | no | `120` | |
 | `MAX_CALL_MINUTES_BY_EVENT` | no | `community call=30` | Comma-separated `name part=minutes`. Counts from the first session of the call. Once it is used up the bot stays out of that event and anything that began before it, and until the channel empties, starts a later event only when its slot begins. |
+| `FOLLOWUP_DM_FORWARD` | no | off | `on` forwards direct messages sent to the bot to the app (`/api/followups/inbound`, authorized with `RECORDER_API_KEY`), which keeps only replies to a recent follow-up. Adds the non-privileged `DirectMessages` intent (no new Developer Portal setting). Retries 3 times (5 s, 30 s, 2 min, in memory); message text is never logged. Check no other service on the same bot token answers DMs first. |
 | `EMPTY_GRACE_MINUTES` | no | `5` | Humans-absent time before stopping. |
 | `PORT` | no | `3000` (Railway sets it) | `/health` |
 

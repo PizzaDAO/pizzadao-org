@@ -353,9 +353,19 @@ async function syncCrewAttendance(
       continue;
     }
 
+    // People a recording already counted for this crew and day (calls.attendanceFromRecordings) stay single.
+    const fromRecordings = new Set(
+      (
+        await prisma.callAttendance.findMany({
+          where: { crewId, callDate: entry.date, source: "recording", discordId: { in: attendees.map((a) => a.discordId) } },
+          select: { discordId: true },
+        })
+      ).map((r) => r.discordId)
+    );
+
     // Bulk insert attendance records (skip duplicates via unique constraint)
     const created = await prisma.callAttendance.createMany({
-      data: attendees.map((a) => ({
+      data: attendees.filter((a) => !fromRecordings.has(a.discordId)).map((a) => ({
         discordId: a.discordId,
         displayName: a.displayName || null,
         crewId,

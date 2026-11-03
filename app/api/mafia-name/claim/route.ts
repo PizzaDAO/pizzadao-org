@@ -28,6 +28,8 @@ import { verifyNameOrigin } from "@/app/lib/name-origin-sig";
 import { MAFIA_FILMS } from "@/app/lib/mafia-films";
 import { NAME_ORIGIN_KINDS } from "@/app/lib/name-origin";
 import { newClaimId } from "@/app/lib/mafia-claim";
+import { themedNameAllowed, NAME_NOT_THEMED_ERROR } from "@/app/lib/themed-name";
+import { fetchMemberByDiscordId } from "@/app/lib/sheets/member-repository";
 
 export const runtime = "nodejs";
 
@@ -58,6 +60,9 @@ const bodySchema = z.object({
 
 const MAX_BODY_BYTES = 16 * 1024;
 
+const verified0 = (body: z.infer<typeof bodySchema>, name: string) =>
+  Boolean(body.origin && verifyNameOrigin(name, body.origin, body.originSig));
+
 export async function POST(req: Request) {
   const limited = await enforceRateLimit(req, "mafia-name-claim");
   if (limited) return limited;
@@ -84,6 +89,15 @@ export async function POST(req: Request) {
   const source = discordId ? (body.source ?? "join") : "public";
   const name = sanitizeDisplayName(body.name);
   if (!name) return NextResponse.json({ error: "Invalid request" }, { status: 400 });
+
+  // Optional themed-name rule (setting names.requireThemed, off by default). A
+  // generator-signed name always passes; so does the member's current name.
+  if (!verified0(body, name)) {
+    const currentName = discordId ? async () => (await fetchMemberByDiscordId(discordId))?.name : undefined;
+    if (!(await themedNameAllowed({ name, discordId, currentName }))) {
+      return NextResponse.json({ error: NAME_NOT_THEMED_ERROR, code: "name_not_themed" }, { status: 422 });
+    }
+  }
 
   const film = body.filmId ? MAFIA_FILMS.find((f) => f.id === body.filmId) : undefined;
   const filmTitle = film?.title ?? body.filmTitle ?? "";

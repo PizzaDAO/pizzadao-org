@@ -129,7 +129,7 @@ describe('merging chat into the transcript', () => {
     expect(data.status).toBe('PROCESSING')
     expect(data.transcriptLanguage).toBeNull()
     expect(data.transcript).toEqual([expect.objectContaining({ text: 'hi all', kind: 'chat', discordId: ANN })])
-    expect(after).toHaveBeenCalledTimes(1)
+    expect(after).toHaveBeenCalledTimes(2)
   })
 
   it('a call without chat is stored exactly as before (no kind field)', async () => {

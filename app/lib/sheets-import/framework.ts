@@ -98,6 +98,8 @@ export interface ParityReport {
   onlyInDb: number
   /** Per-scope mismatch counts (e.g. by crew id). */
   byScope?: Record<string, number>
+  /** Sheet-path rows deliberately left out of the comparison (the check says which and why). */
+  excluded?: number
   error?: string
 }
 

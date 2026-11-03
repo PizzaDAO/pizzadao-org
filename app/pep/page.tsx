@@ -632,7 +632,7 @@ export default function PepDashboard() {
                   className="handwritten -rotate-[5deg]"
                   style={{ fontSize: 14, color: "hsl(var(--foreground) / 0.55)" }}
                 >
-                  bring your respect
+                  spend your PEP
                 </span>
               </div>
               <h2
