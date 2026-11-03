@@ -60,6 +60,7 @@ export function buildLevelInfo(
 
 export async function getLevelInfo(discordId: string): Promise<LevelInfo> {
   const [level, grouped, progress] = await Promise.all([getCurrentLevel(discordId), getMissionsByLevel(), getUserMissionProgress(discordId)])
-  const missions = Object.values(grouped).flat() as MissionLite[]
+  // Level progress counts only the missions that gate a level (not bonus / Anytime ones).
+  const missions = Object.values(grouped).flat().filter((m) => !m.bonus && m.level > 0) as MissionLite[]
   return buildLevelInfo(level, missions, progress.map((p) => ({ missionId: p.missionId, status: p.status })))
 }

@@ -235,3 +235,21 @@ describe('updateLevel', () => {
     await expect(updateLevel(42, { reward: 5 }, ADMIN)).rejects.toMatchObject({ status: 404 })
   })
 })
+
+describe('updateMission: bonus', () => {
+  const base = { ...vouch, bonus: false, bonusReward: 0 }
+  it('turning bonus on needs a confirmation, then saves and audits', async () => {
+    m(prisma.mission.findUnique).mockResolvedValue(base)
+    await expect(updateMission(7, { bonus: true }, ADMIN)).rejects.toMatchObject({ status: 409, needsConfirm: expect.stringMatching(/nobody drops a level/) })
+    await expect(updateMission(7, { bonus: true, bonusReward: 250 }, ADMIN, { confirm: true })).resolves.toEqual({ changed: ['bonus', 'bonusReward'] })
+    expect(m(prisma.appSettingChange.create)).toHaveBeenCalledTimes(2)
+  })
+  it('rejects a bonus reward on a required mission, bad values and un-bonusing an Anytime mission', async () => {
+    m(prisma.mission.findUnique).mockResolvedValue(base)
+    await expect(updateMission(7, { bonusReward: 5 }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400 })
+    await expect(updateMission(7, { bonus: true, bonusReward: -1 }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400 })
+    await expect(updateMission(7, { bonus: 'yes' }, ADMIN)).rejects.toMatchObject({ status: 400 })
+    m(prisma.mission.findUnique).mockResolvedValue({ ...base, level: 0, bonus: true })
+    await expect(updateMission(7, { bonus: false }, ADMIN, { confirm: true })).rejects.toMatchObject({ status: 400, message: expect.stringMatching(/Anytime/) })
+  })
+})

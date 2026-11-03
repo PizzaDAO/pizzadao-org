@@ -81,7 +81,16 @@ export interface Verifier<P = unknown> {
 export interface VerifierSources {
   getXAccount(discordId: string): Promise<{ xUsername: string } | null>
   /** Calls attended (community + crew), from CallAttendance (synced from the attendance sheets). */
-  countCallsAttended(discordId: string): Promise<{ total: number; calls: number; byCrew: Record<string, number> }>
+  countCallsAttended(
+    discordId: string,
+    opts?: { sinceDays?: number; crewId?: string; now?: Date },
+  ): Promise<{ total: number; calls: number; byCrew: Record<string, number> }>
+  /**
+   * Counts for the Anytime (bonus) missions. Optional so older test doubles still compile:
+   * a verifier answers 'unknown' when it is absent. Counts only qualifying rows (approved
+   * check-ins, completed bounties, published articles, ...).
+   */
+  countActivity?(kind: ActivityKind, discordId: string, memberId: string | null): Promise<number>
   /** The member's guild roles; null when Discord couldn't be asked; [] when not in the guild. */
   getMemberRoles(discordId: string): Promise<string[] | null>
   /** Guild role ids for these role names (case-insensitive, cached guild role list); null when unavailable. */
@@ -130,6 +139,15 @@ export interface VerifierSources {
   getWalletAddresses(discordId: string, memberId: string | null): Promise<string[]>
 }
 
+export type ActivityKind =
+  | 'pizzeria_checkin'
+  | 'passport_stamp'
+  | 'spotlight_featured'
+  | 'shop_purchase'
+  | 'bounty_completed'
+  | 'job_completed'
+  | 'article_published'
+
 export interface ReferralRow {
   inviteeDiscordId: string
   inviteeMemberId: string | null
@@ -172,6 +190,12 @@ export function asObject(params: unknown): Record<string, unknown> {
 export function positiveInt(v: unknown, name: string, fallback?: number): number {
   if (v === undefined && fallback !== undefined) return fallback
   if (typeof v !== 'number' || !Number.isInteger(v) || v < 1) throw new Error(`${name} must be a positive integer`)
+  return v
+}
+
+export function nonNegativeInt(v: unknown, name: string, fallback?: number): number {
+  if (v === undefined && fallback !== undefined) return fallback
+  if (typeof v !== 'number' || !Number.isInteger(v) || v < 0) throw new Error(`${name} must be a whole number, 0 or more`)
   return v
 }
 

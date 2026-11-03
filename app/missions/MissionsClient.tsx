@@ -37,6 +37,8 @@ type MissionData = {
   proofHint?: string;
   referral?: boolean;
   getBoxUrl?: string;
+  bonus?: boolean;
+  bonusReward?: number;
   guideHref?: string;
   noManualSubmit?: boolean;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
@@ -699,23 +701,27 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
 
         {/* ─── Level Accordion ────────────────────────────────────
             Each level group is a "§ NN · Level X" file folder. */}
-        {levels.map((levelData, idx) => {
+        {levels.filter((l) => l.level > 0).concat(levels.filter((l) => l.level === 0)).map((levelData, idx) => {
+          const isAnytime = levelData.level === 0;
+          // Bonus missions never gate a level: only the required ones count toward "complete".
+          const requiredMissions = levelData.missions.filter((m) => !m.bonus);
           const isExpanded = expandedLevels.has(levelData.level);
-          const isCurrentLevel = levelData.level === currentLevel;
+          const isCurrentLevel = !isAnytime && levelData.level === currentLevel;
           // Missions on every level can be submitted (the level itself is still earned in order).
           const isUnlocked = true;
           // A level whose reward was already paid stays complete even if a mission was added
           // to it since (that mission is then an optional bonus, nothing is paid again).
           const isPaid = (data.paidLevels ?? []).includes(levelData.level);
           const isComplete =
-            levelData.missions.length > 0 &&
-            (isPaid || levelData.missions.every((m) => m.progress?.status === "APPROVED"));
+            !isAnytime &&
+            requiredMissions.length > 0 &&
+            (isPaid || requiredMissions.every((m) => m.progress?.status === "APPROVED"));
 
           const completedCount = levelData.missions.filter(
             (m) => m.progress?.status === "APPROVED"
           ).length;
 
-          const title = levelData.title || LEVEL_TITLES[levelData.level] || null;
+          const title = isAnytime ? "Anytime" : levelData.title || LEVEL_TITLES[levelData.level] || null;
 
           // Butter pill for current level; emerald complete; muted otherwise.
           const pillBg = isComplete
@@ -801,7 +807,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                     }}
                     aria-hidden
                   >
-                    {isComplete ? "✓" : levelData.level}
+                    {isComplete ? "✓" : isAnytime ? "∞" : levelData.level}
                   </div>
                   <div style={{ minWidth: 0 }}>
                     <span
@@ -814,7 +820,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                         marginBottom: 2,
                       }}
                     >
-                      {sectionNumber} · Level {levelData.level}
+                      {sectionNumber} · {isAnytime ? "Bonus missions" : `Level ${levelData.level}`}
                     </span>
                     <div
                       style={{
@@ -835,10 +841,15 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                         marginTop: 4,
                       }}
                     >
-                      {completedCount}/{levelData.missions.length} missions ·{" "}
-                      <span style={{ color: "hsl(var(--tomato))", fontWeight: 700 }}>
-                        {levelData.reward.toLocaleString()} $PEP
-                      </span>
+                      {completedCount}/{levelData.missions.length} missions
+                      {!isAnytime && (
+                        <>
+                          {" "}·{" "}
+                          <span style={{ color: "hsl(var(--tomato))", fontWeight: 700 }}>
+                            {levelData.reward.toLocaleString()} $PEP
+                          </span>
+                        </>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -894,7 +905,7 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                       check={checks[mission.id]}
                       inviteUrl={mission.referral ? (data?.inviteUrl ?? null) : undefined}
                       levelUnlocked={isUnlocked}
-                      bonus={isPaid && mission.progress?.status !== "APPROVED"}
+                      bonus={!isAnytime && isPaid && mission.progress?.status !== "APPROVED"}
                       humanReleaseMinLevel={data?.humanReleaseMinLevel}
                       onSubmit={handleSubmit}
                     />

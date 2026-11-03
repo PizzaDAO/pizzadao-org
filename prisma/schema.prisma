@@ -549,7 +549,7 @@ enum MissionStatus {
 
 model Mission {
   id          Int      @id @default(autoincrement())
-  level       Int      // 1-8
+  level       Int      // 1-8; 0 = "Anytime" (level-less bonus missions)
   index       Int      // 0-based within level
   title       String
   description String?
@@ -564,6 +564,12 @@ model Mission {
   // Handbook page that explains how to do this mission (internal path, e.g. /handbook/levels#vouching).
   // Editable in /admin/missions; null = no link.
   guideHref      String?   @db.VarChar(120)
+  // Bonus missions are optional: level completion and the per-level reward ignore them.
+  // bonusReward is paid once per member on approval (MISSION_REWARD ledger, metadata.bonusMissionId).
+  bonus          Boolean   @default(false)
+  bonusReward    Int       @default(0)
+  // Set whenever bonusReward changes (or bonus turns on): only approvals at or after it are paid.
+  bonusRewardSetAt DateTime?
   completions MissionCompletion[]
   @@unique([level, index])
 }
