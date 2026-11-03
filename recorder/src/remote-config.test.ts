@@ -10,10 +10,10 @@ describe('parseRemoteConfig', () => {
     expect(parseRemoteConfig({ welcome: { enabled: 'yes', batchSeconds: 9999 } }).welcome).toEqual(REMOTE_CONFIG_OFF.welcome)
   })
   it('only an explicit true turns a behaviour on', () => {
-    const c = parseRemoteConfig({ welcome: { enabled: true, batchSeconds: 30 }, endSong: { enabled: true, minHumans: 2 }, crews: [{ eventId: '1', label: 'Ops' }, { bad: 1 }] })
+    const c = parseRemoteConfig({ welcome: { enabled: true, batchSeconds: 30 }, endSong: { enabled: true, minHumans: 2, crewMap: [{ crew: 'Ops', radio: 'Ops' }, { crew: '', radio: 'x' }] }, crews: [{ eventId: '1', label: 'Ops' }, { bad: 1 }] })
     expect(c.welcome.enabled).toBe(true)
     expect(c.welcome.batchSeconds).toBe(30)
-    expect(c.endSong).toEqual({ enabled: true, minHumans: 2 })
+    expect(c.endSong).toEqual({ enabled: true, minHumans: 2, crewMap: [{ crew: 'Ops', radio: 'Ops' }] })
     expect(c.crews).toEqual([{ eventId: '1', label: 'Ops' }])
   })
 })

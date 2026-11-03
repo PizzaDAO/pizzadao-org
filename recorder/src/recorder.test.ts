@@ -1103,8 +1103,10 @@ describe('welcome wording', () => {
 })
 
 describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
-  const remoteWith = (endSong: Record<string, unknown>, crews: unknown[] = [{ eventId: '100', label: 'Ops Crew', callMinutes: 60 }]) =>
-    ({ get: () => parseRemoteConfig({ endSong, crews }), refresh: async () => parseRemoteConfig({ endSong, crews }) }) as unknown as RemoteConfigClient
+  const remoteWith = (endSong: Record<string, unknown>, crews: unknown[] = [{ eventId: '100', label: 'Ops Crew', callMinutes: 60 }]) => {
+    const es = { crewMap: [{ crew: 'Ops Crew', radio: 'Ops' }], ...endSong }
+    return { get: () => parseRemoteConfig({ endSong: es, crews }), refresh: async () => parseRemoteConfig({ endSong: es, crews }) } as unknown as RemoteConfigClient
+  }
   const radio = { url: 'https://radio.example', apiKey: 'radio-secret' }
   const radioWorld = (endSong: Record<string, unknown> | null, o: { radio?: boolean; crews?: unknown[] } = {}) => {
     const w = world({ remote: endSong ? remoteWith(endSong, o.crews) : undefined })
@@ -1142,13 +1144,13 @@ describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
     await vi.waitFor(() => expect(played()).toBe(1))
     const [url, init] = fetchMock.mock.calls[0]
     expect(url).toBe('https://radio.example/play-crew')
-    expect(JSON.parse(String(init?.body))).toEqual({ crew: 'Ops Crew' })
+    expect(JSON.parse(String(init?.body))).toEqual({ crew: 'Ops', channelId: CHANNEL })
     expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer radio-secret')
     expect(calls).not.toContain('play') // the recorder never touches audio output
   })
 
-  it('on: max-duration fires; empty, superseded, shutdown and disconnected do not', async () => {
-    for (const reason of ['empty', 'superseded', 'disconnected'] as const) {
+  it('on: only event-ended fires; max-duration (the recording cap), empty, superseded, shutdown and disconnected do not', async () => {
+    for (const reason of ['max-duration', 'empty', 'superseded', 'disconnected'] as const) {
       const w = radioWorld({ enabled: true })
       await begin(w)
       await w.rec.stop(reason)
@@ -1159,8 +1161,45 @@ describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
     expect(played()).toBe(0)
     const m = radioWorld({ enabled: true })
     await begin(m)
-    await m.rec.stop('max-duration')
+    await m.rec.stop('event-ended')
     await vi.waitFor(() => expect(played()).toBe(1))
+  })
+
+  it('on: only crews in the end-song crew map play', async () => {
+    const w = radioWorld({ enabled: true, crewMap: [{ crew: 'Art', radio: 'Art' }] })
+    await begin(w)
+    await w.rec.stop('event-ended')
+    expect(played()).toBe(0)
+  })
+
+  it('the marker is written only after a 2xx or a 4xx, not after a network error or 5xx', async () => {
+    fetchMock.mockResolvedValue({ ok: false, status: 503 } as Response)
+    const e = ev({ scheduledStartMs: Date.now() })
+    const a = radioWorld({ enabled: true })
+    await begin(a, e)
+    await a.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBeGreaterThanOrEqual(2), { timeout: 4000 }) // first try + retry
+    await new Promise((r) => setTimeout(r, 20))
+    const again = world({ remote: remoteWith({ enabled: true }), dataDir: a.dataDir })
+    ;(again.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    fetchMock.mockClear()
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response)
+    await begin(again, e)
+    await again.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1)) // not marked, so it may try again
+    const rejected = radioWorld({ enabled: true })
+    fetchMock.mockClear()
+    fetchMock.mockResolvedValue({ ok: false, status: 400 } as Response)
+    const e2 = ev({ scheduledStartMs: Date.now() + 1 })
+    await begin(rejected, e2)
+    await rejected.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await new Promise((r) => setTimeout(r, 20))
+    const second = world({ remote: remoteWith({ enabled: true }), dataDir: rejected.dataDir })
+    ;(second.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    await begin(second, e2)
+    await second.rec.stop('event-ended')
+    expect(played()).toBe(1) // 4xx was marked: no loop
   })
 
   it('on: skipped when fewer than minHumans are in the channel', async () => {
@@ -1186,8 +1225,9 @@ describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
     await begin(w, e)
     await w.rec.stop('event-ended')
     await vi.waitFor(() => expect(played()).toBe(1))
+    await new Promise((r) => setTimeout(r, 20)) // let the marker land
     await begin(w, e) // same occurrence again (rejoin)
-    await w.rec.stop('max-duration')
+    await w.rec.stop('event-ended')
     // a fresh process on the same data dir
     const w2 = world({ remote: remoteWith({ enabled: true }), dataDir: w.dataDir })
     ;(w2.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio

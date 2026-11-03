@@ -12,39 +12,46 @@ export const PLAY_CREW_TIMEOUT_MS = 5_000
 /** Markers older than this are forgotten (longer than any gap between occurrences we care about). */
 export const MARKER_KEEP_MS = 3 * 86_400_000
 
-/** Stop reasons that mean "the call is over and people may still be here". */
-export const END_SONG_STOP_REASONS = ['event-ended', 'max-duration'] as const
+/**
+ * Stop reasons that mean "the call is over and people may still be here". Not max-duration: that is the
+ * recording cap, the call itself may carry on. The other trigger is the scheduled end passing (recorder.ts).
+ */
+export const END_SONG_STOP_REASONS = ['event-ended'] as const
+
+/** What happened to a /play-crew request: accepted, refused for good (4xx), or unreachable / 5xx after the retry. */
+export type PlayCrewOutcome = 'ok' | 'rejected' | 'failed'
 
 export function isEndSongStop(reason: string): boolean {
   return (END_SONG_STOP_REASONS as readonly string[]).includes(reason)
 }
 
-/** POST /play-crew with one retry on a network error or 5xx. True when pizza-radio accepted it. */
+/** POST /play-crew with one retry on a network error or 5xx. `channelId` is the voice channel to play in. */
 export async function postPlayCrew(
   baseUrl: string,
   apiKey: string,
   crew: string,
+  channelId: string | null,
   log: (msg: string) => void,
   fetchImpl: typeof fetch = fetch,
   sleep: (ms: number) => Promise<void> = (ms) => new Promise((r) => setTimeout(r, ms)),
-): Promise<boolean> {
+): Promise<PlayCrewOutcome> {
   for (let attempt = 0; attempt < 2; attempt++) {
     try {
       const res = await fetchImpl(`${baseUrl.replace(/\/$/, '')}/play-crew`, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}`, 'Content-Type': 'application/json' },
-        body: JSON.stringify({ crew }),
+        body: JSON.stringify(channelId ? { crew, channelId } : { crew }),
         signal: AbortSignal.timeout(PLAY_CREW_TIMEOUT_MS),
       })
-      if (res.ok) return true
+      if (res.ok) return 'ok'
       log(`end song: pizza-radio answered ${res.status}`)
-      if (res.status < 500) return false // a bad crew name or key will not fix itself
+      if (res.status < 500) return 'rejected' // a bad crew name or key will not fix itself
     } catch (err) {
       log(`end song: request failed (${err instanceof Error ? err.message : String(err)})`)
     }
     if (attempt === 0) await sleep(1_000)
   }
-  return false
+  return 'failed'
 }
 
 /** Which call occurrences already played their song (persisted in DATA_DIR). */

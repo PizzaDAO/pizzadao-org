@@ -58,14 +58,18 @@ The recorder has no database. At the start of each session and every 5 minutes i
 
 ## End-of-call song
 
-Metalhead never plays audio. When a recorded call really ends it POSTs `{ "crew": "<crew label>" }` to pizza-radio's `/play-crew` (Bearer `PIZZA_RADIO_API_KEY`, 5 s timeout, one retry, fire and forget); pizza-radio joins, plays the crew song and leaves, exactly as the old Apps Script timer did.
+Metalhead never plays audio. When a recorded call really ends it POSTs `{ "crew": "<radio crew name>", "channelId": "<call voice channel>" }` to pizza-radio's `/play-crew` (Bearer `PIZZA_RADIO_API_KEY`, 5 s timeout, one retry on a network error or 5xx, fire and forget); pizza-radio joins, plays the crew song and leaves, exactly as the old Apps Script timer did.
 
-It fires once per call occurrence (a marker in `DATA_DIR/end-song.json` survives restarts) when:
+Only crews listed in the setting `calls.endSongCrewMap` ("our crew label = radio crew", one per line) play; pizza-radio knows Amore, Art, Biz Dev, Comms, Events, Finance, Governance, Mafia, Merch, Ops, Real Estate and Tech.
 
-- the Discord event ends (`event-ended`) or the recording hits its time limit (`max-duration`), or
+It fires once per call occurrence when:
+
+- the Discord event ends (`event-ended`), or
 - the scheduled end (the event's end time, else its start plus the crew's call length) passes while people are still in the channel,
 
-and at least `calls.endSongMinHumans` people are in the channel. It never fires on `empty`, `superseded`, `shutdown` or `disconnected`, and not for an event with no crew mapped.
+and at least `calls.endSongMinHumans` people are in the channel. It never fires on `max-duration` (that is only the recording cap, the call may go on), `empty`, `superseded`, `shutdown` or `disconnected`, nor for an event with no mapped crew.
+
+The "already played" marker (`DATA_DIR/end-song.json`, survives restarts) is written only after pizza-radio answered: a 2xx, or a 4xx that retrying will not fix (logged once). A network error or 5xx after the retry leaves it unmarked.
 
 Cutover order: set the two env vars on Railway and redeploy, turn the setting on, verify one call plays one song, then disable the `fireEndOfCallSong` timer in the Apps Script project so the song does not play twice.
 

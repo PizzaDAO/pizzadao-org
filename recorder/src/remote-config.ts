@@ -8,7 +8,7 @@
 
 export interface RemoteConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
-  endSong: { enabled: boolean; minHumans: number }
+  endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
   crews: { eventId: string; label: string; callMinutes?: number }[]
 }
 
@@ -19,7 +19,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
     batchSeconds: 20,
     recordingLine: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
   },
-  endSong: { enabled: false, minHumans: 1 },
+  endSong: { enabled: false, minHumans: 1, crewMap: [] },
   crews: [],
 }
 
@@ -53,7 +53,18 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
       batchSeconds: int(w.batchSeconds, d.welcome.batchSeconds, 5, 120),
       recordingLine: str(w.recordingLine, d.welcome.recordingLine, 300),
     },
-    endSong: { enabled: e.enabled === true, minHumans: int(e.minHumans, d.endSong.minHumans, 1, 50) },
+    endSong: {
+      enabled: e.enabled === true,
+      minHumans: int(e.minHumans, d.endSong.minHumans, 1, 50),
+      crewMap: Array.isArray(e.crewMap)
+        ? e.crewMap.flatMap((c: unknown) => {
+            const r = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
+            return typeof r.crew === 'string' && typeof r.radio === 'string' && r.crew.trim() && r.radio.trim()
+              ? [{ crew: r.crew.trim().slice(0, 60), radio: r.radio.trim().slice(0, 60) }]
+              : []
+          })
+        : [],
+    },
     crews,
   }
 }
