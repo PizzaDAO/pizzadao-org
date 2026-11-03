@@ -94,8 +94,8 @@ export const ECONOMY_SETTINGS = {
     min: 10, max: 5000, default: 5000, unit: 'PEP', looserWhen: 'higher',
   }),
   'games.cooldownSeconds': num({
-    key: 'games.cooldownSeconds', label: 'Games: seconds between rounds', help: 'One game start per member per this many seconds. The GAME_COOLDOWN_SECONDS env var is used until this is saved.',
-    min: 3, max: 3600, default: 3, unit: 's', looserWhen: 'lower',
+    key: 'games.cooldownSeconds', label: 'Games: seconds between rounds', help: 'One game start per member per this many seconds (slots, roulette, blackjack). Tunable both ways; a saved value replaces the GAME_COOLDOWN_SECONDS env var.',
+    min: 1, max: 3600, default: 3, unit: 's',
   }),
   'games.blackjackTimeoutSeconds': num({
     key: 'games.blackjackTimeoutSeconds', label: 'Blackjack: seconds before a hand times out', help: 'An unfinished hand is settled after this long. The BLACKJACK_TIMEOUT_SECONDS env var is used until this is saved.',
@@ -124,8 +124,8 @@ export const ECONOMY_SETTINGS = {
     min: 55, max: 100, default: 55, unit: '%', looserWhen: 'lower',
   }),
   'crime.cooldownSeconds': num({
-    key: 'crime.cooldownSeconds', label: 'Crime: seconds between attempts', help: 'The CRIME_COOLDOWN_SECONDS env var is used until this is saved.',
-    min: 30, max: 86400, default: 30, unit: 's', looserWhen: 'lower',
+    key: 'crime.cooldownSeconds', label: 'Crime: seconds between attempts', help: 'Tunable both ways; a saved value replaces the CRIME_COOLDOWN_SECONDS env var.',
+    min: 1, max: 86400, default: 30, unit: 's',
   }),
 
   // ---- Work ----

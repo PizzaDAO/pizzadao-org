@@ -107,13 +107,11 @@ describe('economy settings: bounds', () => {
     const tighter: Array<[SettingKey, number, number]> = [
       // key, a looser value (rejected), a tighter value (accepted)
       ['games.maxBet', 5001, 100],
-      ['games.cooldownSeconds', 2, 10],
       ['crime.minPep', 3, 1],
       ['crime.maxPep', 421, 100],
       ['crime.failPercent', 59, 80],
       ['crime.fineMinPercent', 4, 10],
       ['crime.fineMaxPercent', 54, 70],
-      ['crime.cooldownSeconds', 29, 60],
       ['work.minPep', 11, 5],
       ['work.maxPep', 101, 50],
       ['work.cooldownSeconds', 29, 60],
@@ -158,7 +156,8 @@ describe('economy settings: effective values', () => {
     // lower-is-looser knobs go the other way
     vi.stubEnv('CRIME_COOLDOWN_SECONDS', '120')
     expect(crimeConfig(snap({ 'crime.cooldownSeconds': 600 })).cooldownMs).toBe(600_000)
-    expect(crimeConfig(snap({ 'crime.cooldownSeconds': 45 })).cooldownMs).toBe(120_000)
+    // the crime cooldown is two-way: a saved value below the env value wins
+    expect(crimeConfig(snap({ 'crime.cooldownSeconds': 45 })).cooldownMs).toBe(45_000)
   })
 
   it('a saved two-way knob replaces the env value', () => {
