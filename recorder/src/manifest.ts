@@ -57,6 +57,14 @@ export function summarize(records: ManifestRecord[]): SpeakerSummary[] {
     .sort((a, b) => b.talkTimeSec - a.talkTimeSec)
 }
 
+/** Everyone seen in the voice channel during the session (purged users dropped), sorted. */
+export function participantIds(records: ManifestRecord[]): string[] {
+  const purged = new Set(records.filter((r) => r.t === 'purge').map((r) => r.userId))
+  const ids = new Set<string>()
+  for (const r of records) if (r.t === 'present') for (const id of r.userIds) if (!purged.has(id)) ids.add(id)
+  return [...ids].sort()
+}
+
 export const MAX_CHAT_MESSAGES = 5000
 export const MAX_CHAT_TEXT = 4000
 /** Total chat text kept per call (earliest messages win); keeps the ingest body well under the host's request limit. */
