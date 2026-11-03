@@ -99,3 +99,18 @@ export async function loadOwnerContext(discordId: string, memberId?: string | nu
     memberId: mid,
   }
 }
+
+/**
+ * Retention: erase reply text older than `days` (0 = keep forever). Each `reply` event's text is
+ * erased by that event's own age (so a busy row loses its old messages while recent ones stay), and
+ * `FollowUp.lastReply` is blanked separately by `lastReplyAt`. The fact that a reply came in, and
+ * when, stays. One bounded batch of events per call; returns events erased plus rows blanked.
+ */
+export async function sweepOldReplies(days: number, now = new Date(), batch = 500): Promise<number> {
+  if (!Number.isFinite(days) || days <= 0) return 0
+  const cutoff = new Date(now.getTime() - days * 86_400_000)
+  const events = await prisma.$executeRaw`UPDATE "FollowUpEvent" SET "data" = ("data"::jsonb - 'text') || '{"erased":true}'::jsonb WHERE "id" IN (SELECT "id" FROM "FollowUpEvent" WHERE "type" = 'reply' AND "createdAt" < ${cutoff} AND "data" IS NOT NULL AND jsonb_exists("data"::jsonb, 'text') ORDER BY "createdAt" ASC LIMIT ${batch})`
+  const rows = await prisma.followUp.updateMany({ where: { lastReply: { not: null }, lastReplyAt: { lt: cutoff } }, data: { lastReply: null } })
+  return Number(events) + rows.count
+}
+

@@ -22,6 +22,6 @@ export async function GET(request: Request) {
     .map((s) => s.trim().toUpperCase())
     .filter((s): s is FollowUpStatus => (STATUSES as string[]).includes(s))
   const recording = url.searchParams.get('recording')?.trim() || undefined
-  const [list, cfg] = await Promise.all([listFollowUps({ status, recordingId: recording }), loadFollowUpConfig()])
+  const [list, cfg] = await Promise.all([listFollowUps({ status, recordingId: recording, hasReply: url.searchParams.get('hasReply') === '1' }), loadFollowUpConfig()])
   return json({ ...list, sendEnabled: cfg.sendEnabled, footerTelegram: cfg.footerTelegram, footerDiscord: cfg.footerDiscord })
 }

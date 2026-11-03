@@ -4,6 +4,7 @@ import { internalError } from '@/app/lib/errors/error-response'
 import { loadFollowUpConfig } from '@/app/lib/followups/config'
 import { draftFollowUpsForRecording, listNeedingFollowups } from '@/app/lib/followups/draft'
 import { processDue } from '@/app/lib/followups/send'
+import { sweepOldReplies } from '@/app/lib/followups/store'
 import { runHostMatch } from '@/app/lib/telegram/host-match'
 
 export const runtime = 'nodejs'
@@ -35,8 +36,10 @@ export async function GET(request: NextRequest) {
     // Only with time to spare: sending is quick but sequential.
     const sent = Date.now() - started < 200_000 ? await processDue() : { skipped: 1 }
     const hostMatch = Date.now() - started < 120_000 ? await runHostMatch().catch((e) => ({ error: e instanceof Error ? e.message.slice(0, 120) : 'failed' })) : { skipped: 'time' }
-    console.log('[cron/followups]', JSON.stringify({ drafted, sent, hostMatch }))
-    return NextResponse.json({ drafted, sent, hostMatch })
+    // Retention for reply text (followups.replyRetentionDays); never affects the rest of the run.
+    const erased = await sweepOldReplies(cfg.replyRetentionDays).catch(() => -1)
+    console.log('[cron/followups]', JSON.stringify({ drafted, sent, hostMatch, erased }))
+    return NextResponse.json({ drafted, sent, hostMatch, erased })
   } catch (err) {
     return internalError(err, 'cron/followups', 'Follow-ups cron failed')
   }

@@ -1681,6 +1681,9 @@
     "hideTimeline": "Hide history",
     "filterOpen": "Needs attention",
     "filterSent": "Sent",
+    "filterReplies": "Replies",
+    "viaTelegram": "Telegram DM",
+    "viaDiscord": "Discord DM",
     "filterAll": "All",
     "status": {
       "DRAFT": "Draft",
@@ -1711,7 +1714,8 @@
       "reresolved": "Person re-matched",
       "snooze": "Snoozed",
       "telegram-undeliverable": "Telegram could not deliver",
-      "optout-undone": "Opt-out undone"
+      "optout-undone": "Opt-out undone",
+      "inbound": "Reply received"
     },
     "fallback": {
       "off": "Telegram is off",
