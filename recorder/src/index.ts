@@ -14,6 +14,7 @@ import { NicknameManager } from './nickname.js'
 import { CallRecorder } from './recorder.js'
 import { createR2Uploader } from './storage.js'
 import { postIngestWithRetry } from './ingest.js'
+import { handleDm, postFollowupInbound, type DmMessage } from './dm-forward.js'
 
 const log = (msg: string) => console.log(`${new Date().toISOString()} ${msg}`)
 
@@ -28,11 +29,14 @@ log(generateDependencyReport())
 // "Used disallowed intents" (set CAPTURE_VOICE_CHAT=false to run without it).
 const intents = [GatewayIntentBits.Guilds, GatewayIntentBits.GuildVoiceStates, GatewayIntentBits.GuildScheduledEvents]
 if (cfg.captureVoiceChat) intents.push(GatewayIntentBits.GuildMessages, GatewayIntentBits.MessageContent)
+// FOLLOWUP_DM_FORWARD (default off) adds DirectMessages, a NON-privileged intent (DM content is delivered
+// without MessageContent), and the Channel partial (DM channels are not cached).
+if (cfg.followupDmForward) intents.push(GatewayIntentBits.DirectMessages)
 const client = new Client({
   intents,
   // Deletes/edits of messages we did not cache still fire (as partials); cache few messages, and
   // drop them quickly: only the call channel's chat matters.
-  partials: cfg.captureVoiceChat ? [Partials.Message] : [],
+  partials: [...(cfg.captureVoiceChat ? [Partials.Message] : []), ...(cfg.followupDmForward ? [Partials.Channel] : [])],
   makeCache: Options.cacheWithLimits({ ...Options.DefaultMakeCacheSettings, MessageManager: 50 }),
   sweepers: { ...Options.DefaultSweeperSettings, messages: { interval: 300, lifetime: 1800 } },
 })
@@ -103,6 +107,15 @@ client.on('voiceStateUpdate', (o, n) => {
   serial(() => scheduleCheck(false))
 })
 client.on('messageCreate', (m) => recorder.onMessage(m))
+if (cfg.followupDmForward) {
+  // Own handler: fire and forget (retries run in the background), so it can never delay or break recording.
+  const dmDeps = {
+    post: (b: { senderId: string; text: string; externalKey: string }) => postFollowupInbound(cfg.appBaseUrl, cfg.recorderApiKey, b),
+    sleep: (ms: number) => new Promise<void>((r) => setTimeout(r, ms)),
+    log,
+  }
+  client.on('messageCreate', (m) => void handleDm(m as unknown as DmMessage, dmDeps))
+}
 client.on('messageUpdate', (_o, n) => recorder.onMessageUpdate(n))
 client.on('messageDelete', (m) => recorder.onMessageDelete(m))
 client.on('messageDeleteBulk', (ms) => ms.forEach((m) => recorder.onMessageDelete(m)))
