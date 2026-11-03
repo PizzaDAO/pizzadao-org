@@ -236,6 +236,21 @@ describe('summary generation', () => {
     expect(arg.where).toEqual({ id: 'rec1', status: { not: 'REJECTED' } })
   })
 
+  it('merges action items confirmed during the call, without duplicates and respecting redactions', async () => {
+    m(generateText).mockResolvedValue({ output: good })
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', sessionId: SESSION, status: 'PROCESSING', transcript: segments, redactedSpeakerIds: [BOB], speakers: [{ discordId: ANN, displayName: 'Ann' }] })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callLiveItem.findMany.mockResolvedValue([
+      { text: good.actionItems[0].text, owner: null, source: 'speech', speakerIds: [ANN], messageId: null, startMs: 65_000, endMs: 70_000 },
+      { text: 'Order the banner stickers', owner: 'Ann', source: 'speech', speakerIds: [ANN], messageId: null, startMs: 66_000, endMs: 69_000 },
+      { text: 'Something a hidden speaker said', owner: null, source: 'speech', speakerIds: [BOB], messageId: null, startMs: 3_725_000, endMs: 3_730_000 },
+      { text: 'From a line no longer visible', owner: null, source: 'speech', speakerIds: [ANN], messageId: null, startMs: 900_000, endMs: 905_000 },
+    ])
+    expect(await generateAndStoreSummary('rec1')).toBe(true)
+    expect(db.callLiveItem.findMany.mock.calls[0][0].where).toEqual({ sessionId: SESSION })
+    expect(writes()[0][0].data.actionItems).toEqual([...good.actionItems, { text: 'Order the banner stickers', owner: 'Ann' }])
+  })
+
   it('a reject that lands during generation stays rejected (the write matches nothing)', async () => {
     m(generateText).mockResolvedValue({ output: good })
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'PROCESSING', transcript: segments, speakers: [] })

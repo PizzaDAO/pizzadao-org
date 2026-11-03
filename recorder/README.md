@@ -56,6 +56,10 @@ The recorder has no database. At the start of each session and every 5 minutes i
 
 - Welcome message: `calls.welcomeEnabled` (env kill switch `CALL_WELCOME_ENABLED` on the app), `calls.welcomeTemplate`, `calls.welcomeBatchSeconds`, `calls.recordingLine`. The recording notice always opens the call.
 - End-of-call song: `calls.endSongTriggerEnabled` (kill switch `CALL_END_SONG_ENABLED` on the app), `calls.endSongMinHumans`.
+- Live action items (only for the Discord events of crews in `calls.liveActionItemsCrews`):
+  - spoken, `calls.liveActionItemsEnabled` (kill switch `CALL_LIVE_ACTION_ITEMS_ENABLED`): every `calls.liveChunkSeconds` the speech bursts finished since the last cut are uploaded to `calls/<sessionId>/live/<userId>/<startMs>.ogg` and sent to `POST /api/calls/recorder/live-chunk`. The app transcribes them, looks for new action items and answers with the confirmation to post. The live objects are pruned with the other leftovers after ingest.
+  - typed, `calls.chatActionItemsEnabled` (kill switch `CALL_CHAT_ACTION_ITEMS_ENABLED`): a call chat message that starts with one of `calls.chatActionPrefixes` is sent to the same route right away (batched for 3 s, confirmations at least 10 s apart). Needs the chat capture (`CAPTURE_VOICE_CHAT`).
+  - The app applies the private post filter and dedupes; the recorder only posts what it is given, and never after the call stopped. Any failure means no post.
 
 ## End-of-call song
 

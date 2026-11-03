@@ -1423,6 +1423,41 @@ model CallRecording {
   @@index([source, startedAt])
 }
 
+// Live action items (plans/post-call-agenda-updates.md, options A and C). Keyed by the recorder
+// session id: the CallRecording row only exists after the call. Chunks hold the near-live transcript
+// of one speech cut (the detector's rolling window); they are deleted when the call is ingested.
+model CallLiveChunk {
+  id        String   @id @default(cuid())
+  sessionId String
+  seq       Int
+  segments  Json // [{discordId, name, startMs, endMs, text}]
+  audioMs   Int      @default(0) // speech sent for transcription (cost tracking and the per-call cap)
+  segmentKeys String[] @default([]) // R2 keys transcribed in this chunk (the same audio is never transcribed twice)
+  createdAt DateTime @default(now())
+
+  @@unique([sessionId, seq])
+  @@index([createdAt])
+}
+
+// One action item confirmed during a call; merged into CallRecording.actionItems when the summary is generated.
+model CallLiveItem {
+  id         String   @id @default(cuid())
+  sessionId  String
+  source     String // speech | chat
+  text       String
+  owner      String?
+  normKey    String // normalized text (dedupe)
+  speakerIds String[] @default([]) // who said or typed it (a redacted speaker's items are not merged)
+  messageId  String? // chat message id (a deleted or hidden chat line is not merged)
+  startMs    Int?
+  endMs      Int? // spoken items: the span of the speech it came from (merged only if a visible line of the speaker overlaps it)
+  posted     Boolean  @default(false)
+  createdAt  DateTime @default(now())
+
+  @@unique([sessionId, normKey])
+  @@index([createdAt])
+}
+
 model CallSpeaker {
   id          Int           @id @default(autoincrement())
   recordingId String

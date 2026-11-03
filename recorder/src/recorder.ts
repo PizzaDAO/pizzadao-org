@@ -33,6 +33,7 @@ import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
 import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
+import { LiveItems, postLive, type LiveRequest } from './live-items.js'
 
 const TICK_MS = 10_000
 const REMINDER_AFTER_MS = 5 * 60_000
@@ -73,6 +74,8 @@ interface ActiveSession {
   key: string
   /** Voice-channel members already written to the manifest as present. */
   present: Set<string>
+  /** Live action items (settings snapshot at session start); null: off for this call. */
+  live: LiveItems | null
 }
 
 export class CallRecorder {
@@ -101,6 +104,8 @@ export class CallRecorder {
     private readonly serial: (fn: () => Promise<void>) => void = (fn) => void fn(),
     /** Admin settings from the app (all-off until fetched); optional so tests and the spike run without it. */
     private readonly remote: RemoteConfigClient | null = null,
+    /** Live action items request (tests inject it); default POSTs to the app. */
+    private readonly livePost: ((body: LiveRequest) => Promise<string[]>) | null = null,
   ) {
     this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), cfg.callChannelId, log)
     this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
@@ -222,6 +227,8 @@ export class CallRecorder {
     writeSessionMeta(dir, meta)
 
     let capture: VoiceCapture | null = null
+    let live: LiveItems | null = null
+    const names = new Map<string, string>()
     let nickAcquired = false
     let guild: Guild | null = null
     const abort = async (why: string) => {
@@ -248,9 +255,14 @@ export class CallRecorder {
         dir,
         t0: startedAtMs,
         isBot: (id) => this.isBot(id),
-        displayName: async (id) => (await g.members.fetch(id)).displayName,
+        displayName: async (id) => {
+          const name = (await g.members.fetch(id)).displayName
+          names.set(id, name)
+          return name
+        },
         log: (m) => this.log(`[${sessionId}] ${m}`),
         onFatal: (reason) => this.serial(() => this.stop(reason as StopReason)),
+        onSegment: (rec) => live?.onSegment(rec),
       })
 
       // 1. join (subscribes to nothing yet)
@@ -296,7 +308,9 @@ export class CallRecorder {
         event.scheduledStartMs === null ? null : event.scheduledStartMs + NO_SHOW_GRACE_MS,
       )
       tracker.observeHumans(await this.humanCount(g), Date.now())
+      live = this.liveFor(event, rc, { sessionId, dir, startedAtMs, channel, names })
       capture.beginCapture()
+      live?.start()
 
       this.current = {
         meta,
@@ -311,13 +325,42 @@ export class CallRecorder {
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
         present: new Set(),
+        live,
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
       await this.notePresent(this.current)
       this.log(`recording "${event.name}" as ${sessionId}`)
     } catch (err) {
+      live?.stop()
       await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
     }
+  }
+
+  /** Live action items for this call, or null (off, or the crew is not on the allowlist). */
+  private liveFor(
+    event: EventInfo,
+    rc: RemoteConfig,
+    o: { sessionId: string; dir: string; startedAtMs: number; channel: VoiceBasedChannel; names: Map<string, string> },
+  ): LiveItems | null {
+    const l = rc.liveItems
+    if (!(l.audio || l.chat) || !l.eventIds.includes(event.id)) return null
+    // Chat items need the chat capture (MessageContent intent).
+    const cfg = { ...l, chat: l.chat && this.cfg.captureVoiceChat }
+    if (!cfg.audio && !cfg.chat) return null
+    this.log(`live action items on for "${event.name}" (speech: ${cfg.audio ? `every ${cfg.chunkSeconds}s` : 'off'}, chat: ${cfg.chat ? 'on' : 'off'})`)
+    return new LiveItems({
+      sessionId: o.sessionId,
+      eventId: event.id,
+      eventName: event.name,
+      startedAtMs: o.startedAtMs,
+      dir: o.dir,
+      cfg,
+      uploader: this.finalizeDeps.uploader,
+      post: this.livePost ?? ((body) => postLive(this.cfg.appBaseUrl, this.cfg.recorderApiKey, body, this.log)),
+      send: (text) => this.send(o.channel, text),
+      nameOf: (id) => o.names.get(id) ?? null,
+      log: (m) => this.log(`[${o.sessionId}] ${m}`),
+    })
   }
 
   private async onTick(): Promise<void> {
@@ -350,6 +393,7 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.cancelWelcome(s)
+    s.live?.stop()
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
     if (s.endSong && isEndSongStop(reason)) {
       // The call really ended with people possibly still here. empty / superseded / shutdown / disconnected never play.
@@ -446,6 +490,7 @@ export class CallRecorder {
     s.stopping = true
     clearInterval(s.tick)
     this.cancelWelcome(s)
+    s.live?.stop()
     try {
       await this.step('stop capture', () => s.capture.stop())
     } finally {
@@ -606,7 +651,9 @@ export class CallRecorder {
       }
       const displayName = msg.member?.displayName ?? msg.author?.globalName ?? msg.author?.username ?? ''
       this.capturedChat.set(msg.id, s.dir)
-      appendRecord(s.dir, { t: 'chat', messageId: msg.id, userId: msg.author.id, displayName, text, atMs: Math.max(0, msg.createdTimestamp - s.meta.startedAtMs) })
+      const atMs = Math.max(0, msg.createdTimestamp - s.meta.startedAtMs)
+      appendRecord(s.dir, { t: 'chat', messageId: msg.id, userId: msg.author.id, displayName, text, atMs })
+      s.live?.onChat({ discordId: msg.author.id, displayName: displayName || null, messageId: msg.id, text, atMs })
     } catch (err) {
       this.log(`chat capture failed: ${err instanceof Error ? err.message : String(err)}`)
     }

@@ -11,6 +11,8 @@ import { extractEventId } from '@/app/lib/calls/crew-map'
 import { loadSettings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { END_SONG_CREW_LINE } from '@/app/lib/settings/registry'
+import { normalizeCrewId } from '@/app/lib/crew-id'
+import { liveConfigFrom } from '@/app/lib/calls/live-items'
 
 export interface RecorderConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
@@ -18,6 +20,12 @@ export interface RecorderConfig {
   /** Discord event id -> crew label, for naming the call in messages. */
   /** callMinutes: the crew's usual call length, for the end-of-call song when the event has no end time. */
   crews: { eventId: string; label: string; callMinutes?: number }[]
+  /**
+   * Live action items (plans/post-call-agenda-updates.md, options A and C): speech chunks every
+   * chunkSeconds (audio), prefixed chat lines (chat), only for the Discord events of allowlisted crews.
+   * The app re-checks everything (allowlist, private post filter) on each request.
+   */
+  liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -29,6 +37,19 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   },
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
   crews: [],
+  liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
+}
+
+/** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
+export async function loadCrewEventIds(crewIds: readonly string[]): Promise<string[]> {
+  if (crewIds.length === 0) return []
+  try {
+    const { crews } = await getCrewMappings()
+    const want = new Set(crewIds)
+    return [...new Set(crews.filter((c) => want.has(normalizeCrewId(c.id))).flatMap((c) => extractEventId(c.event) ?? []))]
+  } catch {
+    return []
+  }
 }
 
 /** Crew labels by event id. A mapping read failure gives an empty list (the recorder uses the event name). */
@@ -74,5 +95,14 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
       crewMap: parseCrewMap(settings.get('calls.endSongCrewMap')),
     },
     crews: await loadCrewLabels(),
+    liveItems: await liveItemsConfig(settings),
   }
+}
+
+async function liveItemsConfig(settings: Awaited<ReturnType<typeof loadSettings>>): Promise<RecorderConfig['liveItems']> {
+  const live = liveConfigFrom(settings)
+  if (!live.audio && !live.chat) return RECORDER_CONFIG_OFF.liveItems
+  const eventIds = await loadCrewEventIds(live.crews)
+  if (eventIds.length === 0) return RECORDER_CONFIG_OFF.liveItems
+  return { audio: live.audio, chunkSeconds: live.chunkSeconds, chat: live.chat, prefixes: live.chat ? live.prefixes : [], eventIds }
 }

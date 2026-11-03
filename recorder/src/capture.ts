@@ -26,6 +26,7 @@ import type { Guild } from 'discord.js'
 import { GapFiller, OPUS_SILENCE_FRAME } from './gap-filler.js'
 import { appendRecord } from './manifest.js'
 import { OggOpusWriter } from './ogg-opus.js'
+import type { SegmentRecord } from './types.js'
 
 const SILENCE_AFTER_MS = 1000
 const NO_AUDIO_TIMEOUT_MS = 4000
@@ -45,6 +46,8 @@ export interface CaptureDeps {
   log: (msg: string) => void
   /** Called when the connection cannot be re-established; the session should stop. */
   onFatal: (reason: string) => void
+  /** Called after each finished segment is written to the manifest (live action items). Must not throw. */
+  onSegment?: (rec: SegmentRecord) => void
 }
 
 export interface UserStats {
@@ -296,14 +299,20 @@ export class VoiceCapture {
     this.emptyStreak.delete(seg.userId)
     const bytes = existsSync(seg.abs) ? statSync(seg.abs).size : 0
     const startMs = seg.startMs ?? seg.lastPacketWall - this.d.t0
-    appendRecord(this.d.dir, {
+    const rec: SegmentRecord = {
       t: 'segment',
       userId: seg.userId,
       startMs,
       endMs: seg.lastPacketWall - this.d.t0,
       file: seg.file,
       bytes,
-    })
+    }
+    appendRecord(this.d.dir, rec)
+    try {
+      this.d.onSegment?.(rec)
+    } catch (err) {
+      this.d.log(`segment listener failed: ${err instanceof Error ? err.message : String(err)}`)
+    }
     const s = this.stats.get(seg.userId) ?? { segments: 0, packets: 0, bytes: 0 }
     s.segments++
     s.packets += seg.packets

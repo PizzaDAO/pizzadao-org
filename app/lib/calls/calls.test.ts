@@ -301,4 +301,12 @@ describe('POST /api/admin/calls/[id]/remove (reject / hide)', () => {
     expect(db.callSpeaker.deleteMany).not.toHaveBeenCalled()
     expect(signedAudioUrl).not.toHaveBeenCalled() // nothing in R2 was touched
   })
+
+  it('also deletes the action items confirmed live during that call', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', sessionId: 'ev1-1760000000000' })
+    db.callLiveItem.deleteMany.mockRejectedValueOnce(new Error('db down')) // never breaks the reject
+    expect((await call()).status).toBe(200)
+    expect(db.callLiveItem.deleteMany).toHaveBeenCalledWith({ where: { sessionId: 'ev1-1760000000000' } })
+  })
 })

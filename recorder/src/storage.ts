@@ -60,5 +60,7 @@ export function sessionKeys(sessionId: string) {
     prefix: `calls/${sessionId}/`,
     mix: `calls/${sessionId}/mix.m4a`,
     track: (userId: string) => `calls/${sessionId}/tracks/${userId}.ogg`,
+    /** A speech segment sent during the call for live action items (pruned with the other leftovers at finalize). */
+    live: (userId: string, startMs: number) => `calls/${sessionId}/live/${userId}/${startMs}.ogg`,
   }
 }
