@@ -121,6 +121,7 @@ describe('settings registry', () => {
       ['disavow.enabled', false],
       ['reengage.enabled', false],
       ['onboarding.traineeNickEnabled', false],
+      ['names.requireThemed', false],
       ['games.enabled', false],
       ['crime.enabled', false],
       ['portrait.enabled', false],
