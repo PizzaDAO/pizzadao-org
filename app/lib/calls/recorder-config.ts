@@ -15,7 +15,8 @@ export interface RecorderConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
   endSong: { enabled: boolean; minHumans: number }
   /** Discord event id -> crew label, for naming the call in messages. */
-  crews: { eventId: string; label: string }[]
+  /** callMinutes: the crew's usual call length, for the end-of-call song when the event has no end time. */
+  crews: { eventId: string; label: string; callMinutes?: number }[]
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -36,7 +37,9 @@ export async function loadCrewLabels(): Promise<RecorderConfig['crews']> {
     const out: RecorderConfig['crews'] = []
     for (const c of crews) {
       const eventId = extractEventId(c.event)
-      if (eventId && c.label) out.push({ eventId, label: c.label })
+      if (!eventId || !c.label) continue
+      const minutes = Number.parseInt(c.callLength || '', 10)
+      out.push({ eventId, label: c.label, ...(Number.isFinite(minutes) && minutes > 0 && minutes <= 600 ? { callMinutes: minutes } : {}) })
     }
     return out
   } catch {
@@ -54,7 +57,10 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
       batchSeconds: settings.get('calls.welcomeBatchSeconds'),
       recordingLine: settings.get('calls.recordingLine'),
     },
-    endSong: { ...RECORDER_CONFIG_OFF.endSong },
+    endSong: {
+      enabled: resolveToggle('calls.endSongTriggerEnabled', settings),
+      minHumans: settings.get('calls.endSongMinHumans'),
+    },
     crews: await loadCrewLabels(),
   }
 }

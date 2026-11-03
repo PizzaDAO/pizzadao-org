@@ -9,7 +9,7 @@
 export interface RemoteConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
   endSong: { enabled: boolean; minHumans: number }
-  crews: { eventId: string; label: string }[]
+  crews: { eventId: string; label: string; callMinutes?: number }[]
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -39,7 +39,9 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
   const crews = Array.isArray(o.crews)
     ? o.crews.flatMap((c: unknown) => {
         const r = (c && typeof c === 'object' ? c : {}) as Record<string, unknown>
-        return typeof r.eventId === 'string' && typeof r.label === 'string' && r.label ? [{ eventId: r.eventId, label: r.label.slice(0, 80) }] : []
+        return typeof r.eventId === 'string' && typeof r.label === 'string' && r.label
+          ? [{ eventId: r.eventId, label: r.label.slice(0, 80), ...(typeof r.callMinutes === 'number' && r.callMinutes > 0 && r.callMinutes <= 600 ? { callMinutes: r.callMinutes } : {}) }]
+          : []
       })
     : []
   return {

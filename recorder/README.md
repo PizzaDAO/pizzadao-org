@@ -46,6 +46,28 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 | `MAX_CALL_MINUTES_BY_EVENT` | no | `community call=30` | Comma-separated `name part=minutes`. Counts from the first session of the call. Once it is used up the bot stays out of that event and anything that began before it, and until the channel empties, starts a later event only when its slot begins. |
 | `EMPTY_GRACE_MINUTES` | no | `5` | Humans-absent time before stopping. |
 | `PORT` | no | `3000` (Railway sets it) | `/health` |
+| `PIZZA_RADIO_URL` | no | | Base URL of the pizza-radio bot's API (from its Railway service). With `PIZZA_RADIO_API_KEY`, enables the end-of-call song trigger; either missing = off (logged once). |
+| `PIZZA_RADIO_API_KEY` | no | | The pizza-radio API's `PIZZA_RADIO_API_KEY` (Bearer). Secret: Railway env only, never in the settings. |
+
+## Settings the recorder reads from the app
+
+The recorder has no database. At the start of each session and every 5 minutes it reads `GET {APP_BASE_URL}/api/calls/recorder/config` (Bearer `RECORDER_API_KEY`). It keeps the last good answer if the app is unreachable and runs with everything off when it has never had one. All of these default to off and are edited on the admin settings page:
+
+- Welcome message: `calls.welcomeEnabled` (env kill switch `CALL_WELCOME_ENABLED` on the app), `calls.welcomeTemplate`, `calls.welcomeBatchSeconds`, `calls.recordingLine`. The recording notice always opens the call.
+- End-of-call song: `calls.endSongTriggerEnabled` (kill switch `CALL_END_SONG_ENABLED` on the app), `calls.endSongMinHumans`.
+
+## End-of-call song
+
+Metalhead never plays audio. When a recorded call really ends it POSTs `{ "crew": "<crew label>" }` to pizza-radio's `/play-crew` (Bearer `PIZZA_RADIO_API_KEY`, 5 s timeout, one retry, fire and forget); pizza-radio joins, plays the crew song and leaves, exactly as the old Apps Script timer did.
+
+It fires once per call occurrence (a marker in `DATA_DIR/end-song.json` survives restarts) when:
+
+- the Discord event ends (`event-ended`) or the recording hits its time limit (`max-duration`), or
+- the scheduled end (the event's end time, else its start plus the crew's call length) passes while people are still in the channel,
+
+and at least `calls.endSongMinHumans` people are in the channel. It never fires on `empty`, `superseded`, `shutdown` or `disconnected`, and not for an event with no crew mapped.
+
+Cutover order: set the two env vars on Railway and redeploy, turn the setting on, verify one call plays one song, then disable the `fireEndOfCallSong` timer in the Apps Script project so the song does not play twice.
 
 ## R2 bucket and tokens
 

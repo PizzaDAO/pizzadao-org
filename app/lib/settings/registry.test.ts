@@ -116,6 +116,8 @@ describe('settings registry', () => {
       ['calls.welcomeTemplate', 'Welcome {members} to the {call} 🍕'],
       ['calls.welcomeBatchSeconds', 20],
       ['calls.recordingLine', "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded."],
+      ['calls.endSongTriggerEnabled', false],
+      ['calls.endSongMinHumans', 1],
       ['calls.importedRecapPostEnabled', false],
       ['calls.importedFollowupsEnabled', false],
       ['calls.importedAgendaContext', false],

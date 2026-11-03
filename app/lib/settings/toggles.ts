@@ -37,6 +37,7 @@ export const TOGGLES = {
     env: 'CALL_AGENDA_POST_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
   },
+  'calls.endSongTriggerEnabled': { env: 'CALL_END_SONG_ENABLED', legacy: ON_WORDS },
   'calls.welcomeEnabled': { env: 'CALL_WELCOME_ENABLED', legacy: ON_WORDS },
   'calls.importedRecapPostEnabled': { env: 'CALL_IMPORT_RECAP_ENABLED', legacy: ON_WORDS },
   'calls.importedFollowupsEnabled': { env: 'CALL_IMPORT_FOLLOWUPS_ENABLED', legacy: ON_WORDS },

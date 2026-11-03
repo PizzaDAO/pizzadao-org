@@ -883,6 +883,23 @@ export const SETTINGS = {
     check: (v) => v.length > 0,
     checkMessage: 'The recording line cannot be empty',
   }),
+  'calls.endSongTriggerEnabled': boolSetting({
+    key: 'calls.endSongTriggerEnabled',
+    area: 'calls',
+    label: 'End-of-call song from the recorder',
+    help: 'When a recorded call really ends (the Discord event ends or the recording hits its time limit) with people still in the channel, the recorder asks the pizza-radio bot to play the crew song. Metalhead never plays audio itself. Also needs PIZZA_RADIO_URL and PIZZA_RADIO_API_KEY on the recorder. Turn the old Apps Script timer off after the first verified call so the song does not play twice. The CALL_END_SONG_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Pizza-radio will play the crew song when a recorded call ends. Disable the Apps Script song timer to avoid a double play.',
+  }),
+  'calls.endSongMinHumans': intSetting({
+    key: 'calls.endSongMinHumans',
+    area: 'calls',
+    label: 'People needed for the end song',
+    help: 'Play the song only if at least this many people are still in the call channel when it ends.',
+    min: 1,
+    max: 50,
+    default: 1,
+    unit: 'people',
+  }),
   // Calls imported from X live broadcasts (plans/x-call-import.md). All off: an imported call never reaches Discord,
   // the follow-up drafter, the agenda or the automatic summary sweep unless a setting here says so.
   'calls.importedRecapPostEnabled': boolSetting({

@@ -1101,3 +1101,121 @@ describe('welcome wording', () => {
     expect(callDisplayName(undefined, null)).toBe('call')
   })
 })
+
+describe('end-of-call song trigger (calls.endSongTriggerEnabled)', () => {
+  const remoteWith = (endSong: Record<string, unknown>, crews: unknown[] = [{ eventId: '100', label: 'Ops Crew', callMinutes: 60 }]) =>
+    ({ get: () => parseRemoteConfig({ endSong, crews }), refresh: async () => parseRemoteConfig({ endSong, crews }) }) as unknown as RemoteConfigClient
+  const radio = { url: 'https://radio.example', apiKey: 'radio-secret' }
+  const radioWorld = (endSong: Record<string, unknown> | null, o: { radio?: boolean; crews?: unknown[] } = {}) => {
+    const w = world({ remote: endSong ? remoteWith(endSong, o.crews) : undefined })
+    if (o.radio !== false) (w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    return w
+  }
+  const fetchMock = vi.fn(async (_u: string, _i?: RequestInit) => ({ ok: true, status: 200 }) as Response)
+  const played = () => fetchMock.mock.calls.length
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response)
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('off: nothing is requested when a call ends', async () => {
+    const w = radioWorld(null)
+    await begin(w)
+    await w.rec.stop('event-ended')
+    expect(played()).toBe(0)
+    const w2 = radioWorld({ enabled: false })
+    await begin(w2)
+    await w2.rec.stop('max-duration')
+    expect(played()).toBe(0)
+  })
+
+  it('on: event-ended asks pizza-radio (not Metalhead) to play the crew song', async () => {
+    const w = radioWorld({ enabled: true })
+    await begin(w)
+    await w.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://radio.example/play-crew')
+    expect(JSON.parse(String(init?.body))).toEqual({ crew: 'Ops Crew' })
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer radio-secret')
+    expect(calls).not.toContain('play') // the recorder never touches audio output
+  })
+
+  it('on: max-duration fires; empty, superseded, shutdown and disconnected do not', async () => {
+    for (const reason of ['empty', 'superseded', 'disconnected'] as const) {
+      const w = radioWorld({ enabled: true })
+      await begin(w)
+      await w.rec.stop(reason)
+    }
+    const s = radioWorld({ enabled: true })
+    await begin(s)
+    await s.rec.shutdown()
+    expect(played()).toBe(0)
+    const m = radioWorld({ enabled: true })
+    await begin(m)
+    await m.rec.stop('max-duration')
+    await vi.waitFor(() => expect(played()).toBe(1))
+  })
+
+  it('on: skipped when fewer than minHumans are in the channel', async () => {
+    const w = radioWorld({ enabled: true, minHumans: 3 })
+    await begin(w)
+    await w.rec.stop('event-ended')
+    expect(played()).toBe(0)
+  })
+
+  it('on: needs the pizza-radio env and a crew for the event', async () => {
+    const a = radioWorld({ enabled: true }, { radio: false })
+    await begin(a)
+    await a.rec.stop('event-ended')
+    const b = radioWorld({ enabled: true }, { crews: [] })
+    await begin(b)
+    await b.rec.stop('event-ended')
+    expect(played()).toBe(0)
+  })
+
+  it('once per call occurrence, even after a restart (marker persisted)', async () => {
+    const w = radioWorld({ enabled: true })
+    const e = ev({ scheduledStartMs: Date.now() })
+    await begin(w, e)
+    await w.rec.stop('event-ended')
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await begin(w, e) // same occurrence again (rejoin)
+    await w.rec.stop('max-duration')
+    // a fresh process on the same data dir
+    const w2 = world({ remote: remoteWith({ enabled: true }), dataDir: w.dataDir })
+    ;(w2.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    await begin(w2, e)
+    await w2.rec.stop('event-ended')
+    expect(played()).toBe(1)
+  })
+
+  it('fires when the scheduled end passes while people are still in the call', async () => {
+    const start = Date.now()
+    const w = radioWorld({ enabled: true })
+    await begin(w, ev({ name: 'Ops Crew Call', scheduledStartMs: start }))
+    const onTick = (w.rec as unknown as { onTick: () => Promise<void> }).onTick.bind(w.rec)
+    await onTick() // before the end (start + 60 min from the crew): nothing
+    expect(played()).toBe(0)
+    vi.spyOn(Date, 'now').mockReturnValue(start + 61 * 60_000)
+    await onTick()
+    await vi.waitFor(() => expect(played()).toBe(1))
+    await onTick() // not again
+    expect(played()).toBe(1)
+  })
+
+  it('a pizza-radio error never breaks the stop', async () => {
+    fetchMock.mockRejectedValue(new Error('radio down'))
+    const w = radioWorld({ enabled: true })
+    await begin(w)
+    await expect(w.rec.stop('event-ended')).resolves.toBeUndefined()
+    await w.rec.drain()
+    expect(finalizeSession).toHaveBeenCalledTimes(1)
+  })
+})

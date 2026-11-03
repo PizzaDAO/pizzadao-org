@@ -50,6 +50,8 @@ export interface Config {
   port: number
   /** Capture the voice channel's text chat (needs the MessageContent intent). CAPTURE_VOICE_CHAT=false turns it off. */
   captureVoiceChat: boolean
+  /** The pizza-radio bot's API (PIZZA_RADIO_URL + PIZZA_RADIO_API_KEY). null (either missing): the end-of-call song trigger is off. */
+  pizzaRadio: { url: string; apiKey: string } | null
   r2: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string }
 }
 
@@ -86,6 +88,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     eventCaps: eventCaps ?? [],
     emptyGraceMinutes: positiveNumber(env.EMPTY_GRACE_MINUTES, 5, 'EMPTY_GRACE_MINUTES', errors),
     captureVoiceChat: !/^(0|false|off|no)$/i.test(env.CAPTURE_VOICE_CHAT?.trim() ?? ''),
+    pizzaRadio: env.PIZZA_RADIO_URL?.trim() && env.PIZZA_RADIO_API_KEY?.trim() ? { url: env.PIZZA_RADIO_URL.trim().replace(/\/$/, ''), apiKey: env.PIZZA_RADIO_API_KEY.trim() } : null,
     port: positiveNumber(env.PORT, 3000, 'PORT', errors),
     r2: {
       endpoint: req('R2_ENDPOINT'),

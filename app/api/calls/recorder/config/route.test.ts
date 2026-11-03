@@ -5,7 +5,7 @@ vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 vi.mock('@/app/lib/crew-mappings', () => ({
   getCrewMappings: vi.fn(async () => ({
     crews: [
-      { id: 'ops', label: 'Ops Crew', event: 'https://discord.com/events/1/123456789012345678' },
+      { id: 'ops', label: 'Ops Crew', callLength: '60 min', event: 'https://discord.com/events/1/123456789012345678' },
       { id: 'x', label: 'No event' },
     ],
     cached: true,
@@ -30,7 +30,7 @@ describe('GET /api/calls/recorder/config', () => {
     const body = await res.json()
     expect(body.welcome.enabled).toBe(false)
     expect(body.endSong.enabled).toBe(false)
-    expect(body.crews).toEqual([{ eventId: '123456789012345678', label: 'Ops Crew' }])
+    expect(body.crews).toEqual([{ eventId: '123456789012345678', label: 'Ops Crew', callMinutes: 60 }])
     expect(JSON.stringify(body)).not.toContain('secret')
   })
 })
