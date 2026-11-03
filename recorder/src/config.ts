@@ -50,6 +50,8 @@ export interface Config {
   port: number
   /** Capture the voice channel's text chat (needs the MessageContent intent). CAPTURE_VOICE_CHAT=false turns it off. */
   captureVoiceChat: boolean
+  /** Forward DMs sent to the bot to the app as possible follow-up replies (FOLLOWUP_DM_FORWARD=on; default off). Adds the DirectMessages intent. */
+  followupDmForward: boolean
   r2: { endpoint: string; accessKeyId: string; secretAccessKey: string; bucket: string }
 }
 
@@ -86,6 +88,7 @@ export function loadConfig(env: Record<string, string | undefined> = process.env
     eventCaps: eventCaps ?? [],
     emptyGraceMinutes: positiveNumber(env.EMPTY_GRACE_MINUTES, 5, 'EMPTY_GRACE_MINUTES', errors),
     captureVoiceChat: !/^(0|false|off|no)$/i.test(env.CAPTURE_VOICE_CHAT?.trim() ?? ''),
+    followupDmForward: /^(1|true|on|yes)$/i.test(env.FOLLOWUP_DM_FORWARD?.trim() ?? ''),
     port: positiveNumber(env.PORT, 3000, 'PORT', errors),
     r2: {
       endpoint: req('R2_ENDPOINT'),
