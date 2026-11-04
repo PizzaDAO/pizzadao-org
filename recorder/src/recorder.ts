@@ -75,6 +75,10 @@ interface ActiveSession {
   key: string
   /** Voice-channel members already written to the manifest as present. */
   present: Set<string>
+  /** Humans in the channel when the session began (the old call's people). */
+  startPresent: Set<string>
+  /** Event a due switch is being held back for (stays eligible until it switches or the cap passes). */
+  deferTarget: string | null
   /** Live action items (settings snapshot at session start); null: off for this call. */
   live: LiveItems | null
 }
@@ -177,7 +181,14 @@ export class CallRecorder {
     if (cur && deferMaxMs > 0 && humans > 0) {
       try {
         const guild = await this.client.guilds.fetch(this.cfg.guildId)
-        handoff = { deferMaxMs, presentIds: await this.humanIds(guild), lastSpokeMs: cur.capture.lastSpokeByUser(nowMs) }
+        handoff = {
+          deferMaxMs,
+          presentIds: await this.humanIds(guild),
+          lastSpokeMs: cur.capture.lastSpokeByUser(nowMs),
+          firstSpokeMs: cur.capture.firstSpokeByUser(nowMs),
+          startPresentIds: cur.startPresent,
+          pendingTargetId: cur.deferTarget,
+        }
       } catch {
         handoff = undefined // cannot tell who is here: behave as before
       }
@@ -190,11 +201,10 @@ export class CallRecorder {
       events,
       handoff,
     })
-    if (cur && handoff && action.type === 'ignore') {
+    if (cur && handoff) {
+      const due = action.type === 'ignore' ? action.deferredTo : undefined
+      cur.deferTarget = due ? due.id : null
       // Log once per occurrence when a due switch is being held back.
-      const due = events.find(
-        (e) => e.id !== cur.meta.eventId && e.channelId === this.cfg.callChannelId && e.scheduledStartMs !== null && e.scheduledStartMs <= nowMs && e.scheduledStartMs > (cur.eventStartMs ?? 0),
-      )
       if (due && !this.deferLogged.has(eventKey(due))) {
         this.deferLogged.add(eventKey(due))
         this.log(`deferring switch to "${due.name}" (${due.id}): the current call still has people talking (up to ${this.remote?.get().supersedeMaxDeferMinutes} min)`)
@@ -348,10 +358,13 @@ export class CallRecorder {
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
         present: new Set(),
+        startPresent: new Set(),
+        deferTarget: null,
         live,
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
       await this.notePresent(this.current)
+      this.current.startPresent = new Set(this.current.present)
       this.log(`recording "${event.name}" as ${sessionId}`)
     } catch (err) {
       live?.stop()

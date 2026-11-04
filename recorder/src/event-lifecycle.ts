@@ -27,7 +27,8 @@ export interface EventInfo {
 }
 
 export type EventAction =
-  | { type: 'ignore' }
+  /** deferredTo: a due switch is being held back for this event (the caller remembers it). */
+  | { type: 'ignore'; deferredTo?: EventInfo }
   | { type: 'start'; event: EventInfo }
   | { type: 'stop'; reason: StopReason }
   | { type: 'switch'; event: EventInfo; reason: StopReason }
@@ -148,6 +149,12 @@ export interface HandoffInput {
   presentIds: readonly string[]
   /** Wall-clock ms each user last spoke in the current session. */
   lastSpokeMs: ReadonlyMap<string, number>
+  /** Wall-clock ms each user first spoke in the current session. */
+  firstSpokeMs: ReadonlyMap<string, number>
+  /** Humans in the channel when the current session started. */
+  startPresentIds: ReadonlySet<string>
+  /** The event a switch was already deferred for: stays eligible after its window closes. */
+  pendingTargetId?: string | null
 }
 
 /** Users who spoke in the current session within this window count as the old call's speakers. */
@@ -163,9 +170,17 @@ export const HANDOFF_QUIET_MS = 5 * 60_000
 export function shouldDeferSwitch(h: HandoffInput, nextStartMs: number, nowMs: number): boolean {
   if (h.deferMaxMs <= 0) return false
   if (nowMs - nextStartMs >= h.deferMaxMs) return false
+  // Old-call people: here when the session began, or who spoke before the next crew's lead window opened.
+  // The next crew joining early and talking must not count as carry-over.
+  const isOld = (id: string) => {
+    if (h.startPresentIds.has(id)) return true
+    const first = h.firstSpokeMs.get(id)
+    return first !== undefined && first < nextStartMs - WINDOW_LEAD_MS
+  }
   const speakers = new Set<string>()
   let lastAny = -Infinity
   for (const [id, t] of h.lastSpokeMs) {
+    if (!isOld(id)) continue
     if (nowMs - t <= HANDOFF_SPEAKER_WINDOW_MS) speakers.add(id)
     if (t > lastAny) lastAny = t
   }
@@ -196,6 +211,20 @@ export function decideWindowAction(i: WindowInput): EventAction {
       e.scheduledStartMs <= i.nowMs &&
       (provisional || canSwitchTo(e, i.currentStartMs, i.nowMs)),
   )
+  // A switch that was being deferred keeps its target even when that event's window has since closed.
+  const pendingId = i.handoff?.pendingTargetId
+  if (pendingId && !provisional && !eligible.some((e) => e.id === pendingId)) {
+    const p = i.events.find(
+      (e) =>
+        e.id === pendingId &&
+        e.id !== i.currentEventId &&
+        e.channelId === i.callChannelId &&
+        e.status !== EventStatus.Canceled &&
+        !i.blocked?.(e) &&
+        canSwitchTo(e, i.currentStartMs, i.nowMs),
+    )
+    if (p) eligible.push(p)
+  }
   const event = closestEvent(eligible, i.nowMs)
   if (!event) return { type: 'ignore' }
   // Provisional sessions (started in the lead window, slot not begun) keep the immediate switch.
@@ -206,7 +235,7 @@ export function decideWindowAction(i: WindowInput): EventAction {
       .map((e) => e.scheduledStartMs as number)
       .filter((t) => t <= i.nowMs && (i.currentStartMs === null || t > i.currentStartMs))
     const firstDue = Math.min(event.scheduledStartMs as number, ...dueStarts)
-    if (shouldDeferSwitch(i.handoff, firstDue, i.nowMs)) return { type: 'ignore' }
+    if (shouldDeferSwitch(i.handoff, firstDue, i.nowMs)) return { type: 'ignore', deferredTo: event }
   }
   return { type: 'switch', event, reason: 'superseded' }
 }
