@@ -15,6 +15,7 @@ import { CONTENT_SETTINGS } from './content-settings'
 import { ECONOMY_SETTINGS } from './economy-settings'
 import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
 import { TELEGRAM_SETTINGS } from './telegram-settings'
+import { CALL_TIME_SETTINGS } from './call-time-settings'
 import { SHEETS_SETTINGS } from './sheets-settings'
 import { ADMIN_ROLE_IDS, DREAD_PIZZA_ROBERTS_ROLE_ID, MISSION_REVIEWER_ROLE_IDS } from '@/app/ui/constants'
 
@@ -984,6 +985,34 @@ export const SETTINGS = {
     default: 30,
     unit: 'minutes',
   }),
+  'calls.dstFixEnabled': boolSetting({
+    key: 'calls.dstFixEnabled',
+    area: 'calls',
+    label: 'Fix crew call times after a clock change',
+    help: 'Every 6 hours, compares each event in "Crew call local times" with its next start and moves the Discord event when daylight saving shifted it. Events already running are retried later; shifts over the limit below are reported, never applied. While "dry run" (next setting) is on it only logs what it would change. The CALL_DST_FIX_ENABLED env var set to off always wins; preview deploys never change events.',
+    confirmOn: 'This lets the app change the start time of Discord scheduled events (when dry run is also off).',
+  }),
+  'calls.dstFixDryRun': {
+    ...boolSetting({
+      key: 'calls.dstFixDryRun',
+      area: 'calls',
+      label: 'Crew call time fix: dry run',
+      help: 'On: the fix only logs and reports what it would change. Turn off to let it patch Discord events (and also switch the fix on).',
+      default: true,
+    }),
+    // Unreadable settings keep dry run ON.
+    onReadFailure: { value: true },
+  },
+  'calls.dstFixMaxShiftMinutes': intSetting({
+    key: 'calls.dstFixMaxShiftMinutes',
+    area: 'calls',
+    label: 'Crew call time fix: largest shift',
+    help: 'An event whose next start differs from its intended local time by more than this is reported and left alone (someone probably moved it on purpose, or the row is wrong).',
+    min: 15,
+    max: 180,
+    default: 120,
+    unit: 'minutes',
+  }),
   'calls.endSongCrewMap': textSetting({
     key: 'calls.endSongCrewMap',
     area: 'calls',
@@ -1323,6 +1352,11 @@ export const SETTINGS = {
     help: 'Scheduled events in this voice channel get an agenda post.',
     kind: 'voice',
   }),
+  'discord.dstFixChannelId': channelSetting({
+    key: 'discord.dstFixChannelId',
+    label: 'Crew call time fix: report channel',
+    help: 'Where a short summary is posted when the crew call time fix changes, skips or fails an event. Empty posts nothing (the log on /admin/calls still has everything).',
+  }),
   'discord.proposalsChannelId': channelSetting({
     key: 'discord.proposalsChannelId',
     label: 'Proposals channel',
@@ -1485,6 +1519,7 @@ export const SETTINGS = {
     checkMessage: 'This cannot be empty',
   }),
   ...TELEGRAM_SETTINGS,
+  ...CALL_TIME_SETTINGS,
   ...SHEETS_SETTINGS,
   // The Work Payment responses sheet. Empty = form ingest does nothing. Never committed to the repo, and
   // never sent anywhere except this admin settings page (private: true) and the ingest job.
