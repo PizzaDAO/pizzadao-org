@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: Params) {
   const g = await guard(params)
   if ('error' in g) return g.error
   try {
-    return json({ dataset: g.spec.dataset, label: g.spec.label, help: g.spec.help, columns: g.spec.columns, maxRows: g.spec.maxRows, rows: await g.spec.list(), loadedAt: new Date().toISOString() })
+    return json({ dataset: g.spec.dataset, label: g.spec.label, help: g.spec.help, columns: g.spec.columns, maxRows: g.spec.maxRows, rows: await g.spec.list(), loadedAt: new Date(Date.now() - 5_000).toISOString() })
   } catch (e) {
     console.error('[crew-content] list failed', e instanceof Error ? e.message : e)
     return json({ error: 'Could not load' }, 500)
@@ -66,7 +66,8 @@ export async function PUT(request: Request, { params }: Params) {
     }
   }
   try {
-    return json({ ok: true, counts: await g.spec.save(rows, g.auth.session.discordId, { loadedAt }) })
+    const counts = await g.spec.save(rows, g.auth.session.discordId, { loadedAt })
+    return json({ ok: true, counts, rows: await g.spec.list(), loadedAt: new Date(Date.now() - 5_000).toISOString() })
   } catch (e) {
     if (e instanceof EditorConflict) return json({ error: e.message, code: 'conflict' }, 409)
     console.error('[crew-content] save failed', e instanceof Error ? e.message : e)

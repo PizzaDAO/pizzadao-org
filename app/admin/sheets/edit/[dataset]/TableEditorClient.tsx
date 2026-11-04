@@ -25,18 +25,21 @@ export default function TableEditorClient({ dataset, apiUrl, backHref = "/admin/
     const [status, setStatus] = useState<string | null>(null);
     const [saving, setSaving] = useState(false);
 
+    async function load(): Promise<Loaded> {
+        const res = await fetch(endpoint, { cache: "no-store" });
+        const body = await res.json().catch(() => ({}));
+        if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
+        return body as Loaded;
+    }
+
     useEffect(() => {
-        fetch(endpoint)
-            .then(async (res) => {
-                const body = await res.json().catch(() => ({}));
-                if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
-                return body as Loaded;
-            })
+        load()
             .then((d) => {
                 setData(d);
                 setRows(d.rows);
             })
             .catch((e) => setError(e.message));
+        // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [endpoint]);
 
     function setCell(i: number, key: string, value: CellValue) {
@@ -65,6 +68,14 @@ export default function TableEditorClient({ dataset, apiUrl, backHref = "/admin/
             if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);
             const c = body.counts as SaveCounts;
             setStatus(`Saved: ${c.created} added, ${c.updated} changed, ${c.deactivated} removed, ${c.unchanged} unchanged.`);
+            // Reload what was stored: new row ids, fresh revisions and load time, so the next save neither duplicates new rows nor conflicts with this one.
+            try {
+                const fresh = await load();
+                setData(fresh);
+                setRows(fresh.rows);
+            } catch {
+                setStatus((st) => `${st ?? ""} Reload the page before saving again.`);
+            }
         } catch (e) {
             setStatus(`Not saved: ${(e as Error).message}`);
         } finally {

@@ -39,6 +39,20 @@ describe('crew tasks editor: stale pages', () => {
     expect(task.update).toHaveBeenCalled()
   })
 
+  it('two consecutive saves from one editor succeed once it takes the fresh rows; a save from stale rows still conflicts', async () => {
+    const spec = crewTasksEditor('ops')
+    task.findMany.mockResolvedValue([t()] as never)
+    const first = await spec.list()
+    await spec.save([{ ...first[0], stage: 'doing' }], 'lead1') // bumps updatedAt
+    const bumped = new Date('2026-11-01T10:05:00Z')
+    task.findMany.mockResolvedValue([t({ stage: 'doing', updatedAt: bumped })] as never)
+    const second = await spec.list() // what the editor reloads after a save
+    expect(second[0].rev).toBe(bumped.toISOString())
+    await expect(spec.save([{ ...second[0], stage: 'now' }], 'lead1')).resolves.toMatchObject({ updated: 1 })
+    // Another editor changed the row meanwhile: the first editor's (now old) rev conflicts.
+    await expect(spec.save([{ ...first[0], stage: 'done' }], 'lead1')).rejects.toBeInstanceOf(EditorConflict)
+  })
+
   it('refuses to overwrite a task that changed since the page loaded, and writes nothing', async () => {
     task.findMany.mockResolvedValue([t({ updatedAt: new Date('2026-11-01T11:00:00Z'), stage: 'done' })] as never)
     await expect(crewTasksEditor('ops').save([editRow()], 'lead1')).rejects.toBeInstanceOf(EditorConflict)
