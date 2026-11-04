@@ -16,6 +16,7 @@ import { eventCapMinutes, maxMinutesFor, type Config } from './config.js'
 import { callDisplayName, consentNotice, lateJoinWelcome, mentionedIds, MAX_WELCOME_MENTIONS, welcomeBatch, welcomeOpening } from './consent.js'
 import {
   decideWindowAction,
+  type HandoffInput,
   eventKey,
   EventStatus,
   eventsInWindow,
@@ -74,6 +75,10 @@ interface ActiveSession {
   key: string
   /** Voice-channel members already written to the manifest as present. */
   present: Set<string>
+  /** Humans in the channel when the session began (the old call's people). */
+  startPresent: Set<string>
+  /** Event a due switch is being held back for (stays eligible until it switches or the cap passes). */
+  deferTarget: string | null
   /** Live action items (settings snapshot at session start); null: off for this call. */
   live: LiveItems | null
 }
@@ -86,6 +91,7 @@ export class CallRecorder {
   private readonly queued = new Set<string>()
   private readonly botCache = new Map<string, boolean>()
   private readonly backoff = new StartBackoff()
+  private readonly deferLogged = new Set<string>()
   private readonly slots: SlotMemory
   private readonly limits: CallLimits
   private readonly endSongMarker: EndSongMarker
@@ -170,13 +176,41 @@ export class CallRecorder {
     const cur = this.current
     if (cur && opts.nowMs - cur.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(cur.key)
     this.backoff.prune(new Set([...eventsInWindow(events, opts).map(eventKey), ...(cur ? [cur.key] : [])]))
+    const deferMaxMs = (this.remote?.get() ?? REMOTE_CONFIG_OFF).supersedeMaxDeferMinutes * 60_000
+    let handoff: HandoffInput | undefined
+    if (cur && deferMaxMs > 0 && humans > 0) {
+      try {
+        const guild = await this.client.guilds.fetch(this.cfg.guildId)
+        handoff = {
+          deferMaxMs,
+          presentIds: await this.humanIds(guild),
+          lastSpokeMs: cur.capture.lastSpokeByUser(nowMs),
+          firstSpokeMs: cur.capture.firstSpokeByUser(nowMs),
+          startPresentIds: cur.startPresent,
+          pendingTargetId: cur.deferTarget,
+          liveEvents,
+        }
+      } catch {
+        handoff = undefined // cannot tell who is here: behave as before
+      }
+    }
     const action = decideWindowAction({
       ...opts,
       currentEventId: this.currentEventId,
       currentStartMs: this.current?.eventStartMs ?? null,
       humans,
       events,
+      handoff,
     })
+    if (cur && handoff) {
+      const due = action.type === 'ignore' ? action.deferredTo : undefined
+      cur.deferTarget = due ? due.id : null
+      // Log once per occurrence when a due switch is being held back.
+      if (due && !this.deferLogged.has(eventKey(due))) {
+        this.deferLogged.add(eventKey(due))
+        this.log(`deferring switch to "${due.name}" (${due.id}): the current call still has people talking (up to ${this.remote?.get().supersedeMaxDeferMinutes} min)`)
+      }
+    }
     if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(eventKey(action.event), Date.now())) return
     if (action.type === 'start' || action.type === 'switch') {
       const k = eventKey(action.event)
@@ -325,10 +359,13 @@ export class CallRecorder {
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
         present: new Set(),
+        startPresent: new Set(),
+        deferTarget: null,
         live,
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
       await this.notePresent(this.current)
+      this.current.startPresent = new Set(this.current.present)
       this.log(`recording "${event.name}" as ${sessionId}`)
     } catch (err) {
       live?.stop()

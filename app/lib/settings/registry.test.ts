@@ -118,6 +118,7 @@ describe('settings registry', () => {
       ['calls.recordingLine', "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded."],
       ['calls.endSongTriggerEnabled', false],
       ['calls.endSongMinHumans', 1],
+      ['calls.supersedeMaxDeferMinutes', 30],
       ['calls.dstFixEnabled', false],
       ['calls.dstFixDryRun', true],
       ['calls.dstFixMaxShiftMinutes', 120],

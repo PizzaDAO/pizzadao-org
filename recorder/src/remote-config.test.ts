@@ -48,3 +48,12 @@ describe('session-start wait', () => {
     expect(Date.now() - t0).toBeLessThan(1000)
   })
 })
+
+describe('supersedeMaxDeferMinutes', () => {
+  it('defaults to 0 (off), accepts 0-120, rejects bad values', () => {
+    expect(parseRemoteConfig({}).supersedeMaxDeferMinutes).toBe(0)
+    expect(parseRemoteConfig({ supersedeMaxDeferMinutes: 30 }).supersedeMaxDeferMinutes).toBe(30)
+    expect(parseRemoteConfig({ supersedeMaxDeferMinutes: 500 }).supersedeMaxDeferMinutes).toBe(0)
+    expect(parseRemoteConfig({ supersedeMaxDeferMinutes: '30' }).supersedeMaxDeferMinutes).toBe(0)
+  })
+})

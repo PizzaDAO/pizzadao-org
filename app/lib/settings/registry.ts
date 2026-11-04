@@ -975,6 +975,16 @@ export const SETTINGS = {
     default: 1,
     unit: 'people',
   }),
+  'calls.supersedeMaxDeferMinutes': intSetting({
+    key: 'calls.supersedeMaxDeferMinutes',
+    area: 'calls',
+    label: 'Keep recording a call that runs over',
+    help: "When the next crew's call is due but most people in the channel were just talking in the current one, keep recording the current call for up to this long before starting the next recording. 0 switches right at the next start.",
+    min: 0,
+    max: 120,
+    default: 30,
+    unit: 'minutes',
+  }),
   'calls.dstFixEnabled': boolSetting({
     key: 'calls.dstFixEnabled',
     area: 'calls',

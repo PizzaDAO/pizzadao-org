@@ -282,3 +282,84 @@ describe('StartBackoff', () => {
     expect(isFailureStop('disconnected')).toBe(true)
   })
 })
+
+describe('handoff-aware switching (a call that is still going)', () => {
+  const cur = { currentEventId: 'creative', currentStartMs: d('18:15') }
+  const ids = ['a', 'b', 'c', 'd']
+  const spoke = (mins: Record<string, number>, now: string) =>
+    new Map(Object.entries(mins).map(([id, m]) => [id, d(now) - m * MIN]))
+  const hand = (over: Record<string, unknown> = {}) => ({
+    deferMaxMs: 30 * MIN,
+    presentIds: ids,
+    lastSpokeMs: spoke({ a: 1, b: 2, c: 3 }, '18:31'),
+    firstSpokeMs: spoke({ a: 60, b: 60, c: 60 }, '18:31'),
+    startPresentIds: new Set<string>(),
+    liveEvents: day(),
+    ...over,
+  })
+
+  it('without the handoff input, switches immediately (old behavior)', () => {
+    expect(at('18:31', cur)).toMatchObject({ type: 'switch', event: { id: 'art' } })
+  })
+
+  it('defers while most people present spoke recently', () => {
+    expect(at('18:31', { ...cur, handoff: hand() })).toMatchObject({ type: 'ignore' })
+  })
+
+  it('switches when the old speakers have mostly left (rule 1)', () => {
+    expect(at('18:31', { ...cur, handoff: hand({ presentIds: ['a', 'x', 'y', 'z'] }) })).toMatchObject({ type: 'switch' })
+    expect(at('18:31', { ...cur, handoff: hand({ presentIds: ['x', 'y'] }) })).toMatchObject({ type: 'switch' })
+  })
+
+  it('switches when nobody has spoken for 5 minutes (rule 2)', () => {
+    expect(at('18:31', { ...cur, handoff: hand({ lastSpokeMs: spoke({ a: 6, b: 7 }, '18:31') }) })).toMatchObject({ type: 'switch' })
+  })
+
+  it('switches once the cap has elapsed (rule 3), and not before', () => {
+    const h = (now: string) => hand({ lastSpokeMs: spoke({ a: 1, b: 1, c: 1 }, now) })
+    expect(at('18:59', { ...cur, handoff: h('18:59') })).toMatchObject({ type: 'ignore' })
+    expect(at('19:00', { ...cur, handoff: h('19:00') })).toMatchObject({ type: 'switch' })
+  })
+
+  it('a cap of 0 is the kill switch', () => {
+    expect(at('18:31', { ...cur, handoff: hand({ deferMaxMs: 0 }) })).toMatchObject({ type: 'switch' })
+  })
+
+  it('provisional sessions keep the immediate switch', () => {
+    const p = { currentEventId: 'events', currentStartMs: d('19:00'), handoff: hand({ lastSpokeMs: spoke({ a: 1, b: 1, c: 1 }, '18:40') }) }
+    expect(at('18:40', p)).toMatchObject({ type: 'switch', event: { id: 'art' } })
+  })
+
+  it('the next crew joining early and talking does not count as carry-over', () => {
+    // A's people left; B's people joined 5 min early (18:25) and talk. Switch at B's start, not after the cap.
+    const h = hand({
+      presentIds: ['x', 'y'],
+      lastSpokeMs: spoke({ x: 1, y: 1 }, '18:31'),
+      firstSpokeMs: spoke({ x: 6, y: 6 }, '18:31'),
+    })
+    expect(at('18:31', { ...cur, handoff: h })).toMatchObject({ type: 'switch', event: { id: 'art' } })
+  })
+
+  it('people present when the session began count as the old call', () => {
+    const h = hand({ firstSpokeMs: new Map(), startPresentIds: new Set(ids) })
+    expect(at('18:31', { ...cur, handoff: h })).toEqual({ type: 'ignore', deferredTo: expect.objectContaining({ id: 'art' }) })
+  })
+
+  it('keeps the deferred target after its window closes, and switches at the cap even then', () => {
+    // art ends 18:40 (short end), so its window closes while the old call is still talking.
+    const events = day().map((e) => (e.id === 'art' ? { ...e, scheduledEndMs: d('18:40') } : e))
+    const h = (now: string, pending: string | null) => hand({ liveEvents: events, lastSpokeMs: spoke({ a: 1, b: 1, c: 1 }, now), pendingTargetId: pending })
+    expect(at('18:35', { ...cur, events, handoff: h('18:35', null) })).toMatchObject({ type: 'ignore', deferredTo: { id: 'art' } })
+    // Window closed and old speakers left: without the remembered target nothing is eligible...
+    const left = (pending: string | null, live = events) => hand({ liveEvents: live, presentIds: ['x'], lastSpokeMs: spoke({ a: 1 }, '18:45'), pendingTargetId: pending })
+    expect(at('18:45', { ...cur, events, handoff: left(null) })).toEqual({ type: 'ignore' })
+    // ...with it, the switch happens.
+    expect(at('18:45', { ...cur, events, handoff: left('art') })).toMatchObject({ type: 'switch', event: { id: 'art' } })
+    // A deleted / completed event replayed from slot memory is not switched to.
+    expect(at('18:45', { ...cur, events, handoff: left('art', events.filter((e) => e.id !== 'art')) })).toEqual({ type: 'ignore' })
+    const done = events.map((e) => (e.id === 'art' ? { ...e, status: EventStatus.Completed } : e))
+    expect(at('18:45', { ...cur, events, handoff: left('art', done) })).toEqual({ type: 'ignore' })
+    // At the cap (18:30 + 30) it switches even with everyone still talking.
+    expect(at('19:00', { ...cur, events, handoff: h('19:00', 'art') })).toMatchObject({ type: 'switch' })
+  })
+})
