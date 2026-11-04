@@ -45,8 +45,8 @@ beforeEach(() => {
   mockFn(prisma.$transaction).mockImplementation(async (fn: (tx: unknown) => unknown) => fn(prisma))
   mockFn(prisma.$queryRaw).mockResolvedValue([])
   mockFn(prisma.economy.update).mockResolvedValue({})
-  mockFn(prisma.mission.findMany).mockImplementation(async ({ where }: { where: { level?: number } }) =>
-    where.level === undefined ? MISSIONS : MISSIONS.filter((m) => m.level === where.level),
+  mockFn(prisma.mission.findMany).mockImplementation(async ({ where }: { where: { level?: number | object } }) =>
+    typeof where.level !== 'number' ? MISSIONS : MISSIONS.filter((m) => m.level === where.level),
   )
   mockFn(prisma.missionCompletion.findMany).mockImplementation(async () => approved.map((missionId) => ({ missionId })))
   mockFn(prisma.missionCompletion.count).mockImplementation(async ({ where }: { where: { missionId: { in: number[] } } }) =>

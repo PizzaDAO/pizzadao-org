@@ -34,9 +34,12 @@ afterEach(() => {
   vi.unstubAllEnvs()
 })
 
+// Booleans where ON is the safe state (dry run): not enable switches, so no env fallback or kill switch.
+const SAFETY_FLAGS: string[] = ['calls.dstFixDryRun']
+
 describe('feature switches: env stays the fallback and the kill switch', () => {
   it('every switch in the registry has an env var, and the registry default is the legacy default', () => {
-    const switches = SETTING_KEYS.filter((k) => SETTINGS[k].input.type === 'bool')
+    const switches = SETTING_KEYS.filter((k) => SETTINGS[k].input.type === 'bool' && !SAFETY_FLAGS.includes(k))
     expect(switches.sort()).toEqual((Object.keys(TOGGLES) as ToggleKey[]).sort())
     for (const k of Object.keys(TOGGLES) as ToggleKey[]) {
       // With the env var unset, the legacy behaviour is exactly the registry default.

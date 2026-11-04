@@ -13,6 +13,34 @@ export function BonusNote() {
   );
 }
 
+/** Marks a bonus mission: optional for its level, with its own reward when it has one. */
+export function BonusBadge({ reward }: { reward?: number }) {
+  const t = useTranslations("missionLinks");
+  return (
+    <div data-testid="mission-bonus-badge" style={{ marginTop: 6 }}>
+      <span
+        style={{
+          display: "inline-block",
+          fontSize: 11,
+          fontWeight: 800,
+          letterSpacing: "0.08em",
+          textTransform: "uppercase",
+          padding: "2px 8px",
+          borderRadius: 999,
+          background: "hsl(var(--butter))",
+          color: "hsl(var(--ink))",
+          border: "1px solid hsl(var(--rule-warm) / 0.55)",
+        }}
+      >
+        {t("bonusBadge")}
+      </span>
+      <span style={{ fontSize: 12, color: "hsl(var(--muted-foreground))", marginLeft: 8 }}>
+        {reward && reward > 0 ? t("bonusPays", { reward: reward.toLocaleString() }) : t("bonusOptional")}
+      </span>
+    </div>
+  );
+}
+
 export function GetBoxLink({ url }: { url: string }) {
   const t = useTranslations("missionLinks");
   const external = /^https?:\/\//.test(url);

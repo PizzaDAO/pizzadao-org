@@ -29,6 +29,10 @@ vi.mock('@/app/lib/followups/config', () => ({ loadFollowUpConfig: vi.fn(async (
 vi.mock('@/app/lib/telegram/city-posts', () => ({
   processOutbox: vi.fn(async () => ({ status: 'disabled', sent: 0, skipped: 0, failed: 0, uncertain: 0, deferred: 0 })),
 }))
+vi.mock('@/app/lib/calls/event-time-sync', () => ({
+  dstFixConfig: vi.fn(async () => ({ enabled: false, dryRun: true, maxShiftMinutes: 120, rows: [] })),
+  runEventTimeSync: vi.fn(async () => ({ runId: 'r', dryRun: true, checked: 0, patched: 0, wouldPatch: 0, skipped: 0, failed: 0, logged: [], stoppedEarly: false })),
+}))
 vi.mock('@/app/lib/slices/claims', () => ({ sweepAwaitingWallet: vi.fn(async () => 0) }))
 
 vi.mock('@/app/lib/trainee-nick-run', () => ({
@@ -46,6 +50,8 @@ import { scrubCoordinates } from '@/app/lib/passport/scrub'
 
 import { GET as followupsGET } from './followups/route'
 import { GET as telegramPostsGET } from './telegram-posts/route'
+import { GET as eventTimeSyncGET } from './event-time-sync/route'
+import { dstFixConfig, runEventTimeSync } from '@/app/lib/calls/event-time-sync'
 import { processOutbox } from '@/app/lib/telegram/city-posts'
 import { processDue } from '@/app/lib/followups/send'
 import { processMintQueue } from '@/app/lib/slices/mint-queue'
@@ -227,5 +233,32 @@ describe('/api/cron/telegram-posts', () => {
     const { readFileSync } = await import('node:fs')
     const crons = JSON.parse(readFileSync('vercel.json', 'utf8')).crons as Array<{ path: string; schedule: string }>
     expect(crons.filter((c) => c.path === '/api/cron/telegram-posts')).toEqual([{ path: '/api/cron/telegram-posts', schedule: '*/5 * * * *' }])
+  })
+})
+
+describe('/api/cron/event-time-sync', () => {
+  it('401 without the bearer token, and does no work', async () => {
+    expect((await eventTimeSyncGET(req('/api/cron/event-time-sync'))).status).toBe(401)
+    expect(dstFixConfig).not.toHaveBeenCalled()
+    expect(runEventTimeSync).not.toHaveBeenCalled()
+  })
+
+  it('is scheduled every 6 hours in vercel.json', async () => {
+    const { readFileSync } = await import('node:fs')
+    const crons = JSON.parse(readFileSync('vercel.json', 'utf8')).crons as Array<{ path: string; schedule: string }>
+    expect(crons.filter((c) => c.path === '/api/cron/event-time-sync')).toEqual([{ path: '/api/cron/event-time-sync', schedule: '40 */6 * * *' }])
+  })
+
+  it('does nothing while the switch is off', async () => {
+    const res = await eventTimeSyncGET(req('/api/cron/event-time-sync', 'Bearer cron-secret'))
+    expect(await res.json()).toEqual({ skipped: 'disabled' })
+    expect(runEventTimeSync).not.toHaveBeenCalled()
+  })
+
+  it('runs with the saved dry-run flag, and posts, when on', async () => {
+    vi.mocked(dstFixConfig).mockResolvedValueOnce({ enabled: true, dryRun: true, maxShiftMinutes: 120, rows: [] })
+    const res = await eventTimeSyncGET(req('/api/cron/event-time-sync', 'Bearer cron-secret'))
+    expect(res.status).toBe(200)
+    expect(runEventTimeSync).toHaveBeenCalledWith({ dryRun: true, post: true })
   })
 })

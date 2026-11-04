@@ -43,3 +43,11 @@ describe('recorder config: live action items', () => {
     expect((await buildRecorderConfig()).liveItems).toEqual(RECORDER_CONFIG_OFF.liveItems)
   })
 })
+
+describe('recorder config: supersede deferral', () => {
+  it('passes the cap through (default 30 minutes, 0 turns it off)', async () => {
+    expect((await buildRecorderConfig()).supersedeMaxDeferMinutes).toBe(30)
+    state.over = { 'calls.supersedeMaxDeferMinutes': 0 }
+    expect((await buildRecorderConfig()).supersedeMaxDeferMinutes).toBe(0)
+  })
+})

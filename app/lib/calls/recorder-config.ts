@@ -26,6 +26,8 @@ export interface RecorderConfig {
    * The app re-checks everything (allowlist, private post filter) on each request.
    */
   liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
+  /** Longest a switch to the next crew's event waits while the current call still has people talking; 0 = never wait. */
+  supersedeMaxDeferMinutes: number
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -38,6 +40,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
   crews: [],
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
+  supersedeMaxDeferMinutes: 0,
 }
 
 /** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
@@ -96,6 +99,7 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
     },
     crews: await loadCrewLabels(),
     liveItems: await liveItemsConfig(settings),
+    supersedeMaxDeferMinutes: settings.get('calls.supersedeMaxDeferMinutes'),
   }
 }
 

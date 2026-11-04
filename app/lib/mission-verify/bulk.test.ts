@@ -145,6 +145,16 @@ describe('batchSources', () => {
     expect(await paid.getWorkingLevel(OLD_B)).toBe(3) // paid levels count as complete
   })
 
+  it('a windowed / per-crew call count goes to the database, not the all-time prefetch (call streak)', async () => {
+    const countCallsAttended = vi.fn(async () => ({ total: 0, calls: 0, byCrew: {} }))
+    const s = batchSources({ ...base, countCallsAttended } as unknown as VerifierSources, data, null)
+    const opts = { sinceDays: 30, crewId: 'community_call' }
+    // 3 old calls in the prefetch must not satisfy a windowed requirement
+    expect(await s.countCallsAttended(OLD_A, opts)).toEqual({ total: 0, calls: 0, byCrew: {} })
+    expect(countCallsAttended).toHaveBeenCalledWith(OLD_A, opts)
+    expect((await s.countCallsAttended(OLD_A)).total).toBe(3)
+  })
+
   it('answers from the prefetch, never per member upstream', async () => {
     const s = batchSources(base, data, new Map([[OLD_A, [MAFIA]]]))
     expect(await s.getXAccount(OLD_A)).toEqual({ xUsername: 'alice' })

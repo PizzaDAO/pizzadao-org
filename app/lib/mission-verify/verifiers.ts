@@ -24,6 +24,7 @@ import { asObject, positiveInt, stringList, type Verifier, type VerifyCtx, type 
 import { parseMessageLink } from '../discord-channels'
 import { inviteUrl } from '../referral-link'
 import { SEMI_VERIFIERS } from './semi'
+import { ACTIVITY_VERIFIERS } from './verifiers-activity'
 
 const fail = (reason: string, hint?: string, progress?: { have: number; need: number }): VerifyResult => ({
   status: 'fail',
@@ -47,7 +48,7 @@ export const xLinked: Verifier<Record<string, never>> = {
   },
 }
 
-export const attendanceCount: Verifier<{ min: number }> = {
+export const attendanceCount: Verifier<{ min: number; windowDays?: number; crewId?: string }> = {
   key: 'attendance_count',
   mode: 'auto',
   stateful: false,
@@ -56,14 +57,21 @@ export const attendanceCount: Verifier<{ min: number }> = {
     // crews: "any" and distinct: "call" are the only modes (D2, D3); anything else is a config error.
     if (o.crews !== undefined && o.crews !== 'any') throw new Error('crews must be "any"')
     if (o.distinct !== undefined && o.distinct !== 'call') throw new Error('distinct must be "call"')
-    return { min: positiveInt(o.min, 'min', 1) }
+    // Optional: only calls in the last `windowDays` days, and/or only one crew (e.g. "community_call").
+    const windowDays = o.windowDays === undefined ? undefined : positiveInt(o.windowDays, 'windowDays')
+    if (o.crewId !== undefined && (typeof o.crewId !== 'string' || !/^[a-z0-9_-]{1,60}$/.test(o.crewId))) throw new Error('crewId must be a crew slug')
+    return { min: positiveInt(o.min, 'min', 1), ...(windowDays ? { windowDays } : {}), ...(o.crewId ? { crewId: o.crewId as string } : {}) }
   },
-  async check(ctx, { min }) {
-    const { total, byCrew } = await ctx.sources.countCallsAttended(ctx.discordId)
-    if (total >= min) return { status: 'pass', evidence: { calls: total, need: min, byCrew } }
-    const need = min === 1 ? 'Join a community call or any crew call' : `Join ${min - total} more call${min - total === 1 ? '' : 's'} (community or any crew)`
+  async check(ctx, { min, windowDays, crewId }) {
+    const { total, byCrew } = await (windowDays || crewId
+      ? ctx.sources.countCallsAttended(ctx.discordId, { sinceDays: windowDays, crewId, now: ctx.now })
+      : ctx.sources.countCallsAttended(ctx.discordId))
+    if (total >= min) return { status: 'pass', evidence: { calls: total, need: min, byCrew, ...(windowDays ? { windowDays } : {}), ...(crewId ? { crewId } : {}) } }
+    const scope = `${crewId === 'community_call' ? 'community call' : crewId ? `${crewId} call` : 'call'}`
+    const within = windowDays ? ` in ${windowDays} days` : ''
+    const need = min === 1 && !windowDays && !crewId ? 'Join a community call or any crew call' : `Join ${min - total} more ${scope}${min - total === 1 ? '' : 's'}${within}${crewId ? '' : ' (community or any crew)'}`
     return fail(
-      `${total}/${min} calls attended`,
+      `${total}/${min} ${scope}s attended${within}`,
       `${need}. Attendance is synced from the call sheets, so it can take a day to show up.`,
       { have: total, need: min },
     )
@@ -327,7 +335,7 @@ async function memberRoles(ctx: VerifyCtx): Promise<string[] | null> {
 
 // eslint-disable-next-line @typescript-eslint/no-explicit-any
 export const VERIFIERS: Record<string, Verifier<any>> = Object.fromEntries(
-  [xLinked, attendanceCount, discordRole, discordMessage, referral, vouchGiven, vouchReceived, rarePizzaBox, walletConnected, manual, ...SEMI_VERIFIERS].map((v) => [v.key, v]),
+  [xLinked, attendanceCount, discordRole, discordMessage, referral, vouchGiven, vouchReceived, rarePizzaBox, walletConnected, manual, ...ACTIVITY_VERIFIERS, ...SEMI_VERIFIERS].map((v) => [v.key, v]),
 )
 
 export function getVerifier(key: string | null | undefined): Verifier<unknown> | null {

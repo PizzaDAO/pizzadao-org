@@ -863,6 +863,9 @@
     }
   },
   "missionLinks": {
+    "bonusBadge": "Extra",
+    "bonusOptional": "Extra: opcional, no cuenta para completar el nivel.",
+    "bonusPays": "Extra: +{reward} $PEP al aprobarse.",
     "boxHint": "Esta misión necesita una Rare Pizza Box NFT en una wallet conectada a tu perfil.",
     "getBox": "Consigue una Rare Pizza Box",
     "bonus": "Extra: este nivel ya está completo. Esta misión es opcional y no da más recompensa.",
@@ -1565,6 +1568,9 @@
     "errorGeneric": "No se pudo guardar. Revisa los valores e inténtalo de nuevo.",
     "loadError": "No se pudieron cargar las misiones.",
     "rewardLowerOnly": "Las recompensas se pueden bajar, o subir de nuevo hasta el valor del código; superarlo requiere un PR.",
+    "bonus": "Misión extra (opcional: no hace falta para completar el nivel)",
+    "bonusReward": "Recompensa extra ($PEP, se paga una vez al aprobarse)",
+    "anytime": "Cuando quieras (misiones extra)",
     "activeOnlyEnable": "Aquí solo se puede activar; desactivar requiere un PR.",
     "guideLink": "Enlace a la guía",
     "guideLinkHelp": "Opcional. Muestra un enlace \"Cómo hacerlo\" en la tarjeta de la misión. Solo rutas internas del manual, por ejemplo /handbook/levels#vouching. Déjalo vacío para no mostrar enlace."
