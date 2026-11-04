@@ -133,6 +133,47 @@ export interface WindowInput extends LifecycleOptions {
   /** Humans (not bots) in the call channel right now. */
   humans: number
   events: EventInfo[]
+  /**
+   * Handoff awareness (optional; absent or deferMaxMs 0 = switch as soon as the next slot has begun).
+   * A forward switch from a running, non-provisional session is held back while the current call
+   * still has people talking. See shouldDeferSwitch.
+   */
+  handoff?: HandoffInput
+}
+
+export interface HandoffInput {
+  /** Longest a switch may be deferred past the next event's start; 0 turns deferral off. */
+  deferMaxMs: number
+  /** Humans in the call channel right now. */
+  presentIds: readonly string[]
+  /** Wall-clock ms each user last spoke in the current session. */
+  lastSpokeMs: ReadonlyMap<string, number>
+}
+
+/** Users who spoke in the current session within this window count as the old call's speakers. */
+export const HANDOFF_SPEAKER_WINDOW_MS = 10 * 60_000
+/** If nobody has spoken for this long, the old call is over and people are just sitting in the channel. */
+export const HANDOFF_QUIET_MS = 5 * 60_000
+
+/**
+ * True when a due forward switch should wait: the old call still has people talking. Switch (false) when
+ * deferral is off, the cap since the next start has elapsed, the old speakers have mostly left
+ * (under half of those present spoke recently), or nobody has spoken for HANDOFF_QUIET_MS.
+ */
+export function shouldDeferSwitch(h: HandoffInput, nextStartMs: number, nowMs: number): boolean {
+  if (h.deferMaxMs <= 0) return false
+  if (nowMs - nextStartMs >= h.deferMaxMs) return false
+  const speakers = new Set<string>()
+  let lastAny = -Infinity
+  for (const [id, t] of h.lastSpokeMs) {
+    if (nowMs - t <= HANDOFF_SPEAKER_WINDOW_MS) speakers.add(id)
+    if (t > lastAny) lastAny = t
+  }
+  if (nowMs - lastAny >= HANDOFF_QUIET_MS) return false
+  const present = h.presentIds.length
+  const carryover = h.presentIds.filter((id) => speakers.has(id)).length
+  if (present === 0 || carryover === 0 || carryover / present < 0.5) return false
+  return true
 }
 
 /**
@@ -156,7 +197,18 @@ export function decideWindowAction(i: WindowInput): EventAction {
       (provisional || canSwitchTo(e, i.currentStartMs, i.nowMs)),
   )
   const event = closestEvent(eligible, i.nowMs)
-  return event ? { type: 'switch', event, reason: 'superseded' } : { type: 'ignore' }
+  if (!event) return { type: 'ignore' }
+  // Provisional sessions (started in the lead window, slot not begun) keep the immediate switch.
+  // The cap counts from the FIRST later slot that came due, so a chain of back-to-back slots cannot restart it.
+  if (!provisional && i.handoff) {
+    const dueStarts = i.events
+      .filter((e) => e.channelId === i.callChannelId && e.status !== EventStatus.Canceled && e.scheduledStartMs !== null)
+      .map((e) => e.scheduledStartMs as number)
+      .filter((t) => t <= i.nowMs && (i.currentStartMs === null || t > i.currentStartMs))
+    const firstDue = Math.min(event.scheduledStartMs as number, ...dueStarts)
+    if (shouldDeferSwitch(i.handoff, firstDue, i.nowMs)) return { type: 'ignore' }
+  }
+  return { type: 'switch', event, reason: 'superseded' }
 }
 
 /** Identity of one occurrence of an event (ids can recur for recurring events). */

@@ -16,6 +16,8 @@ export interface RemoteConfig {
    * prefix are sent right away. Only events in eventIds (the crew allowlist) take part.
    */
   liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
+  /** Longest a switch to the next crew's event waits while the current call still has people talking; 0 = never wait. */
+  supersedeMaxDeferMinutes: number
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -28,6 +30,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
   crews: [],
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
+  supersedeMaxDeferMinutes: 0,
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
@@ -85,6 +88,7 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
       prefixes,
       eventIds,
     },
+    supersedeMaxDeferMinutes: int(o.supersedeMaxDeferMinutes, d.supersedeMaxDeferMinutes, 0, 120),
   }
 }
 

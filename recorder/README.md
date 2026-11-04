@@ -78,6 +78,10 @@ The "already played" marker (`DATA_DIR/end-song.json`, survives restarts) is wri
 
 Cutover order: set the two env vars on Railway and redeploy, turn the setting on, verify one call plays one song, then disable the `fireEndOfCallSong` timer in the Apps Script project so the song does not play twice.
 
+## Calls that run over
+
+When the next crew's event start has passed, the recorder normally switches recordings at once. With `calls.supersedeMaxDeferMinutes` (default 30, read from the app's `GET /api/calls/recorder/config`; 0 = always switch immediately; unreachable app = 0) it first checks whether the current call is still going: the switch waits while most people in the channel spoke in the last 10 minutes. It goes ahead as soon as the old speakers have mostly left, nobody has spoken for 5 minutes, or the cap since the first due start has passed. Sessions that started early in a lead window (slot not begun) still switch at once. A held-back switch is logged once as "deferring switch to ...".
+
 ## R2 bucket and tokens
 
 - Private bucket (no public access, no custom domain). Objects live under `calls/<sessionId>/` (`mix.m4a`, `tracks/<discordId>.ogg`).

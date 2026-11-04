@@ -54,6 +54,8 @@ export interface UserStats {
   segments: number
   packets: number
   bytes: number
+  /** Wall-clock ms of the last packet of the user's last finished segment. */
+  lastSpokeMs?: number
 }
 
 interface OpenSegment {
@@ -111,6 +113,14 @@ export class VoiceCapture {
   /** Users whose audio is being written right now. */
   get speakingNow(): string[] {
     return [...this.open.keys()]
+  }
+
+  /** Wall-clock ms each user last spoke in this session (speaking now counts as now). */
+  lastSpokeByUser(nowMs: number): Map<string, number> {
+    const m = new Map<string, number>()
+    for (const [id, st] of this.stats) if (st.lastSpokeMs !== undefined) m.set(id, st.lastSpokeMs)
+    for (const id of this.open.keys()) m.set(id, nowMs)
+    return m
   }
 
   private async join(): Promise<void> {
@@ -317,6 +327,7 @@ export class VoiceCapture {
     s.segments++
     s.packets += seg.packets
     s.bytes += bytes
+    s.lastSpokeMs = seg.lastPacketWall
     this.stats.set(seg.userId, s)
   }
 
