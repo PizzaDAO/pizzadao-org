@@ -188,6 +188,7 @@ export class CallRecorder {
           firstSpokeMs: cur.capture.firstSpokeByUser(nowMs),
           startPresentIds: cur.startPresent,
           pendingTargetId: cur.deferTarget,
+          liveEvents,
         }
       } catch {
         handoff = undefined // cannot tell who is here: behave as before

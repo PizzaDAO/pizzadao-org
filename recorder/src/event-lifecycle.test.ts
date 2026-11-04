@@ -294,6 +294,7 @@ describe('handoff-aware switching (a call that is still going)', () => {
     lastSpokeMs: spoke({ a: 1, b: 2, c: 3 }, '18:31'),
     firstSpokeMs: spoke({ a: 60, b: 60, c: 60 }, '18:31'),
     startPresentIds: new Set<string>(),
+    liveEvents: day(),
     ...over,
   })
 
@@ -347,13 +348,17 @@ describe('handoff-aware switching (a call that is still going)', () => {
   it('keeps the deferred target after its window closes, and switches at the cap even then', () => {
     // art ends 18:40 (short end), so its window closes while the old call is still talking.
     const events = day().map((e) => (e.id === 'art' ? { ...e, scheduledEndMs: d('18:40') } : e))
-    const h = (now: string, pending: string | null) => hand({ lastSpokeMs: spoke({ a: 1, b: 1, c: 1 }, now), pendingTargetId: pending })
+    const h = (now: string, pending: string | null) => hand({ liveEvents: events, lastSpokeMs: spoke({ a: 1, b: 1, c: 1 }, now), pendingTargetId: pending })
     expect(at('18:35', { ...cur, events, handoff: h('18:35', null) })).toMatchObject({ type: 'ignore', deferredTo: { id: 'art' } })
     // Window closed and old speakers left: without the remembered target nothing is eligible...
-    const left = (pending: string | null) => hand({ presentIds: ['x'], lastSpokeMs: spoke({ a: 1 }, '18:45'), pendingTargetId: pending })
+    const left = (pending: string | null, live = events) => hand({ liveEvents: live, presentIds: ['x'], lastSpokeMs: spoke({ a: 1 }, '18:45'), pendingTargetId: pending })
     expect(at('18:45', { ...cur, events, handoff: left(null) })).toEqual({ type: 'ignore' })
     // ...with it, the switch happens.
     expect(at('18:45', { ...cur, events, handoff: left('art') })).toMatchObject({ type: 'switch', event: { id: 'art' } })
+    // A deleted / completed event replayed from slot memory is not switched to.
+    expect(at('18:45', { ...cur, events, handoff: left('art', events.filter((e) => e.id !== 'art')) })).toEqual({ type: 'ignore' })
+    const done = events.map((e) => (e.id === 'art' ? { ...e, status: EventStatus.Completed } : e))
+    expect(at('18:45', { ...cur, events, handoff: left('art', done) })).toEqual({ type: 'ignore' })
     // At the cap (18:30 + 30) it switches even with everyone still talking.
     expect(at('19:00', { ...cur, events, handoff: h('19:00', 'art') })).toMatchObject({ type: 'switch' })
   })

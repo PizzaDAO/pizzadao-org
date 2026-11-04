@@ -155,6 +155,8 @@ export interface HandoffInput {
   startPresentIds: ReadonlySet<string>
   /** The event a switch was already deferred for: stays eligible after its window closes. */
   pendingTargetId?: string | null
+  /** The events Discord reported just now (not slot memory): a remembered target must be among them, SCHEDULED or ACTIVE. */
+  liveEvents: readonly EventInfo[]
 }
 
 /** Users who spoke in the current session within this window count as the old call's speakers. */
@@ -220,6 +222,9 @@ export function decideWindowAction(i: WindowInput): EventAction {
         e.id !== i.currentEventId &&
         e.channelId === i.callChannelId &&
         e.status !== EventStatus.Canceled &&
+        i.handoff!.liveEvents.some(
+          (l) => l.id === e.id && l.scheduledStartMs === e.scheduledStartMs && (l.status === EventStatus.Scheduled || l.status === EventStatus.Active),
+        ) &&
         !i.blocked?.(e) &&
         canSwitchTo(e, i.currentStartMs, i.nowMs),
     )
