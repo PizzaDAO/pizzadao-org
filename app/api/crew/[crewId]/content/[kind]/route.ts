@@ -4,7 +4,7 @@ import { json, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { canManageCrew } from '@/app/lib/crew-leads'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import { usesDb } from '@/app/lib/sheets-import/source'
-import { cleanRows, EditorError } from '@/app/lib/sheets-import/editor'
+import { cleanRows, EditorConflict, EditorError } from '@/app/lib/sheets-import/editor'
 import { CREW_EDITORS, type CrewEditorKind } from '@/app/lib/sheets-import/crew-content'
 
 export const runtime = 'nodejs'
@@ -34,7 +34,7 @@ export async function GET(_request: Request, { params }: Params) {
   const g = await guard(params)
   if ('error' in g) return g.error
   try {
-    return json({ dataset: g.spec.dataset, label: g.spec.label, help: g.spec.help, columns: g.spec.columns, maxRows: g.spec.maxRows, rows: await g.spec.list() })
+    return json({ dataset: g.spec.dataset, label: g.spec.label, help: g.spec.help, columns: g.spec.columns, maxRows: g.spec.maxRows, rows: await g.spec.list(), loadedAt: new Date(Date.now() - 5_000).toISOString() })
   } catch (e) {
     console.error('[crew-content] list failed', e instanceof Error ? e.message : e)
     return json({ error: 'Could not load' }, 500)
@@ -46,7 +46,8 @@ export async function PUT(request: Request, { params }: Params) {
   if (unsafe) return unsafe
   const g = await guard(params)
   if ('error' in g) return g.error
-  const body = (await request.json().catch(() => null)) as { rows?: unknown } | null
+  const body = (await request.json().catch(() => null)) as { rows?: unknown; loadedAt?: unknown } | null
+  const loadedAt = typeof body?.loadedAt === 'string' && !Number.isNaN(Date.parse(body.loadedAt)) ? new Date(body.loadedAt) : null
   let rows
   try {
     rows = cleanRows(g.spec, body?.rows)
@@ -65,8 +66,10 @@ export async function PUT(request: Request, { params }: Params) {
     }
   }
   try {
-    return json({ ok: true, counts: await g.spec.save(rows, g.auth.session.discordId) })
+    const counts = await g.spec.save(rows, g.auth.session.discordId, { loadedAt })
+    return json({ ok: true, counts, rows: await g.spec.list(), loadedAt: new Date(Date.now() - 5_000).toISOString() })
   } catch (e) {
+    if (e instanceof EditorConflict) return json({ error: e.message, code: 'conflict' }, 409)
     console.error('[crew-content] save failed', e instanceof Error ? e.message : e)
     return json({ error: 'Could not save' }, 500)
   }

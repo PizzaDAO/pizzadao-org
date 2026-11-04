@@ -1265,7 +1265,13 @@
     "labelLinked": "Lié à un membre",
     "labelSave": "Enregistrer le nom",
     "labelReset": "Revenir à « Intervenant N »",
-    "labelsChanged": "Les noms des intervenants ont changé après la rédaction du résumé. Régénérez le résumé pour qu’il les utilise."
+    "labelsChanged": "Les noms des intervenants ont changé après la rédaction du résumé. Régénérez le résumé pour qu’il les utilise.",
+    "taskProposalsHeading": "Mises à jour de tâches proposées",
+    "taskProposalsHelp": "À relancer après avoir modifié le résumé. Les propositions existantes sont conservées ; seules les nouvelles sont ajoutées. Rien ne change tant qu'un responsable du crew ou un admin ne l'applique pas.",
+    "proposeTasks": "Proposer des mises à jour",
+    "proposingTasks": "En cours...",
+    "tasksProposed": "{count, plural, =0 {Aucune nouvelle proposition} one {# nouvelle proposition} other {# nouvelles propositions}}",
+    "proposeTasksError": "Impossible de proposer des mises à jour (activé pour ce crew ?)."
   },
   "crewDrafts": {
     "title": "Brouillons",
@@ -2131,5 +2137,54 @@
     "sendAfter": "Prévu pour {value}",
     "expiresAt": "Expire {value}",
     "attempts": "Tentatives : {value}"
+  },
+  "crewCallUpdates": {
+    "title": "Mises à jour du dernier appel",
+    "intro": "Modifications de tâches proposées d'après ce qui a été dit pendant l'appel. Rien ne change tant que vous ne l'appliquez pas.",
+    "empty": "Aucune mise à jour en attente.",
+    "kinds": {
+      "CREATE": "Nouvelle",
+      "UPDATE": "Modification",
+      "DONE": "Terminée",
+      "RETIRE": "Retirer"
+    },
+    "statuses": {
+      "PENDING": "En attente",
+      "APPLIED": "Appliquée",
+      "DISMISSED": "Ignorée",
+      "STALE": "Périmée"
+    },
+    "fields": {
+      "label": "Tâche",
+      "stage": "Étape",
+      "priority": "Priorité",
+      "due": "Échéance",
+      "leadName": "Responsable"
+    },
+    "none": "aucun",
+    "newTask": "Nouvelle tâche : {label}",
+    "markDone": "Marquer comme terminée : {label}",
+    "retire": "Retirer : {label}",
+    "retireHint": "La tâche est masquée, pas supprimée.",
+    "taskChanged": "Cette tâche a changé depuis l'appel. Vérifiez-la avant d'appliquer.",
+    "taskGone": "Cette tâche n'existe plus.",
+    "conflict": "La tâche a changé depuis la proposition. Cliquez sur Appliquer quand même pour confirmer.",
+    "pickLead": "Qui est « {name} » ?",
+    "chooseMember": "Choisir un membre",
+    "skipLead": "Laisser le responsable inchangé",
+    "pickLeadFirst": "Choisissez d'abord qui la pilote.",
+    "apply": "Appliquer",
+    "applyAnyway": "Appliquer quand même",
+    "applyAll": "Tout appliquer ({count})",
+    "edit": "Modifier",
+    "cancelEdit": "Annuler",
+    "dismiss": "Ignorer",
+    "working": "En cours...",
+    "genericError": "Une erreur s'est produite. Réessayez.",
+    "appliedAll": "{applied} appliquées, {skipped} à examiner.",
+    "confirmClose": "Cela clôt ou masque la tâche. L'appliquer ?",
+    "applyAllHint": "Tout appliquer ignore les changements qui clôturent ou masquent une tâche : appliquez-les un par un.",
+    "retiredHeading": "Retirées récemment depuis des appels",
+    "undoRetire": "Annuler (réafficher la tâche)"
   }
 }

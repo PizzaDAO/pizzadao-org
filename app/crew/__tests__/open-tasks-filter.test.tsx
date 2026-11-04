@@ -5,6 +5,7 @@ import CrewPage from '../[crewId]/CrewPageClient'
 
 vi.mock('../[crewId]/CrewGettingStarted', () => ({ CrewGettingStarted: () => null }))
 vi.mock('../[crewId]/CrewBounties', () => ({ CrewBounties: () => null }))
+vi.mock('../[crewId]/CrewCallUpdates', () => ({ CrewCallUpdates: () => null }))
 
 // Mock next/font/google - must be before component import is evaluated
 vi.mock('next/font/google', () => ({

@@ -42,10 +42,14 @@ export interface EditorSpec {
   validate?(row: EditorRow): string | null
   /** The natural key of a cleaned row (duplicates are rejected). */
   keyOf(row: EditorRow, index: number): string
-  save(rows: EditorRow[], actor: string): Promise<SaveCounts>
+  /** `loadedAt`: when the page loaded its rows (rows created after that are not removed by this save). */
+  save(rows: EditorRow[], actor: string, opts?: { loadedAt?: Date | null }): Promise<SaveCounts>
 }
 
 export class EditorError extends Error {}
+
+/** A row changed since the page loaded it: nothing was saved, the page has to reload. */
+export class EditorConflict extends EditorError {}
 
 /** Clean and validate the rows a page sent. Throws EditorError with a message that names the row. */
 export function cleanRows(spec: EditorSpec, input: unknown): EditorRow[] {

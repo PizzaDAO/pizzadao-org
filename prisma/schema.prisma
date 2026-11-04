@@ -1411,6 +1411,11 @@ model CallRecording {
   followupsDraftedAt DateTime?
   followupsAttempts  Int                 @default(0) // automatic drafting attempts; the sweep gives up at 3
   followupsError     String? // last drafting failure (no URLs, max 300 chars)
+  // Proposed crew task updates (plans/post-call-agenda-updates.md, ask 2): set once the proposal pass finished (even with zero items).
+  taskProposalsAt       DateTime?
+  taskProposalsAttempts Int       @default(0) // automatic attempts; the sweep gives up at 3
+  taskProposalsError    String? // last failure (no URLs, max 300 chars)
+  taskProposalsNudgedAt DateTime? // the optional crew-channel nudge was claimed (posted at most once)
   // Imported calls (scripts/calls/x-import.mjs). Discord recordings keep source DISCORD and null in the rest.
   source             CallSource          @default(DISCORD)
   sourceUrl          String? // original stream URL; reviewers only, never shown publicly
@@ -1609,6 +1614,38 @@ model CallAgendaPost {
 
   @@unique([eventId, startsAt])
   @@index([crewId, startsAt])
+}
+
+// Proposed crew task changes from a call (plans/post-call-agenda-updates.md, ask 2). Nothing changes a
+// task until a crew lead or admin applies it. kind: CREATE | UPDATE | DONE | RETIRE.
+// status: PENDING | APPLIED | DISMISSED | STALE | UNDONE (an applied retire that was undone).
+model CrewTaskProposal {
+  id            String    @id @default(cuid())
+  recordingId   String
+  crewId        String
+  sourceKey     String    @unique
+  kind          String
+  taskId        String? // null for CREATE
+  baseUpdatedAt DateTime? // the task's updatedAt when proposed (stale check)
+  changes       Json // {field: {from, to}}
+  edited        Json? // the approver's edits, applied instead of `changes`
+  leadName      String? // as said on the call
+  leadMemberId  String? // resolved; null when ambiguous
+  candidates    Json? // ambiguous lead matches to pick from
+  reason        String
+  quote         String? // transcript sentence; shown only to viewers who may read transcripts
+  startMs       Int?
+  confidence    String // high | medium
+  actionItemIdx Int?
+  status        String    @default("PENDING")
+  decidedBy     String?
+  decidedAt     DateTime?
+  error         String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  @@index([crewId, status, createdAt])
+  @@index([recordingId])
 }
 
 // DST sync of crew call times (plans/dst-crew-call-times.md): one row per planned / dry-run / applied /

@@ -20,6 +20,9 @@ import { ReviewActions } from "../ReviewActions";
 import { RedactSpeaker } from "../RedactSpeaker";
 import { RetryTranscription } from "../RetryTranscription";
 import { DraftFollowUps } from "../DraftFollowUps";
+import { ProposeTaskUpdates } from "../ProposeTaskUpdates";
+import { CrewCallUpdates } from "@/app/crew/[crewId]/CrewCallUpdates";
+import { crewInAllowlist, loadTaskProposalConfig } from "@/app/lib/call-tasks/config";
 import { prisma } from "@/app/lib/db";
 import { PERMANENT_TRANSCRIBE_ERRORS, PROGRESS } from "@/app/lib/calls/transcribe";
 import { HideLine } from "../HideLine";
@@ -92,6 +95,11 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
             : null;
     const followUpCount = await prisma.followUp.count({ where: { recordingId: rec.id } }).catch(() => 0);
     const canDraftFollowUps = importedFollowupsOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim();
+    // Proposed crew task updates (plans/post-call-agenda-updates.md): shown when the pass is on for this crew or proposals already exist.
+    const proposalCount = rec.crewId ? await prisma.crewTaskProposal.count({ where: { recordingId: rec.id } }).catch(() => 0) : 0;
+    const proposalCfg = await loadTaskProposalConfig();
+    const showTaskProposals =
+        !!rec.crewId && !imported && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && !!rec.summary?.trim() && ((proposalCfg.enabled && crewInAllowlist(proposalCfg, rec.crewId)) || proposalCount > 0);
     const hasAudio =!!rec.mixKey || rec.speakers.some((s) => s.trackKey);
 
     return (
@@ -175,6 +183,17 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                                 {t("followUpsLink")}
                             </Link>
                         </div>
+                    </section>
+                )}
+
+                {showTaskProposals && rec.crewId && (
+                    <section className="grid gap-2">
+                        <h2 className="text-xl font-bold m-0">{t("taskProposalsHeading")}</h2>
+                        <p className="m-0 text-foreground/70 text-sm">{t("taskProposalsHelp")}</p>
+                        <div className="flex flex-wrap items-center gap-4">
+                            <ProposeTaskUpdates recordingId={rec.id} />
+                        </div>
+                        <CrewCallUpdates crewId={rec.crewId} recordingId={rec.id} showEmpty />
                     </section>
                 )}
 

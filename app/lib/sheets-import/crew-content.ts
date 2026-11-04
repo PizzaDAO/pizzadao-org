@@ -11,8 +11,9 @@ import { crewContentFromDb } from '@/app/lib/crew-content'
 import { fetchGviz } from '@/app/lib/sheets/gviz'
 import { getSheetData } from '@/app/lib/sheets/member-repository'
 import { compareKeyed, type Importer, type ParityReport, type ParseIssue } from './framework'
-import { labelKeys, normalizeLabel, stableEqual } from './plan'
-import { isHttpUrlOrEmpty, type EditorRow, type EditorSpec, type SaveCounts } from './editor'
+import { labelKeys, stableEqual } from './plan'
+import { freshKey, nextDoneAt } from '@/app/lib/crew-tasks-write'
+import { EditorConflict, isHttpUrlOrEmpty, type EditorRow, type EditorSpec, type SaveCounts } from './editor'
 
 // ---------------------------------------------------------------------------
 // Records (one union so a single import run covers all three sections)
@@ -285,15 +286,6 @@ const text = (v: unknown) => (v === null || v === undefined ? '' : String(v).tri
 const orNull = (v: unknown) => (text(v) ? text(v) : null)
 const idKey = (row: EditorRow, index: number) => (row.id ? `id:${row.id}` : `new:${index}`)
 
-/** A natural key not used yet in this crew (web-created rows still match a later re-import by label). */
-function freshKey(label: string, taken: Set<string>): string {
-  const base = normalizeLabel(label) || 'item'
-  let key = base
-  for (let n = 2; taken.has(key); n++) key = `${base}#${n}`
-  taken.add(key)
-  return key
-}
-
 export type Row = { id: string; naturalKey: string; archived: boolean } & Record<string, unknown>
 
 /**
@@ -308,18 +300,30 @@ export async function saveCrewRows(o: {
   create: (data: Record<string, unknown>) => unknown
   update: (id: string, data: Record<string, unknown>) => unknown
   onChange?: (kind: 'create' | 'update' | 'archive', id: string | null, data: Record<string, unknown>) => unknown[]
+  /** When the page loaded its rows: rows created after that are not removed by this save. */
+  loadedAt?: Date | null
 }): Promise<SaveCounts> {
   const byId = new Map(o.existing.map((r) => [r.id, r]))
   const taken = new Set(o.existing.map((r) => r.naturalKey))
   const counts: SaveCounts = { created: 0, updated: 0, deactivated: 0, unchanged: 0 }
   const ops: unknown[] = []
   const kept = new Set<string>()
+  // A row that changed (or was hidden) since the page loaded it is never overwritten or un-hidden by a stale page.
+  const conflicts: string[] = []
+  for (const row of o.rows) {
+    const prev = row.id ? byId.get(String(row.id)) : undefined
+    if (!prev) continue
+    const rev = typeof row.rev === 'string' && row.rev ? row.rev : null
+    const updatedAt = (prev as { updatedAt?: Date }).updatedAt
+    if (prev.archived || (rev && updatedAt && updatedAt.toISOString() !== rev)) conflicts.push(String(row.id))
+  }
+  if (conflicts.length) throw new EditorConflict(`${conflicts.length === 1 ? 'A row was' : `${conflicts.length} rows were`} changed by someone else since you opened this page. Nothing was saved: reload the page and redo your edit.`)
   o.rows.forEach((row, position) => {
     const prev = row.id ? byId.get(String(row.id)) : undefined
     const data = o.fields(row, position, prev)
     if (prev) {
       kept.add(prev.id)
-      const changed = prev.archived || Object.entries(data).some(([k, v]) => JSON.stringify(prev[k] ?? null) !== JSON.stringify(v ?? null))
+      const changed = Object.entries(data).some(([k, v]) => JSON.stringify(prev[k] ?? null) !== JSON.stringify(v ?? null))
       if (!changed) {
         counts.unchanged++
         return
@@ -335,6 +339,9 @@ export async function saveCrewRows(o: {
   })
   for (const r of o.existing) {
     if (kept.has(r.id) || r.archived) continue
+    // Created after the page loaded (e.g. an applied call proposal): the page never saw it, so its absence is not a removal.
+    const createdAt = (r as { createdAt?: Date }).createdAt
+    if (o.loadedAt && createdAt && createdAt.getTime() > o.loadedAt.getTime()) continue
     counts.deactivated++
     ops.push(o.update(r.id, { archived: true }))
     ops.push(...(o.onChange?.('archive', r.id, {}) ?? []))
@@ -350,6 +357,7 @@ export function crewTasksEditor(crewId: string): EditorSpec {
     help: 'Tasks in the order they show. Stage: todo, now, doing, done or skip (done and skip close the task; todo, now and doing rank first; a blank stage ranks with the rest). Priority: Top, High, Mid or Low. Due is a date (YYYY-MM-DD). Lead id is the member id of whoever leads the task. Removing a row hides the task.',
     columns: [
       { key: 'id', label: 'Id', kind: 'text', readOnly: true, hidden: true },
+      { key: 'rev', label: 'Rev', kind: 'text', readOnly: true, hidden: true },
       { key: 'task', label: 'Task', kind: 'text', maxLength: 300, required: true },
       { key: 'url', label: 'Link', kind: 'text', maxLength: 500, placeholder: 'https://...' },
       { key: 'stage', label: 'Stage', kind: 'text', maxLength: 40 },
@@ -371,28 +379,27 @@ export function crewTasksEditor(crewId: string): EditorSpec {
     async list() {
       const rows = await prisma.crewTask.findMany({ where: { crewId, archived: false }, orderBy: [{ position: 'asc' }, { createdAt: 'asc' }] })
       return rows.map((t) => ({
-        id: t.id, task: t.label, url: t.url ?? '', stage: t.stage, priority: t.priority ?? '', due: t.due ?? '', lead: t.leadName ?? '',
+        id: t.id, rev: t.updatedAt.toISOString(), task: t.label, url: t.url ?? '', stage: t.stage, priority: t.priority ?? '', due: t.due ?? '', lead: t.leadName ?? '',
         leadId: t.leadMemberId ?? '', goal: t.goal ?? '', notes: t.notes ?? '',
       }))
     },
-    async save(rows, actor) {
+    async save(rows, actor, opts) {
       const existing = (await prisma.crewTask.findMany({ where: { crewId } })) as unknown as Row[]
       const counts = await saveCrewRows({
         rows,
+        loadedAt: opts?.loadedAt,
         existing,
         labelOf: (r) => text(r.task),
         fields: (r, position, prev) => {
           // Blank stays blank, as on the sheet (not active, shown empty).
           const stage = text(r.stage)
           const due = orNull(r.due)
-          const wasClosed = prev ? isClosedStage(String(prev.stage ?? '')) : false
-          const closed = isClosedStage(stage)
           return {
             label: text(r.task), url: orNull(r.url), stage, priority: orNull(r.priority), due,
             // The sheet's own due text only stays while the date is unchanged.
             dueRaw: prev && (prev.due ?? null) === due ? (prev.dueRaw ?? null) : null,
             leadName: orNull(r.lead), leadMemberId: orNull(r.leadId), goal: orNull(r.goal), notes: orNull(r.notes), position,
-            doneAt: closed ? (wasClosed ? (prev?.doneAt ?? new Date()) : new Date()) : null,
+            doneAt: nextDoneAt(stage, prev as { stage?: string | null; doneAt?: Date | null } | undefined),
           }
         },
         create: (data) => prisma.crewTask.create({ data: { ...data, crewId, createdBy: actor, updatedBy: actor } as never }),

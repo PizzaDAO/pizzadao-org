@@ -5,6 +5,7 @@ import { generateAndStoreSummary, ingestRecording } from '@/app/lib/calls/record
 import { recordAttendanceOnIngest } from '@/app/lib/calls/attendance-from-recordings'
 import { transcribeRecording } from '@/app/lib/calls/transcribe'
 import { draftFollowUpsForRecording } from '@/app/lib/followups/draft'
+import { proposeTasksForRecording } from '@/app/lib/call-tasks/run'
 import { pruneLiveChunks } from '@/app/lib/calls/live-run'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
@@ -42,6 +43,8 @@ export const POST = withErrorHandling(async (request: Request) => {
         const ok = await generateAndStoreSummary(id, { onlyIfEmpty: true })
         // Follow-up drafts (drafts only, once per call; the followups cron retries if this misses).
         if (ok) await draftFollowUpsForRecording(id, { budgetMs: 90_000 })
+        // Proposed crew task updates (off unless switched on for the crew; proposals only; the followups cron retries if this misses).
+        if (ok) await proposeTasksForRecording(id, { budgetMs: 90_000 }).catch((e) => console.error('[calls/ingest] task proposals failed:', e instanceof Error ? e.message : e))
       } catch (err) {
         console.error('[calls/ingest] summary failed:', err instanceof Error ? err.message : err)
       }

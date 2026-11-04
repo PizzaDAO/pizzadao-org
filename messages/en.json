@@ -1265,7 +1265,13 @@
     "labelLinked": "Linked to a member",
     "labelSave": "Save label",
     "labelReset": "Reset to \"Speaker N\"",
-    "labelsChanged": "Speaker labels changed after the summary was written. Regenerate the summary so it uses the names."
+    "labelsChanged": "Speaker labels changed after the summary was written. Regenerate the summary so it uses the names.",
+    "taskProposalsHeading": "Proposed task updates",
+    "taskProposalsHelp": "Re-run after editing the summary. Existing proposals are kept; only new ones are added. Nothing changes until a crew lead or admin applies it.",
+    "proposeTasks": "Propose task updates",
+    "proposingTasks": "Working...",
+    "tasksProposed": "{count, plural, =0 {No new proposals found} one {# new proposal} other {# new proposals}}",
+    "proposeTasksError": "Could not propose task updates (is it switched on for this crew?)."
   },
   "crewDrafts": {
     "title": "Drafts",
@@ -2131,5 +2137,54 @@
     "sendAfter": "Scheduled for {value}",
     "expiresAt": "Expires {value}",
     "attempts": "Attempts: {value}"
+  },
+  "crewCallUpdates": {
+    "title": "Updates from the last call",
+    "intro": "Task changes proposed from what was said on the call. Nothing changes until you apply it.",
+    "empty": "No updates waiting.",
+    "kinds": {
+      "CREATE": "New",
+      "UPDATE": "Change",
+      "DONE": "Done",
+      "RETIRE": "Retire"
+    },
+    "statuses": {
+      "PENDING": "Waiting",
+      "APPLIED": "Applied",
+      "DISMISSED": "Dismissed",
+      "STALE": "Out of date"
+    },
+    "fields": {
+      "label": "Task",
+      "stage": "Stage",
+      "priority": "Priority",
+      "due": "Due",
+      "leadName": "Lead"
+    },
+    "none": "none",
+    "newTask": "New task: {label}",
+    "markDone": "Mark done: {label}",
+    "retire": "Retire: {label}",
+    "retireHint": "The task is hidden, not deleted.",
+    "taskChanged": "This task changed since the call. Check it before applying.",
+    "taskGone": "This task no longer exists.",
+    "conflict": "The task changed since this was proposed. Click Apply anyway to confirm.",
+    "pickLead": "Who is \"{name}\"?",
+    "chooseMember": "Choose a member",
+    "skipLead": "Leave the lead as it is",
+    "pickLeadFirst": "Pick who leads it first.",
+    "apply": "Apply",
+    "applyAnyway": "Apply anyway",
+    "applyAll": "Apply all ({count})",
+    "edit": "Edit",
+    "cancelEdit": "Cancel",
+    "dismiss": "Dismiss",
+    "working": "Working...",
+    "genericError": "Something went wrong. Try again.",
+    "appliedAll": "{applied} applied, {skipped} need a closer look.",
+    "confirmClose": "This closes or hides the task. Apply it?",
+    "applyAllHint": "Apply all skips changes that close or hide a task: apply those one by one.",
+    "retiredHeading": "Recently retired from calls",
+    "undoRetire": "Undo (show the task again)"
   }
 }
