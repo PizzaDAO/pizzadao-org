@@ -111,6 +111,11 @@ describe('recurrence rule', () => {
     expect(shiftedRecurrenceRule(weekly, iso('2026-11-03T23:30:00Z'), iso('2026-11-04T00:30:00Z')).by_weekday).toEqual([2])
     expect(shiftedRecurrenceRule({ ...weekly, by_weekday: [0] }, iso('2026-11-02T00:30:00Z'), iso('2026-11-01T23:30:00Z')).by_weekday).toEqual([6])
   })
+  it('moves by_month_day with a UTC date change', () => {
+    const monthly = { ...weekly, frequency: 3, by_weekday: null, by_month_day: [3, -1] }
+    expect(shiftedRecurrenceRule(monthly, iso('2026-11-03T23:30:00Z'), iso('2026-11-04T00:30:00Z')).by_month_day).toEqual([4, -1])
+    expect(shiftedRecurrenceRule(monthly, iso('2026-11-03T18:00:00Z'), iso('2026-11-03T19:00:00Z')).by_month_day).toEqual([3, -1])
+  })
   it('is sent with the patch', () => {
     const [p] = plan([ev('1', '2026-11-03T18:00:00Z', { recurrence_rule: weekly })])
     expect(p.body?.recurrence_rule).toMatchObject({ start: '2026-11-03T19:00:00.000Z', frequency: 2 })
@@ -163,6 +168,17 @@ describe('executeEventTimeSync', () => {
     expect(patch).toHaveBeenCalledWith('1', { scheduled_start_time: '2026-11-03T19:00:00.000Z' }, 'DST sync: 14:00 America/New_York')
     expect(logged.every((l) => l.action === 'patched' && l.newStart)).toBe(true)
     expect(formatSyncSummary(r)).toMatch(/Crew 1: moved/)
+  })
+
+  it('logs the recurrence rule Discord returned after the patch', async () => {
+    const rule = { start: '2026-11-03T19:00:00+00:00', frequency: 2, interval: 1, by_weekday: [1] }
+    const { deps, logged } = makeDeps([ev('1', '2026-11-03T18:00:00Z', { recurrence_rule: rule })], {
+      patchEvent: async (id, body) => ({ id, scheduled_start_time: body.scheduled_start_time as string, recurrence_rule: rule }),
+    })
+    await executeEventTimeSync({ ...base, rows: [row('1')], dryRun: false }, deps)
+    expect(logged[0].action).toBe('patched')
+    expect(logged[0].error).toContain('recurrence_rule after:')
+    expect(logged[0].error).toContain('by_weekday')
   })
 
   it('logs a skipped outcome once, not on every run', async () => {

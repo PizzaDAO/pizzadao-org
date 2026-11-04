@@ -53,6 +53,11 @@ function shiftDays(days: unknown, by: number): unknown {
 }
 
 /** recurrence_rule for the PATCH: start moved to the new start, weekdays follow a UTC day change; read-only fields dropped. */
+function utcYmd(ms: number): [number, number, number] {
+  const d = new Date(ms)
+  return [d.getUTCFullYear(), d.getUTCMonth(), d.getUTCDate()]
+}
+
 export function shiftedRecurrenceRule(rule: Record<string, unknown>, oldStartMs: number, newStartMs: number): Record<string, unknown> {
   const dayBy = discordWeekday(newStartMs) - discordWeekday(oldStartMs)
   const out: Record<string, unknown> = {
@@ -69,7 +74,11 @@ export function shiftedRecurrenceRule(rule: Record<string, unknown>, oldStartMs:
     )
   }
   if (Array.isArray(rule.by_month)) out.by_month = rule.by_month
-  if (Array.isArray(rule.by_month_day)) out.by_month_day = rule.by_month_day
+  if (Array.isArray(rule.by_month_day)) {
+    // A UTC date change moves the day of month too (positive days only; a result outside 1-31 is left as it was).
+    const dateBy = Math.round((Date.UTC(...utcYmd(newStartMs)) - Date.UTC(...utcYmd(oldStartMs))) / 86_400_000)
+    out.by_month_day = rule.by_month_day.map((d) => (typeof d === 'number' && d > 0 && d + dateBy >= 1 && d + dateBy <= 31 ? d + dateBy : d))
+  }
   return out
 }
 
@@ -273,7 +282,9 @@ export async function executeEventTimeSync(
       const ok = Number.isFinite(got) && Math.abs(got - again.newStartMs) < MIN
       if (ok) {
         result.patched++
-        await log(again, 'patched', { newStartMs: got, always: true })
+        // Keep what Discord answered with for the recurrence rule, so a wrong series is visible in the log.
+        const after = res.recurrence_rule ? `recurrence_rule after: ${JSON.stringify(res.recurrence_rule)}`.slice(0, 500) : null
+        await log(again, 'patched', { newStartMs: got, error: after, always: true })
       } else {
         result.failed++
         await log(again, 'failed', { newStartMs: Number.isFinite(got) ? got : null, error: 'Discord answered with a different start than requested', always: true })
