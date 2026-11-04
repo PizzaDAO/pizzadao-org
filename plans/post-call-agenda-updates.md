@@ -4,6 +4,13 @@
 > (near-live chunked transcription, app-side) plus Option C (typed `action: ...` lines), both behind
 > off-by-default settings and a crew allowlist. Option B and Ask 2 (proposed task updates) are later.
 
+> **Status (2026-11-03):** Ask 2 phase 2 built (proposals table, extraction pass, apply/dismiss/apply-all,
+> crew-page and `/admin/calls/<id>` panels, settings `calls.taskProposals*`, optional crew-channel nudge,
+> all off by default). Differences from the design below: `kind`/`status` are plain strings (no enums);
+> the shared task writer is `app/lib/crew-tasks-write.ts`; the action items fed to the model are the
+> stored ones plus the live ones re-merged with redactions applied; `CallAgendaPost.items`, the
+> agenda dedupe/pending line, follow-up cross-link and the lead DM are not built yet.
+
 Two asks from a crew call:
 
 1. When an action item is said on a call, Metalhead confirms it in text ("Action item recorded: ...")

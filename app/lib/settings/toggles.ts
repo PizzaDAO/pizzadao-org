@@ -49,6 +49,8 @@ export const TOGGLES = {
   'calls.welcomeEnabled': { env: 'CALL_WELCOME_ENABLED', legacy: ON_WORDS },
   'calls.liveActionItemsEnabled': { env: 'CALL_LIVE_ACTION_ITEMS_ENABLED', legacy: ON_WORDS },
   'calls.chatActionItemsEnabled': { env: 'CALL_CHAT_ACTION_ITEMS_ENABLED', legacy: ON_WORDS },
+  'calls.taskProposalsEnabled': { env: 'CALL_TASK_PROPOSALS_ENABLED', legacy: ON_WORDS },
+  'calls.taskProposalsNudgeEnabled': { env: 'CALL_TASK_PROPOSALS_NUDGE_ENABLED', legacy: ON_WORDS },
   'calls.importedRecapPostEnabled': { env: 'CALL_IMPORT_RECAP_ENABLED', legacy: ON_WORDS },
   'calls.importedFollowupsEnabled': { env: 'CALL_IMPORT_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   'calls.importedAgendaContext': { env: 'CALL_IMPORT_AGENDA_ENABLED', legacy: ON_WORDS },

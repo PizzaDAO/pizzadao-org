@@ -1262,7 +1262,13 @@
     "labelLinked": "Vinculado a un miembro",
     "labelSave": "Guardar etiqueta",
     "labelReset": "Volver a \"Hablante N\"",
-    "labelsChanged": "Las etiquetas de los hablantes cambiaron después de escribir el resumen. Regenera el resumen para que use los nombres."
+    "labelsChanged": "Las etiquetas de los hablantes cambiaron después de escribir el resumen. Regenera el resumen para que use los nombres.",
+    "taskProposalsHeading": "Cambios de tareas propuestos",
+    "taskProposalsHelp": "Vuelve a ejecutarlo tras editar el resumen. Se conservan las propuestas existentes; solo se añaden las nuevas. Nada cambia hasta que un líder del crew o un admin lo aplique.",
+    "proposeTasks": "Proponer cambios de tareas",
+    "proposingTasks": "Trabajando...",
+    "tasksProposed": "{count, plural, =0 {No se encontraron propuestas nuevas} one {# propuesta nueva} other {# propuestas nuevas}}",
+    "proposeTasksError": "No se pudieron proponer cambios de tareas (¿está activado para este crew?)."
   },
   "crewDrafts": {
     "title": "Borradores",
@@ -2125,5 +2131,50 @@
     "sendAfter": "Programado para {value}",
     "expiresAt": "Caduca {value}",
     "attempts": "Intentos: {value}"
+  },
+  "crewCallUpdates": {
+    "title": "Novedades de la última llamada",
+    "intro": "Cambios en las tareas propuestos a partir de lo que se dijo en la llamada. Nada cambia hasta que lo apliques.",
+    "empty": "No hay novedades pendientes.",
+    "kinds": {
+      "CREATE": "Nueva",
+      "UPDATE": "Cambio",
+      "DONE": "Hecha",
+      "RETIRE": "Retirar"
+    },
+    "statuses": {
+      "PENDING": "Pendiente",
+      "APPLIED": "Aplicada",
+      "DISMISSED": "Descartada",
+      "STALE": "Desactualizada"
+    },
+    "fields": {
+      "label": "Tarea",
+      "stage": "Etapa",
+      "priority": "Prioridad",
+      "due": "Fecha límite",
+      "leadName": "Responsable"
+    },
+    "none": "ninguno",
+    "newTask": "Nueva tarea: {label}",
+    "markDone": "Marcar como hecha: {label}",
+    "retire": "Retirar: {label}",
+    "retireHint": "La tarea se oculta, no se borra.",
+    "taskChanged": "Esta tarea cambió desde la llamada. Revísala antes de aplicar.",
+    "taskGone": "Esta tarea ya no existe.",
+    "conflict": "La tarea cambió desde que se propuso. Pulsa Aplicar de todos modos para confirmar.",
+    "pickLead": "¿Quién es \"{name}\"?",
+    "chooseMember": "Elige un miembro",
+    "skipLead": "Dejar el responsable como está",
+    "pickLeadFirst": "Elige primero quién la lidera.",
+    "apply": "Aplicar",
+    "applyAnyway": "Aplicar de todos modos",
+    "applyAll": "Aplicar todo ({count})",
+    "edit": "Editar",
+    "cancelEdit": "Cancelar",
+    "dismiss": "Descartar",
+    "working": "Trabajando...",
+    "genericError": "Algo salió mal. Inténtalo de nuevo.",
+    "appliedAll": "{applied} aplicadas, {skipped} requieren revisión."
   }
 }

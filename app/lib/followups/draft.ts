@@ -19,7 +19,7 @@ export type DraftResult = 'ok' | 'already' | 'disabled' | 'crew-excluded' | 'not
 export const MAX_DRAFT_ATTEMPTS = 3
 const WINDOW_DAYS = 14
 
-async function loadMembers(): Promise<MemberRef[]> {
+export async function loadMembers(): Promise<MemberRef[]> {
   try {
     const all = await fetchAllMembers({ includeDiscordId: true, includeUnonboarded: true })
     return all.map((m) => ({ id: m.id, name: m.name, discordId: m.discordId ?? '' }))

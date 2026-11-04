@@ -16,6 +16,7 @@ import {
 import { CrewGettingStarted } from './CrewGettingStarted'
 import { CrewBounties } from './CrewBounties'
 import { CrewDrafts } from './CrewDrafts'
+import { CrewCallUpdates } from './CrewCallUpdates'
 import { crewHasFeature } from '@/app/lib/crew-features'
 
 // Loading stages to show progress
@@ -137,6 +138,8 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
   const [showOpenOnly, setShowOpenOnly] = useState(false)
   const [claimingTask, setClaimingTask] = useState<string | null>(null)
   const [loginPrompt, setLoginPrompt] = useState<string | null>(null)
+  // Bumped after a call update is applied, so the task list reloads.
+  const [reloadKey, setReloadKey] = useState(0)
   const toast = useToast()
 
   const toggleSection = (section: string) => {
@@ -165,7 +168,7 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
       }
     }
     fetchCrew()
-  }, [crewId])
+  }, [crewId, reloadKey])
 
   // Fetch user data
   useEffect(() => {
@@ -711,6 +714,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
               </div>
             </div>
           )}
+
+          {/* Task updates proposed from the last call (crew leads and admins only; renders nothing for anyone else) */}
+          <CrewCallUpdates crewId={crew.id} onApplied={() => setReloadKey((k) => k + 1)} />
 
           {/* Crew bounties (jalapeno-82565) */}
           <CrewBounties crewId={crew.id} crewLabel={crew.label} hideWhenEmpty viewerDiscordId={user?.discordId} />
@@ -1611,6 +1617,9 @@ export default function CrewPageClient({ params }: { params: Promise<{ crewId: s
             </div>
           )
         })()}
+
+        {/* Task updates proposed from the last call (crew leads and admins only; renders nothing for anyone else) */}
+        <CrewCallUpdates crewId={crew.id} onApplied={() => setReloadKey((k) => k + 1)} />
 
         {/* Crew bounties (jalapeno-82565) */}
         <CrewBounties crewId={crew.id} crewLabel={crew.label} viewerDiscordId={user?.discordId} />
