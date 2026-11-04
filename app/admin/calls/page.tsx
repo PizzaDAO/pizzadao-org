@@ -12,6 +12,7 @@ import { listRecordingsPage, type ListRecordingsOpts, type SourceFilter } from "
 import { bulkActionMax } from "@/app/lib/calls/bulk";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
 import AgendaPreview from "./AgendaPreview";
+import EventTimesPanel from "./EventTimesPanel";
 import { PostFilters } from "./PostFilters";
 import { RecordingsTable } from "./RecordingsTable";
 
@@ -98,6 +99,8 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                 )}
 
                 <AgendaPreview />
+
+                <EventTimesPanel />
 
                 <nav aria-label={t("filterSource")} className="flex flex-wrap items-center gap-x-5 gap-y-2 text-sm">
                     <span className="text-foreground/60">{t("filterSource")}:</span>
