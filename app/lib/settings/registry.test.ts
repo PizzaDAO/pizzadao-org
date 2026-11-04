@@ -118,6 +118,9 @@ describe('settings registry', () => {
       ['calls.recordingLine', "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded."],
       ['calls.endSongTriggerEnabled', false],
       ['calls.endSongMinHumans', 1],
+      ['calls.dstFixEnabled', false],
+      ['calls.dstFixDryRun', true],
+      ['calls.dstFixMaxShiftMinutes', 120],
       ['calls.endSongCrewMap', 'Ops = Ops\nTech = Tech\nComms = Comms\nBiz Dev = Biz Dev\nEvents = Events\nArt = Art\nMerch = Merch\nReal Estate = Real Estate\nGovernance = Governance'],
       ['calls.progressReportEnabled', false],
       ['calls.progressMaxItems', 8],
@@ -161,12 +164,14 @@ describe('settings registry', () => {
       ['discord.missionsAnnounceChannelId', ''],
       ['discord.announceChannelId', ''],
       ['discord.callVoiceChannelId', ''],
+      ['discord.dstFixChannelId', ''],
       ['discord.proposalsChannelId', ''],
       ['discord.proposalsPingRoleId', ''],
       ['missions.slaPingRoleId', ''],
       ['missions.reviewerRoleIds', []],
       ['announce.roleIds', []],
       ['articles.authorRoleIds', []],
+      ['calls.eventLocalTimes', []],
     ])
   })
 

@@ -217,3 +217,60 @@ export async function editDiscordMessage(
     throw new DiscordPostError(`Discord API error ${res.status} editing ${where}: ${text.slice(0, 300)}`, res.status);
   }
 }
+
+export interface DiscordScheduledEventRaw {
+  id: string;
+  name?: string;
+  channel_id?: string | null;
+  status?: number;
+  scheduled_start_time?: string;
+  scheduled_end_time?: string | null;
+  recurrence_rule?: Record<string, unknown> | null;
+}
+
+/**
+ * GET/PATCH a guild scheduled event (bot token). A short JSON 429 is waited out and retried (a 429
+ * changed nothing); a Cloudflare block or any other error throws DiscordPostError. PATCH sends
+ * `reason` as X-Audit-Log-Reason so Discord's audit log shows why.
+ */
+export async function discordScheduledEventRequest(
+  req: { method: "GET" | "PATCH"; guildId: string; eventId?: string; botToken: string; body?: Record<string, unknown>; reason?: string },
+  opts: DiscordPostOptions = {},
+): Promise<DiscordScheduledEventRaw | DiscordScheduledEventRaw[]> {
+  const maxAttempts = opts.maxAttempts ?? 3;
+  const maxWaitMs = opts.maxWaitMs ?? 10_000;
+  const sleep = opts.sleep ?? defaultSleep;
+  const doFetch = opts.fetchImpl ?? fetch;
+  const id = /^[0-9]{5,25}$/;
+  if (!id.test(req.guildId) || (req.eventId !== undefined && !id.test(req.eventId))) {
+    throw new DiscordPostError("Bad guild or event id", 400);
+  }
+  const url = `https://discord.com/api/v10/guilds/${req.guildId}/scheduled-events${req.eventId ? `/${req.eventId}` : ""}`;
+  const headers: Record<string, string> = { Authorization: `Bot ${req.botToken}` };
+  if (req.method === "PATCH") headers["Content-Type"] = "application/json";
+  // Header values must be ASCII; Discord limits the reason to 512 characters.
+  if (req.reason) headers["X-Audit-Log-Reason"] = encodeURIComponent(req.reason).slice(0, 512);
+  const init: RequestInit = {
+    method: req.method,
+    headers,
+    body: req.body ? JSON.stringify(req.body) : undefined,
+    cache: "no-store",
+    signal: AbortSignal.timeout(8000),
+  };
+  const where = `scheduled events${req.eventId ? ` ${req.eventId}` : ""}`;
+  for (let attempt = 1; ; attempt++) {
+    const res = await doFetch(url, init);
+    const text = await res.text();
+    if (res.ok) return JSON.parse(text) as DiscordScheduledEventRaw | DiscordScheduledEventRaw[];
+    if (res.status === 429) {
+      const { retryAfterMs, cloudflare } = parseRateLimit(res.headers, text);
+      const wait = retryAfterMs ?? 1000;
+      if (!cloudflare && attempt < maxAttempts && wait <= maxWaitMs) {
+        await sleep(wait + 250);
+        continue;
+      }
+      throw new DiscordPostError(`Discord rate limit on ${where}`, 429, wait, cloudflare);
+    }
+    throw new DiscordPostError(`Discord API error ${res.status} on ${where}: ${text.slice(0, 300)}`, res.status);
+  }
+}
