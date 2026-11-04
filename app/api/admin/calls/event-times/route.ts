@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server'
 import { requireCallReviewer } from '@/app/lib/calls/access'
-import { fetchCallEvents, proposeRows, runEventTimeSync } from '@/app/lib/calls/event-time-sync'
-import { DEFAULT_CALL_TIME_ZONE } from '@/app/lib/calls/zoned-time'
+import { fetchCallEvents, intendedStart, proposeRows, runEventTimeSync } from '@/app/lib/calls/event-time-sync'
+import { DEFAULT_CALL_TIME_ZONE, wallTimeIn } from '@/app/lib/calls/zoned-time'
 import { withErrorHandling } from '@/app/lib/errors/error-response'
 import { ValidationError } from '@/app/lib/errors/api-errors'
 import { getSetting } from '@/app/lib/settings'
@@ -12,7 +12,7 @@ export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
 /**
- * POST /api/admin/calls/event-times (Dread Pizza Roberts only, like call review)
+ * GET / POST /api/admin/calls/event-times (Dread Pizza Roberts only, like call review)
  *   { action: 'fill' }                  add a row for every recurring call-channel event that has none,
  *                                       from the event's CURRENT next start in America/New_York. Saved
  *                                       through the normal settings path (audited).
@@ -20,6 +20,29 @@ export const maxDuration = 60
  *                                       `now` lets an admin preview a coming clock change.
  */
 const NO_STORE = { headers: { 'Cache-Control': 'private, no-store' } }
+
+/** GET: where Discord has each configured event now (read on demand from the panel, never on page load). */
+export const GET = withErrorHandling(async () => {
+  const auth = await requireCallReviewer()
+  if (!auth.ok) return auth.response
+  const { events } = await fetchCallEvents()
+  const rows = await getSetting('calls.eventLocalTimes')
+  return NextResponse.json(
+    {
+      rows: rows.map((r) => {
+        const e = events.find((x) => x.id === r.eventId)
+        const target = e ? intendedStart(e.startMs, r) : null
+        return {
+          eventId: r.eventId,
+          startMs: e ? e.startMs : null,
+          localNow: e ? wallTimeIn(e.startMs, r.timeZone) : null,
+          driftMin: e && target !== null ? Math.round((target - e.startMs) / 60_000) : null,
+        }
+      }),
+    },
+    NO_STORE,
+  )
+})
 
 export const POST = withErrorHandling(async (request: Request) => {
   const auth = await requireCallReviewer()
