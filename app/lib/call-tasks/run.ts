@@ -44,8 +44,10 @@ export async function loadTaskRefs(crewId: string, now: Date): Promise<TaskRef[]
 }
 
 /** Store the new drafts (existing sourceKeys are left alone). Returns the number created. */
-export async function storeProposals(recordingId: string, crewId: string, drafts: ProposalDraft[]): Promise<number> {
+export async function storeProposals(recordingId: string, crewId: string, drafts: ProposalDraft[], startedAt?: Date | null): Promise<number> {
   if (drafts.length === 0) return 0
+  // Only proposals from OLDER calls of the crew go stale (a re-run for an earlier call must not touch a newer call's).
+  const olderIds = startedAt ? (await prisma.callRecording.findMany({ where: { crewId, startedAt: { lt: startedAt }, id: { not: recordingId } }, select: { id: true } })).map((r) => r.id) : []
   const existing = new Set((await prisma.crewTaskProposal.findMany({ where: { sourceKey: { in: drafts.map((d) => d.sourceKey) } }, select: { sourceKey: true } })).map((r) => r.sourceKey))
   let created = 0
   for (const d of drafts) {
@@ -72,8 +74,8 @@ export async function storeProposals(recordingId: string, crewId: string, drafts
       })
       created++
       // A newer call proposes a change to the same task: older undecided proposals for it are out of date.
-      if (d.taskId) {
-        await prisma.crewTaskProposal.updateMany({ where: { crewId, taskId: d.taskId, status: 'PENDING', recordingId: { not: recordingId } }, data: { status: 'STALE' } })
+      if (d.taskId && olderIds.length > 0) {
+        await prisma.crewTaskProposal.updateMany({ where: { crewId, taskId: d.taskId, status: 'PENDING', recordingId: { in: olderIds } }, data: { status: 'STALE' } })
       }
     } catch (e) {
       // A parallel run created the same sourceKey first: that is the idempotency guard working.
@@ -93,6 +95,7 @@ export async function proposeTasksForRecording(
     select: {
       id: true,
       sessionId: true,
+      startedAt: true,
       status: true,
       source: true,
       crewId: true,
@@ -177,7 +180,7 @@ export async function proposeTasksForRecording(
       settings,
       { model: cfg.model, budgetMs: opts.budgetMs },
     )
-    const created = await storeProposals(id, crewId, drafts)
+    const created = await storeProposals(id, crewId, drafts, rec.startedAt)
     await prisma.callRecording.update({ where: { id }, data: { taskProposalsAt: now, taskProposalsError: null } })
     if (created > 0 && cfg.nudge) await nudgeCrew(id).catch((e) => console.warn('[call-tasks] nudge failed:', e instanceof Error ? e.message : e))
     return { result: 'ok', created }

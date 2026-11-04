@@ -32,10 +32,10 @@ export interface ProposalView {
 
 export async function listProposalViews(
   crewId: string,
-  opts: { recordingId?: string; statuses?: string[]; includeQuote: boolean; limit?: number },
+  opts: { recordingId?: string; statuses?: string[]; kinds?: string[]; since?: Date; includeQuote: boolean; limit?: number },
 ): Promise<ProposalView[]> {
   const rows = await prisma.crewTaskProposal.findMany({
-    where: { crewId, status: { in: opts.statuses ?? ['PENDING'] }, ...(opts.recordingId ? { recordingId: opts.recordingId } : {}) },
+    where: { crewId, status: { in: opts.statuses ?? ['PENDING'] }, ...(opts.recordingId ? { recordingId: opts.recordingId } : {}), ...(opts.kinds ? { kind: { in: opts.kinds } } : {}), ...(opts.since ? { decidedAt: { gte: opts.since } } : {}) },
     orderBy: [{ createdAt: 'desc' }, { id: 'asc' }],
     take: opts.limit ?? 100,
   })

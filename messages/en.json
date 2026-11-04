@@ -2175,6 +2175,10 @@
     "dismiss": "Dismiss",
     "working": "Working...",
     "genericError": "Something went wrong. Try again.",
-    "appliedAll": "{applied} applied, {skipped} need a closer look."
+    "appliedAll": "{applied} applied, {skipped} need a closer look.",
+    "confirmClose": "This closes or hides the task. Apply it?",
+    "applyAllHint": "Apply all skips changes that close or hide a task: apply those one by one.",
+    "retiredHeading": "Recently retired from calls",
+    "undoRetire": "Undo (show the task again)"
   }
 }

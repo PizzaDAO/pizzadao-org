@@ -32,6 +32,7 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
   const [edit, setEdit] = useState<Edit | null>(null)
   const [confirmForce, setConfirmForce] = useState<Set<string>>(new Set())
   const [picked, setPicked] = useState<Record<string, string>>({})
+  const [retired, setRetired] = useState<ProposalView[]>([])
 
   const load = useCallback(async () => {
     try {
@@ -42,6 +43,8 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
       }
       const data = (await res.json()) as { proposals?: ProposalView[] }
       setRows(data.proposals ?? [])
+      const r2 = await fetch(`${base}?retired=1`, { cache: 'no-store' }).catch(() => null)
+      if (r2?.ok) setRetired((((await r2.json()) as { proposals?: ProposalView[] }).proposals ?? []).filter((x) => !recordingId || x.recordingId === recordingId))
     } catch {
       setRows(null)
     }
@@ -52,9 +55,9 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
   }, [load])
 
   if (rows === null) return null
-  if (rows.length === 0 && !showEmpty) return null
+  if (rows.length === 0 && retired.length === 0 && !showEmpty) return null
 
-  async function decide(p: ProposalView, action: 'apply' | 'dismiss', extra: { edits?: Record<string, unknown>; force?: boolean } = {}) {
+  async function decide(p: ProposalView, action: 'apply' | 'dismiss' | 'undo', extra: { edits?: Record<string, unknown>; force?: boolean; confirmed?: boolean } = {}) {
     setBusy(p.id)
     setError('')
     setNotice('')
@@ -65,6 +68,11 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
         body: JSON.stringify({ action, ...extra }),
       })
       const data = (await res.json().catch(() => ({}))) as { error?: string; code?: string }
+      if (res.status === 409 && data.code === 'needs-confirm') {
+        setBusy(null)
+        if (window.confirm(t('confirmClose'))) await decide(p, action, { ...extra, confirmed: true })
+        return
+      }
       if (res.status === 409 && data.code === 'conflict') {
         setConfirmForce((s) => new Set(s).add(p.id))
         setError(t('conflict'))
@@ -73,7 +81,7 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
       } else {
         setEditing(null)
         await load()
-        if (action === 'apply') onApplied?.()
+        if (action !== 'dismiss') onApplied?.()
       }
     } catch {
       setError(t('genericError'))
@@ -153,6 +161,7 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
         </p>
       )}
       {rows.length === 0 && <p style={muted}>{t('empty')}</p>}
+      {pending.length > 1 && <p style={{ ...muted, margin: '0 0 8px' }}>{t('applyAllHint')}</p>}
       <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 12 }}>
         {rows.map((p) => {
           const lines = Object.entries(p.changes).filter(([f]) => f !== 'leadMemberId' && f !== 'archived' && !(p.kind === 'CREATE' && f === 'label'))
@@ -272,6 +281,21 @@ export function CrewCallUpdates({ crewId, recordingId, showEmpty = false, onAppl
           )
         })}
       </ul>
+      {retired.length > 0 && (
+        <div style={{ marginTop: 16 }}>
+          <h3 style={{ margin: '0 0 6px', fontSize: 15, fontWeight: 700 }}>{t('retiredHeading')}</h3>
+          <ul style={{ listStyle: 'none', padding: 0, margin: 0, display: 'grid', gap: 6 }}>
+            {retired.map((p) => (
+              <li key={p.id} data-testid="retired-update" style={{ display: 'flex', flexWrap: 'wrap', gap: 8, alignItems: 'center', fontSize: 14 }}>
+                <span style={{ overflowWrap: 'anywhere' }}>{p.taskLabel}</span>
+                <button type="button" style={{ ...btn('secondary'), ...small }} disabled={busy !== null} onClick={() => void decide(p, 'undo')}>
+                  {t('undoRetire')}
+                </button>
+              </li>
+            ))}
+          </ul>
+        </div>
+      )}
     </div>
   )
 }

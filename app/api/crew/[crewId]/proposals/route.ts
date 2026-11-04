@@ -25,9 +25,13 @@ export async function GET(request: Request, { params }: { params: Promise<{ crew
   const url = new URL(request.url)
   const recordingId = url.searchParams.get('recordingId')?.trim() || undefined
   const all = url.searchParams.get('status') === 'all'
+  const retired = url.searchParams.get('retired') === '1'
   try {
     const includeQuote = await canViewCallTranscript(auth.session.discordId)
-    const proposals = await listProposalViews(crewId, { recordingId, statuses: all ? ['PENDING', 'APPLIED', 'DISMISSED', 'STALE'] : ['PENDING'], includeQuote })
+    // Recently retired tasks (applied RETIRE proposals), so a retire can be undone.
+    const proposals = retired
+      ? await listProposalViews(crewId, { statuses: ['APPLIED'], kinds: ['RETIRE'], since: new Date(Date.now() - 30 * 86_400_000), includeQuote: false, limit: 30 })
+      : await listProposalViews(crewId, { recordingId, statuses: all ? ['PENDING', 'APPLIED', 'DISMISSED', 'STALE'] : ['PENDING'], includeQuote })
     return json({ proposals, editable: true })
   } catch (e) {
     console.error('[crew-proposals] list failed', e instanceof Error ? e.message : e)

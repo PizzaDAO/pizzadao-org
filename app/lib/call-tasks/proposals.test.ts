@@ -112,6 +112,8 @@ describe('parseProposals', () => {
     const filter = { ...EMPTY_POST_FILTER, blockedTerms: ['secretword'] }
     expect(run([item({ task: 'T2', stage: 'now', reason: 'About the secretword plan' })], ctx({ filter }))).toEqual([])
     expect(run([item({ kind: 'CREATE', task: null, newLabel: 'Do the secretword thing' })], ctx({ filter }))).toEqual([])
+    expect(run([item({ task: 'T2', stage: 'now', quote: 'we talked about the secretword plan' })], ctx({ filter }))).toEqual([]) // the quote too
+    expect(run([item({ kind: 'CREATE', task: null, newLabel: 'Fine label here', quote: 'secretword' })], ctx({ filter }))).toEqual([])
     expect(run([item({ task: 'T2', stage: 'now' })], ctx({ filter }))).toHaveLength(1)
   })
 

@@ -14,7 +14,7 @@ import { normalizeName, resolveOwner, type Candidate, type MemberRef } from '@/a
 
 export const PROPOSAL_KINDS = ['CREATE', 'UPDATE', 'DONE', 'RETIRE'] as const
 export type ProposalKind = (typeof PROPOSAL_KINDS)[number]
-export type ProposalStatus = 'PENDING' | 'APPLIED' | 'DISMISSED' | 'STALE' | 'FAILED'
+export type ProposalStatus = 'PENDING' | 'APPLIED' | 'DISMISSED' | 'STALE' | 'UNDONE'
 
 /** The task fields a proposal can change (stored flat as `{field: {from, to}}`). */
 export const PROPOSAL_FIELDS = ['label', 'stage', 'priority', 'due', 'leadName', 'leadMemberId', 'archived'] as const
@@ -177,7 +177,7 @@ export function parseProposals(raw: unknown, ctx: ParseContext): ProposalDraft[]
 
     if (it.kind === 'CREATE') {
       const label = cleanItemText(it.newLabel, 300)
-      if (!label || blocked(label, reason)) continue
+      if (!label || blocked(label, reason, it.quote)) continue
       if (ctx.openLabels.some((l) => normalizeLabel(l) === normalizeLabel(label) || isSameItem(l, label))) continue
       const key = makeProposalKey(ctx.recordingId, 'CREATE', null, label)
       if (seen.has(key)) continue
@@ -197,7 +197,7 @@ export function parseProposals(raw: unknown, ctx: ParseContext): ProposalDraft[]
 
     const task = it.task ? ctx.tasksByRef.get(it.task.trim().toUpperCase()) : undefined
     if (!task || touched.has(task.id)) continue
-    if (blocked(task.label, reason)) continue
+    if (blocked(task.label, reason, it.quote)) continue
     const changes: ProposalChanges = {}
     if (it.kind === 'DONE') {
       if (isClosedStage(task.stage)) continue

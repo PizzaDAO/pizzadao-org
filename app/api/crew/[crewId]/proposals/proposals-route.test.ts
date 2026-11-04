@@ -74,7 +74,16 @@ describe('POST decisions', () => {
     expect(res.status).toBe(409)
     expect(await res.json()).toMatchObject({ code: 'conflict', current: { stage: 'now' } })
     await decide(req('http://x', { action: 'apply', force: true }), idParams('ops', 'p1'))
-    expect(vi.mocked(applyProposal).mock.calls[1]).toEqual(['p1', 'lead1', { edits: undefined, force: true }])
+    expect(vi.mocked(applyProposal).mock.calls[1]).toEqual(['p1', 'lead1', { edits: undefined, force: true, confirmed: false }])
+  })
+  it('maps needs-confirm and passes the confirmation through', async () => {
+    vi.mocked(prisma.crewTaskProposal.findUnique).mockResolvedValue({ crewId: 'ops' } as never)
+    vi.mocked(applyProposal).mockResolvedValue({ result: 'needs-confirm' })
+    const res = await decide(req('http://x', { action: 'apply' }), idParams('ops', 'p1'))
+    expect(res.status).toBe(409)
+    expect((await res.json()).code).toBe('needs-confirm')
+    await decide(req('http://x', { action: 'apply', confirmed: true }), idParams('ops', 'p1'))
+    expect(vi.mocked(applyProposal).mock.calls[1][2]).toMatchObject({ confirmed: true })
   })
   it('rejects unknown actions', async () => {
     expect((await decide(req('http://x', { action: 'delete' }), idParams('ops', 'p1'))).status).toBe(400)

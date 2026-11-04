@@ -9,7 +9,10 @@
 import { prisma } from '@/app/lib/db'
 import { canManageCrew } from '@/app/lib/crew-leads'
 import { usesDb } from '@/app/lib/sheets-import/source'
-import { archiveCrewTask, createCrewTask, updateCrewTask, type TaskPatch } from '@/app/lib/crew-tasks-write'
+import { isClosedStage, invalidateCrewMappingsCache } from '@/app/lib/crew-mappings'
+import { isCrewExcluded, loadPostFilter } from '@/app/lib/calls/post-filters'
+import { archiveCrewTask, createCrewTask, unarchiveCrewTask, updateCrewTask, type TaskPatch } from '@/app/lib/crew-tasks-write'
+import { crewInAllowlist, loadTaskProposalConfig } from './config'
 import type { ProposalChanges, ProposalField } from './proposals'
 
 const ISO = /^\d{4}-\d{2}-\d{2}$/
@@ -117,15 +120,29 @@ export function needsLeadPick(r: Pick<Row, 'candidates' | 'leadMemberId'>, eff: 
 
 export type ApplyOutcome =
   | { result: 'applied'; taskId: string | null }
-  | { result: 'not-found' | 'not-pending' | 'forbidden' | 'not-db-crew' | 'needs-lead' | 'missing-task' | 'bad-edits' | 'failed' }
+  | { result: 'not-found' | 'not-pending' | 'forbidden' | 'not-db-crew' | 'needs-lead' | 'needs-confirm' | 'missing-task' | 'bad-edits' | 'failed' | 'disabled' | 'expired' }
   | { result: 'conflict'; current: { label: string; stage: string; priority: string | null; due: string | null; leadName: string | null } }
 
-export async function applyProposal(id: string, actor: string, opts: { edits?: unknown; force?: boolean; now?: Date } = {}): Promise<ApplyOutcome> {
-  const row = (await prisma.crewTaskProposal.findUnique({ where: { id } })) as Row | null
+export async function applyProposal(id: string, actor: string, opts: { edits?: unknown; force?: boolean; confirmed?: boolean; now?: Date } = {}): Promise<ApplyOutcome> {
+  const row = (await prisma.crewTaskProposal.findUnique({ where: { id } })) as (Row & { createdAt?: Date }) | null
   if (!row) return { result: 'not-found' }
   if (row.status !== 'PENDING') return { result: 'not-pending' }
   if (!(await canManageCrew(actor, row.crewId))) return { result: 'forbidden' }
   if (!(await usesDb('crewTasks', row.crewId))) return { result: 'not-db-crew' }
+  // The feature switch, the crew list, the private exclusion list and the age limit all apply to applying too.
+  const cfg = await loadTaskProposalConfig()
+  if (!cfg.enabled || !crewInAllowlist(cfg, row.crewId)) return { result: 'disabled' }
+  const rec = await prisma.callRecording.findUnique({ where: { id: row.recordingId }, select: { crewLabel: true } })
+  try {
+    if (isCrewExcluded({ id: row.crewId, label: rec?.crewLabel }, await loadPostFilter())) return { result: 'disabled' }
+  } catch {
+    return { result: 'disabled' } // fail closed
+  }
+  const now0 = opts.now ?? new Date()
+  if (row.createdAt && row.createdAt.getTime() < now0.getTime() - cfg.maxDays * 86_400_000) {
+    await prisma.crewTaskProposal.updateMany({ where: { id, status: 'PENDING' }, data: { status: 'STALE' } })
+    return { result: 'expired' }
+  }
   const edits = cleanEdits(opts.edits)
   if (!edits) return { result: 'bad-edits' }
   const changes = (row.changes ?? {}) as ProposalChanges
@@ -146,24 +163,40 @@ export async function applyProposal(id: string, actor: string, opts: { edits?: u
     }
   }
 
+  // Closing or hiding a task is single-apply and needs an explicit confirmation.
+  const closes = !!eff.stage && isClosedStage(eff.stage) && !(task && isClosedStage(task.stage))
+  if ((row.kind === 'DONE' || row.kind === 'RETIRE' || closes) && !opts.confirmed) return { result: 'needs-confirm' }
+
   const now = opts.now ?? new Date()
   const hasEdits = Object.keys(edits).length > 0
-  // Claim first: two clicks (or two leads) can never apply the same proposal twice.
-  const claim = await prisma.crewTaskProposal.updateMany({
-    where: { id, status: 'PENDING' },
-    data: { status: 'APPLIED', decidedBy: actor, decidedAt: now, error: null, ...(hasEdits ? { edited: edits as never } : {}) },
-  })
-  if (claim.count !== 1) return { result: 'not-pending' }
+  // Claim first: two clicks (or two leads) can never apply the same proposal twice. (CREATE claims inside its transaction.)
+  if (row.kind !== 'CREATE') {
+    const claim = await prisma.crewTaskProposal.updateMany({
+      where: { id, status: 'PENDING' },
+      data: { status: 'APPLIED', decidedBy: actor, decidedAt: now, error: null, ...(hasEdits ? { edited: edits as never } : {}) },
+    })
+    if (claim.count !== 1) return { result: 'not-pending' }
+  }
   const release = (error: string) => prisma.crewTaskProposal.updateMany({ where: { id }, data: { status: 'PENDING', decidedBy: null, decidedAt: null, error } }).catch(() => {})
   const eventData = { via: 'call-proposal', proposalId: id, recordingId: row.recordingId, kind: row.kind, edited: hasEdits }
   try {
     if (row.kind === 'CREATE') {
-      const taskId = await createCrewTask(
-        row.crewId,
-        { label: eff.label as string, stage: eff.stage ?? undefined, priority: eff.priority ?? null, due: eff.due ?? null, leadName: eff.leadName ?? null, leadMemberId: eff.leadMemberId ?? null },
-        actor,
-        eventData,
-      )
+      // Claim, task and history in one transaction: a retry can never leave a duplicate task behind.
+      const taskId = await prisma.$transaction(async (tx) => {
+        const c = await tx.crewTaskProposal.updateMany({
+          where: { id, status: 'PENDING' },
+          data: { status: 'APPLIED', decidedBy: actor, decidedAt: now, error: null, ...(hasEdits ? { edited: edits as never } : {}) },
+        })
+        if (c.count !== 1) throw new Error('not-pending')
+        return createCrewTask(
+          row.crewId,
+          { label: eff.label as string, stage: eff.stage ?? undefined, priority: eff.priority ?? null, due: eff.due ?? null, leadName: eff.leadName ?? null, leadMemberId: eff.leadMemberId ?? null },
+          actor,
+          eventData,
+          tx as never,
+        )
+      })
+      await invalidateCrewMappingsCache()
       return { result: 'applied', taskId }
     }
     const current = task as NonNullable<typeof task>
@@ -192,6 +225,13 @@ export async function applyProposal(id: string, actor: string, opts: { edits?: u
     }
     return { result: 'applied', taskId: current.id }
   } catch (e) {
+    if (e instanceof Error && e.message === 'not-pending') return { result: 'not-pending' }
+    if (row.kind === 'CREATE') {
+      // The transaction rolled back: no task, no history, still pending.
+      console.error('[call-tasks] apply failed:', e instanceof Error ? e.message : e)
+      await prisma.crewTaskProposal.updateMany({ where: { id, status: 'PENDING' }, data: { error: 'Could not apply; try again' } }).catch(() => {})
+      return { result: 'failed' }
+    }
     console.error('[call-tasks] apply failed:', e instanceof Error ? e.message : e)
     await release('Could not apply; try again')
     return { result: 'failed' }
@@ -211,10 +251,10 @@ export async function dismissProposal(id: string, actor: string, now = new Date(
 
 export interface ApplyAllReport {
   applied: number
-  skipped: Array<{ id: string; reason: 'needs-lead' | 'conflict' | 'missing-task' | 'failed' | 'not-pending' }>
+  skipped: Array<{ id: string; reason: 'needs-lead' | 'needs-confirm' | 'conflict' | 'missing-task' | 'failed' | 'not-pending' | 'disabled' | 'expired' }>
 }
 
-/** Apply every pending proposal that needs no decision (no ambiguous lead, task unchanged). Nothing is forced. */
+/** Apply every pending proposal that needs no decision (no ambiguous lead, task unchanged). Nothing is forced, and anything that closes or hides a task (done, retire) is left for a single, confirmed apply. */
 export async function applyAll(crewId: string, actor: string, opts: { recordingId?: string } = {}): Promise<ApplyAllReport | 'forbidden' | 'not-db-crew'> {
   if (!(await canManageCrew(actor, crewId))) return 'forbidden'
   if (!(await usesDb('crewTasks', crewId))) return 'not-db-crew'
@@ -228,8 +268,22 @@ export async function applyAll(crewId: string, actor: string, opts: { recordingI
   for (const { id } of rows) {
     const r = await applyProposal(id, actor)
     if (r.result === 'applied') report.applied++
-    else if (r.result === 'needs-lead' || r.result === 'conflict' || r.result === 'missing-task' || r.result === 'failed' || r.result === 'not-pending') report.skipped.push({ id, reason: r.result })
+    else if (r.result === 'needs-lead' || r.result === 'needs-confirm' || r.result === 'conflict' || r.result === 'missing-task' || r.result === 'failed' || r.result === 'not-pending' || r.result === 'disabled' || r.result === 'expired') report.skipped.push({ id, reason: r.result })
     else report.skipped.push({ id, reason: 'failed' })
   }
   return report
+}
+
+export type UndoOutcome = 'undone' | 'not-found' | 'forbidden' | 'not-undoable'
+
+/** Undo an applied RETIRE: the task is shown again. Same permission as applying. */
+export async function undoRetire(id: string, actor: string, now = new Date()): Promise<UndoOutcome> {
+  const row = await prisma.crewTaskProposal.findUnique({ where: { id }, select: { crewId: true, kind: true, status: true, taskId: true } })
+  if (!row) return 'not-found'
+  if (!(await canManageCrew(actor, row.crewId))) return 'forbidden'
+  if (row.kind !== 'RETIRE' || row.status !== 'APPLIED' || !row.taskId) return 'not-undoable'
+  const ok = await unarchiveCrewTask(row.crewId, row.taskId, actor, { via: 'call-proposal-undo', proposalId: id })
+  if (!ok) return 'not-undoable'
+  await prisma.crewTaskProposal.updateMany({ where: { id, status: 'APPLIED' }, data: { status: 'UNDONE', decidedBy: actor, decidedAt: now } })
+  return 'undone'
 }

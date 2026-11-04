@@ -10,6 +10,7 @@ interface Loaded {
     columns: EditorColumn[];
     maxRows: number;
     rows: EditorRow[];
+    loadedAt?: string;
 }
 
 function blankRow(columns: EditorColumn[]): EditorRow {
@@ -58,7 +59,7 @@ export default function TableEditorClient({ dataset, apiUrl, backHref = "/admin/
             const res = await fetch(endpoint, {
                 method: "PUT",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ rows }),
+                body: JSON.stringify({ rows, loadedAt: data?.loadedAt }),
             });
             const body = await res.json().catch(() => ({}));
             if (!res.ok) throw new Error(body.error || `HTTP ${res.status}`);

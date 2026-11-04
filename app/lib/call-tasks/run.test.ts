@@ -197,7 +197,18 @@ describe('storeProposals', () => {
     const n = await storeProposals('rec1', 'ops', [draft(), draft({ sourceKey: 'rec1:UPDATE:t2', kind: 'UPDATE', taskId: 't2' })])
     expect(n).toBe(1)
     expect(prop.create).toHaveBeenCalledTimes(1)
-    expect(prop.updateMany.mock.calls[0][0]).toMatchObject({ where: { crewId: 'ops', taskId: 't2', status: 'PENDING', recordingId: { not: 'rec1' } }, data: { status: 'STALE' } })
+    expect(prop.updateMany).not.toHaveBeenCalled() // no start time given: nothing is staled
+  })
+  it('only proposals from OLDER calls of the crew go stale', async () => {
+    const started = new Date('2026-11-02T17:00:00Z')
+    rec.findMany.mockResolvedValue([{ id: 'older1' }] as never)
+    await storeProposals('rec1', 'ops', [draft()], started)
+    expect(rec.findMany.mock.calls[0][0]).toMatchObject({ where: { crewId: 'ops', startedAt: { lt: started }, id: { not: 'rec1' } } })
+    expect(prop.updateMany.mock.calls[0][0]).toMatchObject({ where: { taskId: 't1', status: 'PENDING', recordingId: { in: ['older1'] } } })
+    prop.updateMany.mockClear()
+    rec.findMany.mockResolvedValue([] as never)
+    await storeProposals('rec1', 'ops', [draft({ sourceKey: 'rec1:DONE:t9' })], started) // no older calls: nothing to stale
+    expect(prop.updateMany).not.toHaveBeenCalled()
   })
   it('a parallel run creating the same key is the idempotency guard, not an error', async () => {
     prop.create.mockRejectedValue(Object.assign(new Error('dup'), { code: 'P2002' }))

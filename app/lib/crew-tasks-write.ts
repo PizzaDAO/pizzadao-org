@@ -49,12 +49,12 @@ export type TaskPatch = Partial<{
 export type TaskEventData = Record<string, unknown>
 
 /** Create a task at the end of the crew's list and write its `create` event. Returns the new task id. */
-export async function createCrewTask(crewId: string, input: NewTaskInput, actor: string, eventData: TaskEventData = {}): Promise<string> {
-  const rows = await prisma.crewTask.findMany({ where: { crewId }, select: { naturalKey: true, position: true } })
+export async function createCrewTask(crewId: string, input: NewTaskInput, actor: string, eventData: TaskEventData = {}, db: Pick<typeof prisma, 'crewTask' | 'crewTaskEvent'> = prisma): Promise<string> {
+  const rows = await db.crewTask.findMany({ where: { crewId }, select: { naturalKey: true, position: true } })
   const taken = new Set(rows.map((r) => r.naturalKey))
   const position = rows.reduce((m, r) => Math.max(m, r.position), -1) + 1
   const stage = input.stage ?? 'todo'
-  const created = await prisma.crewTask.create({
+  const created = await db.crewTask.create({
     data: {
       crewId,
       naturalKey: freshKey(input.label, taken),
@@ -74,8 +74,9 @@ export async function createCrewTask(crewId: string, input: NewTaskInput, actor:
     },
     select: { id: true },
   })
-  await prisma.crewTaskEvent.create({ data: { taskId: created.id, crewId, action: 'create', actor, data: { ...eventData, label: input.label } as never } })
-  await invalidateCrewMappingsCache()
+  await db.crewTaskEvent.create({ data: { taskId: created.id, crewId, action: 'create', actor, data: { ...eventData, label: input.label } as never } })
+  // Inside a transaction the caller invalidates after it commits.
+  if (db === prisma) await invalidateCrewMappingsCache()
   return created.id
 }
 
@@ -110,6 +111,15 @@ export async function archiveCrewTask(crewId: string, taskId: string, actor: str
   const res = await prisma.crewTask.updateMany({ where, data: { archived: true, updatedBy: actor } })
   if (res.count !== 1) return false
   await prisma.crewTaskEvent.create({ data: { taskId, crewId, action: 'archive', actor, data: (opts.eventData ?? {}) as never } })
+  await invalidateCrewMappingsCache()
+  return true
+}
+
+/** Undo a retire: show the task again (only if it is archived). Returns false when it is not archived or gone. */
+export async function unarchiveCrewTask(crewId: string, taskId: string, actor: string, eventData: TaskEventData = {}): Promise<boolean> {
+  const res = await prisma.crewTask.updateMany({ where: { id: taskId, crewId, archived: true }, data: { archived: false, updatedBy: actor } })
+  if (res.count !== 1) return false
+  await prisma.crewTaskEvent.create({ data: { taskId, crewId, action: 'unarchive', actor, data: eventData as never } })
   await invalidateCrewMappingsCache()
   return true
 }

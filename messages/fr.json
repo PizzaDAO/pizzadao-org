@@ -2175,6 +2175,10 @@
     "dismiss": "Ignorer",
     "working": "En cours...",
     "genericError": "Une erreur s'est produite. Réessayez.",
-    "appliedAll": "{applied} appliquées, {skipped} à examiner."
+    "appliedAll": "{applied} appliquées, {skipped} à examiner.",
+    "confirmClose": "Cela clôt ou masque la tâche. L'appliquer ?",
+    "applyAllHint": "Tout appliquer ignore les changements qui clôturent ou masquent une tâche : appliquez-les un par un.",
+    "retiredHeading": "Retirées récemment depuis des appels",
+    "undoRetire": "Annuler (réafficher la tâche)"
   }
 }

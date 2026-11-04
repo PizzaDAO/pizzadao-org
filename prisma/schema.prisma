@@ -1612,7 +1612,7 @@ model CallAgendaPost {
 
 // Proposed crew task changes from a call (plans/post-call-agenda-updates.md, ask 2). Nothing changes a
 // task until a crew lead or admin applies it. kind: CREATE | UPDATE | DONE | RETIRE.
-// status: PENDING | APPLIED | DISMISSED | STALE | FAILED.
+// status: PENDING | APPLIED | DISMISSED | STALE | UNDONE (an applied retire that was undone).
 model CrewTaskProposal {
   id            String    @id @default(cuid())
   recordingId   String

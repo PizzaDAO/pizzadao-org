@@ -44,7 +44,8 @@ export async function GET(request: NextRequest) {
         proposed.push({ id: rec.id, result: r.result, created: r.created })
       }
       const tp = await loadTaskProposalConfig()
-      if (tp.enabled) expired = await expireOldProposals(tp.maxDays)
+      // Expiry runs whatever the switch says, so a switched-off pilot does not leave applicable proposals behind.
+      expired = await expireOldProposals(tp.maxDays)
     } catch (e) {
       console.error('[cron/followups] task proposals failed:', e instanceof Error ? e.message : e)
     }
