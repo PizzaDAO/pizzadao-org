@@ -26,7 +26,15 @@ describe("isThemedName", () => {
     expect(isThemedName("Chili Crisp Charlie")).toBe(true);
   });
   it("rejects generic single words", () => {
-    for (const n of ["Red", "Hot Wheels", "Pie", "Ham", "Oven", "Spicy", "Roasted", "Banana"]) expect(isThemedName(n)).toBe(false);
+    for (const n of ["Red", "Hot Wheels", "Pie", "Ham", "Oven", "Spicy", "Roasted"]) expect(isThemedName(n)).toBe(false);
+  });
+  it("accepts widened topping words, misspellings and emoji names", () => {
+    for (const n of ["Steak Hill", "Indi Tandoori Paneer White", "Slevin Di Bufala", "Cherry Zemeckis",
+      "Spinach Corleone", "Caprese Strait", "Don Jalepenos", "Banana 🍌✨", "Turkey Sausage 🦃",
+      "Salame DeVito", "4 Quesos Soprano", "Tetsuo Tomato", "Big Tomatoes", "Jalepeno Joe"]) expect(isThemedName(n)).toBe(true);
+  });
+  it("rejects ordinary handles and names", () => {
+    for (const n of ["kooluser", "yyykki", "Sampa", "wiredinsamurai", "dead_d00d", "Bronze", "karm", "Vishal", "Pharaoh ❥", "Ericnblockchain"]) expect(isThemedName(n)).toBe(false);
   });
   it("rejects names with no pizza word", () => {
     expect(isThemedName("Summer Meetup 2026")).toBe(false);

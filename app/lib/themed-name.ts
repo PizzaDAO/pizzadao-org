@@ -16,6 +16,18 @@ const PIZZA_WORDS = [
   "marinara", "calzone", "stromboli", "focaccia", "neapolitan", "sicilian", "pizzaiolo",
   "pizzeria", "mozzarella", "mozz", "basil", "oregano", "garlic", "pesto", "salami", "bacon",
   "mushroom", "olive", "anchovy", "sausage", "pineapple", "jalapeno", "capricciosa", "diavola",
+  // toppings and cheeses
+  "steak", "paneer", "tandoori", "bufala", "buffalo", "spinach", "caprese", "cherry", "banana",
+  "turkey", "salame", "quesos", "queso", "prosciutto", "pancetta", "chorizo", "ricotta", "burrata",
+  "parmesan", "parmigiano", "gorgonzola", "provolone", "feta", "artichoke", "arugula", "rucola",
+  "onion", "pepper", "chicken", "beef", "meatball", "egg", "corn", "tuna", "shrimp", "truffle",
+  "eggplant", "zucchini", "hawaiian", "hawaiano", "bbq", "tomato",
+];
+
+/** Common misspellings, matched exactly (no fuzzy matching). */
+const ALIASES = [
+  "jalepeno", "jalapeno", "jalepeño", "peperoni", "pepperonni", "mozarella", "mozzarela",
+  "proscuitto", "prosciuto", "parmesean", "parmigiana", "margarita pizza", "chorrizo", "anchovie",
 ];
 
 /** Multi-word catalog toppings only match as the whole phrase; single-word ones match as words. */
@@ -30,16 +42,19 @@ function words(s: string): string[] {
 
 const SINGLE_TOKENS: Set<string> = new Set([
   ...PIZZA_WORDS,
+  ...ALIASES.filter((a) => words(a).length === 1).flatMap((a) => words(a)),
   ...PIZZA_TOPPINGS.filter((t) => words(t).length === 1).flatMap((t) => words(t)),
 ]);
 const PHRASES: string[] = PIZZA_TOPPINGS.filter((t) => words(t).length > 1).map((t) => words(t).join(" "));
 
 const singular = (w: string) => (w.endsWith("s") ? w.slice(0, -1) : w);
+/** Plural forms: "-s" and "-es" (tomatoes). */
+const stems = (w: string) => [w, singular(w), ...(w.endsWith("es") ? [w.slice(0, -2)] : [])];
 
 /** Whether the name contains a recognised topping or pizza word (plurals match). */
 export function isThemedName(name: string): boolean {
   const ws = words(name);
-  if (ws.some((w) => SINGLE_TOKENS.has(w) || SINGLE_TOKENS.has(singular(w)))) return true;
+  if (ws.some((w) => stems(w).some((x) => SINGLE_TOKENS.has(x)))) return true;
   const joined = " " + ws.map(singular).join(" ") + " ";
   return PHRASES.some((p) => joined.includes(" " + p.split(" ").map(singular).join(" ") + " "));
 }
