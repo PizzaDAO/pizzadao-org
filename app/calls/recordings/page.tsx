@@ -10,6 +10,7 @@ import Link from "next/link";
 import { redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { listPublishedRecordings } from "@/app/lib/calls/recordings";
+import { callSectionAccess } from "@/app/lib/calls/transcript-access";
 import { getSession } from "@/app/lib/session";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard } from "@/app/ui/shared/Editorial";
 
@@ -27,6 +28,8 @@ export default async function PublishedCallsPage() {
     const t = await getTranslations("callsPage.recording");
     const locale = await getLocale();
     const rows = await listPublishedRecordings();
+    // The summary excerpt follows the summary level; failures hide it.
+    const showSummary = (await callSectionAccess(session.discordId).catch(() => null))?.summary.visible ?? false;
     const date = new Intl.DateTimeFormat(locale, { dateStyle: "medium" });
 
     return (
@@ -47,7 +50,7 @@ export default async function PublishedCallsPage() {
                                     {r.crewLabel ?? t("overline")} · {date.format(r.startedAt)}
                                 </span>
                                 <span className="font-display text-lg font-black">{r.title ?? r.eventName ?? t("untitled")}</span>
-                                {r.summary && <span className="text-sm text-foreground/70 line-clamp-2">{r.summary.replace(/\s+/g, " ")}</span>}
+                                {showSummary && r.summary && <span className="text-sm text-foreground/70 line-clamp-2">{r.summary.replace(/\s+/g, " ")}</span>}
                             </Link>
                         </li>
                     ))}

@@ -1,8 +1,8 @@
 // app/calls/[id]/page.tsx
 //
-// Members-only page for ONE published call: title, summary, chapters and
-// action items for any signed-in member; the full transcript only for members
-// at the transcript level or above (and Dread Pizza Roberts). Signed-out
+// Members-only page for ONE published call: title, date and length for any
+// signed-in member; the summary, action items, chapters and full transcript
+// each need their own member level (admin settings; Dread Pizza Roberts sees all). Signed-out
 // visitors are sent to login before anything is looked up. Audio is never
 // published and nothing here references it. Unpublished, rejected and unknown
 // ids are a 404. Metadata is generic and noindex so nothing leaks to crawlers.
@@ -12,7 +12,7 @@ import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { asSegments, getPublishedRecording } from "@/app/lib/calls/recordings";
-import { transcriptMinLevel, canViewCallTranscript } from "@/app/lib/calls/transcript-access";
+import { callSectionAccess } from "@/app/lib/calls/transcript-access";
 import { getSession } from "@/app/lib/session";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { displaySpeakerName } from "@/app/lib/calls/speaker-labels";
@@ -35,8 +35,13 @@ export default async function PublishedCallPage({ params }: Params) {
     if (!session?.discordId) redirect(`/login?returnTo=${encodeURIComponent(`/calls/${id}`)}`);
     const rec = await getPublishedRecording(id);
     if (!rec) notFound();
-    const showTranscript = await canViewCallTranscript(session.discordId).catch(() => false);
-    const minLevel = await transcriptMinLevel();
+    // One level lookup (and at most one role lookup) decides every gated section; failures hide them.
+    const access = await callSectionAccess(session.discordId).catch(() => null);
+    const showTranscript = access?.transcript.visible ?? false;
+    const showSummary = access?.summary.visible ?? false;
+    const showActionItems = access?.actionItems.visible ?? false;
+    const showChapters = access?.chapters.visible ?? false;
+    const minLevel = access?.transcript.minLevel ?? 10;
 
     const t = await getTranslations("callsPage.recording");
     const locale = await getLocale();
@@ -45,8 +50,8 @@ export default async function PublishedCallPage({ params }: Params) {
     const speakerText = { speakerN: (n: number) => t("speakerN", { n }), fallback: t("unknownSpeaker") };
     const names = new Map(rec.speakers.map((s) => [s.discordId, displaySpeakerName(s.discordId, s.displayName, speakerText)]));
     const segments = showTranscript ? asSegments(rec.transcript) : [];
-    const actionItems = (Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
-    const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
+    const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string }>;
+    const chapters = (!showChapters ? [] : Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
 
     return (
         <EditorialPage width="max-w-[820px]">
@@ -62,10 +67,22 @@ export default async function PublishedCallPage({ params }: Params) {
             <article className="grid gap-8">
                 {rec.source !== "DISCORD" && <p className="m-0 text-sm text-foreground/60">{t("importedNote")}</p>}
 
-                {rec.summary && (
+                {!showSummary ? (
+                    <section className={`${paperCard} p-5 grid gap-3`}>
+                        <h2 className="font-display text-xl font-black m-0">{t("summary")}</h2>
+                        <p className="m-0 text-sm text-foreground/60">{t("summaryRestricted", { level: access?.summary.minLevel ?? 10 })}</p>
+                    </section>
+                ) : rec.summary && (
                     <section className={`${paperCard} p-5 grid gap-3`}>
                         <h2 className="font-display text-xl font-black m-0">{t("summary")}</h2>
                         <div className="whitespace-pre-wrap leading-relaxed">{rec.summary}</div>
+                    </section>
+                )}
+
+                {!showActionItems && (
+                    <section className="grid gap-2">
+                        <h2 className="font-display text-xl font-black m-0">{t("actionItems")}</h2>
+                        <p className="m-0 text-sm text-foreground/60">{t("actionItemsRestricted", { level: access?.actionItems.minLevel ?? 10 })}</p>
                     </section>
                 )}
 
@@ -80,6 +97,13 @@ export default async function PublishedCallPage({ params }: Params) {
                                 </li>
                             ))}
                         </ul>
+                    </section>
+                )}
+
+                {!showChapters && (
+                    <section className="grid gap-2">
+                        <h2 className="font-display text-xl font-black m-0">{t("chapters")}</h2>
+                        <p className="m-0 text-sm text-foreground/60">{t("chaptersRestricted", { level: access?.chapters.minLevel ?? 10 })}</p>
                     </section>
                 )}
 

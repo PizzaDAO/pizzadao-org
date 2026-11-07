@@ -8,7 +8,7 @@ import { ECONOMY_SETTINGS } from './economy-settings'
 import { CONTENT_SETTINGS } from './content-settings'
 
 const ECONOMY_KEYS = new Set<string>([...Object.keys(ECONOMY_SETTINGS), ...Object.keys(CONTENT_SETTINGS)])
-import { CALL_TRANSCRIPT_MIN_LEVEL } from '@/app/lib/calls/transcript-access'
+import { CALL_TRANSCRIPT_MIN_LEVEL, CALL_SUMMARY_MIN_LEVEL, CALL_ACTION_ITEMS_MIN_LEVEL, CALL_CHAPTERS_MIN_LEVEL } from '@/app/lib/calls/transcript-access'
 import { HUMAN_RELEASE_MIN_LEVEL, NEW_ACCOUNT_DAYS } from '@/app/lib/mission-verify/policy'
 import { DPR_ONLY_MIN_LEVEL } from '@/app/lib/mission-review-access'
 import {
@@ -46,6 +46,9 @@ describe('settings registry', () => {
 
   it('locks every default to the constant it replaced (deploying changes no behaviour)', () => {
     expect(SETTINGS['calls.transcriptMinLevel'].default).toBe(CALL_TRANSCRIPT_MIN_LEVEL)
+    expect(SETTINGS['calls.summaryMinLevel'].default).toBe(CALL_SUMMARY_MIN_LEVEL)
+    expect(SETTINGS['calls.actionItemsMinLevel'].default).toBe(CALL_ACTION_ITEMS_MIN_LEVEL)
+    expect(SETTINGS['calls.chaptersMinLevel'].default).toBe(CALL_CHAPTERS_MIN_LEVEL)
     expect(SETTINGS['missions.humanReleaseMinLevel'].default).toBe(HUMAN_RELEASE_MIN_LEVEL)
     expect(SETTINGS['missions.newAccountDays'].default).toBe(NEW_ACCOUNT_DAYS)
     expect(SETTINGS['missions.dprOnlyMinLevel'].default).toBe(DPR_ONLY_MIN_LEVEL)
@@ -84,6 +87,9 @@ describe('settings registry', () => {
     // And the literal values today (a change here is a deliberate, reviewed change).
     expect(SETTING_KEYS.filter((k) => !k.startsWith('guide.') && !k.startsWith('followups.') && !k.startsWith('payments.') && !k.startsWith('proposals.') && !k.startsWith('telegram.') && !k.startsWith('sheets.') && !ECONOMY_KEYS.has(k)).map((k) => [k, SETTINGS[k].default])).toEqual([
       ['calls.transcriptMinLevel', 6],
+      ['calls.summaryMinLevel', 5],
+      ['calls.actionItemsMinLevel', 4],
+      ['calls.chaptersMinLevel', 3],
       ['missions.humanReleaseMinLevel', 6],
       ['missions.newAccountDays', 30],
       ['missions.dprOnlyMinLevel', 8],
