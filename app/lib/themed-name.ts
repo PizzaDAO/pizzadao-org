@@ -27,7 +27,7 @@ const PIZZA_WORDS = [
 /** Common misspellings, matched exactly (no fuzzy matching). */
 const ALIASES = [
   "jalepeno", "jalapeno", "jalepeño", "peperoni", "pepperonni", "mozarella", "mozzarela",
-  "proscuitto", "prosciuto", "parmesean", "parmigiana", "margarita pizza", "chorrizo", "anchovie",
+  "proscuitto", "prosciuto", "parmesean", "parmigiana", "chorrizo", "anchovie",
 ];
 
 /** Multi-word catalog toppings only match as the whole phrase; single-word ones match as words. */
