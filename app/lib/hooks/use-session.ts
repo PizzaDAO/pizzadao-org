@@ -21,6 +21,8 @@ export interface SessionData {
   canVoteDisavow?: boolean;
   /** Already-localized nav label, sent only to eligible viewers. */
   disavowNavLabel?: string;
+  /** Proposals nav entry: present (true) only while voting or the proposal history is on. */
+  showProposals?: boolean;
 }
 
 export const LOGGED_OUT_SESSION: SessionData = {

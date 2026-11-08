@@ -4,6 +4,7 @@
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound, redirect } from "next/navigation";
+import { proposalsEnabled } from "@/app/lib/proposals/constants";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { getProposalDetail, viewerStates, type ProposalDetail } from "@/app/lib/proposals/store";
@@ -183,6 +184,8 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     const imported = p.source === "IMPORTED";
     // With the history switched off an imported record does not exist for members either.
     if (imported && !(await toggleEnabled("proposals.historyEnabled").catch(() => false))) notFound();
+    // App-run proposals belong to voting: hidden while only the history is switched on.
+    if (!imported && !(await proposalsEnabled().catch(() => false))) notFound();
     const isOpen = p.status === "OPEN" && !imported;
     const viewer = isOpen ? (await viewerStates([p.id], session.discordId))[p.id] : undefined;
 

@@ -5,12 +5,13 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 import type { ReactNode } from 'react'
 
-const m = vi.hoisted(() => ({ detail: null as any, hist: null as any, historyOn: true }))
+const m = vi.hoisted(() => ({ detail: null as any, hist: null as any, historyOn: true, votingOn: true }))
 vi.mock('next/navigation', () => ({ notFound: () => { throw new Error('notFound') }, redirect: () => { throw new Error('redirect') } }))
 vi.mock('next-intl/server', () => ({ getLocale: async () => 'en', getTranslations: async () => (k: string) => k }))
 vi.mock('@/app/lib/session', () => ({ getSession: async () => ({ discordId: 'viewer' }) }))
 vi.mock('@/app/lib/settings', () => ({ getSetting: async () => '' }))
 vi.mock('@/app/lib/settings/toggles', () => ({ toggleEnabled: async () => m.historyOn }))
+vi.mock('@/app/lib/proposals/constants', async (orig) => ({ ...(await orig<typeof import('@/app/lib/proposals/constants')>()), proposalsEnabled: async () => m.votingOn }))
 vi.mock('@/app/lib/people', () => ({ resolvePeople: async () => new Map() }))
 vi.mock('@/app/lib/discord-mention-resolve', () => ({ resolveDiscordMentions: async () => ({ channels: {}, roles: {} }) }))
 vi.mock('@/app/lib/proposals/store', () => ({ getProposalDetail: async () => m.detail, viewerStates: async () => ({}) }))
@@ -51,6 +52,7 @@ const hasPanel = (tree: any) => find(tree, (n) => typeof n.type === 'function' &
 beforeEach(() => {
   m.hist = null
   m.historyOn = true
+  m.votingOn = true
 })
 
 describe('proposal detail page', () => {
@@ -76,6 +78,15 @@ describe('proposal detail page', () => {
     await expect(render()).rejects.toThrow('notFound')
     m.detail = { ...base, status: 'OPEN', source: 'APP' }
     expect(hasPanel(await render())).toBe(true)
+  })
+
+  it('answers not found for an app row while only the history is on (voting off)', async () => {
+    m.votingOn = false
+    m.detail = { ...base, status: 'OPEN', source: 'APP' }
+    await expect(render()).rejects.toThrow('notFound')
+    m.detail = { ...base, status: 'PASSED', source: 'IMPORTED', outcomeSource: 'votes', votes: { ayes: 1, nays: 0, abstains: 0 } }
+    m.hist = { links: [], payments: [], proposerDiscordId: null }
+    expect(texts(await render()).join('|')).toContain('history.heading')
   })
 
   it('renders only http(s) link urls', async () => {
