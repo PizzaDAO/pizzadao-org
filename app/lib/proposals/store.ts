@@ -101,8 +101,10 @@ export async function openProposal(
   // Votes need the pending store in production: do not open a proposal that could not take them.
   if (!pendingFor(opts.pending, env) && !directWriteAllowed(env)) return { ok: false, code: 'no_redis' }
   const now = opts.now ?? new Date()
-  const p = await prisma.proposal.findUnique({ where: { id }, select: { status: true, kind: true, amountUsdCents: true } })
+  const p = await prisma.proposal.findUnique({ where: { id }, select: { status: true, kind: true, amountUsdCents: true, source: true } })
   if (!p) return { ok: false, code: 'not_found' }
+  // Imported history is never opened: it has no voter snapshot and no key.
+  if (p.source === 'IMPORTED') return { ok: false, code: 'not_draft' }
   if (p.status !== 'DRAFT') return { ok: false, code: 'not_draft' }
   const rules = opts.rules ?? (await loadProposalRules())
   const snap = await snapshotRoleHolders(opts.deps ?? defaultRoleDeps)
@@ -359,7 +361,7 @@ export async function settleProposal(id: string, now: Date = new Date(), opts: {
 export interface ProposalSummary {
   id: string
   kind: 'FUNDING' | 'GENERAL'
-  status: 'DRAFT' | 'OPEN' | 'PASSED' | 'FAILED' | 'CANCELLED'
+  status: 'DRAFT' | 'OPEN' | 'PASSED' | 'FAILED' | 'CANCELLED' | 'UNRESOLVED'
   title: string
   amountUsd: number | null
   city: string | null
@@ -367,21 +369,88 @@ export interface ProposalSummary {
   closesAt: string | null
   /** Only for a settled proposal: counts stay hidden while voting is open. */
   result: { ayes: number; nays: number; abstains: number; ayesNeeded: number | null } | null
+  /** Imported history: a read-only record. App proposals are 'APP'. */
+  source: 'APP' | 'IMPORTED'
+  /** Imported rows: paidOverride, else whether any payment is recorded. */
+  paid: boolean
+  /** Payment total in USD (imported rows). */
+  paidUsd: number | null
+  proposerLabel: string | null
+  /** When the proposal was made (the poll post), ISO. */
+  proposedAt: string | null
+  votesRecorded: boolean
+  /** Imported rows with recorded votes. Never used for the vote UI. */
+  votes: { ayes: number; nays: number; abstains: number } | null
+  /** Whitelisted keys of the imported `historical` JSON. */
+  historical: HistoricalInfo | null
 }
 
-type ProposalRow = {
+export interface HistoricalInfo {
+  amountRaw?: string
+  quorumStated?: number
+  sheetStatus?: string
+  eventDateRaw?: string
+  resubmissionOf?: string
+  discussVotes?: number
+  partlyPaid?: boolean
+  reactions?: Array<{ emoji: string; count: number }>
+}
+
+/** Only these keys of the stored JSON ever reach a page; everything else (notes, derived values) stays in the database. */
+export function whitelistHistorical(v: unknown): HistoricalInfo | null {
+  if (!v || typeof v !== 'object' || Array.isArray(v)) return null
+  const o = v as Record<string, unknown>
+  const out: HistoricalInfo = {}
+  if (typeof o.amountRaw === 'string') out.amountRaw = o.amountRaw.slice(0, 300)
+  if (typeof o.quorumStated === 'number') out.quorumStated = o.quorumStated
+  if (typeof o.sheetStatus === 'string') out.sheetStatus = o.sheetStatus.slice(0, 40)
+  if (typeof o.eventDateRaw === 'string') out.eventDateRaw = o.eventDateRaw.slice(0, 60)
+  if (typeof o.resubmissionOf === 'string') out.resubmissionOf = o.resubmissionOf.slice(0, 60)
+  if (typeof o.discussVotes === 'number') out.discussVotes = o.discussVotes
+  if (o.partlyPaid === true) out.partlyPaid = true
+  if (Array.isArray(o.reactions)) {
+    out.reactions = (o.reactions as unknown[])
+      .filter((r): r is { emoji: string; count: number } => !!r && typeof (r as { emoji?: unknown }).emoji === 'string' && typeof (r as { count?: unknown }).count === 'number')
+      .slice(0, 12)
+      .map((r) => ({ emoji: r.emoji.slice(0, 40), count: r.count }))
+  }
+  return out
+}
+
+export type ProposalRow = {
   id: string; kind: 'FUNDING' | 'GENERAL'; status: ProposalSummary['status']; title: string; amountUsdCents: number | null
   city: string | null; opensAt: Date | null; closesAt: Date | null; ayes: number; nays: number; abstains: number; ayesNeeded: number | null
+  source?: 'APP' | 'IMPORTED'; paidOverride?: boolean | null; proposerLabel?: string | null; createdAt?: Date | null; votesRecorded?: boolean; historical?: unknown
+  historyPayments?: Array<{ usdValue: number | null; source?: string }>
 }
 
-const SUMMARY_SELECT = {
+export const SUMMARY_SELECT = {
   id: true, kind: true, status: true, title: true, amountUsdCents: true, city: true, opensAt: true, closesAt: true,
   ayes: true, nays: true, abstains: true, ayesNeeded: true,
+  source: true, paidOverride: true, proposerLabel: true, createdAt: true, votesRecorded: true, historical: true,
+  historyPayments: { select: { usdValue: true, source: true } },
 } as const
 
 export function toSummary(r: ProposalRow): ProposalSummary {
-  const settled = r.status === 'PASSED' || r.status === 'FAILED'
+  const imported = r.source === 'IMPORTED'
+  // Imported rows never show the app's result line (it states today's rule); they carry `votes` instead.
+  const settled = !imported && (r.status === 'PASSED' || r.status === 'FAILED')
+  const pays = r.historyPayments ?? []
+  const paid = imported ? (r.paidOverride ?? pays.length > 0) : false
+  let paidCents: number | null = null
+  if (imported && paid) {
+    const sum = pays.reduce((n, x) => n + (x.usdValue ?? 0), 0)
+    paidCents = sum === 0 && (pays.length === 0 || pays.some((x) => x.usdValue == null && (x.source === 'sheet' || x.source === 'override'))) ? (r.amountUsdCents ?? null) : sum
+  }
   return {
+    source: imported ? 'IMPORTED' : 'APP',
+    paid,
+    paidUsd: paidCents == null ? null : paidCents / 100,
+    proposerLabel: r.proposerLabel ?? null,
+    proposedAt: (imported ? (r.opensAt ?? r.createdAt) : null)?.toISOString() ?? null,
+    votesRecorded: r.votesRecorded ?? true,
+    votes: imported && (r.votesRecorded ?? true) ? { ayes: r.ayes, nays: r.nays, abstains: r.abstains } : null,
+    historical: imported ? whitelistHistorical(r.historical) : null,
     id: r.id,
     kind: r.kind,
     status: r.status,
@@ -414,10 +483,16 @@ export async function viewerStates(proposalIds: string[], discordId: string): Pr
 
 export async function listProposals(recentLimit = 30): Promise<{ open: ProposalSummary[]; recent: ProposalSummary[] }> {
   const [open, recent] = await Promise.all([
-    prisma.proposal.findMany({ where: { status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT }),
-    prisma.proposal.findMany({ where: { status: { in: ['PASSED', 'FAILED'] } }, orderBy: { closedAt: 'desc' }, take: recentLimit, select: SUMMARY_SELECT }),
+    prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT }),
+    prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['PASSED', 'FAILED'] } }, orderBy: { closedAt: 'desc' }, take: recentLimit, select: SUMMARY_SELECT }),
   ])
   return { open: (open as ProposalRow[]).map(toSummary), recent: (recent as ProposalRow[]).map(toSummary) }
+}
+
+/** The proposals open for voting (and drafts about to open): app proposals only. */
+export async function listOpenProposals(): Promise<ProposalSummary[]> {
+  const rows = await prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT })
+  return (rows as ProposalRow[]).map(toSummary)
 }
 
 /** Open proposals this member is in the voter snapshot for (id, title, close time, token already issued?). */
@@ -442,12 +517,13 @@ export interface ProposalDetail extends ProposalSummary {
   ayesNeeded: number | null
   eligibleCount: number | null
   isProposer: boolean
+  outcomeSource: string | null
 }
 
 export async function getProposalDetail(id: string, viewerDiscordId: string): Promise<ProposalDetail | null> {
   const r = await prisma.proposal.findUnique({
     where: { id },
-    select: { ...SUMMARY_SELECT, body: true, eventDate: true, sponsorLabel: true, eligibleCount: true, proposerDiscordId: true, keyFingerprint: true },
+    select: { ...SUMMARY_SELECT, body: true, eventDate: true, sponsorLabel: true, eligibleCount: true, proposerDiscordId: true, keyFingerprint: true, outcomeSource: true },
   })
   if (!r) return null
   return {
@@ -458,14 +534,15 @@ export async function getProposalDetail(id: string, viewerDiscordId: string): Pr
     sponsorLabel: r.sponsorLabel,
     ayesNeeded: r.ayesNeeded,
     eligibleCount: r.eligibleCount,
-    isProposer: r.proposerDiscordId === viewerDiscordId,
+    isProposer: !!r.proposerDiscordId && r.proposerDiscordId === viewerDiscordId,
+    outcomeSource: r.outcomeSource ?? null,
   }
 }
 
 /** Passed funding proposals the member filed, newest first: the ones a payment request can link to. */
 export async function passedFundingProposalsFor(discordId: string): Promise<Array<{ id: string; title: string; amountUsd: number }>> {
   const rows = await prisma.proposal.findMany({
-    where: { kind: 'FUNDING', status: 'PASSED', proposerDiscordId: discordId, amountUsdCents: { not: null } },
+    where: { source: 'APP', kind: 'FUNDING', status: 'PASSED', proposerDiscordId: discordId, amountUsdCents: { not: null } },
     orderBy: { closedAt: 'desc' },
     take: 50,
     select: { id: true, title: true, amountUsdCents: true },

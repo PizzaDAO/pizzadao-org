@@ -11,6 +11,7 @@
  * - Keys never contain secrets. Editorial/private values live only in DB rows, never here.
  */
 import { z } from 'zod'
+import { explorersTextValid } from '@/app/lib/proposals/explorers'
 import { CONTENT_SETTINGS } from './content-settings'
 import { ECONOMY_SETTINGS } from './economy-settings'
 import { isValidSheetId, PAYMENT_SETTINGS } from './payments-settings'
@@ -1512,6 +1513,34 @@ export const SETTINGS = {
     default: 15,
     stricterOnly: true,
     looserWhen: 'lower',
+  }),
+  // ---- Proposals history (plans/proposals-history-import.md): display only, no rule changes. ----
+  'proposals.historyEnabled': boolSetting({
+    key: 'proposals.historyEnabled',
+    area: 'proposals',
+    label: 'Show imported proposal history',
+    help: 'Shows the imported past proposals (read-only records with their links and payments) in the history section of the proposals page. Off hides imported rows; proposals run in the app always stay visible.',
+  }),
+  'proposals.pageSize': intSetting({
+    key: 'proposals.pageSize',
+    area: 'proposals',
+    label: 'History page size',
+    help: 'How many past proposals the history list shows per page.',
+    min: 10,
+    max: 200,
+    default: 50,
+    unit: 'proposals',
+    onReadFailure: { value: 50 },
+  }),
+  'proposals.explorers': textSetting({
+    key: 'proposals.explorers',
+    area: 'proposals',
+    label: 'Block explorer links',
+    help: 'JSON object: chain key to an https link containing {tx}, for example {"ethereum": "https://etherscan.io/tx/{tx}"}. Chains listed here replace the built-in defaults (ethereum, base, optimism, polygon, arbitrum). Empty uses the defaults. A payment on a chain with no link shows its hash without a link.',
+    maxLength: 2000,
+    multiline: true,
+    check: explorersTextValid,
+    checkMessage: 'Use a JSON object of chain keys to https links that contain {tx}, or leave empty',
   }),
   // Payments group (plans/host-fast-track.md): defined in ./payments-settings.
   ...PAYMENT_SETTINGS,

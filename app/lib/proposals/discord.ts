@@ -81,7 +81,7 @@ export type PostOutcome = 'posted' | 'skipped' | 'failed'
 export async function announceOpen(id: string, deps: PostDeps = defaultPostDeps): Promise<PostOutcome> {
   const channelId = await deps.channelId().catch(() => null)
   if (!channelId) return 'skipped'
-  const claimed = await prisma.proposal.updateMany({ where: { id, status: 'OPEN', discordChannelId: null }, data: { discordChannelId: channelId } })
+  const claimed = await prisma.proposal.updateMany({ where: { id, source: 'APP', status: 'OPEN', discordChannelId: null }, data: { discordChannelId: channelId } })
   if (claimed.count !== 1) return 'skipped'
   const p = await prisma.proposal.findUnique({ where: { id }, select: { id: true, title: true, kind: true, amountUsdCents: true, closesAt: true, ayesNeeded: true, keyFingerprint: true } })
   if (!p?.closesAt) {
@@ -102,12 +102,12 @@ export async function announceOpen(id: string, deps: PostDeps = defaultPostDeps)
 export async function announceResult(id: string, now: Date = new Date(), deps: PostDeps = defaultPostDeps): Promise<PostOutcome> {
   const p = await prisma.proposal.findUnique({
     where: { id },
-    select: { id: true, title: true, status: true, ayes: true, nays: true, abstains: true, ayesNeeded: true, discordChannelId: true },
+    select: { id: true, title: true, status: true, source: true, ayes: true, nays: true, abstains: true, ayesNeeded: true, discordChannelId: true },
   })
-  if (!p || (p.status !== 'PASSED' && p.status !== 'FAILED')) return 'skipped'
+  if (!p || p.source !== 'APP' || (p.status !== 'PASSED' && p.status !== 'FAILED')) return 'skipped'
   const channelId = p.discordChannelId || (await deps.channelId().catch(() => null))
   if (!channelId) return 'skipped'
-  const claimed = await prisma.proposal.updateMany({ where: { id, resultPostedAt: null, status: { in: ['PASSED', 'FAILED'] } }, data: { resultPostedAt: now } })
+  const claimed = await prisma.proposal.updateMany({ where: { id, source: 'APP', resultPostedAt: null, status: { in: ['PASSED', 'FAILED'] } }, data: { resultPostedAt: now } })
   if (claimed.count !== 1) return 'skipped'
   try {
     await deps.post(channelId, resultMessage({ ...p, status: p.status }, deps.appUrl()))

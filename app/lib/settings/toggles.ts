@@ -63,6 +63,10 @@ export const TOGGLES = {
   },
   'names.requireThemed': { env: 'REQUIRE_THEMED_NAMES', legacy: ON_WORDS },
   'telegram.dmEnabled': { env: 'TELEGRAM_DM_ENABLED', legacy: ON_WORDS },
+  'proposals.historyEnabled': {
+    env: 'PROPOSALS_HISTORY_ENABLED',
+    legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
+  },
   'proposals.enabled': {
     env: 'PROPOSALS_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
