@@ -307,7 +307,8 @@ export function parsePayment(line: unknown): FinanceLine {
       offchainRef: offRef || null,
       note: r.payee ? String(r.payee).slice(0, 300) : null,
       source: 'finance_match',
-      sourceKey: `finance:${isTx ? ref.toLowerCase() : ref.slice(0, 80)}:${dayOrNull(r.date) ?? ''}:${amount ?? ''}:${idx}`,
+      // Stable across re-runs: the chain and hash, or the method and reference. The amount only helps when there is no reference.
+      sourceKey: isTx ? `finance:tx:${legChain ?? ''}:${ref.toLowerCase()}:${r.asset ? String(r.asset).slice(0, 20) : ''}` : offRef ? `finance:off:${offRef.slice(0, 120)}:${dayOrNull(r.date) ?? ''}:${r.asset ? String(r.asset).slice(0, 20) : ''}` : `finance:off::${dayOrNull(r.date) ?? ''}:${amount ?? ''}:${r.asset ? String(r.asset).slice(0, 20) : ''}:${idx}`,
       chainAssumed: isTx && (!legChain || !Object.prototype.hasOwnProperty.call(DEFAULT_EXPLORERS, legChain)),
     })
   })
@@ -482,7 +483,7 @@ function eraKey(date: string): string {
   return date.slice(0, 10)
 }
 
-function cleanUrl(u: string): string | null {
+export function cleanUrl(u: string): string | null {
   try {
     const url = new URL(u)
     if (url.protocol !== 'https:' && url.protocol !== 'http:') return null
@@ -809,7 +810,7 @@ export function buildImport(inp: ImportInputs): ImportResult {
     arr<NonNullable<RowOverride['payments']>[number]>(o.payments).forEach((p, i) => {
       const tx = p.txHash && TX.test(p.txHash) ? p.txHash.toLowerCase() : null
       row.payments.push({
-        paidAt: p.paidAt ?? null, amount: p.amount ?? null, asset: p.asset ?? null, chain: tx ? (p.chain ?? 'ethereum') : null,
+        paidAt: p.paidAt ?? null, amount: p.amount ?? null, asset: p.asset ?? null, chain: tx && typeof p.chain === 'string' && /^[a-z][a-z0-9_-]{0,30}$/.test(p.chain) ? p.chain : null, chainAssumed: !!tx && !(typeof p.chain === 'string' && Object.prototype.hasOwnProperty.call(DEFAULT_EXPLORERS, p.chain)),
         usdCents: p.usdCents ?? null, txHash: tx, offchainRef: p.offchainRef ?? null, note: p.note ?? null,
         source: p.source === 'discord_thread' ? 'discord_thread' : 'override', sourceKey: p.sourceKey ?? `override:${tx ?? p.offchainRef ?? 'x'}:${i}`,
       })
@@ -821,6 +822,14 @@ export function buildImport(inp: ImportInputs): ImportResult {
     for (const p of row.payments) {
       const c = p.txHash ? o.paymentChains[p.txHash.toLowerCase()] : undefined
       if (c) { p.chain = c; p.chainAssumed = false }
+    }
+  }
+  // Override payments (and overridden chains): a missing or unknown chain shows the hash without a link, with a warning.
+  for (const row of rowsByKey.values()) {
+    for (const p of row.payments) {
+      if (p.source !== 'finance_match' && p.txHash && (!p.chain || !Object.prototype.hasOwnProperty.call(DEFAULT_EXPLORERS, p.chain))) {
+        review.paymentWarnings.push({ key: row.importKey, title: row.title, date: (row.opensAt ?? '').slice(0, 10) || null, detail: `${p.chain ? `unknown chain ${p.chain}` : 'no chain'} for ${p.txHash.slice(0, 12)}: shown without an explorer link` })
+      }
     }
   }
   // Dedupe payments per proposal by sourceKey (a key the finance file and an override both name stays once).
@@ -895,4 +904,10 @@ export function summarize(rows: ImportRow[]) {
     paymentCount: rows.reduce((n, r) => n + r.payments.length, 0),
     paymentUsdTotal: paidCents / 100,
   }
+}
+
+/** Keys present in the database for a proposal but not in the newly built set: re-runs delete these so they converge. */
+export function staleKeys(existing: readonly string[], built: readonly string[]): string[] {
+  const keep = new Set(built)
+  return existing.filter((k) => !keep.has(k))
 }

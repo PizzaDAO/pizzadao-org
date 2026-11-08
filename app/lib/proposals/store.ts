@@ -483,10 +483,16 @@ export async function viewerStates(proposalIds: string[], discordId: string): Pr
 
 export async function listProposals(recentLimit = 30): Promise<{ open: ProposalSummary[]; recent: ProposalSummary[] }> {
   const [open, recent] = await Promise.all([
-    prisma.proposal.findMany({ where: { status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT }),
+    prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT }),
     prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['PASSED', 'FAILED'] } }, orderBy: { closedAt: 'desc' }, take: recentLimit, select: SUMMARY_SELECT }),
   ])
   return { open: (open as ProposalRow[]).map(toSummary), recent: (recent as ProposalRow[]).map(toSummary) }
+}
+
+/** The proposals open for voting (and drafts about to open): app proposals only. */
+export async function listOpenProposals(): Promise<ProposalSummary[]> {
+  const rows = await prisma.proposal.findMany({ where: { source: 'APP', status: { in: ['DRAFT', 'OPEN'] } }, orderBy: { createdAt: 'desc' }, take: 100, select: SUMMARY_SELECT })
+  return (rows as ProposalRow[]).map(toSummary)
 }
 
 /** Open proposals this member is in the voter snapshot for (id, title, close time, token already issued?). */

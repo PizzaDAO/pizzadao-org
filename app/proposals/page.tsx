@@ -9,7 +9,7 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { getSetting } from "@/app/lib/settings";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
-import { listProposals, type ProposalSummary } from "@/app/lib/proposals/store";
+import { listOpenProposals, type ProposalSummary } from "@/app/lib/proposals/store";
 import { listHistory, parseHistoryFilters, type HistoryFilters, type HistoryTotals } from "@/app/lib/proposals/history";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 
@@ -163,7 +163,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     const day = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" });
     const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const f = parseHistoryFilters(await searchParams);
-    const [{ open }, size, withImported] = await Promise.all([listProposals(1), pageSize(), historyEnabled()]);
+    const [open, size, withImported] = await Promise.all([listOpenProposals(), pageSize(), historyEnabled()]);
     const history = await listHistory(f, size, withImported).catch(() => null);
     const thisYear = new Date().getUTCFullYear();
     const years = Array.from({ length: thisYear - 2020 }, (_, i) => thisYear - i);

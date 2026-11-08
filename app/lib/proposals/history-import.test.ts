@@ -2,7 +2,7 @@
 // The importer's pure logic, on synthetic data only (no real titles, names, ids or addresses).
 import { describe, expect, it } from 'vitest'
 import {
-  buildImport, classifyLabel, cleanBody, deriveOutcome, eraFor, eraQuorum, parseAmount, parsePayment, parseQuorum, parseSeshResults, parseUsDate, passes, summarize,
+  buildImport, classifyLabel, cleanUrl, staleKeys, cleanBody, deriveOutcome, eraFor, eraQuorum, parseAmount, parsePayment, parseQuorum, parseSeshResults, parseUsDate, passes, summarize,
   type EraRule, type ImportInputs,
 } from './history-import'
 
@@ -16,7 +16,7 @@ describe('parseSeshResults', () => {
     expect(parseSeshResults({ fields: [field('🥇 Nay', 5), field('🥈 Aye', 3), field('🥉 Abstain', 1)] })).toMatchObject({ ayes: 3, nays: 5, abstains: 1, ambiguous: false })
   })
   it('counts "needs more discussion" as an abstain, and checks "not DAO it" before "DAO it"', () => {
-    const c = parseSeshResults({ fields: [field('🥇 <:0_thumbsup:816083318890168351> Let’s DAO it', 15), field('🥈 🤌 Needs more discussion', 1), field('🥉 👎 Let’s not DAO it', 2)] })
+    const c = parseSeshResults({ fields: [field('🥇 <:0_thumbsup:900000000000000001> Let’s DAO it', 15), field('🥈 🤌 Needs more discussion', 1), field('🥉 👎 Let’s not DAO it', 2)] })
     expect(c).toMatchObject({ ayes: 15, nays: 2, abstains: 1, discuss: 1, ambiguous: false })
     expect(classifyLabel('Let’s not DAO IT')).toBe('nay')
     expect(classifyLabel('Let’s DAO IT')).toBe('aye')
@@ -167,6 +167,33 @@ function world(over: Partial<ImportInputs> = {}): ImportInputs {
     ...over,
   }
 }
+
+describe('stable keys and re-run convergence', () => {
+  const tx = `0x${'a'.repeat(64)}`
+  const leg = (extra: Record<string, unknown>) => parsePayment({ note: 'confidence high', payments: [{ date: '2024-02-01', amount: '1', asset: 'USDC', usd: 1, ...extra }] }).payments[0]
+  it('finance keys do not depend on the array position or the amount', () => {
+    const a = leg({ 'txHash or ref': tx, chain: 'base' })
+    const b = parsePayment({ note: 'confidence high', payments: [{ date: '2024-02-01', amount: '2', asset: 'USDC', usd: 2, 'txHash or ref': 'x' }, { date: '2024-03-01', amount: '9', asset: 'USDC', usd: 2, 'txHash or ref': tx, chain: 'base' }] }).payments[1]
+    expect(b.sourceKey).toBe(a.sourceKey)
+    expect(a.sourceKey).toContain('base')
+    expect(leg({ 'txHash or ref': 'inv-9', method: 'mercury' }).sourceKey).toBe(leg({ 'txHash or ref': 'inv-9', method: 'mercury', amount: '5' }).sourceKey)
+  })
+  it('staleKeys lists what an earlier run left behind', () => {
+    expect(staleKeys(['a', 'b', 'c'], ['b'])).toEqual(['a', 'c'])
+    expect(staleKeys([], ['b'])).toEqual([])
+  })
+  it('override payments get no ethereum fallback: no chain means a warning and no link', () => {
+    const w = world({ overrides: { [`discord:${D}`]: { payments: [{ txHash: `0x${'9'.repeat(64)}`, usdCents: 100 }] } } })
+    const r = buildImport(w)
+    const p = r.rows.find((x) => x.importKey === `discord:${D}`)!.payments[0]
+    expect(p.chain).toBeNull()
+    expect(r.review.paymentWarnings.some((x) => x.detail.includes('no chain'))).toBe(true)
+  })
+  it('cleanUrl accepts http(s) only', () => {
+    expect(cleanUrl('https://example.test/x')).toBe('https://example.test/x')
+    expect(cleanUrl('javascript:alert(1)')).toBeNull()
+  })
+})
 
 describe('buildImport', () => {
   it('makes one row per poll, the early post as reactions, and stable keys', () => {

@@ -7,9 +7,10 @@ import { notFound, redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { getProposalDetail, viewerStates, type ProposalDetail } from "@/app/lib/proposals/store";
-import { getHistoryDetail, renderHistoricalBody, type HistoryDetail } from "@/app/lib/proposals/history";
+import { getHistoryDetail, httpUrlOrNull, renderHistoricalBody, type HistoryDetail } from "@/app/lib/proposals/history";
 import { explorerTxUrl, parseExplorers } from "@/app/lib/proposals/explorers";
 import { getSetting } from "@/app/lib/settings";
+import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { resolvePeople } from "@/app/lib/people";
 import { resolveDiscordMentions } from "@/app/lib/discord-mention-resolve";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
@@ -98,8 +99,8 @@ function HistoryCard({
                     <ul className="m-0 grid list-none gap-1 p-0">
                         {h.links.map((l) => (
                             <li key={l.id}>
-                                {l.url ? (
-                                    <a href={l.url} target="_blank" rel="noopener noreferrer" className="underline">
+                                {httpUrlOrNull(l.url) ? (
+                                    <a href={httpUrlOrNull(l.url) ?? undefined} target="_blank" rel="noopener noreferrer" className="underline">
                                         {l.label || t(`linkKinds.${l.kind}` as never)}
                                     </a>
                                 ) : (
@@ -180,6 +181,8 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     // Imported history is a record: it never gets the vote panel, the key fingerprint or an eligibility check,
     // whatever its status says.
     const imported = p.source === "IMPORTED";
+    // With the history switched off an imported record does not exist for members either.
+    if (imported && !(await toggleEnabled("proposals.historyEnabled").catch(() => false))) notFound();
     const isOpen = p.status === "OPEN" && !imported;
     const viewer = isOpen ? (await viewerStates([p.id], session.discordId))[p.id] : undefined;
 

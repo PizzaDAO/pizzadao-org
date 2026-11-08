@@ -57,3 +57,6 @@ mission-backfill-*.csv
 # Browser CI artifacts
 playwright-report/
 test-results/
+
+# Proposals history import: dry-run output holds private data
+dry-run-*

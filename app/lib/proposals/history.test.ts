@@ -2,9 +2,10 @@
 // @vitest-environment node
 import { describe, expect, it, vi } from 'vitest'
 
-vi.mock('@/app/lib/db', () => ({ prisma: {} }))
+const db = vi.hoisted(() => ({ current: {} as any }))
+vi.mock('@/app/lib/db', () => ({ prisma: new Proxy({}, { get: (_t, k) => db.current[k] }) }))
 
-import { computeTotals, historyWhere, paidCents, parseHistoryFilters, renderHistoricalBody, trimDecimal, type TotalsRow } from './history'
+import { computeTotals, historyWhere, httpUrlOrNull, listHistory, paidCents, parseHistoryFilters, renderHistoricalBody, trimDecimal, type TotalsRow } from './history'
 import { toSummary, whitelistHistorical } from './store'
 
 const row = (o: Partial<TotalsRow> = {}): TotalsRow => ({ status: 'PASSED', kind: 'FUNDING', city: 'Town', closedAt: new Date('2024-05-01T00:00:00Z'), amountUsdCents: 50000, paidOverride: null, historyPayments: [], ...o })
@@ -77,5 +78,33 @@ describe('text helpers', () => {
     expect(trimDecimal('0.500000000000000000')).toBe('0.5')
     expect(trimDecimal('100.000000000000000000')).toBe('100')
     expect(trimDecimal('7')).toBe('7')
+  })
+})
+
+describe('year filter, page clamp, urls', () => {
+  it('filters imported rows by the proposal date and app rows by the close date', () => {
+    const w = historyWhere(parseHistoryFilters({ year: '2024' }), true) as any
+    const or = w.AND[0].OR
+    expect(or[0]).toMatchObject({ source: 'IMPORTED' })
+    expect(Object.keys(or[0])).toContain('opensAt')
+    expect(or[1]).toMatchObject({ source: 'APP' })
+    expect(Object.keys(or[1])).toContain('closedAt')
+  })
+  it('groups an imported row under its proposal year', () => {
+    const t = computeTotals([row({ source: 'IMPORTED', opensAt: new Date('2023-12-31T00:00:00Z'), closedAt: new Date('2024-01-02T00:00:00Z') })])
+    expect(t.byYear.map((g) => g.label)).toEqual(['2023'])
+  })
+  it('a page past the end returns the last page', async () => {
+    const skips: number[] = []
+    db.current = { proposal: { count: async () => 120, findMany: async (a: any) => { if (a.skip !== undefined) skips.push(a.skip); return [] } } }
+    const out = await listHistory(parseHistoryFilters({ page: '99' }), 50, true)
+    expect(out).toMatchObject({ page: 3, pages: 3 })
+    expect(skips).toEqual([100])
+  })
+  it('keeps http(s) urls only', () => {
+    expect(httpUrlOrNull('https://example.test/a')).toBe('https://example.test/a')
+    expect(httpUrlOrNull('javascript:alert(1)')).toBeNull()
+    expect(httpUrlOrNull('data:text/html,x')).toBeNull()
+    expect(httpUrlOrNull(null)).toBeNull()
   })
 })

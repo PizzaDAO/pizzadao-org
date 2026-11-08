@@ -44,7 +44,11 @@ export function historyWhere(f: HistoryFilters, includeImported: boolean): Recor
   const status = f.outcome === 'passed' ? ['PASSED'] : f.outcome === 'failed' ? ['FAILED'] : f.outcome === 'unresolved' ? ['UNRESOLVED'] : [...CLOSED_STATUSES]
   const where: Record<string, unknown> = { status: { in: status }, AND: and }
   if (!includeImported) where.source = 'APP'
-  if (f.year) and.push({ closedAt: { gte: new Date(Date.UTC(f.year, 0, 1)), lt: new Date(Date.UTC(f.year + 1, 0, 1)) } })
+  if (f.year) {
+    const range = { gte: new Date(Date.UTC(f.year, 0, 1)), lt: new Date(Date.UTC(f.year + 1, 0, 1)) }
+    // The year of the date the row shows: the proposal date for imported rows, the close date for app rows.
+    and.push({ OR: [{ source: 'IMPORTED', opensAt: range }, { source: 'APP', closedAt: range }] })
+  }
   if (f.city) and.push({ city: { contains: f.city, mode: 'insensitive' } })
   if (f.kind) and.push({ kind: f.kind })
   if (f.q) and.push({ title: { contains: f.q, mode: 'insensitive' } })
@@ -58,6 +62,8 @@ export interface TotalsRow {
   kind: string
   city: string | null
   closedAt: Date | null
+  opensAt?: Date | null
+  source?: string
   amountUsdCents: number | null
   paidOverride: boolean | null
   historyPayments: Array<{ usdValue: number | null; source?: string }>
@@ -117,7 +123,8 @@ export function computeTotals(rows: TotalsRow[]): HistoryTotals {
     const paid = paidCents(r) / 100
     t.passedAskedUsd += asked
     t.paidUsd += paid
-    bump(years, r.closedAt ? String(r.closedAt.getUTCFullYear()) : '?', asked, paid)
+    const shown = r.source === 'IMPORTED' ? (r.opensAt ?? r.closedAt) : r.closedAt
+    bump(years, shown ? String(shown.getUTCFullYear()) : '?', asked, paid)
     bump(cities, (r.city ?? '').trim() || '?', asked, paid)
   }
   t.byYear = [...years.values()].sort((a, b) => b.label.localeCompare(a.label))
@@ -135,23 +142,36 @@ export interface HistoryPage {
 
 export async function listHistory(f: HistoryFilters, pageSize: number, includeImported: boolean): Promise<HistoryPage> {
   const where = historyWhere(f, includeImported)
-  const [total, rows, totalRows] = await Promise.all([
-    prisma.proposal.count({ where }),
+  const total = await prisma.proposal.count({ where })
+  const pages = Math.max(1, Math.ceil(total / pageSize))
+  // A page past the end shows the last page instead of an empty list.
+  const page = Math.min(f.page, pages)
+  const [rows, totalRows] = await Promise.all([
     prisma.proposal.findMany({
       where,
       orderBy: [{ closedAt: { sort: 'desc', nulls: 'last' } }, { id: 'asc' }],
-      skip: (f.page - 1) * pageSize,
+      skip: (page - 1) * pageSize,
       take: pageSize,
       select: SUMMARY_SELECT,
     }),
     // One query for the totals over the whole filter (a few hundred small rows), summed in computeTotals.
     prisma.proposal.findMany({
       where,
-      select: { status: true, kind: true, city: true, closedAt: true, amountUsdCents: true, paidOverride: true, historyPayments: { select: { usdValue: true, source: true } } },
+      select: { status: true, kind: true, city: true, closedAt: true, opensAt: true, source: true, amountUsdCents: true, paidOverride: true, historyPayments: { select: { usdValue: true, source: true } } },
     }),
   ])
-  const pages = Math.max(1, Math.ceil(total / pageSize))
-  return { rows: (rows as ProposalRow[]).map(toSummary), total, page: Math.min(f.page, pages), pages, totals: computeTotals(totalRows as TotalsRow[]) }
+  return { rows: (rows as ProposalRow[]).map(toSummary), total, page, pages, totals: computeTotals(totalRows as TotalsRow[]) }
+}
+
+/** http(s) URLs only: a stored link is never rendered as javascript: or data: even if the row was edited by hand. */
+export function httpUrlOrNull(u: string | null | undefined): string | null {
+  if (!u) return null
+  try {
+    const x = new URL(u)
+    return x.protocol === 'https:' || x.protocol === 'http:' ? x.toString() : null
+  } catch {
+    return null
+  }
 }
 
 export interface HistoryDetail {
