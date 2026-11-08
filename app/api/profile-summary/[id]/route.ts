@@ -74,6 +74,10 @@ export const SENSITIVE_SHEET_KEYS = [
 // depend on the caller. 5 min TTL — short, public payload.
 // ---------------------------------------------------------------------------
 
+// The response depends on the caller's session (isOwner / viewerId), so browsers and the CDN must
+// not cache it: a copy cached while signed out kept showing "Sign in to vouch" after login.
+export const PROFILE_SUMMARY_CACHE_HEADERS = { "Cache-Control": "private, no-store" } as const;
+
 interface CacheEntry { time: number; data: ProfileSummary }
 const CACHE = new Map<string, CacheEntry>();
 const CACHE_TTL_MS = 5 * 60 * 1000;
@@ -291,9 +295,7 @@ export async function GET(
 
         const cacheKey = `${id}:${viewerMemberId ?? "anon"}`;
         const cached = CACHE.get(cacheKey);
-        const cacheHeaders = {
-            "Cache-Control": "public, max-age=300, s-maxage=300, stale-while-revalidate=600",
-        };
+        const cacheHeaders = PROFILE_SUMMARY_CACHE_HEADERS;
 
         if (cached && Date.now() - cached.time < CACHE_TTL_MS) {
             return NextResponse.json(cached.data, { headers: cacheHeaders });

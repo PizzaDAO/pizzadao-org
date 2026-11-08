@@ -55,7 +55,7 @@ vi.mock("fs", async () => {
     return { ...mocked, default: mocked };
 });
 
-import { composeProfileSummary, SENSITIVE_SHEET_KEYS } from "./route";
+import { composeProfileSummary, SENSITIVE_SHEET_KEYS, PROFILE_SUMMARY_CACHE_HEADERS } from "./route";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
@@ -122,6 +122,15 @@ function setupHappyPath() {
     // Default: no Postgres tagline → composer falls back to the sheet column.
     (getMemberTagline as ReturnType<typeof vi.fn>).mockResolvedValue(null);
 }
+
+describe("profile-summary caching", () => {
+    it("is never cached by browsers or the CDN, since it depends on the viewer's session", () => {
+        const cc = PROFILE_SUMMARY_CACHE_HEADERS["Cache-Control"];
+        expect(cc).toContain("private");
+        expect(cc).toContain("no-store");
+        expect(cc).not.toMatch(/public|s-maxage/);
+    });
+});
 
 describe("composeProfileSummary", () => {
     beforeEach(() => {
