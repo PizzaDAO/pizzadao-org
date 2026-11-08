@@ -9,6 +9,8 @@
 export interface RemoteConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
   endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
+  /** House band at the start of the listed calls (pizza-radio /play-band). */
+  startBand: { enabled: boolean; calls: string[]; maxSongs: number }
   crews: { eventId: string; label: string; callMinutes?: number }[]
   /**
    * Action items confirmed during the call (plans/post-call-agenda-updates.md, options A and C).
@@ -28,6 +30,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
     recordingLine: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
   },
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
+  startBand: { enabled: false, calls: [], maxSongs: 1 },
   crews: [],
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
   supersedeMaxDeferMinutes: 0,
@@ -47,6 +50,7 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const w = (o.welcome && typeof o.welcome === 'object' ? o.welcome : {}) as Record<string, unknown>
   const e = (o.endSong && typeof o.endSong === 'object' ? o.endSong : {}) as Record<string, unknown>
+  const b = (o.startBand && typeof o.startBand === 'object' ? o.startBand : {}) as Record<string, unknown>
   const d = REMOTE_CONFIG_OFF
   const l = (o.liveItems && typeof o.liveItems === 'object' ? o.liveItems : {}) as Record<string, unknown>
   const strings = (v: unknown, max: number, len: number): string[] =>
@@ -79,6 +83,11 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
               : []
           })
         : [],
+    },
+    startBand: {
+      enabled: b.enabled === true,
+      calls: strings(b.calls, 50, 100),
+      maxSongs: int(b.maxSongs, d.startBand.maxSongs, 1, 10),
     },
     crews,
     liveItems: {

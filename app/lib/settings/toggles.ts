@@ -39,6 +39,7 @@ export const TOGGLES = {
   },
   'calls.dstFixEnabled': { env: 'CALL_DST_FIX_ENABLED', legacy: ON_WORDS },
   'calls.endSongTriggerEnabled': { env: 'CALL_END_SONG_ENABLED', legacy: ON_WORDS },
+  'calls.startBandEnabled': { env: 'CALL_START_BAND_ENABLED', legacy: ON_WORDS },
   'calls.progressReportEnabled': { env: 'CALL_PROGRESS_ENABLED', legacy: ON_WORDS },
   'calls.progressShowFollowups': { env: 'CALL_PROGRESS_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
   'vouches.quickVouchEnabled': { env: 'VOUCH_QUICK_ENABLED', legacy: ON_WORDS },

@@ -17,6 +17,8 @@ import { liveConfigFrom } from '@/app/lib/calls/live-items'
 export interface RecorderConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
   endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
+  /** House band at the start of the listed calls (pizza-radio /play-band). */
+  startBand: { enabled: boolean; calls: string[]; maxSongs: number }
   /** Discord event id -> crew label, for naming the call in messages. */
   /** callMinutes: the crew's usual call length, for the end-of-call song when the event has no end time. */
   crews: { eventId: string; label: string; callMinutes?: number }[]
@@ -38,6 +40,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
     recordingLine: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
   },
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
+  startBand: { enabled: false, calls: [], maxSongs: 1 },
   crews: [],
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
   supersedeMaxDeferMinutes: 0,
@@ -82,6 +85,11 @@ export function parseCrewMap(raw: string): { crew: string; radio: string }[] {
   return out
 }
 
+/** One name per line, blanks dropped. */
+export function parseLines(raw: string): string[] {
+  return raw.split('\n').map((l) => l.trim()).filter(Boolean)
+}
+
 export async function buildRecorderConfig(): Promise<RecorderConfig> {
   const settings = await loadSettings()
   return {
@@ -96,6 +104,11 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
       enabled: resolveToggle('calls.endSongTriggerEnabled', settings),
       minHumans: settings.get('calls.endSongMinHumans'),
       crewMap: parseCrewMap(settings.get('calls.endSongCrewMap')),
+    },
+    startBand: {
+      enabled: resolveToggle('calls.startBandEnabled', settings),
+      calls: parseLines(settings.get('calls.startBandCalls')),
+      maxSongs: settings.get('calls.startBandMaxSongs'),
     },
     crews: await loadCrewLabels(),
     liveItems: await liveItemsConfig(settings),

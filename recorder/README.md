@@ -56,6 +56,7 @@ The recorder has no database. At the start of each session and every 5 minutes i
 
 - Welcome message: `calls.welcomeEnabled` (env kill switch `CALL_WELCOME_ENABLED` on the app), `calls.welcomeTemplate`, `calls.welcomeBatchSeconds`, `calls.recordingLine`. The recording notice always opens the call.
 - End-of-call song: `calls.endSongTriggerEnabled` (kill switch `CALL_END_SONG_ENABLED` on the app), `calls.endSongMinHumans`.
+- House band at call start: `calls.startBandEnabled` (kill switch `CALL_START_BAND_ENABLED` on the app), `calls.startBandCalls`, `calls.startBandMaxSongs`.
 - Live action items (only for the Discord events of crews in `calls.liveActionItemsCrews`):
   - spoken, `calls.liveActionItemsEnabled` (kill switch `CALL_LIVE_ACTION_ITEMS_ENABLED`): every `calls.liveChunkSeconds` the speech bursts finished since the last cut are uploaded to `calls/<sessionId>/live/<userId>/<startMs>.ogg` and sent to `POST /api/calls/recorder/live-chunk`. The app transcribes them, looks for new action items and answers with the confirmation to post. The live objects are pruned with the other leftovers after ingest.
   - typed, `calls.chatActionItemsEnabled` (kill switch `CALL_CHAT_ACTION_ITEMS_ENABLED`): a call chat message that starts with one of `calls.chatActionPrefixes` is sent to the same route right away (batched for 3 s, confirmations at least 10 s apart). Needs the chat capture (`CAPTURE_VOICE_CHAT`).
@@ -75,6 +76,12 @@ It fires once per call occurrence when:
 and at least `calls.endSongMinHumans` people are in the channel. It never fires on `max-duration` (that is only the recording cap, the call may go on), `empty`, `superseded`, `shutdown` or `disconnected`, nor for an event with no mapped crew.
 
 The "already played" marker (`DATA_DIR/end-song.json`, survives restarts) is written only after pizza-radio answered: a 2xx, or a 4xx that retrying will not fix (logged once). A network error or 5xx after the retry leaves it unmarked.
+
+## House band at call start
+
+Also played by pizza-radio, never by Metalhead. When the recorder starts recording a call whose name is listed in `calls.startBandCalls` (one call name per line, matched case-insensitively against the Discord event name or the crew label; default `Community Call`) it POSTs `{ "channelId": "<call voice channel>", "maxSongs": <calls.startBandMaxSongs> }` to pizza-radio's `/play-band` (Bearer `PIZZA_RADIO_API_KEY`, 5 s timeout, one retry on a network error or 5xx, fire and forget, outcome logged). Pizza-radio leaves after that many songs. Needs the same `PIZZA_RADIO_URL` / `PIZZA_RADIO_API_KEY` as the end song (missing = not playing, logged once). Off by default; the app's kill switch is `CALL_START_BAND_ENABLED`, and on preview deploys only that env var counts.
+
+It fires once per call occurrence, right after the recording has started (`recording "..." as <session>` in the log), and never blocks or fails the recording. The `DATA_DIR/start-band.json` marker (written before the request, survives restarts) stops a restart or a second recording part of the same call from replaying it, and a session that begins more than 10 minutes after the scheduled start (a resume) does not play either.
 
 Cutover order: set the two env vars on Railway and redeploy, turn the setting on, verify one call plays one song, then disable the `fireEndOfCallSong` timer in the Apps Script project so the song does not play twice.
 

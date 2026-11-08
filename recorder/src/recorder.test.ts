@@ -1325,3 +1325,97 @@ describe('live action items (typed in the call chat)', () => {
     expect(livePost).not.toHaveBeenCalled()
   })
 })
+
+describe('house band at call start (calls.startBandEnabled)', () => {
+  const remoteWith = (startBand: Record<string, unknown>, crews: unknown[] = []) => {
+    const sb = { calls: ['Community Call'], maxSongs: 3, ...startBand }
+    return { get: () => parseRemoteConfig({ startBand: sb, crews }), refresh: async () => parseRemoteConfig({ startBand: sb, crews }) } as unknown as RemoteConfigClient
+  }
+  const radio = { url: 'https://radio.example/', apiKey: 'radio-secret' }
+  const bandWorld = (startBand: Record<string, unknown> | null, o: { radio?: boolean; dataDir?: string; crews?: unknown[] } = {}) => {
+    const w = world({ remote: startBand ? remoteWith(startBand, o.crews) : undefined, dataDir: o.dataDir })
+    if (o.radio !== false) (w.cfg as unknown as { pizzaRadio: unknown }).pizzaRadio = radio
+    return w
+  }
+  const fetchMock = vi.fn(async (_u: string, _i?: RequestInit) => ({ ok: true, status: 200 }) as Response)
+  const asked = () => fetchMock.mock.calls.length
+
+  beforeEach(() => {
+    fetchMock.mockReset()
+    fetchMock.mockResolvedValue({ ok: true, status: 200 } as Response)
+    vi.stubGlobal('fetch', fetchMock)
+  })
+  afterEach(() => {
+    vi.unstubAllGlobals()
+    vi.restoreAllMocks()
+  })
+
+  it('on and listed: one POST /play-band with the channel and song count, Bearer key', async () => {
+    const w = bandWorld({ enabled: true })
+    await begin(w)
+    await vi.waitFor(() => expect(asked()).toBe(1))
+    const [url, init] = fetchMock.mock.calls[0]
+    expect(url).toBe('https://radio.example/play-band')
+    expect(init?.method).toBe('POST')
+    expect(JSON.parse(String(init?.body))).toEqual({ channelId: CHANNEL, maxSongs: 3 })
+    expect((init?.headers as Record<string, string>).Authorization).toBe('Bearer radio-secret')
+  })
+
+  it('matches the name case-insensitively, or the crew label; other calls do not play', async () => {
+    const a = bandWorld({ enabled: true, calls: ['  community CALL '] })
+    await begin(a)
+    await vi.waitFor(() => expect(asked()).toBe(1))
+    fetchMock.mockClear()
+    const b = bandWorld({ enabled: true, calls: ['Ops Crew'] }, { crews: [{ eventId: '100', label: 'Ops Crew' }] })
+    await begin(b)
+    await vi.waitFor(() => expect(asked()).toBe(1))
+    fetchMock.mockClear()
+    const c = bandWorld({ enabled: true, calls: ['Ops Crew'] })
+    await begin(c)
+    const d = bandWorld({ enabled: true, calls: [] })
+    await begin(d)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(asked()).toBe(0)
+  })
+
+  it('off (disabled or no remote config): nothing is requested', async () => {
+    await begin(bandWorld(null))
+    await begin(bandWorld({ enabled: false }))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(asked()).toBe(0)
+  })
+
+  it('missing PIZZA_RADIO config: no request, and recording still starts', async () => {
+    const w = bandWorld({ enabled: true }, { radio: false })
+    await begin(w)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(asked()).toBe(0)
+    expect(w.rec.currentEventId).toBe('100')
+  })
+
+  it('once per call: a restart resuming the same event does not replay it', async () => {
+    const e = ev({ scheduledStartMs: Date.now() })
+    const w = bandWorld({ enabled: true })
+    await begin(w, e)
+    await vi.waitFor(() => expect(asked()).toBe(1))
+    await w.rec.shutdown()
+    const again = bandWorld({ enabled: true }, { dataDir: w.dataDir })
+    await begin(again, e)
+    await new Promise((r) => setTimeout(r, 30))
+    expect(asked()).toBe(1)
+  })
+
+  it('a session that begins long after the scheduled start (a resume) does not play', async () => {
+    const w = bandWorld({ enabled: true })
+    await begin(w, ev({ scheduledStartMs: Date.now() - 30 * 60_000 }))
+    await new Promise((r) => setTimeout(r, 30))
+    expect(asked()).toBe(0)
+  })
+
+  it('a failing pizza-radio never breaks recording', async () => {
+    fetchMock.mockRejectedValue(new Error('down'))
+    const w = bandWorld({ enabled: true })
+    await begin(w)
+    expect(w.rec.currentEventId).toBe('100')
+  })
+})
