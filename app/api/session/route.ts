@@ -20,7 +20,9 @@ export async function GET() {
   const session = await getSession();
 
   if (!session?.discordId) {
-    return NextResponse.json({ authenticated: false }, { status: 401 });
+    // The public proposal history gets a nav entry for signed-out visitors too.
+    const historyOn = await toggleEnabled("proposals.historyEnabled").catch(() => false);
+    return NextResponse.json({ authenticated: false, ...(historyOn ? { showProposals: true } : {}) }, { status: 401 });
   }
 
   // Resolve member data from shared cache (Phase 2)

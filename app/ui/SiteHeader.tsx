@@ -27,7 +27,7 @@ const GROUPS: { key: string; items: NavItem[] }[] = [
     { href: "/manuals", label: "manuals" },
     { href: "/turtles", label: "turtles" },
     { href: "/calls", label: "calls" },
-    { href: "/proposals", label: "proposals", membersOnly: true, proposalsOnly: true },
+    { href: "/proposals", label: "proposals", proposalsOnly: true },
     { href: "/disavow", label: "disavow", disavowOnly: true },
     { href: "/nfts", label: "nfts" },
     { href: "/slices", label: "slices" },

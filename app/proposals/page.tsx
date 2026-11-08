@@ -157,7 +157,9 @@ async function historyEnabled(): Promise<boolean> {
 
 export default async function ProposalsPage({ searchParams }: { searchParams: Promise<Record<string, string | string[] | undefined>> }) {
     const session = await getSession().catch(() => null);
-    if (!session?.discordId) redirect("/login?returnTo=/proposals");
+    const signedIn = !!session?.discordId;
+    // The proposal history is public; live voting is for signed-in members.
+    if (!signedIn && !(await historyEnabled())) redirect("/login?returnTo=/proposals");
     const t = await getTranslations("proposals");
     const locale = await getLocale();
     const fmt = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeStyle: "short" });
@@ -165,7 +167,7 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const f = parseHistoryFilters(await searchParams);
     // Voting (open proposals, "New proposal") only shows while proposals.enabled is on; the history can be on alone.
-    const voting = await proposalsEnabled().catch(() => false);
+    const voting = signedIn && (await proposalsEnabled().catch(() => false));
     const [open, size, withImported] = await Promise.all([voting ? listOpenProposals() : Promise.resolve([]), pageSize(), historyEnabled()]);
     const history = await listHistory(f, size, withImported).catch(() => null);
     const thisYear = new Date().getUTCFullYear();
