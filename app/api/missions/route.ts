@@ -15,11 +15,9 @@ export async function GET() {
 
     const { humanReleaseMinLevel } = await loadHoldPolicy()
     return NextResponse.json({ ...overview, verifiersEnabled: await missionVerifiersEnabled(), humanReleaseMinLevel }, {
-      headers: {
-        'Cache-Control': session?.discordId
-          ? 'private, no-store'
-          : 'public, s-maxage=3600, stale-while-revalidate=86400',
-      },
+      // Never shared-cached: the CDN key ignores the session, so a signed-out copy would be served
+      // to signed-in members without their progress.
+      headers: { 'Cache-Control': 'private, no-store' },
     })
   } catch (error) {
     const message = error instanceof Error ? error.message : 'Unknown error'
