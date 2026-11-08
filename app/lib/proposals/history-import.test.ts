@@ -116,7 +116,14 @@ describe('finance lines', () => {
     const l = parsePayment({ title: 'T', dateProposed: '2024-01-01', discordMessage: `https://discord.com/channels/${G}/${C}/100000000000000010`, paid: true, note: 'confidence high; matched', payments: [{ date: '2024-02-01', amount: '0.5', asset: 'ETH', usd: 1905.14, 'txHash or ref': tx, source: 'ledger.csv', payee: 'Someone' }] })
     expect(l.confidence).toBe('high')
     expect(l.message).toBe('100000000000000010')
-    expect(l.payments[0]).toMatchObject({ amount: '0.5', asset: 'ETH', usdCents: 190514, txHash: tx, chain: 'ethereum', chainAssumed: true })
+    expect(l.payments[0]).toMatchObject({ amount: '0.5', asset: 'ETH', usdCents: 190514, txHash: tx, chain: null, chainAssumed: true })
+  })
+  it('uses the leg chain, warns on an unknown one, and keeps the method of an off-chain leg', () => {
+    const leg = (extra: Record<string, unknown>) => parsePayment({ note: 'confidence high', payments: [{ date: '2024-02-01', amount: '1', asset: 'USDC', usd: 1, ...extra }] }).payments[0]
+    expect(leg({ 'txHash or ref': tx, chain: 'Base' })).toMatchObject({ chain: 'base', chainAssumed: false })
+    expect(leg({ 'txHash or ref': tx, chain: 'solana' })).toMatchObject({ chain: 'solana', chainAssumed: true })
+    expect(leg({ 'txHash or ref': 'inv-9', chain: null, method: 'Mercury' })).toMatchObject({ chain: null, txHash: null, offchainRef: 'mercury: inv-9', chainAssumed: false })
+    expect(leg({ 'txHash or ref': '', chain: null, method: 'box' })).toMatchObject({ offchainRef: 'box' })
   })
   it('treats a non-hash reference as off-chain, and a missing tag as no confidence', () => {
     const l = parsePayment({ title: 'T', note: '', payments: [{ date: '2024-02-01', amount: '100', asset: 'USD', usd: 100, 'txHash or ref': 'paypal-123' }] })

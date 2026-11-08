@@ -7,6 +7,8 @@
  * must stop a dry run (a sheet row on two proposals).
  */
 
+import { DEFAULT_EXPLORERS } from './explorers.ts'
+
 // ------------------------------------------------------------------- shared types
 
 export type HistStatus = 'PASSED' | 'FAILED' | 'UNRESOLVED'
@@ -252,7 +254,7 @@ export interface PaymentInput {
   note: string | null
   source: 'finance_match' | 'discord_thread' | 'sheet' | 'override'
   sourceKey: string
-  /** The chain was guessed (the finance file does not name one); listed in the review. */
+  /** The chain is missing or not a known explorer key: the hash shows without a link; listed in the review. */
   chainAssumed?: boolean
 }
 
@@ -269,7 +271,6 @@ export interface FinanceLine {
 }
 
 const TX = /^0x[0-9a-fA-F]{64}$/
-const CHAIN_HINT = /\b(base|optimism|polygon|arbitrum)\b/i
 
 export const messageIdOf = (url: unknown): string | null => {
   const m = /\/(\d{15,25})\/?(?:[?#].*)?$/.exec(String(url ?? '').trim())
@@ -292,19 +293,22 @@ export function parsePayment(line: unknown): FinanceLine {
     const isTx = TX.test(ref)
     const usd = typeof r.usd === 'number' && Number.isFinite(r.usd) ? Math.round(r.usd * 100) : typeof r.usd === 'string' && r.usd.trim() && Number.isFinite(Number(r.usd)) ? Math.round(Number(r.usd) * 100) : null
     const amount = r.amount != null && String(r.amount).trim() !== '' && Number.isFinite(Number(r.amount)) ? String(r.amount).trim() : null
-    const hint = CHAIN_HINT.exec(`${String(r.source ?? '')} ${String(r.payee ?? '')}`)
+    // The finance file names the chain of an on-chain leg; an unknown or missing one stays unlinked (and is warned about).
+    const legChain = typeof r.chain === 'string' && /^[a-z][a-z0-9_-]{0,30}$/.test(r.chain.trim().toLowerCase()) ? r.chain.trim().toLowerCase() : null
+    const method = typeof r.method === 'string' && /^[a-z][a-z0-9 _-]{0,30}$/i.test(r.method.trim()) ? r.method.trim().toLowerCase() : null
+    const offRef = !isTx ? [method, ref].filter(Boolean).join(': ').slice(0, 200) : ''
     payments.push({
       paidAt: dayOrNull(r.date),
       amount,
       asset: r.asset ? String(r.asset).slice(0, 20) : null,
-      chain: isTx ? (hint ? hint[1].toLowerCase() : 'ethereum') : null,
+      chain: isTx ? legChain : null,
       usdCents: usd,
       txHash: isTx ? ref.toLowerCase() : null,
-      offchainRef: !isTx && ref ? ref.slice(0, 200) : null,
+      offchainRef: offRef || null,
       note: r.payee ? String(r.payee).slice(0, 300) : null,
       source: 'finance_match',
       sourceKey: `finance:${isTx ? ref.toLowerCase() : ref.slice(0, 80)}:${dayOrNull(r.date) ?? ''}:${amount ?? ''}:${idx}`,
-      chainAssumed: isTx && !hint,
+      chainAssumed: isTx && (!legChain || !Object.prototype.hasOwnProperty.call(DEFAULT_EXPLORERS, legChain)),
     })
   })
   return { title: String(o.title ?? ''), dateProposed: String(o.dateProposed ?? ''), message: messageIdOf(o.discordMessage), confidence, note, partial: String(o.paid ?? '').toLowerCase() === 'partial', payments, raw: line }
@@ -794,7 +798,7 @@ export function buildImport(inp: ImportInputs): ImportResult {
     if (line.partial) row.historical.partlyPaid = true
     for (const p of line.payments) {
       row.payments.push(p)
-      if (p.chainAssumed) review.paymentWarnings.push({ ...item, detail: `chain assumed ethereum for ${p.txHash?.slice(0, 12)}` })
+      if (p.chainAssumed) review.paymentWarnings.push({ ...item, detail: `${p.chain ? `unknown chain ${p.chain}` : 'no chain'} for ${p.txHash?.slice(0, 12)}: shown without an explorer link` })
       if (p.usdCents == null) review.paymentWarnings.push({ ...item, detail: `payment without a USD value, shown as its own line and left out of USD totals (${fmtPayment(p)})` })
     }
     if (row.status !== 'PASSED') review.paymentWarnings.push({ ...item, detail: `payment on a ${row.status} proposal` })
