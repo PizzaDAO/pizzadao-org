@@ -29,7 +29,7 @@ import {
 import { clearStarting, finalizeSession, markStarting, pendingSessions, writeSessionMeta, type FinalizeDeps } from './finalize.js'
 import { appendRecord, MAX_CHAT_TEXT } from './manifest.js'
 import { EndSongMarker, isEndSongStop, postPlayCrew } from './end-song.js'
-import { matchesStartBand, postPlayBand, START_BAND_LATE_MS } from './start-band.js'
+import { matchesStartBand, postPlayBand, START_BAND_LATE_EXTRA_MINUTES } from './start-band.js'
 import { SlotMemory } from './slots.js'
 import { NicknameManager } from './nickname.js'
 import { StopTracker, type StopReason } from './stop-conditions.js'
@@ -69,6 +69,8 @@ interface ActiveSession {
   welcome: WelcomeState | null
   /** End-of-call song (settings snapshot at session start); null: off. */
   endSong: EndSongState | null
+  /** Waiting for the scheduled start to play the house band (cancelled on stop). */
+  bandTimer: NodeJS.Timeout | null
   stopping: boolean
   /** Scheduled start of the event being recorded (forward-only switching). */
   eventStartMs: number | null
@@ -98,6 +100,7 @@ export class CallRecorder {
   private readonly endSongMarker: EndSongMarker
   private readonly startBandMarker: EndSongMarker
   private warnedNoRadio = false
+  private warnedNoRadioBand = false
   private retryTimer: NodeJS.Timeout | null = null
   /** Sessions finalized but not yet uploaded (shown on /health). */
   pendingCount = 0
@@ -358,6 +361,7 @@ export class CallRecorder {
         reminded: new Set(present),
         endSong,
         welcome: rc.welcome.enabled ? { cfg: rc.welcome, callName, channel: null, queue: [], timer: null } : null,
+        bandTimer: null,
         stopping: false,
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
@@ -370,7 +374,7 @@ export class CallRecorder {
       await this.notePresent(this.current)
       this.current.startPresent = new Set(this.current.present)
       this.log(`recording "${event.name}" as ${sessionId}`)
-      this.fireStartBand(event, rc, startedAtMs)
+      this.fireStartBand(this.current, event, rc, startedAtMs)
     } catch (err) {
       live?.stop()
       await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -433,6 +437,7 @@ export class CallRecorder {
     if (!s || s.stopping) return
     s.stopping = true
     clearInterval(s.tick)
+    if (s.bandTimer) clearTimeout(s.bandTimer)
     this.cancelWelcome(s)
     s.live?.stop()
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
@@ -523,12 +528,13 @@ export class CallRecorder {
   }
 
   /**
-   * House band at the start of a listed call: the recorder has just started recording it, which is the call's
-   * real start (sessions begin at the scheduled start, a little before it at most). Once per occurrence (persisted
-   * marker, so a restart or a second recording part does not replay it), and not for a session that begins long
-   * after the scheduled start (a resume). Never throws, never blocks.
+   * House band at a listed call: plays at the scheduled start of the call, or at the start of the recording
+   * if that is later (a session opens up to a quarter hour early; a previous call may have run over). Once per
+   * occurrence (persisted marker, so a restart or a second recording part does not replay it). When the marker
+   * file was missing at boot, a session starting long after the scheduled start is treated as a resume and
+   * skipped. Never throws, never blocks. An early session waits on a timer that stop()/shutdown() cancel.
    */
-  private fireStartBand(event: EventInfo, rc: RemoteConfig, startedAtMs: number): void {
+  private fireStartBand(s: ActiveSession, event: EventInfo, rc: RemoteConfig, startedAtMs: number): void {
     try {
       const b = rc.startBand
       if (!b.enabled) return
@@ -536,23 +542,49 @@ export class CallRecorder {
       if (!matchesStartBand(b.calls, event.name, crewLabel)) return
       const radio = this.cfg.pizzaRadio
       if (!radio) {
-        if (!this.warnedNoRadio) {
-          this.warnedNoRadio = true
+        if (!this.warnedNoRadioBand) {
+          this.warnedNoRadioBand = true
           this.log('start band is on in the settings but PIZZA_RADIO_URL / PIZZA_RADIO_API_KEY are not set: not playing')
         }
         return
       }
-      const key = eventKey(event)
-      if (this.startBandMarker.has(key)) return
-      if (event.scheduledStartMs !== null && startedAtMs - event.scheduledStartMs > START_BAND_LATE_MS) {
-        this.log(`start band skipped for "${event.name}": the call began more than ${START_BAND_LATE_MS / 60_000} min ago`)
-        return
+      if (this.startBandMarker.has(s.key)) return
+      if (this.startBandMarker.unreliable && event.scheduledStartMs !== null) {
+        const capMs = (rc.supersedeMaxDeferMinutes + START_BAND_LATE_EXTRA_MINUTES) * 60_000
+        if (startedAtMs - event.scheduledStartMs > capMs) {
+          this.log(`start band skipped for "${event.name}": no record of earlier plays and the call began long ago`)
+          return
+        }
       }
-      this.startBandMarker.mark(key, Date.now()) // before the request, so a crash or restart cannot replay it
-      this.log(`start band: asking pizza-radio to play the house band (${b.maxSongs} song${b.maxSongs === 1 ? '' : 's'}) for "${event.name}"`)
-      void postPlayBand(radio.url, radio.apiKey, this.cfg.callChannelId, b.maxSongs, this.log)
-        .then((outcome) => this.log(`start band: ${outcome === 'ok' ? 'pizza-radio accepted' : outcome === 'rejected' ? 'pizza-radio refused' : 'pizza-radio unreachable'}`))
-        .catch((err) => this.log(`start band failed: ${err instanceof Error ? err.message : String(err)}`))
+      const play = async () => {
+        s.bandTimer = null
+        if (this.current !== s || s.stopping || this.shuttingDown) return
+        if (this.startBandMarker.has(s.key)) return
+        let humans = 0
+        try {
+          humans = await this.humanCount(s.guild)
+        } catch {
+          humans = 0
+        }
+        if (this.current !== s || s.stopping) return
+        if (humans < 1) {
+          this.log(`start band skipped for "${event.name}": nobody in the channel at the start`)
+          return
+        }
+        this.startBandMarker.mark(s.key, Date.now()) // before the request, so a crash or restart cannot replay it
+        this.log(`start band: asking pizza-radio to play the house band (${b.maxSongs} song${b.maxSongs === 1 ? '' : 's'}) for "${event.name}"`)
+        void postPlayBand(radio.url, radio.apiKey, this.cfg.callChannelId, b.maxSongs, this.log)
+          .then((outcome) => this.log(`start band: ${outcome === 'ok' ? 'pizza-radio accepted' : outcome === 'rejected' ? 'pizza-radio refused' : 'pizza-radio unreachable or timed out'}`))
+          .catch((err) => this.log(`start band failed: ${err instanceof Error ? err.message : String(err)}`))
+      }
+      const delay = event.scheduledStartMs !== null ? event.scheduledStartMs - Date.now() : 0
+      if (delay > 0) {
+        this.log(`start band: waiting ${Math.round(delay / 1000)} s for the scheduled start of "${event.name}"`)
+        s.bandTimer = setTimeout(() => void play().catch((err) => this.log(`start band failed: ${err instanceof Error ? err.message : String(err)}`)), delay)
+        s.bandTimer.unref?.()
+      } else {
+        void play().catch((err) => this.log(`start band failed: ${err instanceof Error ? err.message : String(err)}`))
+      }
     } catch (err) {
       this.log(`start band failed: ${err instanceof Error ? err.message : String(err)}`)
     }
@@ -566,6 +598,7 @@ export class CallRecorder {
     if (!s) return
     s.stopping = true
     clearInterval(s.tick)
+    if (s.bandTimer) clearTimeout(s.bandTimer)
     this.cancelWelcome(s)
     s.live?.stop()
     try {

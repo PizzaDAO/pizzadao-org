@@ -1405,11 +1405,71 @@ describe('house band at call start (calls.startBandEnabled)', () => {
     expect(asked()).toBe(1)
   })
 
-  it('a session that begins long after the scheduled start (a resume) does not play', async () => {
-    const w = bandWorld({ enabled: true })
+  it('a session that starts late (the previous call ran over) still plays at its start', async () => {
+    const dataDir = mkdtempSync(path.join(os.tmpdir(), 'band-'))
+    writeFileSync(path.join(dataDir, 'start-band.json'), JSON.stringify({ 'other:1': Date.now() })) // marker file exists
+    const w = bandWorld({ enabled: true }, { dataDir })
     await begin(w, ev({ scheduledStartMs: Date.now() - 30 * 60_000 }))
+    await vi.waitFor(() => expect(asked()).toBe(1))
+  })
+
+  it('with the marker file lost, a very late session is skipped as a resume (cap = defer minutes + 15)', async () => {
+    const w = bandWorld({ enabled: true })
+    await begin(w, ev({ scheduledStartMs: Date.now() - 60 * 60_000 }))
     await new Promise((r) => setTimeout(r, 30))
     expect(asked()).toBe(0)
+  })
+
+  it('a session that starts 10 min early waits for the scheduled start', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    try {
+      const w = bandWorld({ enabled: true })
+      await begin(w, ev({ scheduledStartMs: Date.now() + 10 * 60_000 }))
+      expect(w.rec.currentEventId).toBe('100')
+      await vi.advanceTimersByTimeAsync(9 * 60_000)
+      expect(asked()).toBe(0)
+      await vi.advanceTimersByTimeAsync(61_000)
+      expect(asked()).toBe(1)
+      expect(JSON.parse(String(fetchMock.mock.calls[0][1]?.body))).toEqual({ channelId: CHANNEL, maxSongs: 3 })
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('stopping before the scheduled start cancels the band', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    try {
+      const w = bandWorld({ enabled: true })
+      await begin(w, ev({ scheduledStartMs: Date.now() + 10 * 60_000 }))
+      await w.rec.stop('empty')
+      await vi.advanceTimersByTimeAsync(11 * 60_000)
+      expect(asked()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('nobody in the channel at the scheduled start: no band', async () => {
+    vi.useFakeTimers({ toFake: ['setTimeout', 'clearTimeout', 'Date'] })
+    try {
+      const w = bandWorld({ enabled: true })
+      await begin(w, ev({ scheduledStartMs: Date.now() + 10 * 60_000 }))
+      withHumans(w, 0)
+      await vi.advanceTimersByTimeAsync(11 * 60_000)
+      expect(asked()).toBe(0)
+    } finally {
+      vi.useRealTimers()
+    }
+  })
+
+  it('matches real-shaped event names by containing the phrase', async () => {
+    const a = bandWorld({ enabled: true })
+    await begin(a, ev({ name: '🍕 🤙  Community Call (Recorded)' }))
+    await vi.waitFor(() => expect(asked()).toBe(1))
+    fetchMock.mockClear()
+    const b = bandWorld({ enabled: true })
+    await begin(b, ev({ name: 'Example Community Call January 5, 2030' }))
+    await vi.waitFor(() => expect(asked()).toBe(1))
   })
 
   it('a failing pizza-radio never breaks recording', async () => {

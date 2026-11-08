@@ -3,18 +3,26 @@
  * pizza-radio bot to do it through `POST /play-band` (Bearer API key, body `{ channelId, maxSongs }`;
  * pizza-radio leaves after maxSongs songs). Fire-and-forget; a failure must never touch recording.
  * Once per call occurrence (the marker is the same persisted store as the end song, in its own file).
+ * Plays at the scheduled start of the call, or at the start of the recording if that is later.
  */
-export const PLAY_BAND_TIMEOUT_MS = 5_000
-/** A session that begins later than this after the scheduled start is a resume (restart), not the call start. */
-export const START_BAND_LATE_MS = 10 * 60_000
+export const PLAY_BAND_TIMEOUT_MS = 15_000
+/** Extra minutes, on top of the switch-deferral cap, a session may start after the scheduled start and still play (only used when the marker file was lost). */
+export const START_BAND_LATE_EXTRA_MINUTES = 15
 
 export type PlayBandOutcome = 'ok' | 'rejected' | 'failed'
 
-/** Does this call (event name or crew label) appear in the configured list? Case-insensitive, whole name. */
-export function matchesStartBand(calls: readonly string[], ...names: (string | null | undefined)[]): boolean {
-  const key = (s: string) => s.trim().toLowerCase()
-  const wanted = new Set(calls.map(key).filter(Boolean))
-  return names.some((n) => typeof n === 'string' && n.trim() !== '' && wanted.has(key(n)))
+const norm = (s: string) => s.replace(/\s+/g, ' ').trim().toLowerCase()
+
+/**
+ * Does this call appear in the configured list? A listed phrase matches when the event name CONTAINS it
+ * (case-insensitive, whitespace collapsed; event names carry emoji, dates and "(Recorded)"), or when the
+ * crew label equals it.
+ */
+export function matchesStartBand(calls: readonly string[], eventName: string | null | undefined, crewLabel?: string | null): boolean {
+  const phrases = calls.map(norm).filter(Boolean)
+  const name = typeof eventName === 'string' ? norm(eventName) : ''
+  const label = typeof crewLabel === 'string' ? norm(crewLabel) : ''
+  return phrases.some((p) => (name !== '' && name.includes(p)) || (label !== '' && label === p))
 }
 
 /** POST /play-band with one retry on a network error or 5xx. */
@@ -40,6 +48,8 @@ export async function postPlayBand(
       if (res.status < 500) return 'rejected'
     } catch (err) {
       log(`start band: request failed (${err instanceof Error ? err.message : String(err)})`)
+      // A timeout means the request may well have been received: do not ask twice.
+      if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) return 'failed'
     }
     if (attempt === 0) await sleep(1_000)
   }

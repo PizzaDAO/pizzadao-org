@@ -64,7 +64,7 @@ The recorder has no database. At the start of each session and every 5 minutes i
 
 ## End-of-call song
 
-Metalhead never plays audio. When a recorded call really ends it POSTs `{ "crew": "<radio crew name>", "channelId": "<call voice channel>" }` to pizza-radio's `/play-crew` (Bearer `PIZZA_RADIO_API_KEY`, 5 s timeout, one retry on a network error or 5xx, fire and forget); pizza-radio joins, plays the crew song and leaves, exactly as the old Apps Script timer did.
+Metalhead never plays audio. When a recorded call really ends it POSTs `{ "crew": "<radio crew name>", "channelId": "<call voice channel>" }` to pizza-radio's `/play-crew` (Bearer `PIZZA_RADIO_API_KEY`, 15 s timeout, one retry on a connection error or 5xx but none after a timeout, fire and forget); pizza-radio joins, plays the crew song and leaves, exactly as the old Apps Script timer did.
 
 Only crews listed in the setting `calls.endSongCrewMap` ("our crew label = radio crew", one per line) play; pizza-radio knows Amore, Art, Biz Dev, Comms, Events, Finance, Governance, Mafia, Merch, Ops, Real Estate and Tech.
 
@@ -79,9 +79,9 @@ The "already played" marker (`DATA_DIR/end-song.json`, survives restarts) is wri
 
 ## House band at call start
 
-Also played by pizza-radio, never by Metalhead. When the recorder starts recording a call whose name is listed in `calls.startBandCalls` (one call name per line, matched case-insensitively against the Discord event name or the crew label; default `Community Call`) it POSTs `{ "channelId": "<call voice channel>", "maxSongs": <calls.startBandMaxSongs> }` to pizza-radio's `/play-band` (Bearer `PIZZA_RADIO_API_KEY`, 5 s timeout, one retry on a network error or 5xx, fire and forget, outcome logged). Pizza-radio leaves after that many songs. Needs the same `PIZZA_RADIO_URL` / `PIZZA_RADIO_API_KEY` as the end song (missing = not playing, logged once). Off by default; the app's kill switch is `CALL_START_BAND_ENABLED`, and on preview deploys only that env var counts.
+Also played by pizza-radio, never by Metalhead. When the recorder starts recording a call whose name is listed in `calls.startBandCalls` (one call name per line, an event whose name contains the line, case-insensitively with spaces collapsed, or a crew whose label equals it; default `Community Call`) it POSTs `{ "channelId": "<call voice channel>", "maxSongs": <calls.startBandMaxSongs> }` to pizza-radio's `/play-band` (Bearer `PIZZA_RADIO_API_KEY`, 15 s timeout, one retry on a connection error or 5xx but none after a timeout, fire and forget, outcome logged). Pizza-radio leaves after that many songs. Needs the same `PIZZA_RADIO_URL` / `PIZZA_RADIO_API_KEY` as the end song (missing = not playing, logged once). Off by default; the app's kill switch is `CALL_START_BAND_ENABLED`, and on preview deploys only that env var counts.
 
-It fires once per call occurrence, right after the recording has started (`recording "..." as <session>` in the log), and never blocks or fails the recording. The `DATA_DIR/start-band.json` marker (written before the request, survives restarts) stops a restart or a second recording part of the same call from replaying it, and a session that begins more than 10 minutes after the scheduled start (a resume) does not play either.
+It fires once per call occurrence at the scheduled start of the call, or when the recording starts if that is later (a session can open up to 15 minutes early and then waits; the wait is cancelled if the recording stops or switches first). At that moment at least one person must be in the channel. It never blocks or fails the recording. The `DATA_DIR/start-band.json` marker (written before the request, survives restarts) stops a restart or a second recording part of the same call from replaying it. Only if that file was missing at boot (data folder lost) is a session that starts more than `calls.supersedeMaxDeferMinutes` + 15 minutes after the scheduled start skipped as a resume.
 
 Cutover order: set the two env vars on Railway and redeploy, turn the setting on, verify one call plays one song, then disable the `fireEndOfCallSong` timer in the Apps Script project so the song does not play twice.
 
