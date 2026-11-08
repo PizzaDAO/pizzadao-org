@@ -1887,7 +1887,8 @@
       "OPEN": "Open",
       "PASSED": "Passed",
       "FAILED": "Did not pass",
-      "CANCELLED": "Cancelled"
+      "CANCELLED": "Cancelled",
+      "UNRESOLVED": "Result not recorded"
     },
     "kind": {
       "FUNDING": "Funding",
@@ -1994,7 +1995,99 @@
       "shared": "Code shared.",
       "copied": "Code copied.",
       "failed": "Could not copy. Open the proposal and copy the code from there."
-    }
+    },
+    "historyHeading": "All proposals",
+    "historyDek": "Every past proposal, newest first. Older ones are read-only records imported from Discord and the proposals sheet.",
+    "noHistory": "No past proposals match.",
+    "imported": "Imported",
+    "paidBadge": "Paid",
+    "proposedOn": "Proposed {date}",
+    "counts": "{ayes} aye, {nays} nay, {abstains} abstain",
+    "countsNone": "Votes not recorded",
+    "reactionsLine": "Reactions {summary}",
+    "rawAmount": "Amount: {amount}",
+    "filters": {
+      "year": "Year",
+      "outcome": "Result",
+      "city": "City",
+      "kind": "Type",
+      "paid": "Paid",
+      "search": "Search titles",
+      "any": "Any",
+      "passed": "Passed",
+      "failed": "Did not pass",
+      "unresolved": "Result not recorded",
+      "yes": "Paid",
+      "no": "Not paid",
+      "apply": "Filter",
+      "clear": "Clear"
+    },
+    "totals": {
+      "heading": "Totals for this filter",
+      "proposals": "{count} proposals",
+      "passedFailed": "{passed} passed, {failed} did not pass, {unresolved} result not recorded",
+      "asked": "Asked in passed proposals: {amount}",
+      "paid": "Paid out: {amount}",
+      "byYear": "By year",
+      "byCity": "By city",
+      "col": {
+        "group": "Group",
+        "count": "Proposals",
+        "asked": "Passed, asked",
+        "paid": "Paid"
+      }
+    },
+    "pager": {
+      "prev": "Previous",
+      "next": "Next",
+      "page": "Page {page} of {pages}"
+    },
+    "history": {
+      "heading": "Record",
+      "proposedOn": "Proposed on",
+      "proposer": "Proposer",
+      "city": "City",
+      "event": "Event",
+      "counts": "Counts",
+      "quorumStated": "Quorum on the poll: {needed}",
+      "quorumEra": "Quorum applied from the rules in force at the time: {needed}",
+      "noQuorum": "No quorum recorded",
+      "source": "Result source",
+      "sources": {
+        "override": "Decided by a reviewer",
+        "votes": "Poll counts",
+        "votes_era_quorum": "Poll counts with the quorum of that period",
+        "sheet": "Proposals sheet"
+      },
+      "sourceNone": "Not recorded",
+      "links": "Sources",
+      "payments": "Payments",
+      "noPayments": "No payments recorded",
+      "earlier": "Earlier attempt",
+      "imported": "This is a read-only record imported from past proposals. It cannot be voted on.",
+      "discussNote": "{count} of the abstains were \"needs more discussion\" votes.",
+      "reactionsNote": "This post predates polls. Reactions are shown, not votes.",
+      "paidBadge": "Paid"
+    },
+    "payments": {
+      "date": "Date",
+      "amount": "Amount",
+      "chain": "Chain",
+      "usd": "USD value",
+      "tx": "Transaction",
+      "offchain": "Off-chain",
+      "note": "Note",
+      "total": "Total"
+    },
+    "linkKinds": {
+      "discord_poll": "Discord poll",
+      "discord_thread": "Discord thread",
+      "sheet": "Sheet",
+      "doc": "Notes",
+      "other": "Link"
+    },
+    "partlyPaidBadge": "Partly paid",
+    "partlyPaidLine": "Paid so far {paid} of {asked} asked"
   },
   "followupAction": {
     "overline": "§ Follow-up",

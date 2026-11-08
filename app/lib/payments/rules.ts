@@ -30,7 +30,7 @@ export interface RuleContext {
     /** Proposals are on: the legacy poll link is ignored and a passed in-app proposal is required above the cap. */
     proposalsOn?: boolean
     /** The in-app proposal linked to the request (proposals on only). */
-    proposal?: { status: string; amountUsdCents: number | null } | null
+    proposal?: { status: string; amountUsdCents: number | null; source?: string } | null
     requesterDiscordId: string | null
     requesterMemberId: string | null
   }
@@ -89,7 +89,7 @@ export function computeRuleFlags(c: RuleContext): PaymentFlag[] {
     // Proposals on: a Sesh link or typed count counts for nothing. Above the cap the request needs a PASSED in-app proposal,
     // and it may not ask for more than that proposal did.
     const p = c.req.proposal
-    const passed = p?.status === 'PASSED'
+    const passed = p?.status === 'PASSED' && p.source !== 'IMPORTED'
     if (usd > cap && !passed) add({ id: 'over_cap_no_vote', severity: 'high', detail: 'Above the on-approval cap without a passed in-app proposal linked to the request.' })
     if (passed && p?.amountUsdCents != null && c.req.amountUsdCents > p.amountUsdCents) {
       add({ id: 'amount_over_proposal', severity: 'high', detail: 'The request asks for more than the linked proposal that passed.' })

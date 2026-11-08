@@ -33,7 +33,7 @@ export interface EvalDeps {
 export type LoadedRequest = NonNullable<Awaited<ReturnType<typeof loadRequest>>>
 
 async function loadRequest(id: string) {
-  return prisma.paymentRequest.findUnique({ where: { id }, include: { attachments: { select: { kind: true, sha256: true, createdAt: true } }, proposal: { select: { status: true, amountUsdCents: true } } } })
+  return prisma.paymentRequest.findUnique({ where: { id }, include: { attachments: { select: { kind: true, sha256: true, createdAt: true } }, proposal: { select: { status: true, source: true, amountUsdCents: true } } } })
 }
 
 async function restrictedMatchesOne(discordId: string | null, memberId: string | null): Promise<string[]> {

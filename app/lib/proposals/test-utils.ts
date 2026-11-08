@@ -64,7 +64,7 @@ export function makeFakeDb() {
   const db: any = {
     proposal: {
       create: async ({ data }: any) => {
-        const row = { id: `p${++state.seq}`, status: 'DRAFT', ayes: 0, nays: 0, abstains: 0, countAbstains: true, requireAyesOverNays: true, opensAt: null, closesAt: null, closedAt: null, ayesNeeded: null, eligibleCount: null, discordChannelId: null, discordMessageId: null, resultPostedAt: null, createdAt: new Date(0), ...data }
+        const row = { id: `p${++state.seq}`, status: 'DRAFT', source: 'APP', votesRecorded: true, ayes: 0, nays: 0, abstains: 0, countAbstains: true, requireAyesOverNays: true, opensAt: null, closesAt: null, closedAt: null, ayesNeeded: null, eligibleCount: null, discordChannelId: null, discordMessageId: null, resultPostedAt: null, createdAt: new Date(0), ...data }
         state.proposal.push(row)
         return row
       },

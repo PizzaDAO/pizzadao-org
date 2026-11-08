@@ -21,14 +21,16 @@ export interface LinkInput {
 export interface LinkableProposal {
   kind: string
   status: string
-  proposerDiscordId: string
+  proposerDiscordId: string | null
+  /** Imported history never funds a payment request. Absent means an app proposal. */
+  source?: 'APP' | 'IMPORTED'
   amountUsdCents: number | null
 }
 
 /** Pure: decide from the proposal and the cents already committed to it. */
 export function checkProposalLink(i: LinkInput, proposal: LinkableProposal | null, alreadyFundedCents: number): LinkError | null {
   if (!i.proposalId) return i.amountUsdCents > i.capUsdCents ? 'proposal_required' : null
-  if (!proposal || proposal.kind !== 'FUNDING' || proposal.status !== 'PASSED' || proposal.proposerDiscordId !== i.requesterDiscordId || proposal.amountUsdCents == null) {
+  if (!proposal || proposal.source === 'IMPORTED' || proposal.kind !== 'FUNDING' || proposal.status !== 'PASSED' || proposal.proposerDiscordId !== i.requesterDiscordId || proposal.amountUsdCents == null) {
     return 'proposal_invalid'
   }
   if (i.amountUsdCents > proposal.amountUsdCents) return 'proposal_invalid'
@@ -43,7 +45,7 @@ export async function validatePaymentProposal(i: LinkInput, db: Pick<typeof pris
     return e ? { ok: false, error: e } : { ok: true, proposalId: null }
   }
   const [proposal, others] = await Promise.all([
-    db.proposal.findUnique({ where: { id: i.proposalId }, select: { kind: true, status: true, proposerDiscordId: true, amountUsdCents: true } }),
+    db.proposal.findUnique({ where: { id: i.proposalId }, select: { kind: true, status: true, source: true, proposerDiscordId: true, amountUsdCents: true } }),
     db.paymentRequest.findMany({
       where: { proposalId: i.proposalId, status: { notIn: ['REJECTED', 'WITHDRAWN'] }, ...(i.excludeRequestId ? { id: { not: i.excludeRequestId } } : {}) },
       select: { amountUsdCents: true },

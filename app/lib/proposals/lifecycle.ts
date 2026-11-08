@@ -34,7 +34,7 @@ export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = 
   const out: CronResult = { opened: 0, settled: 0, drained: 0, openPosts: 0, resultPosts: 0 }
 
   const drafts: Array<{ id: string }> = await prisma.proposal.findMany({
-    where: { status: 'DRAFT', createdAt: { lte: new Date(now.getTime() - DRAFT_RETRY_MS) } },
+    where: { source: 'APP', status: 'DRAFT', createdAt: { lte: new Date(now.getTime() - DRAFT_RETRY_MS) } },
     orderBy: { createdAt: 'asc' },
     take: MAX_OPENS_PER_RUN,
     select: { id: true },
@@ -48,7 +48,7 @@ export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = 
     }
   }
 
-  const due: Array<{ id: string }> = await prisma.proposal.findMany({ where: { status: 'OPEN', closesAt: { lte: new Date(now.getTime() - CLOSE_MARGIN_MS) } }, select: { id: true } })
+  const due: Array<{ id: string }> = await prisma.proposal.findMany({ where: { source: 'APP', status: 'OPEN', closesAt: { lte: new Date(now.getTime() - CLOSE_MARGIN_MS) } }, select: { id: true } })
   for (const p of due) {
     try {
       if ((await settleProposal(p.id, now, { pending: opts.pending })).ok) out.settled++
@@ -58,7 +58,7 @@ export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = 
   }
 
   // Proposals still open: move their pending votes into the table (one sorted transaction each).
-  const stillOpen: Array<{ id: string }> = await prisma.proposal.findMany({ where: { status: 'OPEN' }, select: { id: true } })
+  const stillOpen: Array<{ id: string }> = await prisma.proposal.findMany({ where: { source: 'APP', status: 'OPEN' }, select: { id: true } })
   for (const p of stillOpen) {
     try {
       out.drained += await drainPending(p.id, { pending: opts.pending })
@@ -67,11 +67,11 @@ export async function runProposalsCron(now: Date = new Date(), deps: PostDeps = 
     }
   }
 
-  const unposted: Array<{ id: string }> = await prisma.proposal.findMany({ where: { status: 'OPEN', discordChannelId: null }, select: { id: true } })
+  const unposted: Array<{ id: string }> = await prisma.proposal.findMany({ where: { source: 'APP', status: 'OPEN', discordChannelId: null }, select: { id: true } })
   for (const p of unposted) if ((await announceOpen(p.id, deps).catch(() => 'failed')) === 'posted') out.openPosts++
 
   const unannounced: Array<{ id: string }> = await prisma.proposal.findMany({
-    where: { status: { in: ['PASSED', 'FAILED'] }, resultPostedAt: null },
+    where: { source: 'APP', status: { in: ['PASSED', 'FAILED'] }, resultPostedAt: null },
     select: { id: true },
   })
   for (const p of unannounced) if ((await announceResult(p.id, now, deps).catch(() => 'failed')) === 'posted') out.resultPosts++

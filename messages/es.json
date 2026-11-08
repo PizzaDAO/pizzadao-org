@@ -1887,7 +1887,8 @@
       "OPEN": "Abierta",
       "PASSED": "Aprobada",
       "FAILED": "No aprobada",
-      "CANCELLED": "Cancelada"
+      "CANCELLED": "Cancelada",
+      "UNRESOLVED": "Resultado no registrado"
     },
     "kind": {
       "FUNDING": "Financiación",
@@ -1994,7 +1995,99 @@
       "shared": "Código compartido.",
       "copied": "Código copiado.",
       "failed": "No se pudo copiar. Abre la propuesta y copia el código desde allí."
-    }
+    },
+    "historyHeading": "Todas las propuestas",
+    "historyDek": "Todas las propuestas anteriores, las más recientes primero. Las más antiguas son registros de solo lectura importados de Discord y de la hoja de propuestas.",
+    "noHistory": "Ninguna propuesta anterior coincide.",
+    "imported": "Importada",
+    "paidBadge": "Pagada",
+    "proposedOn": "Propuesta el {date}",
+    "counts": "{ayes} a favor, {nays} en contra, {abstains} abstenciones",
+    "countsNone": "Votos no registrados",
+    "reactionsLine": "Reacciones {summary}",
+    "rawAmount": "Monto: {amount}",
+    "filters": {
+      "year": "Año",
+      "outcome": "Resultado",
+      "city": "Ciudad",
+      "kind": "Tipo",
+      "paid": "Pagada",
+      "search": "Buscar en los títulos",
+      "any": "Cualquiera",
+      "passed": "Aprobada",
+      "failed": "No aprobada",
+      "unresolved": "Resultado no registrado",
+      "yes": "Pagada",
+      "no": "No pagada",
+      "apply": "Filtrar",
+      "clear": "Borrar"
+    },
+    "totals": {
+      "heading": "Totales de este filtro",
+      "proposals": "{count} propuestas",
+      "passedFailed": "{passed} aprobadas, {failed} no aprobadas, {unresolved} sin resultado registrado",
+      "asked": "Solicitado en propuestas aprobadas: {amount}",
+      "paid": "Pagado: {amount}",
+      "byYear": "Por año",
+      "byCity": "Por ciudad",
+      "col": {
+        "group": "Grupo",
+        "count": "Propuestas",
+        "asked": "Aprobadas, solicitado",
+        "paid": "Pagado"
+      }
+    },
+    "pager": {
+      "prev": "Anterior",
+      "next": "Siguiente",
+      "page": "Página {page} de {pages}"
+    },
+    "history": {
+      "heading": "Registro",
+      "proposedOn": "Propuesta el",
+      "proposer": "Proponente",
+      "city": "Ciudad",
+      "event": "Evento",
+      "counts": "Votos",
+      "quorumStated": "Quórum de la votación: {needed}",
+      "quorumEra": "Quórum según las reglas vigentes en ese momento: {needed}",
+      "noQuorum": "Sin quórum registrado",
+      "source": "Origen del resultado",
+      "sources": {
+        "override": "Decidido por un revisor",
+        "votes": "Votos de la encuesta",
+        "votes_era_quorum": "Votos con el quórum de ese período",
+        "sheet": "Hoja de propuestas"
+      },
+      "sourceNone": "No registrado",
+      "links": "Fuentes",
+      "payments": "Pagos",
+      "noPayments": "No hay pagos registrados",
+      "earlier": "Intento anterior",
+      "imported": "Este es un registro de solo lectura importado de propuestas anteriores. No se puede votar.",
+      "discussNote": "{count} de las abstenciones fueron votos de \"necesita más discusión\".",
+      "reactionsNote": "Esta publicación es anterior a las encuestas. Se muestran reacciones, no votos.",
+      "paidBadge": "Pagada"
+    },
+    "payments": {
+      "date": "Fecha",
+      "amount": "Monto",
+      "chain": "Red",
+      "usd": "Valor en USD",
+      "tx": "Transacción",
+      "offchain": "Fuera de la cadena",
+      "note": "Nota",
+      "total": "Total"
+    },
+    "linkKinds": {
+      "discord_poll": "Encuesta de Discord",
+      "discord_thread": "Hilo de Discord",
+      "sheet": "Hoja",
+      "doc": "Notas",
+      "other": "Enlace"
+    },
+    "partlyPaidBadge": "Pagada en parte",
+    "partlyPaidLine": "Pagado hasta ahora {paid} de {asked} solicitados"
   },
   "followupAction": {
     "overline": "§ Seguimiento",
