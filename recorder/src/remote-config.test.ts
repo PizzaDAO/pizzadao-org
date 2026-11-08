@@ -16,6 +16,11 @@ describe('parseRemoteConfig', () => {
     expect(c.endSong).toEqual({ enabled: true, minHumans: 2, crewMap: [{ crew: 'Ops', radio: 'Ops' }] })
     expect(c.crews).toEqual([{ eventId: '1', label: 'Ops' }])
   })
+  it('start band: explicit true, trimmed names, maxSongs 1-10', () => {
+    expect(parseRemoteConfig({}).startBand).toEqual({ enabled: false, calls: [], maxSongs: 1 })
+    expect(parseRemoteConfig({ startBand: { enabled: true, calls: [' Community Call ', '', 5], maxSongs: 3 } }).startBand).toEqual({ enabled: true, calls: ['Community Call'], maxSongs: 3 })
+    expect(parseRemoteConfig({ startBand: { enabled: 'yes', maxSongs: 99 } }).startBand).toEqual({ enabled: false, calls: [], maxSongs: 1 })
+  })
 })
 
 describe('RemoteConfigClient', () => {

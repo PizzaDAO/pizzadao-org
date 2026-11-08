@@ -8,7 +8,7 @@
  */
 import { readFileSync, renameSync, writeFileSync } from 'node:fs'
 
-export const PLAY_CREW_TIMEOUT_MS = 5_000
+export const PLAY_CREW_TIMEOUT_MS = 15_000
 /** Markers older than this are forgotten (longer than any gap between occurrences we care about). */
 export const MARKER_KEEP_MS = 3 * 86_400_000
 
@@ -48,6 +48,8 @@ export async function postPlayCrew(
       if (res.status < 500) return 'rejected' // a bad crew name or key will not fix itself
     } catch (err) {
       log(`end song: request failed (${err instanceof Error ? err.message : String(err)})`)
+      // A timeout means the request may well have been received: do not ask twice.
+      if (err instanceof Error && (err.name === 'TimeoutError' || err.name === 'AbortError')) return 'failed'
     }
     if (attempt === 0) await sleep(1_000)
   }
@@ -57,6 +59,8 @@ export async function postPlayCrew(
 /** Which call occurrences already played their song (persisted in DATA_DIR). */
 export class EndSongMarker {
   private entries: Record<string, number> = {}
+  /** True when the file was missing or unreadable at load (first run or a lost data folder): earlier marks may be unknown. */
+  unreliable = false
 
   constructor(
     private readonly file: string,
@@ -66,6 +70,7 @@ export class EndSongMarker {
       const parsed: unknown = JSON.parse(readFileSync(file, 'utf8'))
       if (parsed && typeof parsed === 'object' && !Array.isArray(parsed)) this.entries = parsed as Record<string, number>
     } catch (err) {
+      this.unreliable = true
       if ((err as NodeJS.ErrnoException).code !== 'ENOENT') this.log(`could not read ${file}: ${err instanceof Error ? err.message : String(err)}`)
     }
   }
@@ -77,6 +82,7 @@ export class EndSongMarker {
   /** Remember an occurrence as fired (before the request, so a crash cannot replay it). */
   mark(key: string, nowMs: number): void {
     this.entries[key] = nowMs
+    this.unreliable = false
     for (const [k, at] of Object.entries(this.entries)) if (nowMs - at > MARKER_KEEP_MS) delete this.entries[k]
     try {
       const tmp = `${this.file}.tmp`
