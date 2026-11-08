@@ -1,4 +1,6 @@
 import { NextResponse } from "next/server";
+import { proposalsEnabled } from "@/app/lib/proposals/constants";
+import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { getSession } from "@/app/lib/session";
 import {
   fetchMemberByDiscordId,
@@ -87,6 +89,13 @@ export async function GET() {
     }
   }
 
+  // Proposals nav entry: shown while voting or the proposal history is switched on (fails closed).
+  const [votingOn, historyOn] = await Promise.all([
+    proposalsEnabled().catch(() => false),
+    toggleEnabled("proposals.historyEnabled").catch(() => false),
+  ]);
+  const showProposals = votingOn || historyOn;
+
   // PFP is a quick fs check - include it to avoid a separate request
   let pfpPath: string | null = null;
   if (memberId) {
@@ -115,6 +124,7 @@ export async function GET() {
       canReviewMissions,
       canManageShop,
       ...(disavowFlags ?? {}),
+      ...(showProposals ? { showProposals: true } : {}),
     },
     {
       headers: { "Cache-Control": "private, max-age=300" },

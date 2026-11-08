@@ -10,6 +10,7 @@ import { getSession } from "@/app/lib/session";
 import { getSetting } from "@/app/lib/settings";
 import { toggleEnabled } from "@/app/lib/settings/toggles";
 import { listOpenProposals, type ProposalSummary } from "@/app/lib/proposals/store";
+import { proposalsEnabled } from "@/app/lib/proposals/constants";
 import { listHistory, parseHistoryFilters, type HistoryFilters, type HistoryTotals } from "@/app/lib/proposals/history";
 import { EditorialMasthead, EditorialPage, EmptyState, paperCard, pillOutline, pillTomato } from "@/app/ui/shared/Editorial";
 
@@ -163,7 +164,9 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
     const day = new Intl.DateTimeFormat(locale, { dateStyle: "medium", timeZone: "UTC" });
     const money = new Intl.NumberFormat(locale, { style: "currency", currency: "USD", maximumFractionDigits: 0 });
     const f = parseHistoryFilters(await searchParams);
-    const [open, size, withImported] = await Promise.all([listOpenProposals(), pageSize(), historyEnabled()]);
+    // Voting (open proposals, "New proposal") only shows while proposals.enabled is on; the history can be on alone.
+    const voting = await proposalsEnabled().catch(() => false);
+    const [open, size, withImported] = await Promise.all([voting ? listOpenProposals() : Promise.resolve([]), pageSize(), historyEnabled()]);
     const history = await listHistory(f, size, withImported).catch(() => null);
     const thisYear = new Date().getUTCFullYear();
     const years = Array.from({ length: thisYear - 2020 }, (_, i) => thisYear - i);
@@ -176,20 +179,26 @@ export default async function ProposalsPage({ searchParams }: { searchParams: Pr
                 title={t("title")}
                 dek={t("dek")}
                 aside={
-                    <Link href="/proposals/new" className={pillTomato}>
-                        {t("newProposal")}
-                    </Link>
+                    voting ? (
+                        <Link href="/proposals/new" className={pillTomato}>
+                            {t("newProposal")}
+                        </Link>
+                    ) : undefined
                 }
             />
-            <h2 className="mb-3 font-display text-xl font-black">{t("openHeading")}</h2>
-            {open.length === 0 ? (
-                <EmptyState title={t("noOpen")} />
-            ) : (
-                <ul className="m-0 mb-8 flex list-none flex-col gap-3 p-0">
-                    {open.map((p) => (
-                        <Row key={p.id} p={p} t={t} fmt={fmt} money={money} />
-                    ))}
-                </ul>
+            {voting && (
+                <>
+                    <h2 className="mb-3 font-display text-xl font-black">{t("openHeading")}</h2>
+                    {open.length === 0 ? (
+                        <EmptyState title={t("noOpen")} />
+                    ) : (
+                        <ul className="m-0 mb-8 flex list-none flex-col gap-3 p-0">
+                            {open.map((p) => (
+                                <Row key={p.id} p={p} t={t} fmt={fmt} money={money} />
+                            ))}
+                        </ul>
+                    )}
+                </>
             )}
             <h2 className="mb-1 mt-8 font-display text-xl font-black">{t("historyHeading")}</h2>
             <p className="mb-3 mt-0 text-sm text-foreground/70">{t("historyDek")}</p>

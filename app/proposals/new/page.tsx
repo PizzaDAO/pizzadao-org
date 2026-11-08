@@ -1,7 +1,8 @@
 // app/proposals/new/page.tsx — new proposal form (the proposal template). Members only; the API checks the box.
 
 import type { Metadata } from "next";
-import { redirect } from "next/navigation";
+import { notFound, redirect } from "next/navigation";
+import { proposalsEnabled } from "@/app/lib/proposals/constants";
 import { getTranslations } from "next-intl/server";
 import { getSession } from "@/app/lib/session";
 import { EditorialPage } from "@/app/ui/shared/Editorial";
@@ -16,6 +17,8 @@ export async function generateMetadata(): Promise<Metadata> {
 }
 
 export default async function NewProposalPage() {
+    // The area can be open for the history alone; creating proposals needs voting on.
+    if (!(await proposalsEnabled().catch(() => false))) notFound();
     const session = await getSession().catch(() => null);
     if (!session?.discordId) redirect("/login?returnTo=/proposals/new");
     return (
