@@ -167,12 +167,15 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     const { id } = await params;
     const { fp } = await searchParams;
     const session = await getSession().catch(() => null);
-    if (!session?.discordId) {
+    const viewerId = session?.discordId ?? "";
+    const toLogin = (): never => {
         // Keep the key fingerprint from the Discord link through the login round trip, so the browser can still check against it.
         const back = `/proposals/${encodeURIComponent(id)}${fp && /^[0-9a-fA-F ]{32,40}$/.test(fp) ? `?fp=${encodeURIComponent(fp)}` : ""}`;
         redirect(`/login?returnTo=${encodeURIComponent(back)}`);
-    }
-    const p = await getProposalDetail(id, session.discordId);
+    };
+    const p = await getProposalDetail(id, viewerId);
+    // Imported history records are public; everything else (live voting) is for signed-in members.
+    if (!viewerId && p?.source !== "IMPORTED") toLogin();
     if (!p) notFound();
     const t = await getTranslations("proposals");
     const locale = await getLocale();
@@ -187,7 +190,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
     // App-run proposals belong to voting: hidden while only the history is switched on.
     if (!imported && !(await proposalsEnabled().catch(() => false))) notFound();
     const isOpen = p.status === "OPEN" && !imported;
-    const viewer = isOpen ? (await viewerStates([p.id], session.discordId))[p.id] : undefined;
+    const viewer = isOpen ? (await viewerStates([p.id], viewerId))[p.id] : undefined;
 
     let hist: HistoryDetail | null = null;
     let proposer: string | null = null;

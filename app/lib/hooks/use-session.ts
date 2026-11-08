@@ -53,7 +53,10 @@ export function useSession() {
     queryKey: ["session"],
     queryFn: async () => {
       const res = await fetch("/api/session");
-      if (res.status === 401) return LOGGED_OUT_SESSION;
+      if (res.status === 401) {
+        const body = (await res.json().catch(() => ({}))) as { showProposals?: boolean };
+        return body.showProposals === true ? { ...LOGGED_OUT_SESSION, showProposals: true } : LOGGED_OUT_SESSION;
+      }
       if (!res.ok) throw new Error("Session fetch failed");
       return res.json();
     },
