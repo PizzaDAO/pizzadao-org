@@ -150,6 +150,18 @@ async function apply(rows: ImportRow[], prune: boolean) {
   if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is not set'); process.exit(2) }
   const pc: any = await import('@prisma/client')
   const { PrismaNeon } = await import('@prisma/adapter-neon')
+  // Local testing only: a localhost DATABASE_URL goes through a websocket-to-TCP proxy (IMPORT_WSPROXY_PORT, default 54330),
+  // because the Neon driver speaks websockets. Any other host uses the driver as the app does.
+  const host = new URL(process.env.DATABASE_URL).hostname
+  if (host === 'localhost' || host === '127.0.0.1') {
+    const neon: any = await import('@neondatabase/serverless')
+    const ws: any = await import('ws')
+    neon.neonConfig.webSocketConstructor = ws.default ?? ws.WebSocket
+    neon.neonConfig.wsProxy = (h: string, port: number) => `127.0.0.1:${process.env.IMPORT_WSPROXY_PORT ?? 54330}/v1?address=${h}:${port}`
+    neon.neonConfig.useSecureWebSocket = false
+    neon.neonConfig.pipelineTLS = false
+    neon.neonConfig.pipelineConnect = false
+  }
   const PrismaClient = pc.PrismaClient ?? pc.default?.PrismaClient
   const prisma: any = new PrismaClient({ adapter: new PrismaNeon({ connectionString: process.env.DATABASE_URL }) })
   try {
@@ -225,7 +237,8 @@ async function apply(rows: ImportRow[], prune: boolean) {
   }
 }
 
-main().catch((e) => {
+// Exit explicitly: an open database connection pool must not keep a finished run alive.
+main().then(() => process.exit(0)).catch((e) => {
   console.error(e)
   process.exit(1)
 })
