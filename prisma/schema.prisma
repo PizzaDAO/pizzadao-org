@@ -13,8 +13,8 @@ model User {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
-  pendingSignatures PendingSignature[]
-  economy           Economy?
+  pendingSignatures  PendingSignature[]
+  economy            Economy?
   unlockTicketClaims UnlockTicketClaim[]
 }
 
@@ -31,21 +31,21 @@ model Economy {
 
 // Shop items available for purchase
 model ShopItem {
-  id          Int         @id @default(autoincrement())
-  name        String      @unique
-  description String?
-  price       Int
-  quantity    Int         @default(-1) // -1 = unlimited
-  image       String?     // URL to item image
-  isAvailable Boolean     @default(true)
+  id            Int         @id @default(autoincrement())
+  name          String      @unique
+  description   String?
+  price         Int
+  quantity      Int         @default(-1) // -1 = unlimited
+  image         String? // URL to item image
+  isAvailable   Boolean     @default(true)
   // Collectible: exists so it can be held (granted, shown in inventories) but
   // is never for sale. The shop-sheet sync never touches collectibles (no
   // deactivation, no update from a same-named sheet row) and every purchase
   // path refuses them. Created with scripts/unbelievaboat/seed-store.mjs
   // --collectible "<name>" (e.g. the retired UnbelievaBoat Molto Benny Pin).
-  isCollectible Boolean   @default(false)
-  createdAt   DateTime    @default(now())
-  inventory   Inventory[]
+  isCollectible Boolean     @default(false)
+  createdAt     DateTime    @default(now())
+  inventory     Inventory[]
 }
 
 // User's inventory of purchased items
@@ -62,8 +62,8 @@ model Inventory {
 model Job {
   id          Int             @id @default(autoincrement())
   description String
-  type        String?         // Category from spreadsheet
-  sheetRow    Int?            // Row index for sync tracking
+  type        String? // Category from spreadsheet
+  sheetRow    Int? // Row index for sync tracking
   isActive    Boolean         @default(true)
   createdAt   DateTime        @default(now())
   assignments JobAssignment[]
@@ -88,23 +88,23 @@ model JobCycle {
 
 // User-created bounties with escrowed rewards
 model Bounty {
-  id          Int              @id @default(autoincrement())
-  description String
-  link        String?          // Optional link for more details
-  reward      Int              // Escrowed amount
-  createdBy   String           // Discord ID of poster
-  claimedBy   String?          // Discord ID of claimer
-  status      BountyStatus     @default(OPEN)
-  crewId      String?          // Crew-mappings slug (e.g. "ops"); null = general bounty (jalapeno-82565)
-  submissionNote String?       // Claimer's "what I did" (jalapeno-82565 v2)
-  submissionLink String?       // Optional proof URL (https only)
+  id             Int             @id @default(autoincrement())
+  description    String
+  link           String? // Optional link for more details
+  reward         Int // Escrowed amount
+  createdBy      String // Discord ID of poster
+  claimedBy      String? // Discord ID of claimer
+  status         BountyStatus    @default(OPEN)
+  crewId         String? // Crew-mappings slug (e.g. "ops"); null = general bounty (jalapeno-82565)
+  submissionNote String? // Claimer's "what I did" (jalapeno-82565 v2)
+  submissionLink String? // Optional proof URL (https only)
   submittedAt    DateTime?
-  reviewedBy     String?       // Discord ID of whoever approved/rejected/cancelled last
-  reviewNote     String?       // Rejection feedback (cleared on resubmit)
+  reviewedBy     String? // Discord ID of whoever approved/rejected/cancelled last
+  reviewNote     String? // Rejection feedback (cleared on resubmit)
   completedAt    DateTime?
-  createdAt   DateTime         @default(now())
-  updatedAt   DateTime         @updatedAt
-  comments    BountyComment[]
+  createdAt      DateTime        @default(now())
+  updatedAt      DateTime        @updatedAt
+  comments       BountyComment[]
 
   @@index([crewId, status])
 }
@@ -113,7 +113,7 @@ model Bounty {
 model BountyComment {
   id        Int      @id @default(autoincrement())
   bountyId  Int
-  authorId  String   // Discord ID of commenter
+  authorId  String // Discord ID of commenter
   content   String
   createdAt DateTime @default(now())
   bounty    Bounty   @relation(fields: [bountyId], references: [id], onDelete: Cascade)
@@ -122,33 +122,33 @@ model BountyComment {
 }
 
 enum BountyStatus {
-  OPEN       // Available to claim
-  CLAIMED    // Someone is working on it
-  SUBMITTED  // Claimer submitted work, awaiting poster/crew-lead review (jalapeno-82565)
-  COMPLETED  // Work done, reward paid
-  CANCELLED  // Poster cancelled, refunded
+  OPEN // Available to claim
+  CLAIMED // Someone is working on it
+  SUBMITTED // Claimer submitted work, awaiting poster/crew-lead review (jalapeno-82565)
+  COMPLETED // Work done, reward paid
+  CANCELLED // Poster cancelled, refunded
 }
 
 // Poll definition
 model Poll {
-  id              String   @id @default(cuid())
-  question        String
-  options         Json     // Array of { id: string, label: string }
-  requiredRoleId  String   // Discord role ID required to vote
-  status          PollStatus @default(DRAFT)
-  createdBy       String   // Discord ID of creator
-  createdAt       DateTime @default(now())
-  updatedAt       DateTime @updatedAt
-  batchSignedAt   DateTime? // When tokens were generated
+  id             String     @id @default(cuid())
+  question       String
+  options        Json // Array of { id: string, label: string }
+  requiredRoleId String // Discord role ID required to vote
+  status         PollStatus @default(DRAFT)
+  createdBy      String // Discord ID of creator
+  createdAt      DateTime   @default(now())
+  updatedAt      DateTime   @updatedAt
+  batchSignedAt  DateTime? // When tokens were generated
 
   results           PollResult[]
   pendingSignatures PendingSignature[]
 }
 
 enum PollStatus {
-  DRAFT      // Created but not open
-  OPEN       // Accepting votes
-  CLOSED     // Voting ended, results visible
+  DRAFT // Created but not open
+  OPEN // Accepting votes
+  CLOSED // Voting ended, results visible
 }
 
 // Bridge table: stores signed tokens for eligible users
@@ -180,47 +180,47 @@ model PollResult {
 // Tracks consumed tokens to prevent double voting
 // Only stores hash of token, not the token itself
 model ConsumedToken {
-  tokenHash String   @id
-  pollId    String
+  tokenHash  String   @id
+  pollId     String
   consumedAt DateTime @default(now())
 }
 
 // ===== TRANSACTION HISTORY =====
 
 enum TransactionType {
-  TRANSFER_SENT      // Sent $PEP to another user
-  TRANSFER_RECEIVED  // Received $PEP from another user
-  SHOP_PURCHASE      // Bought an item from the shop
-  JOB_REWARD         // Earned $PEP from completing a job
-  BOUNTY_ESCROW      // Escrowed $PEP when creating a bounty
-  BOUNTY_REWARD      // Earned $PEP from completing a bounty
-  BOUNTY_REFUND      // Refunded $PEP from cancelling a bounty
-  MISSION_REWARD     // Earned $PEP from completing all missions in a level
-  MIGRATION_CREDIT   // One-time credit migrated from another economy (UnbelievaBoat)
+  TRANSFER_SENT // Sent $PEP to another user
+  TRANSFER_RECEIVED // Received $PEP from another user
+  SHOP_PURCHASE // Bought an item from the shop
+  JOB_REWARD // Earned $PEP from completing a job
+  BOUNTY_ESCROW // Escrowed $PEP when creating a bounty
+  BOUNTY_REWARD // Earned $PEP from completing a bounty
+  BOUNTY_REFUND // Refunded $PEP from cancelling a bounty
+  MISSION_REWARD // Earned $PEP from completing all missions in a level
+  MIGRATION_CREDIT // One-time credit migrated from another economy (UnbelievaBoat)
   MIGRATION_REVERSAL // Rollback of a MIGRATION_CREDIT
-  WORK_REWARD        // Discord /work payout
-  CRIME_REWARD       // Web crime success
-  CRIME_FINE         // Web crime fine (negative)
-  ROLE_INCOME        // Discord /collect-income payout (one row per role)
+  WORK_REWARD // Discord /work payout
+  CRIME_REWARD // Web crime success
+  CRIME_FINE // Web crime fine (negative)
+  ROLE_INCOME // Discord /collect-income payout (one row per role)
   // ROB_*: legacy. /rob was removed (owner decision, 2026-10-03); kept so the
   // enum stays in sync with the DB and any historical rows still reconcile.
-  ROB_STEAL          // (removed /rob) robber's gain (+)
-  ROB_LOSS           // (removed /rob) victim's loss (-)
-  ROB_FINE           // (removed /rob) robber pays (-), victim receives (+)
-  GAME_BET           // Casino game stake (-)
-  GAME_WIN           // Casino game payout incl. stake returned on a push (+)
-  ADMIN_GRANT        // Discord /add-money by an admin (+)
-  ADMIN_REMOVE       // Discord /remove-money by an admin (-)
+  ROB_STEAL // (removed /rob) robber's gain (+)
+  ROB_LOSS // (removed /rob) victim's loss (-)
+  ROB_FINE // (removed /rob) robber pays (-), victim receives (+)
+  GAME_BET // Casino game stake (-)
+  GAME_WIN // Casino game payout incl. stake returned on a push (+)
+  ADMIN_GRANT // Discord /add-money by an admin (+)
+  ADMIN_REMOVE // Discord /remove-money by an admin (-)
 }
 
 model Transaction {
   id          Int             @id @default(autoincrement())
-  userId      String          // Discord ID of the user
+  userId      String // Discord ID of the user
   type        TransactionType
-  amount      Int             // Signed: positive = credit, negative = debit
-  balance     Int             // Running balance after this transaction
-  description String          // Human-readable description
-  metadata    Json?           // Optional extra data (bountyId, itemId, etc.)
+  amount      Int // Signed: positive = credit, negative = debit
+  balance     Int // Running balance after this transaction
+  description String // Human-readable description
+  metadata    Json? // Optional extra data (bountyId, itemId, etc.)
   createdAt   DateTime        @default(now())
 
   @@index([userId, createdAt])
@@ -231,10 +231,10 @@ model Transaction {
 // User-added links on their profile (emoji + URL)
 model ProfileLink {
   id        Int      @id @default(autoincrement())
-  memberId  String   // Member ID from Google Sheets (not Discord ID)
-  emoji     String   // Single emoji character
-  url       String   // Full URL
-  label     String?  // Optional display label
+  memberId  String // Member ID from Google Sheets (not Discord ID)
+  emoji     String // Single emoji character
+  url       String // Full URL
+  label     String? // Optional display label
   sortOrder Int      @default(0)
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -249,7 +249,7 @@ model XAccount {
   discordId        String   @unique
   memberId         String?
   xId              String   @unique
-  xUsername         String
+  xUsername        String
   xDisplayName     String?
   xProfileImageUrl String?
   accessToken      String
@@ -263,23 +263,23 @@ model XAccount {
 // ===== NOTIFICATION SYSTEM =====
 
 enum NotificationType {
-  BOUNTY_CLAIMED     // Someone claimed your bounty
-  BOUNTY_COMPLETED   // Bounty you claimed is approved, reward paid
-  BOUNTY_COMMENT     // New comment on a bounty you're involved in
-  BOUNTY_SUBMITTED   // Work was submitted on a bounty you posted / lead
-  BOUNTY_REJECTED    // Your bounty submission was sent back
-  BOUNTY_CANCELLED   // A bounty you claimed was cancelled
-  TASK_ASSIGNED      // A task was assigned to you
-  TASK_DUE_SOON      // Task due within a week
-  MISSION_SUBMITTED  // A mission submission needs admin review
-  MISSION_APPROVED   // A mission submission was approved
-  MISSION_REJECTED   // A mission submission was rejected
-  LEVEL_COMPLETED    // All missions in a level completed, reward paid
-  VOUCH_ADDED @map("FRIEND_ADDED") // Someone vouched for you
-  ARTICLE_COMMENT    // New comment on your article
-  DISAVOW_VOTE_NEEDED     // A disavow nomination needs a DPR vote (no names)
-  DISAVOW_ROUND_CLOSED    // A disavow round you opened has closed (no names)
-  DISAVOW_LISTED_SUBJECT  // You were listed (no names or content)
+  BOUNTY_CLAIMED // Someone claimed your bounty
+  BOUNTY_COMPLETED // Bounty you claimed is approved, reward paid
+  BOUNTY_COMMENT // New comment on a bounty you're involved in
+  BOUNTY_SUBMITTED // Work was submitted on a bounty you posted / lead
+  BOUNTY_REJECTED // Your bounty submission was sent back
+  BOUNTY_CANCELLED // A bounty you claimed was cancelled
+  TASK_ASSIGNED // A task was assigned to you
+  TASK_DUE_SOON // Task due within a week
+  MISSION_SUBMITTED // A mission submission needs admin review
+  MISSION_APPROVED // A mission submission was approved
+  MISSION_REJECTED // A mission submission was rejected
+  LEVEL_COMPLETED // All missions in a level completed, reward paid
+  VOUCH_ADDED            @map("FRIEND_ADDED") // Someone vouched for you
+  ARTICLE_COMMENT // New comment on your article
+  DISAVOW_VOTE_NEEDED // A disavow nomination needs a DPR vote (no names)
+  DISAVOW_ROUND_CLOSED // A disavow round you opened has closed (no names)
+  DISAVOW_LISTED_SUBJECT // You were listed (no names or content)
 }
 
 // ---------------------------------------------------------------------------
@@ -354,8 +354,8 @@ enum DisavowEventType {
 }
 
 model Disavowal {
-  id                 String        @id @default(cuid())
-  status             DisavowStatus @default(NOMINATED)
+  id                 String              @id @default(cuid())
+  status             DisavowStatus       @default(NOMINATED)
   displayName        String
   reason             DisavowReason
   statement          String
@@ -367,8 +367,8 @@ model Disavowal {
   reviewDueAt        DateTime?
   lastAppealAt       DateTime?
   redactedAt         DateTime?
-  createdAt          DateTime      @default(now())
-  updatedAt          DateTime      @updatedAt
+  createdAt          DateTime            @default(now())
+  updatedAt          DateTime            @updatedAt
   identifiers        DisavowIdentifier[]
   rounds             DisavowRound[]
   events             DisavowEvent[]
@@ -414,20 +414,20 @@ model DisavowIdentifier {
 // It exists only in SQL. `prisma migrate dev` may try to drop it as drift: do not
 // accept that; keep it in every future migration's baseline.
 model DisavowRound {
-  id          String            @id @default(cuid())
-  disavowalId String
-  kind        DisavowRoundKind
-  state       DisavowRoundState @default(OPEN)
-  openedBy    String
-  opensAt     DateTime          @default(now())
-  closesAt    DateTime
-  closedAt    DateTime?
+  id           String            @id @default(cuid())
+  disavowalId  String
+  kind         DisavowRoundKind
+  state        DisavowRoundState @default(OPEN)
+  openedBy     String
+  opensAt      DateTime          @default(now())
+  closesAt     DateTime
+  closedAt     DateTime?
   // The rules this round opened under (admin settings at the time). Null: opened before the
   // snapshot existed, so it keeps the code defaults (3 yes votes, 7 days).
   yesThreshold Int?
   decisionDays Int?
-  disavowal   Disavowal         @relation(fields: [disavowalId], references: [id])
-  votes       DisavowVote[]
+  disavowal    Disavowal         @relation(fields: [disavowalId], references: [id])
+  votes        DisavowVote[]
 
   @@index([disavowalId, state])
   @@index([state, closesAt])
@@ -462,14 +462,14 @@ model DisavowEvent {
 model Notification {
   id          String           @id @default(cuid())
   type        NotificationType
-  recipientId String           // Discord ID of notification recipient
-  actorId     String?          // Discord ID of user who triggered it (optional)
-  title       String           // Short title (e.g., "Bounty Claimed")
-  message     String           // Detailed message
-  metadata    Json?            // Type-specific data (bountyId, taskId, etc.)
-  linkUrl     String?          // Optional deep link (e.g., /pep for bounty)
+  recipientId String // Discord ID of notification recipient
+  actorId     String? // Discord ID of user who triggered it (optional)
+  title       String // Short title (e.g., "Bounty Claimed")
+  message     String // Detailed message
+  metadata    Json? // Type-specific data (bountyId, taskId, etc.)
+  linkUrl     String? // Optional deep link (e.g., /pep for bounty)
   createdAt   DateTime         @default(now())
-  readAt      DateTime?        // Null = unread, timestamp = when read
+  readAt      DateTime? // Null = unread, timestamp = when read
 
   @@index([recipientId, createdAt])
   @@index([recipientId, readAt])
@@ -488,19 +488,19 @@ model Article {
   slug                  String        @unique
   title                 String
   excerpt               String?
-  content               String        // Markdown
-  coverImage            String?       // URL
-  authorId              String        // Discord ID
-  authorName            String?       // Cached display name
+  content               String // Markdown
+  coverImage            String? // URL
+  authorId              String // Discord ID
+  authorName            String? // Cached display name
   status                ArticleStatus @default(DRAFT)
-  tags                  String[]      // PostgreSQL array
-  collaboratorMemberIds String[]      // Member IDs who can view/edit drafts
+  tags                  String[] // PostgreSQL array
+  collaboratorMemberIds String[] // Member IDs who can view/edit drafts
   publishedAt           DateTime?
   createdAt             DateTime      @default(now())
   updatedAt             DateTime      @updatedAt
 
-  comments              ArticleComment[]
-  reactions             ArticleReaction[]
+  comments  ArticleComment[]
+  reactions ArticleReaction[]
 
   @@index([status, publishedAt])
   @@index([authorId])
@@ -511,10 +511,10 @@ model Article {
 model ArticleComment {
   id         Int       @id @default(autoincrement())
   articleId  Int
-  authorId   String    // Discord ID of commenter
-  authorName String?   // Cached display name
-  body       String    // Markdown, capped at 500 chars (server-validated)
-  replyToId  Int?      // Reserved for future threading; not used in v1 UI
+  authorId   String // Discord ID of commenter
+  authorName String? // Cached display name
+  body       String // Markdown, capped at 500 chars (server-validated)
+  replyToId  Int? // Reserved for future threading; not used in v1 UI
   createdAt  DateTime  @default(now())
   updatedAt  DateTime  @updatedAt
   deletedAt  DateTime? // Soft-delete; UI shows "[deleted]" placeholder
@@ -530,8 +530,8 @@ model ArticleComment {
 model ArticleReaction {
   id        Int      @id @default(autoincrement())
   articleId Int
-  memberId  String   // Discord ID of the reactor
-  emoji     String   // One of: "thumbs", "heart", "pizza"
+  memberId  String // Discord ID of the reactor
+  emoji     String // One of: "thumbs", "heart", "pizza"
   createdAt DateTime @default(now())
   article   Article  @relation(fields: [articleId], references: [id], onDelete: Cascade)
 
@@ -542,35 +542,36 @@ model ArticleReaction {
 // ===== MISSIONS / LEVELING SYSTEM =====
 
 enum MissionStatus {
-  PENDING      // Submitted, awaiting verification
-  APPROVED     // Verified and reward paid
-  REJECTED     // Admin rejected
+  PENDING // Submitted, awaiting verification
+  APPROVED // Verified and reward paid
+  REJECTED // Admin rejected
 }
 
 model Mission {
-  id          Int      @id @default(autoincrement())
-  level       Int      // 1-8; 0 = "Anytime" (level-less bonus missions)
-  index       Int      // 0-based within level
-  title       String
-  description String?
-  reward      Int      @default(0) // PEP reward (per-level, shared)
-  levelTitle  String?  // e.g., "Pizza Trainee"
-  isActive    Boolean  @default(true)
-  createdAt   DateTime @default(now())
+  id               Int                 @id @default(autoincrement())
+  level            Int // 1-8; 0 = "Anytime" (level-less bonus missions)
+  index            Int // 0-based within level
+  title            String
+  description      String?
+  reward           Int                 @default(0) // PEP reward (per-level, shared)
+  levelTitle       String? // e.g., "Pizza Trainee"
+  isActive         Boolean             @default(true)
+  createdAt        DateTime            @default(now())
   // Mission verification (plans/mission-verification.md §3). null = manual.
-  verifierKey    String?   // registry key, e.g. "x_linked" (app/lib/mission-verify/verifiers)
-  verifierParams Json?     // parsed by the verifier's params parser
-  proofKind      ProofKind @default(NONE) // what the submit form asks for
+  verifierKey      String? // registry key, e.g. "x_linked" (app/lib/mission-verify/verifiers)
+  verifierParams   Json? // parsed by the verifier's params parser
+  proofKind        ProofKind           @default(NONE) // what the submit form asks for
   // Handbook page that explains how to do this mission (internal path, e.g. /handbook/levels#vouching).
   // Editable in /admin/missions; null = no link.
-  guideHref      String?   @db.VarChar(120)
+  guideHref        String?             @db.VarChar(120)
   // Bonus missions are optional: level completion and the per-level reward ignore them.
   // bonusReward is paid once per member on approval (MISSION_REWARD ledger, metadata.bonusMissionId).
-  bonus          Boolean   @default(false)
-  bonusReward    Int       @default(0)
+  bonus            Boolean             @default(false)
+  bonusReward      Int                 @default(0)
   // Set whenever bonusReward changes (or bonus turns on): only approvals at or after it are paid.
   bonusRewardSetAt DateTime?
-  completions MissionCompletion[]
+  completions      MissionCompletion[]
+
   @@unique([level, index])
 }
 
@@ -583,15 +584,15 @@ enum ProofKind {
 
 enum CompletionSource {
   MANUAL // submitted by the member, decided by a human
-  AUTO   // a verifier passed (approved, or held for a human release)
-  SEMI   // proof + pre-checks, decided by a human (Phase 4)
+  AUTO // a verifier passed (approved, or held for a human release)
+  SEMI // proof + pre-checks, decided by a human (Phase 4)
 }
 
 // Why an auto-verified completion is PENDING, waiting for a human "release"
 // (decision D9) instead of being approved automatically.
 enum MissionHold {
-  NEW_ACCOUNT         // Discord account younger than 30 days (cleared automatically once it is older)
-  HIGH_LEVEL          // L6+: always a human release
+  NEW_ACCOUNT // Discord account younger than 30 days (cleared automatically once it is older)
+  HIGH_LEVEL // L6+: always a human release
   PREVIOUSLY_REJECTED // a human rejected it before; a verifier passing never overrides that
 }
 
@@ -600,43 +601,44 @@ enum ReviewAction {
   RESUBMITTED
   AUTO_APPROVED
   AUTO_HELD // verifier passed, held for a human release
-  RELEASED  // a human released a held completion
+  RELEASED // a human released a held completion
   APPROVED
   REJECTED
-  REOPENED  // REJECTED -> PENDING because a verifier now passes (a human decides again)
+  REOPENED // REJECTED -> PENDING because a verifier now passes (a human decides again)
   FLAGGED
   UNFLAGGED
   NOTE
 }
 
 model MissionCompletion {
-  id          Int           @id @default(autoincrement())
-  missionId   Int
-  discordId   String
-  memberId    String?
-  status      MissionStatus @default(PENDING)
-  evidence    String?       // Proof URL or description
-  notes       String?
-  reviewedBy  String?
-  reviewNote  String?
-  submittedAt DateTime      @default(now())
-  reviewedAt  DateTime?
-  source      CompletionSource @default(MANUAL)
-  checkResult Json?         // what the verifier saw (handle, roles, counts, message ids)
-  attempts    Int           @default(1) // submissions so far (cap 3); legacy rows also count their notes history
-  holdReason  MissionHold?  // set while an auto-verified completion awaits a human release
-  flaggedAt   DateTime?     // underlying state lost later: flagged, never clawed back (D17)
-  flagReason  String?
+  id              Int                  @id @default(autoincrement())
+  missionId       Int
+  discordId       String
+  memberId        String?
+  status          MissionStatus        @default(PENDING)
+  evidence        String? // Proof URL or description
+  notes           String?
+  reviewedBy      String?
+  reviewNote      String?
+  submittedAt     DateTime             @default(now())
+  reviewedAt      DateTime?
+  source          CompletionSource     @default(MANUAL)
+  checkResult     Json? // what the verifier saw (handle, roles, counts, message ids)
+  attempts        Int                  @default(1) // submissions so far (cap 3); legacy rows also count their notes history
+  holdReason      MissionHold? // set while an auto-verified completion awaits a human release
+  flaggedAt       DateTime? // underlying state lost later: flagged, never clawed back (D17)
+  flagReason      String?
   // Discord review queue (Phase 3): the card in #work, edited on every decision.
-  reviewMsgId     String?   // the card's message id
-  reviewChannelId String?   // the channel it was posted in
+  reviewMsgId     String? // the card's message id
+  reviewChannelId String? // the channel it was posted in
   reviewCardAt    DateTime? // when the card was claimed / posted (one card per review round)
   // SLA (48 h to a first decision, D13)
   reviewQueuedAt  DateTime? // when it (re-)entered the human queue; null on older rows = submittedAt
   slaNotifiedAt   DateTime? // last time the daily digest listed it as overdue
-  updatedAt   DateTime      @default(now()) @updatedAt
-  mission     Mission       @relation(fields: [missionId], references: [id])
-  events      MissionReviewEvent[]
+  updatedAt       DateTime             @default(now()) @updatedAt
+  mission         Mission              @relation(fields: [missionId], references: [id])
+  events          MissionReviewEvent[]
+
   @@unique([missionId, discordId])
   @@index([discordId])
   @@index([status])
@@ -663,13 +665,13 @@ model MissionReviewEvent {
 // (scripts/missions/backfill.mjs): bookkeeping, resume point and report.
 model VerifierRun {
   id         Int       @id @default(autoincrement())
-  kind       String    // nightly | backfill
-  dryRun     Boolean   // true while MISSION_VERIFIERS_ENABLED is off (or a backfill dry run)
+  kind       String // nightly | backfill
+  dryRun     Boolean // true while MISSION_VERIFIERS_ENABLED is off (or a backfill dry run)
   startedAt  DateTime  @default(now())
   finishedAt DateTime?
-  cursor     String?   // resume point: the last discordId processed
+  cursor     String? // resume point: the last discordId processed
   leaseUntil DateTime? // an invocation working on this run holds it until then
-  stats      Json?     // { members, approved, held, levelsPaid, pepPaid, wouldApprove, ..., errors }
+  stats      Json? // { members, approved, held, levelsPaid, pepPaid, wouldApprove, ..., errors }
   updatedAt  DateTime  @default(now()) @updatedAt
 
   @@index([kind, startedAt])
@@ -698,8 +700,8 @@ model Referral {
   inviteeMemberId  String?
   inviterDiscordId String
   inviterMemberId  String?
-  via              String    // onboarding | invite_link
-  inviteCode       String?   // the ?ref= value of the invite link, when used
+  via              String // onboarding | invite_link
+  inviteCode       String? // the ?ref= value of the invite link, when used
   createdAt        DateTime  @default(now())
   qualifiedAt      DateTime? // the invitee completed onboarding (D4)
   flags            String[]  @default([]) // duplicate-account signal kinds shared with the inviter
@@ -711,8 +713,8 @@ model Referral {
 // by the nightly run. Flags for reviewers only: nothing is blocked or revoked.
 model AccountSignal {
   id          Int      @id @default(autoincrement())
-  kind        String   // shared_wallet | shared_x | shared_telegram | shared_member_id | sheet_duplicate
-  key         String   // what is shared (wallet address, handle, memberId, discordId)
+  kind        String // shared_wallet | shared_x | shared_telegram | shared_member_id | sheet_duplicate
+  key         String // what is shared (wallet address, handle, memberId, discordId)
   discordIds  String[]
   memberIds   String[] @default([])
   detail      Json?
@@ -775,10 +777,10 @@ model Vouch {
 // LEGACY: unused since Call Slices replaced POAP claim links (no links were ever loaded). Left in place; harmless.
 model PoapMintLink {
   id        Int       @id @default(autoincrement())
-  crewId    String    // Crew slug or "community_call" (matches CallAttendance.crewId)
+  crewId    String // Crew slug or "community_call" (matches CallAttendance.crewId)
   callDay   DateTime  @db.Date // UTC calendar day of the call
   link      String    @unique
-  claimedBy String?   // Discord ID of the member who claimed it
+  claimedBy String? // Discord ID of the member who claimed it
   claimedAt DateTime?
   createdAt DateTime  @default(now())
 
@@ -790,12 +792,12 @@ model PoapMintLink {
 // One AttendanceNftCall per (crew, UTC call day); its id IS the on-chain token id.
 // Never delete these rows: token ids must stay stable once minted.
 model AttendanceNftCall {
-  id        Int      @id @default(autoincrement())
+  id        Int                  @id @default(autoincrement())
   crewId    String
   crewLabel String
-  callDay   DateTime @db.Date
-  imageUrl  String?  // rendered PNG in Vercel Blob
-  createdAt DateTime @default(now())
+  callDay   DateTime             @db.Date
+  imageUrl  String? // rendered PNG in Vercel Blob
+  createdAt DateTime             @default(now())
   claims    AttendanceNftClaim[]
 
   @@unique([crewId, callDay])
@@ -804,7 +806,7 @@ model AttendanceNftCall {
 // One claim per member per call. status: AWAITING_WALLET | QUEUED | SUBMITTED | MINTED | FAILED.
 // The on-chain claim key is keccak256("callslice:" + id), so retries can never double-mint.
 model AttendanceNftClaim {
-  id          String    @id @default(cuid())
+  id          String            @id @default(cuid())
   discordId   String
   memberId    String?
   callId      Int
@@ -813,12 +815,12 @@ model AttendanceNftClaim {
   recipient   String?
   txHash      String?
   chainId     Int?
-  attempts    Int       @default(0)
+  attempts    Int               @default(0)
   lastError   String?
-  claimedAt   DateTime  @default(now())
+  claimedAt   DateTime          @default(now())
   submittedAt DateTime?
   mintedAt    DateTime?
-  updatedAt   DateTime  @updatedAt
+  updatedAt   DateTime          @updatedAt
 
   @@unique([discordId, callId])
   @@index([status, claimedAt])
@@ -842,15 +844,15 @@ model SliceMintLease {
 
 // Individual attendance records — one per person per call
 model CallAttendance {
-  id          Int      @id @default(autoincrement())
-  discordId   String   // Discord User ID of attendee
-  displayName String?  // Discord display name at time of call
-  crewId      String   // Crew slug (ops, comms, etc.) or "community_call"
-  crewLabel   String   // Display name (Ops, Comms, Community Call)
-  callDate    DateTime // Date of the call
-  dailySheetId String  // Google Sheet ID of the daily attendance sheet (for dedup); `rec:<crew>:<date>` for rows from recordings
-  source      String   @default("sheet") // sheet | recording
-  createdAt   DateTime @default(now())
+  id           Int      @id @default(autoincrement())
+  discordId    String // Discord User ID of attendee
+  displayName  String? // Discord display name at time of call
+  crewId       String // Crew slug (ops, comms, etc.) or "community_call"
+  crewLabel    String // Display name (Ops, Comms, Community Call)
+  callDate     DateTime // Date of the call
+  dailySheetId String // Google Sheet ID of the daily attendance sheet (for dedup); `rec:<crew>:<date>` for rows from recordings
+  source       String   @default("sheet") // sheet | recording
+  createdAt    DateTime @default(now())
 
   @@unique([discordId, dailySheetId]) // One record per person per call
   @@index([discordId])
@@ -863,8 +865,8 @@ model AttendanceSummary {
   discordId     String   @id
   memberId      String?  @unique
   totalCalls    Int
-  crewBreakdown Json     // { [crewId]: { crewLabel, count, lastAttended } }
-  recentCalls   Json     // [{ date, crew, crewId }] last 10
+  crewBreakdown Json // { [crewId]: { crewLabel, count, lastAttended } }
+  recentCalls   Json // [{ date, crew, crewId }] last 10
   lastSyncedAt  DateTime @default(now())
   updatedAt     DateTime @updatedAt
 
@@ -874,8 +876,8 @@ model AttendanceSummary {
 // Track which daily sheets have already been synced
 model AttendanceSyncLog {
   id            Int      @id @default(autoincrement())
-  crewSheetId   String   // Crew spreadsheet ID
-  crewId        String   // Crew slug
+  crewSheetId   String // Crew spreadsheet ID
+  crewId        String // Crew slug
   dailySheetId  String   @unique // Daily attendance sheet ID (dedup key)
   callDate      DateTime
   attendeeCount Int
@@ -885,15 +887,15 @@ model AttendanceSyncLog {
 // ===== MAGIC LOGIN VIA DISCORD DM =====
 
 model MagicLoginToken {
-  signupDraft Json?            // Allowlisted signup fields, expires with the login journey
-  id        String    @id @default(cuid())
-  tokenHash String    @unique   // SHA-256 of raw token (raw goes in DM link)
-  discordId String
-  username  String
-  nick      String?
-  expiresAt DateTime            // 10 min from creation
-  usedAt    DateTime?           // null = unused
-  createdAt DateTime  @default(now())
+  signupDraft Json? // Allowlisted signup fields, expires with the login journey
+  id          String    @id @default(cuid())
+  tokenHash   String    @unique // SHA-256 of raw token (raw goes in DM link)
+  discordId   String
+  username    String
+  nick        String?
+  expiresAt   DateTime // 10 min from creation
+  usedAt      DateTime? // null = unused
+  createdAt   DateTime  @default(now())
 
   @@index([discordId, createdAt])
 }
@@ -902,24 +904,24 @@ model MagicLoginToken {
 
 // Per-member participation stats computed from Discord export metadata
 model DiscordActivity {
-  discordId          String   @id
-  authorName         String?  // Latest known username
-  totalMessages      Int
-  firstSeen          DateTime
-  lastSeen           DateTime
-  activeDays         Int
-  activeMonths       Int
-  channelsActive     Int
-  topChannels        Json     // [{name, count}] top 10
-  categoryBreakdown  Json     // {category: messageCount}
-  repliesSent        Int
-  reactionsReceived  Int
-  threadMessages     Int
-  avgContentLen      Float
-  monthlyBreakdown   Json     // [{month: "2024-01", count: 42}]
-  engagementScore    Float    // Composite 0-100
-  scoreBreakdown     Json     // {volume, consistency, recency, diversity, engagement}
-  lastSyncedAt       DateTime @default(now())
+  discordId         String   @id
+  authorName        String? // Latest known username
+  totalMessages     Int
+  firstSeen         DateTime
+  lastSeen          DateTime
+  activeDays        Int
+  activeMonths      Int
+  channelsActive    Int
+  topChannels       Json // [{name, count}] top 10
+  categoryBreakdown Json // {category: messageCount}
+  repliesSent       Int
+  reactionsReceived Int
+  threadMessages    Int
+  avgContentLen     Float
+  monthlyBreakdown  Json // [{month: "2024-01", count: 42}]
+  engagementScore   Float // Composite 0-100
+  scoreBreakdown    Json // {volume, consistency, recency, diversity, engagement}
+  lastSyncedAt      DateTime @default(now())
 
   @@index([engagementScore])
   @@index([totalMessages])
@@ -962,28 +964,28 @@ model UnlockTicketRecord {
 //
 // Plans: truffle-91035 (tagline), anchovy-65959 (locale).
 model MemberProfileExtras {
-  memberId                 String    @id // Member ID from Google Sheets (not Discord ID)
-  tagline                  String?   @db.VarChar(140)
-  locale                   String    @default("en") // ISO 639-1, one of SUPPORTED_LOCALES (anchovy-65959)
+  memberId                     String    @id // Member ID from Google Sheets (not Discord ID)
+  tagline                      String?   @db.VarChar(140)
+  locale                       String    @default("en") // ISO 639-1, one of SUPPORTED_LOCALES (anchovy-65959)
   // ===== Celebration loop (diavola-40350) =====
-  lastCelebratedLevel      Int       @default(0)    // highest level whose celebration has fired
-  firstMissionCelebratedAt DateTime?                 // first-ever mission completion celebration
-  vouchPromptShownAt       DateTime?                 // dismissed by user (null = not yet shown)
+  lastCelebratedLevel          Int       @default(0) // highest level whose celebration has fired
+  firstMissionCelebratedAt     DateTime? // first-ever mission completion celebration
+  vouchPromptShownAt           DateTime? // dismissed by user (null = not yet shown)
   // ===== Profile-complete celebration (jalapeno-34126) =====
-  profileCompletedCelebratedAt DateTime?             // null = not yet shown; backfilled for already-complete members
+  profileCompletedCelebratedAt DateTime? // null = not yet shown; backfilled for already-complete members
   // ===== Timezone (pizzaiolo-13628) — the Crew sheet has no Timezone column =====
-  timezone                 String?   @db.VarChar(64) // IANA ID resolved from the onboarding city, e.g. "America/New_York"
+  timezone                     String?   @db.VarChar(64) // IANA ID resolved from the onboarding city, e.g. "America/New_York"
   // ===== Re-engagement email (task/reengage-emails) =====
   // Emails are collected in the app (never in the publicly readable Crew sheet).
   // The digest goes only to an address that is verified AND opted in.
-  email                    String?   @db.VarChar(254)
-  emailVerifiedAt          DateTime?                  // set by the signed confirmation link; reset when the address changes
-  emailConfirmSentAt       DateTime?                  // last confirmation email (throttle)
-  reengageEmailOptIn       Boolean   @default(false)  // explicit opt-in to the weekly digest
+  email                        String?   @db.VarChar(254)
+  emailVerifiedAt              DateTime? // set by the signed confirmation link; reset when the address changes
+  emailConfirmSentAt           DateTime? // last confirmation email (throttle)
+  reengageEmailOptIn           Boolean   @default(false) // explicit opt-in to the weekly digest
   // ===== Pizza Passport (plans/pizza-passport.md): who may see this member's stamps =====
-  passportVisibility       String    @default("public") @db.VarChar(8) // public | members | private
-  updatedAt                DateTime  @updatedAt
-  createdAt                DateTime  @default(now())
+  passportVisibility           String    @default("public") @db.VarChar(8) // public | members | private
+  updatedAt                    DateTime  @updatedAt
+  createdAt                    DateTime  @default(now())
 }
 
 // Multi-wallet: each member can have multiple wallets (EVM, Solana, etc.)
@@ -992,8 +994,8 @@ model MemberWallet {
   memberId      String
   discordId     String?
   walletAddress String
-  label         String?            // "Main", "Vault", etc.
-  chainType     String   @default("evm")  // "evm" | "solana"
+  label         String? // "Main", "Vault", etc.
+  chainType     String   @default("evm") // "evm" | "solana"
   source        String   @default("sheet")
   isPrimary     Boolean  @default(false)
   createdAt     DateTime @default(now())
@@ -1034,10 +1036,10 @@ model Suggestion {
 // is still a true thing that happened.
 model TaskClaimEvent {
   id        Int      @id @default(autoincrement())
-  memberId  String   // Member ID from Google Sheets (not Discord ID)
-  taskKey   String   // `${sheetId}::${taskName}` — disambiguates per-sheet
-  taskName  String   // Denormalized for display
-  sheetUrl  String?  // Optional deep-link back to the sheet
+  memberId  String // Member ID from Google Sheets (not Discord ID)
+  taskKey   String // `${sheetId}::${taskName}` — disambiguates per-sheet
+  taskName  String // Denormalized for display
+  sheetUrl  String? // Optional deep-link back to the sheet
   claimedAt DateTime @default(now())
 
   @@unique([memberId, taskKey])
@@ -1049,8 +1051,8 @@ model TaskClaimEvent {
 model PoapFirstSeen {
   id          Int      @id @default(autoincrement())
   memberId    String
-  poapEventId String   // POAP drop/event id (not token id)
-  poapTokenId String   // First token id observed (display only)
+  poapEventId String // POAP drop/event id (not token id)
+  poapTokenId String // First token id observed (display only)
   title       String?
   imageUrl    String?
   firstSeenAt DateTime @default(now())
@@ -1063,10 +1065,10 @@ model PoapFirstSeen {
 // when a role appears that wasn't in the previous User.roles snapshot.
 model RoleGrantEvent {
   id        Int      @id @default(autoincrement())
-  memberId  String?  // Best-effort; null if unresolvable at write time
+  memberId  String? // Best-effort; null if unresolvable at write time
   discordId String
   roleId    String
-  roleName  String   // Resolved at write time so feed reads need no Discord API call
+  roleName  String // Resolved at write time so feed reads need no Discord API call
   grantedAt DateTime @default(now())
 
   @@unique([discordId, roleId])
@@ -1263,16 +1265,16 @@ enum ItemGrantStatus {
 }
 
 model ItemGrant {
-  id        Int      @id @default(autoincrement())
-  grantKey  String   @unique // "unbelievaboat:<discordId>:<itemId>"
-  source    String // "unbelievaboat"
-  discordId String
-  itemId    Int
-  quantity  Int
-  note      String?
+  id         Int             @id @default(autoincrement())
+  grantKey   String          @unique // "unbelievaboat:<discordId>:<itemId>"
+  source     String // "unbelievaboat"
+  discordId  String
+  itemId     Int
+  quantity   Int
+  note       String?
   status     ItemGrantStatus @default(CREDITED)
   creditedAt DateTime?
-  createdAt DateTime @default(now())
+  createdAt  DateTime        @default(now())
 
   @@index([discordId])
   @@index([discordId, status])
@@ -1358,73 +1360,73 @@ enum CallSource {
 // (idempotent on sessionId). Audio lives in a private R2 bucket and is never
 // public; transcript / summary / actionItems / chapters are filled in Phase 2.
 model CallRecording {
-  id                 String              @id @default(cuid())
-  sessionId          String              @unique // worker idempotency key
-  status             CallRecordingStatus @default(RECORDED)
-  discordEventId     String?
-  eventName          String?
-  crewId             String? // mapped from the Discord scheduled event (crew-mappings)
-  crewLabel          String?
-  channelId          String
-  startedAt          DateTime
-  endedAt            DateTime
-  durationSec        Int
-  endReason          String? // event-ended | empty | max-duration | superseded | shutdown | ...
-  partial            Boolean             @default(false)
-  participantIds     String[]            @default([]) // non-bot Discord ids seen in the voice channel (recorder); feeds attendance
-  mixKey             String? // R2 key of the mixed m4a
-  mixBytes           Int?
-  audioDeletedAt     DateTime? // set when the retention sweep removed the R2 audio
+  id                      String              @id @default(cuid())
+  sessionId               String              @unique // worker idempotency key
+  status                  CallRecordingStatus @default(RECORDED)
+  discordEventId          String?
+  eventName               String?
+  crewId                  String? // mapped from the Discord scheduled event (crew-mappings)
+  crewLabel               String?
+  channelId               String
+  startedAt               DateTime
+  endedAt                 DateTime
+  durationSec             Int
+  endReason               String? // event-ended | empty | max-duration | superseded | shutdown | ...
+  partial                 Boolean             @default(false)
+  participantIds          String[]            @default([]) // non-bot Discord ids seen in the voice channel (recorder); feeds attendance
+  mixKey                  String? // R2 key of the mixed m4a
+  mixBytes                Int?
+  audioDeletedAt          DateTime? // set when the retention sweep removed the R2 audio
   // Phase 2 (nullable, reserved)
-  title              String?
-  transcript         Json? // [{discordId, startMs, endMs, text}]
-  transcriptLanguage String?
-  summary            String?
-  actionItems        Json?
-  chapters           Json?
-  reviewedBy         String? // Discord id
-  reviewedAt         DateTime?
-  publishedAt        DateTime?
+  title                   String?
+  transcript              Json? // [{discordId, startMs, endMs, text}]
+  transcriptLanguage      String?
+  summary                 String?
+  actionItems             Json?
+  chapters                Json?
+  reviewedBy              String? // Discord id
+  reviewedAt              DateTime?
+  publishedAt             DateTime?
   // Server-side transcription (call-recap): set once the per-speaker tracks were transcribed (or found already transcribed).
-  transcribedAt      DateTime?
-  transcribeError    String? // null | 'claimed' (running) | 'progress' (budget hit, resume now) | 'failed: ...' (retry after 6h)
-  transcribeAttempts Int                 @default(0) // gives up (permanent failure, manual retry) at 3
-  transcribeTracks   Json? // per-track results so a retry only does the remaining tracks: {discordId: {utterances, language, talkTimeSec} | {skipped}}
-  summaryGeneratedAt DateTime? // when the AI summary was last generated
-  summaryEditedAt    DateTime? // set when a reviewer edits title/summary/actions/chapters; blocks automatic regeneration
-  summaryError       String? // last automatic summary failure (no URLs, max 300 chars); cleared on success
-  summaryAttempts    Int                 @default(0) // automatic summary attempts (claimed before each model call); the sweep gives up at 3
+  transcribedAt           DateTime?
+  transcribeError         String? // null | 'claimed' (running) | 'progress' (budget hit, resume now) | 'failed: ...' (retry after 6h)
+  transcribeAttempts      Int                 @default(0) // gives up (permanent failure, manual retry) at 3
+  transcribeTracks        Json? // per-track results so a retry only does the remaining tracks: {discordId: {utterances, language, talkTimeSec} | {skipped}}
+  summaryGeneratedAt      DateTime? // when the AI summary was last generated
+  summaryEditedAt         DateTime? // set when a reviewer edits title/summary/actions/chapters; blocks automatic regeneration
+  summaryError            String? // last automatic summary failure (no URLs, max 300 chars); cleared on success
+  summaryAttempts         Int                 @default(0) // automatic summary attempts (claimed before each model call); the sweep gives up at 3
   retranscribeRequestedAt DateTime? // set by the re-transcribe tool so the cron picks the row up whatever its age; cleared when transcription finishes
-  transcribeStats    Json? // per-track counts from the last transcription (talk seconds, words, dropped by filter); never text
-  redactionsUpdatedAt DateTime? // last time a speaker or line was hidden/restored
+  transcribeStats         Json? // per-track counts from the last transcription (talk seconds, words, dropped by filter); never text
+  redactionsUpdatedAt     DateTime? // last time a speaker or line was hidden/restored
   // Discord recap (call-recap): claimed (recapPostedAt) before posting so a publish never double-posts.
-  recapPostedAt      DateTime?
-  recapChannelId     String?
-  recapMessageId     String?
-  recapError         String?
+  recapPostedAt           DateTime?
+  recapChannelId          String?
+  recapMessageId          String?
+  recapError              String?
   // Speakers whose transcript lines are hidden from everything public and from the summary model.
   // Non-destructive: the stored transcript is complete; this only filters.
-  redactedSpeakerIds String[]            @default([])
+  redactedSpeakerIds      String[]            @default([])
   // Single transcript lines hidden the same way (keys from segmentKey(): `c:<messageId>` for chat, `s:<speaker>:<startMs>` for speech).
-  redactedSegmentIds String[]            @default([])
+  redactedSegmentIds      String[]            @default([])
   // Follow-up drafting (metalhead-followups): set once the extraction pass finished (even with zero items).
-  followupsDraftedAt DateTime?
-  followupsAttempts  Int                 @default(0) // automatic drafting attempts; the sweep gives up at 3
-  followupsError     String? // last drafting failure (no URLs, max 300 chars)
+  followupsDraftedAt      DateTime?
+  followupsAttempts       Int                 @default(0) // automatic drafting attempts; the sweep gives up at 3
+  followupsError          String? // last drafting failure (no URLs, max 300 chars)
   // Proposed crew task updates (plans/post-call-agenda-updates.md, ask 2): set once the proposal pass finished (even with zero items).
-  taskProposalsAt       DateTime?
-  taskProposalsAttempts Int       @default(0) // automatic attempts; the sweep gives up at 3
-  taskProposalsError    String? // last failure (no URLs, max 300 chars)
-  taskProposalsNudgedAt DateTime? // the optional crew-channel nudge was claimed (posted at most once)
+  taskProposalsAt         DateTime?
+  taskProposalsAttempts   Int                 @default(0) // automatic attempts; the sweep gives up at 3
+  taskProposalsError      String? // last failure (no URLs, max 300 chars)
+  taskProposalsNudgedAt   DateTime? // the optional crew-channel nudge was claimed (posted at most once)
   // Imported calls (scripts/calls/x-import.mjs). Discord recordings keep source DISCORD and null in the rest.
-  source             CallSource          @default(DISCORD)
-  sourceUrl          String? // original stream URL; reviewers only, never shown publicly
-  importedAt         DateTime?
-  importedBy         String? // Discord id of the operator
-  importMeta         Json? // engine, model, tool versions, sha256s, speaker count; never text
-  speakerLabelsUpdatedAt DateTime? // last time a reviewer labelled a speaker (the summary may be older)
-  createdAt          DateTime            @default(now())
-  updatedAt          DateTime            @updatedAt
+  source                  CallSource          @default(DISCORD)
+  sourceUrl               String? // original stream URL; reviewers only, never shown publicly
+  importedAt              DateTime?
+  importedBy              String? // Discord id of the operator
+  importMeta              Json? // engine, model, tool versions, sha256s, speaker count; never text
+  speakerLabelsUpdatedAt  DateTime? // last time a reviewer labelled a speaker (the summary may be older)
+  createdAt               DateTime            @default(now())
+  updatedAt               DateTime            @updatedAt
 
   speakers CallSpeaker[]
 
@@ -1438,13 +1440,13 @@ model CallRecording {
 // session id: the CallRecording row only exists after the call. Chunks hold the near-live transcript
 // of one speech cut (the detector's rolling window); they are deleted when the call is ingested.
 model CallLiveChunk {
-  id        String   @id @default(cuid())
-  sessionId String
-  seq       Int
-  segments  Json // [{discordId, name, startMs, endMs, text}]
-  audioMs   Int      @default(0) // speech sent for transcription (cost tracking and the per-call cap)
+  id          String   @id @default(cuid())
+  sessionId   String
+  seq         Int
+  segments    Json // [{discordId, name, startMs, endMs, text}]
+  audioMs     Int      @default(0) // speech sent for transcription (cost tracking and the per-call cap)
   segmentKeys String[] @default([]) // R2 keys transcribed in this chunk (the same audio is never transcribed twice)
-  createdAt DateTime @default(now())
+  createdAt   DateTime @default(now())
 
   @@unique([sessionId, seq])
   @@index([createdAt])
@@ -1470,15 +1472,15 @@ model CallLiveItem {
 }
 
 model CallSpeaker {
-  id          Int           @id @default(autoincrement())
-  recordingId String
-  discordId   String
-  displayName String?
-  talkTimeSec Int           @default(0)
-  trackKey    String? // R2 key of this speaker's own track
-  trackBytes  Int?
+  id              Int           @id @default(autoincrement())
+  recordingId     String
+  discordId       String
+  displayName     String?
+  talkTimeSec     Int           @default(0)
+  trackKey        String? // R2 key of this speaker's own track
+  trackBytes      Int?
   linkedDiscordId String? // member an imported (diarized) speaker was identified as; null for guests
-  recording   CallRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  recording       CallRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
 
   @@unique([recordingId, discordId])
   @@index([discordId])
@@ -1510,17 +1512,17 @@ enum CrewDraftStatus {
 
 model CrewDraft {
   id        Int               @id @default(autoincrement())
-  crewId    String            // Crew-mappings slug (e.g. "comms")
+  crewId    String // Crew-mappings slug (e.g. "comms")
   platform  CrewDraftPlatform @default(X)
   text      String
-  mediaUrl  String?           // Optional media link
-  notes     String?           // Optional notes (alt text, timing, ...)
+  mediaUrl  String? // Optional media link
+  notes     String? // Optional notes (alt text, timing, ...)
   status    CrewDraftStatus   @default(DRAFT)
-  createdBy String            // Discord ID
-  updatedBy String            // Discord ID
-  postedBy  String?           // Discord ID of whoever marked it posted
+  createdBy String // Discord ID
+  updatedBy String // Discord ID
+  postedBy  String? // Discord ID of whoever marked it posted
   postedAt  DateTime?
-  postedUrl String?           // Optional link to the live post
+  postedUrl String? // Optional link to the live post
   createdAt DateTime          @default(now())
   updatedAt DateTime          @updatedAt
 
@@ -1529,17 +1531,17 @@ model CrewDraft {
 
 // AI finale portrait cache (plans/mafia-name-port.md, Phase 1).
 model MafiaPortrait {
-  id        String   @id @default(cuid())
-  cacheKey  String   @unique            // sha256(lower(name)|topping|film|variant)
-  name      String   @db.VarChar(80)
-  topping   String   @db.VarChar(50)
-  filmKey   String   @db.VarChar(120)   // MAFIA_FILMS id or clamped title
-  variant   Int      @default(0)
-  animal    String   @db.VarChar(40)
-  model     String   @db.VarChar(80)
-  url       String                      // Vercel Blob public URL
-  discordId String?                     // null for anonymous (Phase 3)
-  createdAt DateTime @default(now())
+  id        String           @id @default(cuid())
+  cacheKey  String           @unique // sha256(lower(name)|topping|film|variant)
+  name      String           @db.VarChar(80)
+  topping   String           @db.VarChar(50)
+  filmKey   String           @db.VarChar(120) // MAFIA_FILMS id or clamped title
+  variant   Int              @default(0)
+  animal    String           @db.VarChar(40)
+  model     String           @db.VarChar(80)
+  url       String // Vercel Blob public URL
+  discordId String? // null for anonymous (Phase 3)
+  createdAt DateTime         @default(now())
   claims    MafiaNameClaim[]
 
   @@index([discordId, createdAt])
@@ -1548,22 +1550,22 @@ model MafiaPortrait {
 /// A member's claimed mafia name. Backs the public /made/[id] certificate: the
 /// public page shows only name, origin, topping and portrait, never discordId.
 model MafiaNameClaim {
-  id          String   @id                // short unguessable public id (10 chars) for /made/[id]
-  discordId   String?                     // null for a public (anonymous) claim
-  actor       String?  @db.VarChar(80)    // anonymous browser id of a public claim
-  name        String   @db.VarChar(80)
-  origin      Json?                       // { kind, person, film }
-  topping     String   @db.VarChar(50)
-  filmId      String?  @db.VarChar(60)    // MAFIA_FILMS id when the pick was a catalog film
-  filmTitle   String   @db.VarChar(120)
-  tmdbMovieId String?  @db.VarChar(20)
-  candidates  Json                        // names shown to the member, incl. rerolls
-  source      String   @default("join") @db.VarChar(16)
-  public      Boolean  @default(false)    // true only for a name namegen offered (signed); gates /made/[id]
+  id          String         @id // short unguessable public id (10 chars) for /made/[id]
+  discordId   String? // null for a public (anonymous) claim
+  actor       String?        @db.VarChar(80) // anonymous browser id of a public claim
+  name        String         @db.VarChar(80)
+  origin      Json? // { kind, person, film }
+  topping     String         @db.VarChar(50)
+  filmId      String?        @db.VarChar(60) // MAFIA_FILMS id when the pick was a catalog film
+  filmTitle   String         @db.VarChar(120)
+  tmdbMovieId String?        @db.VarChar(20)
+  candidates  Json // names shown to the member, incl. rerolls
+  source      String         @default("join") @db.VarChar(16)
+  public      Boolean        @default(false) // true only for a name namegen offered (signed); gates /made/[id]
   portraitId  String?
   portrait    MafiaPortrait? @relation(fields: [portraitId], references: [id], onDelete: SetNull)
-  createdAt   DateTime @default(now())
-  updatedAt   DateTime @default(now()) @updatedAt
+  createdAt   DateTime       @default(now())
+  updatedAt   DateTime       @default(now()) @updatedAt
 
   @@unique([discordId, name])
   @@unique([actor, name])
@@ -1575,12 +1577,12 @@ model MafiaNameClaim {
 // cron runs never double-send. status: SENDING -> SENT | FAILED, or SKIPPED when
 // the digest had nothing to say. Rows are kept (no retry within the week).
 model ReengageEmailSend {
-  id        String   @id @default(cuid())
+  id        String    @id @default(cuid())
   memberId  String
-  weekKey   String   @db.VarChar(10) // e.g. "2026-W44"
-  status    String   @default("SENDING") @db.VarChar(10)
-  locale    String   @default("en") @db.VarChar(5)
-  createdAt DateTime @default(now())
+  weekKey   String    @db.VarChar(10) // e.g. "2026-W44"
+  status    String    @default("SENDING") @db.VarChar(10)
+  locale    String    @default("en") @db.VarChar(5)
+  createdAt DateTime  @default(now())
   sentAt    DateTime?
 
   @@unique([memberId, weekKey])
@@ -1738,7 +1740,7 @@ model Pizzeria {
   isPartner     Boolean           @default(false)
   partnerSince  DateTime?
   qrVersion     Int               @default(1)
-  logoUrl       String?           // partner-granted only
+  logoUrl       String? // partner-granted only
   logoConsentAt DateTime?
   stampInk      String?           @db.VarChar(16)
   website       String?
@@ -1761,7 +1763,7 @@ model PizzeriaCheckIn {
   memberId   String?
   method     CheckInMethod
   status     CheckInStatus @default(APPROVED)
-  lat        Float?        // nulled after 30 days by /api/cron/passport-scrub; never stored on REJECTED rows
+  lat        Float? // nulled after 30 days by /api/cron/passport-scrub; never stored on REJECTED rows
   lng        Float?
   accuracyM  Int?
   distanceM  Int?
@@ -1817,42 +1819,42 @@ enum FollowUpChannel {
 }
 
 model FollowUp {
-  id                String           @id @default(cuid())
-  recordingId       String? // CallRecording.id (null for manual rows)
-  sourceKey         String           @unique // `${recordingId}:${startMs}:${ownerNameNorm}`
-  ownerName         String
-  ownerDiscordId    String?
-  ownerMemberId     String?
-  candidates        Json? // ambiguous matches to pick from: [{memberId, name, discordId}]
-  kind              String
-  ask               String
-  message           String // editable draft / sent text (without the footer)
-  quote             String?
-  startMs           Int?
-  dueAt             DateTime?
-  dueText           String?
-  status            FollowUpStatus   @default(DRAFT)
-  channel           FollowUpChannel?
-  escalateOnly      Boolean          @default(false) // approved to go straight to the approvers
-  sendAfter         DateTime?
-  sendAttemptAt     DateTime? // written before delivery starts; a row with it is never auto-resent
-  discordChannelId  String?
-  discordMessageId  String?
-  telegramChatId    String?
-  telegramMessageId Int?
-  snoozedUntil      DateTime? // the member snoozed this from the action page; reminders must respect it
-  telegramAttemptKey String?  @db.VarChar(80) // idempotency key for the Telegram send; reused after an uncertain send so a replay cannot double-send
-  telegramFallback  String?   @db.VarChar(32) // why Telegram was skipped or failed (no-link, not-started, blocked, off, bad-request)
-  lastReply         String?
-  lastReplyAt       DateTime?
-  approvedBy        String?
-  approvedAt        DateTime?
-  sentAt            DateTime?
-  escalatedAt       DateTime?
-  error             String?
-  createdAt         DateTime         @default(now())
-  updatedAt         DateTime         @updatedAt
-  events            FollowUpEvent[]
+  id                 String           @id @default(cuid())
+  recordingId        String? // CallRecording.id (null for manual rows)
+  sourceKey          String           @unique // `${recordingId}:${startMs}:${ownerNameNorm}`
+  ownerName          String
+  ownerDiscordId     String?
+  ownerMemberId      String?
+  candidates         Json? // ambiguous matches to pick from: [{memberId, name, discordId}]
+  kind               String
+  ask                String
+  message            String // editable draft / sent text (without the footer)
+  quote              String?
+  startMs            Int?
+  dueAt              DateTime?
+  dueText            String?
+  status             FollowUpStatus   @default(DRAFT)
+  channel            FollowUpChannel?
+  escalateOnly       Boolean          @default(false) // approved to go straight to the approvers
+  sendAfter          DateTime?
+  sendAttemptAt      DateTime? // written before delivery starts; a row with it is never auto-resent
+  discordChannelId   String?
+  discordMessageId   String?
+  telegramChatId     String?
+  telegramMessageId  Int?
+  snoozedUntil       DateTime? // the member snoozed this from the action page; reminders must respect it
+  telegramAttemptKey String?          @db.VarChar(80) // idempotency key for the Telegram send; reused after an uncertain send so a replay cannot double-send
+  telegramFallback   String?          @db.VarChar(32) // why Telegram was skipped or failed (no-link, not-started, blocked, off, bad-request)
+  lastReply          String?
+  lastReplyAt        DateTime?
+  approvedBy         String?
+  approvedAt         DateTime?
+  sentAt             DateTime?
+  escalatedAt        DateTime?
+  error              String?
+  createdAt          DateTime         @default(now())
+  updatedAt          DateTime         @updatedAt
+  events             FollowUpEvent[]
 
   @@index([status, sendAfter])
   @@index([ownerDiscordId, sentAt])
@@ -1879,14 +1881,14 @@ model TelegramReach {
 }
 
 model FollowUpEvent {
-  id         Int      @id @default(autoincrement())
-  followUpId String
-  type       String
-  actorId    String? // Discord id, "telegram:<id>", or "system"
-  data       Json?
-  externalKey String? @unique @db.VarChar(120) // idempotency key for inbound replies (plans/followup-replies-inbox.md)
-  createdAt  DateTime @default(now())
-  followUp   FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
+  id          Int      @id @default(autoincrement())
+  followUpId  String
+  type        String
+  actorId     String? // Discord id, "telegram:<id>", or "system"
+  data        Json?
+  externalKey String?  @unique @db.VarChar(120) // idempotency key for inbound replies (plans/followup-replies-inbox.md)
+  createdAt   DateTime @default(now())
+  followUp    FollowUp @relation(fields: [followUpId], references: [id], onDelete: Cascade)
 
   @@index([followUpId, createdAt])
 }
@@ -1964,7 +1966,7 @@ model PaymentRequest {
   attachments PaymentAttachment[]
   checks      PaymentCheck[]
   decisions   PaymentDecision[]
-  proposal    Proposal?          @relation(fields: [proposalId], references: [id], onDelete: SetNull)
+  proposal    Proposal?           @relation(fields: [proposalId], references: [id], onDelete: SetNull)
 
   @@index([status, lane, createdAt])
   @@index([proposalId])
@@ -2042,6 +2044,13 @@ enum ProposalStatus {
   PASSED
   FAILED
   CANCELLED
+  // Imported history only: closed, the outcome was not recorded. Every lifecycle query filters on explicit statuses, so it is invisible to them.
+  UNRESOLVED
+}
+
+enum ProposalSource {
+  APP
+  IMPORTED
 }
 
 enum ProposalChoice {
@@ -2059,7 +2068,7 @@ model Proposal {
   amountUsdCents      Int? // FUNDING only; fixed once the proposal exists
   eventDate           DateTime?
   city                String?
-  proposerDiscordId   String
+  proposerDiscordId   String? // null only for imported history rows
   sponsorLabel        String? // free text: a holder who sponsors a proposer without a box
   opensAt             DateTime?
   closesAt            DateTime?
@@ -2081,16 +2090,63 @@ model Proposal {
   discordChannelId    String?
   discordMessageId    String?
   resultPostedAt      DateTime?
+  // Imported history (plans/proposals-history-import.md). Imported rows are closed, read-only records.
+  source              ProposalSource @default(APP)
+  importKey           String?        @unique // "discord:<messageId>" | "sheet:<row>" | "early:<messageId>"
+  proposerLabel       String? // the proposer's name as written, when no Discord id matched
+  votesRecorded       Boolean        @default(true)
+  outcomeSource       String? // override | votes | votes_era_quorum | sheet
+  paidOverride        Boolean? // null = derive from the payments
+  historical          Json? // amountRaw, quorumStated, sheetStatus, eventDateRaw, reactions, resubmissionOf, notes
   createdAt           DateTime       @default(now())
   updatedAt           DateTime       @updatedAt
 
-  voters   ProposalVoter[]
-  ballots  ProposalBallot[]
-  events   ProposalEvent[]
-  payments PaymentRequest[]
+  voters          ProposalVoter[]
+  ballots         ProposalBallot[]
+  events          ProposalEvent[]
+  payments        PaymentRequest[]
+  links           ProposalLink[]
+  historyPayments ProposalPayment[]
 
   @@index([status, closesAt])
+  @@index([status, closedAt])
   @@index([proposerDiscordId])
+}
+
+// Where an imported proposal came from: the Discord poll, its thread, a sheet row, notes.
+model ProposalLink {
+  id         Int     @id @default(autoincrement())
+  proposalId String
+  kind       String // discord_poll | discord_thread | sheet | doc | other
+  url        String?
+  label      String?
+  sourceKey  String // idempotency
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, sourceKey])
+}
+
+// Historical payouts for imported proposals. Separate from PaymentRequest so the live treasury flows are untouched.
+model ProposalPayment {
+  id          String    @id @default(cuid())
+  proposalId  String
+  paidAt      DateTime?
+  amount      Decimal?  @db.Decimal(38, 18) // in the asset's units
+  asset       String? // ETH | USDC | DAI | ...
+  chain       String? // key into the proposals.explorers setting; null = off-chain
+  usdValue    Int? // cents, at payment time
+  txHash      String?
+  offchainRef String?
+  note        String?
+  source      String // finance_match | discord_thread | sheet | override
+  sourceKey   String
+  createdAt   DateTime  @default(now())
+
+  proposal Proposal @relation(fields: [proposalId], references: [id], onDelete: Cascade)
+
+  @@unique([proposalId, sourceKey])
+  @@index([proposalId])
 }
 
 model ProposalVoter {
