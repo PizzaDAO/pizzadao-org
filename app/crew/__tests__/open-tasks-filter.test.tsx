@@ -7,11 +7,10 @@ vi.mock('../[crewId]/CrewGettingStarted', () => ({ CrewGettingStarted: () => nul
 vi.mock('../[crewId]/CrewBounties', () => ({ CrewBounties: () => null }))
 vi.mock('../[crewId]/CrewCallUpdates', () => ({ CrewCallUpdates: () => null }))
 
-// Mock next/font/google - must be before component import is evaluated
-vi.mock('next/font/google', () => ({
-  Inter: () => ({
+// Mock next/font/local - must be before component import is evaluated
+vi.mock('next/font/local', () => ({
+  default: () => ({
     style: { fontFamily: 'Inter, sans-serif' },
-    subsets: ['latin'],
   }),
 }))
 
