@@ -154,6 +154,8 @@ describe('settings registry', () => {
       ['calls.taskProposalsModel', ''],
       ['calls.taskProposalsNudgeEnabled', false],
       ['vouches.dailyLimit', 50],
+      ['vouches.requestsEnabled', false],
+      ['vouches.requestDailyLimit', 5],
       ['vouches.quickVouchEnabled', false],
       ['vouches.showVouchersEnabled', false],
       ['dashboard.levelCardEnabled', false],

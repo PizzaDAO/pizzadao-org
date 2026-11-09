@@ -42,6 +42,7 @@ export const TOGGLES = {
   'calls.startBandEnabled': { env: 'CALL_START_BAND_ENABLED', legacy: ON_WORDS },
   'calls.progressReportEnabled': { env: 'CALL_PROGRESS_ENABLED', legacy: ON_WORDS },
   'calls.progressShowFollowups': { env: 'CALL_PROGRESS_FOLLOWUPS_ENABLED', legacy: ON_WORDS },
+  'vouches.requestsEnabled': { env: 'VOUCH_REQUESTS_ENABLED', legacy: ON_WORDS },
   'vouches.quickVouchEnabled': { env: 'VOUCH_QUICK_ENABLED', legacy: ON_WORDS },
   'vouches.showVouchersEnabled': { env: 'VOUCH_SHOW_VOUCHERS_ENABLED', legacy: ON_WORDS },
   'dashboard.levelCardEnabled': { env: 'DASHBOARD_LEVEL_CARD_ENABLED', legacy: ON_WORDS },

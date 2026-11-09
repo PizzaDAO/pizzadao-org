@@ -1298,6 +1298,23 @@ export const SETTINGS = {
     default: 50,
     unit: 'vouches',
   }),
+  'vouches.requestsEnabled': boolSetting({
+    key: 'vouches.requestsEnabled',
+    area: 'features',
+    label: 'Ask a member to vouch for you',
+    help: "Signed-in members can pick a member on their dashboard and send them a \"vouch for me\" request, which shows in that member's notification bell until they dismiss it. Needs the VOUCH_REQUEST notification type migration applied first. The VOUCH_REQUESTS_ENABLED env var set to off always wins; on preview deploys only the env var counts.",
+    confirmOn: 'Members will be able to send vouch requests to other members.',
+  }),
+  'vouches.requestDailyLimit': intSetting({
+    key: 'vouches.requestDailyLimit',
+    area: 'features',
+    label: 'Vouch requests per member per day',
+    help: 'Most vouch requests one member can send in a rolling 24 hours. A member can also have only one unread request open with another member at a time.',
+    min: 1,
+    max: 50,
+    default: 5,
+    unit: 'requests',
+  }),
   'vouches.quickVouchEnabled': boolSetting({
     key: 'vouches.quickVouchEnabled',
     area: 'features',

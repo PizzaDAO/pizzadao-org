@@ -4,7 +4,7 @@ import React from "react";
 
 export type NotificationData = {
   id: string;
-  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "BOUNTY_SUBMITTED" | "BOUNTY_REJECTED" | "BOUNTY_CANCELLED" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED";
+  type: "BOUNTY_CLAIMED" | "BOUNTY_COMPLETED" | "BOUNTY_COMMENT" | "BOUNTY_SUBMITTED" | "BOUNTY_REJECTED" | "BOUNTY_CANCELLED" | "TASK_ASSIGNED" | "TASK_DUE_SOON" | "VOUCH_ADDED" | "VOUCH_REQUEST";
   title: string;
   message: string;
   linkUrl: string | null;
@@ -76,6 +76,7 @@ function getIcon(type: NotificationData["type"]): React.ReactNode {
         </svg>
       );
     case "VOUCH_ADDED":
+    case "VOUCH_REQUEST":
       return (
         <svg width={16} height={16} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round">
           <path d="M16 21v-2a4 4 0 0 0-4-4H6a4 4 0 0 0-4 4v2" />
@@ -107,6 +108,7 @@ function getIconBg(type: NotificationData["type"]): string {
     case "TASK_ASSIGNED":
       return "hsl(var(--butter) / 0.35)";
     case "VOUCH_ADDED":
+    case "VOUCH_REQUEST":
       return "hsl(var(--muted))";
     default:
       return "hsl(var(--muted))";
@@ -124,6 +126,7 @@ function getIconColor(type: NotificationData["type"]): string {
     case "BOUNTY_SUBMITTED":
     case "TASK_ASSIGNED":
     case "VOUCH_ADDED":
+    case "VOUCH_REQUEST":
       return "hsl(var(--foreground))";
     default:
       return "hsl(var(--muted-foreground))";
@@ -253,6 +256,31 @@ export function NotificationItem({ notification, onMarkRead, onNavigate }: Notif
         <p style={messageStyle()}>{notification.message}</p>
         <div style={timeStyle()}>{formatRelativeTime(notification.createdAt)}</div>
       </div>
+      {!isRead && notification.type === "VOUCH_REQUEST" && (
+        <button
+          type="button"
+          aria-label="Dismiss request"
+          onClick={(e) => {
+            e.stopPropagation();
+            onMarkRead(notification.id);
+          }}
+          style={{
+            flexShrink: 0,
+            alignSelf: "center",
+            background: "none",
+            border: "1px solid hsl(var(--rule) / 0.25)",
+            borderRadius: 999,
+            padding: "4px 10px",
+            minHeight: 28,
+            fontSize: 11,
+            fontWeight: 700,
+            cursor: "pointer",
+            color: "hsl(var(--muted-foreground))",
+          }}
+        >
+          Dismiss
+        </button>
+      )}
       {!isRead && (
         <div
           style={{

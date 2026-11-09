@@ -659,7 +659,12 @@
       "levelBadge": "Niv.{level}",
       "sendPep": "Envoyer des PEP",
       "editProfile": "Modifier le profil",
-      "manageWallets": "Gérer les wallets"
+      "manageWallets": "Gérer les wallets",
+      "viewPublicProfile": "Voir le profil public",
+      "shareProfile": "Partager le profil",
+      "shareProfileText": "Découvrez mon profil PizzaDAO :",
+      "profileLinkCopied": "Lien du profil copié",
+      "profileLinkCopyFailed": "Impossible de copier le lien"
     },
     "completion": {
       "overline": "§ configuration du profil",
@@ -796,7 +801,27 @@
       "vouchedByTitle": "Parrainé par",
       "vouchedByCount": "{count, plural, one {# membre} other {# membres}}",
       "vouchedByEmpty": "Personne ne s'est encore porté garant.",
-      "vouchedByMore": "et {count} de plus"
+      "vouchedByMore": "et {count} de plus",
+      "ask": {
+        "share": "Demander des parrainages",
+        "shareText": "Parrainez-moi sur PizzaDAO :",
+        "copied": "Lien copié. Collez-le dans un message.",
+        "copyFailed": "Impossible de copier le lien",
+        "askMember": "Demandez à un membre de vous parrainer",
+        "searchPlaceholder": "Rechercher un membre par nom ou ID",
+        "send": "Envoyer la demande",
+        "sent": "Demande envoyée à {name}.",
+        "errors": {
+          "self": "Vous ne pouvez pas vous le demander à vous-même.",
+          "not-found": "Membre introuvable.",
+          "unreachable": "Ce membre ne peut pas encore recevoir de demandes.",
+          "already-vouched": "Ce membre vous a déjà parrainé.",
+          "pending": "Vous avez déjà une demande ouverte avec ce membre.",
+          "limit": "Limite quotidienne atteinte ({limit} demandes). Réessayez demain.",
+          "no-profile": "Nous n'avons pas trouvé votre profil de membre.",
+          "error": "Impossible d'envoyer la demande. Réessayez."
+        }
+      }
     },
     "celebrations": {
       "profile": {
