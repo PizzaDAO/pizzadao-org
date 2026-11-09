@@ -61,7 +61,7 @@ describe('content settings: lock to today\'s values', () => {
       .map(([k, d]) => [k, d.default])
     expect(plain).toEqual([
       ['calls.recapMaxBullets', 5],
-      ['calls.recapMaxActions', 5],
+      ['calls.recapMaxActions', 10],
       ['calls.recapBulletChars', 220],
       ['calls.summaryModel', ''],
       ['calls.summaryPromptExtra', ''],

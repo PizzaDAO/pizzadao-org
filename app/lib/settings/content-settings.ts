@@ -149,8 +149,8 @@ export const CONTENT_SETTINGS = {
     min: 1, max: 10, default: 5,
   }),
   'calls.recapMaxActions': num({
-    key: 'calls.recapMaxActions', area: 'calls', label: 'Recap: most action items', help: 'Action items listed in a Discord recap.',
-    min: 1, max: 10, default: 5,
+    key: 'calls.recapMaxActions', area: 'calls', label: 'Recap: most action items', help: 'Action items listed in a Discord recap. Fewer are shown when they would not fit in Discord\'s message length limit.',
+    min: 1, max: 10, default: 10,
   }),
   'calls.recapBulletChars': num({
     key: 'calls.recapBulletChars', area: 'calls', label: 'Recap: characters per bullet', help: 'Longer bullets and action items are cut here.',

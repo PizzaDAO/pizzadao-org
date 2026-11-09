@@ -1034,6 +1034,7 @@
       "summaryRestricted": "Le résumé est réservé aux membres de niveau {level} et plus.",
       "actionItemsRestricted": "Les actions à mener sont réservées aux membres de niveau {level} et plus.",
       "suggestedBy": "suggéré par {name}",
+      "suggestedAndOwns": "{name} · l'a suggéré et s'en charge",
       "chaptersRestricted": "Les chapitres sont réservés aux membres de niveau {level} et plus.",
       "chatLine": "Écrit dans le chat de l'appel",
       "unknownSpeaker": "Intervenant",

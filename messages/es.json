@@ -1034,6 +1034,7 @@
       "summaryRestricted": "El resumen está disponible para los miembros de nivel {level} o superior.",
       "actionItemsRestricted": "Las tareas pendientes están disponibles para los miembros de nivel {level} o superior.",
       "suggestedBy": "sugerido por {name}",
+      "suggestedAndOwns": "{name} · lo sugirió y se encarga",
       "chaptersRestricted": "Los capítulos están disponibles para los miembros de nivel {level} o superior.",
       "chatLine": "Escrito en el chat de la llamada",
       "unknownSpeaker": "Orador",

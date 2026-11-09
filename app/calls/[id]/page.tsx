@@ -20,6 +20,7 @@ import PersonLink from "@/app/ui/calls/PersonLink";
 import { getSession } from "@/app/lib/session";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { displaySpeakerName } from "@/app/lib/calls/speaker-labels";
+import { sameActionPerson } from "@/app/lib/calls/recap";
 import { EditorialMasthead, EditorialPage, paperCard } from "@/app/ui/shared/Editorial";
 
 export const runtime = "nodejs";
@@ -102,8 +103,14 @@ export default async function PublishedCallPage({ params }: Params) {
                             {actionItems.map((item, i) => (
                                 <li key={i}>
                                     {item.text}
-                                    {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
-                                    {item.suggestedBy ? <span className="text-foreground/60"> {"\u2014"} {t("suggestedBy", { name: item.suggestedBy })}</span> : null}
+                                    {item.owner && item.suggestedBy && sameActionPerson(item.owner, item.suggestedBy) ? (
+                                        <span className="text-foreground/60"> {"\u2014"} {t("suggestedAndOwns", { name: item.owner })}</span>
+                                    ) : (
+                                        <>
+                                            {item.owner ? <span className="text-foreground/60"> ({item.owner})</span> : null}
+                                            {item.suggestedBy ? <span className="text-foreground/60"> {"\u2014"} {t("suggestedBy", { name: item.suggestedBy })}</span> : null}
+                                        </>
+                                    )}
                                 </li>
                             ))}
                         </ul>

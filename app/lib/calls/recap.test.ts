@@ -37,6 +37,27 @@ describe('recap text', () => {
     expect(t).not.toContain('suggested by null')
   })
 
+  it('renders an item once when the owner is also the suggester', () => {
+    const t = buildRecapText({ ...rec, actionItems: [{ text: 'Send the deck', owner: 'Ann', suggestedBy: 'ann' }, { text: 'Book it', owner: 'Ann', suggestedBy: 'Bob' }] }, base)
+    expect(t).toContain('- Send the deck \u2014 Ann (suggested, owner)')
+    expect(t).not.toContain('suggested by ann')
+    expect(t).toContain('- Book it (Ann) \u2014 suggested by Bob')
+  })
+
+  it('fits as many action items as Discord allows and notes the rest', () => {
+    const items = Array.from({ length: 10 }, (_, i) => ({ text: `Item ${i} ${'x'.repeat(190)}`, owner: 'Ann' }))
+    const limits = { bullets: 5, actions: 10, chars: 220 }
+    const t = buildRecapText({ ...rec, actionItems: items }, base, undefined, limits)
+    expect(t.length).toBeLessThanOrEqual(2000)
+    const shown = (t.match(/^- Item /gm) ?? []).length
+    expect(shown).toBeGreaterThan(5)
+    expect(shown).toBeLessThan(10)
+    expect(t).toContain(`+${10 - shown} more on the call page`)
+    expect(t).toContain('Full summary and transcript')
+    const few = buildRecapText({ ...rec, actionItems: items.slice(0, 3) }, base, undefined, limits)
+    expect(few).not.toContain('more on the call page')
+  })
+
   it('has title, bullets, action items with owners and the link', () => {
     const t = buildRecapText(rec, base)
     expect(t).toContain('**Call recap: Ops sync**')
