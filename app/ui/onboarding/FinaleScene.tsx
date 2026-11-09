@@ -322,7 +322,12 @@ export function FinaleScene({
   // --- Share action -------------------------------------------------------
   // Tries the native share sheet first (mobile), falls back to clipboard.
   const shareUrlRef = useRef<string>("");
-  const shareTarget = isPublic ? (claimId ? `/made/${claimId}` : "/get-your-mafia-name") : dashboardHref;
+  // Share the public profile, never the (private) dashboard.
+  const shareTarget = isPublic
+    ? (claimId ? `/made/${claimId}` : "/get-your-mafia-name")
+    : memberId
+      ? `/profile/${encodeURIComponent(memberId)}`
+      : dashboardHref;
   useEffect(() => {
     if (typeof window === "undefined") return;
     shareUrlRef.current = window.location.origin + shareTarget;

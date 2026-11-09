@@ -14,6 +14,7 @@ import { useFormatter, useTranslations } from "next-intl";
 import { PepAmount } from "../../../ui/economy";
 import { NotificationBell } from "../../../ui/notifications";
 import { ThemeToggle } from "../../../ui/ThemeToggle";
+import { ShareProfileButton } from "../../../ui/vouches/ShareProfileButton";
 import type { ProfileCompletion } from "../lib/profile-completion";
 import { ProfileCompletionMeter } from "./ProfileCompletionMeter";
 
@@ -227,6 +228,25 @@ export function HeroBlock({
                     {t("manageWallets")}
                     <ArrowUpRight className="h-3 w-3" />
                 </Link>
+                <Link
+                    href={`/profile/${idValue}`}
+                    className="ui inline-flex items-center gap-1.5 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
+                    style={{
+                        textDecoration: "none",
+                        minHeight: 32,
+                    }}
+                >
+                    {t("viewPublicProfile")}
+                    <ArrowUpRight className="h-3 w-3" />
+                </Link>
+                <ShareProfileButton
+                    memberId={idValue}
+                    label={t("shareProfile")}
+                    text={t("shareProfileText")}
+                    copiedLabel={t("profileLinkCopied")}
+                    failedLabel={t("profileLinkCopyFailed")}
+                    className="ui inline-flex min-h-8 cursor-pointer items-center gap-1.5 rounded-full border-0 bg-transparent p-0 text-[13px] uppercase tracking-[0.08em] text-foreground/70 transition-colors hover:text-tomato-readable"
+                />
             </div>
 
             {/* ── Profile setup meter (hidden once complete) */}

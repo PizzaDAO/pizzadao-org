@@ -276,6 +276,7 @@ enum NotificationType {
   MISSION_REJECTED // A mission submission was rejected
   LEVEL_COMPLETED // All missions in a level completed, reward paid
   VOUCH_ADDED            @map("FRIEND_ADDED") // Someone vouched for you
+  VOUCH_REQUEST // Someone asked you to vouch for them
   ARTICLE_COMMENT // New comment on your article
   DISAVOW_VOTE_NEEDED // A disavow nomination needs a DPR vote (no names)
   DISAVOW_ROUND_CLOSED // A disavow round you opened has closed (no names)
@@ -473,6 +474,7 @@ model Notification {
 
   @@index([recipientId, createdAt])
   @@index([recipientId, readAt])
+  @@index([actorId, type, createdAt])
 }
 
 // ===== ARTICLES / BLOG =====
