@@ -2,9 +2,12 @@
 
 import { useState, useEffect } from "react";
 import Link from "next/link";
-import { Inter } from "next/font/google";
+import localFont from "next/font/local";
 
-const inter = Inter({ subsets: ["latin"] });
+const inter = localFont({
+  src: [{ path: "../../fonts/Inter-latin-variable.woff2", weight: "100 900", style: "normal" }],
+  display: "swap",
+});
 
 interface RosterMismatch {
   memberId: string;

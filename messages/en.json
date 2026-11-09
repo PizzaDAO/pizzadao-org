@@ -2372,5 +2372,26 @@
     "applyAllHint": "Apply all skips changes that close or hide a task: apply those one by one.",
     "retiredHeading": "Recently retired from calls",
     "undoRetire": "Undo (show the task again)"
+  },
+  "collectPep": {
+    "title": "Collect daily PEP",
+    "overline": "Daily income",
+    "available": "{amount} PEP ready to collect",
+    "collect": "Collect",
+    "collecting": "Collecting...",
+    "nextIn": "Next collect in {time}",
+    "timeHM": "{h}h {m}m",
+    "timeM": "{m}m",
+    "timeS": "under a minute",
+    "success": "Collected {amount} PEP. New balance: {balance}.",
+    "alsoDiscord": "Also works in Discord: /collect-income",
+    "noRoles": "No daily PEP yet.",
+    "getRole": "Get the {role} role to earn {amount} PEP a day.",
+    "joinRoles": "Roles that earn daily PEP: {roles}.",
+    "unavailable": "Could not check your roles right now. Try again soon.",
+    "error": "Could not collect. Try again.",
+    "tooMany": "Too many tries. Wait a moment.",
+    "dashLink": "Collect daily PEP",
+    "getRoleEvery": "Get the {role} role to earn {amount} PEP every {hours} hours."
   }
 }

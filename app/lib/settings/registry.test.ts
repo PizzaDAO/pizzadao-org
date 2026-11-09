@@ -195,6 +195,8 @@ describe('settings registry', () => {
       ['pfp.restyleRefusalDailyLimit', 3],
       ['pfp.restyleCostCents', 20],
       ['pfp.outfitOverlayEnabled', false],
+      ['jobs.verifyPosts', true],
+      ['jobs.unverifiableJobsPayOnClick', true],
       ['shop.itemGrantsEnabled', true],
       ['shop.sheetSyncEnabled', false],
       // ...and channels and roles to "not set here" (the env value, then the built-in id, apply).
