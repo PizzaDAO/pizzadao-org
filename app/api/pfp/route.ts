@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolvePfpUrls } from "@/app/lib/pfp";
+import { resolvePfpUrlsAsync } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -26,7 +26,7 @@ export async function GET(request: NextRequest) {
     }
 
     return NextResponse.json(
-        { urls: resolvePfpUrls(ids) },
+        { urls: await resolvePfpUrlsAsync(ids) },
         { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } }
     );
 }

@@ -7,7 +7,7 @@ import {
 } from "@/app/lib/sheets/members-list";
 import { getBatchAttendanceSummary } from "@/app/lib/attendance";
 import { CREWS, TURTLES } from "@/app/ui/constants";
-import { resolvePfpUrl } from "@/app/lib/pfp";
+import { resolvePfpUrlsAsync } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -150,9 +150,9 @@ export const GET = withErrorHandling(async (request: NextRequest) => {
   const totalPages = Math.max(1, Math.ceil(total / limit));
   const safePage = Math.min(page, totalPages);
   const start = (safePage - 1) * limit;
-  const pageSlice = enriched
-    .slice(start, start + limit)
-    .map((m) => ({ ...m, pfpUrl: resolvePfpUrl(m.id) }));
+  const pageRows = enriched.slice(start, start + limit);
+  const pfpUrls = await resolvePfpUrlsAsync(pageRows.map((m) => m.id));
+  const pageSlice = pageRows.map((m) => ({ ...m, pfpUrl: pfpUrls[String(m.id).trim()] ?? null }));
 
   // Per-crew and per-turtle counts from the UNFILTERED result (v1 simple)
   const crewCounts = CREWS.map((c) => ({

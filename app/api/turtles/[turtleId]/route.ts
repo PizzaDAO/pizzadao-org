@@ -6,7 +6,7 @@ import {
   memberIdColumn,
   membersColumn,
 } from "@/app/lib/sheets/member-repository";
-import { resolvePfpUrl } from "@/app/lib/pfp";
+import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -93,7 +93,7 @@ export async function GET(
         status,
         turtles: turtlesRaw,
         // Resolved here so the page needs no per-member /api/pfp request.
-        pfpUrl: id ? resolvePfpUrl(id) : null,
+        pfpUrl: id ? await resolvePfpUrlAsync(id) : null,
       });
     }
 
