@@ -5,8 +5,11 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { appendRecord, summarize, readManifest } from './manifest.js'
 import { finalizeSession, MAX_TRANSCRIBE_ATTEMPTS, writeSessionMeta } from './finalize.js'
 import type { IngestPayload } from './types.js'
+import { MAX_KEYTERM_CHARS, MAX_KEYTERMS, MAX_KEYTERMS_TOTAL_CHARS, normalizeKeyterms } from './keyterms.js'
 import {
   buildConcatList,
+  buildDeepgramUrl,
+  DEEPGRAM_URL,
   buildOffsetMap,
   mergeTranscripts,
   parseDeepgram,
@@ -334,5 +337,37 @@ describe('finalizeSession with a transcript', () => {
     })
     expect(await finalizeSession(dir, deps)).toBe('uploaded')
     expect(posted[0].transcript).toBeUndefined()
+  })
+})
+
+describe('Deepgram keyterms', () => {
+  const file = path.join(mkdtempSync(path.join(os.tmpdir(), 'dgk-')), 'a.ogg')
+  writeFileSync(file, 'audio')
+
+  it('no terms leaves the URL unchanged', () => {
+    expect(buildDeepgramUrl()).toBe(DEEPGRAM_URL)
+    expect(buildDeepgramUrl([' ', ''])).toBe(DEEPGRAM_URL)
+  })
+  it('appends one URL-encoded keyterm per term', () => {
+    expect(buildDeepgramUrl(['ETHDenver', 'Pizza MCP', 'a&b=c'])).toBe(`${DEEPGRAM_URL}&keyterm=ETHDenver&keyterm=Pizza%20MCP&keyterm=a%26b%3Dc`)
+  })
+  it('enforces the count, length and total limits and drops duplicates', () => {
+    expect(normalizeKeyterms(['x'.repeat(MAX_KEYTERM_CHARS + 1), 'ok', 'OK', 5, ' Ok '])).toEqual(['ok'])
+    expect(normalizeKeyterms(Array.from({ length: 300 }, (_, i) => `t${i}`))).toHaveLength(MAX_KEYTERMS)
+    const long = Array.from({ length: 60 }, (_, i) => `${'w'.repeat(30)}${i}`)
+    const out = normalizeKeyterms(long)
+    expect(out.join('').length).toBeLessThanOrEqual(MAX_KEYTERMS_TOTAL_CHARS)
+    expect(out.length).toBeLessThan(long.length)
+  })
+  it('transcribeWithDeepgram requests with the terms', async () => {
+    let seen = ''
+    const fetch: FetchLike = async (u) => {
+      seen = u
+      return { ok: true, status: 200, json: async () => ({}), text: async () => '' }
+    }
+    await transcribeWithDeepgram(file, 'k', { fetch, keyterms: ['ETHDenver'] })
+    expect(seen).toContain('&keyterm=ETHDenver')
+    await transcribeWithDeepgram(file, 'k', { fetch })
+    expect(seen).toBe(DEEPGRAM_URL)
   })
 })

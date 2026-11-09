@@ -22,7 +22,9 @@ import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
-import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
+import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT, spellingsHint } from './summarize'
+import { normalizeKeyterms } from './keyterms'
+import { TRANSCRIPTION_KEYTERMS_DEFAULT } from '@/app/lib/settings/registry'
 import { sanitizeSummaryError, generateAndStoreSummary, generateAndStoreSummaryResult, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { POST as publishPOST } from '@/app/api/admin/calls/[id]/publish/route'
@@ -208,7 +210,7 @@ describe('summary generation', () => {
     expect(out).toEqual(good)
     const arg = m(generateText).mock.calls[0][0]
     expect(arg.model).toBe('anthropic/claude-sonnet-5.5')
-    expect(arg.system).toBe(SUMMARY_SYSTEM_PROMPT)
+    expect(arg.system).toBe(`${SUMMARY_SYSTEM_PROMPT}\n\n${spellingsHint(normalizeKeyterms(TRANSCRIPTION_KEYTERMS_DEFAULT.split('\n')))}`)
     expect(arg.prompt).toContain('[01:05] Ann: We ship on Friday')
   })
 

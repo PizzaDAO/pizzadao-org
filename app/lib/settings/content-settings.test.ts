@@ -14,7 +14,11 @@ import { MAFIA_POINT_SOURCES, MAFIA_RANKS, getRankForPoints } from '@/app/lib/ma
 import { DEFAULT_RECAP_LIMITS, buildRecapText, recapBullets, recapLimits } from '@/app/lib/calls/recap'
 import { DEFAULT_AGENDA_LIMITS, agendaLeadMs, agendaLimits, buildAgendaBullets } from '@/app/lib/call-agenda/rank'
 import { POST_LEAD_MS } from '@/app/lib/call-agenda/run'
-import { DEFAULT_SUMMARY_MODEL, SUMMARY_SYSTEM_PROMPT, summaryModel, summarySystemPrompt } from '@/app/lib/calls/summarize'
+import { DEFAULT_SUMMARY_MODEL, SUMMARY_SYSTEM_PROMPT, spellingsHint, summaryModel, summarySystemPrompt } from '@/app/lib/calls/summarize'
+import { normalizeKeyterms } from '@/app/lib/calls/keyterms'
+import { TRANSCRIPTION_KEYTERMS_DEFAULT } from '@/app/lib/settings/registry'
+
+const DEFAULT_SPELLINGS = spellingsHint(normalizeKeyterms(TRANSCRIPTION_KEYTERMS_DEFAULT.split('\n')))
 import { clampBatch, DEFAULT_BATCH } from '@/app/lib/reengage/run'
 import { isReengageSendDay } from '@/app/lib/reengage/send-day'
 import { DEFAULT_WORK_PROMPTS, workPrompts } from '@/app/lib/pep-earn/work'
@@ -89,7 +93,7 @@ describe('content settings: lock to today\'s values', () => {
       expect(agendaLimits(s)).toEqual(DEFAULT_AGENDA_LIMITS)
       expect(agendaLeadMs(s)).toBe(POST_LEAD_MS)
       expect(summaryModel({}, s)).toBe(DEFAULT_SUMMARY_MODEL)
-      expect(summarySystemPrompt(s)).toBe(SUMMARY_SYSTEM_PROMPT)
+      expect(summarySystemPrompt(s)).toBe(s ? `${SUMMARY_SYSTEM_PROMPT}\n\n${DEFAULT_SPELLINGS}` : SUMMARY_SYSTEM_PROMPT)
       expect(clampBatch(undefined, env(), s)).toBe(DEFAULT_BATCH)
       expect(isReengageSendDay(new Date('2026-11-03T16:00:00Z'), s)).toBe(true) // a Tuesday
       expect(isReengageSendDay(new Date('2026-11-04T16:00:00Z'), s)).toBe(false)
@@ -141,8 +145,8 @@ describe('content settings: saved values apply', () => {
   })
 
   it('the private addendum is appended after the built-in rules, and an unreadable one throws', async () => {
-    expect(summarySystemPrompt(snap({ 'calls.summaryPromptExtra': '  Extra line.  ' }))).toBe(`${SUMMARY_SYSTEM_PROMPT}\n\nExtra line.`)
-    expect(summarySystemPrompt(snap({ 'calls.summaryPromptExtra': '' }))).toBe(SUMMARY_SYSTEM_PROMPT)
+    expect(summarySystemPrompt(snap({ 'calls.summaryPromptExtra': '  Extra line.  ' }))).toBe(`${SUMMARY_SYSTEM_PROMPT}\n\n${DEFAULT_SPELLINGS}\n\nExtra line.`)
+    expect(summarySystemPrompt(snap({ 'calls.summaryPromptExtra': '' }))).toBe(`${SUMMARY_SYSTEM_PROMPT}\n\n${DEFAULT_SPELLINGS}`)
     // An unreadable database: the real loader's failure mode is 'throw' for this key.
     m(prisma.appSetting.findMany).mockRejectedValue(new Error('db down'))
     vi.spyOn(console, 'warn').mockImplementation(() => {})

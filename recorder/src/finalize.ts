@@ -48,6 +48,8 @@ export interface FinalizeDeps {
   postIngest?: (payload: IngestPayload) => Promise<IngestResult>
   /** Deepgram key; without it the call is ingested with no transcript. */
   deepgramApiKey?: string
+  /** Spellings for Deepgram to prefer (admin setting calls.transcriptionKeyterms). */
+  keyterms?: readonly string[]
   transcribe?: (sessionDir: string, outDir: string, speakers: SpeakerSummary[], deps: TranscribeDeps) => ReturnType<typeof transcribeSession>
 }
 
@@ -169,7 +171,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
     let transcript: IngestPayload['transcript']
     try {
       const transcribe = deps.transcribe ?? transcribeSession
-      const t = await transcribe(dir, outDir, speakers.filter((sp) => uploadedTracks.has(sp.userId)), { apiKey: deps.deepgramApiKey, log: deps.log, ffmpeg })
+      const t = await transcribe(dir, outDir, speakers.filter((sp) => uploadedTracks.has(sp.userId)), { apiKey: deps.deepgramApiKey, log: deps.log, ffmpeg, keyterms: deps.keyterms })
       if (t) transcript = t
     } catch (err) {
       deps.log(`transcription failed for ${meta.sessionId}: ${err instanceof Error ? err.message : String(err)}`)

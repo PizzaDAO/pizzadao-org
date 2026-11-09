@@ -12,6 +12,7 @@ import { loadSettings } from '@/app/lib/settings'
 import { resolveToggle } from '@/app/lib/settings/toggles'
 import { END_SONG_CREW_LINE } from '@/app/lib/settings/registry'
 import { normalizeCrewId } from '@/app/lib/crew-id'
+import { normalizeKeyterms } from '@/app/lib/calls/keyterms'
 import { liveConfigFrom } from '@/app/lib/calls/live-items'
 
 export interface RecorderConfig {
@@ -30,6 +31,8 @@ export interface RecorderConfig {
   liveItems: { audio: boolean; chunkSeconds: number; chat: boolean; prefixes: string[]; eventIds: string[] }
   /** Longest a switch to the next crew's event waits while the current call still has people talking; 0 = never wait. */
   supersedeMaxDeferMinutes: number
+  /** Spellings for Deepgram to prefer (keyterm prompting); empty = none. */
+  transcriptionKeyterms: string[]
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -44,6 +47,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   crews: [],
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
   supersedeMaxDeferMinutes: 0,
+  transcriptionKeyterms: [],
 }
 
 /** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
@@ -113,6 +117,7 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
     crews: await loadCrewLabels(),
     liveItems: await liveItemsConfig(settings),
     supersedeMaxDeferMinutes: settings.get('calls.supersedeMaxDeferMinutes'),
+    transcriptionKeyterms: normalizeKeyterms(parseLines(settings.get('calls.transcriptionTerms'))),
   }
 }
 

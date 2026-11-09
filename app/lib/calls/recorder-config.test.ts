@@ -51,3 +51,24 @@ describe('recorder config: supersede deferral', () => {
     expect((await buildRecorderConfig()).supersedeMaxDeferMinutes).toBe(0)
   })
 })
+
+describe('recorder config: transcription keyterms', () => {
+  it('defaults to the starter list, without personal names', async () => {
+    const terms = (await buildRecorderConfig()).transcriptionKeyterms
+    expect(terms).toEqual(['PizzaDAO', 'RSVPizza', 'Pizza MCP', 'OpenPizza', 'ETHDenver', 'Devcon', 'EthCC', 'Global Pizza Party', 'Bitcoin Pizza Day', 'PEP', 'Metalhead', 'Rare Pizzas'])
+    expect(RECORDER_CONFIG_OFF.transcriptionKeyterms).toEqual([])
+  })
+  it('one term per line, blanks and duplicates dropped, limits enforced', async () => {
+    state.over = { 'calls.transcriptionTerms': ' ETHDenver \n\nethdenver\n' + 'x'.repeat(41) + '\nDevcon' }
+    expect((await buildRecorderConfig()).transcriptionKeyterms).toEqual(['ETHDenver', 'Devcon'])
+    state.over = { 'calls.transcriptionTerms': '' }
+    expect((await buildRecorderConfig()).transcriptionKeyterms).toEqual([])
+  })
+  it('summary prompt carries the same terms as spellings to prefer', async () => {
+    const { summarySystemPrompt } = await import('./summarize')
+    const settings = { get: (k: string) => (k === 'calls.transcriptionTerms' ? 'ETHDenver\nDevcon' : '') } as unknown as Settings
+    expect(summarySystemPrompt(settings)).toContain('Spellings to prefer')
+    expect(summarySystemPrompt(settings)).toContain('ETHDenver, Devcon')
+    expect(summarySystemPrompt({ get: () => '' } as unknown as Settings)).not.toContain('Spellings')
+  })
+})
