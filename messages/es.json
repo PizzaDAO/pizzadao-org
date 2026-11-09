@@ -1038,6 +1038,8 @@
       "chatLine": "Escrito en el chat de la llamada",
       "unknownSpeaker": "Orador",
       "speakerN": "Hablante {n}",
+      "attended": "{count} asistieron",
+      "attendedShowMore": "Mostrar {count} más",
       "importedNote": "Originalmente una transmisión de video en vivo en X. La transcripción se generó automáticamente a partir del audio.",
       "qaTitle": "Preguntas de la llamada",
       "qaAnswered": "Respondidas",

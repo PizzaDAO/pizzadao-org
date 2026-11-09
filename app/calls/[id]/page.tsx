@@ -14,6 +14,8 @@ import { getLocale, getTranslations } from "next-intl/server";
 import { asSegments, getPublishedRecording } from "@/app/lib/calls/recordings";
 import { callSectionAccess } from "@/app/lib/calls/transcript-access";
 import { publishedQaForRecording } from "@/app/lib/calls/live-qa";
+import AttendeeChips from "@/app/ui/calls/AttendeeChips";
+import { loadCallAttendees } from "@/app/lib/calls/attendees";
 import PersonLink from "@/app/ui/calls/PersonLink";
 import { getSession } from "@/app/lib/session";
 import { formatClock } from "@/app/lib/calls/summarize";
@@ -51,6 +53,7 @@ export default async function PublishedCallPage({ params }: Params) {
     // Unlabelled speakers of an imported call show as "Speaker N"; the source link and linked member ids are never public.
     const speakerText = { speakerN: (n: number) => t("speakerN", { n }), fallback: t("unknownSpeaker") };
     const names = new Map(rec.speakers.map((s) => [s.discordId, displaySpeakerName(s.discordId, s.displayName, speakerText)]));
+    const attendees = await loadCallAttendees(rec, speakerText);
     const segments = showTranscript ? asSegments(rec.transcript) : [];
     const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string }>;
     // Live Q&A and poll results of the call: gated like the action items (anonymous askers are never named).
@@ -67,6 +70,8 @@ export default async function PublishedCallPage({ params }: Params) {
                 title={rec.title ?? rec.eventName ?? t("untitled")}
                 dek={`${when} · ${t("minutes", { count: Math.max(1, Math.round(rec.durationSec / 60)) })}`}
             />
+
+            <AttendeeChips attendees={attendees} label={t("attended", { count: attendees.length })} showMore={(n) => t("attendedShowMore", { count: n })} />
 
             <article className="grid gap-8">
                 {rec.source !== "DISCORD" && <p className="m-0 text-sm text-foreground/60">{t("importedNote")}</p>}
