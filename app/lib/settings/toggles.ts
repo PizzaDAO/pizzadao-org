@@ -82,6 +82,9 @@ export const TOGGLES = {
   'pfp.restyleEnabled': { env: 'PFP_RESTYLE_ENABLED', legacy: ON_WORDS },
   'pfp.outfitOverlayEnabled': { env: 'PFP_OUTFIT_OVERLAY_ENABLED', legacy: ON_WORDS },
   'portrait.enabled': { env: 'MAFIA_PORTRAIT_ENABLED', legacy: (raw) => raw === '1' },
+  // Both on unless the env var is an explicit off (the kill switch).
+  'jobs.verifyPosts': { env: 'JOBS_VERIFY_POSTS', legacy: (raw) => !envKillsToggle(raw) },
+  'jobs.unverifiableJobsPayOnClick': { env: 'JOBS_UNVERIFIABLE_PAY_ON_CLICK', legacy: (raw) => !envKillsToggle(raw) },
   // On unless the env var is exactly "0" (independent of the one-time migration flag).
   'shop.itemGrantsEnabled': { env: 'ITEM_GRANT_CLAIMS', legacy: (raw) => raw !== '0' },
   'shop.sheetSyncEnabled': { env: 'SHOP_SHEET_SYNC_ENABLED', legacy: (raw) => raw?.trim() === '1' },
