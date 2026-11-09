@@ -24,12 +24,15 @@ vi.mock('@/app/lib/db', () => ({
     },
     memberTableLayout: { findUnique: vi.fn(async () => ({ headers: ['', 'Name'] })), upsert: rec('memberTableLayout', 'upsert') },
     member: {
-      findMany: vi.fn(async () => [
-        { id: '1', cells: [{ v: 1 }, { v: 'A' }], position: 0 },
-        { id: '9', cells: [{ v: 9 }, { v: 'Left the sheet' }], position: 1 },
-      ]),
+      // Tombstoned (merged-away) members are asked for with mergedInto: { not: null }; none here.
+      findMany: vi.fn(async (args?: { where?: { mergedInto?: { not: null } | null } }) =>
+        args?.where?.mergedInto && typeof args.where.mergedInto === 'object' ? [] : [
+          { id: '1', cells: [{ v: 1 }, { v: 'A' }], position: 0 },
+          { id: '9', cells: [{ v: 9 }, { v: 'Left the sheet' }], position: 1 },
+        ]),
       upsert: rec('member', 'upsert'),
     },
+    memberMerge: { findMany: vi.fn(async () => []) },
   },
 }))
 vi.mock('@/app/lib/announce/sheet', async (orig) => ({

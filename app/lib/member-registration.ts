@@ -42,11 +42,11 @@ export function parseSignedUpMembers(rows: unknown[][]): Map<string, string> {
 }
 
 /** The members table as plain values from the database (once sheets.source.members is "db"), else null. */
-async function memberRowsFromDb(): Promise<unknown[][] | null> {
+async function memberRowsFromDb(includeMerged = false): Promise<unknown[][] | null> {
   const { usesDb } = await import("./sheets-import/source");
   if (!(await usesDb("members"))) return null;
   const { loadMembersPayload, memberValueRows } = await import("./members/db-table");
-  return memberValueRows(await loadMembersPayload());
+  return memberValueRows(await loadMembersPayload({ includeMerged }));
 }
 
 /** Everyone with a roster row carrying their Discord ID, read live (the database, or the Sheets API rather than GViz, which lags writes). */
@@ -71,7 +71,8 @@ export async function registerWithMemberId<T>(discordId: string, write: (id: str
   return prisma.$transaction(async tx => {
     await tx.$executeRaw`SELECT pg_advisory_xact_lock(742019331)`;
     // Once members live in the database, ids come from the database only (plans/sheets-cutover.md).
-    let rows = await memberRowsFromDb();
+    // Include merged-away (tombstoned) members: their ids stay taken so an id is never reused.
+    let rows = await memberRowsFromDb(true);
     if (!rows) {
       const sheets = google.sheets({ version: "v4", auth: getGoogleAuth([GOOGLE_SCOPES.sheetsReadonly]) });
       const response = await sheets.spreadsheets.values.get({

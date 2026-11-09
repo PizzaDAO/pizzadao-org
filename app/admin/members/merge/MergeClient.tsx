@@ -78,6 +78,12 @@ export function MergeClient() {
                         Discord: {report.discord.action}
                         {report.pep ? `. PEP: ${report.pep.moved} moves to the kept account through the ledger.` : ""}
                     </p>
+                    {report.discord.action === "both-kept" && (
+                        <p role="note" className="m-0 rounded border border-tomato p-3 text-tomato">
+                            Both members have a Discord account. Only the PEP balance is merged. Missions, attendance, roles and anything else
+                            tied to the removed member&apos;s Discord account ({report.discord.removeDiscordId}) stays with that account and does not follow the merge.
+                        </p>
+                    )}
                     {report.notes.map((n) => (
                         <p key={n} className="m-0 text-foreground/70">{n}</p>
                     ))}
@@ -126,6 +132,25 @@ export function MergeClient() {
                                 Cancel
                             </button>
                         </div>
+                    )}
+                    {phase === "done" && report.mergeId && (
+                        <button
+                            type="button"
+                            className="rounded border border-foreground/30 px-4 py-2 w-fit"
+                            onClick={async () => {
+                                if (!window.confirm(`Undo merge #${report.mergeId}?`)) return;
+                                const res = await fetch("/api/admin/members/merge", {
+                                    method: "POST",
+                                    headers: { "Content-Type": "application/json" },
+                                    body: JSON.stringify({ unmergeId: report.mergeId, apply: true }),
+                                });
+                                const data = await res.json().catch(() => ({}));
+                                if (!res.ok) setError(data.error || "Undo failed");
+                                else { setError(null); setKeepId(""); setRemoveId(""); reset(); }
+                            }}
+                        >
+                            Undo this merge
+                        </button>
                     )}
                     {phase === "done" && (
                         <button type="button" className="rounded border border-foreground/30 px-4 py-2 w-fit" onClick={() => { setKeepId(""); setRemoveId(""); reset(); }}>

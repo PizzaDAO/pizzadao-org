@@ -6,6 +6,8 @@
  *   ... --apply
  *       performs the merge in one transaction (re-points every member-id column, drops duplicates,
  *       sums PEP through the ledger, tombstones the removed member, writes an audit row).
+ *   node scripts/members/merge.ts --unmerge <mergeId> [--apply]
+ *       reverses a merge from its audit row (dry run by default).
  *   ... --json           print the report as JSON.
  *   ... --actor <name>   who is running it, for the audit row (default: cli).
  *
@@ -31,6 +33,18 @@ async function main() {
   const a = parseArgs(process.argv.slice(2))
   const keepId = typeof a.keep === 'string' ? a.keep : ''
   const removeId = typeof a.remove === 'string' ? a.remove : ''
+  if (typeof a.unmerge === 'string') {
+    if (!process.env.DATABASE_URL) { console.error('DATABASE_URL is not set'); process.exit(2) }
+    const { unmergeMembers } = await import('../../app/lib/members/merge.ts')
+    const { prisma } = await import('../../app/lib/db.ts')
+    try {
+      const r = await unmergeMembers(Number(a.unmerge), { dryRun: a.apply !== true, actor: typeof a.actor === 'string' ? a.actor : 'cli' }, { prisma })
+      console.log(JSON.stringify(r, null, 2))
+    } finally {
+      await (prisma as { $disconnect?: () => Promise<void> }).$disconnect?.()
+    }
+    return
+  }
   if (!keepId || !removeId) {
     console.error('Usage: node scripts/members/merge.ts --keep <memberId> --remove <memberId> [--apply] [--json] [--actor <name>]')
     process.exit(2)

@@ -39,6 +39,11 @@ export async function upsertMemberInDb(raw: MemberWriteRaw, actor: string, now: 
       const members = (await tx.member.findMany({ where: { mergedInto: null }, select: { id: true, cells: true } })).map((m) => ({ id: m.id, cells: (Array.isArray(m.cells) ? m.cells : []) as MemberCells }))
       const plan = planMemberUpsert(headers, members, raw, now.toISOString())
       if (!plan.ok || plan.skipped) return plan
+      // Ids of merged-away members stay taken (they are hidden from `members`, not gone).
+      const tombstones = new Set((await tx.member.findMany({ where: { mergedInto: { not: null } }, select: { id: true } })).map((m) => m.id))
+      if ((plan.action === 'inserted' || (plan.previousId && plan.targetId !== plan.previousId)) && tombstones.has(plan.targetId)) {
+        return { ok: false, error: `Member ID ${plan.targetId} is already used by another row.` } as UpsertResult
+      }
       const { discordId, name } = memberIndexFields(headers, plan.cells)
       const data = { cells: plan.cells as never, discordId, name, updatedBy: actor }
       if (plan.action === 'inserted') {

@@ -69,7 +69,10 @@ vi.mock('./../transactions', () => ({
   }),
 }))
 
-import { mergeMembers, MergeError, TABLES, VOUCH_MODEL } from './merge'
+vi.mock('@/app/lib/sheets-import/source', () => ({ usesDb: vi.fn(async () => true) }))
+
+import { usesDb } from '@/app/lib/sheets-import/source'
+import { mergeMembers, unmergeMembers, MergeError, TABLES, VOUCH_MODEL, PK_OVERRIDES } from './merge'
 
 function makeDb() {
   const d = (name: string) => delegate([], [name])
@@ -252,7 +255,101 @@ describe('apply', () => {
   })
 })
 
+describe('safety and reversibility', () => {
+  it('refuses unless members are read from the database', async () => {
+    vi.mocked(usesDb).mockResolvedValueOnce(false)
+    await expect(mergeMembers({ keepId: KEEP, removeId: GONE, dryRun: false })).rejects.toThrow(/not read from the database/)
+    expect(db.member.rows.find((m: any) => m.id === GONE).mergedInto).toBeNull()
+  })
+
+  it('blanks the tombstone Discord cell and uses the DiscordId header', async () => {
+    db.memberTableLayout.rows.push({ id: 1, headers: ['ID', 'Discord ID', 'Name'] })
+    db.member.rows[1].cells = [{ v: GONE }, { v: D_GONE }, { v: 'Gone' }]
+    await mergeMembers({ keepId: KEEP, removeId: GONE, dryRun: false })
+    expect(db.member.rows[1].cells[1]).toBeNull()
+  })
+
+  it('stores undo data and the second pass catches rows inserted mid-merge', async () => {
+    db.profileLink.rows.push({ id: 1, memberId: GONE })
+    let first = true
+    const orig = db.profileLink.updateMany
+    db.profileLink.updateMany = async (a: any) => {
+      const r = await orig(a)
+      if (first) { first = false; db.profileLink.rows.push({ id: 2, memberId: GONE }) }
+      return r
+    }
+    const rep = await mergeMembers({ keepId: KEEP, removeId: GONE, dryRun: false })
+    expect(db.profileLink.rows.map((r: any) => r.memberId)).toEqual([KEEP, KEEP])
+    expect(find(rep, 'ProfileLink', 'memberId').moved).toBe(2)
+    expect(db.memberMerge.rows[0].report.undo.moved.length).toBeGreaterThan(0)
+  })
+
+  it('round trip: unmerge restores moved rows, dropped rows, tombstone, discord and PEP', async () => {
+    const early = new Date('2025-01-01'), late = new Date('2026-01-01')
+    db.member.rows[0].discordId = null
+    db.memberTableLayout.rows.push({ id: 1, headers: ['ID', 'Discord ID'] })
+    db.member.rows[1].cells = [{ v: GONE }, { v: D_GONE }]
+    db.profileLink.rows.push({ id: 1, memberId: GONE })
+    db.vouch.rows.push({ id: 1, followerId: GONE, followeeId: 'A' }, { id: 2, followerId: KEEP, followeeId: 'A' }, { id: 3, followerId: GONE, followeeId: 'B' })
+    db.taskClaimEvent.rows.push({ id: 1, memberId: GONE, taskKey: 't', claimedAt: early }, { id: 2, memberId: KEEP, taskKey: 't', claimedAt: late })
+    db.memberProfileExtras.rows.push({ id: 1, memberId: GONE, bio: 'gone bio' }, { id: 2, memberId: KEEP, bio: 'keep bio' })
+    db.memberPfp.rows.push({ id: 3, memberId: GONE })
+    db.article.rows.push({ id: 'a1', collaboratorMemberIds: [GONE, 'Q'] })
+    const before = JSON.stringify({ v: db.vouch.rows, t: db.taskClaimEvent.rows, e: db.memberProfileExtras.rows, p: db.memberPfp.rows, l: db.profileLink.rows, a: db.article.rows, m: db.member.rows })
+
+    const rep = await mergeMembers({ keepId: KEEP, removeId: GONE, dryRun: false })
+    expect(db.vouch.rows).toHaveLength(2)
+    const dry = await unmergeMembers(rep.mergeId!, { dryRun: true })
+    expect(dry.dryRun).toBe(true)
+    expect(db.member.rows[1].mergedInto).toBe(KEEP)
+
+    const un = await unmergeMembers(rep.mergeId!, { dryRun: false, actor: 't' })
+    expect(un.conflicts).toEqual([])
+    const norm = (rows: any[]) => rows.map((r) => JSON.parse(JSON.stringify(r))).sort((x, y) => JSON.stringify(x).localeCompare(JSON.stringify(y)))
+    const afterObj = { v: db.vouch.rows, t: db.taskClaimEvent.rows, e: db.memberProfileExtras.rows, p: db.memberPfp.rows, l: db.profileLink.rows, a: db.article.rows, m: db.member.rows }
+    const beforeObj = JSON.parse(before)
+    for (const k of Object.keys(beforeObj)) {
+      const strip = (rows: any[]) => rows.map((r) => { const c = { ...r }; delete c.updatedBy; delete c.mergedAt; return c })
+      expect(norm(strip(afterObj[k as keyof typeof afterObj]))).toEqual(norm(strip(beforeObj[k])))
+    }
+    expect(db.member.rows[1].mergedInto).toBeNull()
+    expect(db.memberMerge.rows[0].undoneAt).toBeInstanceOf(Date)
+    await expect(unmergeMembers(rep.mergeId!, { dryRun: false })).rejects.toThrow(/already undone/)
+  })
+
+  it('round trip reverses the PEP transfer through the ledger', async () => {
+    db.user.rows.push({ id: D_GONE }, { id: D_KEEP })
+    db.economy.rows.push({ id: D_GONE, wallet: 70 }, { id: D_KEEP, wallet: 5 })
+    const rep = await mergeMembers({ keepId: KEEP, removeId: GONE, dryRun: false })
+    await unmergeMembers(rep.mergeId!, { dryRun: false })
+    expect(db.economy.rows.find((r: any) => r.id === D_GONE).wallet).toBe(70)
+    expect(db.economy.rows.find((r: any) => r.id === D_KEEP).wallet).toBe(5)
+    expect(db.transaction.rows).toHaveLength(4)
+    expect(db.transaction.rows.slice(2).every((t: any) => t.description.startsWith('UNMERGE'))).toBe(true)
+  })
+
+  it('flags both-kept in the report', async () => {
+    const rep = await mergeMembers({ keepId: KEEP, removeId: GONE })
+    expect(rep.discord.action).toBe('both-kept')
+    expect(rep.notes.join(' ')).toMatch(/do NOT follow the merge/)
+  })
+})
+
 describe('coverage of the schema', () => {
+  it('PK_OVERRIDES match the schema', () => {
+    const schema = readFileSync(join(__dirname, '../../../prisma/schema.prisma'), 'utf8')
+    const models = new Set([...TABLES.map((t) => t.model), VOUCH_MODEL])
+    let model = ''
+    const pks: Record<string, string> = {}
+    for (const line of schema.split('\n')) {
+      const m = line.match(/^model (\w+)/)
+      if (m) model = m[1]
+      const f = line.match(/^\s+(\w+)\s+\S+.*@id\b/)
+      if (f && models.has(model)) pks[model] = f[1]
+    }
+    for (const mdl of models) expect(PK_OVERRIDES[mdl] ?? 'id').toBe(pks[mdl])
+  })
+
   // Member-id columns that are deliberately not merged: they hold a Discord id or a display name.
   const IGNORED = new Set(['ArticleReaction.memberId', 'MafiaRankCache.memberName', 'Proposal.proposerDiscordId', 'Proposal.proposerLabel', 'Vouch.followerId', 'Vouch.followeeId'])
   it('every member-id column in prisma/schema.prisma is handled or explicitly ignored', () => {

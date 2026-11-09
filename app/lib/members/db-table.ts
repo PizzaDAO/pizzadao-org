@@ -41,11 +41,12 @@ export function memberValueRows(payload: MembersPayload): unknown[][] {
   return [payload.headers, ...sorted.map((m) => (Array.isArray(m.cells) ? m.cells : []).map((c) => c?.v ?? c?.f ?? ''))]
 }
 
-export async function loadMembersPayload(): Promise<MembersPayload> {
+/** `includeMerged` also returns tombstoned (merged-away) rows: id allocation must treat their ids as taken. */
+export async function loadMembersPayload(opts: { includeMerged?: boolean } = {}): Promise<MembersPayload> {
   const { prisma } = await import('@/app/lib/db')
   const [layout, rows] = await Promise.all([
     prisma.memberTableLayout.findUnique({ where: { id: 1 } }),
-    prisma.member.findMany({ where: { mergedInto: null }, select: { id: true, cells: true, position: true, updatedAt: true } }),
+    prisma.member.findMany({ where: opts.includeMerged ? {} : { mergedInto: null }, select: { id: true, cells: true, position: true, updatedAt: true } }),
   ])
   if (!layout) throw new Error('Members table is not imported yet')
   let latest = layout.updatedAt.getTime()

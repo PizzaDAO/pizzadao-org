@@ -2669,6 +2669,9 @@ model MemberMerge {
   removeId  String
   actor     String
   report    Json
+  // Set by unmergeMembers() when the merge was reversed.
+  undoneAt  DateTime?
+  undoneBy  String?
   createdAt DateTime @default(now())
 
   @@index([keepId])

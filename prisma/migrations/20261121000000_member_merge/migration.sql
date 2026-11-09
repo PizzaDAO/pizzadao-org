@@ -9,6 +9,8 @@ CREATE TABLE "MemberMerge" (
     "removeId" TEXT NOT NULL,
     "actor" TEXT NOT NULL,
     "report" JSONB NOT NULL,
+    "undoneAt" TIMESTAMP(3),
+    "undoneBy" TEXT,
     "createdAt" TIMESTAMP(3) NOT NULL DEFAULT CURRENT_TIMESTAMP,
 
     CONSTRAINT "MemberMerge_pkey" PRIMARY KEY ("id")
