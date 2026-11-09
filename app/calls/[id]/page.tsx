@@ -13,6 +13,8 @@ import { notFound, redirect } from "next/navigation";
 import { getLocale, getTranslations } from "next-intl/server";
 import { asSegments, getPublishedRecording } from "@/app/lib/calls/recordings";
 import { callSectionAccess } from "@/app/lib/calls/transcript-access";
+import { publishedQaForRecording } from "@/app/lib/calls/live-qa";
+import PersonLink from "@/app/ui/calls/PersonLink";
 import { getSession } from "@/app/lib/session";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { displaySpeakerName } from "@/app/lib/calls/speaker-labels";
@@ -51,6 +53,8 @@ export default async function PublishedCallPage({ params }: Params) {
     const names = new Map(rec.speakers.map((s) => [s.discordId, displaySpeakerName(s.discordId, s.displayName, speakerText)]));
     const segments = showTranscript ? asSegments(rec.transcript) : [];
     const actionItems = (!showActionItems ? [] : Array.isArray(rec.actionItems) ? rec.actionItems : []) as Array<{ text?: string; owner?: string; suggestedBy?: string }>;
+    // Live Q&A and poll results of the call: gated like the action items (anonymous askers are never named).
+    const qa = showActionItems ? await publishedQaForRecording(id) : null;
     const chapters = (!showChapters ? [] : Array.isArray(rec.chapters) ? rec.chapters : []) as Array<{ startMs?: number; title?: string }>;
 
     return (
@@ -98,6 +102,56 @@ export default async function PublishedCallPage({ params }: Params) {
                                 </li>
                             ))}
                         </ul>
+                    </section>
+                )}
+
+                {qa && qa.answered.length + qa.unanswered.length > 0 && (
+                    <section className="grid gap-3">
+                        <h2 className="font-display text-xl font-black m-0">{t("qaTitle")}</h2>
+                        {([["qaAnswered", qa.answered], ["qaUnanswered", qa.unanswered]] as const).map(
+                            ([label, list]) =>
+                                list.length > 0 && (
+                                    <div key={label} className="grid gap-1">
+                                        <h3 className="m-0 text-sm font-semibold uppercase tracking-wide text-foreground/60">{t(label)}</h3>
+                                        <ul className="m-0 grid list-none gap-2 p-0">
+                                            {list.map((q) => (
+                                                <li key={q.id} className="min-w-0 break-words">
+                                                    {q.text}
+                                                    <span className="block text-sm text-foreground/60">
+                                                        {t("qaVotes", { count: q.votes })}
+                                                        {q.author?.name && (
+                                                            <>
+                                                                {" \u00b7 "}
+                                                                {t.rich("qaBy", { name: () => <PersonLink key="n" name={q.author!.name!} memberId={q.author!.memberId} /> })}
+                                                            </>
+                                                        )}
+                                                    </span>
+                                                </li>
+                                            ))}
+                                        </ul>
+                                    </div>
+                                ),
+                        )}
+                    </section>
+                )}
+
+                {qa && qa.polls.length > 0 && (
+                    <section className="grid gap-3">
+                        <h2 className="font-display text-xl font-black m-0">{t("pollsTitle")}</h2>
+                        {qa.polls.map((p) => (
+                            <div key={p.id} className="min-w-0">
+                                <p className="m-0 break-words font-semibold">{p.question}</p>
+                                <ul className="m-0 mt-1 grid list-none gap-1 p-0">
+                                    {p.options.map((o, i) => (
+                                        <li key={i} className="flex min-w-0 justify-between gap-3">
+                                            <span className="min-w-0 break-words">{o.text}</span>
+                                            <span className="shrink-0 text-foreground/60">{o.percent}% {"\u00b7"} {o.votes}</span>
+                                        </li>
+                                    ))}
+                                </ul>
+                                <p className="m-0 mt-1 text-sm text-foreground/60">{t("pollTotal", { count: p.total })}</p>
+                            </div>
+                        ))}
                     </section>
                 )}
 

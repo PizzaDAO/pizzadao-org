@@ -57,7 +57,7 @@ const ev = (over: Partial<EventInfo> = {}): EventInfo => ({
   ...over,
 })
 
-function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string; remote?: RemoteConfigClient; bots?: string[]; livePost?: (b: unknown) => Promise<string[]>; captureVoiceChat?: boolean } = {}) {
+function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: string; remote?: RemoteConfigClient; bots?: string[]; livePost?: (b: unknown) => Promise<string[]>; liveStatePost?: (b: any) => Promise<'ok' | 'off' | 'error'>; captureVoiceChat?: boolean } = {}) {
   const dataDir = opts.dataDir ?? mkdtempSync(path.join(os.tmpdir(), 'orch-'))
   const nicknames: Array<string | null> = []
   const me = {
@@ -79,7 +79,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
   }
   const guild = {
     id: 'g1',
-    members: { fetchMe: async () => me, fetch: async () => ({ displayName: 'x' }) },
+    members: { fetchMe: async () => me, fetch: async () => ({ displayName: 'x' }), cache: new Map() },
     channels: { fetch: async () => channel },
     voiceStates: { cache: { filter: () => ({ map: () => [] }) } },
   }
@@ -96,6 +96,7 @@ function world(opts: { nickFails?: boolean; sendFails?: boolean; dataDir?: strin
     (fn) => void serialJobs.push(fn),
     opts.remote ?? null,
     opts.livePost ?? null,
+    opts.liveStatePost ?? null,
   )
   return { rec, dataDir, me, nicknames, channel, guild, serialJobs, client, cfg, nick }
 }
@@ -1509,5 +1510,56 @@ describe('house band at call start (calls.startBandEnabled)', () => {
     const w = bandWorld({ enabled: true })
     await begin(w)
     expect(w.rec.currentEventId).toBe('100')
+  })
+})
+
+describe('live call view heartbeat', () => {
+  const remote = (liveView: unknown) => {
+    const rc = parseRemoteConfig({ liveView })
+    return { get: () => rc, refresh: async () => rc } as unknown as RemoteConfigClient
+  }
+  const msg = (content: string) => ({
+    id: String(Math.floor(Math.random() * 1e12) + 1e11),
+    channelId: CHANNEL,
+    content,
+    cleanContent: content,
+    createdTimestamp: Date.now() + 1000,
+    system: false,
+    author: { id: '555555555555555555', bot: false, username: 'ann' },
+    member: { displayName: 'Ann' },
+    attachments: new Map(),
+  })
+
+  it('sends nothing while the live view is off', async () => {
+    const liveStatePost = vi.fn(async () => 'ok' as const)
+    const w = world({ remote: remote({ enabled: false }), liveStatePost })
+    await begin(w)
+    await w.rec.stop('event-ended')
+    expect(liveStatePost).not.toHaveBeenCalled()
+  })
+
+  it('reports who is in the channel, the first stream link from the chat, and the end', async () => {
+    const liveStatePost = vi.fn(async (_b: unknown) => 'ok' as const)
+    const w = world({ remote: remote({ enabled: true, pushSeconds: 20 }), liveStatePost })
+    await begin(w)
+    const first = liveStatePost.mock.calls[0][0] as { sessionId: string; present: Array<{ discordId: string; displayName: string | null; inChannel: boolean }>; ended?: boolean }
+    expect(first.present).toEqual([expect.objectContaining({ discordId: 'u0', displayName: 'x', inChannel: true })])
+    expect(first.ended).toBeUndefined()
+    w.rec.onMessage(msg('hi all') as never)
+    w.rec.onMessage(msg('stream: https://x.com/i/broadcasts/1abc and https://x.com/i/broadcasts/2def') as never)
+    await w.rec.stop('event-ended')
+    const bodies = liveStatePost.mock.calls.map((c) => c[0] as { streamLink?: string; ended?: boolean })
+    expect(bodies.some((b) => b.streamLink === 'https://x.com/i/broadcasts/1abc')).toBe(true)
+    expect(bodies.some((b) => b.streamLink === 'https://x.com/i/broadcasts/2def')).toBe(false)
+    expect(bodies.at(-1)?.ended).toBe(true)
+  })
+
+  it('a failing app never breaks the recording', async () => {
+    const liveStatePost = vi.fn(async () => 'error' as const)
+    const w = world({ remote: remote({ enabled: true }), liveStatePost })
+    await begin(w)
+    await expect(w.rec.stop('event-ended')).resolves.toBeUndefined()
+    await w.rec.drain()
+    expect(finalizeSession).toHaveBeenCalledTimes(1)
   })
 })

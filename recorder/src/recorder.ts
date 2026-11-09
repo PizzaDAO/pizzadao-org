@@ -37,6 +37,7 @@ import { StopTracker, type StopReason } from './stop-conditions.js'
 import { REMOTE_CONFIG_OFF, REMOTE_CONFIG_START_WAIT_MS, type RemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import type { SessionMeta } from './types.js'
 import { LiveItems, postLive, type LiveRequest } from './live-items.js'
+import { LiveStatePusher, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
 
 const TICK_MS = 10_000
 const REMINDER_AFTER_MS = 5 * 60_000
@@ -89,6 +90,8 @@ interface ActiveSession {
   deferTarget: string | null
   /** Live action items (settings snapshot at session start); null: off for this call. */
   live: LiveItems | null
+  /** Heartbeat for the app's live call view (settings snapshot at session start); null: off. */
+  liveState: LiveStatePusher | null
 }
 
 export class CallRecorder {
@@ -123,6 +126,8 @@ export class CallRecorder {
     private readonly remote: RemoteConfigClient | null = null,
     /** Live action items request (tests inject it); default POSTs to the app. */
     private readonly livePost: ((body: LiveRequest) => Promise<string[]>) | null = null,
+    /** Live-state heartbeat (tests inject it); default POSTs to the app. */
+    private readonly liveStatePost: ((body: LiveStateBody) => Promise<PostResult>) | null = null,
   ) {
     this.slots = new SlotMemory(path.join(cfg.dataDir, 'slots.json'), (ch) => ch !== null && this.allowedNow().has(ch), log)
     this.limits = new CallLimits(path.join(cfg.dataDir, 'call-limits.json'), log)
@@ -461,9 +466,11 @@ export class CallRecorder {
         startPresent: new Set(),
         deferTarget: null,
         live,
+        liveState: this.liveStateFor(rc, { sessionId, eventId: event.id, eventName: event.name, channelId, startedAtMs }),
         tick: setInterval(() => this.serial(() => this.onTick()), TICK_MS),
       }
       await this.notePresent(this.current)
+      this.current.liveState?.start()
       this.current.startPresent = new Set(this.current.present)
       this.log(`recording "${event.name}" as ${sessionId}`)
       this.fireStartBand(this.current, event, rc, startedAtMs)
@@ -471,6 +478,16 @@ export class CallRecorder {
       live?.stop()
       await abort(`start failed: ${err instanceof Error ? err.message : String(err)}`)
     }
+  }
+
+  /** Live-state heartbeat for this call, or null (off). */
+  private liveStateFor(rc: RemoteConfig, o: { sessionId: string; eventId: string; eventName: string; channelId: string; startedAtMs: number }): LiveStatePusher | null {
+    if (!rc.liveView.enabled) return null
+    return new LiveStatePusher({
+      ...o,
+      pushSeconds: rc.liveView.pushSeconds,
+      post: this.liveStatePost ?? ((body) => postLiveState(this.cfg.appBaseUrl, this.cfg.recorderApiKey, body, this.log)),
+    })
   }
 
   /** Live action items for this call, or null (off, or the crew is not on the allowlist). */
@@ -532,6 +549,7 @@ export class CallRecorder {
     if (s.bandTimer) clearTimeout(s.bandTimer)
     this.cancelWelcome(s)
     s.live?.stop()
+    void s.liveState?.stop() // the end notice is fire and forget: it never delays the recording's finish
     this.log(`stopping ${s.meta.sessionId}: ${reason}`)
     if (s.endSong && isEndSongStop(reason)) {
       // The call really ended with people possibly still here. empty / superseded / shutdown / disconnected never play.
@@ -693,6 +711,7 @@ export class CallRecorder {
     if (s.bandTimer) clearTimeout(s.bandTimer)
     this.cancelWelcome(s)
     s.live?.stop()
+    await this.step('live state end', async () => void (await s.liveState?.stop()))
     try {
       await this.step('stop capture', () => s.capture.stop())
     } finally {
@@ -859,6 +878,7 @@ export class CallRecorder {
       this.capturedChat.set(msg.id, s.dir)
       const atMs = Math.max(0, msg.createdTimestamp - s.meta.startedAtMs)
       appendRecord(s.dir, { t: 'chat', messageId: msg.id, userId: msg.author.id, displayName, text, atMs })
+      s.liveState?.onChat(text)
       s.live?.onChat({ discordId: msg.author.id, displayName: displayName || null, messageId: msg.id, text, atMs })
     } catch (err) {
       this.log(`chat capture failed: ${err instanceof Error ? err.message : String(err)}`)
@@ -920,6 +940,22 @@ export class CallRecorder {
     return humans
   }
 
+  /** Names of people in the channel (looked up once each) and the current set, for the live view. */
+  private async feedLiveState(s: ActiveSession, humans: string[]): Promise<void> {
+    const ls = s.liveState
+    if (!ls) return
+    for (const id of humans) {
+      if (ls.clock.names.has(id)) continue
+      try {
+        const name = s.guild.members.cache.get(id)?.displayName ?? (await s.guild.members.fetch(id)).displayName
+        if (name) ls.clock.names.set(id, name)
+      } catch {
+        // shown without a name
+      }
+    }
+    ls.setPresent(humans)
+  }
+
   /** Record who is in the channel right now (new ids only) so silent attendees reach the app's attendance. Never throws. */
   private async notePresent(s: ActiveSession): Promise<void> {
     if (s.stopping) return
@@ -927,6 +963,7 @@ export class CallRecorder {
       const now = (await this.humanIds(s.guild, s.channelId)).sort()
       // Full member set, only when it changed: the time between records is what presence minutes are summed from.
       const key = now.join(',')
+      if (s.liveState) await this.feedLiveState(s, now)
       if (key !== s.presenceKey) {
         appendRecord(s.dir, { t: 'presence', atMs: Date.now(), userIds: now })
         s.presenceKey = key

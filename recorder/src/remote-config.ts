@@ -29,6 +29,8 @@ export interface RemoteConfig {
   transcriptionKeyterms: string[]
   /** Which voice channels may be recorded and which a crew's call uses (calls.recordableVoiceChannels, calls.crewVoiceChannels). */
   voiceChannels: VoiceChannelSettings
+  /** Live call view heartbeat (calls.liveViewEnabled, calls.livePushSeconds). */
+  liveView: { enabled: boolean; pushSeconds: number }
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -46,6 +48,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
   voiceChannels: VOICE_CHANNELS_OFF,
+  liveView: { enabled: false, pushSeconds: 20 },
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
@@ -65,6 +68,7 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
   const b = (o.startBand && typeof o.startBand === 'object' ? o.startBand : {}) as Record<string, unknown>
   const d = REMOTE_CONFIG_OFF
   const l = (o.liveItems && typeof o.liveItems === 'object' ? o.liveItems : {}) as Record<string, unknown>
+  const lv = (o.liveView && typeof o.liveView === 'object' ? o.liveView : {}) as Record<string, unknown>
   const strings = (v: unknown, max: number, len: number): string[] =>
     Array.isArray(v) ? v.filter((x): x is string => typeof x === 'string' && x.trim().length > 0).map((x) => x.trim().slice(0, len)).slice(0, max) : []
   const eventIds = strings(l.eventIds, 100, 25).filter((x) => /^\d{15,25}$/.test(x))
@@ -113,6 +117,10 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
     supersedeMaxDeferMinutes: int(o.supersedeMaxDeferMinutes, d.supersedeMaxDeferMinutes, 0, 120),
     transcriptionKeyterms: normalizeKeyterms(o.transcriptionKeyterms),
     voiceChannels: parseVoiceChannels(o.voiceChannels, previous?.voiceChannels.byEvent),
+    liveView: {
+      enabled: lv.enabled === true,
+      pushSeconds: int(lv.pushSeconds, d.liveView.pushSeconds, 10, 120),
+    },
   }
 }
 

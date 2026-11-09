@@ -38,6 +38,8 @@ export interface RecorderConfig {
   transcriptionKeyterms: string[]
   /** Channels the recorder may join, and the channel of events that have none of their own (by Discord event id). */
   voiceChannels: { allowed: string[]; byEvent?: { eventId: string; channelId: string }[] }
+  /** Live call view heartbeat: on only while calls.liveViewEnabled is. */
+  liveView: { enabled: boolean; pushSeconds: number }
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -55,6 +57,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
   voiceChannels: { allowed: [], byEvent: [] },
+  liveView: { enabled: false, pushSeconds: 20 },
 }
 
 /** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
@@ -127,6 +130,7 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
     supersedeMaxDeferMinutes: settings.get('calls.supersedeMaxDeferMinutes'),
     transcriptionKeyterms: normalizeKeyterms(parseLines(settings.get('calls.transcriptionTerms'))),
     voiceChannels: await voiceChannelsConfig(settings),
+    liveView: { enabled: resolveToggle('calls.liveViewEnabled', settings), pushSeconds: settings.get('calls.livePushSeconds') },
   }
 }
 

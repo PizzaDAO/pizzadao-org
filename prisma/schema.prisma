@@ -1555,6 +1555,84 @@ model CallLiveItem {
   @@index([createdAt])
 }
 
+// A recorded call that is live right now (or just was): written by the recorder heartbeat
+// (POST /api/calls/recorder/live-state), read by /calls/live. No audio or transcript. Stale (no
+// heartbeat for calls.liveStaleSeconds) counts as ended. Swept with the other live data.
+model CallLiveSession {
+  sessionId  String    @id
+  eventId    String?
+  eventName  String?
+  crewId     String?
+  crewLabel  String?
+  channelId  String?
+  startedAt  DateTime
+  lastSeenAt DateTime
+  endedAt    DateTime?
+  hidden     Boolean   @default(false) // excluded crew (private post filter), or the filter could not be read: never shown
+  streamLink String? // first x.com broadcast or status link posted in the call chat
+  presence   Json      @default("[]") // [{discordId, displayName, presentSec, inChannel}] humans only, max 300
+  updatedAt  DateTime  @updatedAt
+
+  @@index([endedAt, lastSeenAt])
+}
+
+// Live Q&A of a call (keyed by the recorder session id, kept after the call: shown on the published
+// call page). authorName is kept for hosts only when anonymous; anonymous askers are never shown to members.
+model CallLiveQuestion {
+  id         String                 @id @default(cuid())
+  sessionId  String
+  authorId   String
+  authorName String?
+  text       String
+  anonymous  Boolean                @default(false)
+  answered   Boolean                @default(false)
+  pinned     Boolean                @default(false)
+  hidden     Boolean                @default(false) // moderated by a host
+  createdAt  DateTime               @default(now())
+  answeredAt DateTime?
+  votes      CallLiveQuestionVote[]
+
+  @@index([sessionId, createdAt])
+  @@index([sessionId, authorId])
+}
+
+model CallLiveQuestionVote {
+  questionId String
+  question   CallLiveQuestion @relation(fields: [questionId], references: [id], onDelete: Cascade)
+  voterId    String
+  createdAt  DateTime         @default(now())
+
+  @@id([questionId, voterId])
+}
+
+// A host-run poll of a live call: single choice, 2 to 6 options. status draft | open | closed.
+model CallLivePoll {
+  id            String             @id @default(cuid())
+  sessionId     String
+  question      String
+  options       Json // string[]
+  status        String             @default("draft")
+  showResults   Boolean            @default(false) // results visible to members before it is closed
+  createdBy     String
+  createdByName String?
+  createdAt     DateTime           @default(now())
+  openedAt      DateTime?
+  closedAt      DateTime?
+  votes         CallLivePollVote[]
+
+  @@index([sessionId, createdAt])
+}
+
+model CallLivePollVote {
+  pollId      String
+  poll        CallLivePoll @relation(fields: [pollId], references: [id], onDelete: Cascade)
+  voterId     String
+  optionIndex Int
+  updatedAt   DateTime     @updatedAt
+
+  @@id([pollId, voterId])
+}
+
 model CallSpeaker {
   id              Int           @id @default(autoincrement())
   recordingId     String

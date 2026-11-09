@@ -433,6 +433,11 @@ export async function sweepLiveData(opts: { now?: number; retentionDays?: number
       const rejected = (await prisma.callRecording.findMany({ where: { sessionId: { in: itemSessions }, status: 'REJECTED' }, select: { sessionId: true } })).map((r) => r.sessionId)
       if (rejected.length) items += (await prisma.callLiveItem.deleteMany({ where: { sessionId: { in: rejected } } })).count
     }
+    try {
+      await prisma.callLiveSession.deleteMany({ where: { startedAt: { lt: new Date(now - days * 86_400_000) } } })
+    } catch {
+      // the live-state table is optional for the sweep
+    }
   } catch (err) {
     console.warn('[calls/live] sweep failed:', err instanceof Error ? err.message : err)
   }

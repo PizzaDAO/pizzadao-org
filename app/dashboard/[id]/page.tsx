@@ -15,6 +15,7 @@
 "use client";
 
 import { use, useEffect, useState } from "react";
+import LiveCallBanner from "../../ui/calls/LiveCallBanner";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useQueryClient } from "@tanstack/react-query";
@@ -221,6 +222,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
             />
 
             <div style={{ maxWidth: 880, margin: "0 auto", display: "grid", gap: 24 }}>
+                <LiveCallBanner />
                 {/* Main editorial surface */}
                 <div
                     className="paper-soft fade-up relative overflow-hidden rounded-[28px] border"
