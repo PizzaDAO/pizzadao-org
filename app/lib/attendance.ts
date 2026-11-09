@@ -287,6 +287,25 @@ async function fetchDailySheet(
 // 3. Sync one crew
 // ---------------------------------------------------------------------------
 
+/**
+ * People the sheet sync must not insert for a crew and day: anyone already counted by something other than a sheet
+ * (a recording or an admin), and anyone an admin removed (the latest AttendanceEdit for them is a remove).
+ */
+export async function idsToSkipForSheetSync(crewIds: string[], callDate: Date, discordIds: string[]): Promise<Set<string>> {
+  const counted = await prisma.callAttendance.findMany({
+    where: { crewId: { in: crewIds }, callDate, source: { not: "sheet" }, discordId: { in: discordIds } },
+    select: { discordId: true },
+  });
+  const edits = await prisma.attendanceEdit.findMany({
+    where: { crewId: { in: crewIds }, callDate, discordId: { in: discordIds } },
+    select: { discordId: true, action: true },
+    orderBy: { id: "asc" },
+  });
+  const latest = new Map<string, string>();
+  for (const e of edits) latest.set(e.discordId, e.action);
+  return new Set([...counted.map((r) => r.discordId), ...[...latest].filter(([, action]) => action === "remove").map(([id]) => id)]);
+}
+
 async function syncCrewAttendance(
   crewSheetId: string,
   crewId: string,
@@ -355,15 +374,7 @@ async function syncCrewAttendance(
       continue;
     }
 
-    // People a recording already counted for this crew and day (calls.attendanceFromRecordings) stay single.
-    const fromRecordings = new Set(
-      (
-        await prisma.callAttendance.findMany({
-          where: { crewId: { in: crewIdsFor(crewId, aliases) }, callDate: entry.date, source: "recording", discordId: { in: attendees.map((a) => a.discordId) } },
-          select: { discordId: true },
-        })
-      ).map((r) => r.discordId)
-    );
+    const fromRecordings = await idsToSkipForSheetSync(crewIdsFor(crewId, aliases), entry.date, attendees.map((a) => a.discordId));
 
     // Bulk insert attendance records (skip duplicates via unique constraint)
     const created = await prisma.callAttendance.createMany({

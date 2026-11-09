@@ -11,6 +11,7 @@
  */
 import { prisma } from '@/app/lib/db'
 import { toggleEnabled } from '@/app/lib/settings/toggles'
+import { loadSettings } from '@/app/lib/settings'
 import { rebuildAttendanceSummaries } from '@/app/lib/attendance'
 import { attendanceCrewId, crewIdsFor, loadCrewAliases } from './crew-alias'
 import { isImportedSource } from './imported'
@@ -53,6 +54,101 @@ export function attendeesOf(r: AttendanceRecordingInput): Map<string, string | n
   return out
 }
 
+export interface AttendanceThresholds {
+  minMinutes: number
+  shortCallPercent: number
+  speakersAlwaysCount: boolean
+}
+
+export const DEFAULT_THRESHOLDS: AttendanceThresholds = { minMinutes: 5, shortCallPercent: 50, speakersAlwaysCount: true }
+
+export interface CountedRecording extends AttendanceRecordingInput {
+  durationSec: number
+  /** Scheduled length (Discord event start to end) in seconds, when known. */
+  scheduledSec?: number | null
+  presence: Array<{ discordId: string; presentSec: number }>
+}
+
+export interface CountedAttendee {
+  name: string | null
+  /** Seconds in the channel summed over the day's recordings; null when no recording measured this person (old rule). */
+  presentSec: number | null
+}
+
+/** Seconds a person must be present: the minimum, or the short-call share of the scheduled length when that is under twice the minimum (unknown length: the minimum only). */
+export function thresholdSec(scheduledSec: number | null | undefined, t: AttendanceThresholds): number {
+  const min = Math.max(0, t.minMinutes) * 60
+  if (min === 0) return 0
+  // Only a known scheduled length can make a call "short": what was recorded so far (one part of a split call) must not.
+  if (scheduledSec && scheduledSec < 2 * min) return Math.floor((scheduledSec * Math.min(100, Math.max(0, t.shortCallPercent))) / 100)
+  return min
+}
+
+/**
+ * Pure: everyone counted for one crew and day, across all its recordings (split calls are common), as
+ * discordId -> { name, presentSec }. Recordings with presence data are measured against the threshold;
+ * recordings without it use the old rule (everyone seen plus every speaker).
+ */
+export function countedAttendees(recordings: CountedRecording[], t: AttendanceThresholds): Map<string, CountedAttendee> {
+  const out = new Map<string, CountedAttendee>()
+  const measured = new Map<string, number>()
+  const names = new Map<string, string | null>()
+  const speakers = new Set<string>()
+  const measuredIds = new Set<string>()
+  let scheduled = 0
+  for (const r of recordings) {
+    if (r.presence.length === 0) {
+      // Old rule: no presence was measured for this recording.
+      for (const [id, name] of attendeesOf(r)) {
+        const have = out.get(id)
+        if (!have) out.set(id, { name, presentSec: null })
+        else if (!have.name && name) have.name = name
+      }
+      continue
+    }
+    scheduled = Math.max(scheduled, r.scheduledSec ?? 0)
+    for (const p of r.presence) {
+      if (!DISCORD_ID.test(p.discordId)) continue
+      measured.set(p.discordId, (measured.get(p.discordId) ?? 0) + p.presentSec)
+      measuredIds.add(p.discordId)
+    }
+    for (const sp of r.speakers) {
+      if (!names.get(sp.discordId)) names.set(sp.discordId, sp.displayName)
+      if (sp.talkTimeSec > 0 && DISCORD_ID.test(sp.discordId)) speakers.add(sp.discordId)
+    }
+    for (const id of r.participantIds) if (DISCORD_ID.test(id)) measuredIds.add(id)
+  }
+  const need = thresholdSec(scheduled || null, t)
+  for (const id of measuredIds) {
+    const sec = measured.get(id) ?? 0
+    if (sec >= need || (t.speakersAlwaysCount && speakers.has(id))) out.set(id, { name: names.get(id) ?? out.get(id)?.name ?? null, presentSec: sec })
+  }
+  if (t.speakersAlwaysCount) {
+    for (const id of speakers) if (!out.has(id)) out.set(id, { name: names.get(id) ?? null, presentSec: measured.get(id) ?? 0 })
+  }
+  return out
+}
+
+/** Pure: summed measured seconds per person across the recordings that have presence data. */
+export function measuredSeconds(recordings: Array<{ presence: Array<{ discordId: string; presentSec: number }> }>): Map<string, number> {
+  const out = new Map<string, number>()
+  for (const r of recordings) for (const p of r.presence) out.set(p.discordId, (out.get(p.discordId) ?? 0) + p.presentSec)
+  return out
+}
+
+export async function loadAttendanceThresholds(): Promise<AttendanceThresholds> {
+  try {
+    const s = await loadSettings()
+    return {
+      minMinutes: s.get('calls.attendanceMinMinutes'),
+      shortCallPercent: s.get('calls.attendanceShortCallPercent'),
+      speakersAlwaysCount: s.get('calls.attendanceSpeakersAlwaysCount'),
+    }
+  } catch {
+    return DEFAULT_THRESHOLDS
+  }
+}
+
 export interface RecordingAttendanceResult {
   recordingId: string
   skipped?: 'no-crew' | 'no-attendees' | 'imported'
@@ -62,55 +158,88 @@ export interface RecordingAttendanceResult {
 }
 
 /**
- * Write (or, with dryRun, count) the attendance rows for one recording. Idempotent.
+ * Write (or, with dryRun, count) the attendance rows for one recording's crew and day. Idempotent.
+ * The whole day is evaluated together (all recordings of the crew that Eastern day), so minutes add up across a split call.
  * `planned` lets a dry run over several recordings avoid counting one person twice for the same crew and day.
  */
 export async function recordAttendanceForRecording(
   recordingId: string,
-  opts: { dryRun?: boolean; planned?: Set<string>; skipSummary?: boolean; createdIds?: Set<string> } = {},
+  opts: { dryRun?: boolean; planned?: Set<string>; skipSummary?: boolean; createdIds?: Set<string>; thresholds?: AttendanceThresholds } = {},
 ): Promise<RecordingAttendanceResult> {
-  const rec = await prisma.callRecording.findUnique({
-    where: { id: recordingId },
-    select: {
-      crewId: true,
-      crewLabel: true,
-      startedAt: true,
-      source: true,
-      participantIds: true,
-      status: true,
-      speakers: { select: { discordId: true, displayName: true, talkTimeSec: true } },
-    },
-  })
+  const select = {
+    id: true,
+    crewId: true,
+    crewLabel: true,
+    startedAt: true,
+    durationSec: true,
+    scheduledSec: true,
+    source: true,
+    participantIds: true,
+    status: true,
+    speakers: { select: { discordId: true, displayName: true, talkTimeSec: true } },
+    presence: { select: { discordId: true, presentSec: true } },
+  } as const
+  const rec = await prisma.callRecording.findUnique({ where: { id: recordingId }, select })
   const base = { recordingId, attendees: 0, created: 0 }
   if (!rec || !rec.crewId || rec.status === 'REJECTED') return { ...base, skipped: 'no-crew' }
-  const attendees = attendeesOf(rec)
-  if (attendees.size === 0) return { ...base, skipped: isImportedSource(rec.source) ? 'imported' : 'no-attendees' }
 
   const aliases = await loadCrewAliases()
   const crewId = attendanceCrewId(rec.crewId, aliases)
   const crewLabel = crewId === rec.crewId ? (rec.crewLabel ?? crewId) : humanizeCrewId(crewId)
   const day = callDay(rec.startedAt)
   const key = recordingAttendanceKey(crewId, day)
-  const ids = [...attendees.keys()]
-  // Already counted that day for this crew (by the sheet or by the first part of this call).
-  const existing = await prisma.callAttendance.findMany({ where: { crewId: { in: crewIdsFor(crewId, aliases) }, callDate: day, discordId: { in: ids } }, select: { discordId: true } })
+  const crewIds = crewIdsFor(crewId, aliases)
+
+  // Every recording of this crew and day (a call can be split in several parts).
+  const around = await prisma.callRecording.findMany({
+    where: { crewId: { in: crewIds }, status: { not: 'REJECTED' }, startedAt: { gte: day, lt: new Date(day.getTime() + 2 * 86_400_000) } },
+    select,
+  })
+  const sameDay = [rec, ...around.filter((r) => r.id !== rec.id)].filter((r) => callDay(r.startedAt).getTime() === day.getTime())
+  const thresholds = opts.thresholds ?? (await loadAttendanceThresholds())
+  const counted = countedAttendees(sameDay, thresholds)
+  if (counted.size === 0) return { ...base, skipped: isImportedSource(rec.source) ? 'imported' : 'no-attendees' }
+
+  const ids = [...counted.keys()]
+  // Already counted that day for this crew (by the sheet, an admin or an earlier part of this call).
+  const existing = await prisma.callAttendance.findMany({
+    where: { crewId: { in: crewIds }, callDate: day },
+    select: { id: true, discordId: true, source: true, presentSec: true },
+  })
   const have = new Set(existing.map((e) => e.discordId))
-  const fresh = ids.filter((id) => !have.has(id) && !opts.planned?.has(`${key}|${id}`))
+  // An admin removed them for this crew and day (the latest edit wins): do not add them back.
+  const edits = await prisma.attendanceEdit.findMany({
+    where: { crewId: { in: crewIds }, callDate: day, discordId: { in: ids } },
+    select: { discordId: true, action: true },
+    orderBy: { id: 'asc' },
+  })
+  const latest = new Map<string, string>()
+  for (const e of edits) latest.set(e.discordId, e.action)
+  const fresh = ids.filter((id) => !have.has(id) && latest.get(id) !== 'remove' && !opts.planned?.has(`${key}|${id}`))
+  // Minutes on existing recording rows follow the whole day's total.
+  // Every existing recording row of the day, whether or not the person is still over the threshold (rows are never removed).
+  const dayTotals = measuredSeconds(sameDay)
+  const refresh = existing.filter((e) => e.source === 'recording' && dayTotals.has(e.discordId) && dayTotals.get(e.discordId) !== e.presentSec)
   if (opts.dryRun) {
     for (const id of fresh) opts.planned?.add(`${key}|${id}`)
     return { recordingId, attendees: ids.length, created: fresh.length }
+  }
+  for (const e of refresh) {
+    await prisma.callAttendance.update({ where: { id: e.id }, data: { presentSec: dayTotals.get(e.discordId) } })
   }
   if (fresh.length === 0) return { recordingId, attendees: ids.length, created: 0 }
 
   const res = await prisma.callAttendance.createMany({
     data: fresh.map((discordId) => ({
       discordId,
-      displayName: attendees.get(discordId) ?? null,
+      displayName: counted.get(discordId)?.name ?? null,
       crewId,
       crewLabel,
       callDate: day,
       dailySheetId: key,
       source: 'recording',
+      presentSec: counted.get(discordId)?.presentSec ?? null,
+      recordingId,
     })),
     skipDuplicates: true,
   })

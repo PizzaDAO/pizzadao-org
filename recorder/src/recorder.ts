@@ -78,6 +78,8 @@ interface ActiveSession {
   key: string
   /** Voice-channel members already written to the manifest as present. */
   present: Set<string>
+  /** Sorted member ids of the last presence record written ('' before the first). */
+  presenceKey: string | null
   /** Humans in the channel when the session began (the old call's people). */
   startPresent: Set<string>
   /** Event a due switch is being held back for (stays eligible until it switches or the cap passes). */
@@ -263,6 +265,9 @@ export class CallRecorder {
       endedAtMs: null,
       endReason: null,
       partial: false,
+      ...(event.scheduledStartMs != null && event.scheduledEndMs != null && event.scheduledEndMs > event.scheduledStartMs
+        ? { scheduledSec: Math.round((event.scheduledEndMs - event.scheduledStartMs) / 1000) }
+        : {}),
     }
     writeSessionMeta(dir, meta)
 
@@ -366,6 +371,7 @@ export class CallRecorder {
         eventStartMs: event.scheduledStartMs,
         key: eventKey(event),
         present: new Set(),
+        presenceKey: null,
         startPresent: new Set(),
         deferTarget: null,
         live,
@@ -667,6 +673,10 @@ export class CallRecorder {
   onVoiceState(oldState: VoiceState, newState: VoiceState): void {
     const s = this.current
     if (!s || s.stopping) return
+    // A join or leave of the call channel: record the new member set now, so short visits are measured too.
+    if (oldState.channelId !== newState.channelId && (oldState.channelId === this.cfg.callChannelId || newState.channelId === this.cfg.callChannelId)) {
+      this.serial(() => this.notePresent(s))
+    }
     if (newState.channelId !== this.cfg.callChannelId || oldState.channelId === newState.channelId) return
     if (s.welcome) {
       this.queueWelcome(s, s.welcome, newState)
@@ -826,8 +836,16 @@ export class CallRecorder {
 
   /** Record who is in the channel right now (new ids only) so silent attendees reach the app's attendance. Never throws. */
   private async notePresent(s: ActiveSession): Promise<void> {
+    if (s.stopping) return
     try {
-      const fresh = (await this.humanIds(s.guild)).filter((id) => !s.present.has(id))
+      const now = (await this.humanIds(s.guild)).sort()
+      // Full member set, only when it changed: the time between records is what presence minutes are summed from.
+      const key = now.join(',')
+      if (key !== s.presenceKey) {
+        appendRecord(s.dir, { t: 'presence', atMs: Date.now(), userIds: now })
+        s.presenceKey = key
+      }
+      const fresh = now.filter((id) => !s.present.has(id))
       if (fresh.length === 0) return
       appendRecord(s.dir, { t: 'present', userIds: fresh })
       for (const id of fresh) s.present.add(id)
