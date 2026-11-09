@@ -55,6 +55,12 @@ describe('language hint', () => {
     expect((await send({})).get('language')).toBe('fr')
   })
 
+  it('sends the spelling prompt only when given', async () => {
+    expect((await send({})).has('prompt')).toBe(false)
+    expect((await send({ prompt: '' })).has('prompt')).toBe(false)
+    expect((await send({ prompt: 'Terms: ETHDenver.' })).get('prompt')).toBe('Terms: ETHDenver.')
+  })
+
   it('sends no language for auto or an explicit null', async () => {
     vi.stubEnv('CALL_TRANSCRIBE_LANGUAGE', 'auto')
     expect((await send({})).has('language')).toBe(false)

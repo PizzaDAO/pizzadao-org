@@ -17,8 +17,6 @@ import { POST_LEAD_MS } from '@/app/lib/call-agenda/run'
 import { DEFAULT_SUMMARY_MODEL, SUMMARY_SYSTEM_PROMPT, spellingsHint, summaryModel, summarySystemPrompt } from '@/app/lib/calls/summarize'
 import { normalizeKeyterms } from '@/app/lib/calls/keyterms'
 import { TRANSCRIPTION_KEYTERMS_DEFAULT } from '@/app/lib/settings/registry'
-
-const DEFAULT_SPELLINGS = spellingsHint(normalizeKeyterms(TRANSCRIPTION_KEYTERMS_DEFAULT.split('\n')))
 import { clampBatch, DEFAULT_BATCH } from '@/app/lib/reengage/run'
 import { isReengageSendDay } from '@/app/lib/reengage/send-day'
 import { DEFAULT_WORK_PROMPTS, workPrompts } from '@/app/lib/pep-earn/work'
@@ -28,6 +26,8 @@ import { MAX_PENDING, MAX_SUBMISSIONS_PER_DAY } from '@/app/lib/spotlight'
 import { cleanList, MAX_FILTER_ENTRIES } from '@/app/lib/calls/post-filter-lists'
 import { loadPostFilter, clearPostFilterCache } from '@/app/lib/calls/post-filters'
 import { CALL_WINDOW_MS } from '@/app/lib/reengage/digest'
+
+const DEFAULT_SPELLINGS = spellingsHint(normalizeKeyterms(TRANSCRIPTION_KEYTERMS_DEFAULT.split('\n')))
 
 const env = (o: Record<string, string> = {}) => o as unknown as NodeJS.ProcessEnv
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>

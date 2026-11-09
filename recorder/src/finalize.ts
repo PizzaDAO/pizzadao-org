@@ -48,7 +48,7 @@ export interface FinalizeDeps {
   postIngest?: (payload: IngestPayload) => Promise<IngestResult>
   /** Deepgram key; without it the call is ingested with no transcript. */
   deepgramApiKey?: string
-  /** Spellings for Deepgram to prefer (admin setting calls.transcriptionKeyterms). */
+  /** Spellings for Deepgram to prefer (admin setting calls.transcriptionTerms). */
   keyterms?: readonly string[]
   transcribe?: (sessionDir: string, outDir: string, speakers: SpeakerSummary[], deps: TranscribeDeps) => ReturnType<typeof transcribeSession>
 }

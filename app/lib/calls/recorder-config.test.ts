@@ -16,6 +16,8 @@ vi.mock('@/app/lib/settings', () => ({
 vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: async () => ({ crews: state.crews, cached: true }) }))
 
 import { buildRecorderConfig, RECORDER_CONFIG_OFF } from './recorder-config'
+import { MAX_WHISPER_PROMPT_TOKENS, estimateKeytermTokens, normalizeKeyterms, whisperPrompt } from './keyterms'
+import { transcriptionPrompt } from './transcribe'
 
 beforeEach(() => {
   vi.stubEnv('VERCEL_ENV', 'production')
@@ -70,5 +72,33 @@ describe('recorder config: transcription keyterms', () => {
     expect(summarySystemPrompt(settings)).toContain('Spellings to prefer')
     expect(summarySystemPrompt(settings)).toContain('ETHDenver, Devcon')
     expect(summarySystemPrompt({ get: () => '' } as unknown as Settings)).not.toContain('Spellings')
+  })
+})
+
+describe('whisper prompt from the terms', () => {
+  it('is terms only, and absent with no terms', () => {
+    expect(whisperPrompt(['ETHDenver', 'Devcon'])).toBe('Terms: ETHDenver, Devcon.')
+    expect(whisperPrompt([])).toBeUndefined()
+    expect(whisperPrompt([' ', ''])).toBeUndefined()
+  })
+  it("is capped well under Whisper's 224 tokens", () => {
+    const many = Array.from({ length: 100 }, (_, i) => `Term number ${i} here`)
+    const p = whisperPrompt(many)!
+    const used = normalizeKeyterms(p.replace(/^Terms: /, '').replace(/\.$/, '').split(', '))
+    expect(used.reduce((n, t) => n + estimateKeytermTokens(t), 0)).toBeLessThanOrEqual(MAX_WHISPER_PROMPT_TOKENS)
+    expect(used.length).toBeLessThan(many.length)
+    expect(MAX_WHISPER_PROMPT_TOKENS).toBeLessThan(224)
+  })
+  it('transcriptionPrompt reads the setting and fails soft', async () => {
+    const s = (v: string) => ({ get: () => v }) as unknown as Settings
+    expect(await transcriptionPrompt(s('ETHDenver\nDevcon'))).toBe('Terms: ETHDenver, Devcon.')
+    expect(await transcriptionPrompt(s(''))).toBeUndefined()
+    expect(
+      await transcriptionPrompt({
+        get: () => {
+          throw new Error('x')
+        },
+      } as unknown as Settings),
+    ).toBeUndefined()
   })
 })

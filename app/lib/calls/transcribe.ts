@@ -15,6 +15,8 @@
 import { Prisma } from '@prisma/client'
 import { prisma } from '@/app/lib/db'
 import { getObjectBytes } from './r2'
+import { loadSettings, type Settings } from '@/app/lib/settings'
+import { whisperPrompt } from './keyterms'
 import { asSegments, generateAndStoreSummaryResult, sanitizeSummaryError, type SummaryResult } from './recordings'
 import { DISCORD_ONLY, importedAllowed } from './imported'
 import type { TranscriptSegment } from './ingest-schema'
@@ -216,11 +218,21 @@ export const HARD_DEADLINE_MS = 210_000
 export const FUNCTION_LIMIT_MS = 300_000
 const TRACK_TIMEOUT_MS = 170_000
 
+/** The Whisper prompt from the admin setting; best effort (unreadable settings mean no prompt, never a failed transcription). */
+export async function transcriptionPrompt(settings?: Settings): Promise<string | undefined> {
+  try {
+    const s = settings ?? (await loadSettings())
+    return whisperPrompt(String(s.get('calls.transcriptionTerms') ?? '').split('\n'))
+  } catch {
+    return undefined
+  }
+}
+
 /** Transcribe one audio file with OpenAI. Retries 429 and 5xx while the deadline allows; errors carry the status, never the key. */
 export async function transcribeAudio(
   bytes: Uint8Array,
   apiKey: string,
-  opts: { model?: string; language?: string | null; words?: boolean; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; attempts?: number; deadline?: number } = {},
+  opts: { model?: string; language?: string | null; prompt?: string | null; words?: boolean; fetchImpl?: typeof fetch; sleep?: (ms: number) => Promise<void>; attempts?: number; deadline?: number } = {},
 ): Promise<WhisperResult> {
   const doFetch = opts.fetchImpl ?? fetch
   const sleep = opts.sleep ?? ((ms: number) => new Promise<void>((r) => setTimeout(r, ms)))
@@ -246,6 +258,8 @@ export async function transcribeAudio(
       }
       const language = opts.language === undefined ? transcribeLanguage() : opts.language
       if (language) form.append('language', language)
+      // Spelling bias (calls.transcriptionTerms); absent when there are no terms, so the request is unchanged.
+      if (opts.prompt) form.append('prompt', opts.prompt)
       const res = await doFetch(OPENAI_URL, {
         method: 'POST',
         headers: { Authorization: `Bearer ${apiKey}` },
@@ -438,7 +452,8 @@ export async function transcribeRecording(id: string, deps: TranscribeDeps = {})
     return p
   }
   const hint = deps.language === undefined ? transcribeLanguage() : deps.language
-  const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number, o: { language: string | null; words?: boolean }) => transcribeAudio(bytes, key, { deadline, language: o.language, words: o.words }))
+  const prompt = await transcriptionPrompt()
+  const rawSend = deps.transcribe ?? ((bytes: Uint8Array, key: string, deadline: number, o: { language: string | null; words?: boolean }) => transcribeAudio(bytes, key, { deadline, language: o.language, words: o.words, prompt }))
   const send = (bytes: Uint8Array, key: string, deadline: number, words = false) => {
     if (deps.usage) deps.usage.calls++
     return rawSend(bytes, key, deadline, words ? { language: hint, words: true } : { language: hint })

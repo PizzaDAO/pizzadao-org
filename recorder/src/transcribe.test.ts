@@ -5,7 +5,7 @@ import { beforeEach, describe, expect, it } from 'vitest'
 import { appendRecord, summarize, readManifest } from './manifest.js'
 import { finalizeSession, MAX_TRANSCRIBE_ATTEMPTS, writeSessionMeta } from './finalize.js'
 import type { IngestPayload } from './types.js'
-import { MAX_KEYTERM_CHARS, MAX_KEYTERMS, MAX_KEYTERMS_TOTAL_CHARS, normalizeKeyterms } from './keyterms.js'
+import { estimateKeytermTokens, MAX_KEYTERM_CHARS, MAX_KEYTERMS, MAX_KEYTERM_TOKENS, normalizeKeyterms } from './keyterms.js'
 import {
   buildConcatList,
   buildDeepgramUrl,
@@ -356,8 +356,38 @@ describe('Deepgram keyterms', () => {
     expect(normalizeKeyterms(Array.from({ length: 300 }, (_, i) => `t${i}`))).toHaveLength(MAX_KEYTERMS)
     const long = Array.from({ length: 60 }, (_, i) => `${'w'.repeat(30)}${i}`)
     const out = normalizeKeyterms(long)
-    expect(out.join('').length).toBeLessThanOrEqual(MAX_KEYTERMS_TOTAL_CHARS)
+    expect(out.reduce((n, t) => n + estimateKeytermTokens(t), 0)).toBeLessThanOrEqual(MAX_KEYTERM_TOKENS)
     expect(out.length).toBeLessThan(long.length)
+    expect(estimateKeytermTokens('abcd')).toBe(3)
+    expect(estimateKeytermTokens('日本')).toBe(3)
+  })
+  it('a 4xx on a request with keyterms falls back to the plain URL once per session', async () => {
+    const urls: string[] = []
+    const fetch: FetchLike = async (u) => {
+      urls.push(u)
+      return u.includes('keyterm=')
+        ? { ok: false, status: 400, json: async () => ({}), text: async () => 'bad keyterm' }
+        : { ok: true, status: 200, json: async () => ({ results: { utterances: [{ start: 0, end: 1, transcript: 'hi' }] } }), text: async () => '' }
+    }
+    const logs: string[] = []
+    const session = { keytermsRejected: false }
+    const a = await transcribeWithDeepgram(file, 'secret', { fetch, keyterms: ['ETHDenver'], session, log: (m) => logs.push(m) })
+    const b = await transcribeWithDeepgram(file, 'secret', { fetch, keyterms: ['ETHDenver'], session, log: (m) => logs.push(m) })
+    expect(a.utterances).toHaveLength(1)
+    expect(b.utterances).toHaveLength(1)
+    expect(urls.map((u) => u.includes('keyterm='))).toEqual([true, false, false])
+    expect(logs).toHaveLength(1)
+    expect(logs[0]).not.toContain('secret')
+  })
+  it('a 429 with keyterms is retried as before, not treated as a keyterm rejection', async () => {
+    let n = 0
+    const fetch: FetchLike = async (u) => {
+      n++
+      expect(u).toContain('keyterm=')
+      return n === 1 ? { ok: false, status: 429, json: async () => ({}), text: async () => '' } : { ok: true, status: 200, json: async () => ({}), text: async () => '' }
+    }
+    await transcribeWithDeepgram(file, 'k', { fetch, keyterms: ['ETHDenver'], sleep: async () => {} })
+    expect(n).toBe(2)
   })
   it('transcribeWithDeepgram requests with the terms', async () => {
     let seen = ''
