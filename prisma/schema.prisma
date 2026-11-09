@@ -2585,3 +2585,75 @@ model CrewGoal {
   @@unique([crewId, naturalKey])
   @@index([crewId, archived, position])
 }
+
+// ---------------------------------------------------------------------------
+// PFP asset unlocks (plans/sizzle-reels-and-pfp-unlocks.md section 2)
+// ---------------------------------------------------------------------------
+
+/// A layer members can add to their PFP (background | frame | accessory | badge).
+/// Art is a transparent 1024x1024 PNG/WebP in Vercel Blob. Admin-managed; no seed catalog in code.
+model PfpAsset {
+  id               Int             @id @default(autoincrement())
+  slug             String          @unique
+  name             String          @db.VarChar(60)
+  kind             String          @db.VarChar(16) // background | frame | accessory | badge
+  imageUrl         String
+  thumbUrl         String?
+  defaultTransform Json? // {x,y,scale,rotation}: x,y are 0..1 of the canvas, rotation in degrees
+  lockedHint       String?         @db.VarChar(120) // shown while locked; auto-generated when null
+  isActive         Boolean         @default(false)
+  sortOrder        Int             @default(0)
+  rules            PfpAssetRule[]
+  grants           PfpAssetGrant[]
+  createdAt        DateTime        @default(now())
+  updatedAt        DateTime        @updatedAt
+}
+
+/// An asset is unlocked when ANY of its rules matches (or the member holds a manual grant).
+model PfpAssetRule {
+  id      Int      @id @default(autoincrement())
+  assetId Int
+  asset   PfpAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+  kind    String   @db.VarChar(16) // level | role | mission | item | everyone
+  params  Json // {minLevel} | {roleId} | {missionId} | {itemId} | {}
+
+  @@index([assetId])
+}
+
+/// Manual one-off grant by an admin. Keyed by Discord id (what the unlock loader has in hand).
+model PfpAssetGrant {
+  assetId   Int
+  discordId String
+  grantedBy String
+  createdAt DateTime @default(now())
+  asset     PfpAsset @relation(fields: [assetId], references: [id], onDelete: Cascade)
+
+  @@id([assetId, discordId])
+  @@index([discordId])
+}
+
+/// A member's composed PFP. composedUrl is content-hashed so CDN caches never go stale.
+model MemberPfp {
+  memberId    String   @id
+  baseKind    String   @db.VarChar(16) // static | discord | upload | mafia
+  baseUrl     String
+  layers      Json // [{assetId, x, y, scale, rotation}] in z-order
+  composedUrl String
+  updatedAt   DateTime @updatedAt
+}
+
+/// Audit log for /admin/pfp-assets. No FK on purpose: rows survive an asset delete.
+model PfpAdminEvent {
+  id        Int      @id @default(autoincrement())
+  actorId   String
+  action    String   @db.VarChar(16) // CREATE | UPDATE | DELETE | GRANT | REVOKE
+  assetId   Int?
+  assetName String
+  targetId  String?
+  before    Json?
+  after     Json?
+  createdAt DateTime @default(now())
+
+  @@index([createdAt])
+  @@index([assetId, createdAt])
+}

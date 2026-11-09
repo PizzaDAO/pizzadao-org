@@ -26,7 +26,7 @@ vi.mock("@/app/lib/vouches", () => ({
 vi.mock("@/app/lib/notifications", () => ({ getNotifications: async () => [], getUnreadCount: async () => 0 }));
 vi.mock("@/app/lib/crew-mappings", () => ({ getCrewMappings: async () => ({ crews: [], cached: false }) }));
 vi.mock("@/app/lib/my-tasks", () => ({ fetchMyTasksForCrew: async () => ({ active: [], doneCount: 0 }) }));
-vi.mock("@/app/lib/pfp", () => ({ resolvePfpUrl: () => null }));
+vi.mock("@/app/lib/pfp", () => ({ resolvePfpUrlAsync: async () => null }));
 vi.mock("@/app/dashboard/[id]/lib/next-action", () => ({ resolveNextAction: (i: unknown) => resolveNextAction(i) }));
 vi.mock("@/app/lib/discord", () => ({ fetchGuildMember: (...a: unknown[]) => fetchGuildMember(...a) }));
 vi.mock("@/app/lib/discord-interactions/guild-roles", () => ({

@@ -37,6 +37,37 @@ export function resolvePfpUrl(memberId: string | number): string | null {
   }
 }
 
+/**
+ * Async resolution that honours composed PFPs: MemberPfp.composedUrl, then the static file, then
+ * the default. One indexed findMany for the whole batch. A database failure (or a preview without
+ * the migration) degrades to the static lookup. Never throws.
+ */
+export async function resolvePfpUrlsAsync(
+  memberIds: Iterable<string | number>,
+): Promise<Record<string, string | null>> {
+  const base = resolvePfpUrls(memberIds);
+  const ids = Object.keys(base).filter((id) => SAFE_ID.test(id));
+  if (ids.length === 0) return base;
+  try {
+    const { prisma } = await import("@/app/lib/db");
+    const rows = await prisma.memberPfp.findMany({
+      where: { memberId: { in: ids } },
+      select: { memberId: true, composedUrl: true },
+    });
+    for (const row of rows) if (row.composedUrl) base[row.memberId] = row.composedUrl;
+  } catch {
+    // keep the static answers
+  }
+  return base;
+}
+
+/** Single-member version of resolvePfpUrlsAsync. */
+export async function resolvePfpUrlAsync(memberId: string | number): Promise<string | null> {
+  const id = String(memberId ?? "").trim();
+  const out = await resolvePfpUrlsAsync([id]);
+  return out[id] ?? null;
+}
+
 /** Resolve profile-picture URLs for many members in one pass. */
 export function resolvePfpUrls(memberIds: Iterable<string | number>): Record<string, string | null> {
   const out: Record<string, string | null> = {};

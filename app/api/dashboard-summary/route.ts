@@ -44,7 +44,7 @@ import {
     type BoxMafiaStatus,
 } from "@/app/lib/box-mafia";
 import { MISSION_REVIEWER_ROLE_IDS } from "@/app/ui/constants";
-import { resolvePfpUrl } from "@/app/lib/pfp";
+import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -318,7 +318,7 @@ export async function GET(request: NextRequest) {
         const memberCity = String(member?.["City"] || "Worldwide");
 
         // PFP — same resolution as /api/pfp/[memberId].
-        const pfpUrl = resolvePfpUrl(memberId);
+        const pfpUrl = await resolvePfpUrlAsync(memberId);
 
         // --- Wallets ---
         const wallets = {

@@ -201,6 +201,18 @@ export function ProfileHero({
                             </p>
                         )}
 
+                        {isOwner && (
+                            <p className="m-0 mt-2">
+                                <Link
+                                    href={`/profile/${memberId}/pfp`}
+                                    className="text-sm underline underline-offset-2"
+                                    style={{ color: "hsl(var(--butter))" }}
+                                >
+                                    Edit PFP
+                                </Link>
+                            </p>
+                        )}
+
                         {(city || hasLevel || mafiaRank) && (
                             <div className="mt-3 flex flex-wrap items-center gap-x-2 gap-y-1 text-sm text-cream/75 relative">
                                 {city && (
