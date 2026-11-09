@@ -15,22 +15,33 @@ import { isAllowedFetchUrl, isDiscordCdnUrl } from './hosts'
 import { listAssets, type AssetRecord } from './catalog'
 import { loadUnlockContext } from './context'
 import { unlockedAssetIds, type UnlockContext } from './unlocks'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 import {
   CANVAS_SIZE,
   KIND_LIMITS,
   KIND_ORDER,
+  isTransformable,
   cleanTransform,
   type AssetKind,
   type Layer,
 } from './types'
 
-export const BASE_KINDS = ['static', 'discord', 'upload', 'mafia'] as const
+export const BASE_KINDS = ['static', 'discord', 'upload', 'mafia', 'restyle'] as const
 export type BaseKind = (typeof BASE_KINDS)[number]
-export const MAX_LAYERS = 6
+export const MAX_LAYERS = 7
 const MAX_FETCH_BYTES = 8 * 1024 * 1024
 /** Decoded-pixel ceiling for every sharp() call on this path (4096 x 4096). */
 export const MAX_PIXELS = 4096 * 4096
 const S = (input: Buffer) => sharp(input, { limitInputPixels: MAX_PIXELS })
+
+/** Dress-up results are written by the server as restyle-<hash>.png; members cannot upload under that name. */
+export function isRestyleFile(url: string): boolean {
+  try {
+    return (new URL(url).pathname.split('/').pop() ?? '').startsWith('restyle-')
+  } catch {
+    return true
+  }
+}
 
 export function isBaseKind(v: unknown): v is BaseKind {
   return typeof v === 'string' && (BASE_KINDS as readonly string[]).includes(v)
@@ -39,18 +50,19 @@ export function isBaseKind(v: unknown): v is BaseKind {
 /**
  * Clean and authorise the requested layers. Throws 400 for malformed input and 403 when any
  * layer is not unlocked for this member (the client list is display-only; this is the check that
- * counts). Returns layers in z-order (background, accessories, frame, badge).
+ * counts). Returns layers in z-order (background, outfit, accessories, frame, badge).
  */
 export function validateLayers(
   raw: unknown,
   assets: ReadonlyArray<AssetRecord>,
   unlocked: ReadonlySet<number>,
+  opts: { outfitOverlay?: boolean } = {},
 ): Layer[] {
   if (!Array.isArray(raw)) throw new ValidationError('layers must be a list', 'layers')
   if (raw.length > MAX_LAYERS) throw new ValidationError(`At most ${MAX_LAYERS} layers`, 'layers')
   const byId = new Map(assets.map((a) => [a.id, a]))
   const seen = new Set<number>()
-  const counts: Record<AssetKind, number> = { background: 0, frame: 0, accessory: 0, badge: 0 }
+  const counts: Record<AssetKind, number> = { background: 0, outfit: 0, frame: 0, accessory: 0, badge: 0 }
   const out: Array<Layer & { kind: AssetKind; i: number }> = []
 
   raw.forEach((item, i) => {
@@ -62,11 +74,13 @@ export function validateLayers(
     const asset = byId.get(id)
     // Unknown, inactive and locked all look the same to the caller.
     if (!asset || !asset.isActive || !unlocked.has(id)) throw new ForbiddenError('One of the items is not unlocked for you')
+    // Outfits are AI dress-up references; flat overlays only work behind pfp.outfitOverlayEnabled.
+    if (asset.kind === 'outfit' && !opts.outfitOverlay) throw new ValidationError('Outfit overlays are turned off', 'layers')
     counts[asset.kind]++
     if (counts[asset.kind] > KIND_LIMITS[asset.kind]) {
       throw new ValidationError(`Too many ${asset.kind} layers (max ${KIND_LIMITS[asset.kind]})`, 'layers')
     }
-    const t = asset.kind === 'accessory' ? cleanTransform(o, asset.defaultTransform) : cleanTransform({}, { x: 0.5, y: 0.5, scale: 1, rotation: 0 })
+    const t = isTransformable(asset.kind) ? cleanTransform(o, asset.defaultTransform) : cleanTransform({}, { x: 0.5, y: 0.5, scale: 1, rotation: 0 })
     out.push({ assetId: id, ...t, kind: asset.kind, i })
   })
 
@@ -125,7 +139,7 @@ export function discordAvatar1024(url: string): string {
 
 export interface BaseChoice {
   kind: BaseKind
-  /** Only for kind "upload": a Blob URL under pfp-base/<memberId>/. */
+  /** Only for kinds "upload" and "restyle": a Blob URL under pfp-base/<memberId>/. */
   url?: string
 }
 
@@ -136,11 +150,14 @@ export async function loadBase(
   choice: BaseChoice,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ bytes: Buffer; url: string }> {
-  if (choice.kind === 'upload') {
+  if (choice.kind === 'upload' || choice.kind === 'restyle') {
     const url = String(choice.url ?? '')
     let ok = false
     try {
-      ok = isOwnBlobUrl(url, `/pfp-base/${memberId}/`)
+      // Dress-up results are written by the server as pfp-base/<memberId>/restyle-<hash>.png
+      ok = isOwnBlobUrl(url, choice.kind === 'restyle' ? `/pfp-base/${memberId}/restyle-` : `/pfp-base/${memberId}/`)
+      // No chaining: an "upload" can never be a dress-up result.
+      if (ok && choice.kind === 'upload' && isRestyleFile(url)) ok = false
     } catch {
       ok = false
     }
@@ -164,7 +181,7 @@ export async function loadBase(
 
 const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 }
 
-/** One accessory: scaled, rotated about its centre, positioned, and cropped to the canvas. */
+/** One transformable layer (accessory or outfit): scaled, rotated about its centre, positioned, and cropped to the canvas. */
 export async function placeLayer(buf: Buffer, t: Layer): Promise<sharp.OverlayOptions | null> {
   const size = Math.max(8, Math.round(CANVAS_SIZE * t.scale))
   let img = await S(buf).resize(size, size, { fit: 'fill' }).png().toBuffer()
@@ -187,7 +204,7 @@ export async function placeLayer(buf: Buffer, t: Layer): Promise<sharp.OverlayOp
   return { input, left: Math.max(0, left), top: Math.max(0, top) }
 }
 
-/** Draw the stack: background, base, accessories, frame, badge. */
+/** Draw the stack: background, base, outfit, accessories, frame, badge. */
 export async function renderComposite(
   baseBytes: Buffer,
   layers: ReadonlyArray<{ kind: AssetKind; bytes: Buffer; layer: Layer }>,
@@ -195,7 +212,7 @@ export async function renderComposite(
   const full = (b: Buffer) => S(b).resize(CANVAS_SIZE, CANVAS_SIZE, { fit: 'cover' }).png().toBuffer()
   const stack: sharp.OverlayOptions[] = []
   const add = async (l: { kind: AssetKind; bytes: Buffer; layer: Layer }) => {
-    if (l.kind === 'accessory') {
+    if (isTransformable(l.kind)) {
       const p = await placeLayer(l.bytes, l.layer)
       if (p) stack.push(p)
     } else {
@@ -221,6 +238,8 @@ export async function composeMemberPfp(args: {
   memberId: string
   discordId: string
   base: BaseChoice
+  /** For kind "restyle": the base the dress-up was made from (kept so it can be undone). */
+  original?: BaseChoice
   layers: unknown
   ctx?: UnlockContext
   fetchImpl?: typeof fetch
@@ -230,7 +249,16 @@ export async function composeMemberPfp(args: {
 
   // 1. Server-side unlock re-check (never trust the client's list).
   const [assets, ctx] = await Promise.all([listAssets({ activeOnly: true }), args.ctx ?? loadUnlockContext(discordId)])
-  const layers = validateLayers(args.layers, assets, unlockedAssetIds(assets, ctx))
+  const outfitOverlay = await toggleEnabled('pfp.outfitOverlayEnabled')
+  const layers = validateLayers(args.layers, assets, unlockedAssetIds(assets, ctx), { outfitOverlay })
+
+  let original: { kind: BaseKind; url: string | null } | null = null
+  if (base.kind === 'restyle') {
+    const o = args.original
+    if (!o || !isBaseKind(o.kind) || o.kind === 'restyle') throw new ValidationError('Missing the original picture', 'original')
+    if (o.kind === 'upload' && (!isOwnBlobUrl(String(o.url ?? ''), `/pfp-base/${memberId}/`) || isRestyleFile(String(o.url)))) throw new ValidationError('Upload not found', 'original')
+    original = { kind: o.kind, url: o.kind === 'upload' ? String(o.url) : null }
+  }
 
   // 2. Fetch base + layer art, composite.
   const byId = new Map(assets.map((a) => [a.id, a]))
@@ -255,8 +283,8 @@ export async function composeMemberPfp(args: {
   const prev = await prisma.memberPfp.findUnique({ where: { memberId }, select: { composedUrl: true } })
   await prisma.memberPfp.upsert({
     where: { memberId },
-    create: { memberId, baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url },
-    update: { baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url },
+    create: { memberId, baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url, originalBaseKind: original?.kind ?? null, originalBaseUrl: original?.url ?? null },
+    update: { baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url, originalBaseKind: original?.kind ?? null, originalBaseUrl: original?.url ?? null },
   })
   if (prev?.composedUrl && prev.composedUrl !== blob.url && isOwnBlobUrl(prev.composedUrl)) {
     await del(prev.composedUrl).catch(() => undefined) // best effort

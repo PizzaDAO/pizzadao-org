@@ -185,6 +185,13 @@ describe('settings registry', () => {
       ['games.enabled', false],
       ['crime.enabled', false],
       ['portrait.enabled', false],
+      ['pfp.restyleEnabled', false],
+      ['pfp.restylePerUnlock', 2],
+      ['pfp.restyleDailyLimit', 3],
+      ['pfp.restyleMonthlyBudgetUsd', 50],
+      ['pfp.restyleRefusalDailyLimit', 3],
+      ['pfp.restyleCostCents', 20],
+      ['pfp.outfitOverlayEnabled', false],
       ['shop.itemGrantsEnabled', true],
       ['shop.sheetSyncEnabled', false],
       // ...and channels and roles to "not set here" (the env value, then the built-in id, apply).

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from "react";
 
-type Kind = "background" | "frame" | "accessory" | "badge";
+type Kind = "background" | "outfit" | "frame" | "accessory" | "badge";
 type RuleKind = "level" | "role" | "mission" | "item" | "everyone";
 interface Rule { kind: RuleKind; params: Record<string, unknown> }
 interface Asset {
@@ -18,7 +18,7 @@ interface Options {
 interface Grant { assetId: number; discordId: string; createdAt: string }
 interface Event { id: number; action: string; assetName: string; targetId: string | null; actorId: string; createdAt: string }
 
-const KINDS: Kind[] = ["background", "frame", "accessory", "badge"];
+const KINDS: Kind[] = ["background", "outfit", "frame", "accessory", "badge"];
 const SAMPLE_PFP = "/pfp/default.jpg";
 
 async function api(url: string, init?: RequestInit) {

@@ -18,7 +18,8 @@ const A = (id: number, kind: AssetRecord['kind'], over: Partial<AssetRecord> = {
   id, slug: `a${id}`, name: `A${id}`, kind, imageUrl: `https://x.public.blob.vercel-storage.com/a${id}.png`, thumbUrl: null,
   defaultTransform: null, lockedHint: null, isActive: true, sortOrder: id, rules: [], ...over,
 })
-const catalog = [A(1, 'background'), A(2, 'frame'), A(3, 'accessory'), A(4, 'accessory'), A(5, 'accessory'), A(6, 'accessory'), A(7, 'badge')]
+const catalog = [A(1, 'background'), A(2, 'frame'), A(3, 'accessory'), A(4, 'accessory'), A(5, 'accessory'), A(6, 'accessory'), A(7, 'badge'), A(9, 'outfit'), A(10, 'outfit')]
+const OVERLAY = { outfitOverlay: true }
 const all = new Set(catalog.map((a) => a.id))
 
 describe('validateLayers', () => {
@@ -41,11 +42,21 @@ describe('validateLayers', () => {
     expect(() => validateLayers([{ assetId: 3 }, { assetId: 3 }], catalog, all)).toThrow(/only be used once/)
   })
 
-  it('rejects malformed input and returns z-order: background, accessories, frame, badge', () => {
+  it('allows exactly one outfit, which is movable and sits under accessories', () => {
+    expect(() => validateLayers([{ assetId: 9 }, { assetId: 10 }], catalog, all, OVERLAY)).toThrow(/Too many outfit/)
+    expect(() => validateLayers([{ assetId: 9 }], catalog, all)).toThrow(/overlays are turned off/)
+    const out = validateLayers([{ assetId: 3 }, { assetId: 9, x: 0.4, y: 0.9, scale: 0.8 }], catalog, all, OVERLAY)
+    expect(out.map((l) => l.assetId)).toEqual([9, 3])
+    expect(out[0]).toMatchObject({ x: 0.4, y: 0.9, scale: 0.8 })
+    expect(() => validateLayers([{ assetId: 9 }, { assetId: 10 }], catalog, new Set([9]), OVERLAY)).toThrow(/not unlocked/)
+  })
+
+  it('rejects malformed input and returns z-order: background, outfit, accessories, frame, badge', () => {
     expect(() => validateLayers('x', catalog, all)).toThrow(/list/)
     expect(() => validateLayers([{}], catalog, all)).toThrow(/assetId/)
     const out = validateLayers([{ assetId: 7 }, { assetId: 2 }, { assetId: 3, x: 0.3 }, { assetId: 1 }], catalog, all)
     expect(out.map((l) => l.assetId)).toEqual([1, 3, 2, 7])
+    expect(validateLayers([{ assetId: 7 }, { assetId: 2 }, { assetId: 3 }, { assetId: 9 }, { assetId: 1 }], catalog, all, OVERLAY).map((l) => l.assetId)).toEqual([1, 9, 3, 2, 7])
     expect(out[1].x).toBe(0.3)
     expect(out[0]).toMatchObject({ x: 0.5, y: 0.5, scale: 1, rotation: 0 }) // fixed layers ignore client transforms
   })
@@ -162,5 +173,43 @@ describe('composeMemberPfp', () => {
     expect(res.composedUrl).toMatch(/pfp-composed\/42-[0-9a-f]{16}\.webp$/)
     expect(upsert).toHaveBeenCalledTimes(1)
     expect(upsert.mock.calls[0][0].where).toEqual({ memberId: '42' })
+  })
+
+  describe('dress-up bases and undo', () => {
+    const setup = async () => {
+      const art = await solid(64, 64, { r: 9, g: 9, b: 9 })
+      vi.mocked(listAssets).mockResolvedValue([])
+      vi.mocked(loadUnlockContext).mockResolvedValue({ level: 1, roleIds: new Set(), approvedMissionIds: new Set(), itemIds: new Set(), grantIds: new Set() })
+      const upsert = vi.fn()
+      ;(prisma as unknown as Record<string, unknown>).memberPfp = { upsert, findUnique: vi.fn(async () => null) }
+      vi.mocked(put).mockImplementation((async (key: string) => ({ url: `https://s.public.blob.vercel-storage.com/${key}` })) as never)
+      const fetchImpl = vi.fn(async () => new Response(new Uint8Array(art), { status: 200 }))
+      return { upsert, fetchImpl }
+    }
+    const U = 'https://s.public.blob.vercel-storage.com/pfp-base/42'
+
+    it('saving a restyle base keeps the original so it can be undone', async () => {
+      const { upsert, fetchImpl } = await setup()
+      await composeMemberPfp({
+        memberId: '42', discordId: '1', fetchImpl: fetchImpl as never, layers: [],
+        base: { kind: 'restyle', url: `${U}/restyle-abc.png` }, original: { kind: 'upload', url: `${U}/me.png` },
+      })
+      expect(upsert.mock.calls[0][0].create).toMatchObject({ baseKind: 'restyle', baseUrl: `${U}/restyle-abc.png`, originalBaseKind: 'upload', originalBaseUrl: `${U}/me.png` })
+    })
+
+    it('undo: composing the original base clears the stored original', async () => {
+      const { upsert, fetchImpl } = await setup()
+      await composeMemberPfp({ memberId: '42', discordId: '1', fetchImpl: fetchImpl as never, layers: [], base: { kind: 'upload', url: `${U}/me.png` } })
+      expect(upsert.mock.calls[0][0].update).toMatchObject({ baseKind: 'upload', originalBaseKind: null, originalBaseUrl: null })
+    })
+
+    it('a restyle base needs an original, and must be a server-written restyle file of this member', async () => {
+      const { upsert, fetchImpl } = await setup()
+      const base = { memberId: '42', discordId: '1', fetchImpl: fetchImpl as never, layers: [] }
+      await expect(composeMemberPfp({ ...base, base: { kind: 'restyle', url: `${U}/restyle-abc.png` } })).rejects.toThrow(/original/)
+      await expect(composeMemberPfp({ ...base, original: { kind: 'static' }, base: { kind: 'restyle', url: `${U}/me.png` } })).rejects.toThrow(/Upload not found/)
+      await expect(composeMemberPfp({ ...base, original: { kind: 'static' }, base: { kind: 'restyle', url: 'https://s.public.blob.vercel-storage.com/pfp-base/43/restyle-abc.png' } })).rejects.toThrow(/Upload not found/)
+      expect(upsert).not.toHaveBeenCalled()
+    })
   })
 })

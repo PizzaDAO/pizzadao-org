@@ -8,7 +8,7 @@ import { ValidationError } from '@/app/lib/errors/api-errors'
 import { MAX_PIXELS } from './compose'
 
 export const MAX_BASE_DIMENSION = 4096
-export const KEEP_UPLOADS = 5
+export const KEEP_UPLOADS = 8
 
 export async function uploadMemberBase(formData: FormData, memberId: string): Promise<{ url: string }> {
   const file = fileFromForm(formData)
@@ -29,9 +29,9 @@ export async function uploadMemberBase(formData: FormData, memberId: string): Pr
 export async function pruneBaseUploads(memberId: string, keep = KEEP_UPLOADS): Promise<void> {
   const [{ blobs }, current] = await Promise.all([
     list({ prefix: `pfp-base/${memberId}/`, limit: 100 }),
-    prisma.memberPfp.findUnique({ where: { memberId }, select: { baseUrl: true } }),
+    prisma.memberPfp.findUnique({ where: { memberId }, select: { baseUrl: true, originalBaseUrl: true } }),
   ])
   const sorted = [...blobs].sort((a, b) => +new Date(b.uploadedAt) - +new Date(a.uploadedAt))
-  const stale = sorted.slice(keep).filter((b) => b.url !== current?.baseUrl)
+  const stale = sorted.slice(keep).filter((b) => b.url !== current?.baseUrl && b.url !== current?.originalBaseUrl)
   if (stale.length) await del(stale.map((b) => b.url))
 }

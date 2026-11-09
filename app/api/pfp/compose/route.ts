@@ -15,26 +15,54 @@ import { unlockedAssetIds } from '@/app/lib/pfp-assets/unlocks'
 import { lockHint } from '@/app/lib/pfp-assets/types'
 import { availableBases, composeMemberPfp, isBaseKind } from '@/app/lib/pfp-assets/compose'
 import { ValidationError } from '@/app/lib/errors/api-errors'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
+import { evaluateAllowance, loadRestyleSettings, loadUsage, usageByOutfit } from '@/app/lib/pfp-assets/restyle'
 
 export const runtime = 'nodejs'
 export const dynamic = 'force-dynamic'
 export const maxDuration = 60
 
+function parseBase(v: unknown): { kind: import('@/app/lib/pfp-assets/compose').BaseKind; url?: string } | undefined {
+  const o = v as { kind?: unknown; url?: unknown } | null | undefined
+  if (!o || !isBaseKind(o.kind)) return undefined
+  return { kind: o.kind, url: typeof o.url === 'string' ? o.url : undefined }
+}
+
 export const GET = memberPfpRoute(async (_req, { memberId, discordId }) => {
-  const [assets, ctx, bases, current] = await Promise.all([
+  const [assets, ctx, bases, current, outfitOverlay, restyleSettings, used] = await Promise.all([
     listAssets({ activeOnly: true }),
     loadUnlockContext(discordId),
     availableBases(memberId, discordId),
     prisma.memberPfp.findUnique({ where: { memberId } }),
+    toggleEnabled('pfp.outfitOverlayEnabled'),
+    loadRestyleSettings(),
+    usageByOutfit(memberId).catch(() => ({}) as Record<number, number>),
   ])
+  const usage = await loadUsage(memberId, null).catch(() => null)
+  // Daily and monthly gates only (null outfit): the per-outfit count is in `usedByOutfit`.
+  const gate = usage ? evaluateAllowance(restyleSettings, { ...usage, forOutfit: 0 }) : null
   const unlocked = unlockedAssetIds(assets, ctx)
   // Only the names the locked hints need (not the admin pickers' full lists).
   const lookups = await hintLookups(assets.filter((a) => !unlocked.has(a.id)))
   return {
     level: ctx.level,
+    outfitOverlay,
+    restyle: {
+      enabled: restyleSettings.enabled,
+      perUnlock: restyleSettings.perUnlock,
+      dailyRemaining: usage ? Math.max(0, restyleSettings.dailyLimit - usage.today) : 0,
+      blocked: gate && !gate.ok ? gate.message : null,
+      usedByOutfit: used,
+    },
     bases,
     current: current
-      ? { baseKind: current.baseKind, baseUrl: current.baseUrl, layers: current.layers, composedUrl: current.composedUrl }
+      ? {
+          baseKind: current.baseKind,
+          baseUrl: current.baseUrl,
+          layers: current.layers,
+          composedUrl: current.composedUrl,
+          original: current.originalBaseKind ? { kind: current.originalBaseKind, url: current.originalBaseUrl } : null,
+        }
       : null,
     assets: assets.map((a) => {
       const isUnlocked = unlocked.has(a.id)
@@ -62,6 +90,7 @@ export const POST = memberPfpRoute(async (req, { memberId, discordId }) => {
     memberId,
     discordId,
     base: { kind: base.kind, url: typeof base.url === 'string' ? base.url : undefined },
+    original: parseBase(body.original),
     layers: body.layers ?? [],
   })
   return { ok: true, composedUrl: res.composedUrl, layers: res.layers }
