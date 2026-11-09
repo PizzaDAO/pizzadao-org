@@ -36,7 +36,7 @@ async function resolveUsers(userIds: string[], opts: DiscordOpts): Promise<Recor
   if (userIds.length === 0) return users
   try {
     const rows = await prisma.member.findMany({
-      where: { discordId: { in: userIds } },
+      where: { discordId: { in: userIds }, mergedInto: null },
       select: { id: true, discordId: true, name: true },
     })
     for (const row of rows) {

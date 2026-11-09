@@ -45,7 +45,7 @@ export async function loadMembersPayload(): Promise<MembersPayload> {
   const { prisma } = await import('@/app/lib/db')
   const [layout, rows] = await Promise.all([
     prisma.memberTableLayout.findUnique({ where: { id: 1 } }),
-    prisma.member.findMany({ select: { id: true, cells: true, position: true, updatedAt: true } }),
+    prisma.member.findMany({ where: { mergedInto: null }, select: { id: true, cells: true, position: true, updatedAt: true } }),
   ])
   if (!layout) throw new Error('Members table is not imported yet')
   let latest = layout.updatedAt.getTime()

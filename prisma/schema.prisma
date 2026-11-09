@@ -2652,9 +2652,27 @@ model Member {
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
   updatedBy String?
+  // Set when this member was merged into another (app/lib/members/merge.ts). The row is a tombstone:
+  // every reader skips rows where mergedInto is set.
+  mergedInto String?
+  mergedAt   DateTime?
 
   @@index([discordId])
   @@index([position])
+  @@index([mergedInto])
+}
+
+// Audit row for one member merge: who ran it, which ids, and the full per-table report.
+model MemberMerge {
+  id        Int      @id @default(autoincrement())
+  keepId    String
+  removeId  String
+  actor     String
+  report    Json
+  createdAt DateTime @default(now())
+
+  @@index([keepId])
+  @@index([removeId])
 }
 
 // The members table's header row (one row, id 1), in sheet order. Blank headers stay "".

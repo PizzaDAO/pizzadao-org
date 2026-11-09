@@ -72,7 +72,7 @@ export async function loadCallAttendees(rec: AttendeeRecording, text: AttendeeTe
     }
     if (byId.size === 0) return []
 
-    const members = await prisma.member.findMany({ where: { discordId: { in: [...byId.keys()] } }, select: { id: true, discordId: true, name: true } })
+    const members = await prisma.member.findMany({ where: { discordId: { in: [...byId.keys()] }, mergedInto: null }, select: { id: true, discordId: true, name: true } })
     const memberOf = new Map<string, { id: string; name: string }>()
     for (const m of members) if (m.discordId && !memberOf.has(m.discordId)) memberOf.set(m.discordId, { id: m.id, name: m.name })
     const pfps: Record<string, string | null> = await resolvePfpUrlsAsync([...memberOf.values()].map((m) => m.id)).catch(() => ({}))

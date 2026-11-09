@@ -36,7 +36,7 @@ export async function upsertMemberInDb(raw: MemberWriteRaw, actor: string, now: 
       const layout = await tx.memberTableLayout.findUnique({ where: { id: 1 } })
       if (!layout) return { ok: false, error: 'Members table is not imported yet.' } as UpsertResult
       const headers = (Array.isArray(layout.headers) ? layout.headers : []).map((h) => String(h ?? ''))
-      const members = (await tx.member.findMany({ select: { id: true, cells: true } })).map((m) => ({ id: m.id, cells: (Array.isArray(m.cells) ? m.cells : []) as MemberCells }))
+      const members = (await tx.member.findMany({ where: { mergedInto: null }, select: { id: true, cells: true } })).map((m) => ({ id: m.id, cells: (Array.isArray(m.cells) ? m.cells : []) as MemberCells }))
       const plan = planMemberUpsert(headers, members, raw, now.toISOString())
       if (!plan.ok || plan.skipped) return plan
       const { discordId, name } = memberIndexFields(headers, plan.cells)
