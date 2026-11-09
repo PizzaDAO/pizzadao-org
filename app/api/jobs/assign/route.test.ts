@@ -11,6 +11,7 @@ vi.mock('@/app/lib/jobs', () => ({
   recordDailyJobCompletion: vi.fn(),
   isTodaysDailyJob: vi.fn(),
   getDayStart: () => new Date('2026-01-01T00:00:00Z'),
+  getUsedJobMessageIds: vi.fn(async () => []),
 }))
 vi.mock('@/app/lib/jobs-verify', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/jobs-verify')>()),
@@ -140,6 +141,31 @@ describe('POST /api/jobs/assign — post verification', () => {
     expect(body.code).toBe('POST_NOT_FOUND')
     expect(body.channelId).toBe('123456789012345678')
     expect(recordDailyJobCompletion).not.toHaveBeenCalled()
+  })
+
+  it('409s with a mod hint when the channel cannot be checked', async () => {
+    mockFn(verifyJobPost).mockResolvedValue({ ok: false, reason: 'channel_unavailable', channelId: '123456789012345678' })
+    const res = await POST(createRequest({ jobId: 9 }))
+    expect(res.status).toBe(409)
+    const body = await res.json()
+    expect(body.code).toBe('CHANNEL_UNCHECKABLE')
+    expect(body.error).toMatch(/ask a mod/i)
+    expect(recordDailyJobCompletion).not.toHaveBeenCalled()
+  })
+
+  it('409s when the post already completed another job', async () => {
+    mockFn(verifyJobPost).mockResolvedValue({ ok: false, reason: 'reused', channelId: '123456789012345678' })
+    const res = await POST(createRequest({ jobId: 9 }))
+    expect(res.status).toBe(409)
+    expect((await res.json()).error).toMatch(/already completed another job/)
+    expect(recordDailyJobCompletion).not.toHaveBeenCalled()
+  })
+
+  it('409s if the ledger refuses a reused message at pay time', async () => {
+    mockFn(recordDailyJobCompletion).mockResolvedValue('reused')
+    const res = await POST(createRequest({ jobId: 9 }))
+    expect(res.status).toBe(409)
+    expect((await res.json()).code).toBe('POST_REUSED')
   })
 
   it('fails closed with 503 when Discord is unreachable', async () => {

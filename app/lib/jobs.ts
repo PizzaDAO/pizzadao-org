@@ -65,10 +65,18 @@ export async function recordDailyJobCompletion(
   description: string,
   /** The Discord post that verified the job, recorded on the ledger row. */
   proof?: { messageId: string; channelId?: string },
-): Promise<boolean> {
+): Promise<boolean | 'reused'> {
   const dayStart = getDayStart()
   try {
     return await prisma.$transaction(async (tx) => {
+      // One post pays one job: refuse a message that already paid a job today.
+      if (proof) {
+        const reuse = await tx.transaction.findFirst({
+          where: { userId, type: 'JOB_REWARD', createdAt: { gte: dayStart }, metadata: { path: ['messageId'], equals: proof.messageId } },
+          select: { id: true },
+        })
+        if (reuse) return 'reused' as const
+      }
       const moved = await tx.jobAssignment.updateMany({
         where: { jobId, userId, assignedAt: { lt: dayStart } },
         data: { assignedAt: new Date() },
@@ -89,6 +97,20 @@ export async function recordDailyJobCompletion(
     if ((e as { code?: string })?.code === 'P2002') return false
     throw e
   }
+}
+
+/** Ids of the Discord posts that already paid one of this member's jobs today. */
+export async function getUsedJobMessageIds(userId: string): Promise<string[]> {
+  const rows = await prisma.transaction.findMany({
+    where: { userId, type: 'JOB_REWARD', createdAt: { gte: getDayStart() } },
+    select: { metadata: true },
+  })
+  const ids: string[] = []
+  for (const r of rows) {
+    const id = (r.metadata as { messageId?: unknown } | null)?.messageId
+    if (typeof id === 'string') ids.push(id)
+  }
+  return ids
 }
 
 /**
