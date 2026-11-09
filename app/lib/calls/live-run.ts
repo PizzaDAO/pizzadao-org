@@ -23,6 +23,7 @@ import { normalizeCrewId } from '@/app/lib/crew-id'
 import { loadSettings, type Settings } from '@/app/lib/settings'
 import { buildSpeakerLabels } from '@/app/lib/followups/extract'
 import { getObjectBytes } from './r2'
+import { sweepQa } from './live-qa'
 import { resolveCrewForEvent } from './crew-map'
 import { publicChatText } from './chat'
 import type { TranscriptSegment } from './ingest-schema'
@@ -432,6 +433,12 @@ export async function sweepLiveData(opts: { now?: number; retentionDays?: number
     if (itemSessions.length) {
       const rejected = (await prisma.callRecording.findMany({ where: { sessionId: { in: itemSessions }, status: 'REJECTED' }, select: { sessionId: true } })).map((r) => r.sessionId)
       if (rejected.length) items += (await prisma.callLiveItem.deleteMany({ where: { sessionId: { in: rejected } } })).count
+    }
+    try {
+      await prisma.callLiveSession.deleteMany({ where: { startedAt: { lt: new Date(now - days * 86_400_000) } } })
+      await sweepQa(now, days)
+    } catch {
+      // the live-state tables are optional for the sweep
     }
   } catch (err) {
     console.warn('[calls/live] sweep failed:', err instanceof Error ? err.message : err)

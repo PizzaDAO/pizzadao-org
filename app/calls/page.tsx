@@ -11,6 +11,7 @@ import {
   paperCard,
   pillOutline,
 } from "@/app/ui/shared/Editorial";
+import LiveCallBanner from "@/app/ui/calls/LiveCallBanner";
 
 // Editorial restyle: § masthead, paper-soft filter strip and call rows,
 // pill pagination. Fetching, filters, sort and attendee expansion unchanged.
@@ -154,6 +155,7 @@ export default function CallsPage() {
 
   return (
     <EditorialPage width="max-w-[900px]">
+      <LiveCallBanner className="mb-6" />
       <EditorialMasthead
         overline={t("overline")}
         title={

@@ -135,6 +135,12 @@ export const TRANSCRIPTION_KEYTERMS_DEFAULT = [
 /** One line of calls.agendaLinks: `crew-id = Label | https://...`. */
 export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*(https:\/\/\S+)$/
 
+/** One line of calls.liveStreamLinks: `crew-id = https://...` (an X / Twitter link). */
+export const LIVE_STREAM_LINE = /^([A-Za-z0-9_-]+)\s*=\s*(https:\/\/(?:www\.|mobile\.)?(?:x|twitter)\.com\/\S+)$/
+
+/** One role id per line of calls.liveHostRoleIds. */
+export const LIVE_HOST_ROLE_LINE = /^\d{15,25}$/
+
 /** One line of calls.attendanceCrewAliases: `from = to` (crew ids). */
 export const CREW_ALIAS_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([A-Za-z0-9_-]+)$/
 
@@ -1314,6 +1320,90 @@ export const SETTINGS = {
     max: 600,
     default: 120,
     unit: 'minutes',
+  }),
+  // Live call view (plans/live-call-view-and-attendance.md, PR 4 and 5).
+  'calls.liveViewEnabled': boolSetting({
+    key: 'calls.liveViewEnabled',
+    area: 'calls',
+    label: 'Live call view',
+    help: 'Turns on the live-state endpoint the recorder reports to and the /calls/live page with its banners. Everyone sees the title, crew, start time, stream link and head count; signed-in members also see who is present. The CALL_LIVE_VIEW_ENABLED env var set to off always wins; on preview deploys only the env var counts.',
+    confirmOn: 'Anyone can see which crew call is live and how many people are in it. Signed-in members see who is present.',
+  }),
+  'calls.liveStreamLinks': textSetting({
+    key: 'calls.liveStreamLinks',
+    area: 'calls',
+    label: 'Live stream links by crew',
+    help: 'One per line: crew-id = https link on x.com. Used when nobody posts a stream link in the call chat. A broadcast or status link posted in the call chat during the call wins.',
+    maxLength: 2000,
+    multiline: true,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'community_call = https://x.com/i/broadcasts/...',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || LIVE_STREAM_LINE.test(line.trim())),
+    checkMessage: 'Use one line per crew: crew-id = https link on x.com',
+  }),
+  'calls.livePushSeconds': intSetting({
+    key: 'calls.livePushSeconds',
+    area: 'calls',
+    label: 'Live view: recorder heartbeat',
+    help: 'How often the recorder reports the live state of a call (it also reports right away when someone joins or leaves). Takes effect for the next recorded call.',
+    min: 10,
+    max: 120,
+    default: 20,
+    unit: 'seconds',
+  }),
+  'calls.liveStaleSeconds': intSetting({
+    key: 'calls.liveStaleSeconds',
+    area: 'calls',
+    label: 'Live view: stale after',
+    help: 'A call with no heartbeat for this long no longer shows as live (a recorder crash).',
+    min: 30,
+    max: 600,
+    default: 120,
+    unit: 'seconds',
+  }),
+  'calls.liveHostRoleIds': textSetting({
+    key: 'calls.liveHostRoleIds',
+    area: 'calls',
+    label: 'Live view: host roles',
+    help: 'One Discord role id per line. Members with one of these roles (and Dread Pizza Roberts) can moderate the live Q&A and run live polls. Whoever started the call is not a host by default. Empty means Dread Pizza Roberts only.',
+    maxLength: 500,
+    multiline: true,
+    default: '',
+    onReadFailure: { value: '' },
+    placeholder: '123456789012345678',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || LIVE_HOST_ROLE_LINE.test(line.trim())),
+    checkMessage: 'Use one numeric role id per line',
+  }),
+  'calls.liveQuestionMaxPerMember': intSetting({
+    key: 'calls.liveQuestionMaxPerMember',
+    area: 'calls',
+    label: 'Live Q&A: most questions per member',
+    help: 'How many questions one member can ask during one call.',
+    min: 1,
+    max: 50,
+    default: 5,
+    unit: 'questions',
+  }),
+  'calls.liveQuestionMinGapSeconds': intSetting({
+    key: 'calls.liveQuestionMinGapSeconds',
+    area: 'calls',
+    label: 'Live Q&A: pause between questions',
+    help: 'A member must wait this long between two questions.',
+    min: 0,
+    max: 600,
+    default: 20,
+    unit: 'seconds',
+  }),
+  'calls.livePollSeconds': intSetting({
+    key: 'calls.livePollSeconds',
+    area: 'calls',
+    label: 'Live view: page refresh',
+    help: 'How often the /calls/live page asks for updates while the tab is visible.',
+    min: 5,
+    max: 60,
+    default: 10,
+    unit: 'seconds',
   }),
   'calls.liveItemsRetentionDays': intSetting({
     key: 'calls.liveItemsRetentionDays',
