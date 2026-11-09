@@ -818,6 +818,7 @@
         "copied": "Enlace copiado. Pégalo en un mensaje.",
         "copyFailed": "No se pudo copiar el enlace",
         "askMember": "Pide a un miembro que te avale",
+        "askMemberLink": "Pedir a un miembro",
         "searchPlaceholder": "Busca miembros por nombre o ID",
         "send": "Enviar solicitud",
         "sent": "Solicitud enviada a {name}.",
@@ -918,6 +919,16 @@
     }
   },
   "missionLinks": {
+    "vouch": {
+      "title": "Tu enlace de avales",
+      "copy": "Copiar",
+      "copied": "Copiado",
+      "progress": "{have} de {need} avales",
+      "share": "Compartir",
+      "shareText": "Avala mi perfil en PizzaDAO:",
+      "shareCopied": "Enlace copiado. Pégalo en un mensaje.",
+      "copyFailed": "No se pudo copiar el enlace"
+    },
     "bonusBadge": "Extra",
     "bonusOptional": "Extra: opcional, no cuenta para completar el nivel.",
     "bonusPays": "Extra: +{reward} $PEP al aprobarse.",
