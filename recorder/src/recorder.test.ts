@@ -43,7 +43,7 @@ vi.mock('./finalize.js', async (orig) => ({ ...(await orig<typeof import('./fina
 
 import { CallRecorder } from './recorder.js'
 import { NicknameManager, recNickname, stripRecMark } from './nickname.js'
-import { consentNotice, lateJoinWelcome, welcomeBatch, welcomeOpening, callDisplayName, sanitizeCallName } from './consent.js'
+import { startNotice, lateJoinWelcome, welcomeBatch, welcomeOpening, callDisplayName, sanitizeCallName } from './consent.js'
 import { parseRemoteConfig, type RemoteConfigClient } from './remote-config.js'
 import { chatMessages, readManifest } from './manifest.js'
 
@@ -122,24 +122,31 @@ const require_readdir = (d: string) => readdirSync(d).filter((n) => !n.endsWith(
 
 describe('CallRecorder indicator rule', () => {
   it('orders join -> nickname -> notice -> capture', async () => {
-    const w = world()
+    const w = world({ remote: noticeRemote('We record.') })
     await begin(w)
     expect(calls).toEqual(['join', `nick:${REC_NICKNAME}`, 'notice', 'begin'])
     expect(w.rec.currentEventId).toBe('100')
   })
 
   it('captures when only the notice worked, or only the nickname worked', async () => {
-    const a = world({ nickFails: true })
+    const a = world({ nickFails: true, remote: noticeRemote('We record.') })
     await begin(a)
     expect(calls).toContain('begin')
     calls.length = 0
-    const b = world({ sendFails: true })
+    const b = world({ sendFails: true, remote: noticeRemote('We record.') })
     await begin(b)
     expect(calls).toContain('begin')
   })
 
+  it('no notice set and the nickname fails: no indicator, so it does not record', async () => {
+    const w = world({ nickFails: true })
+    await begin(w)
+    expect(calls).not.toContain('begin')
+    expect(w.rec.currentEventId).toBeNull()
+  })
+
   it('never captures, and deletes the session dir, when neither indicator can be shown', async () => {
-    const w = world({ nickFails: true, sendFails: true })
+    const w = world({ nickFails: true, sendFails: true, remote: noticeRemote('We record.') })
     await begin(w)
     expect(calls).not.toContain('begin')
     expect(calls).toContain('capture.stop') // left the channel
@@ -508,11 +515,18 @@ describe('NicknameManager', () => {
   })
 })
 
-describe('consent text', () => {
-  it('says the call is recorded and transcribed and never mentions opt-out', () => {
-    const t = consentNotice()
-    expect(t).toMatch(/recorded and transcribed/)
-    expect(t).not.toMatch(/opt|\/record/i)
+describe('start notice (calls.startNotice)', () => {
+  it('empty or blank means nothing to post', () => {
+    expect(startNotice('')).toBe('')
+    expect(startNotice('  \n ')).toBe('')
+    expect(startNotice(undefined)).toBe('')
+  })
+
+  it('strips user/role mentions, defuses @everyone/@here, caps the length', () => {
+    const t = startNotice('hi <@123> <@&9> @everyone @here ok')
+    expect(t).not.toMatch(/<@/)
+    expect(t).not.toMatch(/@everyone|@here/)
+    expect(startNotice('x'.repeat(900))).toHaveLength(500)
   })
 
   it('welcomes late joiners by mention', () => {
@@ -746,7 +760,7 @@ describe('CallRecorder schedule-window trigger', () => {
     })
 
     it('no duplicate consent notices within the back-off when no indicator can be shown', async () => {
-      const w = world({ nickFails: true, sendFails: true })
+      const w = world({ nickFails: true, sendFails: true, remote: noticeRemote('We record.') })
       withHumans(w, 2)
       for (let m = 0; m <= 4; m++) {
         at(m)
@@ -1013,9 +1027,12 @@ describe('voice channel chat capture', () => {
   })
 })
 
+const noticeRemote = (startNotice: string) =>
+  ({ get: () => parseRemoteConfig({ startNotice }), refresh: async () => parseRemoteConfig({ startNotice }) }) as unknown as RemoteConfigClient
+
 describe('batched welcome (calls.welcomeEnabled)', () => {
-  const remoteWith = (welcome: Record<string, unknown>, crews: unknown[] = []) =>
-    ({ get: () => parseRemoteConfig({ welcome, crews }), refresh: async () => parseRemoteConfig({ welcome, crews }) }) as unknown as RemoteConfigClient
+  const remoteWith = (welcome: Record<string, unknown>, crews: unknown[] = [], startNotice = '') =>
+    ({ get: () => parseRemoteConfig({ welcome, crews, startNotice }), refresh: async () => parseRemoteConfig({ welcome, crews, startNotice }) }) as unknown as RemoteConfigClient
   const joinState = (w: ReturnType<typeof world>, id: string, from: string | null = null) =>
     w.rec.onVoiceState({ id, channelId: from } as never, { id, channelId: CHANNEL, channel: w.channel } as never)
   const sent = (w: ReturnType<typeof world>) => w.channel.send.mock.calls.map((c) => c[0] as { content: string; allowedMentions: { users: string[] } })
@@ -1027,21 +1044,35 @@ describe('batched welcome (calls.welcomeEnabled)', () => {
     vi.useRealTimers()
   })
 
-  it("off (or no remote config): the opening is exactly today's notice and late joiners get the old welcome", async () => {
+  it('off, startNotice empty (the default): nothing is posted when the call starts', async () => {
     const w = world()
     await begin(w)
-    expect(sent(w)[0].content).toBe(consentNotice())
-    joinState(w, 'late')
-    await Promise.resolve()
-    expect(sent(w)).toHaveLength(1) // within 5 minutes: nothing (old behaviour)
+    expect(sent(w)).toHaveLength(0)
   })
 
-  it('on: the opening greets people already here and still carries the full notice, before capture', async () => {
-    const w = world({ remote: remoteWith({ enabled: true }, [{ eventId: '100', label: 'Ops Crew' }]) })
+  it('off, startNotice set: the sanitized notice is posted with no mentions allowed', async () => {
+    const w = world({ remote: noticeRemote('Recording. @everyone') })
+    await begin(w)
+    expect(sent(w)).toHaveLength(1)
+    expect(sent(w)[0].content).not.toContain('@everyone')
+    expect(sent(w)[0].content).toContain('Recording.')
+    expect(sent(w)[0].allowedMentions.users).toEqual([])
+  })
+
+  it('off, startNotice set: late joiners get nothing extra within 5 minutes', async () => {
+    const w = world({ remote: noticeRemote('Recording.') })
+    await begin(w)
+    joinState(w, 'late')
+    await Promise.resolve()
+    expect(sent(w)).toHaveLength(1)
+  })
+
+  it('on: the opening greets people already here and carries the start notice when set, before capture', async () => {
+    const w = world({ remote: remoteWith({ enabled: true }, [{ eventId: '100', label: 'Ops Crew' }], 'Recording.') })
     await begin(w)
     const first = sent(w)[0]
     expect(first.content).toContain('Welcome <@u0> to the Ops Crew call')
-    expect(first.content).toContain(consentNotice())
+    expect(first.content).toContain('Recording.')
     expect(first.allowedMentions.users).toEqual(['u0'])
     expect(calls).toEqual(['join', `nick:${REC_NICKNAME}`, 'notice', 'begin'])
   })
@@ -1089,10 +1120,11 @@ describe('welcome wording', () => {
     expect(m).toContain('and 3 others')
     expect(m.endsWith('\nREC LINE')).toBe(true)
   })
-  it('opening keeps the full notice; empty room still reads well', () => {
-    const o = welcomeOpening('Welcome {members} to the {call} 🍕', [], 'call')
+  it('opening appends the notice only when set; empty room still reads well', () => {
+    const o = welcomeOpening('Welcome {members} to the {call} 🍕', [], 'call', 'NOTICE')
     expect(o.startsWith('Welcome to the call 🍕')).toBe(true)
-    expect(o.endsWith(consentNotice())).toBe(true)
+    expect(o.endsWith('\n\nNOTICE')).toBe(true)
+    expect(welcomeOpening('Welcome {members} to the {call} 🍕', [], 'call')).toBe('Welcome to the call 🍕')
   })
   it('call names are stripped of mentions and markdown', () => {
     expect(sanitizeCallName('<@123> **Hi** @everyone _x_')).toBe('Hi x')

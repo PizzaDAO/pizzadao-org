@@ -1098,6 +1098,15 @@ export const SETTINGS = {
     check: (v) => v.length > 0,
     checkMessage: 'The recording line cannot be empty',
   }),
+  'calls.startNotice': textSetting({
+    key: 'calls.startNotice',
+    area: 'calls',
+    label: 'Start-of-call notice',
+    help: 'Posted in the voice channel chat when the recorder starts a call. Empty posts nothing. Mentions (@everyone, @here, roles) are stripped.',
+    maxLength: 500,
+    multiline: true,
+    default: '',
+  }),
   'calls.endSongTriggerEnabled': boolSetting({
     key: 'calls.endSongTriggerEnabled',
     area: 'calls',

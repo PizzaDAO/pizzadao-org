@@ -11,6 +11,8 @@ import { parseVoiceChannels, VOICE_CHANNELS_OFF, type VoiceChannelSettings } fro
 
 export interface RemoteConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
+  /** Text posted in the voice channel chat when a call starts; empty = nothing (calls.startNotice). */
+  startNotice: string
   endSong: { enabled: boolean; minHumans: number; crewMap: { crew: string; radio: string }[] }
   /** House band at the start of the listed calls (pizza-radio /play-band). */
   startBand: { enabled: boolean; calls: string[]; maxSongs: number }
@@ -36,6 +38,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
     batchSeconds: 20,
     recordingLine: "🔴 This call is recorded and transcribed; audio stays private. Leave the call if you'd rather not be recorded.",
   },
+  startNotice: '',
   endSong: { enabled: false, minHumans: 1, crewMap: [] },
   startBand: { enabled: false, calls: [], maxSongs: 1 },
   crews: [],
@@ -81,6 +84,7 @@ export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null):
       batchSeconds: int(w.batchSeconds, d.welcome.batchSeconds, 5, 120),
       recordingLine: str(w.recordingLine, d.welcome.recordingLine, 300),
     },
+    startNotice: typeof o.startNotice === 'string' ? o.startNotice.trim().slice(0, 500) : '',
     endSong: {
       enabled: e.enabled === true,
       minHumans: int(e.minHumans, d.endSong.minHumans, 1, 50),
