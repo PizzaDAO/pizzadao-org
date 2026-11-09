@@ -2372,5 +2372,26 @@
     "applyAllHint": "Aplicar todo omite los cambios que cierran u ocultan una tarea: aplícalos uno por uno.",
     "retiredHeading": "Retiradas recientemente desde llamadas",
     "undoRetire": "Deshacer (mostrar la tarea de nuevo)"
+  },
+  "collectPep": {
+    "title": "Cobra tu PEP diario",
+    "overline": "Ingreso diario",
+    "available": "{amount} PEP listos para cobrar",
+    "collect": "Cobrar",
+    "collecting": "Cobrando...",
+    "nextIn": "Próximo cobro en {time}",
+    "timeHM": "{h} h {m} min",
+    "timeM": "{m} min",
+    "timeS": "menos de un minuto",
+    "success": "Cobraste {amount} PEP. Nuevo saldo: {balance}.",
+    "alsoDiscord": "También funciona en Discord: /collect-income",
+    "noRoles": "Aún no hay PEP diario.",
+    "getRole": "Consigue el rol {role} para ganar {amount} PEP al día.",
+    "joinRoles": "Roles que ganan PEP diario: {roles}.",
+    "unavailable": "No pudimos revisar tus roles ahora. Inténtalo pronto.",
+    "error": "No se pudo cobrar. Inténtalo de nuevo.",
+    "tooMany": "Demasiados intentos. Espera un momento.",
+    "dashLink": "Cobra tu PEP diario",
+    "getRoleEvery": "Consigue el rol {role} para ganar {amount} PEP cada {hours} horas."
   }
 }

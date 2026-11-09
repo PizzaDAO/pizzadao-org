@@ -7,3 +7,4 @@ export { SendPepModal } from "./SendPepModal";
 export type { SendPepModalProps } from "./SendPepModal";
 export { CrimeCard } from "./CrimeCard";
 export { GamesCard } from "./GamesCard";
+export { DailyPepCard } from "./DailyPepCard";
