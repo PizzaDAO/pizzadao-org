@@ -13,6 +13,7 @@
 
 import { GetBoxLink, BonusNote, BonusBadge } from "./GetBoxLink";
 import { GuideLink } from "./GuideLink";
+import { XFollowNote, xLinkState } from "./XFollowNote";
 import { useState } from "react";
 import { input } from "../shared-styles";
 
@@ -51,6 +52,8 @@ type MissionData = {
   guideHref?: string;
   /** Checked automatically, nothing to submit. */
   noManualSubmit?: boolean;
+  /** The "follow on X" mission: only the X link is verified, the follow is on the honor system. */
+  xFollow?: boolean;
   /** Optional mission: not needed to complete the level. */
   bonus?: boolean;
   /** PEP paid once on approval. */
@@ -317,6 +320,7 @@ export function MissionCard({ mission, levelUnlocked, bonus, onSubmit, check, in
           {mission.bonus && <BonusBadge reward={mission.bonusReward} />}
           {bonus && !mission.bonus && !isCompleted && <BonusNote />}
           {mission.getBoxUrl && !isCompleted && <GetBoxLink url={mission.getBoxUrl} />}
+          {mission.xFollow && <XFollowNote state={xLinkState(isCompleted, check?.status)} />}
           {mission.guideHref && <GuideLink href={mission.guideHref} muted={isCompleted} />}
           {isPending && mission.progress?.holdReason && (
             <div style={{ fontSize: 13, color: "hsl(var(--ink) / 0.75)", marginTop: 8 }}>

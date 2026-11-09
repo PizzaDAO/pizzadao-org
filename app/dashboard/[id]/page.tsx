@@ -42,6 +42,7 @@ import { YourCrews, type CrewOption } from "./components/YourCrews";
 import { SliceClaimsCard } from "../../ui/slices/SliceClaims";
 import { NextActionPanel } from "./components/NextActionPanel";
 import { LevelCard } from "./components/LevelCard";
+import { StartHere } from "./components/StartHere";
 import { BoxMafiaSuggestion } from "./components/BoxMafiaSuggestion";
 import { RecentActivity } from "./components/RecentActivity";
 import { Discover } from "./components/Discover";
@@ -243,6 +244,14 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         missionLevel={missionLevel}
                         onSendPep={() => setShowSendModal(true)}
                         profileCompletion={summary?.profileCompletion}
+                    />
+
+                    <StartHere
+                        enabled={summary?.startHere?.enabled}
+                        memberId={id}
+                        level={missionLevel?.level ?? 1}
+                        nextMission={summary?.level?.nextMission ?? null}
+                        vouchTotal={summary?.vouches?.total ?? 0}
                     />
 
                     {!splitTurtlesCell(data?.Turtles).length && (

@@ -438,10 +438,10 @@
       "errorLookupFailed": "Discord is busy, try again in a minute.",
       "ambiguousHeadline": "Use your exact username.",
       "ambiguousMessage": "More than one member matches that name. Please enter your exact Discord username (Discord → Settings → My Account).",
-      "openDmsMessage": "Couldn't send you a DM. To receive the login link, enable DMs from server members:",
-      "openDmsStep1": "Open Discord and go to the PizzaDAO server",
-      "openDmsStep2": "Click the server name at the top",
-      "openDmsStep3": "Privacy Settings → Enable \"Direct Messages\"",
+      "openDmsMessage": "We couldn't DM you. Discord blocks our bot when direct messages from server members are off. It takes about 30 seconds to fix:",
+      "openDmsStep1": "Open Discord and right-click the PizzaDAO server icon (left sidebar)",
+      "openDmsStep2": "Choose Privacy Settings",
+      "openDmsStep3": "Turn on \"Direct Messages\", then save",
       "rateLimitedMessage": "Too many requests. Please try again in a few minutes.",
       "errorInvalidToken": "That login link is invalid.",
       "errorLinkExpired": "That login link has expired. Request a new one.",
@@ -450,7 +450,17 @@
       "errorGeneric": "Login failed. Please try again.",
       "errorSomethingWrong": "Something went wrong",
       "errorNetwork": "Network error. Please check your connection and try again.",
-      "sameBrowserHint": "Your signup details travel with this link. Open it on any device, then review your name and city."
+      "sameBrowserHint": "Your signup details travel with this link. Open it on any device, then review your name and city.",
+      "dmHint": "You need to be in the PizzaDAO Discord, with direct messages from server members turned on, to get the link. Not sure? We'll show you how.",
+      "openDmsDesktopTitle": "On a computer",
+      "openDmsMobileTitle": "On your phone (Discord app)",
+      "openDmsMobile1": "Open Discord and tap the PizzaDAO server",
+      "openDmsMobile2": "Tap the server name at the top, then Settings, then Privacy Settings",
+      "openDmsMobile3": "Turn on \"Direct Messages\"",
+      "openDmsMobile4": "Come back to this page and tap Try again",
+      "openDmsAltIntro": "Prefer not to change this? Log in with your Discord account instead. No DM needed.",
+      "openDmsAltButton": "Log in with Discord",
+      "dmHintAlt": "Can't get DMs? Log in with Discord instead"
     },
     "claim": {
       "askOverline": "§ ··· Welcome back",
@@ -861,6 +871,23 @@
       "maxBody": "You have reached every level there is.",
       "viewAll": "All missions",
       "nextLevel": "Next level: {title}"
+    },
+    "startHere": {
+      "overline": "Start here",
+      "headline": "New here? Three steps to get going.",
+      "intro": "Do these in order. Each one takes a few minutes.",
+      "done": "Done",
+      "step1Title": "Check your level",
+      "step1Body": "You're on level {level}. See what each level unlocks.",
+      "step1Cta": "See my level",
+      "step2Title": "Do your next mission",
+      "step2Body": "Next up: {mission}",
+      "step2BodyNone": "Nothing left to submit right now. Check your missions for updates.",
+      "step2Cta": "Open missions",
+      "step3Title": "Get vouched",
+      "step3Body": "Ask a member to open your profile and tap Vouch. Share your profile link with someone you know.",
+      "step3Done": "A member has vouched for you.",
+      "step3Cta": "Open my profile"
     }
   },
   "missionLinks": {
@@ -871,7 +898,16 @@
     "getBox": "Get a Rare Pizza Box",
     "bonus": "Bonus: this level is already complete. This mission is optional and pays nothing extra.",
     "howTo": "How to do this",
-    "howLevelsWork": "How levels work"
+    "howLevelsWork": "How levels work",
+    "x": {
+      "title": "Following on X",
+      "linked": "X account linked.",
+      "notLinked": "X account not linked yet. Connect X on your profile first.",
+      "unchecked": "Not checked yet. Tap Check my progress after you link your account.",
+      "honor": "We can only check that your X account is linked. We can't see who you follow, so following @RarePizzas and @Pizza_DAO is on the honor system. Please follow both.",
+      "open": "Open @{handle} on X",
+      "mobile": "On a phone these open the X app (or the X website if you don't have it). Tap Follow, then come back to this page."
+    }
   },
   "crewsPage": {
     "joined": "Joined",

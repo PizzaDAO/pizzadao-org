@@ -40,6 +40,7 @@ type MissionData = {
   bonus?: boolean;
   bonusReward?: number;
   guideHref?: string;
+  xFollow?: boolean;
   noManualSubmit?: boolean;
   progress: { status: string; submittedAt: string; reviewNote?: string | null; holdReason?: string | null } | null;
 };

@@ -57,6 +57,8 @@ export type MissionsOverview = {
       proofHint?: string;
       /** L3.1 "Invite a friend": the mission that shows the viewer's invite link. */
       referral?: boolean;
+      /** L1 "follow on X": only the X link is verified; the follow is on the honor system. */
+      xFollow?: boolean;
       /** L5.3 "Own a Rare Pizza Box": where to get one (an extra link on the card). */
       getBoxUrl?: string;
       /** Handbook page that explains this mission (an internal path, validated). */
@@ -125,6 +127,7 @@ export async function getMissionsOverview(discordId: string | null | undefined):
         ...(getVerifier(m.verifierKey)?.mode === "semi" ? { semiChecked: true } : {}),
         ...(m.verifierKey && PROOF_HINTS[m.verifierKey] ? { proofHint: PROOF_HINTS[m.verifierKey] } : {}),
         ...(m.verifierKey === "referral" ? { referral: true } : {}),
+        ...(m.verifierKey === "x_linked" ? { xFollow: true } : {}),
         ...(acceptsManualSubmission({ verifierKey: m.verifierKey, proofKind: m.proofKind }) ? {} : { noManualSubmit: true }),
         ...(m.bonus ? { bonus: true, bonusReward: m.bonusReward ?? 0 } : {}),
         ...guideField(m.guideHref),

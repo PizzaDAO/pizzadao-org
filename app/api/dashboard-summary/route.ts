@@ -98,6 +98,11 @@ export interface DashboardSummary {
      * means the page renders nothing. The other fields are always filled from the same mission data
      * as `level`, so they cost no extra queries.
      */
+    /**
+     * The first-run "Start here" card (setting dashboard.startHereMaxLevel, 0 = off):
+     * true while the member's level is at or below the max.
+     */
+    startHere: { enabled: boolean };
     levelCard: {
         enabled: boolean;
         level: number;
@@ -416,6 +421,10 @@ export async function GET(request: NextRequest) {
             awaitingReview,
         };
 
+        const startHere = {
+            enabled: currentLevel <= incomeSettings.get("dashboard.startHereMaxLevel"),
+        };
+
         const summary: DashboardSummary = {
             member: {
                 id: memberId,
@@ -442,6 +451,7 @@ export async function GET(request: NextRequest) {
             notifications: { unread: unreadCount, top: topNotifications },
             nextAction,
             levelCard,
+            startHere,
             profileCompletion,
             boxMafia,
         };

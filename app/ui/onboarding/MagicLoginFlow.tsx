@@ -17,6 +17,9 @@ import { useTranslations } from "next-intl";
 const DISCORD_INVITE =
   process.env.NEXT_PUBLIC_DISCORD_INVITE || "https://discord.gg/pizzadao";
 
+/** Discord OAuth login: identifies the member without sending a DM. */
+const DISCORD_LOGIN_PATH = "/api/discord/login";
+
 type State =
   | { step: "form" }
   | { step: "sending" }
@@ -243,14 +246,31 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
             tone="error"
             message={t("openDmsMessage")}
           />
-          <ol
-            className="ml-5 grid gap-2 text-[14px] leading-relaxed text-foreground/80"
-            style={{ listStyleType: "decimal" }}
-          >
-            <li>{t("openDmsStep1")}</li>
-            <li>{t("openDmsStep2")}</li>
-            <li>{t("openDmsStep3")}</li>
-          </ol>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <section className="rounded-2xl border border-foreground/15 p-4" aria-label={t("openDmsDesktopTitle")}>
+              <h3 className="font-bold text-[15px]">{t("openDmsDesktopTitle")}</h3>
+              <ol
+                className="mt-2 ml-5 grid gap-2 text-[14px] leading-relaxed text-foreground/80"
+                style={{ listStyleType: "decimal" }}
+              >
+                <li>{t("openDmsStep1")}</li>
+                <li>{t("openDmsStep2")}</li>
+                <li>{t("openDmsStep3")}</li>
+              </ol>
+            </section>
+            <section className="rounded-2xl border border-foreground/15 p-4" aria-label={t("openDmsMobileTitle")}>
+              <h3 className="font-bold text-[15px]">{t("openDmsMobileTitle")}</h3>
+              <ol
+                className="mt-2 ml-5 grid gap-2 text-[14px] leading-relaxed text-foreground/80"
+                style={{ listStyleType: "decimal" }}
+              >
+                <li>{t("openDmsMobile1")}</li>
+                <li>{t("openDmsMobile2")}</li>
+                <li>{t("openDmsMobile3")}</li>
+                <li>{t("openDmsMobile4")}</li>
+              </ol>
+            </section>
+          </div>
           <div className="grid gap-3">
             <button
               type="button"
@@ -264,6 +284,18 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
               {t("tryAgainButton")}
               <ArrowUpRight className="h-4 w-4 transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </button>
+            <p className="text-sm text-foreground/70">{t("openDmsAltIntro")}</p>
+            <a
+              href={DISCORD_LOGIN_PATH}
+              className="btn-pill-lg no-underline"
+              style={{
+                background: "transparent",
+                color: "hsl(var(--foreground))",
+                border: "1px solid hsl(var(--foreground) / 0.25)",
+              }}
+            >
+              {t("openDmsAltButton")}
+            </a>
             <BackLink onBack={onBack} label={t("back")} />
           </div>
         </Shell>
@@ -330,6 +362,12 @@ export function MagicLoginFlow({ onBack, loginError }: Props) {
         style={{ fontSize: "15px", lineHeight: 1.55 }}
       >
         {t("tagline")}
+      </p>
+      <p className="max-w-md text-foreground/70" style={{ fontSize: "14px", lineHeight: 1.5 }}>
+        {t("dmHint")}{" "}
+        <a href={DISCORD_LOGIN_PATH} className="underline underline-offset-2">
+          {t("dmHintAlt")}
+        </a>
       </p>
 
       <div
