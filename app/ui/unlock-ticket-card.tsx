@@ -7,22 +7,21 @@ interface UnlockTicketCardProps {
   memberId: string;
 }
 
-interface TicketRecord {
-  eventName: string;
+interface TicketEvent {
   networkId: number;
   lockAddress: string;
-  tokenId: string;
+  name: string;
+  year: number | null;
+  count: number;
+  url: string | null;
 }
 
-interface WalletData {
-  id: number;
-  walletAddress: string;
-  ticketCount: number;
-  connectedAt: string;
-  tickets: TicketRecord[];
+interface Summary {
+  totalTickets: number;
+  events: TicketEvent[];
+  wallets: number;
+  refreshing?: boolean;
 }
-
-type CardState = "loading" | "connected" | "not-connected" | "verifying" | "error" | "hidden";
 
 const UNLOCK_CHECKOUT_URL = "https://app.unlock-protocol.com/checkout";
 
@@ -30,104 +29,76 @@ const NETWORK_NAMES: Record<number, string> = {
   1: "Ethereum",
   10: "Optimism",
   56: "BSC",
+  100: "Gnosis",
   137: "Polygon",
   8453: "Base",
   42161: "Arbitrum",
 };
 
 /**
- * UnlockTicketCard — capers-48272 (Phase 4e restyle)
- * Distinct from POAP/NFT cards: uses the butter accent for the
- * "ticket / redeemable" feel, with an ink CTA via shared `btn("accent")`.
+ * UnlockTicketCard: Pizza Party Tickets for a member. The count and events come from a cached scan of
+ * every wallet the member has (refreshed nightly and, in the background, when the data is old).
+ * The owner can Rescan, and connect an Unlock wallet as one more way to add a wallet.
  */
 export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
-  const [state, setState] = useState<CardState>("loading");
-  const [wallets, setWallets] = useState<WalletData[]>([]);
-  const [totalTickets, setTotalTickets] = useState(0);
+  const [loaded, setLoaded] = useState(false);
+  const [summary, setSummary] = useState<Summary | null>(null);
   const [isOwner, setIsOwner] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [note, setNote] = useState<string | null>(null);
 
   useEffect(() => {
     async function init() {
       try {
-        // Fetch existing wallet data
-        const statusRes = await fetch(`/api/unlock-tickets/${memberId}`);
-        const status = await statusRes.json();
-        const hasWallets = status.wallets && status.wallets.length > 0;
-
-        // Check if viewer is the profile owner
-        const meRes = await fetch("/api/me");
+        const [statusRes, meRes] = await Promise.all([fetch(`/api/unlock-tickets/${memberId}`), fetch("/api/me")]);
+        if (statusRes.ok) setSummary(await statusRes.json());
         let owner = false;
         if (meRes.ok) {
           const me = await meRes.json();
           if (me.discordId) {
             const lookupRes = await fetch(`/api/member-lookup/${me.discordId}`);
-            if (lookupRes.ok) {
-              const lookup = await lookupRes.json();
-              owner = String(lookup.memberId) === String(memberId);
-            }
+            if (lookupRes.ok) owner = String((await lookupRes.json()).memberId) === String(memberId);
           }
         }
         setIsOwner(owner);
 
-        // Check if redirected back from Unlock with verified wallet
+        // Back from the Unlock sign-in: add the wallet and scan.
         const urlParams = new URLSearchParams(window.location.search);
         if (urlParams.get("unlock") === "verified" && owner) {
-          // Clean up URL
           const cleanUrl = new URL(window.location.href);
           cleanUrl.searchParams.delete("unlock");
           window.history.replaceState({}, "", cleanUrl.toString());
-
-          // Auto-trigger verification (connects wallet)
-          setState("verifying");
-          await connectWallet();
-          return;
-        }
-
-        if (hasWallets) {
-          setWallets(status.wallets);
-          setTotalTickets(status.totalTickets);
-          setState("connected");
-        } else if (owner) {
-          setState("not-connected");
-        } else {
-          setState("hidden");
+          await call("/api/unlock-tickets/verify", "GET");
         }
       } catch {
-        setState("hidden");
+        /* card stays hidden for non-owners */
+      } finally {
+        setLoaded(true);
       }
     }
     if (memberId) init();
   }, [memberId]);
 
-  async function connectWallet() {
-    setState("verifying");
+  async function call(url: string, method: "GET" | "POST") {
+    setBusy(true);
+    setNote(null);
     try {
-      const res = await fetch("/api/unlock-tickets/verify");
-      if (!res.ok) {
-        if (res.status === 401) {
-          setState(wallets.length > 0 ? "connected" : "not-connected");
-          return;
-        }
-        throw new Error("Connection failed");
+      const res = await fetch(url, { method });
+      const data = await res.json().catch(() => ({}));
+      if (res.ok) {
+        if (typeof data.totalTickets === "number") setSummary(data);
+        return;
       }
-      const data = await res.json();
-
-      // Refresh wallet list after connecting
-      const statusRes = await fetch(`/api/unlock-tickets/${memberId}`);
-      const status = await statusRes.json();
-      setWallets(status.wallets || []);
-      setTotalTickets(status.totalTickets || 0);
-
-      if (data.ticketCount === 0 && !data.alreadyConnected) {
-        setError("No GPP tickets found for this wallet.");
-        setState("error");
+      if (res.status === 429) {
+        const mins = Math.max(1, Math.ceil((data.retryAfterSeconds ?? 60) / 60));
+        setNote(`Rescanned recently. Try again in about ${mins} minute${mins === 1 ? "" : "s"}.`);
       } else {
-        setState("connected");
+        setNote(data.error || "Something went wrong. Please try again.");
       }
     } catch {
-      setError("Failed to connect wallet. Please try again.");
-      setState("error");
+      setNote("Something went wrong. Please try again.");
+    } finally {
+      setBusy(false);
     }
   }
 
@@ -137,112 +108,86 @@ export function UnlockTicketCard({ memberId }: UnlockTicketCardProps) {
     window.location.href = url;
   }
 
-  // Hidden/loading states
-  if (state === "loading" || state === "hidden") return null;
+  if (!loaded) return null;
+  const total = summary?.totalTickets ?? 0;
+  // Visitors only see the card when there is something to show.
+  if (!isOwner && total === 0) return null;
+  const events = summary?.events ?? [];
 
   return (
     <div className="mt-6 pt-6 border-t border-rule">
-      <h3 className="font-display text-lg font-semibold m-0 mb-4">
-        Pizza Party Tickets
-      </h3>
+      <h3 className="font-display text-lg font-semibold m-0 mb-4">Pizza Party Tickets</h3>
 
-      {/* Connected — show tickets from all wallets */}
-      {state === "connected" && wallets.length > 0 && (
-        <div>
-          {/* Hero count tile — butter accent */}
-          <div className="text-center mb-5 px-4 py-5 rounded-[var(--radius)] border border-rule bg-butter/30">
-            <div className="font-display text-5xl font-extrabold leading-none text-foreground">
-              {totalTickets}
-            </div>
-            <div className="mt-1.5 text-xs font-bold uppercase tracking-widest text-ink/70 font-display">
-              GPP Ticket{totalTickets !== 1 ? "s" : ""}
-            </div>
-          </div>
+      <div className="text-center mb-5 px-4 py-5 rounded-[var(--radius)] border border-rule bg-butter/30">
+        <div className="font-display text-5xl font-extrabold leading-none text-foreground">{total}</div>
+        <div className="mt-1.5 text-xs font-bold uppercase tracking-widest text-ink/70 font-display">
+          Pizza Party Ticket{total !== 1 ? "s" : ""}
+        </div>
+      </div>
 
-          {/* All tickets across all wallets */}
-          {wallets.some((w) => w.tickets.length > 0) && (
-            <div className="grid gap-1">
-              {wallets.flatMap((w) =>
-                w.tickets.map((ticket, idx) => (
-                  <div
-                    key={`${w.id}-${idx}`}
-                    className={`flex justify-between items-center px-2.5 py-1.5 rounded-md text-[13px] ${
-                      idx % 2 === 0 ? "bg-transparent" : "bg-muted"
-                    }`}
-                  >
-                    <span className="font-medium">{ticket.eventName}</span>
-                    <span className="text-xs text-muted-foreground">
-                      {NETWORK_NAMES[ticket.networkId] || `Chain ${ticket.networkId}`}
-                    </span>
-                  </div>
-                ))
-              )}
+      {events.length > 0 && (
+        <div className="grid gap-1">
+          {events.map((e, idx) => (
+            <div
+              key={`${e.networkId}-${e.lockAddress}`}
+              className={`flex justify-between items-center gap-3 px-2.5 py-1.5 rounded-md text-[13px] ${idx % 2 === 0 ? "bg-transparent" : "bg-muted"}`}
+            >
+              <span className="font-medium">
+                {e.url ? (
+                  <a href={e.url} target="_blank" rel="noopener noreferrer" className="underline">
+                    {e.name}
+                  </a>
+                ) : (
+                  e.name
+                )}
+                {e.count > 1 ? ` ×${e.count}` : ""}
+              </span>
+              <span className="text-xs text-muted-foreground whitespace-nowrap">
+                {NETWORK_NAMES[e.networkId] || `Chain ${e.networkId}`}
+                {e.year ? ` · ${e.year}` : ""}
+              </span>
             </div>
+          ))}
+        </div>
+      )}
+
+      {isOwner && (
+        <div className="mt-4 grid gap-2 justify-items-center text-center">
+          {total === 0 && (
+            <p className="text-sm text-muted-foreground italic m-0">
+              {summary && summary.wallets > 0
+                ? "No tickets found on your wallets yet. They are checked nightly, or press Rescan."
+                : "Connect your Unlock wallet to see your Pizza Party Tickets."}
+            </p>
           )}
-
-          {/* Owner can connect another wallet — secondary outline */}
-          {isOwner && (
-            <div className="text-center mt-4">
+          {note && <p className="text-sm text-muted-foreground m-0" role="status">{note}</p>}
+          <div className="flex flex-wrap gap-2 justify-center">
+            {summary && summary.wallets > 0 && (
               <button
-                onClick={handleUnlockLogin}
-                className="px-5 py-2 rounded-[var(--radius)] border border-rule bg-transparent text-foreground font-display text-[13px] font-semibold cursor-pointer hover:bg-muted transition-colors"
+                onClick={() => call("/api/unlock-tickets/rescan", "POST")}
+                disabled={busy}
+                className="px-5 py-2 rounded-[var(--radius)] border border-rule bg-transparent text-foreground font-display text-[13px] font-semibold cursor-pointer hover:bg-muted transition-colors disabled:opacity-50"
               >
-                Connect Another Wallet
+                {busy ? "Scanning..." : "Rescan"}
               </button>
-            </div>
-          )}
-        </div>
-      )}
-
-      {/* Not connected — owner sees connect prompt */}
-      {state === "not-connected" && (
-        <div className="text-center py-5 px-4 rounded-[var(--radius)] border border-dashed border-rule bg-butter/20">
-          <p className="text-sm text-muted-foreground italic mb-4">
-            Connect your Unlock wallet to see your GPP tickets.
-          </p>
-          <button
-            onClick={handleUnlockLogin}
-            style={{
-              ...btn("accent"),
-              background: "hsl(var(--butter))",
-              color: "hsl(var(--ink))",
-              borderColor: "hsl(var(--butter))",
-            }}
-          >
-            Connect Unlock Wallet
-          </button>
-        </div>
-      )}
-
-      {/* Verifying / connecting */}
-      {state === "verifying" && (
-        <div className="text-center py-5">
-          <div className="flex items-center justify-center gap-2 text-sm text-muted-foreground">
-            <span className="inline-block w-4 h-4 border-2 border-tomato border-t-transparent rounded-full animate-spin" />
-            Connecting wallet...
-          </div>
-        </div>
-      )}
-
-      {/* Error */}
-      {state === "error" && (
-        <div className="text-center py-5">
-          <p className="text-sm text-destructive italic mb-4">
-            {error}
-          </p>
-          {isOwner && (
+            )}
             <button
               onClick={handleUnlockLogin}
-              style={{
-                ...btn("accent"),
-                background: "hsl(var(--butter))",
-                color: "hsl(var(--ink))",
-                borderColor: "hsl(var(--butter))",
-              }}
+              disabled={busy}
+              style={
+                total === 0 && !(summary && summary.wallets > 0)
+                  ? { ...btn("accent"), background: "hsl(var(--butter))", color: "hsl(var(--ink))", borderColor: "hsl(var(--butter))" }
+                  : undefined
+              }
+              className={
+                total === 0 && !(summary && summary.wallets > 0)
+                  ? undefined
+                  : "px-5 py-2 rounded-[var(--radius)] border border-rule bg-transparent text-foreground font-display text-[13px] font-semibold cursor-pointer hover:bg-muted transition-colors disabled:opacity-50"
+              }
             >
-              Try Again
+              {summary && summary.wallets > 0 ? "Connect Another Wallet" : "Connect Unlock Wallet"}
             </button>
-          )}
+          </div>
         </div>
       )}
     </div>

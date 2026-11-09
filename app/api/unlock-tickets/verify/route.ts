@@ -1,92 +1,45 @@
-import { NextResponse } from "next/server";
-import { getSession } from "@/app/lib/session";
-import { prisma } from "@/app/lib/db";
-import { fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
-import { findTicketsForWallet } from "@/app/lib/unlock/subgraph";
-import contracts from "@/data/gpp-contracts.json";
+import { NextResponse } from 'next/server'
+import { getSession } from '@/app/lib/session'
+import { prisma } from '@/app/lib/db'
+import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
+import { saveWalletForMember } from '@/app/lib/wallet-lookup'
+import { getTicketSummary, scanMembers } from '@/app/lib/unlock/scan'
 
+export const runtime = 'nodejs'
+export const dynamic = 'force-dynamic'
+export const maxDuration = 60
+
+/**
+ * GET: after the Unlock sign-in redirect, add the signed wallet to the member's wallets and scan.
+ * The connect flow is only a way to add a wallet: tickets always come from a scan of every wallet.
+ * If the scan fails nothing is stored as "0 tickets"; the wallet is still added.
+ */
 export async function GET() {
   try {
-    const session = await getSession();
+    const session = await getSession()
     if (!session?.discordId || !session?.unlockWallet) {
-      return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
+      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
+    const memberId = await fetchMemberIdByDiscordId(session.discordId)
+    if (!memberId) return NextResponse.json({ error: 'Member not found' }, { status: 404 })
 
-    const memberId = await fetchMemberIdByDiscordId(session.discordId);
-    if (!memberId) {
-      return NextResponse.json(
-        { error: "Member not found" },
-        { status: 404 }
-      );
+    const walletAddress = session.unlockWallet
+    // Addresses are stored as given (often checksummed), so match case-insensitively to avoid a duplicate row.
+    const existingWallet = await prisma.memberWallet.findFirst({
+      where: { memberId, walletAddress: { equals: walletAddress, mode: 'insensitive' } },
+      select: { id: true },
+    })
+    if (!existingWallet) await saveWalletForMember(memberId, walletAddress, 'unlock', session.discordId)
+
+    try {
+      await scanMembers([memberId], [{ memberId, wallet: walletAddress }])
+    } catch (e) {
+      console.error('[unlock-tickets/verify] scan failed', e)
+      return NextResponse.json({ error: 'Wallet added, but the Unlock service could not be reached. Use Rescan in a few minutes.', walletAdded: true }, { status: 502 })
     }
-
-    // Check if this wallet is already connected
-    const existing = await prisma.unlockTicketClaim.findUnique({
-      where: { walletAddress: session.unlockWallet },
-      include: { tickets: true },
-    });
-
-    if (existing) {
-      return NextResponse.json({
-        walletAddress: existing.walletAddress,
-        ticketCount: existing.ticketCount,
-        alreadyConnected: true,
-        tickets: existing.tickets.map((t) => ({
-          lockAddress: t.lockAddress,
-          networkId: t.networkId,
-          eventName: t.eventName,
-          tokenId: t.tokenId,
-        })),
-      });
-    }
-
-    // Query subgraphs for tickets
-    const tickets = await findTicketsForWallet(session.unlockWallet, contracts);
-
-    // Auto-save: create the claim record and ticket records
-    const claim = await prisma.unlockTicketClaim.create({
-      data: {
-        discordId: session.discordId,
-        memberId,
-        walletAddress: session.unlockWallet,
-        ticketCount: tickets.length,
-        tickets: {
-          create: tickets.map((t) => ({
-            lockAddress: t.lockAddress,
-            networkId: t.networkId,
-            eventName: t.eventName,
-            tokenId: t.tokenId,
-          })),
-        },
-      },
-      include: { tickets: true },
-    });
-
-    return NextResponse.json({
-      walletAddress: claim.walletAddress,
-      ticketCount: claim.ticketCount,
-      alreadyConnected: false,
-      tickets: claim.tickets.map((t) => ({
-        lockAddress: t.lockAddress,
-        networkId: t.networkId,
-        eventName: t.eventName,
-        tokenId: t.tokenId,
-      })),
-    });
+    return NextResponse.json({ walletAddress, alreadyConnected: !!existingWallet, ...(await getTicketSummary(memberId)) })
   } catch (error) {
-    console.error("Error connecting unlock wallet:", error);
-    if (
-      error instanceof Error &&
-      error.message.includes("Unique constraint")
-    ) {
-      return NextResponse.json(
-        { error: "This wallet is already connected" },
-        { status: 409 }
-      );
-    }
-    return NextResponse.json(
-      { error: "Internal server error" },
-      { status: 500 }
-    );
+    console.error('Error connecting unlock wallet:', error)
+    return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }

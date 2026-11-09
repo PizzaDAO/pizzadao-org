@@ -197,6 +197,9 @@ describe('settings registry', () => {
       ['pfp.outfitOverlayEnabled', false],
       ['jobs.verifyPosts', true],
       ['jobs.unverifiableJobsPayOnClick', true],
+      ['tickets.discoveryTerms', 'pizza\npizzadao\npizza party\nbitcoin pizza day'],
+      ['tickets.scanIntervalHours', 24],
+      ['tickets.rescanCooldownMinutes', 10],
       ['shop.itemGrantsEnabled', true],
       ['shop.sheetSyncEnabled', false],
       // ...and channels and roles to "not set here" (the env value, then the built-in id, apply).
