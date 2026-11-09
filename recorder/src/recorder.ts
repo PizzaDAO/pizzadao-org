@@ -13,7 +13,7 @@ import type { Client, Guild, Message, PartialMessage, VoiceBasedChannel, VoiceSt
 import { VoiceCapture } from './capture.js'
 import { CallLimits } from './call-limits.js'
 import { eventCapMinutes, maxMinutesFor, type Config } from './config.js'
-import { callDisplayName, consentNotice, lateJoinWelcome, mentionedIds, MAX_WELCOME_MENTIONS, welcomeBatch, welcomeOpening } from './consent.js'
+import { callDisplayName, lateJoinWelcome, mentionedIds, MAX_WELCOME_MENTIONS, startNotice, welcomeBatch, welcomeOpening } from './consent.js'
 import {
   decideWindowAction,
   type HandoffInput,
@@ -413,9 +413,13 @@ export class CallRecorder {
           present = []
         }
       }
+      // calls.startNotice (empty = nothing). With welcomes on, the greeting is posted either way.
+      const notice = startNotice(rc.startNotice)
       const noticeOk = rc.welcome.enabled
-        ? await this.send(channel, welcomeOpening(rc.welcome.template, present, callName), mentionedIds(present))
-        : await this.send(channel, consentNotice())
+        ? await this.send(channel, welcomeOpening(rc.welcome.template, present, callName, notice), mentionedIds(present))
+        : notice
+          ? await this.send(channel, notice)
+          : false
       if (!nickAcquired && !noticeOk) return await abort('could not show a recording indicator (nickname and notice both failed)')
       if (this.shuttingDown) return await abort('shutting down')
 

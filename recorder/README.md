@@ -54,7 +54,8 @@ Known limits: stereo 48 kHz Opus is stored as received; pauses inside a speaker'
 
 The recorder has no database. At the start of each session and every 5 minutes it reads `GET {APP_BASE_URL}/api/calls/recorder/config` (Bearer `RECORDER_API_KEY`). It keeps the last good answer if the app is unreachable and runs with everything off when it has never had one. All of these default to off and are edited on the admin settings page:
 
-- Welcome message: `calls.welcomeEnabled` (env kill switch `CALL_WELCOME_ENABLED` on the app), `calls.welcomeTemplate`, `calls.welcomeBatchSeconds`, `calls.recordingLine`. The recording notice always opens the call.
+- Welcome message: `calls.welcomeEnabled` (env kill switch `CALL_WELCOME_ENABLED` on the app), `calls.welcomeTemplate`, `calls.welcomeBatchSeconds`, `calls.recordingLine`. Per-member welcomes and the recording line are unchanged.
+- Start-of-call notice: `calls.startNotice` (multiline, max 500 characters, default empty = post nothing). When set, the recorder posts it in the voice channel chat when a call starts (after the welcome greeting when welcomes are on); mentions (`@everyone`, `@here`, roles) are stripped and no mentions are allowed. The `🔴 REC` nickname is unchanged.
 - End-of-call song: `calls.endSongTriggerEnabled` (kill switch `CALL_END_SONG_ENABLED` on the app), `calls.endSongMinHumans`.
 - House band at call start: `calls.startBandEnabled` (kill switch `CALL_START_BAND_ENABLED` on the app), `calls.startBandCalls`, `calls.startBandMaxSongs`.
 - Live action items (only for the Discord events of crews in `calls.liveActionItemsCrews`):

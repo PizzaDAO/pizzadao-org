@@ -125,7 +125,7 @@ function world(voiceChannels: unknown, welcome = false) {
   const client = { guilds: { fetch: async () => guild }, users: { fetch: async () => ({ bot: false }) } }
   const cfg = { dataDir, guildId: 'g1', callChannelId: DEFAULT, maxCallMinutes: 120, eventCaps: [], emptyGraceMinutes: 5, captureVoiceChat: true } as Config
   const logs: string[] = []
-  let raw: Record<string, unknown> = { voiceChannels, ...(welcome ? { welcome: { enabled: true } } : {}) }
+  let raw: Record<string, unknown> = { voiceChannels, startNotice: 'We record.', ...(welcome ? { welcome: { enabled: true } } : {}) }
   const remote = { get: () => parseRemoteConfig(raw), refresh: async () => parseRemoteConfig(raw) } as unknown as RemoteConfigClient
   const setVoiceChannels = (v: unknown) => void (raw = { ...raw, voiceChannels: v })
   const jobs: Array<() => Promise<void>> = []

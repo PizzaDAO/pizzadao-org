@@ -1,11 +1,15 @@
-/** Wording posted to the voice channel's text chat. Audio is never public (Snax, 2026-10-18). No opt-out (Snax, 2026-10-25). */
-
-export function consentNotice(): string {
-  return [
-    '🔴 **This call is being recorded and transcribed.**',
-    'The audio is private (only Dread Pizza Roberts can listen) and is never published. A summary and transcript may be posted on pizzadao.org after review.',
-    "If you don't want to be recorded, please don't join the call (or leave it). Bots are never recorded.",
-  ].join('\n')
+/**
+ * The start-of-call notice is the admin setting calls.startNotice (empty = post nothing). Made safe
+ * here as well as in the app: no @everyone/@here/role/user mentions, trimmed, at most 500 characters.
+ * Returns '' when there is nothing to post.
+ */
+export function startNotice(raw: string | null | undefined): string {
+  return (raw ?? '')
+    .replace(/<@[!&]?\d+>/g, ' ')
+    .replace(/@(everyone|here)/gi, '@\u200b$1')
+    .trim()
+    .slice(0, 500)
+    .trim()
 }
 
 export function lateJoinWelcome(userId: string): string {
@@ -61,11 +65,11 @@ export function welcomeBatch(template: string, userIds: readonly string[], callN
 
 /**
  * The first message of a recorded call when welcomes are on: the welcome for whoever is already here,
- * then the full recording notice unchanged (the legal content stays complete at the start of every call).
+ * then the start notice (calls.startNotice) when one is set.
  */
-export function welcomeOpening(template: string, userIds: readonly string[], callName: string): string {
+export function welcomeOpening(template: string, userIds: readonly string[], callName: string, notice = ''): string {
   const greeting = userIds.length
     ? fillWelcome(template, userIds, callName)
     : fillWelcome(template, [], callName).replace(/\s{2,}/g, ' ')
-  return `${greeting}\n\n${consentNotice()}`
+  return notice ? `${greeting}\n\n${notice}` : greeting
 }
