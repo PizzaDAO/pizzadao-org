@@ -1,0 +1,55 @@
+{
+  "style": "Playful hand-drawn cartoon pizza style: thick clean dark outlines, flat warm colors (tomato red, cheese yellow, crust golden brown, basil green), slight paper-grain texture, friendly and fun. Square 1024x1024 canvas. Keep all important content inside the central circle (a circular crop will be applied), leaving the outer corners completely empty and transparent (except full-canvas backgrounds). No text, no letters, no logos, no watermark.",
+  "layers": [
+    {
+      "slug": "pirate-flag",
+      "kind": "accessory",
+      "prompt": "A small black pirate flag (Jolly Roger) on a short wooden pole, with a pizza slice and crossed pepperoni-bones emblem, waving in the wind, placed in the upper-right area of the canvas. Transparent background, only the flag and pole."
+    },
+    {
+      "slug": "frame-level-2",
+      "kind": "frame",
+      "prompt": "A simple circular picture frame ring made of a plain bread crust edge with a few scattered flour dots and tiny basil leaves. The center of the canvas is completely empty and transparent so a portrait shows through. Modest and rustic. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
+    },
+    {
+      "slug": "frame-level-4",
+      "kind": "frame",
+      "prompt": "A circular picture frame ring made of golden pizza crust with melted cheese drips along the inside edge and small pepperoni slices spaced around it. The center of the canvas is completely empty and transparent so a portrait shows through. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
+    },
+    {
+      "slug": "frame-level-6",
+      "kind": "frame",
+      "prompt": "A fancy circular picture frame ring made of braided golden pizza crust decorated with mushrooms, olives, basil leaves and pepperoni, with a thin glossy olive-oil shine. The center of the canvas is completely empty and transparent so a portrait shows through."
+    },
+    {
+      "slug": "frame-level-8",
+      "kind": "frame",
+      "prompt": "The most luxurious circular picture frame ring: a crown-like crust border with golden sparkle highlights, tiny jeweled olive and tomato gems, basil laurel leaves, and small flames at the top like a wood-fired oven. The center of the canvas is completely empty and transparent so a portrait shows through."
+    },
+    {
+      "slug": "bg-oven-glow",
+      "kind": "background",
+      "prompt": "A full-canvas background of the inside of a brick wood-fired pizza oven: glowing orange and red embers, warm light radiating from the center, curved brick arch around the edges. Fully opaque, fills the whole square."
+    },
+    {
+      "slug": "bg-pizzeria-wall",
+      "kind": "background",
+      "prompt": "A full-canvas background of a cozy pizzeria wall: red and white checkered tablecloth pattern lower area, cream brick wall above, a few framed pizza posters and hanging string lights, softly out of focus in the center. Fully opaque, fills the whole square."
+    },
+    {
+      "slug": "chef-hat",
+      "kind": "accessory",
+      "prompt": "A tall white puffy chef hat (toque) with a small red pizza-slice pin on the band, tilted slightly, placed at the top-center of the canvas. Transparent background, only the hat. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
+    },
+    {
+      "slug": "mafia-fedora",
+      "kind": "accessory",
+      "prompt": "A classic black pinstripe mafia fedora with a red band and a small pepperoni pin, tilted slightly, placed at the top-center of the canvas. Transparent background, only the hat. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
+    },
+    {
+      "slug": "badge-slice",
+      "kind": "badge",
+      "prompt": "A small round enamel-style badge showing a cheesy pepperoni pizza slice on a red circle with a gold rim, placed in the bottom-right corner of the canvas. Transparent background, only the badge."
+    }
+  ]
+}

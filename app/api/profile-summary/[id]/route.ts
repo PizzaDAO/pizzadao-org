@@ -20,7 +20,7 @@ import { getVouchCounts } from "@/app/lib/vouches";
 import { getCrewMappings, type CrewOption } from "@/app/lib/crew-mappings";
 import { prisma } from "@/app/lib/db";
 import { getMemberTagline } from "@/app/api/profile-extras/[id]/route";
-import { resolvePfpUrl } from "@/app/lib/pfp";
+import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 import { internalError } from "@/app/lib/errors/error-response";
 
 export const runtime = "nodejs";
@@ -165,7 +165,7 @@ export async function composeProfileSummary(
 
     // Pull supplementary data in parallel.
     const [pfpUrl, mission, mafia, vouchCounts, xRow, crewMappings, dbTagline] = await Promise.all([
-        safe(Promise.resolve(resolvePfpUrl(memberId)), null as string | null),
+        safe(resolvePfpUrlAsync(memberId), null as string | null),
         memberDiscordId
             ? safe(getUserProgressSummary(memberDiscordId), null as Awaited<
                 ReturnType<typeof getUserProgressSummary>
