@@ -37,7 +37,8 @@ export type CallSummary = z.infer<typeof summarySchema>
 export function cleanSuggestedBy(v: unknown): string | null {
   if (typeof v !== 'string') return null
   const s = v.replace(/[\u0000-\u001f\u007f-\u009f\u2028\u2029]+/g, ' ').replace(/\s+/g, ' ').trim().slice(0, 100)
-  return s || null
+  // Generic fallbacks ("Speaker 3") say nothing about who it was.
+  return s && !/^(Speaker \d+|Unknown speaker)$/.test(s) ? s : null
 }
 
 /** Applies cleanSuggestedBy to every action item of a parsed summary. */

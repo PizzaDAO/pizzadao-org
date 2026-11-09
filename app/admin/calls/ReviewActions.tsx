@@ -75,7 +75,8 @@ export function parseActionItems(raw: string): ActionItem[] {
             let rest = l;
             let suggestedBy = "";
             const byAt = rest.lastIndexOf(` | ${BY}`);
-            if (byAt !== -1) {
+            // Only the FINAL segment counts as the suggester; a " | by: " followed by more segments is part of the text.
+            if (byAt !== -1 && rest.indexOf(" | ", byAt + 3) === -1) {
                 suggestedBy = rest.slice(byAt + 3 + BY.length).trim();
                 rest = rest.slice(0, byAt).trim();
             }

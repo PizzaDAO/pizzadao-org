@@ -235,8 +235,7 @@ export function mergeLiveActionItems(
     }
     if (out.some((o) => isSameItem(o.text, it.text))) continue
     const by = cleanSuggestedBy(names[it.speakerIds[0]] ?? null)
-    // Generic fallbacks ("Speaker 3") say nothing about who it was.
-    out.push({ text: it.text, owner: it.owner, ...(by && !/^(Speaker \d+|Unknown speaker)$/.test(by) ? { suggestedBy: by } : {}) })
+    out.push({ text: it.text, owner: it.owner, ...(by ? { suggestedBy: by } : {}) })
   }
   return out
 }

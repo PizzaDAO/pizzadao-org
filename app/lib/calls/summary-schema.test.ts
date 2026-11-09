@@ -37,6 +37,8 @@ describe('summarySchema', () => {
     expect(cleanSuggestedBy('  Bob\n\tSmith ')).toBe('Bob Smith')
     expect(cleanSuggestedBy('x'.repeat(150))).toHaveLength(100)
     expect(cleanSuggestedBy('   ')).toBeNull()
+    expect(cleanSuggestedBy('Speaker 3')).toBeNull()
+    expect(cleanSuggestedBy('Unknown speaker')).toBeNull()
     expect(cleanSuggestedBy(undefined)).toBeNull()
     const out = sanitizeSummary({ title: 't', summary: 's', chapters: [], actionItems: [{ text: 'a', owner: null, suggestedBy: ' Bob ' }] })
     expect(out.actionItems[0].suggestedBy).toBe('Bob')

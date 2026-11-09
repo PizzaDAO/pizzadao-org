@@ -17,6 +17,11 @@ describe('review form text formats', () => {
     expect(parseActionItems(formatActionItems(items))).toEqual(items)
   })
 
+  it('keeps a "| by:" inside the text when more segments follow it', () => {
+    const items = [{ text: 'Vote | by: Friday', owner: 'Ann' }, { text: 'Vote | by: Friday', owner: 'Ann', suggestedBy: 'Bob' }]
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+  })
+
   it('drops blank lines in action items', () => {
     expect(parseActionItems('\n  one \n\n two | Bob \n')).toEqual([{ text: 'one' }, { text: 'two', owner: 'Bob' }])
   })

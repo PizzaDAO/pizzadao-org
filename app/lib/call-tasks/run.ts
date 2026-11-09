@@ -157,7 +157,7 @@ export async function proposeTasksForRecording(
   try {
     const settings = await loadSettings()
     // The action items: the summary's own (not when a hidden speaker/line may be in them) plus the live ones, merged with redactions applied.
-    const base = Array.isArray(rec.actionItems) ? (rec.actionItems as Array<{ text?: string; owner?: string | null }>).filter((a): a is { text: string; owner: string | null } => typeof a?.text === 'string').map((a) => ({ text: a.text, owner: a.owner ?? null })) : []
+    const base = Array.isArray(rec.actionItems) ? (rec.actionItems as Array<{ text?: string; owner?: string | null; suggestedBy?: string | null }>).filter((a): a is { text: string; owner: string | null; suggestedBy?: string | null } => typeof a?.text === 'string').map((a) => ({ text: a.text, owner: a.owner ?? null, ...(a.suggestedBy ? { suggestedBy: a.suggestedBy } : {}) })) : []
     const live = await prisma.callLiveItem
       .findMany({
         where: { sessionId: rec.sessionId },
