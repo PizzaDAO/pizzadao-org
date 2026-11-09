@@ -55,7 +55,7 @@ vi.mock("fs", async () => {
     return { ...mocked, default: mocked };
 });
 
-import { composeProfileSummary, SENSITIVE_SHEET_KEYS, PROFILE_SUMMARY_CACHE_HEADERS } from "./route";
+import { composeProfileSummary, withDeadline, SENSITIVE_SHEET_KEYS, PROFILE_SUMMARY_CACHE_HEADERS } from "./route";
 import { fetchMemberById } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
 import { getMafiaRank } from "@/app/lib/mafia-points";
@@ -337,5 +337,48 @@ describe("composeProfileSummary", () => {
         expect(summary!.hero.level).toBeNull();
         expect(summary!.hero.mafiaRank).toBeNull();
         expect(summary!.hero.vouchInCount).toBe(0);
+    });
+});
+
+describe("cold-load budget", () => {
+    beforeEach(() => {
+        vi.clearAllMocks();
+        setupHappyPath();
+    });
+
+    it("withDeadline returns the fallback when the work is slower than the budget", async () => {
+        const slow = new Promise<string>((r) => setTimeout(() => r("late"), 200));
+        const out = await withDeadline(slow, 10, "fallback");
+        expect(out).toEqual({ value: "fallback", timedOut: true });
+    });
+
+    it("withDeadline returns the value when it is in time, and the fallback (not timed out) on rejection", async () => {
+        expect(await withDeadline(Promise.resolve("ok"), 100, "fb")).toEqual({ value: "ok", timedOut: false });
+        expect(await withDeadline(Promise.reject(new Error("x")), 100, "fb")).toEqual({ value: "fb", timedOut: false });
+    });
+
+    it("renders without the mafia rank when it is still computing", async () => {
+        vi.useFakeTimers();
+        try {
+            (getMafiaRank as ReturnType<typeof vi.fn>).mockReturnValueOnce(new Promise(() => {}));
+            const p = composeProfileSummary({ memberId: "69", viewerMemberId: null });
+            await vi.advanceTimersByTimeAsync(5000);
+            const summary = await p;
+            expect(summary!.hero.name).toBe("Turkey Sausage");
+            expect(summary!.hero.mafiaRank).toBeNull();
+            expect(summary!.hero.level).toBe(3);
+        } finally {
+            vi.useRealTimers();
+        }
+    });
+
+    it("light mode returns name, pfp and tagline without the slow lookups", async () => {
+        const summary = await composeProfileSummary({ memberId: "69", viewerMemberId: null, light: true });
+        expect(summary!.hero.name).toBe("Turkey Sausage");
+        expect(summary!.hero.tagline).toBe("Pizza maker extraordinaire");
+        expect(getMafiaRank).not.toHaveBeenCalled();
+        expect(getUserProgressSummary).not.toHaveBeenCalled();
+        expect(getVouchCounts).not.toHaveBeenCalled();
+        expect(getCrewMappings).not.toHaveBeenCalled();
     });
 });

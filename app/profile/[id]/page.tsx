@@ -23,7 +23,7 @@ export const runtime = "nodejs";
 // metadata path resilient to upstream sheet flakiness.
 async function loadHero(id: string) {
     try {
-        return await composeProfileSummary({ memberId: id, viewerMemberId: null });
+        return await composeProfileSummary({ memberId: id, viewerMemberId: null, light: true });
     } catch {
         return null;
     }
