@@ -2635,11 +2635,32 @@ model PfpAssetGrant {
 /// A member's composed PFP. composedUrl is content-hashed so CDN caches never go stale.
 model MemberPfp {
   memberId    String   @id
-  baseKind    String   @db.VarChar(16) // static | discord | upload | mafia
+  baseKind    String   @db.VarChar(16) // static | discord | upload | mafia | restyle
   baseUrl     String
   layers      Json // [{assetId, x, y, scale, rotation}] in z-order
   composedUrl String
+  // Set only while baseKind is "restyle" (an AI dress-up): the base it was made from, for "Undo dress-up".
+  originalBaseKind String? @db.VarChar(16)
+  originalBaseUrl  String?
   updatedAt   DateTime @updatedAt
+}
+
+/// One AI dress-up generation (cost control and audit). costCents is an estimate; refused and
+/// failed calls cost 0. No FK on purpose: rows survive an asset delete.
+model PfpRestyle {
+  id           Int      @id @default(autoincrement())
+  memberId     String
+  discordId    String
+  outfitId     Int
+  outfitName   String   @db.VarChar(60)
+  costCents    Int
+  status       String   @db.VarChar(12) // pending | ok | refused | error
+  resultUrl    String?
+  createdAt    DateTime @default(now())
+
+  @@index([memberId, createdAt])
+  @@index([memberId, outfitId])
+  @@index([createdAt])
 }
 
 /// Audit log for /admin/pfp-assets. No FK on purpose: rows survive an asset delete.

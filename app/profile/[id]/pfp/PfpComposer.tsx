@@ -3,7 +3,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
 
 type Kind = "background" | "outfit" | "frame" | "accessory" | "badge";
-type BaseKind = "static" | "discord" | "upload" | "mafia";
+type BaseKind = "static" | "discord" | "upload" | "mafia" | "restyle";
+type OriginalBase = { kind: Exclude<BaseKind, "restyle">; url?: string | null };
 interface Asset {
   id: number; name: string; kind: Kind; imageUrl: string; thumbUrl: string | null;
   defaultTransform: { x: number; y: number; scale: number; rotation: number } | null;
@@ -12,8 +13,10 @@ interface Asset {
 interface State {
   level: number;
   bases: { static: string | null; discord: string | null; mafia: string | null };
-  current: { baseKind: BaseKind; baseUrl: string; composedUrl: string; layers: Layer[] } | null;
+  current: { baseKind: BaseKind; baseUrl: string; composedUrl: string; layers: Layer[]; original: OriginalBase | null } | null;
   assets: Asset[];
+  outfitOverlay: boolean;
+  restyle: { enabled: boolean; perUnlock: number; dailyRemaining: number; blocked: string | null; usedByOutfit: Record<string, number> };
 }
 interface Layer { assetId: number; x: number; y: number; scale: number; rotation: number }
 
@@ -43,6 +46,11 @@ export function PfpComposer({ memberId }: { memberId: string }) {
   const [selected, setSelected] = useState<number | null>(null);
   const [busy, setBusy] = useState(false);
   const [savedUrl, setSavedUrl] = useState<string | null>(null);
+  const [tab, setTab] = useState<"layers" | "dress">("layers");
+  const [restyleUrl, setRestyleUrl] = useState<string | null>(null);
+  const [original, setOriginal] = useState<OriginalBase | null>(null);
+  const [candidate, setCandidate] = useState<{ url: string; from: OriginalBase; outfitId: number } | null>(null);
+  const [generating, setGenerating] = useState<number | null>(null);
   const stage = useRef<HTMLDivElement>(null);
   const drag = useRef<number | null>(null);
 
@@ -53,6 +61,10 @@ export function PfpComposer({ memberId }: { memberId: string }) {
       if (s.current) {
         setBaseKind(s.current.baseKind);
         if (s.current.baseKind === "upload") setUploadUrl(s.current.baseUrl);
+        if (s.current.baseKind === "restyle") {
+          setRestyleUrl(s.current.baseUrl);
+          setOriginal(s.current.original);
+        }
         setLayers(s.current.layers);
         setSavedUrl(s.current.composedUrl);
       } else setBaseKind(s.bases.static ? "static" : s.bases.discord ? "discord" : "static");
@@ -63,7 +75,10 @@ export function PfpComposer({ memberId }: { memberId: string }) {
   if (!state) return <p className="text-foreground/60">{error ?? "Loading..."}</p>;
 
   const byId = new Map(state.assets.map((a) => [a.id, a]));
-  const baseSrc = baseKind === "upload" ? uploadUrl : state.bases[baseKind];
+  const baseSrc = baseKind === "upload" ? uploadUrl : baseKind === "restyle" ? restyleUrl : state.bases[baseKind];
+  // The picture a dress-up starts from: the original under a current dress-up, else the chosen base.
+  const startBase: OriginalBase | null = baseKind === "restyle" ? original : { kind: baseKind, url: baseKind === "upload" ? uploadUrl : undefined };
+  const startSrc = !startBase ? null : startBase.kind === "upload" ? startBase.url ?? null : state.bases[startBase.kind];
   const used = (kind: Kind) => layers.filter((l) => byId.get(l.assetId)?.kind === kind);
 
   function toggle(a: Asset) {
@@ -96,7 +111,7 @@ export function PfpComposer({ memberId }: { memberId: string }) {
       const fd = new FormData();
       fd.set("file", file);
       const r = await api("/api/pfp/compose/upload", { method: "POST", body: fd });
-      setUploadUrl(r.url); setBaseKind("upload");
+      setUploadUrl(r.url); pickBase("upload");
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
 
@@ -106,10 +121,47 @@ export function PfpComposer({ memberId }: { memberId: string }) {
       const r = await api("/api/pfp/compose", {
         method: "POST",
         headers: { "content-type": "application/json" },
-        body: JSON.stringify({ base: { kind: baseKind, url: baseKind === "upload" ? uploadUrl : undefined }, layers }),
+        body: JSON.stringify({
+          base: { kind: baseKind, url: baseKind === "upload" ? uploadUrl : baseKind === "restyle" ? restyleUrl : undefined },
+          ...(baseKind === "restyle" ? { original } : {}),
+          layers,
+        }),
       });
       setSavedUrl(r.composedUrl);
     } catch (e) { setError((e as Error).message); } finally { setBusy(false); }
+  }
+
+  function pickBase(k: Exclude<BaseKind, "restyle">) {
+    setBaseKind(k); setRestyleUrl(null); setOriginal(null); setCandidate(null);
+  }
+
+  async function dressUp(outfitId: number) {
+    if (!startBase) return;
+    setGenerating(outfitId); setError(null); setCandidate(null);
+    try {
+      const r = await api("/api/pfp/restyle", {
+        method: "POST",
+        headers: { "content-type": "application/json" },
+        body: JSON.stringify({ outfitId, base: { kind: startBase.kind, url: startBase.url ?? undefined } }),
+      });
+      setCandidate({ url: r.url, from: startBase, outfitId });
+      setState((cur) => cur && {
+        ...cur,
+        restyle: { ...cur.restyle, dailyRemaining: r.dailyRemaining, usedByOutfit: { ...cur.restyle.usedByOutfit, [outfitId]: cur.restyle.perUnlock - r.outfitRemaining } },
+      });
+    } catch (e) { setError((e as Error).message); } finally { setGenerating(null); }
+  }
+
+  function useCandidate() {
+    if (!candidate) return;
+    setRestyleUrl(candidate.url); setOriginal(candidate.from); setBaseKind("restyle"); setCandidate(null);
+  }
+
+  function undoDressUp() {
+    if (!original) return;
+    setBaseKind(original.kind);
+    if (original.kind === "upload") setUploadUrl(original.url ?? null);
+    setRestyleUrl(null); setOriginal(null); setCandidate(null);
   }
 
   async function reset() {
@@ -203,7 +255,7 @@ export function PfpComposer({ memberId }: { memberId: string }) {
           <h2 className="m-0 text-lg font-bold">Base picture</h2>
           <div className="flex gap-2 flex-wrap">
             {([["static", "Current"], ["discord", "Discord"], ["mafia", "Mafia portrait"]] as const).map(([k, label]) => (
-              <button key={k} type="button" disabled={!state.bases[k]} onClick={() => setBaseKind(k)}
+              <button key={k} type="button" disabled={!state.bases[k]} onClick={() => pickBase(k)}
                 aria-pressed={baseKind === k} className={`rounded border px-3 py-1 text-sm disabled:opacity-40 ${baseKind === k ? "font-bold border-foreground" : ""}`}>
                 {label}
               </button>
@@ -216,7 +268,74 @@ export function PfpComposer({ memberId }: { memberId: string }) {
           </div>
         </section>
 
-        {KINDS.map(({ kind, label }) => {
+        <div role="tablist" className="flex gap-2">
+          {([["layers", "Layers"], ["dress", "Dress up"]] as const).map(([t, label]) => (
+            <button key={t} type="button" role="tab" aria-selected={tab === t} onClick={() => setTab(t)}
+              className={`rounded border px-3 py-1 text-sm ${tab === t ? "font-bold border-foreground" : ""}`}>{label}</button>
+          ))}
+        </div>
+
+        {tab === "dress" && (
+          <section className="grid gap-3">
+            <h2 className="m-0 text-lg font-bold">Dress up</h2>
+            {!state.restyle.enabled ? (
+              <p className="m-0 text-foreground/60">Dress up is not available yet. Check back soon.</p>
+            ) : (
+              <>
+                <p className="m-0 text-sm text-foreground/70">
+                  Redraws your picture wearing an outfit you have unlocked. {state.restyle.dailyRemaining} {state.restyle.dailyRemaining === 1 ? "try" : "tries"} left today.
+                  {state.restyle.blocked ? ` ${state.restyle.blocked}` : ""}
+                </p>
+                {generating !== null && <p role="status" className="m-0 text-sm">Dressing you up... this takes about a minute.</p>}
+                <ul className="m-0 p-0 list-none grid grid-cols-3 sm:grid-cols-4 gap-2">
+                  {state.assets.filter((a) => a.kind === "outfit").map((a) => {
+                    const left = Math.max(0, state.restyle.perUnlock - (state.restyle.usedByOutfit[a.id] ?? 0));
+                    const can = a.unlocked && left > 0 && state.restyle.dailyRemaining > 0 && !state.restyle.blocked && generating === null && !!startBase;
+                    return (
+                      <li key={a.id}>
+                        <button type="button" disabled={!can} onClick={() => dressUp(a.id)} title={a.unlocked ? a.name : a.hint ?? "Locked"}
+                          className={`w-full rounded-lg border p-1 text-left ${a.unlocked ? "" : "opacity-45 cursor-not-allowed"}`}>
+                          {/* eslint-disable-next-line @next/next/no-img-element */}
+                          <img src={a.thumbUrl ?? a.imageUrl} alt="" className={`aspect-square w-full rounded object-contain bg-foreground/5 ${a.unlocked ? "" : "grayscale"}`} />
+                          <span className="block truncate text-xs mt-1">{a.name}</span>
+                          <span className="block text-[11px] leading-tight text-foreground/70">
+                            {a.unlocked ? `${left} ${left === 1 ? "try" : "tries"} left` : a.hint}
+                          </span>
+                        </button>
+                      </li>
+                    );
+                  })}
+                </ul>
+                {candidate && (
+                  <div className="grid gap-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <figure className="m-0 grid gap-1 text-xs text-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        {startSrc && <img src={startSrc} alt="Before" className="aspect-square w-full rounded-lg object-cover" />}
+                        Before
+                      </figure>
+                      <figure className="m-0 grid gap-1 text-xs text-center">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img src={candidate.url} alt="After" className="aspect-square w-full rounded-lg object-cover" />
+                        After
+                      </figure>
+                    </div>
+                    <div className="flex gap-2">
+                      <button type="button" onClick={useCandidate} className="rounded border px-4 py-2 font-semibold">Use this</button>
+                      <button type="button" onClick={() => setCandidate(null)} className="px-2 py-2 text-sm underline">Discard</button>
+                    </div>
+                  </div>
+                )}
+                {baseKind === "restyle" && (
+                  <button type="button" onClick={undoDressUp} className="justify-self-start rounded border px-3 py-1 text-sm">Undo dress up</button>
+                )}
+                <p className="m-0 text-xs text-foreground/60">Press Save to keep it. Frames, accessories and badges are added on top.</p>
+              </>
+            )}
+          </section>
+        )}
+
+        {tab === "layers" && KINDS.filter((k) => k.kind !== "outfit" || state.outfitOverlay).map(({ kind, label }) => {
           const list = state.assets.filter((a) => a.kind === kind);
           if (list.length === 0) return null;
           return (

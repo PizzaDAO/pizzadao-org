@@ -15,6 +15,7 @@ import { isAllowedFetchUrl, isDiscordCdnUrl } from './hosts'
 import { listAssets, type AssetRecord } from './catalog'
 import { loadUnlockContext } from './context'
 import { unlockedAssetIds, type UnlockContext } from './unlocks'
+import { toggleEnabled } from '@/app/lib/settings/toggles'
 import {
   CANVAS_SIZE,
   KIND_LIMITS,
@@ -25,7 +26,7 @@ import {
   type Layer,
 } from './types'
 
-export const BASE_KINDS = ['static', 'discord', 'upload', 'mafia'] as const
+export const BASE_KINDS = ['static', 'discord', 'upload', 'mafia', 'restyle'] as const
 export type BaseKind = (typeof BASE_KINDS)[number]
 export const MAX_LAYERS = 7
 const MAX_FETCH_BYTES = 8 * 1024 * 1024
@@ -46,6 +47,7 @@ export function validateLayers(
   raw: unknown,
   assets: ReadonlyArray<AssetRecord>,
   unlocked: ReadonlySet<number>,
+  opts: { outfitOverlay?: boolean } = {},
 ): Layer[] {
   if (!Array.isArray(raw)) throw new ValidationError('layers must be a list', 'layers')
   if (raw.length > MAX_LAYERS) throw new ValidationError(`At most ${MAX_LAYERS} layers`, 'layers')
@@ -63,6 +65,8 @@ export function validateLayers(
     const asset = byId.get(id)
     // Unknown, inactive and locked all look the same to the caller.
     if (!asset || !asset.isActive || !unlocked.has(id)) throw new ForbiddenError('One of the items is not unlocked for you')
+    // Outfits are AI dress-up references; flat overlays only work behind pfp.outfitOverlayEnabled.
+    if (asset.kind === 'outfit' && !opts.outfitOverlay) throw new ValidationError('Outfit overlays are turned off', 'layers')
     counts[asset.kind]++
     if (counts[asset.kind] > KIND_LIMITS[asset.kind]) {
       throw new ValidationError(`Too many ${asset.kind} layers (max ${KIND_LIMITS[asset.kind]})`, 'layers')
@@ -126,7 +130,7 @@ export function discordAvatar1024(url: string): string {
 
 export interface BaseChoice {
   kind: BaseKind
-  /** Only for kind "upload": a Blob URL under pfp-base/<memberId>/. */
+  /** Only for kinds "upload" and "restyle": a Blob URL under pfp-base/<memberId>/. */
   url?: string
 }
 
@@ -137,11 +141,12 @@ export async function loadBase(
   choice: BaseChoice,
   fetchImpl: typeof fetch = fetch,
 ): Promise<{ bytes: Buffer; url: string }> {
-  if (choice.kind === 'upload') {
+  if (choice.kind === 'upload' || choice.kind === 'restyle') {
     const url = String(choice.url ?? '')
     let ok = false
     try {
-      ok = isOwnBlobUrl(url, `/pfp-base/${memberId}/`)
+      // Dress-up results are written by the server as pfp-base/<memberId>/restyle-<hash>.png
+      ok = isOwnBlobUrl(url, choice.kind === 'restyle' ? `/pfp-base/${memberId}/restyle-` : `/pfp-base/${memberId}/`)
     } catch {
       ok = false
     }
@@ -222,6 +227,8 @@ export async function composeMemberPfp(args: {
   memberId: string
   discordId: string
   base: BaseChoice
+  /** For kind "restyle": the base the dress-up was made from (kept so it can be undone). */
+  original?: BaseChoice
   layers: unknown
   ctx?: UnlockContext
   fetchImpl?: typeof fetch
@@ -231,7 +238,16 @@ export async function composeMemberPfp(args: {
 
   // 1. Server-side unlock re-check (never trust the client's list).
   const [assets, ctx] = await Promise.all([listAssets({ activeOnly: true }), args.ctx ?? loadUnlockContext(discordId)])
-  const layers = validateLayers(args.layers, assets, unlockedAssetIds(assets, ctx))
+  const outfitOverlay = await toggleEnabled('pfp.outfitOverlayEnabled')
+  const layers = validateLayers(args.layers, assets, unlockedAssetIds(assets, ctx), { outfitOverlay })
+
+  let original: { kind: BaseKind; url: string | null } | null = null
+  if (base.kind === 'restyle') {
+    const o = args.original
+    if (!o || !isBaseKind(o.kind) || o.kind === 'restyle') throw new ValidationError('Missing the original picture', 'original')
+    if (o.kind === 'upload' && !isOwnBlobUrl(String(o.url ?? ''), `/pfp-base/${memberId}/`)) throw new ValidationError('Upload not found', 'original')
+    original = { kind: o.kind, url: o.kind === 'upload' ? String(o.url) : null }
+  }
 
   // 2. Fetch base + layer art, composite.
   const byId = new Map(assets.map((a) => [a.id, a]))
@@ -256,8 +272,8 @@ export async function composeMemberPfp(args: {
   const prev = await prisma.memberPfp.findUnique({ where: { memberId }, select: { composedUrl: true } })
   await prisma.memberPfp.upsert({
     where: { memberId },
-    create: { memberId, baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url },
-    update: { baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url },
+    create: { memberId, baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url, originalBaseKind: original?.kind ?? null, originalBaseUrl: original?.url ?? null },
+    update: { baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url, originalBaseKind: original?.kind ?? null, originalBaseUrl: original?.url ?? null },
   })
   if (prev?.composedUrl && prev.composedUrl !== blob.url && isOwnBlobUrl(prev.composedUrl)) {
     await del(prev.composedUrl).catch(() => undefined) // best effort

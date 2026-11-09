@@ -95,6 +95,7 @@ export const RATE_LIMITS = {
   // PFP composer: saving a composite and uploading a base picture, per member.
   "pfp-compose": { limit: 20, windowSec: 10 * 60 },
   "pfp-upload": { limit: 10, windowSec: 10 * 60 },
+  "pfp-restyle": { limit: 6, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;
