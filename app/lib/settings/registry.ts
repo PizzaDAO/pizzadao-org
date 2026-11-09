@@ -949,6 +949,13 @@ export const SETTINGS = {
     help: 'Post the recap to Discord when a call is published. The CALL_RECAP_POST_ENABLED env var set to off always wins.',
     confirmOn: 'Published calls will post a recap to Discord.',
   }),
+  'calls.recapMentionPing': boolSetting({
+    key: 'calls.recapMentionPing',
+    area: 'calls',
+    label: 'Ping people mentioned in recaps',
+    help: 'On: members named in a call recap (speakers, action-item owners) are @mentioned and notified. Off: they show as clickable names without a notification. The CALL_RECAP_MENTION_PING_ENABLED env var set to off always wins.',
+    default: true,
+  }),
   'calls.agendaPostEnabled': boolSetting({
     key: 'calls.agendaPostEnabled',
     area: 'calls',

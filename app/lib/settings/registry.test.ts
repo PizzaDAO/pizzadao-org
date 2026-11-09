@@ -116,6 +116,7 @@ describe('settings registry', () => {
       ['missions.verifiersEnabled', false],
       ['missions.reviewCardsEnabled', false],
       ['calls.recapPostEnabled', false],
+      ['calls.recapMentionPing', true],
       ['calls.agendaPostEnabled', false],
       ['calls.agendaLinks', ''],
       ['calls.attendanceCrewAliases', 'community = community_call'],

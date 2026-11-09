@@ -43,6 +43,7 @@ export const prisma = {
   callRecording: createModelMock(),
   callAgendaPost: createModelMock(),
   callSpeaker: createModelMock(),
+  member: createModelMock(),
   callLiveChunk: createModelMock(),
   callLiveItem: createModelMock(),
   recordingOptOut: createModelMock(),

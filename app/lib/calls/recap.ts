@@ -14,7 +14,7 @@ import { prisma } from '@/app/lib/db'
 import { getCrewMappings } from '@/app/lib/crew-mappings'
 import { DEFAULT_ANNOUNCE_CHANNEL_ID } from '@/app/lib/announce/run'
 import { getChannel, getGuildChannels, normalizeChannelName } from '@/app/lib/discord-channels'
-import { DISCORD_MESSAGE_LIMIT, DiscordPostError, postDiscordMessage } from '@/app/lib/discord-rest'
+import { DISCORD_MESSAGE_LIMIT, DiscordPostError, editDiscordMessage, postDiscordMessage } from '@/app/lib/discord-rest'
 import { EMPTY_POST_FILTER, isCrewExcluded, loadPostFilter, mentionsBlockedTerm, type PostFilter } from '@/app/lib/calls/post-filters'
 import { SITE_URL } from '@/app/lib/site-url'
 import { savedChannelId } from '@/app/lib/settings/channels'
@@ -98,10 +98,224 @@ export function recapUrl(id: string, base: string = SITE_URL): string {
   return `${base.replace(/\/$/, '')}/calls/${encodeURIComponent(id)}`
 }
 
-/** The Discord message text. Always within Discord's 2000-character limit. */
-export function buildRecapText(rec: RecapInput, base: string = SITE_URL, filter: PostFilter = EMPTY_POST_FILTER, limits: RecapLimits = DEFAULT_RECAP_LIMITS): string {
+/** A person the recap may mention: the call's speakers first, then (for action-item names) the members directory. */
+export interface RecapPeople {
+  speakers: Array<{ discordId: string; displayName: string | null }>
+  members: Array<{ discordId: string; name: string }>
+}
+
+/** Ids the recap inserted as mentions, with the name each stands for (only these may ever be pinged). */
+export type RecapMentions = Map<string, string>
+
+export const MAX_MENTION_USERS = 25
+const MENTION_RE = /<@(\d{5,25})>/g
+/** Any user / nickname / role mention already in stored text. */
+const ANY_MENTION_RE = /<@[!&]?\d+>/g
+/** Names that are never mentioned (the bot / the AI), whatever the call's speakers say. */
+const NEVER_MENTION = new Set(['metalhead', 'claude', 'pepperoni bot', 'bot'])
+/** Placeholder owners that never mean one person. */
+const GENERIC_NAMES = new Set(['team', 'everyone', 'everybody', 'tbd', 'tba', 'all', 'anyone', 'someone', 'nobody', 'none', 'unassigned', 'we', 'group', 'crew', 'na', 'n a'])
+/** Words that are not accepted as a lone first-name match inside a sentence. */
+const STOPWORDS = new Set([...GENERIC_NAMES, 'the', 'pizza', 'will', 'they', 'you', 'dao', 'and', 'for', 'this', 'that', 'new', 'call', 'admin', 'host', 'guest', 'pep', 'community', 'ops', 'mod', 'mods', 'she', 'her', 'his', 'him', 'our', 'with', 'from'])
+
+/** Lower-case letters, digits and single spaces only (emoji, punctuation and decoration dropped). */
+export const normalizeName = (s: string): string => s.normalize('NFKC').toLowerCase().replace(/[^\p{L}\p{N}\s]+/gu, ' ').replace(/\s+/g, ' ').trim()
+const isBotName = (n: string) => NEVER_MENTION.has(n) || /\bbot$/.test(n)
+/** A normalized name that must never become a mention (bot, placeholder, digits only, or a lone stopword). */
+const isUnmentionable = (n: string) => !n || isBotName(n) || GENERIC_NAMES.has(n) || /^\d+$/.test(n) || (!n.includes(' ') && STOPWORDS.has(n))
+const firstWord = (n: string) => n.split(' ')[0] ?? ''
+const neutralName = (n: string | null | undefined) => oneLine((n ?? '').replace(ANY_MENTION_RE, '@user'))
+
+/** Replace mention markup already present in stored text (a speaker's name when known, else "@user"), so only the code below creates mentions. */
+export function neutralizeMentions(text: string, people?: RecapPeople): string {
+  return text.replace(ANY_MENTION_RE, (m) => {
+    const id = m.match(/\d+/)![0]
+    const known = m.startsWith('<@&') ? null : people?.speakers.find((s) => s.discordId === id)?.displayName
+    return known ? neutralName(known) || '@user' : '@user'
+  })
+}
+
+interface Mentionable { id: string; name: string; first: string | null; display: string }
+
+/** Speakers that can be mentioned: a real member id, not a bot or placeholder; first word only when it is a real name word nobody else shares. */
+function mentionableSpeakers(people: RecapPeople | undefined): Mentionable[] {
+  const rows: Mentionable[] = []
+  for (const sp of people?.speakers ?? []) {
+    const name = normalizeName(sp.displayName ?? '')
+    if (!SNOWFLAKE.test(sp.discordId) || isUnmentionable(name)) continue
+    rows.push({ id: sp.discordId, name, first: firstWord(name), display: neutralName(sp.displayName) })
+  }
+  const count = new Map<string, number>()
+  for (const r of rows) count.set(r.first!, (count.get(r.first!) ?? 0) + 1)
+  return rows.map((r) => ({ ...r, first: r.first && r.first.length >= 3 && count.get(r.first) === 1 && !STOPWORDS.has(r.first) && !isBotName(r.first) && !/^\d+$/.test(r.first) ? r.first : null }))
+}
+
+/**
+ * The Discord id a name refers to, or null. The call's speakers first (full name, then a unique first
+ * word), then the members directory (exact after normalizing; null when it is ambiguous). Bots,
+ * placeholders (Team, Everyone, TBD...) and ambiguous names resolve to null.
+ */
+export function resolveMentionId(rawName: string, people: RecapPeople | undefined): string | null {
+  const name = normalizeName(rawName)
+  if (!people || isUnmentionable(name)) return null
+  const speakers = mentionableSpeakers(people)
+  const full = [...new Set(speakers.filter((s) => s.name === name).map((s) => s.id))]
+  if (full.length === 1) return full[0]
+  if (full.length > 1) return null
+  const byFirst = speakers.filter((s) => s.first === name)
+  if (byFirst.length === 1) return byFirst[0].id
+  const members = [...new Set(people.members.filter((m) => SNOWFLAKE.test(m.discordId) && normalizeName(m.name) === name).map((m) => m.discordId))]
+  return members.length === 1 ? members[0] : null
+}
+
+/** What to show for an id: the speaker's display name, else the member's name. */
+function nameFor(id: string, people: RecapPeople | undefined): string {
+  return neutralName(people?.speakers.find((s) => s.discordId === id)?.displayName ?? people?.members.find((m) => m.discordId === id)?.name) || 'user'
+}
+
+/** Action-item owner / suggestedBy: each name in "Ann, Bob" or "Ann & Bob" becomes a mention when it resolves. */
+export function mentionNames(raw: string, people: RecapPeople | undefined, out?: RecapMentions): string {
+  if (!people) return raw
+  const parts = raw.split(/(\s*(?:,|&|\/|\band\b)\s*)/i)
+  return parts.map((part, i) => {
+    if (i % 2 === 1) return part
+    const id = resolveMentionId(part, people)
+    if (!id) return part
+    out?.set(id, nameFor(id, people))
+    return `<@${id}>`
+  }).join('')
+}
+
+const escapeRe = (s: string) => s.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')
+const CAPITAL_START = /^[\p{Lu}\p{Lt}\p{N}]/u
+
+/**
+ * Replace the first occurrence per speaker of that speaker's name (or unique first word) in a bullet
+ * with a mention. One pass over all speakers, longest name first; whole words only; every matched
+ * word must start with a capital so common words ("will", "pizza") are not taken for people.
+ */
+export function mentionInBullet(text: string, people: RecapPeople | undefined, out?: RecapMentions): string {
+  const key = new Map<string, string>() // normalized phrase -> id ('' when two speakers share it)
+  const add = (k: string, id: string) => key.set(k, key.has(k) && key.get(k) !== id ? '' : id)
+  for (const sp of mentionableSpeakers(people)) {
+    add(sp.name, sp.id)
+    if (sp.first) add(sp.first, sp.id)
+  }
+  const phrases = [...key.entries()].filter(([, id]) => id).map(([k]) => k).sort((a, b) => b.length - a.length)
+  if (!phrases.length) return text
+  // Spaces in a name match any run of non-letters, so "Enzo Pepperoni" also matches "Enzo-Pepperoni".
+  const alt = phrases.map((p) => p.split(' ').map(escapeRe).join('[^\\p{L}\\p{N}]+')).join('|')
+  const re = new RegExp(`(?<![\\p{L}\\p{N}@<])(?:${alt})(?![\\p{L}\\p{N}>])`, 'giu')
+  const done = new Set<string>()
+  return text.replace(re, (m) => {
+    const words = m.split(/[^\p{L}\p{N}]+/u).filter(Boolean)
+    if (!words.every((w) => CAPITAL_START.test(w))) return m
+    const id = key.get(normalizeName(m))
+    if (!id || done.has(id)) return m
+    done.add(id)
+    out?.set(id, nameFor(id, people))
+    return `<@${id}>`
+  })
+}
+
+/** The unique user ids mentioned in a text. */
+export function mentionedIds(text: string): string[] {
+  return [...new Set([...text.matchAll(MENTION_RE)].map((m) => m[1]))]
+}
+
+/**
+ * allowed_mentions for a recap: ping ONLY the ids the recap code inserted itself (never ids that
+ * were already in stored text) when on; render them quietly when off.
+ */
+export function recapAllowedMentions(ids: readonly string[], ping: boolean): { parse: []; users?: string[] } {
+  const users = [...new Set(ids)].slice(0, MAX_MENTION_USERS)
+  return ping && users.length ? { parse: [], users } : { parse: [] }
+}
+
+/** Whether mentions in the recap notify (calls.recapMentionPing; default on, the env kill switch turns it off). */
+export function recapMentionPing(env: Record<string, string | undefined> = process.env): Promise<boolean> {
+  return toggleEnabled('calls.recapMentionPing', env)
+}
+
+/**
+ * Speakers of the recording plus the members directory rows for the action-item names the speakers
+ * do not cover. Hidden (redacted) speakers and their ids never take part. Imported calls get nobody:
+ * their recap shows plain names only.
+ */
+export async function loadRecapPeople(rec: { id: string; source?: string | null; actionItems: unknown; redactedSpeakerIds?: readonly string[] | null }): Promise<RecapPeople> {
+  const none: RecapPeople = { speakers: [], members: [] }
+  if (isImportedSource(rec.source)) return none
+  const redacted = new Set(rec.redactedSpeakerIds ?? [])
+  const hiddenIds = new Set<string>(redacted)
+  let speakers: RecapPeople['speakers'] = []
+  try {
+    const rows = await prisma.callSpeaker.findMany({ where: { recordingId: rec.id }, select: { discordId: true, linkedDiscordId: true, displayName: true } })
+    for (const r of rows) if (redacted.has(r.discordId) && r.linkedDiscordId) hiddenIds.add(r.linkedDiscordId)
+    speakers = rows.filter((r) => !hiddenIds.has(r.discordId)).map((r) => ({ discordId: r.discordId, displayName: r.displayName }))
+  } catch (err) {
+    console.error('[calls/recap] speakers unavailable, no mentions:', err instanceof Error ? err.message : err)
+    return none
+  }
+  const base: RecapPeople = { speakers, members: [] }
+  const names = new Set<string>()
+  for (const a of Array.isArray(rec.actionItems) ? rec.actionItems : []) {
+    const o = a as { owner?: unknown; suggestedBy?: unknown }
+    for (const v of [o?.owner, o?.suggestedBy]) {
+      if (typeof v !== 'string') continue
+      for (const part of oneLine(neutralizeMentions(v)).split(/\s*(?:,|&|\/|\band\b)\s*/i)) {
+        const n = normalizeName(part)
+        if (n && !isUnmentionable(n) && !resolveMentionId(part, base)) names.add(firstWord(n))
+      }
+    }
+  }
+  if (!names.size) return base
+  try {
+    // Candidates by first word (the database cannot normalize); uniqueness is judged on the normalized names in memory.
+    const rows = await prisma.member.findMany({
+      where: { discordId: { not: null }, OR: [...names].slice(0, 40).map((n) => ({ name: { contains: n, mode: 'insensitive' as const } })) },
+      select: { discordId: true, name: true },
+      take: 400,
+    })
+    return { speakers, members: rows.filter((m): m is { discordId: string; name: string } => !!m.discordId && !hiddenIds.has(m.discordId)) }
+  } catch (err) {
+    console.error('[calls/recap] members unavailable, speakers only:', err instanceof Error ? err.message : err)
+    return base
+  }
+}
+
+export interface RecapParts {
+  text: string
+  /** Ids the recap inserted as mentions and that are still in the final text, with their display names. */
+  mentions: RecapMentions
+}
+
+/** Stored text with any pre-existing mention markup neutralized (the only mentions are the ones we add). */
+function cleanRecapInput(rec: RecapInput, people?: RecapPeople): RecapInput {
+  const s = (v: string | null | undefined) => (typeof v === 'string' ? neutralizeMentions(v, people) : v)
+  const obj = (v: unknown, fields: string[]) => {
+    if (!v || typeof v !== 'object') return v
+    const o: Record<string, unknown> = { ...(v as Record<string, unknown>) }
+    for (const f of fields) if (typeof o[f] === 'string') o[f] = neutralizeMentions(o[f] as string, people)
+    return o
+  }
+  return {
+    ...rec,
+    title: s(rec.title) ?? null,
+    eventName: s(rec.eventName),
+    crewLabel: s(rec.crewLabel) ?? null,
+    summary: s(rec.summary) ?? null,
+    actionItems: Array.isArray(rec.actionItems) ? rec.actionItems.map((a) => obj(a, ['text', 'owner', 'suggestedBy'])) : rec.actionItems,
+    chapters: Array.isArray(rec.chapters) ? rec.chapters.map((c) => obj(c, ['title'])) : rec.chapters,
+  }
+}
+
+/** The recap text plus which mentions it contains. `mention: false` gives plain names (Telegram). Always within Discord's 2000-character limit. */
+export function buildRecapParts(input: RecapInput, base: string = SITE_URL, filter: PostFilter = EMPTY_POST_FILTER, limits: RecapLimits = DEFAULT_RECAP_LIMITS, people?: RecapPeople, mention = true): RecapParts {
+  const rec = cleanRecapInput(input, people)
+  const who = mention ? people : undefined
+  const found: RecapMentions = new Map()
   const title = clip(oneLine(rec.title ?? rec.eventName ?? rec.crewLabel ?? 'Call recap'), 120)
-  const bullets = recapBullets(rec.summary, rec.chapters, filter, limits)
+  const bullets = recapBullets(rec.summary, rec.chapters, filter, limits).map((b) => mentionInBullet(b, who, found))
   const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : [])
     .map((a) => {
       const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown }
@@ -109,7 +323,7 @@ export function buildRecapText(rec: RecapInput, base: string = SITE_URL, filter:
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
       const by = typeof o?.suggestedBy === 'string' ? oneLine(o.suggestedBy) : ''
       return text && !mentionsBlockedTerm(text, filter) && !mentionsBlockedTerm(owner, filter) && !mentionsBlockedTerm(by, filter)
-        ? `${clip(text, limits.chars)}${owner ? ` (${clip(owner, 40)})` : ''}${by ? ` \u2014 suggested by ${clip(by, 40)}` : ''}`
+        ? `${clip(text, limits.chars)}${owner ? ` (${mentionNames(clip(owner, 40), who, found)})` : ''}${by ? ` — suggested by ${mentionNames(clip(by, 40), who, found)}` : ''}`
         : ''
     })
     .filter(Boolean)
@@ -126,7 +340,15 @@ export function buildRecapText(rec: RecapInput, base: string = SITE_URL, filter:
     lines.splice(at, 1)
     text = lines.join('\n')
   }
-  return text.length > DISCORD_MESSAGE_LIMIT ? `**Call recap: ${clip(title, 80)}**\n\nFull summary and transcript: ${url}` : text
+  if (text.length > DISCORD_MESSAGE_LIMIT) text = `**Call recap: ${clip(title, 80)}**\n\nFull summary and transcript: ${url}`
+  // Only ids we inserted and that survived the trimming.
+  const mentions: RecapMentions = new Map([...found].filter(([id]) => text.includes(`<@${id}>`)))
+  return { text, mentions }
+}
+
+/** The Discord message text (mentions of the call's speakers when `people` is given). */
+export function buildRecapText(rec: RecapInput, base: string = SITE_URL, filter: PostFilter = EMPTY_POST_FILTER, limits: RecapLimits = DEFAULT_RECAP_LIMITS, people?: RecapPeople): string {
+  return buildRecapParts(rec, base, filter, limits, people).text
 }
 
 const SNOWFLAKE = /^\d{5,25}$/
@@ -217,6 +439,86 @@ export interface PostRecapDeps extends RecapDeps {
   base?: string
 }
 
+const RECAP_SELECT = {
+  id: true,
+  status: true,
+  source: true,
+  crewId: true,
+  crewLabel: true,
+  eventName: true,
+  title: true,
+  summary: true,
+  actionItems: true,
+  chapters: true,
+  recapPostedAt: true,
+  recapChannelId: true,
+  recapMessageId: true,
+  redactedSpeakerIds: true,
+  redactionsUpdatedAt: true,
+  summaryGeneratedAt: true,
+  summaryEditedAt: true,
+} as const
+
+/**
+ * The recap as Discord text (with mentions of the call's speakers / named members), the plain-name
+ * text for the Telegram mirror (no <@id>), and the allowed_mentions to send with the Discord text.
+ */
+async function renderRecap(rec: RecapInput & { source?: string | null; redactedSpeakerIds?: readonly string[] | null }, filter: PostFilter, deps: PostRecapDeps): Promise<{ content: string; plain: string; allowedMentions: { parse: []; users?: string[] } }> {
+  const env = deps.env ?? process.env
+  const limits = recapLimits(await loadSettings())
+  const people = await loadRecapPeople(rec)
+  const parts = buildRecapParts(rec, deps.base, filter, limits, people)
+  const plain = buildRecapParts(rec, deps.base, filter, limits, people, false).text
+  const ping = await recapMentionPing(env)
+  return { content: parts.text, plain, allowedMentions: recapAllowedMentions([...parts.mentions.keys()], ping) }
+}
+
+const EDIT_ERROR_PREFIX = 'edit failed: '
+
+export type RepostResult = RecapResult | 'updated' | 'no-message'
+
+/**
+ * Re-render the recap of a published call and EDIT the Discord message already posted (the stored
+ * recapChannelId / recapMessageId), e.g. after mentions were added or the summary was corrected.
+ * Never posts a new message and never re-mirrors to Telegram. Without { edit: true } it is the
+ * ordinary once-only post.
+ */
+export async function repostRecap(recordingId: string, opts: { edit?: boolean } = {}, deps: PostRecapDeps & { edit?: typeof editDiscordMessage } = {}): Promise<RepostResult> {
+  if (!opts.edit) return postCallRecap(recordingId, deps)
+  const env = deps.env ?? process.env
+  if (!(await recapPostingEnabled(env))) return 'disabled'
+  const botToken = env.DISCORD_BOT_TOKEN?.trim()
+  if (!botToken) return 'no-token'
+  let filter: PostFilter
+  try {
+    filter = await loadPostFilter()
+  } catch (err) {
+    console.error('[calls/recap] post filter unavailable, not editing:', err instanceof Error ? err.message : err)
+    return 'failed'
+  }
+  const rec = await prisma.callRecording.findUnique({ where: { id: recordingId }, select: RECAP_SELECT })
+  if (!rec || rec.status !== 'PUBLISHED' || !rec.summary?.trim()) return 'not-published'
+  if (isImportedSource(rec.source) && !(await importedAllowed('calls.importedRecapPostEnabled', env))) return 'imported'
+  if (recapCrewExcluded(rec, filter)) return 'excluded'
+  if (redactionsNewerThanSummary(rec)) return 'stale-redactions'
+  if (!rec.recapPostedAt || !rec.recapChannelId || !rec.recapMessageId) return 'no-message'
+  try {
+    const r = await renderRecap(rec, filter, deps)
+    await (deps.edit ?? editDiscordMessage)(
+      { channelId: rec.recapChannelId, messageId: rec.recapMessageId, botToken },
+      { content: r.content, allowed_mentions: r.allowedMentions, flags: 4 /* SUPPRESS_EMBEDS */ },
+    )
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err)
+    console.error('[calls/recap] edit failed:', msg)
+    // Keep an earlier note (e.g. the original post's error); only an edit note is replaced.
+    await prisma.callRecording.updateMany({ where: { id: recordingId, OR: [{ recapError: null }, { recapError: { startsWith: EDIT_ERROR_PREFIX } }] }, data: { recapError: `${EDIT_ERROR_PREFIX}${msg}`.slice(0, 300) } })
+    return 'failed'
+  }
+  await prisma.callRecording.updateMany({ where: { id: recordingId, recapError: { startsWith: EDIT_ERROR_PREFIX } }, data: { recapError: null } }).catch(() => {})
+  return 'updated'
+}
+
 /**
  * Post the recap of a PUBLISHED call, at most once. The row is claimed (recapPostedAt) before the
  * post. The claim is released only when Discord definitely refused (a 4xx incl. 429: nothing was
@@ -236,25 +538,7 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
     console.error('[calls/recap] post filter unavailable, not posting:', err instanceof Error ? err.message : err)
     return 'failed'
   }
-  const rec = await prisma.callRecording.findUnique({
-    where: { id },
-    select: {
-      id: true,
-      status: true,
-      source: true,
-      crewId: true,
-      crewLabel: true,
-      eventName: true,
-      title: true,
-      summary: true,
-      actionItems: true,
-      chapters: true,
-      recapPostedAt: true,
-      redactionsUpdatedAt: true,
-      summaryGeneratedAt: true,
-      summaryEditedAt: true,
-    },
-  })
+  const rec = await prisma.callRecording.findUnique({ where: { id }, select: RECAP_SELECT })
   // Imported (old X broadcast) calls never post a recap unless calls.importedRecapPostEnabled is on (fail-safe: off).
   if (rec && isImportedSource(rec.source) && !(await importedAllowed('calls.importedRecapPostEnabled', env))) return 'imported'
   if (rec && recapCrewExcluded(rec, filter)) return 'excluded'
@@ -267,11 +551,14 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
   if (claim.count !== 1) return 'already-posted'
   let messageId: string | null
   let content: string | undefined
+  let plain: string | undefined
   try {
-    content = buildRecapText(rec, deps.base, filter, recapLimits(await loadSettings()))
+    const r = await renderRecap(rec, filter, deps)
+    content = r.content
+    plain = r.plain
     const sent = await (deps.post ?? postDiscordMessage)(
       { kind: 'bot', channelId: channel.channelId, botToken },
-      { content, allowed_mentions: { parse: [] }, flags: 4 /* SUPPRESS_EMBEDS */ },
+      { content, allowed_mentions: r.allowedMentions, flags: 4 /* SUPPRESS_EMBEDS */ },
     )
     messageId = sent.id
   } catch (err) {
@@ -283,12 +570,12 @@ export async function postCallRecap(id: string, deps: PostRecapDeps = {}): Promi
       // Unknown outcome: the message may have been posted. Keep the claim (no automatic repost).
       await prisma.callRecording.updateMany({ where: { id }, data: { recapError: `unknown outcome: ${msg}`.slice(0, 300) } })
       // The claim is kept, so Discord may have it: mirror (never when Discord definitely refused).
-      if (content) await enqueueMirror({ kind: 'recap', sourceId: rec.id, crewId: rec.crewId, crewLabel: rec.crewLabel, text: content }, env)
+      if (plain) await enqueueMirror({ kind: 'recap', sourceId: rec.id, crewId: rec.crewId, crewLabel: rec.crewLabel, text: plain }, env)
     }
     return 'failed'
   }
   // Mirror to the mapped city Telegram groups (queued only when switched on; never affects Discord).
-  await enqueueMirror({ kind: 'recap', sourceId: rec.id, crewId: rec.crewId, crewLabel: rec.crewLabel, text: content }, env)
+  await enqueueMirror({ kind: 'recap', sourceId: rec.id, crewId: rec.crewId, crewLabel: rec.crewLabel, text: plain ?? content }, env)
   // The post succeeded; bookkeeping trouble must never release the claim or look like a failed post.
   if (messageId) await prisma.callRecording.update({ where: { id }, data: { recapMessageId: messageId } }).catch((e) => console.error('[calls/recap] could not store message id:', e instanceof Error ? e.message : e))
   return 'posted'
