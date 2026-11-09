@@ -9,7 +9,7 @@
  *     event-lifecycle.ts, which feeds `stopReasonForEvent`.
  */
 
-export type StopReason = 'event-ended' | 'empty' | 'max-duration' | 'superseded' | 'shutdown' | 'disconnected'
+export type StopReason = 'event-ended' | 'empty' | 'max-duration' | 'superseded' | 'shutdown' | 'disconnected' | 'channel-disallowed'
 
 export interface StopLimits {
   maxCallMs: number

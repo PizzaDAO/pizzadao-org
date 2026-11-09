@@ -43,11 +43,12 @@ export function recordableEvents(events: readonly EventInfo[], s: VoiceChannelSe
 }
 
 /** Validates the delivered settings; anything malformed is dropped. */
-export function parseVoiceChannels(raw: unknown): VoiceChannelSettings {
+export function parseVoiceChannels(raw: unknown, previousByEvent: VoiceChannelSettings['byEvent'] = []): VoiceChannelSettings {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const allowed = Array.isArray(o.allowed)
     ? o.allowed.filter((x): x is string => typeof x === 'string' && SNOWFLAKE.test(x.trim())).map((x) => x.trim()).slice(0, 50)
     : []
+  // byEvent omitted (the app could not read its crew mapping): keep the last good mapping.
   const byEvent = Array.isArray(o.byEvent)
     ? o.byEvent
         .flatMap((m: unknown) => {
@@ -57,6 +58,6 @@ export function parseVoiceChannels(raw: unknown): VoiceChannelSettings {
             : []
         })
         .slice(0, 100)
-    : []
+    : previousByEvent
   return { allowed, byEvent }
 }

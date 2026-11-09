@@ -184,40 +184,57 @@ export class CallRecorder {
     if (this.shuttingDown || this.starting) return
     if (this.current?.stopping) return
     const cur0 = this.current
+    // The session's channel was taken off the allowlist mid-call: stop recording it.
+    if (cur0 && !this.allowedNow().has(cur0.channelId)) {
+      this.log(`channel of ${cur0.meta.sessionId} is no longer recordable; stopping`)
+      await this.stop('channel-disallowed')
+      return
+    }
+    const nowMs = Date.now()
+    const maxCallMs = this.cfg.maxCallMinutes * 60_000
+    const blocked = (e: EventInfo) => this.limits.blocks(e, nowMs)
     // One recording at a time. While one runs, only its channel is considered (a later call in the same
-    // channel can still take over); idle, every recordable channel with people in it competes.
-    let events: EventInfo[] = allEvents
+    // channel can still take over). Idle, the busy recordable channels compete: the default channel's call
+    // first (a restart mid-call must resume the main call), else the channel with the most people, else the
+    // earliest scheduled.
+    const counts = new Map<string, number>()
+    let events: EventInfo[]
     let channelId: string | undefined
     let humans: number
+    let guild: Guild
     try {
-      const guild = await this.client.guilds.fetch(this.cfg.guildId)
+      guild = await this.client.guilds.fetch(this.cfg.guildId)
       if (cur0) {
         channelId = cur0.channelId
+        counts.set(channelId, await this.humanCount(guild, channelId))
         events = allEvents.filter((e) => e.channelId === channelId)
-        humans = await this.humanCount(guild, channelId)
+        humans = counts.get(channelId) ?? 0
       } else {
-        const counts = new Map<string, number>()
-        for (const ch of new Set(allEvents.map((e) => e.channelId as string))) counts.set(ch, await this.humanCount(guild, ch))
-        events = allEvents.filter((e) => (counts.get(e.channelId as string) ?? 0) > 0)
-        humans = [...counts.values()].reduce((a, b) => a + b, 0)
-        if (events.length === 0 && counts.size === 0) humans = await this.humanCount(guild, this.cfg.callChannelId)
+        for (const ch of new Set([this.cfg.callChannelId, ...allEvents.map((e) => e.channelId as string)])) counts.set(ch, await this.humanCount(guild, ch))
+        const cands: { ch: string; n: number; first: number }[] = []
+        for (const [ch, n] of counts) {
+          if (n <= 0) continue
+          const inWin = eventsInWindow(allEvents.filter((e) => e.channelId === ch), { maxCallMs, nowMs, blocked })
+          if (inWin.length) cands.push({ ch, n, first: Math.min(...inWin.map((e) => e.scheduledStartMs ?? Infinity)) })
+        }
+        const isDef = (ch: string) => (ch === this.cfg.callChannelId ? 1 : 0)
+        cands.sort((a, b) => isDef(b.ch) - isDef(a.ch) || b.n - a.n || a.first - b.first)
+        channelId = cands[0]?.ch
+        events = channelId ? allEvents.filter((e) => e.channelId === channelId) : []
+        humans = cands[0]?.n ?? 0
       }
     } catch (err) {
       this.log(`schedule check failed: ${err instanceof Error ? err.message : String(err)}`)
       return
     }
-    const nowMs = Date.now()
-    if (humans === 0) this.limits.noteChannelEmpty(nowMs)
-    const opts = {
-      callChannelId: channelId,
-      maxCallMs: this.cfg.maxCallMinutes * 60_000,
-      nowMs,
-      blocked: (e: EventInfo) => this.limits.blocks(e, nowMs),
-    }
+    for (const [ch, n] of counts) if (n === 0) this.limits.noteChannelEmpty(nowMs, ch)
+    const opts = { callChannelId: channelId, maxCallMs, nowMs, blocked }
     // Back-off bookkeeping: a session that ran long enough recovered; closed windows are forgotten.
     const cur = this.current
     if (cur && opts.nowMs - cur.meta.startedAtMs >= RECOVERY_MS) this.backoff.clear(cur.key)
-    this.backoff.prune(new Set([...eventsInWindow(events, opts).map(eventKey), ...(cur ? [cur.key] : [])]))
+    const windowKeys = new Set(eventsInWindow(allEvents, { maxCallMs, nowMs, blocked }).map(eventKey))
+    this.backoff.prune(new Set([...windowKeys, ...(cur ? [cur.key] : [])]))
+    for (const k of this.overlapLogged) if (!windowKeys.has(k)) this.overlapLogged.delete(k)
     const deferMaxMs = (this.remote?.get() ?? REMOTE_CONFIG_OFF).supersedeMaxDeferMinutes * 60_000
     let handoff: HandoffInput | undefined
     if (cur && deferMaxMs > 0 && humans > 0) {
@@ -253,7 +270,7 @@ export class CallRecorder {
         this.log(`deferring switch to "${due.name}" (${due.id}): the current call still has people talking (up to ${this.remote?.get().supersedeMaxDeferMinutes} min)`)
       }
     }
-    this.noteOverlap(allEvents, action, cur, nowMs)
+    await this.noteOverlap(guild, allEvents, counts, cur?.channelId ?? channelId, cur?.meta.eventId ?? (action.type === 'start' ? action.event.id : null), nowMs)
     if ((action.type === 'start' || action.type === 'switch') && !this.backoff.allows(eventKey(action.event), Date.now())) return
     if (action.type === 'start' || action.type === 'switch') {
       const k = eventKey(action.event)
@@ -274,18 +291,26 @@ export class CallRecorder {
 
   /**
    * Calls overlap in different channels: only one recording runs at a time, so the running call (or, idle,
-   * the one chosen to start) keeps the recorder and a call in another channel inside its window is skipped.
-   * Logged once per occurrence. The skipped call starts later only if the recorder is free while its window is open.
+   * the one chosen) keeps the recorder and a call in another channel inside its window is skipped. Logged
+   * once per occurrence, and only for calls that would otherwise start (people in their channel, not backed
+   * off). The skipped call starts later only if the recorder is free while its window is open.
    */
-  private noteOverlap(events: EventInfo[], action: { type: string; event?: EventInfo }, cur: ActiveSession | null, nowMs: number): void {
-    const keepChannel = cur?.channelId ?? (action.type === 'start' ? action.event?.channelId : undefined)
+  private async noteOverlap(
+    guild: Guild,
+    events: EventInfo[],
+    counts: Map<string, number>,
+    keepChannel: string | undefined,
+    keepId: string | null,
+    nowMs: number,
+  ): Promise<void> {
     if (!keepChannel) return
-    const keepId = cur?.meta.eventId ?? action.event?.id ?? null
-    const opts = { maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs }
+    const opts = { maxCallMs: this.cfg.maxCallMinutes * 60_000, nowMs, blocked: (e: EventInfo) => this.limits.blocks(e, nowMs) }
     for (const e of eventsInWindow(events, opts)) {
       if (e.channelId === keepChannel || e.id === keepId) continue
       const k = eventKey(e)
-      if (this.overlapLogged.has(k)) continue
+      if (this.overlapLogged.has(k) || !this.backoff.allows(k, nowMs)) continue
+      const here = counts.get(e.channelId as string) ?? (await this.humanCount(guild, e.channelId as string).catch(() => 0))
+      if (here <= 0) continue
       this.overlapLogged.add(k)
       this.log(`skipping "${e.name}" (${e.id}): it overlaps a call being recorded in another channel (one recording at a time)`)
     }
@@ -401,7 +426,7 @@ export class CallRecorder {
       const limitMs = this.eventLimitMs(event.name)
       const capped = eventCapMinutes(this.cfg, event.name) !== undefined
       const tracker = new StopTracker(
-        capped ? this.limits.noteStart(event.id, { baseMs: limitBaseMs, limitMs, startMs: event.scheduledStartMs ?? limitBaseMs }) : limitBaseMs,
+        capped ? this.limits.noteStart(event.id, { baseMs: limitBaseMs, limitMs, startMs: event.scheduledStartMs ?? limitBaseMs, channelId }) : limitBaseMs,
         {
           maxCallMs: limitMs,
           emptyGraceMs: this.cfg.emptyGraceMinutes * 60_000,

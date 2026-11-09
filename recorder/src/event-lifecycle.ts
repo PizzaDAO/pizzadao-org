@@ -286,5 +286,5 @@ export class StartBackoff {
 
 /** Stop reasons that are not failures; anything else (e.g. 'disconnected') counts as one. */
 export function isFailureStop(reason: string): boolean {
-  return !['empty', 'max-duration', 'event-ended', 'superseded', 'shutdown'].includes(reason)
+  return !['empty', 'max-duration', 'event-ended', 'superseded', 'shutdown', 'channel-disallowed'].includes(reason)
 }

@@ -3,7 +3,7 @@ import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import type { Settings } from '@/app/lib/settings'
 import { SETTINGS, type SettingKey } from '@/app/lib/settings/registry'
 
-const { state } = vi.hoisted(() => ({ state: { over: {} as Record<string, unknown>, crews: [] as Array<{ id: string; label: string; event?: string; callLength?: string }> } }))
+const { state } = vi.hoisted(() => ({ state: { fail: false, over: {} as Record<string, unknown>, crews: [] as Array<{ id: string; label: string; event?: string; callLength?: string }> } }))
 
 vi.mock('@/app/lib/settings', () => ({
   loadSettings: async (): Promise<Settings> => ({
@@ -13,7 +13,10 @@ vi.mock('@/app/lib/settings', () => ({
     get: ((k: SettingKey) => (k in state.over ? state.over[k] : SETTINGS[k].default)) as Settings['get'],
   }),
 }))
-vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: async () => ({ crews: state.crews, cached: true }) }))
+vi.mock('@/app/lib/crew-mappings', () => ({ getCrewMappings: async () => {
+    if (state.fail) throw new Error('sheet down')
+    return { crews: state.crews, cached: true }
+  } }))
 
 import { buildRecorderConfig, RECORDER_CONFIG_OFF } from './recorder-config'
 import { MAX_WHISPER_PROMPT_TOKENS, estimateKeytermTokens, normalizeKeyterms, whisperPrompt } from './keyterms'
@@ -22,6 +25,7 @@ import { transcriptionPrompt } from './transcribe'
 beforeEach(() => {
   vi.stubEnv('VERCEL_ENV', 'production')
   state.over = {}
+  state.fail = false
   state.crews = [
     { id: 'ops', label: 'Ops', event: 'https://discord.com/events/1/100000000000000001' },
     { id: 'tech', label: 'Tech', event: '100000000000000002' },
@@ -116,5 +120,10 @@ describe('recorder config: voice channels', () => {
         { eventId: '100000000000000002', channelId: '900000000000000002' },
       ],
     })
+  })
+  it('omits byEvent (not []) when the crew mapping cannot be read', async () => {
+    state.over = { 'calls.recordableVoiceChannels': '900000000000000001', 'calls.crewVoiceChannels': 'ops = 900000000000000001' }
+    state.fail = true
+    expect((await buildRecorderConfig()).voiceChannels).toEqual({ allowed: ['900000000000000001'] })
   })
 })

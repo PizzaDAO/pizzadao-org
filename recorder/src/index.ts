@@ -137,6 +137,9 @@ client.once('ready', () => {
     recorder.recoverPending()
     recorder.startRetryLoop()
 
+    // Settings first: the recordable channels decide which events the first check may start.
+    await remote.refresh() // up to 5 s; a failure leaves the defaults until the next refresh
+
     // A call may already be running (restart mid-call): the schedule window picks it up.
     const events = [...(await guild.scheduledEvents.fetch()).values()].map(toInfo)
     await recorder.checkSchedule(events)

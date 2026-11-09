@@ -35,7 +35,7 @@ export interface RecorderConfig {
   /** Spellings for Deepgram to prefer (keyterm prompting); empty = none. */
   transcriptionKeyterms: string[]
   /** Channels the recorder may join, and the channel of events that have none of their own (by Discord event id). */
-  voiceChannels: { allowed: string[]; byEvent: { eventId: string; channelId: string }[] }
+  voiceChannels: { allowed: string[]; byEvent?: { eventId: string; channelId: string }[] }
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -148,7 +148,8 @@ async function voiceChannelsConfig(settings: Awaited<ReturnType<typeof loadSetti
       if (channelId && eventId) byEvent.push({ eventId, channelId })
     }
   } catch {
-    // mapping unreadable: no per-crew channels this time (the recorder keeps the last good config)
+    // Mapping unreadable: omit byEvent (not []), so the recorder keeps the last mapping it had.
+    return { allowed }
   }
   return { allowed, byEvent }
 }

@@ -55,7 +55,7 @@ const int = (v: unknown, fallback: number, min: number, max: number): number =>
   typeof v === 'number' && Number.isInteger(v) && v >= min && v <= max ? v : fallback
 
 /** Validates an app response; anything malformed falls back to the OFF value for that part. */
-export function parseRemoteConfig(raw: unknown): RemoteConfig {
+export function parseRemoteConfig(raw: unknown, previous?: RemoteConfig | null): RemoteConfig {
   const o = (raw && typeof raw === 'object' ? raw : {}) as Record<string, unknown>
   const w = (o.welcome && typeof o.welcome === 'object' ? o.welcome : {}) as Record<string, unknown>
   const e = (o.endSong && typeof o.endSong === 'object' ? o.endSong : {}) as Record<string, unknown>
@@ -108,7 +108,7 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
     },
     supersedeMaxDeferMinutes: int(o.supersedeMaxDeferMinutes, d.supersedeMaxDeferMinutes, 0, 120),
     transcriptionKeyterms: normalizeKeyterms(o.transcriptionKeyterms),
-    voiceChannels: parseVoiceChannels(o.voiceChannels),
+    voiceChannels: parseVoiceChannels(o.voiceChannels, previous?.voiceChannels.byEvent),
   }
 }
 
@@ -137,7 +137,7 @@ export class RemoteConfigClient {
         signal: AbortSignal.timeout(timeoutMs),
       })
       if (!res.ok) throw new Error(`app answered ${res.status}`)
-      this.last = parseRemoteConfig(await res.json())
+      this.last = parseRemoteConfig(await res.json(), this.last)
       this.warned = false
     } catch (err) {
       // Log the first failure of a streak only.
