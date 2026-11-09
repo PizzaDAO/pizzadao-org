@@ -30,6 +30,13 @@ beforeEach(() => {
 })
 
 describe('recap text', () => {
+  it('shows who suggested an item, and nothing when null', () => {
+    const t = buildRecapText({ ...rec, actionItems: [{ text: 'Send the deck', owner: 'Ann', suggestedBy: 'Bob' }, { text: 'Book the venue', suggestedBy: null }] }, base)
+    expect(t).toContain('- Send the deck (Ann) \u2014 suggested by Bob')
+    expect(t).toContain('- Book the venue\n')
+    expect(t).not.toContain('suggested by null')
+  })
+
   it('has title, bullets, action items with owners and the link', () => {
     const t = buildRecapText(rec, base)
     expect(t).toContain('**Call recap: Ops sync**')

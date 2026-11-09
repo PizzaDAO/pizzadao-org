@@ -24,12 +24,13 @@ function parseTextEdit(body: Record<string, unknown>): RecordingTextEdit {
     if (!Array.isArray(body.actionItems) || body.actionItems.length > MAX_LIST) throw new ValidationError(`actionItems must be an array of up to ${MAX_LIST}`)
     edit.actionItems = body.actionItems
       .map((raw, i) => {
-        const r = (raw ?? {}) as { text?: unknown; owner?: unknown }
+        const r = (raw ?? {}) as { text?: unknown; owner?: unknown; suggestedBy?: unknown }
         const t = text(r.text ?? null, `actionItems[${i}].text`, 500)
         const owner = r.owner == null ? null : text(r.owner, `actionItems[${i}].owner`, 100)
-        return t ? { text: t, ...(owner ? { owner } : {}) } : null
+        const suggestedBy = r.suggestedBy == null ? null : text(r.suggestedBy, `actionItems[${i}].suggestedBy`, 100)
+        return t ? { text: t, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}) } : null
       })
-      .filter((x): x is { text: string; owner?: string } => !!x)
+      .filter((x): x is { text: string; owner?: string; suggestedBy?: string } => !!x)
   }
   if (body.chapters !== undefined) {
     if (!Array.isArray(body.chapters) || body.chapters.length > MAX_LIST) throw new ValidationError(`chapters must be an array of up to ${MAX_LIST}`)

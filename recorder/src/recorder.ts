@@ -635,7 +635,7 @@ export class CallRecorder {
     this.pendingCount++
     this.queue = this.queue.then(async () => {
       try {
-        const status = await finalizeSession(dir, this.finalizeDeps)
+        const status = await finalizeSession(dir, { ...this.finalizeDeps, keyterms: this.remote?.get().transcriptionKeyterms ?? [] })
         if (status !== 'pending') for (const [id, d] of this.capturedChat) if (d === dir) this.capturedChat.delete(id)
       } catch (err) {
         this.log(`finalize crashed for ${dir}: ${err instanceof Error ? err.message : String(err)}`)

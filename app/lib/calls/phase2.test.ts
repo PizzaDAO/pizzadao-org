@@ -22,7 +22,9 @@ import { prisma } from '@/app/lib/db'
 import { getSession } from '@/app/lib/session'
 import { isDreadPizzaRoberts } from '@/app/lib/mission-review-access'
 import { parseIngestPayload } from './ingest-schema'
-import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT } from './summarize'
+import { buildSpeakerNames, buildTranscriptText, DEFAULT_SUMMARY_FALLBACK_MODEL, DEFAULT_SUMMARY_MODEL, summaryFallbackModel, generateCallSummary, isFallbackWorthy, summaryModel, SUMMARY_SYSTEM_PROMPT, spellingsHint } from './summarize'
+import { normalizeKeyterms } from './keyterms'
+import { TRANSCRIPTION_KEYTERMS_DEFAULT } from '@/app/lib/settings/registry'
 import { sanitizeSummaryError, generateAndStoreSummary, generateAndStoreSummaryResult, getPublishedRecording, listPublishedRecordings, publishRecording, setSpeakerRedacted, unpublishRecording, updateRecordingText } from './recordings'
 import { POST as ingestPOST } from '@/app/api/calls/recorder/ingest/route'
 import { POST as publishPOST } from '@/app/api/admin/calls/[id]/publish/route'
@@ -189,7 +191,7 @@ describe('summary generation', () => {
     { discordId: ANN, startMs: 65_000, endMs: 70_000, text: 'We ship on Friday' },
     { discordId: BOB, startMs: 3_725_000, endMs: 3_730_000, text: 'I will test it' },
   ]
-  const good = { title: 'Release planning', summary: 'They ship Friday.', actionItems: [{ text: 'Test', owner: 'Bob' }], chapters: [{ startMs: 65_000, title: 'Release' }] }
+  const good = { title: 'Release planning', summary: 'They ship Friday.', actionItems: [{ text: 'Test', owner: 'Bob', suggestedBy: 'Ann' }], chapters: [{ startMs: 65_000, title: 'Release' }] }
 
   it('labels lines [mm:ss] Name: text in time order', () => {
     const text = buildTranscriptText([...segments].reverse(), { [ANN]: 'Ann', [BOB]: 'Bob' })
@@ -208,7 +210,7 @@ describe('summary generation', () => {
     expect(out).toEqual(good)
     const arg = m(generateText).mock.calls[0][0]
     expect(arg.model).toBe('anthropic/claude-sonnet-5.5')
-    expect(arg.system).toBe(SUMMARY_SYSTEM_PROMPT)
+    expect(arg.system).toBe(`${SUMMARY_SYSTEM_PROMPT}\n\n${spellingsHint(normalizeKeyterms(TRANSCRIPTION_KEYTERMS_DEFAULT.split('\n')))}`)
     expect(arg.prompt).toContain('[01:05] Ann: We ship on Friday')
   })
 
@@ -248,7 +250,7 @@ describe('summary generation', () => {
     ])
     expect(await generateAndStoreSummary('rec1')).toBe(true)
     expect(db.callLiveItem.findMany.mock.calls[0][0].where).toEqual({ sessionId: SESSION })
-    expect(writes()[0][0].data.actionItems).toEqual([...good.actionItems, { text: 'Order the banner stickers', owner: 'Ann' }])
+    expect(writes()[0][0].data.actionItems).toEqual([...good.actionItems, { text: 'Order the banner stickers', owner: 'Ann', suggestedBy: 'Ann' }])
   })
 
   it('a reject that lands during generation stays rejected (the write matches nothing)', async () => {
@@ -578,6 +580,15 @@ describe('reviewer edits', () => {
     db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
     expect((await patch({ title: ' New ' })).status).toBe(200)
     expect(db.callRecording.update.mock.calls[0][0].data).toEqual({ title: 'New' })
+  })
+
+  it('stores and validates suggestedBy on action items', async () => {
+    asReviewer()
+    db.callRecording.findUnique.mockResolvedValue({ id: 'rec1', status: 'IN_REVIEW' })
+    expect((await patch({ actionItems: [{ text: 'A', suggestedBy: ' Bob ' }, { text: 'B', suggestedBy: null }, { text: 'C', owner: 'Ann', suggestedBy: '  ' }] })).status).toBe(200)
+    expect(db.callRecording.update.mock.calls[0][0].data.actionItems).toEqual([{ text: 'A', suggestedBy: 'Bob' }, { text: 'B' }, { text: 'C', owner: 'Ann' }])
+    expect((await patch({ actionItems: [{ text: 'A', suggestedBy: 'x'.repeat(101) }] })).status).toBe(400)
+    expect((await patch({ actionItems: [{ text: 'A', suggestedBy: 5 }] })).status).toBe(400)
   })
 
   it('accepts action items and chapters, dropping blank entries', async () => {

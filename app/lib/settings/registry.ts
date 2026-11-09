@@ -127,6 +127,11 @@ const ISO_DATE = /^\d{4}-\d{2}-\d{2}$/
 export const END_SONG_CREW_LINE = /^([^=\n]{1,60}?)\s*=\s*([^=\n]{1,60})$/
 export const END_SONG_CREW_MAP_DEFAULT = ['Ops', 'Tech', 'Comms', 'Biz Dev', 'Events', 'Art', 'Merch', 'Real Estate', 'Governance'].map((c) => `${c} = ${c}`).join('\n')
 
+/** Starter spellings for calls.transcriptionTerms (no personal names; member nicknames are added in the setting). */
+export const TRANSCRIPTION_KEYTERMS_DEFAULT = [
+  'PizzaDAO', 'RSVPizza', 'Pizza MCP', 'OpenPizza', 'ETHDenver', 'Devcon', 'EthCC', 'Global Pizza Party', 'Bitcoin Pizza Day', 'PEP', 'Metalhead', 'Rare Pizzas',
+].join('\n')
+
 /** One line of calls.agendaLinks: `crew-id = Label | https://...`. */
 export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*(https:\/\/\S+)$/
 
@@ -1023,6 +1028,17 @@ export const SETTINGS = {
     default: 'Community Call',
     onReadFailure: 'lastKnownGood',
     placeholder: 'Community Call',
+  }),
+  'calls.transcriptionTerms': textSetting({
+    key: 'calls.transcriptionTerms',
+    area: 'calls',
+    label: 'Transcription: spellings to prefer',
+    help: 'One term per line (conference names, community lingo, nicknames). Sent to Deepgram as keyterms when a call is transcribed, and given to the summary as spellings to prefer. At most 100 terms, 40 characters each, about 1000 characters in all (Deepgram allows 500 tokens per request); extra or longer lines are ignored. Applies to calls recorded after the recorder next reads its settings (within about 5 minutes).',
+    maxLength: 2000,
+    multiline: true,
+    default: TRANSCRIPTION_KEYTERMS_DEFAULT,
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'ETHDenver',
   }),
   'calls.startBandMaxSongs': intSetting({
     key: 'calls.startBandMaxSongs',

@@ -3,7 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 
 vi.mock('@/app/lib/db', () => ({ prisma: {} }))
 
-import { SETTINGS, SETTING_KEYS, isSettingKey, parseSetting } from './registry'
+import { SETTINGS, SETTING_KEYS, TRANSCRIPTION_KEYTERMS_DEFAULT, isSettingKey, parseSetting } from './registry'
 import { ECONOMY_SETTINGS } from './economy-settings'
 import { CONTENT_SETTINGS } from './content-settings'
 
@@ -126,6 +126,7 @@ describe('settings registry', () => {
       ['calls.endSongMinHumans', 1],
       ['calls.startBandEnabled', false],
       ['calls.startBandCalls', 'Community Call'],
+      ['calls.transcriptionTerms', TRANSCRIPTION_KEYTERMS_DEFAULT],
       ['calls.startBandMaxSongs', 1],
       ['calls.supersedeMaxDeferMinutes', 30],
       ['calls.dstFixEnabled', false],
