@@ -98,6 +98,12 @@ export default async function AdminCallsPage({ searchParams }: { searchParams: P
                     <p className="text-tomato">{t("filtersUnavailable")}</p>
                 )}
 
+                <p className="m-0 text-sm">
+                    <Link href="/admin/calls/attendance" className="underline">
+                        Attendance: compare sheets with recordings, add or remove attendees
+                    </Link>
+                </p>
+
                 <AgendaPreview />
 
                 <EventTimesPanel />
