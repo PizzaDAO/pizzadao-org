@@ -102,3 +102,19 @@ describe('whisper prompt from the terms', () => {
     ).toBeUndefined()
   })
 })
+
+describe('recorder config: voice channels', () => {
+  it('is empty by default', async () => {
+    expect((await buildRecorderConfig()).voiceChannels).toEqual({ allowed: [], byEvent: [] })
+  })
+  it('passes the allowlist and resolves crew ids to Discord event ids', async () => {
+    state.over = { 'calls.recordableVoiceChannels': '900000000000000001\nbad\n900000000000000001', 'calls.crewVoiceChannels': 'ops = 900000000000000001\nTECH=900000000000000002\nnope = x' }
+    expect((await buildRecorderConfig()).voiceChannels).toEqual({
+      allowed: ['900000000000000001'],
+      byEvent: [
+        { eventId: '100000000000000001', channelId: '900000000000000001' },
+        { eventId: '100000000000000002', channelId: '900000000000000002' },
+      ],
+    })
+  })
+})

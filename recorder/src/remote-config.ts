@@ -7,6 +7,7 @@
  */
 
 import { normalizeKeyterms } from './keyterms.js'
+import { parseVoiceChannels, VOICE_CHANNELS_OFF, type VoiceChannelSettings } from './channels.js'
 
 export interface RemoteConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
@@ -24,6 +25,8 @@ export interface RemoteConfig {
   supersedeMaxDeferMinutes: number
   /** Spellings for Deepgram to prefer (keyterm prompting); empty = none. */
   transcriptionKeyterms: string[]
+  /** Which voice channels may be recorded and which a crew's call uses (calls.recordableVoiceChannels, calls.crewVoiceChannels). */
+  voiceChannels: VoiceChannelSettings
 }
 
 export const REMOTE_CONFIG_OFF: RemoteConfig = {
@@ -39,6 +42,7 @@ export const REMOTE_CONFIG_OFF: RemoteConfig = {
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
+  voiceChannels: VOICE_CHANNELS_OFF,
 }
 
 export const REMOTE_CONFIG_TIMEOUT_MS = 5_000
@@ -104,6 +108,7 @@ export function parseRemoteConfig(raw: unknown): RemoteConfig {
     },
     supersedeMaxDeferMinutes: int(o.supersedeMaxDeferMinutes, d.supersedeMaxDeferMinutes, 0, 120),
     transcriptionKeyterms: normalizeKeyterms(o.transcriptionKeyterms),
+    voiceChannels: parseVoiceChannels(o.voiceChannels),
   }
 }
 

@@ -104,10 +104,10 @@ async function scheduleCheck(refetch: boolean) {
 
 client.on('voiceStateUpdate', (o, n) => {
   recorder.onVoiceState(o, n)
-  // Someone joined or left the call channel: maybe a call is starting without its event being set ACTIVE.
+  // Someone joined or left a recordable call channel: maybe a call is starting without its event being set ACTIVE.
   if (n.guild.id !== cfg.guildId) return
   if (n.id === client.user?.id) return // the bot's own join/leave must not trigger a check
-  if (n.channelId !== cfg.callChannelId && o.channelId !== cfg.callChannelId) return
+  if (!recorder.isWatchedChannel(n.channelId) && !recorder.isWatchedChannel(o.channelId)) return
   serial(() => scheduleCheck(false))
 })
 client.on('messageCreate', (m) => recorder.onMessage(m))

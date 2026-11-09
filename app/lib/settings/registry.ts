@@ -138,6 +138,22 @@ export const AGENDA_LINK_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([^|\n]{1,60}?)\s*\|\s*
 /** One line of calls.attendanceCrewAliases: `from = to` (crew ids). */
 export const CREW_ALIAS_LINE = /^([A-Za-z0-9_-]+)\s*=\s*([A-Za-z0-9_-]+)$/
 
+/** One line of calls.crewVoiceChannels: `crew-id = voice channel id`. */
+export const CREW_VOICE_CHANNEL_LINE = /^([A-Za-z0-9_-]+)\s*=\s*(\d{15,25})$/
+
+/** One id per line of calls.recordableVoiceChannels. */
+export const VOICE_CHANNEL_ID_LINE = /^\d{15,25}$/
+
+/** Parse calls.crewVoiceChannels into lower-case crew id -> channel id. Bad lines are skipped. */
+export function parseCrewVoiceChannels(raw: string | null | undefined): Map<string, string> {
+  const out = new Map<string, string>()
+  for (const line of String(raw ?? '').split('\n')) {
+    const m = CREW_VOICE_CHANNEL_LINE.exec(line.trim())
+    if (m) out.set(m[1].toLowerCase(), m[2])
+  }
+  return out
+}
+
 /** Parse calls.attendanceCrewAliases into lower-case from -> to. Lines that do not parse, and self-maps, are skipped. */
 export function parseCrewAliases(raw: string | null | undefined): Map<string, string> {
   const out = new Map<string, string>()
@@ -981,6 +997,32 @@ export const SETTINGS = {
     placeholder: 'community = community_call',
     check: (v) => v.split('\n').every((line) => line.trim() === '' || CREW_ALIAS_LINE.test(line.trim())),
     checkMessage: 'Use one line per alias: from-id = to-id',
+  }),
+  'calls.recordableVoiceChannels': textSetting({
+    key: 'calls.recordableVoiceChannels',
+    area: 'calls',
+    label: 'Recordable voice channels',
+    help: 'One voice channel id per line. The recorder joins a call only in these channels (and the default call channel, which is always allowed). Empty: the default channel only.',
+    maxLength: 1000,
+    multiline: true,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: '123456789012345678',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || VOICE_CHANNEL_ID_LINE.test(line.trim())),
+    checkMessage: 'Use one channel id per line (digits only)',
+  }),
+  'calls.crewVoiceChannels': textSetting({
+    key: 'calls.crewVoiceChannels',
+    area: 'calls',
+    label: 'Crew voice channels',
+    help: 'One per line: crew id = voice channel id. For a crew whose Discord event has no channel of its own, the recorder joins this channel (it must also be in the recordable channels). An event that has a voice channel always uses that channel.',
+    maxLength: 1000,
+    multiline: true,
+    default: '',
+    onReadFailure: 'lastKnownGood',
+    placeholder: 'latam = 123456789012345678',
+    check: (v) => v.split('\n').every((line) => line.trim() === '' || CREW_VOICE_CHANNEL_LINE.test(line.trim())),
+    checkMessage: 'Use one line per crew: crew-id = channel id',
   }),
   'calls.attendanceMinMinutes': intSetting({
     key: 'calls.attendanceMinMinutes',

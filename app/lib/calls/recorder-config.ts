@@ -14,6 +14,7 @@ import { END_SONG_CREW_LINE } from '@/app/lib/settings/registry'
 import { normalizeCrewId } from '@/app/lib/crew-id'
 import { normalizeKeyterms } from '@/app/lib/calls/keyterms'
 import { liveConfigFrom } from '@/app/lib/calls/live-items'
+import { parseCrewVoiceChannels, VOICE_CHANNEL_ID_LINE } from '@/app/lib/settings/registry'
 
 export interface RecorderConfig {
   welcome: { enabled: boolean; template: string; batchSeconds: number; recordingLine: string }
@@ -33,6 +34,8 @@ export interface RecorderConfig {
   supersedeMaxDeferMinutes: number
   /** Spellings for Deepgram to prefer (keyterm prompting); empty = none. */
   transcriptionKeyterms: string[]
+  /** Channels the recorder may join, and the channel of events that have none of their own (by Discord event id). */
+  voiceChannels: { allowed: string[]; byEvent: { eventId: string; channelId: string }[] }
 }
 
 export const RECORDER_CONFIG_OFF: RecorderConfig = {
@@ -48,6 +51,7 @@ export const RECORDER_CONFIG_OFF: RecorderConfig = {
   liveItems: { audio: false, chunkSeconds: 150, chat: false, prefixes: [], eventIds: [] },
   supersedeMaxDeferMinutes: 0,
   transcriptionKeyterms: [],
+  voiceChannels: { allowed: [], byEvent: [] },
 }
 
 /** Discord event ids of the given crews (normalized ids). A mapping read failure gives none. */
@@ -118,6 +122,7 @@ export async function buildRecorderConfig(): Promise<RecorderConfig> {
     liveItems: await liveItemsConfig(settings),
     supersedeMaxDeferMinutes: settings.get('calls.supersedeMaxDeferMinutes'),
     transcriptionKeyterms: normalizeKeyterms(parseLines(settings.get('calls.transcriptionTerms'))),
+    voiceChannels: await voiceChannelsConfig(settings),
   }
 }
 
@@ -127,4 +132,23 @@ async function liveItemsConfig(settings: Awaited<ReturnType<typeof loadSettings>
   const eventIds = await loadCrewEventIds(live.crews)
   if (eventIds.length === 0) return RECORDER_CONFIG_OFF.liveItems
   return { audio: live.audio, chunkSeconds: live.chunkSeconds, chat: live.chat, prefixes: live.chat ? live.prefixes : [], eventIds }
+}
+
+/** calls.recordableVoiceChannels + calls.crewVoiceChannels (crew ids resolved to Discord event ids). */
+async function voiceChannelsConfig(settings: Awaited<ReturnType<typeof loadSettings>>): Promise<RecorderConfig['voiceChannels']> {
+  const allowed = [...new Set(parseLines(settings.get('calls.recordableVoiceChannels')).filter((l) => VOICE_CHANNEL_ID_LINE.test(l)))]
+  const byCrew = parseCrewVoiceChannels(settings.get('calls.crewVoiceChannels'))
+  if (byCrew.size === 0) return { allowed, byEvent: [] }
+  const byEvent: { eventId: string; channelId: string }[] = []
+  try {
+    const { crews } = await getCrewMappings()
+    for (const c of crews) {
+      const channelId = byCrew.get(normalizeCrewId(c.id).toLowerCase())
+      const eventId = extractEventId(c.event)
+      if (channelId && eventId) byEvent.push({ eventId, channelId })
+    }
+  } catch {
+    // mapping unreadable: no per-crew channels this time (the recorder keeps the last good config)
+  }
+  return { allowed, byEvent }
 }

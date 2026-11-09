@@ -9,6 +9,10 @@
 import { existsSync, readFileSync, renameSync, writeFileSync } from 'node:fs'
 import { EventStatus, eventKey, type EventInfo } from './event-lifecycle.js'
 
+/** A channel to match: one id, or a predicate (several recordable channels). */
+export type ChannelSel = string | ((channelId: string | null) => boolean)
+const inChannel = (e: Pick<EventInfo, 'channelId'>, sel: ChannelSel): boolean => (typeof sel === 'string' ? e.channelId === sel : sel(e.channelId))
+
 export const SLOT_RETENTION_MS = 24 * 3_600_000
 
 export interface Slot {
@@ -22,10 +26,10 @@ export interface Slot {
 const slotKey = (s: Pick<Slot, 'eventId' | 'scheduledStartMs'>) => `${s.eventId}:${s.scheduledStartMs}`
 
 /** Occurrences to remember from the live list: each call-channel event plus its derived previous one. */
-export function slotsFromLive(live: EventInfo[], callChannelId: string): Slot[] {
+export function slotsFromLive(live: EventInfo[], callChannelId: ChannelSel): Slot[] {
   const out: Slot[] = []
   for (const e of live) {
-    if (e.channelId !== callChannelId || e.scheduledStartMs === null) continue
+    if (e.channelId === null || !inChannel(e, callChannelId) || e.scheduledStartMs === null) continue
     if (e.status !== EventStatus.Scheduled && e.status !== EventStatus.Active) continue
     const end = e.scheduledEndMs ?? null
     out.push({ eventId: e.id, name: e.name, scheduledStartMs: e.scheduledStartMs, scheduledEndMs: end, channelId: e.channelId })
@@ -62,14 +66,14 @@ export interface DroppedSlot {
 export function staleSlots(
   live: EventInfo[],
   slots: Slot[],
-  callChannelId: string,
+  callChannelId: ChannelSel,
   nowMs: number,
   keep: ReadonlySet<string> = new Set(),
 ): DroppedSlot[] {
   const out: DroppedSlot[] = []
   const seen = new Set<string>()
   for (const e of live) {
-    if (e.channelId !== callChannelId || e.scheduledStartMs === null) continue
+    if (!inChannel(e, callChannelId) || e.scheduledStartMs === null) continue
     if (e.status !== EventStatus.Scheduled && e.status !== EventStatus.Active) continue
     const iv = e.recurrenceIntervalMs && e.recurrenceIntervalMs > 0 ? e.recurrenceIntervalMs : DEFAULT_INTERVAL_MS
     for (const s of slots) {
@@ -97,7 +101,7 @@ export function staleSlots(
 export function mergeSlots(
   live: EventInfo[],
   slots: Slot[],
-  opts: { callChannelId?: string; nowMs?: number; keep?: ReadonlySet<string> } = {},
+  opts: { callChannelId?: ChannelSel; nowMs?: number; keep?: ReadonlySet<string> } = {},
 ): EventInfo[] {
   const liveByKey = new Map(live.map((e) => [eventKey(e), e]))
   const stale = new Set(
@@ -125,7 +129,7 @@ export class SlotMemory {
 
   constructor(
     private readonly file: string,
-    private readonly callChannelId: string,
+    private readonly callChannelId: ChannelSel,
     private readonly log: (m: string) => void = () => {},
   ) {
     this.load()
