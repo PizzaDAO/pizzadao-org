@@ -12,7 +12,7 @@ export type MemberCtx = { discordId: string; memberId: string }
 
 export function memberPfpRoute(
   handler: (req: Request, who: MemberCtx) => Promise<unknown>,
-  opts: { multipart?: boolean; rateLimit?: RateLimitName } = {},
+  opts: { multipart?: boolean; rateLimit?: RateLimitName; rateLimitFailClosed?: boolean } = {},
 ) {
   return async (req: Request): Promise<NextResponse> => {
     const auth = await requireSession()
@@ -25,7 +25,7 @@ export function memberPfpRoute(
       if (bad) return bad
     }
     if (opts.rateLimit) {
-      const rl = await checkKeyedRateLimit(opts.rateLimit, memberId)
+      const rl = await checkKeyedRateLimit(opts.rateLimit, memberId, undefined, { failClosed: opts.rateLimitFailClosed })
       if (!rl.success) return rateLimitResponse(rl)
     }
     try {

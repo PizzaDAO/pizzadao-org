@@ -34,6 +34,15 @@ const MAX_FETCH_BYTES = 8 * 1024 * 1024
 export const MAX_PIXELS = 4096 * 4096
 const S = (input: Buffer) => sharp(input, { limitInputPixels: MAX_PIXELS })
 
+/** Dress-up results are written by the server as restyle-<hash>.png; members cannot upload under that name. */
+export function isRestyleFile(url: string): boolean {
+  try {
+    return (new URL(url).pathname.split('/').pop() ?? '').startsWith('restyle-')
+  } catch {
+    return true
+  }
+}
+
 export function isBaseKind(v: unknown): v is BaseKind {
   return typeof v === 'string' && (BASE_KINDS as readonly string[]).includes(v)
 }
@@ -147,6 +156,8 @@ export async function loadBase(
     try {
       // Dress-up results are written by the server as pfp-base/<memberId>/restyle-<hash>.png
       ok = isOwnBlobUrl(url, choice.kind === 'restyle' ? `/pfp-base/${memberId}/restyle-` : `/pfp-base/${memberId}/`)
+      // No chaining: an "upload" can never be a dress-up result.
+      if (ok && choice.kind === 'upload' && isRestyleFile(url)) ok = false
     } catch {
       ok = false
     }
@@ -245,7 +256,7 @@ export async function composeMemberPfp(args: {
   if (base.kind === 'restyle') {
     const o = args.original
     if (!o || !isBaseKind(o.kind) || o.kind === 'restyle') throw new ValidationError('Missing the original picture', 'original')
-    if (o.kind === 'upload' && !isOwnBlobUrl(String(o.url ?? ''), `/pfp-base/${memberId}/`)) throw new ValidationError('Upload not found', 'original')
+    if (o.kind === 'upload' && (!isOwnBlobUrl(String(o.url ?? ''), `/pfp-base/${memberId}/`) || isRestyleFile(String(o.url)))) throw new ValidationError('Upload not found', 'original')
     original = { kind: o.kind, url: o.kind === 'upload' ? String(o.url) : null }
   }
 

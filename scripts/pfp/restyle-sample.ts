@@ -26,7 +26,7 @@ async function main() {
     const outfit = await square(readFileSync(path.join(OUTFITS, `outfit-level-${level}.png`)));
     const prompt =
       `Redraw this exact character, same face, hair, pose, art style, colors and background, but wearing ${NAMES[level] ?? "the outfit"} ` +
-      `(see the second image for the outfit). Keep it a square avatar. Do not add text.`;
+      `(see the second image for the outfit). Keep it a square avatar. Remove any text, names or captions from the picture; do not add any text.`;
     for (let i = 0; i < MODELS.length; i++) {
       const form = new FormData();
       form.set("model", MODELS[i]);

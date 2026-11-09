@@ -286,6 +286,9 @@ export function PfpComposer({ memberId }: { memberId: string }) {
                   Redraws your picture wearing an outfit you have unlocked. {state.restyle.dailyRemaining} {state.restyle.dailyRemaining === 1 ? "try" : "tries"} left today.
                   {state.restyle.blocked ? ` ${state.restyle.blocked}` : ""}
                 </p>
+                <p className="m-0 text-xs text-foreground/60">
+                  Your picture is sent to OpenAI to generate the outfit. A try that fails does not use up your tries.
+                </p>
                 {generating !== null && <p role="status" className="m-0 text-sm">Dressing you up... this takes about a minute.</p>}
                 <ul className="m-0 p-0 list-none grid grid-cols-3 sm:grid-cols-4 gap-2">
                   {state.assets.filter((a) => a.kind === "outfit").map((a) => {

@@ -189,6 +189,7 @@ describe('settings registry', () => {
       ['pfp.restylePerUnlock', 2],
       ['pfp.restyleDailyLimit', 3],
       ['pfp.restyleMonthlyBudgetUsd', 50],
+      ['pfp.restyleRefusalDailyLimit', 3],
       ['pfp.restyleCostCents', 20],
       ['pfp.outfitOverlayEnabled', false],
       ['shop.itemGrantsEnabled', true],

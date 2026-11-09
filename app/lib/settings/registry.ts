@@ -1625,6 +1625,15 @@ export const SETTINGS = {
     default: 50,
     unit: 'USD',
   }),
+  'pfp.restyleRefusalDailyLimit': intSetting({
+    key: 'pfp.restyleRefusalDailyLimit',
+    area: 'features',
+    label: 'Dress-up declined pictures per day',
+    help: 'How many times the image service may decline a member\'s picture in 24 hours before they are stopped until tomorrow.',
+    min: 0,
+    max: 50,
+    default: 3,
+  }),
   'pfp.restyleCostCents': intSetting({
     key: 'pfp.restyleCostCents',
     area: 'features',

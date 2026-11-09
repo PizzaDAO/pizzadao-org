@@ -26,5 +26,6 @@ export const POST = memberPfpRoute(
       base: { kind: base.kind, url: typeof base.url === 'string' ? base.url : undefined },
     })
   },
-  { rateLimit: 'pfp-restyle' },
+  // Spends money: if the limiter's store is down, deny rather than allow.
+  { rateLimit: 'pfp-restyle', rateLimitFailClosed: true },
 )
