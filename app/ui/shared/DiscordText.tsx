@@ -24,7 +24,8 @@
 //     invalid HTML and fight the outer click target.
 
 import React from "react";
-import { parseDiscordMarkup, formatDiscordTimestamp, isValidDiscordTimestamp } from "@/app/lib/discord-markup";
+import Link from "next/link";
+import { parseDiscordMarkup, formatDiscordTimestamp, isValidDiscordTimestamp, type ResolvedUser } from "@/app/lib/discord-markup";
 
 export type DiscordTextProps = {
   text: string;
@@ -32,6 +33,8 @@ export type DiscordTextProps = {
   channels?: Record<string, string>;
   /** role id -> role name, as resolved server-side */
   roles?: Record<string, string>;
+  /** user id -> { name, memberId? }, as resolved server-side */
+  users?: Record<string, ResolvedUser>;
   /** guild id, used to build discord.com/channels/<guild>/<id> links */
   guildId?: string | null;
   /** render channel mentions/links as real anchors (default true) */
@@ -91,13 +94,14 @@ export function DiscordText({
   text,
   channels,
   roles,
+  users,
   guildId,
   interactive = true,
   className,
 }: DiscordTextProps) {
   const tokens = React.useMemo(
-    () => parseDiscordMarkup(text, { channels, roles }),
-    [text, channels, roles],
+    () => parseDiscordMarkup(text, { channels, roles, users }),
+    [text, channels, roles, users],
   );
 
   return (
@@ -160,12 +164,25 @@ export function DiscordText({
               </span>
             );
 
-          case "user":
-            return (
-              <span key={i} style={{ fontWeight: 600 }}>
-                @user
-              </span>
-            );
+          case "user": {
+              const label = token.name ? `@${token.name}` : "@user";
+              if (interactive && token.memberId) {
+                return (
+                  <Link
+                    key={i}
+                    href={`/profile/${encodeURIComponent(token.memberId)}`}
+                    style={{ ...rolePillStyle, textDecoration: "none", pointerEvents: "auto" }}
+                  >
+                    {label}
+                  </Link>
+                );
+              }
+              return (
+                <span key={i} style={token.name ? rolePillStyle : { fontWeight: 600 }}>
+                  {label}
+                </span>
+              );
+          }
 
           case "emoji":
             return <DiscordEmoji key={i} id={token.id} name={token.name} animated={token.animated} />;

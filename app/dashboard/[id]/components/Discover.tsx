@@ -21,7 +21,7 @@ import { useState } from "react";
 import { ArrowUpRight } from "lucide-react";
 import { useLocale, useTranslations } from "next-intl";
 import { DiscordText } from "@/app/ui/shared/DiscordText";
-import { discordTextToPlainText } from "@/app/lib/discord-markup";
+import { discordTextToPlainText, type ResolvedUser } from "@/app/lib/discord-markup";
 
 // ── Item shapes ──────────────────────────────────────────────────────────
 
@@ -62,6 +62,7 @@ export type DiscoverProps = {
     /** channel/role id -> name maps resolved server-side, for rendering Discord mentions in job descriptions */
     channels?: Record<string, string>;
     roles?: Record<string, string>;
+    users?: Record<string, ResolvedUser>;
     guildId?: string | null;
 };
 
@@ -152,11 +153,13 @@ function BountyItem({
     b,
     channels,
     roles,
+    users,
     guildId,
 }: {
     b: DiscoverBounty;
     channels?: Record<string, string>;
     roles?: Record<string, string>;
+    users?: Record<string, ResolvedUser>;
     guildId?: string | null;
 }) {
     const t = useTranslations("dashboard.discover");
@@ -168,7 +171,7 @@ function BountyItem({
     // description render as styled, non-interactive text (interactive
     // nested inside this <Link> would be invalid HTML and fight the
     // tile's own click target) — same pattern as JobItem below.
-    const plainDescription = discordTextToPlainText(b.description, { channels, roles });
+    const plainDescription = discordTextToPlainText(b.description, { channels, roles, users });
     return (
         <Link
             href={`/pep`}
@@ -200,6 +203,7 @@ function BountyItem({
                         text={b.description}
                         channels={channels}
                         roles={roles}
+                        users={users}
                         guildId={guildId}
                         interactive={false}
                     />
@@ -238,11 +242,13 @@ function JobItem({
     j,
     channels,
     roles,
+    users,
     guildId,
 }: {
     j: DiscoverJob;
     channels?: Record<string, string>;
     roles?: Record<string, string>;
+    users?: Record<string, ResolvedUser>;
     guildId?: string | null;
 }) {
     const t = useTranslations("dashboard.discover");
@@ -253,7 +259,7 @@ function JobItem({
     // description render as styled, non-interactive text (interactive
     // nested inside this <Link> would be invalid HTML and fight the
     // tile's own click target).
-    const plainDescription = discordTextToPlainText(j.description, { channels, roles });
+    const plainDescription = discordTextToPlainText(j.description, { channels, roles, users });
     return (
         <Link
             href={`/pep`}
@@ -285,6 +291,7 @@ function JobItem({
                         text={j.description}
                         channels={channels}
                         roles={roles}
+                        users={users}
                         guildId={guildId}
                         interactive={false}
                     />
@@ -446,6 +453,7 @@ export function Discover({
     calls = [],
     channels,
     roles,
+    users,
     guildId,
 }: DiscoverProps) {
     const t = useTranslations("dashboard.discover");
@@ -555,7 +563,7 @@ export function Discover({
                         bounties
                             .slice(0, 3)
                             .map((b) => (
-                                <BountyItem key={b.id} b={b} channels={channels} roles={roles} guildId={guildId} />
+                                <BountyItem key={b.id} b={b} channels={channels} roles={roles} users={users} guildId={guildId} />
                             ))
                     ))}
                 {active === "jobs" &&
@@ -565,7 +573,7 @@ export function Discover({
                         jobs
                             .slice(0, 3)
                             .map((j) => (
-                                <JobItem key={j.id} j={j} channels={channels} roles={roles} guildId={guildId} />
+                                <JobItem key={j.id} j={j} channels={channels} roles={roles} users={users} guildId={guildId} />
                             ))
                     ))}
                 {active === "articles" &&

@@ -20,7 +20,7 @@ import { formatPep } from "../economy/PepIcon";
 import { paperCard } from "../shared/Editorial";
 import { DiscordText } from "../shared/DiscordText";
 import { prettyLabel } from "@/app/lib/pretty-label";
-import { parseDiscordMarkup, discordMarkupToPlainText } from "@/app/lib/discord-markup";
+import { parseDiscordMarkup, discordMarkupToPlainText, type ResolvedUser } from "@/app/lib/discord-markup";
 
 type Job = {
   id: number;
@@ -38,6 +38,7 @@ type JobCardProps = {
   /** channel/role id -> name maps resolved server-side, and the guild id for channel links */
   channels?: Record<string, string>;
   roles?: Record<string, string>;
+  users?: Record<string, ResolvedUser>;
   guildId?: string | null;
 };
 
@@ -52,6 +53,7 @@ export function JobCard({
   disabled,
   channels,
   roles,
+  users,
   guildId,
 }: JobCardProps) {
   const [loading, setLoading] = useState(false);
@@ -95,7 +97,7 @@ export function JobCard({
   const reward = earnedReward || rewardAmount;
 
   const plainDescription = discordMarkupToPlainText(
-    parseDiscordMarkup(job.description, { channels, roles }),
+    parseDiscordMarkup(job.description, { channels, roles, users }),
   );
   const actionWord = completed ? "Paid" : loading ? "Working on" : "Complete";
 
@@ -148,7 +150,7 @@ export function JobCard({
             <span className="text-[11px] text-muted-foreground">#{job.id}</span>
           </span>
           <span className="block text-sm leading-[1.45] text-foreground">
-            <DiscordText text={job.description} channels={channels} roles={roles} guildId={guildId} />
+            <DiscordText text={job.description} channels={channels} roles={roles} users={users} guildId={guildId} />
           </span>
         </span>
 

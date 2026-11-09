@@ -875,7 +875,9 @@ export async function getPendingSubmissions() {
  * Get a user's mission progress summary for profiles
  */
 export async function getUserProgressSummary(discordId: string) {
-  const [completions, missions] = await Promise.all([
+  // One round of parallel queries: the level and its title are derived from the rows already
+  // loaded (same rules as getCurrentLevel) instead of re-querying them one after another.
+  const [completions, missions, paidLevels, titleRows] = await Promise.all([
     prisma.missionCompletion.findMany({
       where: { discordId },
       include: { mission: true },
@@ -884,10 +886,18 @@ export async function getUserProgressSummary(discordId: string) {
       where: REQUIRED_MISSION_WHERE,
       orderBy: [{ level: 'asc' }, { index: 'asc' }],
     }),
+    getPaidLevels(discordId),
+    prisma.mission.findMany({
+      where: { levelTitle: { not: null } },
+      select: { level: true, levelTitle: true },
+    }),
   ])
 
-  const currentLevel = await getCurrentLevel(discordId)
-  const levelTitle = await getLevelTitle(currentLevel)
+  const approvedIds = new Set(
+    (completions ?? []).filter(c => c.status === 'APPROVED').map(c => c.missionId),
+  )
+  const currentLevel = computeCurrentLevel(missions ?? [], approvedIds, paidLevels)
+  const levelTitle = (titleRows ?? []).find(r => r.level === currentLevel)?.levelTitle ?? null
 
   // Calculate total missions and approved count
   const totalMissions = missions.length

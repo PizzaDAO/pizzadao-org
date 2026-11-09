@@ -13,6 +13,7 @@
  *     cache so a Discord outage doesn't make every request in that window
  *     wait out the REST timeout again — they get the stale list (or null)
  *     immediately instead.
+ *   - getGuildMemberName: one member's display name, cached per id.
  *   - getChannelMessage / getChannel: one REST call each. "unknown" means the
  *     call itself failed (network, 5xx, rate limit, no token), as opposed to a
  *     definite "not found" (null).
@@ -50,6 +51,34 @@ let roleFailCache: { guildId: string; at: number } | null = null
 export function clearGuildRolesCache() {
   roleCache = null
   roleFailCache = null
+}
+
+// One guild member's display name (nick, else global name, else username),
+// cached per id for an hour. "none" caches a definite 404 (left the server) so
+// it isn't re-asked; a failed call starts the short negative cache instead.
+const memberNameCache = new Map<string, { guildId: string; name: string | null; at: number; ttl: number }>()
+
+export function clearGuildMemberNamesCache() {
+  memberNameCache.clear()
+}
+
+/** A guild member's display name, or null when unknown / unavailable. Never throws. */
+export async function getGuildMemberName(userId: string, opts: DiscordOpts = {}): Promise<string | null> {
+  const guildId = guild(opts)
+  if (!guildId || !SNOWFLAKE.test(userId)) return null
+  const now = opts.now ?? Date.now()
+  const key = `${guildId}:${userId}`
+  const hit = memberNameCache.get(key)
+  if (hit && now - hit.at < hit.ttl) return hit.name
+  const r = await getJson(`/guilds/${guildId}/members/${userId}`, opts)
+  if (!r.ok) {
+    memberNameCache.set(key, { guildId, name: hit?.name ?? null, at: now, ttl: r.status === 404 ? TTL_MS : FAIL_TTL_MS })
+    return hit?.name ?? null
+  }
+  const m = r.json as { nick?: string | null; user?: { global_name?: string | null; username?: string | null } }
+  const name = [m?.nick, m?.user?.global_name, m?.user?.username].map((v) => (typeof v === 'string' ? v.trim() : '')).find(Boolean) ?? null
+  memberNameCache.set(key, { guildId, name, at: now, ttl: TTL_MS })
+  return name
 }
 
 function token(opts: DiscordOpts): string {

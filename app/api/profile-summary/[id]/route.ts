@@ -11,7 +11,7 @@
 // opportunistically so we can return isOwner / viewerId without a round-trip,
 // but unauthenticated callers always get the public-safe payload.
 
-import { NextRequest, NextResponse } from "next/server";
+import { NextRequest, NextResponse, after } from "next/server";
 import { getSession } from "@/app/lib/session";
 import { fetchMemberById, fetchMemberIdByDiscordId } from "@/app/lib/sheets/member-repository";
 import { getUserProgressSummary } from "@/app/lib/missions";
@@ -151,51 +151,111 @@ function publicMemberView(member: Record<string, unknown> | null): Record<string
 export interface ComposeOptions {
     memberId: string;
     viewerMemberId: string | null;
+    /**
+     * Only the fields link previews need (name, pfp, tagline): skips mission progress, mafia
+     * rank, vouches, X account and crew mappings. Used by generateMetadata, which must not wait
+     * on the slow lookups.
+     */
+    light?: boolean;
 }
+
+/** How long the profile waits for a cold mafia rank (Discord + Alchemy + POAP calls, ~4s). */
+export const MAFIA_RANK_BUDGET_MS = 1200;
+
+const NO_VOUCHES = { total: 0, pizzadao: 0, farcaster: 0, twitter: 0, followers: 0, pizzadaoFollowers: 0 };
+
+/**
+ * Resolve `p`, or `fallback` once `ms` passes. The underlying promise keeps running (and
+ * warming its own cache); `timedOut` tells the caller the fallback was used. Never rejects.
+ */
+export async function withDeadline<T>(
+    p: Promise<T>,
+    ms: number,
+    fallback: T,
+): Promise<{ value: T; timedOut: boolean }> {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const timeout = new Promise<{ value: T; timedOut: boolean }>((resolve) => {
+        timer = setTimeout(() => resolve({ value: fallback, timedOut: true }), ms);
+    });
+    const work = p.then(
+        (value) => ({ value, timedOut: false }),
+        () => ({ value: fallback, timedOut: false }),
+    );
+    try {
+        return await Promise.race([work, timeout]);
+    } finally {
+        if (timer) clearTimeout(timer);
+    }
+}
+
+/** Keep a still-running lookup alive after the response is sent so it can fill its cache. */
+function keepAlive(p: Promise<unknown>) {
+    try {
+        after(() => p.then(() => undefined, () => undefined));
+    } catch {
+        // Outside a request scope (tests, scripts): nothing to extend.
+    }
+}
+
+/** Set when the summary was composed without a mafia rank because it was still computing. */
+const INCOMPLETE = new WeakSet<ProfileSummary>();
 
 export async function composeProfileSummary(
     opts: ComposeOptions
 ): Promise<ProfileSummary | null> {
-    const { memberId, viewerMemberId } = opts;
+    const { memberId, viewerMemberId, light = false } = opts;
 
-    const member = await safe(fetchMemberById(memberId), null);
-    if (!member) return null;
+    // Everything below except mission progress is keyed by memberId alone, so it starts now,
+    // alongside the member read, instead of waiting for it.
+    const memberPromise = safe(fetchMemberById(memberId), null);
 
-    const memberDiscordId = String(member.discordId || "").trim();
-
-    // Pull supplementary data in parallel.
-    const [pfpUrl, mission, mafia, vouchCounts, xRow, crewMappings, dbTagline] = await Promise.all([
+    // Pull supplementary data in parallel. The cold mafia rank is the slow one, so it gets a
+    // deadline: past it the profile renders without the badge and the lookup finishes in the
+    // background (it caches its result), so the next load has it.
+    const mafiaPromise = light
+        ? Promise.resolve(null)
+        : getMafiaRank(memberId).then(
+            (r) => r,
+            () => null as Awaited<ReturnType<typeof getMafiaRank>> | null,
+        );
+    const [pfpUrl, mission, mafiaResult, vouchCounts, xRow, crewMappings, dbTagline] = await Promise.all([
         safe(resolvePfpUrlAsync(memberId), null as string | null),
-        memberDiscordId
-            ? safe(getUserProgressSummary(memberDiscordId), null as Awaited<
-                ReturnType<typeof getUserProgressSummary>
-            > | null)
-            : Promise.resolve(null),
-        safe(getMafiaRank(memberId), null as Awaited<ReturnType<typeof getMafiaRank>> | null),
-        safe(getVouchCounts(memberId), {
-            total: 0,
-            pizzadao: 0,
-            farcaster: 0,
-            twitter: 0,
-            followers: 0,
-            pizzadaoFollowers: 0,
-        }),
-        safe(
-            (prisma as unknown as {
-                xAccount: {
-                    findFirst: (args: unknown) => Promise<{ xUsername: string } | null>;
-                };
-            }).xAccount.findFirst({
-                where: { memberId },
-                select: { xUsername: true },
+        light
+            ? Promise.resolve(null)
+            : memberPromise.then((m) => {
+                const discordId = String(m?.discordId || "").trim();
+                return discordId
+                    ? safe(getUserProgressSummary(discordId), null as Awaited<
+                        ReturnType<typeof getUserProgressSummary>
+                    > | null)
+                    : null;
             }),
-            null as { xUsername: string } | null
-        ),
-        safe(getCrewMappings(), { crews: [] as CrewOption[], cached: false }),
+        withDeadline(mafiaPromise, MAFIA_RANK_BUDGET_MS, null),
+        light ? Promise.resolve(NO_VOUCHES) : safe(getVouchCounts(memberId), NO_VOUCHES),
+        light
+            ? Promise.resolve(null as { xUsername: string } | null)
+            : safe(
+                (prisma as unknown as {
+                    xAccount: {
+                        findFirst: (args: unknown) => Promise<{ xUsername: string } | null>;
+                    };
+                }).xAccount.findFirst({
+                    where: { memberId },
+                    select: { xUsername: true },
+                }),
+                null as { xUsername: string } | null
+            ),
+        light
+            ? Promise.resolve({ crews: [] as CrewOption[], cached: false })
+            : safe(getCrewMappings(), { crews: [] as CrewOption[], cached: false }),
         // PR4 — tagline from MemberProfileExtras (Postgres). Wins over the
         // sheet read below when present.
         safe(getMemberTagline(memberId), null as string | null),
     ]);
+    const member = await memberPromise;
+    if (!member) return null;
+    const mafia = mafiaResult.value;
+    if (mafiaResult.timedOut) keepAlive(mafiaPromise);
 
     const publicMember = publicMemberView(member);
 
@@ -241,7 +301,7 @@ export async function composeProfileSummary(
 
     const isOwner = !!viewerMemberId && viewerMemberId === memberId;
 
-    return {
+    const summary: ProfileSummary = {
         hero: {
             name,
             pfpUrl,
@@ -263,6 +323,8 @@ export async function composeProfileSummary(
         viewerId: viewerMemberId,
         isOwner,
     };
+    if (mafiaResult.timedOut) INCOMPLETE.add(summary);
+    return summary;
 }
 
 // ---------------------------------------------------------------------------
@@ -279,45 +341,50 @@ export async function GET(
             return NextResponse.json({ error: "Missing member ID" }, { status: 400 });
         }
 
-        // Resolve viewer from cookie — best effort, never blocks the response.
-        let viewerMemberId: string | null = null;
-        try {
-            const session = await getSession();
-            if (session?.discordId) {
-                viewerMemberId = await safe(
-                    fetchMemberIdByDiscordId(session.discordId),
-                    null
-                );
-            }
-        } catch {
-            viewerMemberId = null;
-        }
-
-        const cacheKey = `${id}:${viewerMemberId ?? "anon"}`;
-        const cached = CACHE.get(cacheKey);
         const cacheHeaders = PROFILE_SUMMARY_CACHE_HEADERS;
 
+        // Resolve the viewer (cookie -> member id) while the summary composes: the summary itself
+        // does not depend on the viewer, only isOwner / viewerId do, so the cache is keyed by
+        // profile id and the viewer is applied afterwards.
+        const viewerPromise = (async (): Promise<string | null> => {
+            try {
+                const session = await getSession();
+                if (!session?.discordId) return null;
+                return await safe(fetchMemberIdByDiscordId(session.discordId), null);
+            } catch {
+                return null;
+            }
+        })();
+
+        let base: ProfileSummary | null;
+        const cached = CACHE.get(id);
         if (cached && Date.now() - cached.time < CACHE_TTL_MS) {
-            return NextResponse.json(cached.data, { headers: cacheHeaders });
+            base = cached.data;
+        } else {
+            base = await composeProfileSummary({ memberId: id, viewerMemberId: null });
+            if (base) {
+                // Bound cache growth.
+                if (CACHE.size > CACHE_MAX) {
+                    const oldest = Array.from(CACHE.entries()).sort(
+                        (a, b) => a[1].time - b[1].time
+                    )[0]?.[0];
+                    if (oldest) CACHE.delete(oldest);
+                }
+                // A summary missing its rank (still computing) is not memoised, so the next load picks it up.
+                if (!INCOMPLETE.has(base)) CACHE.set(id, { time: Date.now(), data: base });
+            }
         }
 
-        const summary = await composeProfileSummary({
-            memberId: id,
-            viewerMemberId,
-        });
-
-        if (!summary) {
+        if (!base) {
             return NextResponse.json({ error: "Member not found" }, { status: 404 });
         }
 
-        // Bound cache growth.
-        if (CACHE.size > CACHE_MAX) {
-            const oldest = Array.from(CACHE.entries()).sort(
-                (a, b) => a[1].time - b[1].time
-            )[0]?.[0];
-            if (oldest) CACHE.delete(oldest);
-        }
-        CACHE.set(cacheKey, { time: Date.now(), data: summary });
+        const viewerMemberId = await viewerPromise;
+        const summary: ProfileSummary = {
+            ...base,
+            viewerId: viewerMemberId,
+            isOwner: !!viewerMemberId && viewerMemberId === id,
+        };
 
         return NextResponse.json(summary, { headers: cacheHeaders });
     } catch (error) {

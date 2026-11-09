@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { BountyCard } from "./BountyCard";
 import { card, btn, input } from "../shared-styles";
 import { useCrewMappings } from "@/app/lib/hooks/use-api";
+import type { ResolvedUser } from '@/app/lib/discord-markup'
 
 type Bounty = {
   id: number;
@@ -31,6 +32,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
   const [bounties, setBounties] = useState<Bounty[]>([]);
   const [channels, setChannels] = useState<Record<string, string>>({});
   const [roles, setRoles] = useState<Record<string, string>>({});
+  const [users, setUsers] = useState<Record<string, ResolvedUser>>({});
   const [guildId, setGuildId] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -56,6 +58,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
       setBounties(data.bounties);
       setChannels(data.channels ?? {});
       setRoles(data.roles ?? {});
+      setUsers(data.users ?? {});
       setGuildId(data.guildId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -334,6 +337,7 @@ export function BountyBoard({ currentUserId, onBountyAction }: BountyBoardProps)
                 onAction={handleAction}
                 channels={channels}
                 roles={roles}
+                users={users}
                 guildId={guildId}
               />
             ))}

@@ -14,6 +14,7 @@ import { useCallback, useEffect, useState, type CSSProperties } from 'react'
 import { useLocale, useTranslations } from 'next-intl'
 import { badge, btn, card, input } from '@/app/ui/shared-styles'
 import { DiscordText } from '@/app/ui/shared/DiscordText'
+import type { ResolvedUser } from '@/app/lib/discord-markup'
 
 export type CrewBounty = {
   id: number
@@ -78,6 +79,7 @@ export function CrewBounties({
   const [bounties, setBounties] = useState<CrewBounty[] | null>(null)
   const [channels, setChannels] = useState<Record<string, string>>({})
   const [roles, setRoles] = useState<Record<string, string>>({})
+  const [users, setUsers] = useState<Record<string, ResolvedUser>>({})
   const [viewer, setViewer] = useState<Viewer | null>(null)
   const [reloadKey, setReloadKey] = useState(0)
 
@@ -100,6 +102,7 @@ export function CrewBounties({
       let list: CrewBounty[] = []
       let resolvedChannels: Record<string, string> = {}
       let resolvedRoles: Record<string, string> = {}
+      let resolvedUsers: Record<string, ResolvedUser> = {}
       let resolvedViewer: Viewer | null = null
       try {
         const res = await fetch(`/api/bounties?crewId=${encodeURIComponent(crewId)}`, { cache: 'no-store' })
@@ -108,12 +111,14 @@ export function CrewBounties({
             bounties?: CrewBounty[]
             channels?: Record<string, string>
             roles?: Record<string, string>
+            users?: Record<string, ResolvedUser>
             viewer?: Viewer
           }
           const all = Array.isArray(json?.bounties) ? json.bounties : []
           list = all.filter((b) => b.crewId === crewId)
           resolvedChannels = json?.channels ?? {}
           resolvedRoles = json?.roles ?? {}
+          resolvedUsers = json?.users ?? {}
           resolvedViewer = json?.viewer ?? null
         }
       } catch {
@@ -123,6 +128,7 @@ export function CrewBounties({
         setBounties(list)
         setChannels(resolvedChannels)
         setRoles(resolvedRoles)
+        setUsers(resolvedUsers)
         setViewer(resolvedViewer)
       }
     })()
@@ -254,7 +260,7 @@ export function CrewBounties({
         <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'flex-start', gap: 12 }}>
           <div style={{ minWidth: 0, flex: 1 }}>
             <div style={{ fontSize: 14, fontWeight: 600, color: 'hsl(var(--foreground))', overflowWrap: 'anywhere' }}>
-              <DiscordText text={b.description} channels={channels} roles={roles} interactive={false} />
+              <DiscordText text={b.description} channels={channels} roles={roles} users={users} interactive={false} />
             </div>
             {b.link && (
               <div style={{ marginTop: 4 }}>
