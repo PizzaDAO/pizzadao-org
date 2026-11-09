@@ -12,7 +12,7 @@ import { canReviewCalls } from "@/app/lib/calls/access";
 import { asSegments, getRecording } from "@/app/lib/calls/recordings";
 import { loadPostFilter } from "@/app/lib/calls/post-filters";
 import { loadSettings } from "@/app/lib/settings";
-import { buildRecapText, recapCrewExcluded, recapLimits, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
+import { buildRecapParts, loadRecapPeople, recapCrewExcluded, recapLimits, recapFilteredCount, recapPostingEnabled, redactionsNewerThanSummary, resolveRecapChannel } from "@/app/lib/calls/recap";
 import { formatClock } from "@/app/lib/calls/summarize";
 import { CallAudioPlayer } from "../CallAudioPlayer";
 import { RemoveRecording } from "../RemoveRecording";
@@ -79,10 +79,17 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
     const [importedRecapOn, importedFollowupsOn] = imported
         ? await Promise.all([importedAllowed("calls.importedRecapPostEnabled"), importedAllowed("calls.importedFollowupsEnabled")])
         : [true, true];
-    const recapText =
+    const recapParts =
         postFilter && importedRecapOn && (rec.status === "IN_REVIEW" || rec.status === "PUBLISHED") && rec.summary?.trim()
-            ? buildRecapText({ id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters }, undefined, postFilter, recapLimits(await loadSettings()))
+            ? buildRecapParts(
+                  { id: rec.id, title: rec.title, eventName: rec.eventName, crewLabel: rec.crewLabel, summary: rec.summary, actionItems: rec.actionItems, chapters: rec.chapters },
+                  undefined,
+                  postFilter,
+                  recapLimits(await loadSettings()),
+                  await loadRecapPeople({ id: rec.id, source: rec.source, actionItems: rec.actionItems, redactedSpeakerIds: rec.redactedSpeakerIds }),
+              )
             : null;
+    const recapText = recapParts?.text ?? null;
     const recapChannel = recapText ? await resolveRecapChannel(rec.crewId).catch(() => null) : null;
     const recapEnabled = await recapPostingEnabled();
     const recapExcluded = postFilter ? recapCrewExcluded(rec, postFilter) : false;
@@ -322,7 +329,16 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         {recapStale && <p className="m-0 text-sm text-tomato">{t("recapStale")}</p>}
                         {rec.recapError && <p className="m-0 text-sm text-tomato">{t("recapError", { error: rec.recapError })}</p>}
                         <pre className="m-0 whitespace-pre-wrap break-words rounded-xl border p-3 bg-card text-sm" style={{ borderColor: "hsl(var(--rule-warm) / 0.65)" }}>
-                            {recapText}
+                            {recapText.split(/(<@\d{5,25}>)/).map((seg, i) => {
+                                const id = /^<@(\d{5,25})>$/.exec(seg)?.[1];
+                                return id ? (
+                                    <mark key={i} className="rounded px-1" title={t("recapMentionTitle")}>
+                                        @{recapParts?.mentions.get(id) ?? "user"}
+                                    </mark>
+                                ) : (
+                                    seg
+                                );
+                            })}
                         </pre>
                         {rec.status === "PUBLISHED" && rec.recapPostedAt && rec.recapMessageId && <UpdateRecap recordingId={rec.id} />}
                     </section>

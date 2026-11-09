@@ -9,7 +9,7 @@ vi.mock('@/app/lib/discord-channels', () => ({ resolveChannelId: vi.fn(async () 
 import { prisma } from '@/app/lib/db'
 import { enqueueMirror } from '@/app/lib/telegram/city-posts'
 import { clearPostFilterCache } from './post-filters'
-import { buildRecapText, mentionInBullet, mentionNames, recapAllowedMentions, repostRecap, postCallRecap, resolveMentionId, type RecapPeople } from './recap'
+import { buildRecapParts, buildRecapText, mentionInBullet, mentionNames, loadRecapPeople, recapAllowedMentions, repostRecap, postCallRecap, resolveMentionId, type RecapPeople } from './recap'
 
 const db = prisma as unknown as Record<string, Record<string, ReturnType<typeof vi.fn>>>
 const base = 'https://example.org'
@@ -74,15 +74,15 @@ describe('mentionNames / bullets', () => {
 })
 
 describe('allowed_mentions', () => {
-  const ids = Array.from({ length: 30 }, (_, i) => `<@${`1000000000000000${String(i).padStart(2, '0')}`}>`).join(' ')
+  const ids = Array.from({ length: 30 }, (_, i) => `1000000000000000${String(i).padStart(2, '0')}`)
   it('lists unique mentioned users (max 25) when pinging', () => {
-    const a = recapAllowedMentions(`<@${ENZO}> <@${ENZO}> <@${ANN}>`, true)
+    const a = recapAllowedMentions([ENZO, ENZO, ANN], true)
     expect(a).toEqual({ parse: [], users: [ENZO, ANN] })
     expect(recapAllowedMentions(ids, true).users).toHaveLength(25)
   })
   it('has no users when ping is off or nobody is mentioned', () => {
-    expect(recapAllowedMentions(`<@${ENZO}>`, false)).toEqual({ parse: [] })
-    expect(recapAllowedMentions('plain', true)).toEqual({ parse: [] })
+    expect(recapAllowedMentions([ENZO], false)).toEqual({ parse: [] })
+    expect(recapAllowedMentions([], true)).toEqual({ parse: [] })
   })
 })
 
@@ -168,12 +168,78 @@ describe('posting and editing', () => {
     expect(await repostRecap('abc123', { edit: true }, { env, edit })).toBe('no-message')
     expect(edit).not.toHaveBeenCalled()
   })
+  it('edit: clears its own error note on success', async () => {
+    db.callRecording.findUnique.mockResolvedValue({ ...published, recapPostedAt: new Date(), recapChannelId: '812143244149915679', recapMessageId: '999999999999999999' })
+    db.callRecording.updateMany.mockResolvedValue({ count: 1 })
+    db.callSpeaker.findMany.mockResolvedValue(speakerRows)
+    expect(await repostRecap('abc123', { edit: true }, { env, edit: vi.fn(async () => {}) })).toBe('updated')
+    expect(db.callRecording.updateMany).toHaveBeenCalledWith({ where: { id: 'abc123', recapError: { startsWith: 'edit failed: ' } }, data: { recapError: null } })
+  })
+  it('edit: respects the posting switch and the env kill switch', async () => {
+    const edit = vi.fn()
+    expect(await repostRecap('abc123', { edit: true }, { env: { DISCORD_BOT_TOKEN: 'tok' }, edit })).toBe('disabled')
+    expect(await repostRecap('abc123', { edit: true }, { env: { ...env, CALL_RECAP_POST_ENABLED: '0' }, edit })).toBe('disabled')
+    expect(edit).not.toHaveBeenCalled()
+  })
   it('edit: a Discord failure is recorded and reported', async () => {
     vi.spyOn(console, 'error').mockImplementation(() => {})
     db.callRecording.findUnique.mockResolvedValue({ ...published, recapPostedAt: new Date(), recapChannelId: '812143244149915679', recapMessageId: '999999999999999999' })
     db.callRecording.updateMany.mockResolvedValue({ count: 1 })
     db.callSpeaker.findMany.mockResolvedValue(speakerRows)
     expect(await repostRecap('abc123', { edit: true }, { env, edit: vi.fn(async () => { throw new Error('boom') }) })).toBe('failed')
-    expect(db.callRecording.updateMany).toHaveBeenCalledWith({ where: { id: 'abc123' }, data: { recapError: 'edit failed: boom' } })
+    expect(db.callRecording.updateMany).toHaveBeenCalledWith({ where: { id: 'abc123', OR: [{ recapError: null }, { recapError: { startsWith: 'edit failed: ' } }] }, data: { recapError: 'edit failed: boom' } })
+  })
+})
+
+describe('safety', () => {
+  const rec = { id: 'abc123', title: 'Ops <@999999999999999999>', crewLabel: 'Ops', summary: 'Enzo reviewed the plan with <@999999999999999999> and <@&888888888888888888>. The budget was approved. Everything is on track. Next call moves.', actionItems: [{ text: 'Ping <@!999999999999999999>', owner: '<@999999999999999999>', suggestedBy: `<@${ENZO}>` }], chapters: [] }
+  it('neutralizes injected mentions and pings only ids the code inserted', () => {
+    const parts = buildRecapParts(rec, base, undefined, undefined, people)
+    expect(parts.text).not.toContain('999999999999999999')
+    expect(parts.text).not.toContain('888888888888888888')
+    expect(parts.text).toContain('@user')
+    // a known speaker's injected mention becomes their name, then the code mentions them itself
+    expect([...parts.mentions.keys()]).toEqual([ENZO])
+    expect(recapAllowedMentions([...parts.mentions.keys()], true)).toEqual({ parse: [], users: [ENZO] })
+    expect(buildRecapParts(rec, base).text).not.toContain('<@')
+  })
+  it('never mentions redacted speakers or the imported-call speakers (people loading)', async () => {
+    db.callSpeaker.findMany.mockResolvedValue([
+      { discordId: ENZO, linkedDiscordId: null, displayName: 'Enzo Pepperoni' },
+      { discordId: ANN, linkedDiscordId: ANN2, displayName: 'Ann Anchovy' },
+    ])
+    db.member.findMany.mockResolvedValue([{ discordId: ANN2, name: 'Ann Anchovy' }, { discordId: MEM, name: 'Ann Anchovy 🍕' }])
+    const p = await loadRecapPeople({ id: 'r', source: null, actionItems: [{ text: 'x', owner: 'Ann Anchovy' }], redactedSpeakerIds: [ANN] })
+    expect(p.speakers.map((s) => s.discordId)).toEqual([ENZO])
+    expect(p.members.map((m) => m.discordId)).toEqual([MEM])
+    db.callSpeaker.findMany.mockClear()
+    expect(await loadRecapPeople({ id: 'r', source: 'X_BROADCAST', actionItems: [], redactedSpeakerIds: [] })).toEqual({ speakers: [], members: [] })
+    expect(db.callSpeaker.findMany).not.toHaveBeenCalled()
+  })
+  it('does not resolve placeholder owners or ambiguous directory names', () => {
+    const p: RecapPeople = { speakers: [], members: [{ discordId: ANN, name: 'Team' }, { discordId: MEM, name: 'Lou' }, { discordId: ANN2, name: 'Lou 🍕' }] }
+    for (const n of ['Team', 'Everyone', 'TBD', 'All', 'Anyone']) expect(resolveMentionId(n, p)).toBeNull()
+    expect(resolveMentionId('Lou', p)).toBeNull()
+  })
+})
+
+describe('wrong-person matching', () => {
+  const ppl = (...names: string[]): RecapPeople => ({ speakers: names.map((n, i) => ({ discordId: `70000000000000000${i}`, displayName: n })), members: [] })
+  it('prefers the longest name: "Ann Basil" vs "Ann"', () => {
+    const p = ppl('Ann Basil', 'Ann')
+    expect(mentionInBullet('Ann Basil and Ann spoke.', p)).toBe('<@700000000000000000> and <@700000000000000001> spoke.')
+  })
+  it('takes a first word only when nobody else shares it', () => {
+    expect(mentionInBullet('Ann spoke.', ppl('Ann Basil', 'Ann Pepper'))).toBe('Ann spoke.')
+    expect(mentionInBullet('Ann spoke.', ppl('Ann Basil', 'Bo'))).toBe('<@700000000000000000> spoke.')
+  })
+  it('ignores common words: The Don, Pizza Pete, Will', () => {
+    expect(mentionInBullet('the don said pizza is great and will ship; Will Smith agreed', ppl('The Don', 'Pizza Pete', 'Will Smith'))).toBe('the don said pizza is great and will ship; <@700000000000000002> agreed')
+    expect(mentionInBullet('Pizza night and Will do it.', ppl('Pizza Pete', 'Will Smith'))).toBe('Pizza night and Will do it.')
+    expect(mentionInBullet('The Don agreed with Pizza Pete.', ppl('The Don', 'Pizza Pete'))).toBe('<@700000000000000000> agreed with <@700000000000000001>.')
+  })
+  it('needs a capital', () => {
+    expect(mentionInBullet('enzo left', people)).toBe('enzo left')
+    expect(mentionInBullet('ENZO left', people)).toBe(`<@${ENZO}> left`)
   })
 })

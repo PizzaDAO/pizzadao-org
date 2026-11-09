@@ -7,6 +7,16 @@
 import { useState } from "react";
 import { useTranslations } from "next-intl";
 
+const REASONS: Record<string, "recapUpdateNoMessage" | "recapUpdateDisabled" | "recapUpdateStale" | "recapUpdateExcluded" | "recapUpdateNotPublished" | "recapUpdateImported" | "recapUpdateNoToken"> = {
+    "no-message": "recapUpdateNoMessage",
+    disabled: "recapUpdateDisabled",
+    "stale-redactions": "recapUpdateStale",
+    excluded: "recapUpdateExcluded",
+    "not-published": "recapUpdateNotPublished",
+    imported: "recapUpdateImported",
+    "no-token": "recapUpdateNoToken",
+};
+
 export function UpdateRecap({ recordingId }: { recordingId: string }) {
     const t = useTranslations("adminCalls");
     const [busy, setBusy] = useState(false);
@@ -16,8 +26,13 @@ export function UpdateRecap({ recordingId }: { recordingId: string }) {
         setBusy(true);
         setMessage(null);
         try {
-            const res = await fetch(`/api/admin/calls/${recordingId}/recap`, { method: "POST" });
-            if (!res.ok) throw new Error(String(res.status));
+            const res = await fetch(`/api/admin/calls/${recordingId}/recap`, { method: "POST", headers: { "Content-Type": "application/json" }, body: "{}" });
+            const body = (await res.json().catch(() => ({}))) as { result?: string };
+            if (!res.ok) {
+                const key = REASONS[body.result ?? ""];
+                setMessage({ text: key ? t(key) : t("recapUpdateError"), error: true });
+                return;
+            }
             setMessage({ text: t("recapUpdated"), error: false });
         } catch {
             setMessage({ text: t("recapUpdateError"), error: true });
