@@ -121,3 +121,44 @@ export async function collectIncome(
     return { paid, waiting, total: paid.reduce((s, p) => s + p.amount, 0), balance: econ.wallet }
   })
 }
+
+export type IncomeStatus = {
+  available: Array<{ name: string; roleId: string; amount: number }>
+  waiting: Array<{ name: string; roleId: string; amount: number; readyAt: Date }>
+  totalAvailable: number
+  /** Earliest time something becomes collectible (null when something is collectible now or no role earns). */
+  nextReadyAt: Date | null
+}
+
+/**
+ * Read-only twin of collectIncome: what would pay right now, per held role, from the same
+ * EconomyCooldown rows ("income:<roleId>") the payout claims. Never writes.
+ */
+export async function incomeStatus(
+  discordId: string,
+  memberRoleIds: readonly string[],
+  incomes: readonly ResolvedRoleIncome[],
+  opts: { now?: Date } = {},
+): Promise<IncomeStatus> {
+  const now = opts.now ?? new Date()
+  const held = new Set(memberRoleIds)
+  const eligible = [...new Map(incomes.filter((r) => held.has(r.roleId)).map((r) => [r.roleId, r])).values()]
+  const rows = eligible.length
+    ? await prisma.economyCooldown.findMany({
+        where: { discordId, action: { in: eligible.map((r) => `income:${r.roleId}`) } },
+        select: { action: true, lastAt: true },
+      })
+    : []
+  const last = new Map(rows.map((r) => [r.action, r.lastAt]))
+  const available: IncomeStatus['available'] = []
+  const waiting: IncomeStatus['waiting'] = []
+  for (const role of eligible) {
+    const lastAt = last.get(`income:${role.roleId}`)
+    const readyAt = lastAt ? new Date(lastAt.getTime() + role.intervalHours * 3_600_000) : null
+    if (!readyAt || readyAt.getTime() <= now.getTime()) available.push({ name: role.name, roleId: role.roleId, amount: role.amount })
+    else waiting.push({ name: role.name, roleId: role.roleId, amount: role.amount, readyAt })
+  }
+  const nextReadyAt =
+    available.length || !waiting.length ? null : new Date(Math.min(...waiting.map((w) => w.readyAt.getTime())))
+  return { available, waiting, totalAvailable: available.reduce((s, a) => s + a.amount, 0), nextReadyAt }
+}

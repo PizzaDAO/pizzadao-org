@@ -14,7 +14,7 @@
 import { TermExplanation } from "@/app/ui/shared/TermExplanation";
 import React, { useEffect, useState } from "react";
 import { ArrowUpRight } from "lucide-react";
-import { CrimeCard, GamesCard, Leaderboard, PepIcon, TransactionHistory } from "../ui/economy";
+import { CrimeCard, DailyPepCard, GamesCard, Leaderboard, PepIcon, TransactionHistory } from "../ui/economy";
 import { JobBoard } from "../ui/jobs";
 import { ShopGrid } from "../ui/shop";
 import { BountyBoard } from "../ui/bounties";
@@ -572,10 +572,11 @@ export default function PepDashboard() {
         </header>
 
 
+        <DailyPepCard onCollected={refreshWallet} />
+        <TermExplanation term="pep" />
         {/*
           sicilian-41551: stacks under lg, side-by-side from lg up.
         */}
-        <TermExplanation term="pep" />
       <div className="grid gap-6 lg:grid-cols-[1.2fr_1fr]">
           {/* Left: Jobs and Bounties */}
           <div className="min-w-0">

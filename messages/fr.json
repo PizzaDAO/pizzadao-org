@@ -2372,5 +2372,26 @@
     "applyAllHint": "Tout appliquer ignore les changements qui clôturent ou masquent une tâche : appliquez-les un par un.",
     "retiredHeading": "Retirées récemment depuis des appels",
     "undoRetire": "Annuler (réafficher la tâche)"
+  },
+  "collectPep": {
+    "title": "Récupérer le PEP du jour",
+    "overline": "Revenu quotidien",
+    "available": "{amount} PEP à récupérer",
+    "collect": "Récupérer",
+    "collecting": "En cours...",
+    "nextIn": "Prochain retrait dans {time}",
+    "timeHM": "{h} h {m} min",
+    "timeM": "{m} min",
+    "timeS": "moins d''une minute",
+    "success": "{amount} PEP récupérés. Nouveau solde : {balance}.",
+    "alsoDiscord": "Fonctionne aussi sur Discord : /collect-income",
+    "noRoles": "Pas encore de PEP quotidien.",
+    "getRole": "Obtenez le rôle {role} pour gagner {amount} PEP par jour.",
+    "joinRoles": "Rôles qui rapportent du PEP quotidien : {roles}.",
+    "unavailable": "Impossible de vérifier vos rôles pour le moment. Réessayez bientôt.",
+    "error": "Impossible de récupérer. Réessayez.",
+    "tooMany": "Trop d''essais. Patientez un instant.",
+    "dashLink": "Récupérer le PEP du jour",
+    "getRoleEvery": "Obtenez le rôle {role} pour gagner {amount} PEP toutes les {hours} heures."
   }
 }
