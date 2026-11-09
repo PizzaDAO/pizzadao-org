@@ -321,8 +321,8 @@ export async function completeJob(userId: string, reward: number, grantedBy?: st
   // keepTimestamps: true — a <t:...> tag shouldn't be frozen to today's
   // formatted date/relative string at write time; keep it raw so
   // display-time rendering (DiscordText) formats it fresh.
-  const { channels, roles } = await resolveDiscordMentions([assignment.job.description])
-  const plainDescription = discordTextToPlainText(assignment.job.description, { channels, roles }, { keepTimestamps: true })
+  const { channels, roles, users } = await resolveDiscordMentions([assignment.job.description])
+  const plainDescription = discordTextToPlainText(assignment.job.description, { channels, roles, users }, { keepTimestamps: true })
 
   // Remove the assignment and pay the reward (with its ledger row) in one DB
   // transaction. The delete is conditional, so concurrent completions of the

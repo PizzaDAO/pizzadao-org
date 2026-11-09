@@ -7,6 +7,7 @@ import { BountyComments } from "./BountyComments";
 import { useTranslations } from "next-intl";
 import { card as cardBase, btn, badge, input } from "../shared-styles";
 import { DiscordText } from "../shared/DiscordText";
+import type { ResolvedUser } from '@/app/lib/discord-markup'
 
 type BountyStatus = "OPEN" | "CLAIMED" | "SUBMITTED";
 
@@ -33,6 +34,7 @@ type BountyCardProps = {
   /** channel/role id -> name maps resolved server-side, and the guild id for channel links */
   channels?: Record<string, string>;
   roles?: Record<string, string>;
+  users?: Record<string, ResolvedUser>;
   guildId?: string | null;
 };
 
@@ -73,7 +75,7 @@ function statusBadge(status: BountyStatus): CSSProperties {
   };
 }
 
-export function BountyCard({ bounty, currentUserId, onAction, channels, roles, guildId }: BountyCardProps) {
+export function BountyCard({ bounty, currentUserId, onAction, channels, roles, users, guildId }: BountyCardProps) {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [showComments, setShowComments] = useState(false);
@@ -149,7 +151,7 @@ export function BountyCard({ bounty, currentUserId, onAction, channels, roles, g
               color: "hsl(var(--foreground))",
             }}
           >
-            <DiscordText text={bounty.description} channels={channels} roles={roles} guildId={guildId} />
+            <DiscordText text={bounty.description} channels={channels} roles={roles} users={users} guildId={guildId} />
           </p>
           {bounty.link && (
             <a

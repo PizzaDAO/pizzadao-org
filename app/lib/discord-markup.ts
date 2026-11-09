@@ -45,7 +45,7 @@ export type DiscordMarkupToken =
   | { type: "text"; text: string }
   | { type: "channel"; id: string; name: string | null }
   | { type: "role"; id: string; name: string | null }
-  | { type: "user"; id: string }
+  | { type: "user"; id: string; name: string | null; memberId?: string }
   | { type: "emoji"; id: string; name: string; animated: boolean }
   | { type: "link"; href: string; text: string }
   | { type: "timestamp"; unix: number; style: TimestampStyle; raw: string }
@@ -56,6 +56,14 @@ export interface DiscordMarkupMaps {
   channels?: Record<string, string>
   /** role id -> role name (no leading "@") */
   roles?: Record<string, string>
+  /** user id -> display name (no leading "@"), plus the app member id when they are a member */
+  users?: Record<string, ResolvedUser>
+}
+
+/** A resolved user mention: display name, and the app member id (for a profile link) when they are a member. */
+export interface ResolvedUser {
+  name: string
+  memberId?: string
 }
 
 export interface PlainTextOptions {
@@ -198,7 +206,8 @@ export function parseDiscordMarkup(text: string, maps: DiscordMarkupMaps = {}): 
     } else if (roleId !== undefined) {
       tokens.push({ type: "role", id: roleId, name: maps.roles?.[roleId] ?? null })
     } else if (userId !== undefined) {
-      tokens.push({ type: "user", id: userId })
+      const user = maps.users?.[userId]
+      tokens.push({ type: "user", id: userId, name: user?.name ?? null, ...(user?.memberId ? { memberId: user.memberId } : {}) })
     } else if (timestampUnix !== undefined) {
       const unix = Number(timestampUnix)
       if (isValidDiscordTimestamp(unix)) {
@@ -306,7 +315,7 @@ export function formatDiscordTimestamp(
 }
 
 /**
- * Flatten parsed tokens to a plain-text string — `#name`, `@name`, `@user`,
+ * Flatten parsed tokens to a plain-text string — `#name`, `@name` (role or user; `@user` when unresolved),
  * a link's text, `:name:` for an emoji, a formatted date/time for a
  * timestamp (or, with `opts.keepTimestamps`, the timestamp's original
  * `<t:unix[:style]>` tag, unresolved — see `PlainTextOptions`), and nothing
@@ -331,7 +340,7 @@ export function discordMarkupToPlainText(
         case "role":
           return `@${token.name ?? maps.roles?.[token.id] ?? "role"}`
         case "user":
-          return "@user"
+          return `@${token.name ?? maps.users?.[token.id]?.name ?? "user"}`
         case "emoji":
           return `:${token.name}:`
         case "link":
@@ -353,26 +362,30 @@ export function discordTextToPlainText(text: string, maps: DiscordMarkupMaps = {
 }
 
 /** Channel and role ids mentioned in `text` (deduped), for resolving names. */
-export function extractMentionIds(text: string): { channelIds: string[]; roleIds: string[] } {
+export function extractMentionIds(text: string): { channelIds: string[]; roleIds: string[]; userIds: string[] } {
   const channelIds = new Set<string>()
   const roleIds = new Set<string>()
-  const re = new RegExp(`<#(${SNOWFLAKE})>|<@&(${SNOWFLAKE})>`, "g")
+  const userIds = new Set<string>()
+  const re = new RegExp(`<#(${SNOWFLAKE})>|<@&(${SNOWFLAKE})>|<@!?(${SNOWFLAKE})>`, "g")
   let match: RegExpExecArray | null
   while ((match = re.exec(text))) {
     if (match[1]) channelIds.add(match[1])
     if (match[2]) roleIds.add(match[2])
+    if (match[3]) userIds.add(match[3])
   }
-  return { channelIds: [...channelIds], roleIds: [...roleIds] }
+  return { channelIds: [...channelIds], roleIds: [...roleIds], userIds: [...userIds] }
 }
 
 /** Same as `extractMentionIds`, merged across several descriptions. */
-export function extractMentionIdsFromAll(texts: string[]): { channelIds: string[]; roleIds: string[] } {
+export function extractMentionIdsFromAll(texts: string[]): { channelIds: string[]; roleIds: string[]; userIds: string[] } {
   const channelIds = new Set<string>()
   const roleIds = new Set<string>()
+  const userIds = new Set<string>()
   for (const text of texts) {
     const found = extractMentionIds(text)
     found.channelIds.forEach((id) => channelIds.add(id))
     found.roleIds.forEach((id) => roleIds.add(id))
+    found.userIds.forEach((id) => userIds.add(id))
   }
-  return { channelIds: [...channelIds], roleIds: [...roleIds] }
+  return { channelIds: [...channelIds], roleIds: [...roleIds], userIds: [...userIds] }
 }

@@ -13,6 +13,7 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { PepIcon, formatPep } from "./PepIcon";
 import { DiscordText } from "../shared/DiscordText";
+import type { ResolvedUser } from '@/app/lib/discord-markup'
 
 type TransactionData = {
   id: number;
@@ -129,6 +130,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
   // Discord markup still present in older memos (see DiscordText below).
   const [channels, setChannels] = useState<Record<string, string>>({});
   const [roles, setRoles] = useState<Record<string, string>>({});
+  const [users, setUsers] = useState<Record<string, ResolvedUser>>({});
   const [guildId, setGuildId] = useState<string | null>(null);
 
   const fetchTransactions = useCallback(async (offset = 0, append = false) => {
@@ -143,10 +145,12 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
         // pages' rows are still on screen.
         setChannels((prev) => ({ ...prev, ...(data.channels ?? {}) }));
         setRoles((prev) => ({ ...prev, ...(data.roles ?? {}) }));
+        setUsers((prev) => ({ ...prev, ...(data.users ?? {}) }));
       } else {
         setTransactions(data.transactions);
         setChannels(data.channels ?? {});
         setRoles(data.roles ?? {});
+        setUsers(data.users ?? {});
       }
       setTotal(data.total);
       setGuildId(data.guildId ?? null);
@@ -325,7 +329,7 @@ export function TransactionHistory({ refreshKey }: { refreshKey?: number }) {
                                 real <a> (e.g. a channel mention link) can't nest inside
                                 it, so mentions/links render as styled, non-interactive
                                 text instead. */}
-                            <DiscordText text={tx.description} channels={channels} roles={roles} guildId={guildId} interactive={false} />
+                            <DiscordText text={tx.description} channels={channels} roles={roles} users={users} guildId={guildId} interactive={false} />
                           </span>
                           <span
                             className="ui mt-1 block text-[10px] uppercase tracking-[0.22em]"

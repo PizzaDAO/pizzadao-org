@@ -28,7 +28,7 @@ export async function GET() {
     // Resolve any <#channelId> / <@&roleId> Discord mentions in the job
     // descriptions to names here, server-side (bot token stays on the
     // server) — the client renders them via DiscordText using these maps.
-    const { channels, roles, guildId } = await resolveDiscordMentions(descriptions)
+    const { channels, roles, users, guildId } = await resolveDiscordMentions(descriptions)
 
     return NextResponse.json({
       jobs: jobs.map((job: any, i: number) => ({
@@ -42,6 +42,7 @@ export async function GET() {
       rewardAmount,
       channels,
       roles,
+      users,
       guildId
     }, { headers: NO_STORE_HEADERS })
   } catch (error) {

@@ -157,4 +157,20 @@ describe("DiscordText", () => {
       expect(screen.getByRole("img", { name: ":pizza:" })).toBeInTheDocument();
     });
   });
+
+  it("renders a resolved member mention as @Name linking to their profile", () => {
+    render(<DiscordText text="ping <@100000000000000001>" users={{ "100000000000000001": { name: "Alex", memberId: "m-1" } }} />);
+    expect(screen.getByRole("link", { name: "@Alex" })).toHaveAttribute("href", "/profile/m-1");
+  });
+
+  it("renders a non-member mention as @Name without a link, and a non-interactive member as a span", () => {
+    const users = { "100000000000000001": { name: "Alex", memberId: "m-1" }, "100000000000000002": { name: "Sam" } };
+    render(<DiscordText text="<@100000000000000002>" users={users} />);
+    expect(screen.getByText("@Sam")).toBeInTheDocument();
+    expect(screen.queryByRole("link")).toBeNull();
+    cleanup();
+    render(<DiscordText text="<@100000000000000001>" users={users} interactive={false} />);
+    expect(screen.getByText("@Alex")).toBeInTheDocument();
+    expect(screen.queryByRole("link")).toBeNull();
+  });
 });

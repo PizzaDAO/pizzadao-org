@@ -25,8 +25,8 @@ import { resolveDiscordMentions } from './discord-mention-resolve'
  * date/relative string — display-time rendering formats it fresh.
  */
 async function plainMemoDescription(description: string): Promise<string> {
-  const { channels, roles } = await resolveDiscordMentions([description])
-  return discordTextToPlainText(description, { channels, roles }, { keepTimestamps: true })
+  const { channels, roles, users } = await resolveDiscordMentions([description])
+  return discordTextToPlainText(description, { channels, roles, users }, { keepTimestamps: true })
 }
 
 /**
