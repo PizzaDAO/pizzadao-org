@@ -333,7 +333,7 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
     const data = {
       title: out.title,
       summary: out.summary,
-      actionItems: (await withLiveItems(out.actionItems, rec.sessionId, segments, rec.redactedSpeakerIds)) as unknown as Prisma.InputJsonValue,
+      actionItems: (await withLiveItems(out.actionItems, rec.sessionId, segments, rec.redactedSpeakerIds, buildSpeakerNames(rec.speakers, segments))) as unknown as Prisma.InputJsonValue,
       chapters: out.chapters as unknown as Prisma.InputJsonValue,
       status: 'IN_REVIEW' as const,
       publishedAt: null,
@@ -373,11 +373,12 @@ export async function generateAndStoreSummaryResult(id: string, opts: SummaryOpt
  * and respecting redactions. Any failure keeps the summary's own list.
  */
 async function withLiveItems(
-  base: Array<{ text: string; owner: string | null }>,
+  base: Array<{ text: string; owner: string | null; suggestedBy?: string | null }>,
   sessionId: string | null | undefined,
   segments: TranscriptSegment[],
   redactedSpeakerIds: readonly string[] | null | undefined,
-): Promise<Array<{ text: string; owner: string | null }>> {
+  names: Record<string, string> = {},
+): Promise<Array<{ text: string; owner: string | null; suggestedBy?: string | null }>> {
   if (!sessionId) return base
   try {
     const live = await prisma.callLiveItem.findMany({
@@ -385,7 +386,7 @@ async function withLiveItems(
       orderBy: { createdAt: 'asc' },
       select: { text: true, owner: true, source: true, speakerIds: true, messageId: true, startMs: true, endMs: true },
     })
-    return live.length ? mergeLiveActionItems(base, live, segments, redactedSpeakerIds) : base
+    return live.length ? mergeLiveActionItems(base, live, segments, redactedSpeakerIds, undefined, names) : base
   } catch (err) {
     console.warn('[calls/summary] live action items not merged:', err instanceof Error ? err.message : err)
     return base
@@ -434,7 +435,7 @@ export async function unpublishRecording(id: string, reviewerDiscordId: string, 
 export interface RecordingTextEdit {
   title?: string | null
   summary?: string | null
-  actionItems?: Array<{ text: string; owner?: string }>
+  actionItems?: Array<{ text: string; owner?: string; suggestedBy?: string }>
   chapters?: Array<{ startMs: number; title: string }>
 }
 

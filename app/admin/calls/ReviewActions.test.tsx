@@ -11,6 +11,17 @@ describe('review form text formats', () => {
     expect(parseActionItems(formatActionItems(items))).toEqual(items)
   })
 
+  it('round-trips suggestedBy, with and without an owner', () => {
+    const items = [{ text: 'A', owner: 'Ann', suggestedBy: 'Bob' }, { text: 'B', suggestedBy: 'Cy' }, { text: 'C', owner: 'Dee' }]
+    expect(formatActionItems(items)).toBe('A | Ann | by: Bob\nB | by: Cy\nC | Dee')
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+  })
+
+  it('keeps a "| by:" inside the text when more segments follow it', () => {
+    const items = [{ text: 'Vote | by: Friday', owner: 'Ann' }, { text: 'Vote | by: Friday', owner: 'Ann', suggestedBy: 'Bob' }]
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+  })
+
   it('drops blank lines in action items', () => {
     expect(parseActionItems('\n  one \n\n two | Bob \n')).toEqual([{ text: 'one' }, { text: 'two', owner: 'Bob' }])
   })
