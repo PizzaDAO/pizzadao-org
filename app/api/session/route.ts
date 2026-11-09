@@ -110,6 +110,14 @@ export async function GET() {
     } else if (fs.existsSync(path.join(pfpDir, `${memberId}.png`))) {
       pfpPath = `/pfp/${memberId}.png`;
     }
+    // A composed PFP (unlockable assets) wins over the static file.
+    try {
+      const { prisma } = await import("@/app/lib/db");
+      const composed = await prisma.memberPfp.findUnique({ where: { memberId: String(memberId) }, select: { composedUrl: true } });
+      if (composed?.composedUrl) pfpPath = composed.composedUrl;
+    } catch {
+      // table missing or DB down: keep the static answer
+    }
   }
 
   return NextResponse.json(

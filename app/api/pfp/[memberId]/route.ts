@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
-import { resolvePfpUrl } from "@/app/lib/pfp";
+import { resolvePfpUrlAsync } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -14,8 +14,9 @@ export async function GET(
             return NextResponse.json({ error: "Missing memberId" }, { status: 400 });
         }
 
-        const cacheHeaders = { 'Cache-Control': 'public, s-maxage=3600, stale-while-revalidate=86400' };
-        return NextResponse.json({ url: resolvePfpUrl(memberId) }, { headers: cacheHeaders });
+        // Short cache: the composed URL is content-hashed, but the lookup itself changes on save.
+        const cacheHeaders = { 'Cache-Control': 'public, s-maxage=60, stale-while-revalidate=300' };
+        return NextResponse.json({ url: await resolvePfpUrlAsync(memberId) }, { headers: cacheHeaders });
     } catch {
         return NextResponse.json({ error: "Failed to get profile picture" }, { status: 500 });
     }
