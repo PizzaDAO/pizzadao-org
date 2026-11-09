@@ -714,10 +714,15 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
           // A level whose reward was already paid stays complete even if a mission was added
           // to it since (that mission is then an optional bonus, nothing is paid again).
           const isPaid = (data.paidLevels ?? []).includes(levelData.level);
-          const isComplete =
+          const missionsDone =
             !isAnytime &&
             requiredMissions.length > 0 &&
             (isPaid || requiredMissions.every((m) => m.progress?.status === "APPROVED"));
+          // Levels are earned in order: a level above the member's current level is never "complete",
+          // even when its own missions are approved (signed-out viewers have no level, so nothing is).
+          const reached = isAuthenticated && levelData.level < currentLevel;
+          const isComplete = missionsDone && reached;
+          const doneButLocked = missionsDone && !reached && isAuthenticated;
 
           const completedCount = levelData.missions.filter(
             (m) => m.progress?.status === "APPROVED"
@@ -873,6 +878,22 @@ export default function MissionsClient({ initial }: { initial: MissionsResponse 
                     }}
                   >
                     complete
+                  </span>
+                )}
+                {doneButLocked && (
+                  <span
+                    className="handwritten"
+                    style={{
+                      position: "absolute",
+                      top: 10,
+                      right: 56,
+                      transform: "rotate(-6deg)",
+                      fontSize: 15,
+                      color: "rgba(0, 0, 0, 0.55)",
+                      pointerEvents: "none",
+                    }}
+                  >
+                    missions done · unlocks after Level {levelData.level - 1}
                   </span>
                 )}
 
