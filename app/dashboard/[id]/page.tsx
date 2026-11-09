@@ -302,6 +302,7 @@ export default function Dashboard({ params }: { params: Promise<{ id: string }> 
                         calls={discoverData?.calls}
                         channels={discoverData?.channels}
                         roles={discoverData?.roles}
+                        users={discoverData?.users}
                         guildId={discoverData?.guildId}
                     />
 

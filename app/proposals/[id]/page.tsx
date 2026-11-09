@@ -211,7 +211,7 @@ export default async function ProposalPage({ params, searchParams }: { params: P
             return l && l.source !== "id" ? l.name : undefined;
         };
         proposer = (hist?.proposerDiscordId ? nameOf(hist.proposerDiscordId) : undefined) ?? p.proposerLabel;
-        const maps = await resolveDiscordMentions([p.body]).catch(() => ({ channels: {} as Record<string, string>, roles: {} as Record<string, string> }));
+        const maps = await resolveDiscordMentions([p.body]).catch(() => ({ channels: {} as Record<string, string>, roles: {} as Record<string, string>, users: {} }));
         body = renderHistoricalBody(p.body, { users: Object.fromEntries(ids.map((x) => [x, nameOf(x) ?? "member"])), channels: maps.channels, roles: maps.roles });
     }
 
