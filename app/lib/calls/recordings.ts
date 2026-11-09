@@ -90,6 +90,19 @@ export async function ingestRecording(p: IngestPayload): Promise<{ id: string; d
       endReason: p.endReason,
       partial: p.partial,
       participantIds: p.participantIds,
+      ...(p.presence.length
+        ? {
+            presence: {
+              create: p.presence.map((x) => ({
+                discordId: x.discordId,
+                displayName: p.speakers.find((sp) => sp.discordId === x.discordId)?.displayName ?? null,
+                presentSec: x.presentSec,
+                firstSeenMs: x.firstSeenMs,
+                lastSeenMs: x.lastSeenMs,
+              })),
+            },
+          }
+        : {}),
       mixKey: p.mix?.key ?? null,
       mixBytes: p.mix?.bytes ?? null,
       ...(hasSpeech ? { transcribedAt: new Date() } : {}),

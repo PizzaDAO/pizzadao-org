@@ -1,17 +1,24 @@
 import { beforeEach, describe, expect, it, vi } from 'vitest'
 
 const prismaMock = vi.hoisted(() => ({
-  callRecording: { findUnique: vi.fn() },
-  callAttendance: { findMany: vi.fn(), createMany: vi.fn() },
+  callRecording: { findUnique: vi.fn(), findMany: vi.fn() },
+  callAttendance: { findMany: vi.fn(), createMany: vi.fn(), update: vi.fn() },
+  attendanceEdit: { findMany: vi.fn() },
 }))
 vi.mock('@/app/lib/db', () => ({ prisma: prismaMock }))
 vi.mock('@/app/lib/attendance', () => ({ rebuildAttendanceSummaries: vi.fn() }))
-vi.mock('@/app/lib/settings', () => ({ loadSettings: async () => new Map([['calls.attendanceCrewAliases', 'community = community_call']]) }))
+vi.mock('@/app/lib/settings', () => ({
+  loadSettings: async () => new Map<string, unknown>([['calls.attendanceCrewAliases', 'community = community_call'], ['calls.attendanceMinMinutes', 5], ['calls.attendanceShortCallPercent', 50], ['calls.attendanceSpeakersAlwaysCount', true]]),
+}))
 
-import { attendeesOf, callDay, recordAttendanceForRecording, recordingAttendanceKey } from './attendance-from-recordings'
+import { attendeesOf, callDay, countedAttendees, recordAttendanceForRecording, recordingAttendanceKey, thresholdSec, type CountedRecording } from './attendance-from-recordings'
 import { attendanceCrewId, crewIdsFor } from './crew-alias'
 import { parseCrewAliases, SETTINGS } from '@/app/lib/settings/registry'
-beforeEach(() => vi.clearAllMocks())
+beforeEach(() => {
+  vi.clearAllMocks()
+  prismaMock.callRecording.findMany.mockResolvedValue([])
+  prismaMock.attendanceEdit.findMany.mockResolvedValue([])
+})
 
 const A = '111111111111111111'
 const B = '222222222222222222'
@@ -82,7 +89,7 @@ describe('Nov 8 scenario', () => {
       { discordId: A, crewId: 'community_call', crewLabel: 'Community Call', dailySheetId: 'sheet1', callDate: day },
     ]
     prismaMock.callRecording.findUnique.mockResolvedValue({
-      crewId: 'community', crewLabel: 'community', startedAt: new Date('2026-11-09T00:30:00Z'), source: 'DISCORD', status: 'READY',
+      id: 'r1', durationSec: 3600, presence: [], crewId: 'community', crewLabel: 'community', startedAt: new Date('2026-11-09T00:30:00Z'), source: 'DISCORD', status: 'READY',
       participantIds: [A, B], speakers: [],
     })
     prismaMock.callAttendance.findMany.mockImplementation(async (q: { where: { crewId: { in: string[] }; discordId: { in: string[] } } }) =>

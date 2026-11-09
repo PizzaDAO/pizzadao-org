@@ -853,13 +853,32 @@ model CallAttendance {
   crewLabel    String // Display name (Ops, Comms, Community Call)
   callDate     DateTime // Date of the call
   dailySheetId String // Google Sheet ID of the daily attendance sheet (for dedup); `rec:<crew>:<date>` for rows from recordings
-  source       String   @default("sheet") // sheet | recording
+  source       String   @default("sheet") // sheet | recording | manual
+  presentSec   Int? // measured seconds in the voice channel (recording rows from a recorder that measures presence); null for sheet rows
+  recordingId  String? // the recording that created the row (recording rows)
   createdAt    DateTime @default(now())
 
   @@unique([discordId, dailySheetId]) // One record per person per call
   @@index([discordId])
   @@index([crewId])
   @@index([callDate])
+}
+
+// Admin add/remove of attendance rows, kept as the audit trail. A remove also stops the recording
+// attendance from adding the person back for that crew and day.
+model AttendanceEdit {
+  id        Int      @id @default(autoincrement())
+  action    String // add | remove
+  discordId String // the attendee
+  crewId    String
+  callDate  DateTime
+  actorId   String // Discord id of the admin
+  reason    String?
+  source    String? // source of the row removed (sheet | recording | manual)
+  createdAt DateTime @default(now())
+
+  @@index([crewId, callDate])
+  @@index([discordId])
 }
 
 // Pre-computed per-member attendance aggregates (rebuilt on sync)
@@ -1358,6 +1377,21 @@ enum CallSource {
   X_BROADCAST
 }
 
+// Measured time one person spent in the voice channel during a recorded call (recorder presence records, summed over every stay).
+model CallPresence {
+  id          String        @id @default(cuid())
+  recordingId String
+  recording   CallRecording @relation(fields: [recordingId], references: [id], onDelete: Cascade)
+  discordId   String
+  displayName String?
+  presentSec  Int
+  firstSeenMs Int // milliseconds since the call started
+  lastSeenMs  Int
+
+  @@unique([recordingId, discordId])
+  @@index([discordId])
+}
+
 // One recorded call. Written by the recorder worker through the ingest API
 // (idempotent on sessionId). Audio lives in a private R2 bucket and is never
 // public; transcript / summary / actionItems / chapters are filled in Phase 2.
@@ -1376,6 +1410,7 @@ model CallRecording {
   endReason               String? // event-ended | empty | max-duration | superseded | shutdown | ...
   partial                 Boolean             @default(false)
   participantIds          String[]            @default([]) // non-bot Discord ids seen in the voice channel (recorder); feeds attendance
+  presence                CallPresence[] // measured time in the voice channel per person (recorder); feeds attendance thresholds
   mixKey                  String? // R2 key of the mixed m4a
   mixBytes                Int?
   audioDeletedAt          DateTime? // set when the retention sweep removed the R2 audio

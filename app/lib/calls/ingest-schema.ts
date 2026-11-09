@@ -77,6 +77,16 @@ export interface IngestPayload {
   chat: IngestChatMessage[]
   /** Non-bot Discord ids seen in the voice channel (silent attendees too). Absent from older workers. */
   participantIds: string[]
+  /** Measured time in the voice channel per person. Absent from older workers (then participantIds decides). */
+  presence: IngestPresence[]
+}
+
+export interface IngestPresence {
+  discordId: string
+  presentSec: number
+  /** Milliseconds since the call started. */
+  firstSeenMs: number
+  lastSeenMs: number
 }
 
 const isObj = (v: unknown): v is Record<string, unknown> => typeof v === 'object' && v !== null && !Array.isArray(v)
@@ -165,6 +175,23 @@ function parseParticipants(v: unknown): string[] {
   return [...out].slice(0, MAX_SPEAKERS)
 }
 
+/** Lenient like participantIds: a bad entry is dropped, never failing the ingest. Duplicates keep the first entry. */
+function parsePresence(v: unknown): IngestPresence[] {
+  if (!Array.isArray(v)) return []
+  const out = new Map<string, IngestPresence>()
+  for (const raw of v) {
+    if (!isObj(raw) || typeof raw.discordId !== 'string' || !SNOWFLAKE.test(raw.discordId) || out.has(raw.discordId)) continue
+    const num = (x: unknown) => (typeof x === 'number' && Number.isFinite(x) && x >= 0 && x <= MAX_CALL_MS ? Math.round(x) : null)
+    const presentSec = num(raw.presentSec)
+    const firstSeenMs = num(raw.firstSeenMs)
+    const lastSeenMs = num(raw.lastSeenMs)
+    if (presentSec === null || presentSec > MAX_SECONDS || firstSeenMs === null || lastSeenMs === null) continue
+    out.set(raw.discordId, { discordId: raw.discordId, presentSec, firstSeenMs, lastSeenMs })
+    if (out.size >= MAX_SPEAKERS) break
+  }
+  return [...out.values()]
+}
+
 export function parseIngestPayload(body: unknown): IngestPayload {
   if (!isObj(body)) throw new ValidationError('Body must be a JSON object')
 
@@ -220,5 +247,6 @@ export function parseIngestPayload(body: unknown): IngestPayload {
     transcript: parseTranscript(body.transcript, seen),
     chat: parseChat(body.chat),
     participantIds: parseParticipants(body.participantIds),
+    presence: parsePresence(body.presence),
   }
 }

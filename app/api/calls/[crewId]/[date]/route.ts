@@ -17,8 +17,9 @@ export async function GET(
     discordId: string;
     displayName: string | null;
     crewLabel: string;
+    presentSec: number | null;
   }[] = await prisma.$queryRawUnsafe(
-    `SELECT "discordId", "displayName", "crewLabel"
+    `SELECT "discordId", "displayName", "crewLabel", "presentSec"
      FROM "CallAttendance"
      WHERE "crewId" = $1 AND "callDate"::date = $2::date
      ORDER BY "displayName" ASC NULLS LAST`,
@@ -47,6 +48,8 @@ export async function GET(
     discordId: a.discordId,
     displayName: a.displayName || a.discordId,
     memberId: memberMap.get(a.discordId) || null,
+    // Whole minutes in the call when a recording measured it (never sheet rows).
+    minutes: a.presentSec == null ? null : Math.max(1, Math.round(a.presentSec / 60)),
   }));
 
   return NextResponse.json(

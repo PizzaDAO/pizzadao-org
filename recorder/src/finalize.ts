@@ -11,7 +11,7 @@ import { execFile } from 'node:child_process'
 import { existsSync, mkdirSync, readdirSync, readFileSync, rmSync, statSync, writeFileSync } from 'node:fs'
 import path from 'node:path'
 import { promisify } from 'node:util'
-import { chatMessages, participantIds, MIN_CHAT_FOR_TEXT_ONLY, readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSummary } from './manifest.js'
+import { chatMessages, ingestPresence, participantIds, presenceStats, MIN_CHAT_FOR_TEXT_ONLY, readManifest, summarize, appendRecord, MANIFEST_FILE, type SpeakerSummary } from './manifest.js'
 import { buildMixArgs, buildSpeakerTrackPlan, type PlanSegment } from './mix-plan.js'
 import { postIngestWithRetry, type IngestResult } from './ingest.js'
 import { sessionKeys, type Uploader } from './storage.js'
@@ -191,6 +191,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
     // Silent attendees count too: everyone seen in the channel plus every speaker (the app ignores bots; we never record them).
     const participants = [...new Set([...participantIds(records), ...speakers.map((sp) => sp.userId)])].sort().slice(0, 300)
     const endedAtMs = meta.endedAtMs ?? statSync(path.join(dir, MANIFEST_FILE)).mtimeMs
+    const presence = ingestPresence(presenceStats(records, Math.max(endedAtMs, meta.startedAtMs)), meta.startedAtMs)
     const payload: IngestPayload = {
       sessionId: meta.sessionId,
       eventId: meta.eventId,
@@ -213,6 +214,7 @@ export async function finalizeSession(dir: string, deps: FinalizeDeps): Promise<
       ...(transcript ? { transcript } : {}),
       ...(chat.length ? { chat } : {}),
       ...(participants.length ? { participantIds: participants } : {}),
+      ...(presence.length ? { presence } : {}),
     }
 
     if (payload.speakers.length === 0 && !payload.mix && chat.length < MIN_CHAT_FOR_TEXT_ONLY) {

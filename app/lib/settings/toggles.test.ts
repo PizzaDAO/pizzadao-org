@@ -35,7 +35,7 @@ afterEach(() => {
 })
 
 // Booleans where ON is the safe state (dry run): not enable switches, so no env fallback or kill switch.
-const SAFETY_FLAGS: string[] = ['calls.dstFixDryRun']
+const SAFETY_FLAGS: string[] = ['calls.dstFixDryRun', 'calls.attendanceSpeakersAlwaysCount']
 
 describe('feature switches: env stays the fallback and the kill switch', () => {
   it('every switch in the registry has an env var, and the registry default is the legacy default', () => {

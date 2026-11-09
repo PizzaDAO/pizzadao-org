@@ -50,6 +50,17 @@ export interface IngestPayload {
   chat?: IngestChatMessage[]
   /** Discord ids of every non-bot member seen in the voice channel during the session (silent attendees too). Omitted when none were seen. */
   participantIds?: string[]
+  /** Measured time in the voice channel per member (purged users dropped). Omitted when nothing was measured; apps without it use participantIds. */
+  presence?: IngestPresence[]
+}
+
+export interface IngestPresence {
+  discordId: string
+  /** Whole seconds in the channel, summed over every stay. */
+  presentSec: number
+  /** Milliseconds since the session started (first time seen, last time seen). */
+  firstSeenMs: number
+  lastSeenMs: number
 }
 
 /** Written to <session dir>/session.json when a recording starts, updated as it ends. */
@@ -91,6 +102,16 @@ export interface PresentRecord {
   userIds: string[]
 }
 
+/**
+ * The full set of non-bot members in the voice channel at `atMs` (epoch ms). Written only when the set changes
+ * (and once at the start), so the time between two records is spent by exactly the users in the earlier one.
+ */
+export interface PresenceRecord {
+  t: 'presence'
+  atMs: number
+  userIds: string[]
+}
+
 /** A chat message (append-only; later edits/deletes are separate records). */
 export interface ChatRecord {
   t: 'chat'
@@ -112,4 +133,4 @@ export interface ChatDeleteRecord {
   messageId: string
 }
 
-export type ManifestRecord = SegmentRecord | MemberRecord | PresentRecord | PurgeRecord | ChatRecord | ChatEditRecord | ChatDeleteRecord
+export type ManifestRecord = SegmentRecord | MemberRecord | PresentRecord | PresenceRecord | PurgeRecord | ChatRecord | ChatEditRecord | ChatDeleteRecord

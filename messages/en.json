@@ -1000,6 +1000,7 @@
     "room": "In the room",
     "loadingAttendees": "Loading attendees...",
     "attendeesError": "Failed to load attendees.",
+    "attendeeMinutes": "{count} min",
     "loadError": "Failed to load calls. Please try again.",
     "prev": "← Prev",
     "next": "Next →",

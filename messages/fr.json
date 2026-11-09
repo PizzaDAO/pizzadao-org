@@ -1000,6 +1000,7 @@
     "room": "Participants",
     "loadingAttendees": "Chargement des participants…",
     "attendeesError": "Impossible de charger les participants.",
+    "attendeeMinutes": "{count} min",
     "loadError": "Impossible de charger les appels. Réessayez.",
     "prev": "← Précédent",
     "next": "Suivant →",

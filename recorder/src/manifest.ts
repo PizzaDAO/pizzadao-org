@@ -4,7 +4,7 @@
  */
 import { appendFileSync, existsSync, readFileSync } from 'node:fs'
 import path from 'node:path'
-import type { IngestChatMessage, ManifestRecord, SegmentRecord } from './types.js'
+import type { IngestChatMessage, IngestPresence, ManifestRecord, SegmentRecord } from './types.js'
 
 export const MANIFEST_FILE = 'manifest.jsonl'
 
@@ -63,6 +63,65 @@ export function participantIds(records: ManifestRecord[]): string[] {
   const ids = new Set<string>()
   for (const r of records) if (r.t === 'present') for (const id of r.userIds) if (!purged.has(id)) ids.add(id)
   return [...ids].sort()
+}
+
+export interface PresenceStat {
+  userId: string
+  /** Whole seconds in the channel; null when only the old first-seen records exist (no duration known). */
+  presentSec: number | null
+  firstSeenMs: number
+  lastSeenMs: number
+}
+
+/**
+ * Time in the channel per person, from the `presence` records (full member set at each change).
+ * The last set runs until `endMs`; a record after `endMs` is ignored. Purged users are dropped. Sessions
+ * recorded before presence records existed fall back to the first-seen `present` records (presentSec null,
+ * seen times unknown, reported as 0). Pure; a torn last line was already dropped by readManifest.
+ */
+export function presenceStats(records: ManifestRecord[], endMs: number): PresenceStat[] {
+  const purged = new Set(records.filter((r) => r.t === 'purge').map((r) => r.userId))
+  const marks = records
+    .filter((r): r is Extract<ManifestRecord, { t: 'presence' }> => r.t === 'presence')
+    .map((r) => ({ atMs: r.atMs, userIds: r.userIds }))
+    .sort((a, b) => a.atMs - b.atMs)
+  if (marks.length === 0) {
+    return participantIds(records).map((userId) => ({ userId, presentSec: null, firstSeenMs: 0, lastSeenMs: 0 }))
+  }
+  const acc = new Map<string, { ms: number; first: number; last: number }>()
+  marks.forEach((m, i) => {
+    const from = m.atMs
+    const to = Math.min(i + 1 < marks.length ? marks[i + 1].atMs : endMs, endMs)
+    const len = Math.max(0, to - from)
+    for (const id of new Set(m.userIds)) {
+      if (purged.has(id)) continue
+      const a = acc.get(id) ?? { ms: 0, first: from, last: from }
+      a.ms += len
+      a.last = Math.max(a.last, Math.max(from, to))
+      acc.set(id, a)
+    }
+  })
+  // Anyone only in old-style records (a restart mid-call) is still known to have been there.
+  for (const id of participantIds(records)) if (!acc.has(id)) acc.set(id, { ms: 0, first: marks[0].atMs, last: marks[0].atMs })
+  return [...acc.entries()]
+    .map(([userId, a]) => ({ userId, presentSec: Math.round(a.ms / 1000), firstSeenMs: a.first, lastSeenMs: a.last }))
+    .sort((a, b) => a.userId.localeCompare(b.userId))
+}
+
+export const MAX_PRESENCE = 300
+
+/** The ingest `presence` list: relative times, capped, longest stays first when over the cap. */
+export function ingestPresence(stats: PresenceStat[], startedAtMs: number): IngestPresence[] {
+  return stats
+    .filter((s) => s.presentSec !== null)
+    .map((s) => ({
+      discordId: s.userId,
+      presentSec: s.presentSec as number,
+      firstSeenMs: Math.max(0, Math.round(s.firstSeenMs - startedAtMs)),
+      lastSeenMs: Math.max(0, Math.round(s.lastSeenMs - startedAtMs)),
+    }))
+    .sort((a, b) => b.presentSec - a.presentSec || a.discordId.localeCompare(b.discordId))
+    .slice(0, MAX_PRESENCE)
 }
 
 export const MAX_CHAT_MESSAGES = 5000

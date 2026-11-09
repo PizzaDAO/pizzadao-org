@@ -78,6 +78,22 @@ describe('R2 cleanup after finalize', () => {
   })
 })
 
+describe('presence in the ingest payload', () => {
+  it('sends measured seconds per person', async () => {
+    const dir = session()
+    appendRecord(dir, { t: 'presence', atMs: 1000, userIds: ['111', '222'] })
+    appendRecord(dir, { t: 'presence', atMs: 4000, userIds: ['111'] })
+    let sent: { presence?: unknown } = {}
+    const { deps } = mk(async () => ({ ok: true, id: 'r', duplicate: false, keys: [] }))
+    await finalizeSession(dir, { ...deps, postIngest: async (p) => ((sent = p), { ok: true, id: 'r', duplicate: false, keys: [] }) })
+    // Session runs 1000 -> 9000 ms: 111 stays the whole 8 s, 222 leaves after 3 s.
+    expect(sent.presence).toEqual([
+      { discordId: '111', presentSec: 8, firstSeenMs: 0, lastSeenMs: 8000 },
+      { discordId: '222', presentSec: 3, firstSeenMs: 0, lastSeenMs: 3000 },
+    ])
+  })
+})
+
 describe('session prefix guard', () => {
   it('accepts a real session prefix', () => {
     expect(() => assertSessionPrefix('calls/1394003497153724497-1760000000000/')).not.toThrow()
