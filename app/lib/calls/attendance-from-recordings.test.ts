@@ -11,7 +11,7 @@ vi.mock('@/app/lib/settings', () => ({
   loadSettings: async () => new Map<string, unknown>([['calls.attendanceCrewAliases', 'community = community_call'], ['calls.attendanceMinMinutes', 5], ['calls.attendanceShortCallPercent', 50], ['calls.attendanceSpeakersAlwaysCount', true]]),
 }))
 
-import { attendeesOf, callDay, countedAttendees, recordAttendanceForRecording, recordingAttendanceKey, thresholdSec, type CountedRecording } from './attendance-from-recordings'
+import { attendeesOf, callDay, recordAttendanceForRecording, recordingAttendanceKey } from './attendance-from-recordings'
 import { attendanceCrewId, crewIdsFor } from './crew-alias'
 import { parseCrewAliases, SETTINGS } from '@/app/lib/settings/registry'
 beforeEach(() => {
