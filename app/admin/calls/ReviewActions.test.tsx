@@ -11,6 +11,12 @@ describe('review form text formats', () => {
     expect(parseActionItems(formatActionItems(items))).toEqual(items)
   })
 
+  it('round-trips suggestedBy, with and without an owner', () => {
+    const items = [{ text: 'A', owner: 'Ann', suggestedBy: 'Bob' }, { text: 'B', suggestedBy: 'Cy' }, { text: 'C', owner: 'Dee' }]
+    expect(formatActionItems(items)).toBe('A | Ann | by: Bob\nB | by: Cy\nC | Dee')
+    expect(parseActionItems(formatActionItems(items))).toEqual(items)
+  })
+
   it('drops blank lines in action items', () => {
     expect(parseActionItems('\n  one \n\n two | Bob \n')).toEqual([{ text: 'one' }, { text: 'two', owner: 'Bob' }])
   })

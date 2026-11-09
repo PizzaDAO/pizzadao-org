@@ -83,8 +83,8 @@ export function recapFilteredCount(rec: Pick<RecapInput, 'summary' | 'actionItem
   const sentences = oneLine(rec.summary ?? '').split(/(?<=[.!?])\s+/).filter((s) => s.trim().length > 3 && mentionsBlockedTerm(s, filter)).length
   const chapters = (Array.isArray(rec.chapters) ? rec.chapters : []).filter((c) => mentionsBlockedTerm((c as { title?: unknown })?.title as string, filter)).length
   const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : []).filter((a) => {
-    const o = a as { text?: unknown; owner?: unknown }
-    return mentionsBlockedTerm(typeof o?.text === 'string' ? o.text : '', filter) || mentionsBlockedTerm(typeof o?.owner === 'string' ? o.owner : '', filter)
+    const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown }
+    return mentionsBlockedTerm(typeof o?.text === 'string' ? o.text : '', filter) || mentionsBlockedTerm(typeof o?.owner === 'string' ? o.owner : '', filter) || mentionsBlockedTerm(typeof o?.suggestedBy === 'string' ? o.suggestedBy : '', filter)
   }).length
   return sentences + chapters + actions
 }
@@ -104,10 +104,13 @@ export function buildRecapText(rec: RecapInput, base: string = SITE_URL, filter:
   const bullets = recapBullets(rec.summary, rec.chapters, filter, limits)
   const actions = (Array.isArray(rec.actionItems) ? rec.actionItems : [])
     .map((a) => {
-      const o = a as { text?: unknown; owner?: unknown }
+      const o = a as { text?: unknown; owner?: unknown; suggestedBy?: unknown }
       const text = typeof o?.text === 'string' ? oneLine(o.text) : ''
       const owner = typeof o?.owner === 'string' ? oneLine(o.owner) : ''
-      return text && !mentionsBlockedTerm(text, filter) && !mentionsBlockedTerm(owner, filter) ? `${clip(text, limits.chars)}${owner ? ` (${clip(owner, 40)})` : ''}` : ''
+      const by = typeof o?.suggestedBy === 'string' ? oneLine(o.suggestedBy) : ''
+      return text && !mentionsBlockedTerm(text, filter) && !mentionsBlockedTerm(owner, filter) && !mentionsBlockedTerm(by, filter)
+        ? `${clip(text, limits.chars)}${owner ? ` (${clip(owner, 40)})` : ''}${by ? ` \u2014 suggested by ${clip(by, 40)}` : ''}`
+        : ''
     })
     .filter(Boolean)
     .slice(0, limits.actions)

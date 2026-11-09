@@ -41,6 +41,7 @@ type Busy = "save" | "regenerate" | "publish" | null;
 export interface ActionItem {
     text: string;
     owner?: string;
+    suggestedBy?: string;
 }
 export interface Chapter {
     startMs: number;
@@ -58,9 +59,12 @@ function clock(ms: number): string {
 
 export const MAX_LIST = 30;
 
-/** "text | owner" per line; the owner is whatever follows the LAST " | ". */
+const BY = "by: ";
+/** "text | owner | by: suggester" per line; owner and suggester are optional. A final " | by: NAME" is the suggester, then whatever follows the last " | " is the owner. */
 export function formatActionItems(items: ActionItem[]): string {
-    return items.map((i) => (i.owner ? `${i.text} | ${i.owner}` : i.text)).join("\n");
+    return items
+        .map((i) => [i.text, i.owner, i.suggestedBy ? `${BY}${i.suggestedBy}` : ""].filter(Boolean).join(" | "))
+        .join("\n");
 }
 export function parseActionItems(raw: string): ActionItem[] {
     return raw
@@ -68,11 +72,17 @@ export function parseActionItems(raw: string): ActionItem[] {
         .map((l) => l.trim())
         .filter(Boolean)
         .map((l) => {
-            const at = l.lastIndexOf(" | ");
-            if (at === -1) return { text: l };
-            const owner = l.slice(at + 3).trim();
-            const text = l.slice(0, at).trim();
-            return owner ? { text, owner } : { text };
+            let rest = l;
+            let suggestedBy = "";
+            const byAt = rest.lastIndexOf(` | ${BY}`);
+            if (byAt !== -1) {
+                suggestedBy = rest.slice(byAt + 3 + BY.length).trim();
+                rest = rest.slice(0, byAt).trim();
+            }
+            const at = rest.lastIndexOf(" | ");
+            const owner = at === -1 ? "" : rest.slice(at + 3).trim();
+            const text = (at === -1 ? rest : rest.slice(0, at)).trim();
+            return { text, ...(owner ? { owner } : {}), ...(suggestedBy ? { suggestedBy } : {}) };
         })
         .filter((i) => i.text);
 }

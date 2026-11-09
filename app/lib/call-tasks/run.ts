@@ -13,6 +13,7 @@ import { sanitizeSummaryError, visibleSegments } from '@/app/lib/calls/recording
 import { DISCORD_ONLY, isImportedSource } from '@/app/lib/calls/imported'
 import { isCrewExcluded, loadPostFilter } from '@/app/lib/calls/post-filters'
 import { mergeLiveActionItems } from '@/app/lib/calls/live-items'
+import { buildSpeakerNames } from '@/app/lib/calls/summarize'
 import { redactionsNewerThanSummary, resolveRecapChannel } from '@/app/lib/calls/recap'
 import { DiscordPostError, postDiscordMessage } from '@/app/lib/discord-rest'
 import { appUrl } from '@/app/lib/followups/config'
@@ -164,7 +165,7 @@ export async function proposeTasksForRecording(
         select: { text: true, owner: true, source: true, speakerIds: true, messageId: true, startMs: true, endMs: true },
       })
       .catch(() => [])
-    const actionItems = mergeLiveActionItems(redactionsNewerThanSummary(rec) ? [] : base, live, segments, rec.redactedSpeakerIds)
+    const actionItems = mergeLiveActionItems(redactionsNewerThanSummary(rec) ? [] : base, live, segments, rec.redactedSpeakerIds, undefined, buildSpeakerNames(rec.speakers, segments))
     const drafts = await proposeTaskUpdates(
       {
         recordingId: id,
