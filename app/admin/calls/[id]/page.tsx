@@ -30,6 +30,7 @@ import { segmentKey } from "@/app/lib/calls/chat";
 import { displaySpeakerName, importedSpeakerNumber } from "@/app/lib/calls/speaker-labels";
 import { importedAllowed } from "@/app/lib/calls/imported";
 import { SpeakerLabel } from "../SpeakerLabel";
+import { UpdateRecap } from "../UpdateRecap";
 
 export const runtime = "nodejs";
 export const dynamic = "force-dynamic";
@@ -323,6 +324,7 @@ export default async function AdminCallDetailPage({ params }: { params: Promise<
                         <pre className="m-0 whitespace-pre-wrap break-words rounded-xl border p-3 bg-card text-sm" style={{ borderColor: "hsl(var(--rule-warm) / 0.65)" }}>
                             {recapText}
                         </pre>
+                        {rec.status === "PUBLISHED" && rec.recapPostedAt && rec.recapMessageId && <UpdateRecap recordingId={rec.id} />}
                     </section>
                 )}
 

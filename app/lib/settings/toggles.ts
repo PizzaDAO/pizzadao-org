@@ -33,6 +33,8 @@ export const TOGGLES = {
   'missions.verifiersEnabled': { env: 'MISSION_VERIFIERS_ENABLED', legacy: ON_WORDS },
   'missions.reviewCardsEnabled': { env: 'MISSION_REVIEW_CARDS_ENABLED', legacy: ON_WORDS },
   'calls.recapPostEnabled': { env: 'CALL_RECAP_POST_ENABLED', legacy: ON_WORDS },
+  // On unless the env var is an explicit off (the kill switch): recap mentions notify the people they name.
+  'calls.recapMentionPing': { env: 'CALL_RECAP_MENTION_PING_ENABLED', legacy: (raw) => !envKillsToggle(raw) },
   'calls.agendaPostEnabled': {
     env: 'CALL_AGENDA_POST_ENABLED',
     legacy: (raw) => ['true', '1'].includes((raw ?? '').trim().toLowerCase()),
