@@ -1,5 +1,6 @@
 'use client'
 
+import type { ResolvedUser } from '@/app/lib/discord-markup'
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 
 // ============ Auth ============
@@ -565,6 +566,7 @@ export interface DiscoverData {
   /** channel/role id -> name maps resolved server-side, for rendering Discord mentions in job descriptions */
   channels: Record<string, string>
   roles: Record<string, string>
+  users: Record<string, ResolvedUser>
   guildId: string | null
 }
 
@@ -606,12 +608,14 @@ export function useDiscover() {
           bounties?: Array<DiscoverData['bounties'][number] & { crewLabel?: string | null }>
           channels?: Record<string, string>
           roles?: Record<string, string>
+          users?: Record<string, ResolvedUser>
           guildId?: string | null
         }>(fetch('/api/bounties'), {}),
         safeJson<{
           jobs?: Array<{ id: number; description: string; type?: string; completed?: boolean }>
           channels?: Record<string, string>
           roles?: Record<string, string>
+          users?: Record<string, ResolvedUser>
           guildId?: string | null
         }>(fetch('/api/jobs'), {}),
         safeJson<{ articles?: RawArticle[] }>(
@@ -671,6 +675,7 @@ export function useDiscover() {
         // descriptions can mention different channels/roles.
         channels: { ...bountiesRes.channels, ...jobsRes.channels },
         roles: { ...bountiesRes.roles, ...jobsRes.roles },
+        users: { ...bountiesRes.users, ...jobsRes.users },
         guildId: jobsRes.guildId ?? bountiesRes.guildId ?? null,
       }
     },

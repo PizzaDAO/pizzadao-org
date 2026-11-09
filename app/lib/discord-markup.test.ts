@@ -55,10 +55,10 @@ describe("parseDiscordMarkup", () => {
 
   it("parses user mentions in both nickname forms", () => {
     expect(parseDiscordMarkup("<@123456789012345678>")).toEqual([
-      { type: "user", id: "123456789012345678" },
+      { type: "user", id: "123456789012345678", name: null },
     ])
     expect(parseDiscordMarkup("<@!123456789012345678>")).toEqual([
-      { type: "user", id: "123456789012345678" },
+      { type: "user", id: "123456789012345678", name: null },
     ])
   })
 
@@ -363,15 +363,16 @@ describe("extractMentionIds", () => {
     expect(extractMentionIds(text)).toEqual({
       channelIds: ["11111"],
       roleIds: ["22222", "33333"],
+      userIds: [],
     })
   })
 
   it("returns empty arrays when there are no mentions", () => {
-    expect(extractMentionIds("nothing to see here")).toEqual({ channelIds: [], roleIds: [] })
+    expect(extractMentionIds("nothing to see here")).toEqual({ channelIds: [], roleIds: [], userIds: [] })
   })
 
-  it("does not pick up user mentions", () => {
-    expect(extractMentionIds("<@123456789012345678>")).toEqual({ channelIds: [], roleIds: [] })
+  it("picks up user mentions separately", () => {
+    expect(extractMentionIds("<@123456789012345678>")).toEqual({ channelIds: [], roleIds: [], userIds: ["123456789012345678"] })
   })
 })
 
@@ -413,5 +414,21 @@ describe("formatDiscordTimestamp", () => {
     expect(formatDiscordTimestamp(UNIX, "R", UNIX * 1000)).toBe("now")
     expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 45) * 1000)).toBe("45 seconds ago")
     expect(formatDiscordTimestamp(UNIX, "R", (UNIX + 3 * 86400) * 1000)).toBe("3 days ago")
+  })
+})
+
+describe("user mention names", () => {
+  const users = { "100000000000000001": { name: "Alex", memberId: "m-1" } }
+  it("parses a resolved user with name and member id, unresolved with null", () => {
+    const t = parseDiscordMarkup("<@100000000000000001> <@!100000000000000002>", { users })
+    expect(t[0]).toEqual({ type: "user", id: "100000000000000001", name: "Alex", memberId: "m-1" })
+    expect(t[2]).toEqual({ type: "user", id: "100000000000000002", name: null })
+  })
+  it("flattens to @Name when known, @user otherwise (also via the fallback maps)", () => {
+    expect(discordTextToPlainText("hi <@100000000000000001> and <@100000000000000002>", { users })).toBe("hi @Alex and @user")
+    expect(discordMarkupToPlainText(parseDiscordMarkup("<@100000000000000001>"), { users })).toBe("@Alex")
+  })
+  it("extracts user ids", () => {
+    expect(extractMentionIds("<@100000000000000001> <@!100000000000000002> <@&100000000000000003>").userIds).toEqual(["100000000000000001", "100000000000000002"])
   })
 })

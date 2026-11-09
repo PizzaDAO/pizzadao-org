@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { JobCard } from "./JobCard";
 import { card, btn } from "../shared-styles";
 import { useSession } from "@/app/lib/hooks/use-session";
+import type { ResolvedUser } from '@/app/lib/discord-markup'
 
 type Job = {
   id: number;
@@ -44,6 +45,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
   const [rewardAmount, setRewardAmount] = useState<number>(50);
   const [channels, setChannels] = useState<Record<string, string>>({});
   const [roles, setRoles] = useState<Record<string, string>>({});
+  const [users, setUsers] = useState<Record<string, ResolvedUser>>({});
   const [guildId, setGuildId] = useState<string | null>(null);
 
   const fetchJobs = async () => {
@@ -60,6 +62,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
       }
       setChannels(data.channels || {});
       setRoles(data.roles || {});
+      setUsers(data.users || {});
       setGuildId(data.guildId ?? null);
     } catch (err) {
       setError(err instanceof Error ? err.message : "Unknown error");
@@ -222,6 +225,7 @@ export function JobBoard({ onJobCompleted }: JobBoardProps) {
                 alreadyCompleted={job.completed}
                 channels={channels}
                 roles={roles}
+                users={users}
                 guildId={guildId}
                 onAssign={() => {
                   fetchJobs();

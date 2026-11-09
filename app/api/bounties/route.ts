@@ -22,7 +22,7 @@ export async function GET(request: NextRequest) {
     // descriptions to names here, server-side (bot token stays on the
     // server) — the client renders them via DiscordText using these maps,
     // same as /api/jobs.
-    const { channels, roles, guildId } = await resolveDiscordMentions(bounties.map((b) => b.description))
+    const { channels, roles, users, guildId } = await resolveDiscordMentions(bounties.map((b) => b.description))
 
     // Who is looking (crew page only): lets the UI show Approve/Reject on bounties
     // posted by others. Advisory only; the write routes re-check every time.
@@ -69,6 +69,7 @@ export async function GET(request: NextRequest) {
       })),
       channels,
       roles,
+      users,
       guildId
     }, {
       headers: NO_STORE_HEADERS
