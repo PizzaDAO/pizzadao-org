@@ -18,7 +18,7 @@ const A = (id: number, kind: AssetRecord['kind'], over: Partial<AssetRecord> = {
   id, slug: `a${id}`, name: `A${id}`, kind, imageUrl: `https://x.public.blob.vercel-storage.com/a${id}.png`, thumbUrl: null,
   defaultTransform: null, lockedHint: null, isActive: true, sortOrder: id, rules: [], ...over,
 })
-const catalog = [A(1, 'background'), A(2, 'frame'), A(3, 'accessory'), A(4, 'accessory'), A(5, 'accessory'), A(6, 'accessory'), A(7, 'badge')]
+const catalog = [A(1, 'background'), A(2, 'frame'), A(3, 'accessory'), A(4, 'accessory'), A(5, 'accessory'), A(6, 'accessory'), A(7, 'badge'), A(9, 'outfit'), A(10, 'outfit')]
 const all = new Set(catalog.map((a) => a.id))
 
 describe('validateLayers', () => {
@@ -41,11 +41,20 @@ describe('validateLayers', () => {
     expect(() => validateLayers([{ assetId: 3 }, { assetId: 3 }], catalog, all)).toThrow(/only be used once/)
   })
 
-  it('rejects malformed input and returns z-order: background, accessories, frame, badge', () => {
+  it('allows exactly one outfit, which is movable and sits under accessories', () => {
+    expect(() => validateLayers([{ assetId: 9 }, { assetId: 10 }], catalog, all)).toThrow(/Too many outfit/)
+    const out = validateLayers([{ assetId: 3 }, { assetId: 9, x: 0.4, y: 0.9, scale: 0.8 }], catalog, all)
+    expect(out.map((l) => l.assetId)).toEqual([9, 3])
+    expect(out[0]).toMatchObject({ x: 0.4, y: 0.9, scale: 0.8 })
+    expect(() => validateLayers([{ assetId: 9 }, { assetId: 10 }], catalog, new Set([9]))).toThrow(/not unlocked/)
+  })
+
+  it('rejects malformed input and returns z-order: background, outfit, accessories, frame, badge', () => {
     expect(() => validateLayers('x', catalog, all)).toThrow(/list/)
     expect(() => validateLayers([{}], catalog, all)).toThrow(/assetId/)
     const out = validateLayers([{ assetId: 7 }, { assetId: 2 }, { assetId: 3, x: 0.3 }, { assetId: 1 }], catalog, all)
     expect(out.map((l) => l.assetId)).toEqual([1, 3, 2, 7])
+    expect(validateLayers([{ assetId: 7 }, { assetId: 2 }, { assetId: 3 }, { assetId: 9 }, { assetId: 1 }], catalog, all).map((l) => l.assetId)).toEqual([1, 9, 3, 2, 7])
     expect(out[1].x).toBe(0.3)
     expect(out[0]).toMatchObject({ x: 0.5, y: 0.5, scale: 1, rotation: 0 }) // fixed layers ignore client transforms
   })

@@ -1,16 +1,21 @@
 // Shared types and pure helpers for PFP asset unlocks. No I/O in this file.
 
-export const ASSET_KINDS = ['background', 'frame', 'accessory', 'badge'] as const
+export const ASSET_KINDS = ['background', 'outfit', 'frame', 'accessory', 'badge'] as const
 export type AssetKind = (typeof ASSET_KINDS)[number]
 
 export const RULE_KINDS = ['level', 'role', 'mission', 'item', 'everyone'] as const
 export type RuleKind = (typeof RULE_KINDS)[number]
 
-/** Max layers per kind (one background, one frame, up to 3 accessories, one badge). */
-export const KIND_LIMITS: Record<AssetKind, number> = { background: 1, frame: 1, accessory: 3, badge: 1 }
+/** Max layers per kind (one background, one outfit, one frame, up to 3 accessories, one badge). */
+export const KIND_LIMITS: Record<AssetKind, number> = { background: 1, outfit: 1, frame: 1, accessory: 3, badge: 1 }
 
-/** Z-order, bottom to top. The base image sits between background and accessory. */
-export const KIND_ORDER: readonly AssetKind[] = ['background', 'accessory', 'frame', 'badge']
+/** Z-order, bottom to top. The base image sits between background and outfit. */
+export const KIND_ORDER: readonly AssetKind[] = ['background', 'outfit', 'accessory', 'frame', 'badge']
+
+/** Kinds members can move, scale and rotate (the rest are fixed full-canvas layers). */
+export function isTransformable(kind: AssetKind | string | undefined): boolean {
+  return kind === 'accessory' || kind === 'outfit'
+}
 
 export const CANVAS_SIZE = 1024
 

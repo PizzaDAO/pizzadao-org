@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState } from "react";
 
-type Kind = "background" | "frame" | "accessory" | "badge";
+type Kind = "background" | "outfit" | "frame" | "accessory" | "badge";
 type BaseKind = "static" | "discord" | "upload" | "mafia";
 interface Asset {
   id: number; name: string; kind: Kind; imageUrl: string; thumbUrl: string | null;
@@ -19,11 +19,12 @@ interface Layer { assetId: number; x: number; y: number; scale: number; rotation
 
 const KINDS: { kind: Kind; label: string }[] = [
   { kind: "background", label: "Backgrounds" },
+  { kind: "outfit", label: "Outfits" },
   { kind: "frame", label: "Frames" },
   { kind: "accessory", label: "Accessories (up to 3)" },
   { kind: "badge", label: "Badges" },
 ];
-const LIMIT: Record<Kind, number> = { background: 1, frame: 1, accessory: 3, badge: 1 };
+const LIMIT: Record<Kind, number> = { background: 1, outfit: 1, frame: 1, accessory: 3, badge: 1 };
 const FULL: Omit<Layer, "assetId"> = { x: 0.5, y: 0.5, scale: 1, rotation: 0 };
 
 async function api(url: string, init?: RequestInit) {
@@ -71,9 +72,9 @@ export function PfpComposer({ memberId }: { memberId: string }) {
       if (cur.some((l) => l.assetId === a.id)) return cur.filter((l) => l.assetId !== a.id);
       const same = cur.filter((l) => byId.get(l.assetId)?.kind === a.kind);
       const rest = same.length >= LIMIT[a.kind] ? cur.filter((l) => l !== same[0]) : cur;
-      return [...rest, { assetId: a.id, ...(a.kind === "accessory" ? { ...FULL, ...(a.defaultTransform ?? {}) } : FULL) }];
+      return [...rest, { assetId: a.id, ...(movable(a.kind) ? { ...FULL, ...(a.defaultTransform ?? {}) } : FULL) }];
     });
-    if (a.kind === "accessory") setSelected(a.id);
+    if (movable(a.kind)) setSelected(a.id);
   }
 
   function patch(id: number, p: Partial<Layer>) {
@@ -131,12 +132,12 @@ export function PfpComposer({ memberId }: { memberId: string }) {
   }
 
   const ordered = [...layers].sort((a, b) => order(byId.get(a.assetId)?.kind) - order(byId.get(b.assetId)?.kind));
-  const sel = layers.find((l) => l.assetId === selected && byId.get(l.assetId)?.kind === "accessory");
+  const sel = layers.find((l) => l.assetId === selected && movable(byId.get(l.assetId)?.kind));
 
   return (
     <div className="grid gap-5 md:grid-cols-[minmax(0,320px)_1fr]">
       <div className="grid gap-3 content-start">
-        {/* Preview: background, base, accessories, frame, badge. Drag an accessory to move it. */}
+        {/* Preview: background, base, accessories, frame, badge. Drag an outfit or accessory to move it. */}
         <div
           ref={stage}
           className="relative aspect-square w-full max-w-[320px] overflow-hidden rounded-[24px] border bg-foreground/5 touch-none"
@@ -152,7 +153,7 @@ export function PfpComposer({ memberId }: { memberId: string }) {
           {baseSrc && <img src={baseSrc} alt="Your picture" className="absolute inset-0 h-full w-full object-cover" />}
           {ordered.filter((l) => byId.get(l.assetId)?.kind !== "background").map((l) => {
             const a = byId.get(l.assetId)!;
-            if (a.kind !== "accessory") {
+            if (!movable(a.kind)) {
               // eslint-disable-next-line @next/next/no-img-element
               return <img key={l.assetId} src={a.imageUrl} alt="" className="pointer-events-none absolute inset-0 h-full w-full object-cover" />;
             }
@@ -247,6 +248,10 @@ export function PfpComposer({ memberId }: { memberId: string }) {
   );
 }
 
+function movable(kind: Kind | undefined): boolean {
+  return kind === "accessory" || kind === "outfit";
+}
+
 function order(kind: Kind | undefined): number {
-  return ["background", "accessory", "frame", "badge"].indexOf(kind ?? "accessory");
+  return ["background", "outfit", "accessory", "frame", "badge"].indexOf(kind ?? "accessory");
 }

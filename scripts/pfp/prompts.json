@@ -7,49 +7,44 @@
       "prompt": "A small black pirate flag (Jolly Roger) on a short wooden pole, with a pizza slice and crossed pepperoni-bones emblem, waving in the wind, placed in the upper-right area of the canvas. Transparent background, only the flag and pole."
     },
     {
-      "slug": "frame-level-2",
-      "kind": "frame",
-      "prompt": "A simple circular picture frame ring made of a plain bread crust edge with a few scattered flour dots and tiny basil leaves. The center of the canvas is completely empty and transparent so a portrait shows through. Modest and rustic. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
-    },
-    {
-      "slug": "frame-level-4",
-      "kind": "frame",
-      "prompt": "A circular picture frame ring made of golden pizza crust with melted cheese drips along the inside edge and small pepperoni slices spaced around it. The center of the canvas is completely empty and transparent so a portrait shows through. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
-    },
-    {
-      "slug": "frame-level-6",
-      "kind": "frame",
-      "prompt": "A fancy circular picture frame ring made of braided golden pizza crust decorated with mushrooms, olives, basil leaves and pepperoni, with a thin glossy olive-oil shine. The center of the canvas is completely empty and transparent so a portrait shows through."
-    },
-    {
-      "slug": "frame-level-8",
-      "kind": "frame",
-      "prompt": "The most luxurious circular picture frame ring: a crown-like crust border with golden sparkle highlights, tiny jeweled olive and tomato gems, basil laurel leaves, and small flames at the top like a wood-fired oven. The center of the canvas is completely empty and transparent so a portrait shows through."
-    },
-    {
-      "slug": "bg-oven-glow",
-      "kind": "background",
-      "prompt": "A full-canvas background of the inside of a brick wood-fired pizza oven: glowing orange and red embers, warm light radiating from the center, curved brick arch around the edges. Fully opaque, fills the whole square."
-    },
-    {
-      "slug": "bg-pizzeria-wall",
-      "kind": "background",
-      "prompt": "A full-canvas background of a cozy pizzeria wall: red and white checkered tablecloth pattern lower area, cream brick wall above, a few framed pizza posters and hanging string lights, softly out of focus in the center. Fully opaque, fills the whole square."
-    },
-    {
-      "slug": "chef-hat",
-      "kind": "accessory",
-      "prompt": "A tall white puffy chef hat (toque) with a small red pizza-slice pin on the band, tilted slightly, placed at the top-center of the canvas. Transparent background, only the hat. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
-    },
-    {
       "slug": "mafia-fedora",
       "kind": "accessory",
       "prompt": "A classic black pinstripe mafia fedora with a red band and a small pepperoni pin, tilted slightly, placed at the top-center of the canvas. Transparent background, only the hat. Isolated object, nothing else: fully transparent background everywhere outside the object, no stray toppings, crumbs, drips, shadows, glow or decorations in the corners or edges of the canvas."
     },
     {
-      "slug": "badge-slice",
-      "kind": "badge",
-      "prompt": "A small round enamel-style badge showing a cheesy pepperoni pizza slice on a red circle with a gold rim, placed in the bottom-right corner of the canvas. Transparent background, only the badge."
+      "slug": "outfit-level-2",
+      "kind": "outfit",
+      "prompt": "A plain white dress shirt with an open collar and a loose, slightly undone dark red tie hanging a little below the collar. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
+    },
+    {
+      "slug": "outfit-level-3",
+      "kind": "outfit",
+      "prompt": "A white dress shirt with a dark tie and black suspenders (braces) over both shoulders. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
+    },
+    {
+      "slug": "outfit-level-4",
+      "kind": "outfit",
+      "prompt": "A white dress shirt with a charcoal waistcoat (vest) with buttons and a dark tie. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
+    },
+    {
+      "slug": "outfit-level-5",
+      "kind": "outfit",
+      "prompt": "A dark navy suit jacket with lapels over a white shirt and a dark tie, neat and sharp. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
+    },
+    {
+      "slug": "outfit-level-6",
+      "kind": "outfit",
+      "prompt": "A grey pinstripe suit jacket with wide lapels, white shirt, red tie, and a white pocket square in the chest pocket. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
+    },
+    {
+      "slug": "outfit-level-7",
+      "kind": "outfit",
+      "prompt": "A dark three-piece suit: jacket, waistcoat and white shirt, with a gold tie pin on a dark tie. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
+    },
+    {
+      "slug": "outfit-level-8",
+      "kind": "outfit",
+      "prompt": "The boss look: a crisp white suit jacket over a black dress shirt open at the collar, with a thick gold chain necklace. Front-facing view of ONLY the upper-body clothing (shoulders, chest and torso: no head, no neck, no hands, no person inside), sitting at the bottom of the square canvas: the garment spans most of the canvas width and is cut off by the bottom edge, with the collar opening near the horizontal center and the shoulders in the lower half of the canvas. Mafia-boss style, same cartoon look as the fedora. Isolated clothing, nothing else: fully transparent everywhere outside the clothing, no background, no shadow, no floor, no decorations in the corners."
     }
   ]
 }

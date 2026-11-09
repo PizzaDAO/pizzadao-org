@@ -19,6 +19,7 @@ import {
   CANVAS_SIZE,
   KIND_LIMITS,
   KIND_ORDER,
+  isTransformable,
   cleanTransform,
   type AssetKind,
   type Layer,
@@ -26,7 +27,7 @@ import {
 
 export const BASE_KINDS = ['static', 'discord', 'upload', 'mafia'] as const
 export type BaseKind = (typeof BASE_KINDS)[number]
-export const MAX_LAYERS = 6
+export const MAX_LAYERS = 7
 const MAX_FETCH_BYTES = 8 * 1024 * 1024
 /** Decoded-pixel ceiling for every sharp() call on this path (4096 x 4096). */
 export const MAX_PIXELS = 4096 * 4096
@@ -39,7 +40,7 @@ export function isBaseKind(v: unknown): v is BaseKind {
 /**
  * Clean and authorise the requested layers. Throws 400 for malformed input and 403 when any
  * layer is not unlocked for this member (the client list is display-only; this is the check that
- * counts). Returns layers in z-order (background, accessories, frame, badge).
+ * counts). Returns layers in z-order (background, outfit, accessories, frame, badge).
  */
 export function validateLayers(
   raw: unknown,
@@ -50,7 +51,7 @@ export function validateLayers(
   if (raw.length > MAX_LAYERS) throw new ValidationError(`At most ${MAX_LAYERS} layers`, 'layers')
   const byId = new Map(assets.map((a) => [a.id, a]))
   const seen = new Set<number>()
-  const counts: Record<AssetKind, number> = { background: 0, frame: 0, accessory: 0, badge: 0 }
+  const counts: Record<AssetKind, number> = { background: 0, outfit: 0, frame: 0, accessory: 0, badge: 0 }
   const out: Array<Layer & { kind: AssetKind; i: number }> = []
 
   raw.forEach((item, i) => {
@@ -66,7 +67,7 @@ export function validateLayers(
     if (counts[asset.kind] > KIND_LIMITS[asset.kind]) {
       throw new ValidationError(`Too many ${asset.kind} layers (max ${KIND_LIMITS[asset.kind]})`, 'layers')
     }
-    const t = asset.kind === 'accessory' ? cleanTransform(o, asset.defaultTransform) : cleanTransform({}, { x: 0.5, y: 0.5, scale: 1, rotation: 0 })
+    const t = isTransformable(asset.kind) ? cleanTransform(o, asset.defaultTransform) : cleanTransform({}, { x: 0.5, y: 0.5, scale: 1, rotation: 0 })
     out.push({ assetId: id, ...t, kind: asset.kind, i })
   })
 
@@ -164,7 +165,7 @@ export async function loadBase(
 
 const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 }
 
-/** One accessory: scaled, rotated about its centre, positioned, and cropped to the canvas. */
+/** One transformable layer (accessory or outfit): scaled, rotated about its centre, positioned, and cropped to the canvas. */
 export async function placeLayer(buf: Buffer, t: Layer): Promise<sharp.OverlayOptions | null> {
   const size = Math.max(8, Math.round(CANVAS_SIZE * t.scale))
   let img = await S(buf).resize(size, size, { fit: 'fill' }).png().toBuffer()
@@ -187,7 +188,7 @@ export async function placeLayer(buf: Buffer, t: Layer): Promise<sharp.OverlayOp
   return { input, left: Math.max(0, left), top: Math.max(0, top) }
 }
 
-/** Draw the stack: background, base, accessories, frame, badge. */
+/** Draw the stack: background, base, outfit, accessories, frame, badge. */
 export async function renderComposite(
   baseBytes: Buffer,
   layers: ReadonlyArray<{ kind: AssetKind; bytes: Buffer; layer: Layer }>,
@@ -195,7 +196,7 @@ export async function renderComposite(
   const full = (b: Buffer) => S(b).resize(CANVAS_SIZE, CANVAS_SIZE, { fit: 'cover' }).png().toBuffer()
   const stack: sharp.OverlayOptions[] = []
   const add = async (l: { kind: AssetKind; bytes: Buffer; layer: Layer }) => {
-    if (l.kind === 'accessory') {
+    if (isTransformable(l.kind)) {
       const p = await placeLayer(l.bytes, l.layer)
       if (p) stack.push(p)
     } else {
