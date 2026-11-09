@@ -711,7 +711,7 @@ export class CallRecorder {
     if (s.bandTimer) clearTimeout(s.bandTimer)
     this.cancelWelcome(s)
     s.live?.stop()
-    await this.step('live state end', async () => void (await s.liveState?.stop()))
+    void s.liveState?.stop() // fire and forget: never holds up the shutdown
     try {
       await this.step('stop capture', () => s.capture.stop())
     } finally {
@@ -940,20 +940,32 @@ export class CallRecorder {
     return humans
   }
 
-  /** Names of people in the channel (looked up once each) and the current set, for the live view. */
-  private async feedLiveState(s: ActiveSession, humans: string[]): Promise<void> {
+  /**
+   * The current set for the live view, right away; names are looked up in the background (a slow or
+   * failing lookup never holds up presence, and a failed one is not retried for a few minutes).
+   */
+  private feedLiveState(s: ActiveSession, humans: string[]): void {
     const ls = s.liveState
     if (!ls) return
-    for (const id of humans) {
-      if (ls.clock.names.has(id)) continue
-      try {
-        const name = s.guild.members.cache.get(id)?.displayName ?? (await s.guild.members.fetch(id)).displayName
-        if (name) ls.clock.names.set(id, name)
-      } catch {
-        // shown without a name
+    try {
+      ls.setPresent(humans)
+      for (const id of ls.clock.missingNames(Date.now())) {
+        const cached = s.guild.members.cache?.get(id)?.displayName
+        if (cached) {
+          ls.clock.names.set(id, cached)
+          continue
+        }
+        ls.clock.nameFailed(id, Date.now()) // marked first: one lookup in flight per person
+        void s.guild.members
+          .fetch(id)
+          .then((m) => {
+            if (m.displayName) ls.clock.names.set(id, m.displayName)
+          })
+          .catch(() => undefined)
       }
+    } catch (err) {
+      this.log(`live state presence failed: ${err instanceof Error ? err.message : String(err)}`)
     }
-    ls.setPresent(humans)
   }
 
   /** Record who is in the channel right now (new ids only) so silent attendees reach the app's attendance. Never throws. */
@@ -963,15 +975,17 @@ export class CallRecorder {
       const now = (await this.humanIds(s.guild, s.channelId)).sort()
       // Full member set, only when it changed: the time between records is what presence minutes are summed from.
       const key = now.join(',')
-      if (s.liveState) await this.feedLiveState(s, now)
       if (key !== s.presenceKey) {
         appendRecord(s.dir, { t: 'presence', atMs: Date.now(), userIds: now })
         s.presenceKey = key
       }
       const fresh = now.filter((id) => !s.present.has(id))
-      if (fresh.length === 0) return
-      appendRecord(s.dir, { t: 'present', userIds: fresh })
-      for (const id of fresh) s.present.add(id)
+      if (fresh.length > 0) {
+        appendRecord(s.dir, { t: 'present', userIds: fresh })
+        for (const id of fresh) s.present.add(id)
+      }
+      // After the manifest records: the live view can never get in their way.
+      this.feedLiveState(s, now)
     } catch (err) {
       this.log(`could not note who is in the channel: ${err instanceof Error ? err.message : String(err)}`)
     }

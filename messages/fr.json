@@ -1130,10 +1130,17 @@
         "forbidden": "Seuls les hôtes peuvent faire cela.",
         "another-open": "Fermez d'abord le sondage ouvert.",
         "generic": "Cela n'a pas fonctionné. Réessayez.",
-        "load": "Impossible de charger la vue en direct. Nouvelle tentative."
+        "load": "Impossible de charger la vue en direct. Nouvelle tentative.",
+        "invalid-link": "Utilisez un lien de diffusion ou de publication x.com."
       },
       "banner": "En direct : {title}",
-      "bannerCta": "Rejoindre la vue en direct"
+      "bannerCta": "Rejoindre la vue en direct",
+      "callsTabs": "Appels en direct",
+      "streamEdit": "Définir le lien du stream",
+      "streamLabel": "Lien du stream (x.com)",
+      "streamSave": "Enregistrer",
+      "streamCancel": "Annuler",
+      "bannerMore": "En direct : {title} et {count, plural, one {# autre appel} other {# autres appels}}"
     }
   },
   "communityTerms": {

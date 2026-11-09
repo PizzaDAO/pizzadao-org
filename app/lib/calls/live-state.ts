@@ -62,13 +62,23 @@ export function normalizeStreamLink(raw: string | null | undefined): string | nu
   return `https://${u.hostname.toLowerCase()}${u.pathname}`
 }
 
-/** The first stream link in a chat message, or null. */
+/** A broadcast link (/i/broadcasts/...) beats a status link: the host's stream is the broadcast. */
+export const isBroadcastLink = (link: string | null | undefined): boolean => !!link && link.includes('/i/broadcasts/')
+
+/** The link to keep: the first one, except that a broadcast link replaces an earlier status link. */
+export function betterStreamLink(current: string | null | undefined, next: string | null | undefined): string | null {
+  if (!current) return next ?? null
+  if (next && !isBroadcastLink(current) && isBroadcastLink(next)) return next
+  return current
+}
+
+/** The best stream link in a chat message (a broadcast link first), or null. */
 export function findStreamLink(text: string): string | null {
+  let best: string | null = null
   for (const m of text.matchAll(/https?:\/\/[^\s<>()"']+/gi)) {
-    const hit = normalizeStreamLink(m[0].replace(/[.,;:!?]+$/, ''))
-    if (hit) return hit
+    best = betterStreamLink(best, normalizeStreamLink(m[0].replace(/[.,;:!?]+$/, '')))
   }
-  return null
+  return best
 }
 
 /** calls.liveStreamLinks: lower-case crew id -> link. Lines that do not parse are skipped. */
@@ -127,12 +137,15 @@ export async function handleLiveState(body: LiveStateBody, deps: LiveStateDeps =
       crew = null
     }
   }
-  let hidden = false
-  try {
-    const filter = await (deps.postFilter ?? (() => loadPostFilter()))()
-    hidden = isCrewExcluded({ id: crew?.crewId ?? body.eventName, label: crew?.crewLabel ?? body.eventName }, filter)
-  } catch {
-    hidden = true // cannot tell: never show
+  // Fail closed: an unknown crew cannot be checked against the private filter, so it is never shown.
+  let hidden = !crew
+  if (crew) {
+    try {
+      const filter = await (deps.postFilter ?? (() => loadPostFilter()))()
+      hidden = isCrewExcluded({ id: crew.crewId, label: crew.crewLabel }, filter)
+    } catch {
+      hidden = true // cannot tell: never show
+    }
   }
 
   const seen = new Set<string>()
@@ -142,8 +155,8 @@ export async function handleLiveState(body: LiveStateBody, deps: LiveStateDeps =
     presentSec: p.presentSec,
     inChannel: p.inChannel,
   }))
-  // The link the first heartbeat found stays; the later ones cannot replace it.
-  const streamLink = existing?.streamLink ?? normalizeStreamLink(body.streamLink)
+  // The first link stays, except that a broadcast link replaces an earlier status link.
+  const streamLink = betterStreamLink(existing?.streamLink, normalizeStreamLink(body.streamLink))
   const startedAt = new Date(body.startedAt)
   const data = {
     eventId: body.eventId ?? null,
@@ -152,33 +165,49 @@ export async function handleLiveState(body: LiveStateBody, deps: LiveStateDeps =
     crewId: crew?.crewId ?? null,
     crewLabel: crew?.crewLabel ?? null,
     lastSeenAt: now,
-    endedAt: body.ended ? now : null,
     hidden,
     streamLink,
     presence,
   }
-  await prisma.callLiveSession.upsert({
-    where: { sessionId: body.sessionId },
-    create: { sessionId: body.sessionId, startedAt, ...data },
-    update: data,
+  if (!existing) {
+    try {
+      await prisma.callLiveSession.create({ data: { sessionId: body.sessionId, startedAt, ...data, endedAt: body.ended ? now : null } })
+      return body.ended ? 'ended' : 'ok'
+    } catch (err) {
+      if ((err as { code?: string } | null)?.code !== 'P2002') throw err
+      // A concurrent heartbeat created it first: update below.
+    }
+  }
+  // Conditional on "not ended": a late heartbeat can never revive an ended session, and an update never clears endedAt.
+  await prisma.callLiveSession.updateMany({
+    where: { sessionId: body.sessionId, endedAt: null },
+    data: body.ended ? { ...data, endedAt: now } : data,
   })
   return body.ended ? 'ended' : 'ok'
 }
 
-/** The newest live session, or null. Hidden, ended and stale sessions never count. */
-export async function findLiveSession(settings: Settings, now: number = Date.now()) {
-  if (!resolveToggle('calls.liveViewEnabled', settings)) return null
+/** Most live calls shown at once. */
+export const MAX_LIVE_CALLS = 5
+
+/** Every live session, newest first. Hidden, ended and stale sessions never count. */
+export async function findLiveSessions(settings: Settings, now: number = Date.now()) {
+  if (!resolveToggle('calls.liveViewEnabled', settings)) return []
   const stale = settings.get('calls.liveStaleSeconds')
-  const rows = await prisma.callLiveSession.findMany({
+  return prisma.callLiveSession.findMany({
     where: { endedAt: null, hidden: false, lastSeenAt: { gte: new Date(now - stale * 1000) } },
     orderBy: { startedAt: 'desc' },
-    take: 1,
+    take: MAX_LIVE_CALLS,
   })
-  return rows[0] ?? null
 }
 
-/** The session's stream link: the one found in the call chat, else the crew's calls.liveStreamLinks line. */
-export function streamLinkFor(s: { streamLink: string | null; crewId: string | null }, settings: Settings): string | null {
+/** One live session by id, or null when it is not live (ended, stale, hidden, unknown). */
+export async function findLiveSessionById(settings: Settings, sessionId: string, now: number = Date.now()) {
+  return (await findLiveSessions(settings, now)).find((s) => s.sessionId === sessionId) ?? null
+}
+
+/** The session's stream link: a host's override, else the one found in the call chat, else the crew's calls.liveStreamLinks line. */
+export function streamLinkFor(s: { streamLink: string | null; streamLinkOverride?: string | null; crewId: string | null }, settings: Settings): string | null {
+  if (s.streamLinkOverride) return s.streamLinkOverride
   if (s.streamLink) return s.streamLink
   if (!s.crewId) return null
   return parseStreamLinks(settings.get('calls.liveStreamLinks')).get(normalizeCrewId(s.crewId).toLowerCase()) ?? null

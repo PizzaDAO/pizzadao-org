@@ -1130,10 +1130,17 @@
         "forbidden": "Solo los anfitriones pueden hacer eso.",
         "another-open": "Cierra primero la encuesta abierta.",
         "generic": "No funcionó. Inténtalo de nuevo.",
-        "load": "No se pudo cargar la vista en vivo. Reintentando."
+        "load": "No se pudo cargar la vista en vivo. Reintentando.",
+        "invalid-link": "Usa un enlace de transmisión o publicación de x.com."
       },
       "banner": "En vivo ahora: {title}",
-      "bannerCta": "Unirse a la vista en vivo"
+      "bannerCta": "Unirse a la vista en vivo",
+      "callsTabs": "Llamadas en vivo",
+      "streamEdit": "Poner enlace de transmisión",
+      "streamLabel": "Enlace de transmisión (x.com)",
+      "streamSave": "Guardar",
+      "streamCancel": "Cancelar",
+      "bannerMore": "En vivo ahora: {title} y {count, plural, one {# llamada más} other {# llamadas más}}"
     }
   },
   "communityTerms": {

@@ -15,7 +15,7 @@ export const BANNER_POLL_MS = 30_000;
 export default function LiveCallBanner({ className = "" }: { className?: string }) {
     const t = useTranslations("callsPage.live");
     const [title, setTitle] = useState<string | null>(null);
-    const [live, setLive] = useState(false);
+    const [count, setCount] = useState(0);
 
     useEffect(() => {
         let stopped = false;
@@ -25,13 +25,14 @@ export default function LiveCallBanner({ className = "" }: { className?: string 
             if (!document.hidden) {
                 try {
                     const res = await fetch("/api/calls/live/public");
-                    const data = res.ok ? ((await res.json()) as { live: { title: string | null; crewLabel: string | null } | null }) : null;
+                    const data = res.ok ? ((await res.json()) as { calls?: Array<{ title: string | null; crewLabel: string | null }> }) : null;
+                    const calls = data?.calls ?? [];
                     if (!stopped) {
-                        setLive(!!data?.live);
-                        setTitle(data?.live ? data.live.title || data.live.crewLabel : null);
+                        setCount(calls.length);
+                        setTitle(calls[0] ? calls[0].title || calls[0].crewLabel : null);
                     }
                 } catch {
-                    if (!stopped) setLive(false);
+                    if (!stopped) setCount(0);
                 }
             }
             if (!stopped) timer = setTimeout(check, BANNER_POLL_MS);
@@ -43,7 +44,7 @@ export default function LiveCallBanner({ className = "" }: { className?: string 
         };
     }, []);
 
-    if (!live) return null;
+    if (count === 0) return null;
     return (
         <Link
             href="/calls/live"
@@ -52,7 +53,7 @@ export default function LiveCallBanner({ className = "" }: { className?: string 
         >
             <span className="flex min-w-0 items-center gap-2 font-semibold">
                 <span aria-hidden className="inline-block h-2 w-2 shrink-0 animate-pulse rounded-full bg-cream" />
-                <span className="min-w-0 break-words">{t("banner", { title: title ?? t("untitled") })}</span>
+                <span className="min-w-0 break-words">{count > 1 ? t("bannerMore", { title: title ?? t("untitled"), count: count - 1 }) : t("banner", { title: title ?? t("untitled") })}</span>
             </span>
             <span className="text-sm underline underline-offset-4">{t("bannerCta")}</span>
         </Link>

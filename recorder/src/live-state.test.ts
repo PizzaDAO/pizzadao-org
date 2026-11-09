@@ -1,5 +1,5 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { CHANGE_DEBOUNCE_MS, findStreamLink, LiveStatePusher, MAX_PRESENCE, normalizeStreamLink, OFF_RETRY_MS, PresenceClock, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
+import { CHANGE_DEBOUNCE_MS, NAME_RETRY_MS, findStreamLink, LiveStatePusher, MAX_PRESENCE, normalizeStreamLink, OFF_RETRY_MS, PresenceClock, postLiveState, type LiveStateBody, type PostResult } from './live-state.js'
 import { parseRemoteConfig } from './remote-config.js'
 
 describe('findStreamLink', () => {
@@ -15,6 +15,24 @@ describe('findStreamLink', () => {
     expect(findStreamLink('https://x.com.evil.test/i/broadcasts/abc')).toBeNull()
     expect(findStreamLink('https://user:pw@x.com/i/broadcasts/abc')).toBeNull()
     expect(normalizeStreamLink('nope')).toBeNull()
+  })
+})
+
+describe('stream link preference', () => {
+  it('prefers a broadcast link in one message', () => {
+    expect(findStreamLink('https://x.com/a/status/1 https://x.com/i/broadcasts/1abc')).toBe('https://x.com/i/broadcasts/1abc')
+  })
+})
+
+describe('PresenceClock name lookups', () => {
+  it('does not retry a failed name lookup for a while', () => {
+    const c = new PresenceClock()
+    c.update(['a', 'b'], 0)
+    expect(c.missingNames(0).sort()).toEqual(['a', 'b'])
+    c.nameFailed('a', 0)
+    c.names.set('b', 'Bea')
+    expect(c.missingNames(1000)).toEqual([])
+    expect(c.missingNames(NAME_RETRY_MS)).toEqual(['a'])
   })
 })
 
@@ -81,6 +99,20 @@ describe('LiveStatePusher', () => {
     p.onChat('also https://x.com/i/broadcasts/2zzz')
     await vi.advanceTimersByTimeAsync(0)
     expect(p.link).toBe('https://x.com/i/broadcasts/1abc')
+    expect(post.mock.calls.at(-1)?.[0].streamLink).toBe('https://x.com/i/broadcasts/1abc')
+    p.stop()
+  })
+
+  it('a broadcast link replaces an earlier status link, never the other way round', async () => {
+    const { p, post } = make()
+    p.start()
+    p.onChat('https://x.com/pizzadao/status/123')
+    expect(p.link).toBe('https://x.com/pizzadao/status/123')
+    p.onChat('https://x.com/i/broadcasts/1abc')
+    expect(p.link).toBe('https://x.com/i/broadcasts/1abc')
+    p.onChat('https://x.com/pizzadao/status/999')
+    expect(p.link).toBe('https://x.com/i/broadcasts/1abc')
+    await vi.advanceTimersByTimeAsync(0)
     expect(post.mock.calls.at(-1)?.[0].streamLink).toBe('https://x.com/i/broadcasts/1abc')
     p.stop()
   })

@@ -1570,6 +1570,7 @@ model CallLiveSession {
   endedAt    DateTime?
   hidden     Boolean   @default(false) // excluded crew (private post filter), or the filter could not be read: never shown
   streamLink String? // first x.com broadcast or status link posted in the call chat
+  streamLinkOverride String? // set by a host on the live page; wins over the chat link and the crew setting
   presence   Json      @default("[]") // [{discordId, displayName, presentSec, inChannel}] humans only, max 300
   updatedAt  DateTime  @updatedAt
 

@@ -5,27 +5,26 @@ import Link from "next/link";
 import { useLocale, useTranslations } from "next-intl";
 import { EditorialMasthead, EditorialPage, paperCard, pillInk, pillOutline } from "@/app/ui/shared/Editorial";
 import PersonLink from "@/app/ui/calls/PersonLink";
-import type { LiveItemView, MemberLive, PublicLive } from "@/app/lib/calls/live-view";
+import type { LiveItemView, MemberCall, MemberLive, PublicLive } from "@/app/lib/calls/live-view";
 import type { PollView, QuestionView } from "@/app/lib/calls/live-qa";
 
 // Polling, not SSE: one small request every few seconds while the tab is visible. Signed-out visitors
 // poll the CDN-cached public endpoint (count only); members poll their own uncached endpoint.
+// Several calls can be live at once: one tab per call. Every action names its call.
 
 const MAX_QUESTION = 280;
 
-type PublicResponse = { live: PublicLive | null; pollSeconds: number };
+type PublicResponse = { calls: PublicLive[]; pollSeconds: number };
+type CallState = PublicLive & Partial<Pick<MemberCall, "present" | "itemsLocked" | "questions" | "polls">>;
 
 interface State {
     signedIn: boolean;
-    live: (PublicLive & { present?: NonNullable<MemberLive["live"]>["present"] }) | null;
+    calls: CallState[];
     isHost: boolean;
-    itemsLocked: number | null;
-    questions: QuestionView[];
-    polls: PollView[];
     pollSeconds: number;
 }
 
-const INITIAL: State = { signedIn: false, live: null, isHost: false, itemsLocked: null, questions: [], polls: [], pollSeconds: 10 };
+const INITIAL: State = { signedIn: false, calls: [], isHost: false, pollSeconds: 10 };
 
 export default function LiveCallClient() {
     const t = useTranslations("callsPage.live");
@@ -33,36 +32,36 @@ export default function LiveCallClient() {
     const [state, setState] = useState<State>(INITIAL);
     const [loaded, setLoaded] = useState(false);
     const [loadError, setLoadError] = useState(false);
-    const [items, setItems] = useState<LiveItemView[]>([]);
-    const cursor = useRef(0);
-    const sessionKey = useRef<string | null>(null);
+    const [items, setItems] = useState<Record<string, LiveItemView[]>>({});
+    const [selected, setSelected] = useState<string | null>(null);
+    const cursors = useRef<Map<string, string>>(new Map());
     const signedIn = useRef<boolean | null>(null);
     const pollRef = useRef(10);
 
     const refresh = useCallback(async () => {
         try {
             if (signedIn.current !== false) {
-                const res = await fetch(`/api/calls/live${cursor.current ? `?itemsAfter=${cursor.current}` : ""}`, { cache: "no-store" });
+                const params = new URLSearchParams();
+                for (const [sid, cur] of cursors.current) params.append("after", `${sid}~${cur}`);
+                const res = await fetch(`/api/calls/live${params.size ? `?${params}` : ""}`, { cache: "no-store" });
                 if (res.status === 401) {
                     signedIn.current = false;
                 } else if (res.ok) {
                     signedIn.current = true;
                     const data = (await res.json()) as MemberLive;
-                    // A different call (or none): start the item list over.
-                    const key = data.live ? `${data.live.startedAt}|${data.live.title}` : null;
-                    if (key !== sessionKey.current) {
-                        sessionKey.current = key;
-                        cursor.current = 0;
-                        setItems([]);
-                    }
-                    if (data.itemsCursor > cursor.current) cursor.current = data.itemsCursor;
-                    if (data.items.length) {
-                        setItems((prev) => {
-                            const seen = new Set(prev.map((i) => i.id));
-                            return [...prev, ...data.items.filter((i) => !seen.has(i.id))];
-                        });
-                    }
-                    setState({ signedIn: true, live: data.live, isHost: data.isHost, itemsLocked: data.itemsLocked, questions: data.questions, polls: data.polls, pollSeconds: data.pollSeconds });
+                    const liveIds = new Set(data.calls.map((c) => c.sessionId));
+                    // Calls that ended: forget their cursors and items.
+                    for (const sid of [...cursors.current.keys()]) if (!liveIds.has(sid)) cursors.current.delete(sid);
+                    setItems((prev) => {
+                        const next: Record<string, LiveItemView[]> = {};
+                        for (const c of data.calls) {
+                            const seen = new Set((prev[c.sessionId] ?? []).map((i) => i.id));
+                            next[c.sessionId] = [...(prev[c.sessionId] ?? []), ...c.items.filter((i) => !seen.has(i.id))];
+                        }
+                        return next;
+                    });
+                    for (const c of data.calls) if (c.itemsCursor) cursors.current.set(c.sessionId, c.itemsCursor);
+                    setState({ signedIn: true, calls: data.calls, isHost: data.isHost, pollSeconds: data.pollSeconds });
                     setLoadError(false);
                     setLoaded(true);
                     return;
@@ -73,7 +72,7 @@ export default function LiveCallClient() {
             const res = await fetch("/api/calls/live/public");
             if (!res.ok) throw new Error(String(res.status));
             const data = (await res.json()) as PublicResponse;
-            setState({ ...INITIAL, live: data.live, pollSeconds: data.pollSeconds });
+            setState({ ...INITIAL, calls: data.calls, pollSeconds: data.pollSeconds });
             setLoadError(false);
             setLoaded(true);
         } catch {
@@ -106,8 +105,9 @@ export default function LiveCallClient() {
         };
     }, [refresh]);
     pollRef.current = state.pollSeconds;
-    const live = state.live;
-    const started = useMemo(() => (live ? new Intl.DateTimeFormat(locale, { timeStyle: "short" }).format(new Date(live.startedAt)) : ""), [live, locale]);
+
+    const calls = state.calls;
+    const live = calls.find((c) => c.sessionId === selected) ?? calls[0] ?? null;
 
     return (
         <EditorialPage width="max-w-[820px]">
@@ -117,6 +117,23 @@ export default function LiveCallClient() {
             <EditorialMasthead overline={t("overline")} title={live ? live.title || t("untitled") : t("title")} />
 
             {loadError && <p role="status" className="mb-4 text-sm text-foreground/70">{t("errors.load")}</p>}
+
+            {calls.length > 1 && (
+                <div role="tablist" aria-label={t("callsTabs")} className="mb-5 flex flex-wrap gap-2">
+                    {calls.map((c) => (
+                        <button
+                            key={c.sessionId}
+                            type="button"
+                            role="tab"
+                            aria-selected={c.sessionId === live?.sessionId}
+                            onClick={() => setSelected(c.sessionId)}
+                            className={`btn-pill min-h-11 min-w-0 max-w-full break-words border px-4 text-sm ${c.sessionId === live?.sessionId ? "bg-foreground text-background" : "bg-transparent border-[hsl(var(--foreground)/0.25)]"}`}
+                        >
+                            {c.title || c.crewLabel || t("untitled")}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {!live ? (
                 loaded && (
@@ -130,46 +147,82 @@ export default function LiveCallClient() {
                     </section>
                 )
             ) : (
-                <div className="grid min-w-0 gap-5">
-                    <section className={`${paperCard} min-w-0 p-5`}>
-                        <div className="flex flex-wrap items-center gap-3">
-                            <span className="inline-flex items-center gap-2 rounded-full bg-tomato-deep px-3 py-1 text-xs font-bold uppercase tracking-wide text-cream">
-                                <span aria-hidden className="inline-block h-2 w-2 animate-pulse rounded-full bg-cream" />
-                                {t("liveBadge")}
-                            </span>
-                            {live.crewLabel && <span className="text-sm font-semibold">{live.crewLabel}</span>}
-                            <span className="text-sm text-foreground/70">{t("startedAt", { time: started })}</span>
-                        </div>
-                        <p className="mt-3 mb-0 text-foreground/80">{t("headCount", { count: live.presentCount })}</p>
-                        {live.streamLink && (
-                            <a href={live.streamLink} target="_blank" rel="noopener noreferrer" className={`${pillInk} mt-4`}>
-                                {t("watchStream")}
-                            </a>
-                        )}
-                    </section>
-
-                    {!state.signedIn ? (
-                        <section className={`${paperCard} p-5`}>
-                            <p className="m-0 text-foreground/80">{t("presentSignIn")}</p>
-                            <Link href="/login?returnTo=%2Fcalls%2Flive" className={`${pillInk} mt-4`}>{t("signIn")}</Link>
-                        </section>
-                    ) : (
-                        <>
-                            <PresentSection present={live.present ?? []} />
-                            <ItemsSection items={items} locked={state.itemsLocked} />
-                            <PollsSection polls={state.polls} isHost={state.isHost} onChanged={refresh} />
-                            <QaSection questions={state.questions} isHost={state.isHost} onChanged={refresh} />
-                        </>
-                    )}
-                </div>
+                <LiveCall key={live.sessionId} live={live} state={state} items={items[live.sessionId] ?? []} onChanged={refresh} locale={locale} />
             )}
         </EditorialPage>
     );
 }
 
+function LiveCall({ live, state, items, onChanged, locale }: { live: CallState; state: State; items: LiveItemView[]; onChanged: () => void; locale: string }) {
+    const t = useTranslations("callsPage.live");
+    const started = useMemo(() => new Intl.DateTimeFormat(locale, { timeStyle: "short" }).format(new Date(live.startedAt)), [live.startedAt, locale]);
+    return (
+        <div className="grid min-w-0 gap-5">
+            <section className={`${paperCard} min-w-0 p-5`}>
+                <div className="flex flex-wrap items-center gap-3">
+                    <span className="inline-flex items-center gap-2 rounded-full bg-tomato-deep px-3 py-1 text-xs font-bold uppercase tracking-wide text-cream">
+                        <span aria-hidden className="inline-block h-2 w-2 animate-pulse rounded-full bg-cream" />
+                        {t("liveBadge")}
+                    </span>
+                    {live.crewLabel && <span className="text-sm font-semibold">{live.crewLabel}</span>}
+                    <span className="text-sm text-foreground/70">{t("startedAt", { time: started })}</span>
+                </div>
+                <p className="mt-3 mb-0 text-foreground/80">{t("headCount", { count: live.presentCount })}</p>
+                {live.streamLink && (
+                    <a href={live.streamLink} target="_blank" rel="noopener noreferrer" className={`${pillInk} mt-4`}>
+                        {t("watchStream")}
+                    </a>
+                )}
+                {state.isHost && <StreamLinkEditor sessionId={live.sessionId} current={live.streamLink} onChanged={onChanged} />}
+            </section>
+
+            {!state.signedIn ? (
+                <section className={`${paperCard} p-5`}>
+                    <p className="m-0 text-foreground/80">{t("presentSignIn")}</p>
+                    <Link href="/login?returnTo=%2Fcalls%2Flive" className={`${pillInk} mt-4`}>{t("signIn")}</Link>
+                </section>
+            ) : (
+                <>
+                    <PresentSection present={live.present ?? []} />
+                    <ItemsSection items={items} locked={live.itemsLocked ?? null} />
+                    <PollsSection sessionId={live.sessionId} polls={live.polls ?? []} isHost={state.isHost} onChanged={onChanged} />
+                    <QaSection sessionId={live.sessionId} questions={live.questions ?? []} isHost={state.isHost} onChanged={onChanged} />
+                </>
+            )}
+        </div>
+    );
+}
+
+function StreamLinkEditor({ sessionId, current, onChanged }: { sessionId: string; current: string | null; onChanged: () => void }) {
+    const t = useTranslations("callsPage.live");
+    const { run, error, busy } = useAction(sessionId, onChanged);
+    const [open, setOpen] = useState(false);
+    const [value, setValue] = useState(current ?? "");
+    if (!open) return <button type="button" className={`${smallBtn} mt-3`} onClick={() => setOpen(true)}>{t("streamEdit")}</button>;
+    return (
+        <form
+            className="mt-3 grid gap-2"
+            onSubmit={async (e) => {
+                e.preventDefault();
+                if (await run({ op: "setStreamLink", link: value.trim() || null })) setOpen(false);
+            }}
+        >
+            <label className="grid gap-1 text-sm font-semibold">
+                {t("streamLabel")}
+                <input value={value} maxLength={500} inputMode="url" placeholder="https://x.com/i/broadcasts/..." onChange={(e) => setValue(e.target.value)} className="min-h-11 w-full rounded-md border border-[hsl(var(--foreground)/0.25)] bg-background px-3 font-normal" />
+            </label>
+            <div className="flex flex-wrap gap-2">
+                <button type="submit" disabled={busy} className={`${pillInk} disabled:opacity-50`}>{t("streamSave")}</button>
+                <button type="button" className={smallBtn} onClick={() => setOpen(false)}>{t("streamCancel")}</button>
+            </div>
+            {error && <p role="alert" className="m-0 text-sm text-tomato-readable">{error}</p>}
+        </form>
+    );
+}
+
 // ---- shared ------------------------------------------------------------------------------------
 
-function useAction(onChanged: () => void) {
+function useAction(sessionId: string, onChanged: () => void) {
     const t = useTranslations("callsPage.live");
     const [error, setError] = useState<string | null>(null);
     const [busy, setBusy] = useState(false);
@@ -178,7 +231,7 @@ function useAction(onChanged: () => void) {
             setBusy(true);
             setError(null);
             try {
-                const res = await fetch("/api/calls/live/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify(body) });
+                const res = await fetch("/api/calls/live/action", { method: "POST", headers: { "Content-Type": "application/json" }, body: JSON.stringify({ sessionId, ...body }) });
                 if (!res.ok) {
                     const code = ((await res.json().catch(() => ({}))) as { error?: string }).error ?? "generic";
                     setError(t.has(`errors.${code}`) ? t(`errors.${code}`) : t("errors.generic"));
@@ -193,7 +246,7 @@ function useAction(onChanged: () => void) {
                 setBusy(false);
             }
         },
-        [onChanged, t],
+        [sessionId, onChanged, t],
     );
     return { run, error, busy };
 }
@@ -211,7 +264,7 @@ function Section({ title, children }: { title: string; children: React.ReactNode
 
 // ---- present -----------------------------------------------------------------------------------
 
-function PresentSection({ present }: { present: NonNullable<MemberLive["live"]>["present"] }) {
+function PresentSection({ present }: { present: NonNullable<MemberCall["present"]> }) {
     const t = useTranslations("callsPage.live");
     return (
         <Section title={t("present")}>
@@ -269,9 +322,9 @@ function ItemsSection({ items, locked }: { items: LiveItemView[]; locked: number
 
 // ---- polls -------------------------------------------------------------------------------------
 
-function PollsSection({ polls, isHost, onChanged }: { polls: PollView[]; isHost: boolean; onChanged: () => void }) {
+function PollsSection({ sessionId, polls, isHost, onChanged }: { sessionId: string; polls: PollView[]; isHost: boolean; onChanged: () => void }) {
     const t = useTranslations("callsPage.live");
-    const { run, error, busy } = useAction(onChanged);
+    const { run, error, busy } = useAction(sessionId, onChanged);
     if (polls.length === 0 && !isHost) return null;
     return (
         <Section title={t("pollsTitle")}>
@@ -392,9 +445,9 @@ function NewPoll({ run, busy }: { run: (b: Record<string, unknown>) => Promise<b
 
 // ---- Q&A ---------------------------------------------------------------------------------------
 
-function QaSection({ questions, isHost, onChanged }: { questions: QuestionView[]; isHost: boolean; onChanged: () => void }) {
+function QaSection({ sessionId, questions, isHost, onChanged }: { sessionId: string; questions: QuestionView[]; isHost: boolean; onChanged: () => void }) {
     const t = useTranslations("callsPage.live");
-    const { run, error, busy } = useAction(onChanged);
+    const { run, error, busy } = useAction(sessionId, onChanged);
     const [sort, setSort] = useState<"top" | "new">("top");
     const [text, setText] = useState("");
     const [anonymous, setAnonymous] = useState(false);

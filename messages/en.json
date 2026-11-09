@@ -1130,10 +1130,17 @@
         "forbidden": "Only hosts can do that.",
         "another-open": "Close the open poll first.",
         "generic": "That did not work. Please try again.",
-        "load": "Could not load the live view. Retrying."
+        "load": "Could not load the live view. Retrying.",
+        "invalid-link": "Use an x.com broadcast or post link."
       },
       "banner": "Live now: {title}",
-      "bannerCta": "Join the live view"
+      "bannerCta": "Join the live view",
+      "callsTabs": "Live calls",
+      "streamEdit": "Set stream link",
+      "streamLabel": "Stream link (x.com)",
+      "streamSave": "Save",
+      "streamCancel": "Cancel",
+      "bannerMore": "Live now: {title} and {count, plural, one {# more call} other {# more calls}}"
     }
   },
   "communityTerms": {

@@ -33,6 +33,8 @@ export const LIVE_STATE_TIMEOUT_MS = 5_000
 export const CHANGE_DEBOUNCE_MS = 3_000
 /** After the app says the live view is off, ask again this much later. */
 export const OFF_RETRY_MS = 5 * 60_000
+/** A failed member name lookup is not repeated for this long. */
+export const NAME_RETRY_MS = 5 * 60_000
 
 /** Adds up each person's time in the channel from successive snapshots of who is there. */
 export class PresenceClock {
@@ -40,6 +42,7 @@ export class PresenceClock {
   private readonly here = new Set<string>()
   private lastMs: number | null = null
   readonly names = new Map<string, string>()
+  private readonly nameRetryAt = new Map<string, number>()
 
   /** The humans in the channel at `nowMs`. The time since the last snapshot goes to those who were here. */
   update(ids: readonly string[], nowMs: number): boolean {
@@ -72,10 +75,19 @@ export class PresenceClock {
     return all.sort((a, b) => Number(b.inChannel) - Number(a.inChannel) || b.presentSec - a.presentSec).slice(0, MAX_PRESENCE)
   }
 
-  missingNames(): string[] {
-    return [...this.here].filter((id) => !this.names.has(id))
+  /** People in the channel whose name is still unknown and not waiting out a failed lookup. */
+  missingNames(nowMs: number): string[] {
+    return [...this.here].filter((id) => !this.names.has(id) && (this.nameRetryAt.get(id) ?? 0) <= nowMs)
+  }
+
+  /** A name lookup failed: do not try this person again for a while. */
+  nameFailed(id: string, nowMs: number): void {
+    this.nameRetryAt.set(id, nowMs + NAME_RETRY_MS)
   }
 }
+
+/** A broadcast link beats a status link. */
+export const isBroadcastLink = (link: string | null | undefined): boolean => !!link && link.includes('/i/broadcasts/')
 
 /** The normalized link for an x.com or twitter.com broadcast or status URL, or null. */
 export function normalizeStreamLink(raw: string): string | null {
@@ -91,13 +103,14 @@ export function normalizeStreamLink(raw: string): string | null {
   return ok ? `https://${u.hostname.toLowerCase()}${u.pathname}` : null
 }
 
-/** The first x.com / twitter.com broadcast or status link in a chat message, or null. */
+/** The best x.com / twitter.com link in a chat message (a broadcast link first, else the first status link), or null. */
 export function findStreamLink(text: string): string | null {
+  let best: string | null = null
   for (const m of text.matchAll(/https?:\/\/[^\s<>()"']+/gi)) {
     const hit = normalizeStreamLink(m[0].replace(/[.,;:!?]+$/, ''))
-    if (hit) return hit
+    if (hit && (!best || (!isBroadcastLink(best) && isBroadcastLink(hit)))) best = hit
   }
-  return null
+  return best
 }
 
 export type PostResult = 'ok' | 'off' | 'error'
@@ -175,11 +188,12 @@ export class LiveStatePusher {
     }
   }
 
-  /** A chat message: the first stream link in the call chat is kept. */
+  /** A chat message: the first stream link in the call chat is kept, except that a broadcast link replaces a status link. */
   onChat(text: string): void {
-    if (this.stopped || this.streamLink) return
+    if (this.stopped) return
     const link = findStreamLink(text)
     if (!link) return
+    if (this.streamLink && !(isBroadcastLink(link) && !isBroadcastLink(this.streamLink))) return
     this.streamLink = link
     void this.push()
   }
