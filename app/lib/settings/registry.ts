@@ -1659,6 +1659,20 @@ export const SETTINGS = {
     label: 'PFP outfit overlays',
     help: 'Let members layer outfit art directly over their picture (the old flat overlay). Off: outfits are only used by AI dress up. The PFP_OUTFIT_OVERLAY_ENABLED env var set to off always wins.',
   }),
+  'jobs.verifyPosts': boolSetting({
+    key: 'jobs.verifyPosts',
+    area: 'economy',
+    label: 'Verify daily job posts',
+    help: 'On: a daily job that names a channel only pays once the bot finds the member\'s post in that channel today (with the people, roles and media the job asks for). Off: every job pays on click. The JOBS_VERIFY_POSTS env var set to off always wins.',
+    default: true,
+  }),
+  'jobs.unverifiableJobsPayOnClick': boolSetting({
+    key: 'jobs.unverifiableJobsPayOnClick',
+    area: 'economy',
+    label: 'Pay jobs with no channel on click',
+    help: 'Daily jobs that name no channel cannot be checked. On: they pay when the member taps Complete. Off: they never pay. The JOBS_UNVERIFIABLE_PAY_ON_CLICK env var set to off always wins.',
+    default: true,
+  }),
   'shop.itemGrantsEnabled': boolSetting({
     key: 'shop.itemGrantsEnabled',
     area: 'features',

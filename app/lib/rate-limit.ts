@@ -39,6 +39,8 @@ export const RATE_LIMITS = {
   "magic-login": { limit: 5, windowSec: 15 * 60 },
   "vote-anonymous": { limit: 60, windowSec: 10 * 60 },
   // Per member (keyed by Discord id, not IP): plans/mission-verification.md §6.3.
+  // Daily job post verification: per member; each check reads up to ~300 Discord messages.
+  "jobs-verify": { limit: 3, windowSec: 60 },
   "missions-check": { limit: 1, windowSec: 30 },
   "missions-check-daily": { limit: 30, windowSec: 24 * 60 * 60 },
   "missions-command": { limit: 1, windowSec: 60 },
