@@ -92,6 +92,9 @@ export const RATE_LIMITS = {
   "telegram-host-match-confirm": { limit: 5, windowSec: 10 * 60 },
   // Starting a "link with the Telegram app" code: per member.
   "telegram-link-start": { limit: 5, windowSec: 10 * 60 },
+  // PFP composer: saving a composite and uploading a base picture, per member.
+  "pfp-compose": { limit: 20, windowSec: 10 * 60 },
+  "pfp-upload": { limit: 10, windowSec: 10 * 60 },
 } as const satisfies Record<string, RateLimitRule>;
 
 export type RateLimitName = keyof typeof RATE_LIMITS;

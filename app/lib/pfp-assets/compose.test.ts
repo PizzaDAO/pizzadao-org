@@ -71,6 +71,39 @@ describe('fetch allowlist', () => {
 const solid = (w: number, h: number, c: { r: number; g: number; b: number; alpha?: number }) =>
   sharp({ create: { width: w, height: h, channels: 4, background: { alpha: 1, ...c } } }).png().toBuffer()
 
+describe('own-store pinning', () => {
+  it('refuses another Blob store once the token names ours', async () => {
+    vi.stubEnv('BLOB_READ_WRITE_TOKEN', 'vercel_blob_rw_ourstore_secret')
+    const f = vi.fn()
+    await expect(fetchImageBytes('https://otherstore.public.blob.vercel-storage.com/a.png', f as never)).rejects.toThrow(/not allowed/)
+    await expect(loadBase('42', '1', { kind: 'upload', url: 'https://otherstore.public.blob.vercel-storage.com/pfp-base/42/a.png' }, f as never)).rejects.toThrow(/Upload not found/)
+    expect(f).not.toHaveBeenCalled()
+    vi.unstubAllEnvs()
+  })
+})
+
+describe('fetchImageBytes streaming cap', () => {
+  const png = () => solid(8, 8, { r: 1, g: 2, b: 3 })
+  it('aborts a stream that exceeds the cap even without a content-length', async () => {
+    let cancelled = false
+    const big = new ReadableStream<Uint8Array>({
+      pull(c) { c.enqueue(new Uint8Array(3 * 1024 * 1024)) },
+      cancel() { cancelled = true },
+    })
+    const f = vi.fn(async () => new Response(big, { status: 200 }))
+    await expect(fetchImageBytes('https://s.public.blob.vercel-storage.com/a.png', f as never)).rejects.toThrow(/too large/)
+    expect(cancelled).toBe(true)
+  })
+  it('reads a normal image', async () => {
+    const f = vi.fn(async () => new Response(new Uint8Array(await png()), { status: 200 }))
+    expect((await fetchImageBytes('https://s.public.blob.vercel-storage.com/a.png', f as never)).length).toBeGreaterThan(8)
+  })
+  it('refuses images over the pixel limit', async () => {
+    const huge = await sharp({ create: { width: 5000, height: 5000, channels: 3, background: '#fff' } }).png({ compressionLevel: 9 }).toBuffer()
+    await expect(renderComposite(huge, [])).rejects.toThrow()
+  })
+})
+
 describe('renderComposite', () => {
   it('produces a 1024x1024 webp with layers in z-order', async () => {
     const base = await solid(300, 200, { r: 255, g: 0, b: 0 })

@@ -81,3 +81,20 @@ describe('/api/admin/pfp-assets as an admin', () => {
     expect((await PATCH(req('PATCH', {}), { params: Promise.resolve({ id: 'x' }) })).status).toBe(400)
   })
 })
+
+describe('successful DELETE and grants validation', () => {
+  it('DELETE with a JSON body deletes as the actor', async () => {
+    const r = await DELETE(req('DELETE', {}), ctx)
+    expect(r.status).toBe(200)
+    expect(deleteAsset).toHaveBeenCalledWith(3, '400000000000000001')
+  })
+
+  it('grants: assetId must be an integer (400), and a good grant passes', async () => {
+    for (const assetId of ['abc', 1.5, null, true, '', 0]) {
+      expect((await GRANT(req('POST', { assetId, discordId: '123456' }))).status).toBe(400)
+    }
+    expect(grantAsset).not.toHaveBeenCalled()
+    expect((await GRANT(req('POST', { assetId: 2, discordId: '123456' }))).status).toBe(200)
+    expect(grantAsset).toHaveBeenCalledWith(2, '123456', '400000000000000001')
+  })
+})

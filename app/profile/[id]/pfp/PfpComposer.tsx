@@ -114,7 +114,7 @@ export function PfpComposer({ memberId }: { memberId: string }) {
   async function reset() {
     if (!window.confirm("Go back to your original picture?")) return;
     setBusy(true); setError(null);
-    try { await api("/api/pfp/compose", { method: "DELETE" }); setLayers([]); setSavedUrl(null); await load(); }
+    try { await api("/api/pfp/compose", { method: "DELETE", headers: { "content-type": "application/json" }, body: "{}" }); setLayers([]); setSavedUrl(null); await load(); }
     catch (e) { setError((e as Error).message); } finally { setBusy(false); }
   }
 

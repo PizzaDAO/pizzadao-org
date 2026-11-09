@@ -10,7 +10,8 @@ import { ForbiddenError, ValidationError } from '@/app/lib/errors/api-errors'
 import { fetchGuildMemberProfile } from '@/app/lib/discord'
 import { resolvePfpUrl } from '@/app/lib/pfp'
 import { sniffImageType } from '@/app/lib/image-sniff'
-import { isAllowedFetchUrl, isBlobUrl, isDiscordCdnUrl } from './hosts'
+import { isOwnBlobUrl } from '@/app/lib/blob-url'
+import { isAllowedFetchUrl, isDiscordCdnUrl } from './hosts'
 import { listAssets, type AssetRecord } from './catalog'
 import { loadUnlockContext } from './context'
 import { unlockedAssetIds, type UnlockContext } from './unlocks'
@@ -27,6 +28,9 @@ export const BASE_KINDS = ['static', 'discord', 'upload', 'mafia'] as const
 export type BaseKind = (typeof BASE_KINDS)[number]
 export const MAX_LAYERS = 6
 const MAX_FETCH_BYTES = 8 * 1024 * 1024
+/** Decoded-pixel ceiling for every sharp() call on this path (4096 x 4096). */
+export const MAX_PIXELS = 4096 * 4096
+const S = (input: Buffer) => sharp(input, { limitInputPixels: MAX_PIXELS })
 
 export function isBaseKind(v: unknown): v is BaseKind {
   return typeof v === 'string' && (BASE_KINDS as readonly string[]).includes(v)
@@ -77,10 +81,24 @@ export async function fetchImageBytes(url: string, fetchImpl: typeof fetch = fet
   if (!isAllowedFetchUrl(url)) throw new ImageFetchError('Image host not allowed', 'base')
   const res = await fetchImpl(url, { redirect: 'error', signal: AbortSignal.timeout(10_000) })
   if (!res.ok) throw new ImageFetchError('Could not load an image', 'base')
-  const len = Number(res.headers.get('content-length') ?? 0)
-  if (len > MAX_FETCH_BYTES) throw new ImageFetchError('Image too large', 'base')
-  const buf = Buffer.from(await res.arrayBuffer())
-  if (buf.length === 0 || buf.length > MAX_FETCH_BYTES) throw new ImageFetchError('Image too large', 'base')
+  if (Number(res.headers.get('content-length') ?? 0) > MAX_FETCH_BYTES) throw new ImageFetchError('Image too large', 'base')
+  // Stream with a hard cap: a missing or lying content-length cannot make us buffer more.
+  const chunks: Uint8Array[] = []
+  let total = 0
+  const reader = res.body?.getReader()
+  if (!reader) throw new ImageFetchError('Could not load an image', 'base')
+  for (;;) {
+    const { done, value } = await reader.read()
+    if (done) break
+    total += value.length
+    if (total > MAX_FETCH_BYTES) {
+      await reader.cancel().catch(() => undefined)
+      throw new ImageFetchError('Image too large', 'base')
+    }
+    chunks.push(value)
+  }
+  const buf = Buffer.concat(chunks)
+  if (buf.length === 0) throw new ImageFetchError('Could not load an image', 'base')
   if (!sniffImageType(new Uint8Array(buf.subarray(0, 12)))) throw new ImageFetchError('Unsupported image type', 'base')
   return buf
 }
@@ -97,7 +115,7 @@ export async function availableBases(memberId: string, discordId: string) {
   return {
     static: staticUrl,
     discord: profile?.avatarUrl ? discordAvatar1024(profile.avatarUrl) : null,
-    mafia: portrait?.url && isBlobUrl(portrait.url) ? portrait.url : null,
+    mafia: portrait?.url && isOwnBlobUrl(portrait.url) ? portrait.url : null,
   }
 }
 
@@ -122,7 +140,7 @@ export async function loadBase(
     const url = String(choice.url ?? '')
     let ok = false
     try {
-      ok = isBlobUrl(url) && new URL(url).pathname.startsWith(`/pfp-base/${memberId}/`)
+      ok = isOwnBlobUrl(url, `/pfp-base/${memberId}/`)
     } catch {
       ok = false
     }
@@ -138,7 +156,7 @@ export async function loadBase(
     return { bytes: await fs.readFile(file), url: bases.static }
   }
   const url = choice.kind === 'discord' ? bases.discord : bases.mafia
-  if (!url || (choice.kind === 'discord' ? !isDiscordCdnUrl(url) : !isBlobUrl(url))) {
+  if (!url || (choice.kind === 'discord' ? !isDiscordCdnUrl(url) : !isOwnBlobUrl(url))) {
     throw new ValidationError(`No ${choice.kind} image available`, 'base')
   }
   return { bytes: await fetchImageBytes(url, fetchImpl), url }
@@ -149,9 +167,9 @@ const CLEAR = { r: 0, g: 0, b: 0, alpha: 0 }
 /** One accessory: scaled, rotated about its centre, positioned, and cropped to the canvas. */
 export async function placeLayer(buf: Buffer, t: Layer): Promise<sharp.OverlayOptions | null> {
   const size = Math.max(8, Math.round(CANVAS_SIZE * t.scale))
-  let img = await sharp(buf).resize(size, size, { fit: 'fill' }).png().toBuffer()
-  if (t.rotation % 360 !== 0) img = await sharp(img).rotate(t.rotation, { background: CLEAR }).png().toBuffer()
-  const { width, height } = await sharp(img).metadata()
+  let img = await S(buf).resize(size, size, { fit: 'fill' }).png().toBuffer()
+  if (t.rotation % 360 !== 0) img = await S(img).rotate(t.rotation, { background: CLEAR }).png().toBuffer()
+  const { width, height } = await S(img).metadata()
   if (!width || !height) return null
   const left = Math.round(t.x * CANVAS_SIZE - width / 2)
   const top = Math.round(t.y * CANVAS_SIZE - height / 2)
@@ -164,7 +182,7 @@ export async function placeLayer(buf: Buffer, t: Layer): Promise<sharp.OverlayOp
   if (w <= 0 || h <= 0) return null
   const input =
     cropL || cropT || cropR || cropB
-      ? await sharp(img).extract({ left: cropL, top: cropT, width: w, height: h }).png().toBuffer()
+      ? await S(img).extract({ left: cropL, top: cropT, width: w, height: h }).png().toBuffer()
       : img
   return { input, left: Math.max(0, left), top: Math.max(0, top) }
 }
@@ -174,7 +192,7 @@ export async function renderComposite(
   baseBytes: Buffer,
   layers: ReadonlyArray<{ kind: AssetKind; bytes: Buffer; layer: Layer }>,
 ): Promise<Buffer> {
-  const full = (b: Buffer) => sharp(b).resize(CANVAS_SIZE, CANVAS_SIZE, { fit: 'cover' }).png().toBuffer()
+  const full = (b: Buffer) => S(b).resize(CANVAS_SIZE, CANVAS_SIZE, { fit: 'cover' }).png().toBuffer()
   const stack: sharp.OverlayOptions[] = []
   const add = async (l: { kind: AssetKind; bytes: Buffer; layer: Layer }) => {
     if (l.kind === 'accessory') {
@@ -185,7 +203,7 @@ export async function renderComposite(
     }
   }
   for (const l of layers.filter((x) => x.kind === 'background')) await add(l)
-  stack.push({ input: await sharp(baseBytes).rotate().resize(CANVAS_SIZE, CANVAS_SIZE, { fit: 'cover' }).png().toBuffer(), left: 0, top: 0 })
+  stack.push({ input: await S(baseBytes).rotate().resize(CANVAS_SIZE, CANVAS_SIZE, { fit: 'cover' }).png().toBuffer(), left: 0, top: 0 })
   for (const l of layers.filter((x) => x.kind !== 'background')) await add(l)
 
   return sharp({ create: { width: CANVAS_SIZE, height: CANVAS_SIZE, channels: 4, background: CLEAR } })
@@ -240,7 +258,7 @@ export async function composeMemberPfp(args: {
     create: { memberId, baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url },
     update: { baseKind: base.kind, baseUrl: baseImg.url, layers: layers as never, composedUrl: blob.url },
   })
-  if (prev?.composedUrl && prev.composedUrl !== blob.url && isBlobUrl(prev.composedUrl)) {
+  if (prev?.composedUrl && prev.composedUrl !== blob.url && isOwnBlobUrl(prev.composedUrl)) {
     await del(prev.composedUrl).catch(() => undefined) // best effort
   }
   return { composedUrl: blob.url, layers }

@@ -22,7 +22,7 @@ export async function uploadAssetArt(formData: FormData, actorId: string): Promi
   }
   let meta: sharp.Metadata
   try {
-    meta = await sharp(Buffer.from(await file.arrayBuffer())).metadata()
+    meta = await sharp(Buffer.from(await file.arrayBuffer()), { limitInputPixels: MAX_ART_SIZE * MAX_ART_SIZE }).metadata()
   } catch {
     throw new ValidationError('Could not read that image', 'file')
   }

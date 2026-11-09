@@ -4,6 +4,7 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 vi.mock('@/app/lib/session', () => ({ getSession: vi.fn() }))
 vi.mock('@/app/lib/sheets/member-repository', () => ({ fetchMemberIdByDiscordId: vi.fn() }))
 vi.mock('@/app/lib/db', () => ({ prisma: { memberPfp: { findUnique: vi.fn(), deleteMany: vi.fn() } } }))
+vi.mock('@vercel/blob', () => ({ del: vi.fn(async () => undefined), put: vi.fn(), list: vi.fn() }))
 vi.mock('@/app/lib/pfp-assets/compose', async (orig) => ({
   ...(await orig<typeof import('@/app/lib/pfp-assets/compose')>()),
   composeMemberPfp: vi.fn(),
@@ -11,7 +12,7 @@ vi.mock('@/app/lib/pfp-assets/compose', async (orig) => ({
 }))
 vi.mock('@/app/lib/pfp-assets/catalog', () => ({
   listAssets: vi.fn(async () => []),
-  loadRuleOptions: vi.fn(async () => null),
+  hintLookups: vi.fn(async () => ({})),
 }))
 vi.mock('@/app/lib/pfp-assets/context', () => ({
   loadUnlockContext: vi.fn(async () => ({ level: 1, roleIds: new Set(), approvedMissionIds: new Set(), itemIds: new Set(), grantIds: new Set() })),
@@ -21,6 +22,8 @@ import { getSession } from '@/app/lib/session'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { composeMemberPfp } from '@/app/lib/pfp-assets/compose'
 import { ForbiddenError } from '@/app/lib/errors/api-errors'
+import { prisma } from '@/app/lib/db'
+import { del } from '@vercel/blob'
 import { GET, POST, DELETE } from './route'
 
 const m = (f: unknown) => f as ReturnType<typeof vi.fn>
@@ -81,5 +84,22 @@ describe('POST /api/pfp/compose', () => {
     expect((await POST(post({ layers: [] }))).status).toBe(400)
     expect((await POST(post({ base: { kind: 'https://evil.test/x.png' }, layers: [] }))).status).toBe(400)
     expect(composeMemberPfp).not.toHaveBeenCalled()
+  })
+})
+
+describe('DELETE /api/pfp/compose (reset)', () => {
+  const del_ = (headers: Record<string, string> = {}) =>
+    new Request('https://app.test/api/pfp/compose', { method: 'DELETE', headers: { 'content-type': 'application/json', host: 'app.test', ...headers }, body: '{}' })
+
+  it('succeeds with a JSON body, drops the row and deletes the composed blob', async () => {
+    m(prisma.memberPfp.findUnique).mockResolvedValue({ composedUrl: 'https://s.public.blob.vercel-storage.com/pfp-composed/42-ab.webp' })
+    const r = await DELETE(del_())
+    expect(r.status).toBe(200)
+    expect(prisma.memberPfp.deleteMany).toHaveBeenCalledWith({ where: { memberId: '42' } })
+    expect(del).toHaveBeenCalledWith('https://s.public.blob.vercel-storage.com/pfp-composed/42-ab.webp')
+  })
+
+  it('still 415 without a JSON content type (server check kept)', async () => {
+    expect((await DELETE(del_({ 'content-type': 'text/plain' }))).status).toBe(415)
   })
 })

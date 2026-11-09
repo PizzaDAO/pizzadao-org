@@ -146,7 +146,7 @@ function AssetCard({ asset, options, grants, onSaved, onError }: {
 
   async function remove() {
     if (!asset || !window.confirm(`Delete "${asset.name}"? Rules and grants go with it.`)) return;
-    try { await api(`/api/admin/pfp-assets/${asset.id}`, { method: "DELETE" }); onSaved(); } catch (e) { onError((e as Error).message); }
+    try { await api(`/api/admin/pfp-assets/${asset.id}`, jsonInit("DELETE", {})); onSaved(); } catch (e) { onError((e as Error).message); }
   }
 
   async function grant(revoke: boolean, id?: string) {

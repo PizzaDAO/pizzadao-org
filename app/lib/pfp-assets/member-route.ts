@@ -6,12 +6,13 @@ import { rejectCrossOrigin, rejectUnsafeWrite } from '@/app/lib/admin-guard'
 import { fetchMemberIdByDiscordId } from '@/app/lib/sheets/member-repository'
 import { handleApiError } from '@/app/lib/errors/error-response'
 import { NO_STORE_HEADERS } from '@/app/lib/no-store'
+import { checkKeyedRateLimit, rateLimitResponse, type RateLimitName } from '@/app/lib/rate-limit'
 
 export type MemberCtx = { discordId: string; memberId: string }
 
 export function memberPfpRoute(
   handler: (req: Request, who: MemberCtx) => Promise<unknown>,
-  opts: { multipart?: boolean } = {},
+  opts: { multipart?: boolean; rateLimit?: RateLimitName } = {},
 ) {
   return async (req: Request): Promise<NextResponse> => {
     const auth = await requireSession()
@@ -22,6 +23,10 @@ export function memberPfpRoute(
     if (req.method !== 'GET') {
       const bad = opts.multipart ? rejectCrossOrigin(req) : rejectUnsafeWrite(req)
       if (bad) return bad
+    }
+    if (opts.rateLimit) {
+      const rl = await checkKeyedRateLimit(opts.rateLimit, memberId)
+      if (!rl.success) return rateLimitResponse(rl)
     }
     try {
       return NextResponse.json(await handler(req, { discordId, memberId }), { headers: NO_STORE_HEADERS })

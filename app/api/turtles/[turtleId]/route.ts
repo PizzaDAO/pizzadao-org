@@ -6,7 +6,7 @@ import {
   memberIdColumn,
   membersColumn,
 } from "@/app/lib/sheets/member-repository";
-import { resolvePfpUrlAsync } from "@/app/lib/pfp";
+import { resolvePfpUrlsAsync } from "@/app/lib/pfp";
 
 export const runtime = "nodejs";
 
@@ -92,10 +92,13 @@ export async function GET(
         city,
         status,
         turtles: turtlesRaw,
-        // Resolved here so the page needs no per-member /api/pfp request.
-        pfpUrl: id ? await resolvePfpUrlAsync(id) : null,
+        pfpUrl: null, // filled below from one batched lookup
       });
     }
+
+    // One batched lookup (composed, then static) so the page needs no per-member /api/pfp request.
+    const pfpById = await resolvePfpUrlsAsync(members.map((m) => m.id).filter(Boolean));
+    for (const m of members) m.pfpUrl = m.id ? (pfpById[m.id.trim()] ?? null) : null;
 
     const result = {
       turtle: {

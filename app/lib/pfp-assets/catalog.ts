@@ -2,7 +2,7 @@
 import { prisma } from '@/app/lib/db'
 import { getGuildRoles } from '@/app/lib/discord-channels'
 import { ValidationError } from '@/app/lib/errors/api-errors'
-import { isBlobUrl } from './hosts'
+import { isOwnBlobUrl } from '@/app/lib/blob-url'
 import {
   isAssetKind,
   parseRule,
@@ -138,7 +138,7 @@ function text(v: unknown, max: number, field: string, required: boolean): string
 function imageUrl(v: unknown, field: string, required: boolean): string | null {
   const t = text(v, 600, field, required)
   if (t === null) return null
-  if (!isBlobUrl(t)) throw new ValidationError(`${field} must be an uploaded image`, field)
+  if (!isOwnBlobUrl(t)) throw new ValidationError(`${field} must be an uploaded image`, field)
   return t
 }
 
@@ -299,4 +299,31 @@ export async function loadRuleOptions() {
 
 export async function recentEvents(limit = 30) {
   return prisma.pfpAdminEvent.findMany({ orderBy: { createdAt: 'desc' }, take: limit })
+}
+
+/**
+ * Names for the "how to unlock" hints of the given locked assets: only the levels, roles,
+ * missions and items their rules mention (member-facing, so no full admin lists).
+ */
+export async function hintLookups(locked: ReadonlyArray<AssetRecord>) {
+  const rules = locked.filter((a) => !a.lockedHint?.trim()).flatMap((a) => a.rules)
+  const ids = (kind: string, key: string) => [...new Set(rules.filter((r) => r.kind === kind).map((r) => Number(r.params[key])))].filter(Number.isInteger)
+  const levels = ids('level', 'minLevel')
+  const missionIds = ids('mission', 'missionId')
+  const itemIds = ids('item', 'itemId')
+  const wantRoles = rules.some((r) => r.kind === 'role')
+  const [lv, missions, items, roles] = await Promise.all([
+    levels.length ? prisma.mission.findMany({ where: { level: { in: levels }, levelTitle: { not: null } }, select: { level: true, levelTitle: true } }) : [],
+    missionIds.length ? prisma.mission.findMany({ where: { id: { in: missionIds } }, select: { id: true, title: true } }) : [],
+    itemIds.length ? prisma.shopItem.findMany({ where: { id: { in: itemIds } }, select: { id: true, name: true } }) : [],
+    wantRoles ? getGuildRoles().catch(() => null) : null,
+  ])
+  const levelTitles = new Map<number, string>()
+  for (const m of lv) if (m.levelTitle && !levelTitles.has(m.level)) levelTitles.set(m.level, m.levelTitle)
+  return {
+    levelTitles,
+    roleNames: new Map((roles ?? []).map((r) => [r.id, r.name] as [string, string])),
+    missionTitles: new Map(missions.map((m) => [m.id, m.title] as [number, string])),
+    itemNames: new Map(items.map((i) => [i.id, i.name] as [number, string])),
+  }
 }
